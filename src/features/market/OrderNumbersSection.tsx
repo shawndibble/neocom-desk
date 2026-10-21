@@ -4,6 +4,7 @@ import type { RegionCompetition } from './orderCompetition';
 import type { OpenOrderRow } from './openOrdersModel';
 import { computeSellThrough, stationRank } from './orderScopeState';
 import { IskDelta } from '@/components/ui/IskDelta';
+import { formatCount } from '@/lib/formatCount';
 
 /** "The numbers": rank, sell-through, volume, expiry and the net if it sells as listed. */
 export function OrderNumbersSection({
@@ -109,7 +110,7 @@ export function OrderNumbersSection({
                 />
               )}
               <span className="tabular-nums">
-                {`${row.volumeRemain.toLocaleString()} / ${row.volumeTotal.toLocaleString()}`}
+                {`${formatCount(row.volumeRemain)} / ${formatCount(row.volumeTotal)}`}
               </span>
             </Field>
             <Field label={t('market.orders.statOrderExpires')}>

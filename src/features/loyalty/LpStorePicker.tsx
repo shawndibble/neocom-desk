@@ -32,6 +32,7 @@ import type { CharacterLoyaltyPoints } from '@/esi/endpoints';
 import { loadCharacterLoyaltyPoints } from '@/features/character/loyalty';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { lpStorePickerOptions, type LpStorePickerOption } from './lpStorePickerOptions';
+import { formatCount } from '@/lib/formatCount';
 
 const ID_PREFIX = 'lp-store-picker';
 const LISTBOX_ID = `${ID_PREFIX}-listbox`;
@@ -169,7 +170,7 @@ export function LpStorePicker({ corporationName, size = 'md', className }: LpSto
   function balanceLabel(option: LpStorePickerOption) {
     return option.lp === null
       ? null
-      : t('loyaltyStore.pickerBalance', { lp: option.lp.toLocaleString() });
+      : t('loyaltyStore.pickerBalance', { lp: formatCount(option.lp) });
   }
 
   return (

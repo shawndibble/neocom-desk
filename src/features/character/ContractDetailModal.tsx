@@ -18,6 +18,8 @@
  * items split on `is_included` into what the issuer hands over ("Included")
  * vs what the acceptor must supply ("Requested").
  */
+import { createNumberFormat } from '@/lib/numberLocale';
+import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { useEffect, useMemo, useState } from 'react';
@@ -74,6 +76,8 @@ import { contractTimeline } from '@/engine/contracts/contractTimeline';
 import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { Contract, ContractItem } from '@/esi/endpoints';
+
+const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 
 export interface ContractDetailModalProps {
   characterId: number;
@@ -260,7 +264,7 @@ export function ContractDetailModal({
       align: 'right',
       className: 'tabular-nums',
       sortValue: (item) => item.quantity,
-      render: (item) => item.quantity.toLocaleString(),
+      render: (item) => formatCount(item.quantity),
     },
   ];
 
@@ -282,7 +286,7 @@ export function ContractDetailModal({
   const hasItemLines = items !== undefined && items.list.length > 0;
   const volumeText =
     contract.volume !== undefined && contract.volume > 0
-      ? `${contract.volume.toLocaleString()} m³`
+      ? `${formatDecimal(contract.volume)} m³`
       : null;
   // A contract that can still be taken counts down; one that has lapsed or is
   // over shows the date instead, since "Expires in 0m" would say nothing.

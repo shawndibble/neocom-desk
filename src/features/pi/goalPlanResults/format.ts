@@ -5,12 +5,12 @@ import type { TFunction } from 'i18next';
 import type { PiData } from '@/sde/types';
 import type { FitLimit, FlowEnd, PlanetType } from '@/engine/pi/goalTypes';
 import type { TradeHub } from '@/market/hubs';
-import { createNumberFormat } from '@/lib/numberLocale';
 import { clampIskZero, formatIskCompact } from '@/lib/isk';
+import { createNumberFormat } from '@/lib/numberLocale';
 import { commodityName } from '../goalPlannerFormat';
 
 export const HOURS_PER_DAY = 24;
-export const PERCENT_FORMAT = createNumberFormat({ maximumFractionDigits: 0 });
+export const formatPercent = createNumberFormat({ maximumFractionDigits: 0 });
 
 /** Names and links the sections share. */
 export interface PlanNames {

@@ -60,6 +60,7 @@ import { PageHeaderPortals } from './PageHeaderPortals';
 import type { PageHeaderSlots } from './pageHeaderSlots';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { highlightedTransactionId } from './transactionHighlight';
+import { formatCount } from '@/lib/formatCount';
 
 const HISTORY_CHARACTER_PARAMS = { 'txn.chars': characterFilterParam('current') };
 
@@ -264,7 +265,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         header: t('wallet.quantity'),
         align: 'right',
         className: 'tabular-nums',
-        render: (txn) => txn.quantity.toLocaleString(),
+        render: (txn) => formatCount(txn.quantity),
         sortValue: (txn) => txn.quantity,
       },
       {

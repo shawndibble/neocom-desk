@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { useTranslation } from 'react-i18next';
 import type { PickupHauls } from '@/engine/assets/movePlan';
 import { formatCubicMetres } from '@/lib/volume';
@@ -46,7 +47,7 @@ export function PickupHaulList({ pickup, name }: PickupHaulListProps) {
                     <PlanLine
                       key={l.typeId}
                       name={name(l.typeId)}
-                      qty={`× ${l.quantity.toLocaleString()}`}
+                      qty={`× ${formatCount(l.quantity)}`}
                       trailing={`${formatCubicMetres(l.m3)} m³`}
                     />
                   ))}
@@ -65,7 +66,7 @@ export function PickupHaulList({ pickup, name }: PickupHaulListProps) {
               <PlanLine
                 key={u.typeId}
                 name={name(u.typeId)}
-                qty={`× ${u.quantity.toLocaleString()}`}
+                qty={`× ${formatCount(u.quantity)}`}
                 trailing={t('assets.movePlan.unfitLine', { unit: formatCubicMetres(u.unitM3) })}
                 dim
               />
@@ -83,7 +84,7 @@ export function PickupHaulList({ pickup, name }: PickupHaulListProps) {
               <PlanLine
                 key={u.typeId}
                 name={name(u.typeId)}
-                qty={`× ${u.quantity.toLocaleString()}`}
+                qty={`× ${formatCount(u.quantity)}`}
                 trailing={t('assets.movePlan.unfitLine', { unit: formatCubicMetres(u.unitM3) })}
                 dim
               />

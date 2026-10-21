@@ -31,6 +31,7 @@ import { CorpStatusPill } from '@/features/miningTax/corpBook/CorpStatusPill';
 import type { CorpRowInfo } from '@/features/miningTax/corpBook/corpRows';
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
 import { OreIcon } from './OreIcon';
+import { formatCount } from '@/lib/formatCount';
 
 /** The tick-box column (and History's matching spacer): little room left of the box, the date cell's own padding as the gap after it. */
 const SELECT_COLUMN_CLASS = 'w-9 pl-2 pr-0';
@@ -159,7 +160,7 @@ export function useTaxColumns({
               {m.assignment.oreLines
                 .map(
                   (line) =>
-                    `${typeNames?.get(line.typeId) ?? `#${line.typeId}`} ${line.quantity.toLocaleString()}`
+                    `${typeNames?.get(line.typeId) ?? `#${line.typeId}`} ${formatCount(line.quantity)}`
                 )
                 .join(' · ')}
             </span>

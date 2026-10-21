@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -161,8 +162,8 @@ export function CalculationBreakdown({
                           : 'industry.breakdown.depthLevel',
                         {
                           price: formatIsk(level.price, 2),
-                          units: level.units.toLocaleString(),
-                          listed: level.listed.toLocaleString(),
+                          units: formatCount(level.units),
+                          listed: formatCount(level.listed),
                         }
                       )}
                     </li>
@@ -171,8 +172,8 @@ export function CalculationBreakdown({
                 {!walk.covered && (
                   <p className="text-warning">
                     {t('industry.breakdown.depthShort', {
-                      listed: walk.listed.toLocaleString(),
-                      need: walk.need.toLocaleString(),
+                      listed: formatCount(walk.listed),
+                      need: formatCount(walk.need),
                     })}
                   </p>
                 )}
@@ -218,7 +219,7 @@ export function CalculationBreakdown({
               <p>{t('industry.breakdown.revenue', { hub: context.hubName })}</p>
               <Formula>
                 {t('industry.breakdown.revenueFormula', {
-                  quantity: context.productQuantity.toLocaleString(),
+                  quantity: formatCount(context.productQuantity),
                   unitPrice: formatIsk(context.productUnitPrice),
                   revenue: formatIsk(result.revenue),
                 })}
@@ -266,7 +267,7 @@ export function CalculationBreakdown({
             <Formula>
               {t('industry.breakdown.breakEvenFormula', {
                 total: formatIsk(result.totalCost),
-                quantity: context.productQuantity.toLocaleString(),
+                quantity: formatCount(context.productQuantity),
                 feePct,
                 breakEven: formatIsk(result.breakEvenPrice),
               })}

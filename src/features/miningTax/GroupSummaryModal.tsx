@@ -24,6 +24,7 @@ import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
 import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
 import { LedgerActionError } from './LedgerActionError';
+import { formatCount } from '@/lib/formatCount';
 
 export interface GroupMember {
   row: MoonMiningTaxRow;
@@ -216,9 +217,7 @@ export function GroupSummaryModal({
                         {typeNames.get(line.typeId) ?? `#${line.typeId}`}
                       </OreLink>
                     </span>
-                    <span className="tabular-nums text-text-dim">
-                      {line.quantity.toLocaleString()}
-                    </span>
+                    <span className="tabular-nums text-text-dim">{formatCount(line.quantity)}</span>
                   </li>
                 ))}
               </ul>

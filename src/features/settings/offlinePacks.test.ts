@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LAZY_SDE_FILES } from '@/sde/lazySdeFiles';
 import { TYPE_INFO_SHARD_COUNT } from '@/sde/typeInfoShard';
+import { setDecimalMark } from '@/lib/numberLocale';
 import { OFFLINE_PACK_IDS, formatBytes, packFor, summarizePacks } from './offlinePacks';
 
 describe('packFor', () => {
@@ -49,9 +50,19 @@ describe('summarizePacks', () => {
 
 describe('formatBytes', () => {
   it('uses the largest sensible unit', () => {
-    expect(formatBytes(0, 'en')).toBe('0 byte');
-    expect(formatBytes(2048, 'en')).toBe('2 kB');
-    expect(formatBytes(5 * 1024 * 1024, 'en')).toBe('5 MB');
-    expect(formatBytes(3.5 * 1024 ** 3, 'en')).toBe('3.5 GB');
+    expect(formatBytes(0)).toBe('0 byte');
+    expect(formatBytes(2048)).toBe('2 kB');
+    expect(formatBytes(5 * 1024 * 1024)).toBe('5 MB');
+    expect(formatBytes(3.5 * 1024 ** 3)).toBe('3.5 GB');
+  });
+
+  it('follows the Number format decimal mark', () => {
+    setDecimalMark(',');
+    try {
+      expect(formatBytes(3.5 * 1024 ** 3)).toBe('3,5 GB');
+      expect(formatBytes(1023 * 1024)).toBe('1.023 kB');
+    } finally {
+      setDecimalMark('.');
+    }
   });
 });

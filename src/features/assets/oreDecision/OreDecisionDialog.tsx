@@ -9,6 +9,7 @@
  * like with like. The refining facility is an assumption the dialog states.
  */
 import { fixed1, fixed2 } from '@/lib/fixedFormat';
+import { formatCount } from '@/lib/formatCount';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -323,7 +324,7 @@ export function OreDecisionDialog({
       header: t('assets.oreDecision.unitsColumn'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (r) => r.quantity.toLocaleString(),
+      render: (r) => formatCount(r.quantity),
       sortValue: (r) => r.quantity,
     },
     {
@@ -348,7 +349,7 @@ export function OreDecisionDialog({
       header: t('assets.oreDecision.coveredColumn'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (r) => `${r.covered.toLocaleString()} / ${r.need.toLocaleString()}`,
+      render: (r) => `${formatCount(r.covered)} / ${formatCount(r.need)}`,
       sortValue: (r) => r.covered,
     },
     {
@@ -449,7 +450,7 @@ export function OreDecisionDialog({
                   {exits.unitsLeftOver > 0 && (
                     <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-warning">
                       {t('assets.oreDecision.leftOverHint', {
-                        units: exits.unitsLeftOver.toLocaleString(),
+                        units: formatCount(exits.unitsLeftOver),
                       })}
                     </p>
                   )}
@@ -490,7 +491,7 @@ export function OreDecisionDialog({
                       </div>
                       <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-text-dim">
                         {t('assets.oreDecision.notUsedHint', {
-                          units: inPlan.unitsNotUsed.toLocaleString(),
+                          units: formatCount(inPlan.unitsNotUsed),
                         })}
                       </p>
                     </>

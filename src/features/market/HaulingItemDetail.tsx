@@ -27,6 +27,11 @@ import { MarketItemLink } from './MarketItemLink';
 import { marketIskTone, signedMarketIsk } from '@/lib/signedIsk';
 import type { InstantHaulingScanRow, ListHaulingScanRow } from './haulingData';
 import { formatDaysToSell, type HaulingViewRow } from './haulingView';
+import { createNumberFormat } from '@/lib/numberLocale';
+import { formatCount } from '@/lib/formatCount';
+
+const formatVolumeM3 = createNumberFormat({ maximumFractionDigits: 3 });
+const formatDailyUnits = createNumberFormat({ maximumFractionDigits: 1 });
 
 /** Orders shown from the destination's book; the Market link has the rest. */
 const ORDER_LEVELS = 8;
@@ -225,7 +230,7 @@ function OrderTable({
                   <span className="whitespace-nowrap">{formatMarketIsk(level.price)}</span>
                 )}
               </td>
-              <td className="py-1 text-right whitespace-nowrap">{level.units.toLocaleString()}</td>
+              <td className="py-1 text-right whitespace-nowrap">{formatCount(level.units)}</td>
             </tr>
           ))}
         </tbody>
@@ -301,13 +306,13 @@ function PlanNote({
 }) {
   const { t } = useTranslation();
   const volume = t('market.hauling.volumeEach', {
-    m3: row.unitVolumeM3.toLocaleString(undefined, { maximumFractionDigits: 3 }),
+    m3: formatVolumeM3(row.unitVolumeM3),
   });
   const planned = plannedUnits(line);
   if (planned === undefined) return <p className="text-xs text-text-dim">{volume}</p>;
   const units = t('market.hauling.itemDetail.planUnits', {
     count: planned,
-    units: planned.toLocaleString(),
+    units: formatCount(planned),
   });
   return (
     <p className="text-xs text-text-dim">
@@ -447,12 +452,12 @@ function ListingBody({
           </span>{' '}
           <span className="whitespace-nowrap">
             {t('market.hauling.itemDetail.soldPerDay', {
-              units: sale.dailyVolume.toLocaleString(undefined, { maximumFractionDigits: 1 }),
+              units: formatDailyUnits(sale.dailyVolume),
             })}{' '}
             ·
           </span>{' '}
           <span className="whitespace-nowrap">
-            {t('market.hauling.itemDetail.listedNear', { units: sale.unitsAhead.toLocaleString() })}
+            {t('market.hauling.itemDetail.listedNear', { units: formatCount(sale.unitsAhead) })}
           </span>
         </p>
         <LastSalesSplit row={row} />

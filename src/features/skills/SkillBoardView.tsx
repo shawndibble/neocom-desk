@@ -13,6 +13,7 @@ import { SkillLink } from '@/features/entities/EntityLink';
 import { useSkillDetailModal } from '@/stores/skillDetailModal';
 import type { BoardGroup, BoardSkill } from './skillBoard';
 import { skillGroupIcon } from './skillGroupIcon';
+import { formatNumber } from '@/lib/numberLocale';
 
 /**
  * One skill group on the Trained board: its icon, a bar split trained / queued
@@ -152,7 +153,7 @@ export function SkillBoardRow({
             ? null
             : skill.sp === null
               ? t('common.unknown')
-              : t('skills.sp', { value: skill.sp.toLocaleString() })}
+              : t('skills.sp', { value: formatNumber(skill.sp) })}
         </span>
       </button>
     </li>

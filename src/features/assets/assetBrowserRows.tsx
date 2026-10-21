@@ -13,6 +13,7 @@
  */
 
 import { fixed1 } from '@/lib/fixedFormat';
+import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -514,7 +515,7 @@ export function ItemRow({
               {characterBadge && <CharacterBadge characterName={characterBadge} />}
             </span>
             <span className="flex flex-wrap items-center gap-x-1.5 text-[0.6875rem] text-text-dim tabular-nums md:contents md:text-xs">
-              <span className={ITEM_QUANTITY_CELL}>×{quantity.toLocaleString()}</span>
+              <span className={ITEM_QUANTITY_CELL}>×{formatCount(quantity)}</span>
               <span aria-hidden="true" className="md:hidden">
                 ·
               </span>
@@ -595,7 +596,7 @@ export function SearchResultRow({
               {blueprintKind && <BlueprintBadge kind={blueprintKind} t={t} />}
               {characterBadge && <CharacterBadge characterName={characterBadge} />}
             </span>
-            <span className="shrink-0 text-sm tabular-nums">×{quantity.toLocaleString()}</span>
+            <span className="shrink-0 text-sm tabular-nums">×{formatCount(quantity)}</span>
           </span>
           <span className="flex min-w-0 items-baseline gap-2">
             <span className="flex min-w-0 flex-1 items-baseline gap-1.5">

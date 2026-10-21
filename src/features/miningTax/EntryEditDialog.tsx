@@ -32,6 +32,7 @@ import { useMiningTaxOreValueMode } from './oreValueMode';
 import { LedgerActionError } from './LedgerActionError';
 import { LabelField } from './LabelField';
 import { labelSuggestions } from './assignmentLabel';
+import { formatCount } from '@/lib/formatCount';
 
 interface EntryEditDialogProps {
   open: boolean;
@@ -316,7 +317,7 @@ export function EntryEditDialog({
                       <span className="min-w-0 flex-1 truncate">
                         <OreLink typeId={line.typeId}>{name}</OreLink>
                         <span className="ml-1.5 text-text-dim tabular-nums">
-                          {line.quantity.toLocaleString()}
+                          {formatCount(line.quantity)}
                         </span>
                       </span>
                       {perOre && (

@@ -50,6 +50,10 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
+import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
+
+// Part-trained levels bank fractional SP; the old default printed up to 3 decimals.
+const formatSp = createNumberFormat({ maximumFractionDigits: 3 });
 
 interface Snapshot {
   catalog: SkillCatalog;
@@ -337,7 +341,7 @@ export function Skills() {
           label={t('skills.totalSp')}
           value={
             skillsResult?.data
-              ? (skillsResult.data.total_sp + completedSp).toLocaleString()
+              ? formatSp(skillsResult.data.total_sp + completedSp)
               : t('common.unknown')
           }
         />
@@ -345,7 +349,7 @@ export function Skills() {
           label={t('skills.unallocatedSp')}
           value={
             skillsResult?.data?.unallocated_sp !== undefined
-              ? skillsResult.data.unallocated_sp.toLocaleString()
+              ? formatNumber(skillsResult.data.unallocated_sp)
               : t('common.unknown')
           }
         />

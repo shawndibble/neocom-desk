@@ -16,6 +16,7 @@ import {
 } from '@/engine/market/orderBook';
 import { securityStatusColor } from '@/engine/securityStatus';
 import type { RegionOrder } from '@/esi/endpoints';
+import { formatCount } from '@/lib/formatCount';
 
 export interface LocationCellProps {
   order: RegionOrder;
@@ -77,7 +78,7 @@ export function SecurityCell({ order, npcStations, solarSystems, t }: LocationCe
  */
 export function BaitFlag({ multiple, t }: { multiple: number | null; t: TFunction }) {
   if (multiple === null) return null;
-  const times = Math.round(multiple).toLocaleString();
+  const times = formatCount(multiple);
   return (
     <Tooltip content={t('market.baitHint', { times })}>
       <span

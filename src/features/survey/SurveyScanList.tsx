@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger, textActionClassName } from '@/
 import { formatEveClock } from '@/engine/survey/chatMessage';
 import type { SurveyScan } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
+import { formatCount } from '@/lib/formatCount';
 
 interface SurveyScanListProps {
   scans: readonly SurveyScan[];
@@ -106,7 +107,7 @@ export function SurveyScanList({ scans, ignored, onSetIgnored }: SurveyScanListP
 }
 
 function ScanDetails({ scan }: { scan: SurveyScan }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const lines = oreLines(scan);
   if (lines.length === 0)
     return <p className="text-text-dim">{t('survey.scanList.detailsEmpty')}</p>;
@@ -120,7 +121,7 @@ function ScanDetails({ scan }: { scan: SurveyScan }) {
           </span>
           <span className="w-24 text-right text-text-dim">
             {t('survey.scanList.volume', {
-              volume: Math.round(line.volume).toLocaleString(i18n.language),
+              volume: formatCount(line.volume),
             })}
           </span>
         </li>

@@ -6,6 +6,7 @@ import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import type { SkillCatalog } from '../skillMap';
 import { heroProgress, heroSpPerHour, type QueueRowView } from './queueView';
+import { formatCount } from '@/lib/formatCount';
 
 interface NowTrainingCardProps {
   row: QueueRowView;
@@ -50,7 +51,7 @@ export function NowTrainingCard({ row, next, catalog, nowMs }: NowTrainingCardPr
             <div className="mt-1 text-sm text-text-dim">
               {skill &&
                 `${t('plans.heroAttributes', { primary: t(`skills.attr.${skill.primaryAttr}`), secondary: t(`skills.attr.${skill.secondaryAttr}`) })} · `}
-              {t('plans.heroSpPerHour', { sp: Math.round(spPerHour).toLocaleString('en-US') })}
+              {t('plans.heroSpPerHour', { sp: formatCount(spPerHour) })}
             </div>
           )}
         </div>

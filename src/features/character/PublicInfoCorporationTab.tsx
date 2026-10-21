@@ -15,6 +15,8 @@
  * and skips the killboard and the alliance history: neither means anything
  * for a corporation no player runs.
  */
+import { createNumberFormat } from '@/lib/numberLocale';
+import { formatCount } from '@/lib/formatCount';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -46,6 +48,8 @@ import {
   termClassName,
   websiteUrl,
 } from './publicInfoStyles';
+
+const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 
 export interface PublicInfoCorporationTabProps {
   data: PublicCorporationInfo;
@@ -98,7 +102,7 @@ export default function PublicInfoCorporationTab({
   // One line: who it is (members, age, tax), then how it fights. Tax only when
   // ESI states it; the zKillboard figures only for a corp players run.
   const facts: StatTileItem[] = [
-    { label: t('publicInfo.memberCount'), value: data.member_count.toLocaleString() },
+    { label: t('publicInfo.memberCount'), value: formatCount(data.member_count) },
     {
       label: t('publicInfo.age'),
       value:
@@ -108,7 +112,7 @@ export default function PublicInfoCorporationTab({
     },
     ...(taxPercent === null
       ? []
-      : [{ label: t('publicInfo.taxRate'), value: `${taxPercent.toLocaleString()}%` }]),
+      : [{ label: t('publicInfo.taxRate'), value: `${formatDecimal(taxPercent)}%` }]),
     ...(npc ? [] : [figures.kills, figures.losses, figures.iskDestroyed]),
   ];
 
@@ -213,7 +217,7 @@ export default function PublicInfoCorporationTab({
             {data.shares !== undefined && (
               <>
                 <dt className={termClassName}>{t('publicInfo.shares')}</dt>
-                <dd className="tabular-nums">{data.shares.toLocaleString()}</dd>
+                <dd className="tabular-nums">{formatCount(data.shares)}</dd>
               </>
             )}
           </dl>

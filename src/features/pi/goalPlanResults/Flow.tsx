@@ -10,14 +10,14 @@ import { PiProductLink } from '../PiProductLink';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { TierChip } from '../DirectiveRow';
 import { commodityName, formatUnits } from '../goalPlannerFormat';
-import { HOURS_PER_DAY, PERCENT_FORMAT, planetTypesText, type PlanNames } from './format';
+import { HOURS_PER_DAY, formatPercent, planetTypesText, type PlanNames } from './format';
 
 /** Under this short of one, a made fraction is float dust. */
 const WHOLE = 0.995;
 
 /** The source, with how much is made where the line is partial. */
 function sourceLabel(line: DemandLine, t: TFunction): string {
-  const percent = PERCENT_FORMAT(line.madeFraction * 100);
+  const percent = formatPercent(line.madeFraction * 100);
   if (line.source === 'bought') {
     // The tier names what is bought; a part made as well is said alongside.
     return line.madeFraction > 1 - WHOLE

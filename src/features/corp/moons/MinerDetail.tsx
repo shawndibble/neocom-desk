@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -175,9 +176,7 @@ export function MinerDetail({ id }: { id: string }) {
       primary: true,
       render: (d) => (
         <span>
-          {d.oreLines
-            .map((l) => `${names.ore(l.typeId)} × ${l.quantity.toLocaleString('en')}`)
-            .join(', ')}
+          {d.oreLines.map((l) => `${names.ore(l.typeId)} × ${formatCount(l.quantity)}`).join(', ')}
         </span>
       ),
     },

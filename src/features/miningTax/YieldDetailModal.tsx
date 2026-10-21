@@ -44,6 +44,7 @@ import {
   yieldRefinesCsvColumns,
   type YieldRefinedRow as RefinedRow,
 } from './yieldCsv';
+import { formatCount } from '@/lib/formatCount';
 
 interface YieldDetailModalProps {
   open: boolean;
@@ -189,7 +190,7 @@ export function YieldDetailModal({
       header: t('miningTax.overview.detail.unitsColumn'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (line) => line.quantity.toLocaleString(),
+      render: (line) => formatCount(line.quantity),
       sortValue: (line) => line.quantity,
     },
     {
@@ -267,7 +268,7 @@ export function YieldDetailModal({
       header: t('miningTax.overview.detail.unitsColumn'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (material) => material.quantity.toLocaleString(),
+      render: (material) => formatCount(material.quantity),
       sortValue: (material) => material.quantity,
     },
     {
@@ -330,11 +331,11 @@ export function YieldDetailModal({
             />
             <StatChip
               label={t('miningTax.overview.detail.unitsColumn')}
-              value={totals.units.toLocaleString()}
+              value={formatCount(totals.units)}
             />
             <StatChip
               label={t('miningTax.overview.detail.oreTypesStat')}
-              value={valuation.lines.length.toLocaleString()}
+              value={formatCount(valuation.lines.length)}
             />
           </StatChips>
         </div>
@@ -487,7 +488,7 @@ export function YieldDetailModal({
                 {totals.unitsLeftOver > 0 && (
                   <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-warning">
                     {t('miningTax.overview.detail.leftOverHint', {
-                      units: totals.unitsLeftOver.toLocaleString(),
+                      units: formatCount(totals.unitsLeftOver),
                     })}
                   </p>
                 )}

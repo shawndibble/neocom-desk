@@ -5,6 +5,7 @@
  * that header — location, expiry, contract id, contents — is generic and
  * lives in the shared modal.
  */
+import { formatCount } from '@/lib/formatCount';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
@@ -41,9 +42,9 @@ export function BpcContractModal({
     ? row.price > 0
       ? t('bpcContracts.iskPlusPlexPrice', {
           isk: formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW),
-          plex: row.requestedPlex.toLocaleString(),
+          plex: formatCount(row.requestedPlex),
         })
-      : t('bpcContracts.plexPrice', { plex: row.requestedPlex.toLocaleString() })
+      : t('bpcContracts.plexPrice', { plex: formatCount(row.requestedPlex) })
     : row.isAuction
       ? row.buyout !== undefined
         ? t('bpcContracts.buyout', { price: formatIskAuto(row.buyout, CONTRACT_ISK_CENTS_BELOW) })

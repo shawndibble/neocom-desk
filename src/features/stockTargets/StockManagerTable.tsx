@@ -21,6 +21,7 @@ import { useItemActions } from '@/features/market/itemActions';
 import { cx } from '@/lib/cx';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { StockFillBar, StockStatusPill } from './StockStatus';
+import { formatNumber } from '@/lib/numberLocale';
 
 /** Editable-in-place value (§6c): faint pencil at rest, field box on hover/focus; 44px tap area via ::after. */
 const editableValueClassName = cx(
@@ -105,7 +106,7 @@ function TargetCell({
       }}
     >
       <span className="sr-only">{t('stockTargets.table.editTargetFor', { name })}, </span>
-      {row.target.toLocaleString()}
+      {formatNumber(row.target)}
       <Icon.Rename size={Icon.ICON_SIZE.sm} aria-hidden="true" className="text-text-dim" />
     </button>
   );
@@ -182,7 +183,7 @@ export function StockManagerTable({
       headerCellClassName: 'sm:w-24',
       className: 'tabular-nums',
       stackAffix: { after: ` ${t('stockTargets.table.listedAffix')}` },
-      render: (row) => row.listed.toLocaleString(),
+      render: (row) => formatNumber(row.listed),
       sortValue: (row) => row.listed,
     },
     {
@@ -194,7 +195,7 @@ export function StockManagerTable({
       stackAffix: { after: ` ${t('stockTargets.table.inHangarAffix')}` },
       render: (row) =>
         row.inHangar > 0 ? (
-          row.inHangar.toLocaleString()
+          formatNumber(row.inHangar)
         ) : (
           <span data-dense-omit className="text-text-dim">
             0
@@ -230,13 +231,13 @@ export function StockManagerTable({
           <span className="sm:flex sm:flex-col">
             {row.fromHangar > 0 && (
               <span className="text-accent sm:whitespace-nowrap">
-                {t('stockTargets.table.fromHangar', { n: row.fromHangar.toLocaleString() })}
+                {t('stockTargets.table.fromHangar', { n: formatNumber(row.fromHangar) })}
               </span>
             )}
             {row.fromHangar > 0 && row.toSource > 0 && <span className="sm:hidden"> · </span>}
             {row.toSource > 0 && (
               <span className="text-text-dim sm:whitespace-nowrap">
-                {t('stockTargets.table.toSource', { n: row.toSource.toLocaleString() })}
+                {t('stockTargets.table.toSource', { n: formatNumber(row.toSource) })}
               </span>
             )}
           </span>

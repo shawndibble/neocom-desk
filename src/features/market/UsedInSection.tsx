@@ -25,6 +25,7 @@ import { ItemContextMenu } from './ItemContextMenu';
 import { ItemInfoLink } from '@/features/entities';
 import { withoutEntityInfo } from '@/lib/entityInfo';
 import { useOptionalItemActions } from './itemActions';
+import { formatCount } from '@/lib/formatCount';
 
 /** Rows per page — the whole list for anything but a mineral or common component. */
 export const USED_IN_PAGE = 50;
@@ -91,7 +92,7 @@ export function UsedInSection({
       <h3 className={cx(eyebrowClassName, 'border-b border-line pb-1')}>
         {t('market.itemDetail.usedInTitle', {
           count: uses.length,
-          formatted: uses.length.toLocaleString(),
+          formatted: formatCount(uses.length),
         })}
       </h3>
       {uses.length > FILTER_THRESHOLD && (
@@ -138,7 +139,7 @@ export function UsedInSection({
                 <span className="inline-flex shrink-0 items-center gap-2">
                   <span className="tabular-nums text-text-dim">
                     {t('market.itemDetail.usedInPerRun', {
-                      quantity: use.quantity.toLocaleString(),
+                      quantity: formatCount(use.quantity),
                     })}
                   </span>
                   <RowMoreActions />
@@ -151,8 +152,8 @@ export function UsedInSection({
       {visible.length < filtered.length && (
         <Button size="sm" variant="ghost" className="mt-1" onClick={() => setPages((n) => n + 1)}>
           {t('market.itemDetail.usedInShowMore', {
-            shown: visible.length.toLocaleString(),
-            total: filtered.length.toLocaleString(),
+            shown: formatCount(visible.length),
+            total: formatCount(filtered.length),
           })}
         </Button>
       )}

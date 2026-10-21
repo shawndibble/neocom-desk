@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret, Checkbox } from '@/components/ui';
@@ -128,7 +129,7 @@ export function PickerList({
                                     {t('assets.movePlan.shipRow')}
                                   </span>
                                 ) : (
-                                  `× ${s.quantity.toLocaleString()}`
+                                  `× ${formatCount(s.quantity)}`
                                 )
                               }
                               volume={

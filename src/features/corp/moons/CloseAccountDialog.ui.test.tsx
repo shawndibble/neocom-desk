@@ -80,6 +80,7 @@ function renderDialog(overrides: Partial<BookViewInput> = {}) {
           view,
           names: {
             character: (id) => `Pilot ${id}`,
+            corporation: (id) => `Corp ${id}`,
             refinery: () => 'Efa - Brass Anvil',
             moon: (id) => `Moon ${id}`,
             ore: () => 'Sylvite',

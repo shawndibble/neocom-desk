@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName as MICRO_LABEL } from '@/components/ui/eyebrowClassName';
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -501,7 +502,7 @@ export function FittingRing({
                   count={item.quantity}
                   tooltip={t('fittings.ring.cargoTile', {
                     name: nameOf(item.typeId),
-                    quantity: item.quantity.toLocaleString(),
+                    quantity: formatCount(item.quantity),
                   })}
                 />
               ))}

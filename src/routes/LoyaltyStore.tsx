@@ -66,6 +66,7 @@ import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { applyBlueprintPriceSeed } from '@/features/industry/planSeed';
 import { lpBlueprintPickPrice } from '@/features/industry/blueprintPurchaseOffers';
+import { formatNumber } from '@/lib/numberLocale';
 
 /** Module-level so the table's windowing and row memo see one stable function. */
 const offerRowKey = (row: LoyaltyOfferRow) => row.offer.offer_id;
@@ -397,7 +398,7 @@ function LoyaltyStoreView({ corporationId }: { corporationId: number }) {
               <StatChips>
                 <StatChip
                   label={t('loyaltyStore.yourLp')}
-                  value={playerLp === null ? '—' : playerLp.toLocaleString()}
+                  value={playerLp === null ? '—' : formatNumber(playerLp)}
                   tone="accent"
                   emphasis
                 />

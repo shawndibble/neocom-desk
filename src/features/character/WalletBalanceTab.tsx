@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CachedNotice, IconButton, InfoTooltip } from '@/components/ui';
@@ -163,7 +164,7 @@ export function WalletBalanceTab({
               </p>
               <p className="text-xl font-medium tabular-nums">
                 {loyaltyResult && !loyaltyNeedsReauth
-                  ? loyalty.everMarks.toLocaleString()
+                  ? formatCount(loyalty.everMarks)
                   : t('common.unknown')}
               </p>
             </div>

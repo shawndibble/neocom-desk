@@ -24,6 +24,9 @@ import { isk } from './moonsFormat';
 import { AutomaticSyncSection } from './AutomaticSyncSection';
 import { DeleteBookSection } from './DeleteBookSection';
 import { ReclaimBookSection } from './ReclaimBookSection';
+import { createNumberFormat } from '@/lib/numberLocale';
+
+const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -442,15 +445,14 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
                     {learned
                       ? t('corpTaxBook.moons.settings.measured', {
                           name: names.refinery(id),
-                          rate: learned.m3PerHour.toLocaleString('en'),
+                          rate: formatDecimal(learned.m3PerHour),
                           count: learned.cycles,
                         })
                       : t('corpTaxBook.moons.settings.notMeasured', {
                           name: names.refinery(id),
-                          rate: chunkRateFor(
-                            undefined,
-                            settings.chunkM3PerHour ?? undefined
-                          ).m3PerHour.toLocaleString('en'),
+                          rate: formatDecimal(
+                            chunkRateFor(undefined, settings.chunkM3PerHour ?? undefined).m3PerHour
+                          ),
                         })}
                   </li>
                 );

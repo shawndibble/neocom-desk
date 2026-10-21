@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/controlStyles';
 import { parseIskAmount } from '@/lib/isk';
 import { fittingCargoHolds, hullCargoHolds, totalCargoM3, type HaulingCargo } from './haulingCargo';
+import { formatCount } from '@/lib/formatCount';
 
 type CargoTab = 'ship' | 'fitting' | 'custom';
 
@@ -52,7 +53,7 @@ interface HaulingCargoControlProps {
 }
 
 function formatM3(m3: number): string {
-  return `${Math.round(m3).toLocaleString()} m³`;
+  return `${formatCount(m3)} m³`;
 }
 
 /**

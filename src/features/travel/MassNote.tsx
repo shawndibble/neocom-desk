@@ -7,9 +7,11 @@
 import { useTranslation } from 'react-i18next';
 import { bridgeMassVerdict, holeMassVerdict } from '@/engine/route/jumpMass';
 import { useRouteShipMass } from '@/features/route/routeShip';
+import { createNumberFormat } from '@/lib/numberLocale';
 
 const MT = 1_000_000;
-const mt = (kg: number) => (kg / MT).toLocaleString(undefined, { maximumFractionDigits: 1 });
+const formatMt = createNumberFormat({ maximumFractionDigits: 1 });
+const mt = (kg: number) => formatMt(kg / MT);
 
 export function MassNote({ hole }: { hole: { wormholeType: string | null } | 'bridge' }) {
   const { t } = useTranslation();

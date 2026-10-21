@@ -43,6 +43,7 @@ import {
 import { journalCoverageDays, withinRange } from './chartSeries';
 import { dayTitle, rollingTitles } from './chartTips';
 import type { ListRow, NumberModel, TableCell } from './types';
+import { formatNumber } from '@/lib/numberLocale';
 
 const D = 'overview.widgets.data';
 const C = 'overview.widgets.chart';
@@ -404,7 +405,7 @@ const belowMarket: Builder = (feeds, { t }) => {
     fetchedAt: data.fetchedAt,
     number: best
       ? {
-          value: data.count.toLocaleString(),
+          value: formatNumber(data.count),
           unit: t(`${D}.belowMarket.unit`),
           secondary: {
             text:

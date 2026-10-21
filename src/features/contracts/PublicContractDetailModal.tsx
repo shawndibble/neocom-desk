@@ -37,6 +37,7 @@
  * being judged. Every line right-clicks into the same item actions the rest of
  * the app offers.
  */
+import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { useEffect, useMemo, useState } from 'react';
@@ -522,7 +523,7 @@ function ContractItemRow({
               </span>
             )}
           </span>
-          <span className="shrink-0 tabular-nums">×{line.quantity.toLocaleString()}</span>
+          <span className="shrink-0 tabular-nums">×{formatCount(line.quantity)}</span>
         </li>
       }
     />
