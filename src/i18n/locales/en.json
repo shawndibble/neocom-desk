@@ -5155,11 +5155,6 @@
         "summary_one": "{{count}} Director. Members with a sensitive role: {{holders}}.",
         "summary_other": "{{count}} Directors. Members with a sensitive role: {{holders}}."
       },
-      "corpDoctrine": {
-        "title": "Doctrine readiness",
-        "description": "Which members can fly your doctrine ships",
-        "empty": "This widget is coming soon."
-      },
       "corpJobs": {
         "title": "Corp industry jobs",
         "description": "Jobs running in the corporation’s name, and when they finish",
@@ -5237,11 +5232,6 @@
       "corpSrp": {
         "title": "Ship replacement",
         "description": "SRP claims waiting and paid",
-        "empty": "This widget is coming soon."
-      },
-      "corpProjects": {
-        "title": "Corporation projects",
-        "description": "Progress on your corporation projects and freelance jobs",
         "empty": "This widget is coming soon."
       }
     },

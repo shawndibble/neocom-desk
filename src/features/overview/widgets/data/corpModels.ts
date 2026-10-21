@@ -1,8 +1,8 @@
 /**
  * The Corp overview's widget kinds: the feeds each reads and its builder.
- * Same contract as `models.ts` (pure, derived at render time); spread into its
- * `KINDS` table. Structures and Moon extractions are the Overview's own kinds,
- * reused as they are.
+ * Same contract as `models.ts` (pure, derived at render time); joins its
+ * `KINDS` table through `registerKindDefs` when the Corp route loads.
+ * Structures and Moon extractions are the Overview's own kinds, reused as they are.
  */
 import type { KindDef } from './builderKit';
 import { corpContracts } from './corpContractsModels';

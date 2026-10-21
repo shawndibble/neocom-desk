@@ -282,8 +282,13 @@ describe('the real en.json against the real sources', () => {
 
   it('moves most of the locale out of the shell', () => {
     const shellBytes = JSON.stringify(plan.shell).length;
-    // 0.31: the Corp overview's widget copy is named by `models.ts` (a startup file), so each new
-    // corp widget adds its strings to the shell; develop sat at 0.2997 before Corp kills.
-    expect(shellBytes / JSON.stringify(en).length).toBeLessThan(0.31);
+    expect(shellBytes / JSON.stringify(en).length).toBeLessThan(0.3);
+  });
+
+  it('keeps the Corp overview widget builders, and so their copy, out of the startup graph', () => {
+    const corpBuilders = [...startup].filter((file) =>
+      /\/widgets\/data\/corp[A-Z]\w*Models\.ts$/.test(file)
+    );
+    expect(corpBuilders).toEqual([]);
   });
 });
