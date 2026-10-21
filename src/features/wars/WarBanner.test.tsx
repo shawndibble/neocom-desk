@@ -87,7 +87,7 @@ describe('WarBanner', () => {
   it('opens the war card from Details', async () => {
     loadActiveWars.mockResolvedValue([war()]);
     renderBanner();
-    await userEvent.click(await screen.findByRole('button', { name: 'Details' }));
+    await userEvent.click(await screen.findByRole('button', { name: /At war with Hostile Corp/ }));
     const dialog = await screen.findByRole('dialog', { name: 'War declared' });
     expect(within(dialog).getByText('Declared war on you')).toBeInTheDocument();
     expect(within(dialog).getByText('Active')).toBeInTheDocument();

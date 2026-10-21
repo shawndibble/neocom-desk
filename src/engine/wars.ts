@@ -43,10 +43,7 @@ export interface StoredWars {
 }
 
 /** Whose wars to look for: a corporation, and the alliance it is in, if any. */
-export interface WarEntityIds {
-  corporationId?: number;
-  allianceId?: number;
-}
+export type WarEntityIds = WarAlly;
 
 export type WarStatus =
   | { kind: 'pending'; startsIn: number | null }

@@ -14,7 +14,13 @@ import { parseStoredWars, type StoredWar } from '@/engine/wars';
 const COLLECTION = 'systemConditions';
 const DOC_ID = 'activeWars';
 /** The sweep runs twice a day: reading more often only costs reads. */
-export const ACTIVE_WARS_POLL_MS = 60 * 60 * 1000;
+const ACTIVE_WARS_REREAD_MS = 55 * 60 * 1000;
+/**
+ * How often a mounted page asks. Shorter than the re-read window so a tick
+ * never lands just inside it and waits another hour, and a failed read is
+ * retried within minutes; most ticks are answered from the last read.
+ */
+export const ACTIVE_WARS_POLL_MS = 15 * 60 * 1000;
 /**
  * A list this old means the sweep has stopped, and an ended war would still be
  * listed (an early end moves `finished`, which only a sweep sees): hide it.
@@ -52,7 +58,7 @@ export function freshActiveWars(data: unknown, now: number): readonly StoredWar[
 
 export async function loadActiveWars(characterId: number): Promise<readonly StoredWar[]> {
   if (!isSyncConfigured()) return NONE;
-  if (lastRead === null || Date.now() - lastRead.at >= ACTIVE_WARS_POLL_MS) {
+  if (lastRead === null || Date.now() - lastRead.at >= ACTIVE_WARS_REREAD_MS) {
     // One read at a time: the Overview and the Corp page asking together share it.
     reading ??= readList(characterId).finally(() => {
       reading = null;

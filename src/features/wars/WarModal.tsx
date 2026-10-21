@@ -116,7 +116,7 @@ function WarCard({ hit }: { hit: WarAgainstMe }) {
           ships={war.aggressor.shipsKilled}
         />
         <Tally
-          label={t('wars.modal.weDestroyed')}
+          label={t('wars.modal.youDestroyed')}
           isk={war.defender.iskDestroyed}
           ships={war.defender.shipsKilled}
         />

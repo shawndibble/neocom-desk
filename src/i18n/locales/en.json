@@ -5611,8 +5611,7 @@
       "titleMore_other": "At war with {{name}} and {{count}} more",
       "declared": "Declared {{age}}",
       "startsIn": "Starts in {{time}}",
-      "notStarted": "Not started yet",
-      "view": "Details"
+      "notStarted": "Not started yet"
     },
     "modal": {
       "title_one": "War declared",
@@ -5631,10 +5630,10 @@
       "allies": "Allies",
       "noAllies": "None",
       "theyDestroyed": "They destroyed",
-      "weDestroyed": "We destroyed",
       "ships_one": "{{count}} ship",
       "ships_other": "{{count}} ships",
-      "zkill": "War on zKillboard"
+      "zkill": "War on zKillboard",
+      "youDestroyed": "You destroyed"
     }
   },
   "common": {
