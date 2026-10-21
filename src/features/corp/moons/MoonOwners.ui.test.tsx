@@ -67,16 +67,6 @@ function order() {
 }
 
 describe('MoonOwnersTable', () => {
-  it('labels the owed figure on the phone card (shown only once the row stacks)', () => {
-    render(
-      <MemoryRouter>
-        <MoonOwnersTable rows={ROWS} totals={TOTALS} name={NAME} now={0} onOpen={vi.fn()} />
-      </MemoryRouter>
-    );
-    const table = screen.getByRole('table', { name: 'Moon owners' });
-    expect(within(table).getAllByText('Owed to them', { selector: 'span.hidden' })).toHaveLength(3);
-  });
-
   it('sorts on every numeric column and offers no Pay button without a payer', async () => {
     render(
       <MoonOwnersTable

@@ -131,19 +131,13 @@ export function MoonOwnersTable({
       header: t(k('cols.owed')),
       align: 'right',
       className: 'tabular-nums',
-      cardCorner: true,
       render: (r) =>
         r.mode === 'settled-otherwise' ? (
           '—'
         ) : r.theirRatePct === undefined ? (
           <span className="text-text-dim">{t(k('nothingDue'))}</span>
         ) : (
-          <>
-            <span className="hidden text-[0.625rem] tracking-widest text-text-dim uppercase [.dt-stacked_&]:block">
-              {t(k('cols.owed'))}
-            </span>
-            {isk(r.owed)}
-          </>
+          isk(r.owed)
         ),
       sortValue: (r) => r.owed,
     },
