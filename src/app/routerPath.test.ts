@@ -58,6 +58,7 @@ describe('isPublicRoute', () => {
     expect(isPublicRoute('/share/abc')).toBe(true);
     expect(isPublicRoute('/communities/join/XYZ')).toBe(true);
     expect(isPublicRoute('/corp-tax-book/verify/abc')).toBe(true);
+    expect(isPublicRoute('/corp-tax-book/remove-now/abc')).toBe(true);
   });
 
   it('is false for the app and for routes that merely share a prefix', () => {

@@ -268,6 +268,23 @@ describe('moonOwnerDetail', () => {
     ]);
   });
 
+  it('carries a pending removal and whether a payee is on record', () => {
+    const removal = { startedAt: 5, startedByName: 'Kestrel', effectiveAt: 9 };
+    const pending = moonOwnerDetail(
+      input({
+        feeders: [
+          feeder(A, { status: 'pending-removal', removal, payee: { kind: 'character', id: 3 } }),
+        ],
+      }),
+      A
+    );
+    expect(pending?.removal).toEqual(removal);
+    expect(pending?.hasPayee).toBe(true);
+    const active = moonOwnerDetail(input({ feeders: [feeder(A, { removal })] }), A);
+    expect(active?.removal).toBeUndefined();
+    expect(active?.hasPayee).toBe(false);
+  });
+
   it('is undefined for a corporation that is not a moon owner', () => {
     expect(moonOwnerDetail(input(), 5)).toBeUndefined();
   });

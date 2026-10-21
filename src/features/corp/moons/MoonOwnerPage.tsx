@@ -16,6 +16,7 @@ import type {
 } from '@/engine/corpTaxBook/moonOwners';
 import { isk, shortDate } from './moonsFormat';
 import { Crumb } from './moonsParts';
+import { RemovalStrip } from './RemovalStrip';
 import { MoonOwnerStatusPill } from './MoonOwnersTable';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.page.${key}`;
@@ -114,6 +115,9 @@ export function MoonOwnerPage({
   backTo,
   onSetRate,
   onSettledOtherwise,
+  onRemove,
+  onCancelRemoval,
+  onNoticeSent,
 }: {
   detail: MoonOwnerDetail;
   name: string;
@@ -124,6 +128,12 @@ export function MoonOwnerPage({
   /** Absent for a viewer who may not edit. */
   onSetRate?: () => void;
   onSettledOtherwise?: () => void;
+  /** Start a removal; absent for a viewer who may not edit. */
+  onRemove?: () => void;
+  /** Cancel a pending removal (any Accountant or higher, the starter included). */
+  onCancelRemoval?: () => Promise<void>;
+  /** The officer sent the notice from EVE: starts the 24 hours. */
+  onNoticeSent?: () => Promise<void>;
 }) {
   const { t } = useTranslation();
   const { row } = detail;
@@ -232,10 +242,12 @@ export function MoonOwnerPage({
           {t(k('stale'), { date: shortDate(new Date(row.staleSince).toISOString()) })}
         </p>
       )}
-      {row.status === 'removal-pending' && (
-        <p role="note" className="text-sm text-danger">
-          {t(k('pending'))}
-        </p>
+      {row.status === 'removal-pending' && detail.removal && (
+        <RemovalStrip
+          removal={detail.removal}
+          onCancel={onCancelRemoval}
+          onNoticeSent={onNoticeSent}
+        />
       )}
       {row.status === 'disconnected' && (
         <p role="note" className="text-sm text-danger">
@@ -291,11 +303,18 @@ export function MoonOwnerPage({
           />
         )}
       </Panel>
-      {onSettledOtherwise && (
+      {(onSettledOtherwise || (onRemove && row.status !== 'removal-pending')) && (
         <div className="flex flex-wrap gap-2 border-t border-line pt-4">
-          <Button variant="ghost" onClick={onSettledOtherwise}>
-            {t(k('settledOtherwise'))}
-          </Button>
+          {onSettledOtherwise && (
+            <Button variant="ghost" onClick={onSettledOtherwise}>
+              {t(k('settledOtherwise'))}
+            </Button>
+          )}
+          {onRemove && row.status === 'active' && (
+            <Button variant="ghost" onClick={onRemove}>
+              {t(k('remove'))}
+            </Button>
+          )}
         </div>
       )}
     </div>

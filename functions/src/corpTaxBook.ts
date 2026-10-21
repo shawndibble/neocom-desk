@@ -61,6 +61,11 @@ export const FEEDER_OF_COLLECTION = 'corpTaxBookFeederOf';
  * Collector for the after-leaving view (issue #4512).
  */
 export const FEEDER_PREVIOUS_COLLECTION = 'corpTaxBookFeederPrevious';
+/**
+ * `corpTaxBookRemovalLinks/{sha256(code)}`: the link in a removal's mail (issue #4520); only the
+ * hash is stored. Function-only: a client never reads it.
+ */
+export const REMOVAL_LINKS_COLLECTION = 'corpTaxBookRemovalLinks';
 /** `corpTaxBooks/{collector}/feederViews/{feederCorp}`: the moon owner's read model (issue #4512). */
 export const FEEDER_VIEWS = 'feederViews';
 /**

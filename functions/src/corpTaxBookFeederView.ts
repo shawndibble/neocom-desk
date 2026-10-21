@@ -63,6 +63,9 @@ export interface FeederViewSummary {
   refineryCount: number;
   unpricedDays: number;
   dismissedAt: number | null;
+  /** A pending removal's start and, once its notice is out, when it takes effect (#4520). */
+  removalStartedAt?: number | null;
+  removalEffectiveAt?: number | null;
 }
 
 export interface FeederViewDayLine {
@@ -175,6 +178,7 @@ export type FeederViewRecord = Pick<
   | 'ownerRateHistory'
   | 'modeChanges'
   | 'viewDismissedAt'
+  | 'removal'
 >;
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -388,6 +392,10 @@ export function buildFeederView(input: FeederViewInput): FeederView {
     refineryCount: refineries.size,
     unpricedDays,
     dismissedAt: record.viewDismissedAt ?? null,
+    removalStartedAt:
+      record.status === 'pending-removal' ? (record.removal?.startedAt ?? null) : null,
+    removalEffectiveAt:
+      record.status === 'pending-removal' ? (record.removal?.effectiveAt ?? null) : null,
   };
   return {
     summary,

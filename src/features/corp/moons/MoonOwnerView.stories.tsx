@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { HandledByCard } from './HandledByCard';
 import { MoonOwnerView } from './MoonOwnerView';
 import { OwnerStaleBanner } from './OwnerStaleBanner';
+import { OwnerStatusStrip } from './OwnerStatusStrip';
 import { fixtureView, nameOf } from './ownerViewFixtures';
 
 const noop = async () => undefined;
@@ -80,5 +81,19 @@ export const NoRate: Story = {
       balanceIsk: 0,
       lastPayout: null,
     }),
+  },
+};
+
+/** @summary The accounting corporation started a removal: the strip, with End it now for the moon owner's officers. */
+export const RemovalPending: Story = {
+  args: {
+    view: fixtureView({ status: 'pending-removal' }),
+    banner: (
+      <OwnerStatusStrip
+        title="Removal pending, takes effect 18 Oct 2026 14:22 EVE time"
+        body="Brass Meridian Logistics started this on 17 Oct 2026. If you did not expect it, end it now and get in touch with them."
+        actions={<button type="button">End it now</button>}
+      />
+    ),
   },
 };

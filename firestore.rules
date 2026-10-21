@@ -558,6 +558,10 @@ service cloud.firestore {
     match /corpTaxBookFeederPrevious/{corporationId} {
       allow read, write: if false;
     }
+    // The link in a removal's mail (issue #4520), keyed by the code's hash. Function-only.
+    match /corpTaxBookRemovalLinks/{linkId} {
+      allow read, write: if false;
+    }
 
     // Which Corp Tax Books bill a Character (issue #4517): written by the sync only,
     // readable by that Character's own sign-in and nobody else, officers included.

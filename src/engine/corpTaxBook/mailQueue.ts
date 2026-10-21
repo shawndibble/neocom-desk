@@ -17,7 +17,8 @@ export const SEND_GAP_MAX_MS = 15_000;
 export const OFFLINE_RETRY_MS = 30_000;
 const MAX_RATE_LIMIT_WAIT_MS = 10 * 60_000;
 
-export type MailKind = 'statement' | 'reminder';
+/** `removal` and `removalCancelled` (#4520) are moon owner mails, not Statements. */
+export type MailKind = 'statement' | 'reminder' | 'removal' | 'removalCancelled';
 export type MailStatus = 'waiting' | 'sent' | 'failed';
 export type MailFailureReason = 'cspa' | 'auth' | 'other';
 
@@ -28,6 +29,8 @@ export interface MailQueueItem {
   corporationId: number;
   statementId: string;
   kind: MailKind;
+  /** The moon owner a removal mail is about (#4520); absent on Statement mail. */
+  feederCorporationId?: number;
   /** The character the mail is sent from (an officer with the mail scope). */
   senderCharacterId: number;
   recipientId: number;

@@ -47,7 +47,13 @@ export function currentRouterPath(): string {
  * (and so no background precache of the whole app) until the visitor goes into
  * the app. Keep in step with the exemptions in `App.tsx` / `routeScopes.test.ts`.
  */
-const PUBLIC_ROUTES = ['/s', '/share', '/communities/join', '/corp-tax-book/verify'] as const;
+const PUBLIC_ROUTES = [
+  '/s',
+  '/share',
+  '/communities/join',
+  '/corp-tax-book/verify',
+  '/corp-tax-book/remove-now',
+] as const;
 
 /** Whether `path` (a router path) is on a public link route. */
 export function isPublicRoute(path: string): boolean {

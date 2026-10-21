@@ -145,6 +145,46 @@ export async function enqueueReminder(
   return { ok: true, batchId, queued: added.length, skipped: skipped.length, missingLink };
 }
 
+export interface RemovalMailsInput {
+  corporationId: number;
+  feederCorporationId: number;
+  /** The officer's character the mail goes from. */
+  senderCharacterId: number;
+  kind: 'removal' | 'removalCancelled';
+  recipients: readonly { id: number; name: string }[];
+  mail: { subject: string; body: string };
+}
+
+/**
+ * Queues the removal notice (or its cancellation) once per recipient. The queue sends them
+ * paced like any other mail; the first notice out starts the removal's 24 hours.
+ */
+export async function enqueueRemovalMails(input: RemovalMailsInput): Promise<number> {
+  const batchId = crypto.randomUUID();
+  const start = await nextOrder();
+  const stamp = Date.now();
+  const items: MailQueueItem[] = input.recipients.map((r, i) => ({
+    id: crypto.randomUUID(),
+    batchId,
+    corporationId: input.corporationId,
+    feederCorporationId: input.feederCorporationId,
+    statementId: `${input.kind}:${input.feederCorporationId}:${stamp}:${r.id}`,
+    kind: input.kind,
+    senderCharacterId: input.senderCharacterId,
+    recipientId: r.id,
+    recipientName: r.name,
+    amount: 0,
+    subject: input.mail.subject,
+    body: input.mail.body,
+    order: start + i,
+    status: 'waiting',
+    createdAt: stamp,
+    attempts: 0,
+  }));
+  const { added } = await addToQueue(items);
+  return added.length;
+}
+
 /** Puts a failed mail back at the end of the line. */
 export async function retryMail(item: MailQueueItem): Promise<void> {
   await saveItem(retryItem(item, await nextOrder()));

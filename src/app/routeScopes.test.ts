@@ -134,6 +134,7 @@ describe('every route must declare its scope requirement', () => {
       '/',
       '/callback',
       '/communities/join/:code',
+      '/corp-tax-book/remove-now/:code',
       '/corp-tax-book/verify/:token',
       '/error',
       '/login',

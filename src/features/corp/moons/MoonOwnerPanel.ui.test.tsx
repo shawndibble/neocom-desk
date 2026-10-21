@@ -45,9 +45,15 @@ function ready(over = {}) {
     view: fixtureView(over),
   });
 }
-const mount = () =>
+const mount = (canLeave = true) =>
   render(
-    <MoonOwnerPanel owner={owner} characterId={7} corporationId={98} canLeave onLeft={vi.fn()} />
+    <MoonOwnerPanel
+      owner={owner}
+      characterId={7}
+      corporationId={98}
+      canLeave={canLeave}
+      onLeft={vi.fn()}
+    />
   );
 
 beforeEach(() => {
@@ -84,6 +90,27 @@ describe('MoonOwnerPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Ask for this rate' }));
     await waitFor(() => expect(requestFeederRate).toHaveBeenCalledWith(7, 98, 7));
     await waitFor(() => expect(loadFeederView).toHaveBeenCalledTimes(2));
+  });
+
+  it('shows the pending removal with its time and End it now, which asks before leaving', async () => {
+    ready({
+      status: 'pending-removal',
+      removalStartedAt: Date.UTC(2026, 9, 17, 14, 22),
+      removalEffectiveAt: Date.UTC(2026, 9, 18, 14, 22),
+    });
+    mount();
+    expect(
+      await screen.findByText('Removal pending, takes effect 18 Oct 2026 14:22 EVE time')
+    ).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'End it now' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('End the removal now?');
+  });
+
+  it('offers no End it now to an officer who may not leave', async () => {
+    ready({ status: 'pending-removal', removalStartedAt: 1, removalEffectiveAt: null });
+    mount(false);
+    expect(await screen.findByText('Removal pending')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'End it now' })).toBeNull();
   });
 
   it('says it is waiting when the view is not built yet', async () => {

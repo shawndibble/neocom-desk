@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/ui';
 import { moonOwnerDetail } from '@/engine/corpTaxBook/moonOwners';
-import { setFeederMode, setFeederRate } from '../taxBook/feederClient';
-import { SetRateDialog, SettledOtherwiseDialog } from './MoonOwnerDialogs';
+import { recordFeederRemovalSent, setFeederMode, setFeederRate } from '../taxBook/feederClient';
+import { RemoveMoonOwnerDialog, SetRateDialog, SettledOtherwiseDialog } from './MoonOwnerDialogs';
 import { MoonOwnerPage } from './MoonOwnerPage';
 import { Crumb } from './moonsParts';
+import { cancelRemovalAndMail, startRemovalAndMail, type RemovalContext } from './removalFlow';
+import { useCorporationName } from './statementMailing';
 import { useBook } from './useBook';
 import { useMoonOwners } from './useMoonOwners';
 
@@ -16,7 +18,8 @@ export function MoonOwnerDetail({ id }: { id: string }) {
   const { t } = useTranslation();
   const { names, canEdit, characterId, corporationId, reload } = useBook();
   const { input } = useMoonOwners();
-  const [dialog, setDialog] = useState<'rate' | 'settled' | null>(null);
+  const [dialog, setDialog] = useState<'rate' | 'settled' | 'remove' | null>(null);
+  const accountingName = useCorporationName();
   const corp = Number(id);
   const detail = /^\d+$/.test(id) ? moonOwnerDetail(input, corp) : undefined;
   if (!detail) {
@@ -36,6 +39,16 @@ export function MoonOwnerDetail({ id }: { id: string }) {
       reload();
     }
   };
+  const removal: RemovalContext | null = accountingName
+    ? {
+        characterId,
+        corporationId,
+        feederCorporationId: corp,
+        accountingName,
+        ownerName: name,
+        officerName: names.character(characterId),
+      }
+    : null;
   return (
     <>
       <MoonOwnerPage
@@ -46,9 +59,29 @@ export function MoonOwnerDetail({ id }: { id: string }) {
         oreName={names.ore}
         backTo={BACK}
         {...(canEdit
-          ? { onSetRate: () => setDialog('rate'), onSettledOtherwise: () => setDialog('settled') }
+          ? {
+              onSetRate: () => setDialog('rate'),
+              onSettledOtherwise: () => setDialog('settled'),
+              ...(removal
+                ? {
+                    onRemove: () => setDialog('remove'),
+                    onCancelRemoval: () => afterEdit(() => cancelRemovalAndMail(removal)),
+                  }
+                : {}),
+              onNoticeSent: () =>
+                afterEdit(() => recordFeederRemovalSent(characterId, corporationId, corp)),
+            }
           : {})}
       />
+      {dialog === 'remove' && removal && (
+        <RemoveMoonOwnerDialog
+          ownerName={name}
+          accountingName={removal.accountingName}
+          hasPayee={detail.hasPayee}
+          onClose={() => setDialog(null)}
+          onStart={() => afterEdit(() => startRemovalAndMail(removal))}
+        />
+      )}
       {dialog === 'rate' && (
         <SetRateDialog
           initial={detail.row.theirRatePct ?? null}
