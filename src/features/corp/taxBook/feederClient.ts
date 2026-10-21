@@ -5,6 +5,7 @@
  */
 import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
+import type { OutgoingDonation } from '@/engine/corpTaxBook/payouts';
 import { getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 
@@ -140,6 +141,52 @@ export async function setFeederMode(
     feederCorporationId,
     mode,
     ...(note === undefined || note.trim() === '' ? {} : { note }),
+  });
+}
+
+/** "I've sent it": records a payout at once; the wallet journal attaches to it later. Whole ISK. */
+export async function recordFeederPayout(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  payout: { amount: number; date: string; method: 'donation' | 'contract' | 'other' }
+): Promise<{ id: string }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'recordCorpTaxBookFeederPayoutCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    ...payout,
+  });
+}
+
+/** Mark a detected payment "not a payout" (or put it back). It keeps its journal entry, so it is never found again. */
+export async function markFeederPayout(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  payoutId: string,
+  notAPayout: boolean
+): Promise<{ ok: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'markCorpTaxBookFeederPayoutCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    payoutId,
+    notAPayout,
+  });
+}
+
+/** Hands over the donations the wallet sent so they attach to recorded payouts. Uses the cached officer check. */
+export async function reconcileFeederPayouts(
+  characterId: number,
+  corporationId: number,
+  outgoing: readonly OutgoingDonation[]
+): Promise<{ attached: number; recorded: number }> {
+  return call(characterId, 'reconcileCorpTaxBookFeederPayoutsCallable', {
+    corporationId,
+    outgoing,
   });
 }
 

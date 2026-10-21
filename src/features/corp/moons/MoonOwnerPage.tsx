@@ -114,6 +114,9 @@ export function MoonOwnerPage({
   backTo,
   onSetRate,
   onSettledOtherwise,
+  onPay,
+  onAddPayment,
+  onMarkPayout,
 }: {
   detail: MoonOwnerDetail;
   name: string;
@@ -124,10 +127,16 @@ export function MoonOwnerPage({
   /** Absent for a viewer who may not edit. */
   onSetRate?: () => void;
   onSettledOtherwise?: () => void;
+  /** Pay… the balance: absent when nothing is owed or the viewer may not record payments. */
+  onPay?: () => void;
+  /** Add a payment by hand. */
+  onAddPayment?: () => void;
+  /** Mark a payment "not a payout" (or count it again). */
+  onMarkPayout?: (payoutId: string, notAPayout: boolean) => void;
 }) {
   const { t } = useTranslation();
   const { row } = detail;
-  const payouts = detail.payouts.filter((p) => !p.notAPayout);
+  const payouts = detail.payouts;
 
   const payoutColumns: DataTableColumn<MoonOwnerPayout>[] = [
     {
@@ -154,8 +163,25 @@ export function MoonOwnerPage({
     {
       id: 'status',
       header: t(k('payouts.status')),
-      render: (p) => t(k(`payouts.state.${p.status}`)),
+      render: (p) =>
+        t(k(p.notAPayout ? 'payouts.state.not-a-payout' : `payouts.state.${p.status}`)),
     },
+    ...(onMarkPayout
+      ? [
+          {
+            id: 'mark',
+            header: '',
+            align: 'right' as const,
+            stackEdge: 'end' as const,
+            cellClassName: () => 'dt-action-row',
+            render: (p: MoonOwnerPayout) => (
+              <Button size="sm" variant="ghost" onClick={() => onMarkPayout(p.id, !p.notAPayout)}>
+                {t(k(p.notAPayout ? 'payouts.countIt' : 'payouts.notAPayout'))}
+              </Button>
+            ),
+          },
+        ]
+      : []),
   ];
   const minedKey = (m: MoonOwnerMinedLine) => `${m.characterId}:${m.structureId}`;
   const minedColumns: DataTableColumn<MoonOwnerMinedLine>[] = [
@@ -203,10 +229,19 @@ export function MoonOwnerPage({
         title={name}
         meta={<MoonOwnerStatusPill status={row.status} />}
         actions={
-          onSetRate ? (
-            <Button size="sm" onClick={onSetRate}>
-              {t(k('setRate'))}
-            </Button>
+          onPay || onSetRate ? (
+            <>
+              {onPay && (
+                <Button size="sm" onClick={onPay}>
+                  {t(k('pay'))}
+                </Button>
+              )}
+              {onSetRate && (
+                <Button size="sm" onClick={onSetRate}>
+                  {t(k('setRate'))}
+                </Button>
+              )}
+            </>
           ) : undefined
         }
       />
@@ -263,7 +298,19 @@ export function MoonOwnerPage({
           />
         </div>
       </Panel>
-      <Panel title={t(k('payouts.title'))} padded={false}>
+      <Panel
+        title={t(k('payouts.title'))}
+        padded={false}
+        {...(onAddPayment
+          ? {
+              actions: (
+                <Button size="sm" variant="ghost" onClick={onAddPayment}>
+                  {t(k('payouts.add'))}
+                </Button>
+              ),
+            }
+          : {})}
+      >
         {payouts.length === 0 ? (
           <p className="p-3 text-sm text-text-dim">{t(k('payouts.none'))}</p>
         ) : (

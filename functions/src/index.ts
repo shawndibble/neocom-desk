@@ -85,6 +85,14 @@ import {
   requestFeederRate,
 } from './corpTaxBookFeederViewCalls.js';
 import {
+  markFeederPayout,
+  parseMarkPayoutInput,
+  parseReconcilePayoutsInput,
+  parseRecordPayoutInput,
+  reconcileFeederPayoutsCall,
+  recordFeederPayout,
+} from './corpTaxBookFeederPayouts.js';
+import {
   listFeederInvites,
   parseSetFeederModeInput,
   parseSetFeederRateInput,
@@ -733,6 +741,30 @@ export const setCorpTaxBookFeederRateCallable = onCall<unknown>(FEEDER_OWNER_OPT
 
 export const setCorpTaxBookFeederModeCallable = onCall<unknown>(FEEDER_OWNER_OPTIONS, (request) =>
   setFeederMode(feederOwnerDeps(), callerOf(request), parseSetFeederModeInput(request.data))
+);
+
+// Paying a moon owner (issue #4514): record a payout, mark a journal row not a payout, and attach
+// the wallet journal's outgoing donations to the records. Each rebuilds the moon owner's view.
+export const recordCorpTaxBookFeederPayoutCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    recordFeederPayout(feederOwnerDeps(), callerOf(request), parseRecordPayoutInput(request.data))
+);
+
+export const markCorpTaxBookFeederPayoutCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    markFeederPayout(feederOwnerDeps(), callerOf(request), parseMarkPayoutInput(request.data))
+);
+
+export const reconcileCorpTaxBookFeederPayoutsCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    reconcileFeederPayoutsCall(
+      feederOwnerDeps(),
+      callerOf(request),
+      parseReconcilePayoutsInput(request.data)
+    )
 );
 
 export const listCorpTaxBookFeederInvitesCallable = onCall<unknown>(

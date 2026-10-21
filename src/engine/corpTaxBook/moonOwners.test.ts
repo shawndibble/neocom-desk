@@ -268,6 +268,29 @@ describe('moonOwnerDetail', () => {
     ]);
   });
 
+  it('pays the moon owner itself unless a payee is set, with the days since the last payment', () => {
+    const plain = moonOwnerDetail(
+      input({ entries: [entry(A, '2026-10-05', 100), entry(A, '2026-10-12', 100)] }),
+      A
+    )!;
+    expect(plain.payee).toEqual({ kind: 'corporation', id: A });
+    expect(plain.period).toEqual({ from: '2026-10-05', to: '2026-10-12' });
+    const set = moonOwnerDetail(
+      input({
+        entries: [entry(A, '2026-10-05', 100), entry(A, '2026-10-12', 100)],
+        feeders: [
+          feeder(A, {
+            payee: { kind: 'character', id: 7 },
+            payouts: [payout('a', '2026-10-06', 1)],
+          }),
+        ],
+      }),
+      A
+    )!;
+    expect(set.payee).toEqual({ kind: 'character', id: 7 });
+    expect(set.period).toEqual({ from: '2026-10-12', to: '2026-10-12' });
+  });
+
   it('is undefined for a corporation that is not a moon owner', () => {
     expect(moonOwnerDetail(input(), 5)).toBeUndefined();
   });

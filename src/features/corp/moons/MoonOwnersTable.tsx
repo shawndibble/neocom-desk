@@ -1,10 +1,18 @@
 import { useTranslation } from 'react-i18next';
 import { Pill, type PillTone } from '@/components/ui/Pill';
-import { DataTable, Panel, StatChip, StatChips, type DataTableColumn } from '@/components/ui';
-import type {
-  MoonOwnerRow,
-  MoonOwnerStatus,
-  MoonOwnerTotals,
+import {
+  Button,
+  DataTable,
+  Panel,
+  StatChip,
+  StatChips,
+  type DataTableColumn,
+} from '@/components/ui';
+import {
+  canPayMoonOwner,
+  type MoonOwnerRow,
+  type MoonOwnerStatus,
+  type MoonOwnerTotals,
 } from '@/engine/corpTaxBook/moonOwners';
 import { formatAge } from '@/lib/age';
 import { caretColumn } from './caretColumn';
@@ -41,6 +49,7 @@ export function MoonOwnersTable({
   name,
   now,
   onOpen,
+  onPay,
 }: {
   rows: readonly MoonOwnerRow[];
   totals: MoonOwnerTotals;
@@ -48,6 +57,8 @@ export function MoonOwnersTable({
   /** Epoch ms the ages are read at. */
   now: number;
   onOpen: (row: MoonOwnerRow) => void;
+  /** Pay… on a row that is owed. Absent for a viewer who may not record payments. */
+  onPay?: (row: MoonOwnerRow) => void;
 }) {
   const { t } = useTranslation();
   const columns: DataTableColumn<MoonOwnerRow>[] = [
@@ -131,6 +142,27 @@ export function MoonOwnersTable({
         ),
       sortValue: (r) => r.owed,
     },
+    ...(onPay
+      ? [
+          {
+            id: 'pay',
+            header: '',
+            align: 'right' as const,
+            stackEdge: 'end' as const,
+            cellClassName: () => 'dt-action-row',
+            render: (r: MoonOwnerRow) =>
+              canPayMoonOwner(r) ? (
+                <Button
+                  size="sm"
+                  aria-label={t(k('payNamed'), { name: name(r.corporationId) })}
+                  onClick={() => onPay(r)}
+                >
+                  {t(k('payAction'))}
+                </Button>
+              ) : null,
+          },
+        ]
+      : []),
     caretColumn<MoonOwnerRow>(),
   ];
   return (

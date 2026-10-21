@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/ui';
-import { moonOwnerDetail } from '@/engine/corpTaxBook/moonOwners';
-import { setFeederMode, setFeederRate } from '../taxBook/feederClient';
+import { canPayMoonOwner, moonOwnerDetail } from '@/engine/corpTaxBook/moonOwners';
+import { markFeederPayout, setFeederMode, setFeederRate } from '../taxBook/feederClient';
+import { PayMoonOwnerHost } from './PayMoonOwnerHost';
 import { SetRateDialog, SettledOtherwiseDialog } from './MoonOwnerDialogs';
 import { MoonOwnerPage } from './MoonOwnerPage';
 import { Crumb } from './moonsParts';
@@ -16,7 +17,7 @@ export function MoonOwnerDetail({ id }: { id: string }) {
   const { t } = useTranslation();
   const { names, canEdit, characterId, corporationId, reload } = useBook();
   const { input } = useMoonOwners();
-  const [dialog, setDialog] = useState<'rate' | 'settled' | null>(null);
+  const [dialog, setDialog] = useState<'rate' | 'settled' | 'pay' | 'add' | null>(null);
   const corp = Number(id);
   const detail = /^\d+$/.test(id) ? moonOwnerDetail(input, corp) : undefined;
   if (!detail) {
@@ -46,9 +47,25 @@ export function MoonOwnerDetail({ id }: { id: string }) {
         oreName={names.ore}
         backTo={BACK}
         {...(canEdit
-          ? { onSetRate: () => setDialog('rate'), onSettledOtherwise: () => setDialog('settled') }
+          ? {
+              onSetRate: () => setDialog('rate'),
+              onSettledOtherwise: () => setDialog('settled'),
+              onAddPayment: () => setDialog('add'),
+              onMarkPayout: (payoutId: string, notAPayout: boolean) =>
+                afterEdit(() =>
+                  markFeederPayout(characterId, corporationId, corp, payoutId, notAPayout)
+                ),
+              ...(canPayMoonOwner(detail.row) ? { onPay: () => setDialog('pay') } : {}),
+            }
           : {})}
       />
+      {(dialog === 'pay' || dialog === 'add') && (
+        <PayMoonOwnerHost
+          corporationId={corp}
+          manual={dialog === 'add'}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog === 'rate' && (
         <SetRateDialog
           initial={detail.row.theirRatePct ?? null}

@@ -14624,8 +14624,12 @@
             "state": {
               "recorded": "Recorded",
               "waiting-for-journal": "Waiting for the wallet journal",
-              "matched": "Matched in the wallet journal"
-            }
+              "matched": "Matched in the wallet journal",
+              "not-a-payout": "Not a payout"
+            },
+            "add": "Add a payment…",
+            "notAPayout": "Not a payout",
+            "countIt": "Count it"
           },
           "minedTitle": "Mined at their refineries",
           "minedNone": "Nothing mined at their refineries yet.",
@@ -14635,7 +14639,8 @@
             "ore": "Ore",
             "quantity": "Quantity",
             "value": "Value"
-          }
+          },
+          "pay": "Pay…"
         },
         "dialogs": {
           "rate": {
@@ -14671,6 +14676,17 @@
             "loadFailed": "Could not load the open links.",
             "done": "Done"
           }
+        },
+        "payAction": "Pay…",
+        "payNamed": "Pay {{name}}",
+        "pay": {
+          "title": "Pay {{name}}",
+          "addTitle": "Add a payment to {{name}}",
+          "intro": "Send this in the EVE client; the app cannot move ISK. Record it once it is sent.",
+          "reasonPrefix": "Moon mining payout",
+          "confirm": "I've sent it",
+          "change": "Owed to them {{before}} → {{after}}. The wallet journal confirms it later and never counts it twice.",
+          "afterCredit": "credit of {{amount}}"
         }
       }
     }
