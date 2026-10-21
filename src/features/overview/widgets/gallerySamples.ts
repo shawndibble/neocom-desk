@@ -690,6 +690,16 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ['Dax Orlen', 0.5, '24%'],
       ]),
     },
+    corpOrders: {
+      value: '14',
+      unit: t('overview.widgets.corpOrders.unit', { count: 14 }),
+      note: t('overview.widgets.corpOrders.escrow', { isk: '3.4B' }),
+      rows: [
+        ['Tritanium', 'Jita', '5.1'],
+        ['Compressed Veldspar', 'Amarr', '14.2'],
+        ['Nocxium', 'Jita', '1.9K'],
+      ],
+    },
     corpContracts: {
       value: '7',
       unit: t('overview.widgets.corpContracts.unit'),

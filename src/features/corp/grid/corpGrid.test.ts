@@ -13,6 +13,7 @@ const ALL: CorpCapabilities = {
   canReadAssets: true,
   canReadBlueprints: true,
   canReadContracts: true,
+  canReadOrders: true,
 };
 
 /** What a Character with `caps` sees of the default layout. */

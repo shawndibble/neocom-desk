@@ -23,7 +23,7 @@ import type {
   StructuresBoardData,
 } from '../../data/boardData';
 import type { IncursionsBoardData } from '../../data/incursionsBoard';
-import type { CorpContractsFeed } from './corpFeeds';
+import type { CorpContractsFeed, CorpOrdersFeed } from './corpFeeds';
 import type {
   CorpJobsFeed,
   CorpKillsFeed,
@@ -263,6 +263,7 @@ export interface FeedMap {
   corpMembers: CorpMembersFeed;
   corpMining: CorpMiningFeed;
   corpContracts: CorpContractsFeed;
+  corpOrders: CorpOrdersFeed;
   corpKills: CorpKillsFeed;
 }
 

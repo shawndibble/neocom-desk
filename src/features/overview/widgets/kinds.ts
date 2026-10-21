@@ -390,7 +390,14 @@ const SPECS: Record<string, Spec> = {
     range: true,
     endpoints: ['getCorporationWalletJournal'],
   },
-  corpOrders: { corp: 'corpMoney', views: NT, view: 'table', size: 'M', soon: true, endpoints: [] },
+  corpOrders: {
+    corp: 'corpMoney',
+    capabilities: ['canReadOrders'],
+    views: NT,
+    view: 'table',
+    size: 'M',
+    endpoints: ['getCorporationOrders'],
+  },
   corpMembers: {
     corp: 'corpPeople',
     capabilities: ['canReadMembers'],

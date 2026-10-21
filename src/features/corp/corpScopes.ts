@@ -90,6 +90,8 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
   canReadBlueprints: ['esi-corporations.read_blueprints.v1'],
   /** Open to every member; additive (below), so a corp grant made before it stays `ready`. */
   canReadContracts: ['esi-contracts.read_corporation_contracts.v1'],
+  /** Accountant or Trader; additive (below), so a corp grant made before it stays `ready`. */
+  canReadOrders: ['esi-markets.read_corporation_orders.v1'],
 };
 
 /**
@@ -111,6 +113,7 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
 const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set([
   'canReadMiningLedger',
   'canReadContracts',
+  'canReadOrders',
 ]);
 
 /**

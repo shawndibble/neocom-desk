@@ -12,7 +12,8 @@
  * - a thrown load: the read was allowed and failed. The widget shows Retry.
  * - data, possibly an empty list: read fine.
  */
-import type { Contract, CorporationIndustryJob } from '@/esi/endpoints';
+import type { Contract, CorporationIndustryJob, CorporationOrder } from '@/esi/endpoints';
+import type { HubAggregate } from '@/market/fuzzwork';
 import type { MemberActivity, RosterDiff } from '@/engine/corp/members';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { WalletDivision } from '@/features/corp/divisions';
@@ -89,6 +90,18 @@ export interface CorpContractsFeed extends CorpFeedBase {
   names: ReadonlyMap<number, string>;
 }
 
+export interface CorpOrdersFeed extends CorpFeedBase {
+  /** Every open order the corporation has, both sides. */
+  orders: CorporationOrder[];
+  typeNames: ReadonlyMap<number, string>;
+  /** NPC station names by location id; a location absent is a player structure. */
+  stationNames: ReadonlyMap<number, string>;
+  /** Best rival price per `${locationId}:${typeId}`, for the undercut status. */
+  stationPrices: ReadonlyMap<string, HubAggregate>;
+  /** Names of the Characters who issued the orders. */
+  issuerNames: ReadonlyMap<number, string>;
+}
+
 /**
  * The corporation's zKillboard all-time totals: not an ESI read, so no role or
  * scope gates it. `readable: false` means the widget has nothing to ask about
@@ -125,6 +138,11 @@ export async function loadCorpMiningFeed(characterId: number): Promise<CorpMinin
 export async function loadCorpContractsFeed(characterId: number): Promise<CorpContractsFeed> {
   const { loadCorpContracts } = await import('./corpFeedLoaders');
   return loadCorpContracts(characterId);
+}
+
+export async function loadCorpOrdersFeed(characterId: number): Promise<CorpOrdersFeed> {
+  const { loadCorpOrders } = await import('./corpFeedLoaders');
+  return loadCorpOrders(characterId);
 }
 
 export async function loadCorpKillsFeed(characterId: number): Promise<CorpKillsFeed> {
