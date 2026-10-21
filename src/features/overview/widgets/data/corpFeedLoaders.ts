@@ -17,6 +17,7 @@ import { CorpReadFailed } from '@/features/corp/corpRead';
 import { resolveCorpReadAccess, type CorpCapability } from '@/features/corp/corpReadAccess';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { walletDivisions } from '@/features/corp/divisions';
+import { loadCorporationCustomsOffices } from '@/features/corp/customsOffices';
 import { loadCorporationIndustryJobs } from '@/features/corp/jobs';
 import {
   loadCorporationMemberIds,
@@ -36,6 +37,7 @@ import { fetchCorporationStats } from '@/lib/zkillboard';
 import { parseInstant } from '@/engine/esiInstant';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import type {
+  CorpCustomsFeed,
   CorpContractsFeed,
   CorpJobsFeed,
   CorpJournalLine,
@@ -134,6 +136,43 @@ export async function loadCorpJobs(characterId: number): Promise<CorpJobsFeed> {
     jobs,
     typeNames,
     installerNames,
+  };
+}
+
+export async function loadCorpCustoms(characterId: number): Promise<CorpCustomsFeed> {
+  const empty: CorpCustomsFeed = {
+    ...UNREADABLE,
+    offices: [],
+    typeNames: new Map(),
+    systemNames: new Map(),
+  };
+  const access = await gate(characterId, 'canReadCustomsOffices');
+  if (access === null) return empty;
+  const result = await loadCorporationCustomsOffices(characterId, access.corporationId);
+  if (result.cached === null) {
+    if (result.needsReauth) return { ...empty, needsReauth: true };
+    throw new CorpReadFailed('customs offices');
+  }
+  const offices = result.cached.data;
+  const typeIds = [
+    ...new Set(offices.flatMap((office) => (office.type_id === undefined ? [] : [office.type_id]))),
+  ];
+  const [typeNames, systems] = await Promise.all([
+    typeIds.length === 0 ? new Map<number, string>() : loadTypeNames(typeIds),
+    import('@/sde/solarSystems').then((m) => m.loadSolarSystemsById()).catch(() => null),
+  ]);
+  const systemNames = new Map<number, string>();
+  for (const office of offices) {
+    const name = systems?.get(office.system_id)?.name;
+    if (name !== undefined) systemNames.set(office.system_id, name);
+  }
+  return {
+    readable: true,
+    needsReauth: false,
+    ...readAge([result]),
+    offices,
+    typeNames,
+    systemNames,
   };
 }
 

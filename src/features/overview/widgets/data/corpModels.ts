@@ -7,6 +7,7 @@
 import type { KindDef } from './builderKit';
 import { corpContracts } from './corpContractsModels';
 import { corpDeadlines, corpJobs, corpServices } from './corpClockModels';
+import { corpCustomsOffices } from './corpCustomsModels';
 import { corpCashFlow, corpIncome, corpWallet } from './corpMoneyModels';
 import { corpKills } from './corpOpsModels';
 import { corpInactive, corpMembers, corpMining } from './corpPeopleModels';
@@ -15,6 +16,7 @@ export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
   corpDeadlines: { feeds: ['structures', 'moonChunks', 'corpJobs'], build: corpDeadlines },
   corpServices: { feeds: ['structures'], build: corpServices },
   corpJobs: { feeds: ['corpJobs'], build: corpJobs },
+  corpCustomsOffices: { feeds: ['corpCustoms'], build: corpCustomsOffices },
   corpWallet: { feeds: ['corpWallet'], build: corpWallet },
   corpCashFlow: { feeds: ['corpWallet'], build: corpCashFlow },
   corpIncome: { feeds: ['corpWallet'], build: corpIncome },

@@ -764,6 +764,15 @@ export const ESI_REGISTRY = {
     scope: 'esi-contracts.read_corporation_contracts.v1',
     group: 'corp',
   },
+  /**
+   * Customs offices (issue #4611): Director-only per `x-required-roles`
+   * (`canReadCustomsOffices`); the scope is additive (`corpScopes.ts`).
+   */
+  getCorporationCustomsOffices: {
+    route: '/corporations/{corporation_id}/customs_offices',
+    scope: 'esi-planets.read_customs_offices.v1',
+    group: 'corp',
+  },
 } as const satisfies Record<EndpointName, EsiEndpointSpec>;
 
 export type EsiEndpointId = keyof typeof ESI_REGISTRY;

@@ -700,6 +700,28 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ['Efa to Amarr haul', t('contracts.typeCourier'), '2d 8h'],
       ],
     },
+    corpCustomsOffices: {
+      value: '3',
+      unit: t('overview.widgets.corpCustomsOffices.unit', { count: 3 }),
+      note: t('overview.widgets.corpCustomsOffices.systems', { count: 2 }),
+      rows: [
+        [
+          'Customs Office',
+          'Efa',
+          t('overview.widgets.corpCustomsOffices.window', { start: '18', end: '20' }),
+        ],
+        [
+          'Customs Office',
+          'Niarja',
+          t('overview.widgets.corpCustomsOffices.window', { start: '02', end: '04' }),
+        ],
+        [
+          'Customs Office',
+          'Niarja',
+          t('overview.widgets.corpCustomsOffices.window', { start: '14', end: '16' }),
+        ],
+      ],
+    },
     corpKills: {
       value: '1,284',
       unit: t('overview.widgets.corpKills.unit', { count: 1284 }),
