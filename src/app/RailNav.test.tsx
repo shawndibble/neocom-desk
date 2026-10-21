@@ -109,6 +109,35 @@ describe('the rail', () => {
     expect(within(group).getByRole('link', { name: 'Statements' })).toBeInTheDocument();
   });
 
+  it('marks only Corp Wallet current on /corp/wallet, not Corp Board above it', async () => {
+    vi.mocked(useCorpAccess).mockReturnValue({
+      state: 'ready',
+      capabilities: { ...NO_CORP_CAPABILITIES, canReadWallet: true },
+      missingScopes: [],
+      roles: ['Junior_Accountant'],
+      readFailed: false,
+      retry: () => {},
+    });
+    await db.characters.put({
+      characterId: 42,
+      name: 'Pilot',
+      ownerHash: 'h',
+      addedAt: 0,
+      corporationId: 98000001,
+    });
+    useActiveCharacter.setState({ activeCharacterId: 42, hydrated: true });
+    renderAt('/corp/wallet');
+
+    const group = await within(rail()).findByRole('group', { name: 'Corporation' });
+    expect(within(group).getByRole('link', { name: 'Corp Wallet' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(within(group).getByRole('link', { name: 'Corp Board' })).not.toHaveAttribute(
+      'aria-current'
+    );
+  });
+
   it('draws no Corporation group, heading included, without Corp Access', () => {
     renderAt('/overview');
     expect(screen.queryByText('Corporation')).not.toBeInTheDocument();

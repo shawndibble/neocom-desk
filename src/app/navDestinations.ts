@@ -347,6 +347,17 @@ const LABEL_KEY_BY_PATH = Object.fromEntries(
   NAV_PAGES.map((page) => [page.path, page.labelKey])
 ) as Record<NavPagePath, string>;
 
+/**
+ * Pages whose path is the parent of another page's (`/corp` over
+ * `/corp/wallet`). Their links match exactly, or Corp Board would read as
+ * current on every Corp page; every other page stays current on its own tabs.
+ */
+export const PARENT_PAGE_PATHS: ReadonlySet<string> = new Set(
+  NAV_PAGES.map((page) => page.path as string).filter((path) =>
+    NAV_PAGES.some((other) => other.path.startsWith(`${path}/`))
+  )
+);
+
 /** The `nav.*` key for a page in the descriptor. */
 export function navPageLabelKey(path: NavPagePath): string {
   return LABEL_KEY_BY_PATH[path];
