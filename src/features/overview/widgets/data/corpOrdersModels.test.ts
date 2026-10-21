@@ -51,6 +51,11 @@ describe('corpOrders', () => {
     expect(view.emptyMessage).toBe('overview.board.corpUnreadable');
   });
 
+  it('links its title to the Market orders Corp view', () => {
+    expect(corpOrders(feed([order(1)]), ctx).to).toBe('/market/orders?scope=corp');
+    expect(corpOrders(feed([], { readable: false }), ctx).to).toBe('/market/orders?scope=corp');
+  });
+
   it('counts open orders, sums escrow and flags the undercut one', () => {
     const view = corpOrders(
       feed([

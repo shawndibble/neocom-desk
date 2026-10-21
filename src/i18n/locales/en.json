@@ -10998,6 +10998,20 @@
       "errorHint": "Try again, or reload the page."
     },
     "orders": {
+      "corp": {
+        "scopeLabel": "Whose orders",
+        "characterScope": "Character",
+        "corpScope": "Corp",
+        "tableName": "Corp open orders",
+        "issuedBy": "Issued by",
+        "searchPlaceholder": "Search by item, station or issuer…",
+        "reauthTitle": "Corp orders need a new grant",
+        "reauthHint": "Grant corporation market orders access to see your corporation's open buy and sell orders.",
+        "reauthAction": "Grant access",
+        "emptyTitle": "No corp orders cached",
+        "emptyHint": "Couldn't load your corporation's orders yet. Try again shortly.",
+        "emptyFetchedTitle": "No corp orders"
+      },
       "tableName": "Open orders",
       "scopeOverByPct": "I am over by (%)",
       "badge": {

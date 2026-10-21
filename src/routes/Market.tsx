@@ -112,9 +112,9 @@ import {
 } from '@/features/market/marketOrderColumns';
 
 // One tab renders at a time: each panel loads on first visit.
-const OpenOrdersPanel = lazy(() =>
-  guarded(() => import('@/features/market/OpenOrdersPanel')).then((m) => ({
-    default: m.OpenOrdersPanel,
+const OrdersTab = lazy(() =>
+  guarded(() => import('@/features/market/OrdersTab')).then((m) => ({
+    default: m.OrdersTab,
   }))
 );
 const StockTab = lazy(() =>
@@ -916,7 +916,7 @@ export function Market() {
 
         <TabPanel tabsId={viewsTabsId} tabId={tab}>
           <Suspense fallback={null}>
-            {tab === 'orders' && <OpenOrdersPanel headerSlots={headerSlots} />}
+            {tab === 'orders' && <OrdersTab headerSlots={headerSlots} />}
             {tab === 'stock' && <StockTab activeCharacterId={activeCharacterId} />}
 
             {tab === 'history' && <TransactionsPanel headerSlots={headerSlots} />}
