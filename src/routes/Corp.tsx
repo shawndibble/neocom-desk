@@ -35,7 +35,6 @@ import {
   OverviewCachedNotice,
   OverviewCustomize,
   OverviewDataAge,
-  OverviewNext,
 } from '@/features/overview/OverviewHeader';
 import { useOverviewSummary } from '@/features/overview/useOverviewSummary';
 import { WidgetBoardContext } from '@/features/overview/widgets/board';
@@ -78,17 +77,16 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      {/* Title, tabs, data age and the controls on one line (#566). */}
+      {/*
+        Title, tabs, data age and Customize on one line (#566). No Next deadline
+        button: it squeezed the five tabs off the line, and Due soon already
+        names the next clock.
+      */}
       <PageHeader
         title={t('corp.title')}
         meta={<OverviewDataAge summary={summary} note={t('corp.dataAgeNote')} />}
         subNav={<CorpSubNav flush />}
-        actions={
-          <>
-            <OverviewNext summary={summary} />
-            <OverviewCustomize />
-          </>
-        }
+        actions={<OverviewCustomize />}
       />
       <OverviewCachedNotice summary={summary} />
       {editing && (

@@ -416,8 +416,19 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
       columns: [
         { key: 'product', label: t('overview.widgets.corpJobs.col.product'), priority: 0 },
         { key: 'ends', label: t('overview.widgets.corpJobs.col.ends'), align: 'end', priority: 1 },
-        { key: 'installer', label: t('overview.widgets.corpJobs.col.installer'), priority: 2 },
-        { key: 'activity', label: t('overview.widgets.corpJobs.col.activity'), priority: 3 },
+        // Product and time left are the row; who installed it and how read fine without at phone width.
+        {
+          key: 'installer',
+          label: t('overview.widgets.corpJobs.col.installer'),
+          priority: 2,
+          hideNarrow: true,
+        },
+        {
+          key: 'activity',
+          label: t('overview.widgets.corpJobs.col.activity'),
+          priority: 3,
+          hideNarrow: true,
+        },
       ],
       rows: facts.map((f): TableRowModel => ({
         key: String(f.job.job_id),
