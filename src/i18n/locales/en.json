@@ -4573,7 +4573,6 @@
           "side": "Side",
           "price": "Price",
           "vsBest": "vs best",
-          "issuedBy": "Issued by",
           "expires": "Expires",
           "station": "Station"
         }
@@ -10999,9 +10998,7 @@
     },
     "orders": {
       "corp": {
-        "tableName": "Corp open orders",
         "issuedBy": "Issued by",
-        "searchPlaceholder": "Search by item, station or issuer…",
         "reauthTitle": "Corp orders need a new grant",
         "reauthHint": "Grant corporation market orders access to see your corporation's open buy and sell orders.",
         "reauthAction": "Grant access",
@@ -11295,8 +11292,7 @@
         "healthy_other": "{{count}} healthy orders",
         "showHealthy": "Show",
         "standingsAssumed": "Fees assume base standings for {{name}}",
-        "notShared": "{{name}} hasn't shared their orders",
-        "colOrderPrice": "Price"
+        "notShared": "{{name}} hasn't shared their orders"
       },
       "assumesBaseStandingsHint": "Floor prices on this character's sell orders are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings."
     },

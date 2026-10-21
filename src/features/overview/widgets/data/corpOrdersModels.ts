@@ -6,50 +6,15 @@
  * time. ESI caches the list for 1200 s, and the table shows orders by the
  * day, so no countdown finer than that is drawn.
  */
-import {
-  buildOpenOrderRows,
-  type OpenOrderRow,
-  openOrderProblemCounts,
-  notCheckedCount,
-} from '@/features/market/openOrdersModel';
+import { openOrderProblemCounts, notCheckedCount } from '@/features/market/openOrdersModel';
+import { corpOrderRows } from '@/features/market/corpOpenOrders';
 import { formatIskCompact } from '@/lib/isk';
 import { blank, corpUnreadable, count, statusOf, type Builder } from './builderKit';
-import type { CorpOrdersFeed } from './corpFeeds';
 import { ordersListed, ordersTable } from './ordersModels';
 
 const C = 'overview.widgets.corpOrders';
 /** The Market orders page's Corp view. */
 const TO = '/market/orders?scope=corp';
-
-/**
- * The corporation's open orders as Orders-page rows, judged by the character
- * undercut rules. Shared by the widget and the Market orders Corp view, so the
- * two never disagree on what is undercut.
- */
-export function corpOrderRows(data: CorpOrdersFeed, now: number): OpenOrderRow[] {
-  return buildOpenOrderRows({
-    snapshot: {
-      entries: [
-        {
-          // One synthetic owner: the corporation. Cost basis and skills are per Character.
-          characterId: 0,
-          characterName: '',
-          orders: data.orders.map((order) => ({ ...order, is_corporation: true })),
-          fetchedAt: data.fetchedAt?.getTime() ?? 0,
-          fromCache: data.fromCache,
-          needsReauth: false,
-        },
-      ],
-      skipped: [],
-    },
-    typeNames: data.typeNames,
-    stationPrices: data.stationPrices,
-    costBases: new Map(),
-    stationNames: data.stationNames,
-    skillsByCharacter: new Map(),
-    now,
-  });
-}
 
 export const corpOrders: Builder = (feeds, { t, now }) => {
   const feed = feeds.corpOrders;

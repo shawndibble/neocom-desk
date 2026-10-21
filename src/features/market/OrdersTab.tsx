@@ -1,4 +1,3 @@
-import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -8,16 +7,12 @@ import { optionalEnumParam } from '@/lib/urlState';
 import { OpenOrdersPanel } from './OpenOrdersPanel';
 import type { PageHeaderSlots } from './pageHeaderSlots';
 
-/** The corp view is its own chunk: its reads are for the pilots who can use them. */
-const CorpOrdersView = lazy(() =>
-  import('./CorpOrdersView').then((m) => ({ default: m.CorpOrdersView }))
-);
 /** `?scope=corp` on Open orders: the corporation's orders. Absent is the Character's own (ADR 0015). */
 const SCOPE_PARAM = optionalEnumParam(['corp'] as const);
 
 /**
- * Market's Open orders tab with its Character / Corporation scope, a choice on
- * the Character filter picker. Hide, don't lock: a Character without the
+ * Market's Open orders tab. Corporation is a data source of the same panel,
+ * a choice on the Character filter picker beside This / All characters. Hide, don't lock: a Character without the
  * Accountant or Trader role and the corp orders scope sees neither the option
  * nor the corp view, even from a pasted link.
  */
@@ -41,23 +36,14 @@ export function OrdersTab({ headerSlots }: { headerSlots: PageHeaderSlots }) {
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
-      ) : corpView ? (
-        <Suspense
-          fallback={
-            <div className="flex justify-center py-16">
-              <Spinner label={t('common.loading')} />
-            </div>
-          }
-        >
-          <CorpOrdersView
-            headerSlots={headerSlots}
-            onLeaveCorporation={() => setScopeParam(null)}
-          />
-        </Suspense>
       ) : (
+        // Keyed by source: a switch is a fresh load, never the other source's rows for a frame.
         <OpenOrdersPanel
+          key={corpView ? 'corporation' : 'character'}
           headerSlots={headerSlots}
+          corporation={corpView}
           onChooseCorporation={corpAvailable ? () => setScopeParam('corp') : undefined}
+          onLeaveCorporation={() => setScopeParam(null)}
         />
       )}
     </>

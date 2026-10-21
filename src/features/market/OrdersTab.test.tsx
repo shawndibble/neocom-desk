@@ -9,21 +9,22 @@ import { OrdersTab } from './OrdersTab';
 import type { PageHeaderSlots } from './pageHeaderSlots';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
-// The panels own the picker; stand-ins drive the Corporation option the way the real
-// `CharacterFilterControl` does, through the callbacks OrdersTab hands them.
+// The panel owns the picker; the stand-in drives its options the way the real
+// `CharacterFilterControl` does, through the callbacks OrdersTab hands it.
 vi.mock('./OpenOrdersPanel', () => ({
-  OpenOrdersPanel: ({ onChooseCorporation }: { onChooseCorporation?: () => void }) => (
+  OpenOrdersPanel: ({
+    corporation,
+    onChooseCorporation,
+    onLeaveCorporation,
+  }: {
+    corporation?: boolean;
+    onChooseCorporation?: () => void;
+    onLeaveCorporation?: () => void;
+  }) => (
     <>
-      <p>character orders</p>
+      <p>{corporation ? 'corp orders' : 'character orders'}</p>
       {onChooseCorporation && <button onClick={onChooseCorporation}>Corporation</button>}
-    </>
-  ),
-}));
-vi.mock('./CorpOrdersView', () => ({
-  CorpOrdersView: ({ onLeaveCorporation }: { onLeaveCorporation: () => void }) => (
-    <>
-      <p>corp orders</p>
-      <button onClick={onLeaveCorporation}>This character</button>
+      {corporation && <button onClick={onLeaveCorporation}>This character</button>}
     </>
   ),
 }));
