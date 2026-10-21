@@ -1,11 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { PayMoonOwnerDialog } from './PayMoonOwnerDialog';
 
+const PAY_SCOPES = ['esi-ui.open_window.v1'] as const;
+
 /** @summary Pay… a moon owner: Settle up's shell with one row, the whole-ISK balance, a generated reason and a before → after line. */
 const meta = {
   title: 'corp/PayMoonOwnerDialog',
   component: PayMoonOwnerDialog,
-  parameters: { layout: 'fullscreen' },
+  // A signed-in Character with the Open in EVE scope: the "To" row keeps its width.
+  parameters: {
+    layout: 'fullscreen',
+    shell: { path: '/corp/moons/moon-owners', scopes: PAY_SCOPES },
+  },
   args: {
     ownerName: 'Ashfall Mining Collective',
     payee: { id: 98, name: 'Ashfall Mining Collective' },

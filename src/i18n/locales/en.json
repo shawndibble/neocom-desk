@@ -13911,8 +13911,7 @@
       "introNoTime": "{{accounting}} started removing {{owner}} as a moon owner. You can end it now instead.",
       "hint": "Mining at {{owner}}'s refineries stops being counted from today. What {{accounting}} owes {{owner}} stays owed.",
       "confirm": "Remove now",
-      "unavailable": "This can't be done right now; the removal takes effect {{time}}.",
-      "unavailableNoTime": "This can't be done right now.",
+      "unavailable": "This can't be done right now.",
       "done": "Done. {{owner}} is no longer a moon owner of {{accounting}}. What is owed stays owed.",
       "signIn": "Log in with the character this link was meant for.",
       "login": "Log in with EVE",
@@ -14483,7 +14482,6 @@
           "title": "To stop",
           "body": "Leave any time. Nothing already collected is deleted. It re-syncs about every 6 hours."
         },
-        "moonNames": "If the Character you pick is also a Station Manager, moon names come free. Otherwise add a Station Manager to see which moon.",
         "rate": "Rate you ask for (%, optional)",
         "from": "{{name}} will handle the tax on your moons.",
         "offered": "They offer you {{pct}}% of the value of ore mined at your refineries.",
@@ -14920,6 +14918,7 @@
           "notSet": "Not set",
           "history": {
             "agreed": "Rate set to {{pct}}%",
+            "agreedBy": "Rate set to {{pct}}% by {{by}}",
             "requested": "{{name}} asked for {{pct}}%",
             "joined": "Joined from an invite offering {{pct}}%"
           },

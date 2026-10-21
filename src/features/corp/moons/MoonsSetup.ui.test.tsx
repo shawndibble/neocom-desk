@@ -96,6 +96,22 @@ describe('MoonsSetup', () => {
     expect(beginFeederGrantLogin).toHaveBeenCalledWith(7, 'abc123DEF456', 6);
   });
 
+  it('shows a plain sentence, not the server message, when the EVE login cannot start', async () => {
+    beginFeederGrantLogin.mockRejectedValue(
+      Object.assign(new Error('internal: raw server text'), { details: { reason: 'invite-used' } })
+    );
+    renderSetup(undefined, '?invite=abc123DEF456');
+    await userEvent.click(await screen.findByRole('button', { name: 'Continue to EVE' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/already used/);
+    expect(document.body.textContent).not.toMatch(/raw server text/);
+  });
+
+  it('does not promise moon names from a Station Manager on the consent screen', async () => {
+    renderSetup(undefined, '?invite=abc123DEF456');
+    await screen.findByText('Share your mining ledger');
+    expect(document.body.textContent).not.toMatch(/Station Manager/);
+  });
+
   it('treats a blank rate as a complete grant', async () => {
     renderSetup(undefined, '?invite=abc123DEF456');
     const user = userEvent.setup();
@@ -175,6 +191,10 @@ describe('MoonsSetup', () => {
 
   it('Leave says what is owed, leaves, then offers the choices again', async () => {
     getFeederStatus.mockResolvedValue(owner);
+    loadFeederView.mockResolvedValue({
+      access: { collectorCorporationId: 5, expiresAt: 0, canEdit: true },
+      view: fixtureView({ balanceKind: 'owed', balanceIsk: 2_500_000 }),
+    });
     renderSetup();
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Leave' }));

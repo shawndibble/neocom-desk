@@ -14,14 +14,20 @@ export function FeederConsent({
   characterId,
   code,
   busy,
+  error,
   onContinue,
   onBack,
+  loadPreview = previewFeederInvite,
 }: {
   characterId: number;
   code: string;
   busy: boolean;
+  /** Why the EVE login could not start, as text. */
+  error?: string | null;
   onContinue: (requestedRatePct: number | undefined) => void;
   onBack: () => void;
+  /** Reads who the link is from; a seam for stories. */
+  loadPreview?: typeof previewFeederInvite;
 }) {
   const { t } = useTranslation();
   const [rate, setRate] = useState('');
@@ -29,7 +35,7 @@ export function FeederConsent({
   const [preview, setPreview] = useState<FeederInvitePreview | 'invalid' | null>(null);
   useEffect(() => {
     let cancelled = false;
-    previewFeederInvite(characterId, code).then(
+    loadPreview(characterId, code).then(
       (p) => {
         if (!cancelled) setPreview(p);
       },
@@ -41,7 +47,7 @@ export function FeederConsent({
     return () => {
       cancelled = true;
     };
-  }, [characterId, code]);
+  }, [characterId, code, loadPreview]);
   const offer = preview !== null && preview !== 'invalid' ? preview : null;
   const publicName = useEntityName(
     offer && offer.collectorName === null ? offer.collectorCorporationId : undefined
@@ -67,6 +73,11 @@ export function FeederConsent({
           {t('corpTaxBook.moons.setup.failed.invite-invalid')}
         </p>
       )}
+      {error && (
+        <p role="alert" className="text-danger">
+          {error}
+        </p>
+      )}
       {name !== null && (
         <p>
           {t('corpTaxBook.moons.consent.from', { name })}
@@ -77,7 +88,6 @@ export function FeederConsent({
       {part('sees')}
       {part('cannot')}
       {part('stop')}
-      <p className="text-xs text-text-dim">{t('corpTaxBook.moons.consent.moonNames')}</p>
       <label className="block space-y-1">
         <span className="text-xs text-text-dim">{t('corpTaxBook.moons.consent.rate')}</span>
         <TextInput inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />

@@ -173,7 +173,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   );
 }
 
-function CorpMoonsView() {
+function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   const { t } = useTranslation();
   const sync = useCorpTaxBook();
   const book = useCorpBook(sync);
@@ -223,6 +223,23 @@ function CorpMoonsView() {
   }
   if (state.status !== 'ready' || book.characterId === null || book.corporationId === null)
     return null;
+  // Only a corporation with a book syncs it: a moon owner never needs the mining scope here.
+  if (needsScope) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-4 p-4">
+        <PageHeader title={t('corp.moons.title')} subNav={<CorpSubNav flush />} />
+        <EmptyState
+          title={t('corpTaxBook.moons.scope.title')}
+          hint={t('corpTaxBook.moons.scope.hint')}
+          action={
+            <Button variant="primary" onClick={() => void sync.ledger.request()}>
+              {t('corpTaxBook.moons.scope.action')}
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
   return (
     <BookProvider
       value={{
@@ -273,21 +290,5 @@ export function CorpMoons() {
       </div>
     );
   }
-  if (ledger.state === 'needs-scope') {
-    return (
-      <div className="mx-auto max-w-6xl space-y-4 p-4">
-        <PageHeader title={t('corp.moons.title')} subNav={<CorpSubNav flush />} />
-        <EmptyState
-          title={t('corpTaxBook.moons.scope.title')}
-          hint={t('corpTaxBook.moons.scope.hint')}
-          action={
-            <Button variant="primary" onClick={() => void ledger.request()}>
-              {t('corpTaxBook.moons.scope.action')}
-            </Button>
-          }
-        />
-      </div>
-    );
-  }
-  return <CorpMoonsView />;
+  return <CorpMoonsView needsScope={ledger.state === 'needs-scope'} />;
 }
