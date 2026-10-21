@@ -14597,7 +14597,9 @@
           "too-many-invites": "Too many open invite links. Cancel one first.",
           "ledger-unavailable": "Could not read your mining ledger just now. Try again in a few minutes; the invite still works.",
           "start-before-leave": "The book can start no earlier than the day the accounting corporation stopped handling your moons.",
-          "survey-not-found": "That Survey could not be opened. Check the link, and that it has not expired."
+          "survey-not-found": "That Survey could not be opened. Check the link, and that it has not expired.",
+          "unknown-refinery": "That refinery has no mining for this corporation yet.",
+          "role-required": "Only a CEO, Director or Accountant can do this."
         }
       },
       "consent": {
@@ -14638,6 +14640,14 @@
           "nothingOwed": "{{name}} owes you nothing right now. Nothing is deleted.",
           "body": "This stops the sync at once and revokes the access. To run your own book instead, turn it on afterwards from this page."
         }
+      },
+      "refineryLabels": {
+        "title": "Refineries",
+        "edit": "Label {{name}}",
+        "editTooltip": "Edit label",
+        "field": "Refinery label",
+        "hint": "Both corporations see this label. Leave it empty to use the default name.",
+        "failed": "Could not save the label. Try again."
       },
       "ownerView": {
         "statement": {

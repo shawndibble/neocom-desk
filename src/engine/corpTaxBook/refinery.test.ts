@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { learnRefinerySystems, refineryLabel, sourceCorporationOf } from './refinery';
+import {
+  learnRefinerySystems,
+  officerLabelsOf,
+  refineryFacts,
+  refineryLabel,
+  refineryLabeler,
+  sourceCorporationOf,
+} from './refinery';
 import { groupObservedEntries, mergeObservedRows, observedRowKey } from './observed';
 import type { ObservedRow } from './types';
 
@@ -92,6 +99,65 @@ describe('refineryLabel', () => {
     expect(refineryLabel({ ...base, systemName: 'Jita', officerLabels: edits }).source).toBe(
       'system'
     );
+  });
+});
+
+describe('refineryLabeler', () => {
+  const sources = {
+    officerLabels: (id: number) =>
+      id === TATARA ? [{ label: 'Tatara by the gate', setAt: '2026-10-03T00:00:00Z' }] : undefined,
+    systemName: (id: number) => (id === ATHANOR ? 'Efa' : undefined),
+  };
+
+  it('runs every cell through the chain', () => {
+    const label = refineryLabeler({ ...sources, ownerName: () => 'Moon Owners Inc' });
+    expect(label(TATARA)).toBe('Tatara by the gate');
+    expect(label(ATHANOR)).toBe('Efa');
+    expect(label(42)).toBe('Moon Owners Inc 42');
+  });
+
+  it("never names the moon owner without an owner screen's name source (a miner's line)", () => {
+    const label = refineryLabeler({ ...sources, fallback: (id) => `Refinery ${id}` });
+    expect(label(42)).toBe('Refinery 42');
+    expect(label(42)).not.toContain('Moon Owners');
+  });
+
+  it('uses the structure name before the system', () => {
+    const label = refineryLabeler({ ...sources, structureName: () => 'Efa VII - Tatara' });
+    expect(label(ATHANOR)).toBe('Efa VII - Tatara');
+  });
+
+  it('keeps the plain id when nothing is known and no fallback is given', () => {
+    expect(refineryLabeler({})(42)).toBe('42');
+  });
+});
+
+describe('refineryFacts', () => {
+  it("reads each refinery's system and source corporation from its rows", () => {
+    const facts = refineryFacts([
+      row({ structureId: ATHANOR }),
+      row({ structureId: ATHANOR, solarSystemId: 30000142 }),
+      row({ structureId: TATARA, sourceCorporationId: FEEDER }),
+    ]);
+    expect(facts.systemOf.get(ATHANOR)).toBe(30000142);
+    expect(facts.systemOf.has(TATARA)).toBe(false);
+    expect(facts.sourceOf.get(TATARA)).toBe(FEEDER);
+    expect(facts.sourceOf.has(ATHANOR)).toBe(false);
+  });
+});
+
+describe('officerLabelsOf', () => {
+  it("collects each moon owner's stored labels by structure id", () => {
+    const labels = officerLabelsOf([
+      {
+        refineryLabels: {
+          [String(TATARA)]: { label: 'Gate', setAt: '2026-10-03T00:00:00Z' },
+        },
+      },
+      {},
+    ]);
+    expect(labels.get(TATARA)).toEqual([{ label: 'Gate', setAt: '2026-10-03T00:00:00Z' }]);
+    expect(labels.has(ATHANOR)).toBe(false);
   });
 });
 

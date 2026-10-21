@@ -4,6 +4,7 @@
  * React: it reads the server-written view (`feederViewClient.ts`).
  */
 import { latestRateChange, rateNotice } from '@/engine/corpTaxBook/ownerRate';
+import { refineryLabeler as labelRefineries } from '@/engine/corpTaxBook/refinery';
 import type {
   FeederViewDay,
   FeederViewPayout,
@@ -125,12 +126,29 @@ export function characterIdsOf(days: readonly FeederViewDay[]): number[] {
   return [...new Set(days.flatMap((d) => d.lines.map((l) => l.characterId)))];
 }
 
-/** The label the owner (or the accounting corporation) gave, else a plain fallback with the id. */
+/**
+ * Each refinery cell on the moon owner's own page, through the label chain (#4640): the label
+ * either side set, the system its rows recorded, then the moon owner's name plus the id. The
+ * structure name is not readable here (the grant is ledger-only).
+ */
 export function refineryLabeler(
-  refineries: readonly FeederViewRefinery[]
+  refineries: readonly FeederViewRefinery[],
+  names: { systemName?: (solarSystemId: number) => string | undefined; ownerName?: string }
 ): (structureId: number) => string {
-  const labels = new Map(refineries.map((r) => [r.structureId, r.label]));
-  return (id) => labels.get(id) ?? `#${id}`;
+  const byId = new Map(refineries.map((r) => [r.structureId, r]));
+  const { ownerName } = names;
+  return labelRefineries({
+    officerLabels: (id) => {
+      const r = byId.get(id);
+      return r?.label ? [{ label: r.label, setAt: r.labelSetAt ?? '' }] : undefined;
+    },
+    systemName: (id) => {
+      const system = byId.get(id)?.solarSystemId;
+      return system == null ? undefined : names.systemName?.(system);
+    },
+    ...(ownerName ? { ownerName: () => ownerName } : {}),
+    fallback: (id) => `#${id}`,
+  });
 }
 
 /** Newest payment first. */

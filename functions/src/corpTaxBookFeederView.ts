@@ -144,7 +144,9 @@ export interface FeederViewDay {
 
 export interface FeederViewRefinery {
   structureId: number;
+  /** The label either side's officers set (#4640); the client runs the rest of the label chain. */
   label: string | null;
+  labelSetAt: string | null;
   solarSystemId: number | null;
 }
 
@@ -238,6 +240,7 @@ export type FeederViewRecord = Pick<
   | 'viewDismissedAt'
   | 'removal'
   | 'payee'
+  | 'refineryLabels'
 >;
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -323,9 +326,11 @@ export function buildFeederView(input: FeederViewInput): FeederView {
   for (const r of input.rows) {
     const known = refineries.get(r.structureId);
     if (!known) {
+      const set = record.refineryLabels?.[String(r.structureId)];
       refineries.set(r.structureId, {
         structureId: r.structureId,
-        label: null,
+        label: set?.label ?? null,
+        labelSetAt: set?.setAt ?? null,
         solarSystemId: r.solarSystemId ?? null,
       });
     } else if (known.solarSystemId === null && r.solarSystemId !== undefined) {

@@ -144,6 +144,24 @@ export async function setFeederRate(
 }
 
 /** Settle a moon owner otherwise (or back to normal) from today, with an optional note. */
+/** Labels one of the moon owner's refineries for both sides; null clears it (#4640). */
+export async function setRefineryLabel(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  structureId: number,
+  label: string | null
+): Promise<{ ok: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'setCorpTaxBookRefineryLabelCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    structureId,
+    label,
+  });
+}
+
 export async function setFeederMode(
   characterId: number,
   corporationId: number,

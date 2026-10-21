@@ -77,7 +77,10 @@ export interface FeederViewDay {
 /** `feederViews/{feeder}/refineries/{structureId}`. */
 export interface FeederViewRefinery {
   structureId: number;
+  /** The label either side's officers set (#4640); null when none is. */
   label: string | null;
+  /** When it was set; absent on a view built before labels were stored. */
+  labelSetAt?: string | null;
   solarSystemId: number | null;
 }
 
@@ -122,6 +125,22 @@ export async function getFeederViewAccess(
     corporationId,
     accessToken,
     ...(collectorCorporationId !== undefined ? { collectorCorporationId } : {}),
+  });
+}
+
+/** The moon owner's officer labels one of its refineries for both sides; null clears it (#4640). */
+export async function setOwnRefineryLabel(
+  characterId: number,
+  corporationId: number,
+  structureId: number,
+  label: string | null
+): Promise<{ ok: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'setCorpTaxBookOwnRefineryLabelCallable', {
+    corporationId,
+    accessToken,
+    structureId,
+    label,
   });
 }
 

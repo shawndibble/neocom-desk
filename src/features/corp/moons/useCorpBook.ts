@@ -12,6 +12,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
 import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
+import {
+  officerLabelsOf,
+  refineryFacts,
+  refineryLabeler,
+  type RefineryLabelSources,
+} from '@/engine/corpTaxBook/refinery';
 import { surveyFractions, estimateChunk, learnChunkRates } from '@/engine/corpTaxBook/extraction';
 import { measurable } from '@/engine/corpTaxBook/bookView';
 import { toEngineExtraction } from '@/engine/corpTaxBook/sync';
@@ -46,7 +52,13 @@ export interface BookNames {
   character: (id: number) => string;
   /** A corporation (a moon owner) by id. */
   corporation: (id: number) => string;
+  /**
+   * A refinery through the label chain: an officer label, the structure name, the system, else
+   * "Refinery <id>". Never the moon owner's name, so it is safe on a miner's line or mail.
+   */
   refinery: (id: number) => string;
+  /** The same chain, falling back to the moon owner's name plus the id: officer screens about a moon owner only. */
+  ownerRefinery: (id: number) => string;
   moon: (id: number) => string;
   ore: (typeId: number) => string;
 }
@@ -291,6 +303,8 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
         characterIds.add(f.corporationId);
         if (f.payee) characterIds.add(f.payee.id);
       }
+      // Systems too, for a refinery whose structure name is not readable (a moon owner's).
+      for (const s of refineryFacts(fetched.data.observed).systemOf.values()) characterIds.add(s);
     }
     const refineryIds = new Set<number>([
       ...view.input.extractions.map((x) => x.structureId),
@@ -323,16 +337,41 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
     };
   }, [view, characterId, fetched]);
 
-  const bookNames: BookNames = useMemo(
-    () => ({
+  const refineries = useMemo(
+    () =>
+      fetched.status === 'loaded'
+        ? {
+            ...refineryFacts(fetched.data.observed),
+            labels: officerLabelsOf(fetched.data.feeders ?? []),
+          }
+        : null,
+    [fetched]
+  );
+  const bookNames: BookNames = useMemo(() => {
+    const sources: RefineryLabelSources = {
+      officerLabels: (id) => refineries?.labels.get(id),
+      structureName: (id) => names.refineries.get(id),
+      systemName: (id) => {
+        const system = refineries?.systemOf.get(id);
+        return system === undefined ? undefined : names.characters.get(system);
+      },
+      fallback: refineryPlaceholder,
+    };
+    return {
       character: (id) => names.characters.get(id) ?? `#${id}`,
       corporation: (id) => names.characters.get(id) ?? `#${id}`,
-      refinery: (id) => names.refineries.get(id) ?? refineryPlaceholder(id),
+      refinery: refineryLabeler(sources),
+      ownerRefinery: refineryLabeler({
+        ...sources,
+        ownerName: (id) => {
+          const owner = refineries?.sourceOf.get(id);
+          return owner === undefined ? undefined : names.characters.get(owner);
+        },
+      }),
       moon: (id) => names.moons.get(id) ?? `Moon ${id}`,
       ore: (typeId) => names.ores.get(typeId) ?? `#${typeId}`,
-    }),
-    [names]
-  );
+    };
+  }, [names, refineries]);
 
   const state: CorpBookState =
     fetched.status === 'loaded'

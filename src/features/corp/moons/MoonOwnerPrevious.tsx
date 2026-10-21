@@ -34,6 +34,7 @@ export function MoonOwnerPrevious({
     <MoonOwnerView
       view={view}
       names={load.names}
+      nameOf={load.nameOf}
       canEdit={false}
       onRequestRate={async () => undefined}
       card={

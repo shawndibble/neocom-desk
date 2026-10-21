@@ -188,6 +188,7 @@ function renderBook(
             character: (id) => `Pilot ${id}`,
             corporation: (id) => (id === ASH ? 'Ashfall Mining' : 'Cinder Reach'),
             refinery: (id) => `Refinery ${id}`,
+            ownerRefinery: (id) => `Refinery ${id}`,
             moon: (id) => `Moon ${id}`,
             ore: () => 'Zeolites',
           },

@@ -16,6 +16,7 @@ import {
   type MinedRow,
 } from '../taxBook/feederViewModel';
 import { DialogShell } from './BookDialogs';
+import { RefineryLabels } from './RefineryLabels';
 import { ChangePayeeDialog, PayeeLine } from './MoonOwnerPayee';
 import { isk, shortDate } from './moonsFormat';
 
@@ -109,10 +110,19 @@ function SettledOtherwise({ view, name }: { view: FeederView; name: string }) {
 }
 
 /** Who mined at the moon owner's refineries, per character and refinery. Nothing is capped. */
-function MinedTable({ view, names, title }: { view: FeederView; names: Names; title: string }) {
+function MinedTable({
+  view,
+  names,
+  label,
+  title,
+}: {
+  view: FeederView;
+  names: Names;
+  label: (structureId: number) => string;
+  title: string;
+}) {
   const { t } = useTranslation();
   const rows = minedRows(view.days);
-  const label = refineryLabeler(view.refineries);
   return (
     <Panel title={title} padded={rows.length === 0}>
       {rows.length === 0 ? (
@@ -262,7 +272,9 @@ function AskRateDialog({
 export function MoonOwnerView({
   view,
   names,
+  nameOf,
   canEdit,
+  onSetRefineryLabel,
   onRequestRate,
   characterId,
   onSetPayee,
@@ -273,7 +285,11 @@ export function MoonOwnerView({
   view: FeederView;
   /** Character and corporation names, the payee's included. */
   names: Names;
+  /** A resolved name (a system, the moon owner) or undefined, for the refinery label chain. */
+  nameOf?: (id: number) => string | undefined;
   canEdit: boolean;
+  /** Label a refinery for both sides; null clears it. With `canEdit`, shows the pencil. */
+  onSetRefineryLabel?: (structureId: number, label: string | null) => Promise<void>;
   onRequestRate: (pct: number) => Promise<void>;
   /** Whose token the payee name search runs under; with `onSetPayee`, shows Change…. */
   characterId?: number;
@@ -293,6 +309,20 @@ export function MoonOwnerView({
   const ended = state === 'ended';
   // Settled after leaving folds to its one line: no history under it.
   const folded = isSettledAfterLeaving(view.summary);
+  const refineryName = refineryLabeler(view.refineries, {
+    ...(nameOf ? { systemName: nameOf } : {}),
+    ...(nameOf?.(view.summary.feederCorporationId)
+      ? { ownerName: nameOf(view.summary.feederCorporationId) }
+      : {}),
+  });
+  // The server takes a label while the moon owner is active or being removed, as for the payee.
+  const labelEdit =
+    payeeOpen && canEdit && onSetRefineryLabel
+      ? {
+          current: (id: number) => view.refineries.find((r) => r.structureId === id)?.label ?? '',
+          onSave: onSetRefineryLabel,
+        }
+      : undefined;
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       {banner}
@@ -303,15 +333,23 @@ export function MoonOwnerView({
           {state === 'normal' && <Statement view={view} name={name} />}
           {state === 'settled-otherwise' && <SettledOtherwise view={view} name={name} />}
           {(!ended || view.days.length > 0) && (
-            <MinedTable
-              view={view}
-              names={names}
-              title={t(
-                ended
-                  ? 'corpTaxBook.moons.ownerView.minedWhile'
-                  : 'corpTaxBook.moons.ownerView.mined'
-              )}
-            />
+            <>
+              <MinedTable
+                view={view}
+                names={names}
+                label={refineryName}
+                title={t(
+                  ended
+                    ? 'corpTaxBook.moons.ownerView.minedWhile'
+                    : 'corpTaxBook.moons.ownerView.mined'
+                )}
+              />
+              <RefineryLabels
+                structureIds={view.refineries.map((r) => r.structureId)}
+                name={refineryName}
+                {...(labelEdit ? { edit: labelEdit } : {})}
+              />
+            </>
           )}
           {state === 'normal' && (
             <Panel title={t('corpTaxBook.moons.ownerView.paymentsAndRate')}>

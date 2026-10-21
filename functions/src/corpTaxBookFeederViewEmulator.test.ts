@@ -28,6 +28,7 @@ import {
 } from './corpTaxBookFeederPayouts.js';
 import { outgoingDonationsFromJournal } from './corpTaxBookEngine.js';
 import { createFeederInvite, type FeederRecord } from './corpTaxBookFeeders.js';
+import { setOwnRefineryLabel, setRefineryLabel } from './corpTaxBookRefineryLabels.js';
 import { turnOnBook, type BookDeps, type Caller } from './corpTaxBookStore.js';
 import type { EsiRead, SyncEsi } from './corpTaxBookSyncEsi.js';
 
@@ -41,6 +42,7 @@ const ALT = 12; // the Accountant alt that logs in for the mining scope
 const FEEDER_DIRECTOR = 13;
 const FEEDER_NOBODY = 14;
 const FEEDER_JUNIOR = 15;
+const COLLECTOR_JUNIOR = 16;
 
 const runnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 const suite = runnable ? describe : describe.skip;
@@ -182,6 +184,11 @@ suite('moon owner view', () => {
     identities.set(COLLECTOR_CEO, { corporationId: COLLECTOR, ceoId: COLLECTOR_CEO, roles: [] });
     identities.set(FEEDER_DIRECTOR, { corporationId: FEEDER, ceoId: null, roles: ['Director'] });
     identities.set(FEEDER_NOBODY, { corporationId: FEEDER, ceoId: null, roles: [] });
+    identities.set(COLLECTOR_JUNIOR, {
+      corporationId: COLLECTOR,
+      ceoId: COLLECTOR_CEO,
+      roles: ['Junior_Accountant'],
+    });
     identities.set(FEEDER_JUNIOR, {
       corporationId: FEEDER,
       ceoId: null,
@@ -465,6 +472,94 @@ suite('moon owner view', () => {
         })
       )
     ).toBe('not-your-feeder');
+  });
+
+  describe('refinery labels (#4640)', () => {
+    const REFINERY = 4001;
+    const asCollector = {
+      corporationId: COLLECTOR,
+      accessToken: `roles-${COLLECTOR_CEO}`,
+      feederCorporationId: FEEDER,
+    };
+    const stored = async () => (await feederRecord())?.refineryLabels?.[String(REFINERY)];
+    const viewLabel = async () =>
+      (await viewRef().collection('refineries').doc(String(REFINERY)).get()).get('label');
+
+    it('either side sets it, the last edit wins, and the view carries it', async () => {
+      await save(await newInvite());
+      await setRefineryLabel(bookDeps(), who(COLLECTOR_CEO), {
+        ...asCollector,
+        structureId: REFINERY,
+        label: 'Efa Tatara',
+      });
+      expect(await stored()).toMatchObject({
+        label: 'Efa Tatara',
+        side: 'accounting',
+        setBy: COLLECTOR_CEO,
+      });
+      expect(await viewLabel()).toBe('Efa Tatara');
+
+      await setOwnRefineryLabel(deps(), who(FEEDER_DIRECTOR), {
+        ...asDirector,
+        structureId: REFINERY,
+        label: 'Our Tatara',
+      });
+      expect(await stored()).toMatchObject({ label: 'Our Tatara', side: 'moon-owner' });
+      expect(await viewLabel()).toBe('Our Tatara');
+
+      await setRefineryLabel(bookDeps(), who(COLLECTOR_CEO), {
+        ...asCollector,
+        structureId: REFINERY,
+        label: 'Back again',
+      });
+      expect(await viewLabel()).toBe('Back again');
+
+      // A clear from either side drops it: the chain falls back.
+      await setOwnRefineryLabel(deps(), who(FEEDER_DIRECTOR), {
+        ...asDirector,
+        structureId: REFINERY,
+        label: null,
+      });
+      expect(await stored()).toBeUndefined();
+      expect(await viewLabel()).toBeNull();
+
+      const audit = await collectorBook().collection('audit').get();
+      expect(audit.docs.filter((d) => d.get('action') === 'refineryLabelSet')).toHaveLength(4);
+    });
+
+    it('refuses a non-officer on either side and a refinery that is not theirs', async () => {
+      await save(await newInvite());
+      expect(
+        await reason(
+          setRefineryLabel(bookDeps(), who(COLLECTOR_JUNIOR), {
+            ...asCollector,
+            accessToken: `roles-${COLLECTOR_JUNIOR}`,
+            structureId: REFINERY,
+            label: 'x',
+          })
+        )
+      ).toBe('role-required');
+      expect(
+        await reason(
+          setOwnRefineryLabel(deps(), who(FEEDER_JUNIOR), {
+            corporationId: FEEDER,
+            accessToken: `roles-${FEEDER_JUNIOR}`,
+            structureId: REFINERY,
+            label: 'x',
+          })
+        )
+      ).toBe('not-your-feeder');
+      expect(
+        await reason(
+          setRefineryLabel(bookDeps(), who(COLLECTOR_CEO), {
+            ...asCollector,
+            structureId: 9999,
+            label: 'x',
+          })
+        )
+      ).toBe('unknown-refinery');
+      expect(await stored()).toBeUndefined();
+    });
   });
 
   it('dismiss: refused while active, works after leaving and sticks', async () => {

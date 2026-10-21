@@ -7,7 +7,12 @@ import {
   deriveOwnerRateHistory,
   moonOwnerDetail,
 } from '@/engine/corpTaxBook/moonOwners';
-import { markFeederPayout, setFeederMode, setFeederRate } from '../taxBook/feederClient';
+import {
+  markFeederPayout,
+  setFeederMode,
+  setFeederRate,
+  setRefineryLabel,
+} from '../taxBook/feederClient';
 import { PayMoonOwnerHost } from './PayMoonOwnerHost';
 import { RemoveMoonOwnerDialog, SetRateDialog, SettledOtherwiseDialog } from './MoonOwnerDialogs';
 import { MoonOwnerPage } from './MoonOwnerPage';
@@ -69,7 +74,7 @@ export function MoonOwnerDetail({ id }: { id: string }) {
         name={name}
         {...(accountingName ? { accountingName } : {})}
         characterName={names.character}
-        refineryName={names.refinery}
+        refineryName={names.ownerRefinery}
         oreName={names.ore}
         backTo={BACK}
         payee={{
@@ -81,6 +86,16 @@ export function MoonOwnerDetail({ id }: { id: string }) {
         }}
         {...(canEdit
           ? {
+              refineryEdit: {
+                current: (structureId: number) =>
+                  data.feeders?.find((f) => f.corporationId === corp)?.refineryLabels?.[
+                    String(structureId)
+                  ]?.label ?? '',
+                onSave: async (structureId: number, label: string | null) => {
+                  await setRefineryLabel(characterId, corporationId, corp, structureId, label);
+                  reload();
+                },
+              },
               onSetRate: () => setDialog('rate'),
               onSettledOtherwise: () => setDialog('settled'),
               ...(removal
