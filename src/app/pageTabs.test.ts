@@ -53,6 +53,12 @@ describe('pageKeyFor', () => {
     expect(pageKeyFor('/contacts/nope')).toBe('/contacts');
   });
 
+  it('collapses Corp assets’ state tabs and old tree links to the one page', () => {
+    expect(pageKeyFor('/corp/assets')).toBe('/corp/assets');
+    expect(pageKeyFor('/corp/assets/impounded')).toBe('/corp/assets');
+    expect(pageKeyFor('/corp/assets/1/i:9')).toBe('/corp/assets');
+  });
+
   it('passes everything else through', () => {
     expect(pageKeyFor('/contactsx')).toBe('/contactsx');
     expect(pageKeyFor('/assets60003760')).toBe('/assets60003760');

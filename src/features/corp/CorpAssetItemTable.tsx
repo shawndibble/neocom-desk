@@ -28,7 +28,12 @@ import {
   useVisibleCorpAssetItemColumns,
   type CorpAssetItemColumnId,
 } from './corpAssetsColumns';
-import { placementLabel, placementTone, stackPathText, type LedgerLabels } from './assetLedgerView';
+import {
+  placementLabels,
+  placementTone,
+  stackPathText,
+  type LedgerLabels,
+} from './assetLedgerView';
 import { StockTargetCell } from './StockTargetCell';
 
 export interface ItemTableRow {
@@ -105,7 +110,9 @@ export function CorpAssetItemTable({
       {
         header: t('corp.assets.column.where'),
         value: (r) =>
-          r.ledger.placements.map((p) => `${placementLabel(p, labels)} ×${p.quantity}`).join('; '),
+          placementLabels(r.ledger.placements, labels)
+            .map((text, i) => `${text} ×${r.ledger.placements[i].quantity}`)
+            .join('; '),
       },
       { header: t('corp.assets.column.value'), value: (r) => r.ledger.estimatedValue },
       { header: t('corp.assets.column.volume'), value: (r) => r.ledger.volume },
@@ -193,19 +200,19 @@ export function CorpAssetItemTable({
       id: 'where',
       header: t('corp.assets.column.where'),
       sortValue: (r) => {
-        const first = r.ledger.placements[0];
-        return first ? placementLabel(first, labels).toLowerCase() : undefined;
+        return placementLabels(r.ledger.placements, labels)[0]?.toLowerCase();
       },
       render: (r) => {
         const { placements } = r.ledger;
         if (placements.length === 0) return <span className="text-text-dim">—</span>;
+        const texts = placementLabels(placements, labels);
         const shown = placements.slice(0, MAX_PLACEMENT_CHIPS);
         const hidden = placements.length - shown.length;
         return (
           <span className="flex flex-wrap gap-1">
-            {shown.map((p) => (
+            {shown.map((p, i) => (
               <Pill key={`${p.state}|${p.locationId}|${p.division}`} tone={placementTone(p.state)}>
-                {placementLabel(p, labels)} ×{formatCount(p.quantity)}
+                {texts[i]} ×{formatCount(p.quantity)}
               </Pill>
             ))}
             {hidden > 0 && <Pill>{t('corp.assets.morePlacements', { count: hidden })}</Pill>}

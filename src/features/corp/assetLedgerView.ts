@@ -47,7 +47,7 @@ export function makeLedgerLabels(input: {
 }): LedgerLabels {
   const { t, typeNames, locationNames, divisionNames } = input;
   return {
-    typeName: (typeId) => typeNames.get(typeId) ?? `Type #${typeId}`,
+    typeName: (typeId) => typeNames.get(typeId) ?? t('assets.myShips.unknownType', { id: typeId }),
     placeName: (locationId) =>
       locationId === null
         ? t('corp.assets.unknownPlace')
@@ -62,17 +62,45 @@ export function makeLedgerLabels(input: {
   };
 }
 
-/** A placement's chip text, "Efa · Ships", without its ×quantity. */
+/** A placement's chip text, "Efa · Ships", without its ×quantity; `full` prints the whole place name. */
 export function placementLabel(
   placement: Pick<LedgerPlacement, 'state' | 'locationId' | 'division'>,
-  labels: LedgerLabels
+  labels: LedgerLabels,
+  full = false
 ): string {
-  const place = labels.shortPlaceName(placement.locationId);
+  const place = full
+    ? labels.shortPlaceName(placement.locationId) === null
+      ? null
+      : labels.placeName(placement.locationId)
+    : labels.shortPlaceName(placement.locationId);
   const what =
     placement.state === 'offices' && placement.division !== null
       ? labels.divisionName(placement.division)
       : labels.stateLabel(placement.state);
   return place === null ? what : `${place} · ${what}`;
+}
+
+/**
+ * The chip texts of one row's placements. Two places that share a short name
+ * (two structures in one system) would read as the same chip, so those print
+ * the fuller structure name.
+ */
+export function placementLabels(
+  placements: readonly Pick<LedgerPlacement, 'state' | 'locationId' | 'division'>[],
+  labels: LedgerLabels
+): string[] {
+  const idsByShort = new Map<string, Set<number | null>>();
+  for (const p of placements) {
+    const short = labels.shortPlaceName(p.locationId);
+    if (short === null) continue;
+    const ids = idsByShort.get(short) ?? new Set();
+    ids.add(p.locationId);
+    idsByShort.set(short, ids);
+  }
+  return placements.map((p) => {
+    const short = labels.shortPlaceName(p.locationId);
+    return placementLabel(p, labels, short !== null && (idsByShort.get(short)?.size ?? 0) > 1);
+  });
 }
 
 export type PlacementTone = 'neutral' | 'warning' | 'danger';
@@ -133,21 +161,45 @@ export interface LocationRow {
   /** Totals over the group's rows, for its header. */
   groupItems: number;
   groupValue: number;
-  /** An office with nothing in any division. */
+  /** An office with nothing in any division, judged on the whole corporation, never on a search or filter. */
   groupEmpty: boolean;
+  /** Office groups: how many of the seven divisions hold something (whole corporation); null for other places. */
+  groupDivisionsInUse: number | null;
   label: string;
-  kind: 'division' | 'deliveries' | 'place';
+  kind: 'division' | 'deliveries' | 'place' | 'empty';
   state: LedgerState;
   locationId: number | null;
   division: HangarDivisionNumber | null;
   cell: LedgerCell;
 }
 
+/** What the whole corporation holds in one office, regardless of the page's filters. */
+export interface OfficeUsage {
+  isEmpty: boolean;
+  divisionsInUse: number;
+}
+
+/** Office usage from the unfiltered by-location ledger. */
+export function officeUsage(whole: LocationLedger): Map<number, OfficeUsage> {
+  return new Map(
+    whole.offices.map((office) => [
+      office.locationId,
+      {
+        isEmpty: office.isEmpty,
+        divisionsInUse: office.divisions.filter((d) => d.itemCount > 0).length,
+      },
+    ])
+  );
+}
+
 /**
  * Flattens the by-location ledger into table rows for one tab: an office's
- * seven divisions (and its Corp deliveries) become the rows of the office's
- * group, and on All each non-office place is a group of its own. `loc` and
- * `div` narrow the rows exactly as they narrow the by-item view.
+ * divisions that hold something (and its Corp deliveries, when it has any)
+ * become the rows of the office's group, and on All each non-office place is
+ * a group of its own. An office the whole corporation leaves empty is one
+ * placeholder row, so its group still lists (collapsed) with its flag.
+ * `loc` and `div` narrow the rows exactly as they narrow the by-item view;
+ * `usage` is what flags an office empty, so a search never does.
  */
 export function buildLocationRows(
   ledger: LocationLedger,
@@ -156,55 +208,75 @@ export function buildLocationRows(
     locationId: number | null;
     division: HangarDivisionNumber | null;
     labels: LedgerLabels;
+    usage: ReadonlyMap<number, OfficeUsage>;
   }
 ): LocationRow[] {
-  const { tab, locationId, division, labels } = options;
+  const { tab, locationId, division, labels, usage } = options;
   const groups: LocationRow[][] = [];
 
   for (const office of ledger.offices) {
     if (locationId !== null && office.locationId !== locationId) continue;
     const groupKey = `office:${office.locationId}`;
     const groupLabel = labels.placeName(office.locationId);
+    const info = usage.get(office.locationId) ?? {
+      isEmpty: office.isEmpty,
+      divisionsInUse: office.divisions.filter((d) => d.itemCount > 0).length,
+    };
+    const base = {
+      groupKey,
+      groupLabel,
+      groupItems: 0,
+      groupValue: 0,
+      groupEmpty: info.isEmpty,
+      groupDivisionsInUse: info.divisionsInUse,
+      locationId: office.locationId,
+    };
     const rows: LocationRow[] = [];
     if (tab === 'all' || tab === 'offices') {
       for (const cell of office.divisions) {
+        if (cell.itemCount === 0) continue;
         if (division !== null && cell.division !== division) continue;
         rows.push({
+          ...base,
           key: `${groupKey}:d${cell.division}`,
-          groupKey,
-          groupLabel,
-          groupItems: 0,
-          groupValue: 0,
-          groupEmpty: office.isEmpty,
           label: labels.divisionName(cell.division),
           kind: 'division',
           state: 'offices',
-          locationId: office.locationId,
           division: cell.division,
           cell,
         });
       }
     }
     if ((tab === 'all' || tab === 'deliveries') && division === null) {
+      if (office.deliveries.itemCount > 0) {
+        rows.push({
+          ...base,
+          key: `${groupKey}:deliveries`,
+          label: labels.stateLabel('deliveries'),
+          kind: 'deliveries',
+          state: 'deliveries',
+          division: null,
+          cell: office.deliveries,
+        });
+      }
+    }
+    if (
+      rows.length === 0 &&
+      info.isEmpty &&
+      (tab === 'all' || tab === 'offices') &&
+      division === null
+    ) {
       rows.push({
-        key: `${groupKey}:deliveries`,
-        groupKey,
-        groupLabel,
-        groupItems: 0,
-        groupValue: 0,
-        groupEmpty: office.isEmpty,
-        label: labels.stateLabel('deliveries'),
-        kind: 'deliveries',
-        state: 'deliveries',
-        locationId: office.locationId,
+        ...base,
+        key: `${groupKey}:empty`,
+        label: labels.placeName(office.locationId),
+        kind: 'empty',
+        state: 'offices',
         division: null,
         cell: office.deliveries,
       });
     }
-    // An office with no row for this tab says nothing; a tab with no items still lists the office's empty rows only under Offices.
-    if (rows.length > 0 && (tab !== 'deliveries' || office.deliveries.itemCount > 0)) {
-      groups.push(rows);
-    }
+    if (rows.length > 0) groups.push(rows);
   }
 
   if (division === null) {
@@ -214,15 +286,15 @@ export function buildLocationRows(
       const groupKey = `place:${place.state}:${place.locationId ?? ''}`;
       const where = labels.stateLabel(place.state);
       const placeName = place.locationId === null ? null : labels.shortPlaceName(place.locationId);
-      const label = placeName === null ? where : `${placeName} · ${where}`;
       groups.push([
         {
           key: groupKey,
           groupKey,
-          groupLabel: label,
+          groupLabel: placeName === null ? where : `${placeName} · ${where}`,
           groupItems: 0,
           groupValue: 0,
           groupEmpty: false,
+          groupDivisionsInUse: null,
           label: where,
           kind: 'place',
           state: place.state,

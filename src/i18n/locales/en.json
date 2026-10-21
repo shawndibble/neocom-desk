@@ -12543,6 +12543,8 @@
       "groupTotals_one": "{{count, number}} item · {{value}} ISK",
       "groupTotals_other": "{{count, number}} items · {{value}} ISK",
       "emptyOffice": "Empty office",
+      "nothingStored": "Nothing stored here",
+      "divisionsInUse": "{{count}} of 7 divisions in use",
       "noMatchesTitle": "Nothing matches",
       "noMatchesHint": "Clear the search or a filter, or pick another tab.",
       "filtersTitle": "Filters",

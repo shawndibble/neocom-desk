@@ -87,11 +87,13 @@ import {
   buildLocationRows,
   filterClassified,
   makeLedgerLabels,
+  officeUsage,
   type LocationRow,
 } from '@/features/corp/assetLedgerView';
 import { CorpAssetItemTable, type ItemTableRow } from '@/features/corp/CorpAssetItemTable';
 import { CorpAssetLocationTable } from '@/features/corp/CorpAssetLocationTable';
 import { useCorpStockTargets } from '@/features/corp/stockTargets';
+import { useTargetTypeInfo } from '@/features/corp/useTargetTypeInfo';
 import { StockTargetsDialog } from '@/features/corp/StockTargetsDialog';
 import { loadTypeVolumes } from '@/features/character/typeNames';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
@@ -122,6 +124,7 @@ const EMPTY_PRICES: ReadonlyMap<number, number> = new Map();
 const EMPTY_DIVISION_NAMES: ReadonlyMap<number, string | null> = new Map();
 const EMPTY_CATEGORIES: ReadonlyMap<number, AssetCategory> = new Map();
 const ALL = 'all';
+const EMPTY_KEYS: ReadonlySet<string> = new Set();
 
 const TAB_LABEL_KEY: Readonly<Record<CorpAssetTab, string>> = {
   all: 'corp.assets.tab.all',
@@ -278,10 +281,30 @@ function CorpAssetsView({
   const query = debouncedQuery.trim().toLowerCase();
   const byLocation = params.group === 'location';
 
-  const typeNames = data?.labels.types ?? EMPTY_CORP_ASSET_LABELS.types;
+  const targetsApi = useCorpStockTargets(data?.corporationId ?? null);
+  // A targeted type the corporation owns none of is in no asset read: resolve it separately.
+  const unnamedTargetIds = useMemo(
+    () => [...targetsApi.targets.keys()].filter((id) => !data?.labels.types.has(id)),
+    [targetsApi.targets, data?.labels.types]
+  );
+  const targetInfo = useTargetTypeInfo(unnamedTargetIds);
+
+  const typeNames = useMemo(
+    () =>
+      targetInfo.names.size === 0
+        ? (data?.labels.types ?? EMPTY_CORP_ASSET_LABELS.types)
+        : new Map([...targetInfo.names, ...(data?.labels.types ?? [])]),
+    [data?.labels.types, targetInfo.names]
+  );
   const locationNames = data?.labels.locations ?? EMPTY_CORP_ASSET_LABELS.locations;
   const divisionNames = data?.divisionNames ?? EMPTY_DIVISION_NAMES;
-  const categoryByTypeId = data?.categoryByTypeId ?? EMPTY_CATEGORIES;
+  const categoryByTypeId = useMemo(
+    () =>
+      targetInfo.categories.size === 0
+        ? (data?.categoryByTypeId ?? EMPTY_CATEGORIES)
+        : new Map([...targetInfo.categories, ...(data?.categoryByTypeId ?? [])]),
+    [data?.categoryByTypeId, targetInfo.categories]
+  );
   const blueprintTypeIds = useBlueprintTypeIds(typeNames);
   const labels = useMemo(
     () => makeLedgerLabels({ t, typeNames, locationNames, divisionNames }),
@@ -291,7 +314,6 @@ function CorpAssetsView({
   const classified = useMemo(() => classifyCorpAssets(data?.inputs ?? []), [data?.inputs]);
   const counts = useMemo(() => countLedgerByState(classified.items), [classified.items]);
 
-  const targetsApi = useCorpStockTargets(data?.corporationId ?? null);
   const stock = useMemo(
     () => evaluateStockTargets(targetsApi.targets, classified.items),
     [targetsApi.targets, classified.items]
@@ -325,6 +347,7 @@ function CorpAssetsView({
         division: (params.div ?? undefined) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | undefined,
       },
       targets: targetsApi.targets,
+      stock,
     });
     return ledger
       .filter((row) => {
@@ -351,11 +374,18 @@ function CorpAssetsView({
     params.below,
     params.cat,
     targetsApi.targets,
+    stock,
     shortTypeIds,
     categoryByTypeId,
     query,
     labels,
   ]);
+
+  // Which offices are empty is a fact about the corporation, not about the current search.
+  const officeUsageWhole = useMemo(
+    () => (byLocation ? officeUsage(buildLocationLedger(classified, valuation)) : new Map()),
+    [byLocation, classified, valuation]
+  );
 
   const locationRows = useMemo<LocationRow[]>(() => {
     if (!byLocation) return [];
@@ -368,6 +398,7 @@ function CorpAssetsView({
     });
     const ledger = buildLocationLedger({ ...classified, items }, valuation);
     return buildLocationRows(ledger, {
+      usage: officeUsageWhole,
       tab,
       locationId: params.loc,
       division: (params.div ?? null) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | null,
@@ -386,6 +417,7 @@ function CorpAssetsView({
     categoryByTypeId,
     query,
     labels,
+    officeUsageWhole,
   ]);
 
   // Filter options come from the whole corporation, not the current narrowing.
@@ -411,24 +443,50 @@ function CorpAssetsView({
 
   // Multi-select + bulk actions (same shape as /assets' issue #90), by item only.
   const [selectMode, setSelectMode] = useState(false);
-  const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string>>(new Set());
+  // A selection belongs to the view it was made in: a tab, filter, search or group change drops it.
+  const selectionScope = [
+    tab,
+    params.loc,
+    params.div,
+    params.cat,
+    params.below,
+    params.group,
+    query,
+  ].join('|');
+  const [selection, setSelection] = useState<{ scope: string; keys: ReadonlySet<string> }>({
+    scope: '',
+    keys: new Set(),
+  });
+  const selectedKeys = selection.scope === selectionScope ? selection.keys : EMPTY_KEYS;
+  const setSelectedKeys = useCallback(
+    (update: (prev: ReadonlySet<string>) => ReadonlySet<string>) =>
+      setSelection((prev) => ({
+        scope: selectionScope,
+        keys: update(prev.scope === selectionScope ? prev.keys : EMPTY_KEYS),
+      })),
+    [selectionScope]
+  );
   const toggleSelectMode = useCallback(() => {
     setSelectMode((prev) => {
-      if (prev) setSelectedKeys(new Set());
+      if (prev) setSelection({ scope: '', keys: EMPTY_KEYS });
       return !prev;
     });
   }, []);
-  const toggleKey = useCallback((key: string) => {
-    setSelectedKeys((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(key)) next.add(key);
-      return next;
-    });
-  }, []);
+  const toggleKey = useCallback(
+    (key: string) => {
+      setSelectedKeys((prev) => {
+        const next = new Set(prev);
+        if (!next.delete(key)) next.add(key);
+        return next;
+      });
+    },
+    [setSelectedKeys]
+  );
 
   const itemActions = usePageItemActions({ activeCharacterId: snapshot.activeCharacterId });
   const isAbyssalType = useMutaplasmidLookup()?.isAbyssalType;
-  const selectedTypeIds = [...selectedKeys].map((key) => Number(key.split(':')[0]));
+  // A type's original and its copy are two rows but one type.
+  const selectedTypeIds = [...new Set([...selectedKeys].map((key) => Number(key.split(':')[0])))];
 
   function handleBulkAddToQuickbar() {
     // One write: `quickbar.add` closes over the rendered list, so looping it keeps only the last.
@@ -707,7 +765,7 @@ function CorpAssetsView({
                   <Button
                     size="sm"
                     disabled={selectedKeys.size === 0}
-                    onClick={() => setSelectedKeys(new Set())}
+                    onClick={() => setSelectedKeys(() => EMPTY_KEYS)}
                   >
                     {t('assets.select.deselectAll')}
                   </Button>

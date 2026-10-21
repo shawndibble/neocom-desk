@@ -23,6 +23,13 @@ import {
 } from './corpAssetsColumns';
 import type { LedgerLabels, LocationRow } from './assetLedgerView';
 
+/** `undefined` sinks a row to the end of its group in either sort direction: Corp deliveries always lists after the divisions. */
+function sinkDeliveries<V extends string | number | undefined>(
+  value: (row: LocationRow) => V
+): (row: LocationRow) => V | undefined {
+  return (row) => (row.kind === 'deliveries' ? undefined : value(row));
+}
+
 const DEFAULT_SORT = { columnId: 'value', direction: 'desc' } as const;
 const SORTABLE_IDS = ['place', ...CORP_ASSET_LOCATION_COLUMN_IDS];
 
@@ -86,8 +93,8 @@ export function CorpAssetLocationTable({
       stickyStart: true,
       stickyStartOnPanel: true,
       cellClassName: dim,
-      sortValue: (r) => r.label.toLowerCase(),
-      render: (r) => r.label,
+      sortValue: sinkDeliveries((r) => r.label.toLowerCase()),
+      render: (r) => (r.kind === 'empty' ? t('corp.assets.nothingStored') : r.label),
     },
     items: {
       id: 'items',
@@ -95,14 +102,14 @@ export function CorpAssetLocationTable({
       align: 'right',
       className: 'tabular-nums',
       cellClassName: dim,
-      sortValue: (r) => r.cell.itemCount,
+      sortValue: sinkDeliveries((r) => r.cell.itemCount),
       render: (r) => formatCount(r.cell.itemCount),
     },
     largest: {
       id: 'largest',
       header: t('corp.assets.column.largest'),
       cellClassName: dim,
-      sortValue: (r) => r.cell.topStacks[0]?.estimatedValue,
+      sortValue: sinkDeliveries((r) => r.cell.topStacks[0]?.estimatedValue),
       render: (r) => (r.cell.itemCount === 0 ? '—' : largestText(r)),
     },
     value: {
@@ -111,7 +118,7 @@ export function CorpAssetLocationTable({
       align: 'right',
       className: 'tabular-nums',
       cellClassName: dim,
-      sortValue: (r) => r.cell.estimatedValue,
+      sortValue: sinkDeliveries((r) => r.cell.estimatedValue),
       render: (r) => (r.cell.estimatedValue === 0 ? '—' : formatIsk(r.cell.estimatedValue)),
     },
     volume: {
@@ -120,7 +127,7 @@ export function CorpAssetLocationTable({
       align: 'right',
       className: 'tabular-nums',
       cellClassName: dim,
-      sortValue: (r) => r.cell.volume ?? undefined,
+      sortValue: sinkDeliveries((r) => r.cell.volume ?? undefined),
       render: (r) =>
         r.cell.volume === null || r.cell.itemCount === 0 ? '—' : formatCubicMetres(r.cell.volume),
     },
@@ -181,7 +188,8 @@ export function CorpAssetLocationTable({
             key: (r) => r.groupKey,
             allWidths: true,
             minSize: 1,
-            defaultExpanded: () => true,
+            // An office the corporation keeps nothing in starts folded: its header and flag say it all.
+            defaultExpanded: (group) => !group[0].groupEmpty,
             renderHeader: (group) => {
               const first = group[0];
               return (
@@ -193,6 +201,11 @@ export function CorpAssetLocationTable({
                       value: formatIsk(first.groupValue),
                     })}
                   </span>
+                  {first.groupDivisionsInUse !== null && (
+                    <span className="text-xs text-text-dim tabular-nums">
+                      {t('corp.assets.divisionsInUse', { count: first.groupDivisionsInUse })}
+                    </span>
+                  )}
                   {first.groupEmpty && <Pill tone="warning">{t('corp.assets.emptyOffice')}</Pill>}
                 </span>
               );

@@ -4,7 +4,9 @@ import type { CorpAssetInput } from '@/engine/corp/assetDivisions';
 import {
   buildLocationRows,
   makeLedgerLabels,
+  officeUsage,
   placementLabel,
+  placementLabels,
   placementTone,
 } from './assetLedgerView';
 
@@ -53,6 +55,33 @@ describe('placementLabel', () => {
   });
 });
 
+describe('placementLabels', () => {
+  const two = makeLedgerLabels({
+    t,
+    typeNames: new Map(),
+    locationNames: new Map([
+      [1, 'Efa - Hangar Keep'],
+      [2, 'Efa - Trade Hub'],
+      [3, 'Jita IV - Moon 4'],
+    ]),
+    divisionNames: new Map(),
+  });
+
+  it('keeps the short name unless two places share it, then prints the fuller one', () => {
+    const texts = placementLabels(
+      [
+        { state: 'offices', locationId: 1, division: 1 },
+        { state: 'offices', locationId: 2, division: 1 },
+        { state: 'offices', locationId: 3, division: 1 },
+      ],
+      two
+    );
+    expect(texts[0]).toContain('Efa - Hangar Keep');
+    expect(texts[1]).toContain('Efa - Trade Hub');
+    expect(texts[2]).toMatch(/^Jita IV · /);
+  });
+});
+
 describe('buildLocationRows', () => {
   const classified = classifyCorpAssets([
     input({ itemId: 10, typeId: 27, locationFlag: 'OfficeFolder', locationId: 500 }),
@@ -62,33 +91,46 @@ describe('buildLocationRows', () => {
   ]);
   const ledger = buildLocationLedger(classified, { prices: new Map([[34, 10]]) });
 
-  it('gives each office a group of seven divisions plus deliveries on All, flagging the empty one', () => {
-    const rows = buildLocationRows(ledger, {
-      tab: 'all',
-      locationId: null,
-      division: null,
-      labels,
-    });
+  const usage = officeUsage(ledger);
+  const base = { locationId: null, division: null, labels, usage } as const;
+
+  it('lists only the divisions in use, and one placeholder row for an empty office', () => {
+    const rows = buildLocationRows(ledger, { ...base, tab: 'all' });
     const efa = rows.filter((r) => r.groupKey === 'office:500');
-    expect(efa).toHaveLength(8);
-    expect(efa[0]).toMatchObject({ groupItems: 1, groupValue: 50, groupEmpty: false });
-    expect(rows.find((r) => r.groupKey === 'office:600')?.groupEmpty).toBe(true);
+    expect(efa).toHaveLength(1);
+    expect(efa[0]).toMatchObject({
+      kind: 'division',
+      groupItems: 1,
+      groupValue: 50,
+      groupEmpty: false,
+      groupDivisionsInUse: 1,
+    });
+    const empty = rows.filter((r) => r.groupKey === 'office:600');
+    expect(empty).toHaveLength(1);
+    expect(empty[0]).toMatchObject({ kind: 'empty', groupEmpty: true, groupDivisionsInUse: 0 });
     expect(rows.some((r) => r.kind === 'place' && r.state === 'impounded')).toBe(true);
   });
 
+  it('never calls an office empty because a filter hid its stacks', () => {
+    const filtered = buildLocationLedger(
+      { ...classified, items: classified.items.filter((i) => i.input.itemId !== 1) },
+      { prices: new Map([[34, 10]]) }
+    );
+    const rows = buildLocationRows(filtered, { ...base, tab: 'all' });
+    // The office has no matching stack, so it lists nothing; it is not flagged empty.
+    expect(rows.some((r) => r.groupKey === 'office:500')).toBe(false);
+    expect(rows.find((r) => r.groupKey === 'office:600')?.groupEmpty).toBe(true);
+    expect(usage.get(500)).toEqual({ isEmpty: false, divisionsInUse: 1 });
+  });
+
   it('narrows to one division, and drops other places', () => {
-    const rows = buildLocationRows(ledger, { tab: 'all', locationId: 500, division: 1, labels });
+    const rows = buildLocationRows(ledger, { ...base, tab: 'all', locationId: 500, division: 1 });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ kind: 'division', division: 1 });
   });
 
   it('shows only the matching places on a state tab', () => {
-    const rows = buildLocationRows(ledger, {
-      tab: 'impounded',
-      locationId: null,
-      division: null,
-      labels,
-    });
+    const rows = buildLocationRows(ledger, { ...base, tab: 'impounded' });
     expect(rows.map((r) => r.kind)).toEqual(['place']);
   });
 });

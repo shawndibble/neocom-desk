@@ -60,6 +60,13 @@ vi.mock('@/features/corp/stockTargets', async (importOriginal) => ({
 vi.mock('@/features/corp/assetCategories', () => ({
   loadTypeCategories: vi.fn(async () => new Map()),
 }));
+// Names for a targeted type the corporation owns none of come from the SDE/ESI resolver.
+vi.mock('@/features/character/typeNames', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/character/typeNames')>()),
+  loadTypeNames: vi.fn(
+    async (ids: readonly number[]) => new Map(ids.map((id) => [id, `Name ${id}`]))
+  ),
+}));
 vi.mock('@/features/corp/wallet', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/corp/wallet')>()),
   loadCorporationDivisions: vi.fn(),
@@ -433,6 +440,13 @@ describe('stock targets', () => {
     expect(screen.getByRole('link', { name: 'Pyerite' })).toBeInTheDocument();
   });
 
+  it('names a targeted type the corporation owns none of, and finds it by search', async () => {
+    useTargets([[4242, 7]]);
+    await ledger('/corp/assets?q=name 4242');
+    expect(await screen.findByRole('link', { name: 'Name 4242' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tritanium' })).not.toBeInTheDocument();
+  });
+
   it('opens the Stock targets dialog', async () => {
     const user = userEvent.setup();
     await ledger();
@@ -460,6 +474,32 @@ describe('group by location', () => {
     await waitFor(() => expect(currentLocation()).toBe('/corp/assets?loc=60003760&div=1'));
     expect(await screen.findByRole('link', { name: 'Tritanium' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Pyerite' })).not.toBeInTheDocument();
+  });
+
+  it('lists only the divisions in use, with a count, and folds an empty office', async () => {
+    await ledger('/corp/assets?group=location');
+    expect(await screen.findByText('Empty office')).toBeInTheDocument();
+    expect(screen.getAllByText('2 of 7 divisions in use').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Division 4')).not.toBeInTheDocument();
+    // The empty office is folded: its placeholder row is not mounted.
+    expect(screen.queryByText('Nothing stored here')).not.toBeInTheDocument();
+  });
+
+  it('keeps Corp deliveries after the divisions, however the table is sorted', async () => {
+    const user = userEvent.setup();
+    await ledger('/corp/assets?group=location&lsort=items:asc');
+    await screen.findByText('Empty office');
+    const order = () => itemOrder().filter((r) => /Ships|Division 3|Corp deliveries/.test(r));
+    expect(order().at(-1)).toContain('Corp deliveries');
+    await user.click(screen.getAllByRole('button', { name: /^Items/ })[0]);
+    expect(order().at(-1)).toContain('Corp deliveries');
+  });
+
+  it('does not call an office empty because the search matched nothing in it', async () => {
+    await ledger('/corp/assets?group=location&q=zzz');
+    await screen.findByText('Empty office');
+    expect(screen.getAllByText('Empty office')).toHaveLength(1);
+    expect(screen.queryByText('Jita IV - Moon 4')).not.toBeInTheDocument();
   });
 
   it('lists non-office places as their own groups on All', async () => {
