@@ -18,7 +18,7 @@ export function MoonOwnerDetail({ id }: { id: string }) {
   const { input } = useMoonOwners();
   const [dialog, setDialog] = useState<'rate' | 'settled' | null>(null);
   const corp = Number(id);
-  const detail = Number.isInteger(corp) ? moonOwnerDetail(input, corp) : undefined;
+  const detail = /^\d+$/.test(id) ? moonOwnerDetail(input, corp) : undefined;
   if (!detail) {
     return (
       <div className="space-y-4">

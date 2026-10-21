@@ -26,5 +26,7 @@ export function useMoonOwners() {
     () => hasOwnRefineries(view.input.entries, data.state.extractions.length, corporationId),
     [view.input.entries, data.state.extractions.length, corporationId]
   );
-  return { input, ...built, ownRefineries };
+  // A book with no moon owners yet may simply not have synced its own refineries: keep the tab.
+  const showExtractions = ownRefineries || (data.feeders ?? []).length === 0;
+  return { input, ...built, showExtractions };
 }

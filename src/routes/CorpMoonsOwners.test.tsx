@@ -12,7 +12,10 @@ import { CorpMoons } from './CorpMoons';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
 vi.mock('@/features/corp/taxBook/useCorpTaxBook', () => ({ useCorpTaxBook: vi.fn() }));
-const book = vi.hoisted(() => ({ entries: [] as ObservedMiningEntry[] }));
+const book = vi.hoisted(() => ({
+  entries: [] as ObservedMiningEntry[],
+  feeders: [] as unknown[],
+}));
 vi.mock('@/features/corp/moons/useCorpBook', async () => {
   const { buildBookView } = await import('@/engine/corpTaxBook/bookView');
   const BOOK = 98000000;
@@ -55,7 +58,7 @@ vi.mock('@/features/corp/moons/useCorpBook', async () => {
             moon: (id: number) => `Moon ${id}`,
             ore: () => 'Ore',
           },
-          data: { feeders: [], state: { extractions: [] } } as unknown as BookData,
+          data: { feeders: book.feeders, state: { extractions: [] } } as unknown as BookData,
         },
         reload: vi.fn(),
         characterId: 7,
@@ -73,6 +76,15 @@ const entry = (source: number | undefined): ObservedMiningEntry => ({
   ...(source === undefined ? {} : { sourceCorporationId: source }),
   oreLines: [{ typeId: 1, quantity: 1 }],
 });
+
+const ONE_FEEDER = {
+  corporationId: 98000001,
+  status: 'active',
+  mode: 'normal',
+  joinedAt: Date.parse('2026-10-01T10:00:00Z'),
+  coveragePeriods: [{ from: '2026-10-01' }],
+  payouts: [],
+};
 
 function mount(path: string) {
   vi.mocked(useCorpAccess).mockReturnValue({
@@ -101,6 +113,7 @@ beforeEach(() => vi.clearAllMocks());
 describe('CorpMoons moon owners', () => {
   it('has no Extractions tab when the book reads no refinery of its own, and lands on Moon owners', () => {
     book.entries = [entry(98000001)];
+    book.feeders = [ONE_FEEDER];
     mount('/corp/moons/extractions');
     expect(screen.queryByRole('tab', { name: 'Extractions' })).toBeNull();
     expect(screen.getByRole('tab', { name: 'Moon owners', selected: true })).toBeInTheDocument();
@@ -109,9 +122,17 @@ describe('CorpMoons moon owners', () => {
 
   it('keeps Extractions, and the invite button, for a book with refineries of its own', () => {
     book.entries = [entry(undefined)];
+    book.feeders = [ONE_FEEDER];
     mount('/corp/moons/moon-owners');
     expect(screen.getByRole('tab', { name: 'Extractions' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Moon owners', selected: true })).toBeInTheDocument();
+  });
+
+  it('keeps Extractions for a book with no moon owners and nothing synced yet', () => {
+    book.entries = [];
+    book.feeders = [];
+    mount('/corp/moons/extractions');
+    expect(screen.getByRole('tab', { name: 'Extractions', selected: true })).toBeInTheDocument();
   });
 
   it('keeps the invite button off the other tabs', () => {

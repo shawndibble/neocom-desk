@@ -73,7 +73,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const { view, canEdit, characterId, corporationId, names } = useBook();
-  const { ownRefineries } = useMoonOwners();
+  const { showExtractions } = useMoonOwners();
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
   // Back from EVE's page after the Automatic sync opt-in: show the settings it was pressed in.
@@ -99,9 +99,9 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
       </span>
     );
   // A corporation with no refineries of its own has nothing for Extractions to show.
-  if (!ownRefineries && (tab === 'extractions' || detail?.kind === 'extraction'))
+  if (!showExtractions && (tab === 'extractions' || detail?.kind === 'extraction'))
     return <Navigate to={tabPath(MOONS_TABS, 'moon-owners')} replace />;
-  const tabs = tabBarTabs(MOONS_TABS).filter((x) => ownRefineries || x.id !== 'extractions');
+  const tabs = tabBarTabs(MOONS_TABS).filter((x) => showExtractions || x.id !== 'extractions');
   return (
     <div className="mx-auto max-w-6xl space-y-4 px-4 py-4">
       {detail === null && (

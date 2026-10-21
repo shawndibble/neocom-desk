@@ -36,7 +36,8 @@ export function InviteMoonOwnerDialog({
   const phone = useIsPhone();
   const [invites, setInvites] = useState<OpenInvite[] | null>(null);
   const [offer, setOffer] = useState('');
-  const [link, setLink] = useState<string | null>(null);
+  const [link, setLink] = useState<{ url: string; inviteId: string } | null>(null);
+  const [revoking, setRevoking] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,8 +65,8 @@ export function InviteMoonOwnerDialog({
   const refresh = async () => {
     try {
       setInvites(await fetchInvites());
-    } catch (e) {
-      setError(editErrorMessage(e));
+    } catch {
+      setError(t(k('loadFailed')));
     }
   };
 
@@ -76,8 +77,12 @@ export function InviteMoonOwnerDialog({
     setBusy(true);
     setError(null);
     try {
-      const { code } = await createFeederInvite(characterId, corporationId, offered ?? undefined);
-      setLink(inviteLink(window.location.origin, code));
+      const { code, inviteId } = await createFeederInvite(
+        characterId,
+        corporationId,
+        offered ?? undefined
+      );
+      setLink({ url: inviteLink(window.location.origin, code), inviteId });
       setCopied(false);
       await refresh();
     } catch (e) {
@@ -88,17 +93,22 @@ export function InviteMoonOwnerDialog({
   };
   const revoke = async (inviteId: string) => {
     setError(null);
+    setRevoking(inviteId);
     try {
       await revokeFeederInvite(characterId, corporationId, inviteId);
+      // A revoked link is dead: stop offering it for copying.
+      if (link?.inviteId === inviteId) setLink(null);
       await refresh();
     } catch (e) {
       setError(editErrorMessage(e));
+    } finally {
+      setRevoking(null);
     }
   };
   const copy = async () => {
     if (link === null) return;
     try {
-      await navigator.clipboard.writeText(link);
+      await navigator.clipboard.writeText(link.url);
       setCopied(true);
     } catch {
       // The field is selectable; the officer can copy by hand.
@@ -130,7 +140,7 @@ export function InviteMoonOwnerDialog({
         {link !== null && (
           <div className="space-y-2">
             <Label text={t(k('link'))}>
-              <TextInput readOnly value={link} onFocus={(e) => e.currentTarget.select()} />
+              <TextInput readOnly value={link.url} onFocus={(e) => e.currentTarget.select()} />
             </Label>
             <div className="flex items-center gap-2">
               <Button variant="ghost" onClick={() => void copy()}>
@@ -168,6 +178,7 @@ export function InviteMoonOwnerDialog({
                   aria-label={t(k('revokeLabel'), {
                     date: shortDate(new Date(i.createdAt).toISOString()),
                   })}
+                  disabled={revoking === i.inviteId}
                   onClick={() => void revoke(i.inviteId)}
                 >
                   {t(k('revoke'))}
