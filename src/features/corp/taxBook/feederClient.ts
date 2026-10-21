@@ -143,7 +143,6 @@ export async function setFeederRate(
   });
 }
 
-/** Settle a moon owner otherwise (or back to normal) from today, with an optional note. */
 /** Labels one of the moon owner's refineries for both sides; null clears it (#4640). */
 export async function setRefineryLabel(
   characterId: number,
@@ -162,6 +161,7 @@ export async function setRefineryLabel(
   });
 }
 
+/** Settle a moon owner otherwise (or back to normal) from today, with an optional note. */
 export async function setFeederMode(
   characterId: number,
   corporationId: number,

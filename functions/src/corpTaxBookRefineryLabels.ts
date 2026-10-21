@@ -1,6 +1,7 @@
 // Refinery labels (issue #4640, spec #4504): either side's officers give a moon owner's refinery a
 // free-text label; the last edit wins. Stored on the moon owner's record (it carries on across a
-// rejoin) and copied into the view's `refineries` docs on rebuild. The rest of the label chain
+// rejoin) and written into the view's `refineries` doc in the same transaction (and on every
+// rebuild), so a failed price read can't hold it back. The rest of the label chain
 // (structure name, system, the moon owner's name plus the id) is the client's. Failures carry a
 // stable `reason`; no player-facing text lives here.
 
@@ -14,7 +15,7 @@ import {
   parseFeederCall,
   type FeederCall,
 } from './corpTaxBookFeederGrant.js';
-import { tryRebuildFeederView } from './corpTaxBookFeederView.js';
+import { FEEDER_VIEW_REFINERIES, feederViewRef } from './corpTaxBookFeederView.js';
 import { feederBookDeps } from './corpTaxBookFeederViewCalls.js';
 import type { FeederRecord, RefineryLabelDoc } from './corpTaxBookFeeders.js';
 import {
@@ -90,8 +91,12 @@ async function writeRefineryLabel(
   if (known.empty) fail('not-found', 'Not one of this moon owner’s refineries', 'unknown-refinery');
   const ref = feederRef(deps.db, collector, feeder);
   const field = new FieldPath('refineryLabels', String(input.structureId));
+  const viewRefinery = feederViewRef(deps.db, collector, feeder)
+    .collection(FEEDER_VIEW_REFINERIES)
+    .doc(String(input.structureId));
   await deps.db.runTransaction(async (tx) => {
-    const rec = (await tx.get(ref)).data() as FeederRecord | undefined;
+    const [recSnap, viewSnap] = await Promise.all([tx.get(ref), tx.get(viewRefinery)]);
+    const rec = recSnap.data() as FeederRecord | undefined;
     if (!rec) fail('not-found', 'No such moon owner', 'no-feeder');
     if (ENDED.includes(rec.status)) {
       fail('failed-precondition', 'This moon owner has left', 'feeder-ended');
@@ -106,6 +111,10 @@ async function writeRefineryLabel(
             side,
           };
     tx.update(ref, field, doc ?? FieldValue.delete());
+    // Absent until the view's first build, which then reads the label off the record.
+    if (viewSnap.exists) {
+      tx.update(viewRefinery, { label: doc?.label ?? null, labelSetAt: doc?.setAt ?? null });
+    }
     appendAudit(tx, deps, collector, actor, 'refineryLabelSet', {
       feederCorporationId: feeder,
       structureId: input.structureId,
@@ -113,7 +122,6 @@ async function writeRefineryLabel(
       side,
     });
   });
-  await tryRebuildFeederView(deps, collector, feeder);
   return { ok: true };
 }
 

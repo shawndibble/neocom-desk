@@ -22,6 +22,8 @@ import { isk, shortDate } from './moonsFormat';
 
 type Names = (characterId: number) => string;
 
+const ENDED_STATUSES: readonly string[] = ['left', 'removed'];
+
 /** Page B's plain statement: who handles the tax, what is owed, what was paid. */
 function Statement({ view, name }: { view: FeederView; name: string }) {
   const { t } = useTranslation();
@@ -315,9 +317,9 @@ export function MoonOwnerView({
       ? { ownerName: nameOf(view.summary.feederCorporationId) }
       : {}),
   });
-  // The server takes a label while the moon owner is active or being removed, as for the payee.
+  // The server takes a label until the moon owner leaves or is removed (disconnected included).
   const labelEdit =
-    payeeOpen && canEdit && onSetRefineryLabel
+    !ENDED_STATUSES.includes(view.summary.status) && canEdit && onSetRefineryLabel
       ? {
           current: (id: number) => view.refineries.find((r) => r.structureId === id)?.label ?? '',
           onSave: onSetRefineryLabel,

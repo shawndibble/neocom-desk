@@ -78,7 +78,7 @@ describe("moon owner's own page: refinery labels (#4640)", () => {
     expect(onSetRefineryLabel).toHaveBeenLastCalledWith(10, null);
   });
 
-  it('shows a refusal as translated text, never the server message', async () => {
+  it('shows a refusal as translated text, never the server message, and keeps the draft', async () => {
     const refusal = Object.assign(new Error('This moon owner has left'), {
       details: { reason: 'feeder-ended' },
     });
@@ -89,6 +89,8 @@ describe("moon owner's own page: refinery labels (#4640)", () => {
       expect(screen.getByRole('alert')).toHaveTextContent('This connection has already ended.')
     );
     expect(screen.queryByText('This moon owner has left')).toBeNull();
+    // The field reopens with what was typed.
+    expect(screen.getByRole('textbox', { name: 'Refinery label' })).toHaveValue('X');
   });
 
   it('Escape keeps the label as it was', async () => {

@@ -52,9 +52,12 @@ function RefineryRow({
     if (refocus) focusAfterCommit(pencilRef);
     const next = draft.trim();
     if (!save || next === edit.current(structureId).trim()) return;
-    edit
-      .onSave(structureId, next === '' ? null : next)
-      .catch((e: unknown) => setError(callableErrorText(t, e, k('failed'))));
+    edit.onSave(structureId, next === '' ? null : next).catch((e: unknown) => {
+      setError(callableErrorText(t, e, k('failed')));
+      // Reopen with the draft kept, so a refusal never costs the officer what they typed.
+      settled.current = false;
+      setEditing(true);
+    });
   }
 
   return (

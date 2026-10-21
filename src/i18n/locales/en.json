@@ -14646,7 +14646,7 @@
         "edit": "Label {{name}}",
         "editTooltip": "Edit label",
         "field": "Refinery label",
-        "hint": "Both corporations see this label. Leave it empty to use the default name.",
+        "hint": "Both corporations see this label, and miners see it on their tax lines. Leave it empty to use the default name.",
         "failed": "Could not save the label. Try again."
       },
       "ownerView": {
