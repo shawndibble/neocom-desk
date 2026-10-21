@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest';
 
 const index = readFileSync(join(__dirname, 'index.ts'), 'utf8');
 const registrations = [
-  ...index.matchAll(/export const (\w+) = (communityCallable|corpTaxBookCallable)\(\s*'(\w+)'/g),
+  ...index.matchAll(
+    /export const (\w+) = (communityCallable|corpTaxBookCallable|alertsCallable)\(\s*'(\w+)'/g
+  ),
 ];
 
 function clientSources(dir: string): string[] {
@@ -20,6 +22,9 @@ function clientSources(dir: string): string[] {
 describe('callable router names', () => {
   it('registers every callable under its own export name', () => {
     expect(registrations.length).toBeGreaterThan(60);
+    expect(registrations.map((m) => m[3])).toEqual(
+      expect.arrayContaining(['registerDevice', 'saveAlertGrant', 'deleteAlertGrant'])
+    );
     for (const [, exported, , action] of registrations) expect(action).toBe(exported);
   });
 
@@ -39,7 +44,7 @@ describe('callable router names', () => {
     for (const file of clientSources(join(__dirname, '../../src'))) {
       const text = readFileSync(file, 'utf8');
       for (const m of text.matchAll(
-        /'((?:\w*Communit\w*|\w*CorpTaxBook\w*|verifyCorpOfficer)Callable)'/g
+        /'((?:\w*Communit\w*|\w*CorpTaxBook\w*|verifyCorpOfficer)Callable|registerDevice|saveAlertGrant|deleteAlertGrant)'/g
       )) {
         used.add(m[1]);
       }

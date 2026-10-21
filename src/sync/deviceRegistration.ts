@@ -16,11 +16,11 @@
  * installed the PWA.
  */
 import { deleteToken, getMessaging, getToken } from 'firebase/messaging';
-import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
 import { db } from '@/db';
 import type { ProjectionRow } from '@/engine/projection';
-import { getFirebaseApp, getSyncFunctions } from './firebaseApp';
+import { getFirebaseApp } from './firebaseApp';
+import { callRouted } from './routedCallable';
 import { getDeviceId } from './deviceId';
 import { readLocal, removeLocal, writeLocal } from '@/lib/safeLocalStorage';
 import type { QuietHoursPayload } from '@/features/notifications/quietTime';
@@ -237,20 +237,17 @@ export async function registerDeviceForWebPush(
     .map((attempt) => attempt.value);
   if (withAccessTokens.length === 0) return null;
 
-  const call = httpsCallable<
-    {
-      deviceId: string;
-      fcmToken: string;
-      characters: {
-        characterId: number;
-        accessToken: string;
-        projectionRows: readonly ProjectionRow[];
-        eveTypes: readonly string[];
-      }[];
-      quietHours: QuietHoursPayload | null;
-    },
-    RegisterDeviceResponse
-  >(getSyncFunctions(), 'registerDevice');
+  type RegisterDeviceRequest = {
+    deviceId: string;
+    fcmToken: string;
+    characters: {
+      characterId: number;
+      accessToken: string;
+      projectionRows: readonly ProjectionRow[];
+      eveTypes: readonly string[];
+    }[];
+    quietHours: QuietHoursPayload | null;
+  };
 
   // Forgotten before the call, whatever its outcome: this upload replaces
   // this device's rows, so once it may have landed the previous fingerprint
@@ -261,16 +258,19 @@ export async function registerDeviceForWebPush(
   inFlight += 1;
   if (inFlight > 1) overlapped = true;
   try {
-    const result = await call({
-      deviceId: getDeviceId(),
-      fcmToken,
-      quietHours,
-      characters: withAccessTokens.map((character) => ({
-        ...character,
-        projectionRows: projectionsByCharacter.get(character.characterId) ?? NO_PROJECTION_ROWS,
-        eveTypes: eveTypesByCharacter.get(character.characterId) ?? NO_EVE_TYPES,
-      })),
-    });
+    const result = await callRouted<RegisterDeviceRequest, RegisterDeviceResponse>(
+      'registerDevice',
+      {
+        deviceId: getDeviceId(),
+        fcmToken,
+        quietHours,
+        characters: withAccessTokens.map((character) => ({
+          ...character,
+          projectionRows: projectionsByCharacter.get(character.characterId) ?? NO_PROJECTION_ROWS,
+          eveTypes: eveTypesByCharacter.get(character.characterId) ?? NO_EVE_TYPES,
+        })),
+      }
+    );
     // Remembered only when every Character landed: one that couldn't get a
     // token, or that the backend rejected, must be retried on the next poll
     // rather than left unregistered for REREGISTER_AFTER_MS. Nor when another
@@ -279,11 +279,11 @@ export async function registerDeviceForWebPush(
     if (
       !overlapped &&
       withAccessTokens.length === characters.length &&
-      result.data.rejected.length === 0
+      result.rejected.length === 0
     ) {
       writeLastRegistration({ fingerprint, at: now });
     }
-    return result.data;
+    return result;
   } finally {
     inFlight -= 1;
     if (inFlight === 0) overlapped = false;

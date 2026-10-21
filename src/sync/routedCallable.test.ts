@@ -13,12 +13,15 @@ describe('routerFor', () => {
     ['reclaimCorpTaxBookCallable', 'corpTaxBookCall'],
     ['setCorpTaxBookFeederRateCallable', 'corpTaxBookCall'],
     ['verifyCorpOfficerCallable', 'corpTaxBookCall'],
+    ['registerDevice', 'alertsCall'],
+    ['saveAlertGrant', 'alertsCall'],
+    ['deleteAlertGrant', 'alertsCall'],
   ])('%s goes through %s', (name, router) => {
     expect(routerFor(name)).toBe(router);
   });
 
   it('refuses a callable that has no router', () => {
-    expect(() => routerFor('registerDevice')).toThrow(/No callable router/);
+    expect(() => routerFor('mintFirebaseToken')).toThrow(/No callable router/);
   });
 });
 

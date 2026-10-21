@@ -88,13 +88,16 @@ describe('registerDeviceForWebPush', () => {
     const result = await registerDeviceForWebPush('vapid-key', registration);
 
     expect(call).toHaveBeenCalledWith({
-      deviceId: 'device-1',
-      fcmToken: 'fcm-token',
-      quietHours: null,
-      characters: [
-        { characterId: 1, accessToken: 'token-1', projectionRows: [], eveTypes: [] },
-        { characterId: 2, accessToken: 'token-2', projectionRows: [], eveTypes: [] },
-      ],
+      action: 'registerDevice',
+      data: {
+        deviceId: 'device-1',
+        fcmToken: 'fcm-token',
+        quietHours: null,
+        characters: [
+          { characterId: 1, accessToken: 'token-1', projectionRows: [], eveTypes: [] },
+          { characterId: 2, accessToken: 'token-2', projectionRows: [], eveTypes: [] },
+        ],
+      },
     });
     expect(result).toEqual({ deviceId: 'device-1', registered: [1], rejected: [] });
   });
@@ -108,7 +111,10 @@ describe('registerDeviceForWebPush', () => {
 
     await registerDeviceForWebPush('vapid-key', registration, new Map(), { quietHours });
 
-    expect(call).toHaveBeenCalledWith(expect.objectContaining({ quietHours }));
+    expect(call).toHaveBeenCalledWith({
+      action: 'registerDevice',
+      data: expect.objectContaining({ quietHours }),
+    });
   });
 
   it('includes each Character’s Projection rows from the passed-in map, keyed by characterId', async () => {
@@ -130,13 +136,16 @@ describe('registerDeviceForWebPush', () => {
     await registerDeviceForWebPush('vapid-key', registration, new Map([[1, [row]]]));
 
     expect(call).toHaveBeenCalledWith({
-      deviceId: 'device-1',
-      fcmToken: 'fcm-token',
-      quietHours: null,
-      characters: [
-        { characterId: 1, accessToken: 'token-1', projectionRows: [row], eveTypes: [] },
-        { characterId: 2, accessToken: 'token-2', projectionRows: [], eveTypes: [] },
-      ],
+      action: 'registerDevice',
+      data: {
+        deviceId: 'device-1',
+        fcmToken: 'fcm-token',
+        quietHours: null,
+        characters: [
+          { characterId: 1, accessToken: 'token-1', projectionRows: [row], eveTypes: [] },
+          { characterId: 2, accessToken: 'token-2', projectionRows: [], eveTypes: [] },
+        ],
+      },
     });
   });
 
@@ -173,13 +182,16 @@ describe('registerDeviceForWebPush', () => {
     const result = await registerDeviceForWebPush('vapid-key', registration);
 
     expect(call).toHaveBeenCalledWith({
-      deviceId: 'device-1',
-      fcmToken: 'fcm-token',
-      quietHours: null,
-      characters: [
-        { characterId: 1, accessToken: 'token-1', projectionRows: [], eveTypes: [] },
-        { characterId: 3, accessToken: 'token-3', projectionRows: [], eveTypes: [] },
-      ],
+      action: 'registerDevice',
+      data: {
+        deviceId: 'device-1',
+        fcmToken: 'fcm-token',
+        quietHours: null,
+        characters: [
+          { characterId: 1, accessToken: 'token-1', projectionRows: [], eveTypes: [] },
+          { characterId: 3, accessToken: 'token-3', projectionRows: [], eveTypes: [] },
+        ],
+      },
     });
     expect(result).toEqual({ deviceId: 'device-1', registered: [1], rejected: [] });
   });
@@ -280,7 +292,7 @@ describe('registerDeviceForWebPush with skipIfUnchanged (the 5-minute poll)', ()
     expect(call).not.toHaveBeenCalled();
     await withTypes(['A', 'B']);
     expect(call).toHaveBeenCalledTimes(1);
-    expect(call.mock.calls[0][0].characters[0].eveTypes).toEqual(['A', 'B']);
+    expect(call.mock.calls[0][0].data.characters[0].eveTypes).toEqual(['A', 'B']);
   });
 
   it('re-registers when the FCM token rotates', async () => {

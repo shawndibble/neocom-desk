@@ -450,7 +450,7 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   callables' bookkeeping (100 mails a day, a slot per Pledger), read-only to
   clients; a Request's `notify` is written by the post and edit callables. Leave/removal deletes a Member's Requests and
   Pledges in `deleteMemberShares`.
-  Cleanup (issue #3812): the daily `sweepCommunityRequests` (`functions/src/communityRequestsCleanup.ts`,
+  Cleanup (issue #3812): the daily `sweepCommunityRequests` (a task of `dailyHousekeeping`) (`functions/src/communityRequestsCleanup.ts`,
   verdict in the pure `decideRequestSweep`) deletes Requests expired 7 days ago
   (they stay Expired and extendable meanwhile) and Requests closed 7 days ago with their Pledges (`recursiveDelete`; two
   single-field queries per Community, each candidate re-read before its delete,
