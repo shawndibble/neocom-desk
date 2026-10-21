@@ -11830,7 +11830,7 @@
     "resetViewPrefsHint": "Resets every page's remembered sorts, filters and expanded sections. Characters, groups and plans stay.",
     "resetViewPrefsConfirm": "View preferences reset.",
     "permissions": {
-      "hint": "What this character lets Neocom Desk read from EVE. Grant adds permissions in one login; revoke on <ccp>EVE's site</ccp>.",
+      "hint": "What this character lets Neocom Desk read from EVE. Grant adds permissions in one login; revoke on <ccp>EVE's own site</ccp>.",
       "selectCharacter": "Select a character to see its permissions.",
       "checking": "Checking…",
       "granted": "Granted",
