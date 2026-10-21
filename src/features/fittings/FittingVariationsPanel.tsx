@@ -9,6 +9,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { changeLabel, fittingVariationsCsvColumns } from './fittingVariationsCsv';
 import type { VariationRow } from './useModuleVariations';
+import { fixed1 } from '@/lib/fixedFormat';
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -103,7 +104,7 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
           no={
             row.overage
               ? t('fittings.variations.stillOverBy', {
-                  amount: row.overage.amount.toFixed(1),
+                  amount: fixed1(row.overage.amount),
                   resource: t(`fittings.list.${row.overage.resource}`),
                 })
               : t('fittings.variations.fitsNo')

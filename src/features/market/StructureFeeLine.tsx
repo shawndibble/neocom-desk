@@ -1,3 +1,4 @@
+import { fixed2 } from '@/lib/fixedFormat';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Popover, PopoverContent, PopoverTrigger, TextInput } from '@/components/ui';
@@ -92,7 +93,7 @@ export function StructureFeeLine({ structureId, gross, accountingLevel }: Struct
         />
       </label>
       <p className="text-text-dim">
-        {t('market.structureFee.sccLine', { pct: STRUCTURE_SCC_SURCHARGE_PCT.toFixed(2) })}
+        {t('market.structureFee.sccLine', { pct: fixed2(STRUCTURE_SCC_SURCHARGE_PCT) })}
       </p>
       <p aria-live="polite" className="text-text-dim">
         {preview === null

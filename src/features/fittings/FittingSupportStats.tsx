@@ -4,6 +4,7 @@ import type { FittingStats } from '@/engine/fittings/types';
 import { rangeLines } from './rangeText';
 import { HeatFigure, StatRow, StatRows } from './StatFacts';
 import { joinDetail } from './statKit';
+import { fixed2, fixedFormat } from '@/lib/fixedFormat';
 
 /** Rates and points to one decimal; percentages and jam strength as the game shows them. */
 const DIGITS: Record<SupportRow['kind'], number> = {
@@ -27,7 +28,7 @@ const DIGITS: Record<SupportRow['kind'], number> = {
  * one that rounds to nothing is a plain 0, never −0.
  */
 function signed(amount: number, digits: number): string {
-  const text = Math.abs(amount).toFixed(digits);
+  const text = fixedFormat(digits)(Math.abs(amount));
   if (Number(text) === 0) return text;
   return amount < 0 ? `−${text}` : `+${text}`;
 }
@@ -41,12 +42,13 @@ function effectsText(
   row: SupportRow,
   t: (key: string, options: Record<string, unknown>) => string
 ): string | null {
+  // fixed format: identity key, never shown
   const distinct = new Set(row.effects.map((e) => e.amount.toFixed(4)));
   if (row.effects.length === 0 || (row.kind === 'ecm' && distinct.size === 1)) return null;
   return row.effects
     .map((e) =>
       t(`fittings.stats.support.effect.${e.effect}`, {
-        value: row.kind === 'ecm' ? e.amount.toFixed(2) : signed(e.amount, 0),
+        value: row.kind === 'ecm' ? fixed2(e.amount) : signed(e.amount, 0),
       })
     )
     .join(', ');
@@ -68,7 +70,7 @@ export function SupportFacts({
   const amount = (row: SupportRow) =>
     effectsText(row, t) ??
     t(`fittings.stats.support.kind.${row.kind}`, {
-      value: row.amount.toFixed(DIGITS[row.kind]),
+      value: fixedFormat(DIGITS[row.kind])(row.amount),
       count: row.amount,
     });
   // What a row does, apart from how much: a scripted and an unscripted

@@ -10,6 +10,7 @@ import {
 } from '@/engine/fittings/ringLayout';
 import { budgetValue } from './ringFormat';
 import { useOverBudgetFlash } from '../useOverBudgetFlash';
+import { fmt1 } from '../stats/fixedFormat';
 
 /**
  * How each rim gauge is drawn. CPU and powergrid are told apart by form as
@@ -55,7 +56,7 @@ function gaugeTooltip(t: ReturnType<typeof useTranslation>['t'], budget: Budget)
         label: budget.label,
         value,
         percent,
-        amount: budget.flash.overage.toFixed(1),
+        amount: fmt1(budget.flash.overage),
       })
     : t('fittings.ring.gauge', { label: budget.label, value, percent });
 }

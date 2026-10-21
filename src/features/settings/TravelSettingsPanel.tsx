@@ -123,13 +123,15 @@ export function TravelSettingsPanel() {
       ) : (
         <SettingsPanelLoading title={t('settings.travel.routeTitle')} />
       )}
-      <Panel title={t('settings.travel.networkTitle')}>
-        <div className="space-y-4">
-          <SettingsHint>{t('settings.travel.networkHint')}</SettingsHint>
-          <SavedRouteNetworkFields />
-        </div>
-      </Panel>
-      <AvoidedSystemsPanel />
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <Panel title={t('settings.travel.networkTitle')}>
+          <div className="space-y-4">
+            <SettingsHint>{t('settings.travel.networkHint')}</SettingsHint>
+            <SavedRouteNetworkFields />
+          </div>
+        </Panel>
+        <AvoidedSystemsPanel />
+      </div>
     </div>
   );
 }

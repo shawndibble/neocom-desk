@@ -25,7 +25,7 @@ export function StackRows({ model, maxRows }: { model: StackRowsChartModel; maxR
                       key={part.key}
                       className="block h-full"
                       style={{
-                        width: `${((part.value / total) * 100).toFixed(1)}%`,
+                        width: `${((part.value / total) * 100).toFixed(1)}%`, // fixed format: CSS width
                         backgroundColor: CHART_COLOR[part.color],
                       }}
                     />

@@ -7,6 +7,7 @@ import { kmValue } from '../rangeText';
 import { budgetFigure, makeFigure } from './statFigures';
 import { resourceFacts } from './resourceFacts';
 import { unknownItemsList } from './unknownItemsList';
+import { fmt0, fmt1, fmt3 } from './fixedFormat';
 
 interface FactsProps {
   stats: FittingStats;
@@ -25,14 +26,14 @@ export function DroneFacts({ stats }: FactsProps) {
       items={[
         {
           label: t('fittings.stats.fact.droneDps'),
-          value: figure((s) => s.droneDps.toFixed(1)),
+          value: figure((s) => fmt1(s.droneDps)),
         },
         {
           label: t('fittings.stats.fact.bandwidth'),
           value: figure((s) =>
             t('fittings.stats.unit.bandwidth', {
-              used: s.droneBandwidthUsed.toFixed(0),
-              total: s.droneBandwidthTotal.toFixed(0),
+              used: fmt0(s.droneBandwidthUsed),
+              total: fmt0(s.droneBandwidthTotal),
             })
           ),
         },
@@ -40,7 +41,7 @@ export function DroneFacts({ stats }: FactsProps) {
           label: t('fittings.stats.fact.droneBay'),
           value: figure((s) =>
             t('fittings.stats.unit.cubicMetres', {
-              value: s.droneCapacity.toFixed(0),
+              value: fmt0(s.droneCapacity),
             })
           ),
         },
@@ -68,14 +69,14 @@ export function FighterFacts({ stats }: FactsProps) {
       items={[
         {
           label: t('fittings.stats.fact.fighterDps'),
-          value: figure((s) => s.fighters.dps.toFixed(1)),
+          value: figure((s) => fmt1(s.fighters.dps)),
         },
         {
           label: t('fittings.stats.fact.fighterTubes'),
           value: figure((s) =>
             t('fittings.stats.unit.usedOfTotal', {
-              used: s.fighters.tubes.used.toFixed(0),
-              total: s.fighters.tubes.total.toFixed(0),
+              used: fmt0(s.fighters.tubes.used),
+              total: fmt0(s.fighters.tubes.total),
             })
           ),
         },
@@ -83,8 +84,8 @@ export function FighterFacts({ stats }: FactsProps) {
           label: t('fittings.stats.fact.fighterBay'),
           value: figure((s) =>
             t('fittings.stats.unit.cubicMetresUsed', {
-              used: s.fighters.bay.used.toFixed(0),
-              total: s.fighters.bay.total.toFixed(0),
+              used: fmt0(s.fighters.bay.used),
+              total: fmt0(s.fighters.bay.total),
             })
           ),
         },
@@ -104,7 +105,7 @@ export function NavigationFacts({ stats }: FactsProps) {
           label: t('fittings.stats.fact.maxVelocity'),
           value: figure((s) =>
             t('fittings.stats.maxVelocityMeta', {
-              value: s.navigation.maxVelocity.toFixed(0),
+              value: fmt0(s.navigation.maxVelocity),
             })
           ),
         },
@@ -112,19 +113,19 @@ export function NavigationFacts({ stats }: FactsProps) {
           label: t('fittings.stats.fact.align'),
           value: figure((s) =>
             t('fittings.stats.unit.seconds', {
-              value: alignTimeSeconds(s.navigation.mass, s.navigation.agility).toFixed(1),
+              value: fmt1(alignTimeSeconds(s.navigation.mass, s.navigation.agility)),
             })
           ),
         },
         {
           label: t('fittings.stats.fact.agility'),
-          value: figure((s) => s.navigation.agility.toFixed(3)),
+          value: figure((s) => fmt3(s.navigation.agility)),
         },
         {
           label: t('fittings.stats.fact.mass'),
           value: figure((s) =>
             t('fittings.stats.unit.tonnes', {
-              value: (s.navigation.mass / 1000).toFixed(0),
+              value: fmt0(s.navigation.mass / 1000),
             })
           ),
         },
@@ -132,7 +133,7 @@ export function NavigationFacts({ stats }: FactsProps) {
           label: t('fittings.stats.fact.warpSpeed'),
           value: figure((s) =>
             t('fittings.stats.unit.auPerSecond', {
-              value: s.navigation.warpSpeed.toFixed(1),
+              value: fmt1(s.navigation.warpSpeed),
             })
           ),
         },
@@ -168,7 +169,7 @@ export function TargetingFacts({ stats }: FactsProps) {
           label: t('fittings.stats.fact.scanResolution'),
           value: figure((s) =>
             t('fittings.stats.unit.mm', {
-              value: s.targeting.scanResolution.toFixed(0),
+              value: fmt0(s.targeting.scanResolution),
             })
           ),
         },
@@ -176,7 +177,7 @@ export function TargetingFacts({ stats }: FactsProps) {
           label: t('fittings.stats.fact.signature'),
           value: figure((s) =>
             t('fittings.stats.unit.metres', {
-              value: s.targeting.signatureRadius.toFixed(0),
+              value: fmt0(s.targeting.signatureRadius),
             })
           ),
         },
@@ -197,8 +198,8 @@ export function FittingBudgetFacts({ stats, typeName }: TypeNameProps) {
             label: t('fittings.stats.fact.cpu'),
             value: budgetFigure(figure, 'cpu', stats.cpuUsed, stats.cpuTotal, (s) =>
               t('fittings.stats.unit.usedOfTotal', {
-                used: s.cpuUsed.toFixed(1),
-                total: s.cpuTotal.toFixed(1),
+                used: fmt1(s.cpuUsed),
+                total: fmt1(s.cpuTotal),
               })
             ),
           },
@@ -211,8 +212,8 @@ export function FittingBudgetFacts({ stats, typeName }: TypeNameProps) {
               stats.powergridTotal,
               (s) =>
                 t('fittings.stats.unit.usedOfTotal', {
-                  used: s.powergridUsed.toFixed(1),
-                  total: s.powergridTotal.toFixed(1),
+                  used: fmt1(s.powergridUsed),
+                  total: fmt1(s.powergridTotal),
                 })
             ),
           },
@@ -225,8 +226,8 @@ export function FittingBudgetFacts({ stats, typeName }: TypeNameProps) {
               stats.calibrationTotal,
               (s) =>
                 t('fittings.stats.unit.usedOfTotal', {
-                  used: s.calibrationUsed.toFixed(0),
-                  total: s.calibrationTotal.toFixed(0),
+                  used: fmt0(s.calibrationUsed),
+                  total: fmt0(s.calibrationTotal),
                 })
             ),
           },

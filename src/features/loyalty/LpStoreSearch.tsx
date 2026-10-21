@@ -5,6 +5,7 @@
  * (`/wallet/lp-store/:corporationId?offer=`), carrying the query so the store
  * view can offer a crumb back here.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -114,7 +115,7 @@ export function LpStoreSearch({
         `font-semibold tabular-nums ${iskPerLpTone(search.rowFor(store.offer)?.profit.iskPerLp ?? null)}`,
       render: (store) => {
         const value = search.rowFor(store.offer)?.profit.iskPerLp ?? null;
-        if (value !== null) return value.toFixed(1);
+        if (value !== null) return fixed1(value);
         return search.pricing ? '…' : '—';
       },
     },

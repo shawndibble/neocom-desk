@@ -7,6 +7,7 @@
  * time behind a Sell | Buy toggle; the other card is only hidden by CSS, so a
  * width change never re-mounts a table.
  */
+import { fixedFormat, fixed1 } from '@/lib/fixedFormat';
 import { useMemo, useState } from 'react';
 import type { ReactElement, ReactNode, RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -48,7 +49,7 @@ function signedPercent(ratio: number): string {
   if (ratio >= 9) return `${formatCount(1 + ratio)}×`;
   const share = Math.abs(ratio);
   const digits = share >= 0.1 ? 0 : share >= 0.01 ? 1 : 2;
-  const text = `${Math.abs(ratio * 100).toFixed(digits)}%`;
+  const text = `${fixedFormat(digits)(Math.abs(ratio * 100))}%`;
   return ratio > 0 ? `+${text}` : ratio < 0 ? `−${text}` : text;
 }
 
@@ -78,7 +79,7 @@ export function OrderBookSummaryStrip({
         value={
           spread === null
             ? '—'
-            : `${formatMarketIsk(spread.delta)} (${(spread.ratio * 100).toFixed(1)}%)`
+            : `${formatMarketIsk(spread.delta)} (${fixed1(spread.ratio * 100)}%)`
         }
       />
     </StatChips>

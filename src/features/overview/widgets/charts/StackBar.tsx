@@ -13,7 +13,7 @@ export function StackBar({ model }: { model: StackChartModel }) {
             key={part.key}
             className="block h-full"
             style={{
-              width: `${percents[i]!.toFixed(1)}%`,
+              width: `${percents[i]!.toFixed(1)}%`, // fixed format: CSS width
               backgroundColor: CHART_COLOR[part.color],
             }}
           />

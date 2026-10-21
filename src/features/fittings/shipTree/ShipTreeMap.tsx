@@ -278,6 +278,7 @@ export function ShipTreeMap({
         role="region"
         aria-label={t('ships.tree.mapLabel', { faction: factionNameOf(data.factions, factionID) })}
         data-testid="ship-tree-map"
+        // fixed format: DOM attribute
         data-zoom={cam.z.toFixed(2)}
         className="isis-viewport relative h-[calc(100dvh-17rem)] min-h-[28rem] cursor-grab touch-none overflow-hidden rounded-xs border border-line active:cursor-grabbing"
         style={{

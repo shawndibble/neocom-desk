@@ -153,7 +153,7 @@ export function localeSplitPlugin(): Plugin {
           if (id === SHELL_ID) shellChunk = chunk.fileName;
         }
       }
-      const kb = (n: number) => `${(n / 1024).toFixed(1)} kB`;
+      const kb = (n: number) => `${(n / 1024).toFixed(1)} kB`; // fixed format: build log
       console.log(
         `[neocom-locale-split] shell in ${shellChunk}; locale at startup ${kb(atStartup)} of ${kb(total)}; ` +
           `startup chunks ${[...startup].sort().join(', ')}`

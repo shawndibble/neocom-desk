@@ -4,6 +4,7 @@
  * orders now, Sell → listing it yourself, Split → the spread), then one line of
  * cargo facts. Nothing dropped.
  */
+import { fixed2 } from '@/lib/fixedFormat';
 import type { ReactNode } from 'react';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useTranslation } from 'react-i18next';
@@ -118,7 +119,7 @@ export function AppraisalHeaderStats({
               <>
                 <HintText
                   content={t('market.appraisal.instantNetHelp', {
-                    tax: net.salesTaxPct.toFixed(2),
+                    tax: fixed2(net.salesTaxPct),
                   })}
                 >
                   {t('market.appraisal.summaryBuyNet')}
@@ -155,8 +156,8 @@ export function AppraisalHeaderStats({
               <>
                 <HintText
                   content={t('market.appraisal.listNetHelp', {
-                    tax: net.salesTaxPct.toFixed(2),
-                    broker: net.brokerFeePct.toFixed(2),
+                    tax: fixed2(net.salesTaxPct),
+                    broker: fixed2(net.brokerFeePct),
                   })}
                 >
                   {t('market.appraisal.summarySellNet')}

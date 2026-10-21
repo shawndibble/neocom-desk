@@ -5,6 +5,7 @@
  * with no colony has no home, and the finder says so rather than assuming a
  * hub.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -139,7 +140,7 @@ export function PlanetFinder({
                     <span className="sr-only">
                       {t(`piMap.finder.band.${securityBand(r.security)}`)}{' '}
                     </span>
-                    {shownSecurity(r.security).toFixed(1)}
+                    {fixed1(shownSecurity(r.security))}
                   </span>
                 )}
                 <span className="text-text-dim">

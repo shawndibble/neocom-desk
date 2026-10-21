@@ -1,5 +1,6 @@
 /** Display helpers for the Market Browser's order tables. */
 import { formatMarketIsk } from '@/lib/isk';
+import { fixedFormat } from '@/lib/fixedFormat';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { idReferenceKind } from '@/engine/market/attributeUnits';
 import type { ResolvedOrderLocation } from '@/engine/market/orderBook';
@@ -13,8 +14,8 @@ export function formatVolume(value: number): string {
 
 /** A signed percentage ("+12.5%", "-3.0%"); a figure that rounds to zero takes no sign. */
 export function formatSignedPct(value: number, digits: number): string {
-  const rounded = Number(value.toFixed(digits));
-  return `${rounded > 0 ? '+' : ''}${rounded.toFixed(digits)}%`;
+  const rounded = Number(value.toFixed(digits)); // fixed format: sign test on the rounded number
+  return `${rounded > 0 ? '+' : ''}${fixedFormat(digits)(rounded)}%`;
 }
 
 /**
@@ -74,7 +75,7 @@ export function formatOrderLocationText(
   location: ResolvedOrderLocation,
   unknownStructureLabel: string
 ): string {
-  return `${location.stationName ?? unknownStructureLabel} · ${location.systemName} (${location.security.toFixed(1)})`;
+  return `${location.stationName ?? unknownStructureLabel} · ${location.systemName} (${location.security.toFixed(1)})`; // fixed format: copied text and CSV
 }
 
 interface HoldFigures {

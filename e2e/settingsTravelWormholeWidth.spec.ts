@@ -22,7 +22,11 @@ for (const size of SIZES) {
     const panel = control.locator('xpath=ancestor::section[1]');
     const controlBox = (await control.boundingBox())!;
     const panelBox = (await panel.boundingBox())!;
-    expect(controlBox.width).toBeLessThan(panelBox.width * 0.5);
+    // The panel is half the content area beside Avoided systems, so a share of
+    // its width can't tell natural from stretched: the natural width is ~185px
+    // and a stretched control would fill the panel's inner width (226px at 1024).
+    expect(controlBox.width).toBeLessThan(200);
+    expect(controlBox.width).toBeLessThan(panelBox.width * 0.8);
   });
 
   test(`Route Safety ship-size control fills its rail at ${size.width}px`, async ({ page }) => {

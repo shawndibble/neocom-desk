@@ -13,6 +13,7 @@
  * Everything here is read-only. A Mining Yield row records what ESI reported;
  * there is nothing about it for a pilot to edit.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { OreIcon, OreLink } from './OreIcon';
 import { useMemo } from 'react';
@@ -379,7 +380,7 @@ export function YieldDetailModal({
                 </p>
                 <p className={CARD_HINT}>
                   {t('miningTax.overview.detail.refineCardHint', {
-                    efficiency: (valuation.efficiency * 100).toFixed(1),
+                    efficiency: fixed1(valuation.efficiency * 100),
                   })}
                 </p>
               </div>
@@ -411,7 +412,7 @@ export function YieldDetailModal({
                       totals.deltaPercent > 0
                         ? 'miningTax.overview.detail.deltaPercentGain'
                         : 'miningTax.overview.detail.deltaPercentLoss',
-                      { percent: Math.abs(totals.deltaPercent).toFixed(1) }
+                      { percent: fixed1(Math.abs(totals.deltaPercent)) }
                     )}
                   </p>
                 )}
@@ -504,7 +505,7 @@ export function YieldDetailModal({
                   <p>
                     {t('miningTax.overview.detail.refineBasisHint', {
                       character: row.characterName,
-                      efficiency: (valuation.efficiency * 100).toFixed(1),
+                      efficiency: fixed1(valuation.efficiency * 100),
                     })}
                   </p>
                 )}
