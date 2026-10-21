@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -6,6 +6,15 @@ import { db, type MiningTaxAssignmentRecord, type PayeeRecord } from '@/db';
 import type { BookRowView } from '@/engine/corpTaxBook/personal';
 import { CorpOverlapNotice } from './CorpOverlapNotice';
 import { readOverlapAcks } from './overlapAck';
+
+// Releasing ore re-prices what is left; the market read is stubbed.
+vi.mock('../pricing', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../pricing')>()),
+  loadUnitPricesOnDate: vi.fn(async () => ({
+    prices: new Map([[45490, 1]]),
+    unpriced: new Set<number>(),
+  })),
+}));
 
 const ZEO = 45490;
 const ME = 1;
