@@ -192,7 +192,7 @@ CCP's baked combat certificates graded for the active Character, by area rather 
 
 ## Ways to find and add skills (discovery paths)
 
-Target of every "Add" is the Character's target Skill Plan (`TargetPlanPicker`, synced). Settings > Help lists the main paths (`HelpPanel.tsx`), and the empty Plans list points at queue import, Certified Plan and Ship Tree.
+Target of every "Add" is the Character's target Skill Plan (`TargetPlanPicker`, synced). Help › FAQ lists the main paths under "How do I find skills to train?" (`FaqPanel.tsx`, id `train-skills`), and the empty Plans list points at queue import, Certified Plan and Ship Tree.
 
 | Intent                      | Where                                                 | How                                                                                                           |
 | --------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
