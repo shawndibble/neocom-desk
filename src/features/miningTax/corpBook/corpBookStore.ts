@@ -81,7 +81,9 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
     const rate = r as Data;
     return (
       num(rate.pct) !== undefined &&
-      ['corp', 'guest', 'feeder', 'miner', 'moon', 'record'].includes(String(rate.scope))
+      ['corp', 'guest', 'feeder', 'miner', 'moon', 'structure', 'record'].includes(
+        String(rate.scope)
+      )
     );
   });
   const syncedAt = num((d.lastSync as Data | null | undefined)?.at);

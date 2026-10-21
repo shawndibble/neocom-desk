@@ -32,6 +32,10 @@ export interface QueueDeps {
   sending?(id: string | undefined): void;
   /** The request may have reached ESI before it failed (a timeout): never re-send it. */
   isUnconfirmed?(error: unknown): boolean;
+  /** Re-checked right before a send (#4621): false drops the mail unsent. */
+  isStillDue?(item: MailQueueItem): Promise<boolean>;
+  /** Deletes mails that are no longer due. */
+  drop?(ids: readonly string[]): Promise<void>;
 }
 
 export interface Step {
@@ -83,6 +87,31 @@ export async function stepQueue(
   if (step.kind === 'wait') return { delayMs: Math.max(250, step.until - deps.now()) };
 
   const { item } = step;
+  const settle = async (error: unknown): Promise<Step> => {
+    const failure = classifyMailFailure(failureShape(error, isOffline(error)));
+    if (failure.kind === 'failed') {
+      await deps.save([markFailed(item, failure.reason, failure.detail)]);
+      return { delayMs: sendGapMs(deps.random()) };
+    }
+    // ESI asked us to wait (520) or we are offline: the mail stays waiting.
+    await deps.save(
+      holdQueue(items, item.senderCharacterId, deps.now() + failure.waitMs, failure.kind)
+    );
+    return { delayMs: failure.waitMs };
+  };
+  if (deps.isStillDue && deps.drop) {
+    // A check that cannot answer never sends: the mail fails (Retry) or waits for a connection.
+    let due: boolean;
+    try {
+      due = await deps.isStillDue(item);
+    } catch (error) {
+      return settle(error);
+    }
+    if (!due) {
+      await deps.drop([item.id]);
+      return { delayMs: 0 };
+    }
+  }
   deps.sending?.(item.id);
   try {
     const mailId = await deps.send(item);
@@ -98,16 +127,7 @@ export async function stepQueue(
       ]);
       return { delayMs: sendGapMs(deps.random()) };
     }
-    const failure = classifyMailFailure(failureShape(error, isOffline(error)));
-    if (failure.kind === 'failed') {
-      await deps.save([markFailed(item, failure.reason, failure.detail)]);
-      return { delayMs: sendGapMs(deps.random()) };
-    }
-    // ESI asked us to wait (520) or we are offline: the mail stays waiting.
-    await deps.save(
-      holdQueue(items, item.senderCharacterId, deps.now() + failure.waitMs, failure.kind)
-    );
-    return { delayMs: failure.waitMs };
+    return await settle(error);
   } finally {
     deps.sending?.(undefined);
   }

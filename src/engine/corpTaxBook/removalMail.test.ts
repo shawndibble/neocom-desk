@@ -64,6 +64,22 @@ describe('fillTakesEffect', () => {
     const late = Date.parse('2026-10-17T18:00:00Z');
     expect(removalTakesEffectAt({ effectiveAt }, late)).toBe(effectiveAt);
   });
+  it('an accounting officer copy sent before the clock starts names no time (#4621)', () => {
+    const sentAt = Date.parse('2026-10-17T14:22:00Z');
+    const at = removalTakesEffectAt({ startsClock: false }, sentAt);
+    expect(at).toBeNull();
+    const body = fillTakesEffect(composeRemovalMail(input).body, at);
+    expect(body).toContain('24 hours after the moon owner is notified');
+    expect(body).not.toContain('EVE time');
+    expect(body).not.toContain(TAKES_EFFECT_TOKEN);
+    expect(body.replace(input.link, '')).not.toMatch(FORBIDDEN);
+  });
+  it('an officer copy sent after the clock started states the recorded time', () => {
+    const effectiveAt = Date.parse('2026-10-18T14:22:00Z');
+    expect(removalTakesEffectAt({ startsClock: false, effectiveAt }, effectiveAt - 3_600_000)).toBe(
+      effectiveAt
+    );
+  });
   it('formats an EVE time label', () => {
     expect(eveTimeLabel(Date.parse('2026-10-18T09:05:00Z'))).toBe('18 Oct 2026 09:05 EVE time');
   });

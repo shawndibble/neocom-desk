@@ -75,6 +75,19 @@ export function priceObservedDay(rawTypeIds: readonly number[], inputs: DayPrice
   return day;
 }
 
+/**
+ * What a moon owner's ore is worth (#4621): the hub's saved end-of-day open buy, else its open
+ * sell, else 0 (unpriced). No live tier: the server writes the moon owner's page with this rule,
+ * so the accounting side values a moon owner's accrual with it too and both show one figure.
+ */
+export function moonOwnerUnitPrice(
+  side: { buy?: number | null; sell?: number | null } | undefined
+): number {
+  if (side?.buy != null && side.buy > 0) return side.buy;
+  if (side?.sell != null && side.sell > 0) return side.sell;
+  return 0;
+}
+
 /** One Observed Mining Entry's value and tax, at its day's prices (by raw type id) and rate. */
 export function valueObservedEntry(
   entry: ObservedMiningEntry,

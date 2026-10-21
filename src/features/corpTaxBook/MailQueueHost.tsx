@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import {
   isStatementMail,
+  removalNoticeStillDue,
   startsRemovalClock,
   type MailQueueItem,
 } from '@/engine/corpTaxBook/mailQueue';
@@ -70,6 +71,19 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
     },
     sending,
     isUnconfirmed: isUnconfirmedWrite,
+    // Another officer's cancel (or a Leave, a forced removal, a disconnect) never reaches this
+    // browser's queue: re-read the removal before mailing "removing you" (#4621).
+    isStillDue: async (item) => {
+      if (item.kind !== 'removal' || item.feederCorporationId === undefined) return true;
+      const { readFeederRemovalState } = await import('@/features/corp/taxBook/bookClient');
+      const record = await readFeederRemovalState(
+        item.senderCharacterId,
+        item.corporationId,
+        item.feederCorporationId
+      );
+      return removalNoticeStillDue(item, record);
+    },
+    drop: async (ids) => db.corpMailQueue.bulkDelete([...ids]),
   };
 }
 

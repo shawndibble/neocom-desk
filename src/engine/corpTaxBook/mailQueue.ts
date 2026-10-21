@@ -42,6 +42,8 @@ export interface MailQueueItem {
   startsClock?: boolean;
   /** When the removal takes effect, once its clock has started: the notice states this time. */
   effectiveAt?: number;
+  /** The removal a notice belongs to (`removal.startedAt`, #4621); absent on items queued before. */
+  removalStartedAt?: number;
   /** The character the mail is sent from (an officer with the mail scope). */
   senderCharacterId: number;
   recipientId: number;
@@ -293,4 +295,24 @@ export function stampRemovalEffectiveAt(
       (i) => unsentNoticeFor(i, corporationId, feederCorporationId) && i.effectiveAt !== effectiveAt
     )
     .map((i) => ({ ...i, effectiveAt }));
+}
+
+/** What the send queue reads of a moon owner's record before sending a removal notice. */
+export interface RemovalNoticeRecord {
+  status: string;
+  removal?: { startedAt: number };
+}
+
+/**
+ * Whether a removal notice may still go out (#4621): only while its removal is still pending.
+ * Another officer's cancel, a Leave, a forced removal or a disconnect clears the removal in
+ * Firestore but not in this browser's queue. Every other kind of mail is always due.
+ */
+export function removalNoticeStillDue(
+  item: MailQueueItem,
+  record: RemovalNoticeRecord | undefined
+): boolean {
+  if (item.kind !== 'removal') return true;
+  if (record?.status !== 'pending-removal') return false;
+  return item.removalStartedAt === undefined || record.removal?.startedAt === item.removalStartedAt;
 }

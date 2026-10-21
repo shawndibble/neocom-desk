@@ -1,7 +1,9 @@
 /**
  * Dated tax rates (D3/D31): corp default → Guest default → per-feeder →
- * per-moon → per-Miner → per-record, most specific wins. The per-feeder tier
- * prices every refinery of one feeder corporation. Every rate but a per-record one
+ * per-refinery → per-moon → per-Miner → per-record, most specific wins. The
+ * per-feeder tier prices every refinery of one feeder corporation; the
+ * per-refinery tier (`structure`, #4621) prices one refinery by its structure
+ * id, which a moon owner's ledger-only row always has and a moon id never. Every rate but a per-record one
  * carries an effective-from date and applies only to days on or after it, so a
  * rate change never reaches back over days already mined. A per-record
  * override is an officer's logged correction to one Observed Mining Entry,
@@ -20,6 +22,7 @@ export type TaxRate =
   | (DatedRate & { scope: 'feeder'; feederId: number })
   | (DatedRate & { scope: 'miner'; minerId: string })
   | (DatedRate & { scope: 'moon'; moonId: number })
+  | (DatedRate & { scope: 'structure'; structureId: number })
   | { scope: 'record'; recordKey: string; pct: number };
 
 export type RateScope = TaxRate['scope'];
@@ -29,6 +32,8 @@ export interface RateContext {
   minerId: string;
   /** The moon the refinery was drilling; undefined when unknown. */
   moonId: number | undefined;
+  /** The refinery (structure) that recorded the entry; undefined when not given. */
+  structureId?: number;
   /** `observedEntryKey` of the Observed Mining Entry being taxed. */
   recordKey: string;
   /** The feeder corporation whose refinery recorded the entry; undefined for the book's own. */
@@ -45,7 +50,15 @@ export interface ResolvedRate {
 }
 
 /** Most specific first. */
-const SCOPE_ORDER: readonly RateScope[] = ['record', 'miner', 'moon', 'feeder', 'guest', 'corp'];
+const SCOPE_ORDER: readonly RateScope[] = [
+  'record',
+  'miner',
+  'moon',
+  'structure',
+  'feeder',
+  'guest',
+  'corp',
+];
 
 function targets(rate: TaxRate, ctx: RateContext): boolean {
   switch (rate.scope) {
@@ -53,6 +66,8 @@ function targets(rate: TaxRate, ctx: RateContext): boolean {
       return rate.recordKey === ctx.recordKey;
     case 'moon':
       return ctx.moonId !== undefined && rate.moonId === ctx.moonId;
+    case 'structure':
+      return ctx.structureId !== undefined && rate.structureId === ctx.structureId;
     case 'feeder':
       return ctx.feederId !== undefined && rate.feederId === ctx.feederId;
     case 'miner':

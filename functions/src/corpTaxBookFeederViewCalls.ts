@@ -7,6 +7,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { record } from './communities.js';
 import { ACCESS_TTL_MS, FEEDERS } from './corpTaxBook.js';
 import { type CorpSyncDeps } from './corpSyncGrant.js';
+import type { IdCategoryLookup } from './corpTaxBookEsi.js';
 import { withPayee, withPayeeChange, type Payee, type PayeeChange } from './corpTaxBookEngine.js';
 import {
   authorizeFeederCaller,
@@ -150,17 +151,27 @@ export async function requestFeederRate(
 /**
  * The moon owner names who its money goes to: a corporation or a player. Only its own CEO,
  * Directors and Accountants (live role check); the accounting corporation cannot (#4619).
- * Every set or change stamps `payeeChangedAt` (engine `withPayee`), which the removal's payee
+ * The id is checked against ESI first (#4621). Every set or change stamps `payeeChangedAt` (engine `withPayee`), which the removal's payee
  * link reads, and appends `payeeHistory`, which payout matching reads (#4617).
  */
 export async function setFeederPayee(
   deps: CorpSyncDeps,
   caller: Caller,
-  input: SetFeederPayeeInput
+  input: SetFeederPayeeInput,
+  idCategory: IdCategoryLookup
 ): Promise<{ ok: true }> {
   const ctx = await authorizeFeederCaller(deps, caller, input, 'edit');
   if (!ctx)
     fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
+  // The id must be the kind it claims (#4621): a character stored as a corporation would send
+  // payouts and the removal link to the wrong place. ESI down fails the call; nothing is written.
+  if ((await idCategory(input.payee.id)) !== input.payee.kind) {
+    fail(
+      'invalid-argument',
+      'That id is not a corporation or player of that kind',
+      'payee-mismatch'
+    );
+  }
   const ref = bookRef(deps.db, ctx.collectorCorporationId)
     .collection(FEEDERS)
     .doc(String(input.corporationId));

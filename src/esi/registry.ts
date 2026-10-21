@@ -768,6 +768,16 @@ export const ESI_REGISTRY = {
     scope: 'esi-corporations.read_starbases.v1',
     group: 'corp',
   },
+  /**
+   * Contracts issued by or assigned to the corporation. No in-game role is
+   * required (`x-required-roles` is absent), so `canReadContracts` is open to
+   * every member; the scope is additive (`corpScopes.ts`).
+   */
+  getCorporationContracts: {
+    route: '/corporations/{corporation_id}/contracts',
+    scope: 'esi-contracts.read_corporation_contracts.v1',
+    group: 'corp',
+  },
 } as const satisfies Record<EndpointName, EsiEndpointSpec>;
 
 export type EsiEndpointId = keyof typeof ESI_REGISTRY;

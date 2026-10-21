@@ -12,7 +12,7 @@
  * - a thrown load: the read was allowed and failed. The widget shows Retry.
  * - data, possibly an empty list: read fine.
  */
-import type { CorporationIndustryJob } from '@/esi/endpoints';
+import type { Contract, CorporationIndustryJob } from '@/esi/endpoints';
 import type { MemberActivity, RosterDiff } from '@/engine/corp/members';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { WalletDivision } from '@/features/corp/divisions';
@@ -105,6 +105,13 @@ export interface CorpStarbasesFeed extends CorpFeedBase {
   systemNames: ReadonlyMap<number, string>;
 }
 
+export interface CorpContractsFeed extends CorpFeedBase {
+  /** Every contract ESI lists for the corporation, any status; the builder keeps the open ones. */
+  contracts: Contract[];
+  /** Names for every issuer and assignee, whether a pilot, a corporation or an alliance. */
+  names: ReadonlyMap<number, string>;
+}
+
 /**
  * The corporation's zKillboard all-time totals: not an ESI read, so no role or
  * scope gates it. `readable: false` means the widget has nothing to ask about
@@ -141,6 +148,11 @@ export async function loadCorpMiningFeed(characterId: number): Promise<CorpMinin
 export async function loadCorpStarbasesFeed(characterId: number): Promise<CorpStarbasesFeed> {
   const { loadCorpStarbases } = await import('./corpFeedLoaders');
   return loadCorpStarbases(characterId);
+}
+
+export async function loadCorpContractsFeed(characterId: number): Promise<CorpContractsFeed> {
+  const { loadCorpContracts } = await import('./corpFeedLoaders');
+  return loadCorpContracts(characterId);
 }
 
 export async function loadCorpKillsFeed(characterId: number): Promise<CorpKillsFeed> {

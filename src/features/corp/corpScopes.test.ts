@@ -3,8 +3,17 @@ import { CORP_CAPABILITIES, corpCapabilities } from '@/engine/corpRoles';
 import { SCOPES, scopesForGroup } from '@/esi/scopes';
 import { CORP_SCOPES_FOR_CAPABILITY, corpGrantCoverage, missingCorpScopes } from './corpScopes';
 
+const CONTRACTS = 'esi-contracts.read_corporation_contracts.v1';
+
+/**
+ * `missingCorpScopes` without the contracts scope, which every member is asked for
+ * (no role gates it): these tests are about what each *role* needs.
+ */
+const missingForRoles = (...args: Parameters<typeof missingCorpScopes>) =>
+  missingCorpScopes(...args).filter((scope) => scope !== CONTRACTS);
+
 /** Nothing granted, so "missing" is the full required set — the shape most tests want. */
-const requiredFor = (roles: readonly string[]) => missingCorpScopes(corpCapabilities(roles), []);
+const requiredFor = (roles: readonly string[]) => missingForRoles(corpCapabilities(roles), []);
 
 describe('CORP_SCOPES_FOR_CAPABILITY', () => {
   it('names a scope for every capability, so none can be silently unrequestable', () => {
@@ -58,7 +67,8 @@ describe('CORP_SCOPES_FOR_CAPABILITY', () => {
 });
 
 describe('the required scope set', () => {
-  it('asks for nothing when no capability is held', () => {
+  it('asks only for the contracts scope when no role is held: every member reads contracts', () => {
+    expect(missingCorpScopes(corpCapabilities([]), [])).toEqual([CONTRACTS]);
     expect(requiredFor([])).toEqual([]);
   });
 
@@ -84,7 +94,7 @@ describe('the required scope set', () => {
 
 describe('missingCorpScopes', () => {
   it('reports the scopes a capable character has not granted', () => {
-    expect(missingCorpScopes(corpCapabilities(['Factory_Manager']), [])).toEqual([
+    expect(missingForRoles(corpCapabilities(['Factory_Manager']), [])).toEqual([
       'esi-industry.read_corporation_jobs.v1',
     ]);
   });
@@ -96,7 +106,7 @@ describe('missingCorpScopes', () => {
    */
   it('still reports the divisions scope when only the wallet scope is granted', () => {
     expect(
-      missingCorpScopes(corpCapabilities(['Junior_Accountant']), [
+      missingForRoles(corpCapabilities(['Junior_Accountant']), [
         'esi-wallet.read_corporation_wallets.v1',
       ])
     ).toEqual(['esi-corporations.read_divisions.v1']);
@@ -104,7 +114,7 @@ describe('missingCorpScopes', () => {
 
   it('reports nothing once every needed scope is granted', () => {
     expect(
-      missingCorpScopes(corpCapabilities(['Factory_Manager']), [
+      missingForRoles(corpCapabilities(['Factory_Manager']), [
         'esi-industry.read_corporation_jobs.v1',
       ])
     ).toEqual([]);
@@ -116,8 +126,8 @@ describe('missingCorpScopes', () => {
    * the Director is the point: same empty grant, different ask.
    */
   it('ignores scopes for capabilities the character does not hold', () => {
-    const factoryManager = missingCorpScopes(corpCapabilities(['Factory_Manager']), []);
-    const director = missingCorpScopes(corpCapabilities(['Director']), []);
+    const factoryManager = missingForRoles(corpCapabilities(['Factory_Manager']), []);
+    const director = missingForRoles(corpCapabilities(['Director']), []);
     expect(factoryManager).toEqual(['esi-industry.read_corporation_jobs.v1']);
     expect(factoryManager).not.toContain('esi-wallet.read_corporation_wallets.v1');
     expect(director).toContain('esi-wallet.read_corporation_wallets.v1');
@@ -126,7 +136,7 @@ describe('missingCorpScopes', () => {
 
   it('reports the remainder when a Director has granted only some of them', () => {
     const all = requiredFor(['Director']);
-    const missing = missingCorpScopes(corpCapabilities(['Director']), [
+    const missing = missingForRoles(corpCapabilities(['Director']), [
       'esi-corporations.read_structures.v1',
     ]);
     expect(missing).not.toContain('esi-corporations.read_structures.v1');
@@ -134,7 +144,7 @@ describe('missingCorpScopes', () => {
   });
 
   it('ignores unrelated granted scopes', () => {
-    expect(missingCorpScopes(corpCapabilities([]), ['esi-skills.read_skills.v1'])).toEqual([]);
+    expect(missingForRoles(corpCapabilities([]), ['esi-skills.read_skills.v1'])).toEqual([]);
   });
 
   /**
@@ -179,7 +189,7 @@ describe('corpGrantCoverage', () => {
    */
   it('asks for an additive capability’s scope without blocking the rest', () => {
     const coverage = corpGrantCoverage(corpCapabilities(['Accountant']), WALLET_SCOPES);
-    expect(coverage.missingScopes).toEqual([MINING]);
+    expect(coverage.missingScopes).toEqual([MINING, CONTRACTS]);
     expect(coverage.blocking).toBe(false);
     expect(coverage.capabilities.canReadWallet).toBe(true);
     // Unreadable until granted, so nothing reads the ledger into a 403.
@@ -190,6 +200,7 @@ describe('corpGrantCoverage', () => {
     const coverage = corpGrantCoverage(corpCapabilities(['Accountant']), [
       ...WALLET_SCOPES,
       MINING,
+      CONTRACTS,
     ]);
     expect(coverage).toEqual({
       missingScopes: [],
@@ -215,7 +226,17 @@ describe('corpGrantCoverage', () => {
   it('still blocks when a non-additive capability lacks a scope', () => {
     const coverage = corpGrantCoverage(corpCapabilities(['Accountant']), [MINING]);
     expect(coverage.blocking).toBe(true);
-    expect(coverage.missingScopes).toEqual(WALLET_SCOPES);
+    expect(coverage.missingScopes).toEqual([...WALLET_SCOPES, CONTRACTS]);
+  });
+
+  // Added after members already reached `ready` (#4607): lacking it must not hide the corp UI.
+  it('keeps a Character ready, with contracts off, when only the contracts scope is missing', () => {
+    const granted = scopesForGroup('corp').filter((scope) => scope !== CONTRACTS);
+    const coverage = corpGrantCoverage(corpCapabilities(['Director']), granted);
+    expect(coverage.missingScopes).toEqual([CONTRACTS]);
+    expect(coverage.blocking).toBe(false);
+    expect(coverage.capabilities.canReadContracts).toBe(false);
+    expect(coverage.capabilities.canReadWallet).toBe(true);
   });
 
   /**

@@ -1,6 +1,7 @@
 import { characterPages } from './characterRequest';
 import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
+import { fetchAllPagesStatus } from '../paginated';
 import type { TruncatableResult } from '../paginated';
 import type { EndpointOptions } from './options';
 
@@ -47,6 +48,25 @@ export function getCharacterContracts(
   options: EndpointOptions = {}
 ): Promise<TruncatableResult<Contract>> {
   return characterPages<Contract>('getCharacterContracts', characterId, options);
+}
+
+// --- GET /corporations/{corporation_id}/contracts (esi-contracts.read_corporation_contracts.v1) ---
+
+/**
+ * Contracts issued by or assigned to the corporation. Paginated (X-Pages), cached 300s. No
+ * in-game role is required (`x-required-roles` is absent); the items and bids sub-routes
+ * share the scope and are fetched only when a row is opened.
+ */
+export function getCorporationContracts(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<TruncatableResult<Contract>> {
+  return fetchAllPagesStatus<Contract>(`/corporations/${corporationId}/contracts`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationContracts',
+  });
 }
 
 // --- GET /characters/{character_id}/contracts/{contract_id}/items (esi-contracts.read_character_contracts.v1) ---

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { priceObservedDay, valueObservedEntry } from './valuation';
+import { moonOwnerUnitPrice, priceObservedDay, valueObservedEntry } from './valuation';
 import type { ObservedMiningEntry } from './types';
 
 const RAW_A = 45490;
@@ -96,5 +96,15 @@ describe('valueObservedEntry', () => {
       estimatedValue: 3000,
       taxOwed: 300,
     });
+  });
+});
+
+describe('moonOwnerUnitPrice (#4621)', () => {
+  it("values a moon owner's ore at the hub's saved open buy, else its open sell, else 0", () => {
+    expect(moonOwnerUnitPrice({ buy: 120, sell: 150 })).toBe(120);
+    expect(moonOwnerUnitPrice({ buy: null, sell: 150 })).toBe(150);
+    expect(moonOwnerUnitPrice({ buy: 0, sell: 150 })).toBe(150);
+    expect(moonOwnerUnitPrice({ buy: null, sell: null })).toBe(0);
+    expect(moonOwnerUnitPrice(undefined)).toBe(0);
   });
 });
