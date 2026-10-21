@@ -22,6 +22,10 @@ import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
 import type { OpenOrderRow } from './openOrdersModel';
 import { useOpenOrderTableColumns } from './openOrdersTableColumns';
+import {
+  CharacterFilterControl,
+  type CharacterScopeChoice,
+} from '@/features/character/CharacterFilterControl';
 import { PageHeaderPortals } from './PageHeaderPortals';
 import type { PageHeaderSlots } from './pageHeaderSlots';
 
@@ -36,7 +40,14 @@ const SEARCH_PARAM = textParam();
  * Character view. Cost basis, floors and Do-this-with-skills are per Character,
  * so the view shows none. Read-only: no order detail, no work-through.
  */
-export function CorpOrdersView({ headerSlots }: { headerSlots: PageHeaderSlots }) {
+export function CorpOrdersView({
+  headerSlots,
+  onLeaveCorporation,
+}: {
+  headerSlots: PageHeaderSlots;
+  /** The Character picker's way back: choosing "This character" clears `?scope=corp`. */
+  onLeaveCorporation: () => void;
+}) {
   const { t } = useTranslation();
   const { data, error, loading, activeCharacterId, refresh } = useRouteSnapshot(
     loadCorpOrders,
@@ -99,12 +110,24 @@ export function CorpOrdersView({ headerSlots }: { headerSlots: PageHeaderSlots }
       slots={headerSlots}
       meta={data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
       actions={
-        <IconButton
-          icon={<Icon.Refresh />}
-          label={t('market.orders.refreshOrders')}
-          onClick={refresh}
-          disabled={loading}
-        />
+        <>
+          <CharacterFilterControl<CharacterScopeChoice>
+            size="md"
+            hideAll
+            corporation
+            activeCharacterId={activeCharacterId}
+            value="corporation"
+            onChange={(next) => {
+              if (next !== 'corporation') onLeaveCorporation();
+            }}
+          />
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('market.orders.refreshOrders')}
+            onClick={refresh}
+            disabled={loading}
+          />
+        </>
       }
     />
   );

@@ -30,7 +30,10 @@ import { db } from '@/db';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
 import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
-import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import {
+  CharacterFilterControl,
+  type CharacterScopeChoice,
+} from '@/features/character/CharacterFilterControl';
 import {
   resolveCharacterFilter,
   type CharacterFilterValue,
@@ -101,6 +104,8 @@ interface ActiveChipDisplay {
 
 interface OpenOrdersPanelProps {
   headerSlots: PageHeaderSlots;
+  /** Set when the Character can read corp orders: adds "Corporation" to the Character picker. */
+  onChooseCorporation?: () => void;
 }
 
 /**
@@ -108,7 +113,7 @@ interface OpenOrdersPanelProps {
  * fix list — the orders that need the pilot, worst first, in one flat table
  * that says what is wrong and what to do, with Watch and All one segment away.
  */
-export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
+export function OpenOrdersPanel({ headerSlots, onChooseCorporation }: OpenOrdersPanelProps) {
   const { t } = useTranslation();
   const viewedCharacterId = useViewedCharacterId();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -414,13 +419,19 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
       meta={oldestFetchedAt !== null && <DataAgeBadge date={new Date(oldestFetchedAt)} />}
       actions={
         <>
-          {showCharacterStrip && (
-            <CharacterFilterControl
+          {(showCharacterStrip || onChooseCorporation) && (
+            <CharacterFilterControl<CharacterScopeChoice>
               size="md"
               activeCharacterId={activeCharacterId}
               value={characterFilterValue}
               characterCount={entriesWithOrders.length}
+              corporation={onChooseCorporation !== undefined}
+              hideAll={!showCharacterStrip}
               onChange={(next) => {
+                if (next === 'corporation') {
+                  onChooseCorporation?.();
+                  return;
+                }
                 const resolved = resolveCharacterFilter(next, activeCharacterId);
                 setFilter({ ...filter, characterIds: resolved === 'all' ? [] : [...resolved] });
               }}

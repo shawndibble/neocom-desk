@@ -3907,7 +3907,8 @@
     "filter": {
       "thisCharacter": "This character",
       "allCharacters": "All characters",
-      "unreadFor": "{{name}} · {{count}} unread"
+      "unreadFor": "{{name}} · {{count}} unread",
+      "corporation": "Corporation"
     }
   },
   "characters": {
@@ -8834,9 +8835,6 @@
     "title": "Contracts",
     "tabsLabel": "Contracts sections",
     "historyTab": "History",
-    "scopeLabel": "Whose contracts",
-    "characterScope": "Character",
-    "corpScope": "Corp",
     "corpReauthTitle": "Corp contracts need a new grant",
     "corpReauthHint": "Grant corporation contracts access to read the contracts issued by or assigned to your corporation.",
     "corpEmptyTitle": "No corp contracts cached",
@@ -11001,9 +10999,6 @@
     },
     "orders": {
       "corp": {
-        "scopeLabel": "Whose orders",
-        "characterScope": "Character",
-        "corpScope": "Corp",
         "tableName": "Corp open orders",
         "issuedBy": "Issued by",
         "searchPlaceholder": "Search by item, station or issuer…",

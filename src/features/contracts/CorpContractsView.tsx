@@ -187,7 +187,7 @@ export function CorpContractsView() {
       <div className="flex items-center justify-end gap-2">
         {contractsResult && <DataAgeBadge date={contractsResult.fetchedAt} />}
         <TableActionsMenu
-          name={t('contracts.corpScope')}
+          name={t('character.filter.corporation')}
           tableExport={tableExport}
           size="md"
           showLabel

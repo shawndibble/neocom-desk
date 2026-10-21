@@ -718,6 +718,29 @@ describe('Contracts corp deep link', () => {
   });
 });
 
+describe('Contracts corp picker', () => {
+  it('switches to the corp view from the Character picker and back', async () => {
+    await db.tokens.update(CHAR_ID, {
+      scopes: [
+        'esi-contracts.read_character_contracts.v1',
+        'esi-contracts.read_corporation_contracts.v1',
+      ],
+    });
+    window.history.pushState({}, '', '/contracts/history');
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    await user.click(screen.getByRole('button', { name: 'This character' }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'Corporation' }));
+    expect(await screen.findByText('corp view')).toBeInTheDocument();
+    expect(window.location.search).toBe('?scope=corp');
+    await user.click(screen.getByRole('button', { name: 'Corporation' }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    expect(window.location.search).toBe('');
+  });
+});
+
 describe('Contracts row right-click (issue #676)', () => {
   /** Right-clicks a contract row by its rendered title-cell text and returns the row. */
   async function openContractMenu(cellText: string) {

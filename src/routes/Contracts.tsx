@@ -12,7 +12,6 @@ import {
   IconButton,
   PageHeader,
   Panel,
-  SegmentedControl,
   Spinner,
   Tabs,
   TabPanel,
@@ -51,6 +50,10 @@ import { optionalEnumParam, textParam } from '@/lib/urlState';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { CONTRACTS_TABS } from '@/app/pageTabs';
+import {
+  CharacterFilterControl,
+  type CharacterScopeChoice,
+} from '@/features/character/CharacterFilterControl';
 import { ContractsHistoryTable } from '@/features/contracts/ContractsHistoryTable';
 import { useContractsHistoryColumns } from '@/features/contracts/useContractsHistoryColumns';
 import { loadContractsSnapshot } from '@/features/contracts/contractsSnapshot';
@@ -251,13 +254,25 @@ export function Contracts() {
       <PageHeader
         title={t('contracts.title')}
         meta={
-          corpLike ? undefined : tab === 'history' ? (
-            contractsResult ? (
-              <DataAgeBadge date={contractsResult.fetchedAt} />
-            ) : undefined
-          ) : searchStatus?.lastSyncedAt != null ? (
-            <DataAgeBadge date={new Date(searchStatus.lastSyncedAt)} />
-          ) : undefined
+          <>
+            {tab === 'history' && corpAvailable && (
+              <CharacterFilterControl<CharacterScopeChoice>
+                size="md"
+                hideAll
+                corporation
+                activeCharacterId={activeCharacterId}
+                value={scopeParam === 'corp' ? 'corporation' : 'current'}
+                onChange={(next) => setScopeParam(next === 'corporation' ? 'corp' : null)}
+              />
+            )}
+            {corpLike ? undefined : tab === 'history' ? (
+              contractsResult ? (
+                <DataAgeBadge date={contractsResult.fetchedAt} />
+              ) : undefined
+            ) : searchStatus?.lastSyncedAt != null ? (
+              <DataAgeBadge date={new Date(searchStatus.lastSyncedAt)} />
+            ) : undefined}
+          </>
         }
         actions={
           corpLike ? undefined : tab === 'history' ? (
@@ -298,17 +313,6 @@ export function Contracts() {
         {/* Switched outside the history chain below, not inside it: Search needs
           neither this character's contracts nor its `contracts` scope, so a
           character with an empty history or a 403 must still reach it. */}
-        {tab === 'history' && corpAvailable && (
-          <SegmentedControl
-            label={t('contracts.scopeLabel')}
-            value={scopeParam ?? 'character'}
-            onChange={(next) => setScopeParam(next === 'corp' ? 'corp' : null)}
-            options={[
-              { value: 'character', label: t('contracts.characterScope') },
-              { value: 'corp', label: t('contracts.corpScope') },
-            ]}
-          />
-        )}
         {tab === 'search' ? (
           <ContractSearchPanel mode={mode} onStatusChange={setSearchStatus} />
         ) : corpView ? (

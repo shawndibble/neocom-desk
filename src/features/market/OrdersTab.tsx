@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SegmentedControl, Spinner } from '@/components/ui';
+import { Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useUrlParam } from '@/lib/useUrlState';
@@ -16,9 +16,10 @@ const CorpOrdersView = lazy(() =>
 const SCOPE_PARAM = optionalEnumParam(['corp'] as const);
 
 /**
- * Market's Open orders tab with its Character / Corp scope. Hide, don't lock:
- * a Character without the Accountant or Trader role and the corp orders scope
- * sees neither the toggle nor the corp view, even from a pasted link.
+ * Market's Open orders tab with its Character / Corporation scope, a choice on
+ * the Character filter picker. Hide, don't lock: a Character without the
+ * Accountant or Trader role and the corp orders scope sees neither the option
+ * nor the corp view, even from a pasted link.
  */
 export function OrdersTab({ headerSlots }: { headerSlots: PageHeaderSlots }) {
   const { t } = useTranslation();
@@ -36,17 +37,6 @@ export function OrdersTab({ headerSlots }: { headerSlots: PageHeaderSlots }) {
 
   return (
     <>
-      {corpAvailable && (
-        <SegmentedControl
-          label={t('market.orders.corp.scopeLabel')}
-          value={corpView ? 'corp' : 'character'}
-          onChange={(next) => setScopeParam(next === 'corp' ? 'corp' : null)}
-          options={[
-            { value: 'character', label: t('market.orders.corp.characterScope') },
-            { value: 'corp', label: t('market.orders.corp.corpScope') },
-          ]}
-        />
-      )}
       {holdForAccess ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
@@ -59,10 +49,16 @@ export function OrdersTab({ headerSlots }: { headerSlots: PageHeaderSlots }) {
             </div>
           }
         >
-          <CorpOrdersView headerSlots={headerSlots} />
+          <CorpOrdersView
+            headerSlots={headerSlots}
+            onLeaveCorporation={() => setScopeParam(null)}
+          />
         </Suspense>
       ) : (
-        <OpenOrdersPanel headerSlots={headerSlots} />
+        <OpenOrdersPanel
+          headerSlots={headerSlots}
+          onChooseCorporation={corpAvailable ? () => setScopeParam('corp') : undefined}
+        />
       )}
     </>
   );

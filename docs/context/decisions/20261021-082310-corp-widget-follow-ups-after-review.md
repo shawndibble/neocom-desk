@@ -24,3 +24,5 @@ _Recorded 2026-10-21._
   an accepted courier (ESI keeps it `outstanding`) counts on both.
 - **Corp views of a character page are read-only.** The corp Market orders view
   drops the pilot's work-through columns (no cost basis, no relist advice).
+- **Corp views of a character page are a third option ("Corporation") on the
+  Character filter picker**, not a separate Character / Corp switch.
