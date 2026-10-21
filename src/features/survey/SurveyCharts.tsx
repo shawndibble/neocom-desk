@@ -41,7 +41,9 @@ import {
 import { DepletionChart, IskChart } from './SurveyViewCharts';
 import { oreTone } from './surveyTones';
 import { formatCount } from '@/lib/formatCount';
-import { formatNumber } from '@/lib/numberLocale';
+import { createNumberFormat } from '@/lib/numberLocale';
+
+const formatVolume = createNumberFormat({ maximumFractionDigits: 3 });
 
 interface ScanTableRow {
   at: number;
@@ -154,17 +156,17 @@ export function SurveyCharts({
       {
         id: 'total',
         header: t('survey.chartTotal'),
-        render: (r) => `${formatNumber(r.total)} m³`,
+        render: (r) => `${formatVolume(r.total)} m³`,
       },
       {
         id: 'mined',
         header: t('survey.tableMined'),
-        render: (r) => (r.mined === null ? '' : `${formatNumber(r.mined)} m³`),
+        render: (r) => (r.mined === null ? '' : `${formatVolume(r.mined)} m³`),
       },
       ...summary.oreNames.map((ore) => ({
         id: `ore:${ore}`,
         header: ore,
-        render: (r: ScanTableRow) => `${formatNumber(r.byOre[ore] ?? 0)} m³`,
+        render: (r: ScanTableRow) => `${formatVolume(r.byOre[ore] ?? 0)} m³`,
       })),
     ],
     [summary.oreNames, t]

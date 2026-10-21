@@ -19,7 +19,10 @@ import { UNKNOWN } from './builderKit';
 import { fractionBar } from './cellKit';
 import { placeHead, shortPlaceName } from './placeName';
 import type { SpExtras, TableCell, TableModel, TableRowModel, Translate } from './types';
-import { formatNumber } from '@/lib/numberLocale';
+import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
+
+// Part-trained levels bank fractional SP; the old default printed up to 3 decimals.
+const formatSp = createNumberFormat({ maximumFractionDigits: 3 });
 
 const W = 'overview.widgets';
 
@@ -104,7 +107,7 @@ export function spTable(t: Translate, input: SpTableInput): TableModel {
   const rows: TableRowModel[] = [
     {
       key: 'total',
-      cells: [t('skills.totalSp'), formatNumber(totalSp), ''],
+      cells: [t('skills.totalSp'), formatSp(totalSp), ''],
     },
     {
       key: 'unallocated',

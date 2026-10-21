@@ -60,6 +60,7 @@ describe('formatBytes', () => {
     setDecimalMark(',');
     try {
       expect(formatBytes(3.5 * 1024 ** 3)).toBe('3,5 GB');
+      expect(formatBytes(1023 * 1024)).toBe('1.023 kB');
     } finally {
       setDecimalMark('.');
     }

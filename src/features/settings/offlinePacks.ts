@@ -68,6 +68,6 @@ export function formatBytes(bytes: number): string {
     unitDisplay: 'short',
     maximumFractionDigits: 1,
   }).format(value);
-  // Unit names stay English; only the decimal mark follows the Number format.
-  return getDecimalMark() === ',' ? text.replace('.', ',') : text;
+  // Unit names stay English; the group and decimal marks follow the Number format.
+  return getDecimalMark() === ',' ? text.replace(/[.,]/g, (c) => (c === '.' ? ',' : '.')) : text;
 }

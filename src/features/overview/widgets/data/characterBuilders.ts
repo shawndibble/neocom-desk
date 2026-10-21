@@ -23,7 +23,10 @@ import { blank, count, NEUTRAL_NUMBER, statusOf, UNKNOWN, type Builder } from '.
 import { queueSegments, queueStack } from './chartBuilders';
 import { comingUpTable, spTable, trainingTable } from './characterTables';
 import type { ListRow } from './types';
-import { formatNumber } from '@/lib/numberLocale';
+import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
+
+// Part-trained levels bank fractional SP; the old default printed up to 3 decimals.
+const formatSp = createNumberFormat({ maximumFractionDigits: 3 });
 
 export const training: Builder = (feeds, { t, now, notTrainingAlert }) => {
   const feed = feeds.skills;
@@ -140,7 +143,7 @@ export const sp: Builder = (feeds, { t }) => {
           {
             key: 'total',
             title: t('skills.totalSp'),
-            value: formatNumber(total),
+            value: formatSp(total),
             tone: 'clear',
           },
           {
