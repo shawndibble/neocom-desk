@@ -5231,7 +5231,7 @@
         "summary_other": "{{count}} outstanding corp contracts, {{soon}} expiring within a day."
       },
       "corpAssets": {
-        "title": "Corp assets",
+        "title": "Corp Assets",
         "description": "Asset safety, impounded and delivered items, and stock below target",
         "empty": "The corporation holds no assets and has no stock targets.",
         "allClear": "Nothing in asset safety, impounded or waiting, and every stock target is met.",

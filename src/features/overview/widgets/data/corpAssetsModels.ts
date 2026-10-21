@@ -15,6 +15,11 @@ import type { TableRowModel } from './types';
 const K = 'overview.widgets.corpAssets';
 const ASSETS = '/corp/assets';
 
+/** A stack worth 0 ISK is one the price list doesn't know, so it prints like an unpriced one rather than "0". */
+function pricedValue(value: number | null): number | null {
+  return value !== null && value > 0 ? value : null;
+}
+
 interface Line {
   key: 'safety' | 'impounded' | 'deliveries' | 'belowTarget';
   count: number;
@@ -41,14 +46,14 @@ export const corpAssets: Builder = (feeds, { t }) => {
     {
       key: 'safety',
       count: summary.assetSafety.stacks,
-      value: summary.assetSafety.value,
+      value: pricedValue(summary.assetSafety.value),
       tone: 'critical',
       to: `${ASSETS}/safety`,
     },
     {
       key: 'impounded',
       count: summary.impounded.stacks,
-      value: summary.impounded.value,
+      value: pricedValue(summary.impounded.value),
       tone: 'critical',
       to: `${ASSETS}/impounded`,
     },

@@ -107,6 +107,12 @@ describe('corpAssets', () => {
     expect(view.number.secondary?.text).toBe('overview.widgets.corpAssets.truncated');
   });
 
+  it('treats a zero value as unpriced rather than printing 0 ISK', () => {
+    const view = corpAssets(feeds(summary({ impounded: { stacks: 1, value: 0 } })), ctx);
+    expect(view.table?.rows[0]?.cells[2]).toBe('');
+    expect(view.rows[0]?.detail).toBeUndefined();
+  });
+
   it('summarises with plural-aware counts and no zero parts', () => {
     const view = corpAssets(feeds(summary({ assetSafety: { stacks: 1, value: 5 } })), ctx);
     expect(view.summary).toContain('corpAssets.safetyCount');
