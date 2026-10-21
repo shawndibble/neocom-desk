@@ -48,8 +48,10 @@
  * (`CharacterScopeChoice`, which widens `CharacterFilterValue` without
  * changing it), and the phone trigger shows the `Corporation` glyph for it.
  * `hideAll` drops "All characters" for a page that cannot sum Characters.
- * With either, the control shows even for one Character, since it can still
- * change something.
+ * The options follow from the Character count and those two props: one
+ * Character with no Corporation renders nothing; one Character with it offers
+ * This character / Corporation; several offer This / All (/ Corporation); a
+ * `hideAll` page never offers All.
  */
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
@@ -175,18 +177,25 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
     : isAll
       ? allLabel
       : t('character.filter.thisCharacter');
+  // What there is to choose among. "All" sums Characters, so it needs more than one
+  // (an unknown count keeps it, as every caller before `corporation` expected).
+  const soloCharacter = characterCount !== undefined && characterCount <= 1;
+  const showAll = !hideAll && !(corporation && soloCharacter);
+  const showCurrent = activeCharacterId !== null;
+  // One Character and no Corporation option: nothing to switch, so no picker.
+  if (!corporation && soloCharacter && variant === 'icon') return null;
   const options = (
     <DropdownMenuContent align="start" className={unreadByCharacter ? 'w-60' : 'w-48'}>
       <DropdownMenuRadioGroup
         value={isCorporation ? 'corporation' : isAll ? 'all' : 'current'}
         onValueChange={(next) => onChange(next as V)}
       >
-        {activeCharacterId !== null && (
+        {showCurrent && (
           <DropdownMenuRadioItem value="current">
             {t('character.filter.thisCharacter')}
           </DropdownMenuRadioItem>
         )}
-        {!hideAll && <DropdownMenuRadioItem value="all">{allLabel}</DropdownMenuRadioItem>}
+        {showAll && <DropdownMenuRadioItem value="all">{allLabel}</DropdownMenuRadioItem>}
         {corporation && (
           <DropdownMenuRadioItem value="corporation">{corporationLabel}</DropdownMenuRadioItem>
         )}

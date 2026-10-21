@@ -426,7 +426,6 @@ export function OpenOrdersPanel({ headerSlots, onChooseCorporation }: OpenOrders
               value={characterFilterValue}
               characterCount={entriesWithOrders.length}
               corporation={onChooseCorporation !== undefined}
-              hideAll={!showCharacterStrip}
               onChange={(next) => {
                 if (next === 'corporation') {
                   onChooseCorporation?.();

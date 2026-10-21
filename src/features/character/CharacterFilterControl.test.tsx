@@ -224,4 +224,48 @@ describe('CharacterFilterControl', () => {
       expect(height!.slice(tier.length + 2)).toBe(size!.slice(tier.length + 5));
     }
   });
+
+  describe('option rules', () => {
+    const options = async (props: { count: number; corporation?: boolean; hideAll?: boolean }) => {
+      render(
+        <CharacterFilterControl<CharacterScopeChoice>
+          activeCharacterId={1}
+          value="current"
+          characterCount={props.count}
+          corporation={props.corporation}
+          hideAll={props.hideAll}
+          onChange={() => {}}
+        />
+      );
+      if (!screen.queryByRole('button')) return null;
+      await openMenu();
+      return screen.getAllByRole('menuitemradio').map((el) => el.textContent?.replace(/^✓/, ''));
+    };
+
+    it('one Character, no corp: no picker', async () => {
+      expect(await options({ count: 1 })).toBeNull();
+    });
+    it('one Character + corp: This character / Corporation', async () => {
+      expect(await options({ count: 1, corporation: true })).toEqual([
+        'This character',
+        'Corporation',
+      ]);
+    });
+    it('several, no corp: This / All', async () => {
+      expect(await options({ count: 3 })).toEqual(['This character', 'All characters · 3']);
+    });
+    it('several + corp: This / All / Corporation', async () => {
+      expect(await options({ count: 3, corporation: true })).toEqual([
+        'This character',
+        'All characters · 3',
+        'Corporation',
+      ]);
+    });
+    it('a page that cannot sum Characters never shows All', async () => {
+      expect(await options({ count: 3, corporation: true, hideAll: true })).toEqual([
+        'This character',
+        'Corporation',
+      ]);
+    });
+  });
 });
