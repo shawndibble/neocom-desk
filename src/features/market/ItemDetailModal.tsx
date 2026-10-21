@@ -99,6 +99,7 @@ import { useDynamicItem } from '@/features/abyssal/useDynamicItem';
 import { recordAttributes } from '@/features/abyssal/dynamicItems';
 import type { DynamicItemRecord } from '@/db';
 import { formatIsk, formatIskCompact, marketIskDecimals } from '@/lib/isk';
+import { formatCount } from '@/lib/formatCount';
 
 export interface ItemDetailModalProps {
   typeId: number;
@@ -814,7 +815,7 @@ function PlanetaryProduction({ pi, typeId }: { pi: PiData | null; typeId: number
         <>
           <p className="mt-1 text-xs text-text-dim">
             {t('market.itemDetail.planetaryCycle', {
-              quantity: schematic.quantity.toLocaleString(),
+              quantity: formatCount(schematic.quantity),
               duration: formatDuration(schematic.cycleTime),
             })}
           </p>
@@ -822,7 +823,7 @@ function PlanetaryProduction({ pi, typeId }: { pi: PiData | null; typeId: number
             {schematic.inputs.map((input) => (
               <li key={input.typeID}>
                 {t('market.itemDetail.planetaryInput', {
-                  quantity: input.quantity.toLocaleString(),
+                  quantity: formatCount(input.quantity),
                   name: input.name,
                 })}
               </li>

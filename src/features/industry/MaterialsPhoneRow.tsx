@@ -10,6 +10,7 @@ import { DepthPriceLine } from './DepthPriceLine';
 import { materialRowState } from './materialRow';
 import { LEDGER_VALUE, editPencilClassName, editableValueClassName } from './materialsTableStyle';
 import type { MaterialTableRow } from './subBuildPlan';
+import { formatCount } from '@/lib/formatCount';
 
 /** Calls `onLeave` once focus has left `event.currentTarget` altogether. */
 function whenFocusLeaves(onLeave: () => void) {
@@ -67,7 +68,7 @@ function PhoneHave({
       <span className="sr-only">
         {t('industry.errands.haveFor', { material: nameFor(material.typeID) })},{' '}
       </span>
-      {owned.toLocaleString()}
+      {formatCount(owned)}
       <Icon.Rename size={Icon.ICON_SIZE.sm} aria-hidden="true" className={editPencilClassName} />
     </button>
   );
@@ -225,7 +226,7 @@ export function MaterialsPhoneRow({
       </div>
       {!tier && (
         <>
-          <span className={LEDGER_VALUE}>{material.quantity.toLocaleString()}</span>
+          <span className={LEDGER_VALUE}>{formatCount(material.quantity)}</span>
           <span className={LEDGER_VALUE}>
             <PhoneHave
               material={material}
@@ -238,7 +239,7 @@ export function MaterialsPhoneRow({
             />
           </span>
           <span className={cx(LEDGER_VALUE, 'font-semibold')}>
-            {material.remainingQuantity.toLocaleString()}
+            {formatCount(material.remainingQuantity)}
           </span>
         </>
       )}

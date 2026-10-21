@@ -18,6 +18,7 @@ import type { CorpBookViewBook } from './corpBookView';
 import { CorpStatusPill } from './CorpStatusPill';
 import { useCorpStateHint } from './useCorpStateText';
 import type { CorpRowInfo } from './corpRows';
+import { formatCount } from '@/lib/formatCount';
 
 interface Props {
   open: boolean;
@@ -134,10 +135,10 @@ export function CorpRowDetailModal({
                     <span className="text-text-dim tabular-nums">
                       {you !== undefined && you !== line.quantity
                         ? t('miningTax.corpBook.detail.bookAndYou', {
-                            book: line.quantity.toLocaleString(),
-                            you: you.toLocaleString(),
+                            book: formatCount(line.quantity),
+                            you: formatCount(you),
                           })
-                        : line.quantity.toLocaleString()}
+                        : formatCount(line.quantity)}
                     </span>
                   </li>
                 );
@@ -163,8 +164,7 @@ export function CorpRowDetailModal({
                     <OreLink typeId={line.typeId}>{typeLabel(typeNames, line.typeId)}</OreLink>
                   </span>
                   <span className="text-text-dim tabular-nums">
-                    {line.quantity.toLocaleString()} ×{' '}
-                    {formatIsk(view.unitPrices[line.typeId] ?? 0)}
+                    {formatCount(line.quantity)} × {formatIsk(view.unitPrices[line.typeId] ?? 0)}
                   </span>
                   <span className="text-text-dim">
                     {t(
@@ -215,8 +215,8 @@ export function CorpRowDetailModal({
                     })
                   : view.dispute.quantity && !view.dispute.rate
                     ? t('miningTax.corpBook.disputed.quantity', {
-                        you: view.dispute.personalQuantity.toLocaleString(),
-                        book: view.dispute.bookQuantity.toLocaleString(),
+                        you: formatCount(view.dispute.personalQuantity),
+                        book: formatCount(view.dispute.bookQuantity),
                       })
                     : t('miningTax.corpBook.disputed.both')}
               </p>

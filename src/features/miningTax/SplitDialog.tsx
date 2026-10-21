@@ -29,6 +29,7 @@ import { LabelField } from './LabelField';
 import type { MoonMiningTaxRow } from './snapshot';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
+import { formatCount } from '@/lib/formatCount';
 
 interface SplitDialogProps {
   open: boolean;
@@ -278,7 +279,7 @@ export function SplitDialog({
                         {typeNames.get(line.typeId) ?? `#${line.typeId}`}
                       </OreLink>
                       <span className="ml-1.5 text-xs text-text-dim tabular-nums">
-                        {line.quantity.toLocaleString()}
+                        {formatCount(line.quantity)}
                       </span>
                     </label>
                     <TextInput
@@ -286,7 +287,7 @@ export function SplitDialog({
                       size="sm"
                       type="text"
                       inputMode="numeric"
-                      value={moved === 0 ? '' : moved.toLocaleString()}
+                      value={moved === 0 ? '' : formatCount(moved)}
                       placeholder="0"
                       onChange={(e) =>
                         setMove(line.typeId, unmaskNumber(e.target.value) ?? 0, line.quantity)

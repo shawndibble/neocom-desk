@@ -10,6 +10,7 @@ import type { RunLoss } from './useRunLoss';
 import { iskToneClass } from '@/features/character/format';
 import { formatIsk } from '@/lib/isk';
 import { formatDateOnly } from '@/lib/timestamp';
+import { formatCount } from '@/lib/formatCount';
 
 type T = (key: string) => string;
 
@@ -55,7 +56,7 @@ export function quantityColumn<Row extends ProductionRunSummary>(t: T): DataTabl
     align: 'right',
     className: 'tabular-nums',
     sortValue: (r) => r.run.quantity,
-    render: (r) => r.run.quantity.toLocaleString(),
+    render: (r) => formatCount(r.run.quantity),
   };
 }
 
@@ -77,7 +78,7 @@ export function quantitySoldColumn<Row extends ProductionRunSummary>(t: T): Data
     align: 'right',
     className: 'tabular-nums text-text-dim',
     sortValue: (r) => r.quantitySold,
-    render: (r) => `${r.quantitySold.toLocaleString()} / ${r.run.quantity.toLocaleString()}`,
+    render: (r) => `${formatCount(r.quantitySold)} / ${formatCount(r.run.quantity)}`,
   };
 }
 

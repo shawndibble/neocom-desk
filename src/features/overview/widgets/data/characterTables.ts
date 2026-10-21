@@ -19,6 +19,7 @@ import { UNKNOWN } from './builderKit';
 import { fractionBar } from './cellKit';
 import { placeHead, shortPlaceName } from './placeName';
 import type { SpExtras, TableCell, TableModel, TableRowModel, Translate } from './types';
+import { formatNumber } from '@/lib/numberLocale';
 
 const W = 'overview.widgets';
 
@@ -103,13 +104,13 @@ export function spTable(t: Translate, input: SpTableInput): TableModel {
   const rows: TableRowModel[] = [
     {
       key: 'total',
-      cells: [t('skills.totalSp'), totalSp.toLocaleString(), ''],
+      cells: [t('skills.totalSp'), formatNumber(totalSp), ''],
     },
     {
       key: 'unallocated',
       cells: [
         t('skills.unallocatedSp'),
-        unallocatedSp === null ? UNKNOWN : unallocatedSp.toLocaleString(),
+        unallocatedSp === null ? UNKNOWN : formatNumber(unallocatedSp),
         '',
       ],
     },

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, Panel } from '@/components/ui';
 import { SystemLink } from '@/features/entities';
 import type { SessionContinuation } from './sessionContinuation';
+import { formatCount } from '@/lib/formatCount';
 
 interface ContinueSessionCardProps {
   continuation: SessionContinuation;
@@ -51,7 +52,7 @@ export function ContinueSessionCard({
           {next.row.unassignedOreLines.map((line, i) => (
             <span key={line.typeId} className="font-normal text-text-dim">
               {i === 0 ? ' · ' : ', '}
-              {line.quantity.toLocaleString()}{' '}
+              {formatCount(line.quantity)}{' '}
               <OreLink typeId={line.typeId}>
                 {typeNames.get(line.typeId) ?? `#${line.typeId}`}
               </OreLink>

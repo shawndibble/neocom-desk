@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, EmptyState, Panel, Spinner, StatChip, StatChips } from '@/components/ui';
@@ -428,7 +429,7 @@ function MinedDay({
               className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 md:grid-cols-[minmax(0,1fr)_10rem_14rem]"
             >
               <span>
-                {oreNames.get(o.typeId) ?? `#${o.typeId}`} × {o.quantity.toLocaleString(locale)}
+                {oreNames.get(o.typeId) ?? `#${o.typeId}`} × {formatCount(o.quantity)}
               </span>
               <span className="text-right tabular-nums">
                 {o.unitPrice === undefined ? '—' : isk(o.unitPrice, 2)}

@@ -1,3 +1,5 @@
+import { createNumberFormat } from '@/lib/numberLocale';
+import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { useCallback, useMemo } from 'react';
@@ -35,6 +37,8 @@ import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useUrlSort } from '@/lib/useUrlState';
+
+const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 
 interface BpcColumnsInput {
   blueprintNames: ReadonlyMap<number, string>;
@@ -227,8 +231,8 @@ export function useBpcColumns({
               <HintText
                 desktopOnly
                 content={t('bpcContracts.lpOfferCost', {
-                  isk: row.iskCost.toLocaleString(),
-                  lp: row.lpCost.toLocaleString(),
+                  isk: formatDecimal(row.iskCost),
+                  lp: formatCount(row.lpCost),
                 })}
               >
                 <IskAmount value={row.price} />
@@ -255,10 +259,10 @@ export function useBpcColumns({
             contract.price > 0 ? (
               t('bpcContracts.iskPlusPlexPrice', {
                 isk: formatIskAuto(contract.price, CONTRACT_ISK_CENTS_BELOW),
-                plex: contract.requestedPlex.toLocaleString(),
+                plex: formatCount(contract.requestedPlex),
               })
             ) : (
-              t('bpcContracts.plexPrice', { plex: contract.requestedPlex.toLocaleString() })
+              t('bpcContracts.plexPrice', { plex: formatCount(contract.requestedPlex) })
             )
           ) : contract.isAuction ? (
             <>

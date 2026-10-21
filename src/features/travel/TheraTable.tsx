@@ -28,6 +28,7 @@ import {
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
 import { systemZkillUrl } from '@/lib/zkillboard';
+import { formatNumber } from '@/lib/numberLocale';
 
 const DASH = '—';
 const DEFAULT_SORT = { columnId: 'jumps', direction: 'asc' } as const;
@@ -172,7 +173,7 @@ function JumpsCell({ row }: { row: TheraConnectionRow }) {
     case 'known':
       return (
         <>
-          {row.jumps.jumps.toLocaleString()}
+          {formatNumber(row.jumps.jumps)}
           {/* The card has no Jumps header to say what the bare number is. */}
           <span className="sm:hidden">
             {' '}

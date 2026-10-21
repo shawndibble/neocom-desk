@@ -12,6 +12,7 @@
  * zKillboard's own (`memberCount`): ESI states no alliance-wide headcount,
  * and summing every member corp's record would cost a request per corp.
  */
+import { formatCount } from '@/lib/formatCount';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -62,10 +63,10 @@ export default function PublicInfoAllianceTab({ data }: PublicInfoAllianceTabPro
   const facts: StatTileItem[] = [
     {
       label: t('publicInfo.corporations'),
-      value: corporationCount === undefined ? '—' : corporationCount.toLocaleString(),
+      value: corporationCount === undefined ? '—' : formatCount(corporationCount),
     },
     ...(ready?.memberCount != null
-      ? [{ label: t('publicInfo.pilots'), value: ready.memberCount.toLocaleString() }]
+      ? [{ label: t('publicInfo.pilots'), value: formatCount(ready.memberCount) }]
       : []),
     {
       label: t('publicInfo.age'),
@@ -142,7 +143,7 @@ export default function PublicInfoAllianceTab({ data }: PublicInfoAllianceTabPro
             <h3 className={sectionHeading}>
               {t('publicInfo.memberCorporationsCount', {
                 count: members.corporations.length,
-                formatted: members.corporations.length.toLocaleString(),
+                formatted: formatCount(members.corporations.length),
               })}
             </h3>
             <ul className="max-h-80 space-y-1.5 overflow-y-auto rounded-xs border border-line bg-bg p-2">

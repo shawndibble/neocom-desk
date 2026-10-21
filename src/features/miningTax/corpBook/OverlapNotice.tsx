@@ -3,6 +3,7 @@ import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import type { OreLine } from '@/engine/miningTax/types';
 import { typeLabel } from './typeLabel';
+import { formatCount } from '@/lib/formatCount';
 
 export interface OverlapPreview {
   payeeName: string;
@@ -46,9 +47,7 @@ export function OverlapNotice({
   const describe = (lines: readonly OreLine[]) =>
     lines.length === 0
       ? t('miningTax.corpBook.overlap.nothingLeft')
-      : lines
-          .map((l) => `${l.quantity.toLocaleString()} ${typeLabel(typeNames, l.typeId)}`)
-          .join(', ');
+      : lines.map((l) => `${formatCount(l.quantity)} ${typeLabel(typeNames, l.typeId)}`).join(', ');
 
   return (
     <div

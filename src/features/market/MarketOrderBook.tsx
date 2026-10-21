@@ -35,6 +35,7 @@ import { formatMarketIsk } from '@/lib/isk';
 import type { MarketOrderColumnId } from './marketOrderColumns';
 import { SetDestinationButton } from './SetDestinationButton';
 import { PlaceJumpsLink } from '@/features/route/JumpsLink';
+import { formatCount } from '@/lib/formatCount';
 
 export type BookSide = 'sell' | 'buy';
 
@@ -44,7 +45,7 @@ export type BookSide = 'sell' | 'buy';
  * percentage stops reading as a number, so it says "125×" instead.
  */
 function signedPercent(ratio: number): string {
-  if (ratio >= 9) return `${Math.round(1 + ratio).toLocaleString()}×`;
+  if (ratio >= 9) return `${formatCount(1 + ratio)}×`;
   const share = Math.abs(ratio);
   const digits = share >= 0.1 ? 0 : share >= 0.01 ? 1 : 2;
   const text = `${Math.abs(ratio * 100).toFixed(digits)}%`;

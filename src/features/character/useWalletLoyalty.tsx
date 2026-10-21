@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -50,7 +51,7 @@ export function useWalletLoyalty(
         header: t('loyalty.points'),
         align: 'right',
         className: 'tabular-nums font-semibold',
-        render: (entry) => entry.loyalty_points.toLocaleString(),
+        render: (entry) => formatCount(entry.loyalty_points),
         sortValue: (entry) => entry.loyalty_points,
       },
       {

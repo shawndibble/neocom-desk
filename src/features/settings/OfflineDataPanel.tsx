@@ -40,7 +40,7 @@ const REFRESH_EVERY_FILES = 8;
  * is really there, not what a past download reported.
  */
 export function OfflineDataPanel() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const online = useOnline();
   const [status, setStatus] = useState<OfflineStatus | null>(null);
   const [estimate, setEstimate] = useState<StorageEstimate | null>(null);
@@ -186,8 +186,8 @@ export function OfflineDataPanel() {
             <Field label={t('settings.offline.storageLabel')}>
               <p className="text-xs">
                 {t('settings.offline.storageValue', {
-                  used: formatBytes(estimate.usage, i18n.language),
-                  quota: formatBytes(estimate.quota, i18n.language),
+                  used: formatBytes(estimate.usage),
+                  quota: formatBytes(estimate.quota),
                 })}
               </p>
             </Field>

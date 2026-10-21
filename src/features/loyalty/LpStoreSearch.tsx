@@ -21,6 +21,7 @@ import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { iskToneClass } from '@/features/character/format';
 import { useLpStoreSearch, type LpStoreSearchState } from './useLpStoreSearch';
 import { lpStorePath, type ItemSearchStore, type LpSearchCrumbState } from './itemSearch';
+import { formatCount } from '@/lib/formatCount';
 
 function iskPerLpTone(value: number | null): string {
   return value === null ? 'text-text-dim' : iskToneClass(value);
@@ -156,7 +157,7 @@ export function LpStoreSearch({
                   >
                     <span>{store.name}</span>
                     <span className="shrink-0 text-accent tabular-nums">
-                      {t('loyaltyStore.pickerBalance', { lp: (store.lp ?? 0).toLocaleString() })}
+                      {t('loyaltyStore.pickerBalance', { lp: formatCount(store.lp ?? 0) })}
                     </span>
                   </Link>
                 </li>

@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { Fragment, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -70,13 +71,13 @@ export function BuildRecipeModal({
         <div className="space-y-4">
           <p className="text-xs leading-relaxed text-text-dim">
             {t('industry.buildRecipe.summary', {
-              runs: recipe.runs.toLocaleString(),
-              output: recipe.outputPerRun.toLocaleString(),
-              made: recipe.unitsMade.toLocaleString(),
-              needed: recipe.needed.toLocaleString(),
+              runs: formatCount(recipe.runs),
+              output: formatCount(recipe.outputPerRun),
+              made: formatCount(recipe.unitsMade),
+              needed: formatCount(recipe.needed),
             })}{' '}
             {recipe.spare > 0 &&
-              t('industry.buildRecipe.spare', { spare: recipe.spare.toLocaleString() })}
+              t('industry.buildRecipe.spare', { spare: formatCount(recipe.spare) })}
           </p>
 
           <section className="space-y-1.5">
@@ -101,7 +102,7 @@ export function BuildRecipeModal({
                         )}
                       </span>
                       <span className="inline-flex items-center gap-2">
-                        <span className="tabular-nums">{input.quantity.toLocaleString()}</span>
+                        <span className="tabular-nums">{formatCount(input.quantity)}</span>
                         {itemActionsFor && itemActionsFor(input.typeID)}
                       </span>
                     </li>

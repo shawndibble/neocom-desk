@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { useRef, useState, type ReactNode, type Ref } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
@@ -259,7 +260,7 @@ export function PlanResult({
           label={t('assets.movePlan.volume')}
           value={`${formatCubicMetres(totals.totalM3)} m³`}
         />
-        <Stat label={t('assets.movePlan.stacks')} value={totals.stacks.toLocaleString()} />
+        <Stat label={t('assets.movePlan.stacks')} value={formatCount(totals.stacks)} />
         <Stat
           label={t('assets.movePlan.characters', { count: totals.characters })}
           value={String(totals.characters)}
@@ -332,7 +333,7 @@ export function PlanResult({
                           <PlanLine
                             key={l.typeId}
                             name={name(l.typeId)}
-                            qty={`× ${l.quantity.toLocaleString()}`}
+                            qty={`× ${formatCount(l.quantity)}`}
                             trailing={l.m3 !== null ? `${formatCubicMetres(l.m3)} m³` : null}
                           />
                         ))}
@@ -340,7 +341,7 @@ export function PlanResult({
                         <PlanLine
                           key={`unknown-${u.typeId}`}
                           name={name(u.typeId)}
-                          qty={`× ${u.quantity.toLocaleString()}`}
+                          qty={`× ${formatCount(u.quantity)}`}
                           trailing={t('assets.movePlan.volumeUnknown')}
                           dim
                         />

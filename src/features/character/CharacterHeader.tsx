@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -77,7 +78,7 @@ export function CharacterHeader({
   }, [characterId, loadPublicInfo]);
 
   const sp = (value: number | null | undefined): string =>
-    value == null ? t('common.unknown') : value.toLocaleString();
+    value == null ? t('common.unknown') : formatCount(value);
   const showSp = totalSp !== undefined || unallocatedSp !== undefined;
 
   return (

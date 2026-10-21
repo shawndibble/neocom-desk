@@ -64,6 +64,7 @@ import { MaterialsPhoneRow } from './MaterialsPhoneRow';
 import { MakeOrBuyMarker } from './MakeOrBuyMarker';
 import { SwapButton } from './SwapButton';
 import { ERRAND_GLYPH, ERRAND_LABEL_KEY, ERRAND_TONE, linkClassName } from './materialsTableStyle';
+import { formatCount } from '@/lib/formatCount';
 
 interface MaterialsTableProps {
   /** Engine cost lines — already resolved against the plan's sourcing overrides and hub prices. */
@@ -460,7 +461,7 @@ export function MaterialsTable({
       <>
         {overClaim > 0 && (
           <span className="text-[0.6875rem] text-warning">
-            {t('industry.groupOverClaim', { quantity: overClaim.toLocaleString() })}
+            {t('industry.groupOverClaim', { quantity: formatCount(overClaim) })}
           </span>
         )}
         {offer !== null && (
@@ -631,7 +632,7 @@ export function MaterialsTable({
   function renderTotal(material: MaterialTableRow) {
     if (material.subBuilds.length > 0) {
       const runs = buildRecipe(material)?.runs ?? 0;
-      return <span>{t('industry.subBuildRuns', { runs: runs.toLocaleString() })}</span>;
+      return <span>{t('industry.subBuildRuns', { runs: formatCount(runs) })}</span>;
     }
     const state = materialRowState(material, sourcing, pricesReady);
     return (

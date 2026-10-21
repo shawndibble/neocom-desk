@@ -117,6 +117,7 @@ import { useRouteKills, type RouteKillsCell } from './useRouteKills';
 import { usePreferenceRoutes } from './usePreferenceRoutes';
 import { useRouteSafety, type RouteSafetyLeg } from './useRouteSafety';
 import type { TravelTabProps } from './travelTab';
+import { formatNumber } from '@/lib/numberLocale';
 
 /** The link parameter overriding each wormhole setting. */
 const HOLE_PARAM = {
@@ -178,7 +179,7 @@ function RouteFacts({
             label={t('travel.summary.fuelLabel')}
             value={t('travel.jumpDrive.fuelValue', {
               count: jump.fuel,
-              fuel: jump.fuel.toLocaleString(),
+              fuel: formatNumber(jump.fuel),
             })}
           />
         )}
@@ -217,8 +218,8 @@ function RouteFacts({
           <StatChip
             label={t('travel.summary.killsLabel')}
             value={t('travel.summary.killsValue', {
-              ships: summary.shipKills.toLocaleString(),
-              pods: summary.podKills.toLocaleString(),
+              ships: formatNumber(summary.shipKills),
+              pods: formatNumber(summary.podKills),
             })}
           />
         )}

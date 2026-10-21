@@ -16,6 +16,7 @@ import { formatIskAuto, formatMarketIsk } from '@/lib/isk';
 import { CopyablePrice } from './CopyablePrice';
 import { orderRowSummary, type OrderRowSummary } from './orderRowSummary';
 import type { OpenOrderRow } from './openOrdersModel';
+import { formatCount } from '@/lib/formatCount';
 
 const SCOPE_KEY = {
   station: 'market.orders.rowSummary.undercutStation',
@@ -116,11 +117,11 @@ export function OrderRowSummaryText({
         <span className="text-xs text-text-dim">
           {summary.daysLeft === null
             ? t('market.orders.rowSummary.expiringUnknown', {
-                units: summary.volumeRemain.toLocaleString(),
+                units: formatCount(summary.volumeRemain),
               })
             : t('market.orders.rowSummary.expiring', {
                 days: summary.daysLeft,
-                units: summary.volumeRemain.toLocaleString(),
+                units: formatCount(summary.volumeRemain),
               })}
         </span>
       );

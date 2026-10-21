@@ -16,6 +16,7 @@
  * "what did we buy last Tuesday" is a question worth a control, and the
  * character view answers a much smaller list.
  */
+import { formatCount } from '@/lib/formatCount';
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -204,7 +205,7 @@ export function CorpTransactionsPanel({
         header: t('wallet.quantity'),
         align: 'right',
         className: 'tabular-nums',
-        render: (txn) => txn.quantity.toLocaleString(),
+        render: (txn) => formatCount(txn.quantity),
         sortValue: (txn) => txn.quantity,
       },
       {

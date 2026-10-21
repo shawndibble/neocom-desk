@@ -50,6 +50,7 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import type { CharacterAttributes, CharacterSkills } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
+import { formatNumber } from '@/lib/numberLocale';
 
 interface Snapshot {
   catalog: SkillCatalog;
@@ -337,7 +338,7 @@ export function Skills() {
           label={t('skills.totalSp')}
           value={
             skillsResult?.data
-              ? (skillsResult.data.total_sp + completedSp).toLocaleString()
+              ? formatNumber(skillsResult.data.total_sp + completedSp)
               : t('common.unknown')
           }
         />
@@ -345,7 +346,7 @@ export function Skills() {
           label={t('skills.unallocatedSp')}
           value={
             skillsResult?.data?.unallocated_sp !== undefined
-              ? skillsResult.data.unallocated_sp.toLocaleString()
+              ? formatNumber(skillsResult.data.unallocated_sp)
               : t('common.unknown')
           }
         />

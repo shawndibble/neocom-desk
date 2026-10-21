@@ -67,6 +67,7 @@ import {
 import { CorpBookDiff, StopReminders, VerifyTopBar } from './corpTaxBookParts';
 import { isk, isk2 } from './corpTaxBookFormat';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { formatNumber } from '@/lib/numberLocale';
 
 const ME = SAMPLE_ACTIVE_CHARACTER.characterId;
 const ME_NAME = SAMPLE_ACTIVE_CHARACTER.name;
@@ -569,7 +570,7 @@ function RowDetail({ open }: { open: boolean }) {
                 <OreLink typeId={45490}>Zeolites</OreLink>
               </span>
               <span className="text-text-dim tabular-nums">
-                {BILLED.units.toLocaleString('en')} (book) · 41,200 (you)
+                {formatNumber(BILLED.units)} (book) · 41,200 (you)
               </span>
             </li>
           </ul>
@@ -636,7 +637,7 @@ const verifyColumns: DataTableColumn<DayLine>[] = [
     primary: true,
     render: (r) => (
       <span>
-        {r.ore} × {r.units.toLocaleString('en')}
+        {r.ore} × {formatNumber(r.units)}
         <span className="block text-xs text-text-dim">{r.refinery}</span>
       </span>
     ),

@@ -1,3 +1,5 @@
+import { createNumberFormat } from '@/lib/numberLocale';
+import { formatCount } from '@/lib/formatCount';
 import { useState } from 'react';
 import { caretColumn } from './caretColumn';
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +20,8 @@ import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { isk, shortDateTime } from './moonsFormat';
 import { minerPath } from './moonsPaths';
 import { Crumb, Fact, MinedBar, OreLine, StateWord } from './moonsParts';
+
+const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 
 /** A moon's page (#4056 step 2): this extraction, who mined it, earlier cycles. */
 export function MoonDetail({ id }: { id: string }) {
@@ -52,7 +56,7 @@ export function MoonDetail({ id }: { id: string }) {
       header: t('corpTaxBook.moons.cols.units'),
       align: 'right',
       className: 'tabular-nums',
-      render: (m) => m.units.toLocaleString('en'),
+      render: (m) => formatCount(m.units),
     },
     {
       id: 'value',
@@ -156,7 +160,7 @@ export function MoonDetail({ id }: { id: string }) {
                 {row.chunkRate && (
                   <span className="block text-xs text-text-dim">
                     {t(`corpTaxBook.moons.moon.rate.${row.chunkRate.basis}`, {
-                      rate: row.chunkRate.m3PerHour.toLocaleString('en'),
+                      rate: formatDecimal(row.chunkRate.m3PerHour),
                       count: row.chunkRate.cycles,
                     })}
                   </span>

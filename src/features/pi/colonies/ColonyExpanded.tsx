@@ -31,6 +31,8 @@ import { eveClock, hoursLabel, schematicOutputTypeId } from './coloniesFormat';
 import { quickWinLine } from './coloniesText';
 import { Sentence } from '../sentence';
 import { DAY_MS, HOUR_MS } from '@/lib/age';
+import { formatCount } from '@/lib/formatCount';
+import { formatNumber } from '@/lib/numberLocale';
 
 const MICRO = eyebrowClassName;
 
@@ -201,7 +203,7 @@ export function ColonyExpanded({
                       {banked === null
                         ? '—'
                         : t('pi.yield.bankedValue', {
-                            amount: Math.round(banked).toLocaleString(),
+                            amount: formatCount(banked),
                             percent: Math.round((banked / total) * 100),
                           })}
                     </dd>
@@ -211,7 +213,7 @@ export function ColonyExpanded({
                     <dd className="text-accent tabular-nums">
                       {program
                         ? t('pi.yield.resetGainValue', {
-                            amount: Math.round(resetGainPerDay(program, nowMs)).toLocaleString(),
+                            amount: formatCount(resetGainPerDay(program, nowMs)),
                           })
                         : '—'}
                     </dd>
@@ -276,8 +278,7 @@ export function ColonyExpanded({
                 <div className="flex justify-between text-text-dim">
                   <span>{t('piColonies.cpu')}</span>
                   <span className="tabular-nums">
-                    {Math.round(load.cpuUsed).toLocaleString()} /{' '}
-                    {Math.round(load.cpuBudget).toLocaleString()} tf
+                    {formatCount(load.cpuUsed)} / {formatCount(load.cpuBudget)} tf
                   </span>
                 </div>
                 <Meter fraction={load.cpu} tone={(load.cpu ?? 0) >= 0.9 ? 'warning' : 'accent'} />
@@ -286,8 +287,7 @@ export function ColonyExpanded({
                 <div className="flex justify-between text-text-dim">
                   <span>{t('piColonies.power')}</span>
                   <span className="tabular-nums">
-                    {Math.round(load.powerUsed).toLocaleString()} /{' '}
-                    {Math.round(load.powerBudget).toLocaleString()} MW
+                    {formatCount(load.powerUsed)} / {formatCount(load.powerBudget)} MW
                   </span>
                 </div>
                 <Meter
@@ -300,11 +300,8 @@ export function ColonyExpanded({
               )}
               <p className="text-text-dim">
                 {t('piColonies.expanded.free', {
-                  cpu: Math.max(0, Math.round(load.cpuBudget - load.cpuUsed)).toLocaleString(),
-                  power: Math.max(
-                    0,
-                    Math.round(load.powerBudget - load.powerUsed)
-                  ).toLocaleString(),
+                  cpu: formatNumber(Math.max(0, Math.round(load.cpuBudget - load.cpuUsed))),
+                  power: formatNumber(Math.max(0, Math.round(load.powerBudget - load.powerUsed))),
                 })}
               </p>
             </div>
@@ -320,7 +317,7 @@ export function ColonyExpanded({
           aside={
             storage.capacityM3 !== null
               ? t('piColonies.expanded.capacity', {
-                  m3: Math.round(storage.capacityM3).toLocaleString(),
+                  m3: formatCount(storage.capacityM3),
                 })
               : undefined
           }
@@ -341,7 +338,7 @@ export function ColonyExpanded({
               </div>
               <p className="text-xs">
                 {t('piColonies.expanded.usedLine', {
-                  m3: Math.round(storage.usedM3).toLocaleString(),
+                  m3: formatCount(storage.usedM3),
                 })}{' '}
                 {fullIn === null
                   ? t('piColonies.expanded.fullUnknown')

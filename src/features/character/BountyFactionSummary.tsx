@@ -4,6 +4,7 @@
  * `typeID: count` reason. Reads the total ("21 NPCs killed") until the
  * factions resolve, and keeps it if they never do.
  */
+import { formatCount } from '@/lib/formatCount';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { killsByFaction, type BountyKill } from './bountyKills';
@@ -30,7 +31,7 @@ export function BountyFactionSummary({ kills }: { kills: readonly BountyKill[] }
             .map((group) =>
               t('wallet.journalBountyFaction', {
                 faction: group.faction ?? t('wallet.journalBountyOther'),
-                count: group.count.toLocaleString(),
+                count: formatCount(group.count),
               })
             )
             .join(' · ')
