@@ -467,7 +467,7 @@ Observed gaps: alerts exist only for pinned items and require an active characte
 
 ### 7. Page-level paste router
 
-`src/app/GlobalPasteRouter.tsx`, mounted in Layout. Ctrl/Cmd+V anywhere not in a field and with no overlay open: `pasteDestination` (`engine/import/pasteDestination`) classifies the clipboard as an EFT fit (-> `FITTINGS_PATH` with `fittingLoadText`) or an item list (-> `/market/appraisal` with `appraiseText`); anything else is ignored. No confirm step; parsers and catalogue load lazily on first paste. Decisions: `20261001-211035-...`, `20261002-133425-...`.
+`src/app/GlobalPasteRouter.tsx`, mounted in Layout. Ctrl/Cmd+V anywhere not in a field (an open dialog or sidebar does not block it): `pasteDestination` (`engine/import/pasteDestination`) classifies the clipboard as an EFT fit (-> `FITTINGS_PATH` with `fittingLoadText`) or an item list (-> `/market/appraisal` with `appraiseText`); anything else is ignored. No confirm step; parsers and catalogue load lazily on first paste. Decisions: `20261001-211035-...`, `20261002-133425-...`.
 Observed gaps: no visible hint of the shortcut outside Help shortcuts; a failed classification gives no feedback.
 
 ## 4b. Stock (`/market/stock`, Stock Lists)

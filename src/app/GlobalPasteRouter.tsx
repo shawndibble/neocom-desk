@@ -155,10 +155,7 @@ export function GlobalPasteRouter() {
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
       if (event.defaultPrevented) return;
-      // Only where the paste actually lands: a field that still holds focus
-      // elsewhere, or an overlay that is open (or left in the DOM), must not
-      // swallow a paste that is aimed at the page. A dialog's own import box is
-      // a field, so it is still left alone.
+      // Only where the paste lands: a dialog's own import box is a field.
       if (isTypingTarget(event.target)) return;
       const text = event.clipboardData?.getData('text/plain') ?? '';
       if (text.trim() === '') return;
