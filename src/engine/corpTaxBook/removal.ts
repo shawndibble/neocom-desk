@@ -94,14 +94,17 @@ export function removalRecipients(input: {
 
 /**
  * May the payee end a removal at once? Not when the payee was set or changed
- * within 48 hours before the removal started, or at any time after it started.
- * Exactly one rule, deliberately silent in every player-facing surface.
+ * within 48 hours before the removal started, or at any time after it started,
+ * and never when the accounting side set it (its officer could name their own alt
+ * and skip the 24-hour wait). Deliberately silent in every player-facing surface.
  */
 export function payeeMayForce(input: {
   payeeChangedAt: number | undefined;
   removalStartedAt: number;
+  payeeSetBy?: 'accounting' | 'moon-owner' | undefined;
 }): boolean {
   const { payeeChangedAt, removalStartedAt } = input;
+  if (input.payeeSetBy === 'accounting') return false;
   if (payeeChangedAt === undefined) return true;
   return payeeChangedAt < removalStartedAt - PAYEE_LOOKBACK_MS;
 }

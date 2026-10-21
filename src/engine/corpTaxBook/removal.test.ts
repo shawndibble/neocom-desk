@@ -113,6 +113,24 @@ describe('payeeMayForce boundaries', () => {
   it('is blocked when changed at the very start', () => {
     expect(payeeMayForce({ payeeChangedAt: start, removalStartedAt: start })).toBe(false);
   });
+  it('is blocked when the accounting side set the payee, however long ago', () => {
+    expect(
+      payeeMayForce({
+        payeeChangedAt: start - 1_000 * H,
+        removalStartedAt: start,
+        payeeSetBy: 'accounting',
+      })
+    ).toBe(false);
+  });
+  it('is open when the moon owner set the payee long enough before', () => {
+    expect(
+      payeeMayForce({
+        payeeChangedAt: start - 49 * H,
+        removalStartedAt: start,
+        payeeSetBy: 'moon-owner',
+      })
+    ).toBe(true);
+  });
 });
 
 describe('isPayeeActor', () => {

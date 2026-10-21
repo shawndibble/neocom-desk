@@ -337,7 +337,11 @@ function isLinkedRemoval(rec: FeederRecord, link: RemovalLinkDoc, linkId: string
     rec.removal?.startedAt === link.startedAt &&
     // A link written before the record kept its id has none to compare.
     (rec.removalLinkId === undefined || rec.removalLinkId === linkId) &&
-    payeeMayForce({ payeeChangedAt: rec.payeeChangedAt, removalStartedAt: link.startedAt })
+    payeeMayForce({
+      payeeChangedAt: rec.payeeChangedAt,
+      removalStartedAt: link.startedAt,
+      payeeSetBy: rec.payeeSetBy?.side,
+    })
   );
 }
 
