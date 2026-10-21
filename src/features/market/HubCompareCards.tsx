@@ -6,13 +6,23 @@
  * A card grid has no column to sort, so `TRADE_HUBS`' own fixed order (Jita,
  * Amarr, Dodixie, Rens, Hek) is the order at every width: a hub is always in
  * the same place on the grid.
+ *
+ * A card is also the hub picker: clicking one re-quotes the appraisal at that
+ * hub, and the hub it is quoted at reads as selected. The system name is the
+ * card's title button, not a SystemLink, so the card has one action.
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
-import { SystemLink } from '@/features/entities';
-import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  interactiveClassName,
+  rowInteractiveClassName,
+  selectedRowClassName,
+} from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
+import type { TradeHub } from '@/market/hubs';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
@@ -53,7 +63,11 @@ function CopyableTotal({
     <Tooltip content={copied ? t('market.appraisal.copiedToClipboard') : exact}>
       <button
         type="button"
-        onClick={() => void copy()}
+        onClick={(event) => {
+          // The card's own click picks the hub; a copy is not a pick.
+          event.stopPropagation();
+          void copy();
+        }}
         aria-label={t('market.appraisal.copyTotal', { amount: exact })}
         className={`rounded-xs text-left hover:text-accent ${interactiveClassName} ${focusRingClassName}`}
       >
@@ -93,7 +107,15 @@ function HubFigure({
 /** Identifies the one figure currently showing its "copied" confirmation. */
 type CopiedKey = `${string}:${'sell' | 'buy'}`;
 
-export function HubCompareCards({ rows }: { rows: readonly HubComparisonRow[] }) {
+export function HubCompareCards({
+  rows,
+  selectedHubId,
+  onSelectHub,
+}: {
+  rows: readonly HubComparisonRow[];
+  selectedHubId: TradeHub['id'];
+  onSelectHub: (id: TradeHub['id']) => void;
+}) {
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
   const { copied, flash: announceCopied } = useCopyFeedback<CopiedKey>(COPIED_FEEDBACK_MS);
@@ -121,33 +143,55 @@ export function HubCompareCards({ rows }: { rows: readonly HubComparisonRow[] })
         aria-label={t('market.appraisal.compareHubsTitle')}
         className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5"
       >
-        {rows.map((row) => (
-          <li
-            key={row.hub.id}
-            className="min-w-0 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm"
-          >
-            <p className="truncate text-sm font-semibold">
-              <SystemLink systemId={row.hub.systemId}>{row.hub.systemName}</SystemLink>
-            </p>
-            <dl className="mt-2 flex flex-col gap-2">
-              <HubFigure
-                label={t('market.appraisal.sellTotal')}
-                value={row.sell}
-                copied={copied === `${row.hub.id}:sell`}
-                onCopied={() => announceCopied(`${row.hub.id}:sell`)}
-              />
-              <HubFigure
-                label={t('market.appraisal.buyTotal')}
-                value={row.buy}
-                copied={copied === `${row.hub.id}:buy`}
-                onCopied={() => announceCopied(`${row.hub.id}:buy`)}
-              />
-            </dl>
-            {row.unreachable && (
-              <p className="mt-2 text-[0.6875rem] text-text-dim">{pricesUnavailableLabel}</p>
-            )}
-          </li>
-        ))}
+        {rows.map((row) => {
+          const selected = row.hub.id === selectedHubId;
+          return (
+            // The whole card is the pointer target; the title button is the
+            // keyboard and screen-reader one, so the card needs no tab stop of
+            // its own (DESIGN.md §6c, phone cards).
+            <li
+              key={row.hub.id}
+              aria-current={selected ? 'true' : undefined}
+              onClick={() => onSelectHub(row.hub.id)}
+              className={cx(
+                'min-w-0 cursor-pointer rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm',
+                rowInteractiveClassName,
+                selected && selectedRowClassName
+              )}
+            >
+              <p className="truncate text-sm font-semibold">
+                <button
+                  type="button"
+                  aria-label={t('market.appraisal.appraiseAtHub', { hub: row.hub.systemName })}
+                  aria-pressed={selected}
+                  className={cx(
+                    'max-w-full truncate rounded-xs text-left text-accent',
+                    focusRingClassName
+                  )}
+                >
+                  {row.hub.systemName}
+                </button>
+              </p>
+              <dl className="mt-2 flex flex-col gap-2">
+                <HubFigure
+                  label={t('market.appraisal.sellTotal')}
+                  value={row.sell}
+                  copied={copied === `${row.hub.id}:sell`}
+                  onCopied={() => announceCopied(`${row.hub.id}:sell`)}
+                />
+                <HubFigure
+                  label={t('market.appraisal.buyTotal')}
+                  value={row.buy}
+                  copied={copied === `${row.hub.id}:buy`}
+                  onCopied={() => announceCopied(`${row.hub.id}:buy`)}
+                />
+              </dl>
+              {row.unreachable && (
+                <p className="mt-2 text-[0.6875rem] text-text-dim">{pricesUnavailableLabel}</p>
+              )}
+            </li>
+          );
+        })}
       </ul>
       {/*
         One live region for the whole grid, not one per figure: the tooltip is

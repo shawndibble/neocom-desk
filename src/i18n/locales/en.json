@@ -10850,6 +10850,7 @@
       "unpriced_one": "{{count}} item has no orders on one side at this hub, so it is left out of that total.",
       "unpriced_other": "{{count}} items have no orders on one side at this hub, so they are left out of that total.",
       "compareHubsTitle": "Compare hubs",
+      "appraiseAtHub": "Appraise at {{hub}}",
       "copyTotal": "Copy {{amount}}",
       "copyTotalCompact": "Copy {{short}} ISK ({{full}})",
       "copiedAmount": "Copied {{amount}}",
