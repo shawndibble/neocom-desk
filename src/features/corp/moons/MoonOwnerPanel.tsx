@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { beginFeederGrantLogin } from '@/app/loginFlow';
+import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { Button, LoadFailedState, Spinner } from '@/components/ui';
 import { leaveFeeder, type FeederSetupStatus } from '../taxBook/feederClient';
 import {
@@ -18,6 +19,7 @@ import { MoonOwnerView } from './MoonOwnerView';
 import { OwnerStaleBanner } from './OwnerStaleBanner';
 import { OwnerStatusStrip } from './OwnerStatusStrip';
 import { shortDate } from './moonsFormat';
+import { mailPayeeChange } from './payeeChangeMail';
 import { useFeederView } from './useFeederView';
 
 type Owner = Extract<FeederSetupStatus, { status: 'feeder' }>;
@@ -44,6 +46,7 @@ export function MoonOwnerPanel({
 }) {
   const { t } = useTranslation();
   const { load, reload } = useFeederView(characterId, corporationId);
+  const grantedScopes = useGrantedScopes();
   const [leaving, setLeaving] = useState(false);
   const [reconnectError, setReconnectError] = useState<string | null>(null);
   const name = owner.collectorName ?? t('corpTaxBook.moons.owner.anonymous');
@@ -91,8 +94,22 @@ export function MoonOwnerPanel({
           reload();
         }}
         characterId={characterId}
-        onSetPayee={async (payee) => {
-          await setFeederPayee(characterId, corporationId, payee);
+        onSetPayee={async (payee, payeeName) => {
+          const out = await setFeederPayee(characterId, corporationId, payee);
+          // After the save, and never awaited: the change does not wait on the mail.
+          if (out.changed) {
+            const ownName = load.nameOf?.(corporationId) ?? `#${corporationId}`;
+            void mailPayeeChange({
+              grantedScopes,
+              characterId,
+              corporationId,
+              feederCorporationId: corporationId,
+              recipients: out.recipients ?? [],
+              changedByName: ownName,
+              moonOwnerName: ownName,
+              payeeName,
+            });
+          }
           reload();
         }}
         banner={

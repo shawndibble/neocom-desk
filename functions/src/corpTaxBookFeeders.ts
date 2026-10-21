@@ -66,6 +66,8 @@ export interface FeederRecord {
   /** One payee: a corporation or a player. */
   payee?: { kind: 'corporation' | 'character'; id: number };
   payeeChangedAt?: number;
+  /** Who set the payee last (#4653): either side may; absent on a payee set before it was kept. */
+  payeeSetBy?: PayeeSetBy;
   /** A removal the accounting corporation started (#4520); present while status is `pending-removal`. */
   removal?: Removal;
   /** The id (hash) of the removal mail's link; the link's code is only ever in the mail. */
@@ -100,6 +102,13 @@ export interface FeederRecord {
    * owner's rows rarely carry one. The first learned stays.
    */
   refinerySystems?: Record<string, number>;
+}
+
+/** The side and officer that set a moon owner's payee, and when (ms). */
+export interface PayeeSetBy {
+  side: 'accounting' | 'moon-owner';
+  characterId: number;
+  at: number;
 }
 
 /** One refinery's label on a moon owner's record. */

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { MoonOwnerDetail } from '@/engine/corpTaxBook/moonOwners';
 import { MoonOwnerPage } from './MoonOwnerPage';
+import { PayeeChangeStrip } from './MoonOwnerPayee';
 
 const CHARACTERS: Record<number, string> = {
   1: 'Varro Kestane',
@@ -103,6 +104,23 @@ export const PaidToAPlayer: Story = {
   args: {
     detail: { ...detail, payee: { kind: 'character', id: 77 } },
     payee: { kind: 'character', id: 77, name: 'Kestrel Vane' },
+  },
+};
+
+/** @summary The moon owner changed who gets paid (#4653): the strip with Dismiss, and Change… on the "Paid to" line. */
+export const PayeeChangedByMoonOwner: Story = {
+  args: {
+    detail: { ...detail, payee: { kind: 'character', id: 77 } },
+    payee: { kind: 'character', id: 77, name: 'Kestrel Vane' },
+    onChangePayee: () => {},
+    payeeNotice: (
+      <PayeeChangeStrip
+        storageKey="story"
+        at={Date.UTC(2026, 9, 21, 15)}
+        payeeName="Kestrel Vane"
+        byName="Ashfall Mining Collective"
+      />
+    ),
   },
 };
 

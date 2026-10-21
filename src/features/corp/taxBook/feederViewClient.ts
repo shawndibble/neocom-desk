@@ -8,6 +8,7 @@
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
 import { getValidAccessToken } from '@/auth/session';
 import type { FeederMode } from '@/engine/corpTaxBook/feederAccrual';
+import type { PayeeSetBy } from '@/engine/corpTaxBook/payeeChange';
 import type { Payee } from '@/engine/corpTaxBook/payouts';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { call } from './bookClient';
@@ -55,6 +56,8 @@ export interface FeederViewSummary {
   removalEffectiveAt?: number | null;
   /** Who the moon owner is paid as; null or absent (a view built before #4619) means the moon owner corporation. */
   payee?: Payee | null;
+  /** Which side set the payee last, and when (#4653); null or absent when unknown. */
+  payeeSetBy?: PayeeSetBy | null;
 }
 
 export interface FeederViewLine {
@@ -158,12 +161,20 @@ export async function requestFeederRate(
   });
 }
 
-/** The moon owner's officers name who it is paid as. The accounting corporation cannot. */
+/** What a payee change answers (#4653): whether it changed and whom to mail (the other side). */
+export interface PayeeSetResult {
+  ok: true;
+  /** Absent from a server that predates #4653. */
+  changed?: boolean;
+  recipients?: number[];
+}
+
+/** The moon owner's officers name who it is paid as; the accounting corporation can too (#4653). */
 export async function setFeederPayee(
   characterId: number,
   corporationId: number,
   payee: Payee
-): Promise<{ ok: true }> {
+): Promise<PayeeSetResult> {
   const accessToken = await getValidAccessToken(characterId);
   return call(characterId, 'setCorpTaxBookFeederPayeeCallable', {
     corporationId,

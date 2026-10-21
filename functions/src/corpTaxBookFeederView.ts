@@ -124,6 +124,8 @@ export interface FeederViewSummary {
   removalEffectiveAt?: number | null;
   /** Who the moon owner is paid as (#4619); null when unset, meaning the moon owner corporation. */
   payee?: Payee | null;
+  /** Which side set the payee last, and when (#4653); null when unknown. Never the officer. */
+  payeeSetBy?: { side: 'accounting' | 'moon-owner'; at: number } | null;
 }
 
 export interface FeederViewDayLine {
@@ -240,6 +242,7 @@ export type FeederViewRecord = Pick<
   | 'viewDismissedAt'
   | 'removal'
   | 'payee'
+  | 'payeeSetBy'
   | 'refineryLabels'
   | 'refinerySystems'
 >;
@@ -434,6 +437,9 @@ export function buildFeederView(input: FeederViewInput): FeederView {
     removalEffectiveAt:
       record.status === 'pending-removal' ? (record.removal?.effectiveAt ?? null) : null,
     payee: record.payee ?? null,
+    payeeSetBy: record.payeeSetBy
+      ? { side: record.payeeSetBy.side, at: record.payeeSetBy.at }
+      : null,
   };
   return {
     summary,

@@ -89,10 +89,14 @@ import {
   dismissFeederHistory,
   getFeederViewAccess,
   parseRequestFeederRateInput,
-  parseSetFeederPayeeInput,
   requestFeederRate,
-  setFeederPayee,
 } from './corpTaxBookFeederViewCalls.js';
+import {
+  parseSetBookFeederPayeeInput,
+  parseSetFeederPayeeInput,
+  setBookFeederPayee,
+  setFeederPayee,
+} from './corpTaxBookPayee.js';
 import {
   markFeederPayout,
   parseMarkPayoutInput,
@@ -764,8 +768,8 @@ export const requestCorpTaxBookFeederRateCallable = onCall<unknown>(
     requestFeederRate(corpSyncDeps(), callerOf(request), parseRequestFeederRateInput(request.data))
 );
 
-// The moon owner names its payee (#4619): its own CEO, Directors and Accountants only. The
-// accounting corporation lost write access; same callable name so a deploy replaces the old one.
+// The moon owner names its payee: its own CEO, Directors and Accountants. The accounting
+// corporation's officers set it too (#4653), through `setCorpTaxBookFeederPayeeFromBookCallable`.
 export const setCorpTaxBookFeederPayeeCallable = onCall<unknown>(
   { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
   (request) =>
@@ -830,6 +834,19 @@ const removalDeps = (): BookDeps => ({
   ...feederOwnerDeps(),
   corporationCeo: esiCorporationCeoLookup(),
 });
+
+// Either side sets a moon owner's payee (#4653): this is the accounting corporation's officers'
+// side (Accountant or higher, live role check). The CEO lookup names whom the change is mailed to.
+export const setCorpTaxBookFeederPayeeFromBookCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    setBookFeederPayee(
+      removalDeps(),
+      callerOf(request),
+      parseSetBookFeederPayeeInput(request.data),
+      esiIdCategoryLookup()
+    )
+);
 
 export const startCorpTaxBookFeederRemovalCallable = onCall<unknown>(
   FEEDER_OWNER_OPTIONS,

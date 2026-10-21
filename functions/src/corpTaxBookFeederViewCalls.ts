@@ -1,14 +1,11 @@
 // The moon owner's view callables' logic (issue #4512, spec #4504): the access check, a rate
-// request, setting its payee (#4619) and dismissing the after-leaving view. The caller is the moon owner's own officer
-// (CEO, Director or Accountant, read live from ESI); the view itself is in
+// request and dismissing the after-leaving view; its payee is corpTaxBookPayee.ts (#4653). The
+// caller is the moon owner's own officer (CEO, Director or Accountant, read live from ESI); the view itself is in
 // corpTaxBookFeederView.ts. Failures carry a stable `reason`; no player-facing text lives here.
 
-import { HttpsError } from 'firebase-functions/v2/https';
 import { record } from './communities.js';
 import { ACCESS_TTL_MS, pctField } from './corpTaxBook.js';
 import { type CorpSyncDeps } from './corpSyncGrant.js';
-import type { IdCategoryLookup } from './corpTaxBookEsi.js';
-import { withPayee, withPayeeChange, type Payee, type PayeeChange } from './corpTaxBookEngine.js';
 import {
   authorizeFeederCaller,
   parseFeederCall,
@@ -44,24 +41,6 @@ export interface RequestFeederRateInput extends FeederCall {
 export function parseRequestFeederRateInput(data: unknown): RequestFeederRateInput {
   const call = parseFeederCall(data);
   return { ...call, pct: pctField(record(data).pct, 'pct') };
-}
-
-export interface SetFeederPayeeInput extends FeederCall {
-  payee: Payee;
-}
-
-export function parseSetFeederPayeeInput(data: unknown): SetFeederPayeeInput {
-  const call = parseFeederCall(data);
-  const { kind, id } = record(record(data).payee);
-  if (
-    (kind !== 'corporation' && kind !== 'character') ||
-    typeof id !== 'number' ||
-    !Number.isSafeInteger(id) ||
-    id < 1
-  ) {
-    throw new HttpsError('invalid-argument', 'payee must be a corporation or character id');
-  }
-  return { ...call, payee: { kind, id } };
 }
 
 /**
@@ -133,60 +112,6 @@ export async function requestFeederRate(
       { characterId: ctx.callerId, name: 'Moon owner' },
       'feederRateRequested',
       { feederCorporationId: input.corporationId, pct: input.pct }
-    );
-  });
-  await tryRebuildFeederView(feederBookDeps(deps), ctx.collectorCorporationId, input.corporationId);
-  return { ok: true };
-}
-
-/**
- * The moon owner names who its money goes to: a corporation or a player. Only its own CEO,
- * Directors and Accountants (live role check); the accounting corporation cannot (#4619).
- * The id is checked against ESI first (#4621). Every set or change stamps `payeeChangedAt` (engine `withPayee`), which the removal's payee
- * link reads, and appends `payeeHistory`, which payout matching reads (#4617).
- */
-export async function setFeederPayee(
-  deps: CorpSyncDeps,
-  caller: Caller,
-  input: SetFeederPayeeInput,
-  idCategory: IdCategoryLookup
-): Promise<{ ok: true }> {
-  const ctx = await authorizeFeederCaller(deps, caller, input, 'edit');
-  if (!ctx)
-    fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
-  // The id must be the kind it claims (#4621): a character stored as a corporation would send
-  // payouts and the removal link to the wrong place. ESI down fails the call; nothing is written.
-  if ((await idCategory(input.payee.id)) !== input.payee.kind) {
-    fail(
-      'invalid-argument',
-      'That id is not a corporation or player of that kind',
-      'payee-mismatch'
-    );
-  }
-  const ref = feederRef(deps.db, ctx.collectorCorporationId, input.corporationId);
-  await deps.db.runTransaction(async (tx) => {
-    const rec = (await tx.get(ref)).data() as
-      (FeederRecord & { payeeHistory?: PayeeChange[] }) | undefined;
-    if (!rec || (rec.status !== 'active' && rec.status !== 'pending-removal')) {
-      fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
-    }
-    // Unset means the moon owner corporation: naming it (or the standing payee) changes nothing.
-    const current = rec.payee ?? { kind: 'corporation', id: input.corporationId };
-    if (current.kind === input.payee.kind && current.id === input.payee.id) return;
-    const now = deps.now();
-    const next = withPayee(rec, input.payee, now);
-    tx.update(ref, {
-      payee: input.payee,
-      ...(next.payeeChangedAt !== undefined ? { payeeChangedAt: next.payeeChangedAt } : {}),
-      payeeHistory: withPayeeChange(rec, input.payee, now),
-    });
-    appendAudit(
-      tx,
-      feederBookDeps(deps),
-      ctx.collectorCorporationId,
-      { characterId: ctx.callerId, name: 'Moon owner' },
-      'feederPayeeSet',
-      { feederCorporationId: input.corporationId, payee: input.payee }
     );
   });
   await tryRebuildFeederView(feederBookDeps(deps), ctx.collectorCorporationId, input.corporationId);

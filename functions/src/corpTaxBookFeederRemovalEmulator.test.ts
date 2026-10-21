@@ -9,7 +9,7 @@ import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import { type CorpSyncDeps } from './corpSyncGrant.js';
 import { acceptFeederInvite, createFeederInvite, type FeederRecord } from './corpTaxBookFeeders.js';
 import { leaveFeeder } from './corpTaxBookFeederGrant.js';
-import { setFeederPayee } from './corpTaxBookFeederViewCalls.js';
+import { setFeederPayee } from './corpTaxBookPayee.js';
 import {
   cancelFeederRemoval,
   finalizeDueRemovals,
@@ -156,7 +156,7 @@ async function clearEmulator(): Promise<void> {
   );
 }
 
-/** The moon owner's side, which alone sets its payee (#4619): its Director, live role check. */
+/** The moon owner's side sets its payee here: its Director, live role check. */
 const ownerDeps = (): CorpSyncDeps => ({
   ...syncDeps(),
   verify: deps().verifyToken,

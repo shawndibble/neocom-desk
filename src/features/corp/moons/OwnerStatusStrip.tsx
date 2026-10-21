@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
 
 /**
@@ -13,19 +13,28 @@ export function OwnerStatusStrip({
 }: {
   title: string;
   body: string;
-  tone?: 'danger' | 'warning';
+  /** `neutral`: news, not a problem (a payee the other side changed). */
+  tone?: 'danger' | 'warning' | 'neutral';
   actions?: ReactNode;
 }) {
+  const titleId = useId();
   return (
     <div
       role="status"
+      aria-labelledby={titleId}
       className={cx(
         'flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xs border px-3 py-2',
-        tone === 'danger' ? 'border-danger/60' : 'border-warning/60'
+        tone === 'danger'
+          ? 'border-danger/60'
+          : tone === 'warning'
+            ? 'border-warning/60'
+            : 'border-line-bright'
       )}
     >
       <p className="min-w-0 flex-1 basis-64 text-sm">
-        <span className="block font-semibold">{title}</span>
+        <span id={titleId} className="block font-semibold">
+          {title}
+        </span>
         <span className="text-text-dim">{body}</span>
       </p>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}

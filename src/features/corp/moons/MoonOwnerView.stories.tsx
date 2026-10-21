@@ -60,6 +60,26 @@ export const PayeeSet: Story = {
   args: { view: fixtureView({ payee: { kind: 'character', id: 77 } }) },
 };
 
+/** @summary The accounting corporation changed the payee (#4653): the strip with Dismiss, and "Set by … on …" on the line. */
+export const PayeeChangedByAccounting: Story = {
+  args: {
+    view: fixtureView({
+      payee: { kind: 'character', id: 77 },
+      payeeSetBy: { side: 'accounting', at: Date.UTC(2026, 9, 21, 15) },
+    }),
+  },
+};
+
+/** @summary This side set the payee: "Set by you on …", no strip. */
+export const PayeeSetByYou: Story = {
+  args: {
+    view: fixtureView({
+      payee: { kind: 'character', id: 77 },
+      payeeSetBy: { side: 'moon-owner', at: Date.UTC(2026, 9, 21, 15) },
+    }),
+  },
+};
+
 /** @summary The ledger cannot be read: stale banner with Reconnect above the page. */
 export const Stale: Story = {
   args: {

@@ -14,6 +14,7 @@ import {
   type MailQueueItem,
 } from '@/engine/corpTaxBook/mailQueue';
 import { composeRateChangeMail } from '@/engine/corpTaxBook/ownerRateMail';
+import { composePayeeChangeMail } from '@/engine/corpTaxBook/payeeChange';
 import type { OwnerRateChange } from '@/engine/corpTaxBook/ownerRate';
 import { composeStatementMail, type StatementMailInput } from '@/engine/corpTaxBook/statementMail';
 import { db } from '@/db';
@@ -254,6 +255,56 @@ export async function enqueueRateChangeMail(input: {
       corporationId: input.corporationId,
       statementId: `rate:${input.feederCorporationId}:${event}:${r.id}`,
       kind: 'rate-change',
+      senderCharacterId: input.senderCharacterId,
+      recipientId: r.id,
+      recipientName: r.name,
+      amount: 0,
+      subject: mail.subject,
+      body: mail.body,
+      order: start + i,
+      status: 'waiting',
+      createdAt: Date.now(),
+      attempts: 0,
+    };
+  });
+  const { added } = await addToQueue(items);
+  return { queued: added.length };
+}
+
+/**
+ * Queues the short "payments now go to" mail (#4653), one per recipient. Never throws into the
+ * payee change: the caller has already saved it. One change (`at`) is mailed once per recipient.
+ */
+export async function enqueuePayeeChangeMail(input: {
+  corporationId: number;
+  senderCharacterId: number;
+  feederCorporationId: number;
+  /** When the change was made (ms): one mail per change and recipient. */
+  at: number;
+  /** UTC day of the change. */
+  date: string;
+  changedByName: string;
+  moonOwnerName: string;
+  payeeName: string;
+  recipients: readonly { id: number; name: string }[];
+}): Promise<{ queued: number }> {
+  const batchId = crypto.randomUUID();
+  const start = await nextOrder();
+  const items: MailQueueItem[] = input.recipients.map((r, i) => {
+    const mail = composePayeeChangeMail({
+      recipientName: r.name,
+      changedByName: input.changedByName,
+      moonOwnerName: input.moonOwnerName,
+      payeeName: input.payeeName,
+      date: input.date,
+    });
+    return {
+      id: crypto.randomUUID(),
+      batchId,
+      corporationId: input.corporationId,
+      feederCorporationId: input.feederCorporationId,
+      statementId: `payee:${input.feederCorporationId}:${input.at}:${r.id}`,
+      kind: 'payee-change',
       senderCharacterId: input.senderCharacterId,
       recipientId: r.id,
       recipientName: r.name,

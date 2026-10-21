@@ -14136,6 +14136,7 @@
         "status": "Status",
         "reminder": "Reminder",
         "rate-change": "Rate change",
+        "payee-change": "Payee change",
         "removal": "Moon owner removal",
         "removalCancelled": "Removal cancelled"
       },
@@ -14183,6 +14184,11 @@
     },
     "moons": {
       "title": "Moons",
+      "payeeNotice": {
+        "title": "Payee changed",
+        "body": "Payments now go to {{payee}}. {{by}} changed this on {{date}}.",
+        "dismiss": "Dismiss"
+      },
       "tabs": {
         "extractions": "Extractions",
         "miners": "Miners",
@@ -14707,6 +14713,8 @@
         },
         "payee": {
           "line": "Who gets paid: {{name}}",
+          "setBy": "Set by {{name}} on {{date}}",
+          "setByYou": "Set by you on {{date}}",
           "change": "Change…",
           "changeLabel": "Change who gets paid…",
           "dialogTitle": "Who gets paid",

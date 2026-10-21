@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, Panel, StatChip, StatChips, TextInput } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
+import { payeeChangeNotice } from '@/engine/corpTaxBook/payeeChange';
 import type { Payee } from '@/engine/corpTaxBook/payouts';
 import type { FeederView } from '../taxBook/feederViewClient';
 import {
@@ -17,7 +18,7 @@ import {
 } from '../taxBook/feederViewModel';
 import { DialogShell } from './BookDialogs';
 import { RefineryLabels } from './RefineryLabels';
-import { ChangePayeeDialog, PayeeLine } from './MoonOwnerPayee';
+import { ChangePayeeDialog, PayeeChangeStrip, PayeeLine } from './MoonOwnerPayee';
 import { isk, shortDate } from './moonsFormat';
 
 type Names = (characterId: number) => string;
@@ -293,7 +294,7 @@ export function MoonOwnerView({
   onRequestRate: (pct: number) => Promise<void>;
   /** Whose token the payee name search runs under; with `onSetPayee`, shows Change…. */
   characterId?: number;
-  onSetPayee?: (payee: Payee) => Promise<void>;
+  onSetPayee?: (payee: Payee, name: string) => Promise<void>;
   banner?: ReactNode;
   card?: ReactNode;
   afterCard?: ReactNode;
@@ -307,6 +308,13 @@ export function MoonOwnerView({
   const state = pageState(view.summary);
   const name = view.summary.collectorName ?? t('corpTaxBook.moons.owner.anonymous');
   const ended = state === 'ended';
+  const setBy = view.summary.payeeSetBy ?? null;
+  // The accounting corporation changed who gets paid (#4653): a strip until dismissed.
+  const payeeNotice = payeeChangeNotice({
+    payee: view.summary.payee,
+    payeeSetBy: setBy,
+    viewer: 'moon-owner',
+  });
   // Settled after leaving folds to its one line: no history under it.
   const folded = isSettledAfterLeaving(view.summary);
   const ownerName = nameOf?.(view.summary.feederCorporationId);
@@ -325,6 +333,14 @@ export function MoonOwnerView({
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       {banner}
+      {payeeNotice && !ended && (
+        <PayeeChangeStrip
+          storageKey={`${view.summary.collectorCorporationId}.${view.summary.feederCorporationId}`}
+          at={payeeNotice.at}
+          payeeName={names(payeeNotice.payee.id)}
+          byName={name}
+        />
+      )}
       {card}
       {afterCard}
       {!folded && (
@@ -360,6 +376,14 @@ export function MoonOwnerView({
                 />
                 <PayeeLine
                   name={names(payeeIdOf(view.summary))}
+                  {...(setBy
+                    ? {
+                        setBy: {
+                          name: setBy.side === 'moon-owner' ? null : name,
+                          at: setBy.at,
+                        },
+                      }
+                    : {})}
                   onChange={canSetPayee ? () => setChangingPayee(true) : undefined}
                 />
                 <Payments view={view} />

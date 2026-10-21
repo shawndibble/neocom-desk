@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { MoonOwnerDetail } from '@/engine/corpTaxBook/moonOwners';
 import { MoonOwnerPage } from './MoonOwnerPage';
+import { PayeeChangeStrip } from './MoonOwnerPayee';
 import { MoonOwnerView } from './MoonOwnerView';
 import { fixtureView, nameOf } from './ownerViewFixtures';
 
@@ -71,7 +72,41 @@ describe('moon owner payee line', () => {
     const { onSetPayee } = ownerView();
     const user = await pick('Kestrel Vane', 'character', 77);
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    await waitFor(() => expect(onSetPayee).toHaveBeenCalledWith({ kind: 'character', id: 77 }));
+    await waitFor(() =>
+      expect(onSetPayee).toHaveBeenCalledWith({ kind: 'character', id: 77 }, 'Kestrel Vane')
+    );
+  });
+
+  const AT = Date.UTC(2026, 9, 21, 15);
+
+  it('says who set it and when: this side, or the accounting corporation (#4653)', () => {
+    ownerView({
+      payee: { kind: 'character', id: 77 },
+      payeeSetBy: { side: 'moon-owner', at: AT },
+    });
+    expect(screen.getByText('Set by you on 21 Oct')).toBeVisible();
+    expect(screen.queryByRole('status', { name: /payee changed/i })).toBeNull();
+  });
+
+  it('shows a notice when the accounting corporation changed it, until dismissed', async () => {
+    localStorage.clear();
+    const over = {
+      payee: { kind: 'character' as const, id: 77 },
+      payeeSetBy: { side: 'accounting' as const, at: AT },
+    };
+    ownerView(over);
+    expect(screen.getByText('Set by Brass Meridian Logistics on 21 Oct')).toBeVisible();
+    const notice = screen.getByRole('status', { name: 'Payee changed' });
+    expect(notice).toHaveTextContent(
+      'Payments now go to Kestrel Vane. Brass Meridian Logistics changed this on 21 Oct.'
+    );
+    expect(notice.textContent).not.toMatch(/48|hour|wait|remov|feeder|collector/i);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByRole('status', { name: 'Payee changed' })).toBeNull();
+    // Dismissed on this device: it stays gone on the next visit.
+    cleanup();
+    ownerView(over);
+    expect(screen.queryByRole('status', { name: 'Payee changed' })).toBeNull();
   });
 
   it('saves nothing typed but not picked, and refuses an alliance', async () => {
@@ -149,5 +184,41 @@ describe('accounting side payee', () => {
     );
     expect(screen.getByRole('button', { name: 'Open in EVE: Kestrel Vane' })).toBeVisible();
     expect(screen.queryByRole('button', { name: /who gets paid/i })).toBeNull();
+  });
+
+  it('offers Change… to an officer who may edit (#4653)', async () => {
+    const onChangePayee = vi.fn();
+    render(
+      <MoonOwnerPage
+        detail={detail}
+        name="Ashfall Mining Collective"
+        characterName={nameOf}
+        refineryName={String}
+        oreName={String}
+        backTo="/corp/moons/moon-owners"
+        payee={{ kind: 'character', id: 77, name: 'Kestrel Vane' }}
+        onChangePayee={onChangePayee}
+        payeeNotice={<p>notice slot</p>}
+      />,
+      { wrapper: Router }
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Change who gets paid…' }));
+    expect(onChangePayee).toHaveBeenCalled();
+    expect(screen.getByText('notice slot')).toBeVisible();
+  });
+
+  it('the notice names the moon owner that changed it', () => {
+    localStorage.clear();
+    render(
+      <PayeeChangeStrip
+        storageKey="test"
+        at={Date.UTC(2026, 9, 21)}
+        payeeName="Kestrel Vane"
+        byName="Ashfall Mining Collective"
+      />
+    );
+    expect(screen.getByRole('status', { name: 'Payee changed' })).toHaveTextContent(
+      'Payments now go to Kestrel Vane. Ashfall Mining Collective changed this on 21 Oct.'
+    );
   });
 });

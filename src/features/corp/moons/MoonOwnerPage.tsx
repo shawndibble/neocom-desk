@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -133,6 +134,8 @@ export function MoonOwnerPage({
   onPay,
   onAddPayment,
   onMarkPayout,
+  onChangePayee,
+  payeeNotice,
 }: {
   detail: MoonOwnerDetail;
   name: string;
@@ -144,8 +147,12 @@ export function MoonOwnerPage({
   refineryEdit?: RefineryLabelEdit;
   oreName: (typeId: number) => string;
   backTo: string;
-  /** Who the moon owner is paid as, read-only here: only the moon owner sets it (#4619). */
+  /** Who the moon owner is paid as. Either side sets it (#4653). */
   payee?: Payee & { name: string };
+  /** Change… on the "Paid to" line; absent for a viewer who may not edit. */
+  onChangePayee?: () => void;
+  /** The strip when the moon owner changed it (#4653). */
+  payeeNotice?: ReactNode;
   /** Absent for a viewer who may not edit. */
   onSetRate?: () => void;
   onSettledOtherwise?: () => void;
@@ -300,8 +307,18 @@ export function MoonOwnerPage({
             <CorporationLink id={payee.id}>{payee.name}</CorporationLink>
           )}
           <OpenInEveButton kind="information" id={payee.id} name={payee.name} />
+          {onChangePayee && (
+            <Button
+              size="sm"
+              aria-label={t('corpTaxBook.moons.ownerView.payee.changeLabel')}
+              onClick={onChangePayee}
+            >
+              {t('corpTaxBook.moons.ownerView.payee.change')}
+            </Button>
+          )}
         </div>
       )}
+      {payeeNotice}
       {row.status === 'cant-read' && row.staleSince !== undefined && (
         <p role="note" className="text-sm text-warning">
           {t(k('stale'), { date: shortDate(new Date(row.staleSince).toISOString()) })}

@@ -360,6 +360,8 @@ export interface BookFeeder extends FeederReadClock {
   agreedRatePct?: number;
   offeredOwnerRatePct?: number;
   payee?: { kind: 'corporation' | 'character'; id: number };
+  /** Which side set the payee last, who and when (#4653); absent on an older record. */
+  payeeSetBy?: { side: 'accounting' | 'moon-owner'; characterId: number; at: number };
   coveragePeriods: { from: string; to?: string }[];
   /** Absent on records written before the history existed. */
   ownerRateHistory?: OwnerRateEntry[];
