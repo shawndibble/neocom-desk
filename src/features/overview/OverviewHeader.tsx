@@ -41,12 +41,18 @@ const CHIP_TEXT: Record<ChipTone, string> = {
  * widget. Its tooltip names that widget; a click opens the per-widget table, so
  * "14h ago" is never a mystery (no Refresh: widgets retry themselves).
  */
-export function OverviewDataAge({ summary }: { summary: OverviewSummary }) {
+export function OverviewDataAge({ summary, note }: { summary: OverviewSummary; note?: string }) {
   const { fetchedAt, breakdown, now } = summary;
   const { refresh } = useOverviewRefresh();
   if (!fetchedAt) return null;
   return (
-    <DataAgePopover fetchedAt={fetchedAt} breakdown={breakdown} now={now} onRefresh={refresh} />
+    <DataAgePopover
+      fetchedAt={fetchedAt}
+      breakdown={breakdown}
+      now={now}
+      onRefresh={refresh}
+      note={note}
+    />
   );
 }
 

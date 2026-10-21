@@ -33,6 +33,7 @@ export function DataAgePopover({
   breakdown,
   now,
   onRefresh,
+  note,
 }: {
   /** The stalest read, which sets the age the button shows. */
   fetchedAt: Date;
@@ -40,6 +41,8 @@ export function DataAgePopover({
   breakdown: readonly FetchRow[];
   now: number;
   onRefresh: () => void;
+  /** A line about how fresh the data can be at all (the Corp overview's hourly cache). */
+  note?: string;
 }) {
   const { t } = useTranslation();
   const board = useWidgetBoard();
@@ -103,6 +106,7 @@ export function DataAgePopover({
             ))}
           </tbody>
         </table>
+        {note && <p className="border-t border-line px-3 py-2 text-xs text-text-dim">{note}</p>}
         <div className="border-t border-line p-2">
           <Button size="sm" onClick={onRefresh} className="w-full">
             <Icon.Refresh aria-hidden="true" />

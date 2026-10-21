@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -16,9 +16,19 @@ import * as corpWallet from '@/features/corp/wallet';
 import * as corpJobs from '@/features/corp/jobs';
 import * as corpMembers from '@/features/corp/members';
 import * as rosterState from '@/features/corp/rosterState';
+import * as corpReadAccess from '@/features/corp/corpReadAccess';
+import { db } from '@/db';
+import {
+  CORP_OVERVIEW_LAYOUT_KEY,
+  useCorpOverviewLayout,
+} from '@/features/overview/widgets/layoutStore';
+import type { OverviewLayout } from '@/features/overview/widgets/layout';
 import { Corp } from './Corp';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
+// The widget loaders gate on this before they fetch; the test sets it to the
+// same capabilities `useCorpAccess` reports, as the real two always agree.
+vi.mock('@/features/corp/corpReadAccess', () => ({ resolveCorpReadAccess: vi.fn() }));
 vi.mock('@/features/corp/boardData', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/corp/boardData')>()),
   loadCorporationId: vi.fn(),
@@ -78,15 +88,21 @@ const mocked = {
   ...vi.mocked(corpMembers),
 };
 const mockedRoster = vi.mocked(rosterState);
+const mockedReadAccess = vi.mocked(corpReadAccess);
 
 const CHARACTER_ID = 42;
 const CORPORATION_ID = 98000001;
 const NOW = Date.parse('2026-09-03T12:00:00Z');
-const HOUR = 3_600_000;
 const DAY = 86_400_000;
 const at = (ms: number) => new Date(NOW + ms).toISOString();
 
 function accessOf(state: CorpAccessState, capabilities: Partial<CorpCapabilities>): CorpAccess {
+  const held = { ...NO_CORP_CAPABILITIES, ...capabilities };
+  mockedReadAccess.resolveCorpReadAccess.mockResolvedValue(
+    state === 'ready'
+      ? { corporationId: CORPORATION_ID, can: (capability) => held[capability] }
+      : null
+  );
   return {
     state,
     capabilities: { ...NO_CORP_CAPABILITIES, ...capabilities },
@@ -131,8 +147,10 @@ function renderCorp() {
   );
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
+  await db.settings.clear();
+  useCorpOverviewLayout.setState({ value: null, hydrated: false });
   // The clock, not the timers: `waitFor` needs real ones, and every deadline
   // in this file is written relative to `NOW`.
   vi.setSystemTime(NOW);
@@ -155,6 +173,22 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+const STRUCTURE = {
+  structure_id: 1,
+  corporation_id: CORPORATION_ID,
+  system_id: 1,
+  type_id: 1,
+  profile_id: 1,
+  name: 'Nakugard - Home',
+  fuel_expires: at(4 * DAY),
+};
+
+const widget = (name: string) => screen.findByRole('region', { name });
+
+async function storedLayout(): Promise<OverviewLayout | undefined> {
+  return (await db.settings.get(CORP_OVERVIEW_LAYOUT_KEY))?.value as OverviewLayout | undefined;
+}
+
 describe('access states (AC1)', () => {
   /**
    * `unknown` is the one state where the route and the nav disagree, on
@@ -165,25 +199,21 @@ describe('access states (AC1)', () => {
     mockedAccess.mockReturnValue(accessOf('unknown', {}));
     renderCorp();
     expect(screen.queryByText('No corporation access')).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Ops board' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Corporation' })).not.toBeInTheDocument();
   });
 
   /**
    * The cold-load order every real user hits: `useCorpAccess` reports `unknown`
-   * with no capabilities for the first frames, and only then resolves.
-   *
-   * `useRouteSnapshot` runs its loader on mount and re-runs it only for a
-   * character change or a refresh — so a loader mounted during `unknown` would
-   * capture an empty capability set, fetch nothing, and never be asked again.
-   * That is an empty board for every user, permanently, and it is why the board
-   * is a child component mounted on `ready` rather than a branch inside one.
+   * with no capabilities for the first frames, and only then resolves. A grid
+   * mounted during `unknown` would build its board from an empty capability
+   * set, which is why it mounts on `ready`.
    */
   it('loads once access resolves, not with the empty capabilities it mounted under', async () => {
     mockedAccess.mockReturnValue(accessOf('unknown', {}));
     const { rerender } = renderCorp();
     expect(mocked.loadCorporationStructures).not.toHaveBeenCalled();
 
-    mocked.loadCorporationStructures.mockResolvedValue(cached([]));
+    mocked.loadCorporationStructures.mockResolvedValue(cached([STRUCTURE]));
     mockedAccess.mockReturnValue(accessOf('ready', { canReadStructures: true }));
     rerender(
       <MemoryRouter initialEntries={['/corp']}>
@@ -192,7 +222,7 @@ describe('access states (AC1)', () => {
     );
 
     await waitFor(() => expect(mocked.loadCorporationStructures).toHaveBeenCalled());
-    expect(await screen.findByText(/Nothing due: Fuel/)).toBeInTheDocument();
+    expect(await widget('Structures')).toBeInTheDocument();
   });
 
   it('shows no board and no Grant for a none character who reached the URL anyway', () => {
@@ -215,630 +245,189 @@ describe('access states (AC1)', () => {
   );
 });
 
-describe('per-panel capability gating (AC3)', () => {
+describe('per-widget capability gating (AC3)', () => {
   /**
-   * The ticket's own example: a Station Manager who is not an Accountant sees
-   * structures and no wallet rail, with no 403 surfaced and no empty state
-   * standing in for a panel they were never allowed to ask about. The
-   * `forbidden` loaders make "did not fetch" part of the assertion, not just
-   * "did not render" — an ungated corp read buys a guaranteed 403.
+   * A Station Manager who is not an Accountant gets the clocks and no money
+   * widgets, with no 403 surfaced and no empty state standing in for a widget
+   * they were never allowed to ask about. The `forbidden` loaders make "did not
+   * fetch" part of the assertion, not just "did not render".
    */
   it('reads structures and moons for a Station Manager, and no wallet at all', async () => {
     mockedAccess.mockReturnValue(
       accessOf('ready', { canReadStructures: true, canReadMoonExtractions: true })
     );
-    mocked.loadCorporationStructures.mockResolvedValue(
-      cached([
-        {
-          structure_id: 1,
-          corporation_id: CORPORATION_ID,
-          system_id: 1,
-          type_id: 1,
-          profile_id: 1,
-          name: 'Nakugard - Home',
-          fuel_expires: at(4 * DAY),
-        },
-      ])
-    );
+    mocked.loadCorporationStructures.mockResolvedValue(cached([STRUCTURE]));
     mocked.loadCorporationMiningExtractions.mockResolvedValue(cached([]));
 
     renderCorp();
 
-    await waitFor(() => expect(screen.getByText('Nakugard - Home')).toBeInTheDocument());
+    expect(await widget('Structures')).toBeInTheDocument();
+    expect(await widget('Moon extractions')).toBeInTheDocument();
+    expect(await widget('Due soon')).toBeInTheDocument();
+    expect(await widget('Offline services')).toBeInTheDocument();
+    await waitFor(() => expect(mocked.loadCorporationStructures).toHaveBeenCalled());
     expect(mocked.loadCorporationWallets).not.toHaveBeenCalled();
     expect(mocked.loadCorporationWalletJournal).not.toHaveBeenCalled();
     expect(mocked.loadCorporationIndustryJobs).not.toHaveBeenCalled();
-    expect(screen.queryByText('Vitals')).not.toBeInTheDocument();
-    // No "no jobs" noise about a card this character cannot read (#566): a
-    // Station Manager gets Fuel and Timers and no Industry jobs card at all.
-    expect(screen.queryByText('Industry jobs')).not.toBeInTheDocument();
-    // Nor a money figure in Standing, whose clock half they do hold.
-    expect(screen.queryByText('Runway')).not.toBeInTheDocument();
+    expect(mocked.loadCorporationMemberTracking).not.toHaveBeenCalled();
+    expect(screen.queryByRole('region', { name: 'Corp wallet' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Corp industry jobs' })).not.toBeInTheDocument();
   });
 
-  it('shows the vitals rail, named by the corporation’s own division names', async () => {
+  it('gives an Accountant the money widgets and no clocks', async () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
-    mocked.loadCorporationWallets.mockResolvedValue(
-      cached([
-        { division: 1, balance: 1_000_000 },
-        { division: 3, balance: 250 },
-      ])
-    );
-    mocked.loadCorporationDivisions.mockResolvedValue(
-      cached({ wallet: [{ division: 3, name: 'SRP' }] })
-    );
+    mocked.loadCorporationWallets.mockResolvedValue(cached([{ division: 1, balance: 5e9 }]));
+    mocked.loadCorporationDivisions.mockResolvedValue(cached({ wallet: [], hangar: [] }));
     mocked.loadCorporationWalletJournal.mockResolvedValue(cached([]));
 
     renderCorp();
 
-    await waitFor(() => expect(screen.getByText('Vitals')).toBeInTheDocument());
-    expect(screen.getByText('SRP')).toBeInTheDocument();
-    // Unnamed divisions fall back to the number the client uses too.
-    expect(screen.getByText('Division 1')).toBeInTheDocument();
+    expect(await widget('Corp wallet')).toBeInTheDocument();
+    expect(await widget('Cash flow')).toBeInTheDocument();
+    expect(await widget('Income by source')).toBeInTheDocument();
+    expect(mocked.loadCorporationStructures).not.toHaveBeenCalled();
+    expect(screen.queryByRole('region', { name: 'Structures' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Due soon' })).not.toBeInTheDocument();
   });
 
-  it('says the wallet could not load, not 0 ISK, when the balances read failed', async () => {
-    mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
-    mocked.loadCorporationWallets.mockResolvedValue({ cached: null, needsReauth: false });
-    mocked.loadCorporationDivisions.mockResolvedValue(cached({}));
-    mocked.loadCorporationWalletJournal.mockResolvedValue(cached([]));
+  it('keeps a saved widget the Character cannot read, but does not draw or fetch it', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
+    mocked.loadCorporationMemberTracking.mockResolvedValue(cached([]));
+    mocked.loadCorporationMemberIds.mockResolvedValue(cached([]));
+    await db.settings.put({
+      key: CORP_OVERVIEW_LAYOUT_KEY,
+      value: {
+        version: 1,
+        widgets: [
+          {
+            id: 'a',
+            kind: 'corpWallet',
+            size: 'M',
+            view: 'table',
+            scope: 'header',
+            showOnPhone: true,
+          },
+          {
+            id: 'b',
+            kind: 'corpMembers',
+            size: 'S',
+            view: 'number',
+            scope: 'header',
+            showOnPhone: true,
+          },
+        ],
+      },
+    });
 
     renderCorp();
 
-    expect(await screen.findAllByText("Couldn't load")).not.toHaveLength(0);
-    expect(screen.getByText('Vitals')).toBeInTheDocument();
-    expect(screen.queryByText('Division 1')).not.toBeInTheDocument();
-    expect(screen.queryByText('Runway')).not.toBeInTheDocument();
-  });
-
-  it('shows net and runway as unknown, not 0, when only the journal read failed', async () => {
-    mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
-    mocked.loadCorporationWallets.mockResolvedValue(cached([{ division: 1, balance: 1_000_000 }]));
-    mocked.loadCorporationDivisions.mockResolvedValue(cached({}));
-    mocked.loadCorporationWalletJournal.mockResolvedValue({ cached: null, needsReauth: false });
-
-    renderCorp();
-
-    await waitFor(() => expect(screen.getByText('Vitals')).toBeInTheDocument());
-    // Net reads as the unknown dash in both the Standing panel and the rail.
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
-    expect(screen.queryByText(/^0 ISK$/)).not.toBeInTheDocument();
-  });
-
-  /**
-   * Issue #419: each balance links to the matching Wallet division view
-   * rather than making the manager reopen Wallet and flip both the switch
-   * and the division selector by hand.
-   */
-  it('links each division balance to its matching Wallet division view', async () => {
-    mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
-    mocked.loadCorporationWallets.mockResolvedValue(
-      cached([
-        { division: 1, balance: 1_000_000 },
-        { division: 3, balance: 250 },
-      ])
-    );
-    mocked.loadCorporationDivisions.mockResolvedValue(
-      cached({ wallet: [{ division: 3, name: 'SRP' }] })
-    );
-    mocked.loadCorporationWalletJournal.mockResolvedValue(cached([]));
-
-    renderCorp();
-
-    await waitFor(() => expect(screen.getByText('SRP')).toBeInTheDocument());
-    expect(screen.getByRole('link', { name: 'View SRP in Corp wallet' })).toHaveAttribute(
-      'href',
-      '/corp/wallet?division=3'
-    );
-    // The label replaces the row's text, so the balance rides on the description.
-    expect(
-      screen.getByRole('link', { name: 'View SRP in Corp wallet' })
-    ).toHaveAccessibleDescription('250.00');
-    expect(screen.getByRole('link', { name: 'View Division 1 in Corp wallet' })).toHaveAttribute(
-      'href',
-      '/corp/wallet?division=1'
-    );
-  });
-
-  /**
-   * The runway's two halves must describe the same wallet: ESI publishes no
-   * all-divisions journal, so putting every division's balance over division
-   * 1's spending would answer a question nobody asked.
-   *
-   * 300 ISK/day out of division 1 over the 30-day window, against its 3,000 —
-   * ten days, regardless of the 1,000,000 sitting untouched in division 3.
-   */
-  it('reports a runway from the journalled division alone', async () => {
-    mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
-    mocked.loadCorporationWallets.mockResolvedValue(
-      cached([
-        { division: 1, balance: 3_000 },
-        { division: 3, balance: 1_000_000 },
-      ])
-    );
-    mocked.loadCorporationDivisions.mockResolvedValue(cached({}));
-    mocked.loadCorporationWalletJournal.mockResolvedValue(
-      cached([
-        {
-          id: 1,
-          date: at(-2 * DAY),
-          ref_type: 'office_rental_fee',
-          description: 'rent',
-          amount: -9_000,
-        },
-      ])
-    );
-
-    renderCorp();
-
-    // The plural key resolving, not the literal `corp.vitals.runwayDays_other`.
-    expect(await screen.findByText('10 days')).toBeInTheDocument();
-  });
-
-  /**
-   * The mirror of the case above, and the harder half of AC3: an Accountant
-   * holds none of the board's three capabilities, so there are no Kind Cards —
-   * not empty ones claiming their kind is clear about endpoints they were never
-   * allowed to ask about. Standing still renders, carrying only its money half
-   * (#566): the figures degrade one at a time, not as a panel.
-   */
-  it('gives an Accountant the rail and no kind cards at all', async () => {
-    mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
-    mocked.loadCorporationWallets.mockResolvedValue(cached([]));
-    mocked.loadCorporationDivisions.mockResolvedValue(cached({}));
-    mocked.loadCorporationWalletJournal.mockResolvedValue(cached([]));
-
-    renderCorp();
-
-    await waitFor(() => expect(screen.getByText('Vitals')).toBeInTheDocument());
-    expect(screen.queryByText('Fuel')).not.toBeInTheDocument();
-    expect(screen.queryByText('Structure timers')).not.toBeInTheDocument();
-    expect(screen.queryByText('Moon chunks')).not.toBeInTheDocument();
-    expect(screen.queryByText('Industry jobs')).not.toBeInTheDocument();
-    // Standing is up for the money figures, and says nothing about clocks it
-    // could not read.
-    expect(screen.getByText('Standing')).toBeInTheDocument();
-    expect(screen.queryByText('Due in 24h')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Deadlines per day/)).not.toBeInTheDocument();
+    expect(await widget('Members')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Corp wallet' })).not.toBeInTheDocument();
+    expect(mocked.loadCorporationWallets).not.toHaveBeenCalled();
+    expect((await storedLayout())?.widgets.map((w) => w.kind)).toEqual([
+      'corpWallet',
+      'corpMembers',
+    ]);
   });
 });
 
-describe('the board (AC2, AC5, AC6)', () => {
-  beforeEach(() => {
-    mockedAccess.mockReturnValue(
-      accessOf('ready', {
-        canReadStructures: true,
-        canReadMoonExtractions: true,
-        canReadIndustry: true,
-      })
-    );
-    mocked.loadCorporationMiningExtractions.mockResolvedValue(cached([]));
-    mocked.loadCorporationIndustryJobs.mockResolvedValue(cached([]));
+describe('the layout', () => {
+  it('opens with a default it does not save until the pilot changes something', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
+    mocked.loadCorporationMemberTracking.mockResolvedValue(cached([]));
+    mocked.loadCorporationMemberIds.mockResolvedValue(cached([]));
+
+    renderCorp();
+
+    expect(await widget('Members')).toBeInTheDocument();
+    expect(await widget('Inactive members')).toBeInTheDocument();
+    expect(await storedLayout()).toBeUndefined();
   });
 
-  it('names structures from the endpoint’s own field, with no resolution call (AC4)', async () => {
-    mocked.loadCorporationStructures.mockResolvedValue(
-      cached([
-        {
-          structure_id: 1,
-          corporation_id: CORPORATION_ID,
-          system_id: 1,
-          type_id: 1,
-          profile_id: 1,
-          name: 'Nakugard - Home',
-          fuel_expires: at(9 * DAY),
-        },
+  it('customizes like the Overview: the Gallery offers only the corp widgets this Character can read', async () => {
+    const user = userEvent.setup();
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
+    mocked.loadCorporationMemberTracking.mockResolvedValue(cached([]));
+    mocked.loadCorporationMemberIds.mockResolvedValue(cached([]));
+
+    renderCorp();
+    await widget('Members');
+    await user.click(screen.getByRole('button', { name: 'Customize' }));
+    expect(screen.queryByRole('button', { name: 'Start from a role' })).not.toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Add widget' }));
+
+    const gallery = await screen.findByRole('dialog', { name: 'Add a widget' });
+    expect(within(gallery).getByText('Inactive members')).toBeInTheDocument();
+    // Coming soon, listed for everyone.
+    expect(within(gallery).getByText('Corp kills')).toBeInTheDocument();
+    // Not readable with these roles, so not offered.
+    expect(within(gallery).queryByText('Corp wallet')).not.toBeInTheDocument();
+    // A character widget belongs to the Overview.
+    expect(within(gallery).queryByText('Training')).not.toBeInTheDocument();
+
+    await user.click(within(gallery).getByRole('button', { name: 'Add another Members' }));
+    await waitFor(async () =>
+      expect((await storedLayout())?.widgets.map((w) => w.kind)).toEqual([
+        'corpMembers',
+        'corpInactive',
+        'corpMembers',
       ])
     );
-    renderCorp();
-    await waitFor(() => expect(screen.getByText('Nakugard - Home')).toBeInTheDocument());
-    expect(screen.getByText('Fuel runs out')).toBeInTheDocument();
   });
 
-  /**
-   * The failure mode the ticket names outright: an hour-stale board must not
-   * present a twelve-minute timer as a live countdown.
-   */
-  it('refuses to print a countdown shorter than the cache window', async () => {
-    mocked.loadCorporationStructures.mockResolvedValue(
-      cached([
-        {
-          structure_id: 1,
-          corporation_id: CORPORATION_ID,
-          system_id: 1,
-          type_id: 1,
-          profile_id: 1,
-          name: 'Athanor',
-          fuel_expires: at(20 * DAY),
-          state: 'armor_reinforce',
-          state_timer_end: at(12 * 60_000),
-        },
-      ])
-    );
+  it('offers the section’s sub-nav', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
+    mocked.loadCorporationMemberTracking.mockResolvedValue(cached([]));
+    mocked.loadCorporationMemberIds.mockResolvedValue(cached([]));
     renderCorp();
-    await waitFor(() => expect(screen.getByText('Under 1h')).toBeInTheDocument());
-    expect(screen.queryByText('12m')).not.toBeInTheDocument();
-  });
-
-  /**
-   * #566 replaced the one merged list with per-kind cards, so "leads with" has
-   * no single list to be true of any more. What survives — and what this now
-   * asserts — is that the two sources land in their own cards, and that
-   * Standing counts them together, which is the whole reason the grouping is
-   * safe to make.
-   */
-  it('sends each source to its own card, and counts them together in Standing', async () => {
-    mocked.loadCorporationStructures.mockResolvedValue(
-      cached([
-        {
-          structure_id: 1,
-          corporation_id: CORPORATION_ID,
-          system_id: 1,
-          type_id: 1,
-          profile_id: 1,
-          name: 'Fortizar',
-          fuel_expires: at(20 * DAY),
-        },
-      ])
-    );
-    mocked.loadCorporationIndustryJobs.mockResolvedValue(
-      cached([
-        {
-          job_id: 7,
-          installer_id: 1,
-          activity_id: 1,
-          blueprint_id: 1,
-          blueprint_type_id: 1001,
-          blueprint_location_id: 1,
-          output_location_id: 1,
-          facility_id: 1,
-          location_id: 1,
-          runs: 1,
-          start_date: at(-10 * DAY),
-          end_date: at(-3 * HOUR),
-          status: 'ready',
-        },
-      ])
-    );
-
-    renderCorp();
-
-    await waitFor(() => expect(screen.getByText('Fortizar')).toBeInTheDocument());
-
-    // Each card holds only its own kind: the 20-day fuel clock under Fuel, the
-    // three-hours-late delivery under Industry jobs.
-    const fuelCard = screen.getByRole('heading', { name: 'Fuel' }).closest('section');
-    const jobsCard = screen.getByRole('heading', { name: 'Industry jobs' }).closest('section');
-    expect(fuelCard).toHaveTextContent('Fortizar');
-    expect(fuelCard).not.toHaveTextContent('Type 1001');
-    expect(jobsCard).toHaveTextContent('Type 1001');
-    expect(jobsCard).not.toHaveTextContent('Fortizar');
-
-    // One overdue job inside 24h, and the fuel clock 20 days out is not.
-    expect(screen.getByText('Due in 24h')).toBeInTheDocument();
-    expect(screen.getByText('1 already overdue')).toBeInTheDocument();
-  });
-
-  /**
-   * Issue #419: colour alone is not a signal every reader can use (DESIGN.md
-   * §6/§7), so severity also has to change the row's shape. Two rows far
-   * enough apart on the ladder must render visibly different icons, not the
-   * same decorative glyph repeated.
-   */
-  it('renders each row’s severity as a distinct, decorative shape — not colour alone', async () => {
-    mocked.loadCorporationStructures.mockResolvedValue(
-      cached([
-        {
-          structure_id: 1,
-          corporation_id: CORPORATION_ID,
-          system_id: 1,
-          type_id: 1,
-          profile_id: 1,
-          name: 'Critical Fortizar',
-          fuel_expires: at(3 * HOUR),
-        },
-        {
-          structure_id: 2,
-          corporation_id: CORPORATION_ID,
-          system_id: 1,
-          type_id: 1,
-          profile_id: 1,
-          name: 'Clear Athanor',
-          fuel_expires: at(30 * DAY),
-        },
-      ])
-    );
-    renderCorp();
-    await waitFor(() => expect(screen.getByText('Clear Athanor')).toBeInTheDocument());
-
-    const criticalIcon = screen.getByText('Critical Fortizar').closest('li')?.querySelector('svg');
-    const clearIcon = screen.getByText('Clear Athanor').closest('li')?.querySelector('svg');
-    expect(criticalIcon).not.toBeNull();
-    expect(clearIcon).not.toBeNull();
-    // Decorative: the sr-only severity label (already covered above) is what
-    // names it for assistive tech, not the icon.
-    expect(criticalIcon).not.toHaveAccessibleName();
-    expect(criticalIcon?.innerHTML).not.toEqual(clearIcon?.innerHTML);
-  });
-
-  describe('board rows are read-only', () => {
-    it('has no row menu or More actions button; an item subject links to Show info', async () => {
-      mocked.loadCorporationStructures.mockResolvedValue(cached([]));
-      mocked.loadCorporationIndustryJobs.mockResolvedValue(
-        cached([
-          {
-            job_id: 7,
-            installer_id: 1,
-            activity_id: 1,
-            blueprint_id: 1,
-            blueprint_type_id: 1001,
-            blueprint_location_id: 1,
-            output_location_id: 1,
-            facility_id: 1,
-            location_id: 1,
-            runs: 1,
-            start_date: at(-10 * DAY),
-            end_date: at(-3 * HOUR),
-            status: 'ready' as const,
-          },
-        ])
-      );
-      renderCorp();
-
-      const row = (await screen.findByText('Type 1001')).closest('li');
-      fireEvent.contextMenu(row!);
-
-      expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Type 1001' })).toBeInTheDocument();
-    });
-  });
-
-  /** AC6: the badge is present and says plainly how stale corp data can be. */
-  it('states the hourly cache in the data-age tooltip', async () => {
-    mocked.loadCorporationStructures.mockResolvedValue(cached([]));
-    renderCorp();
-    await waitFor(() => expect(screen.getByText(/Nothing due: Fuel/)).toBeInTheDocument());
-    fireEvent.focus(screen.getByText('30m ago'));
-    expect(screen.getByRole('tooltip')).toHaveTextContent('about an hour');
-  });
-
-  it('offers the section’s sub-nav, which Members will join', async () => {
-    mocked.loadCorporationStructures.mockResolvedValue(cached([]));
-    renderCorp();
-    await waitFor(() => expect(screen.getByText(/Nothing due: Fuel/)).toBeInTheDocument());
-    expect(screen.getByRole('navigation', { name: 'Corporation' })).toBeInTheDocument();
-  });
-
-  it('does not blank the board while a manual refresh is in flight (issue #418)', async () => {
-    mocked.loadCorporationStructures.mockResolvedValue(cached([]));
-    renderCorp();
-    await waitFor(() => expect(screen.getByText(/Nothing due: Fuel/)).toBeInTheDocument());
-
-    let resolveSecondFetch!: (value: ReturnType<typeof cached<never[]>>) => void;
-    mocked.loadCorporationStructures.mockReturnValueOnce(
-      new Promise((resolve) => {
-        resolveSecondFetch = resolve;
-      })
-    );
-
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh corp data' }));
-    expect(screen.getByText(/Nothing due: Fuel/)).toBeInTheDocument();
-
-    resolveSecondFetch(cached([]));
-    await waitFor(() => expect(mocked.loadCorporationStructures).toHaveBeenCalledTimes(2));
-    expect(screen.getByText(/Nothing due: Fuel/)).toBeInTheDocument();
+    expect(await screen.findByRole('navigation', { name: 'Corporation' })).toBeInTheDocument();
   });
 });
 
 describe('the cached data notice', () => {
   beforeEach(() => {
-    mockedAccess.mockReturnValue(
-      accessOf('ready', { canReadStructures: true, canReadMoonExtractions: true })
-    );
-    mocked.loadCorporationStructures.mockResolvedValue(cached([]));
-    mocked.loadCorporationMiningExtractions.mockResolvedValue(cached([]));
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
+    mocked.loadCorporationDivisions.mockResolvedValue(cached({ wallet: [], hangar: [] }));
+    mocked.loadCorporationWalletJournal.mockResolvedValue(cached([]));
   });
 
   it('says nothing while every read is fresh', async () => {
+    mocked.loadCorporationWallets.mockResolvedValue(cached([{ division: 1, balance: 5e9 }]));
     renderCorp();
-    await waitFor(() => expect(mocked.loadCorporationMiningExtractions).toHaveBeenCalled());
-    await waitFor(() => expect(screen.queryByRole('status', { name: 'Loading' })).toBeNull());
+    await widget('Corp wallet');
+    await waitFor(() => expect(mocked.loadCorporationWallets).toHaveBeenCalled());
     expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
   });
 
-  it('shows it, dated by the saved copy, when any one panel read is cached', async () => {
-    mocked.loadCorporationMiningExtractions.mockResolvedValue(savedCopy([]));
+  it('shows it when any one read came from the saved copy', async () => {
+    mocked.loadCorporationWallets.mockResolvedValue(savedCopy([{ division: 1, balance: 5e9 }]));
     renderCorp();
     expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
-    expect(screen.getByText('3h ago', { selector: 'p time' })).toBeInTheDocument();
-  });
-});
-
-describe('a failed read', () => {
-  it('says "couldn\'t load" for a structures read that returned nothing, never "every structure is fuelled"', async () => {
-    mockedAccess.mockReturnValue(accessOf('ready', { canReadStructures: true }));
-    mocked.loadCorporationStructures.mockResolvedValue({ cached: null, needsReauth: false });
-    renderCorp();
-    await waitFor(() => expect(screen.getAllByText("Couldn't load")).toHaveLength(2));
-    expect(screen.queryByText('Every structure is fuelled.')).not.toBeInTheDocument();
-    expect(screen.queryByText('No structure is on a timer.')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Nothing due/)).not.toBeInTheDocument();
   });
 });
 
 describe('an unknown corporation', () => {
-  /**
-   * Every corp cache key folds the corporation id in (#293). Without one there
-   * is no key to read under, and reading anyway would file rows under
-   * `corp:undefined:` — a row that would then survive a corporation change.
-   */
   it('fetches nothing at all rather than keying a cache row on undefined', async () => {
-    mockedAccess.mockReturnValue(accessOf('ready', { canReadStructures: true }));
-    mocked.loadCorporationId.mockResolvedValue(null);
+    mockedAccess.mockReturnValue(
+      accessOf('ready', { canReadStructures: true, canReadWallet: true })
+    );
+    mockedReadAccess.resolveCorpReadAccess.mockResolvedValue(null);
     renderCorp();
-    // Nothing was read, so the card says it could not load rather than "nothing due".
-    await waitFor(() => expect(screen.getAllByText("Couldn't load").length).toBeGreaterThan(0));
-    expect(screen.queryByText(/Nothing due/)).not.toBeInTheDocument();
-    expect(screen.queryByText('Every structure is fuelled.')).not.toBeInTheDocument();
+    expect(await widget('Structures')).toBeInTheDocument();
+    await waitFor(() => expect(mockedReadAccess.resolveCorpReadAccess).toHaveBeenCalled());
     expect(mocked.loadCorporationStructures).not.toHaveBeenCalled();
+    expect(mocked.loadCorporationWallets).not.toHaveBeenCalled();
   });
 });
 
-/**
- * The People half of the side rail (#345) — the panel the Directorate design
- * study always had beside Money, and which fell out of #296's scoping.
- */
-describe('the People rail (#345)', () => {
-  /** The People panel's own subtree: "Members" is also the sub-nav's tab label. */
-  function peopleRail() {
-    const panel = screen.getByRole('heading', { name: 'People' }).closest('section');
-    if (panel === null) throw new Error('the People rail rendered without a panel');
-    return within(panel);
-  }
-
-  /** A `StatChip`'s value, reached through its label — the value span is last. */
-  function statValue(label: string): string {
-    return peopleRail().getByText(label).parentElement?.lastElementChild?.textContent ?? '';
-  }
-
-  function giveDirectorARoster() {
-    mocked.loadCorporationMemberIds.mockResolvedValue(cached([1, 2, 3, 4, 5]));
-    mocked.loadCorporationMemberTracking.mockResolvedValue(
-      cached([
-        { character_id: 1, logoff_date: at(-2 * DAY) },
-        // The one member past `DARK_AFTER_DAYS`.
-        { character_id: 2, logoff_date: at(-40 * DAY) },
-        { character_id: 3, logoff_date: at(-5 * DAY) },
-        { character_id: 4, logoff_date: at(-DAY) },
-        { character_id: 5, logoff_date: at(-3 * HOUR) },
-      ])
-    );
-    // 3, 4 and 5 are new since the baseline; 9 and 10 have gone.
-    mockedRoster.readPreviousRoster.mockResolvedValue([1, 2, 9, 10]);
-  }
-
-  /**
-   * AC1/AC2: the four figures, and every one of them the number
-   * `/corp/members` prints for the same roster — same `DARK_AFTER_MS`, same
-   * `diffRoster`, and a total counted from the tracking rows the roster table
-   * lists rather than from the id list.
-   */
-  it('summarises the roster beside Money, on the roster page own figures', async () => {
-    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true, canReadWallet: true }));
-    mocked.loadCorporationWallets.mockResolvedValue(cached([{ division: 1, balance: 1_000_000 }]));
-    mocked.loadCorporationDivisions.mockResolvedValue(cached({}));
-    mocked.loadCorporationWalletJournal.mockResolvedValue(cached([]));
-    giveDirectorARoster();
-
-    renderCorp();
-
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { name: 'People' })).toBeInTheDocument()
-    );
-    // Beside Money, not instead of it.
-    expect(screen.getByText('Vitals')).toBeInTheDocument();
-    expect(statValue('Members')).toBe('5');
-    expect(statValue('Dark 30d+')).toBe('1');
-    expect(statValue('Joined')).toBe('3');
-    expect(statValue('Left')).toBe('2');
-  });
-
-  /** It answers "should I go look"; the roster page answers "at what". */
-  it('links to the roster rather than repeating it', async () => {
+describe('the roster baseline', () => {
+  it('reads it without consuming it', async () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
-    giveDirectorARoster();
-
+    mocked.loadCorporationMemberTracking.mockResolvedValue(cached([]));
+    mocked.loadCorporationMemberIds.mockResolvedValue(cached([1, 2]));
+    mockedRoster.readPreviousRoster.mockResolvedValue([1]);
     renderCorp();
-
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { name: 'People' })).toBeInTheDocument()
-    );
-    expect(peopleRail().getByRole('link', { name: 'Roster' })).toHaveAttribute(
-      'href',
-      '/corp/members'
-    );
-    // No table, no names — the rail resolved nobody.
-    expect(peopleRail().queryByRole('table')).not.toBeInTheDocument();
-  });
-
-  /**
-   * The agreement that keeps AC2 true over time.
-   *
-   * `rosterState.ts` holds what this device has already *reported*, and
-   * `/corp/members` reads and replaces it in one pass so a change is announced
-   * once. If the overview replaced it too, whichever surface was opened first
-   * would eat the change and the other would show nothing — the failure that
-   * module's note rules out for #299's poller. So the overview only asks.
-   */
-  it('reads the roster baseline without consuming it', async () => {
-    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
-    giveDirectorARoster();
-
-    renderCorp();
-
-    await waitFor(() => expect(statValue('Joined')).toBe('3'));
-    expect(mockedRoster.readPreviousRoster).toHaveBeenCalledWith(CHARACTER_ID, CORPORATION_ID);
+    await waitFor(() => expect(mockedRoster.readPreviousRoster).toHaveBeenCalled());
     expect(mockedRoster.recordRoster).not.toHaveBeenCalled();
-  });
-
-  /**
-   * AC3, the same shape as the wallet rail's own gate: no panel, and no
-   * request either — `membertracking` answers to Director alone, so an
-   * ungated read here buys a guaranteed 403.
-   */
-  it('gives a non-Director no People rail and fires no roster read', async () => {
-    mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
-    mocked.loadCorporationWallets.mockResolvedValue(cached([{ division: 1, balance: 1_000_000 }]));
-    mocked.loadCorporationDivisions.mockResolvedValue(cached({}));
-    mocked.loadCorporationWalletJournal.mockResolvedValue(cached([]));
-
-    renderCorp();
-
-    await waitFor(() => expect(screen.getByText('Vitals')).toBeInTheDocument());
-    expect(screen.queryByRole('heading', { name: 'People' })).not.toBeInTheDocument();
-    expect(mocked.loadCorporationMemberIds).not.toHaveBeenCalled();
-    expect(mocked.loadCorporationMemberTracking).not.toHaveBeenCalled();
-  });
-
-  /**
-   * The other half of AC2's no-drift rule, on the failed-read branch.
-   *
-   * Tracking fine, id list refused: `/corp/members` renders no summary at
-   * all there (`isEmptyRosterDiff`), so a confident "Joined 0 / Left 0"
-   * here would be the rail stating something it does not know. The two
-   * figures it does know still show.
-   */
-  it('drops the change figures, not the rail, when the id list cannot be read', async () => {
-    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
-    giveDirectorARoster();
-    mocked.loadCorporationMemberIds.mockResolvedValue({ cached: null, needsReauth: false });
-
-    renderCorp();
-
-    await waitFor(() => expect(statValue('Members')).toBe('5'));
-    expect(statValue('Dark 30d+')).toBe('1');
-    expect(peopleRail().queryByText('Joined')).not.toBeInTheDocument();
-    expect(peopleRail().queryByText('Left')).not.toBeInTheDocument();
-    // The baseline is still not consumed on the failed branch either.
-    expect(mockedRoster.recordRoster).not.toHaveBeenCalled();
-  });
-
-  /**
-   * A tracking read that produced nothing is "could not read", not "a
-   * corporation of zero people" — the `null`-never-`[]` rule the rest of this
-   * route already follows. A 403 lands here, swallowed by
-   * `detectCorpAuthFailure` inside the loader, and must not become a rail
-   * confidently reporting no members.
-   */
-  it('hides the rail when the roster could not be read at all', async () => {
-    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
-    mocked.loadCorporationMemberIds.mockResolvedValue({ cached: null, needsReauth: false });
-    mocked.loadCorporationMemberTracking.mockResolvedValue({ cached: null, needsReauth: false });
-
-    renderCorp();
-
-    await waitFor(() => expect(mocked.loadCorporationMemberTracking).toHaveBeenCalled());
-    expect(screen.queryByRole('heading', { name: 'People' })).not.toBeInTheDocument();
   });
 });

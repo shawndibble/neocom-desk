@@ -37,9 +37,10 @@ export async function loadStructuresBoardData(characterId: number): Promise<Stru
 /** The Calendar's moon read, as-is: it already gates, names refineries and picks arrival or decay. */
 export async function loadMoonChunksBoardData(characterId: number): Promise<MoonChunksBoardData> {
   const loadedAt = Date.now();
-  const { result, sources } = await loadMoonChunks(characterId, loadedAt);
+  const { result, sources, extractions } = await loadMoonChunks(characterId, loadedAt);
   return {
     chunks: sources ?? null,
+    extractions,
     needsReauth: result.needsReauth,
     fetchedAt: result.cached?.fetchedAt ?? null,
     loadedAt,

@@ -1,0 +1,80 @@
+/**
+ * The Corp overview as a widget board: which kinds it offers, which the
+ * Character may see, and the layout it opens with.
+ *
+ * Pure (no React, Dexie or fetch). The route hands `corpWidgetBoard` the
+ * capabilities `useCorpRouteGate` resolved, so the gate that decides what is
+ * fetched also decides what is drawn and offered: a widget whose capability
+ * is not held is never shown, never fetched and never offered in the Gallery
+ * (corp UI hides rather than locks).
+ */
+import type { CorpCapabilities } from '@/engine/corpRoles';
+import type { WidgetBoard } from '@/features/overview/widgets/board';
+import {
+  boardKinds,
+  CORP_KIND_CATEGORIES,
+  getKind,
+  isAddable,
+  kindOpenTo,
+  type WidgetKindDef,
+  type WidgetKindId,
+} from '@/features/overview/widgets/kinds';
+import {
+  MAX_WIDGETS,
+  newWidget,
+  type MakeId,
+  type OverviewLayout,
+  type Widget,
+} from '@/features/overview/widgets/layout';
+
+/**
+ * The layout a Corp overview opens with, before the pilot changes anything:
+ * the old board's order (when, then money, then people), then the two reads it
+ * never had. Each kind the Character cannot read is left out.
+ */
+export const CORP_DEFAULT_KINDS: readonly WidgetKindId[] = [
+  'corpDeadlines',
+  'structures',
+  'moonChunks',
+  'corpJobs',
+  'corpServices',
+  'corpWallet',
+  'corpCashFlow',
+  'corpMembers',
+  'corpInactive',
+  'corpIncome',
+  'corpMining',
+];
+
+function seqId(prefix: string): MakeId {
+  let n = 0;
+  return () => `${prefix}${++n}`;
+}
+
+export function corpDefaultLayout(
+  capabilities: CorpCapabilities,
+  makeId: MakeId = seqId('c')
+): OverviewLayout {
+  const widgets: Widget[] = [];
+  for (const id of CORP_DEFAULT_KINDS) {
+    const kind = getKind(id);
+    if (!kind || !isAddable(id) || !kindOpenTo(kind, capabilities)) continue;
+    if (widgets.length >= MAX_WIDGETS) break;
+    const widget = newWidget(id, makeId());
+    if (widget) widgets.push(widget);
+  }
+  return { version: 1, widgets };
+}
+
+const CORP_KINDS = boardKinds('corp');
+
+export function corpWidgetBoard(capabilities: CorpCapabilities): WidgetBoard {
+  return {
+    id: 'corp',
+    kinds: CORP_KINDS,
+    categories: CORP_KIND_CATEGORIES,
+    canDraw: (kind: WidgetKindDef) => kindOpenTo(kind, capabilities),
+    characterScope: false,
+    defaultLayout: (makeId) => corpDefaultLayout(capabilities, makeId),
+  };
+}

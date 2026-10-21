@@ -12,14 +12,12 @@ import type {
   CorporationIndustryJob,
   CorporationMiningExtraction,
   CorporationStructure,
-  WalletJournalEntry,
 } from '@/esi/endpoints';
 import type {
   BoardExtractionSource,
   BoardJobSource,
   BoardStructureSource,
 } from '@/engine/corp/board';
-import type { VitalsJournalEntry } from '@/engine/corp/vitals';
 import { parseInstant } from '@/engine/esiInstant';
 
 /**
@@ -143,20 +141,6 @@ export function jobTypeIds(jobs: readonly CorporationIndustryJob[]): number[] {
     ids.add(job.blueprint_type_id);
   }
   return [...ids];
-}
-
-/** The wallet journal, reduced to the two fields the vitals rail's rates need. */
-export function toVitalsJournal(entries: readonly WalletJournalEntry[]): VitalsJournalEntry[] {
-  const reduced: VitalsJournalEntry[] = [];
-  for (const entry of entries) {
-    const atMs = parseInstant(entry.date);
-    // `amount` is optional on the ESI schema (a journal line can be purely
-    // informational). A line with no amount moves no ISK, so it contributes
-    // nothing to a net or a burn rate.
-    if (atMs === null || entry.amount === undefined) continue;
-    reduced.push({ atMs, amount: entry.amount });
-  }
-  return reduced;
 }
 
 // The wallet-division join — balances from `/wallets`, names from `/divisions`
