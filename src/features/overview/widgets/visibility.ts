@@ -5,18 +5,24 @@
  * only count what is on screen), so a widget hidden on a phone contributes
  * neither a tile nor a clock.
  */
-import { getKind } from './kinds';
+import { getKind, type WidgetKindDef } from './kinds';
 import type { Widget } from './layout';
 
 /**
  * Widgets this build can draw: a kind a newer build wrote is kept in the
  * stored layout (so it survives here) but is not drawn. On a phone, widgets
- * set to Hide on phone are left out too.
+ * set to Hide on phone are left out too, and `canDraw` (the board's: the Corp
+ * overview's capability gate) leaves out kinds this Character may not see.
  */
-export function visibleWidgets(widgets: readonly Widget[], isPhone: boolean): Widget[] {
-  return widgets.filter(
-    (widget) => getKind(widget.kind) !== undefined && (!isPhone || widget.showOnPhone)
-  );
+export function visibleWidgets(
+  widgets: readonly Widget[],
+  isPhone: boolean,
+  canDraw: (kind: WidgetKindDef) => boolean = () => true
+): Widget[] {
+  return widgets.filter((widget) => {
+    const kind = getKind(widget.kind);
+    return kind !== undefined && canDraw(kind) && (!isPhone || widget.showOnPhone);
+  });
 }
 
 /** Each kind once, in first-seen order. */

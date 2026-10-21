@@ -284,6 +284,38 @@ across Characters · whether other alert types than danger raise the banner.
   `null` after hydration. Returning pilots with old hidden/order keys are
   migrated.
 
+## 13. Corp overview board
+
+`/corp` is the same engine on a second board (decision
+`docs/context/decisions/20261020-201817-corp-overview-is-a-widget-grid-the-pilot.md`).
+A `WidgetBoard` context (`widgets/board.ts`) carries what differs; the grid,
+Customize, Gallery, menu and phone list are shared.
+
+- **One catalogue.** One global kind table; corp-only ids start with `corp`.
+  Each kind lists the boards it is on; Structures and Moon extractions are on
+  both. Corp kinds carry `capabilities` (any one opens it) and sit in the corp
+  Gallery groups `CORP_KIND_CATEGORIES` (Clocks, Money, People, Industry, Ops).
+- **One layout per pilot**, `sync.corpOverviewLayout`; not per corporation or
+  Character.
+- **No Role chooser, no first-run prompt.** Until the pilot edits, the page
+  draws `corpDefaultLayout(capabilities)` and never saves it: saving would
+  freeze one Character's roles into every device's layout. Reset rebuilds it.
+- **Hide, don't lock.** A kind whose capability the Character lacks is not
+  offered, drawn or fetched (`canDraw`); a saved one stays in the layout, undrawn.
+  Coming-soon kinds are listed for everyone, not addable.
+- **No Character scope menu** (`characterScope: false`): corp data belongs to
+  one corporation.
+- **Gated reads.** Each corp loader calls `resolveCorpReadAccess` before it
+  fetches. Unreadable (no role, or a lapsed grant), failed (Retry) and empty
+  stay distinct.
+- **Hourly cache.** No countdown shorter than the 1 h corp cache window; the
+  data-age popover carries the note.
+- **No Show info links** from rows; tables link rows to pages.
+- **Coming soon (nine):** Starbases, Customs offices, Corp orders, Role audit,
+  Doctrine, Kills, Contracts, SRP, Projects. They need new scopes or app-owned
+  data and are separate tickets; any new corp scope must be additive
+  (`ADDITIVE_CORP_CAPABILITIES`).
+
 ## Appendix A. Default view and size per kind
 
 The owner's rule: not every widget opens as a Number. A kind opens in the view

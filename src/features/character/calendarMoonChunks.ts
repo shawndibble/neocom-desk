@@ -24,6 +24,7 @@ import {
 import { structureName, toBoardExtractions } from '@/features/corp/boardSources';
 import { resolveCorpReadAccess } from '@/features/corp/corpReadAccess';
 import type { BoardClockSource } from '@/engine/character/board';
+import type { BoardExtractionSource } from '@/engine/corp/board';
 import { toMoonChunkSources } from './calendarBoardSources';
 
 export interface MoonChunkRead {
@@ -31,6 +32,10 @@ export interface MoonChunkRead {
   result: StatusResult<unknown[]>;
   /** `undefined` when the Character may not read extractions, so the kind is not readable. */
   sources: BoardClockSource[] | undefined;
+  /** The same extractions before a clock was picked, for the corp board's own ranking. */
+  extractions?: BoardExtractionSource[];
+  /** The read was allowed and came back with nothing: an outage, not a role gap. */
+  failed?: boolean;
 }
 
 const NOT_READABLE: MoonChunkRead = {
@@ -48,7 +53,9 @@ export async function loadMoonChunks(characterId: number, nowMs: number): Promis
     loadCorporationMiningExtractions(characterId, corporationId),
     canNameRefineries ? loadCorporationStructures(characterId, corporationId) : undefined,
   ]);
-  if (extractions.cached === null) return { result: extractions, sources: undefined };
+  if (extractions.cached === null) {
+    return { result: extractions, sources: undefined, failed: !extractions.needsReauth };
+  }
 
   const names = new Map<number, string>(
     (structures?.cached?.data ?? []).map((structure: CorporationStructure) => [
@@ -56,8 +63,10 @@ export async function loadMoonChunks(characterId: number, nowMs: number): Promis
       structureName(structure),
     ])
   );
+  const board = toBoardExtractions(extractions.cached.data, names);
   return {
     result: extractions,
-    sources: toMoonChunkSources(toBoardExtractions(extractions.cached.data, names), nowMs),
+    sources: toMoonChunkSources(board, nowMs),
+    extractions: board,
   };
 }

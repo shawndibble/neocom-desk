@@ -108,10 +108,10 @@ export function loadCorporationMiningExtractions(
 }
 
 /**
- * The division the vitals rail reads a journal from.
+ * The division whose journal the Corp overview's money widgets read: the master wallet.
  *
  * ESI publishes no all-divisions journal and the seven are separately
- * role-gated, so the rail's net and runway can only ever describe one wallet.
+ * role-gated, so net and runway can only ever describe one wallet.
  * The master is the one every Accountant can see, and the one office rent and
  * fuel purchases actually clear through.
  */

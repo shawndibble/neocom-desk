@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { ESI_REGISTRY } from '@/esi/registry';
-import { KIND_CATEGORIES, WIDGET_KINDS, getKind, isAddable, type WidgetKindDef } from './kinds';
+import {
+  CORP_KIND_CATEGORIES,
+  KIND_CATEGORIES,
+  WIDGET_KINDS,
+  boardKinds,
+  getKind,
+  isAddable,
+  kindOpenTo,
+  type WidgetKindDef,
+} from './kinds';
+import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
 
 const ALL_IDS = [
   'training',
@@ -35,9 +45,91 @@ const ALL_IDS = [
   'mail',
 ];
 
+const CORP_IDS = [
+  'structures',
+  'moonChunks',
+  'corpDeadlines',
+  'corpServices',
+  'corpStarbases',
+  'corpCustomsOffices',
+  'corpWallet',
+  'corpCashFlow',
+  'corpIncome',
+  'corpOrders',
+  'corpMembers',
+  'corpInactive',
+  'corpRoleAudit',
+  'corpDoctrine',
+  'corpJobs',
+  'corpMining',
+  'corpKills',
+  'corpContracts',
+  'corpSrp',
+  'corpProjects',
+];
+
+const CORP_SOON = [
+  'corpStarbases',
+  'corpCustomsOffices',
+  'corpOrders',
+  'corpRoleAudit',
+  'corpDoctrine',
+  'corpKills',
+  'corpContracts',
+  'corpSrp',
+  'corpProjects',
+];
+
+const overviewKinds = () => boardKinds('overview');
+
 describe('widget kind catalogue', () => {
-  it('holds exactly the 30 kinds the mockups define', () => {
-    expect(WIDGET_KINDS.map((k) => k.id).sort()).toEqual([...ALL_IDS].sort());
+  it('offers the Overview exactly the 30 kinds the mockups define', () => {
+    expect(
+      overviewKinds()
+        .map((k) => k.id)
+        .sort()
+    ).toEqual([...ALL_IDS].sort());
+  });
+
+  it('offers the Corp overview its corp kinds, structures and moon chunks among them', () => {
+    expect(boardKinds('corp').map((k) => k.id)).toEqual(CORP_IDS);
+  });
+
+  it('puts every kind on at least one board, and every corp kind in a corp group', () => {
+    for (const k of WIDGET_KINDS) {
+      expect(Object.keys(k.boards).length, k.id).toBeGreaterThan(0);
+      if (k.boards.corp) expect(CORP_KIND_CATEGORIES, k.id).toContain(k.boards.corp);
+    }
+  });
+
+  it('never reuses a character kind id for a corp-only kind', () => {
+    for (const k of boardKinds('corp')) {
+      if (k.boards.overview === undefined) expect(k.id, k.id).toMatch(/^corp[A-Z]/);
+    }
+  });
+
+  it('gates every available corp kind on a capability, and only corp kinds', () => {
+    for (const k of boardKinds('corp')) {
+      if (k.availability === 'available') expect(k.capabilities.length, k.id).toBeGreaterThan(0);
+    }
+    for (const k of overviewKinds()) {
+      if (k.boards.corp === undefined) expect(k.capabilities, k.id).toEqual([]);
+    }
+  });
+
+  it('opens a kind to any one of its capabilities, and hides it with none', () => {
+    const deadlines = getKind('corpDeadlines')!;
+    expect(kindOpenTo(deadlines, NO_CORP_CAPABILITIES)).toBe(false);
+    expect(kindOpenTo(deadlines, null)).toBe(false);
+    expect(kindOpenTo(deadlines, { ...NO_CORP_CAPABILITIES, canReadIndustry: true })).toBe(true);
+    expect(kindOpenTo(getKind('wallet')!, null)).toBe(true);
+  });
+
+  it('marks the corp kinds with no data source yet as coming soon', () => {
+    const soon = boardKinds('corp')
+      .filter((k) => k.availability === 'comingSoon')
+      .map((k) => k.id);
+    expect(soon).toEqual(CORP_SOON);
   });
 
   it('has unique ids', () => {
@@ -60,11 +152,20 @@ describe('widget kind catalogue', () => {
     expect(KIND_CATEGORIES).toHaveLength(6);
     for (const c of KIND_CATEGORIES) {
       expect(
-        WIDGET_KINDS.some((k) => k.category === c),
+        overviewKinds().some((k) => k.boards.overview === c),
         c
       ).toBe(true);
     }
-    for (const k of WIDGET_KINDS) expect(KIND_CATEGORIES, k.id).toContain(k.category);
+    for (const k of overviewKinds()) expect(KIND_CATEGORIES, k.id).toContain(k.category);
+  });
+
+  it('uses every one of the corp groups', () => {
+    for (const c of CORP_KIND_CATEGORIES) {
+      expect(
+        boardKinds('corp').some((k) => k.boards.corp === c),
+        c
+      ).toBe(true);
+    }
   });
 
   it('derives i18n keys from the id', () => {
@@ -137,8 +238,10 @@ describe('widget kind catalogue', () => {
     }
   });
 
-  it('marks no kind as coming soon: every kind is available', () => {
-    const soon = WIDGET_KINDS.filter((k) => k.availability === 'comingSoon').map((k) => k.id);
+  it('marks no Overview kind as coming soon: every one is available', () => {
+    const soon = overviewKinds()
+      .filter((k) => k.availability === 'comingSoon')
+      .map((k) => k.id);
     expect(soon).toEqual([]);
     expect(isAddable('wallet')).toBe(true);
     expect(isAddable('routeSafety')).toBe(true);
@@ -149,6 +252,9 @@ describe('widget kind catalogue', () => {
   it('gives a range only to the kinds that read a time window', () => {
     const ranged = WIDGET_KINDS.filter((k: WidgetKindDef) => k.hasRange).map((k) => k.id);
     expect(ranged.sort()).toEqual([
+      'corpCashFlow',
+      'corpIncome',
+      'corpMining',
       'kills',
       'miningYield',
       'omega',
