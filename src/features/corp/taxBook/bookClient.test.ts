@@ -23,10 +23,10 @@ describe('reclaimBook', () => {
   it('sends only the access token to reclaimCorpTaxBookCallable and returns officersRevoked', async () => {
     expect(await reclaimBook(7, 98000001)).toEqual({ officersRevoked: 3 });
     expect(token).toHaveBeenCalledWith(7);
-    expect(fns.httpsCallable).toHaveBeenCalledWith('functions', 'reclaimCorpTaxBookCallable');
+    expect(fns.httpsCallable).toHaveBeenCalledWith('functions', 'corpTaxBookCall');
     expect(fns.callable).toHaveBeenCalledWith({
-      corporationId: 98000001,
-      accessToken: 'access-token',
+      action: 'reclaimCorpTaxBookCallable',
+      data: { corporationId: 98000001, accessToken: 'access-token' },
     });
   });
 });

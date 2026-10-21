@@ -24,43 +24,38 @@ beforeEach(() => {
 describe('owner actions', () => {
   it('sets an agreed rate with the access token', async () => {
     await setFeederRate(7, 100, 200, 6.5);
-    expect(fns.httpsCallable).toHaveBeenCalledWith('functions', 'setCorpTaxBookFeederRateCallable');
+    expect(fns.httpsCallable).toHaveBeenCalledWith('functions', 'corpTaxBookCall');
     expect(fns.callable).toHaveBeenCalledWith({
-      corporationId: 100,
-      accessToken: 'tok',
-      feederCorporationId: 200,
-      pct: 6.5,
+      action: 'setCorpTaxBookFeederRateCallable',
+      data: { corporationId: 100, accessToken: 'tok', feederCorporationId: 200, pct: 6.5 },
     });
   });
 
   it('sets the mode and sends a note only when it has text', async () => {
     await setFeederMode(7, 100, 200, 'settled-otherwise', 'paid by hand');
     expect(fns.callable).toHaveBeenLastCalledWith({
-      corporationId: 100,
-      accessToken: 'tok',
-      feederCorporationId: 200,
-      mode: 'settled-otherwise',
-      note: 'paid by hand',
+      action: 'setCorpTaxBookFeederModeCallable',
+      data: {
+        corporationId: 100,
+        accessToken: 'tok',
+        feederCorporationId: 200,
+        mode: 'settled-otherwise',
+        note: 'paid by hand',
+      },
     });
     await setFeederMode(7, 100, 200, 'normal', '  ');
     expect(fns.callable).toHaveBeenLastCalledWith({
-      corporationId: 100,
-      accessToken: 'tok',
-      feederCorporationId: 200,
-      mode: 'normal',
+      action: 'setCorpTaxBookFeederModeCallable',
+      data: { corporationId: 100, accessToken: 'tok', feederCorporationId: 200, mode: 'normal' },
     });
   });
 
   it('revokes an invite by id', async () => {
     await revokeFeederInvite(7, 100, 'a'.repeat(64));
-    expect(fns.httpsCallable).toHaveBeenCalledWith(
-      'functions',
-      'revokeCorpTaxBookFeederInviteCallable'
-    );
+    expect(fns.httpsCallable).toHaveBeenCalledWith('functions', 'corpTaxBookCall');
     expect(fns.callable).toHaveBeenCalledWith({
-      corporationId: 100,
-      accessToken: 'tok',
-      inviteId: 'a'.repeat(64),
+      action: 'revokeCorpTaxBookFeederInviteCallable',
+      data: { corporationId: 100, accessToken: 'tok', inviteId: 'a'.repeat(64) },
     });
   });
 
@@ -68,11 +63,11 @@ describe('owner actions', () => {
     const invites = [{ inviteId: 'x', createdBy: 1, createdAt: 2 }];
     fns.callable.mockResolvedValue({ data: { invites } });
     expect(await listFeederInvites(7, 100)).toEqual(invites);
-    expect(fns.httpsCallable).toHaveBeenCalledWith(
-      'functions',
-      'listCorpTaxBookFeederInvitesCallable'
-    );
-    expect(fns.callable).toHaveBeenCalledWith({ corporationId: 100 });
+    expect(fns.httpsCallable).toHaveBeenCalledWith('functions', 'corpTaxBookCall');
+    expect(fns.callable).toHaveBeenCalledWith({
+      action: 'listCorpTaxBookFeederInvitesCallable',
+      data: { corporationId: 100 },
+    });
   });
 });
 
