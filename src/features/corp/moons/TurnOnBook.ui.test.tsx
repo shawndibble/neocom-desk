@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { configureClipboard } from '@/lib/clipboard';
 import type { OfficerVerdict } from '../taxBook/bookClient';
 import { TurnOnBook } from './TurnOnBook';
 
@@ -38,10 +39,27 @@ describe('TurnOnBook collecting for others', () => {
     );
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Turn the book on' }));
-    await screen.findByRole('alert');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'That did not go through. Try again.'
+    );
     await user.click(screen.getByRole('button', { name: 'Turn the book on' }));
     expect(await screen.findByDisplayValue(/abc123DEF456/)).toBeInTheDocument();
     expect(turnOnBook).toHaveBeenCalledTimes(1);
     expect(createFeederInvite).toHaveBeenCalledTimes(2);
+  });
+
+  it('copies the new link', async () => {
+    const copied = vi.fn().mockResolvedValue(undefined);
+    configureClipboard(copied);
+    createFeederInvite.mockResolvedValueOnce({ code: 'abc123DEF456', inviteId: 'i' });
+    render(
+      <TurnOnBook collect characterId={7} corporationId={98} verdict={verdict} onDone={vi.fn()} />
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Turn the book on' }));
+    await user.click(await screen.findByRole('button', { name: 'Copy link' }));
+    expect(copied).toHaveBeenCalledWith(expect.stringContaining('invite=abc123DEF456'));
+    expect(screen.getByRole('button', { name: 'Copied' })).toBeInTheDocument();
+    configureClipboard(null);
   });
 });

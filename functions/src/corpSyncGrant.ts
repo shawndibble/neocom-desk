@@ -19,7 +19,6 @@ import { decryptRefreshToken, encryptRefreshToken, rotateStoredToken } from './a
 import { boundedString, record } from './communities.js';
 import { CORP_SYNC_SCOPES } from './corpSyncScopes.js';
 import {
-  FEEDERS,
   FEEDER_OF_COLLECTION,
   META,
   decideRoles,
@@ -31,6 +30,8 @@ import {
   appendAudit,
   authorizeOfficer,
   bookRef,
+  fail,
+  feederRef,
   type Actor,
   type BookDeps,
   type Caller,
@@ -112,6 +113,11 @@ export interface CorpSyncDeps {
   readIdentity: IdentityReader;
   /** Prices the moon owner's view, rebuilt after each ledger read (issue #4512). */
   openPrices?: OpenPricesReader;
+  /**
+   * ESI for a moon owner's last ledger read before its grant is dropped (Leave, a removal
+   * taking effect). Without it the feed ends on the last scheduled read.
+   */
+  esi?: SyncEsi;
   /** Receives only messages and ids — never a token. */
   log: (message: string, data?: Record<string, unknown>) => void;
 }
@@ -130,14 +136,6 @@ const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
   readIdentity: deps.readIdentity,
   ...(deps.openPrices ? { openPrices: deps.openPrices } : {}),
 });
-
-function fail(
-  code: ConstructorParameters<typeof HttpsError>[0],
-  message: string,
-  reason: string
-): never {
-  throw new HttpsError(code, message, { reason });
-}
 
 function sameScopes(scopes: readonly string[]): boolean {
   return (
@@ -515,10 +513,7 @@ async function runFeederSyncs(
   )) {
     try {
       const record = (
-        await bookRef(deps.db, collectorCorporationId)
-          .collection(FEEDERS)
-          .doc(String(feederCorporationId))
-          .get()
+        await feederRef(deps.db, collectorCorporationId, feederCorporationId).get()
       ).data() as FeederRecord | undefined;
       if (!record || !READABLE_FEEDER_STATUSES.includes(record.status)) continue;
       if (!first) await sleep(options.gapMs ?? FEEDER_GAP_MS);
@@ -573,15 +568,17 @@ export async function syncOneFeeder(
     budget = false,
     grant?: CorpSyncGrantDoc
   ): Promise<FeederRunResult> => {
-    const status = await recordFeederRead(
+    const recorded = await recordFeederRead(
       bookDeps(deps),
       collectorCorporationId,
       feederCorporationId,
       read
     );
-    if (status !== null) {
+    // A skip, or another refusal in a spell already stale, moved nothing the view shows.
+    if (recorded?.viewChanged) {
       await tryRebuildFeederView(bookDeps(deps), collectorCorporationId, feederCorporationId);
     }
+    const status = recorded?.status ?? null;
     // At 30 days stale the feeder disconnects; its token has no further use.
     if (status === 'disconnected' && grant) await dropFeederGrant(deps, grant);
     return { outcome: read.outcome, status, budget };
@@ -626,10 +623,7 @@ export async function syncOneFeeder(
   const latest = (await grantRef(deps.db, feederCorporationId).get()).data() as
     CorpSyncGrantDoc | undefined;
   const feederNow = (
-    await bookRef(deps.db, collectorCorporationId)
-      .collection(FEEDERS)
-      .doc(String(feederCorporationId))
-      .get()
+    await feederRef(deps.db, collectorCorporationId, feederCorporationId).get()
   ).data() as FeederRecord | undefined;
   if (
     latest?.encryptedRefreshToken !== live.encryptedRefreshToken ||
@@ -696,16 +690,51 @@ async function refreshGrant(deps: CorpSyncDeps, grant: CorpSyncGrantDoc): Promis
   const written = await deps.db.runTransaction(async (tx) => {
     const ref = grantRef(deps.db, grant.corporationId);
     const latest = (await tx.get(ref)).data() as CorpSyncGrantDoc | undefined;
-    if (latest?.encryptedRefreshToken !== grant.encryptedRefreshToken) return false;
+    if (latest?.encryptedRefreshToken !== grant.encryptedRefreshToken) return latest ?? null;
     tx.update(ref, { encryptedRefreshToken: rotated });
     return true;
   });
-  if (!written) return { kind: 'skip' };
+  if (written !== true) {
+    // A re-grant, revoke or leave replaced the grant mid-refresh: the rotated token is live at
+    // SSO and stored nowhere, so it goes too, unless the grant now holds that very token.
+    await revokeUnlessHeld(deps, grant, tokens.refreshToken, written ?? undefined);
+    return { kind: 'skip' };
+  }
   return {
     kind: 'ok',
     accessToken: tokens.accessToken,
     grant: { ...grant, encryptedRefreshToken: rotated },
   };
+}
+
+/** Revoke `token` at SSO unless `held` stores it (best effort; never logs the token). */
+async function revokeUnlessHeld(
+  deps: CorpSyncDeps,
+  grant: CorpSyncGrantDoc,
+  token: string,
+  held: CorpSyncGrantDoc | undefined
+): Promise<void> {
+  if (held) {
+    try {
+      const stored = decryptRefreshToken(
+        held.encryptedRefreshToken,
+        held.characterId,
+        deps.key(),
+        PURPOSE
+      );
+      if (stored === token) return;
+    } catch {
+      // Unreadable: it cannot be this token.
+    }
+  }
+  try {
+    await deps.revoke(grant.clientId, token);
+  } catch (err) {
+    deps.log('Corp sync grant token revoke failed', {
+      corporationId: grant.corporationId,
+      error: err instanceof Error ? err.message : 'unknown',
+    });
+  }
 }
 
 async function runOne(

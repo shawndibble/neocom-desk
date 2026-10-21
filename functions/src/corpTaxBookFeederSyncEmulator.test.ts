@@ -25,6 +25,10 @@ const suite = runnable ? describe : describe.skip;
 let db: Firestore;
 let now = T0;
 const dead = new Set<string>();
+/** SSO hands back the next token (`rt-H-n` → `rt-H-n+1`) instead of the same one. */
+let rotate = false;
+/** Runs while SSO is redeeming a token: a re-grant or a concurrent run landing mid-refresh. */
+let duringRefresh: (() => Promise<void>) | undefined;
 const revokedAtSso: string[] = [];
 
 const ok = <T>(data: T): EsiRead<T> => ({
@@ -36,7 +40,7 @@ const ok = <T>(data: T): EsiRead<T> => ({
 
 interface FakeEsi {
   /** Per feeder corporation: how its ledger answers. Default `ok`. */
-  mode: Map<number, 'ok' | 'forbidden' | 'throw'>;
+  mode: Map<number, 'ok' | 'forbidden' | 'throw' | 'unavailable'>;
   calls: string[];
 }
 let esiState: FakeEsi;
@@ -46,6 +50,7 @@ const fakeEsi = (): SyncEsi => ({
     esiState.calls.push(`observers:${corp}`);
     const mode = esiState.mode.get(corp) ?? 'ok';
     if (mode === 'throw') throw new Error('boom');
+    if (mode === 'unavailable') return { kind: 'unavailable' };
     return mode === 'forbidden' ? { kind: 'forbidden' } : ok([corp * 10]);
   },
   ledger: async (corp) => {
@@ -77,7 +82,9 @@ const syncDeps = (): CorpSyncDeps => ({
   refresh: async (_clientId, refreshToken) => {
     const match = /^rt-(\d+)-(\d+)$/.exec(refreshToken);
     if (!match || dead.has(refreshToken)) throw new SsoRefreshError(400, true);
-    return { accessToken: `at-${match[1]}`, refreshToken };
+    await duringRefresh?.();
+    const next = rotate ? `rt-${match[1]}-${Number(match[2]) + 1}` : refreshToken;
+    return { accessToken: `at-${match[1]}`, refreshToken: next };
   },
   revoke: async (_clientId, refreshToken) => {
     revokedAtSso.push(refreshToken);
@@ -153,6 +160,8 @@ suite('scheduled feeder pass (emulator)', () => {
     await clearEmulator();
     now = T0;
     dead.clear();
+    rotate = false;
+    duringRefresh = undefined;
     revokedAtSso.length = 0;
     esiState = { mode: new Map(), calls: [] };
     await collectorBook().set({
@@ -322,6 +331,75 @@ suite('scheduled feeder pass (emulator)', () => {
         lastSyncResult: { outcome: 'skipped', reason: 'esi-backoff' },
       });
     }
+  });
+
+  it('revokes a rotated token it could not store because a re-grant replaced the grant (S5)', async () => {
+    await addFeeder(98000002);
+    rotate = true;
+    duringRefresh = async () => {
+      const grant = (await grantDoc(98000002)) as CorpSyncGrantDoc;
+      await db
+        .collection(CORP_SYNC_GRANTS_COLLECTION)
+        .doc('98000002')
+        .set({
+          ...grant,
+          encryptedRefreshToken: encryptRefreshToken(
+            'rt-98001002-7',
+            98001002,
+            KEY,
+            'corpSyncGrant'
+          ),
+        });
+    };
+    await run();
+    // The rotated token is live at SSO and stored nowhere: it goes.
+    expect(revokedAtSso).toEqual(['rt-98001002-1']);
+  });
+
+  it('never revokes a rotated token the grant now holds (a concurrent run stored it)', async () => {
+    await addFeeder(98000002);
+    rotate = true;
+    duringRefresh = async () => {
+      const grant = (await grantDoc(98000002)) as CorpSyncGrantDoc;
+      await db
+        .collection(CORP_SYNC_GRANTS_COLLECTION)
+        .doc('98000002')
+        .set({
+          ...grant,
+          encryptedRefreshToken: encryptRefreshToken(
+            'rt-98001002-1',
+            98001002,
+            KEY,
+            'corpSyncGrant'
+          ),
+        });
+    };
+    await run();
+    expect(revokedAtSso).toEqual([]);
+  });
+
+  it('rebuilds the view only when a read moved something it shows (B5)', async () => {
+    await addFeeder(98000002);
+    const coverage = collectorBook().collection('feederCoverage').doc('98000002');
+    await run();
+    expect((await coverage.get()).exists).toBe(true);
+
+    // A skip moves nothing the view shows.
+    await coverage.delete();
+    esiState.mode.set(98000002, 'unavailable');
+    now += 6 * 3_600_000;
+    await run();
+    expect((await coverage.get()).exists).toBe(false);
+
+    // The first refusal starts a stale spell: rebuilt. The next one in the same spell: not.
+    esiState.mode.set(98000002, 'forbidden');
+    now += 6 * 3_600_000;
+    await run();
+    expect((await coverage.get()).exists).toBe(true);
+    await coverage.delete();
+    now += 6 * 3_600_000;
+    await run();
+    expect((await coverage.get()).exists).toBe(false);
   });
 
   it('runs a feeder after the books, and a book with no grant is unaffected', async () => {

@@ -6,8 +6,6 @@ export interface CoveragePeriod {
   to?: string;
 }
 
-export type FeederStatus = 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
-
 export function isDayCovered(periods: readonly CoveragePeriod[], day: string): boolean {
   return periods.some((p) => day >= p.from && (p.to === undefined || day <= p.to));
 }

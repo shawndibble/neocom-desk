@@ -4,6 +4,7 @@ import { TextInput } from '@/components/ui';
 import { loadSurvey } from '@/features/survey/surveyStore';
 import { useCurrentSurveyId } from '@/features/survey/surveyPref';
 import { DialogShell, Effect, Label } from './BookDialogs';
+import { refusal } from './feederErrorText';
 import { parseSurveyRef } from './surveyRef';
 import { useBook } from './useBook';
 
@@ -35,7 +36,7 @@ export function LinkSurveyDialog({
       canConfirm={id !== null}
       run={async () => {
         const survey = await loadSurvey(id!);
-        if (!survey.ok) throw new Error(t('corpTaxBook.moons.moon.link.notFound'));
+        if (!survey.ok) throw refusal('survey-not-found');
         await edit({ action: 'linkSurvey', extractionId, surveyId: id });
       }}
     >

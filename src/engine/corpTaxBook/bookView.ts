@@ -15,9 +15,9 @@ import {
   type TaxPayment,
 } from './allocation';
 import { lastBillableDate } from './billable';
-import { withholdUnreadFeederDays, type FeederReadClock } from './feederHealth';
+import { splitByCoverageAndRead, type FeederReadClock } from './feederHealth';
 import { buildDayCharges, type DayCharge, type Miner } from './charges';
-import { splitByCoverage, type FeederCoverage } from './coverage';
+import type { FeederCoverage } from './coverage';
 import { activeDismissalFor, type Dismissal } from './dismissals';
 import {
   chunkRateFor,
@@ -269,12 +269,7 @@ function frozenDay(lines: readonly StatementLine[], charge: DayCharge) {
 export function buildBookView(input: BookViewInput): BookView {
   const placeOf = placeOfFactory(input.extractions, input.structureExpiryHours);
   // Coverage first: a moon owner's day outside it owes nothing, so it never holds a miner's day.
-  const { covered, outsideCoverage } = splitByCoverage(
-    input.entries,
-    input.corporationId,
-    input.feeders ?? []
-  );
-  const entries = withholdUnreadFeederDays(covered, {
+  const { readable: entries, outsideCoverage } = splitByCoverageAndRead(input.entries, {
     now: input.now,
     graceHours: input.graceHours,
     bookCorporationId: input.corporationId,

@@ -9,15 +9,14 @@
 
 import { randomBytes } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
-import { HttpsError, type FunctionsErrorCode } from 'firebase-functions/v2/https';
+import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
 import {
-  FEEDERS,
   FEEDER_OF_COLLECTION,
   OFFICERS,
   REMOVAL_LINKS_COLLECTION,
-  parseBookCall,
-  type BookCall,
+  parseFeederTarget,
+  type FeederTargetCall,
 } from './corpTaxBook.js';
 import {
   REMOVAL_WAIT_MS,
@@ -39,6 +38,8 @@ import {
   appendAudit,
   authorizeOfficer,
   bookRef,
+  fail,
+  feederRef,
   type BookDeps,
   type Caller,
 } from './corpTaxBookStore.js';
@@ -53,10 +54,6 @@ const LINK_SLACK_MS = 24 * 3_600_000;
  */
 const LINK_TTL_MS = REMOVAL_WAIT_MS + LINK_SLACK_MS;
 
-function fail(code: FunctionsErrorCode, message: string, reason: string): never {
-  throw new HttpsError(code, message, { reason });
-}
-
 /** No payee on record means the moon owner corporation itself is paid: its CEO acts for it. */
 const payeeOf = (rec: FeederRecord): NonNullable<FeederRecord['payee']> =>
   rec.payee ?? { kind: 'corporation', id: rec.corporationId };
@@ -70,23 +67,15 @@ export interface RemovalLinkDoc {
   /** The removal this link belongs to (`removal.startedAt`). */
   startedAt: number;
   expiresAt: number;
-  /** A copy of the removal's effective time, so an expired link can still say when it took effect. */
+  /** A copy of the removal's effective time, shown only while the link can be used. */
   effectiveAt?: number;
 }
 
 // --- Input -----------------------------------------------------------------
 
-export interface RemovalCall extends BookCall {
-  feederCorporationId: number;
-}
+export type RemovalCall = FeederTargetCall;
 
-export function parseRemovalCall(data: unknown): RemovalCall {
-  const id = record(data).feederCorporationId;
-  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) {
-    throw new HttpsError('invalid-argument', 'feederCorporationId must be a corporation id');
-  }
-  return { ...parseBookCall(data), feederCorporationId: id };
-}
+export const parseRemovalCall = parseFeederTarget;
 
 export interface RemovalNoticeCall extends RemovalCall {
   /** When the mail went out (ms); clamped to the removal's start and now. */
@@ -170,9 +159,7 @@ export async function startFeederRemoval(
   input: RemovalCall
 ): Promise<StartRemovalResult> {
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
-  const ref = bookRef(deps.db, input.corporationId)
-    .collection(FEEDERS)
-    .doc(String(input.feederCorporationId));
+  const ref = feederRef(deps.db, input.corporationId, input.feederCorporationId);
   const code = randomBytes(24).toString('base64url');
   const linkId = hashInviteCode(code);
   const now = deps.now();
@@ -220,9 +207,7 @@ export async function recordRemovalSent(
   input: RemovalNoticeCall
 ): Promise<{ effectiveAt: number | null }> {
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
-  const ref = bookRef(deps.db, input.corporationId)
-    .collection(FEEDERS)
-    .doc(String(input.feederCorporationId));
+  const ref = feederRef(deps.db, input.corporationId, input.feederCorporationId);
   const now = deps.now();
   const effectiveAt = await deps.db.runTransaction(async (tx) => {
     const rec = (await tx.get(ref)).data() as FeederRecord | undefined;
@@ -261,9 +246,7 @@ export async function cancelFeederRemoval(
   input: RemovalCall
 ): Promise<{ recipients: number[] }> {
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
-  const ref = bookRef(deps.db, input.corporationId)
-    .collection(FEEDERS)
-    .doc(String(input.feederCorporationId));
+  const ref = feederRef(deps.db, input.corporationId, input.feederCorporationId);
   const rec = await deps.db.runTransaction(async (tx) => {
     const held = (await tx.get(ref)).data() as FeederRecord | undefined;
     if (!held) fail('not-found', 'No such moon owner', 'no-feeder');
@@ -294,12 +277,11 @@ export async function cancelFeederRemoval(
 // --- The payee's link ---------------------------------------------------------
 
 /**
- * What the link says when it cannot be used, for any reason. One shape, so the page cannot tell
- * an expired link from a guarded one.
+ * What the link says when it cannot be used, for any reason. One shape with no time in it, so
+ * the page cannot tell an expired link (its time behind) from a guarded one (its time ahead).
  */
 export interface RemovalLinkUnavailable {
   available: false;
-  effectiveAt: number | null;
 }
 
 export type RemovalLinkState =
@@ -314,38 +296,31 @@ export type RemovalLinkState =
 interface Resolved {
   state: RemovalLinkState;
   link?: RemovalLinkDoc;
+  /** The link's id, for checking it is still the removal's own when the removal is ended. */
+  linkId?: string;
 }
+
+const UNAVAILABLE: Resolved = { state: { available: false } };
 
 async function resolveLink(deps: BookDeps, caller: Caller, code: string): Promise<Resolved> {
   const characterId = characterIdForUid(caller.uid);
   if (characterId === undefined) {
     fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
   }
-  const link = (await linkRef(deps.db, hashInviteCode(code)).get()).data() as
-    RemovalLinkDoc | undefined;
-  const no = (effectiveAt: number | null): Resolved => ({
-    state: { available: false, effectiveAt },
-  });
-  if (!link) return no(null);
+  const linkId = hashInviteCode(code);
+  const link = (await linkRef(deps.db, linkId).get()).data() as RemovalLinkDoc | undefined;
+  if (!link) return UNAVAILABLE;
   const copy = link.effectiveAt ?? null;
-  if (deps.now() >= link.expiresAt) return no(copy);
+  if (deps.now() >= link.expiresAt) return UNAVAILABLE;
   const rec = (
-    await bookRef(deps.db, link.collectorCorporationId)
-      .collection(FEEDERS)
-      .doc(String(link.feederCorporationId))
-      .get()
+    await feederRef(deps.db, link.collectorCorporationId, link.feederCorporationId).get()
   ).data() as FeederRecord | undefined;
-  if (!rec || rec.status !== 'pending-removal' || rec.removal?.startedAt !== link.startedAt) {
-    return no(copy);
-  }
-  if (!payeeMayForce({ payeeChangedAt: rec.payeeChangedAt, removalStartedAt: link.startedAt })) {
-    return no(copy);
-  }
+  if (!rec || !isLinkedRemoval(rec, link, linkId)) return UNAVAILABLE;
   const ceoOf = deps.corporationCeo ?? (async () => undefined);
   const payee = payeeOf(rec);
   const payeeCorporationCeoId =
     payee.kind === 'corporation' ? await ceoOf(payee.id).catch(() => undefined) : undefined;
-  if (!isPayeeActor({ payee, characterId, payeeCorporationCeoId })) return no(copy);
+  if (!isPayeeActor({ payee, characterId, payeeCorporationCeoId })) return UNAVAILABLE;
   return {
     state: {
       available: true,
@@ -354,7 +329,23 @@ async function resolveLink(deps: BookDeps, caller: Caller, code: string): Promis
       effectiveAt: copy,
     },
     link,
+    linkId,
   };
+}
+
+/**
+ * The record still holds the removal this link was made for, and its payee may end it. Read
+ * again inside the transaction that ends it, so a cancel and restart, or a payee change, that
+ * landed since the link was read refuses it.
+ */
+function isLinkedRemoval(rec: FeederRecord, link: RemovalLinkDoc, linkId: string): boolean {
+  return (
+    rec.status === 'pending-removal' &&
+    rec.removal?.startedAt === link.startedAt &&
+    // A link written before the record kept its id has none to compare.
+    (rec.removalLinkId === undefined || rec.removalLinkId === linkId) &&
+    payeeMayForce({ payeeChangedAt: rec.payeeChangedAt, removalStartedAt: link.startedAt })
+  );
 }
 
 /** What the "Remove now" page shows for this signed-in Character and link. */
@@ -372,7 +363,7 @@ export async function forceRemovalNow(
   caller: Caller,
   input: RemovalLinkCall,
   corporationCeo?: BookDeps['corporationCeo']
-): Promise<{ ended: boolean; effectiveAt: number | null }> {
+): Promise<{ ended: false } | { ended: true; effectiveAt: number | null }> {
   const bookDeps: BookDeps = {
     db: deps.db,
     now: deps.now,
@@ -380,8 +371,8 @@ export async function forceRemovalNow(
     readIdentity: deps.readIdentity,
     ...(corporationCeo ? { corporationCeo } : {}),
   };
-  const { state, link } = await resolveLink(bookDeps, caller, input.code);
-  if (!state.available || !link) return { ended: false, effectiveAt: state.effectiveAt };
+  const { state, link, linkId } = await resolveLink(bookDeps, caller, input.code);
+  if (!state.available || !link || !linkId) return { ended: false };
   const characterId = characterIdForUid(caller.uid)!;
   try {
     await endFeeder(deps, {
@@ -392,10 +383,11 @@ export async function forceRemovalNow(
       actor: { characterId, name: 'Payee' },
       action: 'feederRemovalForced',
       allowed: ['pending-removal'],
+      guard: (rec) => isLinkedRemoval(rec, link, linkId),
     });
   } catch {
-    // Raced with a cancel or the clock: the same answer as an expired link.
-    return { ended: false, effectiveAt: state.effectiveAt };
+    // Raced with a cancel, a restart or the clock: the same answer as an expired link.
+    return { ended: false };
   }
   return { ended: true, effectiveAt: state.effectiveAt };
 }
@@ -414,14 +406,12 @@ export async function finalizeDueRemovals(
   )) {
     try {
       const rec = (
-        await bookRef(deps.db, collectorCorporationId)
-          .collection(FEEDERS)
-          .doc(String(feederCorporationId))
-          .get()
+        await feederRef(deps.db, collectorCorporationId, feederCorporationId).get()
       ).data() as FeederRecord | undefined;
       if (!rec || !isRemovalDue({ status: rec.status, removal: rec.removal }, deps.now())) {
         continue;
       }
+      const startedAt = rec.removal!.startedAt;
       await endFeeder(deps, {
         collectorCorporationId,
         feederCorporationId,
@@ -430,6 +420,10 @@ export async function finalizeDueRemovals(
         actor: { characterId: null, name: 'Removal taking effect', via: 'scheduled' },
         action: 'feederRemoved',
         allowed: ['pending-removal'],
+        // The same removal, still due: a cancel and restart meanwhile is a new one with its own wait.
+        guard: (held) =>
+          held.removal?.startedAt === startedAt &&
+          isRemovalDue({ status: held.status, removal: held.removal }, deps.now()),
       });
       ended += 1;
     } catch (err) {

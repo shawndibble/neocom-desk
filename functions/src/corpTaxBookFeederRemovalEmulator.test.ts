@@ -19,6 +19,8 @@ import {
   startFeederRemoval,
 } from './corpTaxBookFeederRemoval.js';
 import { turnOnBook, verifyOfficer, type BookDeps, type Caller } from './corpTaxBookStore.js';
+import { encryptRefreshToken } from './alertGrantCrypto.js';
+import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 
 const COLLECTOR = 98000001;
 const FEEDER = 98000002;
@@ -81,6 +83,46 @@ const syncDeps = (): CorpSyncDeps => ({
   },
   log: () => undefined,
 });
+/**
+ * Deps whose last ledger read (before the grant goes) runs `during` once: a cancel and a fresh
+ * start landing between the removal being read and it being ended.
+ */
+const raceDeps = (during: () => Promise<void>): CorpSyncDeps => {
+  let ran = false;
+  return {
+    ...syncDeps(),
+    refresh: async () => ({ accessToken: 'at', refreshToken: 'rt-race' }),
+    esi: {
+      observers: async () => {
+        if (!ran) {
+          ran = true;
+          await during();
+        }
+        return { kind: 'unavailable' };
+      },
+      budgetLow: () => false,
+    } as unknown as SyncEsi,
+  };
+};
+const addFeederGrant = () =>
+  db
+    .collection('corpTaxBookSyncGrants')
+    .doc(String(FEEDER))
+    .set({
+      corporationId: FEEDER,
+      characterId: 777,
+      characterName: 'Alt',
+      encryptedRefreshToken: encryptRefreshToken(
+        'rt-race',
+        777,
+        Buffer.alloc(32, 7),
+        'corpSyncGrant'
+      ),
+      clientId: 'c',
+      enabledAt: 0,
+      kind: 'feeder',
+      collectorCorporationId: COLLECTOR,
+    });
 const who = (id: number): Caller => ({ uid: `char:${id}`, ownerHash: `h${id}` });
 const tok = (id: number) => `tok-${id}`;
 const call = (id: number) => ({ corporationId: COLLECTOR, accessToken: tok(id) });
@@ -317,6 +359,9 @@ suite('removing a moon owner', () => {
       expect(Object.keys(blocked).sort()).toEqual(Object.keys(expired).sort());
       expect(blocked).toEqual(expired);
       expect({ ...blockedForce }).toEqual(await force(guarded.code));
+      // No time at all: a guarded link's would lie ahead, an expired one's behind (S4).
+      expect(blocked).toEqual({ available: false });
+      expect(blockedForce).toEqual({ ended: false });
     });
 
     it('allows a payee changed 49 hours before the start', async () => {
@@ -365,6 +410,41 @@ suite('removing a moon owner', () => {
         available: false,
       });
     });
+  });
+
+  it('a removal cancelled and started again meanwhile is not the one that takes effect (B7)', async () => {
+    await start();
+    await recordRemovalSent(deps(), who(ACCOUNTANT), target(ACCOUNTANT));
+    await addFeederGrant();
+    now += 25 * H;
+    const restart = async () => {
+      await cancelFeederRemoval(deps(), who(ACCOUNTANT), target(ACCOUNTANT));
+      now += H;
+      await start();
+    };
+    expect((await finalizeDueRemovals(raceDeps(restart))).ended).toBe(0);
+    const rec = await record();
+    expect(rec?.status).toBe('pending-removal');
+    expect(rec?.removal?.startedAt).toBe(now);
+  });
+
+  it('an old link cannot end a removal started again meanwhile (B7)', async () => {
+    const { code } = await start();
+    await recordRemovalSent(deps(), who(ACCOUNTANT), target(ACCOUNTANT));
+    await addFeederGrant();
+    const restart = async () => {
+      await cancelFeederRemoval(deps(), who(ACCOUNTANT), target(ACCOUNTANT));
+      now += H;
+      await start();
+    };
+    const out = await forceRemovalNow(
+      raceDeps(restart),
+      who(PAYEE),
+      { code },
+      deps().corporationCeo
+    );
+    expect(out).toEqual({ ended: false });
+    expect((await record())?.status).toBe('pending-removal');
   });
 
   it('stamps payeeChangedAt on every payee change', async () => {

@@ -30,6 +30,7 @@ import type { ObservedMiningEntry, ObservedRow } from '@/engine/corpTaxBook/type
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { underFirebaseSession } from '@/features/communities/pledgeWrites';
+import { refineryPlaceholder } from '@/features/corp/moons/moonsFormat';
 
 type Data = Record<string, unknown>;
 
@@ -266,7 +267,7 @@ export function readAdjustment(id: string, d: Data): Adjustment | null {
   };
 }
 
-/** Refinery names the Statements were issued with; the officer side's "Refinery <id>" placeholder is no name. */
+/** Refinery names the Statements were issued with; the officer side's placeholder (older Statements) is no name. */
 export function refineryNamesOf(
   statements: readonly { refineryNames?: Record<string, string> }[]
 ): Record<number, string> {
@@ -275,7 +276,7 @@ export function refineryNamesOf(
     for (const [id, name] of Object.entries(s.refineryNames ?? {})) {
       const structureId = Number(id);
       if (!Number.isSafeInteger(structureId) || typeof name !== 'string') continue;
-      if (name.trim() === '' || name === `Refinery ${id}`) continue;
+      if (name.trim() === '' || name === refineryPlaceholder(id)) continue;
       out[structureId] = name;
     }
   }

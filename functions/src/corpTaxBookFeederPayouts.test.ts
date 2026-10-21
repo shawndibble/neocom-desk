@@ -43,21 +43,10 @@ describe('parseMarkPayoutInput', () => {
 });
 
 describe('parseReconcilePayoutsInput', () => {
-  const row = { refId: 1, division: 1, recipientId: 77, amount: 5, at: '2026-10-18T10:00:00Z' };
-  it('reads the outgoing donations', () => {
-    expect(parseReconcilePayoutsInput({ corporationId: 9, outgoing: [row] }).outgoing).toEqual([
-      { ...row, at: '2026-10-18T10:00:00.000Z' },
-    ]);
-  });
-  it('rejects a malformed row and an oversize list', () => {
-    expect(() =>
-      parseReconcilePayoutsInput({ corporationId: 9, outgoing: [{ ...row, amount: 'x' }] })
-    ).toThrow();
-    expect(() =>
-      parseReconcilePayoutsInput({
-        corporationId: 9,
-        outgoing: Array.from({ length: 501 }, () => row),
-      })
-    ).toThrow();
+  it('reads only the book: the server reads the journal itself, so a client list is ignored', () => {
+    const row = { refId: 1, division: 1, recipientId: 77, amount: 5, at: '2026-10-18T10:00:00Z' };
+    expect(
+      parseReconcilePayoutsInput({ corporationId: 9, accessToken: 't', outgoing: [row] })
+    ).toEqual({ corporationId: 9, accessToken: 't' });
   });
 });

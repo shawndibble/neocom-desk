@@ -14,13 +14,15 @@
 
 import { isDeepStrictEqual } from 'node:util';
 import type { CollectionReference, Firestore } from 'firebase-admin/firestore';
-import { FEEDERS, FEEDER_VIEWS, OBSERVED, utcDate } from './corpTaxBook.js';
+import { FEEDER_VIEWS, OBSERVED, utcDate } from './corpTaxBook.js';
 import {
   BOOK_DEFAULTS,
   accrueValuedDays,
-  dayClosesAt,
+  deriveModeChanges,
+  deriveOwnerRateHistory,
   effectiveOwnerRatePct,
   feederBalance,
+  feederBillableRule,
   isDayCovered,
   oreFormTypeId,
   type CoveragePeriod,
@@ -33,7 +35,7 @@ import {
 import type { FeederRecord } from './corpTaxBookFeeders.js';
 import { COMPRESSED_ORE_TYPE_IDS } from './data/compressedOreTypeIds.js';
 import { SNAPSHOT_HUBS } from './marketOpenPrices.js';
-import { bookRef, type BookDeps, type OpenPricesReader } from './corpTaxBookStore.js';
+import { bookRef, feederRef, type BookDeps, type OpenPricesReader } from './corpTaxBookStore.js';
 
 // --- Stored shapes -----------------------------------------------------------
 
@@ -82,7 +84,7 @@ export async function refreshMemberCoverage(
   feeder: number
 ): Promise<void> {
   try {
-    const snap = await bookRef(db, collector).collection(FEEDERS).doc(String(feeder)).get();
+    const snap = await feederRef(db, collector, feeder).get();
     await writeMemberCoverage(db, collector, feeder, snap.data() as FeederRecord | undefined);
   } catch (e) {
     console.error('member coverage not written', e instanceof Error ? e.message : e);
@@ -240,28 +242,8 @@ export type FeederViewRecord = Pick<
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
-/** The record's rate history, or entries derived from its two rate fields (dated the join day; none invented earlier). */
-export function deriveOwnerRateHistory(record: FeederViewRecord): OwnerRateEntry[] {
-  if (record.ownerRateHistory) return record.ownerRateHistory;
-  const effectiveFrom = utcDate(record.joinedAt);
-  const recordedAt = iso(record.joinedAt);
-  const out: OwnerRateEntry[] = [];
-  if (record.requestedRatePct !== undefined) {
-    out.push({ kind: 'requested', pct: record.requestedRatePct, effectiveFrom, recordedAt });
-  }
-  if (record.agreedRatePct !== undefined) {
-    out.push({ kind: 'agreed', pct: record.agreedRatePct, effectiveFrom, recordedAt });
-  }
-  return out;
-}
-
-/** The record's mode switches, or settled-otherwise from the join day when only `mode` says so. */
-export function deriveModeChanges(record: FeederViewRecord): FeederModeChange[] {
-  if (record.modeChanges) return record.modeChanges;
-  return record.mode === 'settled-otherwise'
-    ? [{ from: utcDate(record.joinedAt), mode: 'settled-otherwise' }]
-    : [];
-}
+// The rate history and mode switches a record implies: the engine mirror's, re-exported for callers.
+export { deriveModeChanges, deriveOwnerRateHistory };
 
 /** The history with a requested rate dated today. A request never changes the effective rate once one is agreed. */
 export function appendRequestedRate(
@@ -327,9 +309,7 @@ export function buildFeederView(input: FeederViewInput): FeederView {
   const history = deriveOwnerRateHistory(record);
   const modeChanges = deriveModeChanges(record);
   const compressed = input.oreForm === 'compressed';
-  const lastRead = record.lastReadWellAt;
-  const isBillable = (day: string) =>
-    lastRead !== undefined && lastRead >= Date.parse(dayClosesAt(day, input.graceHours));
+  const isBillable = feederBillableRule(record.lastReadWellAt, input.graceHours);
 
   interface DayAcc {
     value: number;
@@ -467,8 +447,6 @@ export function buildFeederView(input: FeederViewInput): FeederView {
 
 // --- Rebuild -----------------------------------------------------------------
 
-/** Most observed rows one rebuild reads. */
-export const VIEW_ROW_LIMIT = 100_000;
 const PRICE_READ_CONCURRENCY = 16;
 const BATCH_SIZE = 400;
 
@@ -524,16 +502,18 @@ export async function rebuildFeederView(
   feeder: number
 ): Promise<boolean> {
   const book = bookRef(deps.db, collector);
+  const recordRef = feederRef(deps.db, collector, feeder);
   const [bookSnap, recordSnap, observed, payoutSnap] = await Promise.all([
     book.get(),
-    book.collection(FEEDERS).doc(String(feeder)).get(),
+    recordRef.get(),
     book
       .collection(OBSERVED)
       .where('sourceCorporationId', '==', feeder)
+      // Every row: what is owed sums every covered day, so a capped (unordered) read would
+      // drop an arbitrary slice of them and understate it.
       .select('structureId', 'characterId', 'typeId', 'date', 'quantity', 'solarSystemId')
-      .limit(VIEW_ROW_LIMIT)
       .get(),
-    book.collection(FEEDERS).doc(String(feeder)).collection(FEEDER_VIEW_PAYOUTS).get(),
+    recordRef.collection(FEEDER_VIEW_PAYOUTS).get(),
   ]);
   const record = recordSnap.data() as FeederRecord | undefined;
   // Before pricing: coverage and the read clock reach the miners even when a price read fails.
@@ -580,21 +560,27 @@ export async function rebuildFeederView(
   const ref = feederViewRef(deps.db, collector, feeder);
   const toDocs = <T extends object>(items: T[], id: (item: T) => string) =>
     new Map(items.map((item) => [id(item), item]));
-  await syncDocs(
-    deps.db,
-    ref.collection(FEEDER_VIEW_DAYS),
-    toDocs(view.days, (d) => d.date)
-  );
-  await syncDocs(
-    deps.db,
-    ref.collection(FEEDER_VIEW_REFINERIES),
-    toDocs(view.refineries, (r) => String(r.structureId))
-  );
-  await syncDocs(
-    deps.db,
-    ref.collection(FEEDER_VIEW_PAYOUTS),
-    new Map(view.payouts.map(({ id, ...rest }) => [id, rest] as const))
-  );
+  // Three disjoint collections; the summary goes last, once all of them hold. allSettled: no
+  // write is still running when a failure reaches the caller.
+  const synced = await Promise.allSettled([
+    syncDocs(
+      deps.db,
+      ref.collection(FEEDER_VIEW_DAYS),
+      toDocs(view.days, (d) => d.date)
+    ),
+    syncDocs(
+      deps.db,
+      ref.collection(FEEDER_VIEW_REFINERIES),
+      toDocs(view.refineries, (r) => String(r.structureId))
+    ),
+    syncDocs(
+      deps.db,
+      ref.collection(FEEDER_VIEW_PAYOUTS),
+      new Map(view.payouts.map(({ id, ...rest }) => [id, rest] as const))
+    ),
+  ]);
+  const failed = synced.find((s) => s.status === 'rejected');
+  if (failed) throw failed.reason;
   await ref.set(view.summary);
   return true;
 }

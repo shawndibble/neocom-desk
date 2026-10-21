@@ -160,6 +160,14 @@ function num(value: unknown, field: string, min: number, max: number): number {
   return value;
 }
 
+/** A rate in percent: a finite number 0-100. */
+export function pctField(value: unknown, name: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
+    throw new HttpsError('invalid-argument', `${name} must be 0-100`);
+  }
+  return value;
+}
+
 export function dateString(value: unknown, field: string): string {
   const text = typeof value === 'string' ? value : '';
   const parsed = /^\d{4}-\d{2}-\d{2}$/.test(text) ? Date.parse(`${text}T00:00:00Z`) : NaN;
@@ -207,6 +215,19 @@ export function parseBookCall(data: unknown): BookCall {
   return { corporationId: int(d.corporationId, 'corporationId', 1, CORP_ID_MAX), accessToken };
 }
 
+/** A book call about one of its moon owners. */
+export interface FeederTargetCall extends BookCall {
+  feederCorporationId: number;
+}
+
+export function parseFeederTarget(data: unknown): FeederTargetCall {
+  const id = record(data).feederCorporationId;
+  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) {
+    throw new HttpsError('invalid-argument', 'feederCorporationId must be a corporation id');
+  }
+  return { ...parseBookCall(data), feederCorporationId: id };
+}
+
 export interface TurnOnInput extends BookCall {
   startDate: string;
   /** The corp-default rate, dated at the start date. */
@@ -227,11 +248,19 @@ export type StoredRate =
   | { scope: 'miner'; minerId: string; pct: number; effectiveFrom: string }
   | { scope: 'moon'; moonId: number; pct: number; effectiveFrom: string }
   | { scope: 'structure'; structureId: number; pct: number; effectiveFrom: string }
+  | { scope: 'feeder'; feederId: number; pct: number; effectiveFrom: string }
   | { scope: 'record'; recordKey: string; pct: number };
 
 export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'record' }> {
   const d = record(data);
-  const scope = oneOf(d.scope, 'scope', ['corp', 'guest', 'miner', 'moon', 'structure'] as const);
+  const scope = oneOf(d.scope, 'scope', [
+    'corp',
+    'guest',
+    'miner',
+    'moon',
+    'structure',
+    'feeder',
+  ] as const);
   const base = {
     pct: num(d.pct, 'pct', 0, 100),
     effectiveFrom: dateString(d.effectiveFrom, 'effectiveFrom'),
@@ -241,6 +270,8 @@ export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'rec
   // A refinery by structure id (#4621): a moon owner's ledger-only rows never carry a moon.
   if (scope === 'structure')
     return { scope, structureId: int(d.structureId, 'structureId'), ...base };
+  // Every refinery of one moon owner corporation: the miner rate chain's per-feeder tier.
+  if (scope === 'feeder') return { scope, feederId: int(d.feederId, 'feederId'), ...base };
   return { scope, ...base };
 }
 

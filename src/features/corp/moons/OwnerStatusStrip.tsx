@@ -24,7 +24,7 @@ export function OwnerStatusStrip({
         tone === 'danger' ? 'border-danger/60' : 'border-warning/60'
       )}
     >
-      <p className="min-w-0 flex-1 text-sm">
+      <p className="min-w-0 flex-1 basis-64 text-sm">
         <span className="block font-semibold">{title}</span>
         <span className="text-text-dim">{body}</span>
       </p>

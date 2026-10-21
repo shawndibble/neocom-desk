@@ -12,14 +12,14 @@
 // no player-facing text lives here.
 
 import { createHash } from 'node:crypto';
-import { HttpsError, type FunctionsErrorCode } from 'firebase-functions/v2/https';
+import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, newInviteCode, record } from './communities.js';
 import {
-  FEEDERS,
   FEEDER_INVITES_COLLECTION,
   FEEDER_OF_COLLECTION,
   decideRoles,
   parseBookCall,
+  pctField,
   utcDate,
   type BookCall,
 } from './corpTaxBook.js';
@@ -37,6 +37,8 @@ import {
   appendAudit,
   authorizeOfficer,
   bookRef,
+  fail,
+  feederRef,
   type BookDeps,
   type Caller,
 } from './corpTaxBookStore.js';
@@ -110,10 +112,6 @@ export const hashInviteCode = (code: string) => createHash('sha256').update(code
 const inviteRef = (db: BookDeps['db'], id: string) =>
   db.collection(FEEDER_INVITES_COLLECTION).doc(id);
 
-function fail(code: FunctionsErrorCode, message: string, reason: string): never {
-  throw new HttpsError(code, message, { reason });
-}
-
 // --- Input -----------------------------------------------------------------
 
 export interface CreateFeederInviteInput extends BookCall {
@@ -126,10 +124,7 @@ export function parseCreateFeederInviteInput(data: unknown): CreateFeederInviteI
   const call = parseBookCall(data);
   const rate = d.offeredOwnerRatePct;
   if (rate === undefined) return call;
-  if (typeof rate !== 'number' || !Number.isFinite(rate) || rate < 0 || rate > 100) {
-    throw new HttpsError('invalid-argument', 'offeredOwnerRatePct must be 0-100');
-  }
-  return { ...call, offeredOwnerRatePct: rate };
+  return { ...call, offeredOwnerRatePct: pctField(rate, 'offeredOwnerRatePct') };
 }
 
 export interface RevokeFeederInviteInput extends BookCall {
@@ -361,6 +356,9 @@ const FEED_STATE: readonly (keyof FeederRecord)[] = [
   'viewDismissedAt',
   // The offered rate belongs to the link, not to the record's history.
   'offeredOwnerRatePct',
+  // A holder's standing belongs to the feed it granted; a rejoin names its own.
+  'grantHolder',
+  'grantedBy',
 ];
 
 /** The agreed rate an accepted link's offer stands for, dated the join day. */
@@ -423,8 +421,8 @@ export async function acceptInviteCore(
     }
     const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp));
     const pointer = (await tx.get(pointerRef)).data() as AcceptUndo['priorPointer'];
-    const feederRef = bookRef(deps.db, collector).collection(FEEDERS).doc(String(feederCorp));
-    const held = (await tx.get(feederRef)).data() as FeederRecord | undefined;
+    const recordRef = feederRef(deps.db, collector, feederCorp);
+    const held = (await tx.get(recordRef)).data() as FeederRecord | undefined;
     // A disconnected moon owner keeps its pointer; this book's fresh link takes it back.
     const takenBack =
       input.allowTakeBack === true &&
@@ -444,7 +442,7 @@ export async function acceptInviteCore(
         mode: 'normal',
         coveragePeriods: [{ from: today }],
       };
-      tx.create(feederRef, { ...created, ...offeredRate(created, invite, now), ...extra });
+      tx.create(recordRef, { ...created, ...offeredRate(created, invite, now), ...extra });
     } else {
       // The pointer is gone only once the record has left or been removed, or kept while disconnected.
       if (held.status !== 'left' && held.status !== 'removed' && !takenBack) {
@@ -463,7 +461,7 @@ export async function acceptInviteCore(
         coveragePeriods: reopenPeriod(held.coveragePeriods, today),
         ...extra,
       };
-      tx.set(feederRef, reopened);
+      tx.set(recordRef, reopened);
     }
     tx.set(pointerRef, { collectorCorporationId: collector, since: now });
     const accepted: Partial<FeederInviteDoc> = {

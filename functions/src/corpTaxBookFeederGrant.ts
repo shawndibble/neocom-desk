@@ -26,13 +26,13 @@ import {
   type CorpSyncGrantDoc,
 } from './corpSyncGrant.js';
 import {
-  FEEDERS,
   FEEDER_INVITES_COLLECTION,
   FEEDER_OF_COLLECTION,
   FEEDER_PREVIOUS_COLLECTION,
   OBSERVED,
   REMOVAL_LINKS_COLLECTION,
   decideRoles,
+  pctField,
   utcDate,
 } from './corpTaxBook.js';
 import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
@@ -52,6 +52,8 @@ import {
 import {
   appendAudit,
   bookRef,
+  fail,
+  feederRef,
   ownBookFloor,
   type BookDeps,
   type Caller,
@@ -75,14 +77,6 @@ const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
   ...(deps.openPrices ? { openPrices: deps.openPrices } : {}),
 });
 
-function fail(
-  code: ConstructorParameters<typeof HttpsError>[0],
-  message: string,
-  reason: string
-): never {
-  throw new HttpsError(code, message, { reason });
-}
-
 // --- Input -----------------------------------------------------------------
 
 export interface SaveFeederGrantInput {
@@ -102,10 +96,7 @@ export function parseSaveFeederGrantInput(data: unknown): SaveFeederGrantInput {
   };
   const rate = d.requestedRatePct;
   if (rate !== undefined && rate !== null) {
-    if (typeof rate !== 'number' || !Number.isFinite(rate) || rate < 0 || rate > 100) {
-      throw new HttpsError('invalid-argument', 'requestedRatePct must be 0-100');
-    }
-    out.requestedRatePct = rate;
+    out.requestedRatePct = pctField(rate, 'requestedRatePct');
   }
   return out;
 }
@@ -223,39 +214,96 @@ const RECONNECTABLE: readonly FeederRecord['status'][] = [
   'disconnected',
 ];
 
+/** What a Reconnect wrote over, so a refused one puts back exactly that (B6). */
+interface ReconnectUndo {
+  holder: number;
+  grantedBy: number;
+  /** The record as it was, for the fields reconnect or its first pull may change. */
+  prior: FeederRecord;
+  /** True when it reopened a disconnected record (status, coverage and the clocks changed). */
+  reopened: boolean;
+  /** The coverage reconnect wrote, to tell whether anyone changed it since. */
+  coveragePeriods?: FeederRecord['coveragePeriods'];
+}
+
 async function reconnectCore(
   deps: BookDeps,
   feederCorp: number,
   holder: number,
   grantedBy: number
-): Promise<AcceptFeederInviteResult & { priorRecord: FeederRecord }> {
-  const pointer = (
-    await deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp)).get()
-  ).data();
-  const collector = pointer?.collectorCorporationId;
-  if (typeof collector !== 'number') {
-    fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
-  }
-  const ref = bookRef(deps.db, collector).collection(FEEDERS).doc(String(feederCorp));
-  const rec = (await ref.get()).data() as FeederRecord | undefined;
-  if (!rec || !RECONNECTABLE.includes(rec.status)) {
-    fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
-  }
-  const patch: Record<string, unknown> = { grantHolder: holder, grantedBy };
-  if (rec.status === 'disconnected') {
-    // Back after a disconnect: a new coverage period, the balance and rate history carry on.
-    patch.status = 'active';
-    patch.coveragePeriods = reopenPeriod(rec.coveragePeriods, utcDate(deps.now()));
-    patch.disconnectedAt = FieldValue.delete();
-    patch.staleSince = FieldValue.delete();
-  }
-  await ref.update(patch);
-  return {
-    collectorCorporationId: collector,
-    feederCorporationId: feederCorp,
-    rejoined: false,
-    priorRecord: rec,
-  };
+): Promise<AcceptFeederInviteResult & { reconnect: ReconnectUndo }> {
+  const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp));
+  return deps.db.runTransaction(async (tx) => {
+    const collector: unknown = (await tx.get(pointerRef)).data()?.collectorCorporationId;
+    if (typeof collector !== 'number') {
+      fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
+    }
+    const ref = feederRef(deps.db, collector, feederCorp);
+    const rec = (await tx.get(ref)).data() as FeederRecord | undefined;
+    if (!rec || !RECONNECTABLE.includes(rec.status)) {
+      fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
+    }
+    const patch: Record<string, unknown> = { grantHolder: holder, grantedBy };
+    const reopened = rec.status === 'disconnected';
+    let coveragePeriods: FeederRecord['coveragePeriods'] | undefined;
+    if (reopened) {
+      // Back after a disconnect: a new coverage period, the balance and rate history carry on.
+      coveragePeriods = reopenPeriod(rec.coveragePeriods, utcDate(deps.now()));
+      patch.status = 'active';
+      patch.coveragePeriods = coveragePeriods;
+      patch.disconnectedAt = FieldValue.delete();
+      patch.staleSince = FieldValue.delete();
+    }
+    tx.update(ref, patch);
+    return {
+      collectorCorporationId: collector,
+      feederCorporationId: feederCorp,
+      rejoined: false,
+      reconnect: {
+        holder,
+        grantedBy,
+        prior: rec,
+        reopened,
+        ...(coveragePeriods ? { coveragePeriods } : {}),
+      },
+    };
+  });
+}
+
+/** The fields a reconnect's first pull writes (`recordFeederRead`). */
+const FIRST_PULL_FIELDS = ['staleSince', 'lastSyncResult', 'lastReadWellAt'] as const;
+
+/**
+ * A refused Reconnect puts back only what it (and its first pull) wrote, in a transaction, and
+ * only while the record still holds this reconnect's holder: anything else written meanwhile
+ * (a payee, a rate, a newer reconnect) stays.
+ */
+async function undoReconnect(
+  deps: BookDeps,
+  collector: number,
+  feederCorp: number,
+  undo: ReconnectUndo
+): Promise<void> {
+  const ref = feederRef(deps.db, collector, feederCorp);
+  const back = (key: keyof FeederRecord) =>
+    undo.prior[key] === undefined ? FieldValue.delete() : undo.prior[key];
+  await deps.db.runTransaction(async (tx) => {
+    const rec = (await tx.get(ref)).data() as FeederRecord | undefined;
+    if (!rec || rec.grantHolder !== undo.holder || rec.grantedBy !== undo.grantedBy) return;
+    const update: Record<string, unknown> = {
+      grantHolder: back('grantHolder'),
+      grantedBy: back('grantedBy'),
+    };
+    for (const key of FIRST_PULL_FIELDS) update[key] = back(key);
+    const sameCoverage =
+      JSON.stringify(rec.coveragePeriods) === JSON.stringify(undo.coveragePeriods);
+    if (undo.reopened && rec.status === 'active' && sameCoverage) {
+      update.status = undo.prior.status;
+      update.coveragePeriods = undo.prior.coveragePeriods;
+      update.disconnectedAt = back('disconnectedAt');
+    }
+    tx.update(ref, update);
+  });
 }
 
 export async function saveFeederGrant(
@@ -292,7 +340,7 @@ export async function saveFeederGrant(
 
   let undo: AcceptUndo | undefined;
   let accepted: (AcceptFeederInviteResult & { undo?: AcceptUndo }) | undefined;
-  let reconnectPrior: FeederRecord | undefined;
+  let reconnect: ReconnectUndo | undefined;
   // The grant this save replaces (a Reconnect): revoked once the new one works, else put back.
   let previousGrant: CorpSyncGrantDoc | undefined;
   let grantWritten = false;
@@ -316,7 +364,7 @@ export async function saveFeederGrant(
             allowTakeBack: true,
           });
     undo = accepted.undo;
-    if ('priorRecord' in accepted) reconnectPrior = accepted.priorRecord as FeederRecord;
+    if ('reconnect' in accepted) reconnect = accepted.reconnect as ReconnectUndo;
 
     const now = deps.now();
     const doc: CorpSyncGrantDoc = {
@@ -349,6 +397,11 @@ export async function saveFeederGrant(
         'not-an-accountant'
       );
     }
+    // The read is the role check: without one that landed (ESI down, rate limited, a refresh
+    // skipped) nothing proves the alt may read the ledger, so nothing is activated.
+    if (first.outcome !== 'ok') {
+      fail('unavailable', 'The corporation ledger could not be read now', 'ledger-unavailable');
+    }
   } catch (err) {
     if (undo && accepted) {
       await unwindAccept(
@@ -361,12 +414,14 @@ export async function saveFeederGrant(
         }
       );
     }
-    if (reconnectPrior && accepted) {
-      // A refused reconnect puts the record back.
-      await bookRef(deps.db, accepted.collectorCorporationId)
-        .collection(FEEDERS)
-        .doc(String(accepted.feederCorporationId))
-        .set(reconnectPrior);
+    if (reconnect && accepted) {
+      // A refused reconnect puts back what it wrote, and nothing else.
+      await undoReconnect(
+        bookDeps(deps),
+        accepted.collectorCorporationId,
+        accepted.feederCorporationId,
+        reconnect
+      );
     }
     if (accepted && grantWritten) {
       await putBackGrant(deps, accepted.feederCorporationId, previousGrant);
@@ -380,9 +435,7 @@ export async function saveFeederGrant(
   if (input.requestedRatePct !== undefined) {
     // A blank rate is a complete grant, so a rate that fails to save never fails it.
     try {
-      const ref = bookRef(deps.db, accepted.collectorCorporationId)
-        .collection(FEEDERS)
-        .doc(String(accepted.feederCorporationId));
+      const ref = feederRef(deps.db, accepted.collectorCorporationId, accepted.feederCorporationId);
       const rec = (await ref.get()).data() as FeederRecord | undefined;
       await ref.update({
         requestedRatePct: input.requestedRatePct,
@@ -391,7 +444,9 @@ export async function saveFeederGrant(
           : {}),
       });
     } catch (e) {
-      console.error('feeder requested rate not saved', e instanceof Error ? e.message : e);
+      deps.log('feeder requested rate not saved', {
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
   }
   await tryRebuildFeederView(
@@ -434,10 +489,10 @@ async function unwindAccept(
 ): Promise<void> {
   const grantSnap = await grantRef(deps.db, feederCorp).get();
   const held = grantSnap.data() as CorpSyncGrantDoc | undefined;
-  const feederRef = bookRef(deps.db, collector).collection(FEEDERS).doc(String(feederCorp));
+  const recordRef = feederRef(deps.db, collector, feederCorp);
   await deps.db.runTransaction(async (tx) => {
-    if (undo.priorRecord) tx.set(feederRef, undo.priorRecord);
-    else tx.delete(feederRef);
+    if (undo.priorRecord) tx.set(recordRef, undo.priorRecord);
+    else tx.delete(recordRef);
     const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp));
     if (undo.priorPointer) tx.set(pointerRef, undo.priorPointer);
     else tx.delete(pointerRef);
@@ -463,7 +518,7 @@ async function unwindAccept(
     if (undo.priorRecord) await tryRebuildFeederView(bookDeps(deps), collector, feederCorp);
     else await deps.db.recursiveDelete(feederViewRef(deps.db, collector, feederCorp));
   } catch (e) {
-    console.error('feeder view not restored', e instanceof Error ? e.message : e);
+    deps.log('feeder view not restored', { error: e instanceof Error ? e.message : String(e) });
   }
 }
 
@@ -483,9 +538,9 @@ export interface FeederContext {
 type Standing = 'leave' | 'read' | 'view' | 'edit';
 
 /**
- * Who may act on a feeder from the moon owner's side: the grant holder always, else
- * a live roles check in that corporation (CEO or Director to leave; also an
- * Accountant or Junior Accountant to read).
+ * Who may act on a feeder from the moon owner's side: a live member of that corporation, and
+ * then the grant holder, else by a live roles check (CEO or Director to leave; also an
+ * Accountant or Junior Accountant to read). Holding the grant never stands in for membership.
  */
 export async function authorizeFeederCaller(
   deps: CorpSyncDeps,
@@ -524,7 +579,7 @@ export async function authorizeFeederCaller(
   }
   if (collector === undefined) return null;
   const [recordSnap, grantSnap] = await Promise.all([
-    bookRef(deps.db, collector).collection(FEEDERS).doc(String(input.corporationId)).get(),
+    feederRef(deps.db, collector, input.corporationId).get(),
     grantRef(deps.db, input.corporationId).get(),
   ]);
   const feeder = recordSnap.data() as FeederRecord | undefined;
@@ -537,11 +592,13 @@ export async function authorizeFeederCaller(
       callerId === feeder.grantedBy ||
       callerId === grant?.characterId ||
       callerId === grant?.grantedBy);
+  // Membership is always read live: a holder who left the corporation (or the signed-in
+  // player who handed over an alt's grant from outside it) has no standing here.
+  const identity = await deps.readIdentity(callerId, input.accessToken);
+  if (identity.corporationId !== input.corporationId) {
+    fail('permission-denied', 'Not a member of this corporation', 'not-your-feeder');
+  }
   if (!isHolder) {
-    const identity = await deps.readIdentity(callerId, input.accessToken);
-    if (identity.corporationId !== input.corporationId) {
-      fail('permission-denied', 'Not a member of this corporation', 'not-your-feeder');
-    }
     const roles = decideRoles(identity.roles, identity.ceoId === callerId);
     const allowed =
       standing === 'leave' ? roles.isDirector : standing === 'read' ? roles.canView : roles.canEdit;
@@ -589,6 +646,34 @@ export interface EndFeederInput {
   allowed: readonly FeederRecord['status'][];
   /** False when the view is about to go with its book (a book delete). */
   rebuildView?: boolean;
+  /**
+   * Checked inside the transaction against the record as it stands: false refuses the end like
+   * any other stale request (a removal cancelled and restarted since it was read, B7).
+   */
+  guard?: (rec: FeederRecord) => boolean;
+  /** False skips the last ledger read before the grant goes (a book delete). */
+  finalRead?: boolean;
+}
+
+/**
+ * One last ledger read before a feed's grant is dropped, so its last covered day can become
+ * Billable. Best effort: never fails or delays the end beyond the read itself.
+ */
+async function finalLedgerRead(
+  deps: CorpSyncDeps,
+  collector: number,
+  feederCorp: number
+): Promise<void> {
+  if (!deps.esi) return;
+  try {
+    await syncOneFeeder(deps, deps.esi, collector, feederCorp);
+  } catch (err) {
+    deps.log('Final moon owner ledger read failed', {
+      feederCorporationId: feederCorp,
+      collectorCorporationId: collector,
+      error: err instanceof Error ? err.name : 'unknown',
+    });
+  }
 }
 
 /**
@@ -598,25 +683,31 @@ export interface EndFeederInput {
  */
 export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Promise<void> {
   const { collectorCorporationId: collector, feederCorporationId: feederCorp } = input;
-  const feederRef = bookRef(deps.db, collector).collection(FEEDERS).doc(String(feederCorp));
+  const recordRef = feederRef(deps.db, collector, feederCorp);
   const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp));
   const previousRef = deps.db.collection(FEEDER_PREVIOUS_COLLECTION).doc(String(feederCorp));
   const gRef = grantRef(deps.db, feederCorp);
+  if (input.finalRead !== false) await finalLedgerRead(deps, collector, feederCorp);
   const now = deps.now();
 
   const dropped = await deps.db.runTransaction(async (tx) => {
     const [recSnap, ptrSnap, grantSnap, prevSnap] = await Promise.all([
-      tx.get(feederRef),
+      tx.get(recordRef),
       tx.get(pointerRef),
       tx.get(gRef),
       tx.get(previousRef),
     ]);
     const rec = recSnap.data() as FeederRecord | undefined;
-    if (!rec || !ptrSnap.exists || !input.allowed.includes(rec.status)) {
+    if (
+      !rec ||
+      !ptrSnap.exists ||
+      !input.allowed.includes(rec.status) ||
+      (input.guard && !input.guard(rec))
+    ) {
       fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
     }
     const grant = grantSnap.data() as CorpSyncGrantDoc | undefined;
-    tx.update(feederRef, {
+    tx.update(recordRef, {
       status: input.finalStatus,
       leftAt: now,
       coveragePeriods: closePeriod(rec.coveragePeriods, utcDate(input.effectiveAt)),
@@ -627,6 +718,9 @@ export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Prom
       disconnectedAt: FieldValue.delete(),
       lastSyncResult: FieldValue.delete(),
       viewDismissedAt: FieldValue.delete(),
+      // The holder's standing ends with the feed (S1).
+      grantHolder: FieldValue.delete(),
+      grantedBy: FieldValue.delete(),
     });
     if (rec.removalLinkId) {
       tx.delete(deps.db.collection(REMOVAL_LINKS_COLLECTION).doc(rec.removalLinkId));
@@ -676,6 +770,7 @@ export async function dropBookGrants(deps: CorpSyncDeps, collector: number): Pro
         action: 'feederRemovedBookDeleted',
         allowed: ENDABLE,
         rebuildView: false,
+        finalRead: false,
       });
     } catch (err) {
       // Already ended (a race with a leave): the pointer goes with the book anyway.
@@ -712,9 +807,6 @@ export type FeederStatusResult =
       /** Accounting corporations it left, newest first (#4621): each keeps its history view. */
       previousCollectorIds: number[];
     };
-
-/** Most observed rows one status call reads; a feeder with more shows the newest slice. */
-export const STATUS_ROW_LIMIT = 20_000;
 
 /** Sum mined quantity per refinery over covered days only. Pure. */
 export function aggregateRefineries(
@@ -761,8 +853,8 @@ export async function getFeederStatus(
     bookRef(deps.db, collector)
       .collection(OBSERVED)
       .where('sourceCorporationId', '==', input.corporationId)
+      // Every row: a capped read with no order is an arbitrary slice, not the newest one.
       .select('structureId', 'date', 'quantity')
-      .limit(STATUS_ROW_LIMIT)
       .get(),
     readPrevious(deps.db, input.corporationId),
   ]);

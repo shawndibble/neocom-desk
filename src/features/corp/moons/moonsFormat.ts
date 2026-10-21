@@ -1,8 +1,10 @@
 import { formatIsk } from '@/lib/isk';
+import { MONTHS } from '@/engine/corpTaxBook/monthNames';
 
 export const isk = (value: number) => formatIsk(Math.round(value));
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** A refinery shown before (or without) its name: a placeholder, never written as one. */
+export const refineryPlaceholder = (id: number | string) => `Refinery ${id}`;
 
 /** "18 Oct" from a UTC date or instant. */
 export function shortDate(value: string): string {

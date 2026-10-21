@@ -4,14 +4,15 @@
 // see `setFeederPayee` in corpTaxBookFeederViewCalls.ts. Failures carry a stable `reason`; no player-facing text lives here.
 
 import { FieldValue } from 'firebase-admin/firestore';
-import { HttpsError, type FunctionsErrorCode } from 'firebase-functions/v2/https';
+import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
 import {
-  FEEDERS,
   FEEDER_INVITES_COLLECTION,
-  parseBookCall,
+  parseFeederTarget,
+  pctField,
   utcDate,
   type BookCall,
+  type FeederTargetCall,
 } from './corpTaxBook.js';
 import type { FeederModeChange, OwnerRateEntry } from './corpTaxBookEngine.js';
 import {
@@ -23,30 +24,15 @@ import type { FeederInviteDoc, FeederRecord } from './corpTaxBookFeeders.js';
 import {
   appendAudit,
   authorizeOfficer,
-  bookRef,
+  fail,
+  feederRef,
   type BookDeps,
   type Caller,
 } from './corpTaxBookStore.js';
 
 const MAX_NOTE = 500;
 
-function fail(code: FunctionsErrorCode, message: string, reason: string): never {
-  throw new HttpsError(code, message, { reason });
-}
-
 // --- Input -----------------------------------------------------------------
-
-export interface FeederTargetCall extends BookCall {
-  feederCorporationId: number;
-}
-
-function parseTarget(data: unknown): FeederTargetCall {
-  const id = record(data).feederCorporationId;
-  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) {
-    throw new HttpsError('invalid-argument', 'feederCorporationId must be a corporation id');
-  }
-  return { ...parseBookCall(data), feederCorporationId: id };
-}
 
 export interface SetFeederRateInput extends FeederTargetCall {
   /** The agreed owner rate (0-100). */
@@ -54,12 +40,8 @@ export interface SetFeederRateInput extends FeederTargetCall {
 }
 
 export function parseSetFeederRateInput(data: unknown): SetFeederRateInput {
-  const target = parseTarget(data);
-  const pct = record(data).pct;
-  if (typeof pct !== 'number' || !Number.isFinite(pct) || pct < 0 || pct > 100) {
-    throw new HttpsError('invalid-argument', 'pct must be 0-100');
-  }
-  return { ...target, pct };
+  const target = parseFeederTarget(data);
+  return { ...target, pct: pctField(record(data).pct, 'pct') };
 }
 
 export interface SetFeederModeInput extends FeederTargetCall {
@@ -68,7 +50,7 @@ export interface SetFeederModeInput extends FeederTargetCall {
 }
 
 export function parseSetFeederModeInput(data: unknown): SetFeederModeInput {
-  const target = parseTarget(data);
+  const target = parseFeederTarget(data);
   const d = record(data);
   if (d.mode !== 'normal' && d.mode !== 'settled-otherwise') {
     throw new HttpsError('invalid-argument', 'mode must be normal or settled-otherwise');
@@ -128,9 +110,7 @@ async function editFeeder(
   ) => { update: Record<string, unknown>; action: string; detail: Record<string, unknown> }
 ): Promise<{ ok: true }> {
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
-  const ref = bookRef(deps.db, input.corporationId)
-    .collection(FEEDERS)
-    .doc(String(input.feederCorporationId));
+  const ref = feederRef(deps.db, input.corporationId, input.feederCorporationId);
   await deps.db.runTransaction(async (tx) => {
     const rec = (await tx.get(ref)).data() as FeederRecord | undefined;
     if (!rec) fail('not-found', 'No such moon owner', 'no-feeder');

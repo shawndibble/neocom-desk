@@ -76,6 +76,8 @@ export interface OwnerRateChange {
   newPct: number;
   /** What the feeder asked for, when it asked. */
   requestedPct?: number;
+  /** When the edit that made the change was recorded: tells apart two changes to one rate on one day. */
+  recordedAt?: string;
 }
 
 /**
@@ -94,11 +96,16 @@ export function rateChangeEvent(input: {
   const previous = effectiveOwnerRate(before, date);
   if (previous?.pct === next.pct) return undefined;
   const requestedPct = requestedOwnerRate(after, date);
+  const recordedAt = after.reduce<string | undefined>(
+    (max, e) => (max === undefined || e.recordedAt > max ? e.recordedAt : max),
+    undefined
+  );
   return {
     date,
     ...(previous ? { oldPct: previous.pct } : {}),
     newPct: next.pct,
     ...(requestedPct !== undefined ? { requestedPct } : {}),
+    ...(recordedAt !== undefined ? { recordedAt } : {}),
   };
 }
 
@@ -127,6 +134,7 @@ export function latestRateChange(history: readonly OwnerRateEntry[]): OwnerRateC
     ...(last.oldPct !== undefined ? { oldPct: last.oldPct } : {}),
     newPct: last.newPct,
     ...(asked !== undefined ? { requestedPct: asked } : {}),
+    ...(last.recordedAt !== undefined ? { recordedAt: last.recordedAt } : {}),
   };
 }
 

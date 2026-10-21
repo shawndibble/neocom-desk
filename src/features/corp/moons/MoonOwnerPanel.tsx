@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { beginFeederGrantLogin } from '@/app/loginFlow';
 import { Button, LoadFailedState, Spinner } from '@/components/ui';
-import { leaveFeeder, type FeederStatus } from '../taxBook/feederClient';
+import { leaveFeeder, type FeederSetupStatus } from '../taxBook/feederClient';
 import { RECONNECT_CODE, requestFeederRate, setFeederPayee } from '../taxBook/feederViewClient';
 import { isStale, owedOnLeaving } from '../taxBook/feederViewModel';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
@@ -15,7 +15,7 @@ import { OwnerStatusStrip } from './OwnerStatusStrip';
 import { shortDate } from './moonsFormat';
 import { useFeederView } from './useFeederView';
 
-type Owner = Extract<FeederStatus, { status: 'feeder' }>;
+type Owner = Extract<FeederSetupStatus, { status: 'feeder' }>;
 
 /**
  * A moon owner's Moons page once an accounting corporation handles its tax:

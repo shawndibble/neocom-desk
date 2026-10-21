@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, TextInput } from '@/components/ui';
-import { editErrorMessage } from './useBook';
+import { Button, EmptyState, Panel, TextInput } from '@/components/ui';
+import { callableErrorText } from './feederErrorText';
+import { InviteLinkField } from './InviteLinkField';
 import { turnOnBook, type OfficerVerdict } from '../taxBook/bookClient';
 import { createFeederInvite, inviteLink } from '../taxBook/feederClient';
 
@@ -66,62 +67,61 @@ export function TurnOnBook({
         setLink(inviteLink(window.location.origin, code));
       } else onDone();
     } catch (e) {
-      const reason = (e as { details?: { reason?: unknown } } | null)?.details?.reason;
-      setError(
-        reason === 'start-before-leave'
-          ? t('corpTaxBook.moons.off.startBeforeLeave')
-          : editErrorMessage(e)
-      );
+      setError(callableErrorText(t, e, 'corpTaxBook.moons.dialogs.failed'));
     } finally {
       setBusy(false);
     }
   };
   if (link !== null) {
     return (
-      <div className="mx-auto max-w-md space-y-3 rounded-xs border border-line bg-panel p-4 text-sm">
-        <h2 className="text-base font-semibold">{t('corpTaxBook.moons.setup.collect.ready')}</h2>
-        <p className="text-text-dim">{t('corpTaxBook.moons.setup.collect.linkHint')}</p>
-        <TextInput readOnly value={link} onFocus={(e) => e.currentTarget.select()} />
-        <Button variant="primary" onClick={onDone}>
-          {t('corpTaxBook.moons.setup.collect.done')}
-        </Button>
-      </div>
+      <Panel className="mx-auto max-w-md text-sm">
+        <div className="space-y-3">
+          <h2 className="text-base font-semibold">{t('corpTaxBook.moons.setup.collect.ready')}</h2>
+          <p className="text-text-dim">{t('corpTaxBook.moons.setup.collect.linkHint')}</p>
+          <InviteLinkField url={link} />
+          <Button variant="primary" onClick={onDone}>
+            {t('corpTaxBook.moons.setup.collect.done')}
+          </Button>
+        </div>
+      </Panel>
     );
   }
   return (
-    <div className="mx-auto max-w-md space-y-3 rounded-xs border border-line bg-panel p-4 text-sm">
-      <h2 className="text-base font-semibold">{t('corpTaxBook.moons.off.title')}</h2>
-      <p className="text-text-dim">{t('corpTaxBook.moons.off.intro')}</p>
-      <label className="block space-y-1">
-        <span className="text-xs text-text-dim">{t('corpTaxBook.moons.settings.startDate')}</span>
-        <TextInput
-          type="date"
-          max={today}
-          {...(leaveDay !== null ? { min: leaveDay } : {})}
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-        />
-      </label>
-      <label className="block space-y-1">
-        <span className="text-xs text-text-dim">{t('corpTaxBook.moons.off.rate')}</span>
-        <TextInput inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
-      </label>
-      <p className="text-xs text-text-dim">{t('corpTaxBook.moons.off.hint')}</p>
-      <p className="text-xs text-text-dim">
-        {t(
-          collect
-            ? 'corpTaxBook.moons.setup.collect.noRefineries'
-            : 'corpTaxBook.moons.off.needsRefineries'
-        )}
-      </p>
-      {error && (
-        <p role="alert" className="text-danger">
-          {error}
+    <Panel className="mx-auto max-w-md text-sm">
+      <div className="space-y-3">
+        <h2 className="text-base font-semibold">{t('corpTaxBook.moons.off.title')}</h2>
+        <p className="text-text-dim">{t('corpTaxBook.moons.off.intro')}</p>
+        <label className="block space-y-1">
+          <span className="text-xs text-text-dim">{t('corpTaxBook.moons.settings.startDate')}</span>
+          <TextInput
+            type="date"
+            max={today}
+            {...(leaveDay !== null ? { min: leaveDay } : {})}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </label>
+        <label className="block space-y-1">
+          <span className="text-xs text-text-dim">{t('corpTaxBook.moons.off.rate')}</span>
+          <TextInput inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
+        </label>
+        <p className="text-xs text-text-dim">{t('corpTaxBook.moons.off.hint')}</p>
+        <p className="text-xs text-text-dim">
+          {t(
+            collect
+              ? 'corpTaxBook.moons.setup.collect.noRefineries'
+              : 'corpTaxBook.moons.off.needsRefineries'
+          )}
         </p>
-      )}
-      <Button variant="primary" onClick={() => void submit()} disabled={!valid || busy}>
-        {t('corpTaxBook.moons.off.confirm')}
-      </Button>
-    </div>
+        {error && (
+          <p role="alert" className="text-danger">
+            {error}
+          </p>
+        )}
+        <Button variant="primary" onClick={() => void submit()} disabled={!valid || busy}>
+          {t('corpTaxBook.moons.off.confirm')}
+        </Button>
+      </div>
+    </Panel>
   );
 }

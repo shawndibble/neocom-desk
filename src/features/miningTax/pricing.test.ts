@@ -449,12 +449,23 @@ describe('moonOwnerPricesAtHubOnDate (#4621)', () => {
     hubSnapshotMock.loadHubSnapshotRange.mockResolvedValue({
       saved: new Map([[DATE, new Map([[COMPRESSED_ZEOLITES, { buy: null, sell: 900 }]])]]),
     });
-    const data = await loadDatedUnitPricesByHub([ZEOLITES], ['jita'], [DATE, '2026-09-05']);
+    const data = await loadDatedUnitPricesByHub([ZEOLITES], ['jita'], [DATE, '2026-09-05'], true, {
+      moonOwner: true,
+    });
     // The miner's line takes the live buy for want of a saved one.
     expect(pricesAtHubOnDate(data, 'jita', DATE).get(ZEOLITES)).toBe(1343);
     // The moon owner's figure is the saved sell, as the server prices its page.
     expect(moonOwnerPricesAtHubOnDate(data, 'jita', DATE).get(ZEOLITES)).toBe(900);
     // Nothing saved that day: 0 (unpriced), never the live book.
     expect(moonOwnerPricesAtHubOnDate(data, 'jita', '2026-09-05').get(ZEOLITES)).toBe(0);
+  });
+
+  it('builds no moon owner prices unless asked (Mining Tax never reads them)', async () => {
+    pricesMock.getHubPrices.mockResolvedValue(new Map());
+    hubSnapshotMock.loadHubSnapshotRange.mockResolvedValue({
+      saved: new Map([[DATE, new Map([[COMPRESSED_ZEOLITES, { buy: 800, sell: 900 }]])]]),
+    });
+    const data = await loadDatedUnitPricesByHub([ZEOLITES], ['jita'], [DATE]);
+    expect(moonOwnerPricesAtHubOnDate(data, 'jita', DATE).size).toBe(0);
   });
 });

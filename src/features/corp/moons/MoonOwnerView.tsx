@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, Panel, StatChip, StatChips, TextInput } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import type { FeederPayee, FeederView } from '../taxBook/feederViewClient';
+import { Button } from '@/components/ui/Button';
+import type { Payee } from '@/engine/corpTaxBook/payouts';
+import type { FeederView } from '../taxBook/feederViewClient';
 import {
   isSettledAfterLeaving,
   minedRows,
@@ -19,14 +20,13 @@ import { ChangePayeeDialog, PayeeLine } from './MoonOwnerPayee';
 import { isk, shortDate } from './moonsFormat';
 
 type Names = (characterId: number) => string;
-const day = (iso: string) => shortDate(iso);
 
 /** Page B's plain statement: who handles the tax, what is owed, what was paid. */
 function Statement({ view, name }: { view: FeederView; name: string }) {
   const { t } = useTranslation();
   const s = view.summary;
   const rate = s.effectiveRatePct;
-  const since = s.coverageFrom ? day(s.coverageFrom) : null;
+  const since = s.coverageFrom ? shortDate(s.coverageFrom) : null;
   const k = (key: string) => `corpTaxBook.moons.ownerView.statement.${key}`;
   return (
     <Panel>
@@ -43,7 +43,7 @@ function Statement({ view, name }: { view: FeederView; name: string }) {
                 ? t(k('paid'), {
                     paid: isk(s.paidIsk),
                     amount: isk(s.lastPayout.amount),
-                    date: day(s.lastPayout.date),
+                    date: shortDate(s.lastPayout.date),
                   })
                 : t(k('notPaid'))}
             </p>
@@ -60,7 +60,7 @@ function Statement({ view, name }: { view: FeederView; name: string }) {
               t(k('paid'), {
                 paid: isk(s.paidIsk),
                 amount: isk(s.lastPayout.amount),
-                date: day(s.lastPayout.date),
+                date: shortDate(s.lastPayout.date),
               })}
           </p>
         )}
@@ -98,7 +98,10 @@ function SettledOtherwise({ view, name }: { view: FeederView; name: string }) {
           value={t('corpTaxBook.moons.ownerView.units', { volume: isk(s.minedVolume) })}
         />
         {s.coverageFrom && (
-          <StatChip label={t('corpTaxBook.moons.ownerView.since')} value={day(s.coverageFrom)} />
+          <StatChip
+            label={t('corpTaxBook.moons.ownerView.since')}
+            value={shortDate(s.coverageFrom)}
+          />
         )}
       </StatChips>
     </>
@@ -175,21 +178,22 @@ function RateLine({
       <p>
         {note.kind === 'none' && t(k('none'))}
         {note.kind === 'plain' && t(k('plain'), { pct: note.pct })}
+        {note.kind === 'set' && t(k('set'), { pct: note.pct, name, date: shortDate(note.since) })}
         {note.kind === 'asked' && t(k('asked'), { pct: note.askedPct })}
         {note.kind === 'override' &&
           (note.since
             ? t(k('override'), {
                 pct: note.agreedPct,
                 name,
-                date: day(note.since),
+                date: shortDate(note.since),
                 asked: note.askedPct,
               })
             : t(k('overrideUndated'), { pct: note.agreedPct, name, asked: note.askedPct }))}
       </p>
       {onAskRate && (
-        <button type="button" className={inlineLinkClassName} onClick={onAskRate}>
-          {t(k('ask'))}
-        </button>
+        <Button size="sm" onClick={onAskRate}>
+          {t(k(note.kind === 'none' ? 'askFirst' : 'ask'))}
+        </Button>
       )}
     </div>
   );
@@ -208,7 +212,7 @@ function Payments({ view }: { view: FeederView }) {
     <ul className="space-y-0.5 text-xs text-text-dim">
       {rows.map((p, i) => (
         <li key={`${p.date}:${p.amount}:${i}`}>
-          {day(p.date)} · <span className="tabular-nums">{isk(p.amount)}</span> ·{' '}
+          {shortDate(p.date)} · <span className="tabular-nums">{isk(p.amount)}</span> ·{' '}
           {t(`corpTaxBook.moons.ownerView.payments.method.${METHOD[p.method]}`)} ·{' '}
           {t(`corpTaxBook.moons.ownerView.payments.status.${p.status}`)}
         </li>
@@ -273,7 +277,7 @@ export function MoonOwnerView({
   onRequestRate: (pct: number) => Promise<void>;
   /** Whose token the payee name search runs under; with `onSetPayee`, shows Change…. */
   characterId?: number;
-  onSetPayee?: (payee: FeederPayee) => Promise<void>;
+  onSetPayee?: (payee: Payee) => Promise<void>;
   banner?: ReactNode;
   card?: ReactNode;
   afterCard?: ReactNode;

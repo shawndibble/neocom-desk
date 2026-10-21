@@ -102,9 +102,22 @@ describe('rateNote', () => {
       kind: 'plain',
       pct: 6,
     });
+  });
+  it('says who set the rate and when, when they never asked', () => {
     expect(
       rateNote({ ...base, requestedRatePct: null, rateHistory: [base.rateHistory[1]!] })
-    ).toEqual({ kind: 'plain', pct: 8 });
+    ).toEqual({ kind: 'set', pct: 8, since: '2026-10-01' });
+  });
+  it('says who set the rate and when, without the ask, when they asked for the same', () => {
+    const history = [
+      ...base.rateHistory,
+      { kind: 'requested' as const, pct: 8, effectiveFrom: '2026-10-09', recordedAt: '2' },
+    ];
+    expect(rateNote({ ...base, requestedRatePct: 8, rateHistory: history })).toEqual({
+      kind: 'set',
+      pct: 8,
+      since: '2026-10-01',
+    });
   });
   it('comes from the last rate change and shows what is asked for now', () => {
     const history = [

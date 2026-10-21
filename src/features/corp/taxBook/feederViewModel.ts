@@ -42,6 +42,8 @@ export function isDismissed(s: FeederViewSummary): boolean {
 export type RateNote =
   | { kind: 'none' }
   | { kind: 'plain'; pct: number }
+  /** The accounting corporation set the rate; they never asked, or asked for the same. */
+  | { kind: 'set'; pct: number; since: string }
   /** The accounting corporation set a rate other than the one asked for. */
   | { kind: 'override'; agreedPct: number; since: string | null; askedPct: number }
   /** Asked for a rate, nothing agreed yet. */
@@ -56,7 +58,7 @@ export function rateNote(s: FeederViewSummary): RateNote {
   if (change) {
     const notice = rateNotice(change);
     return notice.askedPct === undefined
-      ? { kind: 'plain', pct: notice.pct }
+      ? { kind: 'set', pct: notice.pct, since: notice.date }
       : { kind: 'override', agreedPct: notice.pct, since: notice.date, askedPct: notice.askedPct };
   }
   if (s.agreedRatePct !== null) {

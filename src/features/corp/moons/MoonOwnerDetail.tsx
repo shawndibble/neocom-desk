@@ -21,7 +21,7 @@ import {
 } from './removalFlow';
 import { useCorporationName } from './statementMailing';
 import { useBook } from './useBook';
-import { useMoonOwners } from './useMoonOwners';
+import { useMoonOwnersInput } from './useMoonOwners';
 
 const BACK = '/corp/moons/moon-owners';
 
@@ -31,7 +31,7 @@ export function MoonOwnerDetail({ id }: { id: string }) {
   const { names, canEdit, characterId, corporationId, reload, data } = useBook();
   const grantedScopes = useGrantedScopes();
   const accountingName = useCorporationName();
-  const { input } = useMoonOwners();
+  const input = useMoonOwnersInput();
   const [dialog, setDialog] = useState<'rate' | 'settled' | 'remove' | 'pay' | 'add' | null>(null);
   const corp = Number(id);
   const detail = /^\d+$/.test(id) ? moonOwnerDetail(input, corp) : undefined;

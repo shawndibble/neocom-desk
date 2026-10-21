@@ -95,6 +95,33 @@ describe('outgoingDonationsFromJournal', () => {
       },
     ]);
   });
+
+  it('keeps a corporation wallet "Give ISK", journaled as a corporation account withdrawal', () => {
+    const rows = outgoingDonationsFromJournal(
+      [
+        {
+          id: 5,
+          date: '2026-10-18T10:00:00Z',
+          ref_type: 'corporation_account_withdrawal',
+          amount: -4e6,
+          first_party_id: 9,
+          second_party_id: 77,
+        },
+        // A move between the corporation's own divisions is not a payment to anyone.
+        {
+          id: 6,
+          date: '2026-10-18T10:00:00Z',
+          ref_type: 'corporation_account_withdrawal',
+          amount: -4e6,
+          first_party_id: 9,
+          second_party_id: 9,
+        },
+      ],
+      1,
+      9
+    );
+    expect(rows.map((r) => [r.refId, r.recipientId, r.amount])).toEqual([[5, 77, 4_000_000]]);
+  });
 });
 
 describe('reconcileOutgoing', () => {

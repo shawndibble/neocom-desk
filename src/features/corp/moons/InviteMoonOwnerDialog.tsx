@@ -11,7 +11,8 @@ import {
 } from '../taxBook/feederClient';
 import { parseRequestedRate } from '../taxBook/feederViewModel';
 import { Label } from './BookDialogs';
-import { editErrorMessage } from './useBook';
+import { callableErrorText } from './feederErrorText';
+import { InviteLinkField } from './InviteLinkField';
 import { shortDate } from './moonsFormat';
 
 const k = (key: string) => `corpTaxBook.moons.moonOwners.dialogs.invite.${key}`;
@@ -38,7 +39,6 @@ export function InviteMoonOwnerDialog({
   const [offer, setOffer] = useState('');
   const [link, setLink] = useState<{ url: string; inviteId: string } | null>(null);
   const [revoking, setRevoking] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,7 +55,7 @@ export function InviteMoonOwnerDialog({
       (e) => {
         if (cancelled) return;
         setInvites([]);
-        setError(editErrorMessage(e) || t(k('loadFailed')));
+        setError(callableErrorText(t, e, k('loadFailed')));
       }
     );
     return () => {
@@ -83,10 +83,9 @@ export function InviteMoonOwnerDialog({
         offered ?? undefined
       );
       setLink({ url: inviteLink(window.location.origin, code), inviteId });
-      setCopied(false);
       await refresh();
     } catch (e) {
-      setError(editErrorMessage(e));
+      setError(callableErrorText(t, e, 'corpTaxBook.moons.dialogs.failed'));
     } finally {
       setBusy(false);
     }
@@ -100,18 +99,9 @@ export function InviteMoonOwnerDialog({
       if (link?.inviteId === inviteId) setLink(null);
       await refresh();
     } catch (e) {
-      setError(editErrorMessage(e));
+      setError(callableErrorText(t, e, 'corpTaxBook.moons.dialogs.failed'));
     } finally {
       setRevoking(null);
-    }
-  };
-  const copy = async () => {
-    if (link === null) return;
-    try {
-      await navigator.clipboard.writeText(link.url);
-      setCopied(true);
-    } catch {
-      // The field is selectable; the officer can copy by hand.
     }
   };
 
@@ -139,14 +129,7 @@ export function InviteMoonOwnerDialog({
         </Button>
         {link !== null && (
           <div className="space-y-2">
-            <Label text={t(k('link'))}>
-              <TextInput readOnly value={link.url} onFocus={(e) => e.currentTarget.select()} />
-            </Label>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" onClick={() => void copy()}>
-                {copied ? t(k('copied')) : t(k('copy'))}
-              </Button>
-            </div>
+            <InviteLinkField url={link.url} />
             <p className="text-xs text-text-dim">{t(k('warning'))}</p>
           </div>
         )}
@@ -178,7 +161,7 @@ export function InviteMoonOwnerDialog({
                   aria-label={t(k('revokeLabel'), {
                     date: shortDate(new Date(i.createdAt).toISOString()),
                   })}
-                  disabled={revoking === i.inviteId}
+                  loading={revoking === i.inviteId}
                   onClick={() => void revoke(i.inviteId)}
                 >
                   {t(k('revoke'))}

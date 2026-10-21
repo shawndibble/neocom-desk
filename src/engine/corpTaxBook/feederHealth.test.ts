@@ -3,6 +3,7 @@ import {
   FEEDER_DISCONNECT_DAYS,
   advanceFeederHealth,
   disconnectedCoverage,
+  splitByCoverageAndRead,
   withholdUnreadFeederDays,
   type FeederHealth,
 } from './feederHealth';
@@ -180,5 +181,31 @@ describe('withholdUnreadFeederDays', () => {
         (e) => e.characterId
       )
     ).toEqual([2]);
+  });
+});
+
+describe('splitByCoverageAndRead', () => {
+  it('splits rows into readable, unread (held by a read) and outside coverage', () => {
+    const outside = entry(1, '2026-09-01', 7);
+    const read = entry(1, '2026-10-10', 7);
+    const notRead = entry(2, '2026-10-18', 7);
+    const sameDay = entry(2, '2026-10-18');
+    const own = entry(3, '2026-10-18');
+    const feeders = [
+      {
+        corporationId: 7,
+        coveragePeriods: [{ from: '2026-10-01' }],
+        lastReadWellAt: '2026-10-12T00:00:00.000Z',
+      },
+    ];
+    const split = splitByCoverageAndRead([outside, read, notRead, sameDay, own], {
+      now: NOW,
+      graceHours: 6,
+      bookCorporationId: 99,
+      feeders,
+    });
+    expect(split.outsideCoverage).toEqual([outside]);
+    expect(split.readable).toEqual([read, own]);
+    expect(split.unread).toEqual([notRead, sameDay]);
   });
 });

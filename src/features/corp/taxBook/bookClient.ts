@@ -32,7 +32,11 @@ import type {
   SyncGap,
 } from '@/engine/corpTaxBook/sync';
 import { scheduledSyncFrom, type ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
-import type { FeederModeChange, FeederPayout } from '@/engine/corpTaxBook/feederAccrual';
+import type {
+  FeederMode,
+  FeederModeChange,
+  FeederPayout,
+} from '@/engine/corpTaxBook/feederAccrual';
 import type { FeederReadClock } from '@/engine/corpTaxBook/feederHealth';
 import type { RemovalNoticeRecord } from '@/engine/corpTaxBook/mailQueue';
 import type { OwnerRateEntry } from '@/engine/corpTaxBook/ownerRate';
@@ -87,7 +91,8 @@ export interface SyncReceipt {
   donationsAdded: number;
 }
 
-async function call<In, Out>(characterId: number, name: string, data: In): Promise<Out> {
+/** One Corp Tax Book callable, signed in as `characterId`; the other taxBook clients share it. */
+export async function call<In, Out>(characterId: number, name: string, data: In): Promise<Out> {
   await ensureSignedIn(characterId);
   const result = await httpsCallable<In, Out>(getSyncFunctions(), name)(data);
   return result.data;
@@ -334,7 +339,7 @@ export type FeederPayoutRow = FeederPayout & { id: string };
  */
 export interface BookFeeder extends FeederReadClock {
   status: 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
-  mode: 'normal' | 'settled-otherwise';
+  mode: FeederMode;
   note?: string;
   invitedBy: number;
   joinedAt: number;

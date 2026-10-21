@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { OfficerVerdict } from '../taxBook/bookClient';
-import type { FeederStatus } from '../taxBook/feederClient';
+import type { FeederSetupStatus } from '../taxBook/feederClient';
 import { MoonsSetup } from './MoonsSetup';
 import { fixtureView } from './ownerViewFixtures';
 
@@ -37,7 +37,7 @@ const verdict = {
   canEdit: true,
   bookActive: false,
 } as OfficerVerdict;
-const owner: FeederStatus = {
+const owner: FeederSetupStatus = {
   status: 'feeder',
   collectorCorporationId: 5,
   collectorName: 'B-UH Accounting',

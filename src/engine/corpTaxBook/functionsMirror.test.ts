@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as mirror from '../../../functions/src/corpTaxBookEngine';
-import { allocatePayments, dismissalCredits } from './allocation';
+import { allocatePayments, dismissalCredits, isBeforeBook } from './allocation';
 import { placeOfFactory } from './bookView';
 import { FORFEIT_NO_REPLY_DAYS, forfeitAllowed } from './closeAccount';
 import type { Dismissal } from './dismissals';
@@ -14,11 +14,23 @@ import {
   disconnectedCoverage,
   type FeederHealth,
 } from './feederHealth';
-import { accrueValuedDays, feederBalance, onPayList } from './feederAccrual';
 import {
+  accrueValuedDays,
+  deriveModeChanges,
+  deriveOwnerRateHistory,
+  feederBalance,
+  feederBillableRule,
+  onPayList,
+} from './feederAccrual';
+import {
+  balanceAfter,
   buildRecordedPayout,
   outgoingDonationsFromJournal,
+  PAYOUT_LINK_WINDOW_DAYS,
   payeeIdsAt,
+  payoutId,
+  payoutPeriod,
+  payoutReason,
   payoutToMerge,
   reconcileBookOutgoing,
   withPayeeChange,
@@ -37,6 +49,8 @@ import {
 } from './statements';
 import type { ObservedRow } from './types';
 import * as removal from './removal';
+import { effectiveOwnerRate } from './ownerRate';
+import { moonOwnerMailRecipients } from './ownerRateMail';
 
 // `functions/` cannot import `src/`, so the callables enforce a mirror of these
 // engine functions (functions/src/corpTaxBookEngine.ts). This keeps the two
@@ -447,6 +461,38 @@ describe('feeder view mirror', () => {
     expect(mirror.dayClosesAt('2026-06-01')).toBe(dayClosesAt('2026-06-01'));
   });
 
+  it('applies the moon owner Billable rule the same', () => {
+    const closes = Date.parse(dayClosesAt('2026-06-30', 6));
+    for (const lastRead of [undefined, closes - 1, closes, closes + 1, Date.parse('2027-01-01')]) {
+      for (const grace of [0, 6, 30]) {
+        for (const day of ['2026-06-29', '2026-06-30', '2026-07-01', '2026-12-31']) {
+          expect(mirror.feederBillableRule(lastRead, grace)(day)).toBe(
+            feederBillableRule(lastRead, grace)(day)
+          );
+        }
+      }
+    }
+  });
+
+  it("derives a record's rate history and mode switches the same", () => {
+    const history = [
+      { kind: 'agreed' as const, pct: 5, effectiveFrom: '2026-06-02', recordedAt: 'x' },
+    ];
+    const modeChanges = [{ from: '2026-06-03', mode: 'normal' as const }];
+    const joinedAt = Date.parse('2026-06-01T23:59:59.999Z');
+    for (const record of [
+      { joinedAt, mode: 'normal' as const },
+      { joinedAt, mode: 'settled-otherwise' as const },
+      { joinedAt, mode: 'settled-otherwise' as const, modeChanges },
+      { joinedAt, requestedRatePct: 6 },
+      { joinedAt, requestedRatePct: 6, agreedRatePct: 8 },
+      { joinedAt, agreedRatePct: 8, ownerRateHistory: history },
+    ]) {
+      expect(mirror.deriveOwnerRateHistory(record)).toEqual(deriveOwnerRateHistory(record));
+      expect(mirror.deriveModeChanges(record)).toEqual(deriveModeChanges(record));
+    }
+  });
+
   it("prices a moon owner's ore the same (#4621)", () => {
     for (const side of [
       undefined,
@@ -495,8 +541,26 @@ describe('feeder view mirror', () => {
         amount: 6e6,
         first_party_id: 77,
       },
+      // A corporation wallet "Give ISK" (#4504 B1); a move between its own divisions is not.
+      {
+        id: 4,
+        date: '2026-10-19T11:00:00Z',
+        ref_type: 'corporation_account_withdrawal',
+        amount: -7e6,
+        first_party_id: 9,
+        second_party_id: 77,
+      },
+      {
+        id: 5,
+        date: '2026-10-19T11:00:00Z',
+        ref_type: 'corporation_account_withdrawal',
+        amount: -7e6,
+        first_party_id: 9,
+        second_party_id: 9,
+      },
     ];
     const outgoing: OutgoingDonation[] = outgoingDonationsFromJournal(journal, 1, 9);
+    expect(outgoing.map((o) => o.refId)).toEqual([1, 2, 4]);
     expect(mirror.outgoingDonationsFromJournal(journal, 1, 9)).toEqual(outgoing);
     const payouts = [
       {
@@ -569,5 +633,113 @@ describe('removal mirror (#4520)', () => {
       payeeCeoId: 4,
     };
     expect(mirror.removalRecipients(rec)).toEqual(removal.removalRecipients(rec));
+  });
+});
+
+describe('remaining engine parity (#4515, #4520, #4621)', () => {
+  it('effectiveOwnerRatePct agrees: agreed wins, ties, nothing yet', () => {
+    const history = [
+      { kind: 'requested' as const, pct: 8, effectiveFrom: '2026-06-01', recordedAt: 'a' },
+      { kind: 'agreed' as const, pct: 5, effectiveFrom: '2026-06-04', recordedAt: '1' },
+      { kind: 'agreed' as const, pct: 7, effectiveFrom: '2026-06-04', recordedAt: '2' },
+    ];
+    for (const date of ['2026-05-31', '2026-06-01', '2026-06-04', '2026-07-01']) {
+      expect(mirror.effectiveOwnerRatePct(history, date)).toBe(
+        effectiveOwnerRate(history, date)?.pct
+      );
+    }
+    expect(mirror.effectiveOwnerRatePct([], '2026-06-01')).toBeUndefined();
+  });
+
+  it('removal state guards agree', () => {
+    const states = ['active', 'pending-removal', 'removed', 'left', 'disconnected'] as const;
+    const by = { characterId: 1, name: 'A' };
+    for (const status of states) {
+      expect(mirror.canStartRemoval({ status })).toBe(removal.canStartRemoval({ status }));
+    }
+    const pending = removal.startRemoval({ status: 'active' }, by, 5);
+    expect(mirror.cancelRemoval(pending)).toEqual(removal.cancelRemoval(pending));
+    expect(() => mirror.cancelRemoval({ status: 'active' })).toThrow();
+    expect(() => removal.cancelRemoval({ status: 'active' })).toThrow();
+  });
+
+  it('payee helpers agree', () => {
+    const payees = [
+      undefined,
+      { kind: 'character' as const, id: 7 },
+      { kind: 'corporation' as const, id: 9 },
+    ];
+    for (const payee of payees) {
+      for (const characterId of [7, 8]) {
+        for (const payeeCorporationCeoId of [undefined, 7, 8]) {
+          const input = { payee, characterId, payeeCorporationCeoId };
+          expect(mirror.isPayeeActor(input)).toBe(removal.isPayeeActor(input));
+        }
+      }
+    }
+    const recs = [
+      { payee: { kind: 'character' as const, id: 7 } },
+      { payee: { kind: 'character' as const, id: 7 }, payeeChangedAt: 3 },
+      {},
+    ];
+    for (const rec of recs) {
+      for (const p of [
+        { kind: 'character' as const, id: 7 },
+        { kind: 'corporation' as const, id: 7 },
+      ]) {
+        expect(mirror.withPayee(rec, p, 99)).toEqual(removal.withPayee(rec, p, 99));
+      }
+    }
+  });
+
+  it('moonOwnerMailRecipients agrees', () => {
+    const inputs = [
+      { ceoId: 1, payee: { kind: 'character' as const, id: 1 } },
+      { ceoId: 1, payee: { kind: 'character' as const, id: 2 } },
+      { ceoId: 1, payee: { kind: 'corporation' as const, id: 9 }, payeeCeoId: 3 },
+      { ceoId: 1, payee: { kind: 'corporation' as const, id: 9 }, payeeCeoId: null },
+      { ceoId: null },
+    ];
+    for (const input of inputs) {
+      expect(mirror.moonOwnerMailRecipients(input)).toEqual(moonOwnerMailRecipients(input));
+    }
+  });
+
+  it('payout helpers agree', () => {
+    expect(mirror.PAYOUT_LINK_WINDOW_DAYS).toBe(PAYOUT_LINK_WINDOW_DAYS);
+    expect(mirror.payoutId({ division: 2, refId: 55 })).toBe(payoutId({ division: 2, refId: 55 }));
+    const period = { from: '2026-10-01', to: '2026-10-09' };
+    for (const p of [period, undefined]) {
+      expect(mirror.payoutReason('Moon mining payout', p)).toBe(
+        payoutReason('Moon mining payout', p)
+      );
+    }
+    const days = ['2026-10-03', '2026-10-01', '2026-10-09'].map((date) => ({ date }));
+    const paid = [
+      { date: '2026-10-02', notAPayout: false },
+      { date: '2026-10-08', notAPayout: true },
+    ];
+    for (const [d, p] of [
+      [days, paid],
+      [days, []],
+      [days, [{ date: '2026-10-09', notAPayout: false }]],
+      [[], paid],
+    ] as const) {
+      expect(mirror.payoutPeriod(d, p)).toEqual(payoutPeriod(d, p));
+    }
+    for (const [balance, sent] of [
+      [100.5, 100],
+      [100, 100],
+      [50, 100.9],
+      [0, 0],
+    ] as const) {
+      expect(mirror.balanceAfter(balance, sent)).toEqual(balanceAfter(balance, sent));
+    }
+  });
+
+  it('isBeforeBook agrees', () => {
+    for (const at of ['2026-09-30T23:59:59Z', '2026-10-01T00:00:00Z', '2026-10-02']) {
+      expect(mirror.isBeforeBook(at, '2026-10-01')).toBe(isBeforeBook(at, '2026-10-01'));
+    }
   });
 });

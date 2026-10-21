@@ -2,7 +2,7 @@
  * The Corp Tax Book's officer dialogs (#4056 steps 5-9, #4063): every one is a
  * `Modal` (a sheet on a phone) that says who it is logged as, runs one edit
  * through `useBook().edit` (`editBook`, role re-checked live on the server)
- * and shows the server's message when it refuses.
+ * and shows the refusal's mapped reason when it refuses.
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,7 +20,8 @@ import {
 } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { editErrorMessage, useBook } from './useBook';
+import { callableErrorText } from './feederErrorText';
+import { useBook } from './useBook';
 import { isk, newId } from './moonsFormat';
 
 export function Label({ text, children }: { text: ReactNode; children: ReactNode }) {
@@ -66,7 +67,7 @@ export function DialogShell({
       await run();
       onClose();
     } catch (e) {
-      setError(editErrorMessage(e));
+      setError(callableErrorText(t, e, 'corpTaxBook.moons.dialogs.failed'));
     } finally {
       setBusy(false);
     }

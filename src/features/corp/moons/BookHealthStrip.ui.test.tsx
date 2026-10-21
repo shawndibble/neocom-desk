@@ -19,7 +19,8 @@ const sync = {
 function renderStrip(
   scheduledSync: ScheduledSyncStatus | null,
   strip: CorpTaxBookSync = sync,
-  feeders: unknown[] = []
+  feeders: unknown[] = [],
+  settings: { membersSeeFrom?: number } = {}
 ) {
   render(
     <MemoryRouter>
@@ -31,6 +32,7 @@ function renderStrip(
             view: { unrated: [], billableThrough: null, input: { graceHours: 6 } },
             names: { refinery: () => 'Efa - Brass Anvil' },
             data: { scheduledSync, feeders },
+            settings,
             verdict: { canEdit: true },
             reload: vi.fn(),
           } as unknown as Omit<BookContextValue, 'edit' | 'canEdit'>
@@ -97,5 +99,17 @@ describe('BookHealthStrip, scheduled sync', () => {
   it('says nothing extra while the schedule is running', () => {
     renderStrip({ status: 'active', characterId: 9, characterName: 'Pilot 9', enabledAt: 1 });
     expect(screen.queryByText(/Automatic sync stopped/)).not.toBeInTheDocument();
+  });
+});
+
+describe('BookHealthStrip, member hold', () => {
+  it('tells officers when members start to see a new book', () => {
+    renderStrip(null, sync, [], { membersSeeFrom: Date.now() + 3_600_000 });
+    expect(screen.getByText(/Hidden from members until/)).toBeInTheDocument();
+  });
+
+  it('says nothing once the hold has run out', () => {
+    renderStrip(null, sync, [], { membersSeeFrom: Date.now() - 1000 });
+    expect(screen.queryByText(/Hidden from members/)).toBeNull();
   });
 });

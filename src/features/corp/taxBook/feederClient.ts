@@ -3,11 +3,11 @@
  * reading where the corporation stands, and leaving. The grant itself is
  * `feederGrant.ts`. Player-facing text never says feeder or Collector.
  */
-import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
+import type { FeederMode } from '@/engine/corpTaxBook/feederAccrual';
 import type { OutgoingDonation } from '@/engine/corpTaxBook/payouts';
-import { getSyncFunctions } from '@/sync/firebaseApp';
-import { ensureSignedIn } from '@/sync/syncAuth';
+import { callableErrorReason } from '@/lib/callableError';
+import { call } from './bookClient';
 
 /** The query parameter an invite link carries its code in. */
 export const INVITE_PARAM = 'invite';
@@ -38,7 +38,7 @@ export interface FeederRefinery {
   volume: number;
 }
 
-export type FeederStatus =
+export type FeederSetupStatus =
   /** `ownBookFrom`: a former moon owner's earliest own-book start (UTC day). */
   | {
       status: 'none';
@@ -62,27 +62,21 @@ export type FeederStatus =
       previousCollectorIds?: number[];
     };
 
-async function call<In, Out>(characterId: number, name: string, data: In): Promise<Out> {
-  await ensureSignedIn(characterId);
-  return (await httpsCallable<In, Out>(getSyncFunctions(), name)(data)).data;
-}
-
 /** Where this corporation stands as a moon owner. Roles are checked live, so the access token travels. */
 export async function getFeederStatus(
   characterId: number,
   corporationId: number
-): Promise<FeederStatus> {
+): Promise<FeederSetupStatus> {
   const accessToken = await getValidAccessToken(characterId);
   try {
-    return await call<{ corporationId: number; accessToken: string }, FeederStatus>(
+    return await call<{ corporationId: number; accessToken: string }, FeederSetupStatus>(
       characterId,
       'getCorpTaxBookFeederStatusCallable',
       { corporationId, accessToken }
     );
   } catch (error) {
     // A member who may not see the corporation's standing sees the ordinary choices.
-    const reason = (error as { details?: { reason?: unknown } } | null)?.details?.reason;
-    if (reason === 'not-your-feeder') return { status: 'none' };
+    if (callableErrorReason(error) === 'not-your-feeder') return { status: 'none' };
     throw error;
   }
 }
@@ -154,7 +148,7 @@ export async function setFeederMode(
   characterId: number,
   corporationId: number,
   feederCorporationId: number,
-  mode: 'normal' | 'settled-otherwise',
+  mode: FeederMode,
   note?: string
 ): Promise<{ ok: true }> {
   const accessToken = await getValidAccessToken(characterId);
@@ -209,6 +203,8 @@ export async function reconcileFeederPayouts(
 ): Promise<{ attached: number; recorded: number }> {
   return call(characterId, 'reconcileCorpTaxBookFeederPayoutsCallable', {
     corporationId,
+    accessToken: await getValidAccessToken(characterId),
+    // Old servers require it; the new one reads the journal itself.
     outgoing,
   });
 }

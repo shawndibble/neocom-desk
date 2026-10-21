@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   accrueFeeder,
+  deriveModeChanges,
+  deriveOwnerRateHistory,
   feederBalance,
+  feederBillableRule,
   onPayList,
   type FeederAccrualInput,
   type FeederPayout,
@@ -186,5 +189,64 @@ describe('onPayList', () => {
     expect(onPayList(feederBalance(500, []))).toBe(true);
     expect(onPayList(feederBalance(0.5, []))).toBe(false);
     expect(onPayList(feederBalance(0, [payout(5)]))).toBe(false);
+  });
+});
+
+describe('feederBillableRule', () => {
+  // 2026-10-10 closes at 2026-10-11T06:00Z with a 6h grace.
+  const closes = Date.parse('2026-10-11T06:00:00.000Z');
+
+  it('a day is Billable once a good read lands at or after it closes', () => {
+    expect(feederBillableRule(closes, 6)('2026-10-10')).toBe(true);
+    expect(feederBillableRule(closes - 1, 6)('2026-10-10')).toBe(false);
+    expect(feederBillableRule(closes, 6)('2026-10-11')).toBe(false);
+  });
+
+  it('the grace moves the close', () => {
+    expect(feederBillableRule(Date.parse('2026-10-11T00:00:00.000Z'), 0)('2026-10-10')).toBe(true);
+    expect(feederBillableRule(Date.parse('2026-10-11T00:00:00.000Z'), 6)('2026-10-10')).toBe(false);
+  });
+
+  it('never read well: nothing is Billable', () => {
+    expect(feederBillableRule(undefined, 6)('2000-01-01')).toBe(false);
+  });
+});
+
+describe('deriving a feeder record’s rules', () => {
+  const joinedAt = Date.parse('2026-10-01T12:00:00.000Z');
+
+  it('a stored rate history or mode list is returned as is', () => {
+    const history = [
+      { kind: 'agreed' as const, pct: 5, effectiveFrom: '2026-10-02', recordedAt: 'x' },
+    ];
+    const modeChanges = [{ from: '2026-10-03', mode: 'normal' as const }];
+    expect(deriveOwnerRateHistory({ joinedAt, ownerRateHistory: history, agreedRatePct: 9 })).toBe(
+      history
+    );
+    expect(deriveModeChanges({ joinedAt, mode: 'settled-otherwise', modeChanges })).toBe(
+      modeChanges
+    );
+  });
+
+  it('derives from the scalar fields, dated the join day', () => {
+    expect(deriveOwnerRateHistory({ joinedAt, requestedRatePct: 6, agreedRatePct: 8 })).toEqual([
+      {
+        kind: 'requested',
+        pct: 6,
+        effectiveFrom: '2026-10-01',
+        recordedAt: '2026-10-01T12:00:00.000Z',
+      },
+      {
+        kind: 'agreed',
+        pct: 8,
+        effectiveFrom: '2026-10-01',
+        recordedAt: '2026-10-01T12:00:00.000Z',
+      },
+    ]);
+    expect(deriveOwnerRateHistory({ joinedAt })).toEqual([]);
+    expect(deriveModeChanges({ joinedAt, mode: 'settled-otherwise' })).toEqual([
+      { from: '2026-10-01', mode: 'settled-otherwise' },
+    ]);
+    expect(deriveModeChanges({ joinedAt, mode: 'normal' })).toEqual([]);
   });
 });

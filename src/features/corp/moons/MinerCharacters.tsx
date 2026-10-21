@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Button, Panel, textActionClassName } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { GroupMinersDialog } from './GroupMinersDialog';
-import { editErrorMessage, useBook } from './useBook';
+import { callableErrorText } from './feederErrorText';
+import { useBook } from './useBook';
 
 /** The stored grouping carries the guest-confirmation state the engine's Miner shape leaves out (D26b). */
 interface StoredGrouping {
@@ -41,7 +42,7 @@ export function MinerCharacters({ miner }: { miner: MinerRow }) {
     try {
       await action();
     } catch (e) {
-      setError(editErrorMessage(e));
+      setError(callableErrorText(t, e, 'corpTaxBook.moons.dialogs.failed'));
     }
   };
   const makeMain = (characterId: number) =>

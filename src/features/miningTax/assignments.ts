@@ -695,32 +695,60 @@ export async function deleteAssignments(
   }
 }
 
+/** What "Let the corporation bill it" re-prices the kept ore at, and the Ore Form it priced in. */
+export interface ReleasePrices {
+  prices: ReadonlyMap<number, number>;
+  compressed: boolean;
+}
+
+/**
+ * The prices `releaseOreFromAssignment` needs: the Assignment's Payee's hub on its mined
+ * day, in the current Ore Form. Run before the write's transaction: it reads market data.
+ */
+export async function loadReleasePrices(
+  assignment: MiningTaxAssignmentRecord,
+  remaining: readonly MiningTaxOreLine[]
+): Promise<ReleasePrices> {
+  const payee =
+    assignment.payeeId === undefined
+      ? undefined
+      : (await loadPayees(assignment.characterId)).find((p) => p.id === assignment.payeeId);
+  const compressed = currentCompressedOre();
+  const { prices } = await loadUnitPricesOnDate(
+    remaining.filter((l) => l.quantity > 0).map((line) => line.typeId),
+    hubForPayee(payee?.hubId),
+    assignment.date,
+    compressed
+  );
+  return { prices, compressed };
+}
+
 /**
  * "Let the corporation bill it" (issue #4517): takes ore off an Assignment because
- * the Corp Tax Book bills it, keeping what is left at the same price per unit.
- * Nothing left deletes it. A per-ore-type value correction does not survive, as in
- * a split. Returns the changed record, or undefined when it was deleted.
+ * the Corp Tax Book bills it. What is left is re-priced per ore type at `priced`
+ * (`loadReleasePrices`), as a split re-prices each side (`splitAssignment`): a
+ * hand-edited value or per-ore-type correction does not survive. Nothing left
+ * deletes it. Returns the changed record, or undefined when it was deleted.
  */
 export async function releaseOreFromAssignment(
   assignment: MiningTaxAssignmentRecord,
-  remaining: readonly MiningTaxOreLine[]
+  remaining: readonly MiningTaxOreLine[],
+  priced: ReleasePrices
 ): Promise<MiningTaxAssignmentRecord | undefined> {
   const kept = remaining.filter((l) => l.quantity > 0);
   if (kept.length === 0) {
     await deleteAssignments([assignment]);
     return undefined;
   }
-  const quantity = (lines: readonly MiningTaxOreLine[]) =>
-    lines.reduce((sum, l) => sum + l.quantity, 0);
-  const estimatedValue =
-    (assignment.estimatedValue * quantity(kept)) / quantity(assignment.oreLines);
-  const next: MiningTaxAssignmentRecord = {
-    ...assignment,
-    oreLines: kept,
-    estimatedValue,
-    taxOwed: (estimatedValue * assignment.taxPct) / 100,
-    updatedAt: Date.now(),
-  };
+  const { estimatedValue, taxOwed } = computeAssignmentValue(
+    kept,
+    priced.prices,
+    assignment.taxPct
+  );
+  const next: MiningTaxAssignmentRecord = withOreFormMarker(
+    { ...assignment, oreLines: kept, estimatedValue, taxOwed, updatedAt: Date.now() },
+    priced.compressed
+  );
   delete next.oreLineValues;
   await db.miningTaxAssignments.put(next);
   return next;

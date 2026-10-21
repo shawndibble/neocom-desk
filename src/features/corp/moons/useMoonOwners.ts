@@ -6,10 +6,10 @@ import {
 } from '@/engine/corpTaxBook/moonOwners';
 import { useBook } from './useBook';
 
-/** The book's moon owners (feeders) as the tab and their page read them. */
-export function useMoonOwners() {
+/** What the moon owners are built from; cheap, for a page or dialog that reads one owner. */
+export function useMoonOwnersInput(): MoonOwnersInput {
   const { view, settings, data, corporationId } = useBook();
-  const input = useMemo<MoonOwnersInput>(
+  return useMemo<MoonOwnersInput>(
     () => ({
       now: view.input.now,
       graceHours: settings.graceHours,
@@ -22,12 +22,22 @@ export function useMoonOwners() {
     }),
     [view, settings, data.feeders, corporationId]
   );
-  const built = useMemo(() => buildMoonOwners(input), [input]);
+}
+
+/** Whether the Extractions tab shows: the corporation has refineries of its own. */
+export function useShowExtractions(): boolean {
+  const { view, data, corporationId } = useBook();
   const ownRefineries = useMemo(
     () => hasOwnRefineries(view.input.entries, data.state.extractions.length, corporationId),
     [view.input.entries, data.state.extractions.length, corporationId]
   );
   // A book with no moon owners yet may simply not have synced its own refineries: keep the tab.
-  const showExtractions = ownRefineries || (data.feeders ?? []).length === 0;
-  return { input, ...built, showExtractions };
+  return ownRefineries || (data.feeders ?? []).length === 0;
+}
+
+/** The book's moon owners (feeders) as the tab reads them; only the tab builds every row. */
+export function useMoonOwners() {
+  const input = useMoonOwnersInput();
+  const built = useMemo(() => buildMoonOwners(input), [input]);
+  return { input, ...built };
 }

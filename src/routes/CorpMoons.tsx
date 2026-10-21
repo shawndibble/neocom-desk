@@ -53,7 +53,7 @@ import { MOONS_TABS, moonsDetail } from '@/features/corp/moons/moonsPaths';
 import { StatementsTab } from '@/features/corp/moons/StatementsTab';
 import { MoonsSetup } from '@/features/corp/moons/MoonsSetup';
 import { useCorpBook } from '@/features/corp/moons/useCorpBook';
-import { useMoonOwners } from '@/features/corp/moons/useMoonOwners';
+import { useShowExtractions } from '@/features/corp/moons/useMoonOwners';
 
 function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
@@ -73,7 +73,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const { view, canEdit, characterId, corporationId, names } = useBook();
-  const { showExtractions } = useMoonOwners();
+  const showExtractions = useShowExtractions();
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
   // Back from EVE's page after the Automatic sync opt-in: show the settings it was pressed in.

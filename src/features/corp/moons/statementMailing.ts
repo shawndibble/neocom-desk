@@ -10,7 +10,7 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { useEntityName } from '@/features/character/useEntityName';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { StatementToMail } from '@/features/corpTaxBook/mailQueue';
-import { addDays, periodLabel } from './moonsFormat';
+import { addDays, periodLabel, refineryPlaceholder } from './moonsFormat';
 import type { BookContextValue } from './bookContextValue';
 import { useBook } from './useBook';
 
@@ -25,6 +25,24 @@ export function remindersStopped(statement: Statement): boolean {
 
 export function manualRemindersSent(statement: Statement): number {
   return (statement as Statement & { manualRemindersSent?: number }).manualRemindersSent ?? 0;
+}
+
+/**
+ * The refinery names an issued Statement carries, for a guest's verify page that cannot look them
+ * up. A refinery whose name is unknown is left out: the verify page shows its own placeholder.
+ */
+export function statementRefineryNames(
+  statement: Pick<Statement, 'lines'>,
+  names: Pick<BookContextValue['names'], 'refinery'>
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const { structureId } of statement.lines) {
+    if (!structureId) continue;
+    const name = names.refinery(structureId);
+    if (name.trim() !== '' && name !== refineryPlaceholder(structureId))
+      out[String(structureId)] = name;
+  }
+  return out;
 }
 
 export function mailTarget(

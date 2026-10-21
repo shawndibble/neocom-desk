@@ -475,10 +475,13 @@ export function effectiveOwnerRatePct(
     ?.pct;
 }
 
+/** Engine `FeederMode`. */
+export type FeederMode = 'normal' | 'settled-otherwise';
+
 /** Engine `FeederModeChange`. */
 export interface FeederModeChange {
   from: string;
-  mode: 'normal' | 'settled-otherwise';
+  mode: FeederMode;
 }
 
 /** Engine `FeederPayout`, the fields the balance reads. */
@@ -549,6 +552,46 @@ export function dayClosesAt(date: string, graceHours: number = BOOK_DEFAULTS.gra
   return new Date(
     Date.parse(`${shiftDate(date, 1)}T00:00:00Z`) + graceHours * HOUR_MS
   ).toISOString();
+}
+
+/** Engine `feederBillableRule`: a day is Billable once a good read (ms) landed after it closed. */
+export function feederBillableRule(
+  lastReadWellAt: number | undefined,
+  graceHours: number
+): (day: string) => boolean {
+  return (day) =>
+    lastReadWellAt !== undefined && lastReadWellAt >= Date.parse(dayClosesAt(day, graceHours));
+}
+
+/** Engine `FeederRulesRecord`: what a feeder record holds of its rates and mode. */
+export interface FeederRulesRecord {
+  joinedAt: number;
+  mode?: FeederMode;
+  requestedRatePct?: number;
+  agreedRatePct?: number;
+  ownerRateHistory?: OwnerRateEntry[];
+  modeChanges?: FeederModeChange[];
+}
+
+/** Engine `deriveOwnerRateHistory`: the stored history, or entries from the two rate fields dated the join day. */
+export function deriveOwnerRateHistory(record: FeederRulesRecord): OwnerRateEntry[] {
+  if (record.ownerRateHistory) return record.ownerRateHistory;
+  const effectiveFrom = new Date(record.joinedAt).toISOString().slice(0, 10);
+  const recordedAt = new Date(record.joinedAt).toISOString();
+  const out: OwnerRateEntry[] = [];
+  if (record.requestedRatePct !== undefined)
+    out.push({ kind: 'requested', pct: record.requestedRatePct, effectiveFrom, recordedAt });
+  if (record.agreedRatePct !== undefined)
+    out.push({ kind: 'agreed', pct: record.agreedRatePct, effectiveFrom, recordedAt });
+  return out;
+}
+
+/** Engine `deriveModeChanges`: the stored switches, or settled-otherwise from the join day. */
+export function deriveModeChanges(record: FeederRulesRecord): FeederModeChange[] {
+  if (record.modeChanges) return record.modeChanges;
+  return record.mode === 'settled-otherwise'
+    ? [{ from: new Date(record.joinedAt).toISOString().slice(0, 10), mode: 'settled-otherwise' }]
+    : [];
 }
 
 /** Engine `moonOwnerUnitPrice` (#4621): saved open buy, else open sell, else 0. */
@@ -743,6 +786,12 @@ export const payoutId = (d: Pick<OutgoingDonation, 'division' | 'refId'>) =>
 const dayIndex = (date: string) =>
   Math.floor(Date.parse(`${date.slice(0, 10)}T00:00:00Z`) / DAY_MS);
 
+/** Engine `OUTGOING_REF_TYPES`: a corporation wallet's "Give ISK" is a withdrawal. */
+const OUTGOING_REF_TYPES: ReadonlySet<string> = new Set([
+  'player_donation',
+  'corporation_account_withdrawal',
+]);
+
 /** ISK the corporation's wallet donated to someone else (the amount is negative on the journal). */
 export function outgoingDonationsFromJournal(
   entries: readonly JournalEntryOut[],
@@ -751,9 +800,11 @@ export function outgoingDonationsFromJournal(
 ): OutgoingDonation[] {
   const out: OutgoingDonation[] = [];
   for (const e of entries) {
-    if (e.ref_type !== 'player_donation') continue;
+    if (!OUTGOING_REF_TYPES.has(e.ref_type)) continue;
     if (!(typeof e.amount === 'number' && e.amount < 0)) continue;
     if (e.first_party_id !== corporationId || e.second_party_id === undefined) continue;
+    // A move between the corporation's own divisions pays nobody.
+    if (e.second_party_id === corporationId) continue;
     if (!Number.isSafeInteger(e.id) || Number.isNaN(Date.parse(e.date))) continue;
     out.push({
       refId: e.id,

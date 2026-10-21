@@ -97,7 +97,21 @@ describe('rateChangeEvent', () => {
       oldPct: 6,
       newPct: 8,
       requestedPct: 6,
+      recordedAt: '2026-10-05T00:00:00Z',
     });
+  });
+
+  it('is told apart by when it was recorded: 8% to 6% and back to 8% on one day are three changes', () => {
+    const first = [agreed(8, '2026-10-05', '2026-10-05T10:00:00Z')];
+    const second = [...first, agreed(6, '2026-10-05', '2026-10-05T11:00:00Z')];
+    const third = [...second, agreed(8, '2026-10-05', '2026-10-05T12:00:00Z')];
+    const date = '2026-10-05';
+    expect(rateChangeEvent({ before: first, after: second, date })?.recordedAt).toBe(
+      '2026-10-05T11:00:00Z'
+    );
+    expect(rateChangeEvent({ before: second, after: third, date })?.recordedAt).toBe(
+      '2026-10-05T12:00:00Z'
+    );
   });
 
   it('reports no old rate for a first rate', () => {
@@ -106,7 +120,7 @@ describe('rateChangeEvent', () => {
       after: [agreed(8, '2026-10-05')],
       date: '2026-10-05',
     });
-    expect(event).toEqual({ date: '2026-10-05', newPct: 8 });
+    expect(event).toEqual({ date: '2026-10-05', newPct: 8, recordedAt: '2026-10-05T00:00:00Z' });
   });
 
   it('is undefined when the effective rate did not change', () => {
@@ -131,7 +145,13 @@ describe('rateChangeEvent', () => {
     const before = [req(6, '2026-10-01')];
     expect(
       rateChangeEvent({ before, after: [...before, req(5, '2026-10-08')], date: '2026-10-08' })
-    ).toEqual({ date: '2026-10-08', oldPct: 6, newPct: 5, requestedPct: 5 });
+    ).toEqual({
+      date: '2026-10-08',
+      oldPct: 6,
+      newPct: 5,
+      requestedPct: 5,
+      recordedAt: '2026-10-08T00:00:00Z',
+    });
   });
 });
 
@@ -143,6 +163,7 @@ describe('latestRateChange', () => {
       oldPct: 6,
       newPct: 8,
       requestedPct: 7,
+      recordedAt: '2026-10-05T00:00:00Z',
     });
   });
 

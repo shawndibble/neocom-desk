@@ -5,7 +5,7 @@
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import { record } from './communities.js';
-import { ACCESS_TTL_MS, FEEDERS } from './corpTaxBook.js';
+import { ACCESS_TTL_MS, pctField } from './corpTaxBook.js';
 import { type CorpSyncDeps } from './corpSyncGrant.js';
 import type { IdCategoryLookup } from './corpTaxBookEsi.js';
 import { withPayee, withPayeeChange, type Payee, type PayeeChange } from './corpTaxBookEngine.js';
@@ -23,7 +23,7 @@ import {
   type FeederViewerAccess,
 } from './corpTaxBookFeederView.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
-import { appendAudit, bookRef, type BookDeps, type Caller } from './corpTaxBookStore.js';
+import { appendAudit, fail, feederRef, type BookDeps, type Caller } from './corpTaxBookStore.js';
 
 export { parseFeederCall };
 
@@ -35,14 +35,6 @@ const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
   ...(deps.openPrices ? { openPrices: deps.openPrices } : {}),
 });
 
-function fail(
-  code: ConstructorParameters<typeof HttpsError>[0],
-  message: string,
-  reason: string
-): never {
-  throw new HttpsError(code, message, { reason });
-}
-
 export interface RequestFeederRateInput extends FeederCall {
   /** What the moon owner asks to be paid (0-100). */
   pct: number;
@@ -50,11 +42,7 @@ export interface RequestFeederRateInput extends FeederCall {
 
 export function parseRequestFeederRateInput(data: unknown): RequestFeederRateInput {
   const call = parseFeederCall(data);
-  const pct = record(data).pct;
-  if (typeof pct !== 'number' || !Number.isFinite(pct) || pct < 0 || pct > 100) {
-    throw new HttpsError('invalid-argument', 'pct must be 0-100');
-  }
-  return { ...call, pct };
+  return { ...call, pct: pctField(record(data).pct, 'pct') };
 }
 
 export interface SetFeederPayeeInput extends FeederCall {
@@ -123,9 +111,7 @@ export async function requestFeederRate(
   const ctx = await authorizeFeederCaller(deps, caller, input, 'edit');
   if (!ctx)
     fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
-  const ref = bookRef(deps.db, ctx.collectorCorporationId)
-    .collection(FEEDERS)
-    .doc(String(input.corporationId));
+  const ref = feederRef(deps.db, ctx.collectorCorporationId, input.corporationId);
   await deps.db.runTransaction(async (tx) => {
     const rec = (await tx.get(ref)).data() as FeederRecord | undefined;
     if (!rec || (rec.status !== 'active' && rec.status !== 'pending-removal')) {
@@ -172,9 +158,7 @@ export async function setFeederPayee(
       'payee-mismatch'
     );
   }
-  const ref = bookRef(deps.db, ctx.collectorCorporationId)
-    .collection(FEEDERS)
-    .doc(String(input.corporationId));
+  const ref = feederRef(deps.db, ctx.collectorCorporationId, input.corporationId);
   await deps.db.runTransaction(async (tx) => {
     const rec = (await tx.get(ref)).data() as
       (FeederRecord & { payeeHistory?: PayeeChange[] }) | undefined;
@@ -215,9 +199,7 @@ export async function dismissFeederHistory(
   const ctx = await authorizeFeederCaller(deps, caller, input, 'view');
   if (!ctx)
     fail('failed-precondition', 'This corporation has no moon owner view', 'not-your-feeder');
-  const ref = bookRef(deps.db, ctx.collectorCorporationId)
-    .collection(FEEDERS)
-    .doc(String(input.corporationId));
+  const ref = feederRef(deps.db, ctx.collectorCorporationId, input.corporationId);
   await deps.db.runTransaction(async (tx) => {
     const rec = (await tx.get(ref)).data() as FeederRecord | undefined;
     if (!rec || !ENDED.includes(rec.status)) {

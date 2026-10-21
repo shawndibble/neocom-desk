@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Button, TextInput } from '@/components/ui';
+import { Button, Panel, TextInput } from '@/components/ui';
 import { parseInviteInput } from '../taxBook/feederClient';
 
 export type SetupChoice = 'own' | 'consent' | 'collect';
@@ -48,38 +48,37 @@ export function MoonsChoices({
             ['collect', 'collect', canOwn],
           ] as const
         ).map(([key, next, enabled]) => (
-          <div
-            key={key}
-            className="flex flex-col justify-between gap-3 rounded-xs border border-line bg-panel p-4 text-sm"
-          >
-            <div className="space-y-1">
-              <h2 className="text-base font-semibold">
-                {t(`corpTaxBook.moons.setup.${key}.title`)}
-              </h2>
-              <p className="text-text-dim">{t(`corpTaxBook.moons.setup.${key}.hint`)}</p>
-            </div>
-            {key === 'handled' ? (
-              <div className="space-y-2">
-                <label className="block space-y-1">
-                  <span className="text-xs text-text-dim">
-                    {t('corpTaxBook.moons.setup.paste')}
-                  </span>
-                  <TextInput value={paste} onChange={(e) => onPaste(e.target.value)} />
-                </label>
-                <Button
-                  variant="primary"
-                  disabled={parseInviteInput(paste) === null}
-                  onClick={() => onChoose(next)}
-                >
-                  {t('corpTaxBook.moons.setup.handled.action')}
-                </Button>
+          <Panel key={key} fill className="flex flex-col text-sm">
+            <div className="flex flex-1 flex-col justify-between gap-3">
+              <div className="space-y-1">
+                <h2 className="text-base font-semibold">
+                  {t(`corpTaxBook.moons.setup.${key}.title`)}
+                </h2>
+                <p className="text-text-dim">{t(`corpTaxBook.moons.setup.${key}.hint`)}</p>
               </div>
-            ) : (
-              <Button variant="primary" disabled={!enabled} onClick={() => onChoose(next)}>
-                {t(`corpTaxBook.moons.setup.${key}.action`)}
-              </Button>
-            )}
-          </div>
+              {key === 'handled' ? (
+                <div className="space-y-2">
+                  <label className="block space-y-1">
+                    <span className="text-xs text-text-dim">
+                      {t('corpTaxBook.moons.setup.paste')}
+                    </span>
+                    <TextInput value={paste} onChange={(e) => onPaste(e.target.value)} />
+                  </label>
+                  <Button
+                    variant="primary"
+                    disabled={parseInviteInput(paste) === null}
+                    onClick={() => onChoose(next)}
+                  >
+                    {t('corpTaxBook.moons.setup.handled.action')}
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="primary" disabled={!enabled} onClick={() => onChoose(next)}>
+                  {t(`corpTaxBook.moons.setup.${key}.action`)}
+                </Button>
+              )}
+            </div>
+          </Panel>
         ))}
       </div>
       {!canOwn && (

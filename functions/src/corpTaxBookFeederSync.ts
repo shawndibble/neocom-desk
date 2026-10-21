@@ -11,7 +11,7 @@
 // returns a token.
 
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
-import { FEEDERS, REMOVAL_LINKS_COLLECTION } from './corpTaxBook.js';
+import { REMOVAL_LINKS_COLLECTION } from './corpTaxBook.js';
 import {
   BOOK_DEFAULTS,
   advanceFeederHealth,
@@ -21,7 +21,13 @@ import {
   type ObservedRow,
 } from './corpTaxBookEngine.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
-import { SCHEDULED_VIA, appendAudit, bookRef, type BookDeps } from './corpTaxBookStore.js';
+import {
+  SCHEDULED_VIA,
+  appendAudit,
+  bookRef,
+  feederRef,
+  type BookDeps,
+} from './corpTaxBookStore.js';
 import { observedRowsFromLedger } from './corpTaxBookSyncEngine.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 
@@ -96,6 +102,15 @@ export interface FeederReadRecord {
   refineries?: number;
 }
 
+export interface FeederReadResult {
+  status: 'active' | 'disconnected';
+  /**
+   * False when the read moved nothing the moon owner's view or the miners' coverage shows: a
+   * skip, or another refusal in a spell already stale. Those need no rebuild.
+   */
+  viewChanged: boolean;
+}
+
 /**
  * Write what one run found onto the feeder record and move its health: lastReadWellAt,
  * staleSince, lastSyncResult and, at 30 days stale, the disconnect (coverage ends on the
@@ -107,10 +122,8 @@ export async function recordFeederRead(
   collectorCorporationId: number,
   feederCorporationId: number,
   read: FeederReadRecord
-): Promise<'active' | 'disconnected' | null> {
-  const ref = bookRef(deps.db, collectorCorporationId)
-    .collection(FEEDERS)
-    .doc(String(feederCorporationId));
+): Promise<FeederReadResult | null> {
+  const ref = feederRef(deps.db, collectorCorporationId, feederCorporationId);
   return deps.db.runTransaction(async (tx) => {
     const [snap, book] = await Promise.all([
       tx.get(ref),
@@ -157,7 +170,12 @@ export async function recordFeederRead(
       );
     }
     tx.update(ref, update);
-    return next.status;
+    const staleMoved = (record.staleSince === undefined) !== (next.staleSince === undefined);
+    return {
+      status: next.status,
+      // A good read moves `lastReadWellAt`, so which days are Billable.
+      viewChanged: read.outcome === 'ok' || next.status === 'disconnected' || staleMoved,
+    };
   });
 }
 
