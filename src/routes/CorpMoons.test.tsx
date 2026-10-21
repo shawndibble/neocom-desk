@@ -10,13 +10,12 @@ import { CorpMoons } from './CorpMoons';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
 vi.mock('@/features/corp/taxBook/useCorpTaxBook', () => ({ useCorpTaxBook: vi.fn() }));
+let bookState: object = { status: 'loading' };
 vi.mock('@/features/corp/moons/useCorpBook', () => ({
-  useCorpBook: () => ({
-    state: { status: 'loading' },
-    reload: vi.fn(),
-    characterId: 1,
-    corporationId: 2,
-  }),
+  useCorpBook: () => ({ state: bookState, reload: vi.fn(), characterId: 1, corporationId: 2 }),
+}));
+vi.mock('@/features/corp/moons/MoonsSetup', () => ({
+  MoonsSetup: () => <p>Moons setup</p>,
 }));
 
 const request = vi.fn();
@@ -38,14 +37,25 @@ function mount(ledger: object, roles: string[] = ['Accountant']) {
   );
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  bookState = { status: 'loading' };
+});
 
 describe('CorpMoons gate', () => {
   it('asks for the mining scope on the first screen that reads the ledger', async () => {
+    bookState = { status: 'ready' };
     mount({ state: 'needs-scope', scopes: ['esi-industry.read_corporation_mining.v1'] });
     expect(screen.getByText('Allow the refinery ledger')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Allow mining ledger access' }));
     expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the mining-scope gate for a corporation with no book (a moon owner)', () => {
+    bookState = { status: 'off', verdict: {} };
+    mount({ state: 'needs-scope', scopes: ['esi-industry.read_corporation_mining.v1'] });
+    expect(screen.getByText('Moons setup')).toBeInTheDocument();
+    expect(screen.queryByText('Allow the refinery ledger')).toBeNull();
   });
 
   it('explains a role that cannot read the ledger instead of offering a grant', () => {
