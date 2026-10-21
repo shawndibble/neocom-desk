@@ -249,7 +249,7 @@ describe('FaqPanel — What We Store', () => {
       screen.getByText(/is not uploaded, apart from what you choose to share/i)
     ).toBeInTheDocument();
     // The intro used to say EVE data "stays on this device" without exception.
-    expect(screen.getByText(/exceptions, listed below/i)).toBeInTheDocument();
+    expect(screen.getByText(/exceptions are listed below/i)).toBeInTheDocument();
   });
 
   it('points to the Help page’s Support tab', () => {
