@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, TextInput } from '@/components/ui';
 import { editErrorMessage } from './useBook';
@@ -36,6 +36,8 @@ export function TurnOnBook({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
+  // The book exists once created: a retry after a failed invite makes only the invite.
+  const booked = useRef(false);
   if (!verdict.isDirector) {
     return (
       <EmptyState
@@ -55,7 +57,10 @@ export function TurnOnBook({
     setBusy(true);
     setError(null);
     try {
-      await turnOnBook(characterId, corporationId, startDate, pct);
+      if (!booked.current) {
+        await turnOnBook(characterId, corporationId, startDate, pct);
+        booked.current = true;
+      }
       if (collect) {
         const { code } = await createFeederInvite(characterId, corporationId);
         setLink(inviteLink(window.location.origin, code));

@@ -18,7 +18,7 @@ type State =
       owner: number;
       at: number | null;
     }
-  | { status: 'unavailable'; at: number | null }
+  | { status: 'unavailable' }
   | { status: 'done'; accounting: number; owner: number }
   | { status: 'failed' };
 
@@ -43,7 +43,6 @@ export function RemoveNowPage({ code }: { code: string }) {
     if (characters === undefined || characters.length === 0) return;
     let cancelled = false;
     void (async () => {
-      let at: number | null = null;
       try {
         for (const c of characters) {
           const link = await getRemovalLink(c.characterId, code);
@@ -58,9 +57,8 @@ export function RemoveNowPage({ code }: { code: string }) {
             });
             return;
           }
-          at = at ?? link.effectiveAt;
         }
-        setState({ status: 'unavailable', at });
+        setState({ status: 'unavailable' });
       } catch {
         if (!cancelled) setState({ status: 'failed' });
       }
@@ -85,7 +83,7 @@ export function RemoveNowPage({ code }: { code: string }) {
       setState(
         result.ended && prior
           ? { status: 'done', accounting: prior.accounting, owner: prior.owner }
-          : { status: 'unavailable', at: result.effectiveAt }
+          : { status: 'unavailable' }
       );
     } catch {
       setState({ status: 'failed' });
@@ -101,6 +99,51 @@ export function RemoveNowPage({ code }: { code: string }) {
   }
 
   const signedOut = characters !== undefined && characters.length === 0;
+  return (
+    <RemoveNowView
+      screen={signedOut ? 'signed-out' : state.status}
+      accounting={accounting}
+      owner={owner}
+      at={state.status === 'available' ? state.at : null}
+      working={working}
+      loggingIn={loggingIn}
+      onLogIn={logIn}
+      onRemove={() => state.status === 'available' && void remove(state.characterId)}
+      onRetry={() => {
+        setState({ status: 'loading' });
+        setAttempt((n) => n + 1);
+      }}
+    />
+  );
+}
+
+/**
+ * What the payee sees, one screen per state. Presentational: the page decides which.
+ * Every reason the link cannot be used is the one `unavailable` screen, never why.
+ */
+export function RemoveNowView({
+  screen,
+  accounting,
+  owner,
+  at,
+  working = false,
+  loggingIn = false,
+  onLogIn,
+  onRemove,
+  onRetry,
+}: {
+  screen: 'signed-out' | 'loading' | 'available' | 'done' | 'unavailable' | 'failed';
+  accounting: string;
+  owner: string;
+  /** When the pending removal takes effect, if known. */
+  at?: number | null;
+  working?: boolean;
+  loggingIn?: boolean;
+  onLogIn: () => void;
+  onRemove: () => void;
+  onRetry: () => void;
+}) {
+  const { t } = useTranslation();
   const k = (key: string) => `corpTaxBook.removeNow.${key}`;
   return (
     <div className="mx-auto flex min-h-screen max-w-xl flex-col gap-4 bg-bg p-2 text-text sm:p-6">
@@ -110,61 +153,45 @@ export function RemoveNowPage({ code }: { code: string }) {
       </header>
       <main className="flex flex-1 flex-col gap-4">
         <h1 className="text-sm font-semibold tracking-widest uppercase">{t(k('title'))}</h1>
-        {signedOut ? (
+        {screen === 'signed-out' ? (
           <Panel>
             <div className="space-y-3 text-sm">
               <p>{t(k('signIn'))}</p>
               <EveSsoButton
                 size="large"
                 pending={loggingIn}
-                onClick={logIn}
+                onClick={onLogIn}
                 label={t(k('login'))}
               />
             </div>
           </Panel>
-        ) : state.status === 'loading' ? (
+        ) : screen === 'loading' ? (
           <Spinner label={t(k('checking'))} />
-        ) : state.status === 'available' ? (
+        ) : screen === 'available' ? (
           <Panel>
             <div className="space-y-3 text-sm">
               <p>
-                {state.at === null
+                {at == null
                   ? t(k('introNoTime'), { accounting, owner })
-                  : t(k('intro'), { accounting, owner, time: eveTimeLabel(state.at) })}
+                  : t(k('intro'), { accounting, owner, time: eveTimeLabel(at) })}
               </p>
               <p className="text-text-dim">{t(k('hint'), { accounting, owner })}</p>
-              <Button
-                variant="danger"
-                disabled={working}
-                onClick={() => void remove(state.characterId)}
-              >
+              <Button variant="danger" disabled={working} onClick={onRemove}>
                 {t(k('confirm'))}
               </Button>
             </div>
           </Panel>
-        ) : state.status === 'done' ? (
+        ) : screen === 'done' ? (
           <p role="status" className="text-sm">
             {t(k('done'), { accounting, owner })}
           </p>
-        ) : state.status === 'unavailable' ? (
-          <EmptyState
-            title={
-              state.at === null
-                ? t(k('unavailableNoTime'))
-                : t(k('unavailable'), { time: eveTimeLabel(state.at) })
-            }
-          />
+        ) : screen === 'unavailable' ? (
+          <EmptyState title={t(k('unavailable'))} />
         ) : (
           <EmptyState
             title={t(k('failed'))}
             action={
-              <Button
-                size="sm"
-                onClick={() => {
-                  setState({ status: 'loading' });
-                  setAttempt((n) => n + 1);
-                }}
-              >
+              <Button size="sm" onClick={onRetry}>
                 {t(k('retry'))}
               </Button>
             }

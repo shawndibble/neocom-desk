@@ -56,6 +56,22 @@ function page(d: MoonOwnerDetail, props: Partial<Parameters<typeof MoonOwnerPage
   );
 }
 
+describe('the rate history', () => {
+  const history = [
+    {
+      kind: 'agreed' as const,
+      pct: 8,
+      effectiveFrom: '2026-10-01',
+      recordedAt: '2026-10-01T12:00:00Z',
+    },
+  ];
+
+  it('says who set an agreed rate when the accounting corporation is known', () => {
+    page(detail({ history }), { accountingName: 'Brass Meridian Logistics' });
+    expect(screen.getByText(/Rate set to 8% by Brass Meridian Logistics/)).toBeInTheDocument();
+  });
+});
+
 describe('the removal strip', () => {
   it('says when it takes effect and who started it', () => {
     page(pending());

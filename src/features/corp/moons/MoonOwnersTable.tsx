@@ -131,7 +131,6 @@ export function MoonOwnersTable({
       header: t(k('cols.owed')),
       align: 'right',
       className: 'tabular-nums',
-      cardCorner: true,
       render: (r) =>
         r.mode === 'settled-otherwise' ? (
           '—'
