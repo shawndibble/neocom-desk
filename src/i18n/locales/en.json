@@ -11352,7 +11352,7 @@
     "deviceDeleteUnpurged_one": "The synced data for {{names}} could not be deleted from the sync server (offline, or the login has expired). The server deletes it after 90 days without a sync; Finish deleting to erase this device's data.",
     "deviceDeleteUnpurged_other": "The synced data for {{names}} could not be deleted from the sync server (offline, or the logins have expired). The server deletes it after 90 days without a sync; Finish deleting to erase this device's data.",
     "faq": {
-      "storeIntro": "What you make in the app is stored with us and syncs between your devices (display settings and sorts stay local). What we read from EVE stays on this device. Exceptions, listed below: alerts you've seen, push and Alerts when closed (if on), a Corp Tax Book's Automatic sync (if an officer turns it on), anything you share with a Community, and Share Links you create.",
+      "storeIntro": "What you make here syncs between your devices. What we read from EVE stays on this one. Exceptions are listed below.",
       "groups": {
         "using": "Using Neocom Desk",
         "data": "Your data"
