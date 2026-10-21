@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { boardKey, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
 import { flexRule, GRID_GAP, PHONE_GRID_GAP } from './gridStyle';
 import { getKind, type WidgetSize } from './kinds';
@@ -220,10 +221,11 @@ function Cell({
 
 function EmptyBoard({ onAdd, onRoles }: Pick<WidgetGridProps, 'onAdd' | 'onRoles'>) {
   const { t } = useTranslation();
+  const board = useWidgetBoard();
   return (
     <section className="grid justify-items-start gap-2 rounded-xs border border-dashed border-line bg-panel/85 p-4">
-      <h2 className="text-sm font-semibold">{t('overview.customize.emptyTitle')}</h2>
-      <p className="text-xs text-text-dim">{t('overview.customize.emptyBody')}</p>
+      <h2 className="text-sm font-semibold">{t(boardKey(board, 'customize.emptyTitle'))}</h2>
+      <p className="text-xs text-text-dim">{t(boardKey(board, 'customize.emptyBody'))}</p>
       <span className="flex flex-wrap gap-2">
         {onAdd && (
           <Button variant="primary" onClick={onAdd}>
@@ -248,7 +250,8 @@ export function WidgetGrid({
   const edit = useOverviewEdit();
   const titleOf = useWidgetTitle();
   const isPhone = useIsPhone();
-  const shown = visibleWidgets(widgets, isPhone);
+  const board = useWidgetBoard();
+  const shown = visibleWidgets(widgets, isPhone, board.canDraw);
   const sensors = useSensors(
     // A 4px travel before a drag starts, so a tap on the grip is not a drag.
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -256,11 +259,17 @@ export function WidgetGrid({
   );
   const [dragging, setDragging] = useState(false);
 
-  if (widgets.length === 0) return <EmptyBoard onAdd={onAdd} onRoles={onRoles} />;
+  // Known widgets this Character may not see (every one's corp capability gone) read as an empty
+  // board: "nothing to show" would blame the phone or a newer build for what is a role.
+  const known = widgets.filter((w) => getKind(w.kind) !== undefined);
+  const hiddenByBoard = known.length > 0 && !known.some((w) => board.canDraw(getKind(w.kind)!));
+  if (widgets.length === 0 || hiddenByBoard) {
+    return <EmptyBoard onAdd={onAdd} onRoles={onRoles} />;
+  }
   if (shown.length === 0) {
     return (
       <p className="rounded-xs border border-line bg-panel/85 px-3 py-4 text-xs text-text-dim">
-        {t('overview.widgets.noWidgets')}
+        {t(boardKey(board, 'widgets.noWidgets'))}
       </p>
     );
   }

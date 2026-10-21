@@ -229,6 +229,15 @@
 // Supersedes the two Overview keys above, which stay on the list to seed a
 // returning pilot's first layout. No `legacyKey`: new.
 //
+// sync.corpOverviewLayout: the Corp overview's widget grid, the same shape and
+// parse as sync.overviewLayout (features/overview/widgets/layoutStore.ts), one
+// value for the whole account rather than per corporation or per Character.
+// Absent means "never edited": the page then draws a default built from the
+// Character's corp capabilities and does not write it, so a Director's layout
+// never lands on another device before the pilot has changed anything. A
+// widget whose capability a Character lacks is kept and simply not drawn. No
+// `legacyKey`: new.
+//
 // sync.avoidedSystems: the solar system ids the pilot keeps off their routes,
 // managed from Settings → Travel (features/route/avoidedSystems.ts). One list
 // for the whole account — "I never fly through Uedama" is about the pilot, not
@@ -326,6 +335,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.overviewCardOrder',
   'sync.overviewHiddenCards',
   'sync.overviewLayout',
+  'sync.corpOverviewLayout',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
   'sync.podKillThreshold',

@@ -31,6 +31,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { kindSumsAcrossCharacters } from './data/models';
+import { boardKey, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
 import { getKind } from './kinds';
 import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
@@ -178,6 +179,7 @@ function PlexPlanDialog({
 export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: boolean }) {
   const { t } = useTranslation();
   const edit = useOverviewEdit();
+  const board = useWidgetBoard();
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const [renaming, setRenaming] = useState(false);
   const [planning, setPlanning] = useState(false);
@@ -220,24 +222,29 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
               <DropdownMenuSeparator />
             </>
           )}
-          <DropdownMenuLabel>{t('overview.menu.character')}</DropdownMenuLabel>
-          <DropdownMenuRadioGroup
-            value={widget.scope}
-            onValueChange={(next) => edit.setScope(widget.id, next as WidgetScope)}
-          >
-            <DropdownMenuRadioItem value="header">
-              {t('overview.menu.header')}
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="all" disabled={!canSum}>
-              {t('overview.menu.all')}
-            </DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
-          {!canSum && (
-            <p className="px-2 pb-1 text-xs text-text-dim">{t('overview.menu.nameOnly')}</p>
+          {/* Corp data belongs to one corporation: there is no Character to choose. */}
+          {board.characterScope && (
+            <>
+              <DropdownMenuLabel>{t('overview.menu.character')}</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={widget.scope}
+                onValueChange={(next) => edit.setScope(widget.id, next as WidgetScope)}
+              >
+                <DropdownMenuRadioItem value="header">
+                  {t('overview.menu.header')}
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="all" disabled={!canSum}>
+                  {t('overview.menu.all')}
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+              {!canSum && (
+                <p className="px-2 pb-1 text-xs text-text-dim">{t('overview.menu.nameOnly')}</p>
+              )}
+            </>
           )}
           {kind.hasRange && (
             <>
-              <DropdownMenuSeparator />
+              {board.characterScope && <DropdownMenuSeparator />}
               <DropdownMenuLabel>{t('overview.menu.range')}</DropdownMenuLabel>
               <DropdownMenuRadioGroup
                 value={String(widget.range)}
@@ -277,7 +284,11 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
               </DropdownMenuItem>
             </>
           )}
-          <DropdownMenuSeparator />
+          {/* The View group ends in its own separator; any group after it does not. */}
+          {(board.characterScope ||
+            kind.hasRange ||
+            kind.hasCalendarEvents ||
+            kind.hasPlexPlan) && <DropdownMenuSeparator />}
           <DropdownMenuItem onSelect={() => run(() => (inert ? undefined : setRenaming(true)))}>
             {t('overview.menu.rename')}
           </DropdownMenuItem>
@@ -304,7 +315,7 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
           </DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem className="text-danger" onSelect={() => edit.remove(widget.id)}>
-            {t('overview.menu.remove')}
+            {t(boardKey(board, 'menu.remove'))}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

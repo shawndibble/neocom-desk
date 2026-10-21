@@ -16,6 +16,7 @@ import {
 import { cx } from '@/lib/cx';
 import { formatAge } from '@/lib/age';
 import type { FetchRow } from './widgets/headerSummary';
+import { boardKey, useWidgetBoard } from './widgets/board';
 import { getKind } from './widgets/kinds';
 
 /**
@@ -41,6 +42,7 @@ export function DataAgePopover({
   onRefresh: () => void;
 }) {
   const { t } = useTranslation();
+  const board = useWidgetBoard();
   const title = (kind: string) => {
     const def = getKind(kind);
     return def ? t(def.titleKey) : kind;
@@ -73,7 +75,7 @@ export function DataAgePopover({
       </Tooltip>
       <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-0">
         <table className="w-full text-xs">
-          <caption className="sr-only">{t('overview.header.breakdownCaption')}</caption>
+          <caption className="sr-only">{t(boardKey(board, 'header.breakdownCaption'))}</caption>
           <thead>
             <tr className="border-b border-line text-left text-text-dim uppercase">
               <th scope="col" className="px-3 py-2 font-semibold tracking-widest">

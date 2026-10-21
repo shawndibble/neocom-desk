@@ -4925,6 +4925,96 @@
           "profit": "Profit",
           "jumps": "Jumps"
         }
+      },
+      "corpDeadlines": {
+        "title": "Due soon",
+        "description": "Every corp clock in one place: fuel, timers, moon chunks and finished jobs",
+        "empty": "Nothing is due."
+      },
+      "corpServices": {
+        "title": "Offline services",
+        "description": "Structure services that are switched off",
+        "empty": "Every structure service is online."
+      },
+      "corpStarbases": {
+        "title": "Starbases",
+        "description": "Starbase fuel, strontium and state",
+        "empty": "This widget is coming soon."
+      },
+      "corpCustomsOffices": {
+        "title": "Customs offices",
+        "description": "Your customs offices, their tax rates and timers",
+        "empty": "This widget is coming soon."
+      },
+      "corpWallet": {
+        "title": "Corp wallet",
+        "description": "The balance of each wallet division",
+        "empty": "There are no wallet divisions to show."
+      },
+      "corpCashFlow": {
+        "title": "Cash flow",
+        "description": "Money into and out of the master wallet, and how long it lasts",
+        "empty": "No master wallet activity in this window."
+      },
+      "corpIncome": {
+        "title": "Income by source",
+        "description": "Where the master wallet’s money comes from: bounties, taxes, market and more",
+        "empty": "No income in this window."
+      },
+      "corpOrders": {
+        "title": "Corp market orders",
+        "description": "Open buy and sell orders, and the ISK held in escrow",
+        "empty": "This widget is coming soon."
+      },
+      "corpMembers": {
+        "title": "Members",
+        "description": "Headcount, and who joined or left since you last looked",
+        "empty": "There are no members to show."
+      },
+      "corpInactive": {
+        "title": "Inactive members",
+        "description": "Members who have not logged in for a while",
+        "empty": "Every member has logged in recently."
+      },
+      "corpRoleAudit": {
+        "title": "Roles audit",
+        "description": "Who holds Director and other roles, and recent role changes",
+        "empty": "This widget is coming soon."
+      },
+      "corpDoctrine": {
+        "title": "Doctrine readiness",
+        "description": "Which members can fly your doctrine ships",
+        "empty": "This widget is coming soon."
+      },
+      "corpJobs": {
+        "title": "Corp industry jobs",
+        "description": "Jobs running in the corporation’s name, and when they finish",
+        "empty": "No corp industry jobs are running."
+      },
+      "corpMining": {
+        "title": "Moon mining ledger",
+        "description": "Who mined how much at your refineries",
+        "empty": "Nothing was mined at your refineries in this window."
+      },
+      "corpKills": {
+        "title": "Corp kills",
+        "description": "Kills, losses and ISK efficiency",
+        "empty": "This widget is coming soon."
+      },
+      "corpContracts": {
+        "title": "Corp contracts",
+        "description": "Outstanding courier and item exchange contracts",
+        "empty": "This widget is coming soon."
+      },
+      "corpSrp": {
+        "title": "Ship replacement",
+        "description": "SRP claims waiting and paid",
+        "empty": "This widget is coming soon."
+      },
+      "corpProjects": {
+        "title": "Corporation projects",
+        "description": "Progress on your corporation projects and freelance jobs",
+        "empty": "This widget is coming soon."
       }
     },
     "header": {
@@ -5004,7 +5094,12 @@
         "industry": "Industry and mining",
         "planets": "Planets and structures",
         "space": "Space and travel",
-        "messages": "Messages and schedule"
+        "messages": "Messages and schedule",
+        "corpClocks": "Structures and timers",
+        "corpMoney": "Money",
+        "corpPeople": "Members",
+        "corpIndustry": "Industry and mining",
+        "corpOps": "Operations"
       },
       "add": "Add",
       "addAnother": "Add another",
@@ -11411,7 +11506,7 @@
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
-            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
+            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your corporation overview layout, hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs. The notes you wrote on solar systems (up to 500 characters each, so don't put anything private in them)."
           }
         },
@@ -12160,6 +12255,26 @@
       "title": "Moons",
       "noAccessTitle": "Moons need the Accountant role",
       "noAccessHint": "EVE only opens the refinery ledger to an Accountant, Director or CEO, so the Corp Tax Book is not available to your roles."
+    },
+    "grid": {
+      "customize": {
+        "barLabel": "Customize the corporation overview",
+        "emptyTitle": "Your corporation overview is empty",
+        "emptyBody": "Add widgets to track what your corporation needs."
+      },
+      "gallery": {
+        "subtitle": "{{total}} widgets · {{onBoard}} on your corporation overview",
+        "onBoard": "On your corporation overview ×{{count}}"
+      },
+      "menu": {
+        "remove": "Remove from corporation overview"
+      },
+      "header": {
+        "breakdownCaption": "When each widget on the corporation overview last read its data"
+      },
+      "widgets": {
+        "noWidgets": "There are no widgets to show on this corporation overview."
+      }
     }
   },
   "publicInfo": {

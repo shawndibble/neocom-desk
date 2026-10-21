@@ -12,11 +12,20 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { boardKey, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
 import { MAX_WIDGETS } from './layout';
 
-export function CustomizeBar({ onAdd, onRoles }: { onAdd: () => void; onRoles: () => void }) {
+export function CustomizeBar({
+  onAdd,
+  onRoles,
+}: {
+  onAdd: () => void;
+  /** Start from a role; absent on a board with no roles (the Corp overview). */
+  onRoles?: () => void;
+}) {
   const { t } = useTranslation();
+  const board = useWidgetBoard();
   const edit = useOverviewEdit();
   const [confirming, setConfirming] = useState(false);
   const keepRef = useRef<HTMLButtonElement>(null);
@@ -43,7 +52,7 @@ export function CustomizeBar({ onAdd, onRoles }: { onAdd: () => void; onRoles: (
     <div
       data-customize-bar
       role="region"
-      aria-label={t('overview.customize.barLabel')}
+      aria-label={t(boardKey(board, 'customize.barLabel'))}
       className="flex flex-wrap items-center gap-2 rounded-xs border border-dashed border-line-bright bg-panel px-3 py-2"
     >
       <b className="text-sm">{t('overview.customize.title')}</b>
@@ -83,7 +92,7 @@ export function CustomizeBar({ onAdd, onRoles }: { onAdd: () => void; onRoles: (
             <Icon.AddWidget size={Icon.ICON_SIZE.md} aria-hidden="true" />
             {t('overview.customize.add')}
           </Button>
-          <Button onClick={onRoles}>{t('overview.customize.roles')}</Button>
+          {onRoles && <Button onClick={onRoles}>{t('overview.customize.roles')}</Button>}
           <Button ref={resetRef} onClick={() => setConfirming(true)}>
             {t('overview.customize.reset')}
           </Button>

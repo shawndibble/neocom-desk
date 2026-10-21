@@ -7,7 +7,9 @@ import '@/i18n';
 import { createFeedStore } from './data/feedStore';
 import { FeedStoreContext } from './data/feedStoreContext';
 import { Gallery } from './Gallery';
-import { WIDGET_KINDS } from './kinds';
+import { boardKinds } from './kinds';
+
+const OVERVIEW_KINDS = boardKinds('overview');
 import { MAX_WIDGETS, type OverviewLayout, type Widget } from './layout';
 import { OverviewEditProvider } from './OverviewEditProvider';
 
@@ -61,7 +63,7 @@ async function openGallery({
 const itemOf = (dialog: HTMLElement, title: string) =>
   within(dialog).getByText(title, { selector: 'div' }).closest('li') as HTMLElement;
 
-const SUBTITLE = `${WIDGET_KINDS.length} widgets · 3 on your Overview`;
+const SUBTITLE = `${OVERVIEW_KINDS.length} widgets · 3 on your Overview`;
 
 describe('Gallery', () => {
   it('says how many widgets there are and how many are on the Overview', async () => {
@@ -94,7 +96,7 @@ describe('Gallery', () => {
     const row = within(dialog).getByRole('group', { name: 'Categories' });
     expect(within(row).getAllByRole('button')).toHaveLength(7);
     expect(within(row).getByRole('button', { name: /^All/ })).toHaveTextContent(
-      String(WIDGET_KINDS.length)
+      String(OVERVIEW_KINDS.length)
     );
   });
 
