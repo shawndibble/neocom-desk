@@ -18,6 +18,7 @@ import { CorpReadFailed } from '@/features/corp/corpRead';
 import { resolveCorpReadAccess, type CorpCapability } from '@/features/corp/corpReadAccess';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { walletDivisions } from '@/features/corp/divisions';
+import { loadRoleAudit } from '@/features/corp/roleAudit';
 import { loadCorporationCustomsOffices } from '@/features/corp/customsOffices';
 import { loadCorporationIndustryJobs } from '@/features/corp/jobs';
 import {
@@ -40,6 +41,7 @@ import { parseInstant } from '@/engine/esiInstant';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import type {
   CorpCustomsFeed,
+  CorpRoleAuditFeed,
   CorpContractsFeed,
   CorpJobsFeed,
   CorpJournalLine,
@@ -177,6 +179,22 @@ export async function loadCorpCustoms(characterId: number): Promise<CorpCustomsF
     offices,
     typeNames,
     systemNames,
+  };
+}
+
+export async function loadCorpRoleAudit(characterId: number): Promise<CorpRoleAuditFeed> {
+  const empty: CorpRoleAuditFeed = { ...UNREADABLE, audit: null };
+  const access = await gate(characterId, 'canReadRoleAudit');
+  if (access === null) return empty;
+  const result = await loadRoleAudit(characterId, access.corporationId, { withTitles: false });
+  if ('needsReauth' in result) return { ...empty, needsReauth: true };
+  const { data } = result;
+  return {
+    readable: true,
+    needsReauth: false,
+    fetchedAt: data.fetchedAt,
+    fromCache: data.fromCache,
+    audit: data,
   };
 }
 

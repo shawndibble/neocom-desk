@@ -5132,8 +5132,21 @@
       },
       "corpRoleAudit": {
         "title": "Roles audit",
-        "description": "Who holds Director and other roles, and recent role changes",
-        "empty": "This widget is coming soon."
+        "description": "Who holds Director and other sensitive roles, and recent role changes",
+        "empty": "No member holds a sensitive role.",
+        "col": {
+          "member": "Member",
+          "roles": "Sensitive roles",
+          "change": "Last change"
+        },
+        "unit_one": "Director",
+        "unit_other": "Directors",
+        "changes_one": "{{count}} role change in {{days}} days",
+        "changes_other": "{{count}} role changes in {{days}} days",
+        "changesUnknown": "Role changes unavailable",
+        "historyUnknown": "Role history could not be read, so last changes are not shown.",
+        "summary_one": "{{count}} Director. Members with a sensitive role: {{holders}}.",
+        "summary_other": "{{count}} Directors. Members with a sensitive role: {{holders}}."
       },
       "corpDoctrine": {
         "title": "Doctrine readiness",
@@ -12374,6 +12387,36 @@
       "shipFilterAll": "Any ship",
       "locationFilterLabel": "Location",
       "locationFilterAll": "Any location"
+    },
+    "roles": {
+      "tab": "Roles",
+      "refresh": "Refresh roles",
+      "holdersHeading": "Sensitive roles",
+      "holdersSummary_one": "{{directors}} Director. Members with a sensitive role: {{holders}}.",
+      "holdersSummary_other": "{{directors}} Directors. Members with a sensitive role: {{holders}}.",
+      "holdersEmpty": "No member holds a sensitive role",
+      "holdersEmptyHint": "Director, Accountant, Junior Accountant, Personnel Manager, Station Manager, Trader, Security Officer and the hangar and container take roles are checked.",
+      "tableLabel": "Members with sensitive roles",
+      "columnMember": "Member",
+      "columnRoles": "Sensitive roles",
+      "columnTitles": "Titles",
+      "columnLastChange": "Last change",
+      "columnWhen": "When",
+      "columnChange": "Change",
+      "columnIssuer": "Changed by",
+      "historyHeading": "Role changes",
+      "historyHint": "Sensitive roles granted or removed in the last {{days}} days. EVE keeps about a month of history.",
+      "historyLabel": "Role changes",
+      "historyEmpty": "No sensitive role changes in {{days}} days",
+      "historyEmptyHint": "Nothing was granted or removed in that time.",
+      "historyUnavailable": "Role history could not be read",
+      "historyUnavailableHint": "Who holds each role is shown above. Refresh to try the history again.",
+      "granted": "Granted {{roles}}",
+      "removed": "Removed {{roles}}",
+      "showOlder_one": "Show {{count}} older change",
+      "showOlder_other": "Show {{count}} older changes",
+      "loadFailedHint": "Roles are not saved on this device yet, so there is nothing to show. They load once EVE answers.",
+      "needsGrantHint": "The corporation permission needs to be granted again from Settings before roles can load."
     },
     "wallet": {
       "title": "Corp wallet",

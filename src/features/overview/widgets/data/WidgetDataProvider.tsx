@@ -63,6 +63,7 @@ import {
   loadCorpJobsFeed,
   loadCorpKillsFeed,
   loadCorpMembersFeed,
+  loadCorpRoleAuditFeed,
   loadCorpMiningFeed,
   loadCorpStarbasesFeed,
   loadCorpContractsFeed,
@@ -287,6 +288,14 @@ function Source({ feed }: { feed: FeedId }) {
     case 'corpCustoms':
       return (
         <SnapshotSource feed="corpCustoms" load={loadCorpCustomsFeed} cacheKey="corp:customs" />
+      );
+    case 'corpRoleAudit':
+      return (
+        <SnapshotSource
+          feed="corpRoleAudit"
+          load={loadCorpRoleAuditFeed}
+          cacheKey="corp:roleAudit"
+        />
       );
     case 'corpMembers':
       return (

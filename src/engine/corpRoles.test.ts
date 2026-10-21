@@ -108,6 +108,8 @@ describe('corpCapabilities', () => {
     expect(corpCapabilities(['Director']).canReadBlueprints).toBe(true);
     expect(corpCapabilities(['Factory_Manager']).canReadCustomsOffices).toBe(false);
     expect(corpCapabilities(['Director']).canReadCustomsOffices).toBe(true);
+    expect(corpCapabilities(['Factory_Manager']).canReadRoleAudit).toBe(false);
+    expect(corpCapabilities(['Director']).canReadRoleAudit).toBe(true);
   });
 
   it('opens the starbase reads to a Director alone', () => {
