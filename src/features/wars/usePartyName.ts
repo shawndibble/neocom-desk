@@ -1,6 +1,6 @@
 import { useEntityName } from '@/features/character/useEntityName';
 import type { WarParty } from '@/engine/wars';
-import { partyEntity } from './warParty';
+import { partyEntity } from './partyEntity';
 
 /** A war party's name as text (`#id` until it resolves), for sentences. */
 export function usePartyName(party: Pick<WarParty, 'corporationId' | 'allianceId'>): string {

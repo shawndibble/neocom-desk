@@ -1,7 +1,7 @@
 import { AllianceLink, CorporationLink } from '@/features/entities';
 import { allianceLogoUrl, corporationLogoUrl } from '@/lib/eveImages';
 import type { WarParty as WarPartyData } from '@/engine/wars';
-import { partyEntity } from './warParty';
+import { partyEntity } from './partyEntity';
 import { usePartyName } from './usePartyName';
 
 /** A war party's logo and name, the name opening its Show Info (§6c "Entities"). */
