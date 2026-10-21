@@ -1,9 +1,6 @@
-// Refinery labels (issue #4640, spec #4504): either side's officers give a moon owner's refinery a
-// free-text label; the last edit wins. Stored on the moon owner's record (it carries on across a
-// rejoin) and written into the view's `refineries` doc in the same transaction (and on every
-// rebuild), so a failed price read can't hold it back. The rest of the label chain
-// (structure name, system, the moon owner's name plus the id) is the client's. Failures carry a
-// stable `reason`; no player-facing text lives here.
+// Refinery labels (issue #4640, spec #4504): either side's officers label a moon owner's refinery.
+// Written to the record and the view's refinery doc in one transaction, so a failed price read in a
+// rebuild can't hold it back; the rest of the label chain is the client's. Failures carry a `reason`.
 
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -16,6 +13,7 @@ import {
   type FeederCall,
 } from './corpTaxBookFeederGrant.js';
 import { FEEDER_VIEW_REFINERIES, feederViewRef } from './corpTaxBookFeederView.js';
+import { ENDED } from './corpTaxBookFeederOwnerCalls.js';
 import { feederBookDeps } from './corpTaxBookFeederViewCalls.js';
 import type { FeederRecord, RefineryLabelDoc } from './corpTaxBookFeeders.js';
 import {
@@ -69,8 +67,6 @@ export interface SetOwnRefineryLabelInput extends FeederCall, RefineryLabelField
 export function parseSetOwnRefineryLabelInput(data: unknown): SetOwnRefineryLabelInput {
   return { ...parseFeederCall(data), ...parseLabelFields(data) };
 }
-
-const ENDED: readonly FeederRecord['status'][] = ['left', 'removed'];
 
 /** One label per refinery, replaced in a transaction: the last edit wins, whichever side made it. */
 async function writeRefineryLabel(

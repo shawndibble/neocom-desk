@@ -8,7 +8,7 @@ import {
   payeeIdOf,
   payoutRows,
   rateNote,
-  refineryLabeler,
+  viewRefineryLabeler,
 } from './feederViewModel';
 import type { FeederViewDay, FeederViewSummary } from './feederViewClient';
 
@@ -183,7 +183,7 @@ describe('minedRows', () => {
   });
 });
 
-describe('refineryLabeler / payoutRows', () => {
+describe('viewRefineryLabeler / payoutRows', () => {
   const refineries = [
     { structureId: 10, label: 'Efa', labelSetAt: '2026-10-12T00:00:00Z', solarSystemId: 30000142 },
     { structureId: 11, label: null, solarSystemId: 30000142 },
@@ -191,13 +191,13 @@ describe('refineryLabeler / payoutRows', () => {
   ];
   const systemName = (id: number) => (id === 30000142 ? 'Jita' : undefined);
   it('runs every cell through the chain: label, system, then the owner name plus id (#4640)', () => {
-    const label = refineryLabeler(refineries, { systemName, ownerName: 'Moon Owners Inc' });
+    const label = viewRefineryLabeler(refineries, { systemName, ownerName: 'Moon Owners Inc' });
     expect(label(10)).toBe('Efa');
     expect(label(11)).toBe('Jita');
     expect(label(12)).toBe('Moon Owners Inc 12');
   });
   it('falls back to the id when the owner name is not known', () => {
-    const label = refineryLabeler(refineries, { systemName });
+    const label = viewRefineryLabeler(refineries, { systemName });
     expect(label(12)).toBe('#12');
   });
   it('orders payments newest first', () => {

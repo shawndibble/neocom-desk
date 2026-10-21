@@ -98,7 +98,8 @@ export function appendModeChange(
 
 // --- Calls -----------------------------------------------------------------
 
-const ENDED: readonly FeederRecord['status'][] = ['left', 'removed'];
+/** A moon owner that left or was removed: its record takes no more edits. */
+export const ENDED: readonly FeederRecord['status'][] = ['left', 'removed'];
 
 async function editFeeder(
   deps: BookDeps,

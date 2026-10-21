@@ -5,7 +5,7 @@ import * as Icon from '@/components/ui/icons';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { callableErrorText } from './feederErrorText';
 
-/** The label's longest form; the server refuses anything longer. */
+/** The server's `MAX_REFINERY_LABEL`: it refuses anything longer. */
 export const REFINERY_LABEL_MAX = 100;
 
 const k = (key: string) => `corpTaxBook.moons.refineryLabels.${key}`;
@@ -117,10 +117,7 @@ function RefineryRow({
   );
 }
 
-/**
- * A moon owner's refineries, one row each, by the label chain. Either side's
- * officers can label one (`edit`); both corporations see it, the last edit wins.
- */
+/** A moon owner's refineries, one row each, by the label chain; `edit` adds the pencil. */
 export function RefineryLabels({
   structureIds,
   name,

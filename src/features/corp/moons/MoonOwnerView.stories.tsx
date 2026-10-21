@@ -34,7 +34,7 @@ type Story = StoryObj<typeof meta>;
 /** @summary Page B with the rate override line ("Rate set to 8% by ... You asked for 6%."). */
 export const Normal: Story = {};
 
-/** @summary Refineries through the label chain (#4640): a label either side set, then the system, then the moon owner's own name plus the id. Officers edit a label behind the faint pencil. */
+/** @summary Refineries through the label chain: a label either side set, then the system, then the moon owner's own name plus the id. Officers edit a label behind the faint pencil. */
 export const RefineryLabels: Story = {
   args: {
     view: {

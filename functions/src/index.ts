@@ -794,8 +794,8 @@ export const setCorpTaxBookFeederModeCallable = onCall<unknown>(FEEDER_OWNER_OPT
   setFeederMode(feederOwnerDeps(), callerOf(request), parseSetFeederModeInput(request.data))
 );
 
-// Refinery labels (issue #4640): either side's officers label a moon owner's refinery, last edit
-// wins. The accounting side passes `feederCorporationId`; the moon owner's own officers do not.
+// Refinery labels (issue #4640): the accounting side passes `feederCorporationId`; the moon owner's
+// own officers do not.
 export const setCorpTaxBookRefineryLabelCallable = onCall<unknown>(
   FEEDER_OWNER_OPTIONS,
   (request) =>
@@ -803,7 +803,7 @@ export const setCorpTaxBookRefineryLabelCallable = onCall<unknown>(
 );
 
 export const setCorpTaxBookOwnRefineryLabelCallable = onCall<unknown>(
-  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
+  FEEDER_OWNER_OPTIONS,
   (request) =>
     setOwnRefineryLabel(
       corpSyncDeps(),

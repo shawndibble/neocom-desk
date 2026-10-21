@@ -4,7 +4,7 @@
  * React: it reads the server-written view (`feederViewClient.ts`).
  */
 import { latestRateChange, rateNotice } from '@/engine/corpTaxBook/ownerRate';
-import { refineryLabeler as labelRefineries } from '@/engine/corpTaxBook/refinery';
+import { refineryLabeler } from '@/engine/corpTaxBook/refinery';
 import type {
   FeederViewDay,
   FeederViewPayout,
@@ -131,13 +131,13 @@ export function characterIdsOf(days: readonly FeederViewDay[]): number[] {
  * either side set, the system its rows recorded, then the moon owner's name plus the id. The
  * structure name is not readable here (the grant is ledger-only).
  */
-export function refineryLabeler(
+export function viewRefineryLabeler(
   refineries: readonly FeederViewRefinery[],
   names: { systemName?: (solarSystemId: number) => string | undefined; ownerName?: string }
 ): (structureId: number) => string {
   const byId = new Map(refineries.map((r) => [r.structureId, r]));
   const { ownerName } = names;
-  return labelRefineries({
+  return refineryLabeler({
     officerLabels: (id) => {
       const r = byId.get(id);
       return r?.label ? [{ label: r.label, setAt: r.labelSetAt ?? '' }] : undefined;

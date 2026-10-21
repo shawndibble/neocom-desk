@@ -25,7 +25,7 @@ export interface RefineryLabelInput {
   officerLabels?: readonly OfficerLabel[];
   /** The structure's name, when ESI let us read it. */
   structureName?: string;
-  /** The system, learned from the miner's own character ledger. */
+  /** The system, from an observed row or learned from a miner's own ledger. */
   systemName?: string;
   /** The feeder corporation's name. */
   feederName?: string;
@@ -102,7 +102,7 @@ export function refineryFacts(
   return { systemOf, sourceOf };
 }
 
-/** A label stored on a moon owner's record, keyed by structure id: one per refinery, last edit wins. */
+/** A label stored on a moon owner's record, keyed by structure id. */
 export interface StoredRefineryLabel extends OfficerLabel {
   setBy?: number;
   side?: 'accounting' | 'moon-owner';

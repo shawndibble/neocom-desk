@@ -197,7 +197,7 @@ export const NotAPayout: Story = {
   },
 };
 
-/** @summary Refineries through the label chain (#4640): one an officer labelled, one with neither name nor system, so it reads as the moon owner's name plus its id. Either side can edit a label behind the faint pencil. */
+/** @summary Refineries through the label chain: one an officer labelled, one with neither name nor system, so it reads as the moon owner's name plus its id. Either side can edit a label behind the faint pencil. */
 export const RefineryLabels: Story = {
   args: {
     refineryName: (id: number) =>

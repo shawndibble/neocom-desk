@@ -12,7 +12,7 @@ import {
   parseRequestedRate,
   payoutRows,
   rateNote,
-  refineryLabeler,
+  viewRefineryLabeler,
   type MinedRow,
 } from '../taxBook/feederViewModel';
 import { DialogShell } from './BookDialogs';
@@ -21,8 +21,6 @@ import { ChangePayeeDialog, PayeeLine } from './MoonOwnerPayee';
 import { isk, shortDate } from './moonsFormat';
 
 type Names = (characterId: number) => string;
-
-const ENDED_STATUSES: readonly string[] = ['left', 'removed'];
 
 /** Page B's plain statement: who handles the tax, what is owed, what was paid. */
 function Statement({ view, name }: { view: FeederView; name: string }) {
@@ -311,15 +309,14 @@ export function MoonOwnerView({
   const ended = state === 'ended';
   // Settled after leaving folds to its one line: no history under it.
   const folded = isSettledAfterLeaving(view.summary);
-  const refineryName = refineryLabeler(view.refineries, {
+  const ownerName = nameOf?.(view.summary.feederCorporationId);
+  const refineryName = viewRefineryLabeler(view.refineries, {
     ...(nameOf ? { systemName: nameOf } : {}),
-    ...(nameOf?.(view.summary.feederCorporationId)
-      ? { ownerName: nameOf(view.summary.feederCorporationId) }
-      : {}),
+    ...(ownerName ? { ownerName } : {}),
   });
   // The server takes a label until the moon owner leaves or is removed (disconnected included).
   const labelEdit =
-    !ENDED_STATUSES.includes(view.summary.status) && canEdit && onSetRefineryLabel
+    !ended && canEdit && onSetRefineryLabel
       ? {
           current: (id: number) => view.refineries.find((r) => r.structureId === id)?.label ?? '',
           onSave: onSetRefineryLabel,
