@@ -24,10 +24,11 @@ import { allocatePayments, dismissalCredits, settleTolerance, type TaxPayment } 
 import { splitAcrossBooks, resolveBookShare, type BookObservation } from './attribution';
 import { dayClosesAt, isDayBillable, lastBillableDate } from './billable';
 import { buildDayCharges, type DayCharge, type Miner } from './charges';
+import { splitByCoverage, type FeederCoverage } from './coverage';
 import { activeDismissalFor, type Dismissal } from './dismissals';
 import { observedEntryKey } from './observed';
 import type { TaxRate, RateScope } from './rates';
-import type { Statement, StatementLine } from './statements';
+import { frozenDayRate, type Statement, type StatementLine } from './statements';
 import type { DayPrices } from './valuation';
 import type { ObservedMiningEntry } from './types';
 
@@ -77,6 +78,8 @@ export interface PersonalBook {
   inFlight: { amount: number; at: string }[];
   /** Refinery names by structure id, where ESI let the app read them. */
   structureNames?: Record<number, string>;
+  /** Moon owners' coverage, when the reader can see it; a day outside it owes nothing (#4618). */
+  feeders?: readonly FeederCoverage[];
 }
 
 /** The miner's own listing of ore the corporation also bills (issue #4517). */
@@ -242,7 +245,9 @@ interface Prepared {
 }
 
 function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: string): Prepared {
-  const { charges, unrated } = buildDayCharges(book.observed, {
+  // A moon owner's day outside its coverage owes nothing (#4618).
+  const { covered } = splitByCoverage(book.observed, book.corporationId, book.feeders ?? []);
+  const { charges, unrated } = buildDayCharges(covered, {
     corporationId: book.corporationId,
     startDate: book.startDate,
     miners: book.miners,
@@ -359,18 +364,7 @@ function dayValue(p: PreparedCharge): {
   const first = statement.lines[0];
   const estimatedValue = statement.lines.reduce((sum, l) => sum + l.estimatedValue, 0);
   const tax = statement.lines.reduce((sum, l) => sum + l.tax, 0);
-  // Each line was billed at its own rate (a rate fix lands on later lines only), so
-  // the day shows one rate only when its lines share it, else the rate they came to.
-  const pcts = new Set(statement.lines.map((l) => l.taxPct ?? charge.taxPct));
-  const mixed = pcts.size > 1;
-  const taxPct = mixed
-    ? estimatedValue > 0
-      ? Math.round((tax / estimatedValue) * 100 * 1e4) / 1e4
-      : charge.taxPct
-    : (first.taxPct ?? charge.taxPct);
-  const rateEffectiveFrom = mixed
-    ? undefined
-    : (first.rateEffectiveFrom ?? charge.rateEffectiveFrom);
+  const { taxPct, rateEffectiveFrom } = frozenDayRate(statement.lines, charge);
   return {
     lines,
     unitPrices: first.unitPrices ?? charge.unitPrices,
