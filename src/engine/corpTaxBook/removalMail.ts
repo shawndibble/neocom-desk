@@ -78,10 +78,12 @@ export function composeRemovalCancelledMail(input: Omit<RemovalMailInput, 'link'
   };
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 /** "18 Oct 2026 14:22 EVE time" for an instant. */
 export function eveTimeLabel(at: number): string {
   const d = new Date(at);
-  const month = d.toLocaleString('en-GB', { month: 'short', timeZone: 'UTC' });
+  const month = MONTHS[d.getUTCMonth()];
   const hh = String(d.getUTCHours()).padStart(2, '0');
   const mm = String(d.getUTCMinutes()).padStart(2, '0');
   return `${d.getUTCDate()} ${month} ${d.getUTCFullYear()} ${hh}:${mm} EVE time`;

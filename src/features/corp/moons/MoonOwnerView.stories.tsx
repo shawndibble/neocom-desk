@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { Button } from '@/components/ui';
 import { HandledByCard } from './HandledByCard';
 import { MoonOwnerView } from './MoonOwnerView';
 import { OwnerStaleBanner } from './OwnerStaleBanner';
@@ -92,7 +93,11 @@ export const RemovalPending: Story = {
       <OwnerStatusStrip
         title="Removal pending, takes effect 18 Oct 2026 14:22 EVE time"
         body="Brass Meridian Logistics started this on 17 Oct 2026. If you did not expect it, end it now and get in touch with them."
-        actions={<button type="button">End it now</button>}
+        actions={
+          <Button size="sm" variant="ghost">
+            End it now
+          </Button>
+        }
       />
     ),
   },
