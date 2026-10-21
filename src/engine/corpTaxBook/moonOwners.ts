@@ -43,6 +43,8 @@ export interface MoonOwnerFeeder {
   ownerRateHistory?: OwnerRateEntry[];
   modeChanges?: FeederModeChange[];
   coveragePeriods: CoveragePeriod[];
+  /** A pending removal (#4520); `effectiveAt` is set once its notice is out. */
+  removal?: { startedAt: number; startedByName: string; effectiveAt?: number };
   payouts: readonly MoonOwnerPayout[];
 }
 
@@ -274,6 +276,8 @@ export interface MoonOwnerDetail {
   accrued: number;
   paid: number;
   mined: MoonOwnerMinedLine[];
+  hasPayee: boolean;
+  removal?: { startedAt: number; startedByName: string; effectiveAt?: number };
   /** Who a payment goes to. */
   payee: { kind: 'corporation' | 'character'; id: number };
   /** The days a payment now covers, for its reason; absent when nothing accrued. */
@@ -333,6 +337,8 @@ export function moonOwnerDetail(input: MoonOwnersInput, id: number): MoonOwnerDe
     accrued,
     paid: paidOf(f.payouts),
     mined,
+    hasPayee: f.payee !== undefined,
+    ...(f.status === 'pending-removal' && f.removal ? { removal: f.removal } : {}),
     payee: f.payee ?? { kind: 'corporation', id: f.corporationId },
     ...(period ? { period } : {}),
   };

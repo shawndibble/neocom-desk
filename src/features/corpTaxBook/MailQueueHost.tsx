@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { isStatementMail, type MailQueueItem } from '@/engine/corpTaxBook/mailQueue';
+import { fillTakesEffect } from '@/engine/corpTaxBook/removalMail';
 import { isOfflineFailure, isUnconfirmedWrite } from '@/esi/client';
 import { sendMail } from '@/features/character/mail';
 import { openNewMail } from '@/features/openInEve/sendOpenNewMail';
@@ -21,9 +22,21 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
         item.senderCharacterId,
         [{ recipient_id: item.recipientId, recipient_type: 'character' }],
         item.subject,
-        item.body
+        // A removal notice's 24 hours run from the moment it goes out.
+        item.kind === 'removal' ? fillTakesEffect(item.body, Date.now()) : item.body
       ),
     log: async (item) => {
+      if (item.kind === 'removalCancelled') return;
+      if (item.kind === 'removal') {
+        const { recordFeederRemovalSent } = await import('@/features/corp/taxBook/feederClient');
+        await recordFeederRemovalSent(
+          item.senderCharacterId,
+          item.corporationId,
+          item.feederCorporationId!,
+          item.sentAt
+        );
+        return;
+      }
       // A rate-change mail has no Statement to log on; the rate change is already in the audit trail.
       if (!isStatementMail(item.kind)) return;
       const { editBook } = await import('@/features/corp/taxBook/bookClient');

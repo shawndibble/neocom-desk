@@ -50,6 +50,7 @@ const detail: MoonOwnerDetail = {
       notAPayout: false,
     },
   ],
+  hasPayee: true,
   accrued: 33_024_480,
   paid: 20_000_000,
   payee: { kind: 'corporation', id: 98 },
@@ -125,6 +126,43 @@ export const NoRateSet: Story = {
     },
   },
 };
+
+const removalRow = { ...detail.row, status: 'removal-pending' } as const;
+
+/** @summary A removal whose notice went out: the strip says when it takes effect, with Cancel removal. */
+export const RemovalPending: Story = {
+  args: {
+    detail: {
+      ...detail,
+      row: removalRow,
+      removal: {
+        startedAt: Date.UTC(2026, 9, 17, 14, 22),
+        startedByName: 'Kestrel Vane',
+        effectiveAt: Date.UTC(2026, 9, 18, 14, 22),
+      },
+    },
+    onRemove: () => {},
+    onCancelRemoval: async () => {},
+    onNoticeSent: async () => {},
+  },
+};
+
+/** @summary A removal whose notice has not gone out: the 24 hours have not begun. */
+export const RemovalPendingNoticeUnsent: Story = {
+  args: {
+    detail: {
+      ...detail,
+      row: removalRow,
+      removal: { startedAt: Date.UTC(2026, 9, 17, 14, 22), startedByName: 'Kestrel Vane' },
+    },
+    onRemove: () => {},
+    onCancelRemoval: async () => {},
+    onNoticeSent: async () => {},
+  },
+};
+
+/** @summary An officer who may edit sees Remove from this book… beside Settled otherwise…. */
+export const WithRemoveButton: Story = { args: { onRemove: () => {} } };
 
 /** @summary A detected payment an officer marked "not a payout": it stays listed and can be counted again. */
 export const NotAPayout: Story = {

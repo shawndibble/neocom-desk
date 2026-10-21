@@ -32,6 +32,7 @@ import {
   type Statement,
 } from './statements';
 import type { ObservedRow } from './types';
+import * as removal from './removal';
 
 // `functions/` cannot import `src/`, so the callables enforce a mirror of these
 // engine functions (functions/src/corpTaxBookEngine.ts). This keeps the two
@@ -497,5 +498,35 @@ describe('feeder view mirror', () => {
       const rec = { amount: 12, date: '2026-10-18', method };
       expect(mirror.buildRecordedPayout(rec)).toEqual(buildRecordedPayout(rec));
     }
+  });
+});
+
+describe('removal mirror (#4520)', () => {
+  const H = 3_600_000;
+  it('payeeMayForce agrees on the boundaries', () => {
+    const start = 1000 * H;
+    for (const changed of [undefined, start - 49 * H, start - 47 * H, start, start + H]) {
+      const input = { payeeChangedAt: changed, removalStartedAt: start };
+      expect(mirror.payeeMayForce(input)).toBe(removal.payeeMayForce(input));
+    }
+  });
+  it('the clock, due check and recipients agree', () => {
+    expect(mirror.REMOVAL_WAIT_MS).toBe(removal.REMOVAL_WAIT_MS);
+    const by = { characterId: 1, name: 'A' };
+    const pending = removal.startRemoval({ status: 'active' }, by, 5);
+    expect(mirror.startRemoval({ status: 'active' }, by, 5)).toEqual(pending);
+    const sent = removal.recordRemovalNotice(pending, 9);
+    expect(mirror.recordRemovalNotice(pending, 9)).toEqual(sent);
+    for (const now of [9, 9 + 24 * H, 9 + 25 * H]) {
+      expect(mirror.isRemovalDue(sent, now)).toBe(removal.isRemovalDue(sent, now));
+    }
+    const rec = {
+      officerIds: [1, 2, 3],
+      startedBy: 1,
+      ceoId: 3,
+      payee: { kind: 'corporation' as const, id: 9 },
+      payeeCeoId: 4,
+    };
+    expect(mirror.removalRecipients(rec)).toEqual(removal.removalRecipients(rec));
   });
 });

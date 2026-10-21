@@ -13628,6 +13628,23 @@
     }
   },
   "corpTaxBook": {
+    "removeNow": {
+      "title": "End a removal now",
+      "checking": "Checking this link…",
+      "intro": "{{accounting}} started removing {{owner}} as a moon owner. It takes effect {{time}}. You can end it now instead.",
+      "introNoTime": "{{accounting}} started removing {{owner}} as a moon owner. You can end it now instead.",
+      "hint": "Mining at {{owner}}'s refineries stops being counted from today. What {{accounting}} owes {{owner}} stays owed.",
+      "confirm": "Remove now",
+      "unavailable": "This can't be done right now; the removal takes effect {{time}}.",
+      "unavailableNoTime": "This can't be done right now.",
+      "done": "Done. {{owner}} is no longer a moon owner of {{accounting}}. What is owed stays owed.",
+      "signIn": "Log in with the character this link was meant for.",
+      "login": "Log in with EVE",
+      "failed": "That did not go through. Try again.",
+      "retry": "Try again",
+      "theAccounting": "the accounting corporation",
+      "theOwner": "the moon owner"
+    },
     "verify": {
       "title": "Your Statement",
       "readOnly": "Read-only · no login needed",
@@ -13726,7 +13743,9 @@
         "to": "To",
         "statement": "Statement",
         "status": "Status",
-        "reminder": "Reminder"
+        "reminder": "Reminder",
+        "removal": "Moon owner removal",
+        "removalCancelled": "Removal cancelled"
       },
       "status": {
         "sent": "Sent",
@@ -14229,6 +14248,14 @@
           "hint": "The character who gave access lost the Accountant role or revoked it. Mining since then is not counted until it is reconnected.",
           "action": "Reconnect"
         },
+        "removal": {
+          "title": "Removal pending, takes effect {{time}}",
+          "titleNoTime": "Removal pending",
+          "body": "{{name}} started this on {{date}}. If you did not expect it, end it now and get in touch with them.",
+          "action": "End it now",
+          "confirmTitle": "End the removal now?",
+          "confirmBody": "{{name}} stops handling the tax on your moons from today. What it owes you stays owed. To run your own book instead, turn it on afterwards from this page."
+        },
         "settledOtherwise": {
           "title": "How you are paid",
           "intro": "You are settled with {{name}} another way.",
@@ -14608,10 +14635,19 @@
             "joined": "Joined from an invite offering {{pct}}%"
           },
           "setRate": "Set rate…",
+          "remove": "Remove from this book…",
           "settledOtherwise": "Settled otherwise…",
           "settledNote": "Settled otherwise: nothing is due and no balance is kept.",
           "stale": "Can't read their ledger since {{date}}. Their days wait until it reads again.",
-          "pending": "Removal pending. It ends when its 24-hour wait is over.",
+          "removal": {
+            "title": "Removal pending, takes effect {{time}}",
+            "titleNoTime": "Removal pending",
+            "body": "Started by {{name}} on {{date}}. They were mailed. Mining is still read until then.",
+            "bodyNoTime": "Started by {{name}} on {{date}}. The 24 hours start when the notice is sent. Mining is still read until then.",
+            "cancel": "Cancel removal",
+            "sentIt": "I sent the notice",
+            "failed": "That did not go through. Try again."
+          },
           "disconnected": "Disconnected. Their ledger could not be read for 30 days.",
           "payouts": {
             "title": "Payments",
@@ -14659,6 +14695,17 @@
             "onHint": "Nothing is due and no balance is kept from today.",
             "offHint": "Switching this off resumes accrual from today. Past days are not backfilled.",
             "confirm": "Save"
+          },
+          "remove": {
+            "title": "Remove {{name}} from this book?",
+            "body": "It takes effect in 24 hours, once the mail below has been sent. Until then they stay active and mining is still read. Anyone in {{accounting}} who can manage the book can cancel it, and they can end it at once from their side.",
+            "mailTo": "One mail goes to",
+            "officers": "{{accounting}}'s other officers",
+            "ceo": "{{name}}'s CEO",
+            "payee": "{{name}}'s payee",
+            "kept": "Nothing is deleted. What they are owed stays until you settle it, and mining from the day this takes effect is no longer yours to bill.",
+            "mailNote": "If the mail cannot be sent, the removal stays pending and the send queue offers Open in EVE.",
+            "confirm": "Start removal"
           },
           "invite": {
             "title": "Invite a moon owner",

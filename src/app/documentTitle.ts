@@ -78,6 +78,7 @@ const OTHER_ROUTE_TITLE_KEYS: Record<string, readonly string[]> = {
   '/share/:shareId': ['share.title'],
   '/communities/join/:code': ['communities.join.title'],
   '/corp-tax-book/verify/:token': ['corpTaxBook.verify.title'],
+  '/corp-tax-book/remove-now/:code': ['corpTaxBook.removeNow.title'],
 };
 
 const ROUTE_PATTERNS = Object.entries({ ...OTHER_ROUTE_TITLE_KEYS, ...ROUTE_TITLE_KEYS });

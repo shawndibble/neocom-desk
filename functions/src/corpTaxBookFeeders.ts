@@ -28,6 +28,7 @@ import {
   type CoveragePeriod,
   type FeederModeChange,
   type OwnerRateEntry,
+  type Removal,
 } from './corpTaxBookEngine.js';
 import { ROLES_SCOPE } from './corpTaxBookEsi.js';
 import {
@@ -61,6 +62,10 @@ export interface FeederRecord {
   /** One payee: a corporation or a player. */
   payee?: { kind: 'corporation' | 'character'; id: number };
   payeeChangedAt?: number;
+  /** A removal the accounting corporation started (#4520); present while status is `pending-removal`. */
+  removal?: Removal;
+  /** The id (hash) of the removal mail's link; the link's code is only ever in the mail. */
+  removalLinkId?: string;
   mode: 'normal' | 'settled-otherwise';
   note?: string;
   /** The Character (the signed-in player) who handed over the mining grant; the holder may be their alt. */

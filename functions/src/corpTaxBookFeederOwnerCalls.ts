@@ -12,7 +12,7 @@ import {
   utcDate,
   type BookCall,
 } from './corpTaxBook.js';
-import type { FeederModeChange, OwnerRateEntry } from './corpTaxBookEngine.js';
+import { withPayee, type FeederModeChange, type OwnerRateEntry } from './corpTaxBookEngine.js';
 import {
   deriveModeChanges,
   deriveOwnerRateHistory,
@@ -78,6 +78,25 @@ export function parseSetFeederModeInput(data: unknown): SetFeederModeInput {
       ? undefined
       : boundedString(d.note, 'note', MAX_NOTE);
   return { ...target, mode: d.mode, ...(note !== undefined ? { note } : {}) };
+}
+
+export interface SetFeederPayeeInput extends FeederTargetCall {
+  payee: { kind: 'corporation' | 'character'; id: number };
+}
+
+export function parseSetFeederPayeeInput(data: unknown): SetFeederPayeeInput {
+  const target = parseTarget(data);
+  const payee = record(record(data).payee);
+  const { kind, id } = payee;
+  if (
+    (kind !== 'corporation' && kind !== 'character') ||
+    typeof id !== 'number' ||
+    !Number.isSafeInteger(id) ||
+    id < 1
+  ) {
+    throw new HttpsError('invalid-argument', 'payee must be a corporation or character id');
+  }
+  return { ...target, payee: { kind, id } };
 }
 
 // --- History ---------------------------------------------------------------
@@ -179,6 +198,28 @@ export function setFeederMode(
     action: 'feederModeSet',
     detail: { mode: input.mode, ...(input.note !== undefined ? { note: input.note } : {}) },
   }));
+}
+
+/**
+ * Set a moon owner's payee. Every set or change stamps `payeeChangedAt` (engine `withPayee`);
+ * the removal's payee link reads it.
+ */
+export function setFeederPayee(
+  deps: BookDeps,
+  caller: Caller,
+  input: SetFeederPayeeInput
+): Promise<{ ok: true }> {
+  return editFeeder(deps, caller, input, (rec, now) => {
+    const next = withPayee(rec, input.payee, now);
+    return {
+      update: {
+        payee: input.payee,
+        ...(next.payeeChangedAt !== undefined ? { payeeChangedAt: next.payeeChangedAt } : {}),
+      },
+      action: 'feederPayeeSet',
+      detail: { payee: input.payee },
+    };
+  });
 }
 
 export interface OpenFeederInvite {

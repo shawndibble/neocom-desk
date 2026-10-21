@@ -159,6 +159,10 @@ export const loadCorpTaxBookVerify = named(
   () => import('@/routes/CorpTaxBookVerify'),
   'CorpTaxBookVerify'
 );
+export const loadCorpTaxBookRemoveNow = named(
+  () => import('@/routes/CorpTaxBookRemoveNow'),
+  'CorpTaxBookRemoveNow'
+);
 export const loadErrorProbe = named(() => import('@/routes/ErrorProbe'), 'ErrorProbe');
 
 /**

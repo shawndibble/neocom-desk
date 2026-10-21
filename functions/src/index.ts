@@ -54,7 +54,11 @@ import {
   parseToken,
   parseTurnOnInput,
 } from './corpTaxBook.js';
-import { esiCorporationLookup, esiIdentityReader } from './corpTaxBookEsi.js';
+import {
+  esiCorporationCeoLookup,
+  esiCorporationLookup,
+  esiIdentityReader,
+} from './corpTaxBookEsi.js';
 import {
   parseSaveCorpSyncGrantInput,
   dropCorpSyncGrant,
@@ -95,10 +99,23 @@ import {
 import {
   listFeederInvites,
   parseSetFeederModeInput,
+  parseSetFeederPayeeInput,
   parseSetFeederRateInput,
   setFeederMode,
+  setFeederPayee,
   setFeederRate,
 } from './corpTaxBookFeederOwnerCalls.js';
+import {
+  cancelFeederRemoval,
+  finalizeDueRemovals,
+  forceRemovalNow,
+  getRemovalLink,
+  parseRemovalCall,
+  parseRemovalLinkCall,
+  parseRemovalNoticeCall,
+  recordRemovalSent,
+  startFeederRemoval,
+} from './corpTaxBookFeederRemoval.js';
 import { esiSyncReader } from './corpTaxBookSyncEsi.js';
 import {
   claimPayment,
@@ -741,6 +758,56 @@ export const setCorpTaxBookFeederRateCallable = onCall<unknown>(FEEDER_OWNER_OPT
 
 export const setCorpTaxBookFeederModeCallable = onCall<unknown>(FEEDER_OWNER_OPTIONS, (request) =>
   setFeederMode(feederOwnerDeps(), callerOf(request), parseSetFeederModeInput(request.data))
+);
+
+export const setCorpTaxBookFeederPayeeCallable = onCall<unknown>(FEEDER_OWNER_OPTIONS, (request) =>
+  setFeederPayee(feederOwnerDeps(), callerOf(request), parseSetFeederPayeeInput(request.data))
+);
+
+// Removing a moon owner (issue #4520): start, notice sent, cancel (officers), the payee's link.
+const removalDeps = (): BookDeps => ({
+  ...feederOwnerDeps(),
+  corporationCeo: esiCorporationCeoLookup(),
+});
+
+export const startCorpTaxBookFeederRemovalCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) => startFeederRemoval(removalDeps(), callerOf(request), parseRemovalCall(request.data))
+);
+
+export const recordCorpTaxBookFeederRemovalSentCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    recordRemovalSent(removalDeps(), callerOf(request), parseRemovalNoticeCall(request.data))
+);
+
+export const cancelCorpTaxBookFeederRemovalCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) => cancelFeederRemoval(removalDeps(), callerOf(request), parseRemovalCall(request.data))
+);
+
+export const getCorpTaxBookRemovalLinkCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  getRemovalLink(removalDeps(), callerOf(request), parseRemovalLinkCall(request.data))
+);
+
+export const forceCorpTaxBookRemovalCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
+  (request) =>
+    forceRemovalNow(
+      corpSyncDeps(),
+      callerOf(request),
+      parseRemovalLinkCall(request.data),
+      esiCorporationCeoLookup()
+    )
+);
+
+/** Ends every removal whose 24 hours are up. Deploy is manual, like the other schedules. */
+export const finalizeCorpTaxBookRemovals = onSchedule(
+  { schedule: 'every 1 hours', secrets: FEEDER_VIEW_SECRETS, maxInstances: 1 },
+  async () => {
+    const summary = await finalizeDueRemovals(corpSyncDeps());
+    logInfo('finalizeCorpTaxBookRemovals finished', { ...summary });
+  }
 );
 
 // Paying a moon owner (issue #4514): record a payout, mark a journal row not a payout, and attach

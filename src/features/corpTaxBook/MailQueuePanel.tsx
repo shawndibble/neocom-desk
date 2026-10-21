@@ -116,6 +116,11 @@ export function MailQueueTable({
       render: (row) => (
         <span>
           {row.recipientName}
+          {(row.kind === 'removal' || row.kind === 'removalCancelled') && (
+            <span className="ml-1 text-xs text-text-dim">
+              ({t(`corpTaxBook.mailQueue.table.${row.kind}`)})
+            </span>
+          )}
           {row.kind === 'reminder' && (
             <span className="ml-1 text-xs text-text-dim">
               ({t('corpTaxBook.mailQueue.table.reminder')})
@@ -130,7 +135,8 @@ export function MailQueueTable({
       align: 'right',
       className: 'tabular-nums',
       phoneHidden: true,
-      render: (row) => formatIsk(row.amount),
+      render: (row) =>
+        row.kind === 'removal' || row.kind === 'removalCancelled' ? '—' : formatIsk(row.amount),
     },
     {
       id: 'status',

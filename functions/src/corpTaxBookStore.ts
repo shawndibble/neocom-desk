@@ -83,6 +83,8 @@ export interface BookDeps {
   readIdentity: IdentityReader;
   /** Prices the feeder view (issue #4512); absent in tests that never rebuild one. */
   openPrices?: OpenPricesReader;
+  /** A corporation's CEO (public ESI); only the removal callables (issue #4520) need it. */
+  corporationCeo?: (corporationId: number) => Promise<number | undefined>;
 }
 
 /** Who is calling: the Firebase uid `char:{id}` and the ownerHash claim. */

@@ -560,6 +560,147 @@ export function oreFormTypeId(
   return compressed ? (compressedByRaw[String(rawTypeId)] ?? rawTypeId) : rawTypeId;
 }
 
+// --- Removing a moon owner (#4520); engine removal.ts ---------------------------
+
+/** How long a removal waits once its mail is sent. */
+export const REMOVAL_WAIT_MS = 24 * HOUR_MS;
+
+/** Code-only: the payee-force guard looks back this far from the start of a removal. */
+const PAYEE_LOOKBACK_MS = 48 * HOUR_MS;
+
+/** A started removal. The clock (`effectiveAt`) is set when the mail is sent, never before. */
+export interface Removal {
+  startedAt: number;
+  startedBy: number;
+  startedByName: string;
+  /** When the notice went out (the mail queue's send time, or the officer's confirmation). */
+  noticeAt?: number;
+  /** `noticeAt` plus 24 hours; absent until the notice is out. */
+  effectiveAt?: number;
+}
+
+export type RemovableStatus = 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
+
+export interface RemovalState {
+  status: RemovableStatus;
+  removal?: Removal;
+}
+
+/** A removal can start on an active moon owner only, and not twice. */
+export function canStartRemoval(state: RemovalState): boolean {
+  return state.status === 'active';
+}
+
+export function startRemoval(
+  state: RemovalState,
+  by: { characterId: number; name: string },
+  now: number
+): RemovalState {
+  if (!canStartRemoval(state)) throw new Error('only an active moon owner can be removed');
+  return {
+    status: 'pending-removal',
+    removal: { startedAt: now, startedBy: by.characterId, startedByName: by.name },
+  };
+}
+
+/** The notice went out: the 24 hours run from here. Idempotent: the first notice wins. */
+export function recordRemovalNotice(state: RemovalState, noticeAt: number): RemovalState {
+  const { removal } = state;
+  if (state.status !== 'pending-removal' || !removal || removal.effectiveAt !== undefined) {
+    return state;
+  }
+  return {
+    ...state,
+    removal: { ...removal, noticeAt, effectiveAt: noticeAt + REMOVAL_WAIT_MS },
+  };
+}
+
+/** Any Collector Accountant or higher (the caller checks the role); back to active. */
+export function cancelRemoval(state: RemovalState): RemovalState {
+  if (state.status !== 'pending-removal') throw new Error('no removal is pending');
+  return { status: 'active' };
+}
+
+/** The wait is over. A removal whose notice never went out never takes effect on its own. */
+export function isRemovalDue(state: RemovalState, now: number): boolean {
+  const at = state.removal?.effectiveAt;
+  return state.status === 'pending-removal' && at !== undefined && at <= now;
+}
+
+/** Engine `moonOwnerMailRecipients` (ownerRateMail.ts): CEO and payee, once each. */
+export function moonOwnerMailRecipients(input: {
+  ceoId: number | null;
+  payee?: { kind: 'corporation' | 'character'; id: number };
+  payeeCeoId?: number | null;
+}): number[] {
+  const payeeId = input.payee?.kind === 'character' ? input.payee.id : (input.payeeCeoId ?? null);
+  return [...new Set([input.ceoId, payeeId].filter((id): id is number => typeof id === 'number'))];
+}
+
+/**
+ * Whom the one mail goes to: the book's other officers, plus the moon owner's CEO and its
+ * payee through the engine's shared `moonOwnerMailRecipients` (#4515). The officer who started it is
+ * not mailed; nobody twice.
+ */
+export function removalRecipients(input: {
+  officerIds: readonly number[];
+  startedBy: number;
+  ceoId: number | null;
+  payee?: { kind: 'corporation' | 'character'; id: number };
+  /** The payee corporation's CEO, when the payee is a corporation. */
+  payeeCeoId?: number | null;
+}): number[] {
+  const out = new Set<number>();
+  for (const id of input.officerIds) if (id !== input.startedBy) out.add(id);
+  for (const id of moonOwnerMailRecipients(input)) out.add(id);
+  return [...out];
+}
+
+/**
+ * May the payee end a removal at once? Not when the payee was set or changed
+ * within 48 hours before the removal started, or at any time after it started.
+ * Exactly one rule, deliberately silent in every player-facing surface.
+ */
+export function payeeMayForce(input: {
+  payeeChangedAt: number | undefined;
+  removalStartedAt: number;
+}): boolean {
+  const { payeeChangedAt, removalStartedAt } = input;
+  if (payeeChangedAt === undefined) return true;
+  return payeeChangedAt < removalStartedAt - PAYEE_LOOKBACK_MS;
+}
+
+/**
+ * Who may use the payee's link: the payee when it is a player, the corporation's
+ * CEO when it is a corporation.
+ */
+export function isPayeeActor(input: {
+  payee: { kind: 'corporation' | 'character'; id: number } | undefined;
+  characterId: number;
+  payeeCorporationCeoId: number | undefined;
+}): boolean {
+  const { payee, characterId } = input;
+  if (!payee) return false;
+  return payee.kind === 'character'
+    ? payee.id === characterId
+    : input.payeeCorporationCeoId === characterId;
+}
+
+/** A payee set or changed: the new payee and when. Re-saving the same payee changes nothing. */
+export function withPayee<T extends { payee?: { kind: 'corporation' | 'character'; id: number } }>(
+  rec: T,
+  payee: { kind: 'corporation' | 'character'; id: number },
+  now: number
+): T & { payeeChangedAt?: number } {
+  const same = rec.payee?.kind === payee.kind && rec.payee.id === payee.id;
+  const prior = (rec as { payeeChangedAt?: number }).payeeChangedAt;
+  return {
+    ...rec,
+    payee,
+    ...(same ? (prior !== undefined ? { payeeChangedAt: prior } : {}) : { payeeChangedAt: now }),
+  };
+}
+
 // --- Payouts (#4514) -----------------------------------------------------------
 // Engine `payouts.ts`: recording a payout and attaching the journal's outgoing donation to it.
 

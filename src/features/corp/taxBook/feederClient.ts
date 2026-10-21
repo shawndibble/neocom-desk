@@ -216,3 +216,97 @@ export async function listFeederInvites(
   );
   return invites;
 }
+
+/** Removing a moon owner (#4520): the server's answer when a removal starts. */
+export interface StartedRemoval {
+  startedAt: number;
+  /** The code for the "Remove now" link in the mail; never shown elsewhere. */
+  code: string;
+  /** Character ids the one mail goes to. */
+  recipients: number[];
+}
+
+/** Start a 24-hour removal. The 24 hours begin when the notice is sent. */
+export async function startFeederRemoval(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number
+): Promise<StartedRemoval> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'startCorpTaxBookFeederRemovalCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+  });
+}
+
+/** The notice went out: the removal's 24 hours run from `sentAt`. The first notice wins. */
+export async function recordFeederRemovalSent(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  sentAt?: number
+): Promise<{ effectiveAt: number | null }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'recordCorpTaxBookFeederRemovalSentCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    ...(sentAt === undefined ? {} : { sentAt }),
+  });
+}
+
+/** Cancel a pending removal; returns whom the short cancellation mail goes to. */
+export async function cancelFeederRemoval(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number
+): Promise<{ recipients: number[] }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'cancelCorpTaxBookFeederRemovalCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+  });
+}
+
+/**
+ * The payee's "Remove now" page: one answer for a link that cannot be used, whatever the reason
+ * (expired, over, guarded, or the wrong person), with when the removal takes effect, if known.
+ */
+export type RemovalLinkState =
+  | { available: false; effectiveAt: number | null }
+  | {
+      available: true;
+      collectorCorporationId: number;
+      feederCorporationId: number;
+      effectiveAt: number | null;
+    };
+
+export function getRemovalLink(characterId: number, code: string): Promise<RemovalLinkState> {
+  return call(characterId, 'getCorpTaxBookRemovalLinkCallable', { code });
+}
+
+/** End the removal now, as the payee. `ended: false` is the same neutral answer as an expired link. */
+export function forceRemoval(
+  characterId: number,
+  code: string
+): Promise<{ ended: boolean; effectiveAt: number | null }> {
+  return call(characterId, 'forceCorpTaxBookRemovalCallable', { code });
+}
+
+/** Set a moon owner's payee; stamps when it changed. */
+export async function setFeederPayee(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  payee: { kind: 'corporation' | 'character'; id: number }
+): Promise<{ ok: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'setCorpTaxBookFeederPayeeCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    payee,
+  });
+}

@@ -30,6 +30,7 @@ import {
   FEEDER_OF_COLLECTION,
   FEEDER_PREVIOUS_COLLECTION,
   OBSERVED,
+  REMOVAL_LINKS_COLLECTION,
   decideRoles,
   utcDate,
 } from './corpTaxBook.js';
@@ -453,14 +454,43 @@ export async function leaveFeeder(
   if (!ctx || !LEAVABLE.includes(ctx.record.status)) {
     fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
   }
-  const feederRef = bookRef(deps.db, ctx.collectorCorporationId)
-    .collection(FEEDERS)
-    .doc(String(input.corporationId));
-  const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(input.corporationId));
-  const previousRef = deps.db
-    .collection(FEEDER_PREVIOUS_COLLECTION)
-    .doc(String(input.corporationId));
-  const gRef = grantRef(deps.db, input.corporationId);
+  // Leaving while a removal is pending is the moon owner forcing it: it reads as removed.
+  await endFeeder(deps, {
+    collectorCorporationId: ctx.collectorCorporationId,
+    feederCorporationId: input.corporationId,
+    effectiveAt: deps.now(),
+    finalStatus: ctx.record.status === 'pending-removal' ? 'removed' : 'left',
+    actor: { characterId: ctx.callerId, name: 'Moon owner' },
+    action: ctx.record.status === 'pending-removal' ? 'feederRemovalForced' : 'feederLeft',
+    allowed: LEAVABLE,
+  });
+  // No server-side accrual engine yet (#4510 is client-side): the balance is the client's to show.
+  return { left: true, owedIsk: null };
+}
+
+export interface EndFeederInput {
+  collectorCorporationId: number;
+  feederCorporationId: number;
+  /** Coverage ends the day before this moment's UTC day. */
+  effectiveAt: number;
+  finalStatus: 'left' | 'removed';
+  actor: { characterId: number | null; name: string; via?: string };
+  action: string;
+  /** The statuses this may end; anything else is refused. */
+  allowed: readonly FeederRecord['status'][];
+}
+
+/**
+ * Ends a feeder: the record, its pointer, its grant and its coverage, then the view. Leave,
+ * a forced removal and a removal taking effect differ only in `finalStatus`, `effectiveAt`
+ * and the audit entry.
+ */
+export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Promise<void> {
+  const { collectorCorporationId: collector, feederCorporationId: feederCorp } = input;
+  const feederRef = bookRef(deps.db, collector).collection(FEEDERS).doc(String(feederCorp));
+  const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp));
+  const previousRef = deps.db.collection(FEEDER_PREVIOUS_COLLECTION).doc(String(feederCorp));
+  const gRef = grantRef(deps.db, feederCorp);
   const now = deps.now();
 
   const dropped = await deps.db.runTransaction(async (tx) => {
@@ -470,33 +500,31 @@ export async function leaveFeeder(
       tx.get(gRef),
     ]);
     const rec = recSnap.data() as FeederRecord | undefined;
-    if (!rec || !ptrSnap.exists || !LEAVABLE.includes(rec.status)) {
+    if (!rec || !ptrSnap.exists || !input.allowed.includes(rec.status)) {
       fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
     }
     const grant = grantSnap.data() as CorpSyncGrantDoc | undefined;
     tx.update(feederRef, {
-      status: 'left',
+      status: input.finalStatus,
       leftAt: now,
-      coveragePeriods: closePeriod(rec.coveragePeriods, utcDate(now)),
+      coveragePeriods: closePeriod(rec.coveragePeriods, utcDate(input.effectiveAt)),
+      removal: FieldValue.delete(),
+      removalLinkId: FieldValue.delete(),
     });
+    if (rec.removalLinkId) {
+      tx.delete(deps.db.collection(REMOVAL_LINKS_COLLECTION).doc(rec.removalLinkId));
+    }
     tx.delete(pointerRef);
     // The after-leaving view still finds its Collector through this.
-    tx.set(previousRef, { collectorCorporationId: ctx.collectorCorporationId, leftAt: now });
+    tx.set(previousRef, { collectorCorporationId: collector, leftAt: now });
     if (grant?.kind === 'feeder') tx.delete(gRef);
-    appendAudit(
-      tx,
-      bookDeps(deps),
-      ctx.collectorCorporationId,
-      { characterId: ctx.callerId, name: 'Moon owner' },
-      'feederLeft',
-      { feederCorporationId: input.corporationId }
-    );
+    appendAudit(tx, bookDeps(deps), collector, input.actor, input.action, {
+      feederCorporationId: feederCorp,
+    });
     return grant?.kind === 'feeder' ? grant : undefined;
   });
   if (dropped) await revokeStored(deps, dropped);
-  await tryRebuildFeederView(bookDeps(deps), ctx.collectorCorporationId, input.corporationId);
-  // No server-side accrual engine yet (#4510 is client-side): the balance is the client's to show.
-  return { left: true, owedIsk: null };
+  await tryRebuildFeederView(bookDeps(deps), collector, feederCorp);
 }
 
 // --- Status ----------------------------------------------------------------
