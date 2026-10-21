@@ -8,11 +8,8 @@
  * Never rejects: a failed read, no sync configured, or a stale or missing list
  * all come back as "no wars", so the banner stays quiet rather than wrong.
  */
-import { doc, getDoc } from 'firebase/firestore/lite';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { parseStoredWars, type StoredWar } from '@/engine/wars';
-import { getSyncFirestore } from '@/sync/firebaseApp';
-import { ensureAnySession } from '@/sync/syncAuth';
 
 const COLLECTION = 'systemConditions';
 const DOC_ID = 'activeWars';
@@ -32,6 +29,12 @@ let reading: Promise<void> | null = null;
 
 async function readList(characterId: number): Promise<void> {
   try {
+    // Dynamic: the Overview mounts this, and Firebase stays out of the startup graph.
+    const [{ doc, getDoc }, { getSyncFirestore }, { ensureAnySession }] = await Promise.all([
+      import('firebase/firestore/lite'),
+      import('@/sync/firebaseApp'),
+      import('@/sync/syncAuth'),
+    ]);
     await ensureAnySession(characterId);
     const snapshot = await getDoc(doc(getSyncFirestore(), COLLECTION, DOC_ID));
     lastRead = { at: Date.now(), data: snapshot.data() };
