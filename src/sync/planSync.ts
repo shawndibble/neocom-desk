@@ -23,6 +23,7 @@
 import { collection, doc, setDoc } from 'firebase/firestore/lite';
 import { db } from '@/db';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { annotateFailure } from '@/observability/reportFailure';
 import { syncEditableCollection, type SyncContext } from './collectionSync';
 import { syncFeed } from './feedSync';
 import {
@@ -44,6 +45,7 @@ import {
   BUILD_PLANS,
   EDITABLE_COLLECTIONS,
   FITTINGS,
+  NOTIFICATION_FEED,
   PLANET_RICHNESS,
   PRODUCTION_ORDER_WATCHES,
   PRODUCTION_LOSSES,
@@ -51,6 +53,7 @@ import {
   PRODUCTION_SALE_LINKS,
   SKILL_PLANS,
   STATION_PINS,
+  SYNCED_SETTINGS,
 } from './syncedCollections';
 
 /**
@@ -398,32 +401,54 @@ export async function removeProductionLoss(characterId: number, lossId: string):
  */
 const COLLECTION_PULL_CONCURRENCY = 4;
 
+/** A unit of a sync pass; `name` is what a failure report says failed. */
+interface NamedTask {
+  name: string;
+  run: () => Promise<void>;
+}
+
+/** A Firebase/Firestore error's `code` without its `firestore/`-style prefix. */
+function errorCodeOf(error: unknown): string {
+  const { code } = (error ?? {}) as { code?: unknown };
+  return typeof code === 'string' ? code.replace(/^[a-z]+\//, '') : 'none';
+}
+
 /**
  * Run every task, at most `limit` at a time, and throw only once *all* of them
  * have settled: the one failure as-is, or an `AggregateError` of several.
  * Rejecting early would let the queue start the next Character — and swap the
  * Firebase session — under this one's still-running writes, the race the
  * global serialization exists to prevent.
+ *
+ * The thrown error is annotated with which tasks failed and with what codes,
+ * for the Sentry report: an `AggregateError` carries neither in its message.
  */
-async function settleAllThenThrow(
-  tasks: readonly (() => Promise<void>)[],
-  limit: number
-): Promise<void> {
-  const errors: unknown[] = [];
+async function settleAllThenThrow(tasks: readonly NamedTask[], limit: number): Promise<void> {
+  const failures: { name: string; error: unknown }[] = [];
   await mapWithConcurrencyLimit(tasks, limit, async (task) => {
     try {
-      await task();
+      await task.run();
     } catch (error) {
-      errors.push(error);
+      failures.push({ name: task.name, error });
     }
   });
-  if (errors.length === 1) throw errors[0];
-  if (errors.length > 1) {
-    const first = errors[0] instanceof Error ? errors[0].message : String(errors[0]);
-    // Every failure kept for whoever inspects it; the message — what the sync
-    // status line shows — stays the first one's, with a count.
-    throw new AggregateError(errors, `${first} (and ${errors.length - 1} more)`);
-  }
+  if (failures.length === 0) return;
+  const errors = failures.map((f) => f.error);
+  const thrown =
+    errors.length === 1
+      ? errors[0]
+      : new AggregateError(
+          errors,
+          // Every failure kept for whoever inspects it; the message — what the sync
+          // status line shows — stays the first one's, with a count.
+          `${errors[0] instanceof Error ? errors[0].message : String(errors[0])} (and ${errors.length - 1} more)`
+        );
+  annotateFailure(thrown, {
+    failed_collections: failures.map((f) => f.name).join(','),
+    failed_count: String(failures.length),
+    error_codes: [...new Set(errors.map(errorCodeOf))].join(','),
+  });
+  throw thrown;
 }
 
 async function syncCharacter(characterId: number): Promise<void> {
@@ -442,9 +467,12 @@ async function syncCharacter(characterId: number): Promise<void> {
   // and the failed one re-reads its window on the next pass.
   await settleAllThenThrow(
     [
-      ...EDITABLE_COLLECTIONS.map((spec) => () => syncEditableCollection(spec, ctx)),
-      () => syncFeed(ctx),
-      () => syncSettings(ctx),
+      ...EDITABLE_COLLECTIONS.map((spec) => ({
+        name: spec.remoteName,
+        run: () => syncEditableCollection(spec, ctx),
+      })),
+      { name: NOTIFICATION_FEED.remoteName, run: () => syncFeed(ctx) },
+      { name: SYNCED_SETTINGS.remoteName, run: () => syncSettings(ctx) },
     ],
     COLLECTION_PULL_CONCURRENCY
   );
