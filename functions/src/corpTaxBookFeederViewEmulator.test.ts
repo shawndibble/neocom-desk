@@ -7,7 +7,12 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
-import { leaveFeeder, saveFeederGrant, type FeederGrantDeps } from './corpTaxBookFeederGrant.js';
+import {
+  getFeederStatus,
+  leaveFeeder,
+  saveFeederGrant,
+  type FeederGrantDeps,
+} from './corpTaxBookFeederGrant.js';
 import {
   dismissFeederHistory,
   getFeederViewAccess,
@@ -372,11 +377,84 @@ suite('moon owner view', () => {
     expect(await pointer()).toBeUndefined();
     expect(
       (await db.collection('corpTaxBookFeederPrevious').doc(String(FEEDER)).get()).data()
-    ).toEqual({ collectorCorporationId: COLLECTOR, leftAt: T0 });
+    ).toEqual({
+      collectorCorporationId: COLLECTOR,
+      leftAt: T0,
+      history: [{ collectorCorporationId: COLLECTOR, leftAt: T0 }],
+    });
     // joined and left the same day: no day was ever covered
     expect(await summary()).toMatchObject({ status: 'left', leftAt: T0, coverageFrom: null });
     const out = await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), asDirector);
     expect(out.collectorCorporationId).toBe(COLLECTOR);
+  });
+
+  it('keeps every accounting corporation it left, by id, across a later join and leave (#4621)', async () => {
+    const OTHER = 98000050;
+    await save(await newInvite(), 6);
+    await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
+    // Joins another accounting corporation.
+    await db
+      .collection('corpTaxBooks')
+      .doc(String(OTHER))
+      .set({ active: true, corporationName: 'Other' });
+    await db
+      .collection('corpTaxBooks')
+      .doc(String(OTHER))
+      .collection('feeders')
+      .doc(String(FEEDER))
+      .set({
+        corporationId: FEEDER,
+        status: 'active',
+        invitedBy: 1,
+        joinedAt: T0,
+        mode: 'normal',
+        coveragePeriods: [{ from: '2026-10-18' }],
+      });
+    await db
+      .collection('corpTaxBookFeederOf')
+      .doc(String(FEEDER))
+      .set({ collectorCorporationId: OTHER, since: T0 });
+
+    const previous = { ...asDirector, collectorCorporationId: COLLECTOR };
+    expect(
+      (await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), previous)).collectorCorporationId
+    ).toBe(COLLECTOR);
+    expect(
+      (await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), asDirector)).collectorCorporationId
+    ).toBe(OTHER);
+    expect(await getFeederStatus(deps(), who(FEEDER_DIRECTOR), asDirector)).toMatchObject({
+      status: 'feeder',
+      collectorCorporationId: OTHER,
+      previousCollectorIds: [COLLECTOR],
+    });
+
+    // Leaving the second keeps the first.
+    await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
+    const doc = (await db.collection('corpTaxBookFeederPrevious').doc(String(FEEDER)).get()).data();
+    expect(doc).toMatchObject({ collectorCorporationId: OTHER, leftAt: T0 });
+    expect(doc?.history).toEqual([
+      { collectorCorporationId: COLLECTOR, leftAt: T0 },
+      { collectorCorporationId: OTHER, leftAt: T0 },
+    ]);
+    expect(
+      (await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), previous)).collectorCorporationId
+    ).toBe(COLLECTOR);
+    expect(await getFeederStatus(deps(), who(FEEDER_DIRECTOR), asDirector)).toMatchObject({
+      status: 'none',
+      previousCollectorIds: [OTHER, COLLECTOR],
+    });
+    await dismissFeederHistory(deps(), who(FEEDER_DIRECTOR), previous);
+    expect((await feederRecord())?.viewDismissedAt).toBe(T0);
+
+    // A corporation that never handled it resolves nothing.
+    expect(
+      await reason(
+        getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), {
+          ...asDirector,
+          collectorCorporationId: 98000099,
+        })
+      )
+    ).toBe('not-your-feeder');
   });
 
   it('dismiss: refused while active, works after leaving and sticks', async () => {
