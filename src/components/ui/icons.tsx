@@ -126,10 +126,13 @@ import { Target } from '@phosphor-icons/react/dist/csr/Target';
 import { TextAa } from '@phosphor-icons/react/dist/csr/TextAa';
 import { Tray } from '@phosphor-icons/react/dist/csr/Tray';
 import { User } from '@phosphor-icons/react/dist/csr/User';
+import { UserList } from '@phosphor-icons/react/dist/csr/UserList';
 import { UserPlus } from '@phosphor-icons/react/dist/csr/UserPlus';
 import { UsersFour } from '@phosphor-icons/react/dist/csr/UsersFour';
 import { UsersThree } from '@phosphor-icons/react/dist/csr/UsersThree';
+import { Vault } from '@phosphor-icons/react/dist/csr/Vault';
 import { Wallet as WalletGlyph } from '@phosphor-icons/react/dist/csr/Wallet';
+import { Warehouse } from '@phosphor-icons/react/dist/csr/Warehouse';
 import { Warning } from '@phosphor-icons/react/dist/csr/Warning';
 import { WarningOctagon } from '@phosphor-icons/react/dist/csr/WarningOctagon';
 import { X } from '@phosphor-icons/react/dist/csr/X';
@@ -444,6 +447,15 @@ export const ColumnsPicker = withWeight(ColumnsGlyph);
 export const NavOverview = withWeight(SquaresFour);
 export const NavAlerts = withWeight(Bell);
 export const NavCorp = withWeight(Buildings);
+/*
+ * The other Corp pages each look unlike the pilot page they share a word with:
+ * a roster (not Communities' crowd), a vault (not Wallet's billfold), a
+ * warehouse (not Assets' box), and the moon the Moon Mining Tax ledger uses.
+ */
+export const NavCorpMembers = withWeight(UserList);
+export const NavCorpWallet = withWeight(Vault);
+export const NavCorpAssets = withWeight(Warehouse);
+export const NavCorpMoons = withWeight(Moon);
 export const NavSkills = withWeight(GraduationCap);
 export const NavIndustry = withWeight(Factory);
 export const NavShips = withWeight(RocketLaunch);
