@@ -9,6 +9,7 @@ import { useGrantedScopes } from './useGrantedScopes';
 import { warmRoute } from './routeWarm';
 import { preloadRouteChunk } from './routeChunks';
 import { NAV_ICON_BY_PATH } from './navIcons';
+import { PARENT_PAGE_PATHS } from './navDestinations';
 import { toggleHiddenNav } from './navPreferences';
 import type { AppRoutePath } from './routeScopes';
 
@@ -136,6 +137,7 @@ export function NavItem({
   const link = (
     <NavLink
       to={to}
+      end={PARENT_PAGE_PATHS.has(to)}
       state={originState}
       onClick={onClick}
       onMouseEnter={warm}

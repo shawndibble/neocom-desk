@@ -13,6 +13,12 @@ import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCorporationId, MASTER_WALLET_DIVISION } from '@/features/corp/boardData';
 import { jobTypeIds } from '@/features/corp/boardSources';
+import { classifyCorpAssets } from '@/engine/corp/assetLedger';
+import { loadCorporationAssets, toCorpAssetInputs } from '@/features/corp/assets';
+import { loadCorporationBlueprints } from '@/features/corp/blueprints';
+import { loadAssetCopyValues } from '@/features/assets/assetCopyValues';
+import { getAveragePriceByType } from '@/market/prices';
+import { summariseCorpAssets } from './corpAssetsSummary';
 import { loadCorporationContracts } from '@/features/corp/contracts';
 import { loadCorporationOrders } from '@/features/corp/orders';
 import { loadStationBestPrices } from '@/features/market/orderCompetition';
@@ -43,6 +49,7 @@ import { fetchCorporationStatsRead } from '@/lib/zkillboard';
 import { parseInstant } from '@/engine/esiInstant';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import type {
+  CorpAssetsFeed,
   CorpCustomsFeed,
   CorpRoleAuditFeed,
   CorpContractsFeed,
@@ -183,6 +190,49 @@ export async function loadCorpCustoms(characterId: number): Promise<CorpCustomsF
     offices,
     typeNames,
     systemNames,
+  };
+}
+
+/**
+ * The page's own corp asset read (`loadCorporationAssets`, same cache row) with
+ * the page's own price and copy-value inputs, reduced to the widget's counts.
+ */
+export async function loadCorpAssets(characterId: number): Promise<CorpAssetsFeed> {
+  const empty: CorpAssetsFeed = {
+    ...UNREADABLE,
+    corporationId: null,
+    summary: null,
+    truncated: false,
+  };
+  // Not `gate()`: this loader also needs `canReadBlueprints` from the same access.
+  const resolved = await resolveCorpReadAccess(characterId);
+  if (resolved === null || !resolved.can('canReadAssets')) return empty;
+  const { corporationId } = resolved;
+  const result = await loadCorporationAssets(characterId, corporationId);
+  if (result.cached === null) {
+    if (result.needsReauth) return { ...empty, needsReauth: true };
+    // No assets read means no counts: a zero would read as "all clear".
+    throw new CorpReadFailed('assets');
+  }
+  const assets = result.cached.data;
+  const canReadBlueprints = resolved.can('canReadBlueprints');
+  const [prices, copyValues] = await Promise.all([
+    // A failed price read leaves counts without values, as the page does.
+    getAveragePriceByType().catch(() => new Map<number, number>()),
+    loadAssetCopyValues(characterId, assets, async () =>
+      canReadBlueprints
+        ? ((await loadCorporationBlueprints(characterId, corporationId)).cached?.data ?? null)
+        : null
+    ),
+  ]);
+  const { items } = classifyCorpAssets(toCorpAssetInputs(assets));
+  return {
+    readable: true,
+    needsReauth: false,
+    ...readAge([result]),
+    corporationId,
+    summary: summariseCorpAssets(items, { prices, copyValues }),
+    truncated: result.cached.truncated,
   };
 }
 

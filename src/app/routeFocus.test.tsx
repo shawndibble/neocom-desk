@@ -25,11 +25,15 @@ describe('focusKeyFor', () => {
 
   it('collapses a sub-nav’s sibling routes to one page', () => {
     expect(focusKeyFor('/skills/trained')).toBe(focusKeyFor('/skills/plans'));
-    expect(focusKeyFor('/corp/members')).toBe(focusKeyFor('/corp'));
-    expect(focusKeyFor('/corp/members/roles')).toBe(focusKeyFor('/corp'));
-    expect(focusKeyFor('/corp/wallet')).toBe(focusKeyFor('/corp'));
+    expect(focusKeyFor('/corp/members/roles')).toBe(focusKeyFor('/corp/members'));
     expect(focusKeyFor('/clones')).toBe(focusKeyFor('/overview'));
     expect(focusKeyFor('/overview')).not.toBe(focusKeyFor('/mail'));
+  });
+
+  it('treats each Corp page as a page of its own, not part of /corp', () => {
+    for (const path of ['/corp/members', '/corp/wallet', '/corp/moons']) {
+      expect(focusKeyFor(path)).not.toBe(focusKeyFor('/corp'));
+    }
   });
 
   it('treats opening a Fitting as a new page, and Ships’ tabs as one', () => {

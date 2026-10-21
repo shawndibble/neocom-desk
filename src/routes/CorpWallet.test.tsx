@@ -543,7 +543,7 @@ describe('Wallet no longer carries the corporation', () => {
     expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     // The switch used to appear only once corp access resolved to `ready`,
     // which is also what puts Corp in the sidebar.
-    expect(await screen.findByRole('link', { name: 'Corporation' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Corp Board' })).toBeInTheDocument();
 
     expect(screen.queryByRole('group', { name: 'Wallet owner' })).toBeNull();
     expect(screen.queryByLabelText('Wallet division')).toBeNull();

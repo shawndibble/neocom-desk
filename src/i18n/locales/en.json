@@ -26,11 +26,17 @@
     "characters": "Characters",
     "overview": "Overview",
     "corp": "Corporation",
+    "corpBoard": "Corp Board",
+    "corpMembers": "Members",
+    "corpWallet": "Corp Wallet",
+    "corpAssets": "Corp Assets",
+    "corpMoons": "Moons",
     "skills": "Skills",
     "industry": "Industry",
     "ships": "Ships",
     "market": "Market",
     "groups": {
+      "corp": "Corporation",
       "progression": "Progression",
       "economy": "Economy",
       "social": "Social"
@@ -5229,6 +5235,36 @@
         },
         "summary_one": "{{count}} outstanding corp contract, {{soon}} expiring within a day.",
         "summary_other": "{{count}} outstanding corp contracts, {{soon}} expiring within a day."
+      },
+      "corpAssets": {
+        "title": "Corp Assets",
+        "description": "Asset safety, impounded and delivered items, and stock below target",
+        "empty": "The corporation holds no assets and has no stock targets.",
+        "allClear": "Nothing in asset safety, impounded or waiting, and every stock target is met.",
+        "unit_one": "thing to look at",
+        "unit_other": "things to look at",
+        "truncated": "The asset list was cut short, so counts may be incomplete.",
+        "line": {
+          "safety": "Asset safety",
+          "impounded": "Impounded",
+          "deliveries": "Corp deliveries waiting",
+          "belowTarget": "Below target"
+        },
+        "safetyCount_one": "{{count}} stack",
+        "safetyCount_other": "{{count}} stacks",
+        "impoundedCount_one": "{{count}} stack",
+        "impoundedCount_other": "{{count}} stacks",
+        "deliveriesCount_one": "{{count}} stack",
+        "deliveriesCount_other": "{{count}} stacks",
+        "belowTargetCount_one": "{{count}} type",
+        "belowTargetCount_other": "{{count}} types",
+        "col": {
+          "line": "Where",
+          "count": "Count",
+          "value": "Est. value"
+        },
+        "summary": "{{parts}}.",
+        "summaryClear": "Nothing in asset safety, impounded or waiting, and every stock target is met."
       },
       "corpSrp": {
         "title": "Ship replacement",
@@ -12413,6 +12449,7 @@
       "refresh": "Refresh member list",
       "tableLabel": "Corporation members",
       "columnMember": "Member",
+      "rosterTab": "Roster",
       "columnLastSeen": "Last seen",
       "columnShip": "Ship",
       "columnLocation": "Location",

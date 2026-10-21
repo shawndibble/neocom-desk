@@ -5,6 +5,7 @@
  * Structures and Moon extractions are the Overview's own kinds, reused as they are.
  */
 import type { KindDef } from './builderKit';
+import { corpAssets } from './corpAssetsModels';
 import { corpContracts } from './corpContractsModels';
 import { corpOrders } from './corpOrdersModels';
 import { corpDeadlines, corpJobs, corpServices } from './corpClockModels';
@@ -33,5 +34,6 @@ export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
   corpMining: { feeds: ['corpMining'], build: corpMining },
   corpOrders: { feeds: ['corpOrders'], build: corpOrders },
   corpContracts: { feeds: ['corpContracts'], build: corpContracts },
+  corpAssets: { feeds: ['corpAssets', 'corpStockTargets'], build: corpAssets },
   corpKills: { feeds: ['corpKills'], build: corpKills },
 };

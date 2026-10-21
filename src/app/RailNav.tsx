@@ -21,6 +21,7 @@ import { useHiddenTabPaths } from './useHiddenTabPaths';
 import { useCommandPalette } from '@/features/commandPalette/store';
 import { useLockedRoutes } from './useGrantedScopes';
 import {
+  isNavPageAvailable,
   listNavDestinations,
   NAV_LOCK_PATHS,
   railGroups,
@@ -259,7 +260,9 @@ const RailNavBody = memo(function RailNavBody({
   // level, not a second tree). The page you are on stays in its own group.
   const morePages = RAIL_GROUPS.flatMap((group) => group.pages).filter(
     (page) =>
-      (page.gating !== 'corp' || corpVisible) && hidden.has(page.path) && page.path !== current
+      isNavPageAvailable(page, corpVisible, capabilities) &&
+      hidden.has(page.path) &&
+      page.path !== current
   );
   const toggleOpen = useCallback(
     (path: string) => setOpen((state) => ({ ...state, path: state.path === path ? null : path })),
@@ -292,7 +295,7 @@ const RailNavBody = memo(function RailNavBody({
         {RAIL_GROUPS.map((group) => {
           const pages = group.pages.filter(
             (page) =>
-              (page.gating !== 'corp' || corpVisible) &&
+              isNavPageAvailable(page, corpVisible, capabilities) &&
               (editing || !hidden.has(page.path) || page.path === current)
           );
           // A heading over nothing would strand itself.

@@ -63,6 +63,7 @@ const CORP_IDS = [
   'corpMining',
   'corpKills',
   'corpContracts',
+  'corpAssets',
   'corpSrp',
 ];
 

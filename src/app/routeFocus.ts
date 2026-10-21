@@ -12,7 +12,7 @@ import type { AppRoutePath } from './routeScopes';
 
 /**
  * Routes that are separate paths but one page to the pilot: each set shares a
- * sub-nav (`SkillsSubNav`, `CorpSubNav`, `OverviewSubNav`) that stays on
+ * sub-nav (`SkillsSubNav`, `OverviewSubNav`) that stays on
  * screen across the switch, so it behaves like a tab bar — the link just used
  * is still there to keep focus on.
  */
@@ -20,10 +20,6 @@ const SUB_NAV_PAGES: Partial<Record<AppRoutePath, AppRoutePath>> = {
   '/skills/trained': '/skills',
   '/skills/plans': '/skills',
   '/skills/certificates': '/skills',
-  '/corp/members': '/corp',
-  '/corp/wallet': '/corp',
-  '/corp/assets': '/corp',
-  '/corp/moons': '/corp',
   '/clones': '/overview',
   '/employment-history': '/overview',
 };

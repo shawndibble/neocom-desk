@@ -14,6 +14,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useCorpStockTargetsStore } from '@/features/corp/stockTargets';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import {
   useSpExtractionMonitoringEnabled,
@@ -59,6 +60,7 @@ import {
   loadSurveyWidget,
 } from './kindLoaders';
 import {
+  loadCorpAssetsFeed,
   loadCorpCustomsFeed,
   loadCorpJobsFeed,
   loadCorpKillsFeed,
@@ -149,6 +151,22 @@ function SpExtrasSource() {
     store.set('spExtras', { data: extras, error: false, loading: extras === null });
   }, [store, extras]);
   useEffect(() => () => store.clear('spExtras'), [store]);
+  return null;
+}
+
+/** The synced corp stock targets, a hook not a load; hydrated before it answers. */
+function CorpStockTargetsSource() {
+  const store = useFeedStore();
+  const value = useCorpStockTargetsStore((state) => state.value);
+  const hydrated = useHydratedStore(useCorpStockTargetsStore);
+  useEffect(() => {
+    store.set('corpStockTargets', {
+      data: hydrated ? value : null,
+      error: false,
+      loading: !hydrated,
+    });
+  }, [store, hydrated, value]);
+  useEffect(() => () => store.clear('corpStockTargets'), [store]);
   return null;
 }
 
@@ -290,6 +308,10 @@ function Source({ feed }: { feed: FeedId }) {
       return (
         <SnapshotSource feed="corpCustoms" load={loadCorpCustomsFeed} cacheKey="corp:customs" />
       );
+    case 'corpAssets':
+      return <SnapshotSource feed="corpAssets" load={loadCorpAssetsFeed} cacheKey="corp:assets" />;
+    case 'corpStockTargets':
+      return <CorpStockTargetsSource />;
     case 'corpRoleAudit':
       return (
         <SnapshotSource

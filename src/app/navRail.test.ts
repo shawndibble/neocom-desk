@@ -30,8 +30,14 @@ describe('canHide', () => {
   });
 
   it('never hides the pages that are the only way to something', () => {
-    for (const path of ['/corp', '/settings', '/characters', '/help']) {
+    for (const path of ['/settings', '/characters', '/help']) {
       expect(canHide(path)).toBe(false);
+    }
+  });
+
+  it('lets a pilot hide each Corp page on its own', () => {
+    for (const path of ['/corp', '/corp/members', '/corp/wallet', '/corp/assets', '/corp/moons']) {
+      expect(canHide(path)).toBe(true);
     }
   });
 });
@@ -98,7 +104,8 @@ describe('the default rail', () => {
 
   it('never hides a page the pilot could not hide themselves', () => {
     expect(defaultHiddenNav()).not.toContain('/settings');
-    expect(defaultHiddenNav()).not.toContain('/corp');
+    expect(DEFAULT_SHOWN_NAV).toEqual(expect.arrayContaining(['/corp', '/corp/moons']));
+    expect(defaultHiddenNav().filter((path) => path.startsWith('/corp'))).toEqual([]);
   });
 
   it('is in nav order, as a stored list is', () => {
