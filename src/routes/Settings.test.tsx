@@ -885,7 +885,7 @@ describe('Settings — Notifications (issue #170)', () => {
 
     await openTopic(user, 'Corp');
     const corp = (await panel.findByRole('heading', { name: 'Corp' })).parentElement!.textContent!;
-    expect(at(corp, 'Best-effort')).toBeLessThan(at(corp, 'Structure fuel low'));
+    expect(at(corp, 'Best effort')).toBeLessThan(at(corp, 'Structure fuel low'));
     expect(at(corp, 'Structure fuel low')).toBeLessThan(at(corp, 'Member joined'));
   });
 

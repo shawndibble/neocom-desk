@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Fields, Panel } from '@/components/ui';
 import { useAnalyticsEnabled } from '@/app/analyticsPref';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import { CheckboxField, SettingsPanelLoading, SettingsScopeHint } from './settingsFields';
+import { CheckboxField, SettingsPanelLoading } from './settingsFields';
 
 /** Settings → App: the device-local switch for Google Analytics page views. */
 export function AnalyticsPanel() {
@@ -15,18 +15,15 @@ export function AnalyticsPanel() {
 
   return (
     <Panel title={t('settings.analyticsTitle')}>
-      <div className="space-y-4">
-        <SettingsScopeHint scope="device" />
-        <Fields variant="form">
-          <CheckboxField
-            id="analytics-enabled"
-            label={t('settings.analyticsLabel')}
-            hint={t('settings.analyticsHint')}
-            checked={enabled}
-            onChange={() => void setEnabled(!enabled)}
-          />
-        </Fields>
-      </div>
+      <Fields variant="form">
+        <CheckboxField
+          id="analytics-enabled"
+          label={t('settings.analyticsLabel')}
+          hint={t('settings.analyticsHint')}
+          checked={enabled}
+          onChange={() => void setEnabled(!enabled)}
+        />
+      </Fields>
     </Panel>
   );
 }
