@@ -53,6 +53,28 @@ describe('OpenInEveButton', () => {
     expect(info).not.toHaveBeenCalled();
   });
 
+  it('renders nothing when the character lacks the permission', async () => {
+    await db.tokens.update(ONE, { scopes: [] });
+    render(
+      <MemoryRouter>
+        <OpenInEveButton kind="information" id={1} />
+      </MemoryRouter>
+    );
+    await vi.waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Open in EVE' })).not.toBeInTheDocument()
+    );
+  });
+
+  it('renders nothing without a character', () => {
+    useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
+    render(
+      <MemoryRouter>
+        <OpenInEveButton kind="information" id={1} />
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
   it('says it is offline on a network failure', async () => {
     info.mockRejectedValue(new TypeError('Failed to fetch'));
     render(

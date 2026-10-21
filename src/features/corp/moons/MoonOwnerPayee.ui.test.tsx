@@ -4,6 +4,8 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { seedGrant } from '@/test/seed';
 import type { MoonOwnerDetail } from '@/engine/corpTaxBook/moonOwners';
 import { MoonOwnerPage } from './MoonOwnerPage';
 import { PayeeChangeStrip } from './MoonOwnerPayee';
@@ -163,7 +165,9 @@ const detail = {
 } as unknown as MoonOwnerDetail;
 
 describe('accounting side payee', () => {
-  it('shows who the moon owner is paid as, read-only, with Open in EVE', () => {
+  it('shows who the moon owner is paid as, read-only, with Open in EVE', async () => {
+    await seedGrant(9, ['esi-ui.open_window.v1']);
+    useActiveCharacter.setState({ activeCharacterId: 9, hydrated: true });
     render(
       <MoonOwnerPage
         detail={detail}
@@ -182,7 +186,7 @@ describe('accounting side payee', () => {
       'href',
       expect.stringContaining('info=character-77')
     );
-    expect(screen.getByRole('button', { name: 'Open in EVE: Kestrel Vane' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Open in EVE: Kestrel Vane' })).toBeVisible();
     expect(screen.queryByRole('button', { name: /who gets paid/i })).toBeNull();
   });
 

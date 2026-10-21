@@ -1,8 +1,9 @@
 /**
  * "Open in EVE" as a button, for a detail modal's header or a dialog's row:
- * opens the target's window in the active Character's EVE client. The
- * blocked reason or the outcome shows beside it, as `SetDestinationButton`
- * does, so a refusal is never silent. The menu twin is `OpenInEveMenuItem`.
+ * opens the target's window in the active Character's EVE client. Without
+ * a Character or the Open in EVE Permission it isn't rendered at all. Offline,
+ * the reason or the outcome shows beside it, as `SetDestinationButton` does,
+ * so a refusal is never silent. The menu twin is `OpenInEveMenuItem`.
  */
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,9 +33,11 @@ export function OpenInEveButton({
   inRow?: boolean;
 }) {
   const { t } = useTranslation();
-  const { blockedReason, sending, outcome, send } = useOpenInEve({ kind, id }, lookup);
+  const { unavailable, blockedReason, sending, outcome, send } = useOpenInEve({ kind, id }, lookup);
   const label = t(`openInEve.${kind}`);
   const reasonId = useId();
+
+  if (unavailable) return null;
 
   return (
     <span className={inRow ? 'contents' : 'inline-flex flex-wrap items-center gap-2'}>

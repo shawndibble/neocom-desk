@@ -9741,7 +9741,6 @@
         "none_other": "No Requests within {{count}} jumps"
       },
       "message": "Message {{name}}…",
-      "messageNeedsPermission": "Messaging opens a window in your EVE client, which needs the Open in EVE Permission.",
       "mail": {
         "subject": "Your Request: {{items}}",
         "body": "Hi {{name}}, about your Request in {{community}} for {{items}}: "

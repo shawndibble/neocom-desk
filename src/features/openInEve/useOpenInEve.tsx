@@ -25,6 +25,8 @@ export interface OpenInEve {
   blockedReason: ReactNode;
   /** Sending is blocked only because the browser is offline: the item reads "Needs a connection". */
   offline: boolean;
+  /** No Character, or one without the Open in EVE permission: a button hides itself rather than show a reason. */
+  unavailable: boolean;
   /** The Permissions blocking it, for a menu that can't carry a link in its reason; empty otherwise. */
   missingGroups: readonly ScopeGroup[];
   sending: boolean;
@@ -110,6 +112,7 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
 
   return {
     blockedReason,
+    unavailable: characterId === null || lacksScope,
     offline: characterId !== null && !lacksScope && !online,
     missingGroups: lacksScope && characterId !== null ? MISSING_GROUPS : [],
     sending,

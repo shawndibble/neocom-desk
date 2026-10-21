@@ -3,6 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { seedGrant } from '@/test/seed';
 import { OrderDetailContent } from './OrderDetailModal';
 import { relistFees } from './orderDetailView';
 import type { OpenOrderRow, CharacterSkills } from './openOrdersModel';
@@ -26,6 +28,7 @@ vi.mock('@/sde/loadSde', async (importOriginal) => ({
 }));
 const mockedLoadMutaplasmids = vi.mocked(loadMutaplasmids);
 beforeEach(() => {
+  useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
   resetMutaplasmidLookupForTests();
   mockedLoadMutaplasmids.mockClear();
   mockedLoadMutaplasmids.mockResolvedValue(NO_ABYSSAL);
@@ -1312,8 +1315,12 @@ describe('OrderDetailModal — buy order copy (#1733)', () => {
   );
 });
 
+const OPEN_WINDOW_CHARACTER = 4242;
+
 describe('OrderDetailModal — Open market in EVE (#4025)', () => {
   it('offers Open market in EVE for the item beside View in Market', async () => {
+    await seedGrant(OPEN_WINDOW_CHARACTER, ['esi-ui.open_window.v1']);
+    useActiveCharacter.setState({ activeCharacterId: OPEN_WINDOW_CHARACTER, hydrated: true });
     renderModal();
     await waitFor(() => expect(mockedLoadMutaplasmids).toHaveBeenCalled());
     expect(
