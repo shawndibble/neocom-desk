@@ -90,15 +90,26 @@ export function eveTimeLabel(at: number): string {
   return `${d.getUTCDate()} ${month} ${d.getUTCFullYear()} ${hh}:${mm} EVE time`;
 }
 
+/** What an accounting officer's copy says while no copy to the moon owner side has gone out. */
+export const TAKES_EFFECT_NOT_STARTED = '24 hours after the moon owner is notified';
+
 /**
  * When a copy sent at `now` says the removal takes effect: the recorded time once the clock has
- * started, else 24 hours from this send (which is what starts it).
+ * started, else 24 hours from this send when this copy starts it (a copy to the moon owner's
+ * side), else null: an accounting officer's own copy never starts the clock (#4621).
  */
-export function removalTakesEffectAt(item: { effectiveAt?: number }, now: number): number {
-  return item.effectiveAt ?? now + REMOVAL_WAIT_MS;
+export function removalTakesEffectAt(
+  item: { effectiveAt?: number; startsClock?: boolean },
+  now: number
+): number | null {
+  if (item.effectiveAt !== undefined) return item.effectiveAt;
+  return item.startsClock === false ? null : now + REMOVAL_WAIT_MS;
 }
 
-/** The notice with its "takes effect" time filled in. */
-export function fillTakesEffect(body: string, effectiveAt: number): string {
-  return body.replaceAll(TAKES_EFFECT_TOKEN, eveTimeLabel(effectiveAt));
+/** The notice with its "takes effect" time filled in; null says it starts once the moon owner is notified. */
+export function fillTakesEffect(body: string, effectiveAt: number | null): string {
+  return body.replaceAll(
+    TAKES_EFFECT_TOKEN,
+    effectiveAt === null ? TAKES_EFFECT_NOT_STARTED : eveTimeLabel(effectiveAt)
+  );
 }
