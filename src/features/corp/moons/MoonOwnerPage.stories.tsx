@@ -77,6 +77,7 @@ const meta = {
     refineryName: (id: number) => REFINERIES[id] ?? `Refinery ${id}`,
     oreName: (id: number) => ORES[id] ?? `#${id}`,
     backTo: '/corp/moons/moon-owners',
+    payee: { kind: 'corporation', id: 98, name: 'Ashfall Mining Collective' },
     onSetRate: () => {},
     onSettledOtherwise: () => {},
     onPay: () => {},
@@ -90,6 +91,14 @@ type Story = StoryObj<typeof meta>;
 
 /** @summary Active, with a rate they asked for that the book overrode. */
 export const Active: Story = {};
+
+/** @summary The moon owner named a player as its payee: shown read-only with Open in EVE. */
+export const PaidToAPlayer: Story = {
+  args: {
+    detail: { ...detail, payee: { kind: 'character', id: 77 } },
+    payee: { kind: 'character', id: 77, name: 'Kestrel Vane' },
+  },
+};
 
 /** @summary Their ledger cannot be read: the warning names the date. */
 export const CantReadLedger: Story = {

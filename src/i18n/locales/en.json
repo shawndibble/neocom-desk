@@ -14541,6 +14541,16 @@
           "hint": "Asking changes nothing until they agree.",
           "confirm": "Ask for this rate"
         },
+        "payee": {
+          "line": "Who gets paid: {{name}}",
+          "change": "Change…",
+          "changeLabel": "Change who gets paid…",
+          "dialogTitle": "Who gets paid",
+          "field": "Corporation or player",
+          "hint": "Pick a corporation or a player from the list.",
+          "alliance": "An alliance can't be paid. Pick a corporation or a player.",
+          "confirm": "Save"
+        },
         "payments": {
           "none": "No payments yet.",
           "method": {
@@ -14936,7 +14946,8 @@
             "quantity": "Quantity",
             "value": "Value"
           },
-          "pay": "Pay…"
+          "pay": "Pay…",
+          "paidTo": "Paid to"
         },
         "dialogs": {
           "rate": {

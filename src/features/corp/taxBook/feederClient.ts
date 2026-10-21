@@ -315,19 +315,3 @@ export function forceRemoval(
 ): Promise<{ ended: boolean; effectiveAt: number | null }> {
   return call(characterId, 'forceCorpTaxBookRemovalCallable', { code });
 }
-
-/** Set a moon owner's payee; stamps when it changed. */
-export async function setFeederPayee(
-  characterId: number,
-  corporationId: number,
-  feederCorporationId: number,
-  payee: { kind: 'corporation' | 'character'; id: number }
-): Promise<{ ok: true }> {
-  const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'setCorpTaxBookFeederPayeeCallable', {
-    corporationId,
-    accessToken,
-    feederCorporationId,
-    payee,
-  });
-}

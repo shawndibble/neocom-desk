@@ -8,6 +8,7 @@
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
 import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
+import type { Payee } from '@/engine/corpTaxBook/payouts';
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 
@@ -18,6 +19,9 @@ export interface FeederViewRateEntry {
   effectiveFrom: string;
   recordedAt: string;
 }
+
+/** Who a moon owner is paid as: a corporation or a player. */
+export type FeederPayee = Payee;
 
 /** `feederViews/{feeder}`. */
 export interface FeederViewSummary {
@@ -52,6 +56,8 @@ export interface FeederViewSummary {
   /** A pending removal (#4520): when it started and, once its notice is out, when it takes effect. */
   removalStartedAt?: number | null;
   removalEffectiveAt?: number | null;
+  /** Who the moon owner is paid as; null or absent (a view built before #4619) means the moon owner corporation. */
+  payee?: FeederPayee | null;
 }
 
 export interface FeederViewLine {
@@ -135,6 +141,20 @@ export async function requestFeederRate(
     corporationId,
     accessToken,
     pct,
+  });
+}
+
+/** The moon owner's officers name who it is paid as. The accounting corporation cannot. */
+export async function setFeederPayee(
+  characterId: number,
+  corporationId: number,
+  payee: FeederPayee
+): Promise<{ ok: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'setCorpTaxBookFeederPayeeCallable', {
+    corporationId,
+    accessToken,
+    payee,
   });
 }
 

@@ -4,7 +4,7 @@ import { beginFeederGrantLogin } from '@/app/loginFlow';
 import { Button, LoadFailedState, Spinner } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { leaveFeeder, type FeederStatus } from '../taxBook/feederClient';
-import { RECONNECT_CODE, requestFeederRate } from '../taxBook/feederViewClient';
+import { RECONNECT_CODE, requestFeederRate, setFeederPayee } from '../taxBook/feederViewClient';
 import { isStale } from '../taxBook/feederViewModel';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { DialogShell } from './BookDialogs';
@@ -75,6 +75,11 @@ export function MoonOwnerPanel({
         canEdit={access.canEdit}
         onRequestRate={async (pct) => {
           await requestFeederRate(characterId, corporationId, pct);
+          reload();
+        }}
+        characterId={characterId}
+        onSetPayee={async (payee) => {
+          await setFeederPayee(characterId, corporationId, payee);
           reload();
         }}
         banner={

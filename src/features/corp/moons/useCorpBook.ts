@@ -278,7 +278,11 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
     if (fetched.status === 'loaded') {
       for (const a of fetched.data.groupingAnswers ?? []) characterIds.add(a.characterId);
       // Moon owners are corporations; the universe names lookup resolves both kinds.
-      for (const f of fetched.data.feeders ?? []) characterIds.add(f.corporationId);
+      // A payee the moon owner named is a player or another corporation.
+      for (const f of fetched.data.feeders ?? []) {
+        characterIds.add(f.corporationId);
+        if (f.payee) characterIds.add(f.payee.id);
+      }
     }
     const refineryIds = new Set<number>([
       ...view.input.extractions.map((x) => x.structureId),

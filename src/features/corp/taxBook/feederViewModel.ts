@@ -20,6 +20,11 @@ export function pageState(s: FeederViewSummary): OwnerPageState {
 }
 
 /** The ledger cannot be read: banner with Reconnect, over an active or disconnected owner. */
+/** Who the moon owner is paid as: its payee, or the moon owner corporation itself when none is set. */
+export function payeeIdOf(s: FeederViewSummary): number {
+  return s.payee?.id ?? s.feederCorporationId;
+}
+
 export function isStale(s: FeederViewSummary): boolean {
   return s.staleSince !== null && pageState(s) !== 'ended';
 }

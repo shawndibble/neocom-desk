@@ -5,6 +5,7 @@ import {
   minedRows,
   pageState,
   parseRequestedRate,
+  payeeIdOf,
   payoutRows,
   rateNote,
   refineryLabeler,
@@ -43,6 +44,14 @@ const base: FeederViewSummary = {
   unpricedDays: 0,
   dismissedAt: null,
 };
+
+describe('payeeIdOf', () => {
+  it('is the payee set, else the moon owner corporation (absent on an older view, or null)', () => {
+    expect(payeeIdOf(base)).toBe(9);
+    expect(payeeIdOf({ ...base, payee: null })).toBe(9);
+    expect(payeeIdOf({ ...base, payee: { kind: 'character', id: 77 } })).toBe(77);
+  });
+});
 
 describe('pageState', () => {
   it('ended wins over settled otherwise', () => {

@@ -1,6 +1,7 @@
 // The accounting corporation's side of a moon owner (issue #4586, spec #4504): agree a rate,
 // switch to settled otherwise, and list open invite links. Officer-only, the same live role
-// check as creating an invite. Failures carry a stable `reason`; no player-facing text lives here.
+// check as creating an invite. The payee is the moon owner's to set (#4619), never this side's:
+// see `setFeederPayee` in corpTaxBookFeederViewCalls.ts. Failures carry a stable `reason`; no player-facing text lives here.
 
 import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError, type FunctionsErrorCode } from 'firebase-functions/v2/https';
@@ -12,13 +13,7 @@ import {
   utcDate,
   type BookCall,
 } from './corpTaxBook.js';
-import {
-  withPayee,
-  withPayeeChange,
-  type FeederModeChange,
-  type OwnerRateEntry,
-  type PayeeChange,
-} from './corpTaxBookEngine.js';
+import type { FeederModeChange, OwnerRateEntry } from './corpTaxBookEngine.js';
 import {
   deriveModeChanges,
   deriveOwnerRateHistory,
@@ -84,25 +79,6 @@ export function parseSetFeederModeInput(data: unknown): SetFeederModeInput {
       ? undefined
       : boundedString(d.note, 'note', MAX_NOTE);
   return { ...target, mode: d.mode, ...(note !== undefined ? { note } : {}) };
-}
-
-export interface SetFeederPayeeInput extends FeederTargetCall {
-  payee: { kind: 'corporation' | 'character'; id: number };
-}
-
-export function parseSetFeederPayeeInput(data: unknown): SetFeederPayeeInput {
-  const target = parseTarget(data);
-  const payee = record(record(data).payee);
-  const { kind, id } = payee;
-  if (
-    (kind !== 'corporation' && kind !== 'character') ||
-    typeof id !== 'number' ||
-    !Number.isSafeInteger(id) ||
-    id < 1
-  ) {
-    throw new HttpsError('invalid-argument', 'payee must be a corporation or character id');
-  }
-  return { ...target, payee: { kind, id } };
 }
 
 // --- History ---------------------------------------------------------------
@@ -204,34 +180,6 @@ export function setFeederMode(
     action: 'feederModeSet',
     detail: { mode: input.mode, ...(input.note !== undefined ? { note: input.note } : {}) },
   }));
-}
-
-/**
- * Set a moon owner's payee. Every set or change stamps `payeeChangedAt` (engine `withPayee`);
- * the removal's payee link reads it.
- */
-export function setFeederPayee(
-  deps: BookDeps,
-  caller: Caller,
-  input: SetFeederPayeeInput
-): Promise<{ ok: true }> {
-  return editFeeder(deps, caller, input, (rec, now) => {
-    const next = withPayee(rec, input.payee, now);
-    return {
-      update: {
-        payee: input.payee,
-        ...(next.payeeChangedAt !== undefined ? { payeeChangedAt: next.payeeChangedAt } : {}),
-        // Who was paid when: a donation matches the payee in force on its date (#4617).
-        payeeHistory: withPayeeChange(
-          rec as FeederRecord & { payeeHistory?: PayeeChange[] },
-          input.payee,
-          now
-        ),
-      },
-      action: 'feederPayeeSet',
-      detail: { payee: input.payee },
-    };
-  });
 }
 
 export interface OpenFeederInvite {
