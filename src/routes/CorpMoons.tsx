@@ -15,7 +15,7 @@
  */
 import { useState } from 'react';
 import { canViewCorpTaxBook } from '@/engine/corpRoles';
-import { useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -29,7 +29,7 @@ import {
   useTabsId,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { tabBarTabs } from '@/lib/pageTabs';
+import { tabBarTabs, tabPath } from '@/lib/pageTabs';
 import { usePageTab } from '@/lib/usePageTab';
 import { formatAge } from '@/lib/age';
 import { CorpDenied } from '@/features/corp/CorpDenied';
@@ -43,13 +43,17 @@ import { useBook } from '@/features/corp/moons/useBook';
 import { BookHealthStrip } from '@/features/corp/moons/BookHealthStrip';
 import { BookSettingsDialog } from '@/features/corp/moons/BookSettingsDialog';
 import { ExtractionsTab } from '@/features/corp/moons/ExtractionsTab';
+import { InviteMoonOwnerDialog } from '@/features/corp/moons/InviteMoonOwnerDialog';
 import { MinerDetail } from '@/features/corp/moons/MinerDetail';
 import { MinersTab } from '@/features/corp/moons/MinersTab';
 import { MoonDetail } from '@/features/corp/moons/MoonDetail';
+import { MoonOwnerDetail } from '@/features/corp/moons/MoonOwnerDetail';
+import { MoonOwnersTab } from '@/features/corp/moons/MoonOwnersTab';
 import { MOONS_TABS, moonsDetail } from '@/features/corp/moons/moonsPaths';
 import { StatementsTab } from '@/features/corp/moons/StatementsTab';
 import { MoonsSetup } from '@/features/corp/moons/MoonsSetup';
 import { useCorpBook } from '@/features/corp/moons/useCorpBook';
+import { useMoonOwners } from '@/features/corp/moons/useMoonOwners';
 
 function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
@@ -68,7 +72,8 @@ function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }
 function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const { view } = useBook();
+  const { view, canEdit, characterId, corporationId, names } = useBook();
+  const { showExtractions } = useMoonOwners();
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
   // Back from EVE's page after the Automatic sync opt-in: show the settings it was pressed in.
@@ -77,6 +82,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
     () => (routerState as { corpSyncGrant?: unknown } | null)?.corpSyncGrant !== undefined
   );
   const [activityOpen, setActivityOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const detail = moonsDetail(pathname);
   const status = sync.status;
   const meta =
@@ -92,6 +98,10 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
         })}
       </span>
     );
+  // A corporation with no refineries of its own has nothing for Extractions to show.
+  if (!showExtractions && (tab === 'extractions' || detail?.kind === 'extraction'))
+    return <Navigate to={tabPath(MOONS_TABS, 'moon-owners')} replace />;
+  const tabs = tabBarTabs(MOONS_TABS).filter((x) => showExtractions || x.id !== 'extractions');
   return (
     <div className="mx-auto max-w-6xl space-y-4 px-4 py-4">
       {detail === null && (
@@ -102,6 +112,11 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             subNav={<CorpSubNav flush />}
             actions={
               <span className="flex items-center gap-1">
+                {tab === 'moon-owners' && canEdit && (
+                  <Button variant="ghost" onClick={() => setInviteOpen(true)}>
+                    {t('corpTaxBook.moons.moonOwners.invite')}
+                  </Button>
+                )}
                 <Button variant="ghost" onClick={() => setActivityOpen(true)}>
                   <Icon.Recent size={Icon.ICON_SIZE.sm} aria-hidden="true" />
                   {t('corpTaxBook.moons.activity.button')}
@@ -127,7 +142,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             label={t('corpTaxBook.moons.title')}
             value={tab}
             onChange={(id) => selectTab(id as typeof tab)}
-            tabs={tabBarTabs(MOONS_TABS).map((x) => ({ id: x.id, label: t(x.labelKey) }))}
+            tabs={tabs.map((x) => ({ id: x.id, label: t(x.labelKey) }))}
           />
           {sync.ledger.state !== 'ready' && (
             <p className="text-sm text-text-dim" role="note">
@@ -138,11 +153,21 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           {tab === 'extractions' && <ExtractionsTab />}
           {tab === 'miners' && <MinersTab />}
           {tab === 'statements' && <StatementsTab />}
+          {tab === 'moon-owners' && <MoonOwnersTab />}
         </>
       )}
       {detail?.kind === 'extraction' && <MoonDetail id={detail.id} />}
       {detail?.kind === 'miner' && <MinerDetail id={detail.id} />}
+      {detail?.kind === 'moonOwner' && <MoonOwnerDetail id={detail.id} />}
       {view && settingsOpen && <BookSettingsDialog open onClose={() => setSettingsOpen(false)} />}
+      {inviteOpen && (
+        <InviteMoonOwnerDialog
+          characterId={characterId}
+          corporationId={corporationId}
+          characterName={names.character}
+          onClose={() => setInviteOpen(false)}
+        />
+      )}
       {activityOpen && <ActivityPanel open onClose={() => setActivityOpen(false)} />}
     </div>
   );
