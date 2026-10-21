@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { beginFeederGrantLogin } from '@/app/loginFlow';
 import { Button, LoadFailedState, Spinner } from '@/components/ui';
-import { formatIsk } from '@/lib/isk';
 import { leaveFeeder, type FeederStatus } from '../taxBook/feederClient';
 import { RECONNECT_CODE, requestFeederRate, setFeederPayee } from '../taxBook/feederViewClient';
-import { isStale } from '../taxBook/feederViewModel';
+import { isStale, owedOnLeaving } from '../taxBook/feederViewModel';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
-import { DialogShell } from './BookDialogs';
+import { feederErrorText } from './feederErrorText';
+import { LeaveMoonOwnerDialog } from './LeaveMoonOwnerDialog';
 import { MoonOwnerPrevious } from './MoonOwnerPrevious';
 import { MoonOwnerView } from './MoonOwnerView';
 import { OwnerStaleBanner } from './OwnerStaleBanner';
@@ -40,15 +40,17 @@ export function MoonOwnerPanel({
   const { t } = useTranslation();
   const { load, reload } = useFeederView(characterId, corporationId);
   const [leaving, setLeaving] = useState(false);
-  const [owed, setOwed] = useState<number | null>(owner.owedIsk);
   const [reconnectError, setReconnectError] = useState<string | null>(null);
   const name = owner.collectorName ?? t('corpTaxBook.moons.owner.anonymous');
+  // The server's leave answer carries no balance; the page already loaded has it.
+  const owed =
+    load.state === 'ready' && load.view !== null ? owedOnLeaving(load.view.summary) : null;
   const removing = load.state === 'ready' && load.view?.summary.status === 'pending-removal';
 
   const reconnect = () => {
     setReconnectError(null);
     beginFeederGrantLogin(characterId, RECONNECT_CODE).catch((e: unknown) =>
-      setReconnectError(e instanceof Error ? e.message : String(e))
+      setReconnectError(feederErrorText(t, e))
     );
   };
 
@@ -142,43 +144,16 @@ export function MoonOwnerPanel({
         </div>
       )}
       {leaving && (
-        <DialogShell
-          open
+        <LeaveMoonOwnerDialog
+          name={name}
+          owed={owed}
+          removing={removing}
           onClose={() => setLeaving(false)}
-          title={t(
-            removing
-              ? 'corpTaxBook.moons.ownerView.removal.confirmTitle'
-              : 'corpTaxBook.moons.owner.leave.title'
-          )}
-          confirmLabel={t(
-            removing
-              ? 'corpTaxBook.moons.ownerView.removal.action'
-              : 'corpTaxBook.moons.owner.leave.confirm'
-          )}
-          canConfirm
-          danger
-          run={async () => {
-            const result = await leaveFeeder(characterId, corporationId);
-            setOwed(result.owedIsk);
+          onLeave={async () => {
+            await leaveFeeder(characterId, corporationId);
             onLeft();
           }}
-        >
-          <p>
-            {owed === null
-              ? t('corpTaxBook.moons.owner.leave.owedUnknown', { name })
-              : owed > 0
-                ? t('corpTaxBook.moons.owner.leave.owed', {
-                    name,
-                    isk: formatIsk(owed),
-                  })
-                : t('corpTaxBook.moons.owner.leave.nothingOwed', { name })}
-          </p>
-          <p className="mt-2 text-text-dim">
-            {removing
-              ? t('corpTaxBook.moons.ownerView.removal.confirmBody', { name })
-              : t('corpTaxBook.moons.owner.leave.body')}
-          </p>
-        </DialogShell>
+        />
       )}
     </div>
   );

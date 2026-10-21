@@ -5137,8 +5137,15 @@
       },
       "corpKills": {
         "title": "Corp kills",
-        "description": "Kills, losses and ISK efficiency",
-        "empty": "This widget is coming soon."
+        "description": "Kills, losses and ISK efficiency, all time",
+        "empty": "zKillboard has no kills or losses for your corporation.",
+        "npc": "NPC corporations have no killboard.",
+        "unavailable": "zKillboard could not be reached. Try again in a bit.",
+        "unit_one": "kill",
+        "unit_other": "kills",
+        "secondary": "{{losses}} lost · {{efficiency}} ISK efficiency",
+        "allTime": "All time, from zKillboard",
+        "summary": "{{kills}} kills, {{losses}} losses, {{efficiency}} ISK efficiency, all time."
       },
       "corpContracts": {
         "title": "Corp contracts",
@@ -13890,8 +13897,7 @@
       "introNoTime": "{{accounting}} started removing {{owner}} as a moon owner. You can end it now instead.",
       "hint": "Mining at {{owner}}'s refineries stops being counted from today. What {{accounting}} owes {{owner}} stays owed.",
       "confirm": "Remove now",
-      "unavailable": "This can't be done right now; the removal takes effect {{time}}.",
-      "unavailableNoTime": "This can't be done right now.",
+      "unavailable": "This can't be done right now.",
       "done": "Done. {{owner}} is no longer a moon owner of {{accounting}}. What is owed stays owed.",
       "signIn": "Log in with the character this link was meant for.",
       "login": "Log in with EVE",
@@ -14462,7 +14468,6 @@
           "title": "To stop",
           "body": "Leave any time. Nothing already collected is deleted. It re-syncs about every 6 hours."
         },
-        "moonNames": "If the Character you pick is also a Station Manager, moon names come free. Otherwise add a Station Manager to see which moon.",
         "rate": "Rate you ask for (%, optional)",
         "from": "{{name}} will handle the tax on your moons.",
         "offered": "They offer you {{pct}}% of the value of ore mined at your refineries.",
@@ -14900,6 +14905,7 @@
           "notSet": "Not set",
           "history": {
             "agreed": "Rate set to {{pct}}%",
+            "agreedBy": "Rate set to {{pct}}% by {{by}}",
             "requested": "{{name}} asked for {{pct}}%",
             "joined": "Joined from an invite offering {{pct}}%"
           },

@@ -106,6 +106,29 @@ describe('MoonOwnerPanel', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('End the removal now?');
   });
 
+  it('shows what is still owed from the loaded page when leaving, not the server answer', async () => {
+    ready({ balanceKind: 'owed', balanceIsk: 13_024_480.6 });
+    mount();
+    await userEvent.click(await screen.findByRole('button', { name: 'Leave' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('13,024,480 ISK');
+  });
+
+  it('says nothing is owed when the page shows no balance', async () => {
+    ready({ balanceKind: 'even', balanceIsk: 0 });
+    mount();
+    await userEvent.click(await screen.findByRole('button', { name: 'Leave' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('owes you nothing right now');
+  });
+
+  it('shows a plain sentence, not the server message, when Reconnect fails', async () => {
+    ready({ staleSince: Date.UTC(2026, 9, 11) });
+    beginFeederGrantLogin.mockRejectedValue(new Error('internal: raw server text'));
+    mount();
+    await userEvent.click(await screen.findByRole('button', { name: 'Reconnect' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Could not connect/);
+    expect(document.body.textContent).not.toMatch(/raw server text/);
+  });
+
   it('offers no End it now to an officer who may not leave', async () => {
     ready({ status: 'pending-removal', removalStartedAt: 1, removalEffectiveAt: null });
     mount(false);
