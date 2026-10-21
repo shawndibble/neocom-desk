@@ -1092,7 +1092,7 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect(JSON.stringify(entries)).not.toContain('tok-');
     });
 
-    it("stamps an Adjustment with the Miner's sign-ins (#4622)", async () => {
+    it("stamps an Adjustment and a write-off with the Miner's sign-ins (#4622)", async () => {
       await turnOn();
       await edit(ACCOUNTANT, {
         action: 'addAdjustment',
@@ -1101,8 +1101,15 @@ suite('Corp Tax Book callables (emulator)', () => {
         amount: -100,
         reason: 'rounding',
       });
-      const docs = (await book().collection('adjustments').get()).docs.map((d) => d.data());
-      expect(docs.map((d) => d.uids)).toEqual([['char:50']]);
+      await edit(
+        ACCOUNTANT,
+        { action: 'writeOff', minerId: 'solo:50', amount: 5, reason: 'left' },
+        true
+      );
+      for (const kind of ['adjustments', 'writeOffs']) {
+        const docs = (await book().collection(kind).get()).docs.map((d) => d.data());
+        expect(docs.map((d) => d.uids)).toEqual([['char:50']]);
+      }
     });
   });
 
@@ -1274,6 +1281,27 @@ suite('Corp Tax Book callables (emulator)', () => {
       });
       await book().collection('miners').doc('solo:50').set({ closedAt: '2026-11-05T00:00:00Z' });
       expect((await readStatementByToken(deps(), String(verifyToken))).accountClosed).toBe(true);
+    });
+
+    it("reduces the Statement by an officer's write-off (#4637)", async () => {
+      await turnOn();
+      const { verifyToken } = await edit(ACCOUNTANT, {
+        action: 'issueStatement',
+        statement: statement('s1'),
+      });
+      await edit(
+        ACCOUNTANT,
+        {
+          action: 'writeOff',
+          minerId: 'solo:50',
+          statementId: 's1',
+          amount: 4_000_000,
+          reason: 'r',
+        },
+        true
+      );
+      const view = await readStatementByToken(deps(), String(verifyToken));
+      expect(view.settlement).toMatchObject({ forgiven: 4_000_000, remaining: 6_000_000 });
     });
 
     describe('moon and Extraction dismissals (#4184)', () => {

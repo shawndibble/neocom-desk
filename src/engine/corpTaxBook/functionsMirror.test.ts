@@ -172,6 +172,45 @@ describe('functions mirror of the Corp Tax Book engine', () => {
     expect(theirs.balance).toBe(ours.balance);
   });
 
+  it('applies officer write-offs identically (#4637)', () => {
+    const statements = [
+      { id: 's2', amount: 8_000_000, issuedAt: '2026-07-31T00:00:00Z' },
+      { id: 's1', amount: 10_000_000, issuedAt: '2026-06-30T00:00:00Z' },
+      { id: 's3', amount: 4_000_000, issuedAt: '2026-08-31T00:00:00Z' },
+    ];
+    const payments = [{ id: 'p1', amount: 9_000_000, at: '2026-09-01T00:00:00Z' }];
+    const officerWriteOffs = [
+      { id: 'w2', amount: 20_000_000, at: '2026-09-03T00:00:00Z' },
+      { id: 'w1', amount: 5_000_000, at: '2026-09-02T00:00:00Z', statementId: 's3' },
+    ];
+    const theirs = mirror.allocatePayments({
+      statements,
+      payments,
+      dismissalCredits: [],
+      officerWriteOffs,
+    });
+    const ours = allocatePayments({
+      statements: statements.map((s) => ({ ...s, minerId: 'm', code: '', lines: [] }) as never),
+      payments: payments.map((p) => ({
+        ...p,
+        minerId: 'm',
+        characterId: 1,
+        source: 'donation' as const,
+      })),
+      dismissalCredits: [],
+      officerWriteOffs,
+    });
+    expect(theirs.writeOffCredits).toEqual(ours.writeOffCredits);
+    expect([...theirs.byStatement]).toEqual([...ours.byStatement]);
+    expect(theirs.credit).toBe(ours.credit);
+    expect(theirs.balance).toBe(ours.balance);
+    expect(ours.balance).toBe(0);
+    expect(
+      mirror.writeOffForAllocation({ id: 'w1', amount: 5, at: 'x', statementId: 's1', uids: [] })
+    ).toEqual({ id: 'w1', amount: 5, at: 'x', statementId: 's1' });
+    expect(mirror.writeOffForAllocation({ id: 'w1', amount: 5 })).toBeNull();
+  });
+
   it('allocatePayments drops a donation before the start date the same way (#4505)', () => {
     const statements = [{ id: 's1', amount: 10_000_000, issuedAt: '2026-07-01T00:00:00Z' }];
     for (const at of ['2026-05-31T23:59:59Z', '2026-06-01T00:00:00Z']) {

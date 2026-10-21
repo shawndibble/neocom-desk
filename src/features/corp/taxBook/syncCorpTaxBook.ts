@@ -316,6 +316,7 @@ export async function syncCorpTaxBook(
         miners: after.miners,
         alreadyPaid: after.paidStatementIds,
         extractions: after.extractions,
+        ...(after.writeOffs ? { writeOffs: after.writeOffs } : {}),
         startDate: after.book.startDate,
       })
     : [];

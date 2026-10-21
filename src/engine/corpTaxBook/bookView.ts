@@ -12,6 +12,8 @@ import {
   dismissalCredits,
   isBeforeBook,
   type Allocation,
+  type DismissalCredit,
+  type RecordedWriteOff,
   type TaxPayment,
 } from './allocation';
 import { lastBillableDate } from './billable';
@@ -71,6 +73,8 @@ export interface BookViewInput {
   dismissals: readonly Dismissal[];
   declarations: readonly Declaration[];
   adjustments: readonly Adjustment[];
+  /** Officer write-offs (#4637): each reduces what its Miner owes. */
+  writeOffs?: readonly RecordedWriteOff[];
   /**
    * Feeders' last good ledger reads. A feeder's refinery days are withheld until
    * one lands after the day's grace (#4509), and a day outside its coverage owes
@@ -320,12 +324,15 @@ export function buildBookView(input: BookViewInput): BookView {
     );
     const mine = charges.filter((c) => c.minerId === id);
 
+    const credits = dismissalCredits(statements, input.dismissals, mine);
     const allocation = allocatePayments({
       statements,
       payments,
-      dismissalCredits: dismissalCredits(statements, input.dismissals, mine),
+      dismissalCredits: credits,
+      officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === id),
       startDate: input.startDate,
     });
+    const forgivenKeys = forgivenDayKeys(statements, allocation, credits);
     const draft = draftStatement({
       minerId: id,
       startDate: input.startDate,
@@ -360,12 +367,13 @@ export function buildBookView(input: BookViewInput): BookView {
         if (dismissal || dismissedKeys.has(c.key)) status = 'dismissed';
         else if (writtenOffKeys.has(c.key)) status = 'written-off';
         else if (unbilledKeys.has(c.key)) status = 'unbilled';
+        else if (statement && forgivenKeys.has(c.key)) status = 'written-off';
         else if (statement)
           status = allocation.byStatement.get(statement.id)?.settled ? 'paid' : 'on-statement';
         else status = 'not-billable';
         // A day on an issued Statement is frozen (D22): its lines, never today's prices.
         const frozen =
-          statement && (status === 'on-statement' || status === 'paid')
+          statement && (status === 'on-statement' || status === 'paid' || forgivenKeys.has(c.key))
             ? frozenDay(linesBy.get(c.key) ?? [], c)
             : undefined;
         if (frozen) frozenByKey.set(c.key, frozen);
@@ -593,6 +601,48 @@ function buildExtractionRows(
     .sort((a, b) => a.chunkArrivalAt.localeCompare(b.chunkArrivalAt));
 }
 
+/**
+ * The Statement days an officer write-off forgave in full (#4637). Mirrors the order the
+ * allocation credits a Statement in: payments cover its oldest days, the write-off the next.
+ */
+function forgivenDayKeys(
+  statements: readonly Statement[],
+  allocation: Allocation,
+  credits: readonly DismissalCredit[]
+): Set<string> {
+  const keys = new Set<string>();
+  for (const s of statements) {
+    const settlement = allocation.byStatement.get(s.id);
+    if (!settlement || settlement.forgiven <= 0) continue;
+    const dismissed = credits.filter((c) => c.statementId === s.id);
+    const dismissedKeys = new Set(dismissed.map((c) => c.chargeKey));
+    let paid = Math.max(
+      0,
+      settlement.credited - settlement.forgiven - dismissed.reduce((sum, c) => sum + c.amount, 0)
+    );
+    let forgiven = settlement.forgiven;
+    const days = new Map<string, { date: string; tax: number }>();
+    for (const line of s.lines) {
+      if (!line.chargeKey || dismissedKeys.has(line.chargeKey)) continue;
+      const held = days.get(line.chargeKey) ?? { date: line.date, tax: 0 };
+      held.tax += line.tax;
+      days.set(line.chargeKey, held);
+    }
+    const oldestFirst = [...days].sort(
+      ([ka, a], [kb, b]) => a.date.localeCompare(b.date) || ka.localeCompare(kb)
+    );
+    for (const [key, day] of oldestFirst) {
+      if (day.tax <= 0) continue;
+      const fromPaid = Math.min(paid, day.tax);
+      paid -= fromPaid;
+      const fromForgiven = Math.min(forgiven, day.tax - fromPaid);
+      forgiven -= fromForgiven;
+      if (fromPaid === 0 && day.tax - fromForgiven < 0.01) keys.add(key);
+    }
+  }
+  return keys;
+}
+
 // --- Drill-downs -----------------------------------------------------------
 
 export interface MinerDetail {
@@ -604,6 +654,8 @@ export interface MinerDetail {
   toleranceWriteOffs: { statementId: string; amount: number }[];
   /** Lines recorded after payment, never billed (D22). */
   lateWriteOffs: { chargeKey: string; date: string; tax: number }[];
+  /** Officer write-offs (#4637), oldest first; `amount` is what each forgave, 0 when nothing was left. */
+  officerWriteOffs: { id: string; amount: number; reason: string; at: string }[];
   dismissals: Dismissal[];
   declarations: Declaration[];
   credit: number;
@@ -635,6 +687,17 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
       date: w.date,
       tax: w.tax,
     })),
+    officerWriteOffs: (view.input.writeOffs ?? [])
+      .filter((w) => w.minerId === minerId)
+      .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
+      .map((w) => ({
+        id: w.id,
+        amount: inner.allocation.writeOffCredits
+          .filter((c) => c.writeOffId === w.id)
+          .reduce((s, c) => s + c.amount, 0),
+        reason: w.reason,
+        at: w.at,
+      })),
     dismissals,
     declarations: view.input.declarations.filter((d) => statementIds.has(d.statementId)),
     credit: inner.allocation.credit,

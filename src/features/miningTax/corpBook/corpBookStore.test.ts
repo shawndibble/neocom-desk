@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   readAdjustment,
+  readWriteOff,
   readBilledByPointer,
   readFeederCoverage,
   refineryNamesOf,
@@ -213,6 +214,27 @@ describe('the miner-side copies (#4622)', () => {
       at: '2026-10-18T00:00:00Z',
     });
     expect(readAdjustment('a2', { minerId: 'solo:1', amount: 1 })).toBeNull();
+  });
+
+  it('reads a write-off, and skips a malformed one (#4637)', () => {
+    expect(
+      readWriteOff('w1', {
+        minerId: 'solo:1',
+        amount: 5,
+        reason: 'y',
+        at: '2026-10-20T00:00:00Z',
+        statementId: 's1',
+        uids: ['char:1'],
+      })
+    ).toEqual({
+      id: 'w1',
+      minerId: 'solo:1',
+      amount: 5,
+      reason: 'y',
+      at: '2026-10-20T00:00:00Z',
+      statementId: 's1',
+    });
+    expect(readWriteOff('w2', { minerId: 'solo:1', amount: 5 })).toBeNull();
   });
 
   it("names refineries from the Statements' own names, never a placeholder", () => {

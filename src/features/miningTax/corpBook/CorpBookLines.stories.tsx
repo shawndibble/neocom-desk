@@ -60,6 +60,15 @@ const overlay: PersonalOverlay = {
       refineryLabel: 'Efa IV - Moon Drill',
       overlap: { payeeIds: ['ashfall'], ore: [{ typeId: ZEO, quantity: 20_000 }], paid: false },
     }),
+    line({
+      id: `${CORP}:1:3000:2026-10-15`,
+      date: '2026-10-15',
+      structureId: 3000,
+      state: 'waived',
+      taxOwed: 0,
+      dismissalReason: 'Goodwill',
+      correction: { before: 955_710, after: 0, reasons: ['Goodwill'] },
+    }),
   ],
   takenFromFree: new Map(),
   labels: new Map(),
@@ -113,5 +122,5 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Refinery labels, a corrected line and an overlap mark. */
+/** Refinery labels, a corrected line, an overlap mark and a waived (written-off) line. */
 export const Default: Story = {};

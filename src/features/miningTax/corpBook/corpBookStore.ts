@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore/lite';
 import { httpsCallable } from 'firebase/functions';
 import { db as localDb } from '@/db';
-import type { TaxPayment } from '@/engine/corpTaxBook/allocation';
+import type { RecordedWriteOff, TaxPayment } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
@@ -78,6 +78,8 @@ export interface LoadedCorpBook {
   feeders?: MemberFeederCoverage[];
   /** The tracked Characters' own corrections (#4622). */
   adjustments?: Adjustment[];
+  /** The tracked Characters' own officer write-offs (#4637). */
+  writeOffs?: RecordedWriteOff[];
   /** Refinery names, where a Statement or ESI gave one (#4622). */
   structureNames?: Record<number, string>;
 }
@@ -269,6 +271,22 @@ export function readAdjustment(id: string, d: Data): Adjustment | null {
   };
 }
 
+export function readWriteOff(id: string, d: Data): RecordedWriteOff | null {
+  const minerId = str(d.minerId);
+  const amount = num(d.amount);
+  const at = str(d.at);
+  if (!minerId || amount === undefined || !at) return null;
+  const statementId = str(d.statementId);
+  return {
+    id,
+    minerId,
+    amount,
+    at,
+    reason: str(d.reason) ?? '',
+    ...(statementId ? { statementId } : {}),
+  };
+}
+
 /** Refinery names the Statements were issued with; the officer side's placeholder (older Statements) is no name. */
 export function refineryNamesOf(
   statements: readonly { refineryNames?: Record<string, string> }[]
@@ -425,6 +443,7 @@ async function readOneBook(
   const statements: Statement[][] = [];
   const miners: Miner[][] = [];
   const adjustments: Adjustment[][] = [];
+  const writeOffs: RecordedWriteOff[][] = [];
   let feeders: MemberFeederCoverage[] | null = null;
   for (const characterId of characterIds) {
     const uid = await ensureSignedIn(characterId);
@@ -442,6 +461,7 @@ async function readOneBook(
       statementSnap,
       minerSnap,
       adjustmentSnap,
+      writeOffSnap,
       coverageSnap,
     ] = await Promise.all([
       getDocs(query(collection(fs, root, 'observed'), where('uid', '==', uid))),
@@ -450,11 +470,13 @@ async function readOneBook(
       getDocs(query(collection(fs, root, 'statements'), where('uids', 'array-contains', uid))),
       getDocs(query(collection(fs, root, 'miners'), where('uids', 'array-contains', uid))),
       own('adjustments'),
+      own('writeOffs'),
       coverageRead,
     ]);
     adjustments.push(
       adjustmentSnap?.docs.flatMap((d) => readAdjustment(d.id, d.data()) ?? []) ?? []
     );
+    writeOffs.push(writeOffSnap?.docs.flatMap((d) => readWriteOff(d.id, d.data()) ?? []) ?? []);
     if (coverageSnap) {
       feeders = coverageSnap.docs.flatMap((d) => readFeederCoverage(d.id, d.data()) ?? []);
     }
@@ -480,6 +502,7 @@ async function readOneBook(
     observed: groupObservedEntries(rows),
     ...(feeders ? { feeders } : {}),
     adjustments: mergeById(adjustments),
+    writeOffs: mergeById(writeOffs),
     structureNames,
     payments: mergeById([payments]),
     held,

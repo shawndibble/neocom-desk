@@ -422,4 +422,44 @@ describe('functions mirror of the Corp Tax Book sync engine', () => {
       expect(ours.length).toBe(at.startsWith('2026-06') ? 1 : 0);
     }
   });
+  it("planSettlements settles a Statement an officer wrote off, in both copies, by the Miner's own (#4637)", () => {
+    const statements = [
+      {
+        id: 's1',
+        minerId: 'solo:50',
+        amount: 10_000_000,
+        issuedAt: '2026-10-01T00:00:00Z',
+        lines: [],
+      },
+      {
+        id: 's2',
+        minerId: 'solo:60',
+        amount: 10_000_000,
+        issuedAt: '2026-10-01T00:00:00Z',
+        lines: [],
+      },
+    ];
+    const writeOffs = [
+      { id: 'w1', minerId: 'solo:50', amount: 10_000_000, at: '2026-10-05T00:00:00Z', reason: 'r' },
+      { id: 'w2', minerId: 'solo:60', amount: 1_000_000, at: '2026-10-05T00:00:00Z', reason: 'r' },
+    ];
+    const ours = planSettlements({
+      statements: statements as unknown as Statement[],
+      payments: [],
+      dismissals: [],
+      miners: [],
+      alreadyPaid: new Set(),
+      writeOffs,
+    });
+    const theirs = mirror.planSettlements({
+      statements,
+      payments: [],
+      dismissals: [],
+      alreadyPaid: new Set(),
+      extractions: [],
+      writeOffs,
+    });
+    expect(theirs).toEqual(ours);
+    expect(ours).toEqual(['s1']);
+  });
 });

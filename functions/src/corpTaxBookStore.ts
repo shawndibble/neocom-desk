@@ -69,6 +69,7 @@ import {
   mergeObservedRows,
   observedRowKey,
   shiftDate,
+  writeOffForAllocation,
   type CoveragePeriod,
   type DismissableLine,
   type MirrorDismissal,
@@ -1053,6 +1054,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
       }
       const id = `w${now}_${rand(4)}`;
+      // The book applies it (#4637), and the Miner reads it on the personal tab.
+      const uids = await minerUids(c, action.minerId);
       tx.create(col(c, WRITE_OFFS).doc(id), {
         id,
         minerId: action.minerId,
@@ -1060,6 +1063,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         reason: action.reason,
         by,
         at: iso,
+        uids,
         ...(action.statementId ? { statementId: action.statementId } : {}),
       });
       return {
@@ -1295,11 +1299,12 @@ async function closeAccount(
     fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
 
   // The credit the guest is left with once the final Statement is counted.
-  const [statements, payments, dismissals, extractions] = await Promise.all([
+  const [statements, payments, dismissals, extractions, writeOffs] = await Promise.all([
     tx.get(col(c, STATEMENTS).where('minerId', '==', action.minerId)),
     tx.get(col(c, PAYMENTS).where('minerId', '==', action.minerId)),
     tx.get(col(c, DISMISSALS)),
     tx.get(col(c, EXTRACTIONS)),
+    tx.get(col(c, WRITE_OFFS).where('minerId', '==', action.minerId)),
   ]);
   const held = statements.docs.map((d) => d.data() as Data);
   const allocation = allocatePayments({
@@ -1319,6 +1324,7 @@ async function closeAccount(
       extractions: extractions.docs.map((d) => d.data() as MirrorExtraction),
       expiryHours: (c.book.structureExpiryHours as Record<string, number> | undefined) ?? {},
     }),
+    officerWriteOffs: writeOffs.docs.flatMap((d) => writeOffForAllocation(d.data()) ?? []),
     startDate: c.book.startDate as string | undefined,
   });
   const credit = Math.max(0, allocation.credit);
@@ -1602,17 +1608,27 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     statementId: string;
     minerId: string;
   };
-  const [book, statements, payments, dismissals, extractions, paid, declarations, miner] =
-    await Promise.all([
-      bookRef(deps.db, corporationId).get(),
-      sub(deps.db, corporationId, STATEMENTS).where('minerId', '==', minerId).get(),
-      sub(deps.db, corporationId, PAYMENTS).where('minerId', '==', minerId).get(),
-      sub(deps.db, corporationId, DISMISSALS).get(),
-      sub(deps.db, corporationId, EXTRACTIONS).get(),
-      sub(deps.db, corporationId, META).doc(PAID_DOC).get(),
-      sub(deps.db, corporationId, DECLARATIONS).where('statementId', '==', statementId).get(),
-      sub(deps.db, corporationId, MINERS).doc(minerId).get(),
-    ]);
+  const [
+    book,
+    statements,
+    payments,
+    dismissals,
+    extractions,
+    paid,
+    declarations,
+    miner,
+    writeOffs,
+  ] = await Promise.all([
+    bookRef(deps.db, corporationId).get(),
+    sub(deps.db, corporationId, STATEMENTS).where('minerId', '==', minerId).get(),
+    sub(deps.db, corporationId, PAYMENTS).where('minerId', '==', minerId).get(),
+    sub(deps.db, corporationId, DISMISSALS).get(),
+    sub(deps.db, corporationId, EXTRACTIONS).get(),
+    sub(deps.db, corporationId, META).doc(PAID_DOC).get(),
+    sub(deps.db, corporationId, DECLARATIONS).where('statementId', '==', statementId).get(),
+    sub(deps.db, corporationId, MINERS).doc(minerId).get(),
+    sub(deps.db, corporationId, WRITE_OFFS).where('minerId', '==', minerId).get(),
+  ]);
   const thisStatement = statements.docs.find((d) => d.id === statementId);
   if (!thisStatement) fail('not-found', 'Verify link is not valid', 'invalid-token');
   const s = thisStatement.data() as Data;
@@ -1660,6 +1676,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
       extractions: extractions.docs.map((d) => d.data() as MirrorExtraction),
       expiryHours: (b.structureExpiryHours as Record<string, number> | undefined) ?? {},
     }),
+    officerWriteOffs: writeOffs.docs.flatMap((d) => writeOffForAllocation(d.data()) ?? []),
     startDate: b.startDate as string | undefined,
   });
   const here = allocation.paymentCredits.filter((c) => c.statementId === statementId);

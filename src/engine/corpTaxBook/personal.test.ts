@@ -1170,6 +1170,82 @@ describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
     expect(row.taxOwed).toBe(800_000);
   });
 
+  const forgive = (amount: number, extra: { statementId?: string } = {}) => ({
+    id: 'w1',
+    minerId: MINER,
+    amount,
+    reason: 'Goodwill',
+    at: '2026-10-20T00:00:00Z',
+    ...extra,
+  });
+
+  it('a write-off that forgives the whole day reads Waived, before and after kept (#4637)', () => {
+    const row = overlay(
+      [entry()],
+      [
+        book({
+          statements: [issued([mined])],
+          writeOffs: [forgive(900_000, { statementId: 's1' })],
+        }),
+      ]
+    ).rows[0];
+    expect(row.state).toBe('waived');
+    expect(row.taxOwed).toBe(0);
+    expect(row.dismissalReason).toBe('Goodwill');
+    expect(row.correction).toEqual({ before: 900_000, after: 0, reasons: ['Goodwill'] });
+  });
+
+  it('a part write-off leaves the rest owed, and says so on the line (#4637)', () => {
+    const out = overlay(
+      [entry()],
+      [book({ statements: [issued([mined])], writeOffs: [forgive(400_000)] })]
+    );
+    const row = out.rows[0];
+    expect(row.state).toBe('billed');
+    expect(row.taxOwed).toBe(500_000);
+    expect(row.correction).toEqual({ before: 900_000, after: 500_000, reasons: ['Goodwill'] });
+    expect(out.books[0].credit).toBe(0);
+  });
+
+  it('a payment pays first; the write-off forgives what is left, and the day is Paid (#4637)', () => {
+    const row = overlay(
+      [entry()],
+      [
+        book({
+          statements: [issued([mined])],
+          payments: [
+            {
+              id: 'p1',
+              minerId: MINER,
+              characterId: ME,
+              amount: 400_000,
+              at: '2026-10-21T00:00:00Z',
+              source: 'donation' as const,
+            },
+          ],
+          writeOffs: [forgive(900_000)],
+        }),
+      ]
+    ).rows[0];
+    expect(row.state).toBe('paid');
+    expect(row.taxOwed).toBe(0);
+    expect(row.correction).toEqual({ before: 900_000, after: 400_000, reasons: ['Goodwill'] });
+  });
+
+  it("ignores another Miner's write-off (#4637)", () => {
+    const row = overlay(
+      [entry()],
+      [
+        book({
+          statements: [issued([mined])],
+          writeOffs: [{ ...forgive(900_000), minerId: 'solo:1' }],
+        }),
+      ]
+    ).rows[0];
+    expect(row.state).toBe('billed');
+    expect(row.correction).toBeUndefined();
+  });
+
   const pay = (id: string, amount: number) => ({
     id,
     minerId: MINER,
