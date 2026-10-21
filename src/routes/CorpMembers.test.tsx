@@ -854,7 +854,7 @@ describe('Roles tab (#4613)', () => {
     const user = userEvent.setup();
     await rosterTable();
     await user.click(screen.getByRole('tab', { name: 'Roles' }));
-    expect(currentLocation()).toBe('/corp/members?tab=roles');
+    expect(currentLocation()).toBe('/corp/members/roles');
     expect(
       await screen.findByRole('table', { name: 'Members with sensitive roles' })
     ).toBeVisible();
@@ -862,7 +862,7 @@ describe('Roles tab (#4613)', () => {
 
   it('shows sensitive holders and recent changes, older ones behind a button', async () => {
     const user = userEvent.setup();
-    renderMembers('/corp/members?tab=roles');
+    renderMembers('/corp/members/roles');
     const holders = await screen.findByRole('table', { name: 'Members with sensitive roles' });
     expect(within(holders).getByText('Director, Trader')).toBeInTheDocument();
     expect(within(holders).getByText('CEO')).toBeInTheDocument();
@@ -874,16 +874,17 @@ describe('Roles tab (#4613)', () => {
   });
 
   it('never reads or records the roster while the Roles tab is open', async () => {
-    renderMembers('/corp/members?tab=roles');
+    renderMembers('/corp/members/roles');
     await screen.findByRole('table', { name: 'Members with sensitive roles' });
     expect(mocked.loadCorporationMemberTracking).not.toHaveBeenCalled();
     expect(mocked.recordRoster).not.toHaveBeenCalled();
   });
 
-  it('ignores ?tab=roles without the capability', async () => {
+  it('moves the Roles path to the roster without the capability', async () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
-    renderMembers('/corp/members?tab=roles');
+    renderMembers('/corp/members/roles');
     await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
+    expect(currentLocation()).toBe('/corp/members/members');
     expect(roleAudit.loadRoleAudit).not.toHaveBeenCalled();
   });
 });
