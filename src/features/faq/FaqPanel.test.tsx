@@ -361,6 +361,13 @@ describe('FaqPanel: Using Neocom Desk', () => {
     expect(screen.getByRole('heading', { name: 'Your data' })).toBeInTheDocument();
   });
 
+  it('lists the ways to find skills to train under a FAQ question', () => {
+    renderFaq();
+    expect(screen.getByText(/From skill queue/i)).toBeInTheDocument();
+    expect(screen.getByText(/Certified Plan/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ships › Tree/)).toBeInTheDocument();
+  });
+
   it('points the permissions answer at EVE’s authorized-apps page', () => {
     renderFaq();
     expect(screen.getByRole('link', { name: /authorized apps page/i })).toHaveAttribute(
