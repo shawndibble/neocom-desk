@@ -449,6 +449,14 @@ const SPECS: Record<string, Spec> = {
     size: 'M',
     endpoints: ['getCorporationContracts'],
   },
+  corpAssets: {
+    corp: 'corpOps',
+    capabilities: ['canReadAssets'],
+    views: NT,
+    view: 'table',
+    size: 'M',
+    endpoints: ['getCorporationAssets'],
+  },
   corpSrp: { corp: 'corpOps', views: NT, view: 'table', size: 'M', soon: true, endpoints: [] },
 };
 

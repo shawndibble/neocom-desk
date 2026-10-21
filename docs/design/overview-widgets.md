@@ -312,6 +312,7 @@ Customize, Gallery, menu and phone list are shared.
 - **Cache window.** No countdown shorter than the read's cache window: 1 h for
   the corp reads, 5 min for corp contracts (ESI caches that route for 300 s).
   The data-age popover carries the hourly note.
+- **Corp assets** (`corpAssets`, `canReadAssets`): lines for Asset safety and Impounded (danger), Corp deliveries waiting and Below target (warning), each hidden at zero and linking to its `/corp/assets` tab; all-clear when none. Reads the page's cached asset read; not in the default layout, like the other Director ledgers (orders, contracts, customs).
 - **No Show info links** from rows; tables link rows to pages.
 - **Coming soon (one):** SRP, which needs app-owned data and an ADR first (#4608).
   Doctrine readiness and Corporation projects were dropped (#4614, #4609). Any new

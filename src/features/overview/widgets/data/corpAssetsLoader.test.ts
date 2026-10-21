@@ -1,0 +1,70 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const resolveCorpReadAccess = vi.fn();
+const loadCorporationAssets = vi.fn();
+vi.mock('@/features/corp/corpReadAccess', () => ({
+  resolveCorpReadAccess: (...a: unknown[]) => resolveCorpReadAccess(...a),
+}));
+vi.mock('@/features/corp/assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/corp/assets')>()),
+  loadCorporationAssets: (...a: unknown[]) => loadCorporationAssets(...a),
+}));
+vi.mock('@/market/prices', () => ({ getAveragePriceByType: async () => new Map([[34, 10]]) }));
+vi.mock('@/features/corp/blueprints', () => ({
+  loadCorporationBlueprints: async () => ({ cached: null }),
+}));
+
+import { loadCorpAssets } from './corpFeedLoaders';
+
+const access = (can: boolean) => ({ corporationId: 98000001, can: () => can });
+const asset = (item_id: number, location_flag: string) => ({
+  item_id,
+  type_id: 34,
+  quantity: 3,
+  location_id: 60003760,
+  location_type: 'station',
+  location_flag,
+  is_singleton: false,
+});
+
+beforeEach(() => vi.clearAllMocks());
+
+describe('loadCorpAssets', () => {
+  it('makes no request without the capability', async () => {
+    resolveCorpReadAccess.mockResolvedValue(access(false));
+    expect((await loadCorpAssets(1)).readable).toBe(false);
+    expect(loadCorporationAssets).not.toHaveBeenCalled();
+  });
+
+  it('makes no request with no corp access at all', async () => {
+    resolveCorpReadAccess.mockResolvedValue(null);
+    expect((await loadCorpAssets(1)).readable).toBe(false);
+    expect(loadCorporationAssets).not.toHaveBeenCalled();
+  });
+
+  it('summarises the cached read with the page prices', async () => {
+    resolveCorpReadAccess.mockResolvedValue(access(true));
+    loadCorporationAssets.mockResolvedValue({
+      cached: {
+        data: [asset(1, 'AssetSafety'), asset(2, 'CorpDeliveries')],
+        fetchedAt: new Date(0),
+        fromCache: false,
+        truncated: false,
+      },
+      needsReauth: false,
+    });
+    const feed = await loadCorpAssets(1);
+    expect(loadCorporationAssets).toHaveBeenCalledWith(1, 98000001);
+    expect(feed.readable).toBe(true);
+    expect(feed.summary?.assetSafety).toEqual({ stacks: 1, value: 30 });
+    expect(feed.summary?.deliveries.stacks).toBe(1);
+  });
+
+  it('asks for a grant when it lapsed, and throws when the read failed', async () => {
+    resolveCorpReadAccess.mockResolvedValue(access(true));
+    loadCorporationAssets.mockResolvedValue({ cached: null, needsReauth: true });
+    expect(await loadCorpAssets(1)).toMatchObject({ readable: false, needsReauth: true });
+    loadCorporationAssets.mockResolvedValue({ cached: null, needsReauth: false });
+    await expect(loadCorpAssets(1)).rejects.toThrow('assets');
+  });
+});
