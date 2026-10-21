@@ -45,13 +45,13 @@ const ROUTE_TITLE_KEYS = {
   '/planetary-industry/advisor': ['pi.title'],
   '/employment-history': ['employmentHistory.title'],
   // Each Corp page is named on its own, with no "Corporation" prefix.
-  '/corp': ['corp.boardPageTitle'],
+  '/corp': ['nav.corpBoard'],
   // A tabbed page (pageTabs.ts): its title leads, the tab follows it.
   '/corp/members': ['corp.members.title'],
   '/corp/wallet': ['corp.wallet.title'],
-  '/corp/assets': ['corp.assetsPageTitle'],
+  '/corp/assets': ['nav.corpAssets'],
   '/corp/moons': ['corp.moons.title'],
-  '/corp/assets/*': ['corp.assetsPageTitle'],
+  '/corp/assets/*': ['nav.corpAssets'],
   '/assets': ['assets.title'],
   '/mail': ['mail.title'],
   '/calendar': ['calendar.title'],

@@ -12353,8 +12353,6 @@
     "rolesUnavailable": "Can't check your corporation roles right now",
     "rolesUnavailableHint": "Neocom Desk reads your roles from EVE, and none are saved on this device yet. Try again, or connect if you're offline. It will retry when you're back online.",
     "title": "Corporation",
-    "boardPageTitle": "Corp Board",
-    "assetsPageTitle": "Corp Assets",
     "overviewTab": "Overview",
     "membersTab": "Members",
     "assetsTab": "Assets",

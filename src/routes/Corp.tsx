@@ -94,7 +94,7 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
         names the next clock.
       */}
       <PageHeader
-        title={t('corp.boardPageTitle')}
+        title={t('nav.corpBoard')}
         meta={<OverviewDataAge summary={summary} note={t('corp.dataAgeNote')} />}
         actions={<OverviewCustomize />}
       />
