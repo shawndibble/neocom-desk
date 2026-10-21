@@ -30,7 +30,14 @@ export interface VerifyPayload {
     minimumStatement?: number;
   };
   payments: { id: string; amount: number; at: string; source: 'donation' | 'manual' }[];
-  settlement: { amount: number; credited: number; writtenOff: number; remaining: number } | null;
+  settlement: {
+    amount: number;
+    credited: number;
+    /** What officer write-offs forgave (#4637), part of `credited`; absent from older servers. */
+    forgiven?: number;
+    writtenOff: number;
+    remaining: number;
+  } | null;
   declarations: { kind: string; at: string; resolution: string | null }[];
   settled: boolean;
   remindersStopped: boolean;

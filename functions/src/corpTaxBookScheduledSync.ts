@@ -24,6 +24,7 @@ import {
   EXTRACTIONS,
   OBSERVED,
   FEEDERS,
+  WRITE_OFFS,
 } from './corpTaxBook.js';
 import {
   SCHEDULED_VIA,
@@ -57,6 +58,8 @@ import {
 } from './corpTaxBookSyncEngine.js';
 import {
   outgoingDonationsFromJournal,
+  writeOffForAllocation,
+  type AllocWriteOff,
   type MirrorDismissal,
   type ObservedRow,
   type OutgoingDonation,
@@ -114,6 +117,8 @@ export interface AdminBookState {
   dismissals: MirrorDismissal[];
   extractions: SyncExtraction[];
   paidStatementIds: Set<string>;
+  /** Officer write-offs (#4637): a Statement one forgives in full settles. */
+  writeOffs?: (AllocWriteOff & { minerId: string })[];
 }
 
 /** The sync's reads of the book, with the admin SDK (the client reads the same collections under the rules). */
@@ -126,14 +131,16 @@ export async function readBookStateAdmin(
   if (!snap.exists || snap.get('active') !== true) return null;
   const list = async <T>(name: string): Promise<T[]> =>
     (await ref.collection(name).get()).docs.map((d) => d.data() as T);
-  const [miners, statements, payments, dismissals, extractions, paid] = await Promise.all([
-    list<AdminBookState['miners'][number]>(MINERS),
-    list<AdminBookState['statements'][number]>(STATEMENTS),
-    list<AdminBookState['payments'][number]>(PAYMENTS),
-    list<MirrorDismissal>(DISMISSALS),
-    list<SyncExtraction>(EXTRACTIONS),
-    ref.collection(META).doc(PAID_DOC).get(),
-  ]);
+  const [miners, statements, payments, dismissals, extractions, paid, writeOffDocs] =
+    await Promise.all([
+      list<AdminBookState['miners'][number]>(MINERS),
+      list<AdminBookState['statements'][number]>(STATEMENTS),
+      list<AdminBookState['payments'][number]>(PAYMENTS),
+      list<MirrorDismissal>(DISMISSALS),
+      list<SyncExtraction>(EXTRACTIONS),
+      ref.collection(META).doc(PAID_DOC).get(),
+      list<Record<string, unknown>>(WRITE_OFFS),
+    ]);
   const data = snap.data() as Data;
   return {
     startDate: String(data.startDate ?? ''),
@@ -145,6 +152,10 @@ export async function readBookStateAdmin(
     dismissals,
     extractions,
     paidStatementIds: new Set((paid.data()?.ids as string[] | undefined) ?? []),
+    writeOffs: writeOffDocs.flatMap((d) => {
+      const w = writeOffForAllocation(d);
+      return w && typeof d.minerId === 'string' ? [{ ...w, minerId: d.minerId }] : [];
+    }),
   };
 }
 
@@ -353,6 +364,7 @@ export async function runBookSync(
         dismissals: after.dismissals,
         alreadyPaid: after.paidStatementIds,
         extractions: after.extractions,
+        ...(after.writeOffs ? { writeOffs: after.writeOffs } : {}),
         startDate: after.startDate,
       })
     : [];

@@ -39,7 +39,7 @@ import {
 } from '@/features/corp/wallet';
 import { isNpcCorporationId } from '@/esi/entityIds';
 import { DAY_MS } from '@/lib/age';
-import { fetchCorporationStats } from '@/lib/zkillboard';
+import { fetchCorporationStatsRead } from '@/lib/zkillboard';
 import { parseInstant } from '@/engine/esiInstant';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import type {
@@ -302,15 +302,24 @@ export async function loadCorpStarbases(characterId: number): Promise<CorpStarba
     throw new CorpReadFailed('starbases');
   }
   const towers = list.cached.data;
-  // Fuel and strontium live on the per-tower call, and only a tower burning fuel has a bay worth reading.
-  const online = towers.filter((tower) => tower.state === 'online');
-  const [details, typeNames, systemNames] = await Promise.all([
-    loadStarbaseDetails(characterId, corporationId, online),
+  // Fuel and strontium live on the per-tower call. An online tower burns fuel and a reinforced one
+  // holds its strontium bay; an offline, onlining or unanchoring one has nothing worth the read.
+  const readable = towers.filter(
+    (tower) => tower.state === 'online' || tower.state === 'reinforced'
+  );
+  const [details, typeNames, systems] = await Promise.all([
+    loadStarbaseDetails(characterId, corporationId, readable),
     loadTypeNames([...new Set(towers.map((tower) => tower.type_id))]),
-    resolveNames([...new Set(towers.map((tower) => tower.system_id))]),
+    import('@/sde/solarSystems').then((m) => m.loadSolarSystemsById()).catch(() => null),
   ]);
+  // Same static-data names as the Customs offices widget.
+  const systemNames = new Map<number, string>();
+  for (const tower of towers) {
+    const name = systems?.get(tower.system_id)?.name;
+    if (name !== undefined) systemNames.set(tower.system_id, name);
+  }
   const starbases = towers.map((tower): CorpStarbaseRow => {
-    const detail = details.get(tower.starbase_id)?.cached?.data;
+    const read = details.get(tower.starbase_id)?.cached;
     return {
       starbaseId: tower.starbase_id,
       systemId: tower.system_id,
@@ -318,7 +327,9 @@ export async function loadCorpStarbases(characterId: number): Promise<CorpStarba
       state: tower.state ?? 'unknown',
       reinforcedUntilMs: parseInstant(tower.reinforced_until),
       unanchorsAtMs: parseInstant(tower.unanchor_at),
-      bay: detail === undefined ? null : summariseBay(detail.fuels),
+      bay: read ? summariseBay(read.data.fuels) : null,
+      // Each bay's own read time: a detail that fell back to an old cached row must not drag the others.
+      bayReadAtMs: read ? read.fetchedAt.getTime() : null,
     };
   });
   return {
@@ -403,8 +414,8 @@ export async function loadCorpKills(characterId: number): Promise<CorpKillsFeed>
   if (corporationId === null) return none;
   // The modal skips the killboard for an NPC corporation, so there is nothing to show.
   if (isNpcCorporationId(corporationId)) return { ...none, corporationId };
-  const result = await fetchCorporationStats(corporationId);
-  const base = { readable: true, needsReauth: false, fetchedAt: new Date(), fromCache: false };
+  const { result, fetchedAt, fromCache } = await fetchCorporationStatsRead(corporationId);
+  const base = { readable: true, needsReauth: false, fetchedAt, fromCache };
   if (result.kind === 'failed') {
     return { ...base, corporationId, stats: null, failed: result.reason };
   }

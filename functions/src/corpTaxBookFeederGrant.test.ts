@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   aggregateRefineries,
+  feederGrantReadsStructures,
   parseFeederCall,
   parseSaveFeederGrantInput,
 } from './corpTaxBookFeederGrant.js';
@@ -58,5 +59,37 @@ describe('aggregateRefineries', () => {
 
   it('is empty with no coverage', () => {
     expect(aggregateRefineries(rows, [])).toEqual([]);
+  });
+});
+
+describe('feeder grant scopes (#4654)', () => {
+  const MINING = 'esi-industry.read_corporation_mining.v1';
+  const STRUCTURES = 'esi-universe.read_structures.v1';
+  const reason = (scopes: string[]) => {
+    try {
+      feederGrantReadsStructures(scopes);
+      return 'ok';
+    } catch (e) {
+      return (e as { details?: { reason?: string } }).details?.reason;
+    }
+  };
+
+  it('takes the mining and structure scopes, and says it reads structure names', () => {
+    expect(feederGrantReadsStructures([MINING, STRUCTURES])).toBe(true);
+  });
+
+  it('still takes a grant from before, with the mining scope only', () => {
+    expect(feederGrantReadsStructures([MINING])).toBe(false);
+  });
+
+  it('refuses a grant without the mining scope', () => {
+    expect(reason([STRUCTURES])).toBe('missing-scope');
+  });
+
+  it('refuses any other scope', () => {
+    expect(reason([MINING, 'esi-characters.read_corporation_roles.v1'])).toBe('wrong-scopes');
+    expect(reason([MINING, STRUCTURES, 'esi-wallet.read_corporation_wallets.v1'])).toBe(
+      'wrong-scopes'
+    );
   });
 });

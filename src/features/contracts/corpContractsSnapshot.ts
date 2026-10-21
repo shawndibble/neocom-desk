@@ -1,5 +1,4 @@
 import { db } from '@/db';
-import { withAcceptedCourierInProgress } from '@/engine/contracts/contractStatus';
 import { ESI_REGISTRY } from '@/esi/registry';
 import type { CachedResult } from '@/esi/cache';
 import type { Contract } from '@/esi/endpoints';
@@ -43,11 +42,10 @@ export async function loadCorpContractsSnapshot(
   if (!granted.includes(SCOPE)) return { ...empty, needsReauth: true };
   const corporationId = await loadCorporationId(characterId);
   if (corporationId === null) return empty;
-  const { cached, needsReauth } = await loadCorporationContracts(characterId, corporationId);
-  const contractsResult = cached && {
-    ...cached,
-    data: cached.data.map(withAcceptedCourierInProgress),
-  };
+  const { cached: contractsResult, needsReauth } = await loadCorporationContracts(
+    characterId,
+    corporationId
+  );
   const contracts = signal.cancelled ? [] : (contractsResult?.data ?? []);
   const receiverIds = contracts.flatMap((c) => contractReceiver(c, corporationId)?.id ?? []);
   const [names, receiverCategories] = await Promise.all([

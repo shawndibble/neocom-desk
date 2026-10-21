@@ -17,10 +17,19 @@
  *   no one; ore no book observed at all stays Unassigned.
  * - Payments credit the Miner oldest Statement first (`allocatePayments`), and
  *   a Statement's settled days are Paid for good.
+ * - An officer's write-off (#4637) reduces a Statement after its payments: the
+ *   days it forgives keep the old figure beside the new, and a day it forgives
+ *   in full reads Waived.
  */
 import { computeAssignmentValue } from '../miningTax/valuation';
 import { entryKey, type OreLine } from '../miningTax/types';
-import { allocatePayments, dismissalCredits, settleTolerance, type TaxPayment } from './allocation';
+import {
+  allocatePayments,
+  dismissalCredits,
+  settleTolerance,
+  type RecordedWriteOff,
+  type TaxPayment,
+} from './allocation';
 import { splitAcrossBooks, resolveBookShare, type BookObservation } from './attribution';
 import { dayClosesAt, isDayBillable, lastBillableDate } from './billable';
 import { buildDayCharges, type DayCharge, type Miner } from './charges';
@@ -39,7 +48,7 @@ import {
 import type { DayPrices } from './valuation';
 import type { ObservedMiningEntry } from './types';
 
-export type BookRowState = 'billed' | 'sent-waiting' | 'conflict' | 'dismissed' | 'paid';
+export type BookRowState = 'billed' | 'sent-waiting' | 'conflict' | 'dismissed' | 'waived' | 'paid';
 /** A relabel of a personal row that has no Payee yet, not a row of its own. */
 export type BookLabelState = 'pending' | 'unattributed';
 
@@ -92,6 +101,8 @@ export interface PersonalBook {
   feeders?: readonly (FeederCoverage & Pick<FeederReadClock, 'lastReadWellAt'>)[];
   /** The member's own Adjustments the book lets them read (#4622). */
   adjustments?: readonly Adjustment[];
+  /** The member's own officer write-offs the book lets them read (#4637). */
+  writeOffs?: readonly RecordedWriteOff[];
 }
 
 /** The miner's own listing of ore the corporation also bills (issue #4517). */
@@ -143,7 +154,7 @@ export interface BookRowView {
   rateScope: RateScope;
   rateEffectiveFrom?: string;
   estimatedValue: number;
-  /** Still owed; `null` for a conflict (visible, not owed), 0 once paid or dismissed. */
+  /** Still owed; `null` for a conflict (visible, not owed), 0 once paid, dismissed or waived. */
   taxOwed: number | null;
   /** The whole bill of the day, before payments. */
   billed: number;
@@ -255,8 +266,14 @@ interface Prepared {
   charges: PreparedCharge[];
   /** Observations nothing can bill yet: unrated or not Billable, lined up with an entry or not. */
   pending: { observed: ObservedMiningEntry; entry?: PersonalEntry }[];
-  /** Per Statement id: settled, and what has been credited towards its non-dismissed days. */
-  settlement: Map<string, { settled: boolean; pool: number }>;
+  /**
+   * Per Statement id: settled; what payments credited towards its non-dismissed days; what
+   * officer write-offs forgave of it, and their reasons.
+   */
+  settlement: Map<
+    string,
+    { settled: boolean; pool: number; forgiven: number; forgivenReasons: string[] }
+  >;
   credit: number;
 }
 
@@ -331,10 +348,12 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
   for (const minerId of minerIds) {
     const statements = book.statements.filter((s) => s.minerId === minerId);
     const credits = dismissalCredits(statements, book.dismissals, charges);
+    const writeOffs = (book.writeOffs ?? []).filter((w) => w.minerId === minerId);
     const allocation = allocatePayments({
       statements,
       payments: book.payments.filter((p) => p.minerId === minerId),
       dismissalCredits: credits,
+      officerWriteOffs: writeOffs,
       startDate: book.startDate,
     });
     credit += allocation.credit;
@@ -343,9 +362,20 @@ function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: str
       const dismissed = credits
         .filter((c) => c.statementId === s.id)
         .reduce((sum, c) => sum + c.amount, 0);
+      const forgiven = result?.forgiven ?? 0;
+      const forgivenReasons = [
+        ...new Set(
+          allocation.writeOffCredits
+            .filter((c) => c.statementId === s.id)
+            .map((c) => writeOffs.find((w) => w.id === c.writeOffId)?.reason ?? '')
+            .filter((r) => r !== '')
+        ),
+      ];
       settlement.set(s.id, {
         settled: result?.settled ?? false,
-        pool: Math.max(0, (result?.credited ?? 0) - dismissed),
+        pool: Math.max(0, (result?.credited ?? 0) - dismissed - forgiven),
+        forgiven,
+        forgivenReasons,
       });
     }
   }
@@ -693,6 +723,7 @@ export function overlayCorpBooks(input: {
 
   // 4. Payments: a Statement's days are Paid oldest first; part payments land on the oldest days.
   // A raise billed on another Statement than its day's (or not billed yet) is owed on its own.
+  // An officer write-off then forgives the next open days of its Statement (#4637).
   for (const p of prepared) {
     const mine = rowsByBook.get(p.book.corporationId) ?? [];
     const partsOf = new Map<BookRowView, OwedPart[]>();
@@ -716,29 +747,54 @@ export function overlayCorpBooks(input: {
       }
     }
     const settledParts = new Set<OwedPart>();
+    const billedOf = new Map(
+      [...partsOf].map(([row, parts]) => [row, parts.reduce((sum, part) => sum + part.owed, 0)])
+    );
+    const forgivenOf = new Map<BookRowView, { amount: number; reasons: string[] }>();
     for (const [statementId, list] of byStatement) {
       const state = p.settlement.get(statementId);
       if (!state) continue;
       let pool = state.pool;
-      for (const { part } of list.sort(
+      let forgive = state.forgiven;
+      for (const { row, part } of list.sort(
         (a, b) => a.row.date.localeCompare(b.row.date) || a.row.id.localeCompare(b.row.id)
       )) {
         const owed = part.owed;
         settledParts.add(part);
-        if (state.settled || pool >= owed) {
-          part.owed = 0;
-          pool = Math.max(0, pool - owed);
-        } else if (pool > 0) {
-          part.owed = owed - pool;
-          pool = 0;
+        const fromPool = Math.min(pool, owed);
+        pool = Math.max(0, pool - fromPool);
+        const fromForgiven = Math.min(forgive, owed - fromPool);
+        if (fromForgiven > 0) {
+          forgive -= fromForgiven;
+          const held = forgivenOf.get(row) ?? { amount: 0, reasons: [] };
+          held.amount += fromForgiven;
+          for (const r of state.forgivenReasons)
+            if (!held.reasons.includes(r)) held.reasons.push(r);
+          forgivenOf.set(row, held);
         }
+        // A settled Statement owes nothing more: the tolerance wrote off any shortfall.
+        part.owed = state.settled ? 0 : owed - fromPool - fromForgiven;
       }
     }
     for (const [row, parts] of partsOf) {
-      // Paid once every part was billed on a Statement and nothing of it is left.
+      const forgiven = forgivenOf.get(row);
+      if (forgiven) {
+        // Never silent (spec #4504): the old figure stays beside what the write-off left.
+        const before = row.correction?.before ?? row.billed;
+        const after = (row.correction?.after ?? row.billed) - forgiven.amount;
+        row.correction = {
+          before,
+          after: Math.max(0, after),
+          reasons: [...(row.correction?.reasons ?? []), ...forgiven.reasons],
+        };
+      }
+      // Paid once every part was billed on a Statement and nothing of it is left;
+      // Waived when a write-off forgave all of it.
       if (parts.every((part) => settledParts.has(part) && part.owed === 0)) {
-        row.state = 'paid';
+        const waived = forgiven !== undefined && (billedOf.get(row) ?? 0) - forgiven.amount < 0.01;
+        row.state = waived ? 'waived' : 'paid';
         row.taxOwed = 0;
+        if (waived) row.dismissalReason = forgiven.reasons.join(' · ');
       } else {
         row.taxOwed = parts.reduce((sum, part) => sum + part.owed, 0);
       }

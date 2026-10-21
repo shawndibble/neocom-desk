@@ -108,6 +108,25 @@ describe('VerifyPage', () => {
     expect(await screen.findByText(/Donate ISK to Brass Meridian/)).toBeInTheDocument();
   });
 
+  it("says an officer's write-off apart from a dismissal (#4637)", async () => {
+    api.read.mockResolvedValue(
+      payload({
+        settlement: {
+          amount: 8_000_000,
+          credited: 8_000_000,
+          forgiven: 4_000_000,
+          writtenOff: 0,
+          remaining: 0,
+        },
+      })
+    );
+    render(<VerifyPage token="tok" />);
+    expect(
+      await screen.findByText(/4,000,000 ISK was written off by an officer/)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/1,500,000 ISK was waived by an officer/)).toBeInTheDocument();
+  });
+
   it('puts each ore of a day on its own sub-row beside its own price, with the day once', async () => {
     const base = payload();
     const line = base.statement.lines[0]!;

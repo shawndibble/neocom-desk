@@ -11,6 +11,7 @@ import {
   dismissalCredits,
   moonOnDay,
   shiftDate,
+  type AllocWriteOff,
   type MirrorDismissal,
   type MirrorExtraction,
   type ObservedRow,
@@ -527,6 +528,8 @@ export function planSettlements(input: {
   dismissals: readonly MirrorDismissal[];
   alreadyPaid: ReadonlySet<string>;
   extractions: readonly MirrorExtraction[];
+  /** Officer write-offs (#4637): a Statement one forgives in full is settled. */
+  writeOffs?: readonly (AllocWriteOff & { minerId: string })[];
   startDate?: string;
 }): string[] {
   const settled: string[] = [];
@@ -544,6 +547,7 @@ export function planSettlements(input: {
         extractions: input.extractions,
         expiryHours: {},
       }),
+      officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId),
       startDate: input.startDate,
     });
     for (const s of statements) {

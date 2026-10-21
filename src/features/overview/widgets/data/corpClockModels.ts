@@ -128,7 +128,7 @@ export const corpDeadlines: Builder = (feeds, { t, now }) => {
     jobsData === undefined &&
     towersData === undefined
   ) {
-    const failed = list.find((feed) => feed && !feed.data && feed.error);
+    const failed = [...list, towers].find((feed) => feed && !feed.data && feed.error);
     if (failed) return blank(null, statusOf(failed));
     const needsReauth =
       Boolean(feeds.structures?.data?.needsReauth) ||
@@ -192,14 +192,15 @@ export const corpDeadlines: Builder = (feeds, { t, now }) => {
   ].filter((at): at is Date => at instanceof Date);
 
   return {
-    ...blank(
-      null,
-      statusOf(undefined, {
-        loading: list.some((feed) => feed?.loading),
+    ...blank(null, {
+      ...statusOf(undefined, {
+        loading: [...list, towers].some((feed) => feed?.loading),
         hasData: true,
         isEmpty: timed.length === 0,
-      })
-    ),
+      }),
+      // Any failed read still draws what the other feeds gave, flagged as failed.
+      error: [...list, towers].some((feed) => Boolean(feed && !feed.data && feed.error)),
+    }),
     fetchedAt:
       fetched.length > 0 ? fetched.reduce((oldest, at) => (at < oldest ? at : oldest)) : null,
     fromCache: jobsData?.fromCache ?? false,

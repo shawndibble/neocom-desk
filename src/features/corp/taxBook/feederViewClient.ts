@@ -58,6 +58,11 @@ export interface FeederViewSummary {
   payee?: Payee | null;
   /** Which side set the payee last, and when (#4653); null or absent when unknown. */
   payeeSetBy?: PayeeSetBy | null;
+  /**
+   * The grant reads refinery names (#4654). False on a grant from before, so the page offers
+   * to grant again; absent on a view built before it existed.
+   */
+  refineryNamesGranted?: boolean;
 }
 
 export interface FeederViewLine {
@@ -85,6 +90,8 @@ export interface FeederViewRefinery {
   /** When it was set; absent on a view built before labels were stored. */
   labelSetAt?: string | null;
   solarSystemId: number | null;
+  /** The structure's name, read with the moon owner's grant (#4654); absent on an older view. */
+  structureName?: string | null;
 }
 
 /** `feederViews/{feeder}/payouts/{id}`. */

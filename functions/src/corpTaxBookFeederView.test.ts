@@ -353,8 +353,14 @@ describe('buildFeederView', () => {
       })
     );
     expect(v.refineries).toEqual([
-      { structureId: 77, label: null, labelSetAt: null, solarSystemId: 30000142 },
-      { structureId: 78, label: null, labelSetAt: null, solarSystemId: null },
+      {
+        structureId: 77,
+        label: null,
+        labelSetAt: null,
+        solarSystemId: 30000142,
+        structureName: null,
+      },
+      { structureId: 78, label: null, labelSetAt: null, solarSystemId: null, structureName: null },
     ]);
     expect(v.summary.refineryCount).toBe(2);
   });
@@ -381,8 +387,9 @@ describe('buildFeederView', () => {
         label: 'Efa Tatara',
         labelSetAt: '2026-10-12T00:00:00.000Z',
         solarSystemId: null,
+        structureName: null,
       },
-      { structureId: 78, label: null, labelSetAt: null, solarSystemId: null },
+      { structureId: 78, label: null, labelSetAt: null, solarSystemId: null, structureName: null },
     ]);
   });
 
@@ -401,6 +408,31 @@ describe('buildFeederView', () => {
       [77, 30002187],
       [78, 30000142],
     ]);
+  });
+
+  it('carries the structure name the lookup read; its system wins over a learned one (#4654)', () => {
+    const v = buildFeederView(
+      input({
+        record: record({
+          refinerySystems: { '77': 30002187, '78': 30002187 },
+          refineryStructures: {
+            '77': { name: 'Efa VII - Tatara', solarSystemId: 30004000, checkedAt: NOW },
+            '78': { checkedAt: NOW, denied: true },
+          },
+        }),
+        rows: [row('2026-10-12', 1), row('2026-10-12', 1, { structureId: 78 })],
+      })
+    );
+    expect(v.refineries.map((r) => [r.structureId, r.structureName, r.solarSystemId])).toEqual([
+      [77, 'Efa VII - Tatara', 30004000],
+      [78, null, 30002187],
+    ]);
+  });
+
+  it('says whether the grant reads structure names, so the page can ask to grant again (#4654)', () => {
+    expect(buildFeederView(input()).summary.refineryNamesGranted).toBe(false);
+    const granted = buildFeederView(input({ record: record({ readsStructureNames: true }) }));
+    expect(granted.summary.refineryNamesGranted).toBe(true);
   });
 });
 

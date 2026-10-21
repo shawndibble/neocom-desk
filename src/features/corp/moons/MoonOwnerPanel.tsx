@@ -17,6 +17,7 @@ import { LeaveMoonOwnerDialog } from './LeaveMoonOwnerDialog';
 import { MoonOwnerPrevious } from './MoonOwnerPrevious';
 import { MoonOwnerView } from './MoonOwnerView';
 import { OwnerStaleBanner } from './OwnerStaleBanner';
+import { RefineryNamesBanner } from './RefineryNamesBanner';
 import { OwnerStatusStrip } from './OwnerStatusStrip';
 import { shortDate } from './moonsFormat';
 import { canMail, mailPayeeChange } from './payeeChangeMail';
@@ -130,6 +131,19 @@ export function MoonOwnerPanel({
                 )}
               </>
             )}
+            {/* Optional (#4654): a grant from before reads no refinery names. Reconnect covers it while stale. */}
+            {view.summary.refineryNamesGranted === false &&
+              view.summary.status === 'active' &&
+              !isStale(view.summary) && (
+                <>
+                  <RefineryNamesBanner onGrant={reconnect} />
+                  {reconnectError && (
+                    <p role="alert" className="text-xs text-danger">
+                      {reconnectError}
+                    </p>
+                  )}
+                </>
+              )}
             {view.summary.status === 'pending-removal' && (
               <OwnerStatusStrip
                 title={

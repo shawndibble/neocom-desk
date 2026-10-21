@@ -95,7 +95,10 @@ export function MinerDetail({ id }: { id: string }) {
     (s) => !view.internals.byMiner.get(id)?.allocation.byStatement.get(s.id)?.settled
   );
   const closedAt = view.input.miners.find((m) => m.id === id)?.closedAt;
-  const toleranceTotal = detail.toleranceWriteOffs.reduce((s, w) => s + w.amount, 0);
+  // Tolerance shortfalls and officer write-offs (#4637) both come off what is owed.
+  const toleranceTotal =
+    detail.toleranceWriteOffs.reduce((s, w) => s + w.amount, 0) +
+    detail.officerWriteOffs.reduce((s, w) => s + w.amount, 0);
   const lateTotal = detail.lateWriteOffs.reduce((s, w) => s + w.tax, 0);
   const selectedDays = detail.days.filter((d) => selected.has(d.key));
   const selectedTax = selectedDays.reduce((s, d) => s + d.tax, 0);

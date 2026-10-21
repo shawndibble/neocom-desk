@@ -96,6 +96,7 @@ function HistoryTable({ rows }: { rows: readonly HistoryRow[] }) {
       {
         id: 'member',
         header: t('corp.roles.columnMember'),
+        primary: true,
         className: 'truncate',
         render: (row) => (
           <CharacterLink id={row.change.characterId}>
@@ -134,16 +135,13 @@ function HistoryTable({ rows }: { rows: readonly HistoryRow[] }) {
     [t]
   );
   return (
-    <div className="overflow-x-auto">
-      <DataTable
-        columns={columns}
-        rows={rows}
-        responsive="table"
-        rowKey={(row) => row.key}
-        label={t('corp.roles.historyLabel')}
-        density="compact"
-      />
-    </div>
+    <DataTable
+      columns={columns}
+      rows={rows}
+      rowKey={(row) => row.key}
+      label={t('corp.roles.historyLabel')}
+      density="compact"
+    />
   );
 }
 
@@ -227,6 +225,7 @@ export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
       {
         id: 'member',
         header: t('corp.roles.columnMember'),
+        primary: true,
         className: 'truncate',
         render: (row) => (
           <CharacterLink id={row.characterId}>{label(row.name, row.characterId)}</CharacterLink>
@@ -304,7 +303,11 @@ export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
                 {t('corp.roles.holdersHeading')}
               </h2>
               <p className="px-3 pb-2 text-xs text-text-dim">
-                {t('corp.roles.holdersSummary', { directors, holders: holders.length })}
+                {t('corp.roles.holdersSummary', {
+                  count: directors,
+                  directors,
+                  holders: holders.length,
+                })}
               </p>
               {holders.length === 0 ? (
                 <EmptyState
@@ -313,16 +316,13 @@ export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
                   className="py-8"
                 />
               ) : (
-                <div className="overflow-x-auto">
-                  <DataTable
-                    columns={columns}
-                    rows={holders}
-                    responsive="table"
-                    rowKey={(row) => row.characterId}
-                    label={t('corp.roles.tableLabel')}
-                    density="compact"
-                  />
-                </div>
+                <DataTable
+                  columns={columns}
+                  rows={holders}
+                  rowKey={(row) => row.characterId}
+                  label={t('corp.roles.tableLabel')}
+                  density="compact"
+                />
               )}
             </Panel>
             <Panel padded={false}>

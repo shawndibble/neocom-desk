@@ -3907,7 +3907,8 @@
     "filter": {
       "thisCharacter": "This character",
       "allCharacters": "All characters",
-      "unreadFor": "{{name}} · {{count}} unread"
+      "unreadFor": "{{name}} · {{count}} unread",
+      "corporation": "Corporation"
     }
   },
   "characters": {
@@ -4572,7 +4573,6 @@
           "side": "Side",
           "price": "Price",
           "vsBest": "vs best",
-          "issuedBy": "Issued by",
           "expires": "Expires",
           "station": "Station"
         }
@@ -4979,7 +4979,8 @@
           "unanchoring": "Unanchoring"
         },
         "summary_one": "{{count}} starbase, {{low}} low on fuel.",
-        "summary_other": "{{count}} starbases, {{low}} low on fuel."
+        "summary_other": "{{count}} starbases, {{low}} low on fuel.",
+        "reinforceEnded": "Ended"
       },
       "corpCustomsOffices": {
         "title": "Customs offices",
@@ -6277,7 +6278,8 @@
         "sentWaitingShort": "Sent, waiting",
         "conflict": "Conflict",
         "unattributed": "Unattributed",
-        "dismissed": "Dismissed by corp"
+        "dismissed": "Dismissed by corp",
+        "waived": "Waived"
       },
       "hint": {
         "pending": "{{corp}} has not closed this day in its book yet. Until it does, your own allocation applies and nothing is owed to the corp.",
@@ -6286,6 +6288,7 @@
         "conflict": "You gave this ore to another Payee, and {{corp}}'s book also recorded it. It is not owed; it resolves to {{corp}} on {{date}} unless you sort it out first.",
         "unattributed": "No Corp Tax Book claims this ore, so nobody is owed for it.",
         "dismissed": "{{corp}} dismissed this day: {{reason}}",
+        "waived": "{{corp}} wrote this day off: {{reason}}",
         "paid": "Credited by {{corp}}'s book."
       },
       "sync": {
@@ -8833,14 +8836,14 @@
     "title": "Contracts",
     "tabsLabel": "Contracts sections",
     "historyTab": "History",
-    "scopeLabel": "Whose contracts",
-    "characterScope": "Character",
-    "corpScope": "Corp",
     "corpReauthTitle": "Corp contracts need a new grant",
     "corpReauthHint": "Grant corporation contracts access to read the contracts issued by or assigned to your corporation.",
     "corpEmptyTitle": "No corp contracts cached",
     "corpEmptyHint": "Couldn't load your corporation's contracts yet. Try again shortly.",
     "corpEmptyFetchedTitle": "No corp contracts",
+    "allEmptyHint": "Couldn't load your characters' contracts yet. Try again shortly.",
+    "character": "Character",
+    "notShared": "{{name}} hasn't shared their contracts",
     "itemSearchTab": "Item search",
     "courierTab": "Courier",
     "refresh": "Refresh",
@@ -11000,12 +11003,7 @@
     },
     "orders": {
       "corp": {
-        "scopeLabel": "Whose orders",
-        "characterScope": "Character",
-        "corpScope": "Corp",
-        "tableName": "Corp open orders",
         "issuedBy": "Issued by",
-        "searchPlaceholder": "Search by item, station or issuer…",
         "reauthTitle": "Corp orders need a new grant",
         "reauthHint": "Grant corporation market orders access to see your corporation's open buy and sell orders.",
         "reauthAction": "Grant access",
@@ -14066,6 +14064,7 @@
       "balanceDue": "Balance due",
       "balanceSum": "Billed {{billed}} − paid {{paid}}.",
       "dismissed": "{{amount}} was waived by an officer.",
+      "forgiven": "{{amount}} was written off by an officer.",
       "writtenOff": "{{amount}} short of the Statement was written off.",
       "howToPay": "Donate ISK to {{corp}}; any of your characters counts.",
       "payCodeLead": "Put the code",
@@ -14427,7 +14426,7 @@
         "writtenOff": "Written off",
         "writtenOffValue_one": "{{tolerance}} + {{count}} line",
         "writtenOffValue_other": "{{tolerance}} + {{count}} lines",
-        "writtenOffTip": "What payments within tolerance left over, and lines recorded after a Statement was paid ({{late}}). Paid days are closed for good; both are logged."
+        "writtenOffTip": "What officers wrote off, what payments within tolerance left over, and lines recorded after a Statement was paid ({{late}}). Paid days are closed for good; all are logged."
       },
       "activity": {
         "button": "Activity",
@@ -14613,7 +14612,7 @@
         "title": "Share your mining ledger",
         "sees": {
           "title": "They will see",
-          "body": "Who mined at your refineries, how much and what, and when."
+          "body": "Who mined at your refineries, how much and what, and when. We also read your refineries' names and systems."
         },
         "cannot": {
           "title": "They cannot",
@@ -14673,6 +14672,11 @@
           "title": "We can't read your mining ledger since {{date}}",
           "hint": "The character who gave access lost the Accountant role or revoked it. Mining since then is not counted until it is reconnected.",
           "action": "Reconnect"
+        },
+        "refineryNames": {
+          "title": "Refinery names not shared",
+          "hint": "Grant again to show your refinery names.",
+          "action": "Grant again"
         },
         "removal": {
           "title": "Removal pending, takes effect {{time}}",

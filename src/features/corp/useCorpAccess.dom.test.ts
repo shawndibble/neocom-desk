@@ -223,6 +223,14 @@ describe('useCorpAccess — roles-without-grant', () => {
     ]);
   });
 
+  it('lands a Trader-only Character on roles-without-grant so it is asked to grant', async () => {
+    mockedGrantedScopes.mockReturnValue([ROLES_SCOPE]);
+    mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Trader']));
+    const { result } = renderHook(() => useCorpAccess());
+    await waitFor(() => expect(result.current.state).toBe('roles-without-grant'));
+    expect(result.current.missingScopes).toContain('esi-markets.read_corporation_orders.v1');
+  });
+
   it('does not ask a Factory_Manager for scopes only an Accountant could use', async () => {
     mockedGrantedScopes.mockReturnValue([ROLES_SCOPE]);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Factory_Manager']));

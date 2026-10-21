@@ -129,6 +129,26 @@ export interface AllocDismissalCredit {
   amount: number;
 }
 
+/** Mirror of allocation.ts `OfficerWriteOff` (#4637). */
+export interface AllocWriteOff {
+  id: string;
+  amount: number;
+  at: string;
+  statementId?: string;
+}
+
+/** A `writeOffs` doc as allocation reads it; null when malformed. */
+export function writeOffForAllocation(d: Record<string, unknown>): AllocWriteOff | null {
+  if (typeof d.id !== 'string' || typeof d.amount !== 'number' || typeof d.at !== 'string')
+    return null;
+  return {
+    id: d.id,
+    amount: d.amount,
+    at: d.at,
+    ...(typeof d.statementId === 'string' ? { statementId: d.statementId } : {}),
+  };
+}
+
 export function settleTolerance(amount: number): number {
   return Math.max((amount * 0.5) / 100, 100_000);
 }
@@ -142,6 +162,7 @@ export function allocatePayments(rawInput: {
   statements: readonly AllocStatement[];
   payments: readonly AllocPayment[];
   dismissalCredits: readonly AllocDismissalCredit[];
+  officerWriteOffs?: readonly AllocWriteOff[];
   startDate?: string;
 }) {
   const { startDate } = rawInput;
@@ -154,9 +175,9 @@ export function allocatePayments(rawInput: {
   const ordered = [...input.statements].sort(
     (a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id)
   );
-  type Running = { amount: number; credited: number; paidIn: number };
+  type Running = { amount: number; credited: number; paidIn: number; forgiven: number };
   const state = new Map<string, Running>(
-    ordered.map((s) => [s.id, { amount: s.amount, credited: 0, paidIn: 0 }])
+    ordered.map((s) => [s.id, { amount: s.amount, credited: 0, paidIn: 0, forgiven: 0 }])
   );
   const isDone = (st: Running): boolean => {
     const remaining = st.amount - st.credited;
@@ -201,9 +222,37 @@ export function allocatePayments(rawInput: {
     }
   }
 
+  // Officer write-offs (#4637), after every payment; a leftover is dropped, never credit.
+  const writeOffCredits: { writeOffId: string; statementId: string; amount: number }[] = [];
+  let forgivenTotal = 0;
+  const officerWriteOffs = [...(input.officerWriteOffs ?? [])].sort(
+    (a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id)
+  );
+  for (const w of officerWriteOffs) {
+    const targets = w.statementId ? ordered.filter((s) => s.id === w.statementId) : ordered;
+    let available = w.amount;
+    for (const s of targets) {
+      if (available <= 0) break;
+      const left = apply(s.id, available, false);
+      const amount = available - left;
+      available = left;
+      if (amount <= 0) continue;
+      state.get(s.id)!.forgiven += amount;
+      forgivenTotal += amount;
+      writeOffCredits.push({ writeOffId: w.id, statementId: s.id, amount });
+    }
+  }
+
   const byStatement = new Map<
     string,
-    { amount: number; credited: number; writtenOff: number; remaining: number; settled: boolean }
+    {
+      amount: number;
+      credited: number;
+      forgiven: number;
+      writtenOff: number;
+      remaining: number;
+      settled: boolean;
+    }
   >();
   let billed = 0;
   let writtenOffTotal = 0;
@@ -217,6 +266,7 @@ export function allocatePayments(rawInput: {
     byStatement.set(s.id, {
       amount: st.amount,
       credited: st.credited,
+      forgiven: st.forgiven,
       writtenOff,
       remaining: shortfall - writtenOff,
       settled,
@@ -225,8 +275,9 @@ export function allocatePayments(rawInput: {
   return {
     byStatement,
     paymentCredits,
+    writeOffCredits,
     credit,
-    balance: billed - paid - dismissed - writtenOffTotal,
+    balance: billed - paid - dismissed - writtenOffTotal - forgivenTotal,
   };
 }
 

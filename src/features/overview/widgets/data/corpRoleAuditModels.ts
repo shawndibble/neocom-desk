@@ -22,7 +22,7 @@ import {
 import type { TableModel } from './types';
 
 const K = 'overview.widgets.corpRoleAudit';
-const PATH = '/corp/members?tab=roles';
+const PATH = '/corp/members/roles';
 
 export const corpRoleAudit: Builder = (feeds, { t, now }) => {
   const feed = feeds.corpRoleAudit;

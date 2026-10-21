@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore/lite';
 import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
+import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { Declaration } from '@/engine/corpTaxBook/overdue';
@@ -41,7 +42,7 @@ import type {
 import type { FeederReadClock } from '@/engine/corpTaxBook/feederHealth';
 import type { RemovalNoticeRecord } from '@/engine/corpTaxBook/mailQueue';
 import type { OwnerRateEntry } from '@/engine/corpTaxBook/ownerRate';
-import type { StoredRefineryLabel } from '@/engine/corpTaxBook/refinery';
+import type { StoredRefineryLabel, StoredRefineryStructure } from '@/engine/corpTaxBook/refinery';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -77,6 +78,8 @@ export interface BookState {
   extractions: SyncExtraction[];
   /** Statement ids settled so far (`meta/paid`), which only ever grows (D22). */
   paidStatementIds: Set<string>;
+  /** Officer write-offs (#4637): they reduce what a Miner owes. */
+  writeOffs?: RecordedWriteOff[];
 }
 
 export interface SyncUpload {
@@ -227,14 +230,16 @@ export async function readBookState(
     collection(getSyncFirestore(), 'corpTaxBooks', String(corporationId), name);
   const list = async <T>(name: string): Promise<T[]> =>
     (await getDocs(root(name))).docs.map((d) => d.data() as T);
-  const [miners, statements, payments, dismissals, extractions, paid] = await Promise.all([
-    list<Miner>('miners'),
-    list<Statement>('statements'),
-    list<SettlePayment>('payments'),
-    list<Dismissal>('dismissals'),
-    list<SyncExtraction>('extractions'),
-    getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'paid')),
-  ]);
+  const [miners, statements, payments, dismissals, extractions, paid, writeOffs] =
+    await Promise.all([
+      list<Miner>('miners'),
+      list<Statement>('statements'),
+      list<SettlePayment>('payments'),
+      list<Dismissal>('dismissals'),
+      list<SyncExtraction>('extractions'),
+      getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'paid')),
+      list<RecordedWriteOff>('writeOffs'),
+    ]);
   return {
     book,
     miners,
@@ -243,6 +248,7 @@ export async function readBookState(
     dismissals,
     extractions,
     paidStatementIds: new Set((paid.data()?.ids as string[] | undefined) ?? []),
+    writeOffs,
   };
 }
 
@@ -372,6 +378,10 @@ export interface BookFeeder extends FeederReadClock {
   refineryLabels?: Record<string, StoredRefineryLabel>;
   /** Refinery systems by structure id, learned from miners' own ledgers (#4650). */
   refinerySystems?: Record<string, number>;
+  /** Refinery names and systems the sync read with the moon owner's grant (#4654). */
+  refineryStructures?: Record<string, StoredRefineryStructure>;
+  /** The moon owner's grant reads refinery names (#4654); absent on a grant from before. */
+  readsStructureNames?: boolean;
   payouts: FeederPayoutRow[];
 }
 
@@ -436,6 +446,7 @@ export async function readBookData(
     answers,
     scheduled,
     feeders,
+    writeOffs,
   ] = await Promise.all([
     list<Miner>('miners'),
     list<Statement>('statements'),
@@ -451,6 +462,7 @@ export async function readBookData(
     ),
     getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'scheduledSync')),
     list<FeederDoc>('feeders'),
+    list<RecordedWriteOff>('writeOffs'),
   ]);
   const feederRows = await Promise.all(
     feeders.map(async (f) =>
@@ -472,6 +484,7 @@ export async function readBookData(
       dismissals,
       extractions,
       paidStatementIds: new Set((paid.data()?.ids as string[] | undefined) ?? []),
+      writeOffs,
     },
     observed,
     declarations,

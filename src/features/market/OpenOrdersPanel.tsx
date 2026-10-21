@@ -27,10 +27,14 @@ import { GrantBanner } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { useCharacterCount } from '@/features/character/useCharacters';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
 import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
-import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import {
+  CharacterFilterControl,
+  type CharacterScopeChoice,
+} from '@/features/character/CharacterFilterControl';
 import {
   resolveCharacterFilter,
   type CharacterFilterValue,
@@ -50,6 +54,7 @@ import type { CompetingOrder } from '@/engine/market/undercut';
 import { ItemContextMenu } from './ItemContextMenu';
 import { OpenOrdersList } from './OpenOrdersList';
 import { loadOpenOrdersSnapshot } from './openOrdersPageSnapshot';
+import { loadCorpOpenOrdersSnapshot } from './corpOpenOrders';
 import { recordOrderProblemSamples, sampleableCharacterIds } from './orderProblemSamples';
 import { sampledProblem } from '@/engine/market/orderProblemHistory';
 import { buildOpenOrderRows, openOrderProblemCounts, type OpenOrderRow } from './openOrdersModel';
@@ -101,6 +106,12 @@ interface ActiveChipDisplay {
 
 interface OpenOrdersPanelProps {
   headerSlots: PageHeaderSlots;
+  /** Corporation is the data source: the corp's orders in the same page, the same look. */
+  corporation?: boolean;
+  /** Set when the Character can read corp orders: adds "Corporation" to the Character picker. */
+  onChooseCorporation?: () => void;
+  /** Corporation source only: the picker went straight to This character or All characters. */
+  onLeaveCorporation?: () => void;
 }
 
 /**
@@ -108,16 +119,41 @@ interface OpenOrdersPanelProps {
  * fix list — the orders that need the pilot, worst first, in one flat table
  * that says what is wrong and what to do, with Watch and All one segment away.
  */
-export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
+export function OpenOrdersPanel({
+  headerSlots,
+  corporation = false,
+  onChooseCorporation,
+  onLeaveCorporation,
+}: OpenOrdersPanelProps) {
   const { t } = useTranslation();
-  const viewedCharacterId = useViewedCharacterId();
+  const viewedFromUrl = useViewedCharacterId();
+  // The URL's Character narrows Character rows; the corporation's are not any Character's.
+  const viewedCharacterId = corporation ? undefined : viewedFromUrl;
+  // The source is fixed for a mount (the caller keys the panel by it).
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
-    loadOpenOrdersSnapshot,
+    corporation ? loadCorpOpenOrdersSnapshot : loadOpenOrdersSnapshot,
     undefined,
-    { cacheKey: 'market:open-orders' }
+    { cacheKey: corporation ? 'market:corp-orders' : 'market:open-orders' }
   );
+  const deviceCharacterCount = useCharacterCount();
 
-  const { filter, rowsFilter, setFilter } = useOpenOrdersFilterState(activeCharacterId);
+  const {
+    filter: urlFilter,
+    rowsFilter: urlRowsFilter,
+    setFilter: setUrlFilter,
+  } = useOpenOrdersFilterState(activeCharacterId);
+  // Issuers are not Characters: a remembered Character pick filters nothing here,
+  // and is left in the URL for the way back.
+  const filter = useMemo(
+    () => (corporation ? { ...urlFilter, characterIds: [] } : urlFilter),
+    [corporation, urlFilter]
+  );
+  const rowsFilter = useMemo(
+    () => (corporation ? { ...urlRowsFilter, characterIds: [] } : urlRowsFilter),
+    [corporation, urlRowsFilter]
+  );
+  const setFilter = (next: OpenOrdersFilter) =>
+    setUrlFilter(corporation ? { ...next, characterIds: urlFilter.characterIds } : next);
   /**
    * The order a Notification Event (an undercut, or a fill) sent the reader
    * to, spent once on arrival (`useHighlightParam`'s own doc). Landing on the
@@ -243,7 +279,8 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
    * error state on a page whose job is elsewhere.
    */
   useEffect(() => {
-    if (!snapshot) return;
+    // Order history is the Character's own: a corporation order's issuer may be an alt.
+    if (!snapshot || corporation) return;
     const characterIds = sampleableCharacterIds(snapshot.openOrders.entries);
     void recordOrderProblemSamples(
       allRows.map((row) => ({
@@ -255,7 +292,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
       characterIds,
       snapshot.now
     ).catch(() => {});
-  }, [snapshot, allRows]);
+  }, [snapshot, allRows, corporation]);
 
   const problemCounts = useMemo(() => openOrderProblemCounts(allRows), [allRows]);
 
@@ -414,15 +451,25 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
       meta={oldestFetchedAt !== null && <DataAgeBadge date={new Date(oldestFetchedAt)} />}
       actions={
         <>
-          {showCharacterStrip && (
-            <CharacterFilterControl
+          {(showCharacterStrip || onChooseCorporation) && (
+            <CharacterFilterControl<CharacterScopeChoice>
               size="md"
               activeCharacterId={activeCharacterId}
-              value={characterFilterValue}
-              characterCount={entriesWithOrders.length}
+              value={corporation ? 'corporation' : characterFilterValue}
+              // Under Corporation the entries are issuers, so All counts the device's Characters.
+              characterCount={corporation ? deviceCharacterCount : entriesWithOrders.length}
+              corporation={onChooseCorporation !== undefined}
               onChange={(next) => {
+                if (next === 'corporation') {
+                  if (!corporation) onChooseCorporation?.();
+                  return;
+                }
                 const resolved = resolveCharacterFilter(next, activeCharacterId);
-                setFilter({ ...filter, characterIds: resolved === 'all' ? [] : [...resolved] });
+                setUrlFilter({
+                  ...urlFilter,
+                  characterIds: resolved === 'all' ? [] : [...resolved],
+                });
+                if (corporation) onLeaveCorporation?.();
               }}
             />
           )}
@@ -481,6 +528,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
   }));
 
   const notShared = snapshot.openOrders.skipped;
+  const corpReauth = corporation && snapshot.corporation?.needsReauth === true;
 
   // The modal loads what the order needs as it opens (`useOpenOrderDetail`).
   function openDetails(row: OpenOrderRow) {
@@ -521,7 +569,7 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
   }
 
   const tableLabel = t(TABLE_LABEL_KEY[view]);
-  const noOrders = reauthEntries.length === 0 && allRows.length === 0;
+  const noOrders = reauthEntries.length === 0 && !corpReauth && allRows.length === 0;
 
   return (
     <>
@@ -566,6 +614,16 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
             />
           ))}
 
+          {corpReauth && (
+            <GrantBanner
+              characterId={activeCharacterId}
+              endpoints={['getCorporationOrders']}
+              title={t('market.orders.corp.reauthTitle')}
+              hint={t('market.orders.corp.reauthHint')}
+              actionLabel={t('market.orders.corp.reauthAction')}
+            />
+          )}
+
           {fromCacheAny && <CachedNotice fetchedAt={oldestFetchedAt} />}
 
           {noOrders ? (
@@ -573,9 +631,11 @@ export function OpenOrdersPanel({ headerSlots }: OpenOrdersPanelProps) {
             notShared.length > 0 && snapshot.openOrders.entries.length === 0 ? null : (
               <CachedEmptyState
                 result={{ fromCache: fromCacheAny }}
-                title={t('orders.emptyTitle')}
-                hint={t('orders.emptyHint')}
-                fetchedTitle={t('orders.emptyFetchedTitle')}
+                title={t(corporation ? 'market.orders.corp.emptyTitle' : 'orders.emptyTitle')}
+                hint={t(corporation ? 'market.orders.corp.emptyHint' : 'orders.emptyHint')}
+                fetchedTitle={t(
+                  corporation ? 'market.orders.corp.emptyFetchedTitle' : 'orders.emptyFetchedTitle'
+                )}
                 className="py-8"
               />
             )

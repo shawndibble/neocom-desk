@@ -13,6 +13,7 @@ const PILL_TONE: Record<PillState, string> = {
   conflict: 'text-warning bg-warning/10',
   unattributed: 'text-text-dim',
   dismissed: 'text-text-dim',
+  waived: 'text-text-dim',
 };
 
 export function CorpStatusPill({ corp }: { corp: CorpRowInfo }) {

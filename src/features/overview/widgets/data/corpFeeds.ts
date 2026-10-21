@@ -114,9 +114,11 @@ export interface CorpStarbaseRow {
   unanchorsAtMs: number | null;
   /**
    * What the bay held when read; null when no detail was read (the tower is not
-   * online, or its read failed): unknown, not empty.
+   * online or reinforced, or its read failed): unknown, not empty.
    */
   bay: { fuelBlocks: number; strontium: number } | null;
+  /** Epoch ms of the response behind `bay` (its own, not the oldest of the feed); null with no bay. */
+  bayReadAtMs: number | null;
 }
 
 export interface CorpStarbasesFeed extends CorpFeedBase {
