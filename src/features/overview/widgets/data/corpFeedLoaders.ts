@@ -14,6 +14,9 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCorporationId, MASTER_WALLET_DIVISION } from '@/features/corp/boardData';
 import { jobTypeIds } from '@/features/corp/boardSources';
 import { loadCorporationContracts } from '@/features/corp/contracts';
+import { loadCorporationOrders } from '@/features/corp/orders';
+import { loadStationBestPrices } from '@/features/market/orderCompetition';
+import { loadNpcStations } from '@/sde/loadMarketSde';
 import { CorpReadFailed } from '@/features/corp/corpRead';
 import { resolveCorpReadAccess, type CorpCapability } from '@/features/corp/corpReadAccess';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
@@ -50,6 +53,7 @@ import type {
   CorpMiningFeed,
   CorpStarbaseRow,
   CorpStarbasesFeed,
+  CorpOrdersFeed,
   CorpWalletFeed,
 } from './corpFeeds';
 
@@ -342,6 +346,50 @@ export async function loadCorpContracts(characterId: number): Promise<CorpContra
     ...new Set(open.flatMap((c) => [c.issuer_id, c.assignee_id]).filter((id) => id > 0)),
   ]);
   return { readable: true, needsReauth: false, ...readAge([result]), contracts, names };
+}
+
+export async function loadCorpOrders(characterId: number): Promise<CorpOrdersFeed> {
+  const empty: CorpOrdersFeed = {
+    ...UNREADABLE,
+    orders: [],
+    typeNames: new Map(),
+    stationNames: new Map(),
+    stationPrices: new Map(),
+    issuerNames: new Map(),
+  };
+  const access = await gate(characterId, 'canReadOrders');
+  if (access === null) return empty;
+  const result = await loadCorporationOrders(characterId, access.corporationId);
+  if (result.cached === null) {
+    if (result.needsReauth) return { ...empty, needsReauth: true };
+    throw new CorpReadFailed('market orders');
+  }
+  const orders = result.cached.data;
+  const typesByStation = new Map<number, Set<number>>();
+  for (const order of orders) {
+    const set = typesByStation.get(order.location_id) ?? new Set<number>();
+    set.add(order.type_id);
+    typesByStation.set(order.location_id, set);
+  }
+  const [typeNames, issuerNames, stationPrices, stations] = await Promise.all([
+    loadTypeNames([...new Set(orders.map((o) => o.type_id))]),
+    resolveNames([...new Set(orders.map((o) => o.issued_by ?? 0).filter((id) => id > 0))]),
+    loadStationBestPrices(
+      [...typesByStation].map(([stationId, ids]) => ({ stationId, typeIds: [...ids] }))
+    ),
+    // Offline first visit: the station file may be missing. Names then read as a structure.
+    loadNpcStations().catch(() => []),
+  ]);
+  return {
+    readable: true,
+    needsReauth: false,
+    ...readAge([result]),
+    orders,
+    typeNames,
+    stationNames: new Map(stations.map((s) => [s.id, s.name])),
+    stationPrices,
+    issuerNames,
+  };
 }
 
 /**

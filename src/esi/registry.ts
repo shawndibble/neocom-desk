@@ -335,6 +335,15 @@ export const ESI_REGISTRY = {
     scope: 'esi-markets.read_character_orders.v1',
     group: 'marketOrders',
   },
+  /**
+   * The corporation's open market orders. In-game role Accountant or Trader;
+   * the scope is additive (`corpScopes.ts`).
+   */
+  getCorporationOrders: {
+    route: '/corporations/{corporation_id}/orders',
+    scope: 'esi-markets.read_corporation_orders.v1',
+    group: 'corp',
+  },
   getCharacterOrderHistory: {
     route: '/characters/{character_id}/orders/history',
     scope: 'esi-markets.read_character_orders.v1',

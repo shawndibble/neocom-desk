@@ -4,6 +4,7 @@ import { SCOPES, scopesForGroup } from '@/esi/scopes';
 import { CORP_SCOPES_FOR_CAPABILITY, corpGrantCoverage, missingCorpScopes } from './corpScopes';
 
 const CONTRACTS = 'esi-contracts.read_corporation_contracts.v1';
+const ORDERS = 'esi-markets.read_corporation_orders.v1';
 
 /**
  * `missingCorpScopes` without the contracts scope, which every member is asked for
@@ -189,7 +190,7 @@ describe('corpGrantCoverage', () => {
    */
   it('asks for an additive capability’s scope without blocking the rest', () => {
     const coverage = corpGrantCoverage(corpCapabilities(['Accountant']), WALLET_SCOPES);
-    expect(coverage.missingScopes).toEqual([MINING, CONTRACTS]);
+    expect(coverage.missingScopes).toEqual([MINING, CONTRACTS, ORDERS]);
     expect(coverage.blocking).toBe(false);
     expect(coverage.capabilities.canReadWallet).toBe(true);
     // Unreadable until granted, so nothing reads the ledger into a 403.
@@ -201,6 +202,7 @@ describe('corpGrantCoverage', () => {
       ...WALLET_SCOPES,
       MINING,
       CONTRACTS,
+      ORDERS,
     ]);
     expect(coverage).toEqual({
       missingScopes: [],
@@ -226,7 +228,7 @@ describe('corpGrantCoverage', () => {
   it('still blocks when a non-additive capability lacks a scope', () => {
     const coverage = corpGrantCoverage(corpCapabilities(['Accountant']), [MINING]);
     expect(coverage.blocking).toBe(true);
-    expect(coverage.missingScopes).toEqual([...WALLET_SCOPES, CONTRACTS]);
+    expect(coverage.missingScopes).toEqual([...WALLET_SCOPES, CONTRACTS, ORDERS]);
   });
 
   // Added after members already reached `ready` (#4607): lacking it must not hide the corp UI.

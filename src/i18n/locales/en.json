@@ -4572,6 +4572,7 @@
           "side": "Side",
           "price": "Price",
           "vsBest": "vs best",
+          "issuedBy": "Issued by",
           "expires": "Expires",
           "station": "Station"
         }
@@ -5087,7 +5088,13 @@
       "corpOrders": {
         "title": "Corp market orders",
         "description": "Open buy and sell orders, and the ISK held in escrow",
-        "empty": "This widget is coming soon."
+        "empty": "The corporation has no open market orders.",
+        "unit_one": "open order",
+        "unit_other": "open orders",
+        "escrow": "{{isk}} ISK in escrow",
+        "listed": "{{isk}} ISK listed",
+        "summary_one": "{{count}} open corp order, {{undercut}} undercut.",
+        "summary_other": "{{count}} open corp orders, {{undercut}} undercut."
       },
       "corpMembers": {
         "title": "Members",
