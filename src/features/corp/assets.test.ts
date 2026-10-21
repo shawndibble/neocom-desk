@@ -156,6 +156,7 @@ describe('toCorpAssetInputs', () => {
         locationId: 60003760,
         locationType: 'other',
         locationFlag: 'CorpSAG1',
+        isSingleton: false,
       },
       {
         itemId: 1002,
@@ -164,6 +165,7 @@ describe('toCorpAssetInputs', () => {
         locationId: 60003760,
         locationType: 'other',
         locationFlag: 'CorpSAG7',
+        isSingleton: false,
       },
     ]);
   });
