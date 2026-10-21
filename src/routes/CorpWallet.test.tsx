@@ -246,18 +246,7 @@ describe('Corp Wallet: the gate', () => {
     await findDivisions();
   });
 
-  it('is an entry in the Corp section nav for a Character who can read the wallet', async () => {
-    render(<App />);
-    await findDivisions();
-
-    const nav = screen.getByRole('navigation', { name: 'Corporation' });
-    expect(within(nav).getByRole('link', { name: 'Wallet' })).toHaveAttribute(
-      'href',
-      '/corp/wallet'
-    );
-  });
-
-  /** One level of tabs: the Corp sub-nav. The page switches its table with a view control. */
+  /** A page of its own, not a tab: it switches its table with a view control. */
   it('has no tab bar of its own', async () => {
     render(<App />);
     await findDivisions();

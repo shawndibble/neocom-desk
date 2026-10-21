@@ -11,6 +11,14 @@ describe('documentTitleFor', () => {
     expect(documentTitleFor('/mail', t)).toBe('Mail — Neocom Desk');
   });
 
+  it('titles each Corp page on its own, with no Corporation prefix', () => {
+    expect(documentTitleFor('/corp', t)).toBe('Corp Board — Neocom Desk');
+    expect(documentTitleFor('/corp/wallet', t)).toBe('Corp Wallet — Neocom Desk');
+    expect(documentTitleFor('/corp/assets', t)).toBe('Corp Assets — Neocom Desk');
+    expect(documentTitleFor('/corp/members', t)).toBe('Members — Neocom Desk');
+    expect(documentTitleFor('/corp/moons', t)).toBe('Moons — Neocom Desk');
+  });
+
   it('changes between two routes', () => {
     expect(documentTitleFor('/overview', t)).not.toBe(documentTitleFor('/assets', t));
   });

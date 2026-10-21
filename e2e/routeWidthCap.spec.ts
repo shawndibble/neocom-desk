@@ -1,5 +1,5 @@
 /**
- * Corp overview, Corp Members, Corp Assets and LP Store (#2195): the only
+ * Corp Board, Corp Members, Corp Assets and LP Store (#2195): the only
  * routes still rendering their root at `<main>`'s full flex-1 width instead
  * of the `mx-auto max-w-6xl` cap every other data route in the app applies
  * (scope decision `20260901-172427-app-wide-page-width.md`). One spec is

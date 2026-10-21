@@ -6,7 +6,7 @@
  * "which views does a kind have" and "can it be added" are answered in one
  * place. Titles and descriptions are i18n keys; the strings live in en.json.
  *
- * One table serves both boards (the Overview and the Corp overview): a kind
+ * One table serves both boards (the Overview and the Corp Board): a kind
  * names the boards it is offered on and its category on each. Ids are global,
  * so a corp-only kind's id never reuses a character kind's (`corpWallet`, not
  * `wallet`). Structures and Moon extractions sit on both.
@@ -27,7 +27,7 @@ export const KIND_CATEGORIES = [
   'messages',
 ] as const;
 
-/** The Corp overview's Gallery groups, in Gallery order. */
+/** The Corp Board's Gallery groups, in Gallery order. */
 export const CORP_KIND_CATEGORIES = [
   'corpClocks',
   'corpMoney',
@@ -49,7 +49,7 @@ export interface WidgetKindDef {
   id: WidgetKindId;
   titleKey: string;
   descKey: string;
-  /** Its Gallery group on the Overview, or on the Corp overview for a corp-only kind. */
+  /** Its Gallery group on the Overview, or on the Corp Board for a corp-only kind. */
   category: KindCategory;
   /** The boards that offer it, and its Gallery group on each. */
   boards: Partial<Record<BoardId, KindCategory>>;
@@ -81,7 +81,7 @@ const N: readonly WidgetView[] = ['number'];
 interface Spec {
   /** The Overview's Gallery group; absent for a corp-only kind. */
   category?: OverviewCategory;
-  /** The Corp overview's Gallery group; absent for a kind the Corp overview does not offer. */
+  /** The Corp Board's Gallery group; absent for a kind the Corp Board does not offer. */
   corp?: CorpCategory;
   /** Any one of these opens a corp kind. */
   capabilities?: readonly CorpCapability[];
@@ -327,7 +327,7 @@ const SPECS: Record<string, Spec> = {
     endpoints: ['getCharacterMailLabels', 'getCharacterMailHeaders'],
   },
 
-  // --- Corp overview only ----------------------------------------------------
+  // --- Corp Board only ----------------------------------------------------
   corpDeadlines: {
     corp: 'corpClocks',
     capabilities: ['canReadStructures', 'canReadMoonExtractions', 'canReadIndustry'],

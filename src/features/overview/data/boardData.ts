@@ -560,7 +560,7 @@ export interface MoonChunksBoardData {
   chunks: BoardClockSource[] | null;
   /**
    * The same drills as the corp board ranks them (arrival and natural decay
-   * both known), for the Corp overview's Due soon; absent when unreadable.
+   * both known), for the Corp Board's Due soon; absent when unreadable.
    */
   extractions?: BoardExtractionSource[];
   needsReauth: boolean;

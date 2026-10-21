@@ -1,5 +1,5 @@
 /**
- * The Corp overview's reads, loaded behind `import()` from `corpFeeds.ts`.
+ * The Corp Board's reads, loaded behind `import()` from `corpFeeds.ts`.
  *
  * **Gated before they fetch** (`features/corp/corpReadAccess.ts`): no corp call
  * at all unless the roles and grant cover it. CCP role-gates these endpoints

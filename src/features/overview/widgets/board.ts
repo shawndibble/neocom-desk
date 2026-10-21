@@ -1,5 +1,5 @@
 /**
- * Which widget board a grid belongs to: the Overview or the Corp overview. One
+ * Which widget board a grid belongs to: the Overview or the Corp Board. One
  * grid, edit bar, Gallery, menu and phone list serve both; what differs is read
  * here. The Overview is the default, so a surface with no provider (a test, the
  * Gallery preview, the login preview) behaves as it always has.
@@ -19,7 +19,7 @@ export interface WidgetBoard {
   id: BoardId;
   kinds: readonly WidgetKindDef[];
   categories: readonly KindCategory[];
-  /** The Corp overview hides a kind whose capability is not held: hide, never lock. */
+  /** The Corp Board hides a kind whose capability is not held: hide, never lock. */
   canDraw: (kind: WidgetKindDef) => boolean;
   /** Whether a widget's menu offers Header / All characters; corp data has one owner. */
   characterScope: boolean;

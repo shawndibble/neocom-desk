@@ -72,7 +72,7 @@ const kindFeeds: Record<string, readonly FeedId[]> = Object.fromEntries(
 /** Kind -> the feeds it reads. A kind absent here reads no feed and draws without data. */
 export const KIND_FEEDS: Readonly<Record<string, readonly FeedId[]>> = kindFeeds;
 
-/** Adds kinds that load with their own route (the Corp overview's); idempotent. */
+/** Adds kinds that load with their own route (the Corp Board's); idempotent. */
 export function registerKindDefs(defs: Readonly<Record<string, KindDef>>): void {
   for (const [kind, def] of Object.entries(defs)) {
     KINDS[kind] = def;

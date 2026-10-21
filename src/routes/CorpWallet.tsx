@@ -10,10 +10,10 @@ import { NO_NAMES } from '@/lib/emptyCollections';
  * decision reversing round 38 for Wallet.
  *
  * Gated like `/corp/members`: `useCorpRouteGate` with `canReadWallet`, so an
- * Accountant sees it and a Director with no wallet role does not, and the
- * `CorpSubNav` entry is hidden by the same capability.
+ * Accountant sees it and a Director with no wallet role does not, and its rail
+ * entry is hidden by the same capability.
  *
- * No tab bar of its own: the Corp sub-nav is the one level of tabs, so the
+ * No tab bar of its own: Corp Wallet is a page of its own, not a tab, so the
  * page is a strip of every division's balance (clicking one selects it) above
  * one table, switched between Journal and Transactions by a
  * `SegmentedControl` (`?view=`). Both reads load for the selected division
@@ -85,7 +85,6 @@ import {
   type WalletTransactionFilter,
 } from '@/features/character/walletTransactionFilter';
 import { CorpDenied } from '@/features/corp/CorpDenied';
-import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { CorpTransactionsPanel } from '@/features/corp/CorpTransactionsPanel';
 import { walletDivisions, type WalletDivision } from '@/features/corp/divisions';
 import { useActiveCorporationIdState } from '@/features/corp/owner';
@@ -616,7 +615,6 @@ function CorpWalletView() {
       >
         <PageHeader
           title={t('corp.wallet.title')}
-          subNav={<CorpSubNav flush />}
           actions={
             <IconButton
               icon={<Icon.Refresh />}

@@ -33,7 +33,6 @@ import { tabBarTabs, tabPath } from '@/lib/pageTabs';
 import { usePageTab } from '@/lib/usePageTab';
 import { formatAge } from '@/lib/age';
 import { CorpDenied } from '@/features/corp/CorpDenied';
-import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useCorpTaxBook } from '@/features/corp/taxBook/useCorpTaxBook';
 import { AuditFeed } from '@/features/corp/moons/AuditFeed';
@@ -109,7 +108,6 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           <PageHeader
             title={t('corp.moons.title')}
             meta={meta}
-            subNav={<CorpSubNav flush />}
             actions={
               <span className="flex items-center gap-1">
                 {tab === 'moon-owners' && canEdit && (
@@ -200,7 +198,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   if (state.status === 'denied') {
     return (
       <div className="mx-auto max-w-6xl space-y-4 p-4">
-        <PageHeader title={t('corp.moons.title')} subNav={<CorpSubNav flush />} />
+        <PageHeader title={t('corp.moons.title')} />
         <EmptyState
           title={t('corp.moons.noAccessTitle')}
           hint={state.message ?? t('corp.moons.noAccessHint')}
@@ -211,7 +209,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   if (state.status === 'off' && book.characterId !== null && book.corporationId !== null) {
     return (
       <div className="mx-auto max-w-6xl space-y-4 p-4">
-        <PageHeader title={t('corp.moons.title')} subNav={<CorpSubNav flush />} />
+        <PageHeader title={t('corp.moons.title')} />
         <MoonsSetup
           characterId={book.characterId}
           corporationId={book.corporationId}
@@ -227,7 +225,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   if (needsScope) {
     return (
       <div className="mx-auto max-w-6xl space-y-4 p-4">
-        <PageHeader title={t('corp.moons.title')} subNav={<CorpSubNav flush />} />
+        <PageHeader title={t('corp.moons.title')} />
         <EmptyState
           title={t('corpTaxBook.moons.scope.title')}
           hint={t('corpTaxBook.moons.scope.hint')}
@@ -285,7 +283,7 @@ export function CorpMoons() {
   if (!viewer && (ledger.state === 'unavailable' || ledger.state === 'unknown')) {
     return (
       <div className="mx-auto max-w-6xl space-y-4 p-4">
-        <PageHeader title={t('corp.moons.title')} subNav={<CorpSubNav flush />} />
+        <PageHeader title={t('corp.moons.title')} />
         <EmptyState title={t('corp.moons.noAccessTitle')} hint={t('corp.moons.noAccessHint')} />
       </div>
     );

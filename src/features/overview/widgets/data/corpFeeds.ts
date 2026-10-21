@@ -1,5 +1,5 @@
 /**
- * The Corp overview's own reads: their shapes, and thin loaders that pull the
+ * The Corp Board's own reads: their shapes, and thin loaders that pull the
  * real work in behind `import()` (`corpFeedLoaders.ts`), like the structure
  * and moon reads in `../../data/boardData.ts`. The corp reads, role checks and
  * engines are for the few pilots with corp roles; the Overview's first paint

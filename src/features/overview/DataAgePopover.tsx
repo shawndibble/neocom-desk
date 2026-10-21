@@ -41,7 +41,7 @@ export function DataAgePopover({
   breakdown: readonly FetchRow[];
   now: number;
   onRefresh: () => void;
-  /** A line about how fresh the data can be at all (the Corp overview's hourly cache). */
+  /** A line about how fresh the data can be at all (the Corp Board's hourly cache). */
   note?: string;
 }) {
   const { t } = useTranslation();

@@ -229,7 +229,7 @@
 // Supersedes the two Overview keys above, which stay on the list to seed a
 // returning pilot's first layout. No `legacyKey`: new.
 //
-// sync.corpOverviewLayout: the Corp overview's widget grid, the same shape and
+// sync.corpOverviewLayout: the Corp Board's widget grid, the same shape and
 // parse as sync.overviewLayout (features/overview/widgets/layoutStore.ts), one
 // value for the whole account rather than per corporation or per Character.
 // Absent means "never edited": the page then draws the full default and does
