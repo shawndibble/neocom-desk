@@ -1,33 +1,14 @@
 /**
- * Corp assets, grouped division-first (issue #330), now onto the same
- * virtualized tree engine `/assets` uses (issue #779).
- *
- * Round 41/44 (GLOSSARY.md) rejected reusing `engine/assetTree.ts`: division
- * lives in `location_flag` (`CorpSAG1`..`CorpSAG7`), which has no `item_id`
- * to key a URL segment on, and that engine had no grouping level between a
- * station and a container to express it. That reasoning didn't account for
- * the fact the tree engine already solves an identical problem for bay
- * nodes — grouped by `location_flag`, addressed by kind rather than an asset
- * id it doesn't have (`AssetTreeBayNode`, `assetNodeSegment`'s `b:${bay}`).
- * `buildAssetGroups` (`engine/assetTree.ts`) generalizes exactly that
- * mechanism to an arbitrary top-level grouping, so this module is now a thin
- * division-shaped adapter over it rather than its own flat implementation —
- * see `docs/context/decisions/` for the decision reversing round 41/44.
+ * Corp asset types and the `location_flag` -> group mapping `engine/industry/ownedStock.ts`
+ * still reads. The division-first tree this module once built was replaced by the inventory
+ * ledger (`assetLedger.ts`, issue #4671).
  *
  * Pure (CLAUDE.md): no `fetch`/DOM/Dexie import, and no `@/esi/endpoints`
  * import either — `features/corp/assets.ts` adapts ESI's `CorporationAsset`
- * (snake_case, extra fields this grouping never uses) into `CorpAssetInput`
- * at the boundary, the same split `engine/corp/members.ts` makes for
- * `MemberActivity`.
+ * into `CorpAssetInput` at the boundary.
  */
-import {
-  buildAssetGroups,
-  nodeContribution,
-  type AssetTreeContainerNode,
-  type AssetTreeGroup,
-  type AssetTreeNode,
-  type EngineAsset,
-} from '../assetTree';
+
+import type { EngineAsset } from '../assetTree';
 
 /** The seven hangar divisions every corporation has, in order. */
 export const HANGAR_DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
@@ -50,25 +31,6 @@ export type CorpAssetFlagKind = 'officeFolder' | 'corpDeliveries' | 'impounded' 
  * corporation own" (GLOSSARY.md round 44).
  */
 export type CorpAssetGroupId = HangarDivisionNumber | CorpAssetFlagKind | 'other';
-
-/** Fixed display order for the flag groups, applied after the seven divisions. */
-const FLAG_GROUP_ORDER: readonly CorpAssetFlagKind[] = [
-  'officeFolder',
-  'corpDeliveries',
-  'impounded',
-  'assetSafety',
-];
-
-/**
- * Every `CorpAssetGroupId` this module knows about, in the fixed order
- * `buildCorpAssetTree` and `engine/corp/assetPath.ts`'s URL parser both need
- * — an 8th division or a new flag kind then only has to be added here.
- */
-export const ALL_CORP_ASSET_GROUP_IDS: readonly CorpAssetGroupId[] = [
-  ...HANGAR_DIVISIONS,
-  ...FLAG_GROUP_ORDER,
-  'other',
-];
 
 const HANGAR_FLAG_PATTERN = /^CorpSAG([1-7])$/;
 
@@ -98,154 +60,4 @@ export interface CorpAssetInput {
   isBlueprintCopy?: boolean;
   /** ESI `is_singleton`: assembled (true) vs packaged (false). Absent when the source does not say. */
   isSingleton?: boolean;
-}
-
-function toEngineAsset(asset: CorpAssetInput): EngineAsset {
-  return {
-    item_id: asset.itemId,
-    type_id: asset.typeId,
-    quantity: asset.quantity,
-    location_id: asset.locationId,
-    location_type: asset.locationType,
-    location_flag: asset.locationFlag,
-    ...(asset.isBlueprintCopy ? { is_blueprint_copy: true } : {}),
-  };
-}
-
-/**
- * Sentinel `location_flag` for the synthetic node `buildCorpAssetTree` wraps
- * an office's contents in, keyed on the station/structure the office sits
- * at — never a real ESI flag, so it can never collide with one on the wire.
- */
-export const CORP_ASSET_LOCATION_FLAG = '__corp-asset-location__';
-
-/** The station/structure id a location-wrapper node stands for, or null for any other node. */
-export function corpAssetLocationId(node: AssetTreeNode): number | null {
-  return node.kind !== 'bay' && node.asset.location_flag === CORP_ASSET_LOCATION_FLAG
-    ? -node.asset.item_id
-    : null;
-}
-
-function locationNode(
-  stationId: number,
-  children: AssetTreeNode[],
-  priceByTypeId: ReadonlyMap<number, number>,
-  copyValueByItemId: ReadonlyMap<number, number>
-): AssetTreeContainerNode {
-  let itemCount = 0;
-  let estimatedValue = 0;
-  for (const child of children) {
-    const contribution = nodeContribution(child, priceByTypeId, copyValueByItemId);
-    itemCount += contribution.itemCount;
-    estimatedValue += contribution.estimatedValue;
-  }
-  return {
-    kind: 'container',
-    asset: {
-      // Negated: real item ids are always positive, so this can never
-      // collide with a sibling asset's — segment/React keys are item_id alone.
-      item_id: -stationId,
-      type_id: 0,
-      quantity: 0,
-      location_id: stationId,
-      location_type: 'station',
-      location_flag: CORP_ASSET_LOCATION_FLAG,
-    },
-    children,
-    itemCount,
-    estimatedValue,
-  };
-}
-
-/**
- * Wraps a group's office-derived roots by station. `buildAssetGroups` has
- * no such level — it groups roots by `groupIdFor` once and stops — so this
- * runs once more after, over roots already sorted into their real division.
- * A root that didn't come through an office stays exactly where
- * `buildAssetGroups` put it, unwrapped.
- */
-function withLocationLevels(
-  group: AssetTreeGroup<CorpAssetGroupId>,
-  stationIdByItemId: ReadonlyMap<number, number>,
-  priceByTypeId: ReadonlyMap<number, number>,
-  copyValueByItemId: ReadonlyMap<number, number>
-): AssetTreeGroup<CorpAssetGroupId> {
-  const byStation = new Map<number, AssetTreeNode[]>();
-  const direct: AssetTreeNode[] = [];
-
-  for (const node of group.children) {
-    const stationId = node.kind === 'bay' ? undefined : stationIdByItemId.get(node.asset.item_id);
-    if (stationId === undefined) {
-      direct.push(node);
-      continue;
-    }
-    const list = byStation.get(stationId) ?? [];
-    list.push(node);
-    byStation.set(stationId, list);
-  }
-
-  if (byStation.size === 0) return group;
-
-  const locationNodes = [...byStation.entries()]
-    .sort(([a], [b]) => a - b)
-    .map(([stationId, stationChildren]) =>
-      locationNode(stationId, stationChildren, priceByTypeId, copyValueByItemId)
-    );
-
-  return { ...group, children: [...locationNodes, ...direct] };
-}
-
-/**
- * The corp assets tree: divisions/flag groups as `buildAssetGroups`' top
- * axis, exactly `ALL_CORP_ASSET_GROUP_IDS`'s order. The seven hangar
- * divisions are always present even when empty ("seven hangar divisions as
- * the top axis" — the issue); the flag groups and `other` are the opposite,
- * appearing only when the corporation actually has something in them
- * (GLOSSARY.md round 44). Beneath each root, a container/ship/bay recurses
- * exactly as `/assets`' own tree does — a container placed in a division
- * shows its contents nested inside it, not flag-bucketed separately.
- *
- * An office is a pass-through, not a bucket: it holds nothing of its own, so
- * its own row is dropped before grouping rather than bucketed under
- * `'officeFolder'` the way every other root would be. Its children keep
- * their own `location_id` pointing at the now-absent office item id, which
- * is exactly the condition `buildAssetGroups`' own orphan-rescue pass
- * already promotes to a root of its own — grouped by *its* real `CorpSAGn`
- * flag, which `buildNode` never reads at the top level otherwise. Each
- * promoted root is then wrapped in a location node named for the office's
- * own station, by `withLocationLevels`.
- */
-export function buildCorpAssetTree(
-  inputs: readonly CorpAssetInput[],
-  priceByTypeId: ReadonlyMap<number, number> = new Map(),
-  copyValueByItemId: ReadonlyMap<number, number> = new Map()
-): AssetTreeGroup<CorpAssetGroupId>[] {
-  const officeStationByItemId = new Map<number, number>();
-  for (const input of inputs) {
-    if (input.locationFlag === 'OfficeFolder') {
-      officeStationByItemId.set(input.itemId, input.locationId);
-    }
-  }
-
-  const stationIdByItemId = new Map<number, number>();
-  const passThroughAssets: EngineAsset[] = [];
-  for (const input of inputs) {
-    if (input.locationFlag === 'OfficeFolder') continue;
-    const stationId = officeStationByItemId.get(input.locationId);
-    if (stationId !== undefined) stationIdByItemId.set(input.itemId, stationId);
-    passThroughAssets.push(toEngineAsset(input));
-  }
-
-  const groups = buildAssetGroups(
-    passThroughAssets,
-    ALL_CORP_ASSET_GROUP_IDS,
-    new Set(HANGAR_DIVISIONS),
-    (asset) => corpAssetGroupId(asset.location_flag),
-    priceByTypeId,
-    copyValueByItemId
-  );
-
-  return groups.map((group) =>
-    withLocationLevels(group, stationIdByItemId, priceByTypeId, copyValueByItemId)
-  );
 }

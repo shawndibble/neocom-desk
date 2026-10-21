@@ -64,7 +64,7 @@ export function loadCorporationAssets(
  * carries through for the ledger (`assetLedger.ts`); the tree engine tells a
  * container from a leaf by whether anything else's `location_id` points at
  * it, not by this flag. `location_type` carries through too:
- * `buildCorpAssetTree` (issue #779) needs it to tell a division's own top-level roots from an asset nested
+ * the ledger needs it to tell a division's own top-level roots from an asset nested
  * inside a container placed in one, and `is_blueprint_copy` does too, so a
  * copy is valued on its own rather than at its original's type price.
  */

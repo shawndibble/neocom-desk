@@ -291,6 +291,12 @@ describe('buildItemLedger', () => {
       expect(bpc.stock).toBeNull();
     });
 
+    it('uses a stock evaluation the caller already made', () => {
+      const stock = evaluateStockTargets(targets, classified.items);
+      const rows = buildItemLedger(classified.items, { ...opts, targets, stock });
+      expect(rows.find((r) => r.typeId === 999)?.stock).toBe(stock.get(999));
+    });
+
     it('evaluates stock against everything, even when the rows are filtered', () => {
       const rows = buildItemLedger(classified.items, {
         ...opts,

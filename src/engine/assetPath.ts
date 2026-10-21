@@ -53,9 +53,7 @@ export interface AssetTreeWalkResult {
  * first segment the tree cannot match and reporting that segment and
  * everything after it as unresolved. The part of path resolution that has
  * nothing to do with *how* a caller names its top level (a station id for
- * `/assets`, a division/flag group id for `/corp/assets` — see
- * `engine/corp/assetPath.ts`) — both share this walk and its unresolved-segment
- * contract.
+ * `/assets`) and its unresolved-segment contract.
  */
 export function walkAssetTreeSegments(
   startChildren: readonly AssetTreeNode[],

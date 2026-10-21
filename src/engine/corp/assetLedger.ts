@@ -296,6 +296,11 @@ export interface ItemLedgerRow {
 export interface ItemLedgerOptions extends LedgerValuation {
   filter?: LedgerFilter;
   targets?: ReadonlyMap<number, number>;
+  /**
+   * `evaluateStockTargets(targets, items)` already computed by the caller (the
+   * page also needs it for the Below target filter); computed here when absent.
+   */
+  stock?: ReadonlyMap<number, StockTargetStatus>;
 }
 
 function placementKey(s: LedgerStack): string {
@@ -313,9 +318,9 @@ export function buildItemLedger(
   options: ItemLedgerOptions
 ): ItemLedgerRow[] {
   const { filter, targets } = options;
-  const stock = targets
-    ? evaluateStockTargets(targets, items)
-    : new Map<number, StockTargetStatus>();
+  const stock =
+    options.stock ??
+    (targets ? evaluateStockTargets(targets, items) : new Map<number, StockTargetStatus>());
 
   const rows = new Map<string, ItemLedgerRow>();
   const placements = new Map<string, Map<string, LedgerPlacement>>();

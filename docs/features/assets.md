@@ -2,7 +2,7 @@
 
 Route `/assets/*` (`src/routes/Assets.tsx`): tabs Items (`/assets/items`, drill-down `/assets/items/:stationId/*`), Ships (`/assets/ships`, `features/assets/MyShipsView.tsx`) and Move (`/assets/move`, `features/assets/MovePlanTab.tsx`). Economy nav group, mobile tab (`src/app/navDestinations.ts:205`). A tabbed page (`ASSETS_TABS`, Items is `deep`): depth is drill-down in the URL path below Items. Old `/assets/<id>/…` and `/assets?view=ships` redirect via `legacyAssetsLocation`. Read-only, cached for offline. Terms per `GLOSSARY.md`: **Quickbar**, **Compare Set**, **Station Pin**, **Jump Basis**, **BPO/BPC**, **Character filter**.
 
-Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) reuse the same row components and tree engine; pointer only, see end.
+Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) are a separate inventory ledger now (#4671); pointer only, see end.
 
 ## Summary
 
@@ -188,7 +188,7 @@ Item name link: `ItemInfoLink` → opens Show info (`?info=type-<id>` modal, `fe
 
 - Command Palette: "Assets" group lists every owned type once (summed across Characters, cache-only, no request) → `/assets/items?q=<name>` (adds `chars=all` if an alt holds it, `assetsProvider.ts:78`).
 - Industry Build Plans read all Characters' assets for owned stock (`loadAllCharactersAssets`, `assets.ts`); Fittings reads asset ships.
-- Corp assets `/corp/assets` (`routes/CorpAssets.tsx`, `engine/corp/assetDivisions.ts`): division-first; `LocationRow` hides pin there (`showPin`). Pointer only.
+- Corp assets `/corp/assets` (`routes/CorpAssets.tsx`): an inventory ledger since #4671, no longer a division tree; see `docs/features/corp.md` section 4 and `20261021-163150-corp-assets-is-an-inventory-ledger-not-a.md`. Pointer only.
 
 ## Observed gaps (facts from code)
 
@@ -224,7 +224,7 @@ Item name link: `ItemInfoLink` → opens Show info (`?info=type-<id>` modal, `fe
 - Jumps away on locations, bounded fan-out: `docs/context/decisions/20260831-230742-jumps-away-ships-for-the-assets-page-distinct.md`.
 - Item columns at item rows only: `20260926-203503-assets-item-columns-ship-at-item-rows-only.md`.
 - BPC value from contract listings (0 without a listing): `20260930-120122-asset-value-prices-blueprint-copies-from-contract-listings.md`.
-- Corp assets reuse the engine: `20260903-162701-corp-assets-are-registered-and-assets-gets-no.md`, `20260910-152158`.
+- Corp assets reuse the engine: `20260903-162701-corp-assets-are-registered-and-assets-gets-no.md`, `20260910-152158` (both reversed by `20261021-163150-corp-assets-is-an-inventory-ledger-not-a`).
 - Character filter placement: `20260908-192806`.
 - Use-assets in Build Plans (readers of the same assets): `20261003-203239-use-all-fills-every-row-its-use-assets.md`.
 - Drill-down in the URL so Back steps up: `src/engine/assetPath.ts:1-14`.
@@ -303,6 +303,6 @@ Interview Qs: **Why does Show info keep working offline?** It does not fully: ty
 Full spec in `docs/features/corp.md` section 4. What it shares with Assets and where it differs (all verified in code):
 
 - Shared: `ItemRow`, `ContainerRow`, `LocationRow`, `SectionHeading` (`assetBrowserRows.tsx`), tree engine `engine/assetTree.ts` (`buildAssetGroups`, `assetTree.ts:292-381`), `ItemContextMenu`, selection helpers (`assetSelection.ts`), CSV shape (Location, Item, Quantity), 250 ms search debounce, URL `q`, virtualized rows.
-- Different: top level is a group (hangar division or special flag) not a station, via `engine/corp/assetDivisions.ts` and `engine/corp/assetPath.ts`; `LocationRow` is rendered with `showPin={false}` and no security/jumps (`CorpAssets.tsx:805-818`); no cross-character merge, no All-items toggle, no min-value filter, no route/jumps selects (`CorpAssets.tsx:20-30` header comment); item menu has `blueprintTypeID={null}` so Build Plan is permanently "No blueprint options" and the blueprint catalog never loads (`:29`); blueprint copy values only if `canReadBlueprints`.
+- Different: no tree at all. `/corp/assets` is an inventory ledger (state tabs, by item / by location, stock targets) over `engine/corp/assetLedger.ts`; it shares only the item-name link, BPO/BPC badge and item menu with `/assets`, and has no cross-character merge or pin (details in `corp.md` section 4).
 - Gating: `canReadAssets` capability (Director) hides the destination when absent (`navDestinations.ts:141`, `CorpDenied`). Scope `esi-assets.read_corporation_assets.v1` + divisions scope (`corp.md` access model). Route `UNGATED` with capability gate instead (`routeScopes.ts:156-165`).
-- Decision: `20260903-162701-corp-assets-are-registered-and-assets-gets-no`, `20260903-212133-corp-assets-division-first`, `20260910-152158-corp-assets-rejoin-the-shared-tree-engine-via`.
+- Decision: `20260903-162701-corp-assets-are-registered-and-assets-gets-no`, `20260903-212133-corp-assets-division-first`, `20260910-152158-corp-assets-rejoin-the-shared-tree-engine-via`; all reversed by `20261021-163150-corp-assets-is-an-inventory-ledger-not-a`.
