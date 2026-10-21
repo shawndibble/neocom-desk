@@ -45,6 +45,15 @@ closed classes 1-3 or intel/dev infra; Slipway Jobs view + slot deduction is
 already Active Jobs / job-slot count), Pod Warden (native PI/skill/order/in-game-
 notification push app — PI alerts covered by kill-tests 12/17 and ADR 0020),
 Isktracker - Incursions (unexamined, non-pipeline).
+JitaSpace (jita.space, MIT, live: Next.js companion with mail, assets, wallet, orders,
+contracts, calendar, LP store, travel, fittings, skills, SDE/dogma explorer and
+SDE build-diff history — no industry or PI; every pipeline-adjacent page is
+already Mail/Assets/Wallet/Contracts/Calendar/Loyalty Store/Travel; incursions
+are #3540-3542; killmail and ship-scan pages die on decisions/kill-test 2). Its
+issues/PRs (#748-897, all read) hold no other pipeline idea: LP-store
+affordability and LP-held filters ship (LoyaltyOfferFilterBar), Variations is
+variation/meta compare, public-contract model and sov/incursion history are
+server-side crawls (kill-test 1), the rest is themes, perf and SDE-ingest chores.
 
 **Remit widened (#2328, decision `20260929-234357`): intel and travel tools are
 in scope** — route safety (kills/jumps along a route), Thera/Turnur connections
@@ -363,6 +372,11 @@ of pricing them as 1 (Janice #34/#28/#22).
 ## Killed / dropped candidates (never filed)
 
 Grouped by the test that killed them; the reason is what stops a re-pitch.
+
+- **Ship insurance price/payout lookup** (JitaSpace #860/#866): ESI
+  `/insurance/prices` is public but the payout is a fixed fraction of a hull base
+  value; the player pays one premium per ship. Not an ISK-pipeline step; the
+  Production Log already takes a manual `insurancePayout`.
 
 - **Hull demand board** (ForgeWire Predictions): needs a new killmail ingest job and archive dependency while Functions are not auto-deployed; popular fits and route safety read zKillboard client-side by decision; loss rate is an input, not a build decision Opportunities/Market don't already make.
 - **Structured WTS/WTB listing board** (TradeRelay, early test, no replies): a cross-player listing book needs a server holding every user's listings — the cross-player aggregation wall in a local-first PWA. Settlement is plain EVE contracts, which the app already reads.
