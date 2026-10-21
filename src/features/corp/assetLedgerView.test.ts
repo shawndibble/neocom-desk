@@ -120,6 +120,9 @@ describe('buildLocationRows', () => {
     // The office has no matching stack, so it lists nothing; it is not flagged empty.
     expect(rows.some((r) => r.groupKey === 'office:500')).toBe(false);
     expect(rows.find((r) => r.groupKey === 'office:600')?.groupEmpty).toBe(true);
+    expect(
+      buildLocationRows(filtered, { ...base, tab: 'all', filtered: true }).map((r) => r.groupKey)
+    ).toEqual(['place:impounded:500']);
     expect(usage.get(500)).toEqual({ isEmpty: false, divisionsInUse: 1 });
   });
 

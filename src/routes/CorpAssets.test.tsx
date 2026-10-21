@@ -495,10 +495,11 @@ describe('group by location', () => {
     expect(order().at(-1)).toContain('Corp deliveries');
   });
 
-  it('does not call an office empty because the search matched nothing in it', async () => {
+  it('hides every group with no match under a filter, empty offices included', async () => {
     await ledger('/corp/assets?group=location&q=zzz');
-    await screen.findByText('Empty office');
-    expect(screen.getAllByText('Empty office')).toHaveLength(1);
+    expect(await screen.findByText('Nothing matches')).toBeInTheDocument();
+    // A filter hides every group with no matching row, empty offices included.
+    expect(screen.queryByText('Empty office')).not.toBeInTheDocument();
     expect(screen.queryByText('Jita IV - Moon 4')).not.toBeInTheDocument();
   });
 

@@ -209,9 +209,11 @@ export function buildLocationRows(
     division: HangarDivisionNumber | null;
     labels: LedgerLabels;
     usage: ReadonlyMap<number, OfficeUsage>;
+    /** A search, Category, Below target, `loc` or `div` filter is on: groups with no matching row are left out, empty offices included. */
+    filtered?: boolean;
   }
 ): LocationRow[] {
-  const { tab, locationId, division, labels, usage } = options;
+  const { tab, locationId, division, labels, usage, filtered = false } = options;
   const groups: LocationRow[][] = [];
 
   for (const office of ledger.offices) {
@@ -263,6 +265,7 @@ export function buildLocationRows(
     if (
       rows.length === 0 &&
       info.isEmpty &&
+      !filtered &&
       (tab === 'all' || tab === 'offices') &&
       division === null
     ) {

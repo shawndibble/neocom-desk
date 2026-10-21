@@ -399,6 +399,12 @@ function CorpAssetsView({
     const ledger = buildLocationLedger({ ...classified, items }, valuation);
     return buildLocationRows(ledger, {
       usage: officeUsageWhole,
+      filtered:
+        query !== '' ||
+        params.cat !== null ||
+        params.below ||
+        params.loc !== null ||
+        params.div !== null,
       tab,
       locationId: params.loc,
       division: (params.div ?? null) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | null,
