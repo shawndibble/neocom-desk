@@ -16,6 +16,7 @@ import {
   startsRemovalClock,
   summarize,
   type MailQueueItem,
+  removalNoticeStillDue,
 } from './mailQueue';
 
 function item(n: number, patch: Partial<MailQueueItem> = {}): MailQueueItem {
@@ -250,5 +251,38 @@ describe('removal notices (#4617)', () => {
       ['m2', 99],
       ['m3', 99],
     ]);
+  });
+});
+
+describe('removalNoticeStillDue (#4621)', () => {
+  const notice = (patch: Partial<MailQueueItem> = {}) =>
+    item(1, { kind: 'removal', feederCorporationId: 98000002, removalStartedAt: 500, ...patch });
+  it('sends while the same removal is still pending', () => {
+    expect(
+      removalNoticeStillDue(notice(), { status: 'pending-removal', removal: { startedAt: 500 } })
+    ).toBe(true);
+  });
+  it('drops it once cancelled, ended or disconnected, by anyone', () => {
+    for (const status of ['active', 'removed', 'left', 'disconnected']) {
+      expect(removalNoticeStillDue(notice(), { status })).toBe(false);
+    }
+    expect(removalNoticeStillDue(notice(), undefined)).toBe(false);
+  });
+  it('drops a notice for an earlier removal when a new one started', () => {
+    expect(
+      removalNoticeStillDue(notice(), { status: 'pending-removal', removal: { startedAt: 900 } })
+    ).toBe(false);
+  });
+  it('an item queued before the removal was recorded on it only needs a pending removal', () => {
+    expect(
+      removalNoticeStillDue(notice({ removalStartedAt: undefined }), {
+        status: 'pending-removal',
+        removal: { startedAt: 900 },
+      })
+    ).toBe(true);
+  });
+  it('never holds back any other kind of mail', () => {
+    expect(removalNoticeStillDue(item(1), undefined)).toBe(true);
+    expect(removalNoticeStillDue(item(1, { kind: 'removalCancelled' }), undefined)).toBe(true);
   });
 });

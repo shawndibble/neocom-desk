@@ -51,14 +51,20 @@ const displayDate = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' });
 
 const DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
-const RATE_SCOPES = ['corp', 'guest', 'miner', 'moon'] as const;
+const RATE_SCOPES = ['corp', 'guest', 'miner', 'moon', 'structure'] as const;
 
-function rateLabel(rate: TaxRate, character: (minerId: string) => string): string {
+function rateLabel(
+  rate: TaxRate,
+  character: (minerId: string) => string,
+  refinery: (structureId: number) => string
+): string {
   switch (rate.scope) {
     case 'miner':
       return character(rate.minerId);
     case 'moon':
       return `Moon ${rate.moonId}`;
+    case 'structure':
+      return refinery(rate.structureId);
     case 'record':
       return rate.recordKey;
     default:
@@ -68,7 +74,7 @@ function rateLabel(rate: TaxRate, character: (minerId: string) => string): strin
 
 /**
  * The book's settings (D21: from the page header's gear): the dated rates
- * (corp default, Guest default, per-Miner, per-moon), hub and Ore Form, grace,
+ * (corp default, Guest default, per-Miner, per-moon, per-refinery), hub and Ore Form, grace,
  * minimum Statement, Overdue days, divisions, cadence, chunk rate, per-structure
  * expiry and the dismissal approval limit. A rate is never retroactive, so a
  * new one starts today or later; everything else saves as one patch.
@@ -103,6 +109,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
   const [rateScope, setRateScope] = useState<(typeof RATE_SCOPES)[number]>('corp');
   const [rateMiner, setRateMiner] = useState('');
   const [rateMoon, setRateMoon] = useState('');
+  const [rateRefinery, setRateRefinery] = useState('');
   const [ratePct, setRatePct] = useState('');
   const today = new Date().toISOString().slice(0, 10);
   const [rateFrom, setRateFrom] = useState(today);
@@ -114,6 +121,14 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
   const moons = useMemo(
     () => [...new Set(view.input.extractions.map((x) => x.moonId))],
     [view.input.extractions]
+  );
+  // Every refinery the book reads, a moon owner's included: its rows never carry a moon (#4621).
+  const refineries = useMemo(
+    () =>
+      [...new Set([...structures, ...view.input.entries.map((e) => e.structureId)])].sort(
+        (a, b) => a - b
+      ),
+    [structures, view.input.entries]
   );
   const minerName = (id: string) => {
     const m = view.miners.find((x) => x.id === id);
@@ -166,7 +181,9 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
           ? { scope: 'miner', minerId: rateMiner, ...base }
           : rateScope === 'moon'
             ? { scope: 'moon', moonId: Number(rateMoon), ...base }
-            : { scope: rateScope, ...base };
+            : rateScope === 'structure'
+              ? { scope: 'structure', structureId: Number(rateRefinery), ...base }
+              : { scope: rateScope, ...base };
       await edit({ action: 'addRate', rate });
       setRatePct('');
     });
@@ -177,7 +194,8 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
     Number(ratePct) <= 100 &&
     rateFrom >= today &&
     (rateScope !== 'miner' || rateMiner !== '') &&
-    (rateScope !== 'moon' || rateMoon !== '');
+    (rateScope !== 'moon' || rateMoon !== '') &&
+    (rateScope !== 'structure' || rateRefinery !== '');
   const rates = [...settings.rates]
     .filter((r): r is Exclude<TaxRate, { scope: 'record' }> => r.scope !== 'record')
     .sort(
@@ -216,12 +234,13 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
           <ul className="divide-y divide-line">
             {rates.map((r) => (
               <li
-                key={`${r.scope}-${'minerId' in r ? r.minerId : ''}-${'moonId' in r ? r.moonId : ''}-${r.effectiveFrom}`}
+                key={`${r.scope}-${'minerId' in r ? r.minerId : ''}-${'moonId' in r ? r.moonId : ''}-${'structureId' in r ? r.structureId : ''}-${r.effectiveFrom}`}
                 className="flex flex-wrap justify-between gap-2 py-1.5"
               >
                 <span>
                   {t(`corpTaxBook.moons.settings.rateScope.${r.scope}`)}
-                  {rateLabel(r, minerName) && ` · ${rateLabel(r, minerName)}`}
+                  {rateLabel(r, minerName, names.refinery) &&
+                    ` · ${rateLabel(r, minerName, names.refinery)}`}
                 </span>
                 <span className="tabular-nums text-text-dim">
                   {r.pct}% ·{' '}
@@ -284,6 +303,25 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
                       {moons.map((m) => (
                         <SelectItem key={m} value={String(m)}>
                           {names.moon(m)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Label>
+              )}
+              {rateScope === 'structure' && (
+                <Label text={t('corpTaxBook.moons.settings.rateScope.structure')}>
+                  <Select value={rateRefinery} onValueChange={setRateRefinery}>
+                    <SelectTrigger
+                      aria-label={t('corpTaxBook.moons.settings.rateScope.structure')}
+                      className="w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {refineries.map((id) => (
+                        <SelectItem key={id} value={String(id)}>
+                          {names.refinery(id)}
                         </SelectItem>
                       ))}
                     </SelectContent>

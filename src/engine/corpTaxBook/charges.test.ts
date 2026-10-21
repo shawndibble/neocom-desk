@@ -112,3 +112,24 @@ describe('buildDayCharges per-feeder tier', () => {
     ]);
   });
 });
+
+describe('buildDayCharges per-refinery tier (#4621)', () => {
+  it('prices a moon owner refinery with no moon at its own refinery rate', () => {
+    const refineryRates: TaxRate[] = [
+      ...rates,
+      { scope: 'feeder', feederId: 98000077, pct: 7, effectiveFrom: '2026-01-01' },
+      { scope: 'structure', structureId: 1003, pct: 4, effectiveFrom: '2026-01-01' },
+    ];
+    const { charges } = buildDayCharges(
+      [
+        entry({ structureId: 1002, sourceCorporationId: 98000077 }),
+        entry({ structureId: 1003, sourceCorporationId: 98000077 }),
+      ],
+      { ...book, rates: refineryRates }
+    );
+    expect(charges.map((c) => [c.structureId, c.taxPct, c.rateScope])).toEqual([
+      [1002, 7, 'feeder'],
+      [1003, 4, 'structure'],
+    ]);
+  });
+});

@@ -26,6 +26,7 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import {
   hubForPayee,
   loadDatedUnitPricesByHub,
+  moonOwnerPricesAtHubOnDate,
   pricesAtHubOnDate,
   sourcesAtHubOnDate,
 } from '@/features/miningTax/pricing';
@@ -66,6 +67,7 @@ type Fetched =
       verdict: OfficerVerdict;
       data: BookData;
       pricesOn: BookViewInput['pricesOn'];
+      moonOwnerPricesOn: NonNullable<BookViewInput['moonOwnerPricesOn']>;
     };
 
 export type CorpBookState =
@@ -156,6 +158,9 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
             const day = priceDay(prices, data.settings.hubId, date);
             return day.prices.size > 0 ? day : priceDay(prices, data.settings.hubId, loadedOn);
           },
+          // No fallback day: the moon owner's page prices an unsaved day at 0, so this does too.
+          moonOwnerPricesOn: (date) =>
+            moonOwnerPricesAtHubOnDate(prices, hubForPayee(data.settings.hubId).id, date),
         });
       } catch (error) {
         if (cancelled) return;
@@ -263,6 +268,7 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
       extractions: data.state.extractions,
       paidStatementIds: data.state.paidStatementIds,
       pricesOn: fetched.pricesOn,
+      moonOwnerPricesOn: fetched.moonOwnerPricesOn,
       memberIds,
       surveyOreLines,
     });

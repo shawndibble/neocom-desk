@@ -56,6 +56,7 @@ import {
 } from './corpTaxBook.js';
 import {
   esiCorporationCeoLookup,
+  esiIdCategoryLookup,
   esiCorporationLookup,
   esiIdentityReader,
 } from './corpTaxBookEsi.js';
@@ -759,7 +760,12 @@ export const requestCorpTaxBookFeederRateCallable = onCall<unknown>(
 export const setCorpTaxBookFeederPayeeCallable = onCall<unknown>(
   { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
   (request) =>
-    setFeederPayee(corpSyncDeps(), callerOf(request), parseSetFeederPayeeInput(request.data))
+    setFeederPayee(
+      corpSyncDeps(),
+      callerOf(request),
+      parseSetFeederPayeeInput(request.data),
+      esiIdCategoryLookup()
+    )
 );
 
 export const dismissCorpTaxBookFeederHistoryCallable = onCall<unknown>(

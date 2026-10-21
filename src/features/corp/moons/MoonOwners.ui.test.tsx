@@ -144,7 +144,12 @@ const feeder = (corporationId: number, over: Partial<BookFeeder> = {}): BookFeed
   ...over,
 });
 
-function renderBook(ui: ReactElement, feeders: BookFeeder[], path = '/corp/moons/moon-owners') {
+function renderBook(
+  ui: ReactElement,
+  feeders: BookFeeder[],
+  path = '/corp/moons/moon-owners',
+  over: Partial<BookViewInput> = {}
+) {
   const input: BookViewInput = {
     corporationId: BOOK,
     now: '2026-10-20T12:00:00Z',
@@ -169,6 +174,7 @@ function renderBook(ui: ReactElement, feeders: BookFeeder[], path = '/corp/moons
     extractions: [],
     paidStatementIds: new Set(),
     pricesOn: () => ({ prices: new Map([[ORE, 100]]), sources: new Map() }),
+    ...over,
   };
   const reload = vi.fn();
   render(
@@ -223,6 +229,16 @@ describe('MoonOwnersTab', () => {
     expect(within(table).getByText("Can't read ledger")).toBeInTheDocument();
     // 1000 ore at 100 ISK, 8%: whole ISK.
     expect(within(table).getByText(/8,000/)).toBeInTheDocument();
+  });
+
+  it("owes what the moon owner's own page shows: its prices, not the miner line's (#4621)", () => {
+    renderBook(<MoonOwnersTab />, [feeder(ASH, { agreedRatePct: 8 })], '/corp/moons/moon-owners', {
+      moonOwnerPricesOn: () => new Map([[ORE, 50]]),
+    });
+    const table = screen.getByRole('table', { name: 'Moon owners' });
+    // 1000 ore at the page's 50 ISK, 8%: 4,000, not the miner line's 8,000.
+    expect(within(table).getByText(/4,000/)).toBeInTheDocument();
+    expect(within(table).queryByText(/8,000/)).toBeNull();
   });
 
   it('says so when the book has no moon owners', () => {

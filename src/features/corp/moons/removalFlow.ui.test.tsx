@@ -53,7 +53,12 @@ describe('startRemovalAndMail', () => {
     });
     await startRemovalAndMail(ctx);
     const queued = api.enqueue.mock.calls[0]![0];
-    expect(queued).toMatchObject({ kind: 'removal', corporationId: 1, feederCorporationId: 2 });
+    expect(queued).toMatchObject({
+      kind: 'removal',
+      corporationId: 1,
+      feederCorporationId: 2,
+      removalStartedAt: 5,
+    });
     expect(queued.recipients).toEqual([
       { id: 11, name: 'Ceo Pilot', startsClock: true },
       { id: 12, name: '#12', startsClock: false },

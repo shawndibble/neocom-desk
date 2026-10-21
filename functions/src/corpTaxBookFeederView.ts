@@ -28,6 +28,7 @@ import {
   type FeederPayout,
   type OwnerRateEntry,
   type Payee,
+  moonOwnerUnitPrice,
 } from './corpTaxBookEngine.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
 import { COMPRESSED_ORE_TYPE_IDS } from './data/compressedOreTypeIds.js';
@@ -258,13 +259,6 @@ export interface FeederView {
   payouts: FeederViewPayout[];
 }
 
-/** A day's open buy at the hub, else its open sell, else 0 (unpriced). */
-function unitPrice(prices: SidePrices | undefined): number {
-  if (prices?.buy != null && prices.buy > 0) return prices.buy;
-  if (prices?.sell != null && prices.sell > 0) return prices.sell;
-  return 0;
-}
-
 const latestPct = (
   history: readonly OwnerRateEntry[],
   kind: OwnerRateEntry['kind'],
@@ -307,7 +301,8 @@ export function buildFeederView(input: FeederViewInput): FeederView {
     }
     if (!isDayCovered(record.coveragePeriods, r.date)) continue;
     const priced = oreFormTypeId(r.typeId, input.compressedByRaw, compressed);
-    const unit = unitPrice(input.prices.get(priceKey(priced, r.date)));
+    // The accounting side prices a moon owner's accrual with the same rule (#4621).
+    const unit = moonOwnerUnitPrice(input.prices.get(priceKey(priced, r.date)));
     const value = r.quantity * unit;
     minedVolume += r.quantity;
     minedValueIsk += value;

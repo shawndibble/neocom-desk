@@ -7,6 +7,7 @@ import type { Dismissal } from './dismissals';
 import { extractionId, type SyncExtraction } from './sync';
 import { closePeriod, isDayCovered, reopenPeriod } from './coverage';
 import { oreFormTypeId } from '../miningTax/oreForm';
+import { moonOwnerUnitPrice } from './valuation';
 import {
   FEEDER_DISCONNECT_DAYS,
   advanceFeederHealth,
@@ -444,6 +445,18 @@ describe('feeder view mirror', () => {
       }
     }
     expect(mirror.dayClosesAt('2026-06-01')).toBe(dayClosesAt('2026-06-01'));
+  });
+
+  it("prices a moon owner's ore the same (#4621)", () => {
+    for (const side of [
+      undefined,
+      { buy: 120, sell: 150 },
+      { buy: null, sell: 150 },
+      { buy: 0, sell: 0 },
+      { buy: null, sell: null },
+    ]) {
+      expect(mirror.moonOwnerUnitPrice(side)).toBe(moonOwnerUnitPrice(side));
+    }
   });
 
   it('maps Ore Form the same', () => {

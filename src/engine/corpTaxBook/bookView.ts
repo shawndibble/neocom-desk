@@ -81,6 +81,12 @@ export interface BookViewInput {
   paidStatementIds: ReadonlySet<string>;
   /** The day's prices at the book's hub and Ore Form, by raw type id. */
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
+  /**
+   * A moon owner's prices by raw type id (#4621): the server's rule for the moon owner's own
+   * page (`moonOwnerUnitPrice`), so the Moon owners tab, Pay… and that page owe one figure.
+   * Absent: `pricesOn`.
+   */
+  moonOwnerPricesOn?: (date: string) => ReadonlyMap<number, number>;
   /** Ore of chunks with no notification, estimated from a linked Moon Ore Survey (D13), by extraction id. */
   surveyOreLines?: ReadonlyMap<string, readonly OreLine[]>;
   /** Current members, when the viewer can read the roster; else standing comes from the ledger. */

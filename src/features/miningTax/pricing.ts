@@ -25,6 +25,7 @@
 import { getHubPrices, getHubPricesWithStatus } from '@/market/prices';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { loadCompressedOreTypeIds, loadOreAndIceTypeIds, loadTypes } from '@/sde/loadSde';
+import { moonOwnerUnitPrice } from '@/engine/corpTaxBook/valuation';
 import { oreFormTypeId } from '@/engine/miningTax/oreForm';
 import { loadHubSnapshotRange } from '@/features/market/hubSnapshot';
 import { readCompressedOre } from './oreForm';
@@ -58,6 +59,11 @@ export interface UnitPrices {
    * bidding" — the banner and the Assign dialog say so.
    */
   liveUnreachable?: boolean;
+  /**
+   * Per-unit price by raw typeId for a moon owner's accrual (#4621): the saved open buy, else
+   * the saved open sell, else 0 — never the live book, matching the moon owner's own page.
+   */
+  moonOwner?: Map<number, number>;
 }
 
 /** The hub a Payee's `hubId` names, or Jita when it names none (or one this build does not know). */
@@ -106,6 +112,7 @@ async function resolvePricesForHubAcrossDates(
     const savedForDate = saved.get(date);
 
     const prices = new Map<number, number>();
+    const moonOwner = new Map<number, number>();
     const unpriced = new Set<number>();
     const sellFallback = new Set<number>();
     const sources = new Map<number, TaxPriceSource>();
@@ -120,6 +127,7 @@ async function resolvePricesForHubAcrossDates(
       });
       const price = resolved.price ?? 0;
       prices.set(typeId, price);
+      moonOwner.set(typeId, moonOwnerUnitPrice(savedForDate?.get(pid)));
       sources.set(typeId, resolved.source);
       if (resolved.source === 'live-sell') sellFallback.add(typeId);
       // A quoted zero counts as unpriced: an order book that bids nothing
@@ -133,6 +141,7 @@ async function resolvePricesForHubAcrossDates(
       sellFallback,
       sources,
       liveUnreachable: live.unreachable,
+      moonOwner,
     });
   }
   return { byDate };
@@ -180,6 +189,11 @@ export interface DatedUnitPrices {
   sourcesByHubAndDate?: ReadonlyMap<
     TradeHub['id'],
     ReadonlyMap<string, ReadonlyMap<number, TaxPriceSource>>
+  >;
+  /** Per hub, per date, a moon owner's prices — see `UnitPrices.moonOwner`. */
+  moonOwnerByHubAndDate?: ReadonlyMap<
+    TradeHub['id'],
+    ReadonlyMap<string, ReadonlyMap<number, number>>
   >;
 }
 
@@ -235,6 +249,23 @@ export function sourcesAtHubOnDate(
 }
 
 /**
+ * A moon owner's prices on `date` at the hub `hubId` names (#4621): saved buy, else saved sell,
+ * else 0, the rule the server writes the moon owner's own page with. Read like `pricesAtHubOnDate`.
+ */
+export function moonOwnerPricesAtHubOnDate(
+  data: DatedUnitPrices,
+  hubId: string | undefined,
+  date: string
+): ReadonlyMap<number, number> {
+  const hub = hubForPayee(hubId);
+  return (
+    data.moonOwnerByHubAndDate?.get(hub.id)?.get(date) ??
+    data.moonOwnerByHubAndDate?.get(DEFAULT_TRADE_HUB.id)?.get(date) ??
+    NO_PRICES
+  );
+}
+
+/**
  * Prices `typeIds` at each distinct hub in `hubIds` — the ledger's Payees'
  * hubs — plus the default, which is always loaded: the ledger values its
  * *unassigned* ore at Jita (no Payee, no hub) whether or not any Payee names
@@ -277,15 +308,21 @@ export async function loadDatedUnitPricesByHub(
     ReadonlyMap<string, ReadonlyMap<number, TaxPriceSource>>
   >();
   const unreachableHubs = new Set<TradeHub['id']>();
+  const moonOwnerByHubAndDate = new Map<
+    TradeHub['id'],
+    ReadonlyMap<string, ReadonlyMap<number, number>>
+  >();
   for (const [hubId, result] of loaded) {
     const sourcesByDate = new Map<string, ReadonlyMap<number, TaxPriceSource>>();
     const byDate = new Map<string, ReadonlyMap<number, number>>();
     const sellByDate = new Map<string, ReadonlySet<number>>();
+    const moonOwnerByDate = new Map<string, ReadonlyMap<number, number>>();
     const hubUnpriced = new Set<number>();
     for (const [date, dayResult] of result.byDate) {
       if (dayResult.liveUnreachable) unreachableHubs.add(hubId);
       byDate.set(date, dayResult.prices);
       sellByDate.set(date, dayResult.sellFallback);
+      if (dayResult.moonOwner) moonOwnerByDate.set(date, dayResult.moonOwner);
       sourcesByDate.set(date, dayResult.sources ?? NO_SOURCES);
       for (const typeId of dayResult.unpriced) {
         hubUnpriced.add(typeId);
@@ -294,6 +331,7 @@ export async function loadDatedUnitPricesByHub(
     }
     byHubAndDate.set(hubId, byDate);
     sellFallbackByHubAndDate.set(hubId, sellByDate);
+    moonOwnerByHubAndDate.set(hubId, moonOwnerByDate);
     sourcesByHubAndDate.set(hubId, sourcesByDate);
     unpricedByHub.set(hubId, hubUnpriced);
   }
@@ -304,6 +342,7 @@ export async function loadDatedUnitPricesByHub(
     sellFallbackByHubAndDate,
     sourcesByHubAndDate,
     unreachableHubs,
+    moonOwnerByHubAndDate,
   };
 }
 

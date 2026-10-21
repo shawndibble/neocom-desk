@@ -551,6 +551,15 @@ export function dayClosesAt(date: string, graceHours: number = BOOK_DEFAULTS.gra
   ).toISOString();
 }
 
+/** Engine `moonOwnerUnitPrice` (#4621): saved open buy, else open sell, else 0. */
+export function moonOwnerUnitPrice(
+  side: { buy?: number | null; sell?: number | null } | undefined
+): number {
+  if (side?.buy != null && side.buy > 0) return side.buy;
+  if (side?.sell != null && side.sell > 0) return side.sell;
+  return 0;
+}
+
 /** Engine `oreFormTypeId`: the type a mined ore is valued as. */
 export function oreFormTypeId(
   rawTypeId: number,
