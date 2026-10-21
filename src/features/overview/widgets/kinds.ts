@@ -409,11 +409,11 @@ const SPECS: Record<string, Spec> = {
   },
   corpRoleAudit: {
     corp: 'corpPeople',
+    capabilities: ['canReadRoleAudit'],
     views: NT,
     view: 'table',
     size: 'M',
-    soon: true,
-    endpoints: [],
+    endpoints: ['getCorporationMemberRoles', 'getCorporationRoleHistory'],
   },
   corpDoctrine: {
     corp: 'corpPeople',

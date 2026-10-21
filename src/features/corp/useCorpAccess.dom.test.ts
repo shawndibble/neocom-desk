@@ -252,6 +252,7 @@ describe('useCorpAccess — ready', () => {
       canReadAssets: true,
       canReadBlueprints: true,
       canReadCustomsOffices: true,
+      canReadRoleAudit: true,
       canReadContracts: true,
     });
   });
