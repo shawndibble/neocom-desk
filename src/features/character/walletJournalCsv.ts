@@ -11,11 +11,13 @@ import { journalRefLabel } from './journalRefLabel';
  * table's `toLocaleString()` rendering is display-only. Every optional field
  * is blank (not 0) when ESI omitted it; an actual 0 stays 0 (`??`, not `||`).
  * The ref type reads as the table's does (PLEX bought / sold); `characterName`
- * adds the multi-Character view's Character column after the date.
+ * adds the multi-Character view's Character column after the date;
+ * `playerName` adds the corp journal's Player column after the ref type.
  */
 export function walletJournalCsvColumns(
   t: CsvTranslate,
-  characterName?: (characterId: number) => string
+  characterName?: (characterId: number) => string,
+  playerName?: (entry: JournalRow) => string
 ): CsvColumn<JournalRow>[] {
   const characterColumn: CsvColumn<JournalRow>[] = characterName
     ? [
@@ -26,10 +28,14 @@ export function walletJournalCsvColumns(
         },
       ]
     : [];
+  const playerColumn: CsvColumn<JournalRow>[] = playerName
+    ? [{ header: t('wallet.playerColumn'), value: (entry) => playerName(entry) || null }]
+    : [];
   return [
     { header: t('wallet.date'), value: (entry) => entry.date },
     ...characterColumn,
     { header: t('wallet.refType'), value: (entry) => journalRefLabel(journalRefKey(entry), t) },
+    ...playerColumn,
     { header: t('wallet.description'), value: (entry) => entry.description },
     { header: t('wallet.amount'), value: (entry) => entry.amount ?? null },
     { header: t('wallet.balanceCol'), value: (entry) => entry.balance ?? null },

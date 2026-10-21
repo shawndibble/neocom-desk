@@ -191,12 +191,15 @@ export function useWalletJournalView({
   const journal = journalResult?.data ?? EMPTY_JOURNAL;
 
   // In the URL (`journal.*`, issue #1302).
-  const [journalFilter, setJournalFilter, journalRowsFilter] = useUrlFilter<WalletJournalFilter>(
+  const [urlFilter, setJournalFilter, urlRowsFilter] = useUrlFilter<WalletJournalFilter>(
     'personal',
     JOURNAL_FILTER_PARAMS,
     JOURNAL_FIELD_TO_PARAM,
     EMPTY_JOURNAL_FILTER_PARAMS
   );
+  // Player is a corp-only filter: a stray `?journal.player=` must not hide personal rows.
+  const journalFilter = useMemo(() => ({ ...urlFilter, player: null }), [urlFilter]);
+  const journalRowsFilter = useMemo(() => ({ ...urlRowsFilter, player: null }), [urlRowsFilter]);
   // Lines between the pilot's own Characters are netted against every Character
   // with the wallet permission, picked or not: a donation from your own alt is
   // internal even in the one-Character view.

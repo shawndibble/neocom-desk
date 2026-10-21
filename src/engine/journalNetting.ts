@@ -24,6 +24,8 @@ export type JournalLine = WalletJournalEntry & { characterId?: number };
 /** A journal line plus what the Journal derives from it. */
 export type JournalRow = WalletJournalEntry & {
   characterId?: number;
+  /** The corp journal's Player: the character party of the line, when it has one. */
+  playerId?: number;
   /** Both parties are the pilot's own Characters: left out of In, Out and the ref-type rows. */
   internal?: boolean;
   /** Replaces `ref_type` for grouping and filtering: PLEX bought or sold. */
