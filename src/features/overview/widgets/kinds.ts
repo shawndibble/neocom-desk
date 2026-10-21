@@ -76,6 +76,7 @@ export interface WidgetKindDef {
 
 const NCT: readonly WidgetView[] = ['number', 'chart', 'table'];
 const NT: readonly WidgetView[] = ['number', 'table'];
+const N: readonly WidgetView[] = ['number'];
 
 interface Spec {
   /** The Overview's Gallery group; absent for a corp-only kind. */
@@ -439,7 +440,8 @@ const SPECS: Record<string, Spec> = {
     range: true,
     endpoints: ['getCorporationMiningObservers', 'getCorporationMiningObserver'],
   },
-  corpKills: { corp: 'corpOps', views: NCT, view: 'number', size: 'M', soon: true, endpoints: [] },
+  // zKillboard's all-time totals, not corp ESI: no capability, so any Character on the board sees it.
+  corpKills: { corp: 'corpOps', views: N, view: 'number', size: 'S', endpoints: [] },
   corpContracts: {
     corp: 'corpOps',
     capabilities: ['canReadContracts'],

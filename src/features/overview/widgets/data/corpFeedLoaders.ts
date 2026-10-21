@@ -10,7 +10,7 @@
 import { diffRoster } from '@/engine/corp/members';
 import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { MASTER_WALLET_DIVISION } from '@/features/corp/boardData';
+import { loadCorporationId, MASTER_WALLET_DIVISION } from '@/features/corp/boardData';
 import { jobTypeIds } from '@/features/corp/boardSources';
 import { loadCorporationContracts } from '@/features/corp/contracts';
 import { CorpReadFailed } from '@/features/corp/corpRead';
@@ -30,13 +30,16 @@ import {
   loadCorporationWalletJournal,
   loadCorporationWallets,
 } from '@/features/corp/wallet';
+import { isNpcCorporationId } from '@/esi/entityIds';
 import { DAY_MS } from '@/lib/age';
+import { fetchCorporationStats } from '@/lib/zkillboard';
 import { parseInstant } from '@/engine/esiInstant';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import type {
   CorpContractsFeed,
   CorpJobsFeed,
   CorpJournalLine,
+  CorpKillsFeed,
   CorpMembersFeed,
   CorpMiningFeed,
   CorpWalletFeed,
@@ -233,4 +236,28 @@ export async function loadCorpContracts(characterId: number): Promise<CorpContra
     ...new Set(open.flatMap((c) => [c.issuer_id, c.assignee_id]).filter((id) => id > 0)),
   ]);
   return { readable: true, needsReauth: false, ...readAge([result]), contracts, names };
+}
+
+/**
+ * Not a corp-ESI read (no role, no scope): the corporation id is public, and
+ * the totals are the ones the Public info Corporation tab shows, through the
+ * same cached `fetchCorporationStats`, so widget and modal never disagree.
+ */
+export async function loadCorpKills(characterId: number): Promise<CorpKillsFeed> {
+  const none: CorpKillsFeed = { ...UNREADABLE, corporationId: null, stats: null, failed: null };
+  const corporationId = await loadCorporationId(characterId);
+  if (corporationId === null) return none;
+  // The modal skips the killboard for an NPC corporation, so there is nothing to show.
+  if (isNpcCorporationId(corporationId)) return { ...none, corporationId };
+  const result = await fetchCorporationStats(corporationId);
+  const base = { readable: true, needsReauth: false, fetchedAt: new Date(), fromCache: false };
+  if (result.kind === 'failed') {
+    return { ...base, corporationId, stats: null, failed: result.reason };
+  }
+  return {
+    ...base,
+    corporationId,
+    stats: result.kind === 'stats' ? result.stats : null,
+    failed: null,
+  };
 }

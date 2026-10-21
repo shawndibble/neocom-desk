@@ -24,7 +24,13 @@ import type {
 } from '../../data/boardData';
 import type { IncursionsBoardData } from '../../data/incursionsBoard';
 import type { CorpContractsFeed } from './corpFeeds';
-import type { CorpJobsFeed, CorpMembersFeed, CorpMiningFeed, CorpWalletFeed } from './corpFeeds';
+import type {
+  CorpJobsFeed,
+  CorpKillsFeed,
+  CorpMembersFeed,
+  CorpMiningFeed,
+  CorpWalletFeed,
+} from './corpFeeds';
 import type { BoardDeadline } from '../nextDeadline';
 import type { WidgetStateInput } from '../state';
 import type { CalendarEventsChoice, WidgetRange } from '../layout';
@@ -257,6 +263,7 @@ export interface FeedMap {
   corpMembers: CorpMembersFeed;
   corpMining: CorpMiningFeed;
   corpContracts: CorpContractsFeed;
+  corpKills: CorpKillsFeed;
 }
 
 export type FeedId = keyof FeedMap;
