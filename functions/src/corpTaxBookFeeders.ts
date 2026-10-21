@@ -95,6 +95,11 @@ export interface FeederRecord {
    * edit replaces it. Kept here, not in the view, so they carry on across a rejoin.
    */
   refineryLabels?: Record<string, RefineryLabelDoc>;
+  /**
+   * Each refinery's system by structure id (#4650), learned from a miner's own ledger: a moon
+   * owner's rows rarely carry one. The first learned stays.
+   */
+  refinerySystems?: Record<string, number>;
 }
 
 /** One refinery's label on a moon owner's record. */

@@ -385,6 +385,23 @@ describe('buildFeederView', () => {
       { structureId: 78, label: null, labelSetAt: null, solarSystemId: null },
     ]);
   });
+
+  it("falls back to the system learned from a miner's ledger; a row's own wins (#4650)", () => {
+    const v = buildFeederView(
+      input({
+        record: record({ refinerySystems: { '77': 30002187, '78': 30002187 } }),
+        rows: [
+          row('2026-10-12', 1),
+          row('2026-10-12', 1, { structureId: 78 }),
+          row('2026-10-13', 1, { structureId: 78, solarSystemId: 30000142 }),
+        ],
+      })
+    );
+    expect(v.refineries.map((r) => [r.structureId, r.solarSystemId])).toEqual([
+      [77, 30002187],
+      [78, 30000142],
+    ]);
+  });
 });
 
 describe('review fixes', () => {

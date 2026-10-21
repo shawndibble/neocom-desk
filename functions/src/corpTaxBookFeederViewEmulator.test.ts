@@ -28,7 +28,11 @@ import {
 } from './corpTaxBookFeederPayouts.js';
 import { outgoingDonationsFromJournal } from './corpTaxBookEngine.js';
 import { createFeederInvite, type FeederRecord } from './corpTaxBookFeeders.js';
-import { setOwnRefineryLabel, setRefineryLabel } from './corpTaxBookRefineryLabels.js';
+import {
+  learnRefinerySystems,
+  setOwnRefineryLabel,
+  setRefineryLabel,
+} from './corpTaxBookRefineryLabels.js';
 import { turnOnBook, type BookDeps, type Caller } from './corpTaxBookStore.js';
 import type { EsiRead, SyncEsi } from './corpTaxBookSyncEsi.js';
 
@@ -472,6 +476,34 @@ suite('moon owner view', () => {
         })
       )
     ).toBe('not-your-feeder');
+  });
+
+  describe('learned refinery systems (#4650)', () => {
+    const REFINERY = 4001;
+    const learn = (characterId: number, system: number) =>
+      learnRefinerySystems(bookDeps(), who(characterId), {
+        corporationId: COLLECTOR,
+        systems: { [String(REFINERY)]: system },
+      });
+    const viewSystem = async () =>
+      (await viewRef().collection('refineries').doc(String(REFINERY)).get()).get('solarSystemId');
+
+    it("keeps the first system a miner's own ledger placed it in, on the record and the view", async () => {
+      await save(await newInvite());
+      // Someone with no row at that refinery teaches nothing.
+      await learn(901, 30000142);
+      expect((await feederRecord())?.refinerySystems).toBeUndefined();
+
+      await learn(900, 30002187);
+      expect((await feederRecord())?.refinerySystems).toEqual({ [String(REFINERY)]: 30002187 });
+      expect(await viewSystem()).toBe(30002187);
+
+      // A later report never moves it.
+      await learn(900, 30000142);
+      expect((await feederRecord())?.refinerySystems).toEqual({ [String(REFINERY)]: 30002187 });
+      const audit = await collectorBook().collection('audit').get();
+      expect(audit.docs.filter((d) => d.get('action') === 'refinerySystemLearned')).toHaveLength(1);
+    });
   });
 
   describe('refinery labels (#4640)', () => {

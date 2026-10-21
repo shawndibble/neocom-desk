@@ -109,6 +109,8 @@ import {
   setFeederRate,
 } from './corpTaxBookFeederOwnerCalls.js';
 import {
+  learnRefinerySystems,
+  parseLearnRefinerySystemsInput,
   parseSetOwnRefineryLabelInput,
   parseSetRefineryLabelInput,
   setOwnRefineryLabel,
@@ -809,6 +811,17 @@ export const setCorpTaxBookOwnRefineryLabelCallable = onCall<unknown>(
       corpSyncDeps(),
       callerOf(request),
       parseSetOwnRefineryLabelInput(request.data)
+    )
+);
+
+// A refinery's system (issue #4650): a miner's client reports what its own ledger placed it in.
+export const learnCorpTaxBookRefinerySystemsCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    learnRefinerySystems(
+      corpTaxBookDeps(),
+      callerOf(request),
+      parseLearnRefinerySystemsInput(request.data)
     )
 );
 
