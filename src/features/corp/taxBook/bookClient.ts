@@ -40,6 +40,7 @@ import type {
 import type { FeederReadClock } from '@/engine/corpTaxBook/feederHealth';
 import type { RemovalNoticeRecord } from '@/engine/corpTaxBook/mailQueue';
 import type { OwnerRateEntry } from '@/engine/corpTaxBook/ownerRate';
+import type { StoredRefineryLabel } from '@/engine/corpTaxBook/refinery';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -364,6 +365,8 @@ export interface BookFeeder extends FeederReadClock {
   ownerRateHistory?: OwnerRateEntry[];
   /** Absent means derive from `mode`. */
   modeChanges?: FeederModeChange[];
+  /** Refinery labels by structure id, set by either side's officers (#4640). */
+  refineryLabels?: Record<string, StoredRefineryLabel>;
   payouts: FeederPayoutRow[];
 }
 

@@ -19,7 +19,9 @@ const meta = {
   args: {
     view: fixtureView(),
     names,
+    nameOf: (id: number) => (id === 98 ? names(id) : id === 30000142 ? 'Jita' : undefined),
     canEdit: true,
+    onSetRefineryLabel: noop,
     onRequestRate: noop,
     characterId: 1,
     onSetPayee: noop,
@@ -31,6 +33,27 @@ type Story = StoryObj<typeof meta>;
 
 /** @summary Page B with the rate override line ("Rate set to 8% by ... You asked for 6%."). */
 export const Normal: Story = {};
+
+/** @summary Refineries through the label chain: a label either side set, then the system, then the moon owner's own name plus the id. Officers edit a label behind the faint pencil. */
+export const RefineryLabels: Story = {
+  args: {
+    view: {
+      ...fixtureView(),
+      refineries: [
+        { structureId: 10, label: 'Efa - Ashfall Tatara', solarSystemId: null },
+        { structureId: 11, label: null, solarSystemId: 30000142 },
+        { structureId: 12, label: null, solarSystemId: null },
+      ],
+      days: fixtureView().days.map((d) => ({
+        ...d,
+        lines: [
+          ...d.lines,
+          { characterId: 2, structureId: 12, volume: 40_000, valueIsk: 4_000_000 },
+        ],
+      })),
+    },
+  },
+};
 
 /** @summary The moon owner named a player as its payee: "Who gets paid" names them, with Change…. */
 export const PayeeSet: Story = {

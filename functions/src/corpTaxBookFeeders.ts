@@ -90,6 +90,20 @@ export interface FeederRecord {
   modeChanges?: FeederModeChange[];
   /** When the corporation's officers dismissed the after-leaving view (ms). */
   viewDismissedAt?: number;
+  /**
+   * Free-text refinery labels by structure id (#4640): either side's officers set one, the last
+   * edit replaces it. Kept here, not in the view, so they carry on across a rejoin.
+   */
+  refineryLabels?: Record<string, RefineryLabelDoc>;
+}
+
+/** One refinery's label on a moon owner's record. */
+export interface RefineryLabelDoc {
+  label: string;
+  /** ISO instant of the edit. */
+  setAt: string;
+  setBy: number;
+  side: 'accounting' | 'moon-owner';
 }
 
 /** `corpTaxBookFeederInvites/{hash}`. */

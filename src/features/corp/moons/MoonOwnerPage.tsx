@@ -20,6 +20,7 @@ import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { formatCount } from '@/lib/formatCount';
 import { isk, shortDate } from './moonsFormat';
 import { Crumb } from './moonsParts';
+import { RefineryLabels, type RefineryLabelEdit } from './RefineryLabels';
 import { RemovalStrip } from './RemovalStrip';
 import { MoonOwnerStatusPill } from './MoonOwnersTable';
 
@@ -120,6 +121,7 @@ export function MoonOwnerPage({
   accountingName,
   characterName,
   refineryName,
+  refineryEdit,
   oreName,
   backTo,
   payee,
@@ -138,6 +140,8 @@ export function MoonOwnerPage({
   accountingName?: string;
   characterName: (id: number) => string;
   refineryName: (id: number) => string;
+  /** Label their refineries for both sides; absent for a viewer who may not edit. */
+  refineryEdit?: RefineryLabelEdit;
   oreName: (typeId: number) => string;
   backTo: string;
   /** Who the moon owner is paid as, read-only here: only the moon owner sets it (#4619). */
@@ -377,6 +381,13 @@ export function MoonOwnerPage({
           />
         )}
       </Panel>
+      <RefineryLabels
+        structureIds={[...new Set(detail.mined.map((m) => m.structureId))]}
+        name={refineryName}
+        {...(refineryEdit && row.status !== 'left' && row.status !== 'removed'
+          ? { edit: refineryEdit }
+          : {})}
+      />
       {(onSettledOtherwise || canRemove) && (
         <div className="flex flex-wrap gap-2 border-t border-line pt-4">
           {onSettledOtherwise && (

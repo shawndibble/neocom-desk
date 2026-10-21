@@ -338,6 +338,14 @@ suite('feeder invites', () => {
         // The last feed's holder must not carry its powers into the new one.
         grantHolder: 4242,
         grantedBy: 4243,
+        refineryLabels: {
+          '4001': {
+            label: 'Gate Athanor',
+            setAt: '2026-10-19T00:00:00.000Z',
+            setBy: 1,
+            side: 'moon-owner',
+          },
+        },
       });
       await db.collection('corpTaxBookFeederOf').doc(String(FEEDER)).delete();
       now = T0 + 5 * DAY;
@@ -351,6 +359,8 @@ suite('feeder invites', () => {
         payee: { kind: 'character', id: 99 },
         coveragePeriods: [{ from: '2026-10-18', to: '2026-10-19' }, { from: '2026-10-23' }],
         lastReadWellAt: T0,
+        // Labels carry on across a rejoin (#4640).
+        refineryLabels: { '4001': { label: 'Gate Athanor' } },
       });
       for (const gone of [
         'leftAt',

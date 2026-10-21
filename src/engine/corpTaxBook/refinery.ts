@@ -25,7 +25,7 @@ export interface RefineryLabelInput {
   officerLabels?: readonly OfficerLabel[];
   /** The structure's name, when ESI let us read it. */
   structureName?: string;
-  /** The system, learned from the miner's own character ledger. */
+  /** The system, from an observed row or learned from a miner's own ledger. */
   systemName?: string;
   /** The feeder corporation's name. */
   feederName?: string;
@@ -54,6 +54,71 @@ export function refineryLabel(input: RefineryLabelInput): {
     return { label: `${input.feederName} ${input.structureId}`, source: 'feeder' };
   }
   return { label: String(input.structureId), source: 'id' };
+}
+
+/**
+ * What a screen knows about each refinery, by structure id. `ownerName` is for
+ * officer and moon owner screens only: a miner's line never names the moon owner.
+ */
+export interface RefineryLabelSources {
+  officerLabels?: (structureId: number) => readonly OfficerLabel[] | undefined;
+  structureName?: (structureId: number) => string | undefined;
+  systemName?: (structureId: number) => string | undefined;
+  ownerName?: (structureId: number) => string | undefined;
+  /** What a refinery with nothing known reads as; the plain id when absent. */
+  fallback?: (structureId: number) => string;
+}
+
+/** Every refinery cell through `refineryLabel`, from one screen's sources. */
+export function refineryLabeler(sources: RefineryLabelSources): (structureId: number) => string {
+  return (structureId) => {
+    const officerLabels = sources.officerLabels?.(structureId);
+    const structureName = sources.structureName?.(structureId);
+    const systemName = sources.systemName?.(structureId);
+    const feederName = sources.ownerName?.(structureId);
+    const { label, source } = refineryLabel({
+      structureId,
+      ...(officerLabels ? { officerLabels } : {}),
+      ...(structureName ? { structureName } : {}),
+      ...(systemName ? { systemName } : {}),
+      ...(feederName ? { feederName } : {}),
+    });
+    return source === 'id' && sources.fallback ? sources.fallback(structureId) : label;
+  };
+}
+
+/** Each refinery's system (when a row carried it) and its moon owner (absent: the book's own). */
+export function refineryFacts(
+  rows: readonly Pick<ObservedRow, 'structureId' | 'solarSystemId' | 'sourceCorporationId'>[]
+): { systemOf: Map<number, number>; sourceOf: Map<number, number> } {
+  const systemOf = new Map<number, number>();
+  const sourceOf = new Map<number, number>();
+  for (const r of rows) {
+    if (r.solarSystemId !== undefined && !systemOf.has(r.structureId)) {
+      systemOf.set(r.structureId, r.solarSystemId);
+    }
+    if (r.sourceCorporationId !== undefined) sourceOf.set(r.structureId, r.sourceCorporationId);
+  }
+  return { systemOf, sourceOf };
+}
+
+/** A label stored on a moon owner's record, keyed by structure id. */
+export interface StoredRefineryLabel extends OfficerLabel {
+  setBy?: number;
+  side?: 'accounting' | 'moon-owner';
+}
+
+/** The officer labels on the moon owners' records, by structure id. */
+export function officerLabelsOf(
+  feeders: readonly { refineryLabels?: Readonly<Record<string, StoredRefineryLabel>> }[]
+): Map<number, OfficerLabel[]> {
+  const labels = new Map<number, OfficerLabel[]>();
+  for (const f of feeders)
+    for (const [id, l] of Object.entries(f.refineryLabels ?? {})) {
+      const key = Number(id);
+      labels.set(key, [...(labels.get(key) ?? []), { label: l.label, setAt: l.setAt }]);
+    }
+  return labels;
 }
 
 const sameOre = (a: ObservedMiningEntry['oreLines'], b: MiningLedgerEntry['oreLines']) =>

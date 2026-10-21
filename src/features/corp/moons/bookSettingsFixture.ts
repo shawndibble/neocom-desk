@@ -89,6 +89,7 @@ export function bookSettingsValue(): Omit<BookContextValue, 'edit' | 'canEdit'> 
       character: (id) => `Pilot ${id}`,
       corporation: (id) => `Corp ${id}`,
       refinery: (id) => REFINERY_NAMES[id] ?? `Refinery ${id}`,
+      ownerRefinery: (id) => REFINERY_NAMES[id] ?? `Refinery ${id}`,
       moon: (id) => `Moon ${id}`,
       ore: () => 'Zeolites',
     },

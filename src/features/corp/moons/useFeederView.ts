@@ -16,6 +16,8 @@ export type FeederViewLoad =
       /** `null` when the server has not built the view yet. */
       view: FeederView | null;
       names: (characterId: number) => string;
+      /** A resolved name, or undefined: the refinery label chain skips what is unknown. */
+      nameOf: (id: number) => string | undefined;
     };
 
 /**
@@ -37,7 +39,16 @@ export function useFeederView(
           collectorCorporationId === undefined
             ? await loadFeederView(characterId, corporationId)
             : await loadFeederView(characterId, corporationId, collectorCorporationId);
-        const ids = view ? [...characterIdsOf(view.days), payeeIdOf(view.summary)] : [];
+        // Universe names resolves characters, corporations and systems alike: the miners, the
+        // payee, the moon owner itself and its refineries' systems for the label chain.
+        const ids = view
+          ? [
+              ...characterIdsOf(view.days),
+              payeeIdOf(view.summary),
+              view.summary.feederCorporationId,
+              ...view.refineries.flatMap((r) => (r.solarSystemId == null ? [] : [r.solarSystemId])),
+            ]
+          : [];
         const resolved = await resolveNames(ids).catch(() => new Map<number, string>());
         if (!cancelled)
           setLoad({
@@ -45,6 +56,7 @@ export function useFeederView(
             access,
             view,
             names: (id) => resolved.get(id) ?? `#${id}`,
+            nameOf: (id) => resolved.get(id),
           });
       } catch (e) {
         if (!cancelled)

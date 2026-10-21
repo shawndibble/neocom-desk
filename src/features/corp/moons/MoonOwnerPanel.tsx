@@ -3,7 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { beginFeederGrantLogin } from '@/app/loginFlow';
 import { Button, LoadFailedState, Spinner } from '@/components/ui';
 import { leaveFeeder, type FeederSetupStatus } from '../taxBook/feederClient';
-import { RECONNECT_CODE, requestFeederRate, setFeederPayee } from '../taxBook/feederViewClient';
+import {
+  RECONNECT_CODE,
+  requestFeederRate,
+  setFeederPayee,
+  setOwnRefineryLabel,
+} from '../taxBook/feederViewClient';
 import { isStale, owedOnLeaving } from '../taxBook/feederViewModel';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { feederErrorText } from './feederErrorText';
@@ -75,7 +80,12 @@ export function MoonOwnerPanel({
       <MoonOwnerView
         view={view}
         names={load.names}
+        nameOf={load.nameOf}
         canEdit={access.canEdit}
+        onSetRefineryLabel={async (structureId, label) => {
+          await setOwnRefineryLabel(characterId, corporationId, structureId, label);
+          reload();
+        }}
         onRequestRate={async (pct) => {
           await requestFeederRate(characterId, corporationId, pct);
           reload();

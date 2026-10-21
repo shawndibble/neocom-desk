@@ -109,6 +109,12 @@ import {
   setFeederRate,
 } from './corpTaxBookFeederOwnerCalls.js';
 import {
+  parseSetOwnRefineryLabelInput,
+  parseSetRefineryLabelInput,
+  setOwnRefineryLabel,
+  setRefineryLabel,
+} from './corpTaxBookRefineryLabels.js';
+import {
   cancelFeederRemoval,
   finalizeDueRemovals,
   forceRemovalNow,
@@ -786,6 +792,24 @@ export const setCorpTaxBookFeederRateCallable = onCall<unknown>(FEEDER_OWNER_OPT
 
 export const setCorpTaxBookFeederModeCallable = onCall<unknown>(FEEDER_OWNER_OPTIONS, (request) =>
   setFeederMode(feederOwnerDeps(), callerOf(request), parseSetFeederModeInput(request.data))
+);
+
+// Refinery labels (issue #4640): the accounting side passes `feederCorporationId`; the moon owner's
+// own officers do not.
+export const setCorpTaxBookRefineryLabelCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    setRefineryLabel(feederOwnerDeps(), callerOf(request), parseSetRefineryLabelInput(request.data))
+);
+
+export const setCorpTaxBookOwnRefineryLabelCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    setOwnRefineryLabel(
+      corpSyncDeps(),
+      callerOf(request),
+      parseSetOwnRefineryLabelInput(request.data)
+    )
 );
 
 // Removing a moon owner (issue #4520): start, notice sent, cancel (officers), the payee's link.

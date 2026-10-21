@@ -27,7 +27,8 @@ import { appendAudit, fail, feederRef, type BookDeps, type Caller } from './corp
 
 export { parseFeederCall };
 
-const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
+/** The book deps a moon owner's call writes with. */
+export const feederBookDeps = (deps: CorpSyncDeps): BookDeps => ({
   db: deps.db,
   now: deps.now,
   verifyToken: deps.verify,
@@ -89,7 +90,11 @@ export async function getFeederViewAccess(
   const view = feederViewRef(deps.db, ctx.collectorCorporationId, input.corporationId);
   await view.collection(FEEDER_VIEW_VIEWERS).doc(caller.uid).set(access);
   if (!(await view.get()).exists) {
-    await tryRebuildFeederView(bookDeps(deps), ctx.collectorCorporationId, input.corporationId);
+    await tryRebuildFeederView(
+      feederBookDeps(deps),
+      ctx.collectorCorporationId,
+      input.corporationId
+    );
   }
   return {
     collectorCorporationId: ctx.collectorCorporationId,
@@ -123,14 +128,14 @@ export async function requestFeederRate(
     });
     appendAudit(
       tx,
-      bookDeps(deps),
+      feederBookDeps(deps),
       ctx.collectorCorporationId,
       { characterId: ctx.callerId, name: 'Moon owner' },
       'feederRateRequested',
       { feederCorporationId: input.corporationId, pct: input.pct }
     );
   });
-  await tryRebuildFeederView(bookDeps(deps), ctx.collectorCorporationId, input.corporationId);
+  await tryRebuildFeederView(feederBookDeps(deps), ctx.collectorCorporationId, input.corporationId);
   return { ok: true };
 }
 
@@ -177,14 +182,14 @@ export async function setFeederPayee(
     });
     appendAudit(
       tx,
-      bookDeps(deps),
+      feederBookDeps(deps),
       ctx.collectorCorporationId,
       { characterId: ctx.callerId, name: 'Moon owner' },
       'feederPayeeSet',
       { feederCorporationId: input.corporationId, payee: input.payee }
     );
   });
-  await tryRebuildFeederView(bookDeps(deps), ctx.collectorCorporationId, input.corporationId);
+  await tryRebuildFeederView(feederBookDeps(deps), ctx.collectorCorporationId, input.corporationId);
   return { ok: true };
 }
 
@@ -209,13 +214,13 @@ export async function dismissFeederHistory(
     tx.update(ref, { viewDismissedAt: deps.now() });
     appendAudit(
       tx,
-      bookDeps(deps),
+      feederBookDeps(deps),
       ctx.collectorCorporationId,
       { characterId: ctx.callerId, name: 'Moon owner' },
       'feederViewDismissed',
       { feederCorporationId: input.corporationId }
     );
   });
-  await tryRebuildFeederView(bookDeps(deps), ctx.collectorCorporationId, input.corporationId);
+  await tryRebuildFeederView(feederBookDeps(deps), ctx.collectorCorporationId, input.corporationId);
   return { ok: true };
 }

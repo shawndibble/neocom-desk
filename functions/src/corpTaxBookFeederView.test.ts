@@ -353,10 +353,37 @@ describe('buildFeederView', () => {
       })
     );
     expect(v.refineries).toEqual([
-      { structureId: 77, label: null, solarSystemId: 30000142 },
-      { structureId: 78, label: null, solarSystemId: null },
+      { structureId: 77, label: null, labelSetAt: null, solarSystemId: 30000142 },
+      { structureId: 78, label: null, labelSetAt: null, solarSystemId: null },
     ]);
     expect(v.summary.refineryCount).toBe(2);
+  });
+
+  it("carries the label either side's officers set, kept on the record (#4640)", () => {
+    const v = buildFeederView(
+      input({
+        record: record({
+          refineryLabels: {
+            '77': {
+              label: 'Efa Tatara',
+              setAt: '2026-10-12T00:00:00.000Z',
+              setBy: 1,
+              side: 'accounting',
+            },
+          },
+        }),
+        rows: [row('2026-10-12', 1), row('2026-10-12', 1, { structureId: 78 })],
+      })
+    );
+    expect(v.refineries).toEqual([
+      {
+        structureId: 77,
+        label: 'Efa Tatara',
+        labelSetAt: '2026-10-12T00:00:00.000Z',
+        solarSystemId: null,
+      },
+      { structureId: 78, label: null, labelSetAt: null, solarSystemId: null },
+    ]);
   });
 });
 

@@ -76,6 +76,10 @@ const meta = {
     accountingName: 'Brass Meridian Logistics',
     characterName: (id: number) => CHARACTERS[id] ?? `#${id}`,
     refineryName: (id: number) => REFINERIES[id] ?? `Refinery ${id}`,
+    refineryEdit: {
+      current: (id: number) => (id === 10 ? 'Efa - Ashfall Tatara' : ''),
+      onSave: async () => {},
+    },
     oreName: (id: number) => ORES[id] ?? `#${id}`,
     backTo: '/corp/moons/moon-owners',
     payee: { kind: 'corporation', id: 98, name: 'Ashfall Mining Collective' },
@@ -193,9 +197,18 @@ export const NotAPayout: Story = {
   },
 };
 
+/** @summary Refineries through the label chain: one an officer labelled, one with neither name nor system, so it reads as the moon owner's name plus its id. Either side can edit a label behind the faint pencil. */
+export const RefineryLabels: Story = {
+  args: {
+    refineryName: (id: number) =>
+      id === 10 ? 'Efa - Ashfall Tatara' : `Ashfall Mining Collective ${id}`,
+  },
+};
+
 /** @summary A viewer who may not edit: no Pay, Set rate, Settled otherwise or payment actions. */
 export const ReadOnly: Story = {
   args: {
+    refineryEdit: undefined,
     onSetRate: undefined,
     onSettledOtherwise: undefined,
     onRemove: undefined,
