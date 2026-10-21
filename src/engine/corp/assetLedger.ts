@@ -56,8 +56,7 @@ export interface ClassifiedAsset {
   /**
    * Station/structure of the root's office (Offices, Corp deliveries inside an
    * office), else the root's own `location_id` (station, structure or solar
-   * system). Null never occurs today; kept nullable so callers handle a
-   * location the data cannot supply.
+   * system). Null when the chain is cyclic and no location is derivable.
    */
   locationId: number | null;
   /** 1–7 for Offices, else null. */
@@ -138,20 +137,20 @@ export function classifyCorpAssets(inputs: readonly CorpAssetInput[]): Classifie
       input,
       state,
       division,
-      locationId: officeLocation ?? root.locationId,
+      locationId: cyclic ? null : (officeLocation ?? root.locationId),
       path: ancestors.map((a) => ({ itemId: a.itemId, typeId: a.typeId })),
     });
   }
   return { items, officeLocationIds };
 }
 
-/** Units (not stacks) per tab, for the tab badges; `all` is the grand total. */
+/** Asset stacks (one per item row, not summed quantity) per tab, for the tab badges; `all` is the grand total. */
 export function countLedgerByState(items: readonly ClassifiedAsset[]): Record<LedgerTab, number> {
   const counts = { all: 0 } as Record<LedgerTab, number>;
   for (const state of LEDGER_STATES) counts[state] = 0;
   for (const item of items) {
-    counts[item.state] += item.input.quantity;
-    counts.all += item.input.quantity;
+    counts[item.state] += 1;
+    counts.all += 1;
   }
   return counts;
 }
@@ -259,7 +258,7 @@ export function evaluateStockTargets(
       target,
       owned: have,
       shortBy,
-      status: have === 0 ? 'none-owned' : shortBy > 0 ? 'short' : 'met',
+      status: shortBy === 0 ? 'met' : have === 0 ? 'none-owned' : 'short',
     });
   }
   return result;
@@ -306,7 +305,7 @@ function placementKey(s: LedgerStack): string {
 /**
  * By-item ledger: one row per (type, isBlueprintCopy) over the items passing
  * `filter`. A targeted type nothing passes still yields a qty-0 row, but only
- * when the filter would not exclude it by nature (state all/offices/deliveries
+ * when the filter would not exclude it by nature (tab all/offices
  * and no location/division filter).
  */
 export function buildItemLedger(
@@ -363,7 +362,7 @@ export function buildItemLedger(
   for (const [key, row] of rows) row.placements = [...placements.get(key)!.values()];
 
   const targetRowsApply =
-    (!filter?.state || ['all', 'offices', 'deliveries'].includes(filter.state)) &&
+    (!filter?.state || filter.state === 'all' || filter.state === 'offices') &&
     filter?.locationId === undefined &&
     filter?.division === undefined;
   if (targets && targetRowsApply) {
@@ -384,7 +383,7 @@ export function buildItemLedger(
   return [...rows.values()];
 }
 
-/** Totals for one office division, one office's Corp deliveries, or one non-office place. */
+/** Totals for one office division, one office's Corp deliveries, or one non-office place. `itemCount` counts asset stacks. */
 export interface LedgerCell {
   itemCount: number;
   estimatedValue: number;
@@ -407,14 +406,14 @@ export interface OfficeGroup {
 }
 
 export interface PlaceGroup extends LedgerCell {
-  state: Exclude<LedgerState, 'offices' | 'deliveries'>;
+  state: LedgerState;
   locationId: number | null;
 }
 
 export interface LocationLedger {
   /** Sorted by location id; includes offices holding nothing. */
   offices: OfficeGroup[];
-  /** One group per (non-office state, location), in `LEDGER_STATES` order. */
+  /** One group per (state, location) outside a known office, in `LEDGER_STATES` order. */
   others: PlaceGroup[];
 }
 
@@ -423,7 +422,7 @@ function buildCell(stacks: readonly LedgerStack[], hasVolumes: boolean): LedgerC
   let estimatedValue = 0;
   let volume = hasVolumes ? 0 : null;
   for (const s of stacks) {
-    itemCount += s.quantity;
+    itemCount += 1;
     estimatedValue += s.estimatedValue;
     if (volume !== null) volume += s.volume ?? 0;
   }
@@ -451,12 +450,16 @@ export function buildLocationLedger(
 
   for (const item of classified.items) {
     const stack = toStack(item, valuation);
-    if ((item.state === 'offices' || item.state === 'deliveries') && item.locationId !== null) {
+    const inOffice =
+      (item.state === 'offices' || item.state === 'deliveries') &&
+      item.locationId !== null &&
+      officeStacks.has(item.locationId);
+    if (inOffice && item.locationId !== null) {
       const list = officeStacks.get(item.locationId) ?? [];
       list.push(stack);
       officeStacks.set(item.locationId, list);
     } else {
-      const state = item.state as PlaceGroup['state'];
+      const state = item.state;
       const key = `${state}|${item.locationId ?? ''}`;
       const group = otherStacks.get(key) ?? { state, locationId: item.locationId, stacks: [] };
       group.stacks.push(stack);

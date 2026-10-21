@@ -114,12 +114,12 @@ describe('classifyCorpAssets', () => {
       a({ itemId: 2, locationId: 1, locationFlag: 'Unlocked' }),
     ]);
     expect(items).toHaveLength(2);
-    expect(items.every((i) => i.state === 'other')).toBe(true);
+    expect(items.every((i) => i.state === 'other' && i.locationId === null)).toBe(true);
   });
 });
 
 describe('countLedgerByState', () => {
-  it('counts units per state plus all', () => {
+  it('counts stacks (not units) per state plus all', () => {
     const { items } = classifyCorpAssets([
       office,
       a({ itemId: 1, quantity: 5 }),
@@ -132,9 +132,9 @@ describe('countLedgerByState', () => {
       }),
     ]);
     expect(countLedgerByState(items)).toMatchObject({
-      all: 7,
-      offices: 5,
-      impounded: 2,
+      all: 2,
+      offices: 1,
+      impounded: 1,
       lockdown: 0,
     });
   });
@@ -266,6 +266,22 @@ describe('buildItemLedger', () => {
       expect(evaluateStockTargets(new Map([[100, 3]]), c.items).get(100)?.owned).toBe(2);
     });
 
+    it('treats a zero target as met', () => {
+      expect(evaluateStockTargets(new Map([[999, 0]]), []).get(999)).toMatchObject({
+        status: 'met',
+        shortBy: 0,
+      });
+    });
+
+    it('adds no qty-0 rows on the deliveries tab', () => {
+      const rows = buildItemLedger(classified.items, {
+        ...opts,
+        targets,
+        filter: { state: 'deliveries' },
+      });
+      expect(rows.find((r) => r.typeId === 999)).toBeUndefined();
+    });
+
     it('adds qty-0 rows for targeted types nothing owns and attaches stock to rows', () => {
       const rows = buildItemLedger(classified.items, { ...opts, targets });
       const missing = rows.find((r) => r.typeId === 999)!;
@@ -309,12 +325,29 @@ describe('buildLocationLedger', () => {
     const main = offices[1];
     expect(main.isEmpty).toBe(false);
     const d1 = main.divisions[0];
-    expect(d1.itemCount).toBe(44);
+    expect(d1.itemCount).toBe(4);
     expect(d1.estimatedValue).toBe(430 + 1000);
     expect(d1.volume).toBe(43);
     expect(d1.topStacks.map((s) => s.itemId)).toEqual([2, 4, 1]);
     expect(main.divisions[1].itemCount).toBe(0);
     expect(main.deliveries.itemCount).toBe(1);
+  });
+
+  it('sends locations without an OfficeFolder to others with their state', () => {
+    const ledger = buildLocationLedger(
+      classifyCorpAssets([
+        a({
+          itemId: 1,
+          locationId: STATION,
+          locationType: 'station',
+          locationFlag: 'CorpDeliveries',
+        }),
+        a({ itemId: 2, locationId: 777, locationType: 'item', locationFlag: 'CorpSAG1' }),
+      ]),
+      { prices }
+    );
+    expect(ledger.offices).toEqual([]);
+    expect(ledger.others.map((g) => g.state)).toEqual(['offices', 'deliveries']);
   });
 
   it('treats an office with only deliveries as empty and groups other states', () => {
