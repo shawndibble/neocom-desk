@@ -22,6 +22,7 @@ import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from '.
 import { fractionBar } from './cellKit';
 import { hbarsFromRows } from './chartBuilders';
 import type { CorpJobsFeed } from './corpFeeds';
+import { toBoardStarbases } from './corpStarbaseModels';
 import { elapsedShare } from './industryModels';
 import { shortStructureName } from './structureModels';
 import type { NumberSecondary, TableCell, TableModel, TableRowModel, Translate } from './types';
@@ -106,7 +107,12 @@ export const corpDeadlines: Builder = (feeds, { t, now }) => {
   const list = [feeds.structures, feeds.moonChunks, feeds.corpJobs] as const;
   // A feed still on its first load: nothing to say until every read has an answer.
   const pending = list.find((feed) => !feed || (!feed.data && feed.loading));
-  if (list.some((feed) => !feed) || pending !== undefined) return blank(null, statusOf(pending));
+  // Towers only add clocks: a Character may not read them, so they wait for an answer but never block one.
+  const towers = feeds.corpStarbases;
+  const towersPending = towers && !towers.data && towers.loading ? towers : undefined;
+  if (list.some((feed) => !feed) || pending !== undefined || towersPending !== undefined) {
+    return blank(null, statusOf(pending ?? towersPending));
+  }
 
   // A source this Character cannot read contributes undefined, never [].
   const structures = feeds.structures?.data?.structures ?? undefined;
@@ -114,8 +120,14 @@ export const corpDeadlines: Builder = (feeds, { t, now }) => {
   const chunks = feeds.moonChunks?.data?.chunks ?? undefined;
   const extractions = chunks ? (feeds.moonChunks?.data?.extractions ?? []) : undefined;
   const jobsData = feeds.corpJobs?.data?.readable ? feeds.corpJobs.data : undefined;
+  const towersData = towers?.data?.readable ? towers.data : undefined;
 
-  if (structures === undefined && chunks === undefined && jobsData === undefined) {
+  if (
+    structures === undefined &&
+    chunks === undefined &&
+    jobsData === undefined &&
+    towersData === undefined
+  ) {
     const failed = list.find((feed) => feed && !feed.data && feed.error);
     if (failed) return blank(null, statusOf(failed));
     const needsReauth =
@@ -131,6 +143,7 @@ export const corpDeadlines: Builder = (feeds, { t, now }) => {
     structures,
     extractions,
     jobs: jobsData ? toBoardJobs(jobsData.jobs, jobsData.typeNames) : undefined,
+    starbases: towersData ? toBoardStarbases(towersData, now) : undefined,
   });
   // The board is already soonest-first; an offline service has no clock, so it is no deadline.
   const timed = items.filter((item) => item.timing !== 'untimed');
@@ -175,6 +188,7 @@ export const corpDeadlines: Builder = (feeds, { t, now }) => {
     structures ? feeds.structures?.data?.fetchedAt : null,
     chunks ? feeds.moonChunks?.data?.fetchedAt : null,
     jobsData?.fetchedAt,
+    towersData?.fetchedAt,
   ].filter((at): at is Date => at instanceof Date);
 
   return {

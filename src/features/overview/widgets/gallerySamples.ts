@@ -555,6 +555,23 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ['Efa Athanor', 'Standup Reprocessing Facility I', t('overview.board.structureOffline')],
       ],
     },
+    corpStarbases: {
+      value: '4',
+      unit: t('overview.widgets.corpStarbases.unit'),
+      note: t('overview.widgets.corpStarbases.lowest', { name: 'Efa', duration: '1d 6h' }),
+      rows: [
+        [
+          'Caldari Control Tower',
+          'Efa',
+          t('overview.widgets.corpStarbases.fuelCell', { blocks: '1,248', duration: '1d 6h' }),
+        ],
+        [
+          'Amarr Control Tower Medium',
+          'Jita',
+          t('overview.widgets.corpStarbases.fuelCell', { blocks: '2,940', duration: '6d 3h' }),
+        ],
+      ],
+    },
     corpJobs: {
       value: '3',
       unit: t('overview.widgets.corpJobs.unit'),

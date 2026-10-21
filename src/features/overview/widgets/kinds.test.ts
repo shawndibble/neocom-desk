@@ -69,7 +69,6 @@ const CORP_IDS = [
 ];
 
 const CORP_SOON = [
-  'corpStarbases',
   'corpCustomsOffices',
   'corpOrders',
   'corpRoleAudit',

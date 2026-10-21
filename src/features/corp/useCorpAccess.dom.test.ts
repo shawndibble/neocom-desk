@@ -247,6 +247,7 @@ describe('useCorpAccess — ready', () => {
       canReadIndustry: true,
       canReadAssets: true,
       canReadBlueprints: true,
+      canReadStarbases: true,
     });
   });
 

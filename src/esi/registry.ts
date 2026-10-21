@@ -754,6 +754,20 @@ export const ESI_REGISTRY = {
     scope: 'esi-corporations.read_blueprints.v1',
     group: 'corp',
   },
+  /**
+   * The corp's starbases (POS) and one tower's detail (issue #4610): Director
+   * per `x-required-roles` (`canReadStarbases` in `engine/corpRoles.ts`).
+   */
+  getCorporationStarbases: {
+    route: '/corporations/{corporation_id}/starbases',
+    scope: 'esi-corporations.read_starbases.v1',
+    group: 'corp',
+  },
+  getCorporationStarbase: {
+    route: '/corporations/{corporation_id}/starbases/{starbase_id}',
+    scope: 'esi-corporations.read_starbases.v1',
+    group: 'corp',
+  },
 } as const satisfies Record<EndpointName, EsiEndpointSpec>;
 
 export type EsiEndpointId = keyof typeof ESI_REGISTRY;

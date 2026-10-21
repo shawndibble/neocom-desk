@@ -88,6 +88,12 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
    * read says nothing about the corp one.
    */
   canReadBlueprints: ['esi-corporations.read_blueprints.v1'],
+  /**
+   * The tower list and detail (issue #4610). Additive (below): a Director who
+   * granted the corp group before it existed keeps every corp surface and only
+   * the Starbases widget stays off until the scope arrives.
+   */
+  canReadStarbases: ['esi-corporations.read_starbases.v1'],
 };
 
 /**
@@ -106,7 +112,10 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
  * the corp grant prompt's once-only ask on nothing (decision
  * `20261018-141225-additive-corp-capabilities-do-not-hide-corp-ui`).
  */
-const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set(['canReadMiningLedger']);
+const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set([
+  'canReadMiningLedger',
+  'canReadStarbases',
+]);
 
 /**
  * Every scope the held capabilities need, deduplicated and in capability order.

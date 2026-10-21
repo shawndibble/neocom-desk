@@ -81,6 +81,29 @@ export interface CorpMiningFeed extends CorpFeedBase {
   minerNames: ReadonlyMap<number, string>;
 }
 
+/** One tower, reduced to what the Starbases builder reads. */
+export interface CorpStarbaseRow {
+  starbaseId: number;
+  systemId: number;
+  /** The tower's own type: its size and faction decide the burn rate. */
+  typeId: number;
+  /** ESI's `state`; "unknown" when it sent none. */
+  state: string;
+  reinforcedUntilMs: number | null;
+  unanchorsAtMs: number | null;
+  /**
+   * What the bay held when read; null when no detail was read (the tower is not
+   * online, or its read failed): unknown, not empty.
+   */
+  bay: { fuelBlocks: number; strontium: number } | null;
+}
+
+export interface CorpStarbasesFeed extends CorpFeedBase {
+  starbases: CorpStarbaseRow[];
+  typeNames: ReadonlyMap<number, string>;
+  systemNames: ReadonlyMap<number, string>;
+}
+
 export async function loadCorpWalletFeed(characterId: number): Promise<CorpWalletFeed> {
   const { loadCorpWallet } = await import('./corpFeedLoaders');
   return loadCorpWallet(characterId);
@@ -99,4 +122,9 @@ export async function loadCorpMembersFeed(characterId: number): Promise<CorpMemb
 export async function loadCorpMiningFeed(characterId: number): Promise<CorpMiningFeed> {
   const { loadCorpMining } = await import('./corpFeedLoaders');
   return loadCorpMining(characterId);
+}
+
+export async function loadCorpStarbasesFeed(characterId: number): Promise<CorpStarbasesFeed> {
+  const { loadCorpStarbases } = await import('./corpFeedLoaders');
+  return loadCorpStarbases(characterId);
 }

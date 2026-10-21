@@ -62,6 +62,12 @@ export interface CorpCapabilities {
    * `x-required-roles` on this route is `["Director"]` alone.
    */
   canReadBlueprints: boolean;
+  /**
+   * GET /corporations/{id}/starbases and /starbases/{starbase_id} — each
+   * tower's state, fuel and strontium (issue #4610). Director-only:
+   * `x-required-roles` is ["Director"] on both.
+   */
+  canReadStarbases: boolean;
 }
 
 export type CorpCapability = keyof CorpCapabilities;
@@ -82,6 +88,7 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadIndustry',
   'canReadAssets',
   'canReadBlueprints',
+  'canReadStarbases',
 ];
 
 /** The answer for a Character with no roles — and the shape of "not loaded yet". */
@@ -94,6 +101,7 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadIndustry: false,
   canReadAssets: false,
   canReadBlueprints: false,
+  canReadStarbases: false,
 };
 
 /**
@@ -126,6 +134,8 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
   // ["Director"] alone (issue #839's own brief guessed Director/
   // Factory_Manager, which the live spec does not confirm).
   canReadBlueprints: [],
+  // ['Director'] alone on both starbases paths, so the Director clause covers it.
+  canReadStarbases: [],
 };
 
 /**

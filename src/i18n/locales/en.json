@@ -4956,7 +4956,29 @@
       "corpStarbases": {
         "title": "Starbases",
         "description": "Starbase fuel, strontium and state",
-        "empty": "This widget is coming soon."
+        "empty": "The corporation has no starbases.",
+        "unit": "starbases",
+        "lowest": "{{name}} has {{duration}} of fuel",
+        "lowFuel_one": "{{count}} has under {{hours}} hours of fuel",
+        "lowFuel_other": "{{count}} have under {{hours}} hours of fuel",
+        "fuelCell": "{{blocks}} ({{duration}})",
+        "col": {
+          "tower": "Tower",
+          "system": "System",
+          "state": "State",
+          "fuel": "Fuel blocks",
+          "strontium": "Strontium",
+          "reinforced": "Reinforced for"
+        },
+        "state": {
+          "offline": "Offline",
+          "online": "Online",
+          "onlining": "Onlining",
+          "reinforced": "Reinforced",
+          "unanchoring": "Unanchoring"
+        },
+        "summary_one": "{{count}} starbase, {{low}} low on fuel.",
+        "summary_other": "{{count}} starbases, {{low}} low on fuel."
       },
       "corpCustomsOffices": {
         "title": "Customs offices",

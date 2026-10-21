@@ -198,6 +198,20 @@ describe('corpGrantCoverage', () => {
     });
   });
 
+  /** Issue #4610: a Director who granted the corp group before starbases keeps every corp surface. */
+  it('keeps a Director who predates the starbase scope out of roles-without-grant', () => {
+    const STARBASES = 'esi-corporations.read_starbases.v1';
+    const coverage = corpGrantCoverage(
+      corpCapabilities(['Director']),
+      scopesForGroup('corp').filter((scope) => scope !== STARBASES)
+    );
+    expect(coverage.missingScopes).toEqual([STARBASES]);
+    expect(coverage.blocking).toBe(false);
+    expect(coverage.capabilities.canReadStarbases).toBe(false);
+    expect(coverage.capabilities.canReadWallet).toBe(true);
+    expect(coverage.capabilities.canReadAssets).toBe(true);
+  });
+
   it('still blocks when a non-additive capability lacks a scope', () => {
     const coverage = corpGrantCoverage(corpCapabilities(['Accountant']), [MINING]);
     expect(coverage.blocking).toBe(true);
