@@ -344,3 +344,28 @@ describe('linkSurvey', () => {
     ).toThrow();
   });
 });
+
+describe('per-refinery rate (#4621)', () => {
+  it('parses a structure-scoped rate with its structure id', () => {
+    expect(
+      parseEditAction({
+        action: 'addRate',
+        rate: {
+          scope: 'structure',
+          structureId: 1035000000001,
+          pct: 4,
+          effectiveFrom: '2026-10-18',
+        },
+      })
+    ).toEqual({
+      action: 'addRate',
+      rate: { scope: 'structure', structureId: 1035000000001, pct: 4, effectiveFrom: '2026-10-18' },
+    });
+    expect(() =>
+      parseEditAction({
+        action: 'addRate',
+        rate: { scope: 'structure', pct: 4, effectiveFrom: '2026-10-18' },
+      })
+    ).toThrow();
+  });
+});

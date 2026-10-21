@@ -11,7 +11,7 @@
 // returns a token.
 
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
-import { FEEDERS } from './corpTaxBook.js';
+import { FEEDERS, REMOVAL_LINKS_COLLECTION } from './corpTaxBook.js';
 import {
   BOOK_DEFAULTS,
   advanceFeederHealth,
@@ -141,6 +141,12 @@ export async function recordFeederRead(
       update.status = 'disconnected';
       update.disconnectedAt = now;
       update.coveragePeriods = disconnectedCoverage(record.coveragePeriods, next, grace);
+      // A removal pending at the disconnect ends with it: its strip and its link would go stale.
+      update.removal = FieldValue.delete();
+      update.removalLinkId = FieldValue.delete();
+      if (record.removalLinkId) {
+        tx.delete(deps.db.collection(REMOVAL_LINKS_COLLECTION).doc(record.removalLinkId));
+      }
       appendAudit(
         tx,
         deps,

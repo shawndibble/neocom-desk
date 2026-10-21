@@ -114,7 +114,59 @@ export interface FeederCall {
   corporationId: number;
   /** The caller's own token carrying the corporation roles scope. */
   accessToken: string;
+  /**
+   * The moon owner's view only: which accounting corporation's history to open, the current one
+   * or any it left (#4621). Absent: the current one, else the last it left.
+   */
+  collectorCorporationId?: number;
 }
+
+/** One accounting corporation a moon owner left, in `corpTaxBookFeederPrevious.history`. */
+export interface PreviousCollector {
+  collectorCorporationId: number;
+  leftAt: number;
+}
+
+/**
+ * The accounting corporations a moon owner left, oldest first (#4621). A pointer written before
+ * the list holds only its top-level fields: that one entry.
+ */
+export function previousCollectors(doc: Record<string, unknown> | undefined): PreviousCollector[] {
+  if (!doc) return [];
+  const history = Array.isArray(doc.history)
+    ? (doc.history as unknown[]).filter(
+        (e): e is PreviousCollector =>
+          typeof e === 'object' &&
+          e !== null &&
+          typeof (e as PreviousCollector).collectorCorporationId === 'number' &&
+          typeof (e as PreviousCollector).leftAt === 'number'
+      )
+    : [];
+  if (history.length > 0) return history;
+  return typeof doc.collectorCorporationId === 'number' && typeof doc.leftAt === 'number'
+    ? [{ collectorCorporationId: doc.collectorCorporationId, leftAt: doc.leftAt }]
+    : [];
+}
+
+/** The list with `entry` last: leaving the same accounting corporation again moves it, never repeats it. */
+export function withPreviousCollector(
+  list: readonly PreviousCollector[],
+  entry: PreviousCollector
+): PreviousCollector[] {
+  return [...list.filter((e) => e.collectorCorporationId !== entry.collectorCorporationId), entry];
+}
+
+/** Ids of the accounting corporations it left, newest first, without `current`. */
+const previousIds = (list: readonly PreviousCollector[], current?: number): number[] =>
+  [...list]
+    .reverse()
+    .map((e) => e.collectorCorporationId)
+    .filter((id) => id !== current);
+
+const readPrevious = async (db: CorpSyncDeps['db'], corporationId: number) =>
+  previousCollectors(
+    (await db.collection(FEEDER_PREVIOUS_COLLECTION).doc(String(corporationId)).get()).data()
+  );
 
 export function parseFeederCall(data: unknown): FeederCall {
   const d = record(data);
@@ -126,7 +178,18 @@ export function parseFeederCall(data: unknown): FeederCall {
   ) {
     throw new HttpsError('invalid-argument', 'corporationId must be a positive integer');
   }
-  return { corporationId, accessToken: boundedString(d.accessToken, 'accessToken', 8192) };
+  const collector = d.collectorCorporationId;
+  if (
+    collector !== undefined &&
+    (typeof collector !== 'number' || !Number.isSafeInteger(collector) || collector <= 0)
+  ) {
+    throw new HttpsError('invalid-argument', 'collectorCorporationId must be a positive integer');
+  }
+  return {
+    corporationId,
+    accessToken: boundedString(d.accessToken, 'accessToken', 8192),
+    ...(collector !== undefined ? { collectorCorporationId: collector } : {}),
+  };
 }
 
 // --- Save ------------------------------------------------------------------
@@ -444,14 +507,22 @@ export async function authorizeFeederCaller(
   const pointer = (
     await deps.db.collection(FEEDER_OF_COLLECTION).doc(String(input.corporationId)).get()
   ).data();
-  let collector = pointer?.collectorCorporationId;
-  if (typeof collector !== 'number' && standing === 'view') {
-    const previous = (
-      await deps.db.collection(FEEDER_PREVIOUS_COLLECTION).doc(String(input.corporationId)).get()
-    ).data();
-    collector = previous?.collectorCorporationId;
+  const current: unknown = pointer?.collectorCorporationId;
+  let collector = typeof current === 'number' ? current : undefined;
+  if (standing === 'view') {
+    // The view also opens the history of any accounting corporation it left (#4621).
+    const previous = await readPrevious(deps.db, input.corporationId);
+    const wanted = input.collectorCorporationId;
+    if (wanted !== undefined) {
+      collector =
+        wanted === collector || previous.some((e) => e.collectorCorporationId === wanted)
+          ? wanted
+          : undefined;
+    } else if (collector === undefined) {
+      collector = previous.at(-1)?.collectorCorporationId;
+    }
   }
-  if (typeof collector !== 'number') return null;
+  if (collector === undefined) return null;
   const [recordSnap, grantSnap] = await Promise.all([
     bookRef(deps.db, collector).collection(FEEDERS).doc(String(input.corporationId)).get(),
     grantRef(deps.db, input.corporationId).get(),
@@ -534,10 +605,11 @@ export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Prom
   const now = deps.now();
 
   const dropped = await deps.db.runTransaction(async (tx) => {
-    const [recSnap, ptrSnap, grantSnap] = await Promise.all([
+    const [recSnap, ptrSnap, grantSnap, prevSnap] = await Promise.all([
       tx.get(feederRef),
       tx.get(pointerRef),
       tx.get(gRef),
+      tx.get(previousRef),
     ]);
     const rec = recSnap.data() as FeederRecord | undefined;
     if (!rec || !ptrSnap.exists || !input.allowed.includes(rec.status)) {
@@ -560,8 +632,16 @@ export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Prom
       tx.delete(deps.db.collection(REMOVAL_LINKS_COLLECTION).doc(rec.removalLinkId));
     }
     tx.delete(pointerRef);
-    // The after-leaving view still finds its Collector through this.
-    tx.set(previousRef, { collectorCorporationId: collector, leftAt: now });
+    // The after-leaving view still finds its Collector through this. The top-level fields are
+    // the last one left; `history` keeps every one, so a later join and leave loses none (#4621).
+    tx.set(previousRef, {
+      collectorCorporationId: collector,
+      leftAt: now,
+      history: withPreviousCollector(previousCollectors(prevSnap.data()), {
+        collectorCorporationId: collector,
+        leftAt: now,
+      }),
+    });
     if (grant?.kind === 'feeder') tx.delete(gRef);
     appendAudit(tx, bookDeps(deps), collector, input.actor, input.action, {
       feederCorporationId: feederCorp,
@@ -616,7 +696,7 @@ export interface FeederRefinery {
 
 export type FeederStatusResult =
   /** `ownBookFrom`: a former moon owner's earliest own-book start (UTC day), for its members. */
-  | { status: 'none'; ownBookFrom?: string }
+  | { status: 'none'; ownBookFrom?: string; previousCollectorIds?: number[] }
   | {
       status: 'feeder';
       collectorCorporationId: number;
@@ -629,6 +709,8 @@ export type FeederStatusResult =
       isHolder: boolean;
       refineries: FeederRefinery[];
       owedIsk: number | null;
+      /** Accounting corporations it left, newest first (#4621): each keeps its history view. */
+      previousCollectorIds: number[];
     };
 
 /** Most observed rows one status call reads; a feeder with more shows the newest slice. */
@@ -661,9 +743,9 @@ async function notFeeding(
   const identity = await deps
     .readIdentity(characterIdForUid(caller.uid)!, input.accessToken)
     .catch(() => null);
-  return identity?.corporationId === input.corporationId
-    ? { status: 'none', ownBookFrom: floor }
-    : { status: 'none' };
+  if (identity?.corporationId !== input.corporationId) return { status: 'none' };
+  const previous = previousIds(await readPrevious(deps.db, input.corporationId));
+  return { status: 'none', ownBookFrom: floor, previousCollectorIds: previous };
 }
 
 export async function getFeederStatus(
@@ -674,7 +756,7 @@ export async function getFeederStatus(
   const ctx = await authorizeFeederCaller(deps, caller, input, 'read');
   if (!ctx) return notFeeding(deps, caller, input);
   const { record: rec, collectorCorporationId: collector } = ctx;
-  const [book, observed] = await Promise.all([
+  const [book, observed, previous] = await Promise.all([
     bookRef(deps.db, collector).get(),
     bookRef(deps.db, collector)
       .collection(OBSERVED)
@@ -682,6 +764,7 @@ export async function getFeederStatus(
       .select('structureId', 'date', 'quantity')
       .limit(STATUS_ROW_LIMIT)
       .get(),
+    readPrevious(deps.db, input.corporationId),
   ]);
   const name = book.get('corporationName');
   const rows = observed.docs.map(
@@ -705,5 +788,6 @@ export async function getFeederStatus(
       ctx.callerId === ctx.grant?.grantedBy,
     refineries: aggregateRefineries(rows, rec.coveragePeriods),
     owedIsk: null,
+    previousCollectorIds: previousIds(previous, collector),
   };
 }

@@ -7,7 +7,12 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
-import { leaveFeeder, saveFeederGrant, type FeederGrantDeps } from './corpTaxBookFeederGrant.js';
+import {
+  getFeederStatus,
+  leaveFeeder,
+  saveFeederGrant,
+  type FeederGrantDeps,
+} from './corpTaxBookFeederGrant.js';
 import {
   dismissFeederHistory,
   getFeederViewAccess,
@@ -107,6 +112,9 @@ const bookDeps = (): BookDeps => {
     openPrices: d.openPrices,
   };
 };
+/** ESI's universe/names stand-in: player corporations are 98xxxxxx, id 5 is nobody. */
+const idCategory = async (id: number) =>
+  id === 5 ? undefined : id >= 98_000_000 && id < 99_000_000 ? 'corporation' : 'character';
 const who = (id: number): Caller => ({ uid: `char:${id}`, ownerHash: `h${id}` });
 const collectorBook = () => db.collection('corpTaxBooks').doc(String(COLLECTOR));
 const feederRecord = async () =>
@@ -297,7 +305,7 @@ suite('moon owner view', () => {
   it('payee: the moon owner sets it, stamped and in the view (#4619)', async () => {
     await save(await newInvite());
     const payee = { kind: 'character' as const, id: 77 };
-    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee });
+    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee }, idCategory);
     const rec = (await feederRecord()) as (FeederRecord & { payeeHistory?: unknown }) | undefined;
     expect(rec?.payee).toEqual(payee);
     expect(rec?.payeeChangedAt).toBe(T0);
@@ -307,10 +315,26 @@ suite('moon owner view', () => {
     expect(audit.docs.filter((d) => d.get('action') === 'feederPayeeSet')).toHaveLength(1);
   });
 
+  it('payee: refuses an id that is not the kind it claims to be (#4621)', async () => {
+    await save(await newInvite());
+    for (const payee of [
+      { kind: 'corporation' as const, id: 77 },
+      { kind: 'character' as const, id: 98000009 },
+      { kind: 'character' as const, id: 5 },
+    ]) {
+      expect(
+        await reason(
+          setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee }, idCategory)
+        )
+      ).toBe('payee-mismatch');
+    }
+    expect((await feederRecord())?.payee).toBeUndefined();
+  });
+
   it('payee: naming the standing payee, or its own corporation when unset, writes nothing', async () => {
     await save(await newInvite());
     const own = { kind: 'corporation' as const, id: FEEDER };
-    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee: own });
+    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee: own }, idCategory);
     const rec = await feederRecord();
     expect(rec?.payee).toBeUndefined();
     expect(rec?.payeeChangedAt).toBeUndefined();
@@ -324,22 +348,24 @@ suite('moon owner view', () => {
     for (const id of [FEEDER_JUNIOR, FEEDER_NOBODY, COLLECTOR_CEO]) {
       expect(
         await reason(
-          setFeederPayee(deps(), who(id), {
-            corporationId: FEEDER,
-            accessToken: `roles-${id}`,
-            payee,
-          })
+          setFeederPayee(
+            deps(),
+            who(id),
+            { corporationId: FEEDER, accessToken: `roles-${id}`, payee },
+            idCategory
+          )
         )
       ).toBe('not-your-feeder');
     }
     // The accounting corporation naming itself: no moon owner by that id.
     expect(
       await reason(
-        setFeederPayee(deps(), who(COLLECTOR_CEO), {
-          corporationId: COLLECTOR,
-          accessToken: `roles-${COLLECTOR_CEO}`,
-          payee,
-        })
+        setFeederPayee(
+          deps(),
+          who(COLLECTOR_CEO),
+          { corporationId: COLLECTOR, accessToken: `roles-${COLLECTOR_CEO}`, payee },
+          idCategory
+        )
       )
     ).toBe('not-your-feeder');
     expect((await feederRecord())?.payee).toBeUndefined();
@@ -351,11 +377,84 @@ suite('moon owner view', () => {
     expect(await pointer()).toBeUndefined();
     expect(
       (await db.collection('corpTaxBookFeederPrevious').doc(String(FEEDER)).get()).data()
-    ).toEqual({ collectorCorporationId: COLLECTOR, leftAt: T0 });
+    ).toEqual({
+      collectorCorporationId: COLLECTOR,
+      leftAt: T0,
+      history: [{ collectorCorporationId: COLLECTOR, leftAt: T0 }],
+    });
     // joined and left the same day: no day was ever covered
     expect(await summary()).toMatchObject({ status: 'left', leftAt: T0, coverageFrom: null });
     const out = await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), asDirector);
     expect(out.collectorCorporationId).toBe(COLLECTOR);
+  });
+
+  it('keeps every accounting corporation it left, by id, across a later join and leave (#4621)', async () => {
+    const OTHER = 98000050;
+    await save(await newInvite(), 6);
+    await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
+    // Joins another accounting corporation.
+    await db
+      .collection('corpTaxBooks')
+      .doc(String(OTHER))
+      .set({ active: true, corporationName: 'Other' });
+    await db
+      .collection('corpTaxBooks')
+      .doc(String(OTHER))
+      .collection('feeders')
+      .doc(String(FEEDER))
+      .set({
+        corporationId: FEEDER,
+        status: 'active',
+        invitedBy: 1,
+        joinedAt: T0,
+        mode: 'normal',
+        coveragePeriods: [{ from: '2026-10-18' }],
+      });
+    await db
+      .collection('corpTaxBookFeederOf')
+      .doc(String(FEEDER))
+      .set({ collectorCorporationId: OTHER, since: T0 });
+
+    const previous = { ...asDirector, collectorCorporationId: COLLECTOR };
+    expect(
+      (await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), previous)).collectorCorporationId
+    ).toBe(COLLECTOR);
+    expect(
+      (await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), asDirector)).collectorCorporationId
+    ).toBe(OTHER);
+    expect(await getFeederStatus(deps(), who(FEEDER_DIRECTOR), asDirector)).toMatchObject({
+      status: 'feeder',
+      collectorCorporationId: OTHER,
+      previousCollectorIds: [COLLECTOR],
+    });
+
+    // Leaving the second keeps the first.
+    await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
+    const doc = (await db.collection('corpTaxBookFeederPrevious').doc(String(FEEDER)).get()).data();
+    expect(doc).toMatchObject({ collectorCorporationId: OTHER, leftAt: T0 });
+    expect(doc?.history).toEqual([
+      { collectorCorporationId: COLLECTOR, leftAt: T0 },
+      { collectorCorporationId: OTHER, leftAt: T0 },
+    ]);
+    expect(
+      (await getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), previous)).collectorCorporationId
+    ).toBe(COLLECTOR);
+    expect(await getFeederStatus(deps(), who(FEEDER_DIRECTOR), asDirector)).toMatchObject({
+      status: 'none',
+      previousCollectorIds: [OTHER, COLLECTOR],
+    });
+    await dismissFeederHistory(deps(), who(FEEDER_DIRECTOR), previous);
+    expect((await feederRecord())?.viewDismissedAt).toBe(T0);
+
+    // A corporation that never handled it resolves nothing.
+    expect(
+      await reason(
+        getFeederViewAccess(deps(), who(FEEDER_DIRECTOR), {
+          ...asDirector,
+          collectorCorporationId: 98000099,
+        })
+      )
+    ).toBe('not-your-feeder');
   });
 
   it('dismiss: refused while active, works after leaving and sticks', async () => {

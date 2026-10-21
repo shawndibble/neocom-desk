@@ -111,6 +111,7 @@ describe('scopesForGroup', () => {
         'esi-characters.read_corporation_roles.v1',
         'esi-corporations.read_blueprints.v1',
         'esi-planets.read_customs_offices.v1',
+        'esi-contracts.read_corporation_contracts.v1',
       ].sort()
     );
   });

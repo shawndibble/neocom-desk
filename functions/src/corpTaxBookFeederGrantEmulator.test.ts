@@ -291,6 +291,7 @@ suite('moon owner onboarding', () => {
     expect(await getFeederStatus(deps(), who(FEEDER_DIRECTOR), call)).toEqual({
       status: 'none',
       ownBookFrom: '2026-10-18',
+      previousCollectorIds: [COLLECTOR],
     });
     expect(
       await getFeederStatus(deps(), who(COLLECTOR_CEO), {

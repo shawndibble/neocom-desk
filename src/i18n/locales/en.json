@@ -5173,7 +5173,24 @@
       "corpContracts": {
         "title": "Corp contracts",
         "description": "Outstanding courier and item exchange contracts",
-        "empty": "This widget is coming soon."
+        "empty": "No courier or item exchange contracts are outstanding.",
+        "unit": "outstanding",
+        "expiringSoon_one": "{{count}} expiring within a day",
+        "expiringSoon_other": "{{count}} expiring within a day",
+        "collateral": "{{amount}} ISK courier collateral at stake",
+        "untitled": "{{type}} #{{id}}",
+        "overdue": "Overdue",
+        "underCache": "Under 5 min",
+        "col": {
+          "contract": "Contract",
+          "expiry": "Expires in",
+          "type": "Type",
+          "issuer": "Issuer",
+          "assignee": "Assignee",
+          "collateral": "Collateral"
+        },
+        "summary_one": "{{count}} outstanding corp contract, {{soon}} expiring within a day.",
+        "summary_other": "{{count}} outstanding corp contracts, {{soon}} expiring within a day."
       },
       "corpSrp": {
         "title": "Ship replacement",
@@ -6271,6 +6288,7 @@
         "guest": "guest rate",
         "miner": "per-Miner rate",
         "moon": "per-moon rate",
+        "structure": "per-refinery rate",
         "record": "correction for this day"
       },
       "detail": {
@@ -14667,7 +14685,8 @@
           "corp": "Corp default",
           "guest": "Guest default",
           "miner": "Miner",
-          "moon": "Moon"
+          "moon": "Moon",
+          "structure": "Refinery"
         },
         "from": "from {{date}}",
         "rateFor": "Applies to",

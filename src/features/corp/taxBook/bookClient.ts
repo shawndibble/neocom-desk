@@ -34,6 +34,7 @@ import type {
 import { scheduledSyncFrom, type ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import type { FeederModeChange, FeederPayout } from '@/engine/corpTaxBook/feederAccrual';
 import type { FeederReadClock } from '@/engine/corpTaxBook/feederHealth';
+import type { RemovalNoticeRecord } from '@/engine/corpTaxBook/mailQueue';
 import type { OwnerRateEntry } from '@/engine/corpTaxBook/ownerRate';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
@@ -90,6 +91,34 @@ async function call<In, Out>(characterId: number, name: string, data: In): Promi
   await ensureSignedIn(characterId);
   const result = await httpsCallable<In, Out>(getSyncFunctions(), name)(data);
   return result.data;
+}
+
+/**
+ * A moon owner's status and pending removal, read under the officer rules right before the send
+ * queue mails a removal notice (#4621). A lapsed officer record is renewed once.
+ */
+export async function readFeederRemovalState(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number
+): Promise<RemovalNoticeRecord | undefined> {
+  await ensureSignedIn(characterId);
+  const ref = doc(
+    getSyncFirestore(),
+    'corpTaxBooks',
+    String(corporationId),
+    'feeders',
+    String(feederCorporationId)
+  );
+  const read = async () => (await getDoc(ref)).data() as RemovalNoticeRecord | undefined;
+  try {
+    return await read();
+  } catch (error) {
+    if (!String((error as { code?: unknown }).code ?? '').endsWith('permission-denied'))
+      throw error;
+    await verifyOfficer(characterId, corporationId);
+    return read();
+  }
 }
 
 /** Checks the Character's corporation and roles with ESI and records officer access for 24 hours (D7). */

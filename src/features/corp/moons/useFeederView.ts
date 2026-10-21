@@ -18,10 +18,14 @@ export type FeederViewLoad =
       names: (characterId: number) => string;
     };
 
-/** The moon owner's view for a corporation: access, then the view, then the miners' names. */
+/**
+ * The moon owner's view for a corporation: access, then the view, then the miners' names.
+ * `collectorCorporationId` opens an accounting corporation it left (#4621).
+ */
 export function useFeederView(
   characterId: number,
-  corporationId: number
+  corporationId: number,
+  collectorCorporationId?: number
 ): { load: FeederViewLoad; reload: () => void } {
   const [load, setLoad] = useState<FeederViewLoad>({ state: 'loading' });
   const [attempt, setAttempt] = useState(0);
@@ -29,7 +33,10 @@ export function useFeederView(
     let cancelled = false;
     void (async () => {
       try {
-        const { access, view } = await loadFeederView(characterId, corporationId);
+        const { access, view } =
+          collectorCorporationId === undefined
+            ? await loadFeederView(characterId, corporationId)
+            : await loadFeederView(characterId, corporationId, collectorCorporationId);
         const ids = view ? [...characterIdsOf(view.days), payeeIdOf(view.summary)] : [];
         const resolved = await resolveNames(ids).catch(() => new Map<number, string>());
         if (!cancelled)
@@ -47,7 +54,7 @@ export function useFeederView(
     return () => {
       cancelled = true;
     };
-  }, [characterId, corporationId, attempt]);
+  }, [characterId, corporationId, collectorCorporationId, attempt]);
   const reload = useCallback(() => {
     setLoad({ state: 'loading' });
     setAttempt((n) => n + 1);

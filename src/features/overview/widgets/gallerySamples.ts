@@ -690,6 +690,16 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ['Dax Orlen', 0.5, '24%'],
       ]),
     },
+    corpContracts: {
+      value: '7',
+      unit: t('overview.widgets.corpContracts.unit'),
+      note: t('overview.widgets.corpContracts.expiringSoon', { count: 2 }),
+      rows: [
+        ['Jita to Efa haul', t('contracts.typeCourier'), '5h 10m'],
+        ['Rifter fleet stock', t('contracts.typeItemExchange'), '1d 3h'],
+        ['Efa to Amarr haul', t('contracts.typeCourier'), '2d 8h'],
+      ],
+    },
     corpCustomsOffices: {
       value: '3',
       unit: t('overview.widgets.corpCustomsOffices.unit', { count: 3 }),

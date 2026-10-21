@@ -755,9 +755,18 @@ export const ESI_REGISTRY = {
     group: 'corp',
   },
   /**
+   * Contracts issued by or assigned to the corporation. No in-game role is
+   * required (`x-required-roles` is absent), so `canReadContracts` is open to
+   * every member; the scope is additive (`corpScopes.ts`).
+   */
+  getCorporationContracts: {
+    route: '/corporations/{corporation_id}/contracts',
+    scope: 'esi-contracts.read_corporation_contracts.v1',
+    group: 'corp',
+  },
+  /**
    * Customs offices (issue #4611): Director-only per `x-required-roles`
-   * (`canReadCustomsOffices`). The scope is the corp twin of nothing in the
-   * Base Grant, and additive (`corpScopes.ts`).
+   * (`canReadCustomsOffices`); the scope is additive (`corpScopes.ts`).
    */
   getCorporationCustomsOffices: {
     route: '/corporations/{corporation_id}/customs_offices',

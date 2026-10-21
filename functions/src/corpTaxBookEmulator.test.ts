@@ -386,6 +386,21 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect((await book().get()).get('rates')).toHaveLength(3);
     });
 
+    it('keeps a per-refinery rate for each refinery on one day (#4621)', async () => {
+      await turnOn();
+      for (const structureId of [1035000000001, 1035000000002]) {
+        await edit(ACCOUNTANT, {
+          action: 'addRate',
+          rate: { scope: 'structure', structureId, pct: 4, effectiveFrom: '2026-10-18' },
+        });
+      }
+      expect(
+        ((await book().get()).get('rates') as { scope: string; structureId?: number }[])
+          .filter((r) => r.scope === 'structure')
+          .map((r) => r.structureId)
+      ).toEqual([1035000000001, 1035000000002]);
+    });
+
     it('re-checks the role live for dismiss, write-off, rebill and not tax', async () => {
       await turnOn();
       const dismiss = {

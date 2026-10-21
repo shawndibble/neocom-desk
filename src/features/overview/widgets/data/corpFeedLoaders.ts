@@ -12,6 +12,7 @@ import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCorporationId, MASTER_WALLET_DIVISION } from '@/features/corp/boardData';
 import { jobTypeIds } from '@/features/corp/boardSources';
+import { loadCorporationContracts } from '@/features/corp/contracts';
 import { CorpReadFailed } from '@/features/corp/corpRead';
 import { resolveCorpReadAccess, type CorpCapability } from '@/features/corp/corpReadAccess';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
@@ -37,6 +38,7 @@ import { parseInstant } from '@/engine/esiInstant';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import type {
   CorpCustomsFeed,
+  CorpContractsFeed,
   CorpJobsFeed,
   CorpJournalLine,
   CorpKillsFeed,
@@ -256,6 +258,23 @@ export async function loadCorpMining(characterId: number): Promise<CorpMiningFee
     typeNames,
     minerNames,
   };
+}
+
+export async function loadCorpContracts(characterId: number): Promise<CorpContractsFeed> {
+  const empty: CorpContractsFeed = { ...UNREADABLE, contracts: [], names: new Map() };
+  const access = await gate(characterId, 'canReadContracts');
+  if (access === null) return empty;
+  const result = await loadCorporationContracts(characterId, access.corporationId);
+  if (result.cached === null) {
+    if (result.needsReauth) return { ...empty, needsReauth: true };
+    throw new CorpReadFailed('contracts');
+  }
+  const contracts = result.cached.data;
+  const open = contracts.filter((c) => c.status === 'outstanding' || c.status === 'in_progress');
+  const names = await resolveNames([
+    ...new Set(open.flatMap((c) => [c.issuer_id, c.assignee_id]).filter((id) => id > 0)),
+  ]);
+  return { readable: true, needsReauth: false, ...readAge([result]), contracts, names };
 }
 
 /**
