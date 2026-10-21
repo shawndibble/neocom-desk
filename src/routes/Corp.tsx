@@ -53,8 +53,10 @@ import { OverviewEditProvider } from '@/features/overview/widgets/OverviewEditPr
 import { distinctKinds, visibleWidgets } from '@/features/overview/widgets/visibility';
 import { WidgetGrid } from '@/features/overview/widgets/WidgetGrid';
 import type { CorpCapabilities } from '@/engine/corpRoles';
+import { WarBanner } from '@/features/wars/WarBanner';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 
 // The corp kinds' builders load with this route, not with the Overview's startup graph.
 registerKindDefs(CORP_DEFS);
@@ -83,6 +85,7 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
   const isPhone = useIsPhone();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const summary = useOverviewSummary(layout.widgets);
+  const characterId = useActiveCharacter((state) => state.activeCharacterId);
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -97,6 +100,7 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
         subNav={<CorpSubNav flush />}
         actions={<OverviewCustomize />}
       />
+      {characterId !== null && <WarBanner characterId={characterId} />}
       <OverviewCachedNotice summary={summary} />
       {editing && (
         <Suspense fallback={null}>
