@@ -121,11 +121,12 @@ const ownerDeps = (): CorpSyncDeps => ({
   readIdentity: deps().readIdentity,
 });
 const setPayee = (payee: { kind: 'character' | 'corporation'; id: number }) =>
-  setFeederPayee(ownerDeps(), who(FEEDER_DIRECTOR), {
-    corporationId: FEEDER,
-    accessToken: tok(FEEDER_DIRECTOR),
-    payee,
-  });
+  setFeederPayee(
+    ownerDeps(),
+    who(FEEDER_DIRECTOR),
+    { corporationId: FEEDER, accessToken: tok(FEEDER_DIRECTOR), payee },
+    async (id) => (id >= 98_000_000 && id < 99_000_000 ? 'corporation' : 'character')
+  );
 /** A real change of payee: away and back, so the stamp moves even for the same final payee. */
 const changePayeeTo = async (payee: { kind: 'character' | 'corporation'; id: number }) => {
   await setPayee({ kind: 'character', id: STRANGER });

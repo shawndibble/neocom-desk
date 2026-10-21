@@ -107,6 +107,9 @@ const bookDeps = (): BookDeps => {
     openPrices: d.openPrices,
   };
 };
+/** ESI's universe/names stand-in: player corporations are 98xxxxxx, id 5 is nobody. */
+const idCategory = async (id: number) =>
+  id === 5 ? undefined : id >= 98_000_000 && id < 99_000_000 ? 'corporation' : 'character';
 const who = (id: number): Caller => ({ uid: `char:${id}`, ownerHash: `h${id}` });
 const collectorBook = () => db.collection('corpTaxBooks').doc(String(COLLECTOR));
 const feederRecord = async () =>
@@ -297,7 +300,7 @@ suite('moon owner view', () => {
   it('payee: the moon owner sets it, stamped and in the view (#4619)', async () => {
     await save(await newInvite());
     const payee = { kind: 'character' as const, id: 77 };
-    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee });
+    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee }, idCategory);
     const rec = (await feederRecord()) as (FeederRecord & { payeeHistory?: unknown }) | undefined;
     expect(rec?.payee).toEqual(payee);
     expect(rec?.payeeChangedAt).toBe(T0);
@@ -307,10 +310,26 @@ suite('moon owner view', () => {
     expect(audit.docs.filter((d) => d.get('action') === 'feederPayeeSet')).toHaveLength(1);
   });
 
+  it('payee: refuses an id that is not the kind it claims to be (#4621)', async () => {
+    await save(await newInvite());
+    for (const payee of [
+      { kind: 'corporation' as const, id: 77 },
+      { kind: 'character' as const, id: 98000009 },
+      { kind: 'character' as const, id: 5 },
+    ]) {
+      expect(
+        await reason(
+          setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee }, idCategory)
+        )
+      ).toBe('payee-mismatch');
+    }
+    expect((await feederRecord())?.payee).toBeUndefined();
+  });
+
   it('payee: naming the standing payee, or its own corporation when unset, writes nothing', async () => {
     await save(await newInvite());
     const own = { kind: 'corporation' as const, id: FEEDER };
-    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee: own });
+    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee: own }, idCategory);
     const rec = await feederRecord();
     expect(rec?.payee).toBeUndefined();
     expect(rec?.payeeChangedAt).toBeUndefined();
@@ -324,22 +343,24 @@ suite('moon owner view', () => {
     for (const id of [FEEDER_JUNIOR, FEEDER_NOBODY, COLLECTOR_CEO]) {
       expect(
         await reason(
-          setFeederPayee(deps(), who(id), {
-            corporationId: FEEDER,
-            accessToken: `roles-${id}`,
-            payee,
-          })
+          setFeederPayee(
+            deps(),
+            who(id),
+            { corporationId: FEEDER, accessToken: `roles-${id}`, payee },
+            idCategory
+          )
         )
       ).toBe('not-your-feeder');
     }
     // The accounting corporation naming itself: no moon owner by that id.
     expect(
       await reason(
-        setFeederPayee(deps(), who(COLLECTOR_CEO), {
-          corporationId: COLLECTOR,
-          accessToken: `roles-${COLLECTOR_CEO}`,
-          payee,
-        })
+        setFeederPayee(
+          deps(),
+          who(COLLECTOR_CEO),
+          { corporationId: COLLECTOR, accessToken: `roles-${COLLECTOR_CEO}`, payee },
+          idCategory
+        )
       )
     ).toBe('not-your-feeder');
     expect((await feederRecord())?.payee).toBeUndefined();
