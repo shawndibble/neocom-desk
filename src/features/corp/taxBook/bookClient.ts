@@ -40,7 +40,7 @@ import type {
 import type { FeederReadClock } from '@/engine/corpTaxBook/feederHealth';
 import type { RemovalNoticeRecord } from '@/engine/corpTaxBook/mailQueue';
 import type { OwnerRateEntry } from '@/engine/corpTaxBook/ownerRate';
-import type { StoredRefineryLabel } from '@/engine/corpTaxBook/refinery';
+import type { StoredRefineryLabel, StoredRefineryStructure } from '@/engine/corpTaxBook/refinery';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -369,6 +369,10 @@ export interface BookFeeder extends FeederReadClock {
   refineryLabels?: Record<string, StoredRefineryLabel>;
   /** Refinery systems by structure id, learned from miners' own ledgers (#4650). */
   refinerySystems?: Record<string, number>;
+  /** Refinery names and systems the sync read with the moon owner's grant (#4654). */
+  refineryStructures?: Record<string, StoredRefineryStructure>;
+  /** The moon owner's grant reads refinery names (#4654); absent on a grant from before. */
+  readsStructureNames?: boolean;
   payouts: FeederPayoutRow[];
 }
 

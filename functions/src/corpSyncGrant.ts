@@ -46,6 +46,7 @@ import {
   outcomeOf,
   readFeederLedger,
   recordFeederRead,
+  refreshRefineryStructures,
   type FeederReadRecord,
 } from './corpTaxBookFeederSync.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
@@ -78,6 +79,11 @@ export interface CorpSyncGrantDoc {
   grantedBy?: number;
   /** Feeder grants: the Collector whose book the feeder feeds. */
   collectorCorporationId?: number;
+  /**
+   * Feeder grants: the token also carries `esi-universe.read_structures.v1`, so the sync reads
+   * its refineries' names and systems (#4654). Absent on grants from before: never looked up.
+   */
+  readsStructures?: boolean;
 }
 
 /** `corpTaxBooks/{corp}/meta/scheduledSync`: officers read this, nobody writes it but the functions. */
@@ -633,6 +639,23 @@ export async function syncOneFeeder(
     return finish({ outcome: 'none', reason: 'esi-unavailable' }, false, live);
   }
   await mergeObservedInto(bookDeps(deps), collectorCorporationId, read.rows);
+  // Refinery names and systems (#4654): best effort, never part of the feeder's health.
+  try {
+    await refreshRefineryStructures(
+      bookDeps(deps),
+      esi,
+      collectorCorporationId,
+      feederCorporationId,
+      read.rows.map((r) => r.structureId),
+      refreshed.accessToken,
+      live.readsStructures === true
+    );
+  } catch (err) {
+    deps.log('Refinery structure lookup failed', {
+      feederCorporationId,
+      error: err instanceof Error ? err.name : 'unknown',
+    });
+  }
   return finish({ outcome, refineries: read.refineries }, false, live);
 }
 

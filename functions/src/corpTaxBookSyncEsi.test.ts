@@ -79,4 +79,37 @@ describe('esiSyncReader', () => {
     });
     expect(await esi.structureSystem(5, 'tok')).toMatchObject({ kind: 'ok', data: 30000142 });
   });
+
+  it('reads a structure name and system with the identification headers (#4654)', async () => {
+    const seen: { url: string; headers: Headers }[] = [];
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      seen.push({ url, headers: new Headers(init.headers) });
+      return json({ name: 'Efa VII - Tatara', solar_system_id: 30004000, owner_id: 98000002 });
+    }) as unknown as typeof fetch;
+    expect(await esiSyncReader(fetchImpl).structure(1_000_000_000_001, 'tok')).toEqual({
+      kind: 'ok',
+      name: 'Efa VII - Tatara',
+      solarSystemId: 30004000,
+    });
+    expect(new URL(seen[0].url).pathname).toBe('/latest/universe/structures/1000000000001/');
+    expect(seen[0].headers.get('X-Compatibility-Date')).toBeTruthy();
+    expect(seen[0].headers.get('X-User-Agent')).toMatch(/Neocom Desk/);
+  });
+
+  it.each([
+    [403, 'denied'],
+    [404, 'denied'],
+    [401, 'unavailable'],
+    [420, 'backoff'],
+    [429, 'backoff'],
+    [500, 'unavailable'],
+  ])('reads a structure lookup %i as %s', async (status, kind) => {
+    const fetchImpl = (async () => json({}, {}, status)) as unknown as typeof fetch;
+    expect((await esiSyncReader(fetchImpl).structure(5, 'tok')).kind).toBe(kind);
+  });
+
+  it('a structure answer with no name or system is no answer', async () => {
+    const fetchImpl = (async () => json({ name: 'X' })) as unknown as typeof fetch;
+    expect((await esiSyncReader(fetchImpl).structure(5, 'tok')).kind).toBe('unavailable');
+  });
 });

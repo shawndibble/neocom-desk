@@ -78,6 +78,7 @@ const esi = (): SyncEsi =>
         },
       ]),
     journal: async () => ok(journalRows),
+    structure: async () => ({ kind: 'unavailable' }),
     budgetLow: () => false,
   }) as unknown as SyncEsi;
 

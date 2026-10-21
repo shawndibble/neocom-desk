@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   FEEDER_FORBIDDEN_STORM,
   FeederStorm,
+  MAX_STRUCTURE_LOOKUPS,
+  STRUCTURE_RECHECK_MS,
+  lookUpRefineryStructures,
   outcomeOf,
   readFeederLedger,
+  structuresToLookUp,
   type FeederLedgerRead,
 } from './corpTaxBookFeederSync.js';
 import type { EsiRead, SyncEsi } from './corpTaxBookSyncEsi.js';
@@ -37,6 +41,14 @@ function fakeEsi(over: Partial<Record<keyof SyncEsi, unknown>> = {}) {
     notifications: async () => (calls.push('notifications'), ok([])),
     journal: async () => (calls.push('journal'), ok([])),
     structureSystem: async () => (calls.push('system'), ok(1)),
+    structure: async (id: number) => (
+      calls.push(`structure:${id}`),
+      (over.structure as ((id: number) => unknown) | undefined)?.(id) ?? {
+        kind: 'ok',
+        name: `Refinery ${id}`,
+        solarSystemId: 30004000,
+      }
+    ),
     budgetLow: () => Boolean(over.budgetLow),
   } as unknown as SyncEsi;
   return { esi, calls };
@@ -117,5 +129,73 @@ describe('FeederStorm', () => {
     expect(storm.tripped).toBe(false);
     storm.record('stale');
     expect(storm.tripped).toBe(true);
+  });
+});
+
+describe('structuresToLookUp (#4654)', () => {
+  const NOW = Date.parse('2026-10-20T12:00:00Z');
+  const fresh = NOW - STRUCTURE_RECHECK_MS + 60_000;
+  const old = NOW - STRUCTURE_RECHECK_MS - 60_000;
+
+  it('looks up a refinery that is new, and leaves alone one read or refused this week', () => {
+    expect(
+      structuresToLookUp(
+        [5001, 5002, 5003],
+        {
+          '5002': { name: 'Efa VII - Tatara', solarSystemId: 30004000, checkedAt: fresh },
+          '5003': { checkedAt: fresh, denied: true },
+        },
+        NOW
+      )
+    ).toEqual([5001]);
+  });
+
+  it('re-reads a name, or retries a refusal, once a week has passed', () => {
+    expect(
+      structuresToLookUp(
+        [5002, 5003],
+        {
+          '5002': { name: 'Efa VII - Tatara', solarSystemId: 30004000, checkedAt: old },
+          '5003': { checkedAt: old, denied: true },
+        },
+        NOW
+      )
+    ).toEqual([5002, 5003]);
+  });
+
+  it('looks up at most a capped number a run, each once', () => {
+    const ids = Array.from({ length: MAX_STRUCTURE_LOOKUPS + 5 }, (_, i) => 6000 + i);
+    expect(structuresToLookUp([...ids, 6000], undefined, NOW)).toEqual(
+      ids.slice(0, MAX_STRUCTURE_LOOKUPS)
+    );
+  });
+});
+
+describe('lookUpRefineryStructures (#4654)', () => {
+  const NOW = Date.parse('2026-10-20T12:00:00Z');
+
+  it('keeps the name and system, and remembers a 403 or 404 as refused', async () => {
+    const { esi, calls } = fakeEsi({
+      structure: (id: number) => (id === 5002 ? { kind: 'denied' } : undefined),
+    });
+    expect(await lookUpRefineryStructures(esi, [5001, 5002], 'tok', NOW)).toEqual({
+      '5001': { name: 'Refinery 5001', solarSystemId: 30004000, checkedAt: NOW },
+      '5002': { checkedAt: NOW, denied: true },
+    });
+    expect(calls).toEqual(['structure:5001', 'structure:5002']);
+  });
+
+  it('remembers nothing for an unanswered lookup, so the next run tries again', async () => {
+    const { esi } = fakeEsi({ structure: () => ({ kind: 'unavailable' }) });
+    expect(await lookUpRefineryStructures(esi, [5001], 'tok', NOW)).toEqual({});
+  });
+
+  it('stops at a 420/429 or a low shared budget', async () => {
+    const backoff = fakeEsi({ structure: () => ({ kind: 'backoff' }) });
+    expect(await lookUpRefineryStructures(backoff.esi, [5001, 5002], 'tok', NOW)).toEqual({});
+    expect(backoff.calls).toEqual(['structure:5001']);
+    const low = fakeEsi({ budgetLow: true });
+    expect(await lookUpRefineryStructures(low.esi, [5001], 'tok', NOW)).toEqual({});
+    expect(low.calls).toEqual([]);
   });
 });

@@ -187,14 +187,23 @@ export function parseFeederCall(data: unknown): FeederCall {
 
 export type SaveFeederGrantResult = AcceptFeederInviteResult;
 
-function verifyFeederToken(claims: EveTokenClaims): void {
-  const [only] = FEEDER_SYNC_SCOPES;
-  if (!claims.scopes.includes(only)) {
+/**
+ * The ledger scope is required; the structure scope is optional (a grant from before #4654 lacks
+ * it); nothing else is allowed. Says whether the grant can read its refineries' names.
+ */
+export function feederGrantReadsStructures(scopes: readonly string[]): boolean {
+  const [ledger, structures] = FEEDER_SYNC_SCOPES;
+  if (!scopes.includes(ledger)) {
     fail('failed-precondition', 'Grant the corporation mining scope first', 'missing-scope');
   }
-  if (claims.scopes.length !== FEEDER_SYNC_SCOPES.length) {
-    fail('permission-denied', 'Token must carry only the mining scope', 'wrong-scopes');
+  if (scopes.some((s) => !(FEEDER_SYNC_SCOPES as readonly string[]).includes(s))) {
+    fail(
+      'permission-denied',
+      'Token must carry only the mining and structure scopes',
+      'wrong-scopes'
+    );
   }
+  return scopes.includes(structures);
 }
 
 async function verifiedClaims(deps: CorpSyncDeps, accessToken: string): Promise<EveTokenClaims> {
@@ -318,7 +327,7 @@ export async function saveFeederGrant(
   // The alt need not be on the caller's account, so the token's Character is not
   // compared with the caller; the refresh token must be the same alt's, below.
   const supplied = await verifiedClaims(deps, input.accessToken);
-  verifyFeederToken(supplied);
+  feederGrantReadsStructures(supplied.scopes);
 
   let refreshed: RefreshedTokens;
   try {
@@ -349,7 +358,7 @@ export async function saveFeederGrant(
     if (claims.characterId !== supplied.characterId) {
       fail('permission-denied', 'Refresh token belongs to another Character', 'token-mismatch');
     }
-    verifyFeederToken(claims);
+    const readsStructures = feederGrantReadsStructures(claims.scopes);
     const feederCorp = await deps.lookupCorporation(claims.characterId);
 
     accepted =
@@ -382,6 +391,7 @@ export async function saveFeederGrant(
       kind: 'feeder',
       collectorCorporationId: accepted.collectorCorporationId,
       grantedBy: callerId,
+      readsStructures,
     };
     previousGrant = (await grantRef(deps.db, feederCorp).get()).data() as
       CorpSyncGrantDoc | undefined;

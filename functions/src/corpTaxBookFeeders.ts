@@ -100,6 +100,23 @@ export interface FeederRecord {
    * owner's rows rarely carry one. The first learned stays.
    */
   refinerySystems?: Record<string, number>;
+  /**
+   * Each refinery's name and system by structure id (#4654), read by the sync with the moon
+   * owner's own token. Its system wins over a learned one. Re-read about weekly.
+   */
+  refineryStructures?: Record<string, RefineryStructureDoc>;
+  /** The current grant carries the structure scope (#4654); absent on grants from before. */
+  readsStructureNames?: boolean;
+}
+
+/** One refinery's structure lookup on a moon owner's record. */
+export interface RefineryStructureDoc {
+  name?: string;
+  solarSystemId?: number;
+  /** When it was looked up (ms). */
+  checkedAt: number;
+  /** ESI said 403 (no docking access) or 404: not retried until a week has passed. */
+  denied?: boolean;
 }
 
 /** One refinery's label on a moon owner's record. */

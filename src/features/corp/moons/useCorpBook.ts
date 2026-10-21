@@ -16,6 +16,7 @@ import {
   learnedSystemsOf,
   officerLabelsOf,
   refineryFacts,
+  structureNamesOf,
   refineryLabeler,
   type RefineryLabelSources,
 } from '@/engine/corpTaxBook/refinery';
@@ -349,6 +350,8 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
             // A moon owner's rows rarely carry a system; miners' own ledgers teach it (#4650).
             ...refineryFacts(fetched.data.observed, learnedSystemsOf(fetched.data.feeders ?? [])),
             labels: officerLabelsOf(fetched.data.feeders ?? []),
+            // Read by the server with the moon owner's own grant (#4654).
+            structureNames: structureNamesOf(fetched.data.feeders ?? []),
           }
         : null,
     [fetched]
@@ -356,7 +359,7 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
   const bookNames: BookNames = useMemo(() => {
     const sources: RefineryLabelSources = {
       officerLabels: (id) => refineries?.labels.get(id),
-      structureName: (id) => names.refineries.get(id),
+      structureName: (id) => names.refineries.get(id) ?? refineries?.structureNames.get(id),
       systemName: (id) => {
         const system = refineries?.systemOf.get(id);
         return system === undefined ? undefined : names.characters.get(system);

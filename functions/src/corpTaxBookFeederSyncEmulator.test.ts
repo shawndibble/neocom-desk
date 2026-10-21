@@ -12,7 +12,7 @@ import {
   type CorpSyncGrantDoc,
 } from './corpSyncGrant.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
-import type { EsiRead, SyncEsi } from './corpTaxBookSyncEsi.js';
+import type { EsiRead, StructureLookup, SyncEsi } from './corpTaxBookSyncEsi.js';
 
 const COLLECTOR = 98000001;
 const T0 = Date.parse('2026-10-18T12:00:00Z');
@@ -41,6 +41,8 @@ const ok = <T>(data: T): EsiRead<T> => ({
 interface FakeEsi {
   /** Per feeder corporation: how its ledger answers. Default `ok`. */
   mode: Map<number, 'ok' | 'forbidden' | 'throw' | 'unavailable'>;
+  /** Per structure id: how its `/universe/structures` lookup answers. Default a name. */
+  structure: Map<number, StructureLookup>;
   calls: string[];
 }
 let esiState: FakeEsi;
@@ -69,6 +71,12 @@ const fakeEsi = (): SyncEsi => ({
   notifications: async () => (esiState.calls.push('notifications'), ok([])),
   journal: async () => (esiState.calls.push('journal'), ok([])),
   structureSystem: async () => (esiState.calls.push('system'), ok(1)),
+  structure: async (id) => {
+    esiState.calls.push(`structure:${id}`);
+    return (
+      esiState.structure.get(id) ?? { kind: 'ok', name: `Refinery ${id}`, solarSystemId: 30004000 }
+    );
+  },
   budgetLow: () => false,
 });
 
@@ -114,7 +122,8 @@ async function clearEmulator(): Promise<void> {
 async function addFeeder(
   corp: number,
   over: Partial<FeederRecord> = {},
-  withGrant = true
+  withGrant = true,
+  grantOver: Partial<CorpSyncGrantDoc> = {}
 ): Promise<string> {
   const holder = corp + 1000;
   const token = `rt-${holder}-0`;
@@ -142,6 +151,7 @@ async function addFeeder(
       enabledAt: T0 - 40 * DAY,
       kind: 'feeder',
       collectorCorporationId: COLLECTOR,
+      ...grantOver,
     };
     await db.collection(CORP_SYNC_GRANTS_COLLECTION).doc(String(corp)).set(grant);
   }
@@ -163,7 +173,7 @@ suite('scheduled feeder pass (emulator)', () => {
     rotate = false;
     duringRefresh = undefined;
     revokedAtSso.length = 0;
-    esiState = { mode: new Map(), calls: [] };
+    esiState = { mode: new Map(), structure: new Map(), calls: [] };
     await collectorBook().set({
       active: true,
       startDate: '2026-08-01',
@@ -185,6 +195,75 @@ suite('scheduled feeder pass (emulator)', () => {
     });
     expect(rec?.staleSince).toBeUndefined();
     expect((await collectorBook().get()).get('lastSync')).toEqual({ at: T0 - 3_600_000, gaps: [] });
+  });
+
+  it('a grant from before, with the mining scope only, syncs, is not stale, and looks nothing up (#4654)', async () => {
+    await addFeeder(98000002);
+    expect((await run()).feeders).toMatchObject({ read: 1, stale: 0 });
+    const rec = await feederRecord(98000002);
+    expect(rec?.staleSince).toBeUndefined();
+    expect(rec?.lastSyncResult?.outcome).toBe('synced');
+    expect(rec?.refineryStructures).toBeUndefined();
+    expect(rec?.readsStructureNames).toBe(false);
+    expect(esiState.calls.filter((c) => c.startsWith('structure'))).toEqual([]);
+  });
+
+  it('a grant with the structure scope keeps each refinery name and system on the record (#4654)', async () => {
+    await addFeeder(98000002, { refinerySystems: { '980000020': 30002187 } }, true, {
+      readsStructures: true,
+    });
+    await run();
+    const rec = await feederRecord(98000002);
+    expect(rec?.readsStructureNames).toBe(true);
+    expect(rec?.refineryStructures).toEqual({
+      '980000020': { name: 'Refinery 980000020', solarSystemId: 30004000, checkedAt: T0 },
+    });
+    // The view carries both (no prices reader here, so its build is covered by buildFeederView's tests).
+  });
+
+  it('looks a refinery up only when needed: not again within the week, again after it (#4654)', async () => {
+    await addFeeder(98000002, {}, true, { readsStructures: true });
+    await run();
+    now += 6 * 3_600_000;
+    esiState.calls = [];
+    await run();
+    expect(esiState.calls.filter((c) => c.startsWith('structure'))).toEqual([]);
+    now = T0 + 8 * DAY;
+    await run();
+    expect(esiState.calls.filter((c) => c.startsWith('structure'))).toEqual([
+      'structure:980000020',
+    ]);
+    expect((await feederRecord(98000002))?.refineryStructures?.['980000020']?.checkedAt).toBe(now);
+  });
+
+  it.each([
+    ['403', 98000002],
+    ['404', 98000003],
+  ])(
+    'a %s is remembered, not retried each run, and never marks the moon owner stale (#4654)',
+    async (_s, corp) => {
+      await addFeeder(corp, {}, true, { readsStructures: true });
+      esiState.structure.set(corp * 10, { kind: 'denied' });
+      await run();
+      now += 6 * 3_600_000;
+      await run();
+      expect(esiState.calls.filter((c) => c.startsWith('structure'))).toEqual([
+        `structure:${corp * 10}`,
+      ]);
+      const rec = await feederRecord(corp);
+      expect(rec?.refineryStructures?.[String(corp * 10)]).toEqual({ checkedAt: T0, denied: true });
+      expect(rec?.staleSince).toBeUndefined();
+      expect(rec?.lastSyncResult?.outcome).toBe('synced');
+    }
+  );
+
+  it('an unanswered or rate-limited lookup is not kept and never touches the moon owner health (#4654)', async () => {
+    await addFeeder(98000002, {}, true, { readsStructures: true });
+    esiState.structure.set(980000020, { kind: 'backoff' });
+    expect((await run()).feeders).toMatchObject({ read: 1, stale: 0 });
+    const rec = await feederRecord(98000002);
+    expect(rec?.refineryStructures).toBeUndefined();
+    expect(rec?.staleSince).toBeUndefined();
   });
 
   it('only reads the observer list and ledgers: nothing the ledger-only grant cannot reach', async () => {

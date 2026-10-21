@@ -196,6 +196,13 @@ describe('viewRefineryLabeler / payoutRows', () => {
     expect(label(11)).toBe('Jita');
     expect(label(12)).toBe('Moon Owners Inc 12');
   });
+  it('uses the structure name the grant read before the system (#4654)', () => {
+    const label = viewRefineryLabeler(
+      [{ structureId: 11, label: null, solarSystemId: 30000142, structureName: 'Jita - Tatara' }],
+      { systemName, ownerName: 'Moon Owners Inc' }
+    );
+    expect(label(11)).toBe('Jita - Tatara');
+  });
   it('falls back to the id when the owner name is not known', () => {
     const label = viewRefineryLabeler(refineries, { systemName });
     expect(label(12)).toBe('#12');

@@ -4,6 +4,7 @@ import { HandledByCard } from './HandledByCard';
 import { MoonOwnerView } from './MoonOwnerView';
 import { OwnerStaleBanner } from './OwnerStaleBanner';
 import { OwnerStatusStrip } from './OwnerStatusStrip';
+import { RefineryNamesBanner } from './RefineryNamesBanner';
 import { fixtureView, nameOf } from './ownerViewFixtures';
 
 const noop = async () => undefined;
@@ -34,7 +35,7 @@ type Story = StoryObj<typeof meta>;
 /** @summary Page B with the rate override line ("Rate set to 8% by ... You asked for 6%."). */
 export const Normal: Story = {};
 
-/** @summary Refineries through the label chain: a label either side set, then the system, then the moon owner's own name plus the id. Officers edit a label behind the faint pencil. */
+/** @summary Refineries through the label chain: a label either side set, the structure name the grant read, then the system, then the moon owner's own name plus the id. Officers edit a label behind the faint pencil. */
 export const RefineryLabels: Story = {
   args: {
     view: {
@@ -43,12 +44,19 @@ export const RefineryLabels: Story = {
         { structureId: 10, label: 'Efa - Ashfall Tatara', solarSystemId: null },
         { structureId: 11, label: null, solarSystemId: 30000142 },
         { structureId: 12, label: null, solarSystemId: null },
+        {
+          structureId: 13,
+          label: null,
+          solarSystemId: 30000142,
+          structureName: 'Jita - Moon Drill',
+        },
       ],
       days: fixtureView().days.map((d) => ({
         ...d,
         lines: [
           ...d.lines,
           { characterId: 2, structureId: 12, volume: 40_000, valueIsk: 4_000_000 },
+          { characterId: 3, structureId: 13, volume: 25_000, valueIsk: 2_500_000 },
         ],
       })),
     },
@@ -58,6 +66,14 @@ export const RefineryLabels: Story = {
 /** @summary The moon owner named a player as its payee: "Who gets paid" names them, with Change…. */
 export const PayeeSet: Story = {
   args: { view: fixtureView({ payee: { kind: 'character', id: 77 } }) },
+};
+
+/** @summary A grant from before refinery names were read (#4654): the optional Grant again prompt above the page. */
+export const RefineryNamesNotGranted: Story = {
+  args: {
+    view: fixtureView({ refineryNamesGranted: false }),
+    banner: <RefineryNamesBanner onGrant={() => {}} />,
+  },
 };
 
 /** @summary The ledger cannot be read: stale banner with Reconnect above the page. */

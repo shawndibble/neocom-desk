@@ -1,8 +1,9 @@
 // The scheduled read of one feeder's mining ledger (issue #4509, spec #4504, ADR 0025).
-// A feeder's grant is ledger-only (`esi-industry.read_corporation_mining.v1`), so this
-// reads exactly two things — the observer list and each refinery's ledger — and never
-// calls an endpoint that grant cannot reach (each 403 would burn the shared ESI error
-// budget). Rows go into the Collector's `observed` collection tagged with the feeder's
+// A feeder's grant is the ledger (`esi-industry.read_corporation_mining.v1`), plus, on grants
+// from #4654 on, `esi-universe.read_structures.v1`. The ledger read is two things — the observer
+// list and each refinery's ledger; a grant with the structure scope then looks up the names and
+// systems of refineries not read this week. Nothing calls an endpoint the grant cannot reach
+// (each 403 would burn the shared ESI error budget). Rows go into the Collector's `observed` collection tagged with the feeder's
 // corporation id; the Collector book's own `lastSync` and gaps are not touched.
 //
 // What the read means for the feeder (the pure rules are corpTaxBookEngine.ts's
@@ -10,7 +11,7 @@
 // that lands clears that, and 30 days stale disconnects it. Nothing here logs or
 // returns a token.
 
-import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import { FieldPath, FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { REMOVAL_LINKS_COLLECTION } from './corpTaxBook.js';
 import {
   BOOK_DEFAULTS,
@@ -20,7 +21,7 @@ import {
   type FeederReadOutcome,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
-import type { FeederRecord } from './corpTaxBookFeeders.js';
+import type { FeederRecord, RefineryStructureDoc } from './corpTaxBookFeeders.js';
 import {
   SCHEDULED_VIA,
   appendAudit,
@@ -30,6 +31,11 @@ import {
 } from './corpTaxBookStore.js';
 import { observedRowsFromLedger } from './corpTaxBookSyncEngine.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
+
+/** A refinery's name is re-read, or a refused lookup retried, after this long (#4654). */
+export const STRUCTURE_RECHECK_MS = 7 * 24 * 3_600_000;
+/** The most structure lookups one feeder's run makes; the rest wait for the next run. */
+export const MAX_STRUCTURE_LOOKUPS = 20;
 
 /** This many refusals in a row across feeders stop the run reading more of them: a 403 storm. */
 export const FEEDER_FORBIDDEN_STORM = 5;
@@ -73,6 +79,83 @@ export async function readFeederLedger(
     truncated ||= ledger.truncated;
   }
   return { kind: 'ok', rows, refineries: observers.data.length, truncated };
+}
+
+/** The refineries to look up this run: new ones, and those last read or refused a week ago. */
+export function structuresToLookUp(
+  structureIds: Iterable<number>,
+  cached: Readonly<Record<string, RefineryStructureDoc>> | undefined,
+  now: number
+): number[] {
+  const out: number[] = [];
+  for (const id of new Set(structureIds)) {
+    if (out.length >= MAX_STRUCTURE_LOOKUPS) break;
+    const known = cached?.[String(id)];
+    if (!known || now - known.checkedAt >= STRUCTURE_RECHECK_MS) out.push(id);
+  }
+  return out;
+}
+
+/**
+ * Each refinery's name and system, with the moon owner's own token. A 403 or 404 is remembered
+ * as refused; an unanswered lookup is not kept (the next run tries again); a 420/429 or a low
+ * shared budget stops it. Never touches the feeder's health.
+ */
+export async function lookUpRefineryStructures(
+  esi: SyncEsi,
+  structureIds: readonly number[],
+  accessToken: string,
+  now: number
+): Promise<Record<string, RefineryStructureDoc>> {
+  const found: Record<string, RefineryStructureDoc> = {};
+  for (const id of structureIds) {
+    if (esi.budgetLow()) break;
+    const read = await esi.structure(id, accessToken);
+    if (read.kind === 'backoff') break;
+    if (read.kind === 'ok') {
+      found[String(id)] = { name: read.name, solarSystemId: read.solarSystemId, checkedAt: now };
+    } else if (read.kind === 'denied') {
+      found[String(id)] = { checkedAt: now, denied: true };
+    }
+  }
+  return found;
+}
+
+/**
+ * After a good ledger read: look up the refineries that need it (only when the grant carries the
+ * structure scope) and keep them on the record, with whether the grant reads names at all. Best
+ * effort: a failure here is logged by the caller and never fails the read.
+ */
+export async function refreshRefineryStructures(
+  deps: BookDeps,
+  esi: SyncEsi,
+  collectorCorporationId: number,
+  feederCorporationId: number,
+  structureIds: Iterable<number>,
+  accessToken: string,
+  readsStructures: boolean
+): Promise<void> {
+  const ref = feederRef(deps.db, collectorCorporationId, feederCorporationId);
+  const record = (await ref.get()).data() as FeederRecord | undefined;
+  if (!record) return;
+  const now = deps.now();
+  const found = readsStructures
+    ? await lookUpRefineryStructures(
+        esi,
+        structuresToLookUp(structureIds, record.refineryStructures, now),
+        accessToken,
+        now
+      )
+    : {};
+  const fields = Object.entries(found);
+  if (fields.length === 0 && record.readsStructureNames === readsStructures) return;
+  await deps.db.runTransaction(async (tx) => {
+    const latest = (await tx.get(ref)).data() as FeederRecord | undefined;
+    if (!latest || !READABLE_FEEDER_STATUSES.includes(latest.status)) return;
+    const pairs: unknown[] = [];
+    for (const [id, doc] of fields) pairs.push(new FieldPath('refineryStructures', id), doc);
+    tx.update(ref, 'readsStructureNames', readsStructures, ...pairs);
+  });
 }
 
 /** The health outcome a ledger read stands for. */
