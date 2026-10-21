@@ -5,7 +5,7 @@ import {
   type FeederView,
   type FeederViewAccess,
 } from '../taxBook/feederViewClient';
-import { characterIdsOf } from '../taxBook/feederViewModel';
+import { characterIdsOf, payeeIdOf } from '../taxBook/feederViewModel';
 
 export type FeederViewLoad =
   | { state: 'loading' }
@@ -30,7 +30,7 @@ export function useFeederView(
     void (async () => {
       try {
         const { access, view } = await loadFeederView(characterId, corporationId);
-        const ids = view ? characterIdsOf(view.days) : [];
+        const ids = view ? [...characterIdsOf(view.days), payeeIdOf(view.summary)] : [];
         const resolved = await resolveNames(ids).catch(() => new Map<number, string>());
         if (!cancelled)
           setLoad({

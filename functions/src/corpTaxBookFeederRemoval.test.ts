@@ -4,7 +4,7 @@ import {
   parseRemovalLinkCall,
   parseRemovalNoticeCall,
 } from './corpTaxBookFeederRemoval.js';
-import { parseSetFeederPayeeInput } from './corpTaxBookFeederOwnerCalls.js';
+import { parseSetFeederPayeeInput } from './corpTaxBookFeederViewCalls.js';
 
 const book = { corporationId: 98000001, accessToken: 'tok' };
 
@@ -32,7 +32,8 @@ describe('removal input', () => {
 });
 
 describe('payee input', () => {
-  const base = { ...book, feederCorporationId: 98000002 };
+  // The moon owner's own corporation: the moon owner sets its payee (#4619).
+  const base = { corporationId: 98000002, accessToken: 'tok' };
   it('takes a player or a corporation', () => {
     expect(
       parseSetFeederPayeeInput({ ...base, payee: { kind: 'character', id: 5 } }).payee

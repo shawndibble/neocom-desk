@@ -27,6 +27,7 @@ import {
   type FeederModeChange,
   type FeederPayout,
   type OwnerRateEntry,
+  type Payee,
 } from './corpTaxBookEngine.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
 import { COMPRESSED_ORE_TYPE_IDS } from './data/compressedOreTypeIds.js';
@@ -66,6 +67,8 @@ export interface FeederViewSummary {
   /** A pending removal's start and, once its notice is out, when it takes effect (#4520). */
   removalStartedAt?: number | null;
   removalEffectiveAt?: number | null;
+  /** Who the moon owner is paid as (#4619); null when unset, meaning the moon owner corporation. */
+  payee?: Payee | null;
 }
 
 export interface FeederViewDayLine {
@@ -179,6 +182,7 @@ export type FeederViewRecord = Pick<
   | 'modeChanges'
   | 'viewDismissedAt'
   | 'removal'
+  | 'payee'
 >;
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -396,6 +400,7 @@ export function buildFeederView(input: FeederViewInput): FeederView {
       record.status === 'pending-removal' ? (record.removal?.startedAt ?? null) : null,
     removalEffectiveAt:
       record.status === 'pending-removal' ? (record.removal?.effectiveAt ?? null) : null,
+    payee: record.payee ?? null,
   };
   return {
     summary,

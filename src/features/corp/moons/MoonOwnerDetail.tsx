@@ -72,6 +72,13 @@ export function MoonOwnerDetail({ id }: { id: string }) {
         refineryName={names.refinery}
         oreName={names.ore}
         backTo={BACK}
+        payee={{
+          ...detail.payee,
+          name:
+            detail.payee.kind === 'character'
+              ? names.character(detail.payee.id)
+              : names.corporation(detail.payee.id),
+        }}
         {...(canEdit
           ? {
               onSetRate: () => setDialog('rate'),

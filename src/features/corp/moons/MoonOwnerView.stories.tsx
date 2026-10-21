@@ -7,13 +7,23 @@ import { OwnerStatusStrip } from './OwnerStatusStrip';
 import { fixtureView, nameOf } from './ownerViewFixtures';
 
 const noop = async () => undefined;
+/** The fixtures' names plus the moon owner corporation (98) and a player payee (77). */
+const names = (id: number) =>
+  id === 98 ? 'Ashfall Mining Collective' : id === 77 ? 'Kestrel Vane' : nameOf(id);
 
 /** @summary The moon owner's page (Page B): statement first, who mined, payments and rate. */
 const meta = {
   title: 'corp/MoonOwnerView',
   component: MoonOwnerView,
   parameters: { layout: 'padded' },
-  args: { view: fixtureView(), names: nameOf, canEdit: true, onRequestRate: noop },
+  args: {
+    view: fixtureView(),
+    names,
+    canEdit: true,
+    onRequestRate: noop,
+    characterId: 1,
+    onSetPayee: noop,
+  },
 } satisfies Meta<typeof MoonOwnerView>;
 
 export default meta;
@@ -21,6 +31,11 @@ type Story = StoryObj<typeof meta>;
 
 /** @summary Page B with the rate override line ("Rate set to 8% by ... You asked for 6%."). */
 export const Normal: Story = {};
+
+/** @summary The moon owner named a player as its payee: "Who gets paid" names them, with Change…. */
+export const PayeeSet: Story = {
+  args: { view: fixtureView({ payee: { kind: 'character', id: 77 } }) },
+};
 
 /** @summary The ledger cannot be read: stale banner with Reconnect above the page. */
 export const Stale: Story = {

@@ -88,7 +88,9 @@ import {
   dismissFeederHistory,
   getFeederViewAccess,
   parseRequestFeederRateInput,
+  parseSetFeederPayeeInput,
   requestFeederRate,
+  setFeederPayee,
 } from './corpTaxBookFeederViewCalls.js';
 import {
   markFeederPayout,
@@ -101,10 +103,8 @@ import {
 import {
   listFeederInvites,
   parseSetFeederModeInput,
-  parseSetFeederPayeeInput,
   parseSetFeederRateInput,
   setFeederMode,
-  setFeederPayee,
   setFeederRate,
 } from './corpTaxBookFeederOwnerCalls.js';
 import {
@@ -754,6 +754,14 @@ export const requestCorpTaxBookFeederRateCallable = onCall<unknown>(
     requestFeederRate(corpSyncDeps(), callerOf(request), parseRequestFeederRateInput(request.data))
 );
 
+// The moon owner names its payee (#4619): its own CEO, Directors and Accountants only. The
+// accounting corporation lost write access; same callable name so a deploy replaces the old one.
+export const setCorpTaxBookFeederPayeeCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
+  (request) =>
+    setFeederPayee(corpSyncDeps(), callerOf(request), parseSetFeederPayeeInput(request.data))
+);
+
 export const dismissCorpTaxBookFeederHistoryCallable = onCall<unknown>(
   { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
   (request) =>
@@ -771,10 +779,6 @@ export const setCorpTaxBookFeederRateCallable = onCall<unknown>(FEEDER_OWNER_OPT
 
 export const setCorpTaxBookFeederModeCallable = onCall<unknown>(FEEDER_OWNER_OPTIONS, (request) =>
   setFeederMode(feederOwnerDeps(), callerOf(request), parseSetFeederModeInput(request.data))
-);
-
-export const setCorpTaxBookFeederPayeeCallable = onCall<unknown>(FEEDER_OWNER_OPTIONS, (request) =>
-  setFeederPayee(feederOwnerDeps(), callerOf(request), parseSetFeederPayeeInput(request.data))
 );
 
 // Removing a moon owner (issue #4520): start, notice sent, cancel (officers), the payee's link.

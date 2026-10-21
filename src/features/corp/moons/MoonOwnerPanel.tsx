@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { beginFeederGrantLogin } from '@/app/loginFlow';
 import { Button, LoadFailedState, Spinner } from '@/components/ui';
 import { leaveFeeder, type FeederStatus } from '../taxBook/feederClient';
-import { RECONNECT_CODE, requestFeederRate } from '../taxBook/feederViewClient';
+import { RECONNECT_CODE, requestFeederRate, setFeederPayee } from '../taxBook/feederViewClient';
 import { isStale, owedOnLeaving } from '../taxBook/feederViewModel';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { feederErrorText } from './feederErrorText';
@@ -77,6 +77,11 @@ export function MoonOwnerPanel({
         canEdit={access.canEdit}
         onRequestRate={async (pct) => {
           await requestFeederRate(characterId, corporationId, pct);
+          reload();
+        }}
+        characterId={characterId}
+        onSetPayee={async (payee) => {
+          await setFeederPayee(characterId, corporationId, payee);
           reload();
         }}
         banner={
