@@ -364,7 +364,7 @@ suite('feeder invites', () => {
       ).toBe('active');
     });
 
-    it('takes a disconnected moon owner back on a fresh link from the same book', async () => {
+    it('takes a disconnected moon owner back only with a new grant', async () => {
       await accept((await invite()).code);
       await collectorBook()
         .collection('feeders')
@@ -376,15 +376,9 @@ suite('feeder invites', () => {
           coveragePeriods: [{ from: '2026-10-18', to: '2026-10-18' }],
         });
       now = T0 + 3 * DAY;
-      expect(await accept((await invite()).code)).toMatchObject({ rejoined: true });
-      const record = await feederRecord();
-      expect(record).toMatchObject({
-        status: 'active',
-        coveragePeriods: [{ from: '2026-10-18', to: '2026-10-18' }, { from: '2026-10-21' }],
-      });
-      expect(record).not.toHaveProperty('disconnectedAt');
-      expect(record).not.toHaveProperty('staleSince');
-      expect(await pointer()).toMatchObject({ collectorCorporationId: COLLECTOR });
+      // The roles-scope accept stores no grant, so it cannot take a disconnected owner back.
+      expect(await reason(accept((await invite()).code))).toBe('already-feeder');
+      expect((await feederRecord())?.status).toBe('disconnected');
     });
   });
 
@@ -609,11 +603,20 @@ suite('feeder invites', () => {
     expect(await feederRecord()).toBeUndefined();
   });
 
-  it("a former moon owner's own book starts no earlier than the leave day", async () => {
+  it("a former moon owner's own book starts no earlier than the day its coverage ended", async () => {
+    // A removal finalised late: coverage ended on the 14th, the record was closed on the 18th.
     await db
       .collection('corpTaxBookFeederPrevious')
       .doc(String(FEEDER))
       .set({ collectorCorporationId: COLLECTOR, leftAt: T0 });
+    await collectorBook()
+      .collection('feeders')
+      .doc(String(FEEDER))
+      .set({
+        corporationId: FEEDER,
+        status: 'removed',
+        coveragePeriods: [{ from: '2026-10-01', to: '2026-10-14' }],
+      });
     const turnOn = (startDate: string) =>
       turnOnBook(
         deps(),
@@ -625,10 +628,10 @@ suite('feeder invites', () => {
           startRatePct: 10,
         })
       );
-    expect(await reason(turnOn('2026-10-17'))).toBe('start-before-leave');
-    await turnOn('2026-10-18');
+    expect(await reason(turnOn('2026-10-14'))).toBe('start-before-leave');
+    await turnOn('2026-10-15');
     expect((await db.collection('corpTaxBooks').doc(String(FEEDER)).get()).get('startDate')).toBe(
-      '2026-10-18'
+      '2026-10-15'
     );
   });
 });

@@ -374,6 +374,11 @@ export interface AcceptCoreInput {
   feederCorp: number;
   /** Extra fields stamped on the new or reopened record (the grant path's holder). */
   recordExtra?: Partial<FeederRecord>;
+  /**
+   * Take back a disconnected moon owner of this book. Only the grant path sets it: a
+   * take-back without a fresh grant would only go stale and disconnect again.
+   */
+  allowTakeBack?: boolean;
 }
 
 /**
@@ -415,7 +420,9 @@ export async function acceptInviteCore(
     const held = (await tx.get(feederRef)).data() as FeederRecord | undefined;
     // A disconnected moon owner keeps its pointer; this book's fresh link takes it back.
     const takenBack =
-      pointer?.collectorCorporationId === collector && held?.status === 'disconnected';
+      input.allowTakeBack === true &&
+      pointer?.collectorCorporationId === collector &&
+      held?.status === 'disconnected';
     if (pointer && !takenBack)
       fail('failed-precondition', 'This corporation already feeds a book', 'already-feeder');
 

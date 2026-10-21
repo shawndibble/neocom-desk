@@ -273,6 +273,31 @@ suite('moon owner onboarding', () => {
     expect(await reason(save(code))).toBe('not-an-accountant');
     expect(await pointer()).toMatchObject({ collectorCorporationId: COLLECTOR });
     expect((await feederRecord())?.status).toBe('disconnected');
+    // With a grant that reads, the same link takes it back as a new coverage period.
+    ledger = 'ok';
+    expect(await save(code)).toMatchObject({ rejoined: true });
+    const record = await feederRecord();
+    expect(record).toMatchObject({
+      status: 'active',
+      coveragePeriods: [{ from: '2026-10-01', to: '2026-10-10' }, { from: '2026-10-18' }],
+    });
+    expect(record).not.toHaveProperty('disconnectedAt');
+  });
+
+  it("status: after leaving, the earliest start of the corporation's own book, for its members only", async () => {
+    await save(await newInvite());
+    const call = { corporationId: FEEDER, accessToken: `roles-${FEEDER_DIRECTOR}` };
+    await leaveFeeder(deps(), who(FEEDER_DIRECTOR), call);
+    expect(await getFeederStatus(deps(), who(FEEDER_DIRECTOR), call)).toEqual({
+      status: 'none',
+      ownBookFrom: '2026-10-18',
+    });
+    expect(
+      await getFeederStatus(deps(), who(COLLECTOR_CEO), {
+        corporationId: FEEDER,
+        accessToken: `roles-${COLLECTOR_CEO}`,
+      })
+    ).toEqual({ status: 'none' });
   });
 
   it('leave: someone without standing is refused', async () => {

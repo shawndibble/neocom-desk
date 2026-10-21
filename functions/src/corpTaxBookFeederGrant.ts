@@ -49,7 +49,13 @@ import {
   feederViewRef,
   tryRebuildFeederView,
 } from './corpTaxBookFeederView.js';
-import { appendAudit, bookRef, type BookDeps, type Caller } from './corpTaxBookStore.js';
+import {
+  appendAudit,
+  bookRef,
+  ownBookFloor,
+  type BookDeps,
+  type Caller,
+} from './corpTaxBookStore.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
 
@@ -244,6 +250,7 @@ export async function saveFeederGrant(
             name: claims.name,
             feederCorp,
             recordExtra: { grantHolder: claims.characterId, grantedBy: callerId },
+            allowTakeBack: true,
           });
     undo = accepted.undo;
     if ('priorRecord' in accepted) reconnectPrior = accepted.priorRecord as FeederRecord;
@@ -608,7 +615,8 @@ export interface FeederRefinery {
 }
 
 export type FeederStatusResult =
-  | { status: 'none' }
+  /** `ownBookFrom`: a former moon owner's earliest own-book start (UTC day), for its members. */
+  | { status: 'none'; ownBookFrom?: string }
   | {
       status: 'feeder';
       collectorCorporationId: number;
@@ -641,13 +649,30 @@ export function aggregateRefineries(
     .sort((a, b) => b.volume - a.volume || a.structureId - b.structureId);
 }
 
+/** Not feeding: a former moon owner's members also learn how early their own book may start. */
+async function notFeeding(
+  deps: CorpSyncDeps,
+  caller: Caller,
+  input: FeederCall
+): Promise<FeederStatusResult> {
+  const floor = await ownBookFloor((ref) => ref.get(), deps.db, input.corporationId);
+  if (floor === null) return { status: 'none' };
+  // The token was verified for this caller above; membership is read only for a former moon owner.
+  const identity = await deps
+    .readIdentity(characterIdForUid(caller.uid)!, input.accessToken)
+    .catch(() => null);
+  return identity?.corporationId === input.corporationId
+    ? { status: 'none', ownBookFrom: floor }
+    : { status: 'none' };
+}
+
 export async function getFeederStatus(
   deps: CorpSyncDeps,
   caller: Caller,
   input: FeederCall
 ): Promise<FeederStatusResult> {
   const ctx = await authorizeFeederCaller(deps, caller, input, 'read');
-  if (!ctx) return { status: 'none' };
+  if (!ctx) return notFeeding(deps, caller, input);
   const { record: rec, collectorCorporationId: collector } = ctx;
   const [book, observed] = await Promise.all([
     bookRef(deps.db, collector).get(),

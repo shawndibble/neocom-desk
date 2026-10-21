@@ -124,17 +124,13 @@ describe('MoonsSetup', () => {
     expect(screen.getByRole('button', { name: 'Continue to EVE' })).toBeDisabled();
   });
 
-  it("starts a former moon owner's own book on the leave day", async () => {
-    loadFeederView.mockResolvedValue({
-      access: { collectorCorporationId: 5, expiresAt: 0, canEdit: true },
-      view: fixtureView({ status: 'left', leftAt: Date.UTC(2026, 9, 12, 15) }),
-    });
+  it("starts a former moon owner's own book on the day its coverage ended", async () => {
+    getFeederStatus.mockResolvedValue({ status: 'none', ownBookFrom: '2026-10-12' });
     renderSetup();
     const user = userEvent.setup();
-    await screen.findByText(/Previously handled by/);
-    await user.click(screen.getByRole('button', { name: 'Turn on our own book' }));
+    await user.click(await screen.findByRole('button', { name: 'Turn on our own book' }));
     const date = screen.getByLabelText('Start date');
-    await waitFor(() => expect(date).toHaveValue('2026-10-12'));
+    expect(date).toHaveValue('2026-10-12');
     expect(date).toHaveAttribute('min', '2026-10-12');
   });
 

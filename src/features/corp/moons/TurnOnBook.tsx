@@ -1,38 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, TextInput } from '@/components/ui';
 import { editErrorMessage } from './useBook';
 import { turnOnBook, type OfficerVerdict } from '../taxBook/bookClient';
 import { createFeederInvite, inviteLink } from '../taxBook/feederClient';
-import { loadFeederView } from '../taxBook/feederViewClient';
-
-/**
- * The leave day (UTC) of a corporation an accounting corporation handled before, or null.
- * Its own book starts no earlier: every day before it was covered there.
- */
-function useLeaveDay(characterId: number, corporationId: number): string | null {
-  const [day, setDay] = useState<string | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    loadFeederView(characterId, corporationId).then(
-      ({ view }) => {
-        const leftAt = view?.summary.leftAt;
-        if (!cancelled && leftAt != null) setDay(new Date(leftAt).toISOString().slice(0, 10));
-      },
-      // Never handled, or not readable: no floor beyond the server's own check.
-      () => undefined
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId, corporationId]);
-  return day;
-}
 
 /**
  * D10: a Director picks the start date (and the corp's default rate) to turn the book on.
  * With `collect`, the book is for collecting tax for other corporations: it needs no
- * refineries, and an invite link is made and shown before moving on.
+ * refineries, and an invite link is made and shown before moving on. `earliestStart`: a
+ * former moon owner's book starts no earlier than the day its coverage ended (the default).
  */
 export function TurnOnBook({
   characterId,
@@ -40,16 +17,18 @@ export function TurnOnBook({
   verdict,
   onDone,
   collect = false,
+  earliestStart,
 }: {
   characterId: number;
   corporationId: number;
   verdict: OfficerVerdict;
   onDone: () => void;
   collect?: boolean;
+  earliestStart?: string;
 }) {
   const { t } = useTranslation();
   const today = new Date().toISOString().slice(0, 10);
-  const leaveDay = useLeaveDay(characterId, corporationId);
+  const leaveDay = earliestStart ?? null;
   // Untouched, it is the leave day once known (also the earliest pick), else today.
   const [picked, setStartDate] = useState<string | null>(null);
   const startDate = picked ?? leaveDay ?? today;
@@ -82,7 +61,12 @@ export function TurnOnBook({
         setLink(inviteLink(window.location.origin, code));
       } else onDone();
     } catch (e) {
-      setError(editErrorMessage(e));
+      const reason = (e as { details?: { reason?: unknown } } | null)?.details?.reason;
+      setError(
+        reason === 'start-before-leave'
+          ? t('corpTaxBook.moons.off.startBeforeLeave')
+          : editErrorMessage(e)
+      );
     } finally {
       setBusy(false);
     }

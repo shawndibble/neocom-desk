@@ -39,7 +39,8 @@ export interface FeederRefinery {
 }
 
 export type FeederStatus =
-  | { status: 'none' }
+  /** `ownBookFrom`: a former moon owner's earliest own-book start (UTC day). */
+  | { status: 'none'; ownBookFrom?: string }
   | {
       status: 'feeder';
       collectorCorporationId: number;
