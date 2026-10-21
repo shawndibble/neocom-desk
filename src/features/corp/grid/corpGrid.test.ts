@@ -12,6 +12,7 @@ const ALL: CorpCapabilities = {
   canReadIndustry: true,
   canReadAssets: true,
   canReadBlueprints: true,
+  canReadCustomsOffices: true,
   canReadContracts: true,
   canReadOrders: true,
 };

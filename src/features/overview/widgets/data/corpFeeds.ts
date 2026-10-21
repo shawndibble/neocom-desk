@@ -12,7 +12,12 @@
  * - a thrown load: the read was allowed and failed. The widget shows Retry.
  * - data, possibly an empty list: read fine.
  */
-import type { Contract, CorporationIndustryJob, CorporationOrder } from '@/esi/endpoints';
+import type {
+  Contract,
+  CorporationCustomsOffice,
+  CorporationIndustryJob,
+  CorporationOrder,
+} from '@/esi/endpoints';
 import type { HubAggregate } from '@/market/fuzzwork';
 import type { MemberActivity, RosterDiff } from '@/engine/corp/members';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
@@ -54,6 +59,14 @@ export interface CorpJobsFeed extends CorpFeedBase {
   typeNames: ReadonlyMap<number, string>;
   /** Installer names, for the table. */
   installerNames: ReadonlyMap<number, string>;
+}
+
+export interface CorpCustomsFeed extends CorpFeedBase {
+  offices: CorporationCustomsOffice[];
+  /** Office type names ("Customs Office", "Interbus Customs Office"...). */
+  typeNames: ReadonlyMap<number, string>;
+  /** Solar system names from the static data; a missing one degrades one cell. */
+  systemNames: ReadonlyMap<number, string>;
 }
 
 export interface CorpMembersFeed extends CorpFeedBase {
@@ -148,4 +161,9 @@ export async function loadCorpOrdersFeed(characterId: number): Promise<CorpOrder
 export async function loadCorpKillsFeed(characterId: number): Promise<CorpKillsFeed> {
   const { loadCorpKills } = await import('./corpFeedLoaders');
   return loadCorpKills(characterId);
+}
+
+export async function loadCorpCustomsFeed(characterId: number): Promise<CorpCustomsFeed> {
+  const { loadCorpCustoms } = await import('./corpFeedLoaders');
+  return loadCorpCustoms(characterId);
 }
