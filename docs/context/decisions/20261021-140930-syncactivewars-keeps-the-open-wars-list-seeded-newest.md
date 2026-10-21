@@ -1,0 +1,9 @@
+# Scope decisions — syncActiveWars keeps the open-wars list, seeded newest-first, twice a day
+
+_Recorded 2026-10-21._
+
+- **`syncActiveWars` runs every 12 hours and keeps every war that is still running in `systemConditions/activeWars`** (one doc: `updatedAt`, `wars`, plus the sweep's own `topId` and `floorId`). It exists because ESI cannot list one corporation's wars; the War banner reads this doc and filters it client-side. Twice a day is enough because a declaration also reaches pilots with Alerts through the feed, and a war has a wait before it starts.
+- **A run reads new war ids, re-reads the wars it holds, then seeds backward from the newest id** with what is left of a 1,500-read allowance, toward 12,000 ids back (about 15 months at about 26 wars a day). Newest-first means the first run already covers the last couple of months, where nearly every open war is. Older wars fill in over the next runs; one run can be repeated from Cloud Scheduler to seed faster. A war older than the horizon that never ended is not found by the sweep.
+- **`/wars/{id}` is limited to 3,600 tokens per 15 minutes, 2 per read.** A run stops when ESI reports fewer than 300 left, so it never empties the window, and a 420/429 stops it. ESI answers a war id that does not exist with a 500, not a 404, so only ids from `/wars` are read.
+- **`updatedAt` means "every held war was read again this run".** If a held war could not be read, the list is still written (new wars are not lost) but `updatedAt` keeps its old value, so the app hides the list at 48 hours rather than show an ended war as running. A _new_ id that will not read does not age the list; it is retried next run, and the top id is held back until it reads.
+- **Cloud Functions are not auto-deployed** (CI ships Pages only). Deploying `syncActiveWars` is a manual step; until then the doc does not exist and the War banner draws nothing.
