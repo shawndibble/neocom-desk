@@ -200,6 +200,10 @@ export function CorpRowDetailModal({
                 before: formatIsk(view.correction.before),
                 after: formatIsk(view.correction.after),
               })}
+              {view.correction.reasons.length > 0 &&
+                ` ${t('miningTax.corpBook.detail.reason', {
+                  reasons: view.correction.reasons.join(' · '),
+                })}`}
             </p>
           )}
 

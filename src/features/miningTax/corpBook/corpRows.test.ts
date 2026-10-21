@@ -125,6 +125,16 @@ describe('buildDisplayRows', () => {
     expect(byId.p.status).toBe('paid');
     expect(byId.d.status).toBe('dismissed');
   });
+  it('names the refinery on the line, beside the corporation (#4622)', () => {
+    const [row] = buildDisplayRows(
+      [],
+      overlay({ rows: [view({ refineryLabel: 'Ikao - Moon Drill' })] }),
+      nameOf
+    );
+    expect(row.assignment?.label).toBe('Ikao - Moon Drill');
+    const [unnamed] = buildDisplayRows([], overlay({ rows: [view()] }), nameOf);
+    expect(unnamed.assignment?.label).toBeUndefined();
+  });
 });
 
 describe('corp Payee ids', () => {
