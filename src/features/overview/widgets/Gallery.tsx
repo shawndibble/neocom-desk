@@ -23,16 +23,10 @@ import { Button, EmptyState, FilterChip, Modal, SearchInput, SlideOver } from '@
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { boardKey, categoryOn, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
 import { sampleHasChart, sampleView } from './gallerySamples';
-import {
-  KIND_CATEGORIES,
-  WIDGET_KINDS,
-  type KindCategory,
-  type WidgetKindDef,
-  type WidgetSize,
-  type WidgetView,
-} from './kinds';
+import { type KindCategory, type WidgetKindDef, type WidgetSize, type WidgetView } from './kinds';
 import { MAX_WIDGETS, newWidget } from './layout';
 import { Widget } from './Widget';
 
@@ -111,12 +105,13 @@ function GalleryItem({
   onAdd: (kind: string) => void;
 }) {
   const { t } = useTranslation();
+  const board = useWidgetBoard();
   const title = t(kind.titleKey);
   const soon = kind.availability === 'comingSoon';
   // The status line is always mounted so a screen reader hears its text change.
   let status = '';
   if (justAdded) status = t('overview.gallery.added');
-  else if (count > 0) status = t('overview.gallery.onBoard', { count });
+  else if (count > 0) status = t(boardKey(board, 'gallery.onBoard'), { count });
   let action = null;
   if (soon) {
     // Nothing to press: the badge beside the name says why.
@@ -204,6 +199,7 @@ function GalleryBody({
 }) {
   const { t } = useTranslation();
   const edit = useOverviewEdit();
+  const board = useWidgetBoard();
   const searchId = useId();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryFilter>('all');
@@ -224,17 +220,19 @@ function GalleryBody({
   const full = edit.layout.widgets.length >= MAX_WIDGETS;
 
   const needle = query.trim().toLowerCase();
-  const matching = WIDGET_KINDS.filter(
+  const offered = board.kinds.filter(board.canDraw);
+  const matching = offered.filter(
     (kind) => !needle || `${t(kind.titleKey)} ${t(kind.descKey)}`.toLowerCase().includes(needle)
   );
-  const items = matching.filter((kind) => category === 'all' || kind.category === category);
+  const groupOf = (kind: WidgetKindDef) => categoryOn(board, kind);
+  const items = matching.filter((kind) => category === 'all' || groupOf(kind) === category);
 
   const chips: { id: CategoryFilter; label: string; count: number }[] = [
     { id: 'all', label: t('overview.gallery.categories.all'), count: matching.length },
-    ...KIND_CATEGORIES.map((id) => ({
+    ...board.categories.map((id) => ({
       id,
       label: t(`overview.gallery.categories.${id}`),
-      count: matching.filter((kind) => kind.category === id).length,
+      count: matching.filter((kind) => groupOf(kind) === id).length,
     })),
   ];
 
@@ -275,8 +273,8 @@ function GalleryBody({
   } else if (category === 'all') {
     list = (
       <div className="grid gap-5">
-        {KIND_CATEGORIES.map((id) => {
-          const group = items.filter((kind) => kind.category === id);
+        {board.categories.map((id) => {
+          const group = items.filter((kind) => groupOf(kind) === id);
           if (group.length === 0) return null;
           return (
             <section key={id} aria-labelledby={`gallery-group-${id}`} className="grid gap-2">
@@ -339,11 +337,12 @@ function GalleryBody({
 export function Gallery({ open, onClose }: GalleryProps) {
   const { t } = useTranslation();
   const edit = useOverviewEdit();
+  const board = useWidgetBoard();
   const isPhone = useIsPhone();
   const searchRef = useRef<HTMLInputElement>(null);
   const title = t('overview.gallery.title');
-  const subtitle = t('overview.gallery.subtitle', {
-    total: WIDGET_KINDS.length,
+  const subtitle = t(boardKey(board, 'gallery.subtitle'), {
+    total: board.kinds.filter(board.canDraw).length,
     onBoard: edit.layout.widgets.length,
   });
   if (isPhone) {

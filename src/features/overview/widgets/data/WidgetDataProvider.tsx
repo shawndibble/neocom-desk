@@ -58,6 +58,12 @@ import {
   loadTradingProfitWidget,
   loadSurveyWidget,
 } from './kindLoaders';
+import {
+  loadCorpJobsFeed,
+  loadCorpMembersFeed,
+  loadCorpMiningFeed,
+  loadCorpWalletFeed,
+} from './corpFeeds';
 import { feedsFor } from './models';
 import { useOverviewRefresh } from './refreshContext';
 import type { FeedId, FeedMap } from './types';
@@ -269,6 +275,17 @@ function Source({ feed }: { feed: FeedId }) {
           accountWide
         />
       );
+    // The Corp overview's reads: keyed `corp:` so they never share a row with a character read.
+    case 'corpWallet':
+      return <SnapshotSource feed="corpWallet" load={loadCorpWalletFeed} cacheKey="corp:wallet" />;
+    case 'corpJobs':
+      return <SnapshotSource feed="corpJobs" load={loadCorpJobsFeed} cacheKey="corp:jobs" />;
+    case 'corpMembers':
+      return (
+        <SnapshotSource feed="corpMembers" load={loadCorpMembersFeed} cacheKey="corp:members" />
+      );
+    case 'corpMining':
+      return <SnapshotSource feed="corpMining" load={loadCorpMiningFeed} cacheKey="corp:mining" />;
     case 'incursions':
       return <IncursionsSource />;
     case 'spExtras':

@@ -4925,6 +4925,235 @@
           "profit": "Profit",
           "jumps": "Jumps"
         }
+      },
+      "corpDeadlines": {
+        "title": "Due soon",
+        "description": "Every corp clock in one place: fuel, timers, moon chunks and finished jobs",
+        "empty": "Nothing is due.",
+        "col": {
+          "subject": "Subject",
+          "what": "What",
+          "when": "When"
+        },
+        "next": "Next: {{name}}, {{when}}",
+        "chartNote": "Deadlines per day, next {{days}} days",
+        "summary_one": "{{count}} corp clock is due in 24 hours, {{overdue}} already overdue.",
+        "summary_other": "{{count}} corp clocks are due in 24 hours, {{overdue}} already overdue."
+      },
+      "corpServices": {
+        "title": "Offline services",
+        "description": "Structure services that are switched off",
+        "empty": "Every structure service is online.",
+        "col": {
+          "structure": "Structure",
+          "service": "Service"
+        },
+        "unit": "offline",
+        "most": "{{name}} has {{count}}",
+        "summary_one": "{{count}} structure service is offline.",
+        "summary_other": "{{count}} structure services are offline across {{structures}} structures."
+      },
+      "corpStarbases": {
+        "title": "Starbases",
+        "description": "Starbase fuel, strontium and state",
+        "empty": "This widget is coming soon."
+      },
+      "corpCustomsOffices": {
+        "title": "Customs offices",
+        "description": "Your customs offices, their tax rates and timers",
+        "empty": "This widget is coming soon."
+      },
+      "corpWallet": {
+        "title": "Corp wallet",
+        "description": "The balance of each wallet division",
+        "empty": "There are no wallet divisions to show.",
+        "col": {
+          "division": "Division",
+          "balance": "Balance",
+          "share": "Share"
+        },
+        "summary_one": "{{isk}} ISK in {{count}} wallet division.",
+        "summary_other": "{{isk}} ISK across {{count}} wallet divisions.",
+        "biggest": "{{name}} holds {{share}}% of it",
+        "chartNote": "Share of the corporation's ISK by division"
+      },
+      "corpCashFlow": {
+        "title": "Cash flow",
+        "description": "Money into and out of the master wallet, and how long it lasts",
+        "empty": "No master wallet activity in this window.",
+        "col": {
+          "day": "Day",
+          "in": "In",
+          "out": "Out",
+          "net": "Net"
+        },
+        "unit": "net ISK",
+        "runway_one": "Runway {{count}} day at current spending",
+        "runway_other": "Runway {{count}} days at current spending",
+        "runwayUnknown": "Runway unknown",
+        "runwayWindow": "Runway uses the last {{count}} days of spending.",
+        "unavailable": "The master wallet journal couldn't load, so net and runway are unknown.",
+        "coverage_one": "The journal reaches back {{count}} day.",
+        "coverage_other": "The journal reaches back {{count}} days.",
+        "chartNote": "Net ISK per day",
+        "summary": "Net {{isk}} ISK over {{count}} days: {{income}} in, {{spending}} out."
+      },
+      "corpIncome": {
+        "title": "Income by source",
+        "description": "Where the master wallet’s money comes from: bounties, taxes, market and more",
+        "empty": "No income in this window.",
+        "col": {
+          "source": "Source",
+          "amount": "Amount",
+          "share": "Share"
+        },
+        "unit": "ISK in",
+        "top": "{{name}} brings in {{share}}%",
+        "unavailable": "The master wallet journal couldn't load, so income is unknown.",
+        "coverage_one": "The journal reaches back {{count}} day.",
+        "coverage_other": "The journal reaches back {{count}} days.",
+        "chartNote": "Share of income by source",
+        "summary_one": "{{isk}} ISK income over {{days}} days from {{count}} source.",
+        "summary_other": "{{isk}} ISK income over {{days}} days from {{count}} sources.",
+        "refType": {
+          "bounty_prizes": "Bounty prizes",
+          "ess_escrow_transfer": "ESS payout",
+          "corporate_reward_payout": "Corporate reward payout",
+          "market_transaction": "Market sales",
+          "player_donation": "Donations",
+          "planetary_export_tax": "Planetary export tax",
+          "planetary_import_tax": "Planetary import tax",
+          "industry_job_tax": "Industry job tax",
+          "reprocessing_tax": "Reprocessing tax",
+          "brokers_fee": "Broker's fee refund",
+          "structure_gate_jump": "Structure gate jumps",
+          "corporation_account_withdrawal": "Corporation account transfer",
+          "corporation_dividend_payment": "Dividend payment",
+          "contract_reward": "Contract reward",
+          "contract_price": "Contract sale",
+          "contract_collateral": "Contract collateral",
+          "project_discovery_reward": "Project Discovery reward",
+          "insurance": "Insurance payout",
+          "daily_goal_payouts": "Daily goal payouts",
+          "agent_mission_reward": "Mission reward",
+          "office_rental_fee": "Office rental"
+        }
+      },
+      "corpOrders": {
+        "title": "Corp market orders",
+        "description": "Open buy and sell orders, and the ISK held in escrow",
+        "empty": "This widget is coming soon."
+      },
+      "corpMembers": {
+        "title": "Members",
+        "description": "Headcount, and who joined or left since you last looked",
+        "empty": "There are no members to show.",
+        "unit_one": "member",
+        "unit_other": "members",
+        "secondary": "{{joined}} joined · {{left}} left since you last looked",
+        "joined": "Joined",
+        "left": "Left",
+        "col": {
+          "member": "Member",
+          "change": "Change"
+        },
+        "noChange": "No one joined or left since you last looked.",
+        "unknownDiff": "Joins and leaves are unknown: the member list could not be read.",
+        "summary_one": "{{count}} member.",
+        "summary_other": "{{count}} members.",
+        "chart": {
+          "note": "Members by month joined",
+          "max": "max {{value}}",
+          "monthsAgo_one": "{{count}} month ago",
+          "monthsAgo_other": "{{count}} months ago",
+          "thisMonth": "This month",
+          "joined": "Joined",
+          "summary": "{{count}} current members joined in the last {{months}} months. By month: {{items}}."
+        }
+      },
+      "corpInactive": {
+        "title": "Inactive members",
+        "description": "Members who have not logged in for a while",
+        "empty": "Every member has logged in recently.",
+        "unit_one": "inactive",
+        "unit_other": "inactive",
+        "threshold": "Over {{days}} days",
+        "col": {
+          "member": "Member",
+          "lastSeen": "Last seen"
+        },
+        "summary_one": "{{count}} member has not logged in for {{days}} days or more.",
+        "summary_other": "{{count}} members have not logged in for {{days}} days or more."
+      },
+      "corpRoleAudit": {
+        "title": "Roles audit",
+        "description": "Who holds Director and other roles, and recent role changes",
+        "empty": "This widget is coming soon."
+      },
+      "corpDoctrine": {
+        "title": "Doctrine readiness",
+        "description": "Which members can fly your doctrine ships",
+        "empty": "This widget is coming soon."
+      },
+      "corpJobs": {
+        "title": "Corp industry jobs",
+        "description": "Jobs running in the corporation’s name, and when they finish",
+        "empty": "No corp industry jobs are running.",
+        "col": {
+          "product": "Product",
+          "ends": "Ends in",
+          "installer": "Installer",
+          "activity": "Activity"
+        },
+        "unit": "running",
+        "ready_one": "{{count}} ready to deliver",
+        "ready_other": "{{count}} ready to deliver",
+        "next": "Next: {{name}} in {{duration}}",
+        "chartNote": "Time left on each corp job",
+        "summary": "{{running}} corp jobs running, {{ready}} ready to deliver."
+      },
+      "corpMining": {
+        "title": "Moon mining ledger",
+        "description": "Who mined how much at your refineries",
+        "empty": "Nothing was mined at your refineries in this window.",
+        "unit": "units mined",
+        "topMiner": "Top miner {{name}}, {{share}} of units",
+        "percent": "{{value}}%",
+        "underOne": "<1%",
+        "col": {
+          "miner": "Miner",
+          "units": "Units",
+          "share": "Share",
+          "ore": "Top ore"
+        },
+        "noRefineries": "Your corporation has no refineries with a mining ledger.",
+        "truncated": "Some of the ledger could not be read, so figures may be low.",
+        "covered": "The ledger only holds about {{covered}} of the last {{count}} days.",
+        "chart": {
+          "note": "Share of units mined, last {{count}} days"
+        },
+        "summary_one": "{{units}} units mined by {{count}} miner in the last {{days}} days.",
+        "summary_other": "{{units}} units mined by {{count}} miners in the last {{days}} days."
+      },
+      "corpKills": {
+        "title": "Corp kills",
+        "description": "Kills, losses and ISK efficiency",
+        "empty": "This widget is coming soon."
+      },
+      "corpContracts": {
+        "title": "Corp contracts",
+        "description": "Outstanding courier and item exchange contracts",
+        "empty": "This widget is coming soon."
+      },
+      "corpSrp": {
+        "title": "Ship replacement",
+        "description": "SRP claims waiting and paid",
+        "empty": "This widget is coming soon."
+      },
+      "corpProjects": {
+        "title": "Corporation projects",
+        "description": "Progress on your corporation projects and freelance jobs",
+        "empty": "This widget is coming soon."
       }
     },
     "header": {
@@ -5004,7 +5233,12 @@
         "industry": "Industry and mining",
         "planets": "Planets and structures",
         "space": "Space and travel",
-        "messages": "Messages and schedule"
+        "messages": "Messages and schedule",
+        "corpClocks": "Structures and timers",
+        "corpMoney": "Money",
+        "corpPeople": "Members",
+        "corpIndustry": "Industry and mining",
+        "corpOps": "Operations"
       },
       "add": "Add",
       "addAnother": "Add another",
@@ -11422,7 +11656,7 @@
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
-            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
+            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your corporation overview layout, hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs. The notes you wrote on solar systems (up to 500 characters each, so don't put anything private in them)."
           }
         },
@@ -12163,6 +12397,26 @@
       "title": "Moons",
       "noAccessTitle": "Moons need the Accountant role",
       "noAccessHint": "EVE only opens the refinery ledger to an Accountant, Director or CEO, so the Corp Tax Book is not available to your roles."
+    },
+    "grid": {
+      "customize": {
+        "barLabel": "Customize the corporation overview",
+        "emptyTitle": "Your corporation overview is empty",
+        "emptyBody": "Add widgets to track what your corporation needs."
+      },
+      "gallery": {
+        "subtitle": "{{total}} widgets · {{onBoard}} on your corporation overview",
+        "onBoard": "On your corporation overview ×{{count}}"
+      },
+      "menu": {
+        "remove": "Remove from corporation overview"
+      },
+      "header": {
+        "breakdownCaption": "When each widget on the corporation overview last read its data"
+      },
+      "widgets": {
+        "noWidgets": "There are no widgets to show on this corporation overview."
+      }
     }
   },
   "publicInfo": {

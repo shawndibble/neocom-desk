@@ -6,6 +6,7 @@ import { useKindViews, viewKey } from './widgets/data/useWidgetView';
 import { collectDeadlines, fetchBreakdown, stalestFetch } from './widgets/headerSummary';
 import type { Widget } from './widgets/layout';
 import { chipTone, nextDeadline } from './widgets/nextDeadline';
+import { useWidgetBoard } from './widgets/board';
 import { distinctKinds, visibleWidgets } from './widgets/visibility';
 
 /** A kind whose view has not been built yet: no read to date. */
@@ -17,8 +18,12 @@ export type OverviewSummary = ReturnType<typeof useOverviewSummary>;
 /** Read once by the board and handed to each header part, so the kinds are not resolved three times. */
 export function useOverviewSummary(widgets: readonly Widget[]) {
   const isPhone = useIsPhone();
+  const { canDraw } = useWidgetBoard();
   const now = useTicker(OVERVIEW_TICK_MS);
-  const shown = useMemo(() => visibleWidgets(widgets, isPhone), [widgets, isPhone]);
+  const shown = useMemo(
+    () => visibleWidgets(widgets, isPhone, canDraw),
+    [widgets, isPhone, canDraw]
+  );
   const requests = useMemo(
     () => distinctKinds(shown).map((kind) => ({ kind, scopeAll: false })),
     [shown]

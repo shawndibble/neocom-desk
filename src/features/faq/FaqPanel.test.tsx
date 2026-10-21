@@ -77,6 +77,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.navSetupAnswered': /answered the rail question/i,
   'sync.overviewCardOrder': /hidden and reordered Overview cards/i,
   'sync.overviewLayout': /your Overview layout/i,
+  'sync.corpOverviewLayout': /your corporation overview layout/i,
   'sync.avoidedSystems': /avoided systems/i,
   'sync.systemNotes': /notes you wrote on solar systems/i,
   'sync.avoidedSystemsEnabled': /whether the list is on/i,
