@@ -30,10 +30,14 @@ describe('number-format lint guard', () => {
     expect(await numberFormatErrors(source)).toHaveLength(1);
   });
 
-  it('fires in a .ts module and in a primitive', async () => {
+  it.each([
+    ['src/lib/fixture.ts'],
+    ['src/components/ui/Fixture.tsx'],
+    ['src/components/ui/fixture.ts'],
+    ['src/components/ui/DataTable.tsx'],
+  ])('fires in %s', async (filePath) => {
     const source = 'export const f = (n: number) => n.toLocaleString();\n';
-    expect(await numberFormatErrors(source, 'src/lib/fixture.ts')).toHaveLength(1);
-    expect(await numberFormatErrors(source, 'src/components/ui/Fixture.tsx')).toHaveLength(1);
+    expect(await numberFormatErrors(source, filePath)).toHaveLength(1);
   });
 
   it.each([
@@ -58,6 +62,9 @@ describe('number-format lint guard', () => {
     ['functions/src/fixture.ts'],
   ])('exempts %s', async (filePath) => {
     const source = "export const f = new Intl.NumberFormat('en');\n";
+    const [result] = await eslint.lintText(source, { filePath });
+    // A file ESLint ignores, or can't parse, reports a null ruleId: not an exemption.
+    expect(result.messages.filter((m) => m.ruleId === null)).toEqual([]);
     expect(await numberFormatErrors(source, filePath)).toHaveLength(0);
   });
 

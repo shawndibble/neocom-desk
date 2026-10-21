@@ -257,8 +257,8 @@ export default tseslint.config(
     },
   },
   {
-    // Stories are mockups and e2e/tests are fixtures: no house radius to keep,
-    // and their numbers are sample data, not the pilot's.
+    // Stories are mockups: no house radius to keep, and their numbers are
+    // sample data, not the pilot's.
     files: ['src/**/*.stories.tsx'],
     ignores: ['src/components/ui/**'],
     rules: {
@@ -285,6 +285,7 @@ export default tseslint.config(
     },
   },
   {
+    // Tests and e2e are fixtures: same reasons as stories.
     files: ['src/**/*.test.ts', 'e2e/**/*.ts'],
     rules: {
       'no-restricted-syntax': ['error', ...withoutNumberFormat(withoutRadius(restrictedSyntax))],
@@ -306,6 +307,19 @@ export default tseslint.config(
     ignores: ['src/components/ui/DataTable.test.tsx'],
     rules: {
       'no-restricted-syntax': ['error', ...sortArrowSyntax],
+    },
+  },
+  {
+    // The sort-arrow exemption above is for the glyph only; the number rule
+    // still reaches these, and the primitives' .ts modules.
+    files: [
+      'src/components/ui/DataTable.tsx',
+      'src/components/ui/DataTableSortPicker.tsx',
+      'src/components/ui/**/*.ts',
+    ],
+    ignores: ['src/components/ui/**/*.test.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...numberFormatSyntax],
     },
   },
   {
