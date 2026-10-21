@@ -62,6 +62,7 @@ import {
   loadCorpJobsFeed,
   loadCorpMembersFeed,
   loadCorpMiningFeed,
+  loadCorpContractsFeed,
   loadCorpWalletFeed,
 } from './corpFeeds';
 import { feedsFor } from './models';
@@ -286,6 +287,14 @@ function Source({ feed }: { feed: FeedId }) {
       );
     case 'corpMining':
       return <SnapshotSource feed="corpMining" load={loadCorpMiningFeed} cacheKey="corp:mining" />;
+    case 'corpContracts':
+      return (
+        <SnapshotSource
+          feed="corpContracts"
+          load={loadCorpContractsFeed}
+          cacheKey="corp:contracts"
+        />
+      );
     case 'incursions':
       return <IncursionsSource />;
     case 'spExtras':

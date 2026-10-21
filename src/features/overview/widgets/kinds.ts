@@ -442,11 +442,11 @@ const SPECS: Record<string, Spec> = {
   corpKills: { corp: 'corpOps', views: NCT, view: 'number', size: 'M', soon: true, endpoints: [] },
   corpContracts: {
     corp: 'corpOps',
+    capabilities: ['canReadContracts'],
     views: NT,
     view: 'table',
     size: 'M',
-    soon: true,
-    endpoints: [],
+    endpoints: ['getCorporationContracts'],
   },
   corpSrp: { corp: 'corpOps', views: NT, view: 'table', size: 'M', soon: true, endpoints: [] },
   corpProjects: { corp: 'corpOps', views: NT, view: 'table', size: 'M', soon: true, endpoints: [] },

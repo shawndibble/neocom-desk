@@ -12,7 +12,7 @@
  * - a thrown load: the read was allowed and failed. The widget shows Retry.
  * - data, possibly an empty list: read fine.
  */
-import type { CorporationIndustryJob } from '@/esi/endpoints';
+import type { Contract, CorporationIndustryJob } from '@/esi/endpoints';
 import type { MemberActivity, RosterDiff } from '@/engine/corp/members';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { WalletDivision } from '@/features/corp/divisions';
@@ -81,6 +81,13 @@ export interface CorpMiningFeed extends CorpFeedBase {
   minerNames: ReadonlyMap<number, string>;
 }
 
+export interface CorpContractsFeed extends CorpFeedBase {
+  /** Every contract ESI lists for the corporation, any status; the builder keeps the open ones. */
+  contracts: Contract[];
+  /** Names for every issuer and assignee, whether a pilot, a corporation or an alliance. */
+  names: ReadonlyMap<number, string>;
+}
+
 export async function loadCorpWalletFeed(characterId: number): Promise<CorpWalletFeed> {
   const { loadCorpWallet } = await import('./corpFeedLoaders');
   return loadCorpWallet(characterId);
@@ -99,4 +106,9 @@ export async function loadCorpMembersFeed(characterId: number): Promise<CorpMemb
 export async function loadCorpMiningFeed(characterId: number): Promise<CorpMiningFeed> {
   const { loadCorpMining } = await import('./corpFeedLoaders');
   return loadCorpMining(characterId);
+}
+
+export async function loadCorpContractsFeed(characterId: number): Promise<CorpContractsFeed> {
+  const { loadCorpContracts } = await import('./corpFeedLoaders');
+  return loadCorpContracts(characterId);
 }

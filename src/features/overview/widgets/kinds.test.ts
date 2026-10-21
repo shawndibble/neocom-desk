@@ -75,7 +75,6 @@ const CORP_SOON = [
   'corpRoleAudit',
   'corpDoctrine',
   'corpKills',
-  'corpContracts',
   'corpSrp',
   'corpProjects',
 ];
