@@ -1,7 +1,7 @@
 /**
  * The Corp overview's widget kinds: the feeds each reads and its builder.
  * Same contract as `models.ts` (pure, derived at render time); spread into its
- * `KINDS` table. Structures and Moon chunks are the Overview's own kinds,
+ * `KINDS` table. Structures and Moon extractions are the Overview's own kinds,
  * reused as they are.
  */
 import type { KindDef } from './builderKit';

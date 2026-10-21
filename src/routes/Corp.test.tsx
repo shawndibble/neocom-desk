@@ -23,6 +23,7 @@ import {
   useCorpOverviewLayout,
 } from '@/features/overview/widgets/layoutStore';
 import type { OverviewLayout } from '@/features/overview/widgets/layout';
+import { CORP_DEFAULT_KINDS } from '@/features/corp/grid/corpGrid';
 import { Corp } from './Corp';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
@@ -366,10 +367,10 @@ describe('the layout', () => {
     expect(within(gallery).queryByText('Training')).not.toBeInTheDocument();
 
     await user.click(within(gallery).getByRole('button', { name: 'Add another Members' }));
+    // The whole default is saved, not this Character's slice: a Director main keeps its wallet.
     await waitFor(async () =>
       expect((await storedLayout())?.widgets.map((w) => w.kind)).toEqual([
-        'corpMembers',
-        'corpInactive',
+        ...CORP_DEFAULT_KINDS,
         'corpMembers',
       ])
     );
@@ -403,6 +404,17 @@ describe('the cached data notice', () => {
     mocked.loadCorporationWallets.mockResolvedValue(savedCopy([{ division: 1, balance: 5e9 }]));
     renderCorp();
     expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
+  });
+});
+
+describe('a failed read', () => {
+  it('offers Retry for a structures read that came back empty-handed, never "your roles don’t cover this"', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadStructures: true }));
+    mocked.loadCorporationStructures.mockResolvedValue({ cached: null, needsReauth: false });
+    renderCorp();
+    const card = await widget('Structures');
+    expect(await within(card).findByText('Could not load')).toBeInTheDocument();
+    expect(within(card).queryByText("Your corp roles don't cover this.")).not.toBeInTheDocument();
   });
 });
 

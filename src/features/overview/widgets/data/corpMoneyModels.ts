@@ -61,7 +61,8 @@ function directionCell(value: number, tone: 'good' | 'bad'): TableCell {
 /** How many whole days back the journal's oldest line reaches; 0 for none. */
 function coveredDays(journal: readonly CorpJournalLine[], now: number): number {
   if (journal.length === 0) return 0;
-  const oldest = Math.min(...journal.map((entry) => entry.atMs));
+  // A reduce: a big corp's journal is too many arguments for Math.min.
+  const oldest = journal.reduce((min, entry) => Math.min(min, entry.atMs), Infinity);
   return Math.max(1, Math.ceil((now - oldest) / DAY_MS));
 }
 

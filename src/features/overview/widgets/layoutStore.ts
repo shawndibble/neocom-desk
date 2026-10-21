@@ -84,8 +84,8 @@ export const useOverviewLayout = createSyncedSetting<OverviewLayout | null>({
 
 /**
  * The Corp overview's layout: same shape and parse. `null` means the pilot has
- * never edited it, and the page draws a default built from the Character's
- * capabilities without saving it (see `corpBoard.ts`).
+ * never edited it, and the page draws the full default without saving it
+ * (`features/corp/grid/corpGrid.ts`).
  */
 export const CORP_OVERVIEW_LAYOUT_KEY = 'sync.corpOverviewLayout';
 

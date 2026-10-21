@@ -213,7 +213,8 @@ export const corpDeadlines: Builder = (feeds, { t, now }) => {
         isEmpty: timed.length === 0,
       })
     ),
-    fetchedAt: fetched.length > 0 ? new Date(Math.min(...fetched.map((at) => at.getTime()))) : null,
+    fetchedAt:
+      fetched.length > 0 ? fetched.reduce((oldest, at) => (at < oldest ? at : oldest)) : null,
     fromCache: jobsData?.fromCache ?? false,
     number: {
       value: count(due.total),
@@ -372,6 +373,13 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
   const ready = facts.filter((f) => f.done);
   const running = facts.filter((f) => !f.done);
   const next = running[0];
+  // Under CCP's hour-long cache a finish time may already be past, so it is not ticked down.
+  const left = (f: JobFacts) => {
+    const remainingMs = f.endMs - now;
+    return remainingMs < CORP_CACHE_WINDOW_MS
+      ? t('corp.board.underCacheWindow')
+      : formatCountdown(remainingMs / 1000);
+  };
 
   const secondary: NumberSecondary | undefined =
     ready.length > 0
@@ -380,14 +388,14 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
         ? {
             text: t('overview.widgets.corpJobs.next', {
               name: next.label,
-              duration: formatCountdown((next.endMs - now) / 1000),
+              duration: left(next),
             }),
           }
         : undefined;
 
   const endsCell = (f: JobFacts): TableCell => {
     if (f.done) return t('overview.board.ready');
-    const text = formatCountdown((f.endMs - now) / 1000);
+    const text = left(f);
     const share = elapsedShare(Date.parse(f.job.start_date), f.endMs, now);
     const bar = share === null ? undefined : fractionBar(share, 1);
     return bar === undefined ? text : { text, bar };
@@ -409,7 +417,7 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
       key: String(f.job.job_id),
       title: f.label,
       detail: activityOf(f.job),
-      value: f.done ? t('overview.board.ready') : formatCountdown((f.endMs - now) / 1000),
+      value: f.done ? t('overview.board.ready') : left(f),
       tone: f.tone,
     })),
     table: {
@@ -441,16 +449,17 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
         tone: f.tone,
       })),
     },
-    deadlines: next
-      ? [
-          {
-            at: next.endMs,
-            note: t('overview.widgets.corpJobs.deadline', { name: next.label }),
-            severity: next.tone,
-            to: DEADLINE_TO,
-          },
-        ]
-      : [],
+    deadlines:
+      next && next.endMs - now >= CORP_CACHE_WINDOW_MS
+        ? [
+            {
+              at: next.endMs,
+              note: t('overview.widgets.corpJobs.deadline', { name: next.label }),
+              severity: next.tone,
+              to: DEADLINE_TO,
+            },
+          ]
+        : [],
     summary: t('overview.widgets.corpJobs.summary', {
       running: running.length,
       ready: ready.length,
@@ -464,7 +473,7 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
             key: String(f.job.job_id),
             label: f.label,
             value: seconds,
-            text: f.done ? t('overview.board.ready') : formatCountdown(seconds),
+            text: f.done ? t('overview.board.ready') : left(f),
             color: f.done ? ('warning' as const) : ('accent' as const),
           };
         }),

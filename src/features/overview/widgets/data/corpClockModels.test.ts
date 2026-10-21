@@ -290,6 +290,16 @@ describe('corpJobs', () => {
     ]),
   });
 
+  it('never ticks a job down inside the one-hour cache window, nor offers it as a deadline', () => {
+    const view = corpJobs(
+      { corpJobs: jobsFeed([job({ end_date: new Date(NOW + 20 * MIN).toISOString() })]) },
+      ctx
+    );
+    expect(view.table?.rows[0]?.cells[1]).toMatchObject({ text: 'corp.board.underCacheWindow' });
+    expect(view.number.secondary?.text).toContain('corp.board.underCacheWindow');
+    expect(view.deadlines).toEqual([]);
+  });
+
   it('counts running jobs and flags the ones ready to deliver', () => {
     const view = corpJobs(feeds(), ctx);
     expect(view.number.value).toBe('2');

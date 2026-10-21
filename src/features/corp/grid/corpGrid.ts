@@ -13,7 +13,6 @@ import type { WidgetBoard } from '@/features/overview/widgets/board';
 import {
   boardKinds,
   CORP_KIND_CATEGORIES,
-  getKind,
   isAddable,
   kindOpenTo,
   type WidgetKindDef,
@@ -30,7 +29,12 @@ import {
 /**
  * The layout a Corp overview opens with, before the pilot changes anything:
  * the old board's order (when, then money, then people), then the two reads it
- * never had. Each kind the Character cannot read is left out.
+ * never had.
+ *
+ * Every kind, whatever this Character can read: the board's `canDraw` hides
+ * the rest. The layout is one per pilot, so a default trimmed to an alt's
+ * roles would, once edited and saved, drop the Director main's widgets on
+ * every device.
  */
 export const CORP_DEFAULT_KINDS: readonly WidgetKindId[] = [
   'corpDeadlines',
@@ -51,15 +55,10 @@ function seqId(prefix: string): MakeId {
   return () => `${prefix}${++n}`;
 }
 
-export function corpDefaultLayout(
-  capabilities: CorpCapabilities,
-  makeId: MakeId = seqId('c')
-): OverviewLayout {
+export function corpDefaultLayout(makeId: MakeId = seqId('c')): OverviewLayout {
   const widgets: Widget[] = [];
   for (const id of CORP_DEFAULT_KINDS) {
-    const kind = getKind(id);
-    if (!kind || !isAddable(id) || !kindOpenTo(kind, capabilities)) continue;
-    if (widgets.length >= MAX_WIDGETS) break;
+    if (!isAddable(id) || widgets.length >= MAX_WIDGETS) continue;
     const widget = newWidget(id, makeId());
     if (widget) widgets.push(widget);
   }
@@ -75,6 +74,6 @@ export function corpWidgetBoard(capabilities: CorpCapabilities): WidgetBoard {
     categories: CORP_KIND_CATEGORIES,
     canDraw: (kind: WidgetKindDef) => kindOpenTo(kind, capabilities),
     characterScope: false,
-    defaultLayout: (makeId) => corpDefaultLayout(capabilities, makeId),
+    defaultLayout: corpDefaultLayout,
   };
 }

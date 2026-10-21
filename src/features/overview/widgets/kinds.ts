@@ -9,7 +9,7 @@
  * One table serves both boards (the Overview and the Corp overview): a kind
  * names the boards it is offered on and its category on each. Ids are global,
  * so a corp-only kind's id never reuses a character kind's (`corpWallet`, not
- * `wallet`). Structures and Moon chunks sit on both.
+ * `wallet`). Structures and Moon extractions sit on both.
  */
 import type { CorpCapability } from '@/engine/corpRoles';
 import type { EsiEndpointId } from '@/esi/registry';

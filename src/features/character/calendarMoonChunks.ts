@@ -34,6 +34,8 @@ export interface MoonChunkRead {
   sources: BoardClockSource[] | undefined;
   /** The same extractions before a clock was picked, for the corp board's own ranking. */
   extractions?: BoardExtractionSource[];
+  /** The read was allowed and came back with nothing: an outage, not a role gap. */
+  failed?: boolean;
 }
 
 const NOT_READABLE: MoonChunkRead = {
@@ -51,7 +53,9 @@ export async function loadMoonChunks(characterId: number, nowMs: number): Promis
     loadCorporationMiningExtractions(characterId, corporationId),
     canNameRefineries ? loadCorporationStructures(characterId, corporationId) : undefined,
   ]);
-  if (extractions.cached === null) return { result: extractions, sources: undefined };
+  if (extractions.cached === null) {
+    return { result: extractions, sources: undefined, failed: !extractions.needsReauth };
+  }
 
   const names = new Map<number, string>(
     (structures?.cached?.data ?? []).map((structure: CorporationStructure) => [

@@ -14,9 +14,11 @@ _Recorded 2026-10-20._
 - **One Corp overview layout per pilot,** synced as `sync.corpOverviewLayout`;
   not per corporation, not per Character.
 - **No Role chooser or first-run prompt on the Corp overview.** Until the pilot
-  edits, the page draws a default built from the Character's corp capabilities
-  and never saves it: saving would freeze one Character's roles into the layout
-  every device opens with.
+  edits, the page draws the full default (every default corp kind) and never
+  saves it; the capability gate decides what is drawn. The default is never
+  trimmed to one Character's roles: an alt's edit would then save a layout
+  missing the Director main's widgets. On a new device it waits for the first
+  sync pull before drawing the default, like the Overview's first run.
 - **Hide, don't lock.** A kind whose capability the Character lacks is never
   offered in the Gallery, drawn or fetched. A saved one stays in the layout but
   is not drawn. Coming-soon kinds are listed for everyone, not addable.

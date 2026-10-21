@@ -84,8 +84,7 @@ export function PageHeader({ title, meta, actions, subNav, className = '' }: Pag
         {/* `md:order-1`: after the sub-nav, which sits between meta and actions at `md`. The bell is always there (dim at zero), so the cluster never collapses. */}
         <div
           className={cx(
-            // `min-w-0 max-w-full`: a full-width action (the Corp overview's Next deadline on a
-            // phone) truncates its nowrap text instead of pushing the page sideways.
+            // `min-w-0 max-w-full`: a full-width nowrap action truncates instead of pushing the page sideways.
             'ml-auto flex max-w-full min-w-0 flex-wrap items-center justify-end gap-1.5 md:order-1',
             subNav ? 'md:pb-1' : undefined
           )}

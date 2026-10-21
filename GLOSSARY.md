@@ -283,9 +283,9 @@ here — they go one per file in `docs/context/decisions/`.
   Capability: hidden, never locked.
 - **Corp overview layout**: The ordered list of **Widgets** on the **Corp
   overview**. One per pilot, not per corporation or Character, synced as
-  `sync.corpOverviewLayout`. Until the pilot edits it the page draws a default
-  built from the Character's Corp Capabilities and never saves it, so no
-  Character's roles are frozen into every device's layout. No Role chooser.
+  `sync.corpOverviewLayout`. Until the pilot edits it the page draws the full
+  default and never saves it; each Character sees the widgets its Corp
+  Capabilities open. No Role chooser.
 - **Corp Role**: An in-game corporation role (Director, Accountant,
   Station_Manager, Factory_Manager, ...) held by a Character. A second,
   invisible access axis alongside granted scopes: CCP role-gates the

@@ -42,7 +42,11 @@ import { OverviewRefreshProvider } from '@/features/overview/widgets/data/Overvi
 import { WidgetDataProvider } from '@/features/overview/widgets/data/WidgetDataProvider';
 import { useOverviewEdit } from '@/features/overview/widgets/editContext';
 import type { OverviewLayout } from '@/features/overview/widgets/layout';
-import { useCorpOverviewLayout } from '@/features/overview/widgets/layoutStore';
+import {
+  CORP_OVERVIEW_LAYOUT_KEY,
+  useCorpOverviewLayout,
+} from '@/features/overview/widgets/layoutStore';
+import { useFirstRunReady } from '@/features/overview/widgets/useFirstRunReady';
 import { OverviewEditProvider } from '@/features/overview/widgets/OverviewEditProvider';
 import { distinctKinds, visibleWidgets } from '@/features/overview/widgets/visibility';
 import { WidgetGrid } from '@/features/overview/widgets/WidgetGrid';
@@ -123,9 +127,8 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
  * new character's roles read is in flight, so this unmounts and comes back
  * with that character's answer.
  *
- * Until the pilot edits it, the layout is a default built from those
- * capabilities and never written: saving it would freeze one Character's
- * roles into the layout every device and every alt then opens with.
+ * Until the pilot edits it, the layout is the full default (`corpDefaultLayout`)
+ * and is never written; the board's capability gate decides what is drawn.
  */
 function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
   const { t } = useTranslation();
@@ -133,8 +136,11 @@ function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
   const stored = useCorpOverviewLayout((state) => state.value);
   const setLayout = useCorpOverviewLayout((state) => state.setValue);
   const hydrated = useHydratedStore(useCorpOverviewLayout);
+  // An absent layout is the default only once a second device's pull has had its say: an edit
+  // made over the default before then would overwrite the layout already synced.
+  const firstRunReady = useFirstRunReady(hydrated, CORP_OVERVIEW_LAYOUT_KEY);
   const board = useMemo(() => corpWidgetBoard(capabilities), [capabilities]);
-  const fallback = useMemo(() => corpDefaultLayout(capabilities), [capabilities]);
+  const fallback = useMemo(() => corpDefaultLayout(), []);
   const layout = stored ?? fallback;
   const onLayoutChange = useCallback((next: OverviewLayout) => void setLayout(next), [setLayout]);
   const kinds = useMemo(
@@ -142,7 +148,7 @@ function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
     [layout.widgets, isPhone, board]
   );
 
-  if (!hydrated) {
+  if (!hydrated || (stored === null && !firstRunReady)) {
     return (
       <div className="flex justify-center py-16">
         <Spinner label={t('common.loading')} />
