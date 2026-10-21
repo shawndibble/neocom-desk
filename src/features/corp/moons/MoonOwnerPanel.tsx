@@ -8,6 +8,7 @@ import { RECONNECT_CODE, requestFeederRate, setFeederPayee } from '../taxBook/fe
 import { isStale } from '../taxBook/feederViewModel';
 import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { DialogShell } from './BookDialogs';
+import { MoonOwnerPrevious } from './MoonOwnerPrevious';
 import { MoonOwnerView } from './MoonOwnerView';
 import { OwnerStaleBanner } from './OwnerStaleBanner';
 import { OwnerStatusStrip } from './OwnerStatusStrip';
@@ -124,6 +125,15 @@ export function MoonOwnerPanel({
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       {body}
+      {/* Each accounting corporation it left keeps its own history until dismissed (#4621). */}
+      {(owner.previousCollectorIds ?? []).map((id) => (
+        <MoonOwnerPrevious
+          key={id}
+          characterId={characterId}
+          corporationId={corporationId}
+          collectorCorporationId={id}
+        />
+      ))}
       {canLeave && (
         <div>
           <Button variant="danger" size="sm" onClick={() => setLeaving(true)}>

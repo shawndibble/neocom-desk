@@ -121,12 +121,15 @@ async function call<In, Out>(characterId: number, name: string, data: In): Promi
 /** Live role check; records the 24h viewer access and builds the view when it is absent. */
 export async function getFeederViewAccess(
   characterId: number,
-  corporationId: number
+  corporationId: number,
+  /** An accounting corporation it left (#4621); absent: the current one, else the last left. */
+  collectorCorporationId?: number
 ): Promise<FeederViewAccess> {
   const accessToken = await getValidAccessToken(characterId);
   return call(characterId, 'getCorpTaxBookFeederViewAccessCallable', {
     corporationId,
     accessToken,
+    ...(collectorCorporationId !== undefined ? { collectorCorporationId } : {}),
   });
 }
 
@@ -161,12 +164,14 @@ export async function setFeederPayee(
 /** Dismiss the after-leaving section for the corporation's officers. */
 export async function dismissFeederHistory(
   characterId: number,
-  corporationId: number
+  corporationId: number,
+  collectorCorporationId?: number
 ): Promise<{ ok: true }> {
   const accessToken = await getValidAccessToken(characterId);
   return call(characterId, 'dismissCorpTaxBookFeederHistoryCallable', {
     corporationId,
     accessToken,
+    ...(collectorCorporationId !== undefined ? { collectorCorporationId } : {}),
   });
 }
 
@@ -198,9 +203,10 @@ export async function readFeederView(
 /** Access, then the view: one call for the page. */
 export async function loadFeederView(
   characterId: number,
-  corporationId: number
+  corporationId: number,
+  collectorCorporationId?: number
 ): Promise<{ access: FeederViewAccess; view: FeederView | null }> {
-  const access = await getFeederViewAccess(characterId, corporationId);
+  const access = await getFeederViewAccess(characterId, corporationId, collectorCorporationId);
   return {
     access,
     view: await readFeederView(access.collectorCorporationId, corporationId),

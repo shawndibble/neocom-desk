@@ -113,6 +113,37 @@ describe('MoonOwnerPanel', () => {
     expect(screen.queryByRole('button', { name: 'End it now' })).toBeNull();
   });
 
+  it('keeps "Previously handled by" for each accounting corporation it left (#4621)', async () => {
+    loadFeederView.mockImplementation(async (_c: number, _corp: number, collector?: number) =>
+      collector === 4
+        ? {
+            access: { collectorCorporationId: 4, expiresAt: 0, canEdit: true },
+            view: fixtureView({
+              status: 'left',
+              collectorCorporationId: 4,
+              collectorName: 'Old Ledger Holdings',
+              leftAt: Date.UTC(2026, 8, 30),
+              coverageTo: '2026-09-29',
+            }),
+          }
+        : {
+            access: { collectorCorporationId: 5, expiresAt: 0, canEdit: true },
+            view: fixtureView(),
+          }
+    );
+    render(
+      <MoonOwnerPanel
+        owner={{ ...owner, previousCollectorIds: [4] }}
+        characterId={7}
+        corporationId={98}
+        canLeave
+        onLeft={vi.fn()}
+      />
+    );
+    expect(await screen.findByText('Previously handled by Old Ledger Holdings')).toBeVisible();
+    expect(loadFeederView).toHaveBeenCalledWith(7, 98, 4);
+  });
+
   it('says it is waiting when the view is not built yet', async () => {
     loadFeederView.mockResolvedValue({
       access: { collectorCorporationId: 5, expiresAt: 0, canEdit: true },

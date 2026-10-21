@@ -40,7 +40,12 @@ export interface FeederRefinery {
 
 export type FeederStatus =
   /** `ownBookFrom`: a former moon owner's earliest own-book start (UTC day). */
-  | { status: 'none'; ownBookFrom?: string }
+  | {
+      status: 'none';
+      ownBookFrom?: string;
+      /** Accounting corporations it left, newest first (#4621); absent from an older server. */
+      previousCollectorIds?: number[];
+    }
   | {
       status: 'feeder';
       collectorCorporationId: number;
@@ -53,6 +58,8 @@ export type FeederStatus =
       isHolder: boolean;
       refineries: FeederRefinery[];
       owedIsk: number | null;
+      /** Accounting corporations it left before, newest first (#4621); absent from an older server. */
+      previousCollectorIds?: number[];
     };
 
 async function call<In, Out>(characterId: number, name: string, data: In): Promise<Out> {

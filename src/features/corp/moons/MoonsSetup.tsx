@@ -242,10 +242,22 @@ export function MoonsSetup({
       )}
     </div>
   );
-  // A corporation an accounting corporation handled before sees that history above the choice.
+  // A corporation an accounting corporation handled before sees that history above the choice;
+  // any it left before that keep theirs below (#4621).
+  const older = status.status === 'none' ? (status.previousCollectorIds ?? []).slice(1) : [];
   return (
-    <MoonOwnerPrevious key={String(left)} characterId={characterId} corporationId={corporationId}>
-      {choices}
-    </MoonOwnerPrevious>
+    <>
+      <MoonOwnerPrevious key={String(left)} characterId={characterId} corporationId={corporationId}>
+        {choices}
+      </MoonOwnerPrevious>
+      {older.map((id) => (
+        <MoonOwnerPrevious
+          key={`${String(left)}-${id}`}
+          characterId={characterId}
+          corporationId={corporationId}
+          collectorCorporationId={id}
+        />
+      ))}
+    </>
   );
 }
