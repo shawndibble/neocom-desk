@@ -483,3 +483,51 @@ describe('a mixed-rate day on an issued Statement (#4618)', () => {
     expect(day.rateEffectiveFrom).toBeUndefined();
   });
 });
+
+describe('officer write-offs (#4637)', () => {
+  const base = input({
+    entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-08-12', 2000)],
+    memberIds: new Set(),
+  });
+  const first = buildBookView(base);
+  const plan = planStatementRun(first, nextRunPeriod(first)!);
+  const statement = statementForLine(first, plan, plan.lines[0]);
+  const writeOff = (amount: number, extra: { statementId?: string } = {}) => ({
+    id: 'w1',
+    minerId: 'solo:1',
+    amount,
+    reason: 'Left the corp',
+    at: '2026-09-10T00:00:00Z',
+    ...extra,
+  });
+
+  it('reduces what the Miner owes, oldest days first; a day it covers in full reads written off', () => {
+    const view = buildBookView({
+      ...base,
+      statements: [statement],
+      writeOffs: [writeOff(150_000)],
+    });
+    expect(view.miners[0].owed).toBe(150_000);
+    const detail = minerDetail(view, 'solo:1')!;
+    expect(detail.days.map((d) => [d.date, d.status])).toEqual([
+      ['2026-08-12', 'on-statement'],
+      ['2026-08-10', 'written-off'],
+    ]);
+    expect(detail.officerWriteOffs).toEqual([
+      { id: 'w1', amount: 150_000, reason: 'Left the corp', at: '2026-09-10T00:00:00Z' },
+    ]);
+  });
+
+  it("writing off a leaver's whole balance clears it from Needs you", () => {
+    const owing = buildBookView({ ...base, statements: [statement] });
+    expect(owing.needsYou.some((n) => n.kind === 'leaver')).toBe(true);
+    const view = buildBookView({
+      ...base,
+      statements: [statement],
+      writeOffs: [writeOff(300_000, { statementId: statement.id })],
+    });
+    expect(view.miners[0].owed).toBe(0);
+    expect(view.needsYou.some((n) => n.kind === 'leaver')).toBe(false);
+    expect(minerDetail(view, 'solo:1')!.days.every((d) => d.status === 'written-off')).toBe(true);
+  });
+});

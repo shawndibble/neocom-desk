@@ -10,7 +10,13 @@
  */
 import type { EveNotificationPayload } from '../eveNotificationPayload';
 import { shiftDate } from '../miningTax/yieldRange';
-import { allocatePayments, dismissalCredits, matchDonation, type TaxPayment } from './allocation';
+import {
+  allocatePayments,
+  dismissalCredits,
+  matchDonation,
+  type RecordedWriteOff,
+  type TaxPayment,
+} from './allocation';
 import type { Miner } from './charges';
 import type { Dismissal } from './dismissals';
 import { MOON_ORE_M3_PER_UNIT, extractionStatus, type Extraction } from './extraction';
@@ -332,6 +338,8 @@ export interface SettleInput {
   alreadyPaid: ReadonlySet<string>;
   /** Lets a moon or Extraction dismissal reach the days it covers. */
   extractions?: readonly SyncExtraction[];
+  /** Officer write-offs (#4637): a Statement one forgives in full is settled. */
+  writeOffs?: readonly RecordedWriteOff[];
   now?: string;
   /** The book's start date; a donation dated before it credits nothing. */
   startDate?: string;
@@ -370,6 +378,7 @@ export function planSettlements(input: SettleInput): string[] {
       statements,
       payments,
       dismissalCredits: dismissalCredits(statements, input.dismissals, charges),
+      officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId),
       startDate: input.startDate,
     });
     for (const s of statements) {

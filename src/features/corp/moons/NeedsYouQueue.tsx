@@ -329,10 +329,10 @@ export function NeedsYouQueue() {
             amount: isk(open.item.owed),
           })}
           run={async (reason) => {
+            // The whole balance, so no Statement: it reduces open Statements oldest first (#4637).
             await edit({
               action: 'writeOff',
               minerId: open.miner.id,
-              statementId: open.item.statementId,
               amount: open.item.owed,
               reason,
             });

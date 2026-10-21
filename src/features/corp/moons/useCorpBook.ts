@@ -279,6 +279,7 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
       dismissals: data.state.dismissals,
       declarations: data.declarations,
       adjustments: data.adjustments,
+      ...(data.state.writeOffs ? { writeOffs: data.state.writeOffs } : {}),
       feeders: data.feeders,
       extractions: data.state.extractions,
       paidStatementIds: data.state.paidStatementIds,

@@ -6277,7 +6277,8 @@
         "sentWaitingShort": "Sent, waiting",
         "conflict": "Conflict",
         "unattributed": "Unattributed",
-        "dismissed": "Dismissed by corp"
+        "dismissed": "Dismissed by corp",
+        "waived": "Waived"
       },
       "hint": {
         "pending": "{{corp}} has not closed this day in its book yet. Until it does, your own allocation applies and nothing is owed to the corp.",
@@ -6286,6 +6287,7 @@
         "conflict": "You gave this ore to another Payee, and {{corp}}'s book also recorded it. It is not owed; it resolves to {{corp}} on {{date}} unless you sort it out first.",
         "unattributed": "No Corp Tax Book claims this ore, so nobody is owed for it.",
         "dismissed": "{{corp}} dismissed this day: {{reason}}",
+        "waived": "{{corp}} wrote this day off: {{reason}}",
         "paid": "Credited by {{corp}}'s book."
       },
       "sync": {
@@ -14066,6 +14068,7 @@
       "balanceDue": "Balance due",
       "balanceSum": "Billed {{billed}} − paid {{paid}}.",
       "dismissed": "{{amount}} was waived by an officer.",
+      "forgiven": "{{amount}} was written off by an officer.",
       "writtenOff": "{{amount}} short of the Statement was written off.",
       "howToPay": "Donate ISK to {{corp}}; any of your characters counts.",
       "payCodeLead": "Put the code",
@@ -14421,7 +14424,7 @@
         "writtenOff": "Written off",
         "writtenOffValue_one": "{{tolerance}} + {{count}} line",
         "writtenOffValue_other": "{{tolerance}} + {{count}} lines",
-        "writtenOffTip": "What payments within tolerance left over, and lines recorded after a Statement was paid ({{late}}). Paid days are closed for good; both are logged."
+        "writtenOffTip": "What officers wrote off, what payments within tolerance left over, and lines recorded after a Statement was paid ({{late}}). Paid days are closed for good; all are logged."
       },
       "activity": {
         "button": "Activity",

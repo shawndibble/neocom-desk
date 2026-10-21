@@ -9,6 +9,11 @@
  *
  * Recomputed from the whole history each time, so marking "not tax" or
  * reversing a dismissal simply reflows the credit.
+ *
+ * An officer's write-off (#4637) applies after every payment, in the order
+ * they were recorded: one with a Statement reduces that Statement, one without
+ * reduces open Statements oldest first. What it finds nothing left to forgive
+ * is dropped, never credit, so it never moves a payment off what it paid.
  */
 import { activeDismissalFor, type DismissableCharge, type Dismissal } from './dismissals';
 import { minerIdFor, type Miner } from './charges';
@@ -72,9 +77,35 @@ export function dismissalCredits(
   return credits;
 }
 
+/** A write-off an officer recorded (`writeOffs`): the corporation forgave part of what a Miner owes. */
+export interface OfficerWriteOff {
+  id: string;
+  amount: number;
+  /** ISO instant it was recorded. */
+  at: string;
+  /** The Statement it reduces; none reduces open Statements oldest first. */
+  statementId?: string;
+}
+
+/** A `writeOffs` doc as the book stores it: whose debt, and the officer's reason. */
+export interface RecordedWriteOff extends OfficerWriteOff {
+  minerId: string;
+  reason: string;
+}
+
+/** The part of one officer write-off that reduced one Statement. */
+export interface WriteOffCredit {
+  writeOffId: string;
+  statementId: string;
+  amount: number;
+}
+
 export interface StatementSettlement {
   amount: number;
+  /** Payments, dismissals and officer write-offs credited to it. */
   credited: number;
+  /** What officer write-offs forgave of it (part of `credited`). */
+  forgiven: number;
   /** The shortfall the tolerance wrote off. */
   writtenOff: number;
   remaining: number;
@@ -94,9 +125,11 @@ export interface Allocation {
   writeOffs: { statementId: string; amount: number }[];
   /** Which Statement each Tax Payment's money went to, one entry per payment and Statement. */
   paymentCredits: PaymentCredit[];
+  /** Which Statement each officer write-off reduced. */
+  writeOffCredits: WriteOffCredit[];
   /** Payment nothing absorbed — printed on the next Statement. */
   credit: number;
-  /** Statements − payments − dismissals − write-offs; negative is credit. */
+  /** Statements − payments − dismissals − write-offs (tolerance and officer); negative is credit. */
   balance: number;
 }
 
@@ -111,6 +144,8 @@ export interface AllocationInput {
   /** That Miner's Tax Payments. */
   payments: readonly TaxPayment[];
   dismissalCredits: readonly DismissalCredit[];
+  /** That Miner's officer write-offs. */
+  officerWriteOffs?: readonly OfficerWriteOff[];
   /** The book's start date: a donation dated before it credits nothing. Hand-recorded payments always count. */
   startDate?: string;
 }
@@ -126,9 +161,9 @@ export function allocatePayments(rawInput: AllocationInput): Allocation {
   const ordered = [...input.statements].sort(
     (a, b) => a.issuedAt.localeCompare(b.issuedAt) || a.id.localeCompare(b.id)
   );
-  type Running = { amount: number; credited: number; paidIn: number };
+  type Running = { amount: number; credited: number; paidIn: number; forgiven: number };
   const state = new Map<string, Running>(
-    ordered.map((s) => [s.id, { amount: s.amount, credited: 0, paidIn: 0 }])
+    ordered.map((s) => [s.id, { amount: s.amount, credited: 0, paidIn: 0, forgiven: 0 }])
   );
   // Only a payment settles within the tolerance; a dismissal must cover in full.
   const isDone = (st: Running): boolean => {
@@ -176,6 +211,27 @@ export function allocatePayments(rawInput: AllocationInput): Allocation {
     }
   }
 
+  // Officer write-offs, after every payment; a leftover is dropped, never credit.
+  const writeOffCredits: WriteOffCredit[] = [];
+  let forgivenTotal = 0;
+  const officerWriteOffs = [...(input.officerWriteOffs ?? [])].sort(
+    (a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id)
+  );
+  for (const w of officerWriteOffs) {
+    const targets = w.statementId ? ordered.filter((s) => s.id === w.statementId) : ordered;
+    let available = w.amount;
+    for (const s of targets) {
+      if (available <= 0) break;
+      const left = apply(s.id, available, false);
+      const amount = available - left;
+      available = left;
+      if (amount <= 0) continue;
+      state.get(s.id)!.forgiven += amount;
+      forgivenTotal += amount;
+      writeOffCredits.push({ writeOffId: w.id, statementId: s.id, amount });
+    }
+  }
+
   const byStatement = new Map<string, StatementSettlement>();
   const writeOffs: Allocation['writeOffs'] = [];
   let billed = 0;
@@ -191,6 +247,7 @@ export function allocatePayments(rawInput: AllocationInput): Allocation {
     byStatement.set(s.id, {
       amount: st.amount,
       credited: st.credited,
+      forgiven: st.forgiven,
       writtenOff,
       remaining: shortfall - writtenOff,
       settled,
@@ -200,8 +257,9 @@ export function allocatePayments(rawInput: AllocationInput): Allocation {
     byStatement,
     writeOffs,
     paymentCredits,
+    writeOffCredits,
     credit,
-    balance: billed - paid - dismissed - writtenOffTotal,
+    balance: billed - paid - dismissed - writtenOffTotal - forgivenTotal,
   };
 }
 

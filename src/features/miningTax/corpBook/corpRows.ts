@@ -60,6 +60,8 @@ const STATUS_OF_STATE: Record<BookRowView['state'], MiningTaxAssignmentStatus> =
   conflict: 'needs-review',
   paid: 'paid',
   dismissed: 'dismissed',
+  // Forgiven in full by an officer write-off (#4637): not owed, like a dismissal.
+  waived: 'dismissed',
 };
 
 function minusLines(from: readonly OreLine[], take: readonly OreLine[] | undefined): OreLine[] {
