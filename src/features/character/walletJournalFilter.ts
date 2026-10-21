@@ -50,7 +50,7 @@ export const {
  * slice of `entry.date` is sufficient for the range check — ISO dates sort
  * lexicographically the same as chronologically.
  */
-export function filterWalletJournal<T extends WalletJournalEntry & { playerId?: number }>(
+export function filterWalletJournal<T extends WalletJournalEntry & Pick<JournalRow, 'playerId'>>(
   entries: readonly T[],
   filter: WalletJournalFilter,
   /** The description the journal shows for a line, which free text matches against. */
@@ -59,7 +59,7 @@ export function filterWalletJournal<T extends WalletJournalEntry & { playerId?: 
   const text = filter.text.trim().toLowerCase();
   return entries.filter((entry) => {
     if (filter.refType !== null && journalRefKey(entry) !== filter.refType) return false;
-    if (filter.player !== null && String(entry.playerId) !== filter.player) return false;
+    if (filter.player !== null && entry.playerId?.toString() !== filter.player) return false;
     const day = entry.date.slice(0, 10);
     if (filter.startDate !== null && day < filter.startDate) return false;
     if (filter.endDate !== null && day > filter.endDate) return false;

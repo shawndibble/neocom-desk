@@ -391,6 +391,15 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     expect(screen.queryByText('Master division payout')).toBeNull();
   });
 
+  it('still draws the journal, with a blank Player cell, when the name read fails', async () => {
+    server.use(http.post(`${BASE}/universe/names`, () => HttpResponse.error()));
+    render(<App />);
+    await screen.findByText('Master division payout');
+    // The category lookup fails too, so no party is known to be a character: blank, not wrong.
+    const table = screen.getByRole('table', { name: 'Journal' });
+    expect(within(table).queryByText('#91000001')).toBeNull();
+  });
+
   it('keeps a Where the ISK went panel on the corp journal, with no own-Character netting', async () => {
     const user = userEvent.setup();
     render(<App />);

@@ -28,6 +28,7 @@ export const JOURNAL_SORT_COLUMN_IDS = [
   'date',
   'character',
   'refType',
+  'player',
   'description',
   'amount',
   'balance',

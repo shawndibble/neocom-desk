@@ -115,6 +115,8 @@ const VIEW_PARAM = enumParam<WalletTable>(['journal', 'transactions'], 'journal'
 
 const TRANSACTIONS_SORT = { columnId: 'date', direction: 'desc' } as const;
 
+const NO_IDS: ReadonlySet<number> = new Set();
+
 /** Stable identities, so a missing read doesn't invalidate its dependent memos every render. */
 const EMPTY_JOURNAL: readonly WalletJournalEntry[] = [];
 const EMPTY_TRANSACTIONS: readonly CorporationWalletTransaction[] = [];
@@ -171,7 +173,9 @@ async function loadCorpTransactions(
  */
 interface CorpJournalSnapshot {
   journalResult: StatusResult<WalletJournalEntry[]>;
-  /** Character id -> name, for the lines that have a character party. */
+  /** Every party id that is a character, named or not: a failed name read must not hide its lines. */
+  playerIds: Set<number>;
+  /** Character id -> name; absent for a name that did not resolve. */
   playerNames: Map<number, string>;
 }
 
@@ -186,7 +190,11 @@ async function loadCorpJournal(
   );
   const categories = await resolveCategories(partyIds);
   const characterIds = [...categories].filter(([, c]) => c === 'character').map(([id]) => id);
-  return { journalResult, playerNames: await resolveNames(characterIds) };
+  return {
+    journalResult,
+    playerIds: new Set(characterIds),
+    playerNames: await resolveNames(characterIds),
+  };
 }
 
 interface CorpDivisionsPanelProps {
@@ -532,11 +540,12 @@ function CorpWalletView() {
   );
   const corpJournalResult = corpJournal.data?.journalResult.cached ?? null;
   const playerNames = corpJournal.data?.playerNames ?? NO_NAMES;
+  const playerIds = corpJournal.data?.playerIds ?? NO_IDS;
   // The corp journal shows who did it; a party that isn't a resolved character
   // (the corp itself, a system) leaves the cell blank.
   const playerNameFor = useCallback(
     (entry: JournalRow) =>
-      entry.playerId === undefined ? '' : (playerNames.get(entry.playerId) ?? ''),
+      entry.playerId === undefined ? '' : (playerNames.get(entry.playerId) ?? `#${entry.playerId}`),
     [playerNames]
   );
   // Stamped on each line so the Player filter, column and CSV read one field.
@@ -544,15 +553,15 @@ function CorpWalletView() {
     () =>
       (corpJournalResult?.data ?? EMPTY_JOURNAL).map((entry) => ({
         ...entry,
-        playerId: journalPlayerId(entry, (partyId) => playerNames.has(partyId)),
+        playerId: journalPlayerId(entry, (partyId) => playerIds.has(partyId)),
       })),
-    [corpJournalResult, playerNames]
+    [corpJournalResult, playerIds]
   );
   const playerOptions = useMemo<PlayerOption[]>(
     () =>
       [...new Set(stampedJournal.map((entry) => entry.playerId))]
         .filter((id): id is number => id !== undefined)
-        .map((id) => ({ id: String(id), name: playerNames.get(id) ?? '' }))
+        .map((id) => ({ id: String(id), name: playerNames.get(id) ?? `#${id}` }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     [stampedJournal, playerNames]
   );

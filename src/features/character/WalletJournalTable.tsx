@@ -80,11 +80,11 @@ interface JournalFilterBarProps {
 }
 
 /**
- * "Any ref type" sentinel. Prefixed so it cannot collide with a real ESI
+ * "Any ref type" / "Any player" sentinel. Prefixed so it cannot collide with a real ESI
  * `ref_type`, which is what fills the rest of the list; Radix needs some value
  * here, and the empty string reads to it as "nothing selected".
  */
-const ALL_REF_TYPES = '__all';
+const ALL_OPTION = '__all';
 
 /** The ref-type / date-range / text filter row above a journal table (issue #413). */
 function JournalFilterBar({
@@ -116,16 +116,16 @@ function JournalFilterBar({
         <>
           <FilterField label={t('wallet.refTypeFilterLabel')}>
             <Select
-              value={draft.refType ?? ALL_REF_TYPES}
+              value={draft.refType ?? ALL_OPTION}
               onValueChange={(value) =>
-                setDraft({ ...draft, refType: value === ALL_REF_TYPES ? null : value })
+                setDraft({ ...draft, refType: value === ALL_OPTION ? null : value })
               }
             >
               <SelectTrigger aria-label={t('wallet.refTypeFilterLabel')} className="w-44">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL_REF_TYPES}>{t('wallet.refTypeFilterAll')}</SelectItem>
+                <SelectItem value={ALL_OPTION}>{t('wallet.refTypeFilterAll')}</SelectItem>
                 {refTypeOptions.map((refType) => (
                   <SelectItem key={refType} value={refType}>
                     {journalRefLabel(refType, t)}
@@ -137,17 +137,23 @@ function JournalFilterBar({
           {playerOptions && (
             <FilterField label={t('wallet.playerFilterLabel')}>
               <Select
-                value={draft.player ?? ALL_REF_TYPES}
+                value={draft.player ?? ALL_OPTION}
                 onValueChange={(value) =>
-                  setDraft({ ...draft, player: value === ALL_REF_TYPES ? null : value })
+                  setDraft({ ...draft, player: value === ALL_OPTION ? null : value })
                 }
               >
                 <SelectTrigger aria-label={t('wallet.playerFilterLabel')} className="w-44">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_REF_TYPES}>{t('wallet.playerFilterAll')}</SelectItem>
-                  {playerOptions.map((player) => (
+                  <SelectItem value={ALL_OPTION}>{t('wallet.playerFilterAll')}</SelectItem>
+                  {/* A deep-linked id with no line in this division still needs an option to show. */}
+                  {[
+                    ...playerOptions,
+                    ...(draft.player !== null && !playerOptions.some((p) => p.id === draft.player)
+                      ? [{ id: draft.player, name: `#${draft.player}` }]
+                      : []),
+                  ].map((player) => (
                     <SelectItem key={player.id} value={player.id}>
                       {player.name}
                     </SelectItem>
