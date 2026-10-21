@@ -125,13 +125,17 @@ describe('GlobalPasteRouter', () => {
     expect(screen.getByTestId('where')).toHaveTextContent('/overview');
   });
 
-  it('leaves a paste alone while a dialog is open', async () => {
+  it('still routes a paste while a dialog or sidebar is open', async () => {
     renderRouter(<div role="dialog" />);
-    const classify = vi.mocked(pasteDestinationModule.pasteDestination);
-    classify.mockClear();
     await paste(document.body, FIT);
-    expect(classify).not.toHaveBeenCalled();
-    expect(screen.getByTestId('where')).toHaveTextContent('/overview');
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/fittings'));
+  });
+
+  it('still routes a paste when a field elsewhere kept focus', async () => {
+    renderRouter(<input aria-label="search" />);
+    screen.getByLabelText('search').focus();
+    await paste(document.body, FIT);
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/fittings'));
   });
 
   describe('without the market catalogue (offline, first visit)', () => {
