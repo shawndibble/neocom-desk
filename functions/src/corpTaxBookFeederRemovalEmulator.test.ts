@@ -2,7 +2,7 @@
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
@@ -252,6 +252,22 @@ suite('removing a moon owner', () => {
       { corporationId: FEEDER, accessToken: tok(FEEDER_DIRECTOR) }
     );
     expect((await record())?.status).toBe('removed');
+  });
+
+  it('treats a missing payee as the moon owner corporation: its CEO may force', async () => {
+    await collectorBook()
+      .collection('feeders')
+      .doc(String(FEEDER))
+      .update({ payee: FieldValue.delete(), payeeChangedAt: FieldValue.delete() });
+    const { code, recipients } = await start();
+    expect(recipients).toContain(FEEDER_CEO);
+    await recordRemovalSent(deps(), who(ACCOUNTANT), target(ACCOUNTANT));
+    expect(
+      (await forceRemovalNow(syncDeps(), who(STRANGER), { code }, deps().corporationCeo)).ended
+    ).toBe(false);
+    expect(
+      (await forceRemovalNow(syncDeps(), who(FEEDER_CEO), { code }, deps().corporationCeo)).ended
+    ).toBe(true);
   });
 
   describe("the payee's link", () => {

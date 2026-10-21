@@ -50,6 +50,10 @@ function fail(code: FunctionsErrorCode, message: string, reason: string): never 
   throw new HttpsError(code, message, { reason });
 }
 
+/** No payee on record means the moon owner corporation itself is paid: its CEO acts for it. */
+const payeeOf = (rec: FeederRecord): NonNullable<FeederRecord['payee']> =>
+  rec.payee ?? { kind: 'corporation', id: rec.corporationId };
+
 const linkRef = (db: BookDeps['db'], id: string) => db.collection(REMOVAL_LINKS_COLLECTION).doc(id);
 
 /** `corpTaxBookRemovalLinks/{hash}`. */
@@ -117,15 +121,14 @@ async function recipientsFor(
   });
   const ceoOf = deps.corporationCeo ?? (async () => undefined);
   const ceoId = await ceoOf(rec.corporationId).catch(() => undefined);
+  const payee = payeeOf(rec);
   const payeeCeoId =
-    rec.payee?.kind === 'corporation'
-      ? await ceoOf(rec.payee.id).catch(() => undefined)
-      : undefined;
+    payee.kind === 'corporation' ? await ceoOf(payee.id).catch(() => undefined) : undefined;
   return removalRecipients({
     officerIds,
     startedBy: excludeCharacterId,
     ceoId: ceoId ?? null,
-    ...(rec.payee ? { payee: rec.payee } : {}),
+    payee,
     payeeCeoId: payeeCeoId ?? null,
   });
 }
@@ -314,11 +317,10 @@ async function resolveLink(deps: BookDeps, caller: Caller, code: string): Promis
     return no(copy);
   }
   const ceoOf = deps.corporationCeo ?? (async () => undefined);
+  const payee = payeeOf(rec);
   const payeeCorporationCeoId =
-    rec.payee?.kind === 'corporation'
-      ? await ceoOf(rec.payee.id).catch(() => undefined)
-      : undefined;
-  if (!isPayeeActor({ payee: rec.payee, characterId, payeeCorporationCeoId })) return no(copy);
+    payee.kind === 'corporation' ? await ceoOf(payee.id).catch(() => undefined) : undefined;
+  if (!isPayeeActor({ payee, characterId, payeeCorporationCeoId })) return no(copy);
   return {
     state: {
       available: true,
