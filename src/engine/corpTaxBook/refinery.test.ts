@@ -263,4 +263,17 @@ describe('learnRefinerySystems', () => {
       ])
     ).toEqual({ [ATHANOR]: 30000142 });
   });
+
+  it('learns nothing on a tie', () => {
+    const entries = groupObservedEntries([
+      row({ quantity: 700 }),
+      row({ quantity: 800, date: '2026-10-02' }),
+    ]);
+    expect(
+      learnRefinerySystems(entries, [
+        personal(90000001, '2026-10-01', 30000144, 700),
+        personal(90000001, '2026-10-02', 30000142, 800),
+      ])
+    ).toEqual({});
+  });
 });

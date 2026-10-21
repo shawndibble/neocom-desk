@@ -147,7 +147,7 @@ const sameOre = (a: ObservedMiningEntry['oreLines'], b: MiningLedgerEntry['oreLi
 /**
  * Learns each refinery's system by matching its entries (same character, day
  * and ore) against the miner's own ledger entries. When matches disagree the
- * most common system wins; a tie goes to the lowest id.
+ * most common system wins; a tie learns nothing (a kept system never moves).
  */
 export function learnRefinerySystems(
   entries: readonly ObservedMiningEntry[],
@@ -170,8 +170,9 @@ export function learnRefinerySystems(
   }
   const learned: Record<number, number> = {};
   for (const [structureId, tally] of votes) {
-    const [system] = [...tally].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0];
-    learned[structureId] = system;
+    const [first, second] = [...tally].sort((a, b) => b[1] - a[1]);
+    if (second && second[1] === first[1]) continue;
+    learned[structureId] = first[0];
   }
   return learned;
 }

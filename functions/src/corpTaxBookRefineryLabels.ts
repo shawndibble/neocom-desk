@@ -7,7 +7,13 @@
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { record } from './communities.js';
-import { OBSERVED, parseFeederTarget, type FeederTargetCall } from './corpTaxBook.js';
+import {
+  int,
+  OBSERVED,
+  parseBookCall,
+  parseFeederTarget,
+  type FeederTargetCall,
+} from './corpTaxBook.js';
 import type { CorpSyncDeps } from './corpSyncGrant.js';
 import {
   authorizeFeederCaller,
@@ -171,15 +177,9 @@ export interface LearnRefinerySystemsInput {
   systems: Record<string, number>;
 }
 
-const isId = (v: unknown, min: number, max = Number.MAX_SAFE_INTEGER): v is number =>
-  typeof v === 'number' && Number.isSafeInteger(v) && v >= min && v <= max;
-
 export function parseLearnRefinerySystemsInput(data: unknown): LearnRefinerySystemsInput {
-  const d = record(data);
-  if (!isId(d.corporationId, 1)) {
-    throw new HttpsError('invalid-argument', 'corporationId must be a corporation id');
-  }
-  const entries = Object.entries(record(d.systems));
+  const { corporationId } = parseBookCall(data);
+  const entries = Object.entries(record(record(data).systems));
   if (entries.length === 0 || entries.length > MAX_LEARNED_SYSTEMS) {
     throw new HttpsError(
       'invalid-argument',
@@ -188,15 +188,12 @@ export function parseLearnRefinerySystemsInput(data: unknown): LearnRefinerySyst
   }
   const systems: Record<string, number> = {};
   for (const [id, system] of entries) {
-    if (!isId(Number(id), 1) || String(Number(id)) !== id) {
+    if (String(int(Number(id), 'structureId')) !== id) {
       throw new HttpsError('invalid-argument', 'systems must be keyed by structure id');
     }
-    if (!isId(system, 30_000_000, 32_000_000)) {
-      throw new HttpsError('invalid-argument', 'systems must be solar system ids');
-    }
-    systems[id] = system;
+    systems[id] = int(system, 'solarSystemId', 30_000_000, 32_000_000);
   }
-  return { corporationId: d.corporationId, systems };
+  return { corporationId, systems };
 }
 
 /**
@@ -214,14 +211,20 @@ export async function learnRefinerySystems(
     fail('unauthenticated', 'Log in with a Character first', 'not-signed-in');
   }
   const book = bookRef(deps.db, input.corporationId);
-  for (const [id, system] of Object.entries(input.systems)) {
-    const own = await book
-      .collection(OBSERVED)
-      .where('uid', '==', caller.uid)
-      .where('structureId', '==', Number(id))
-      .limit(1)
-      .get();
-    const row = own.docs[0];
+  const ids = Object.keys(input.systems);
+  const own = await Promise.all(
+    ids.map((id) =>
+      book
+        .collection(OBSERVED)
+        .where('uid', '==', caller.uid)
+        .where('structureId', '==', Number(id))
+        .limit(1)
+        .get()
+    )
+  );
+  for (const [i, id] of ids.entries()) {
+    const system = input.systems[id];
+    const row = own[i].docs[0];
     const feeder: unknown = row?.get('sourceCorporationId');
     if (typeof feeder !== 'number' || typeof row.get('solarSystemId') === 'number') continue;
     const ref = feederRef(deps.db, input.corporationId, feeder);

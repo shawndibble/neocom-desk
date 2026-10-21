@@ -540,13 +540,18 @@ export async function teachRefinerySystems(
 ): Promise<void> {
   for (const book of books) {
     for (const characterId of book.characterIds) {
+      // Matching is entries × ledger: skip what this session already reported first.
+      const entries = book.observed.filter(
+        (o) =>
+          o.characterId === characterId &&
+          !reportedSystems.has(`${book.corporationId}:${o.structureId}`)
+      );
+      if (entries.length === 0) continue;
       const learned = ownerRefinerySystemsToLearn(
-        book.observed.filter((o) => o.characterId === characterId),
+        entries,
         personal.filter((e) => e.characterId === characterId)
       );
-      const fresh = Object.entries(learned)
-        .filter(([id]) => !reportedSystems.has(`${book.corporationId}:${id}`))
-        .slice(0, MAX_LEARNED_SYSTEMS);
+      const fresh = Object.entries(learned).slice(0, MAX_LEARNED_SYSTEMS);
       if (fresh.length === 0) continue;
       for (const [id] of fresh) reportedSystems.add(`${book.corporationId}:${id}`);
       try {
