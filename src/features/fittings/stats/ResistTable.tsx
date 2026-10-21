@@ -11,6 +11,7 @@ import {
   type DamageType,
 } from './resistFormat';
 import { STAT_EYEBROW, STAT_EYEBROW_TYPE } from '../statKit';
+import { fmt0 } from './fixedFormat';
 
 /** One resist, as the game draws it: the damage type's colour filling the share resisted. */
 function ResistCell({
@@ -33,13 +34,13 @@ function ResistCell({
           style={{ width: `${pct}%` }}
         />
         {unheated === undefined ? (
-          <span className="relative">{pct.toFixed(0)}%</span>
+          <span className="relative">{fmt0(pct)}%</span>
         ) : (
           <HintText
             content={t('fittings.stats.unheated', { value: unheated })}
             className="relative text-warning"
           >
-            {pct.toFixed(0)}%
+            {fmt0(pct)}%
             <span className="sr-only"> ({t('fittings.stats.unheated', { value: unheated })})</span>
           </HintText>
         )}

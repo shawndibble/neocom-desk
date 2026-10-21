@@ -12,6 +12,7 @@
  * (`w-14`/`w-16`/`w-20`) wrap with everything else.
  */
 
+import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { type ReactElement, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -53,7 +54,7 @@ interface SecurityValueProps {
  */
 export function SecurityValue({ security }: SecurityValueProps) {
   if (security === null || security === undefined) return null;
-  const value = security.toFixed(1);
+  const value = fixed1(security);
   return (
     <span
       className="shrink-0 text-[0.6875rem] font-semibold tabular-nums"

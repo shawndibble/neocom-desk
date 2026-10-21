@@ -14,6 +14,7 @@ import type { AffectedAttribute, AffectedSource } from '@/engine/fittings/affect
 import { displaySourceValue } from '@/engine/fittings/attributeUnits';
 import { attributeValueText, formatAttributeNumber } from './attributeValueText';
 import { useAttributeDictionary } from './useAttributeDictionary';
+import { fixed0 } from '@/lib/fixedFormat';
 
 function AffectedSourceLine({
   source,
@@ -46,7 +47,7 @@ function AffectedSourceLine({
         })}
         {source.penalty !== null && (
           <span className="block text-text-dim">
-            {t('fittings.affectedBy.penalty', { pct: (source.penalty * 100).toFixed(0) })}
+            {t('fittings.affectedBy.penalty', { pct: fixed0(source.penalty * 100) })}
           </span>
         )}
       </span>

@@ -5,6 +5,7 @@
  * time, the widget's range applied here over data shared by every widget of
  * the kind.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 import { CLONE_NOTE_KEY } from '@/features/character/cloneVerdictGate';
 import { journalRefTypeBreakdown } from '@/features/character/walletJournalFilter';
@@ -601,7 +602,7 @@ const location: Builder = (feeds, { t }) => {
   const security =
     system?.security === null || system?.security === undefined
       ? undefined
-      : t(`${D}.location.security`, { value: system.security.toFixed(1) });
+      : t(`${D}.location.security`, { value: fixed1(system.security) });
   const rows: ListRow[] = system
     ? [
         {

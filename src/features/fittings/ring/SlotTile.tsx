@@ -138,6 +138,7 @@ export function SlotTile({
   const pressed = !compact && module === undefined ? selected : undefined;
   // A charge drag lights every module that takes it and dims the rest.
   const lights = chargeDragLights(drag, slot.rack, slot.index);
+  // fixed format: CSS angle
   const upright = { transform: `rotate(${(-angle).toFixed(1)}deg)` };
   const chargePip =
     module?.chargeTypeId !== undefined ? 'loaded' : module && takesCharges ? 'empty' : undefined;
@@ -231,6 +232,7 @@ export function SlotTile({
       data-module-state={module ? shownState : undefined}
       tabIndex={tabbable ? 0 : -1}
       className={`absolute border bg-bg ${border} ${interactiveClassName} ${focusRingClassName} ${lights === 'dim' ? 'opacity-35' : ''} ${interactive ? `cursor-pointer${module === undefined ? ' hover:border-accent' : ''}` : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
+      // fixed format: CSS angle
       style={{ ...position, transform: `rotate(${angle.toFixed(1)}deg)` }}
       {...(cycles ? guard.handlers : undefined)}
       onClick={

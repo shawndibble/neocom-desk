@@ -37,7 +37,8 @@ export function fittingCompareCsvColumns(
         if (value === undefined) return null;
         if (row.key !== 'capacitor') return value;
         return value >= 0
-          ? t('fittings.compare.stat.capacitorStable', { pct: value.toFixed(0) })
+          ? // fixed format: CSV
+            t('fittings.compare.stat.capacitorStable', { pct: value.toFixed(0) })
           : t('fittings.compare.stat.capacitorUnstable', { time: formatSeconds(-value) });
       },
     })),

@@ -8,6 +8,7 @@
  * Market Hub's buy price less sales tax, both exits taxed alike so they compare
  * like with like. The refining facility is an assumption the dialog states.
  */
+import { fixed1, fixed2 } from '@/lib/fixedFormat';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -371,7 +372,7 @@ export function OreDecisionDialog({
     structureRate > 0
       ? t('assets.oreDecision.facilityStructure')
       : t('assets.oreDecision.facilityNpc');
-  const percentText = (efficiency * 100).toFixed(1);
+  const percentText = fixed1(efficiency * 100);
 
   return (
     <Modal
@@ -507,7 +508,7 @@ export function OreDecisionDialog({
                   <p>
                     {t('assets.oreDecision.pricingBasis', {
                       hub: data.hub.name,
-                      tax: taxPct.toFixed(2),
+                      tax: fixed2(taxPct),
                     })}
                   </p>
                   <p className="flex flex-wrap items-center gap-2">
@@ -537,7 +538,7 @@ export function OreDecisionDialog({
                         max={100}
                         step={0.1}
                         className="w-24"
-                        defaultValue={structureRate > 0 ? (structureRate * 100).toFixed(1) : ''}
+                        defaultValue={structureRate > 0 ? (structureRate * 100).toFixed(1) : ''} // fixed format: type=number input needs '.'
                         placeholder="50"
                         onChange={(e) => {
                           const pct = Number(e.target.value);

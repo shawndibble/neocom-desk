@@ -1,3 +1,4 @@
+import { fixed1 } from '@/lib/fixedFormat';
 import { useId, useState } from 'react';
 import { formatCount } from '@/lib/formatCount';
 import { useTranslation } from 'react-i18next';
@@ -6,7 +7,7 @@ import { HAUL_SHIPS } from '@/engine/pi/planHaul';
 import type { HaulView } from '../planView';
 
 function formatTrips(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return Number.isInteger(value) ? String(value) : fixed1(value);
 }
 
 export function HaulingPanel({ hauling, hubName }: { hauling: HaulView; hubName: string }) {

@@ -5,6 +5,7 @@
  * decide what survives a narrow widget. Pure: figures and a translate function
  * in, a `TableModel` out.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import type { DeadlineSeverity } from '@/engine/character/severity';
 import { extractableSp, extractorCount } from '@/engine/skills/spExtraction';
 import type { SkillQueueEntry } from '@/esi/endpoints';
@@ -340,7 +341,7 @@ export function locationTable(
       key: 'security',
       cells: [
         t(`${D}.location.securityLabel`),
-        { text: input.security.toFixed(1), tone: securityTone(input.security) },
+        { text: fixed1(input.security), tone: securityTone(input.security) },
       ],
     });
   }

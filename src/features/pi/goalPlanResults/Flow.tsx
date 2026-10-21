@@ -17,7 +17,7 @@ const WHOLE = 0.995;
 
 /** The source, with how much is made where the line is partial. */
 function sourceLabel(line: DemandLine, t: TFunction): string {
-  const percent = PERCENT_FORMAT.format(line.madeFraction * 100);
+  const percent = PERCENT_FORMAT(line.madeFraction * 100);
   if (line.source === 'bought') {
     // The tier names what is bought; a part made as well is said alongside.
     return line.madeFraction > 1 - WHOLE

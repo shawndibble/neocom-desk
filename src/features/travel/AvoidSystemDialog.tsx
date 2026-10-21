@@ -14,6 +14,7 @@
  * the preview counts it switched on and the dialog offers to switch it on
  * along with the add.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Spinner } from '@/components/ui';
@@ -56,7 +57,7 @@ function PreviewText({ preview, name }: { preview: AvoidPreview; name: string })
           : t('travel.avoid.becomesLowest', {
               count: preview.jumps,
               delta,
-              security: preview.lowestSecurity.toFixed(1),
+              security: fixed1(preview.lowestSecurity),
             })}
       </p>
       {preview.stillCrosses && <p>{t('travel.avoid.noWayAround', { name })}</p>}

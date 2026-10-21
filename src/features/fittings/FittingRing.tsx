@@ -380,6 +380,7 @@ export function FittingRing({
                 key={`ghost-${rack}-${index}`}
                 aria-hidden="true"
                 className="absolute border border-line/60 bg-bg/40"
+                // fixed format: CSS angle
                 style={{ ...tilePosition(angle), transform: `rotate(${angle.toFixed(1)}deg)` }}
               />
             );

@@ -6,6 +6,7 @@
  * Header's `ItemMoreActions` ⋮ carries the item's actions. Sized for a ~20rem
  * rail and a 390px sheet: figures never break mid-number.
  */
+import { fixed2 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -365,13 +366,13 @@ function TheMath({
             <LedgerLine label={sellLabel} amount={`+${formatMarketIsk(sellEach)}`} />
             <LedgerLine
               label={t('market.hauling.detail.tax')}
-              note={`${lot.salesTaxPct.toFixed(2)}%`}
+              note={`${fixed2(lot.salesTaxPct)}%`}
               amount={`−${formatMarketIsk(per(lot.salesTax))}`}
             />
             {row.mode === 'list' && (
               <LedgerLine
                 label={t('market.hauling.detail.broker')}
-                note={`${lot.brokerFeePct.toFixed(2)}%`}
+                note={`${fixed2(lot.brokerFeePct)}%`}
                 amount={`−${formatMarketIsk(per(lot.brokerFee))}`}
               />
             )}

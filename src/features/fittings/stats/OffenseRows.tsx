@@ -15,6 +15,7 @@ import { joinDetail, statRowClassName } from '../statKit';
 import { FittingItemMenu, WeaponMenuItems } from '../FittingItemMenu';
 import { rangeLines } from '../rangeText';
 import { useFittingItemActions } from '../fittingItemActions';
+import { fmt0, fmt1 } from './fixedFormat';
 
 /**
  * A row's DPS and volley — under "Overheat all", in the warning tone where
@@ -33,17 +34,17 @@ function DamageFigures({
 }) {
   const { t } = useTranslation();
   const sustainedLabel = (s: FittingStats) =>
-    t('fittings.stats.sustainedDps', { value: figures(s).sustainedDps.toFixed(1) });
+    t('fittings.stats.sustainedDps', { value: fmt1(figures(s).sustainedDps) });
   // Only where reloading costs something as shown: never lasers or drones.
   const { dps, sustainedDps } = figures(stats);
-  const reloads = sustainedDps.toFixed(1) !== dps.toFixed(1);
+  const reloads = fmt1(sustainedDps) !== fmt1(dps);
   const tooltip = sustained === 'tooltip' && reloads ? sustainedLabel(stats) : undefined;
   const numbers = (
     <span className="ml-auto shrink-0 text-right tabular-nums">
       <span>
         <HeatFigure
           stats={stats}
-          format={(s) => t('fittings.stats.weaponDps', { value: figures(s).dps.toFixed(1) })}
+          format={(s) => t('fittings.stats.weaponDps', { value: fmt1(figures(s).dps) })}
           note={tooltip}
         />
       </span>
@@ -51,7 +52,7 @@ function DamageFigures({
       <span>
         <HeatFigure
           stats={stats}
-          format={(s) => t('fittings.stats.weaponVolley', { value: figures(s).volley.toFixed(0) })}
+          format={(s) => t('fittings.stats.weaponVolley', { value: fmt0(figures(s).volley) })}
         />
       </span>
       {tooltip && <span className="sr-only"> ({tooltip})</span>}

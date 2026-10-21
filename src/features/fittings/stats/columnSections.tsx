@@ -32,6 +32,7 @@ import {
 } from './shipFacts';
 import { OVER_BUDGET_TONE, type Figure } from './statFigures';
 import type { SectionBuilder } from './useSectionBuilder';
+import { fmt0, fmt1 } from './fixedFormat';
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
@@ -77,7 +78,7 @@ export function damageSections({
     section(
       'offense',
       stats && stats.offense.weapons.length > 0
-        ? figure((s) => t('fittings.stats.weaponDps', { value: s.offense.dps.toFixed(1) }))
+        ? figure((s) => t('fittings.stats.weaponDps', { value: fmt1(s.offense.dps) }))
         : undefined,
       stats ? (
         stats.offense.weapons.length > 0 ? (
@@ -116,14 +117,14 @@ export function damageSections({
     showDrones &&
       section(
         'drones',
-        figure((s) => t('fittings.stats.weaponDps', { value: s.droneDps.toFixed(1) })),
+        figure((s) => t('fittings.stats.weaponDps', { value: fmt1(s.droneDps) })),
         stats ? <DroneFacts stats={stats} /> : placeholder
       ),
     stats &&
       stats.fighters.tubes.total > 0 &&
       section(
         'fighters',
-        figure((s) => t('fittings.stats.weaponDps', { value: s.fighters.dps.toFixed(1) })),
+        figure((s) => t('fittings.stats.weaponDps', { value: fmt1(s.fighters.dps) })),
         <FighterFacts stats={stats} />
       ),
   ];
@@ -188,7 +189,7 @@ export function shipSections({
         (s) =>
           s.capacitor.stable
             ? t('fittings.stats.capacitorStable', {
-                pct: s.capacitor.stablePercentage.toFixed(0),
+                pct: fmt0(s.capacitor.stablePercentage),
               })
             : t('fittings.stats.capacitorDepletes', {
                 time: formatSeconds(s.capacitor.depletesInSeconds),
@@ -199,9 +200,7 @@ export function shipSections({
     ),
     section(
       'navigation',
-      figure((s) =>
-        t('fittings.stats.maxVelocityMeta', { value: s.navigation.maxVelocity.toFixed(0) })
-      ),
+      figure((s) => t('fittings.stats.maxVelocityMeta', { value: fmt0(s.navigation.maxVelocity) })),
       stats ? <NavigationFacts stats={stats} /> : placeholder
     ),
     section(
@@ -223,9 +222,9 @@ export function shipSections({
               ? 'fittings.stats.fittingMetaCalibration'
               : 'fittings.stats.fittingMeta',
             {
-              cpu: pctOf(s.cpuUsed, s.cpuTotal).toFixed(0),
-              pg: pctOf(s.powergridUsed, s.powergridTotal).toFixed(0),
-              cal: pctOf(s.calibrationUsed, s.calibrationTotal).toFixed(0),
+              cpu: fmt0(pctOf(s.cpuUsed, s.cpuTotal)),
+              pg: fmt0(pctOf(s.powergridUsed, s.powergridTotal)),
+              cal: fmt0(pctOf(s.calibrationUsed, s.calibrationTotal)),
             }
           ),
         stats && !fitsResourceBudget(stats) ? OVER_BUDGET_TONE : undefined
@@ -246,7 +245,7 @@ export function shipSections({
         'mining',
         figure((s) =>
           t('fittings.stats.unit.cubicMetresPerSecond', {
-            value: s.mining.perSecond.toFixed(1),
+            value: fmt1(s.mining.perSecond),
           })
         ),
         <MiningFacts stats={stats} typeName={typeName} />

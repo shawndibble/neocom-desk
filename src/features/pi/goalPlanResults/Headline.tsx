@@ -94,7 +94,7 @@ function attainmentText(attainment: GoalAttainment, pi: PiData, t: TFunction): s
       .map((goal) =>
         t('piPlan.shortAchievedGoal', {
           name: commodityName(goal.typeId, pi),
-          percent: PERCENT_FORMAT.format(goal.fraction * 100),
+          percent: PERCENT_FORMAT(goal.fraction * 100),
         })
       )
       .join(', '),

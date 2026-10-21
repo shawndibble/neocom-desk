@@ -15,6 +15,7 @@ import type { useFittingDropTarget } from './fittingItemActions';
 import type { FittingContext } from './fittingContext';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
+import { fixed1 } from '@/lib/fixedFormat';
 
 export const RACK_LABEL_CLASS =
   'mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
@@ -61,13 +62,13 @@ export function ResourceBar({ label, used, total, resource }: ResourceBarProps) 
           key={flashKey}
           className={`w-24 shrink-0 text-right ${overBudget ? 'text-danger' : 'text-text-dim'} ${flashKey > 0 && overBudget ? 'flash-danger' : ''}`}
         >
-          {known ? `${used.toFixed(1)} / ${total.toFixed(1)}` : '…'}
+          {known ? `${fixed1(used)} / ${fixed1(total)}` : '…'}
         </span>
       </div>
       {overBudget && (
         <>
           <p className="pl-30 text-right text-xs text-danger">
-            {t('fittings.list.overBy', { amount: overage.toFixed(1) })}
+            {t('fittings.list.overBy', { amount: fixed1(overage) })}
           </p>
           {resource && (
             <div className="flex justify-end">
