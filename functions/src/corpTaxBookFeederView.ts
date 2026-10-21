@@ -37,6 +37,58 @@ import { bookRef, type BookDeps, type OpenPricesReader } from './corpTaxBookStor
 
 // --- Stored shapes -----------------------------------------------------------
 
+/**
+ * `corpTaxBooks/{collector}/feederCoverage/{feederCorp}` (issue #4622): what a miner's personal
+ * tab needs of a moon owner, readable by the miners the book bills. Coverage periods and the
+ * read clock only: never the payee, rates, notes or the moon owner's name.
+ */
+export const FEEDER_COVERAGE = 'feederCoverage';
+
+export interface MemberCoverageDoc {
+  coveragePeriods: CoveragePeriod[];
+  /** The last good read of the moon owner's ledger (ms); absent before the first. */
+  lastReadWellAt?: number;
+}
+
+/** The member-readable copy of a feeder record: an allow-list, so a new record field never leaks. */
+export function memberCoverageOf(
+  record: Pick<FeederRecord, 'coveragePeriods' | 'lastReadWellAt'>
+): MemberCoverageDoc {
+  return {
+    coveragePeriods: record.coveragePeriods.map((p) => ({
+      from: p.from,
+      ...(p.to !== undefined ? { to: p.to } : {}),
+    })),
+    ...(typeof record.lastReadWellAt === 'number' ? { lastReadWellAt: record.lastReadWellAt } : {}),
+  };
+}
+
+/** Write (or, with no record, delete) the member-readable copy. */
+export async function writeMemberCoverage(
+  db: Firestore,
+  collector: number,
+  feeder: number,
+  record: FeederRecord | undefined
+): Promise<void> {
+  const ref = bookRef(db, collector).collection(FEEDER_COVERAGE).doc(String(feeder));
+  if (record) await ref.set(memberCoverageOf(record));
+  else await ref.delete();
+}
+
+/** Re-read the record and refresh its copy; never throws (the next rebuild writes it again). */
+export async function refreshMemberCoverage(
+  db: Firestore,
+  collector: number,
+  feeder: number
+): Promise<void> {
+  try {
+    const snap = await bookRef(db, collector).collection(FEEDERS).doc(String(feeder)).get();
+    await writeMemberCoverage(db, collector, feeder, snap.data() as FeederRecord | undefined);
+  } catch (e) {
+    console.error('member coverage not written', e instanceof Error ? e.message : e);
+  }
+}
+
 export interface FeederViewSummary {
   schemaVersion: 1;
   feederCorporationId: number;
@@ -484,6 +536,8 @@ export async function rebuildFeederView(
     book.collection(FEEDERS).doc(String(feeder)).collection(FEEDER_VIEW_PAYOUTS).get(),
   ]);
   const record = recordSnap.data() as FeederRecord | undefined;
+  // Before pricing: coverage and the read clock reach the miners even when a price read fails.
+  await writeMemberCoverage(deps.db, collector, feeder, record);
   if (!record) return false;
 
   const oreForm = bookSnap.get('oreForm') === 'raw' ? 'raw' : BOOK_DEFAULTS.oreForm;

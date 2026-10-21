@@ -469,4 +469,26 @@ suite('moon owner view', () => {
     await dismissFeederHistory(deps(), who(FEEDER_DIRECTOR), asDirector);
     expect((await summary())?.dismissedAt).toBe(T0);
   });
+  // Issue #4622: the copy a miner's personal tab reads holds coverage and the read clock only.
+  const memberCopy = async () =>
+    (await collectorBook().collection('feederCoverage').doc(String(FEEDER)).get()).data();
+
+  it('member copy: the first pull writes coverage and the read clock, nothing else', async () => {
+    await save(await newInvite(), 6);
+    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), {
+      ...asDirector,
+      payee: { kind: 'character', id: FEEDER_DIRECTOR },
+    });
+    expect(await memberCopy()).toEqual({
+      coveragePeriods: [{ from: '2026-10-18' }],
+      lastReadWellAt: T0,
+    });
+  });
+
+  it('member copy: leaving ends the coverage there too', async () => {
+    await save(await newInvite());
+    await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
+    // joined and left the same day: the one period covered nothing and is gone
+    expect(await memberCopy()).toEqual({ coveragePeriods: [], lastReadWellAt: T0 });
+  });
 });

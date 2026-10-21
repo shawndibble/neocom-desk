@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  memberCoverageOf,
   appendRequestedRate,
   buildFeederView,
   deriveModeChanges,
@@ -387,5 +388,28 @@ describe('review fixes', () => {
       input({ record: record({ payee: { kind: 'character', id: 77 } }) })
     );
     expect(set.summary.payee).toEqual({ kind: 'character', id: 77 });
+  });
+});
+
+describe('memberCoverageOf (#4622)', () => {
+  it('copies coverage and the read clock only, whatever else the record holds', () => {
+    const record = {
+      coveragePeriods: [{ from: '2026-10-01', to: '2026-10-09' }, { from: '2026-10-12' }],
+      lastReadWellAt: 5,
+      payee: { kind: 'character', id: 9 },
+      note: 'private',
+      agreedRatePct: 7,
+      corporationName: 'Moon Owner Inc',
+    } as unknown as Parameters<typeof memberCoverageOf>[0];
+    expect(memberCoverageOf(record)).toEqual({
+      coveragePeriods: [{ from: '2026-10-01', to: '2026-10-09' }, { from: '2026-10-12' }],
+      lastReadWellAt: 5,
+    });
+  });
+
+  it('leaves the read clock out before the first good read', () => {
+    expect(memberCoverageOf({ coveragePeriods: [{ from: '2026-10-01' }] })).toEqual({
+      coveragePeriods: [{ from: '2026-10-01' }],
+    });
   });
 });

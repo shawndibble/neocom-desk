@@ -144,3 +144,76 @@ describe('buildCorpBookView', () => {
     ]);
   });
 });
+
+describe('buildCorpBookView: what the miner reads beyond their lines (#4622)', () => {
+  const OWNER = 98000077;
+  const owned = loaded().observed.map((o) => ({ ...o, sourceCorporationId: OWNER }));
+
+  it("holds back a day the moon owner's ledger was not read well after", () => {
+    const view = buildCorpBookView(
+      input({
+        loaded: [
+          loaded({
+            observed: owned,
+            feeders: [
+              {
+                corporationId: OWNER,
+                coveragePeriods: [{ from: '2026-10-01' }],
+                lastReadWellAt: '2026-10-17T20:00:00.000Z',
+              },
+            ],
+          }),
+        ],
+      }),
+      payeeName
+    );
+    expect(view?.overlay.rows).toEqual([]);
+  });
+
+  it("bills nothing outside the moon owner's coverage", () => {
+    const view = buildCorpBookView(
+      input({
+        loaded: [
+          loaded({
+            observed: owned,
+            feeders: [{ corporationId: OWNER, coveragePeriods: [{ from: '2026-10-18' }] }],
+          }),
+        ],
+      }),
+      payeeName
+    );
+    expect(view?.overlay.rows).toEqual([]);
+  });
+
+  it('labels the line with the refinery name', () => {
+    const view = buildCorpBookView(
+      input({ loaded: [loaded({ structureNames: { 1000: 'Ikao - Moon Drill' } })] }),
+      payeeName
+    );
+    expect(view?.overlay.rows[0].refineryLabel).toBe('Ikao - Moon Drill');
+  });
+
+  it("shows the corporation's correction of the day", () => {
+    const view = buildCorpBookView(
+      input({
+        loaded: [
+          loaded({
+            adjustments: [
+              {
+                id: 'a1',
+                minerId: `solo:${ME}`,
+                date: '2026-10-17',
+                amount: 100,
+                reason: 'Missed ore',
+                by: 1,
+                at: '2026-10-18T13:00:00Z',
+              },
+            ],
+          }),
+        ],
+      }),
+      payeeName
+    );
+    expect(view?.overlay.rows[0].correction?.reasons).toEqual(['Missed ore']);
+  });
+});
