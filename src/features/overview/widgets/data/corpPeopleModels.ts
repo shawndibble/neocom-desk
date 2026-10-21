@@ -6,11 +6,11 @@ import { shiftUtcDate, utcDay } from '@/engine/localDay';
 import { label, memberStanding, type MemberActivity } from '@/engine/corp/members';
 import { DAY_MS } from '@/lib/age';
 import { formatNumber } from '@/lib/numberLocale';
-import { ageText, blank, count, statusOf, type Builder } from './builderKit';
+import { ageText, blank, corpUnreadable, count, statusOf, type Builder } from './builderKit';
 import { fractionBar } from './cellKit';
 import { hbarsFromRows } from './chartBuilders';
 import type { BarsChartModel } from '../charts/types';
-import type { KindView, TableModel, Translate } from './types';
+import type { TableModel, Translate } from './types';
 
 const M = 'overview.widgets.corpMembers';
 const I = 'overview.widgets.corpInactive';
@@ -28,19 +28,6 @@ const TOP_MINERS = 8;
 
 /** A name ESI could not resolve prints the way the roster prints it. */
 const nameOf = (names: ReadonlyMap<number, string>, id: number) => label(names.get(id) ?? null, id);
-
-/** The pilot cannot read this: no role, or a lapsed grant. */
-function unreadable(
-  to: string,
-  feed: Parameters<typeof statusOf>[0],
-  needsReauth: boolean,
-  t: Translate
-): KindView {
-  return {
-    ...blank(to, statusOf(feed, { needsPermission: needsReauth, isEmpty: !needsReauth })),
-    emptyMessage: t('overview.board.corpUnreadable'),
-  };
-}
 
 // --- Members -----------------------------------------------------------------------
 
@@ -98,7 +85,7 @@ export const corpMembers: Builder = (feeds, { t, now }) => {
   const data = feed?.data ?? null;
   const to = MEMBERS_PATH;
   if (!data) return blank(to, statusOf(feed));
-  if (!data.readable) return unreadable(to, feed, data.needsReauth, t);
+  if (!data.readable) return corpUnreadable(to, feed, data.needsReauth, t);
 
   const { members, diff, names } = data;
   const changed = diff !== null && (diff.joined.length > 0 || diff.left.length > 0);
@@ -158,7 +145,7 @@ export const corpInactive: Builder = (feeds, { t }) => {
   const data = feed?.data ?? null;
   const to = INACTIVE_PATH;
   if (!data) return blank(to, statusOf(feed));
-  if (!data.readable) return unreadable(to, feed, data.needsReauth, t);
+  if (!data.readable) return corpUnreadable(to, feed, data.needsReauth, t);
 
   const { names, darkAfterDays, loadedAt } = data;
   // The roster's own rule: later of logon/logoff, or the join date for a member who never played.
@@ -232,7 +219,7 @@ export const corpMining: Builder = (feeds, { t, now, range }) => {
   const data = feed?.data ?? null;
   const to = MOONS_PATH;
   if (!data) return blank(to, statusOf(feed));
-  if (!data.readable) return unreadable(to, feed, data.needsReauth, t);
+  if (!data.readable) return corpUnreadable(to, feed, data.needsReauth, t);
   if (data.refineryCount === 0) {
     return {
       ...blank(to, statusOf(feed, { isEmpty: true })),

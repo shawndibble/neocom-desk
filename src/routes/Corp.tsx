@@ -6,7 +6,7 @@
  * Due soon and the structure and moon clocks lead, money and people follow.
  * Everything after that is the pilot's choice (`features/corp/grid`).
  *
- * Three rules from the fixed board this replaces still shape it:
+ * Three rules shape it:
  *
  * - **Each widget is gated on its own capability.** A Station Manager who is
  *   not an Accountant gets clocks and no wallet widgets, with no error and no
@@ -82,7 +82,7 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       {/*
-        Title, tabs, data age and Customize on one line (#566). No Next deadline
+        Title, tabs, data age and Customize on one line. No Next deadline
         button: it squeezed the five tabs off the line, and Due soon already
         names the next clock.
       */}
@@ -126,9 +126,6 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
  * real capability set, and a character switch returns to `unknown` while the
  * new character's roles read is in flight, so this unmounts and comes back
  * with that character's answer.
- *
- * Until the pilot edits it, the layout is the full default (`corpDefaultLayout`)
- * and is never written; the board's capability gate decides what is drawn.
  */
 function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
   const { t } = useTranslation();

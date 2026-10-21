@@ -12,6 +12,7 @@ import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { MASTER_WALLET_DIVISION } from '@/features/corp/boardData';
 import { jobTypeIds } from '@/features/corp/boardSources';
+import { CorpReadFailed } from '@/features/corp/corpRead';
 import { resolveCorpReadAccess, type CorpCapability } from '@/features/corp/corpReadAccess';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { walletDivisions } from '@/features/corp/divisions';
@@ -38,14 +39,6 @@ import type {
   CorpMiningFeed,
   CorpWalletFeed,
 } from './corpFeeds';
-
-/** A read that was allowed and came back with nothing: the widget shows Retry. */
-export class CorpReadFailed extends Error {
-  constructor(what: string) {
-    super(`corp ${what} read failed`);
-    this.name = 'CorpReadFailed';
-  }
-}
 
 type Access = { characterId: number; corporationId: number };
 
@@ -152,9 +145,10 @@ export async function loadCorpMembers(characterId: number): Promise<CorpMembersF
   const access = await gate(characterId, 'canReadMembers');
   if (access === null) return empty;
   const { corporationId } = access;
-  const [tracking, ids] = await Promise.all([
+  const [tracking, ids, baseline] = await Promise.all([
     loadCorporationMemberTracking(characterId, corporationId),
     loadCorporationMemberIds(characterId, corporationId),
+    readPreviousRoster(characterId, corporationId),
     useDarkThreshold.getState().hydrate(),
   ]);
   if (tracking.cached === null) {
@@ -163,12 +157,8 @@ export async function loadCorpMembers(characterId: number): Promise<CorpMembersF
   }
   const members = toMemberActivity(tracking.cached.data);
   const memberIds = ids.cached?.data ?? null;
-  // The baseline is read and never replaced: `/corp/members` records it, so
-  // each change is announced there exactly once (see `routes/Corp.tsx`'s old note).
-  const diff =
-    memberIds === null
-      ? null
-      : diffRoster(await readPreviousRoster(characterId, corporationId), memberIds);
+  // Read, never recorded: `/corp/members` records it, so each change is announced there exactly once.
+  const diff = memberIds === null ? null : diffRoster(baseline, memberIds);
   const darkAfterDays = useDarkThreshold.getState().value;
   const darkBefore = loadedAt - darkAfterDays * DAY_MS;
   const named = new Set<number>([...(diff?.joined ?? []), ...(diff?.left ?? [])]);

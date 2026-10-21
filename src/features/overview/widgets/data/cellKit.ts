@@ -23,3 +23,12 @@ export function fractionBar(value: number, max: number): number | undefined {
   if (!Number.isFinite(value) || !Number.isFinite(max) || max <= 0) return undefined;
   return Math.min(1, Math.max(0, value / max));
 }
+
+/**
+ * `part` of `whole` as a whole percent with its bar; the text states the share,
+ * the bar only draws it. `none` is the text when there is no whole to share.
+ */
+export function shareCell(part: number, whole: number, none = '0%'): TableCell {
+  const share = fractionBar(Math.max(0, part), whole);
+  return share === undefined ? none : { text: `${Math.round(share * 100)}%`, bar: share };
+}

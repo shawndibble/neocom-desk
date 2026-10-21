@@ -29,7 +29,7 @@ export const ROLES: Record<RoleId, readonly WidgetKindId[]> = {
 export const BASE_KINDS: readonly WidgetKindId[] = ['wallet', 'training', 'comingUp', 'mail'];
 
 /** `r1`, `r2`, ...: stable ids for layouts built without a caller's makeId. */
-function seqId(prefix: string): MakeId {
+export function seqId(prefix: string): MakeId {
   let n = 0;
   return () => `${prefix}${++n}`;
 }

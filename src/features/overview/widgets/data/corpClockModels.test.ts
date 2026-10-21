@@ -159,24 +159,6 @@ describe('corpDeadlines', () => {
     expect(chart.summary).toContain('corp.standing.strip.describe');
   });
 
-  it('offers the soonest live clock to the header', () => {
-    const feeds: Feeds = {
-      structures: structuresFeed([structure({ fuelExpiresMs: NOW + 5 * DAY })]),
-      moonChunks: moonFeed([
-        {
-          structureId: 3,
-          subject: 'Efa - Drill',
-          chunkArrivalMs: NOW + 2 * DAY,
-          naturalDecayMs: NOW + 2 * DAY + 3 * HOUR,
-        },
-      ]),
-      corpJobs: jobsFeed([]),
-    };
-    const view = corpDeadlines(feeds, ctx);
-    expect(view.deadlines).toHaveLength(1);
-    expect(view.deadlines[0]?.at).toBe(NOW + 2 * DAY);
-  });
-
   it('draws what it could read when one feed is unreadable', () => {
     const feeds: Feeds = {
       structures: structuresFeed([structure({ fuelExpiresMs: NOW + 5 * HOUR })]),
@@ -290,14 +272,13 @@ describe('corpJobs', () => {
     ]),
   });
 
-  it('never ticks a job down inside the one-hour cache window, nor offers it as a deadline', () => {
+  it('never ticks a job down inside the one-hour cache window', () => {
     const view = corpJobs(
       { corpJobs: jobsFeed([job({ end_date: new Date(NOW + 20 * MIN).toISOString() })]) },
       ctx
     );
     expect(view.table?.rows[0]?.cells[1]).toMatchObject({ text: 'corp.board.underCacheWindow' });
     expect(view.number.secondary?.text).toContain('corp.board.underCacheWindow');
-    expect(view.deadlines).toEqual([]);
   });
 
   it('counts running jobs and flags the ones ready to deliver', () => {
@@ -337,12 +318,6 @@ describe('corpJobs', () => {
     expect(chart?.kind).toBe('hbars');
     if (chart?.kind !== 'hbars') return;
     expect(chart.rows).toHaveLength(3);
-  });
-
-  it('offers the next job to finish to the header', () => {
-    const view = corpJobs(feeds(), ctx);
-    expect(view.deadlines).toHaveLength(1);
-    expect(view.deadlines[0]?.at).toBe(NOW + HOUR);
   });
 
   it('is empty with no active or ready jobs, and unreadable apart from that', () => {

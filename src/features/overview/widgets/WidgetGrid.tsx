@@ -1,5 +1,5 @@
 /**
- * The Overview's grid: flex-wrap rows of widgets in layout order.
+ * A widget board's grid: flex-wrap rows of widgets in layout order.
  *
  * No gap-filling, on purpose: reading order is screen order is the order the
  * pilot arranged, so Move up and Move down do what they say. A row's leftover

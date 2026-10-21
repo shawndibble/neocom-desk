@@ -9,6 +9,7 @@
  */
 import { loadCorporationStructures } from '@/features/corp/boardData';
 import { toBoardStructures } from '@/features/corp/boardSources';
+import { CorpReadFailed } from '@/features/corp/corpRead';
 import { resolveCorpReadAccess } from '@/features/corp/corpReadAccess';
 import { loadMoonChunks } from '@/features/character/calendarMoonChunks';
 import type { MoonChunksBoardData, StructuresBoardData } from './boardData';
@@ -27,7 +28,7 @@ export async function loadStructuresBoardData(characterId: number): Promise<Stru
   if (result.cached === null) {
     if (result.needsReauth) return { ...UNREADABLE_STRUCTURES, needsReauth: true };
     // Allowed and empty-handed: an outage, so the widget offers Retry rather than "your roles don't cover this".
-    throw new Error('corp structures read failed');
+    throw new CorpReadFailed('structures');
   }
   const structures = result.cached.data;
   return {
@@ -42,7 +43,7 @@ export async function loadStructuresBoardData(characterId: number): Promise<Stru
 export async function loadMoonChunksBoardData(characterId: number): Promise<MoonChunksBoardData> {
   const loadedAt = Date.now();
   const { result, sources, extractions, failed } = await loadMoonChunks(characterId, loadedAt);
-  if (failed) throw new Error('corp moon extractions read failed');
+  if (failed) throw new CorpReadFailed('moon extractions');
   return {
     chunks: sources ?? null,
     extractions,

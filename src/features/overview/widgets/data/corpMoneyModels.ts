@@ -6,8 +6,8 @@ import { DAY_MS } from '@/lib/age';
 import { dailyOutgoings, runwayDays, VITALS_WINDOW_DAYS } from '@/engine/corp/vitals';
 import { humanizeRefType } from '@/features/character/format';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
-import { blank, statusOf, UNKNOWN, type Builder } from './builderKit';
-import { fractionBar, signedCell } from './cellKit';
+import { blank, corpUnreadable, statusOf, UNKNOWN, type Builder } from './builderKit';
+import { fractionBar, shareCell, signedCell } from './cellKit';
 import { hbarsFromRows } from './chartBuilders';
 import { backwardBucketSums } from './chartSeries';
 import { rollingTitles, signTone } from './chartTips';
@@ -26,28 +26,12 @@ function notReady(
 ): { data: CorpWalletFeed } | { view: KindView } {
   const data = feed?.data ?? null;
   if (!data) return { view: blank(TO, statusOf(feed)) };
-  if (!data.readable) {
-    return {
-      view: {
-        ...blank(
-          TO,
-          statusOf(feed, { needsPermission: data.needsReauth, isEmpty: !data.needsReauth })
-        ),
-        emptyMessage: t('overview.board.corpUnreadable'),
-      },
-    };
-  }
+  if (!data.readable) return { view: corpUnreadable(TO, feed, data.needsReauth, t) };
   return { data };
 }
 
 function withFeed(view: KindView, data: CorpWalletFeed): KindView {
   return { ...view, fetchedAt: data.fetchedAt, fromCache: data.fromCache };
-}
-
-/** `part` of `whole` as a whole percent with its bar; the text states the share, the bar only draws it. */
-function shareCell(part: number, whole: number): TableCell {
-  const share = fractionBar(Math.max(0, part), whole);
-  return share === undefined ? UNKNOWN : { text: `${Math.round(share * 100)}%`, bar: share };
 }
 
 const iskCell = (value: number): TableCell => ({ text: formatIskCompact(value), iskAmount: value });
@@ -107,7 +91,7 @@ export const corpWallet: Builder = (feeds, { t }) => {
     rows: named.map((d) => ({
       key: String(d.division),
       to: `${TO}?division=${d.division}`,
-      cells: [d.label, iskCell(d.balance), shareCell(d.balance, total)],
+      cells: [d.label, iskCell(d.balance), shareCell(d.balance, total, UNKNOWN)],
     })),
   };
   return withFeed(
@@ -204,7 +188,7 @@ export const corpCashFlow: Builder = (feeds, { t, now, range }) => {
   const totalIn = income.reduce((a, b) => a + b, 0);
   const totalOut = spending.reduce((a, b) => a + b, 0);
 
-  // The runway rides the vitals window and the master wallet's own balance, as the old rail did.
+  // The runway rides the vitals window and the master wallet's own balance, whatever the range.
   const balance = data.divisions.find((d) => d.division === data.journalDivision)?.balance ?? 0;
   const runway = runwayDays(balance, dailyOutgoings(data.journal, now));
   const runwayDaysWhole = runway === null ? null : Math.floor(runway);
@@ -315,7 +299,7 @@ export const corpIncome: Builder = (feeds, { t, now, range }) => {
     ],
     rows: sources.map((s) => ({
       key: s.refType,
-      cells: [s.label, iskCell(s.amount), shareCell(s.amount, total)],
+      cells: [s.label, iskCell(s.amount), shareCell(s.amount, total, UNKNOWN)],
     })),
     footer: coverage,
   };

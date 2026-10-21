@@ -1,5 +1,5 @@
 /**
- * True once an absent Overview Layout really means "this pilot has none": the
+ * True once an absent layout (the Overview's, or the board `layoutKey` names) means "none": the
  * settings store has hydrated, the first sync pull has landed (or cannot), and
  * Dexie itself holds no layout row. See `firstRun.ts` for why.
  *

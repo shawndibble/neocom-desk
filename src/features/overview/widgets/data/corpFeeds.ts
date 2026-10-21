@@ -6,7 +6,7 @@
  * must not carry them for everyone else.
  *
  * Every corp feed answers three different ways, and the builders keep them
- * apart (the old board's AC3):
+ * apart:
  * - `readable: false`: this Character may not read it (no role, or a lapsed
  *   grant when `needsReauth`). No request was made.
  * - a thrown load: the read was allowed and failed. The widget shows Retry.

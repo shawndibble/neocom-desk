@@ -4936,7 +4936,6 @@
           "when": "When"
         },
         "next": "Next: {{name}}, {{when}}",
-        "deadline": "{{subject}}: {{what}}",
         "chartNote": "Deadlines per day, next {{days}} days",
         "summary_one": "{{count}} corp clock is due in 24 hours, {{overdue}} already overdue.",
         "summary_other": "{{count}} corp clocks are due in 24 hours, {{overdue}} already overdue."
@@ -5110,7 +5109,6 @@
         "ready_one": "{{count}} ready to deliver",
         "ready_other": "{{count}} ready to deliver",
         "next": "Next: {{name}} in {{duration}}",
-        "deadline": "{{name}} corp job finishes",
         "chartNote": "Time left on each corp job",
         "summary": "{{running}} corp jobs running, {{ready}} ready to deliver."
       },

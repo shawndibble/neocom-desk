@@ -456,7 +456,6 @@ export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(SPECS).map(
   id,
   titleKey: `overview.widgets.${id}.title`,
   descKey: `overview.widgets.${id}.description`,
-  // Every spec names at least one board; `kinds.test.ts` holds that.
   category: (s.category ?? s.corp)!,
   boards: {
     ...(s.category ? { overview: s.category } : {}),

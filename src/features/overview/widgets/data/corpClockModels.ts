@@ -18,36 +18,13 @@ import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatDateOnly } from '@/lib/timestamp';
 import { CORP_CACHE_WINDOW_MS } from '../../data/corpCards';
 import type { BarsChartModel } from '../charts/types';
-import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
+import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { fractionBar } from './cellKit';
 import { hbarsFromRows } from './chartBuilders';
 import type { CorpJobsFeed } from './corpFeeds';
 import { elapsedShare } from './industryModels';
 import { shortStructureName } from './structureModels';
-import type {
-  FeedState,
-  KindView,
-  NumberSecondary,
-  TableCell,
-  TableModel,
-  TableRowModel,
-  Translate,
-} from './types';
-
-/** Where the header's Next deadline button leads; the widgets themselves have no page of their own. */
-const DEADLINE_TO = '/corp';
-
-/** The unreadable view: ask for a grant when it lapsed, otherwise say the roles do not cover it. */
-function unreadable(
-  t: Translate,
-  feed: FeedState<unknown> | undefined,
-  needsReauth: boolean
-): KindView {
-  return {
-    ...blank(null, statusOf(feed, { needsPermission: needsReauth, isEmpty: !needsReauth })),
-    emptyMessage: t('overview.board.corpUnreadable'),
-  };
-}
+import type { NumberSecondary, TableCell, TableModel, TableRowModel, Translate } from './types';
 
 // --- Due soon ---------------------------------------------------------------------
 
@@ -86,7 +63,7 @@ function whenOf(item: CorpBoardItem, t: Translate): string {
   return formatCountdown(remainingMs / 1000);
 }
 
-/** The Deadline Strip as day bars (CorpDeadlineStrip's own buckets); absent when nothing lands in it. */
+/** The Deadline Strip as day bars; absent when nothing lands in it. */
 function dayChart(
   t: Translate,
   items: readonly CorpBoardItem[],
@@ -145,7 +122,7 @@ export const corpDeadlines: Builder = (feeds, { t, now }) => {
       Boolean(feeds.structures?.data?.needsReauth) ||
       Boolean(feeds.moonChunks?.data?.needsReauth) ||
       Boolean(feeds.corpJobs?.data?.needsReauth);
-    return unreadable(t, feeds.structures, needsReauth);
+    return corpUnreadable(null, feeds.structures, needsReauth, t);
   }
 
   const items = buildCorpBoard({
@@ -194,10 +171,6 @@ export const corpDeadlines: Builder = (feeds, { t, now }) => {
       tone: item.severity,
     })),
   };
-  // A clock the snapshot cannot honestly tick (under the cache window) or that is over is no deadline to count to.
-  const live = timed.find(
-    (item) => item.deadlineMs !== null && item.deadlineMs > now && !item.withinStaleWindow
-  );
   const fetched = [
     structures ? feeds.structures?.data?.fetchedAt : null,
     chunks ? feeds.moonChunks?.data?.fetchedAt : null,
@@ -238,19 +211,6 @@ export const corpDeadlines: Builder = (feeds, { t, now }) => {
       tone: item.severity,
     })),
     table,
-    deadlines: live
-      ? [
-          {
-            at: live.deadlineMs!,
-            note: t('overview.widgets.corpDeadlines.deadline', {
-              subject: subjectOf(live),
-              what: whatOf(live, t),
-            }),
-            severity: live.severity,
-            to: DEADLINE_TO,
-          },
-        ]
-      : [],
     summary: t('overview.widgets.corpDeadlines.summary', {
       count: due.total,
       overdue: due.overdue,
@@ -265,7 +225,7 @@ export const corpServices: Builder = (feeds, { t, now }) => {
   const feed = feeds.structures;
   const data = feed?.data ?? null;
   if (!data) return blank(null, statusOf(feed));
-  if (data.structures === null) return unreadable(t, feed, data.needsReauth);
+  if (data.structures === null) return corpUnreadable(null, feed, data.needsReauth, t);
 
   const items = buildCorpBoard({
     nowMs: now,
@@ -367,7 +327,7 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
   const feed = feeds.corpJobs;
   const data = feed?.data ?? null;
   if (!data) return blank(null, statusOf(feed));
-  if (!data.readable) return unreadable(t, feed, data.needsReauth);
+  if (!data.readable) return corpUnreadable(null, feed, data.needsReauth, t);
 
   const facts = jobFacts(data, t, now);
   const ready = facts.filter((f) => f.done);
@@ -449,17 +409,6 @@ export const corpJobs: Builder = (feeds, { t, now }) => {
         tone: f.tone,
       })),
     },
-    deadlines:
-      next && next.endMs - now >= CORP_CACHE_WINDOW_MS
-        ? [
-            {
-              at: next.endMs,
-              note: t('overview.widgets.corpJobs.deadline', { name: next.label }),
-              severity: next.tone,
-              to: DEADLINE_TO,
-            },
-          ]
-        : [],
     summary: t('overview.widgets.corpJobs.summary', {
       running: running.length,
       ready: ready.length,

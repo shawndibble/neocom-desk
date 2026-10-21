@@ -25,11 +25,11 @@ import {
   type OverviewLayout,
   type Widget,
 } from '@/features/overview/widgets/layout';
+import { seqId } from '@/features/overview/widgets/roles';
 
 /**
  * The layout a Corp overview opens with, before the pilot changes anything:
- * the old board's order (when, then money, then people), then the two reads it
- * never had.
+ * when, then money, then people, then the ledgers.
  *
  * Every kind, whatever this Character can read: the board's `canDraw` hides
  * the rest. The layout is one per pilot, so a default trimmed to an alt's
@@ -49,11 +49,6 @@ export const CORP_DEFAULT_KINDS: readonly WidgetKindId[] = [
   'corpIncome',
   'corpMining',
 ];
-
-function seqId(prefix: string): MakeId {
-  let n = 0;
-  return () => `${prefix}${++n}`;
-}
 
 export function corpDefaultLayout(makeId: MakeId = seqId('c')): OverviewLayout {
   const widgets: Widget[] = [];

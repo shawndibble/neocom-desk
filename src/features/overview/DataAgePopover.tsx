@@ -20,7 +20,7 @@ import { boardKey, useWidgetBoard } from './widgets/board';
 import { getKind } from './widgets/kinds';
 
 /**
- * The button on the Overview's tab row ("Data updated 2m ago") and the popover
+ * The button on a board's tab row ("Data updated 2m ago") and the popover
  * it opens: one row per widget kind with its own age, and Refresh all. Drawn
  * from plain props so the signed-out landing page's demo shows the very same
  * control over sample reads (`OverviewDataAge` feeds it the live ones).

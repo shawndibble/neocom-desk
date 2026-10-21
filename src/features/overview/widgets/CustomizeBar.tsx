@@ -1,5 +1,5 @@
 /**
- * The bar above the grid while the Overview is being customized: how many of
+ * The bar above the grid while a board is being customized: how many of
  * the 30 widgets are used, the ways to add (Add widget, Start from a role),
  * Reset behind an inline "Reset the layout?" question, and Cancel / Done.
  *
