@@ -16,6 +16,7 @@ import {
   getCorporationPublicInfo,
   getCorporationMiningObservers,
   getCorporationContracts,
+  getCorporationContractItems,
   getCorporationOrders,
   getCorporationMiningObserver,
   getAlliancePublicInfo,
@@ -757,6 +758,24 @@ describe('corp contracts', () => {
 
     expect(result.items).toEqual([contract(1), contract(2)]);
     expect(result.truncated).toBe(false);
+  });
+
+  it('getCorporationContractItems reads one contract’s items under the corporation', async () => {
+    const items = [{ record_id: 1, type_id: 34, quantity: 5, is_included: true }];
+    server.use(
+      http.get(
+        `${ESI_BASE_URL}/corporations/${CORPORATION_ID}/contracts/77/items`,
+        ({ request }) => {
+          const bad = rejectBadEsiHeaders(request);
+          if (bad) return bad;
+          return HttpResponse.json(items);
+        }
+      )
+    );
+
+    const result = await getCorporationContractItems(CHARACTER_ID, CORPORATION_ID, 77);
+
+    expect(result.data).toEqual(items);
   });
 });
 

@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
+import { corpCacheKey } from '@/esi/cache';
 import { loadContractItemsDetailed } from './contractItems';
 
 const CHAR_ID = 91;
@@ -34,6 +35,24 @@ describe('loadContractItemsDetailed (result)', () => {
 
     expect(result?.data).toEqual(items);
     expect((await db.esiCache.get([CHAR_ID, 'contract-items:12345']))?.value).toEqual(items);
+  });
+
+  it("reads a corporation's contract through the corp route, filed under the corporation", async () => {
+    const items = [
+      { record_id: 1, type_id: 34, quantity: 5, is_included: true, is_singleton: false },
+    ];
+    server.use(
+      http.get(`${ESI_BASE_URL}/corporations/98000001/contracts/777/items`, () =>
+        HttpResponse.json(items)
+      )
+    );
+
+    const { result } = await loadContractItemsDetailed(CHAR_ID, 777, 98000001);
+
+    expect(result?.data).toEqual(items);
+    expect(
+      (await db.esiCache.get([CHAR_ID, corpCacheKey(98000001, 'contract-items:777')]))?.value
+    ).toEqual(items);
   });
 
   it('returns null when unresolvable (offline + uncached)', async () => {

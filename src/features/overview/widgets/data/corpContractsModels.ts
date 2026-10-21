@@ -16,6 +16,8 @@ import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from '.
 import type { TableCell, TableRowModel, Translate } from './types';
 
 const C = 'overview.widgets.corpContracts';
+/** The Contracts page's Corp view, where a member with no corp role reads the same list. */
+const TO = '/contracts/history?scope=corp';
 /** The corp contracts read's cache window: a clock under it would tick past what ESI knows. */
 const CACHE_WINDOW_MS = 300_000;
 
@@ -33,8 +35,8 @@ function clock(row: CorpContractRow, now: number, t: Translate): string {
 export const corpContracts: Builder = (feeds, { t, now }) => {
   const feed = feeds.corpContracts;
   const data = feed?.data ?? null;
-  if (!data) return blank(null, statusOf(feed));
-  if (!data.readable) return corpUnreadable(null, feed, data.needsReauth, t);
+  if (!data) return blank(TO, statusOf(feed));
+  if (!data.readable) return corpUnreadable(TO, feed, data.needsReauth, t);
 
   const summary = summarizeCorpContracts(data.contracts, now);
   const { rows } = summary;
@@ -47,7 +49,7 @@ export const corpContracts: Builder = (feeds, { t, now }) => {
       : UNKNOWN;
 
   return {
-    ...blank(null, statusOf(feed, { isEmpty: rows.length === 0 })),
+    ...blank(TO, statusOf(feed, { isEmpty: rows.length === 0 })),
     fetchedAt: data.fetchedAt,
     fromCache: data.fromCache,
     number: {
