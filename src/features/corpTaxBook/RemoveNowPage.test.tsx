@@ -87,7 +87,7 @@ describe('RemoveNowPage', () => {
 
   // The server answers a guarded payee exactly as it answers an expired link; the page must
   // not add a difference of its own.
-  it('renders an expired link and a guarded link identically', async () => {
+  it('renders an expired, a guarded and an unknown link identically', async () => {
     api.link.mockResolvedValue({ available: false, effectiveAt: AT });
     const first = render(<RemoveNowPage code="expired" />);
     await screen.findByText(/This can't be done right now/);
@@ -98,7 +98,14 @@ describe('RemoveNowPage', () => {
     const second = render(<RemoveNowPage code="guarded" />);
     await screen.findByText(/This can't be done right now/);
     expect(second.container.innerHTML).toBe(expiredHtml);
-    expect(screen.getByText(/takes effect 18 Oct 2026 14:22 EVE time/)).toBeInTheDocument();
+    second.unmount();
+
+    // An unknown or garbled code has no removal to date: it reads the same, with no time.
+    api.link.mockResolvedValue({ available: false, effectiveAt: null });
+    const third = render(<RemoveNowPage code="garbled" />);
+    await screen.findByText(/This can't be done right now/);
+    expect(third.container.innerHTML).toBe(expiredHtml);
+    expect(document.body.textContent).not.toMatch(/EVE time/);
   });
 
   it('shows the same neutral message when forcing is refused at the last moment', async () => {
@@ -106,11 +113,7 @@ describe('RemoveNowPage', () => {
     api.force.mockResolvedValue({ ended: false, effectiveAt: AT });
     render(<RemoveNowPage code="c" />);
     await userEvent.click(await screen.findByRole('button', { name: 'Remove now' }));
-    expect(
-      await screen.findByText(
-        "This can't be done right now; the removal takes effect 18 Oct 2026 14:22 EVE time."
-      )
-    ).toBeInTheDocument();
+    expect(await screen.findByText("This can't be done right now.")).toBeInTheDocument();
   });
 
   it('never explains why, whatever the page says', async () => {

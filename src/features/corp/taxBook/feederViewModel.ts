@@ -49,6 +49,8 @@ export type RateNote =
 
 /** The rate line: the agreed rate wins; a different request is shown beside it. */
 export function rateNote(s: FeederViewSummary): RateNote {
+  // No effective rate means nothing is owed: stale history must not read as a rate set.
+  if (s.effectiveRatePct === null) return { kind: 'none' };
   // The rate-changed event drives the line; records with no event fall back to the plain fields.
   const change = latestRateChange(s.rateHistory);
   if (change) {
@@ -74,6 +76,11 @@ export function rateNote(s: FeederViewSummary): RateNote {
   return s.effectiveRatePct === null
     ? { kind: 'none' }
     : { kind: 'plain', pct: s.effectiveRatePct };
+}
+
+/** What is still owed to the moon owner, in whole ISK, for the Leave dialog. */
+export function owedOnLeaving(s: FeederViewSummary): number {
+  return s.balanceKind === 'owed' ? Math.max(0, Math.floor(s.balanceIsk)) : 0;
 }
 
 /** Whether a request for `pct` is a real change worth sending. */
