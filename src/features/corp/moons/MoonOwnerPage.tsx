@@ -14,6 +14,7 @@ import type {
   MoonOwnerMinedLine,
   MoonOwnerPayout,
 } from '@/engine/corpTaxBook/moonOwners';
+import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { formatCount } from '@/lib/formatCount';
 import { isk, shortDate } from './moonsFormat';
 import { Crumb } from './moonsParts';
@@ -114,6 +115,7 @@ export function MoonOwnerPage({
   refineryName,
   oreName,
   backTo,
+  payee,
   onSetRate,
   onSettledOtherwise,
   onRemove,
@@ -129,6 +131,8 @@ export function MoonOwnerPage({
   refineryName: (id: number) => string;
   oreName: (typeId: number) => string;
   backTo: string;
+  /** Who the moon owner is paid as, read-only here: only the moon owner sets it (#4619). */
+  payee?: { id: number; name: string };
   /** Absent for a viewer who may not edit. */
   onSetRate?: () => void;
   onSettledOtherwise?: () => void;
@@ -273,6 +277,13 @@ export function MoonOwnerPage({
           }
         />
       </StatChips>
+      {payee && (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+          <span className="text-text-dim">{t(k('paidTo'))}</span>
+          <span className="font-medium">{payee.name}</span>
+          <OpenInEveButton kind="information" id={payee.id} name={payee.name} />
+        </div>
+      )}
       {row.status === 'cant-read' && row.staleSince !== undefined && (
         <p role="note" className="text-sm text-warning">
           {t(k('stale'), { date: shortDate(new Date(row.staleSince).toISOString()) })}

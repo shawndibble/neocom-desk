@@ -380,4 +380,12 @@ describe('review fixes', () => {
     );
     expect(settled.summary.note).toBe('fuel');
   });
+
+  it('carries the payee the moon owner set, null when unset (#4619)', () => {
+    expect(buildFeederView(input()).summary.payee).toBeNull();
+    const set = buildFeederView(
+      input({ record: record({ payee: { kind: 'character', id: 77 } }) })
+    );
+    expect(set.summary.payee).toEqual({ kind: 'character', id: 77 });
+  });
 });

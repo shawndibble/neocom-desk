@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, Panel, StatChip, StatChips, TextInput } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import type { FeederView } from '../taxBook/feederViewClient';
+import type { FeederPayee, FeederView } from '../taxBook/feederViewClient';
 import {
   isSettledAfterLeaving,
   minedRows,
@@ -14,6 +14,7 @@ import {
   type MinedRow,
 } from '../taxBook/feederViewModel';
 import { DialogShell } from './BookDialogs';
+import { ChangePayeeDialog, PayeeLine } from './MoonOwnerPayee';
 import { isk, shortDate } from './moonsFormat';
 
 type Names = (characterId: number) => string;
@@ -258,20 +259,29 @@ export function MoonOwnerView({
   names,
   canEdit,
   onRequestRate,
+  characterId,
+  onSetPayee,
   banner,
   card,
   afterCard,
 }: {
   view: FeederView;
+  /** Character and corporation names, the payee's included. */
   names: Names;
   canEdit: boolean;
   onRequestRate: (pct: number) => Promise<void>;
+  /** Whose token the payee name search runs under; with `onSetPayee`, shows Change…. */
+  characterId?: number;
+  onSetPayee?: (payee: FeederPayee) => Promise<void>;
   banner?: ReactNode;
   card?: ReactNode;
   afterCard?: ReactNode;
 }) {
   const { t } = useTranslation();
   const [asking, setAsking] = useState(false);
+  const [changingPayee, setChangingPayee] = useState(false);
+  const canSetPayee = canEdit && onSetPayee !== undefined && characterId !== undefined;
+  const payeeId = view.summary.payee?.id ?? view.summary.feederCorporationId;
   const state = pageState(view.summary);
   const name = view.summary.collectorName ?? t('corpTaxBook.moons.owner.anonymous');
   const ended = state === 'ended';
@@ -305,6 +315,10 @@ export function MoonOwnerView({
                   name={name}
                   onAskRate={canEdit ? () => setAsking(true) : undefined}
                 />
+                <PayeeLine
+                  name={names(payeeId)}
+                  onChange={canSetPayee ? () => setChangingPayee(true) : undefined}
+                />
                 <Payments view={view} />
               </div>
             </Panel>
@@ -321,6 +335,13 @@ export function MoonOwnerView({
           initial={view.summary.requestedRatePct}
           onClose={() => setAsking(false)}
           onRequest={onRequestRate}
+        />
+      )}
+      {changingPayee && canSetPayee && (
+        <ChangePayeeDialog
+          characterId={characterId}
+          onClose={() => setChangingPayee(false)}
+          onSave={onSetPayee}
         />
       )}
     </div>

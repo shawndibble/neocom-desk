@@ -12,6 +12,7 @@ import {
   dismissFeederHistory,
   getFeederViewAccess,
   requestFeederRate,
+  setFeederPayee,
 } from './corpTaxBookFeederViewCalls.js';
 import type { FeederViewSummary } from './corpTaxBookFeederView.js';
 import { createFeederInvite, type FeederRecord } from './corpTaxBookFeeders.js';
@@ -291,6 +292,46 @@ suite('moon owner view', () => {
         })
       )
     ).toBe('not-your-feeder');
+  });
+
+  it('payee: the moon owner sets it, stamped and in the view (#4619)', async () => {
+    await save(await newInvite());
+    const payee = { kind: 'character' as const, id: 77 };
+    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee });
+    const rec = (await feederRecord()) as (FeederRecord & { payeeHistory?: unknown }) | undefined;
+    expect(rec?.payee).toEqual(payee);
+    expect(rec?.payeeChangedAt).toBe(T0);
+    expect(rec?.payeeHistory).toEqual([{ payee, from: T0 }]);
+    expect((await summary())?.payee).toEqual(payee);
+    const audit = await collectorBook().collection('audit').get();
+    expect(audit.docs.filter((d) => d.get('action') === 'feederPayeeSet')).toHaveLength(1);
+  });
+
+  it('payee: refuses a junior, a nobody and every accounting officer (#4619)', async () => {
+    await save(await newInvite());
+    const payee = { kind: 'corporation' as const, id: 98000009 };
+    for (const id of [FEEDER_JUNIOR, FEEDER_NOBODY, COLLECTOR_CEO]) {
+      expect(
+        await reason(
+          setFeederPayee(deps(), who(id), {
+            corporationId: FEEDER,
+            accessToken: `roles-${id}`,
+            payee,
+          })
+        )
+      ).toBe('not-your-feeder');
+    }
+    // The accounting corporation naming itself: no moon owner by that id.
+    expect(
+      await reason(
+        setFeederPayee(deps(), who(COLLECTOR_CEO), {
+          corporationId: COLLECTOR,
+          accessToken: `roles-${COLLECTOR_CEO}`,
+          payee,
+        })
+      )
+    ).toBe('not-your-feeder');
+    expect((await feederRecord())?.payee).toBeUndefined();
   });
 
   it('leave: keeps the view, writes the Previous pointer and keeps access working', async () => {

@@ -30,7 +30,9 @@ export function useFeederView(
     void (async () => {
       try {
         const { access, view } = await loadFeederView(characterId, corporationId);
-        const ids = view ? characterIdsOf(view.days) : [];
+        // The payee, or the moon owner corporation itself when none is set.
+        const payeeId = view?.summary.payee?.id ?? corporationId;
+        const ids = [...(view ? characterIdsOf(view.days) : []), payeeId];
         const resolved = await resolveNames(ids).catch(() => new Map<number, string>());
         if (!cancelled)
           setLoad({

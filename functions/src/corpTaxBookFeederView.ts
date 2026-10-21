@@ -66,6 +66,8 @@ export interface FeederViewSummary {
   /** A pending removal's start and, once its notice is out, when it takes effect (#4520). */
   removalStartedAt?: number | null;
   removalEffectiveAt?: number | null;
+  /** Who the moon owner is paid as (#4619); null when unset, meaning the moon owner corporation. */
+  payee?: { kind: 'corporation' | 'character'; id: number } | null;
 }
 
 export interface FeederViewDayLine {
@@ -179,6 +181,7 @@ export type FeederViewRecord = Pick<
   | 'modeChanges'
   | 'viewDismissedAt'
   | 'removal'
+  | 'payee'
 >;
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -396,6 +399,7 @@ export function buildFeederView(input: FeederViewInput): FeederView {
       record.status === 'pending-removal' ? (record.removal?.startedAt ?? null) : null,
     removalEffectiveAt:
       record.status === 'pending-removal' ? (record.removal?.effectiveAt ?? null) : null,
+    payee: record.payee ?? null,
   };
   return {
     summary,

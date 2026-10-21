@@ -9,7 +9,7 @@ import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import { type CorpSyncDeps } from './corpSyncGrant.js';
 import { acceptFeederInvite, createFeederInvite, type FeederRecord } from './corpTaxBookFeeders.js';
 import { leaveFeeder } from './corpTaxBookFeederGrant.js';
-import { setFeederPayee } from './corpTaxBookFeederOwnerCalls.js';
+import { setFeederPayee } from './corpTaxBookFeederViewCalls.js';
 import {
   cancelFeederRemoval,
   finalizeDueRemovals,
@@ -114,8 +114,18 @@ async function clearEmulator(): Promise<void> {
   );
 }
 
+/** The moon owner's side, which alone sets its payee (#4619): its Director, live role check. */
+const ownerDeps = (): CorpSyncDeps => ({
+  ...syncDeps(),
+  verify: deps().verifyToken,
+  readIdentity: deps().readIdentity,
+});
 const setPayee = (payee: { kind: 'character' | 'corporation'; id: number }) =>
-  setFeederPayee(deps(), who(ACCOUNTANT), { ...target(ACCOUNTANT), payee });
+  setFeederPayee(ownerDeps(), who(FEEDER_DIRECTOR), {
+    corporationId: FEEDER,
+    accessToken: tok(FEEDER_DIRECTOR),
+    payee,
+  });
 /** A real change of payee: away and back, so the stamp moves even for the same final payee. */
 const changePayeeTo = async (payee: { kind: 'character' | 'corporation'; id: number }) => {
   await setPayee({ kind: 'character', id: STRANGER });

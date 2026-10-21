@@ -19,6 +19,12 @@ export interface FeederViewRateEntry {
   recordedAt: string;
 }
 
+/** Who a moon owner is paid as (#4619): a corporation or a player. */
+export interface FeederPayee {
+  kind: 'corporation' | 'character';
+  id: number;
+}
+
 /** `feederViews/{feeder}`. */
 export interface FeederViewSummary {
   schemaVersion: 1;
@@ -52,6 +58,8 @@ export interface FeederViewSummary {
   /** A pending removal (#4520): when it started and, once its notice is out, when it takes effect. */
   removalStartedAt?: number | null;
   removalEffectiveAt?: number | null;
+  /** Who the moon owner is paid as; null or absent (a view built before #4619) means the moon owner corporation. */
+  payee?: FeederPayee | null;
 }
 
 export interface FeederViewLine {
@@ -135,6 +143,20 @@ export async function requestFeederRate(
     corporationId,
     accessToken,
     pct,
+  });
+}
+
+/** The moon owner's officers name who it is paid as. The accounting corporation cannot. */
+export async function setFeederPayee(
+  characterId: number,
+  corporationId: number,
+  payee: FeederPayee
+): Promise<{ ok: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'setCorpTaxBookFeederPayeeCallable', {
+    corporationId,
+    accessToken,
+    payee,
   });
 }
 
