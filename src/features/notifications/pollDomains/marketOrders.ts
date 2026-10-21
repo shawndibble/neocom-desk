@@ -194,7 +194,13 @@ export const marketOrderUndercutDomain = defineDomain<
       [...typeIdsByStation.entries()],
       ESI_FANOUT_CONCURRENCY,
       async ([stationId, typeIds]) => {
-        pricesByStation.set(stationId, await getStationPrices(stationId, [...new Set(typeIds)]));
+        pricesByStation.set(
+          stationId,
+          await getStationPrices(stationId, [...new Set(typeIds)], Date.now, {
+            // Compared with a live order: yesterday's close would read as a false undercut.
+            allowStale: false,
+          })
+        );
       }
     );
 

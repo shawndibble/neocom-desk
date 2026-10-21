@@ -80,6 +80,9 @@ export function AppraisalSummary({
         </div>
       )}
 
+      {result.pricesStale && (
+        <p className="text-[0.6875rem] text-warning">{t('market.appraisal.pricesFromYesterday')}</p>
+      )}
       {!result.pricesUnreachable && totals.unpricedRows > 0 && (
         <p className="text-[0.6875rem] text-warning">
           {t('market.appraisal.unpriced', { count: totals.unpricedRows })}

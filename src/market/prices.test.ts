@@ -1,9 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from 'vitest';
 import { http, HttpResponse, delay } from 'msw';
 import { db } from '@/db';
 import { setupServer } from 'msw/node';
 import { ESI_BASE_URL } from '@/esi/client';
+import { fallbackSourcesDown } from '@/test/fallbackSourcesDown';
+import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
+import { resetMarketOpenPricesCache } from '@/features/market/marketOpenPrices';
 import { FUZZWORK_AGGREGATES_URL } from './fuzzwork';
+import { resetPriceFallback as clearFuzzworkBackoff } from './priceFallback';
 import { DEFAULT_TRADE_HUB } from './hubs';
 import {
   getHubPrices,
@@ -21,9 +25,15 @@ import {
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeEach(() => {
+  // The fallback sources are down unless a test brings one up, so "Fuzzwork
+  // failed" still means "no price" for the tests that predate the fallback.
+  server.use(...fallbackSourcesDown);
+});
 afterEach(() => {
   server.resetHandlers();
   clearMarketPriceCache();
+  resetMarketOpenPricesCache();
 });
 afterAll(() => server.close());
 
@@ -126,6 +136,7 @@ describe('getHubPrices', () => {
     expect(failed.get(34)).toEqual({ sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 });
 
     now += 1000; // well inside HUB_PRICE_TTL_MS
+    clearFuzzworkBackoff(); // the outage is remembered for a minute; a later ask tries again
     const retried = await getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
 
     expect(attempt).toBe(2);
@@ -255,6 +266,7 @@ describe('getStationPrices', () => {
     expect(attempt).toBe(1);
 
     now += 1000; // well within TTL — nothing was cached, so this retries
+    clearFuzzworkBackoff(); // the outage is remembered for a minute; a later ask tries again
     const second = await getStationPrices(DEFAULT_TRADE_HUB.stationId, [34], clock);
     expect(second.get(34)).toEqual({ sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 });
     expect(attempt).toBe(2);
@@ -629,7 +641,12 @@ describe('a Fuzzwork request that never answers', () => {
           init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
         })
     );
-    vi.stubGlobal('fetch', hung);
+    // Only Fuzzwork hangs; the fallback sources refuse at once.
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) =>
+      String(input).includes('fuzzwork')
+        ? hung(input, init)
+        : Promise.reject(new TypeError('network down'))
+    );
     // Only the timer is faked: the persisted-price read before the fetch needs real turns.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const clock = () => 1_000_000;
@@ -644,11 +661,83 @@ describe('a Fuzzwork request that never answers', () => {
       buyVolume: 0,
     });
 
-    // A dead promise left in flight would be joined here and hang; a fresh ask fetches again.
-    const second = getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
-    while (hung.mock.calls.length < 2) await new Promise((resolve) => setImmediate(resolve));
-    await vi.advanceTimersByTimeAsync(15_000);
-    expect((await second).get(34)?.sellMin).toBeNull();
-    expect(hung).toHaveBeenCalledTimes(2);
+    // A dead promise left in flight would be joined here and hang. The outage is
+    // remembered, so this ask skips the hung Fuzzwork call and answers at once.
+    expect((await getHubPrices(DEFAULT_TRADE_HUB, [34], clock)).get(34)?.sellMin).toBeNull();
+    expect(hung).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('when Fuzzwork is down', () => {
+  // The reload tests above reset the module registry, so the instance the fallback
+  // lazily imports is not the one imported at the top of this file.
+  beforeEach(async () => {
+    (await import('@/features/market/marketOpenPrices')).resetMarketOpenPricesCache();
+  });
+
+  const jitaBook = http.get(`${ESI_BASE_URL}/markets/10000002/orders`, () =>
+    HttpResponse.json([
+      {
+        is_buy_order: false,
+        location_id: 60003760,
+        price: 4.2,
+        volume_remain: 9,
+        type_id: 34,
+      },
+      {
+        is_buy_order: true,
+        location_id: 60003760,
+        price: 3.1,
+        volume_remain: 4,
+        type_id: 34,
+      },
+    ])
+  );
+  const fuzzworkDown = http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error());
+  const r2Close = http.get(`${R2_SNAPSHOT_ORIGIN}/open-prices/34.json`, () =>
+    HttpResponse.json({
+      typeId: 34,
+      dates: [new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)],
+      stations: { '60003760': { buy: [3], sell: [4] } },
+    })
+  );
+
+  it('serves live prices from ESI orders, not flagged unreachable or stale', async () => {
+    server.use(fuzzworkDown, jitaBook);
+    const out = await getHubPricesWithStatus(DEFAULT_TRADE_HUB, [34]);
+    expect(out.prices.get(34)).toEqual({ sellMin: 4.2, buyMax: 3.1, sellVolume: 9, buyVolume: 4 });
+    expect(out.unreachable).toBe(false);
+    expect(out.stale).toBe(false);
+  });
+
+  it('serves yesterday\u2019s close from R2 flagged stale, and does not cache it', async () => {
+    server.use(fuzzworkDown, r2Close);
+    const first = await getHubPricesWithStatus(DEFAULT_TRADE_HUB, [34]);
+    expect(first.prices.get(34)?.sellMin).toBe(4);
+    expect(first.stale).toBe(true);
+    expect(first.unreachable).toBe(false);
+
+    // Fuzzwork is back: the stale close was not held, so the live price replaces it.
+    server.use(fuzzworkHandler({ count: 0 }));
+    clearFuzzworkBackoff();
+    const second = await getHubPricesWithStatus(DEFAULT_TRADE_HUB, [34]);
+    expect(second.prices.get(34)?.sellMin).toBe(3.8);
+    expect(second.stale).toBe(false);
+  });
+
+  it('reads stale as unreachable for a caller that cannot use yesterday\u2019s close', async () => {
+    server.use(fuzzworkDown, r2Close);
+    const out = await getHubPricesWithStatus(DEFAULT_TRADE_HUB, [34], Date.now, {
+      allowStale: false,
+    });
+    expect(out.prices.get(34)?.sellMin).toBeNull();
+    expect(out.unreachable).toBe(true);
+    expect(out.stale).toBe(false);
+  });
+
+  it('lets the region lookup fall back to ESI orders too', async () => {
+    server.use(fuzzworkDown, jitaBook);
+    const out = await getRegionSellPrices(10000002, [34]);
+    expect(out.get(34)).toBe(4.2);
   });
 });

@@ -108,7 +108,10 @@ const server = setupServer(
   // Open Orders prices each order's station; an answer with no orders for the
   // type reads as checked-and-healthy. Left unanswered, the order would land
   // in "Not checked" instead (competition never read).
-  http.get('https://market.fuzzwork.co.uk/aggregates/', () => HttpResponse.json({}))
+  http.get('https://market.fuzzwork.co.uk/aggregates/', () => HttpResponse.json({})),
+  // Fuzzwork answering with no orders at all falls through to the live ESI book,
+  // which here is empty too: still checked-and-healthy.
+  http.get('https://esi.evetech.net/markets/:regionId/orders', () => HttpResponse.json([]))
 );
 
 beforeAll(async () => {

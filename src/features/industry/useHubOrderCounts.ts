@@ -3,7 +3,8 @@
  * Fuzzwork call per distinct hub, fetched only while a market column is shown.
  */
 import { useCallback } from 'react';
-import { fetchOrderCounts, type HubOrderCounts } from '@/market/fuzzwork';
+import type { HubOrderCounts } from '@/market/fuzzwork';
+import { fetchOrderCountsWithFallback } from '@/market/priceFallback';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { getTradeHub } from '@/market/hubs';
 
@@ -25,7 +26,7 @@ export interface HubOrderCountsState {
 const IDLE: HubOrderCountsState = { counts: new Map(), loading: false, failed: false };
 const LOADING: HubOrderCountsState = { counts: new Map(), loading: true, failed: false };
 
-/** One Fuzzwork call per hub in `key`; a hub whose call fails marks the whole result `failed`. */
+/** One Fuzzwork call (ESI behind it) per hub in `key`; a hub whose call fails marks the whole result `failed`. */
 async function loadCounts(key: string): Promise<HubOrderCountsState> {
   const byHub = new Map<string, number[]>();
   for (const entry of key.split(',')) {
@@ -36,7 +37,10 @@ async function loadCounts(key: string): Promise<HubOrderCountsState> {
     [...byHub].map(async ([hubId, typeIds]) => {
       const hub = getTradeHub(hubId);
       if (!hub) return { hubId, counts: null };
-      return { hubId, counts: await fetchOrderCounts(hub.stationId, typeIds).catch(() => null) };
+      return {
+        hubId,
+        counts: await fetchOrderCountsWithFallback(hub.stationId, typeIds).catch(() => null),
+      };
     })
   );
   const counts = new Map<string, HubOrderCounts>();

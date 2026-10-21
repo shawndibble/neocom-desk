@@ -1372,7 +1372,9 @@ describe('priceAlertDomain', () => {
     expect(entries).toEqual([
       { typeId: 34, name: 'Tritanium', targetPrice: 5, direction: 'above', price: 6 },
     ]);
-    expect(getHubPrices).toHaveBeenCalledWith(getTradeHub('jita'), [34]);
+    expect(getHubPrices).toHaveBeenCalledWith(getTradeHub('jita'), [34], Date.now, {
+      allowStale: false,
+    });
   });
 
   it('carries a null price rather than guessing one, when the hub has no aggregate for the type (AC4)', async () => {

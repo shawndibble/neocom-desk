@@ -53,7 +53,10 @@ export const priceAlertDomain = defineDomain<
     const hub = await currentHub();
     const prices = await getHubPrices(
       hub,
-      targeted.map((item) => item.typeId)
+      targeted.map((item) => item.typeId),
+      Date.now,
+      // An alert compares a live price with a target; yesterday's close could fire a false one.
+      { allowStale: false }
     );
     return targeted.map((item) => ({
       typeId: item.typeId,

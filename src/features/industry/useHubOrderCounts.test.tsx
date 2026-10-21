@@ -1,10 +1,10 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchOrderCounts } from '@/market/fuzzwork';
+import { fetchOrderCountsWithFallback as fetchOrderCounts } from '@/market/priceFallback';
 import { getTradeHub } from '@/market/hubs';
 import { hubOrderKey, useHubOrderCounts } from './useHubOrderCounts';
 
-vi.mock('@/market/fuzzwork', () => ({ fetchOrderCounts: vi.fn() }));
+vi.mock('@/market/priceFallback', () => ({ fetchOrderCountsWithFallback: vi.fn() }));
 
 const jita = getTradeHub('jita')!;
 
