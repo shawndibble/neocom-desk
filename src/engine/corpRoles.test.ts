@@ -39,7 +39,13 @@ describe('corpCapabilities', () => {
   // GET /corporations/{id}/wallets (+ journal, transactions) declares
   // x-required-roles ["Accountant", "Junior_Accountant"] — either one alone.
   it('grants wallet and mining-ledger access to an Accountant', () => {
-    expect(held(['Accountant'])).toEqual(['canReadWallet', 'canReadMiningLedger']);
+    expect(held(['Accountant'])).toEqual(['canReadWallet', 'canReadMiningLedger', 'canReadOrders']);
+  });
+
+  // GET /corporations/{id}/orders declares x-required-roles ["Accountant", "Trader"].
+  it('grants market orders to a Trader alone, and not to a Junior_Accountant', () => {
+    expect(held(['Trader'])).toEqual(['canReadOrders']);
+    expect(corpCapabilities(['Junior_Accountant']).canReadOrders).toBe(false);
   });
 
   it('grants wallet access to a Junior_Accountant', () => {
@@ -131,6 +137,7 @@ describe('corpCapabilities', () => {
       'canReadWallet',
       'canReadMiningLedger',
       'canReadIndustry',
+      'canReadOrders',
     ]);
   });
 
