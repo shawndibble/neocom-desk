@@ -28,7 +28,7 @@ export function areaCoords(values: readonly number[], height: number): { x: numb
 
 /** Points for an area/line chart in a `100 x height` viewBox. Fewer than two values draw nothing. */
 export function areaPoints(values: readonly number[], height: number): AreaGeometry {
-  const line = areaCoords(values, height).map(({ x, y }) => `${x.toFixed(1)},${y.toFixed(1)}`);
+  const line = areaCoords(values, height).map(({ x, y }) => `${x.toFixed(1)},${y.toFixed(1)}`); // fixed format: SVG points
   if (line.length === 0) return { line: [], polygon: '' };
   return { line, polygon: `0,${height} ${line.join(' ')} 100,${height}` };
 }
@@ -104,8 +104,8 @@ export function stackedAreaBands(layers: readonly (readonly number[])[], height:
   );
   const max = Math.max(...totals);
   if (max <= 0) return [];
-  const y = (value: number) => (height - (value / max) * (height - 4)).toFixed(1);
-  const x = (i: number) => ((i / (points - 1)) * 100).toFixed(0);
+  const y = (value: number) => (height - (value / max) * (height - 4)).toFixed(1); // fixed format: SVG coordinate
+  const x = (i: number) => ((i / (points - 1)) * 100).toFixed(0); // fixed format: SVG coordinate
   const below = Array<number>(points).fill(0);
   return layers.map((layer) => {
     const upper = layer.map((_, i) => below[i]! + Math.max(0, layer[i] ?? 0));

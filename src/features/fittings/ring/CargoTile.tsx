@@ -11,6 +11,7 @@ import {
   type FittingItemActions,
 } from '../fittingItemActions';
 import { useOverBudgetFlash } from '../useOverBudgetFlash';
+import { fmt1 } from '../stats/fixedFormat';
 
 /**
  * A cargo item beneath the ring: its icon, a count, and a tooltip naming it.
@@ -82,8 +83,8 @@ export function CargoHoldReadout({ actions }: { actions: FittingItemActions }) {
       aria-valuemax={total}
       className={`rounded-xs text-xs tabular-nums ${overBudget ? 'font-semibold text-danger' : 'text-text-dim'} ${flashKey > 0 && overBudget ? 'flash-danger' : ''}`}
     >
-      {t('fittings.item.cargoHold', { used: used.toFixed(1), total: total.toFixed(1) })}
-      {overBudget && ` · ${t('fittings.list.overBy', { amount: overage.toFixed(1) })}`}
+      {t('fittings.item.cargoHold', { used: fmt1(used), total: fmt1(total) })}
+      {overBudget && ` · ${t('fittings.list.overBy', { amount: fmt1(overage) })}`}
     </p>
   );
 }

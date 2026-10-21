@@ -1,3 +1,4 @@
+import { fixed1 } from '@/lib/fixedFormat';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, type DataTableColumn } from '@/components/ui';
@@ -66,7 +67,7 @@ export function useLoyaltyOfferColumns({
           if (lpBasis === 'concord' && concordPending) return '—';
           if (lpBasis === 'concord' && !concord) return t('loyaltyStore.noConcordExchange');
           const value = shownIskPerLp(row);
-          return value === null ? '—' : value.toFixed(1);
+          return value === null ? '—' : fixed1(value);
         },
       },
     }),

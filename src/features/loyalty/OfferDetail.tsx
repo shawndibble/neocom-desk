@@ -2,6 +2,7 @@
  * The selected offer's profit breakdown (right pane on desktop, bottom sheet on a
  * phone), plus the row-level helpers it shares with the offers table.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -178,7 +179,7 @@ export function OfferDetail({
               ? t('loyaltyStore.noConcordExchange')
               : shownIskPerLp === null
                 ? '—'
-                : shownIskPerLp.toFixed(1)}
+                : fixed1(shownIskPerLp)}
           </div>
         </div>
         <div>

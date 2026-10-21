@@ -1,13 +1,21 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { setDecimalMark } from '@/lib/numberLocale';
 import i18n from '@/i18n';
 import { kmValue, rangeLines } from './rangeText';
 
 const t = i18n.t.bind(i18n);
 
+afterEach(() => setDecimalMark('.'));
+
 describe('kmValue', () => {
   it('reads metres as km to one decimal', () => {
     expect(kmValue(62500)).toBe('62.5');
     expect(kmValue(2410)).toBe('2.4');
+  });
+
+  it('follows the decimal mark', () => {
+    setDecimalMark(',');
+    expect(kmValue(62500)).toBe('62,5');
   });
 });
 

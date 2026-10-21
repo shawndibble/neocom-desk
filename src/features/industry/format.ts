@@ -1,3 +1,4 @@
+import { fixed2 } from '@/lib/fixedFormat';
 import type { ReactNode } from 'react';
 import { createNumberFormat } from '@/lib/numberLocale';
 
@@ -13,7 +14,7 @@ export function formatPercent(value: number): string {
 
 /** ESI system cost index (a 0..1 fraction) shown as a percent (e.g. "4.64%"). */
 export function formatCostIndex(index: number): string {
-  return `${(index * 100).toFixed(2)}%`;
+  return `${fixed2(index * 100)}%`;
 }
 
 const VOLUME_FORMAT = createNumberFormat({ maximumFractionDigits: 1 });

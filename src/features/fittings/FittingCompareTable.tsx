@@ -11,6 +11,7 @@ import type { CompareRow } from '@/engine/fittings/fittingCompare';
 import { STAT_DIGITS } from '@/engine/fittings/fittingStatFields';
 import { formatSeconds } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
+import { fixed0, fixed1, fixedFormat } from '@/lib/fixedFormat';
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -18,10 +19,10 @@ function formatValue(row: CompareRow, index: number, t: Translate): string {
   if (row.key === 'capacitor') {
     const value = row.values[index]!;
     return value >= 0
-      ? t('fittings.compare.stat.capacitorStable', { pct: value.toFixed(0) })
+      ? t('fittings.compare.stat.capacitorStable', { pct: fixed0(value) })
       : t('fittings.compare.stat.capacitorUnstable', { time: formatSeconds(-value) });
   }
-  if (row.key === 'appliedDps' || row.key === 'bestRange') return row.values[index]!.toFixed(1);
+  if (row.key === 'appliedDps' || row.key === 'bestRange') return fixed1(row.values[index]!);
   if (row.key === 'priceSell' || row.key === 'priceBuy') {
     const value = row.values[index]!;
     // NaN marks a slot whose price fetch failed — the engine row still carries it so the other
@@ -30,7 +31,7 @@ function formatValue(row: CompareRow, index: number, t: Translate): string {
     // Whole ISK, same rounding the engine row was built at, so what's shown always matches what `differs` compared.
     return formatIsk(value, 0);
   }
-  return row.values[index]!.toFixed(STAT_DIGITS[row.key]);
+  return fixedFormat(STAT_DIGITS[row.key])(row.values[index]!);
 }
 
 export interface FittingCompareColumn {

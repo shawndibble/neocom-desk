@@ -1,3 +1,4 @@
+import { fixed1 } from '@/lib/fixedFormat';
 import { selectedRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { memo, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -282,7 +283,7 @@ export const PlanRow = memo(function PlanRow({
           </span>
           <span className="hidden w-16 shrink-0 text-right tabular-nums text-text-dim lg:block">
             <span className="sr-only">{t('industry.marginColumn')}: </span>
-            {stats?.marginPct == null ? '—' : `${stats.marginPct.toFixed(1)}%`}
+            {stats?.marginPct == null ? '—' : `${fixed1(stats.marginPct)}%`}
           </span>
           <span className="hidden w-14 shrink-0 justify-end sm:flex">
             <span className="sr-only">{t('industry.verdictColumn')}: </span>

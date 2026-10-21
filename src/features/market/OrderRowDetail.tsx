@@ -8,6 +8,7 @@
  * Only facts about the order. The item's own (its required skills) are the
  * same on every row, so they sit once in the item header instead.
  */
+import { fixed2 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
@@ -147,9 +148,7 @@ export function OrderRowDetail({
         <Fact label={t('market.orderDetail.versusBest')}>
           {versusBest === null || versusBest.delta === 0
             ? t('market.orderDetail.isBest')
-            : `${signedMarketIsk(versusBest.delta)} (${versusBest.ratio > 0 ? '+' : '−'}${Math.abs(
-                versusBest.ratio * 100
-              ).toFixed(2)}%)`}
+            : `${signedMarketIsk(versusBest.delta)} (${versusBest.ratio > 0 ? '+' : '−'}${fixed2(Math.abs(versusBest.ratio * 100))}%)`}
         </Fact>
         <Fact label={t('market.expiry')}>
           {expiry.toLocaleDateString()}{' '}

@@ -16,6 +16,7 @@
  * One `role="img"`, not a tab stop per cell: a 40-jump route would otherwise
  * be 40 stops the table below already covers.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
@@ -51,7 +52,7 @@ const STEP_CELL = {
 } as const;
 
 function securityText(row: RouteSafetyRow): string {
-  return row.security === null ? '—' : row.security.toFixed(1);
+  return row.security === null ? '—' : fixed1(row.security);
 }
 
 function hasKills(row: RouteSafetyRow, cell: RouteKillsCell): boolean {
@@ -124,7 +125,7 @@ export function RouteStrip({
                   content={t(step.tip, {
                     from: routeSystemName(previous),
                     to: routeSystemName(row),
-                    distance: row.entry?.kind === 'jump' ? row.entry.distanceLy.toFixed(1) : '',
+                    distance: row.entry?.kind === 'jump' ? fixed1(row.entry.distanceLy) : '',
                   })}
                 >
                   <span
@@ -133,7 +134,7 @@ export function RouteStrip({
                   >
                     {row.entry?.kind === 'jump' &&
                       t('travel.jumpDrive.stripDistance', {
-                        distance: row.entry.distanceLy.toFixed(1),
+                        distance: fixed1(row.entry.distanceLy),
                       })}
                   </span>
                 </Tooltip>

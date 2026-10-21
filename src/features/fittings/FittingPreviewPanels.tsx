@@ -9,6 +9,7 @@ import { ResistTable, type ResistRow } from './stats/ResistTable';
 import { MissingSkillsChip } from './MissingSkillsChip';
 import { IN_GAME_FITTING_DESCRIPTION_MAX } from './saveToEve';
 import { useFittingSkillGaps } from './useFittingSkillGaps';
+import { fixed1 } from '@/lib/fixedFormat';
 
 /** One resource meter: what is used of what the hull has, red-flagged past the limit. */
 function Meter({
@@ -125,7 +126,7 @@ export function OffensePanel({
   const items = [
     { label: t('fittings.start.preview.totalDps'), value: formatCompactNumber(offense.dps) },
     { label: t('fittings.start.preview.volley'), value: formatCompactNumber(offense.volley) },
-    ...(offense.sustainedDps.toFixed(1) !== offense.dps.toFixed(1)
+    ...(fixed1(offense.sustainedDps) !== fixed1(offense.dps)
       ? [
           {
             label: t('fittings.start.preview.sustainedDps'),

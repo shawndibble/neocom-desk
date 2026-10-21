@@ -2,11 +2,12 @@
  * "Copy stats as text": a Fitting's headline stats as plain lines, to paste
  * into chat or a doc. Every label goes through i18next like the rest of the
  * stats column; the numbers are rounded as the column shows them.
+ * Every `toFixed` here is clipboard text, so the mark stays `.` whatever the
+ * display setting is.
  */
 import { formatSeconds } from '@/lib/duration';
 import { alignTimeSeconds, resistPct } from '@/engine/fittings/stats';
 import type { FittingStats, Resonances } from '@/engine/fittings/types';
-import { kmValue } from './rangeText';
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
@@ -77,7 +78,7 @@ export function fittingStatsText(stats: FittingStats, t: Translate): string {
       warp: stats.navigation.warpSpeed.toFixed(1),
     }),
     k('targeting', {
-      range: kmValue(stats.targeting.maxTargetRange),
+      range: (stats.targeting.maxTargetRange / 1000).toFixed(1),
       targets: stats.targeting.maxLockedTargets,
       scanResolution: stats.targeting.scanResolution.toFixed(0),
       signature: stats.targeting.signatureRadius.toFixed(0),

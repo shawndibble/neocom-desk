@@ -87,7 +87,7 @@ function parseSize(raw: string): number | null {
 /** `#aarrggbb` as a CSS `rgba(...)` colour. */
 export function markupColorToCss(color: string): string {
   const [a, r, g, b] = [1, 3, 5, 7].map((i) => parseInt(color.slice(i, i + 2), 16));
-  return `rgba(${r}, ${g}, ${b}, ${Number((a / 255).toFixed(3))})`;
+  return `rgba(${r}, ${g}, ${b}, ${Number((a / 255).toFixed(3))})`; // fixed format: CSS rgba alpha
 }
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', nbsp: ' ' };
