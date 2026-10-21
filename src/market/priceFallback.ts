@@ -91,34 +91,54 @@ async function esiBooks(
   const regionId = scope === 'region' ? locationId : await regionOfStation(locationId);
   if (regionId === null) return null;
   const books = new Map<number, StationBook>();
+  let failed = false;
   try {
     await mapWithConcurrencyLimit(typeIds, ESI_STEP_CONCURRENCY, async (typeId) => {
+      // One failure discards the whole step, so stop spending the ESI error budget.
+      if (failed) return;
       const { items, truncated } = await getMarketOrders(regionId, typeId);
       if (truncated) throw new Error(`order book ${regionId}:${typeId} truncated`);
       books.set(typeId, summarizeStationBook(items, scope === 'region' ? null : locationId));
+    }).catch((error) => {
+      failed = true;
+      throw error;
     });
   } catch {
+    failed = true;
     return null;
   }
   return books;
 }
 
-/** Yesterday's close at a hub station, or null for a non-hub station / no object at all. */
+/** Older than this, a close is no longer "yesterday's" and is not offered as a price. */
+export const R2_MAX_AGE_DAYS = 3;
+
+/**
+ * Yesterday's close at a hub station, or null for a non-hub station, no object
+ * at all, or a series whose last day is older than `R2_MAX_AGE_DAYS` (the daily
+ * job stopped, and the label would lie).
+ */
 async function r2Prices(
   stationId: number,
-  typeIds: readonly number[]
+  typeIds: readonly number[],
+  nowMs: number
 ): Promise<Map<number, HubAggregate> | null> {
   if (!TRADE_HUBS.some((h) => h.stationId === stationId)) return null;
+  // Imported on demand so the R2 reader loads only when a fallback needs it.
   const { loadStoredOpenPrices } = await import('@/features/market/marketOpenPrices');
   const prices = new Map<number, HubAggregate>();
   let answered = false;
   await mapWithConcurrencyLimit(typeIds, ESI_FANOUT_CONCURRENCY, async (typeId) => {
     const stored = await loadStoredOpenPrices(typeId);
     const series = stored?.stations.get(stationId);
-    const last = series ? series.dates.length - 1 : -1;
+    let last = series ? series.dates.length - 1 : -1;
+    const lastDay = series?.dates[last];
+    if (lastDay && nowMs - Date.parse(`${lastDay}T00:00:00Z`) > R2_MAX_AGE_DAYS * 86_400_000) {
+      last = -1;
+    }
     const sellMin = last >= 0 ? (series?.sell[last] ?? null) : null;
     const buyMax = last >= 0 ? (series?.buy[last] ?? null) : null;
-    if (series) answered = true;
+    if (last >= 0) answered = true;
     prices.set(typeId, { sellMin, buyMax, sellVolume: 0, buyVolume: 0 });
   });
   return answered ? prices : null;
@@ -162,7 +182,7 @@ export async function fetchAggregatesWithFallback(
   }
 
   if (scope === 'station') {
-    const prices = await r2Prices(locationId, typeIds);
+    const prices = await r2Prices(locationId, typeIds, now());
     if (prices) return { prices, stale: new Set(prices.keys()) };
   }
 

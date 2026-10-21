@@ -171,7 +171,7 @@ describe('appraisePaste', () => {
       http.get(`${R2_SNAPSHOT_ORIGIN}/open-prices/34.json`, () =>
         HttpResponse.json({
           typeId: 34,
-          dates: ['2026-10-20'],
+          dates: [new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)],
           stations: { '60003760': { buy: [3], sell: [4] } },
         })
       )

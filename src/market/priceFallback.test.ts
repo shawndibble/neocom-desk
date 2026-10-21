@@ -118,9 +118,21 @@ describe('fetchAggregatesWithFallback', () => {
         [JITA, { dates: ['2026-10-19', '2026-10-20'], buy: [1, 3], sell: [2, 4] }],
       ]),
     });
-    const out = await fetchAggregatesWithFallback(JITA, [34]);
+    const out = await fetchAggregatesWithFallback(JITA, [34], 'station', () =>
+      Date.parse('2026-10-21T12:00:00Z')
+    );
     expect(out.prices.get(34)).toEqual({ sellMin: 4, buyMax: 3, sellVolume: 0, buyVolume: 0 });
     expect([...out.stale]).toEqual([34]);
+  });
+
+  it('does not offer an R2 close older than a few days as yesterday\u2019s price', async () => {
+    mocks.fetchAggregates.mockRejectedValue(new Error('503'));
+    mocks.getMarketOrders.mockRejectedValue(new Error('esi down'));
+    mocks.loadStoredOpenPrices.mockResolvedValue({
+      stations: new Map([[JITA, { dates: ['2026-10-01'], buy: [3], sell: [4] }]]),
+    });
+    const now = () => Date.parse('2026-10-21T12:00:00Z');
+    await expect(fetchAggregatesWithFallback(JITA, [34], 'station', now)).rejects.toThrow();
   });
 
   it('skips ESI past the type cap and goes to R2', async () => {
@@ -129,7 +141,9 @@ describe('fetchAggregatesWithFallback', () => {
       stations: new Map([[JITA, { dates: ['2026-10-20'], buy: [3], sell: [4] }]]),
     });
     const ids = Array.from({ length: ESI_FALLBACK_MAX_TYPES + 1 }, (_, i) => i + 1);
-    const out = await fetchAggregatesWithFallback(JITA, ids);
+    const out = await fetchAggregatesWithFallback(JITA, ids, 'station', () =>
+      Date.parse('2026-10-21T12:00:00Z')
+    );
     expect(mocks.getMarketOrders).not.toHaveBeenCalled();
     expect(out.stale.size).toBe(ids.length);
   });

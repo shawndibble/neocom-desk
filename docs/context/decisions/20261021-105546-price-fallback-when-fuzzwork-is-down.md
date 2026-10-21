@@ -7,6 +7,8 @@ _Recorded 2026-10-21. Amends ADR 0002._
 - **R2 step: yesterday's close, hub stations only, flagged stale.** The last day of `open-prices/<typeId>.json`; no volumes (0). Never used for region scope (it holds the hub station's price, not the region's lowest). A type is `stale`, not cached in memory or Dexie, so the next ask retries Fuzzwork.
 - **`PricesWithStatus.stale`.** `unreachable` now means no source answered. The Appraisal shows one amber line (`market.appraisal.pricesFromYesterday`) when its prices are stale. Other pages do not label it yet; they show the figure as before.
 - **Callers that compare with a live order refuse stale prices.** Price alerts, the market-orders poll and the undercut/competition read pass `allowStale: false`; a stale type reads as unreachable there, so yesterday's close cannot fire a false alert or undercut.
+- **A close older than 3 days is not offered.** If the daily job stopped, the "yesterday" label would lie, so the R2 step answers nothing and the lookup reads unreachable.
+- **ESI-sourced prices are live, so they are cached on the normal 15-minute TTL**, which means they can outlast Fuzzwork's recovery by up to that long. Only stale (R2) prices skip the cache.
 - **Outage is remembered for 60 s.** After Fuzzwork throws, lookups go straight to the fallback so each ask does not wait out the 15 s timeout.
 - **Order counts have an ESI step only** (`fetchOrderCountsWithFallback`): R2 holds no counts.
 - **Not changed:** the nightly SDE refresh still reads Fuzzwork's CSV dump; a failure there leaves the baked data in place and shows nothing to users. Janice, EVE Tycoon and Adam4EVE stay rejected (ADR 0002: no CORS or a key in the bundle).
