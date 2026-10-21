@@ -58,6 +58,22 @@ export function blank(to: string | null, status: WidgetStateInput): KindView {
   };
 }
 
+/**
+ * A corp read this Character may not make: Grant access when the grant
+ * lapsed, otherwise "your corp roles don't cover this" (a grant would not fix that).
+ */
+export function corpUnreadable(
+  to: string | null,
+  feed: FeedState<unknown> | undefined,
+  needsReauth: boolean,
+  t: Translate
+): KindView {
+  return {
+    ...blank(to, statusOf(feed, { needsPermission: needsReauth, isEmpty: !needsReauth })),
+    emptyMessage: t('overview.board.corpUnreadable'),
+  };
+}
+
 /** "3 h ago", or the unknown dash when never read. */
 export function ageText(t: Translate, nowMs: number, atMs: number | null): string {
   return atMs === null ? UNKNOWN : formatAge(Math.max(0, nowMs - atMs), t);

@@ -53,3 +53,11 @@ export function loadCorpPaginatedWithCacheStatus<T>(
     detectAuthFailure: detectCorpAuthFailure,
   });
 }
+
+/** A read that was allowed and came back with nothing: the widget shows Retry. */
+export class CorpReadFailed extends Error {
+  constructor(what: string) {
+    super(`corp ${what} read failed`);
+    this.name = 'CorpReadFailed';
+  }
+}

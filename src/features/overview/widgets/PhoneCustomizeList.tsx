@@ -8,13 +8,18 @@
 import { useTranslation } from 'react-i18next';
 import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { categoryOn, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
 import { getKind } from './kinds';
 
 export function PhoneCustomizeList() {
   const { t } = useTranslation();
   const edit = useOverviewEdit();
-  const rows = edit.layout.widgets.filter((w) => getKind(w.kind) !== undefined);
+  const board = useWidgetBoard();
+  const rows = edit.layout.widgets.filter((w) => {
+    const kind = getKind(w.kind);
+    return kind !== undefined && board.canDraw(kind);
+  });
   return (
     <div className="grid gap-2">
       <ul className="grid gap-1.5">
@@ -34,7 +39,7 @@ export function PhoneCustomizeList() {
                 <b className="block truncate text-sm font-semibold">{title}</b>
                 <span className="block truncate text-xs text-text-dim">
                   {widget.showOnPhone
-                    ? t(`overview.gallery.categories.${kind.category}`)
+                    ? t(`overview.gallery.categories.${categoryOn(board, kind)}`)
                     : t('overview.customize.phone.hidden')}
                 </span>
               </span>

@@ -47,6 +47,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.overviewCardOrder',
   'sync.overviewHiddenCards',
   'sync.overviewLayout',
+  'sync.corpOverviewLayout',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
   'sync.skillCloneStates',

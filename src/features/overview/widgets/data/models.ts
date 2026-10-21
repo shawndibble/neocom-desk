@@ -13,6 +13,7 @@
 import { blank, type KindDef } from './builderKit';
 import { ACCOUNT_DEFS } from './accountModels';
 import { comingUp, sp, training } from './characterBuilders';
+import { CORP_DEFS } from './corpModels';
 import { KIND_DEFS } from './kindModels';
 import { WORLD_DEFS } from './worldModels';
 import type { BuildContext, FeedId, Feeds, KindView } from './types';
@@ -59,6 +60,7 @@ const KINDS: Readonly<Record<string, KindDef>> = {
   comingUp: { feeds: ['calendar'], build: comingUp },
   ...WORLD_DEFS,
   ...KIND_DEFS,
+  ...CORP_DEFS,
 };
 
 /** Kind -> the feeds it reads. A kind absent here reads no feed and draws without data. */

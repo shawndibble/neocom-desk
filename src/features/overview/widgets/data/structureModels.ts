@@ -150,7 +150,13 @@ export const structures: Builder = (feeds, { t, now }) => {
     columns: [
       { key: 'structure', label: t('overview.widgets.structures.col.structure'), priority: 0 },
       { key: 'fuel', label: t('overview.widgets.structures.col.fuel'), align: 'end', priority: 1 },
-      { key: 'state', label: t('overview.widgets.structures.col.state'), priority: 2 },
+      // The row's severity dot and the fuel and timer cells say the same at phone width.
+      {
+        key: 'state',
+        label: t('overview.widgets.structures.col.state'),
+        priority: 2,
+        hideNarrow: true,
+      },
       {
         key: 'timer',
         label: t('overview.widgets.structures.col.timer'),

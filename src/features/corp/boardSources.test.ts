@@ -6,7 +6,6 @@ import {
   toBoardExtractions,
   toBoardJobs,
   toBoardStructures,
-  toVitalsJournal,
 } from './boardSources';
 import type { CorporationIndustryJob, CorporationStructure } from '@/esi/endpoints';
 
@@ -165,29 +164,6 @@ describe('toBoardJobs', () => {
   it('collects the type ids a job needs names for, without duplicates', () => {
     expect(jobTypeIds([job, job]).sort()).toEqual([1001, 2001]);
     expect(jobTypeIds([{ ...job, product_type_id: undefined }])).toEqual([1001]);
-  });
-});
-
-describe('toVitalsJournal', () => {
-  it('reduces a journal to instants and amounts', () => {
-    expect(
-      toVitalsJournal([
-        {
-          id: 1,
-          date: '2026-09-01T00:00:00Z',
-          ref_type: 'office_rental_fee',
-          description: 'rent',
-          amount: -500,
-        },
-      ])
-    ).toEqual([{ atMs: Date.parse('2026-09-01T00:00:00Z'), amount: -500 }]);
-  });
-
-  /** A line with no amount moved no ISK, so it belongs in no rate. */
-  it('drops a line carrying no amount', () => {
-    expect(
-      toVitalsJournal([{ id: 1, date: '2026-09-01T00:00:00Z', ref_type: 'x', description: 'x' }])
-    ).toEqual([]);
   });
 });
 

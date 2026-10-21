@@ -40,7 +40,7 @@ import {
   type OverviewLayout,
   type UndoableResult,
 } from './layout';
-import { defaultLayout } from './roles';
+import { useWidgetBoard } from './board';
 import { visibleWidgets } from './visibility';
 
 export const FLASH_MS = 1600;
@@ -66,6 +66,7 @@ export function OverviewEditProvider({
 }: OverviewEditProviderProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
+  const board = useWidgetBoard();
   const [editing, setEditing] = useState(false);
   const [toast, setToast] = useState<UndoToast | null>(null);
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -82,6 +83,10 @@ export function OverviewEditProvider({
   useEffect(() => {
     isPhoneRef.current = isPhone;
   }, [isPhone]);
+  const boardRef = useRef(board);
+  useEffect(() => {
+    boardRef.current = board;
+  }, [board]);
 
   const commit = useCallback(
     (next: OverviewLayout) => {
@@ -124,7 +129,8 @@ export function OverviewEditProvider({
 
   const value = useMemo<OverviewEdit>(() => {
     const widgetIndex = (id: string) => layoutRef.current.widgets.findIndex((w) => w.id === id);
-    const drawn = () => visibleWidgets(layoutRef.current.widgets, isPhoneRef.current);
+    const drawn = () =>
+      visibleWidgets(layoutRef.current.widgets, isPhoneRef.current, boardRef.current.canDraw);
 
     const planFocusAfterRemoval = (id: string) => {
       const list = drawn();
@@ -176,7 +182,9 @@ export function OverviewEditProvider({
         }
       },
       reset: () =>
-        void commitUndoable(resetLayoutUndoable(layoutRef.current, defaultLayout(makeWidgetId))),
+        void commitUndoable(
+          resetLayoutUndoable(layoutRef.current, boardRef.current.defaultLayout(makeWidgetId))
+        ),
       replace: (next) => {
         const before = layoutRef.current;
         commit(next);
