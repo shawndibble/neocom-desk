@@ -209,6 +209,8 @@ export async function reconcileFeederPayouts(
 ): Promise<{ attached: number; recorded: number }> {
   return call(characterId, 'reconcileCorpTaxBookFeederPayoutsCallable', {
     corporationId,
+    accessToken: await getValidAccessToken(characterId),
+    // Old servers require it; the new one reads the journal itself.
     outgoing,
   });
 }

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import {
+  enqueueRateChangeMail,
   enqueueReminder,
   enqueueRemovalMails,
   enqueueStatements,
@@ -201,5 +202,29 @@ describe('enqueueRemovalMails', () => {
     const items = await db.corpMailQueue.toArray();
     expect(items.filter((i) => i.kind === 'removal')).toHaveLength(3);
     expect(items.filter((i) => i.kind === 'removalCancelled')).toHaveLength(1);
+  });
+});
+
+describe('enqueueRateChangeMail', () => {
+  const mail = (newPct: number, recordedAt: string) =>
+    enqueueRateChangeMail({
+      corporationId: 98000001,
+      accountingCorporationName: 'Ore & Glory',
+      senderCharacterId: 7,
+      feederCorporationId: 98000002,
+      change: { date: '2026-10-05', newPct, recordedAt },
+      recipients: [{ id: 300, name: 'Owner CEO' }],
+    });
+
+  it('mails each change, even 8% to 6% and back to 8% on one day', async () => {
+    await mail(8, '2026-10-05T10:00:00.000Z');
+    await mail(6, '2026-10-05T11:00:00.000Z');
+    expect(await mail(8, '2026-10-05T12:00:00.000Z')).toEqual({ queued: 1 });
+    expect(await db.corpMailQueue.count()).toBe(3);
+  });
+
+  it('queues one change only once', async () => {
+    await mail(8, '2026-10-05T10:00:00.000Z');
+    expect(await mail(8, '2026-10-05T10:00:00.000Z')).toEqual({ queued: 0 });
   });
 });

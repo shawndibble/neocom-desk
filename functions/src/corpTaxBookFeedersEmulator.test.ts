@@ -335,6 +335,9 @@ suite('feeder invites', () => {
         disconnectedAt: T0 - 5 * DAY,
         lastSyncResult: { at: T0, outcome: 'stale', reason: 'esi-refused' },
         viewDismissedAt: T0 + 3 * DAY,
+        // The last feed's holder must not carry its powers into the new one.
+        grantHolder: 4242,
+        grantedBy: 4243,
       });
       await db.collection('corpTaxBookFeederOf').doc(String(FEEDER)).delete();
       now = T0 + 5 * DAY;
@@ -355,12 +358,15 @@ suite('feeder invites', () => {
         'disconnectedAt',
         'lastSyncResult',
         'viewDismissedAt',
+        'grantHolder',
+        'grantedBy',
       ]) {
         expect(record).not.toHaveProperty(gone);
       }
       // The old stale spell does not disconnect the new period on the next refused read.
       expect(
-        await recordFeederRead(deps(), COLLECTOR, FEEDER, { outcome: 'stale', reason: 'x' })
+        (await recordFeederRead(deps(), COLLECTOR, FEEDER, { outcome: 'stale', reason: 'x' }))
+          ?.status
       ).toBe('active');
     });
 

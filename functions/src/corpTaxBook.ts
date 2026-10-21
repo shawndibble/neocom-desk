@@ -227,11 +227,19 @@ export type StoredRate =
   | { scope: 'miner'; minerId: string; pct: number; effectiveFrom: string }
   | { scope: 'moon'; moonId: number; pct: number; effectiveFrom: string }
   | { scope: 'structure'; structureId: number; pct: number; effectiveFrom: string }
+  | { scope: 'feeder'; feederId: number; pct: number; effectiveFrom: string }
   | { scope: 'record'; recordKey: string; pct: number };
 
 export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'record' }> {
   const d = record(data);
-  const scope = oneOf(d.scope, 'scope', ['corp', 'guest', 'miner', 'moon', 'structure'] as const);
+  const scope = oneOf(d.scope, 'scope', [
+    'corp',
+    'guest',
+    'miner',
+    'moon',
+    'structure',
+    'feeder',
+  ] as const);
   const base = {
     pct: num(d.pct, 'pct', 0, 100),
     effectiveFrom: dateString(d.effectiveFrom, 'effectiveFrom'),
@@ -241,6 +249,8 @@ export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'rec
   // A refinery by structure id (#4621): a moon owner's ledger-only rows never carry a moon.
   if (scope === 'structure')
     return { scope, structureId: int(d.structureId, 'structureId'), ...base };
+  // Every refinery of one moon owner corporation: the miner rate chain's per-feeder tier.
+  if (scope === 'feeder') return { scope, feederId: int(d.feederId, 'feederId'), ...base };
   return { scope, ...base };
 }
 

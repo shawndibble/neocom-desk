@@ -8,7 +8,7 @@ import type { BookData, BookSettings, OfficerVerdict } from '../taxBook/bookClie
 import type { BookContextValue } from './bookContextValue';
 
 const BOOK = 98000000;
-const OWNER = 98000001;
+export const OWNER = 98000001;
 const ORE = 45490;
 export const REFINERY_A = 1035000000001;
 export const REFINERY_B = 1035000000002;
@@ -21,7 +21,11 @@ const REFINERY_NAMES: Record<number, string> = {
 const rates: TaxRate[] = [
   { scope: 'corp', pct: 10, effectiveFrom: '2026-10-01' },
   { scope: 'structure', structureId: REFINERY_A, pct: 6, effectiveFrom: '2026-10-05' },
+  { scope: 'feeder', feederId: OWNER, pct: 8, effectiveFrom: '2026-10-05' },
 ];
+
+/** A moon owner that left: no rate can be set for it any more. */
+export const LEFT_OWNER = 98000003;
 
 export function bookSettingsValue(): Omit<BookContextValue, 'edit' | 'canEdit'> {
   const input: BookViewInput = {
@@ -89,7 +93,13 @@ export function bookSettingsValue(): Omit<BookContextValue, 'edit' | 'canEdit'> 
       ore: () => 'Zeolites',
     },
     settings,
-    data: { feeders: [], state: { extractions: [] } } as unknown as BookData,
+    data: {
+      feeders: [
+        { corporationId: OWNER, status: 'active' },
+        { corporationId: LEFT_OWNER, status: 'left' },
+      ],
+      state: { extractions: [] },
+    } as unknown as BookData,
     verdict,
     reload: () => undefined,
   };

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, Panel, StatChip, StatChips, TextInput } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { Button } from '@/components/ui/Button';
 import type { FeederPayee, FeederView } from '../taxBook/feederViewClient';
 import {
   isSettledAfterLeaving,
@@ -175,6 +175,7 @@ function RateLine({
       <p>
         {note.kind === 'none' && t(k('none'))}
         {note.kind === 'plain' && t(k('plain'), { pct: note.pct })}
+        {note.kind === 'set' && t(k('set'), { pct: note.pct, name, date: day(note.since) })}
         {note.kind === 'asked' && t(k('asked'), { pct: note.askedPct })}
         {note.kind === 'override' &&
           (note.since
@@ -187,9 +188,9 @@ function RateLine({
             : t(k('overrideUndated'), { pct: note.agreedPct, name, asked: note.askedPct }))}
       </p>
       {onAskRate && (
-        <button type="button" className={inlineLinkClassName} onClick={onAskRate}>
+        <Button size="sm" onClick={onAskRate}>
           {t(k(note.kind === 'none' ? 'askFirst' : 'ask'))}
-        </button>
+        </Button>
       )}
     </div>
   );

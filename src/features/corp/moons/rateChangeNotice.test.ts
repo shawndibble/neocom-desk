@@ -78,6 +78,7 @@ describe('agreedRateChange', () => {
       oldPct: 6,
       newPct: 8,
       requestedPct: 6,
+      recordedAt: at.toISOString(),
     });
   });
   it('is undefined when the agreed rate equals the rate already in force', () => {

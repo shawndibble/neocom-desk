@@ -11,6 +11,7 @@ import {
 } from '../taxBook/feederClient';
 import { parseRequestedRate } from '../taxBook/feederViewModel';
 import { Label } from './BookDialogs';
+import { knownReasonText } from './feederErrorText';
 import { editErrorMessage } from './useBook';
 import { shortDate } from './moonsFormat';
 
@@ -55,7 +56,7 @@ export function InviteMoonOwnerDialog({
       (e) => {
         if (cancelled) return;
         setInvites([]);
-        setError(editErrorMessage(e) || t(k('loadFailed')));
+        setError(knownReasonText(t, e) ?? t(k('loadFailed')));
       }
     );
     return () => {
@@ -86,7 +87,7 @@ export function InviteMoonOwnerDialog({
       setCopied(false);
       await refresh();
     } catch (e) {
-      setError(editErrorMessage(e));
+      setError(knownReasonText(t, e) ?? editErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -100,7 +101,7 @@ export function InviteMoonOwnerDialog({
       if (link?.inviteId === inviteId) setLink(null);
       await refresh();
     } catch (e) {
-      setError(editErrorMessage(e));
+      setError(knownReasonText(t, e) ?? editErrorMessage(e));
     } finally {
       setRevoking(null);
     }
@@ -178,7 +179,7 @@ export function InviteMoonOwnerDialog({
                   aria-label={t(k('revokeLabel'), {
                     date: shortDate(new Date(i.createdAt).toISOString()),
                   })}
-                  disabled={revoking === i.inviteId}
+                  loading={revoking === i.inviteId}
                   onClick={() => void revoke(i.inviteId)}
                 >
                   {t(k('revoke'))}

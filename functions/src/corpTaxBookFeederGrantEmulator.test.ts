@@ -33,7 +33,10 @@ const runnable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 const suite = runnable ? describe : describe.skip;
 
 let db: Firestore;
-let ledger: 'ok' | 'forbidden' = 'ok';
+let ledger: 'ok' | 'forbidden' | 'unavailable' = 'ok';
+let now = T0;
+/** Runs during the first pull's observer read: a concurrent write landing mid-save. */
+let duringPull: (() => Promise<void>) | undefined;
 const revoked: string[] = [];
 const identities = new Map<number, CorpIdentity>();
 
@@ -45,7 +48,11 @@ const ok = <T>(data: T): EsiRead<T> => ({
 });
 const esi = (): SyncEsi =>
   ({
-    observers: async () => (ledger === 'forbidden' ? { kind: 'forbidden' } : ok([4001])),
+    observers: async () => {
+      await duringPull?.();
+      if (ledger === 'unavailable') return { kind: 'unavailable' };
+      return ledger === 'forbidden' ? { kind: 'forbidden' } : ok([4001]);
+    },
     ledger: async () =>
       ok([
         {
@@ -61,7 +68,7 @@ const esi = (): SyncEsi =>
 
 const deps = (): FeederGrantDeps => ({
   db,
-  now: () => T0,
+  now: () => now,
   key: () => KEY,
   verify: async (token) => {
     const m = /^(mine|roles)-(\d+)$/.exec(token);
@@ -147,6 +154,8 @@ suite('moon owner onboarding', () => {
   beforeEach(async () => {
     await clearEmulator();
     ledger = 'ok';
+    now = T0;
+    duringPull = undefined;
     revoked.length = 0;
     identities.clear();
     identities.set(COLLECTOR_CEO, { corporationId: COLLECTOR, ceoId: COLLECTOR_CEO, roles: [] });
@@ -326,5 +335,90 @@ suite('moon owner onboarding', () => {
       isHolder: false,
       refineries: [{ structureId: 4001, volume: 100 }],
     });
+  });
+
+  it('a first pull that could not reach ESI activates nothing: retry later (S2)', async () => {
+    const code = await newInvite();
+    ledger = 'unavailable';
+    expect(await reason(save(code, 6))).toBe('ledger-unavailable');
+    expect(await grant()).toBeUndefined();
+    expect(await feederRecord()).toBeUndefined();
+    expect(await pointer()).toBeUndefined();
+    expect(revoked).toContain(`rt-${ALT}`);
+    ledger = 'ok';
+    expect(await save(code)).toMatchObject({ feederCorporationId: FEEDER });
+  });
+
+  it('holder: the player who handed the grant over, outside the corporation, has no standing (S1)', async () => {
+    await save(await newInvite());
+    identities.set(PLAYER, { corporationId: 98000999, ceoId: null, roles: [] });
+    const call = { corporationId: FEEDER, accessToken: `roles-${PLAYER}` };
+    expect(await reason(getFeederStatus(deps(), who(PLAYER), call))).toBe('not-your-feeder');
+    expect(await reason(leaveFeeder(deps(), who(PLAYER), call))).toBe('not-your-feeder');
+    expect((await feederRecord())?.status).toBe('active');
+  });
+
+  it('holder: a member holding the grant may leave without a director role (S1)', async () => {
+    await save(await newInvite());
+    identities.set(ALT, { corporationId: FEEDER, ceoId: null, roles: [] });
+    const call = { corporationId: FEEDER, accessToken: `roles-${ALT}` };
+    expect(await getFeederStatus(deps(), who(ALT), call)).toMatchObject({ isHolder: true });
+    await leaveFeeder(deps(), who(ALT), call);
+    const record = await feederRecord();
+    expect(record?.status).toBe('left');
+    // The holder's standing ends with the feed.
+    expect(record).not.toHaveProperty('grantHolder');
+    expect(record).not.toHaveProperty('grantedBy');
+  });
+
+  it('leave: one last ledger read before the grant goes, so the last day can close (B3)', async () => {
+    await save(await newInvite());
+    now = T0 + 24 * 3_600_000;
+    await leaveFeeder(deps(), who(FEEDER_DIRECTOR), {
+      corporationId: FEEDER,
+      accessToken: `roles-${FEEDER_DIRECTOR}`,
+    });
+    expect(await feederRecord()).toMatchObject({ status: 'left', lastReadWellAt: now });
+    expect(await grant()).toBeUndefined();
+  });
+
+  it('leave: a final read that fails never blocks the leave', async () => {
+    await save(await newInvite());
+    now = T0 + 24 * 3_600_000;
+    ledger = 'unavailable';
+    await leaveFeeder(deps(), who(FEEDER_DIRECTOR), {
+      corporationId: FEEDER,
+      accessToken: `roles-${FEEDER_DIRECTOR}`,
+    });
+    expect(await feederRecord()).toMatchObject({ status: 'left', lastReadWellAt: T0 });
+  });
+
+  it('reconnect: a refusal puts back only what reconnect changed, keeping a concurrent edit (B6)', async () => {
+    await save(await newInvite());
+    const ref = collectorBook().collection('feeders').doc(String(FEEDER));
+    await ref.update({
+      status: 'disconnected',
+      disconnectedAt: T0 - 1000,
+      coveragePeriods: [{ from: '2026-10-01', to: '2026-10-10' }],
+    });
+    await db.collection(CORP_SYNC_GRANTS_COLLECTION).doc(String(FEEDER)).delete();
+    const before = await feederRecord();
+    ledger = 'forbidden';
+    duringPull = async () => {
+      await ref.update({ payee: { kind: 'character', id: 4242 } });
+    };
+    expect(await reason(save(RECONNECT_CODE, undefined, OTHER_ALT))).toBe('not-an-accountant');
+    const after = await feederRecord();
+    expect(after).toMatchObject({
+      status: 'disconnected',
+      disconnectedAt: T0 - 1000,
+      coveragePeriods: [{ from: '2026-10-01', to: '2026-10-10' }],
+      grantHolder: before?.grantHolder,
+      grantedBy: before?.grantedBy,
+      payee: { kind: 'character', id: 4242 },
+    });
+    // The refused pull's stale mark is the refused alt's, not the feed's.
+    expect(after).not.toHaveProperty('staleSince');
+    expect(after?.lastSyncResult).toEqual(before?.lastSyncResult);
   });
 });

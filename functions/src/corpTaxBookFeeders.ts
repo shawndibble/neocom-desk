@@ -361,6 +361,9 @@ const FEED_STATE: readonly (keyof FeederRecord)[] = [
   'viewDismissedAt',
   // The offered rate belongs to the link, not to the record's history.
   'offeredOwnerRatePct',
+  // A holder's standing belongs to the feed it granted; a rejoin names its own.
+  'grantHolder',
+  'grantedBy',
 ];
 
 /** The agreed rate an accepted link's offer stands for, dated the join day. */

@@ -743,6 +743,12 @@ export const payoutId = (d: Pick<OutgoingDonation, 'division' | 'refId'>) =>
 const dayIndex = (date: string) =>
   Math.floor(Date.parse(`${date.slice(0, 10)}T00:00:00Z`) / DAY_MS);
 
+/** Engine `OUTGOING_REF_TYPES`: a corporation wallet's "Give ISK" is a withdrawal. */
+const OUTGOING_REF_TYPES: ReadonlySet<string> = new Set([
+  'player_donation',
+  'corporation_account_withdrawal',
+]);
+
 /** ISK the corporation's wallet donated to someone else (the amount is negative on the journal). */
 export function outgoingDonationsFromJournal(
   entries: readonly JournalEntryOut[],
@@ -751,9 +757,11 @@ export function outgoingDonationsFromJournal(
 ): OutgoingDonation[] {
   const out: OutgoingDonation[] = [];
   for (const e of entries) {
-    if (e.ref_type !== 'player_donation') continue;
+    if (!OUTGOING_REF_TYPES.has(e.ref_type)) continue;
     if (!(typeof e.amount === 'number' && e.amount < 0)) continue;
     if (e.first_party_id !== corporationId || e.second_party_id === undefined) continue;
+    // A move between the corporation's own divisions pays nobody.
+    if (e.second_party_id === corporationId) continue;
     if (!Number.isSafeInteger(e.id) || Number.isNaN(Date.parse(e.date))) continue;
     out.push({
       refId: e.id,

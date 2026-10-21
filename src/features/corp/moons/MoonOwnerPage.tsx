@@ -245,6 +245,7 @@ export function MoonOwnerPage({
       sortValue: (m) => m.value,
     },
   ];
+  const canRemove = onRemove !== undefined && row.status === 'active';
 
   return (
     <div className="space-y-4">
@@ -376,14 +377,14 @@ export function MoonOwnerPage({
           />
         )}
       </Panel>
-      {(onSettledOtherwise || (onRemove && row.status !== 'removal-pending')) && (
+      {(onSettledOtherwise || canRemove) && (
         <div className="flex flex-wrap gap-2 border-t border-line pt-4">
           {onSettledOtherwise && (
             <Button variant="ghost" onClick={onSettledOtherwise}>
               {t(k('settledOtherwise'))}
             </Button>
           )}
-          {onRemove && row.status === 'active' && (
+          {canRemove && (
             <Button variant="ghost" onClick={onRemove}>
               {t(k('remove'))}
             </Button>

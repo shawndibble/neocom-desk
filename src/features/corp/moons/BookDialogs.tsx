@@ -20,6 +20,7 @@ import {
 } from '@/components/ui';
 import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { knownReasonText } from './feederErrorText';
 import { editErrorMessage, useBook } from './useBook';
 import { isk, newId } from './moonsFormat';
 
@@ -66,7 +67,7 @@ export function DialogShell({
       await run();
       onClose();
     } catch (e) {
-      setError(editErrorMessage(e));
+      setError(knownReasonText(t, e) ?? editErrorMessage(e));
     } finally {
       setBusy(false);
     }

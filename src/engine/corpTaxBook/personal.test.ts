@@ -1170,6 +1170,87 @@ describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
     expect(row.taxOwed).toBe(800_000);
   });
 
+  const pay = (id: string, amount: number) => ({
+    id,
+    minerId: MINER,
+    characterId: ME,
+    amount,
+    at: '2026-10-19T10:00:00Z',
+    source: 'donation' as const,
+  });
+  const raise = {
+    id: 'a3',
+    minerId: MINER,
+    date: '2026-10-17',
+    amount: 200_000,
+    reason: 'Missed ore',
+    by: 1,
+    at: '2026-10-19T00:00:00Z',
+  };
+  const later = (lines: Statement['lines']): Statement => ({
+    ...issued(lines),
+    id: 's2',
+    code: 'DEF',
+    coversFrom: '2026-10-18',
+    coversThrough: '2026-10-31',
+    issuedAt: '2026-11-01T00:00:00Z',
+  });
+  const raiseLine = {
+    kind: 'correction' as const,
+    date: '2026-10-17',
+    adjustmentId: 'a3',
+    oreLines: [],
+    estimatedValue: 0,
+    tax: 200_000,
+    reason: 'Missed ore',
+  };
+
+  it('never shows a raise on a paid day, which the book never bills', () => {
+    const row = overlay(
+      [entry()],
+      [
+        book({
+          statements: [issued([mined])],
+          payments: [pay('p1', 900_000)],
+          adjustments: [raise],
+        }),
+      ]
+    ).rows[0];
+    expect(row.correction).toBeUndefined();
+    expect(row).toMatchObject({ state: 'paid', taxOwed: 0 });
+  });
+
+  it('keeps a raise billed on a later Statement owed after the first is paid', () => {
+    const statements = [issued([mined]), later([raiseLine])];
+    const row = overlay(
+      [entry()],
+      [book({ statements, payments: [pay('p1', 900_000)], adjustments: [raise] })]
+    ).rows[0];
+    expect(row.correction).toEqual({ before: 900_000, after: 1_100_000, reasons: ['Missed ore'] });
+    expect(row).toMatchObject({ state: 'billed', taxOwed: 200_000 });
+  });
+
+  it('marks the day paid once the later Statement is paid too', () => {
+    const statements = [issued([mined]), later([raiseLine])];
+    const row = overlay([entry()], [book({ statements, payments: [pay('p1', 1_100_000)] })])
+      .rows[0];
+    expect(row).toMatchObject({ state: 'paid', taxOwed: 0 });
+  });
+
+  it('keeps a raise not billed yet owed beside a part-paid Statement', () => {
+    const row = overlay(
+      [entry()],
+      [
+        book({
+          statements: [issued([mined])],
+          payments: [pay('p1', 500_000)],
+          adjustments: [raise],
+        }),
+      ]
+    ).rows[0];
+    expect(row).toMatchObject({ state: 'billed', taxOwed: 600_000 });
+  });
+
   it("ignores another miner's corrections", () => {
     const row = overlay(
       [entry()],

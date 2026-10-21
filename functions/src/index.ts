@@ -695,6 +695,7 @@ function corpSyncDeps(): CorpSyncDeps {
   return {
     db: firestore(),
     now: Date.now,
+    esi: esiSyncReader(),
     key: () => parseAlertsKey(ALERTS_TOKEN_KEY.value()),
     verify: (accessToken) => verifyEveAccessToken(accessToken, verifyOptions),
     refresh: (clientId, refreshToken) => refreshAtSso(clientId, refreshToken),
@@ -851,7 +852,7 @@ export const reconcileCorpTaxBookFeederPayoutsCallable = onCall<unknown>(
   FEEDER_OWNER_OPTIONS,
   (request) =>
     reconcileFeederPayoutsCall(
-      feederOwnerDeps(),
+      { ...feederOwnerDeps(), esi: esiSyncReader() },
       callerOf(request),
       parseReconcilePayoutsInput(request.data)
     )

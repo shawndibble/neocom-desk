@@ -47,9 +47,11 @@ export function PayMoonOwnerDialog({
   const typed = different ? unmaskNumber(sentText) : undefined;
   const amount = different ? Math.round(typed ?? 0) : whole;
   const reason = payoutReason(t(k('reasonPrefix')), period);
-  const after = balanceAfter(balance, amount);
-  const afterText =
-    after.kind === 'credit' ? t(k('afterCredit'), { amount: isk(after.isk) }) : isk(after.isk);
+  // Before reads the balance as it stands, a credit included; only the amount to send floors at 0.
+  const shown = (b: ReturnType<typeof balanceAfter>) =>
+    b.kind === 'credit' ? t(k('afterCredit'), { amount: isk(b.isk) }) : isk(b.isk);
+  const beforeText = shown(balanceAfter(balance, 0));
+  const afterText = shown(balanceAfter(balance, amount));
 
   return (
     <DialogShell
@@ -115,7 +117,7 @@ export function PayMoonOwnerDialog({
         method={method}
         onMethod={setMethod}
       />
-      <Effect>{t(k('change'), { before: isk(whole), after: afterText })}</Effect>
+      <Effect>{t(k('change'), { before: beforeText, after: afterText })}</Effect>
     </DialogShell>
   );
 }

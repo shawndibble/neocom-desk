@@ -20,6 +20,13 @@ import {
   setFeederPayee,
 } from './corpTaxBookFeederViewCalls.js';
 import type { FeederViewSummary } from './corpTaxBookFeederView.js';
+import {
+  applyFeederPayoutPlan,
+  planFeederPayouts,
+  reconcileFeederPayoutsCall,
+  recordFeederPayout,
+} from './corpTaxBookFeederPayouts.js';
+import { outgoingDonationsFromJournal } from './corpTaxBookEngine.js';
 import { createFeederInvite, type FeederRecord } from './corpTaxBookFeeders.js';
 import { turnOnBook, type BookDeps, type Caller } from './corpTaxBookStore.js';
 import type { EsiRead, SyncEsi } from './corpTaxBookSyncEsi.js';
@@ -40,6 +47,8 @@ const suite = runnable ? describe : describe.skip;
 
 let db: Firestore;
 let ledger: 'ok' | 'forbidden' = 'ok';
+/** The accounting corporation's wallet journal, as ESI returns it. */
+let journalRows: unknown[] = [];
 const revoked: string[] = [];
 const identities = new Map<number, CorpIdentity>();
 
@@ -62,6 +71,7 @@ const esi = (): SyncEsi =>
           last_updated: '2026-10-18',
         },
       ]),
+    journal: async () => ok(journalRows),
     budgetLow: () => false,
   }) as unknown as SyncEsi;
 
@@ -475,10 +485,12 @@ suite('moon owner view', () => {
 
   it('member copy: the first pull writes coverage and the read clock, nothing else', async () => {
     await save(await newInvite(), 6);
-    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), {
-      ...asDirector,
-      payee: { kind: 'character', id: FEEDER_DIRECTOR },
-    });
+    await setFeederPayee(
+      deps(),
+      who(FEEDER_DIRECTOR),
+      { ...asDirector, payee: { kind: 'character', id: FEEDER_DIRECTOR } },
+      idCategory
+    );
     expect(await memberCopy()).toEqual({
       coveragePeriods: [{ from: '2026-10-18' }],
       lastReadWellAt: T0,
@@ -490,5 +502,87 @@ suite('moon owner view', () => {
     await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
     // joined and left the same day: the one period covered nothing and is gone
     expect(await memberCopy()).toEqual({ coveragePeriods: [], lastReadWellAt: T0 });
+  });
+});
+
+// Paying a moon owner (#4514): what the wallet journal says, read by the server, matched once.
+suite('moon owner payouts (emulator)', () => {
+  const officer = { corporationId: COLLECTOR, accessToken: `roles-${COLLECTOR_CEO}` };
+  const payoutDeps = () => ({ ...bookDeps(), esi: esi() });
+  const payouts = async () =>
+    (
+      await collectorBook().collection('feeders').doc(String(FEEDER)).collection('payouts').get()
+    ).docs.map((d) => ({ id: d.id, ...d.data() }));
+  /** A corporation wallet "Give ISK" to the moon owner corporation (its payee when none is set). */
+  const giveIsk = (id: number, amount: number) => ({
+    id,
+    date: '2026-10-18T15:00:00Z',
+    ref_type: 'corporation_account_withdrawal',
+    amount: -amount,
+    first_party_id: COLLECTOR,
+    second_party_id: FEEDER,
+  });
+
+  beforeEach(async () => {
+    await clearEmulator();
+    ledger = 'ok';
+    journalRows = [];
+    identities.clear();
+    identities.set(COLLECTOR_CEO, { corporationId: COLLECTOR, ceoId: COLLECTOR_CEO, roles: [] });
+    await turnOnBook(
+      bookDeps(),
+      who(COLLECTOR_CEO),
+      parseTurnOnInput({ ...officer, startDate: '2026-10-01', startRatePct: 10 })
+    );
+    await save(await newInvite(), 6);
+  });
+
+  it('the officer call reads the journal itself, never a client list, and audits it (S3)', async () => {
+    journalRows = [giveIsk(501, 4_000_000)];
+    const input = {
+      ...officer,
+      outgoing: [{ refId: 999, division: 1, recipientId: FEEDER, amount: 9e9, at: 'x' }],
+    };
+    expect(await reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), input)).toEqual({
+      attached: 0,
+      recorded: 1,
+    });
+    expect(await payouts()).toMatchObject([
+      { id: 'j1_501', amount: 4_000_000, status: 'matched', journalRef: 501 },
+    ]);
+    const audit = (await collectorBook().collection('audit').get()).docs.map((d) => d.data());
+    expect(audit).toContainEqual(
+      expect.objectContaining({ action: 'feederPayoutsReconciled', by: COLLECTOR_CEO })
+    );
+  });
+
+  it('the officer call needs a live role check', async () => {
+    expect(
+      await reason(
+        reconcileFeederPayoutsCall(payoutDeps(), who(COLLECTOR_CEO), {
+          corporationId: COLLECTOR,
+        })
+      )
+    ).toBe('live-check-required');
+    expect(await payouts()).toEqual([]);
+  });
+
+  it('an officer record landing between plan and write takes the journal entry: counted once (B2)', async () => {
+    const outgoing = outgoingDonationsFromJournal([giveIsk(502, 5_000_000)], 1, COLLECTOR);
+    const [plan] = await planFeederPayouts(bookDeps(), COLLECTOR, outgoing);
+    expect(plan?.createRefs).toEqual([502]);
+    await recordFeederPayout(bookDeps(), who(COLLECTOR_CEO), {
+      ...officer,
+      feederCorporationId: FEEDER,
+      amount: 5_000_000,
+      date: '2026-10-18',
+      method: 'donation',
+    });
+    expect(
+      await applyFeederPayoutPlan(bookDeps(), COLLECTOR, plan!, { characterId: null, name: 'x' })
+    ).toEqual({ attached: 1, recorded: 0 });
+    const rows = await payouts();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ amount: 5_000_000, status: 'matched', journalRef: 502 });
   });
 });

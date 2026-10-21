@@ -6266,6 +6266,7 @@
         "miner": "per-Miner rate",
         "moon": "per-moon rate",
         "structure": "per-refinery rate",
+        "feeder": "per-moon-owner rate",
         "record": "correction for this day"
       },
       "detail": {
@@ -14354,6 +14355,7 @@
         }
       },
       "health": {
+        "hiddenFromMembers": "Hidden from members until {{date}}",
         "gap": "Gap: {{from}} – {{to}}, {{refinery}} — unrecoverable",
         "gapDetail": "No officer synced in time and ESI no longer returns these days for this refinery. Whatever was mined is missing from the book and cannot be billed.",
         "unrated_one": "{{count}} day has no rate yet",
@@ -14473,7 +14475,21 @@
           "own-book-exists": "This corporation already keeps its own book. Delete it before letting another corporation handle the tax.",
           "already-feeder": "This corporation is already handled by an accounting corporation.",
           "feeder-active": "This corporation is already connected.",
-          "token-mismatch": "That login did not match your logged-in account. Try again."
+          "token-mismatch": "That login did not match your logged-in account. Try again.",
+          "no-book": "This corporation has no active Corp Tax Book.",
+          "wrong-scopes": "EVE did not grant exactly the permissions needed. Try again and keep every box ticked.",
+          "missing-scope": "That login is missing a permission. Try again and keep every box ticked.",
+          "not-signed-in": "Sign in first, then try again.",
+          "not-your-feeder": "This corporation is not handled by your book.",
+          "no-feeder": "This corporation is not handled by your book.",
+          "collector-gone": "The accounting corporation's book is gone.",
+          "feeder-ended": "This connection has already ended.",
+          "not-ended": "This connection has not ended yet.",
+          "not-pending": "No removal is pending for this corporation.",
+          "not-removable": "This corporation cannot be removed right now.",
+          "no-payout": "That payout was not found.",
+          "too-many-invites": "Too many open invite links. Cancel one first.",
+          "ledger-unavailable": "Could not read your mining ledger just now. Try again in a few minutes; the invite still works."
         }
       },
       "consent": {
@@ -14563,6 +14579,7 @@
           "asked": "You asked for {{pct}}%. Nothing changes until they agree.",
           "override": "Rate set to {{pct}}% by {{name}} on {{date}}. You asked for {{asked}}%.",
           "overrideUndated": "Rate set to {{pct}}% by {{name}}. You asked for {{asked}}%.",
+          "set": "Rate set to {{pct}}% by {{name}} on {{date}}.",
           "ask": "Ask for a different rate…",
           "askFirst": "Ask for a rate…",
           "dialogTitle": "Ask for a different rate",
@@ -14663,13 +14680,14 @@
         "open": "Corp Tax Book settings",
         "title": "Corp Tax Book settings",
         "rates": "Tax rates",
-        "ratesHint": "The most specific rate wins: Miner, then moon, then Guest default, then the corp default. A rate starts on its date and never reaches back.",
+        "ratesHint": "The most specific rate wins: Miner, then moon, then refinery, then moon owner, then Guest default, then the corp default. A rate starts on its date and never reaches back.",
         "rateScope": {
           "corp": "Corp default",
           "guest": "Guest default",
           "miner": "Miner",
           "moon": "Moon",
-          "structure": "Refinery"
+          "structure": "Refinery",
+          "feeder": "Moon owner"
         },
         "from": "from {{date}}",
         "rateFor": "Applies to",

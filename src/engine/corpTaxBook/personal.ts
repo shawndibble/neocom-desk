@@ -29,7 +29,13 @@ import { activeDismissalFor, type Dismissal } from './dismissals';
 import { withholdUnreadFeederDays, type FeederReadClock } from './feederHealth';
 import { observedEntryKey } from './observed';
 import type { TaxRate, RateScope } from './rates';
-import { frozenDayRate, type Adjustment, type Statement, type StatementLine } from './statements';
+import {
+  frozenDayRate,
+  statementDays,
+  type Adjustment,
+  type Statement,
+  type StatementLine,
+} from './statements';
 import type { DayPrices } from './valuation';
 import type { ObservedMiningEntry } from './types';
 
@@ -689,32 +695,59 @@ export function overlayCorpBooks(input: {
   }
 
   // 3. A correction is never silent (spec #4504): an Adjustment shows on its day's first line.
-  for (const p of prepared) applyAdjustments(p, rowsByBook.get(p.book.corporationId) ?? []);
+  const extras = new Map<BookRowView, OwedPart[]>();
+  for (const p of prepared) applyAdjustments(p, rowsByBook.get(p.book.corporationId) ?? [], extras);
 
   // 4. Payments: a Statement's days are Paid oldest first; part payments land on the oldest days.
+  // A raise billed on another Statement than its day's (or not billed yet) is owed on its own.
   for (const p of prepared) {
     const mine = rowsByBook.get(p.book.corporationId) ?? [];
-    const byStatement = new Map<string, BookRowView[]>();
+    const partsOf = new Map<BookRowView, OwedPart[]>();
+    const byStatement = new Map<string, { row: BookRowView; part: OwedPart }[]>();
     for (const row of mine) {
-      if (!row.statementId || row.state !== 'billed') continue;
-      byStatement.set(row.statementId, [...(byStatement.get(row.statementId) ?? []), row]);
+      if (row.state !== 'billed') continue;
+      const extra = extras.get(row) ?? [];
+      if (!row.statementId && extra.every((e) => e.statementId === undefined)) continue;
+      const own = (row.taxOwed ?? 0) - extra.reduce((sum, e) => sum + e.owed, 0);
+      const parts = [
+        { ...(row.statementId ? { statementId: row.statementId } : {}), owed: own },
+        ...extra.map((e) => ({ ...e })),
+      ];
+      partsOf.set(row, parts);
+      for (const part of parts) {
+        if (part.statementId === undefined) continue;
+        byStatement.set(part.statementId, [
+          ...(byStatement.get(part.statementId) ?? []),
+          { row, part },
+        ]);
+      }
     }
+    const settledParts = new Set<OwedPart>();
     for (const [statementId, list] of byStatement) {
       const state = p.settlement.get(statementId);
       if (!state) continue;
       let pool = state.pool;
-      for (const row of list.sort(
-        (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)
+      for (const { part } of list.sort(
+        (a, b) => a.row.date.localeCompare(b.row.date) || a.row.id.localeCompare(b.row.id)
       )) {
-        const owed = row.taxOwed ?? 0;
+        const owed = part.owed;
+        settledParts.add(part);
         if (state.settled || pool >= owed) {
-          row.state = 'paid';
-          row.taxOwed = 0;
+          part.owed = 0;
           pool = Math.max(0, pool - owed);
         } else if (pool > 0) {
-          row.taxOwed = owed - pool;
+          part.owed = owed - pool;
           pool = 0;
         }
+      }
+    }
+    for (const [row, parts] of partsOf) {
+      // Paid once every part was billed on a Statement and nothing of it is left.
+      if (parts.every((part) => settledParts.has(part) && part.owed === 0)) {
+        row.state = 'paid';
+        row.taxOwed = 0;
+      } else {
+        row.taxOwed = parts.reduce((sum, part) => sum + part.owed, 0);
       }
     }
     // Donations sent and not yet credited cover the oldest Billed days.
@@ -797,30 +830,58 @@ export function overlayCorpBooks(input: {
 const byDateThenId = (a: BookRowView, b: BookRowView) =>
   a.date.localeCompare(b.date) || a.id.localeCompare(b.id);
 
+/** Part of a day's tax and the Statement that bills it; none when not billed yet. */
+interface OwedPart {
+  statementId?: string;
+  owed: number;
+}
+
 /**
  * Each Adjustment of a Miner's day, from the Statement that billed it (frozen) or, not billed
- * yet, from the book's own record. Counted once, on the first billed line of that day.
+ * yet, from the book's own record. Counted once, on the first billed line of that day. A raise
+ * dated on a paid Statement's day is never billed (D22), so it never shows. A raise billed on
+ * another Statement than the day's own, or not billed yet, goes in `extras`: it is paid with
+ * that Statement, not marked paid with the day's.
  */
-function applyAdjustments(p: Prepared, rows: readonly BookRowView[]): void {
-  const byDay = new Map<string, { amount: number; reasons: string[] }>();
+function applyAdjustments(
+  p: Prepared,
+  rows: readonly BookRowView[],
+  extras: Map<BookRowView, OwedPart[]>
+): void {
+  const paidDays = new Set<string>();
+  for (const s of p.book.statements) {
+    if (p.settlement.get(s.id)?.settled)
+      for (const day of statementDays(s)) paidDays.add(`${s.minerId}|${day}`);
+  }
+  const byDay = new Map<string, { amount: number; reasons: string[]; parts: OwedPart[] }>();
   const seen = new Set<string>();
-  const add = (id: string, minerId: string, date: string, amount: number, reason?: string) => {
+  const add = (
+    id: string,
+    minerId: string,
+    date: string,
+    amount: number,
+    reason: string | undefined,
+    statementId: string | undefined
+  ) => {
     if (seen.has(id)) return;
     seen.add(id);
     const key = `${minerId}|${date}`;
-    const held = byDay.get(key) ?? { amount: 0, reasons: [] };
+    if (statementId === undefined && amount > 0 && paidDays.has(key)) return;
+    const held = byDay.get(key) ?? { amount: 0, reasons: [], parts: [] };
     held.amount += amount;
     if (reason) held.reasons.push(reason);
+    held.parts.push({ ...(statementId !== undefined ? { statementId } : {}), owed: amount });
     byDay.set(key, held);
   };
   for (const s of p.book.statements) {
     for (const line of s.lines) {
       if (line.kind === 'correction' && line.adjustmentId) {
-        add(line.adjustmentId, s.minerId, line.date, line.tax, line.reason);
+        add(line.adjustmentId, s.minerId, line.date, line.tax, line.reason, s.id);
       }
     }
   }
-  for (const a of p.book.adjustments ?? []) add(a.id, a.minerId, a.date, a.amount, a.reason);
+  for (const a of p.book.adjustments ?? [])
+    add(a.id, a.minerId, a.date, a.amount, a.reason, undefined);
   if (byDay.size === 0) return;
   const billed = rows.filter((r) => r.state === 'billed').sort(byDateThenId);
   for (const [key, adjustment] of byDay) {
@@ -831,6 +892,11 @@ function applyAdjustments(p: Prepared, rows: readonly BookRowView[]): void {
     row.correction = { before, after, reasons: adjustment.reasons };
     row.taxOwed = after;
     row.billed = after;
+    // A credit lowers the day as a whole; only a raise is owed apart from the day's Statement.
+    const apart = adjustment.parts.filter(
+      (part) => part.owed > 0 && part.statementId !== row.statementId
+    );
+    if (apart.length > 0) extras.set(row, apart);
   }
 }
 

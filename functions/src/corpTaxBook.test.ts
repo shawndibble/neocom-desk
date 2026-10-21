@@ -369,3 +369,23 @@ describe('per-refinery rate (#4621)', () => {
     ).toThrow();
   });
 });
+
+describe('per-moon-owner miner rate', () => {
+  it('parses a feeder-scoped rate with its moon owner corporation id', () => {
+    expect(
+      parseEditAction({
+        action: 'addRate',
+        rate: { scope: 'feeder', feederId: 98000002, pct: 9, effectiveFrom: '2026-10-21' },
+      })
+    ).toEqual({
+      action: 'addRate',
+      rate: { scope: 'feeder', feederId: 98000002, pct: 9, effectiveFrom: '2026-10-21' },
+    });
+    expect(() =>
+      parseEditAction({
+        action: 'addRate',
+        rate: { scope: 'feeder', pct: 9, effectiveFrom: '2026-10-21' },
+      })
+    ).toThrow();
+  });
+});

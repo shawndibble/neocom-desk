@@ -55,7 +55,7 @@ describe('MoonOwnerView', () => {
       recordedAt: '2026-10-01T10:00:00Z',
     };
     view({ requestedRatePct: null, rateHistory: [agreed] });
-    expect(screen.getByText('Your rate is 8%.')).toBeVisible();
+    expect(screen.getByText('Rate set to 8% by Brass Meridian Logistics on 1 Oct.')).toBeVisible();
     expect(screen.queryByText(/You asked/)).toBeNull();
   });
 

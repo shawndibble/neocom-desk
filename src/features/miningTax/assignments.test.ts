@@ -12,6 +12,7 @@ import {
   markAssignmentsPaid,
   moveAssignmentsToPayee,
   planNeedsReviewResolution,
+  loadReleasePrices,
   releaseOreFromAssignment,
   splitAssignment,
   uncombineAssignments,
@@ -1631,19 +1632,51 @@ describe('releaseOreFromAssignment', () => {
     updatedAt: 1,
   };
 
-  it('keeps what is left at the same price per unit', async () => {
+  it('re-prices what is left at its Payee hub on the mined day', async () => {
     await db.miningTaxAssignments.put(base);
-    const out = await releaseOreFromAssignment(base, [{ typeId: TYPE_A, quantity: 40 }]);
+    const left = [{ typeId: TYPE_A, quantity: 40 }];
+    const priced = await loadReleasePrices(base, left);
+    // The write runs in the ledger's transaction, as `releaseOre` runs it.
+    const out = await db.transaction('rw', db.miningTaxAssignments, db.payees, db.settings, () =>
+      releaseOreFromAssignment(base, left, priced)
+    );
+    // TYPE_A is 10 a unit: 40 × 10, at 10%.
     expect(out).toMatchObject({ estimatedValue: 400, taxOwed: 40 });
     expect(out?.oreLineValues).toBeUndefined();
+    expect(pricingMock.loadUnitPricesOnDate).toHaveBeenCalledWith(
+      [TYPE_A],
+      expect.anything(),
+      '2026-09-05',
+      true
+    );
     expect((await db.miningTaxAssignments.get('a1'))?.oreLines).toEqual([
       { typeId: TYPE_A, quantity: 40 },
     ]);
   });
 
+  it('prices each ore type it keeps at its own price, not the day average', async () => {
+    const mixed: MiningTaxAssignmentRecord = {
+      ...base,
+      oreLines: [
+        { typeId: TYPE_A, quantity: 100 },
+        { typeId: TYPE_B, quantity: 100 },
+      ],
+      // A pilot-edited figure: 100 × 10 + 100 × 4 = 1400 at market.
+      estimatedValue: 2000,
+      taxOwed: 250,
+    };
+    delete mixed.oreLineValues;
+    await db.miningTaxAssignments.put(mixed);
+    const left = [{ typeId: TYPE_B, quantity: 100 }];
+    const out = await releaseOreFromAssignment(mixed, left, await loadReleasePrices(mixed, left));
+    expect(out).toMatchObject({ estimatedValue: 400, taxOwed: 40 });
+  });
+
   it('deletes the Assignment, with a tombstone, when nothing is left', async () => {
     await db.miningTaxAssignments.put(base);
-    expect(await releaseOreFromAssignment(base, [])).toBeUndefined();
+    expect(
+      await releaseOreFromAssignment(base, [], { prices: new Map(), compressed: true })
+    ).toBeUndefined();
     expect(await db.miningTaxAssignments.get('a1')).toBeUndefined();
     expect(await readTombstones(tombstoneKey(MINING_TAX_ASSIGNMENTS, CHAR_A))).toEqual([
       expect.objectContaining({ id: 'a1' }),

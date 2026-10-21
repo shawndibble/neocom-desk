@@ -162,6 +162,44 @@ describe('buildMoonOwners', () => {
     expect(rowOf(input()).minerRatePct).toBe(12);
   });
 
+  it('prices their miners as Guests, the way billing does', () => {
+    const rates = [
+      { scope: 'corp' as const, pct: 12, effectiveFrom: '2026-01-01' },
+      { scope: 'guest' as const, pct: 15, effectiveFrom: '2026-01-01' },
+    ];
+    expect(rowOf(input({ rates })).minerRatePct).toBe(15);
+  });
+
+  it('reads a per-refinery rate at their refinery', () => {
+    const rates = [
+      { scope: 'corp' as const, pct: 12, effectiveFrom: '2026-01-01' },
+      { scope: 'feeder' as const, feederId: A, pct: 11, effectiveFrom: '2026-01-01' },
+      { scope: 'structure' as const, structureId: 10, pct: 9, effectiveFrom: '2026-01-01' },
+    ];
+    expect(rowOf(input({ rates })).minerRatePct).toBe(9);
+  });
+
+  it('shows the most common rate when it varies by refinery', () => {
+    const rates = [
+      { scope: 'corp' as const, pct: 12, effectiveFrom: '2026-01-01' },
+      { scope: 'structure' as const, structureId: 11, pct: 9, effectiveFrom: '2026-01-01' },
+    ];
+    const entries = [
+      entry(A, '2026-10-05', 1000),
+      entry(A, '2026-10-06', 1000, { structureId: 11 }),
+      entry(A, '2026-10-07', 1000, { structureId: 11 }),
+    ];
+    expect(rowOf(input({ rates, entries })).minerRatePct).toBe(9);
+  });
+
+  it('prices a moon owner with no ore yet as Guests', () => {
+    const rates = [
+      { scope: 'corp' as const, pct: 12, effectiveFrom: '2026-01-01' },
+      { scope: 'guest' as const, pct: 15, effectiveFrom: '2026-01-01' },
+    ];
+    expect(rowOf(input({ rates, entries: [] })).minerRatePct).toBe(15);
+  });
+
   it('ranks the status: removal pending, cannot read, settled, no rate, active', () => {
     const stale = Date.parse('2026-10-11T09:12:00Z');
     expect(statusOf({ status: 'pending-removal', staleSince: stale })).toBe('removal-pending');

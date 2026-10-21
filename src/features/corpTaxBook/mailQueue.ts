@@ -239,6 +239,9 @@ export async function enqueueRateChangeMail(input: {
 }): Promise<{ queued: number }> {
   const batchId = crypto.randomUUID();
   const start = await nextOrder();
+  // The change is the edit that made it: 8% → 6% → 8% on one day is three mails, not two.
+  const { change } = input;
+  const event = change.recordedAt ?? `${change.date}:${change.newPct}`;
   const items: MailQueueItem[] = input.recipients.map((r, i) => {
     const mail = composeRateChangeMail({
       accountingCorporationName: input.accountingCorporationName,
@@ -249,7 +252,7 @@ export async function enqueueRateChangeMail(input: {
       id: crypto.randomUUID(),
       batchId,
       corporationId: input.corporationId,
-      statementId: `rate:${input.feederCorporationId}:${input.change.date}:${input.change.newPct}:${r.id}`,
+      statementId: `rate:${input.feederCorporationId}:${event}:${r.id}`,
       kind: 'rate-change',
       senderCharacterId: input.senderCharacterId,
       recipientId: r.id,

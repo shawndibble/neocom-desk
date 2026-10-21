@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { Button } from '@/components/ui/Button';
 import { PayeeNameField } from '@/features/miningTax/PayeeNameField';
 import type { PayeeEntityMatch } from '@/features/miningTax/payeeEntitySearch';
 import type { FeederPayee } from '../taxBook/feederViewClient';
@@ -15,14 +15,9 @@ export function PayeeLine({ name, onChange }: { name: string; onChange?: () => v
     <div className="space-y-1 text-sm">
       <p>{t(k('line'), { name })}</p>
       {onChange && (
-        <button
-          type="button"
-          className={inlineLinkClassName}
-          aria-label={t(k('changeLabel'))}
-          onClick={onChange}
-        >
+        <Button size="sm" aria-label={t(k('changeLabel'))} onClick={onChange}>
           {t(k('change'))}
-        </button>
+        </Button>
       )}
     </div>
   );

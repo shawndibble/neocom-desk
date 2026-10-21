@@ -602,7 +602,8 @@ const rateKey = (r: StoredRate): string =>
   r.scope === 'record'
     ? `record:${r.recordKey}`
     : `${r.scope}:${'minerId' in r ? r.minerId : ''}:${'moonId' in r ? r.moonId : ''}:${r.effectiveFrom}` +
-      (r.scope === 'structure' ? `:${r.structureId}` : '');
+      (r.scope === 'structure' ? `:${r.structureId}` : '') +
+      (r.scope === 'feeder' ? `:${r.feederId}` : '');
 
 /** The characters an officer unlinked: automatic grouping (D26) leaves them alone. */
 const DECLINED_DOC = 'declinedAutoGroup';

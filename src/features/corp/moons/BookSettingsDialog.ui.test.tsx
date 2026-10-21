@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { BookProvider } from './BookContext';
 import { BookSettingsDialog } from './BookSettingsDialog';
-import { REFINERY_B, bookSettingsValue } from './bookSettingsFixture';
+import { OWNER, REFINERY_B, bookSettingsValue } from './bookSettingsFixture';
 
 const editBook = vi.fn();
 vi.mock('../taxBook/bookClient', async (importOriginal) => ({
@@ -48,6 +48,30 @@ describe('BookSettingsDialog per-refinery rate (#4621)', () => {
     expect(editBook).toHaveBeenCalledWith(7, 98000000, {
       action: 'addRate',
       rate: expect.objectContaining({ scope: 'structure', structureId: REFINERY_B, pct: 4 }),
+    });
+  });
+});
+
+describe('BookSettingsDialog per-moon-owner rate', () => {
+  it('lists a moon owner rate by the corporation name', () => {
+    renderDialog();
+    expect(screen.getByText(`Moon owner · Corp ${OWNER}`)).toBeInTheDocument();
+  });
+
+  it('adds a rate for every refinery of a moon owner still in the book', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('combobox', { name: 'Applies to' }));
+    await user.click(screen.getByRole('option', { name: 'Moon owner' }));
+    await user.click(screen.getByRole('combobox', { name: 'Moon owner' }));
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([`Corp ${OWNER}`]);
+    await user.click(screen.getByRole('option', { name: `Corp ${OWNER}` }));
+    const rates = screen.getByRole('button', { name: 'Add rate' }).closest('div.grid')!;
+    await user.type(within(rates as HTMLElement).getByLabelText('Rate (%)'), '9');
+    await user.click(screen.getByRole('button', { name: 'Add rate' }));
+    expect(editBook).toHaveBeenCalledWith(7, 98000000, {
+      action: 'addRate',
+      rate: expect.objectContaining({ scope: 'feeder', feederId: OWNER, pct: 9 }),
     });
   });
 });

@@ -143,6 +143,34 @@ function statusOf(f: MoonOwnerFeeder, settledNow: boolean, ratePct: number | und
   return 'active';
 }
 
+/**
+ * What miners pay at a moon owner's refineries today, resolved per entry the way billing does
+ * (`buildDayCharges`): Guest when recorded outside the book's corporation, by refinery and moon.
+ * When it varies, the rate most of their entries take (the higher on a tie). No ore yet: Guests.
+ */
+function minerRateAt(
+  input: MoonOwnersInput,
+  feederId: number,
+  own: readonly ObservedMiningEntry[],
+  today: string
+): { pct: number } | undefined {
+  const base = { date: today, minerId: '', recordKey: '', feederId };
+  if (own.length === 0)
+    return resolveRate(input.rates, { ...base, moonId: undefined, isGuest: true });
+  const counts = new Map<number, number>();
+  for (const e of own) {
+    const rate = resolveRate(input.rates, {
+      ...base,
+      moonId: e.moonId,
+      structureId: e.structureId,
+      isGuest: e.recordedCorporationId !== input.bookCorporationId,
+    });
+    if (rate) counts.set(rate.pct, (counts.get(rate.pct) ?? 0) + 1);
+  }
+  const top = [...counts].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0];
+  return top && { pct: top[0] };
+}
+
 interface Worked {
   row: MoonOwnerRow;
   accrued: number;
@@ -184,14 +212,7 @@ function work(input: MoonOwnersInput, f: MoonOwnerFeeder): Worked {
     .sort()
     .at(-1);
   const until = f.staleSince !== undefined ? utcDay(f.staleSince) : open ? undefined : lastTo;
-  const minerRate = resolveRate(input.rates, {
-    date: today,
-    minerId: '',
-    moonId: undefined,
-    recordKey: '',
-    feederId: f.corporationId,
-    isGuest: false,
-  });
+  const minerRate = minerRateAt(input, f.corporationId, own, today);
   return {
     accrued,
     accruedDays: byDay,

@@ -1,9 +1,10 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { formatAge } from '@/lib/age';
 import { AttentionStrip, type AttentionItem } from '@/features/miningTax/AttentionStrip';
 import { useBook } from './useBook';
-import { shortDate } from './moonsFormat';
+import { shortDate, shortDateTime } from './moonsFormat';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 
 /**
@@ -13,7 +14,8 @@ import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
  */
 export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
   const { t } = useTranslation();
-  const { view, names, canEdit, data } = useBook();
+  const { view, names, canEdit, data, settings } = useBook();
+  const [openedAt] = useState(() => Date.now());
   const { status } = sync;
   const items: AttentionItem[] = [];
   const syncing = sync.run.phase === 'syncing';
@@ -145,5 +147,19 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       title: t(`corpTaxBook.moons.health.skipped.${sync.run.outcome.reason}`),
     });
   }
-  return <AttentionStrip items={items} />;
+  // The member hold of a new book (72 hours): officers see when members start to see it.
+  const seeFrom = settings?.membersSeeFrom;
+  const held = seeFrom !== undefined && openedAt < seeFrom;
+  return (
+    <>
+      {held && (
+        <p className="text-xs text-text-dim" role="note">
+          {t('corpTaxBook.moons.health.hiddenFromMembers', {
+            date: shortDateTime(new Date(seeFrom).toISOString()),
+          })}
+        </p>
+      )}
+      <AttentionStrip items={items} />
+    </>
+  );
 }

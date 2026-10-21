@@ -467,8 +467,6 @@ export function buildFeederView(input: FeederViewInput): FeederView {
 
 // --- Rebuild -----------------------------------------------------------------
 
-/** Most observed rows one rebuild reads. */
-export const VIEW_ROW_LIMIT = 100_000;
 const PRICE_READ_CONCURRENCY = 16;
 const BATCH_SIZE = 400;
 
@@ -530,8 +528,9 @@ export async function rebuildFeederView(
     book
       .collection(OBSERVED)
       .where('sourceCorporationId', '==', feeder)
+      // Every row: what is owed sums every covered day, so a capped (unordered) read would
+      // drop an arbitrary slice of them and understate it.
       .select('structureId', 'characterId', 'typeId', 'date', 'quantity', 'solarSystemId')
-      .limit(VIEW_ROW_LIMIT)
       .get(),
     book.collection(FEEDERS).doc(String(feeder)).collection(FEEDER_VIEW_PAYOUTS).get(),
   ]);

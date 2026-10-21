@@ -99,7 +99,8 @@ export function FeederConsent({
         </Button>
         <Button
           variant="primary"
-          disabled={!valid || busy || preview === 'invalid'}
+          loading={busy}
+          disabled={!valid || preview === 'invalid'}
           onClick={() => onContinue(rate.trim() === '' ? undefined : pct)}
         >
           {t('corpTaxBook.moons.consent.continue')}

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, TextInput } from '@/components/ui';
+import { knownReasonText } from './feederErrorText';
 import { editErrorMessage } from './useBook';
 import { turnOnBook, type OfficerVerdict } from '../taxBook/bookClient';
 import { createFeederInvite, inviteLink } from '../taxBook/feederClient';
@@ -70,7 +71,7 @@ export function TurnOnBook({
       setError(
         reason === 'start-before-leave'
           ? t('corpTaxBook.moons.off.startBeforeLeave')
-          : editErrorMessage(e)
+          : (knownReasonText(t, e) ?? editErrorMessage(e))
       );
     } finally {
       setBusy(false);

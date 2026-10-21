@@ -36,7 +36,9 @@ import {
   markAssignmentsPaid,
   moveAssignmentsToPayee,
   planNeedsReviewResolution,
+  loadReleasePrices,
   releaseOreFromAssignment,
+  type ReleasePrices,
   splitAssignment,
   uncombineAssignments,
   unmarkAssignmentsPaid,
@@ -269,11 +271,19 @@ export function unsettle(
 }
 
 /** Takes ore off the miner's own Assignments because the corporation bills it (#4517). */
-export function releaseOre(
+export async function releaseOre(
   releases: readonly { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[]
 ): Promise<LedgerActionResult> {
+  // Priced before the write: pricing reads market data outside the ledger's transaction.
+  let priced: ReleasePrices[];
+  try {
+    priced = await Promise.all(releases.map((r) => loadReleasePrices(r.assignment, r.after)));
+  } catch (cause) {
+    return failure(cause);
+  }
   return commit(charactersOf(releases.map((r) => r.assignment)), async () => {
-    for (const r of releases) await releaseOreFromAssignment(r.assignment, r.after);
+    for (const [i, r] of releases.entries())
+      await releaseOreFromAssignment(r.assignment, r.after, priced[i]!);
   });
 }
 

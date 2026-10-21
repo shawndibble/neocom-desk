@@ -96,6 +96,15 @@ export interface FeederReadRecord {
   refineries?: number;
 }
 
+export interface FeederReadResult {
+  status: 'active' | 'disconnected';
+  /**
+   * False when the read moved nothing the moon owner's view or the miners' coverage shows: a
+   * skip, or another refusal in a spell already stale. Those need no rebuild.
+   */
+  viewChanged: boolean;
+}
+
 /**
  * Write what one run found onto the feeder record and move its health: lastReadWellAt,
  * staleSince, lastSyncResult and, at 30 days stale, the disconnect (coverage ends on the
@@ -107,7 +116,7 @@ export async function recordFeederRead(
   collectorCorporationId: number,
   feederCorporationId: number,
   read: FeederReadRecord
-): Promise<'active' | 'disconnected' | null> {
+): Promise<FeederReadResult | null> {
   const ref = bookRef(deps.db, collectorCorporationId)
     .collection(FEEDERS)
     .doc(String(feederCorporationId));
@@ -157,7 +166,12 @@ export async function recordFeederRead(
       );
     }
     tx.update(ref, update);
-    return next.status;
+    const staleMoved = (record.staleSince === undefined) !== (next.staleSince === undefined);
+    return {
+      status: next.status,
+      // A good read moves `lastReadWellAt`, so which days are Billable.
+      viewChanged: read.outcome === 'ok' || next.status === 'disconnected' || staleMoved,
+    };
   });
 }
 
