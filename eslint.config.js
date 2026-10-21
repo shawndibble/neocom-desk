@@ -227,8 +227,9 @@ export default tseslint.config(
     // Code that formats in a fixed shape, not the pilot's Number format: the
     // home of the number formatters, Date formatters, English K/M/B shorthand
     // (marks swapped by hand), chat text pasted into EVE (stays English, per
-    // scope decision 20261020-113345), and mockup fixtures. CSV and clipboard
-    // code writes raw numbers or toFixed, so needs no entry.
+    // scope decision 20261020-113345), mockup fixtures, and Cloud Functions
+    // (server code has no Number format setting). CSV and clipboard code
+    // writes raw numbers or toFixed, so needs no entry.
     files: [
       'src/lib/numberLocale.ts',
       'src/lib/timestamp.ts',
@@ -236,6 +237,7 @@ export default tseslint.config(
       'src/lib/compactNumber.ts',
       'src/engine/survey/chatMessage.ts',
       'src/mockups/**/*.ts',
+      'functions/**/*.ts',
     ],
     rules: {
       'no-restricted-syntax': ['error', ...withoutNumberFormat(restrictedSyntax)],

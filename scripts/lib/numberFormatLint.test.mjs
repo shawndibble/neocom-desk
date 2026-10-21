@@ -55,6 +55,7 @@ describe('number-format lint guard', () => {
     ['src/features/Fixture.stories.tsx'],
     ['src/components/ui/Fixture.stories.tsx'],
     ['e2e/fixture.ts'],
+    ['functions/src/fixture.ts'],
   ])('exempts %s', async (filePath) => {
     const source = "export const f = new Intl.NumberFormat('en');\n";
     expect(await numberFormatErrors(source, filePath)).toHaveLength(0);
