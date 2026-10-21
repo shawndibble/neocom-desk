@@ -579,8 +579,11 @@ describe('AppraisalPanel', () => {
       const list = await compareCards();
       const amarr = hubCard(list, TRADE_HUBS[1].systemName);
 
-      // Anywhere on the card, not only its title.
-      await userEvent.click(within(amarr).getByText('Sell total'));
+      // The title stretches over the whole card in CSS (`after:inset-0`),
+      // which jsdom can't lay out, so the title button stands in for the card.
+      await userEvent.click(
+        within(amarr).getByRole('button', { name: `Appraise at ${TRADE_HUBS[1].systemName}` })
+      );
       expect(onHubChange).toHaveBeenLastCalledWith(TRADE_HUBS[1].id);
 
       await userEvent.click(
@@ -614,6 +617,21 @@ describe('AppraisalPanel', () => {
       expect(hubCard(list, TRADE_HUBS[1].systemName)).toHaveAttribute('aria-current', 'true');
       expect(hubCard(list, TRADE_HUBS[0].systemName)).not.toHaveAttribute('aria-current');
       expect(within(list).queryAllByRole('link')).toHaveLength(0);
+    });
+
+    it('does nothing when the hub already quoted is clicked', async () => {
+      const onHubChange = vi.fn();
+      renderPanel({
+        controller: controller({ result: outcome(), compare: COMPARE_ROWS }),
+        onHubChange,
+      });
+      const list = await compareCards();
+      await userEvent.click(
+        within(hubCard(list, TRADE_HUBS[0].systemName)).getByRole('button', {
+          name: `Appraise at ${TRADE_HUBS[0].systemName}`,
+        })
+      );
+      expect(onHubChange).not.toHaveBeenCalled();
     });
   });
 

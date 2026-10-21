@@ -63,13 +63,10 @@ function CopyableTotal({
     <Tooltip content={copied ? t('market.appraisal.copiedToClipboard') : exact}>
       <button
         type="button"
-        onClick={(event) => {
-          // The card's own click picks the hub; a copy is not a pick.
-          event.stopPropagation();
-          void copy();
-        }}
+        onClick={() => void copy()}
         aria-label={t('market.appraisal.copyTotal', { amount: exact })}
-        className={`rounded-xs text-left hover:text-accent ${interactiveClassName} ${focusRingClassName}`}
+        // `relative` lifts it above the card title's stretched hit area, so a click here copies.
+        className={`relative rounded-xs text-left hover:text-accent ${interactiveClassName} ${focusRingClassName}`}
       >
         {/* Exception: a copy button with its own exact-figure tooltip; IskAmount would nest a second tab stop. */}
         <span aria-hidden="true">{formatIskCompact(value)}</span>
@@ -146,15 +143,15 @@ export function HubCompareCards({
         {rows.map((row) => {
           const selected = row.hub.id === selectedHubId;
           return (
-            // The whole card is the pointer target; the title button is the
-            // keyboard and screen-reader one, so the card needs no tab stop of
-            // its own (DESIGN.md §6c, phone cards).
+            // The title button stretches over the whole card (`after:inset-0`),
+            // so the card is one target with one tab stop, like My Ships'
+            // cards. Every card keeps a 2px left border so the selected one's
+            // accent edge doesn't shift its content.
             <li
               key={row.hub.id}
               aria-current={selected ? 'true' : undefined}
-              onClick={() => onSelectHub(row.hub.id)}
               className={cx(
-                'min-w-0 cursor-pointer rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm',
+                'relative min-w-0 rounded-xs border border-l-2 border-line bg-panel/85 p-3 backdrop-blur-sm',
                 rowInteractiveClassName,
                 selected && selectedRowClassName
               )}
@@ -163,9 +160,11 @@ export function HubCompareCards({
                 <button
                   type="button"
                   aria-label={t('market.appraisal.appraiseAtHub', { hub: row.hub.systemName })}
-                  aria-pressed={selected}
+                  onClick={() => {
+                    if (!selected) onSelectHub(row.hub.id);
+                  }}
                   className={cx(
-                    'max-w-full truncate rounded-xs text-left text-accent',
+                    'dt-primary max-w-full cursor-pointer truncate rounded-xs text-left text-text after:absolute after:inset-0',
                     focusRingClassName
                   )}
                 >
