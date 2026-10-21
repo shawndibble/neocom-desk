@@ -21,6 +21,7 @@ import type {
 import type { HubAggregate } from '@/market/fuzzwork';
 import type { MemberActivity, RosterDiff } from '@/engine/corp/members';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
+import type { RoleAuditData } from '@/features/corp/roleAudit';
 import type { WalletDivision } from '@/features/corp/divisions';
 import type { PilotStats, ZkillFailureReason } from '@/lib/zkillboard';
 
@@ -67,6 +68,11 @@ export interface CorpCustomsFeed extends CorpFeedBase {
   typeNames: ReadonlyMap<number, string>;
   /** Solar system names from the static data; a missing one degrades one cell. */
   systemNames: ReadonlyMap<number, string>;
+}
+
+export interface CorpRoleAuditFeed extends CorpFeedBase {
+  /** Null when the feed is unreadable. */
+  audit: RoleAuditData | null;
 }
 
 export interface CorpMembersFeed extends CorpFeedBase {
@@ -166,4 +172,9 @@ export async function loadCorpKillsFeed(characterId: number): Promise<CorpKillsF
 export async function loadCorpCustomsFeed(characterId: number): Promise<CorpCustomsFeed> {
   const { loadCorpCustoms } = await import('./corpFeedLoaders');
   return loadCorpCustoms(characterId);
+}
+
+export async function loadCorpRoleAuditFeed(characterId: number): Promise<CorpRoleAuditFeed> {
+  const { loadCorpRoleAudit } = await import('./corpFeedLoaders');
+  return loadCorpRoleAudit(characterId);
 }

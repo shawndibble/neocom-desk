@@ -782,6 +782,26 @@ export const ESI_REGISTRY = {
     scope: 'esi-planets.read_customs_offices.v1',
     group: 'corp',
   },
+  /**
+   * Role audit (issue #4613): Director-only per `x-required-roles`
+   * (`canReadRoleAudit`). History rides the membership scope; titles need
+   * `read_titles`, the additive one (`corpScopes.ts`).
+   */
+  getCorporationRoleHistory: {
+    route: '/corporations/{corporation_id}/roles/history',
+    scope: 'esi-corporations.read_corporation_membership.v1',
+    group: 'corp',
+  },
+  getCorporationTitles: {
+    route: '/corporations/{corporation_id}/titles',
+    scope: 'esi-corporations.read_titles.v1',
+    group: 'corp',
+  },
+  getCorporationMemberTitles: {
+    route: '/corporations/{corporation_id}/members/titles',
+    scope: 'esi-corporations.read_titles.v1',
+    group: 'corp',
+  },
 } as const satisfies Record<EndpointName, EsiEndpointSpec>;
 
 export type EsiEndpointId = keyof typeof ESI_REGISTRY;

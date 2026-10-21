@@ -293,3 +293,75 @@ export function getCorporationCustomsOffices(
     { ...options, characterId, endpointId: 'getCorporationCustomsOffices' }
   );
 }
+
+// --- GET /corporations/{corporation_id}/roles/history (esi-corporations.read_corporation_membership.v1) ---
+
+/**
+ * One role change. ESI keeps about a month, newest page first, cached 3600s,
+ * Director-only. `role_type` is `roles` for the corporation-wide grant, the
+ * `roles_at_*` and `grantable_*` variants otherwise.
+ */
+export interface CorporationRoleHistory {
+  changed_at: string;
+  character_id: number;
+  issuer_id: number;
+  role_type: string;
+  old_roles: string[];
+  new_roles: string[];
+}
+
+export function getCorporationRoleHistory(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<PaginatedResult<CorporationRoleHistory>> {
+  return fetchAllPagesStatus<CorporationRoleHistory>(
+    `/corporations/${corporationId}/roles/history`,
+    {
+      ...options,
+      characterId,
+      endpointId: 'getCorporationRoleHistory',
+    }
+  );
+}
+
+// --- GET /corporations/{corporation_id}/titles (esi-corporations.read_titles.v1) ---
+
+/** A corporation title: a named bundle of roles. Director-only, cached 3600s. */
+export interface CorporationTitle {
+  title_id: number;
+  name?: string;
+  roles?: string[];
+}
+
+export function getCorporationTitles(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationTitle[]>> {
+  return esiFetch<CorporationTitle[]>(`/corporations/${corporationId}/titles`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationTitles',
+  });
+}
+
+// --- GET /corporations/{corporation_id}/members/titles (esi-corporations.read_titles.v1) ---
+
+/** The title ids each member holds. Director-only, cached 3600s. */
+export interface CorporationMemberTitles {
+  character_id: number;
+  titles: number[];
+}
+
+export function getCorporationMemberTitles(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationMemberTitles[]>> {
+  return esiFetch<CorporationMemberTitles[]>(`/corporations/${corporationId}/members/titles`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationMemberTitles',
+  });
+}

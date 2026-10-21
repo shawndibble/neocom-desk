@@ -253,6 +253,19 @@ describe('corpGrantCoverage', () => {
     expect(coverage.capabilities.canReadWallet).toBe(true);
   });
 
+  it('keeps a Director’s older grant ready when only the titles scope is missing (#4613)', () => {
+    const TITLES = 'esi-corporations.read_titles.v1';
+    expect(CORP_SCOPES_FOR_CAPABILITY.canReadRoleAudit).toContain(TITLES);
+    const coverage = corpGrantCoverage(
+      corpCapabilities(['Director']),
+      scopesForGroup('corp').filter((scope) => scope !== TITLES)
+    );
+    expect(coverage.blocking).toBe(false);
+    expect(coverage.missingScopes).toEqual([TITLES]);
+    expect(coverage.capabilities.canReadRoleAudit).toBe(false);
+    expect(coverage.capabilities.canReadMembers).toBe(true);
+  });
+
   it('reports the same missing set as missingCorpScopes', () => {
     for (const roles of [['Director'], ['Accountant'], ['Station_Manager'], []]) {
       const capabilities = corpCapabilities(roles);

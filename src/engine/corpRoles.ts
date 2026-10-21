@@ -69,6 +69,12 @@ export interface CorpCapabilities {
    */
   canReadCustomsOffices: boolean;
   /**
+   * GET /corporations/{id}/roles/history, /titles and /members/titles — who holds
+   * sensitive roles, their titles, and recent role changes (issue #4613).
+   * Director-only: `x-required-roles` on all three is ["Director"] alone.
+   */
+  canReadRoleAudit: boolean;
+  /**
    * GET /corporations/{id}/contracts — contracts issued by or assigned to the
    * corporation (issue #4607). ESI names no required role, so every member
    * holds this; it alone never opens a corp surface (`hasAnyCorpCapability`).
@@ -100,6 +106,7 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadAssets',
   'canReadBlueprints',
   'canReadCustomsOffices',
+  'canReadRoleAudit',
   'canReadContracts',
   'canReadOrders',
 ];
@@ -115,6 +122,7 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadAssets: false,
   canReadBlueprints: false,
   canReadCustomsOffices: false,
+  canReadRoleAudit: false,
   canReadContracts: false,
   canReadOrders: false,
 };
@@ -151,6 +159,8 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
   canReadBlueprints: [],
   // `x-required-roles` on customs_offices is ["Director"] alone.
   canReadCustomsOffices: [],
+  // `x-required-roles` on roles/history, titles and members/titles is ["Director"] alone.
+  canReadRoleAudit: [],
   // No `x-required-roles` on the contracts routes: handled as "every member" in `corpCapabilities`.
   canReadContracts: [],
   // `x-required-roles` on /corporations/{id}/orders: Accountant or Trader.
