@@ -475,10 +475,12 @@ suite('moon owner view', () => {
 
   it('member copy: the first pull writes coverage and the read clock, nothing else', async () => {
     await save(await newInvite(), 6);
-    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), {
-      ...asDirector,
-      payee: { kind: 'character', id: FEEDER_DIRECTOR },
-    });
+    await setFeederPayee(
+      deps(),
+      who(FEEDER_DIRECTOR),
+      { ...asDirector, payee: { kind: 'character', id: FEEDER_DIRECTOR } },
+      idCategory
+    );
     expect(await memberCopy()).toEqual({
       coveragePeriods: [{ from: '2026-10-18' }],
       lastReadWellAt: T0,
