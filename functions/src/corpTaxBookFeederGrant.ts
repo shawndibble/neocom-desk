@@ -18,6 +18,7 @@ import { boundedString, record } from './communities.js';
 import { encryptRefreshToken } from './alertGrantCrypto.js';
 import type { RefreshedTokens } from './alertGrant.js';
 import {
+  dropCorpSyncGrant,
   grantRef,
   revokeStored,
   syncOneFeeder,
@@ -30,6 +31,7 @@ import {
   FEEDER_OF_COLLECTION,
   FEEDER_PREVIOUS_COLLECTION,
   OBSERVED,
+  REMOVAL_LINKS_COLLECTION,
   decideRoles,
   utcDate,
 } from './corpTaxBook.js';
@@ -47,7 +49,13 @@ import {
   feederViewRef,
   tryRebuildFeederView,
 } from './corpTaxBookFeederView.js';
-import { appendAudit, bookRef, type BookDeps, type Caller } from './corpTaxBookStore.js';
+import {
+  appendAudit,
+  bookRef,
+  ownBookFloor,
+  type BookDeps,
+  type Caller,
+} from './corpTaxBookStore.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
 
@@ -222,6 +230,9 @@ export async function saveFeederGrant(
   let undo: AcceptUndo | undefined;
   let accepted: (AcceptFeederInviteResult & { undo?: AcceptUndo }) | undefined;
   let reconnectPrior: FeederRecord | undefined;
+  // The grant this save replaces (a Reconnect): revoked once the new one works, else put back.
+  let previousGrant: CorpSyncGrantDoc | undefined;
+  let grantWritten = false;
   try {
     const claims = await verifiedClaims(deps, refreshed.accessToken);
     if (claims.characterId !== supplied.characterId) {
@@ -239,6 +250,7 @@ export async function saveFeederGrant(
             name: claims.name,
             feederCorp,
             recordExtra: { grantHolder: claims.characterId, grantedBy: callerId },
+            allowTakeBack: true,
           });
     undo = accepted.undo;
     if ('priorRecord' in accepted) reconnectPrior = accepted.priorRecord as FeederRecord;
@@ -260,7 +272,10 @@ export async function saveFeederGrant(
       collectorCorporationId: accepted.collectorCorporationId,
       grantedBy: callerId,
     };
+    previousGrant = (await grantRef(deps.db, feederCorp).get()).data() as
+      CorpSyncGrantDoc | undefined;
     await grantRef(deps.db, feederCorp).set(doc);
+    grantWritten = true;
 
     const first = await syncOneFeeder(deps, deps.esi, accepted.collectorCorporationId, feederCorp);
     // A refused first pull means the alt is not an Accountant (or lost the role at once).
@@ -284,16 +299,20 @@ export async function saveFeederGrant(
       );
     }
     if (reconnectPrior && accepted) {
-      // A refused reconnect puts the record back and drops the grant it just stored.
+      // A refused reconnect puts the record back.
       await bookRef(deps.db, accepted.collectorCorporationId)
         .collection(FEEDERS)
         .doc(String(accepted.feederCorporationId))
         .set(reconnectPrior);
-      await grantRef(deps.db, accepted.feederCorporationId).delete();
+    }
+    if (accepted && grantWritten) {
+      await putBackGrant(deps, accepted.feederCorporationId, previousGrant);
     }
     await orphan();
     throw err;
   }
+  // The replaced token is orphaned: revoke it, unless SSO handed back that same one.
+  if (previousGrant) await revokeStored(deps, previousGrant, refreshed.refreshToken);
 
   if (input.requestedRatePct !== undefined) {
     // A blank rate is a complete grant, so a rate that fails to save never fails it.
@@ -324,6 +343,24 @@ export async function saveFeederGrant(
   };
 }
 
+/**
+ * A refused save stored a grant over whatever was held: drop the new one (SSO may have
+ * rotated it on the first pull, so it is revoked as stored) and restore the earlier one.
+ */
+async function putBackGrant(
+  deps: CorpSyncDeps,
+  feederCorp: number,
+  previous: CorpSyncGrantDoc | undefined
+): Promise<void> {
+  const ref = grantRef(deps.db, feederCorp);
+  const current = (await ref.get()).data() as CorpSyncGrantDoc | undefined;
+  if (previous) await ref.set(previous);
+  else if (current) await ref.delete();
+  if (current && current.encryptedRefreshToken !== previous?.encryptedRefreshToken) {
+    await revokeStored(deps, current);
+  }
+}
+
 /** Put the feeder record, pointer, invite and grant back to how they were before the accept. */
 async function unwindAccept(
   deps: FeederGrantDeps,
@@ -338,7 +375,9 @@ async function unwindAccept(
   await deps.db.runTransaction(async (tx) => {
     if (undo.priorRecord) tx.set(feederRef, undo.priorRecord);
     else tx.delete(feederRef);
-    tx.delete(deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp)));
+    const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp));
+    if (undo.priorPointer) tx.set(pointerRef, undo.priorPointer);
+    else tx.delete(pointerRef);
     tx.update(deps.db.collection(FEEDER_INVITES_COLLECTION).doc(undo.inviteId), {
       acceptedBy: FieldValue.delete(),
       acceptedAt: FieldValue.delete(),
@@ -453,14 +492,45 @@ export async function leaveFeeder(
   if (!ctx || !LEAVABLE.includes(ctx.record.status)) {
     fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
   }
-  const feederRef = bookRef(deps.db, ctx.collectorCorporationId)
-    .collection(FEEDERS)
-    .doc(String(input.corporationId));
-  const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(input.corporationId));
-  const previousRef = deps.db
-    .collection(FEEDER_PREVIOUS_COLLECTION)
-    .doc(String(input.corporationId));
-  const gRef = grantRef(deps.db, input.corporationId);
+  // Leaving while a removal is pending is the moon owner forcing it: it reads as removed.
+  await endFeeder(deps, {
+    collectorCorporationId: ctx.collectorCorporationId,
+    feederCorporationId: input.corporationId,
+    effectiveAt: deps.now(),
+    finalStatus: ctx.record.status === 'pending-removal' ? 'removed' : 'left',
+    actor: { characterId: ctx.callerId, name: 'Moon owner' },
+    action: ctx.record.status === 'pending-removal' ? 'feederRemovalForced' : 'feederLeft',
+    allowed: LEAVABLE,
+  });
+  // No server-side accrual engine yet (#4510 is client-side): the balance is the client's to show.
+  return { left: true, owedIsk: null };
+}
+
+export interface EndFeederInput {
+  collectorCorporationId: number;
+  feederCorporationId: number;
+  /** Coverage ends the day before this moment's UTC day. */
+  effectiveAt: number;
+  finalStatus: 'left' | 'removed';
+  actor: { characterId: number | null; name: string; via?: string };
+  action: string;
+  /** The statuses this may end; anything else is refused. */
+  allowed: readonly FeederRecord['status'][];
+  /** False when the view is about to go with its book (a book delete). */
+  rebuildView?: boolean;
+}
+
+/**
+ * Ends a feeder: the record, its pointer, its grant and its coverage, then the view. Leave,
+ * a forced removal and a removal taking effect differ only in `finalStatus`, `effectiveAt`
+ * and the audit entry.
+ */
+export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Promise<void> {
+  const { collectorCorporationId: collector, feederCorporationId: feederCorp } = input;
+  const feederRef = bookRef(deps.db, collector).collection(FEEDERS).doc(String(feederCorp));
+  const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp));
+  const previousRef = deps.db.collection(FEEDER_PREVIOUS_COLLECTION).doc(String(feederCorp));
+  const gRef = grantRef(deps.db, feederCorp);
   const now = deps.now();
 
   const dropped = await deps.db.runTransaction(async (tx) => {
@@ -470,33 +540,69 @@ export async function leaveFeeder(
       tx.get(gRef),
     ]);
     const rec = recSnap.data() as FeederRecord | undefined;
-    if (!rec || !ptrSnap.exists || !LEAVABLE.includes(rec.status)) {
+    if (!rec || !ptrSnap.exists || !input.allowed.includes(rec.status)) {
       fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
     }
     const grant = grantSnap.data() as CorpSyncGrantDoc | undefined;
     tx.update(feederRef, {
-      status: 'left',
+      status: input.finalStatus,
       leftAt: now,
-      coveragePeriods: closePeriod(rec.coveragePeriods, utcDate(now)),
+      coveragePeriods: closePeriod(rec.coveragePeriods, utcDate(input.effectiveAt)),
+      removal: FieldValue.delete(),
+      removalLinkId: FieldValue.delete(),
+      // The feed's sync state and a dismissed history belong to this feed, not the next.
+      staleSince: FieldValue.delete(),
+      disconnectedAt: FieldValue.delete(),
+      lastSyncResult: FieldValue.delete(),
+      viewDismissedAt: FieldValue.delete(),
     });
+    if (rec.removalLinkId) {
+      tx.delete(deps.db.collection(REMOVAL_LINKS_COLLECTION).doc(rec.removalLinkId));
+    }
     tx.delete(pointerRef);
     // The after-leaving view still finds its Collector through this.
-    tx.set(previousRef, { collectorCorporationId: ctx.collectorCorporationId, leftAt: now });
+    tx.set(previousRef, { collectorCorporationId: collector, leftAt: now });
     if (grant?.kind === 'feeder') tx.delete(gRef);
-    appendAudit(
-      tx,
-      bookDeps(deps),
-      ctx.collectorCorporationId,
-      { characterId: ctx.callerId, name: 'Moon owner' },
-      'feederLeft',
-      { feederCorporationId: input.corporationId }
-    );
+    appendAudit(tx, bookDeps(deps), collector, input.actor, input.action, {
+      feederCorporationId: feederCorp,
+    });
     return grant?.kind === 'feeder' ? grant : undefined;
   });
   if (dropped) await revokeStored(deps, dropped);
-  await tryRebuildFeederView(bookDeps(deps), ctx.collectorCorporationId, input.corporationId);
-  // No server-side accrual engine yet (#4510 is client-side): the balance is the client's to show.
-  return { left: true, owedIsk: null };
+  if (input.rebuildView !== false)
+    await tryRebuildFeederView(bookDeps(deps), collector, feederCorp);
+}
+
+const ENDABLE: readonly FeederRecord['status'][] = ['active', 'pending-removal', 'disconnected'];
+
+/**
+ * A book is being deleted (`deleteBook`'s `beforeDelete`): end every moon owner it holds as
+ * removed, so each grant is revoked at SSO and each owner keeps its after-leaving pointer
+ * (and its own book's start-date floor), then drop the book's own sync grant.
+ */
+export async function dropBookGrants(deps: CorpSyncDeps, collector: number): Promise<void> {
+  const pointers = await deps.db
+    .collection(FEEDER_OF_COLLECTION)
+    .where('collectorCorporationId', '==', collector)
+    .get();
+  for (const doc of pointers.docs) {
+    try {
+      await endFeeder(deps, {
+        collectorCorporationId: collector,
+        feederCorporationId: Number(doc.id),
+        effectiveAt: deps.now(),
+        finalStatus: 'removed',
+        actor: { characterId: null, name: 'Book deleted' },
+        action: 'feederRemovedBookDeleted',
+        allowed: ENDABLE,
+        rebuildView: false,
+      });
+    } catch (err) {
+      // Already ended (a race with a leave): the pointer goes with the book anyway.
+      if (!(err instanceof HttpsError && err.code === 'failed-precondition')) throw err;
+    }
+  }
+  await dropCorpSyncGrant(deps, collector);
 }
 
 // --- Status ----------------------------------------------------------------
@@ -509,7 +615,8 @@ export interface FeederRefinery {
 }
 
 export type FeederStatusResult =
-  | { status: 'none' }
+  /** `ownBookFrom`: a former moon owner's earliest own-book start (UTC day), for its members. */
+  | { status: 'none'; ownBookFrom?: string }
   | {
       status: 'feeder';
       collectorCorporationId: number;
@@ -542,13 +649,30 @@ export function aggregateRefineries(
     .sort((a, b) => b.volume - a.volume || a.structureId - b.structureId);
 }
 
+/** Not feeding: a former moon owner's members also learn how early their own book may start. */
+async function notFeeding(
+  deps: CorpSyncDeps,
+  caller: Caller,
+  input: FeederCall
+): Promise<FeederStatusResult> {
+  const floor = await ownBookFloor((ref) => ref.get(), deps.db, input.corporationId);
+  if (floor === null) return { status: 'none' };
+  // The token was verified for this caller above; membership is read only for a former moon owner.
+  const identity = await deps
+    .readIdentity(characterIdForUid(caller.uid)!, input.accessToken)
+    .catch(() => null);
+  return identity?.corporationId === input.corporationId
+    ? { status: 'none', ownBookFrom: floor }
+    : { status: 'none' };
+}
+
 export async function getFeederStatus(
   deps: CorpSyncDeps,
   caller: Caller,
   input: FeederCall
 ): Promise<FeederStatusResult> {
   const ctx = await authorizeFeederCaller(deps, caller, input, 'read');
-  if (!ctx) return { status: 'none' };
+  if (!ctx) return notFeeding(deps, caller, input);
   const { record: rec, collectorCorporationId: collector } = ctx;
   const [book, observed] = await Promise.all([
     bookRef(deps.db, collector).get(),

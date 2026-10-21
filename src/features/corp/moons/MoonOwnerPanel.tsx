@@ -6,9 +6,12 @@ import { formatIsk } from '@/lib/isk';
 import { leaveFeeder, type FeederStatus } from '../taxBook/feederClient';
 import { RECONNECT_CODE, requestFeederRate } from '../taxBook/feederViewClient';
 import { isStale } from '../taxBook/feederViewModel';
+import { eveTimeLabel } from '@/engine/corpTaxBook/removalMail';
 import { DialogShell } from './BookDialogs';
 import { MoonOwnerView } from './MoonOwnerView';
 import { OwnerStaleBanner } from './OwnerStaleBanner';
+import { OwnerStatusStrip } from './OwnerStatusStrip';
+import { shortDate } from './moonsFormat';
 import { useFeederView } from './useFeederView';
 
 type Owner = Extract<FeederStatus, { status: 'feeder' }>;
@@ -39,6 +42,7 @@ export function MoonOwnerPanel({
   const [owed, setOwed] = useState<number | null>(owner.owedIsk);
   const [reconnectError, setReconnectError] = useState<string | null>(null);
   const name = owner.collectorName ?? t('corpTaxBook.moons.owner.anonymous');
+  const removing = load.state === 'ready' && load.view?.summary.status === 'pending-removal';
 
   const reconnect = () => {
     setReconnectError(null);
@@ -74,16 +78,40 @@ export function MoonOwnerPanel({
           reload();
         }}
         banner={
-          isStale(view.summary) && view.summary.staleSince !== null ? (
-            <>
-              <OwnerStaleBanner since={view.summary.staleSince} onReconnect={reconnect} />
-              {reconnectError && (
-                <p role="alert" className="text-xs text-danger">
-                  {reconnectError}
-                </p>
-              )}
-            </>
-          ) : undefined
+          <>
+            {isStale(view.summary) && view.summary.staleSince !== null && (
+              <>
+                <OwnerStaleBanner since={view.summary.staleSince} onReconnect={reconnect} />
+                {reconnectError && (
+                  <p role="alert" className="text-xs text-danger">
+                    {reconnectError}
+                  </p>
+                )}
+              </>
+            )}
+            {view.summary.status === 'pending-removal' && (
+              <OwnerStatusStrip
+                title={
+                  typeof view.summary.removalEffectiveAt === 'number'
+                    ? t('corpTaxBook.moons.ownerView.removal.title', {
+                        time: eveTimeLabel(view.summary.removalEffectiveAt),
+                      })
+                    : t('corpTaxBook.moons.ownerView.removal.titleNoTime')
+                }
+                body={t('corpTaxBook.moons.ownerView.removal.body', {
+                  name,
+                  date: shortDate(new Date(view.summary.removalStartedAt ?? 0).toISOString()),
+                })}
+                actions={
+                  canLeave ? (
+                    <Button size="sm" variant="ghost" onClick={() => setLeaving(true)}>
+                      {t('corpTaxBook.moons.ownerView.removal.action')}
+                    </Button>
+                  ) : undefined
+                }
+              />
+            )}
+          </>
         }
       />
     );
@@ -102,8 +130,16 @@ export function MoonOwnerPanel({
         <DialogShell
           open
           onClose={() => setLeaving(false)}
-          title={t('corpTaxBook.moons.owner.leave.title')}
-          confirmLabel={t('corpTaxBook.moons.owner.leave.confirm')}
+          title={t(
+            removing
+              ? 'corpTaxBook.moons.ownerView.removal.confirmTitle'
+              : 'corpTaxBook.moons.owner.leave.title'
+          )}
+          confirmLabel={t(
+            removing
+              ? 'corpTaxBook.moons.ownerView.removal.action'
+              : 'corpTaxBook.moons.owner.leave.confirm'
+          )}
           canConfirm
           danger
           run={async () => {
@@ -122,7 +158,11 @@ export function MoonOwnerPanel({
                   })
                 : t('corpTaxBook.moons.owner.leave.nothingOwed', { name })}
           </p>
-          <p className="mt-2 text-text-dim">{t('corpTaxBook.moons.owner.leave.body')}</p>
+          <p className="mt-2 text-text-dim">
+            {removing
+              ? t('corpTaxBook.moons.ownerView.removal.confirmBody', { name })
+              : t('corpTaxBook.moons.owner.leave.body')}
+          </p>
         </DialogShell>
       )}
     </div>

@@ -74,6 +74,17 @@ export function esiIdentityReader(fetchImpl: typeof fetch = fetch): IdentityRead
   };
 }
 
+/** The public lookup of a corporation's CEO: no token, no scope. */
+export type CorporationCeoLookup = (corporationId: number) => Promise<number | undefined>;
+
+export function esiCorporationCeoLookup(fetchImpl: typeof fetch = fetch): CorporationCeoLookup {
+  return async (corporationId) => {
+    const corp = await getJson(`${ESI_BASE}/corporations/${corporationId}/`, null, fetchImpl);
+    const ceo = (corp as { ceo_id?: unknown } | null)?.ceo_id;
+    return typeof ceo === 'number' && ceo > 1 ? ceo : undefined;
+  };
+}
+
 /** The public lookup of which corporation a Character is in: no token, no scope. */
 export type CorporationLookup = (characterId: number) => Promise<number>;
 

@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { isStatementMail, type MailQueueItem } from '@/engine/corpTaxBook/mailQueue';
+import { db } from '@/db';
+import {
+  isStatementMail,
+  startsRemovalClock,
+  type MailQueueItem,
+} from '@/engine/corpTaxBook/mailQueue';
+import { fillTakesEffect, removalTakesEffectAt } from '@/engine/corpTaxBook/removalMail';
 import { isOfflineFailure, isUnconfirmedWrite } from '@/esi/client';
 import { sendMail } from '@/features/character/mail';
 import { openNewMail } from '@/features/openInEve/sendOpenNewMail';
@@ -16,14 +22,37 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
     random: Math.random,
     list: () => listQueue(),
     save: saveItems,
-    send: (item) =>
-      sendMail(
+    send: async (item) => {
+      // The recorded time once the clock runs (re-read: a log earlier in this step may have
+      // just stamped it); else 24 hours from this send, which starts it.
+      const body =
+        item.kind === 'removal'
+          ? fillTakesEffect(
+              item.body,
+              removalTakesEffectAt((await db.corpMailQueue.get(item.id)) ?? item, Date.now())
+            )
+          : item.body;
+      return sendMail(
         item.senderCharacterId,
         [{ recipient_id: item.recipientId, recipient_type: 'character' }],
         item.subject,
-        item.body
-      ),
+        body
+      );
+    },
     log: async (item) => {
+      if (item.kind === 'removalCancelled') return;
+      if (item.kind === 'removal') {
+        // Only a copy to the moon owner's CEO or payee starts the 24 hours.
+        if (!startsRemovalClock(item)) return;
+        const { recordRemovalNoticeSent } = await import('@/features/corp/moons/removalFlow');
+        await recordRemovalNoticeSent(
+          item.senderCharacterId,
+          item.corporationId,
+          item.feederCorporationId!,
+          item.sentAt
+        );
+        return;
+      }
       // A rate-change mail has no Statement to log on; the rate change is already in the audit trail.
       if (!isStatementMail(item.kind)) return;
       const { editBook } = await import('@/features/corp/taxBook/bookClient');

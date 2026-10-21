@@ -43,3 +43,33 @@ export function filterCovered<T extends { date: string }>(
 ): T[] {
   return rows.filter((row) => isDayCovered(periods, row.date));
 }
+
+/** A moon owner's coverage, as the book holds it on its feeder record. */
+export interface FeederCoverage {
+  corporationId: number;
+  /** Absent: not known to this reader, so its rows are not tested. */
+  coveragePeriods?: readonly CoveragePeriod[];
+}
+
+/**
+ * Moon owner rows outside their coverage owe nothing (#4618), like mining
+ * before the book's start date: kept, never billed. Only rows a known moon owner's
+ * refinery recorded are tested; the book's own refineries' rows are always covered.
+ */
+export function splitByCoverage<T extends { date: string; sourceCorporationId?: number }>(
+  rows: readonly T[],
+  bookCorporationId: number,
+  feeders: readonly FeederCoverage[]
+): { covered: T[]; outsideCoverage: T[] } {
+  const periodsOf = new Map(feeders.map((f) => [f.corporationId, f.coveragePeriods]));
+  const covered: T[] = [];
+  const outsideCoverage: T[] = [];
+  for (const row of rows) {
+    const source = row.sourceCorporationId;
+    const periods =
+      source === undefined || source === bookCorporationId ? undefined : periodsOf.get(source);
+    if (periods === undefined || isDayCovered(periods, row.date)) covered.push(row);
+    else outsideCoverage.push(row);
+  }
+  return { covered, outsideCoverage };
+}

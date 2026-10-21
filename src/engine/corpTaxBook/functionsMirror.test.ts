@@ -14,6 +14,15 @@ import {
   type FeederHealth,
 } from './feederHealth';
 import { accrueValuedDays, feederBalance, onPayList } from './feederAccrual';
+import {
+  buildRecordedPayout,
+  outgoingDonationsFromJournal,
+  payeeIdsAt,
+  payoutToMerge,
+  reconcileBookOutgoing,
+  withPayeeChange,
+  type OutgoingDonation,
+} from './payouts';
 import { DEFAULT_GRACE_HOURS, dayClosesAt } from './billable';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { mergeObservedRows, observedRowKey } from './observed';
@@ -26,6 +35,7 @@ import {
   type Statement,
 } from './statements';
 import type { ObservedRow } from './types';
+import * as removal from './removal';
 
 // `functions/` cannot import `src/`, so the callables enforce a mirror of these
 // engine functions (functions/src/corpTaxBookEngine.ts). This keeps the two
@@ -445,5 +455,106 @@ describe('feeder view mirror', () => {
         );
       }
     }
+  });
+
+  it('reads, records and matches moon owner payouts identically', () => {
+    const journal = [
+      {
+        id: 1,
+        date: '2026-10-18T10:00:00Z',
+        ref_type: 'player_donation',
+        amount: -5e6,
+        first_party_id: 9,
+        second_party_id: 77,
+      },
+      {
+        id: 2,
+        date: '2026-10-19T10:00:00Z',
+        ref_type: 'player_donation',
+        amount: -6e6,
+        first_party_id: 9,
+        second_party_id: 77,
+      },
+      {
+        id: 3,
+        date: '2026-10-19T10:00:00Z',
+        ref_type: 'player_donation',
+        amount: 6e6,
+        first_party_id: 77,
+      },
+    ];
+    const outgoing: OutgoingDonation[] = outgoingDonationsFromJournal(journal, 1, 9);
+    expect(mirror.outgoingDonationsFromJournal(journal, 1, 9)).toEqual(outgoing);
+    const payouts = [
+      {
+        id: 'a',
+        date: '2026-10-17',
+        amount: 5e6,
+        method: 'donation' as const,
+        status: 'waiting-for-journal' as const,
+        notAPayout: false,
+      },
+    ];
+    const history = [
+      { payee: { kind: 'character' as const, id: 70 }, from: 0 },
+      { payee: { kind: 'character' as const, id: 77 }, from: Date.parse('2026-10-19T00:00:00Z') },
+    ];
+    const input = {
+      owners: [
+        {
+          corporationId: 5,
+          payee: { kind: 'character' as const, id: 77 },
+          payouts,
+          since: '2026-10-01',
+        },
+        { corporationId: 6, payeeHistory: history, payouts: [], since: '2026-10-01' },
+      ],
+      outgoing,
+    };
+    expect(mirror.reconcileBookOutgoing(input)).toEqual(reconcileBookOutgoing(input));
+    for (const at of ['2026-10-18T10:00:00Z', '2026-10-19T10:00:00Z']) {
+      expect(mirror.payeeIdsAt(input.owners[1]!, at)).toEqual(payeeIdsAt(input.owners[1]!, at));
+    }
+    const legacy = { payee: { kind: 'character' as const, id: 70 }, payeeChangedAt: 3 };
+    expect(mirror.withPayeeChange(legacy, { kind: 'character', id: 77 }, 9)).toEqual(
+      withPayeeChange(legacy, { kind: 'character', id: 77 }, 9)
+    );
+    const auto = [{ ...payouts[0]!, id: 'j1_1', status: 'matched' as const, journalRef: 1 }];
+    const recorded = { amount: 5e6, date: '2026-10-19', method: 'donation' as const };
+    expect(mirror.payoutToMerge(auto, recorded)).toBe(payoutToMerge(auto, recorded));
+    for (const method of ['donation', 'contract', 'other'] as const) {
+      const rec = { amount: 12, date: '2026-10-18', method };
+      expect(mirror.buildRecordedPayout(rec)).toEqual(buildRecordedPayout(rec));
+    }
+  });
+});
+
+describe('removal mirror (#4520)', () => {
+  const H = 3_600_000;
+  it('payeeMayForce agrees on the boundaries', () => {
+    const start = 1000 * H;
+    for (const changed of [undefined, start - 49 * H, start - 47 * H, start, start + H]) {
+      const input = { payeeChangedAt: changed, removalStartedAt: start };
+      expect(mirror.payeeMayForce(input)).toBe(removal.payeeMayForce(input));
+    }
+  });
+  it('the clock, due check and recipients agree', () => {
+    expect(mirror.REMOVAL_WAIT_MS).toBe(removal.REMOVAL_WAIT_MS);
+    const by = { characterId: 1, name: 'A' };
+    const pending = removal.startRemoval({ status: 'active' }, by, 5);
+    expect(mirror.startRemoval({ status: 'active' }, by, 5)).toEqual(pending);
+    const sent = removal.recordRemovalNotice(pending, 9);
+    expect(mirror.recordRemovalNotice(pending, 9)).toEqual(sent);
+    for (const now of [9, 9 + 24 * H, 9 + 25 * H]) {
+      expect(mirror.isRemovalDue(sent, now)).toBe(removal.isRemovalDue(sent, now));
+    }
+    const rec = {
+      officerIds: [1, 2, 3],
+      startedBy: 1,
+      ceoId: 3,
+      payee: { kind: 'corporation' as const, id: 9 },
+      payeeCeoId: 4,
+    };
+    expect(mirror.removalRecipients(rec)).toEqual(removal.removalRecipients(rec));
   });
 });

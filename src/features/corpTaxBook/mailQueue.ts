@@ -7,14 +7,17 @@
 import {
   isAlreadyQueued,
   reminderAllowed,
+  removalMailsToDrop,
   retryItem,
+  stampRemovalEffectiveAt,
   type MailKind,
   type MailQueueItem,
 } from '@/engine/corpTaxBook/mailQueue';
 import { composeRateChangeMail } from '@/engine/corpTaxBook/ownerRateMail';
 import type { OwnerRateChange } from '@/engine/corpTaxBook/ownerRate';
 import { composeStatementMail, type StatementMailInput } from '@/engine/corpTaxBook/statementMail';
-import { addToQueue, listQueue, nextOrder, saveItem } from './mailQueueStore';
+import { db } from '@/db';
+import { addToQueue, listQueue, nextOrder, saveItem, saveItems } from './mailQueueStore';
 
 /** What the queue needs to mail one Miner their Statement. */
 export interface StatementToMail extends Omit<
@@ -145,6 +148,72 @@ export async function enqueueReminder(
   );
   const { added, skipped } = await addToQueue(items);
   return { ok: true, batchId, queued: added.length, skipped: skipped.length, missingLink };
+}
+
+export interface RemovalMailsInput {
+  corporationId: number;
+  feederCorporationId: number;
+  /** The officer's character the mail goes from. */
+  senderCharacterId: number;
+  kind: 'removal' | 'removalCancelled';
+  /** `startsClock`: a copy to the moon owner's CEO or payee (a removal notice only). */
+  recipients: readonly { id: number; name: string; startsClock?: boolean }[];
+  mail: { subject: string; body: string };
+}
+
+/**
+ * Queues the removal notice (or its cancellation) once per recipient. The queue sends them
+ * paced like any other mail; the first copy to the moon owner side starts the removal's 24 hours.
+ */
+export async function enqueueRemovalMails(input: RemovalMailsInput): Promise<number> {
+  const batchId = crypto.randomUUID();
+  const start = await nextOrder();
+  const stamp = Date.now();
+  const items: MailQueueItem[] = input.recipients.map((r, i) => ({
+    id: crypto.randomUUID(),
+    batchId,
+    corporationId: input.corporationId,
+    feederCorporationId: input.feederCorporationId,
+    statementId: `${input.kind}:${input.feederCorporationId}:${stamp}:${r.id}`,
+    kind: input.kind,
+    senderCharacterId: input.senderCharacterId,
+    recipientId: r.id,
+    recipientName: r.name,
+    ...(r.startsClock === undefined ? {} : { startsClock: r.startsClock }),
+    amount: 0,
+    subject: input.mail.subject,
+    body: input.mail.body,
+    order: start + i,
+    status: 'waiting',
+    createdAt: stamp,
+    attempts: 0,
+  }));
+  const { added } = await addToQueue(items);
+  return added.length;
+}
+
+/** A cancelled removal: its notices still waiting (or failed, awaiting Retry) never go out. */
+export async function dropRemovalMails(
+  corporationId: number,
+  feederCorporationId: number
+): Promise<void> {
+  const ids = removalMailsToDrop(await listQueue(), corporationId, feederCorporationId);
+  if (ids.length > 0) await db.corpMailQueue.bulkDelete(ids);
+}
+
+/** The removal's clock started: every copy still to send states that recorded time. */
+export async function stampRemovalMails(
+  corporationId: number,
+  feederCorporationId: number,
+  effectiveAt: number
+): Promise<void> {
+  const stamped = stampRemovalEffectiveAt(
+    await listQueue(),
+    corporationId,
+    feederCorporationId,
+    effectiveAt
+  );
+  if (stamped.length > 0) await saveItems(stamped);
 }
 
 /** Puts a failed mail back at the end of the line. */

@@ -61,7 +61,9 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
     </Button>
   ) : undefined;
   // A visit that found no refinery to read is not "Synced": say what the book needs instead.
+  // A book that collects for moon owners needs none of its own (decision 20261020-205040).
   const noRefineries =
+    (data.feeders ?? []).length === 0 &&
     sync.run.phase === 'done' &&
     sync.run.outcome.kind === 'synced' &&
     sync.run.outcome.noRefineries;

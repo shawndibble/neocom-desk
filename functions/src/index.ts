@@ -54,10 +54,13 @@ import {
   parseToken,
   parseTurnOnInput,
 } from './corpTaxBook.js';
-import { esiCorporationLookup, esiIdentityReader } from './corpTaxBookEsi.js';
+import {
+  esiCorporationCeoLookup,
+  esiCorporationLookup,
+  esiIdentityReader,
+} from './corpTaxBookEsi.js';
 import {
   parseSaveCorpSyncGrantInput,
-  dropCorpSyncGrant,
   revokeCorpSyncGrant,
   runScheduledCorpSyncs,
   saveCorpSyncGrant,
@@ -68,10 +71,13 @@ import {
   createFeederInvite,
   parseAcceptFeederInviteInput,
   parseCreateFeederInviteInput,
+  parsePreviewFeederInviteInput,
   parseRevokeFeederInviteInput,
+  previewFeederInvite,
   revokeFeederInvite,
 } from './corpTaxBookFeeders.js';
 import {
+  dropBookGrants,
   getFeederStatus,
   leaveFeeder,
   parseFeederCall,
@@ -85,12 +91,33 @@ import {
   requestFeederRate,
 } from './corpTaxBookFeederViewCalls.js';
 import {
+  markFeederPayout,
+  parseMarkPayoutInput,
+  parseReconcilePayoutsInput,
+  parseRecordPayoutInput,
+  reconcileFeederPayoutsCall,
+  recordFeederPayout,
+} from './corpTaxBookFeederPayouts.js';
+import {
   listFeederInvites,
   parseSetFeederModeInput,
+  parseSetFeederPayeeInput,
   parseSetFeederRateInput,
   setFeederMode,
+  setFeederPayee,
   setFeederRate,
 } from './corpTaxBookFeederOwnerCalls.js';
+import {
+  cancelFeederRemoval,
+  finalizeDueRemovals,
+  forceRemovalNow,
+  getRemovalLink,
+  parseRemovalCall,
+  parseRemovalLinkCall,
+  parseRemovalNoticeCall,
+  recordRemovalSent,
+  startFeederRemoval,
+} from './corpTaxBookFeederRemoval.js';
 import { esiSyncReader } from './corpTaxBookSyncEsi.js';
 import {
   claimPayment,
@@ -637,6 +664,17 @@ export const revokeCorpTaxBookFeederInviteCallable = onCall<unknown>(
     )
 );
 
+// The consent screen's preview of a link: the accounting corporation and the offered rate.
+export const previewCorpTaxBookFeederInviteCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    previewFeederInvite(
+      corpTaxBookDeps(),
+      callerOf(request),
+      parsePreviewFeederInviteInput(request.data)
+    )
+);
+
 export const acceptCorpTaxBookFeederInviteCallable = onCall<unknown>(
   CORP_TAX_BOOK_OPTIONS,
   (request) =>
@@ -735,6 +773,80 @@ export const setCorpTaxBookFeederModeCallable = onCall<unknown>(FEEDER_OWNER_OPT
   setFeederMode(feederOwnerDeps(), callerOf(request), parseSetFeederModeInput(request.data))
 );
 
+export const setCorpTaxBookFeederPayeeCallable = onCall<unknown>(FEEDER_OWNER_OPTIONS, (request) =>
+  setFeederPayee(feederOwnerDeps(), callerOf(request), parseSetFeederPayeeInput(request.data))
+);
+
+// Removing a moon owner (issue #4520): start, notice sent, cancel (officers), the payee's link.
+const removalDeps = (): BookDeps => ({
+  ...feederOwnerDeps(),
+  corporationCeo: esiCorporationCeoLookup(),
+});
+
+export const startCorpTaxBookFeederRemovalCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) => startFeederRemoval(removalDeps(), callerOf(request), parseRemovalCall(request.data))
+);
+
+export const recordCorpTaxBookFeederRemovalSentCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    recordRemovalSent(removalDeps(), callerOf(request), parseRemovalNoticeCall(request.data))
+);
+
+export const cancelCorpTaxBookFeederRemovalCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) => cancelFeederRemoval(removalDeps(), callerOf(request), parseRemovalCall(request.data))
+);
+
+export const getCorpTaxBookRemovalLinkCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  getRemovalLink(removalDeps(), callerOf(request), parseRemovalLinkCall(request.data))
+);
+
+export const forceCorpTaxBookRemovalCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
+  (request) =>
+    forceRemovalNow(
+      corpSyncDeps(),
+      callerOf(request),
+      parseRemovalLinkCall(request.data),
+      esiCorporationCeoLookup()
+    )
+);
+
+/** Ends every removal whose 24 hours are up. Deploy is manual, like the other schedules. */
+export const finalizeCorpTaxBookRemovals = onSchedule(
+  { schedule: 'every 1 hours', secrets: FEEDER_VIEW_SECRETS, maxInstances: 1 },
+  async () => {
+    const summary = await finalizeDueRemovals(corpSyncDeps());
+    logInfo('finalizeCorpTaxBookRemovals finished', { ...summary });
+  }
+);
+
+// Paying a moon owner (issue #4514): record a payout, mark a journal row not a payout, and attach
+// the wallet journal's outgoing donations to the records. Each rebuilds the moon owner's view.
+export const recordCorpTaxBookFeederPayoutCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    recordFeederPayout(feederOwnerDeps(), callerOf(request), parseRecordPayoutInput(request.data))
+);
+
+export const markCorpTaxBookFeederPayoutCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    markFeederPayout(feederOwnerDeps(), callerOf(request), parseMarkPayoutInput(request.data))
+);
+
+export const reconcileCorpTaxBookFeederPayoutsCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    reconcileFeederPayoutsCall(
+      feederOwnerDeps(),
+      callerOf(request),
+      parseReconcilePayoutsInput(request.data)
+    )
+);
+
 export const listCorpTaxBookFeederInvitesCallable = onCall<unknown>(
   CORP_TAX_BOOK_OPTIONS,
   (request) => listFeederInvites(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
@@ -778,7 +890,7 @@ export const deleteCorpTaxBookCallable = onCall<unknown>(
   { ...CORP_TAX_BOOK_OPTIONS, secrets: [ALERTS_TOKEN_KEY] },
   (request) =>
     deleteBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data), (corporationId) =>
-      dropCorpSyncGrant(corpSyncDeps(), corporationId)
+      dropBookGrants(corpSyncDeps(), corporationId)
     )
 );
 
@@ -878,8 +990,8 @@ export const sweepCommunityRequests = onSchedule(
 /**
  * syncLawlessSystems (issue #2870): Route Safety's "lawless" badge. CCP's
  * insurgency feed is CORS-locked to eveonline.com, so this fetches it every
- * 10 minutes (its own cache window) and stores the lawless system ids for the
- * app to read. A failed fetch writes nothing: the doc just ages, and the app
+ * 15 minutes (CCP caches it for 10; cost: it was every 10) and stores the
+ * lawless system ids for the app to read. A failed fetch writes nothing: the doc just ages, and the app
  * hides the badge once `updatedAt` passes its staleness limit. An unchanged
  * list is not rewritten each run (issue #4272): only when it changes or the
  * `LAWLESS_HEARTBEAT_MS` refresh is due, so `updatedAt` means "last confirmed".
@@ -887,7 +999,7 @@ export const sweepCommunityRequests = onSchedule(
  * Another Cloud Scheduler job past the free three, like the jobs above.
  */
 export const syncLawlessSystems = onSchedule(
-  { schedule: 'every 10 minutes' },
+  { schedule: 'every 15 minutes' },
   runSyncLawlessSystems
 );
 

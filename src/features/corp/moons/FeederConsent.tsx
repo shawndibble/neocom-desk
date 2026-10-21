@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, TextInput } from '@/components/ui';
+import { useEntityName } from '@/features/character/useEntityName';
+import { previewFeederInvite, type FeederInvitePreview } from '../taxBook/feederClient';
 
 /**
  * What an accounting corporation will see, what it cannot do, how to stop it,
@@ -9,16 +11,44 @@ import { Button, TextInput } from '@/components/ui';
  * collects the rate and sends the player there.
  */
 export function FeederConsent({
+  characterId,
+  code,
   busy,
   onContinue,
   onBack,
 }: {
+  characterId: number;
+  code: string;
   busy: boolean;
   onContinue: (requestedRatePct: number | undefined) => void;
   onBack: () => void;
 }) {
   const { t } = useTranslation();
   const [rate, setRate] = useState('');
+  // Who the link is from and what it offers; a preview that cannot load leaves the screen as it was.
+  const [preview, setPreview] = useState<FeederInvitePreview | 'invalid' | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    previewFeederInvite(characterId, code).then(
+      (p) => {
+        if (!cancelled) setPreview(p);
+      },
+      (e: unknown) => {
+        const reason = (e as { details?: { reason?: unknown } } | null)?.details?.reason;
+        if (!cancelled && reason === 'invite-invalid') setPreview('invalid');
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [characterId, code]);
+  const offer = preview !== null && preview !== 'invalid' ? preview : null;
+  const publicName = useEntityName(
+    offer && offer.collectorName === null ? offer.collectorCorporationId : undefined
+  );
+  const name = offer
+    ? (offer.collectorName ?? publicName ?? `#${offer.collectorCorporationId}`)
+    : null;
   const pct = Number(rate);
   const valid = rate.trim() === '' || (Number.isFinite(pct) && pct >= 0 && pct <= 100);
   const part = (key: 'sees' | 'cannot' | 'stop') => (
@@ -32,6 +62,18 @@ export function FeederConsent({
   return (
     <div className="mx-auto max-w-md space-y-3 rounded-xs border border-line bg-panel p-4 text-sm">
       <h2 className="text-base font-semibold">{t('corpTaxBook.moons.consent.title')}</h2>
+      {preview === 'invalid' && (
+        <p role="alert" className="text-danger">
+          {t('corpTaxBook.moons.setup.failed.invite-invalid')}
+        </p>
+      )}
+      {name !== null && (
+        <p>
+          {t('corpTaxBook.moons.consent.from', { name })}
+          {offer?.offeredOwnerRatePct != null &&
+            ` ${t('corpTaxBook.moons.consent.offered', { pct: offer.offeredOwnerRatePct })}`}
+        </p>
+      )}
       {part('sees')}
       {part('cannot')}
       {part('stop')}
@@ -47,7 +89,7 @@ export function FeederConsent({
         </Button>
         <Button
           variant="primary"
-          disabled={!valid || busy}
+          disabled={!valid || busy || preview === 'invalid'}
           onClick={() => onContinue(rate.trim() === '' ? undefined : pct)}
         >
           {t('corpTaxBook.moons.consent.continue')}

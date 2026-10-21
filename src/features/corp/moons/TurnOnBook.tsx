@@ -8,7 +8,8 @@ import { createFeederInvite, inviteLink } from '../taxBook/feederClient';
 /**
  * D10: a Director picks the start date (and the corp's default rate) to turn the book on.
  * With `collect`, the book is for collecting tax for other corporations: it needs no
- * refineries, and an invite link is made and shown before moving on.
+ * refineries, and an invite link is made and shown before moving on. `earliestStart`: a
+ * former moon owner's book starts no earlier than the day its coverage ended (the default).
  */
 export function TurnOnBook({
   characterId,
@@ -16,16 +17,21 @@ export function TurnOnBook({
   verdict,
   onDone,
   collect = false,
+  earliestStart,
 }: {
   characterId: number;
   corporationId: number;
   verdict: OfficerVerdict;
   onDone: () => void;
   collect?: boolean;
+  earliestStart?: string;
 }) {
   const { t } = useTranslation();
   const today = new Date().toISOString().slice(0, 10);
-  const [startDate, setStartDate] = useState(today);
+  const leaveDay = earliestStart ?? null;
+  // Untouched, it is the leave day once known (also the earliest pick), else today.
+  const [picked, setStartDate] = useState<string | null>(null);
+  const startDate = picked ?? leaveDay ?? today;
   const [rate, setRate] = useState('10');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +45,12 @@ export function TurnOnBook({
     );
   }
   const pct = Number(rate);
-  const valid = startDate <= today && rate !== '' && pct >= 0 && pct <= 100;
+  const valid =
+    startDate <= today &&
+    (leaveDay === null || startDate >= leaveDay) &&
+    rate !== '' &&
+    pct >= 0 &&
+    pct <= 100;
   const submit = async () => {
     setBusy(true);
     setError(null);
@@ -50,7 +61,12 @@ export function TurnOnBook({
         setLink(inviteLink(window.location.origin, code));
       } else onDone();
     } catch (e) {
-      setError(editErrorMessage(e));
+      const reason = (e as { details?: { reason?: unknown } } | null)?.details?.reason;
+      setError(
+        reason === 'start-before-leave'
+          ? t('corpTaxBook.moons.off.startBeforeLeave')
+          : editErrorMessage(e)
+      );
     } finally {
       setBusy(false);
     }
@@ -76,6 +92,7 @@ export function TurnOnBook({
         <TextInput
           type="date"
           max={today}
+          {...(leaveDay !== null ? { min: leaveDay } : {})}
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
         />

@@ -11,7 +11,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:emulator": "vitest run --no-file-parallelism src/corpTaxBookEmulator.test.ts src/corpSyncGrantEmulator.test.ts src/corpTaxBookFeederSyncEmulator.test.ts src/corpTaxBookFeederGrantEmulator.test.ts src/corpTaxBookFeederViewEmulator.test.ts"
+    "test:emulator": "vitest run --no-file-parallelism src/corpTaxBookEmulator.test.ts src/corpSyncGrantEmulator.test.ts src/corpTaxBookFeederSyncEmulator.test.ts src/corpTaxBookFeederGrantEmulator.test.ts src/corpTaxBookFeederViewEmulator.test.ts src/corpTaxBookFeederRemovalEmulator.test.ts src/corpTaxBookFeedersEmulator.test.ts"
   },
   "dependencies": {
     "aws4fetch": "^1.0.20",

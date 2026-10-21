@@ -15,6 +15,7 @@ const RECORD = 'corpTaxBooks/98000001/feeders/98000002';
 const PAYOUT = `${RECORD}/payouts/p1`;
 const INVITE = 'corpTaxBookFeederInvites/abc';
 const POINTER = 'corpTaxBookFeederOf/98000002';
+const REMOVAL_LINK = 'corpTaxBookRemovalLinks/abc';
 
 beforeAll(async () => {
   env = await createRulesEnv();
@@ -30,6 +31,7 @@ beforeEach(async () => {
     await setDoc(doc(db, PAYOUT), { amount: 1 });
     await setDoc(doc(db, INVITE), { collectorCorporationId: 98000001 });
     await setDoc(doc(db, POINTER), { collectorCorporationId: 98000001 });
+    await setDoc(doc(db, REMOVAL_LINK), { collectorCorporationId: 98000001 });
     await setDoc(doc(db, `corpTaxBooks/98000001/officers/char:${OFFICER}`), {
       ownerHash: 'h',
       corporationId: 98000001,
@@ -62,6 +64,15 @@ describe('feeder paths', () => {
     const db = ctx(env);
     await assertFails(getDoc(doc(db, INVITE)));
     await assertFails(getDoc(doc(db, POINTER)));
+  });
+
+  // Issue #4520: the link in a removal's mail is function-only, like an invite.
+  it.each(clients)('denies %s every read and write of a removal link', async (_n, ctx) => {
+    const db = ctx(env);
+    await assertFails(getDoc(doc(db, REMOVAL_LINK)));
+    await assertFails(setDoc(doc(db, REMOVAL_LINK), { startedAt: 1 }));
+    await assertFails(setDoc(doc(db, 'corpTaxBookRemovalLinks/new'), { startedAt: 1 }));
+    await assertFails(deleteDoc(doc(db, REMOVAL_LINK)));
   });
 
   it('lets an officer read a feeder record, and nobody else', async () => {

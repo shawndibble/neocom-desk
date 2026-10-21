@@ -50,8 +50,11 @@ const detail: MoonOwnerDetail = {
       notAPayout: false,
     },
   ],
+  hasPayee: true,
   accrued: 33_024_480,
   paid: 20_000_000,
+  payee: { kind: 'corporation', id: 98 },
+  period: { from: '2026-10-17', to: '2026-10-19' },
   mined: [
     { characterId: 3, structureId: 11, oreTypeIds: [1, 2], quantity: 801_150, value: 152_430_000 },
     { characterId: 1, structureId: 10, oreTypeIds: [1, 2], quantity: 412_300, value: 81_204_000 },
@@ -76,6 +79,9 @@ const meta = {
     backTo: '/corp/moons/moon-owners',
     onSetRate: () => {},
     onSettledOtherwise: () => {},
+    onPay: () => {},
+    onAddPayment: () => {},
+    onMarkPayout: () => {},
   },
 } satisfies Meta<typeof MoonOwnerPage>;
 
@@ -121,5 +127,71 @@ export const NoRateSet: Story = {
   },
 };
 
-/** @summary A viewer who may not edit: no Set rate or Settled otherwise. */
-export const ReadOnly: Story = { args: { onSetRate: undefined, onSettledOtherwise: undefined } };
+const removalRow = { ...detail.row, status: 'removal-pending' } as const;
+
+/** @summary A removal whose notice went out: the strip says when it takes effect, with Cancel removal. */
+export const RemovalPending: Story = {
+  args: {
+    detail: {
+      ...detail,
+      row: removalRow,
+      removal: {
+        startedAt: Date.UTC(2026, 9, 17, 14, 22),
+        startedByName: 'Kestrel Vane',
+        effectiveAt: Date.UTC(2026, 9, 18, 14, 22),
+      },
+    },
+    onRemove: () => {},
+    onCancelRemoval: async () => {},
+    onNoticeSent: async () => {},
+  },
+};
+
+/** @summary A removal whose notice has not gone out: the 24 hours have not begun. */
+export const RemovalPendingNoticeUnsent: Story = {
+  args: {
+    detail: {
+      ...detail,
+      row: removalRow,
+      removal: { startedAt: Date.UTC(2026, 9, 17, 14, 22), startedByName: 'Kestrel Vane' },
+    },
+    onRemove: () => {},
+    onCancelRemoval: async () => {},
+    onNoticeSent: async () => {},
+  },
+};
+
+/** @summary An officer who may edit sees Remove from this book… beside Settled otherwise…. */
+export const WithRemoveButton: Story = { args: { onRemove: () => {} } };
+
+/** @summary A detected payment an officer marked "not a payout": it stays listed and can be counted again. */
+export const NotAPayout: Story = {
+  args: {
+    detail: {
+      ...detail,
+      payouts: [
+        ...detail.payouts,
+        {
+          id: 'j1_9',
+          date: '2026-10-12',
+          amount: 3_000_000,
+          method: 'donation',
+          status: 'matched',
+          journalRef: 9,
+          notAPayout: true,
+        },
+      ],
+    },
+  },
+};
+
+/** @summary A viewer who may not edit: no Pay, Set rate, Settled otherwise or payment actions. */
+export const ReadOnly: Story = {
+  args: {
+    onSetRate: undefined,
+    onSettledOtherwise: undefined,
+    onPay: undefined,
+    onAddPayment: undefined,
+    onMarkPayout: undefined,
+  },
+};

@@ -130,9 +130,11 @@ export function MoonsSetup({
     );
   }
 
+  const earliestStart = status.status === 'none' ? status.ownBookFrom : undefined;
   if (step === 'own')
     return (
       <TurnOnBook
+        earliestStart={earliestStart}
         characterId={characterId}
         corporationId={corporationId}
         verdict={verdict}
@@ -143,6 +145,7 @@ export function MoonsSetup({
     return (
       <TurnOnBook
         collect
+        earliestStart={earliestStart}
         characterId={characterId}
         corporationId={corporationId}
         verdict={verdict}
@@ -153,6 +156,8 @@ export function MoonsSetup({
   if (step === 'consent' && code)
     return (
       <FeederConsent
+        characterId={characterId}
+        code={code}
         busy={busy}
         onBack={() => setStep('choices')}
         onContinue={(rate) => {

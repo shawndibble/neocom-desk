@@ -4,11 +4,11 @@ Route `/help` (`src/routes/Help.tsx`), a footer-group page (`src/app/navDestinat
 
 Command palette (`src/features/commandPalette`) is covered elsewhere; here only its link to Help: the `?` key and the palette's shortcuts command both land on `/help/shortcuts`.
 
-| Tab       | Component                                            | Content                                                                |
-| --------- | ---------------------------------------------------- | ---------------------------------------------------------------------- |
-| Shortcuts | `src/features/help/ShortcutsPanel.tsx`               | Every key the app answers to, from the same array that dispatches them |
-| FAQ       | `src/features/faq/FaqPanel.tsx` (+ `whatWeStore.ts`) | 8 collapsible questions; "what we store" commitments                   |
-| Support   | `src/features/help/HelpPanel.tsx`                    | Discord, source, say thanks                                            |
+| Tab       | Component                                            | Content                                                                                          |
+| --------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Shortcuts | `src/features/help/ShortcutsPanel.tsx`               | Every key the app answers to, from the same array that dispatches them                           |
+| FAQ       | `src/features/faq/FaqPanel.tsx` (+ `whatWeStore.ts`) | collapsible questions, one of them "How do I find skills to train?"; "what we store" commitments |
+| Support   | `src/features/help/HelpPanel.tsx`                    | Discord, source, say thanks                                                                      |
 
 ## Purpose and user goal
 
@@ -75,7 +75,7 @@ No ESI, no scope, no Dexie, no Firestore, no URL state beyond the tab path. Stat
 ## Tests assert
 
 - `HelpPanel.test.tsx`: Support has the "Bugs, ideas and chat" panel with a Discord link (`DISCORD_URL`, `target=_blank`, `rel` has `noopener`); "Source code" links `REPO_URL` the same way and says report bugs and ideas on Discord not GitHub; "Say thanks" names Mero Otichoda and says donations are "never expected".
-- `FaqPanel.test.tsx` ("What We Store"): every synced collection in the registry maps to an existing FAQ line and every synced line maps to a collection; synced lines keep their reading order; every synced setting key has words in the FAQ; questions render closed (`aria-expanded=false`), exact question count, delete and update questions exist; opening renders every group and line once; how-to answers say where to go ("press Update app", push kinds text); exactly two groups and no group listing things we do not hold; states the cases where something leaves the device (push, crash reports, writes to EVE); says when a removed character's synced copy leaves our servers; does not claim EVE data is uploaded; points to the Help Support tab.
+- `FaqPanel.test.tsx` ("What We Store"): every synced collection in the registry maps to an existing FAQ line and every synced line maps to a collection; synced lines keep their reading order; every synced setting key has words in the FAQ; questions render closed (`aria-expanded=false`), exact question count, delete and update questions exist; opening renders every group and line once; how-to answers say where to go ("Update now", push kinds text); exactly two groups and no group listing things we do not hold; states the cases where something leaves the device (push, crash reports, writes to EVE); says when a removed character's synced copy leaves our servers; does not claim EVE data is uploaded; points to the Help Support tab.
 - `legacyPaths.test.ts`: `/settings/faq` -> `/help/faq`, `/settings/help` -> `/help/support`; unknown paths and prefix-only matches are left alone.
 
 ## Observed gaps

@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
-import { enqueueReminder, enqueueStatements, retryMail, type StatementToMail } from './mailQueue';
+import {
+  enqueueReminder,
+  enqueueRemovalMails,
+  enqueueStatements,
+  retryMail,
+  type StatementToMail,
+} from './mailQueue';
 
 const readVerifyTokens = vi.fn();
 const editCorpTaxBook = vi.fn();
@@ -159,5 +165,41 @@ describe('retryMail', () => {
     expect(after).toMatchObject({ status: 'waiting' });
     expect(after?.order).toBeGreaterThan(first.order + 1);
     expect(after?.failureReason).toBeUndefined();
+  });
+});
+
+describe('enqueueRemovalMails', () => {
+  const input = {
+    corporationId: 98000001,
+    feederCorporationId: 98000002,
+    senderCharacterId: 7,
+    kind: 'removal' as const,
+    recipients: [
+      { id: 11, name: 'Ceo' },
+      { id: 12, name: 'Payee' },
+      { id: 13, name: 'Officer' },
+    ],
+    mail: { subject: 'S', body: 'B' },
+  };
+
+  it('queues one waiting mail per recipient, all about the same moon owner', async () => {
+    expect(await enqueueRemovalMails(input)).toBe(3);
+    const items = await db.corpMailQueue.toArray();
+    expect(items.map((i) => i.recipientId).sort()).toEqual([11, 12, 13]);
+    expect(items.every((i) => i.status === 'waiting' && i.kind === 'removal')).toBe(true);
+    expect(items.every((i) => i.feederCorporationId === 98000002)).toBe(true);
+    expect(items.every((i) => i.senderCharacterId === 7 && i.amount === 0)).toBe(true);
+  });
+
+  it('queues the cancellation as its own kind without touching the notice', async () => {
+    await enqueueRemovalMails(input);
+    await enqueueRemovalMails({
+      ...input,
+      kind: 'removalCancelled',
+      recipients: [input.recipients[0]!],
+    });
+    const items = await db.corpMailQueue.toArray();
+    expect(items.filter((i) => i.kind === 'removal')).toHaveLength(3);
+    expect(items.filter((i) => i.kind === 'removalCancelled')).toHaveLength(1);
   });
 });

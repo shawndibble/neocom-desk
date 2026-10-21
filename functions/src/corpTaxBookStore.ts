@@ -8,6 +8,7 @@
 import { randomBytes } from 'node:crypto';
 import {
   FieldValue,
+  type DocumentSnapshot,
   type DocumentReference,
   type Firestore,
   type QueryDocumentSnapshot,
@@ -24,7 +25,9 @@ import {
   EXTRACTIONS,
   FEEDER_INVITES_COLLECTION,
   BILLED_BY_COLLECTION,
+  FEEDERS,
   FEEDER_OF_COLLECTION,
+  FEEDER_PREVIOUS_COLLECTION,
   MEMBER_SETUP_MS,
   META,
   MINERS,
@@ -65,6 +68,8 @@ import {
   isRetroactiveRate,
   mergeObservedRows,
   observedRowKey,
+  shiftDate,
+  type CoveragePeriod,
   type DismissableLine,
   type MirrorDismissal,
   type MirrorExtraction,
@@ -83,6 +88,8 @@ export interface BookDeps {
   readIdentity: IdentityReader;
   /** Prices the feeder view (issue #4512); absent in tests that never rebuild one. */
   openPrices?: OpenPricesReader;
+  /** A corporation's CEO (public ESI); only the removal callables (issue #4520) need it. */
+  corporationCeo?: (corporationId: number) => Promise<number | undefined>;
 }
 
 /** Who is calling: the Firebase uid `char:{id}` and the ownerHash claim. */
@@ -281,6 +288,11 @@ export async function turnOnBook(deps: BookDeps, caller: Caller, input: TurnOnIn
         .exists
     )
       fail('failed-precondition', 'This corporation feeds another book', 'is-a-feeder');
+    // A former moon owner's book starts no earlier than the leave day: the accounting
+    // corporation covered every day before it, and an earlier start would bill them twice.
+    const floor = await ownBookFloor((r) => tx.get(r), deps.db, input.corporationId);
+    if (floor !== null && input.startDate < floor)
+      fail('invalid-argument', 'The start date is before the leave day', 'start-before-leave');
     tx.create(ref, {
       ...defaultSettings(input.startDate, input.startRatePct),
       corporationId: input.corporationId,
@@ -299,6 +311,31 @@ export async function turnOnBook(deps: BookDeps, caller: Caller, input: TurnOnIn
     });
   });
   return { corporationId: input.corporationId };
+}
+
+/**
+ * The earliest own-book start of a corporation an accounting corporation handled before: the
+ * day after its last coverage ended (a removal can take effect before it is processed), else
+ * the UTC day it left (no closed coverage, or the book that held it is gone). Null if never.
+ */
+export async function ownBookFloor(
+  get: (ref: DocumentReference) => Promise<DocumentSnapshot>,
+  db: Firestore,
+  corporationId: number
+): Promise<string | null> {
+  const previous = await get(db.collection(FEEDER_PREVIOUS_COLLECTION).doc(String(corporationId)));
+  const leftAt = previous.get('leftAt');
+  if (typeof leftAt !== 'number') return null;
+  const collector = previous.get('collectorCorporationId');
+  if (typeof collector === 'number') {
+    const record = await get(bookRef(db, collector).collection(FEEDERS).doc(String(corporationId)));
+    const periods = (record.get('coveragePeriods') ?? []) as CoveragePeriod[];
+    const ends = periods.map((p) => p.to);
+    if (ends.length > 0 && ends.every((to) => typeof to === 'string')) {
+      return shiftDate((ends as string[]).sort().at(-1)!, 1);
+    }
+  }
+  return utcDate(leftAt);
 }
 
 /**

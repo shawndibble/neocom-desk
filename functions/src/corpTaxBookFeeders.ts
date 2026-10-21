@@ -28,8 +28,10 @@ import {
   type CoveragePeriod,
   type FeederModeChange,
   type OwnerRateEntry,
+  type Removal,
 } from './corpTaxBookEngine.js';
 import { ROLES_SCOPE } from './corpTaxBookEsi.js';
+import { appendAgreedRate } from './corpTaxBookFeederOwnerCalls.js';
 import {
   appendAudit,
   authorizeOfficer,
@@ -61,6 +63,10 @@ export interface FeederRecord {
   /** One payee: a corporation or a player. */
   payee?: { kind: 'corporation' | 'character'; id: number };
   payeeChangedAt?: number;
+  /** A removal the accounting corporation started (#4520); present while status is `pending-removal`. */
+  removal?: Removal;
+  /** The id (hash) of the removal mail's link; the link's code is only ever in the mail. */
+  removalLinkId?: string;
   mode: 'normal' | 'settled-otherwise';
   note?: string;
   /** The Character (the signed-in player) who handed over the mining grant; the holder may be their alt. */
@@ -235,12 +241,54 @@ export async function revokeFeederInvite(
   return { revoked: true };
 }
 
+// --- Preview ---------------------------------------------------------------
+
+export interface FeederInvitePreview {
+  collectorCorporationId: number;
+  /** The book's own name setting; absent when never set (the client resolves the public name). */
+  collectorName: string | null;
+  offeredOwnerRatePct: number | null;
+}
+
+export function parsePreviewFeederInviteInput(data: unknown): { code: string } {
+  return { code: boundedString(record(data).code, 'code', 64) };
+}
+
+/**
+ * What the consent screen shows before the grant: who the link is from and the rate it
+ * offers. Holding the code is the standing; a revoked, used or unknown link, or one whose
+ * book is closed, all read the same.
+ */
+export async function previewFeederInvite(
+  deps: BookDeps,
+  caller: Caller,
+  input: { code: string }
+): Promise<FeederInvitePreview> {
+  if (characterIdForUid(caller.uid) === undefined)
+    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const invite = (await inviteRef(deps.db, hashInviteCode(input.code)).get()).data() as
+    FeederInviteDoc | undefined;
+  const book =
+    invite && !invite.revokedAt && !invite.acceptedAt
+      ? await bookRef(deps.db, invite.collectorCorporationId).get()
+      : undefined;
+  if (!invite || !book?.exists || book.get('active') !== true) {
+    fail('not-found', 'No such invite link', 'invite-invalid');
+  }
+  const name = book.get('corporationName');
+  return {
+    collectorCorporationId: invite.collectorCorporationId,
+    collectorName: typeof name === 'string' && name !== '' ? name : null,
+    offeredOwnerRatePct: invite.offeredOwnerRatePct ?? null,
+  };
+}
+
 // --- Accept ----------------------------------------------------------------
 
 export interface AcceptFeederInviteResult {
   collectorCorporationId: number;
   feederCorporationId: number;
-  /** True when this reopened a record that had left or been removed. */
+  /** True when this reopened a record that had left, been removed or disconnected. */
   rejoined: boolean;
 }
 
@@ -292,7 +340,31 @@ export async function acceptFeederInvite(
 export interface AcceptUndo {
   /** The feeder record before the accept; absent when the accept created it. */
   priorRecord?: FeederRecord;
+  /** The pointer before the accept: only a disconnected moon owner taken back has one. */
+  priorPointer?: { collectorCorporationId: number; since: number };
   inviteId: string;
+}
+
+/** Per-feed sync state that never carries into a new coverage period. */
+const FEED_STATE: readonly (keyof FeederRecord)[] = [
+  'leftAt',
+  'staleSince',
+  'disconnectedAt',
+  'lastSyncResult',
+  'viewDismissedAt',
+  // The offered rate belongs to the link, not to the record's history.
+  'offeredOwnerRatePct',
+];
+
+/** The agreed rate an accepted link's offer stands for, dated the join day. */
+function offeredRate(base: FeederRecord, invite: FeederInviteDoc, now: number) {
+  const pct = invite.offeredOwnerRatePct;
+  if (pct === undefined) return {};
+  return {
+    offeredOwnerRatePct: pct,
+    agreedRatePct: pct,
+    ownerRateHistory: appendAgreedRate(base, pct, now),
+  };
 }
 
 export interface AcceptCoreInput {
@@ -302,6 +374,11 @@ export interface AcceptCoreInput {
   feederCorp: number;
   /** Extra fields stamped on the new or reopened record (the grant path's holder). */
   recordExtra?: Partial<FeederRecord>;
+  /**
+   * Take back a disconnected moon owner of this book. Only the grant path sets it: a
+   * take-back without a fresh grant would only go stale and disconnect again.
+   */
+  allowTakeBack?: boolean;
 }
 
 /**
@@ -338,11 +415,16 @@ export async function acceptInviteCore(
       fail('failed-precondition', 'This corporation runs its own book', 'own-book-exists');
     }
     const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp));
-    const pointer = (await tx.get(pointerRef)).data();
-    if (pointer)
-      fail('failed-precondition', 'This corporation already feeds a book', 'already-feeder');
+    const pointer = (await tx.get(pointerRef)).data() as AcceptUndo['priorPointer'];
     const feederRef = bookRef(deps.db, collector).collection(FEEDERS).doc(String(feederCorp));
     const held = (await tx.get(feederRef)).data() as FeederRecord | undefined;
+    // A disconnected moon owner keeps its pointer; this book's fresh link takes it back.
+    const takenBack =
+      input.allowTakeBack === true &&
+      pointer?.collectorCorporationId === collector &&
+      held?.status === 'disconnected';
+    if (pointer && !takenBack)
+      fail('failed-precondition', 'This corporation already feeds a book', 'already-feeder');
 
     let rejoined = false;
     let priorRecord: FeederRecord | undefined;
@@ -353,32 +435,24 @@ export async function acceptInviteCore(
         invitedBy: invite.createdBy,
         joinedAt: now,
         mode: 'normal',
-        ...(invite.offeredOwnerRatePct !== undefined
-          ? { offeredOwnerRatePct: invite.offeredOwnerRatePct }
-          : {}),
         coveragePeriods: [{ from: today }],
-        ...extra,
       };
-      tx.create(feederRef, created);
+      tx.create(feederRef, { ...created, ...offeredRate(created, invite, now), ...extra });
     } else {
-      // The pointer is gone only once the record has left or been removed.
-      if (held.status !== 'left' && held.status !== 'removed') {
+      // The pointer is gone only once the record has left or been removed, or kept while disconnected.
+      if (held.status !== 'left' && held.status !== 'removed' && !takenBack) {
         fail('failed-precondition', 'This corporation already feeds this book', 'feeder-active');
       }
       rejoined = true;
       priorRecord = held;
       const kept: FeederRecord = { ...held };
-      delete kept.leftAt;
-      // The offered rate belongs to the link, not to the record's history.
-      delete kept.offeredOwnerRatePct;
+      for (const key of FEED_STATE) delete kept[key];
       const reopened: FeederRecord = {
         ...kept,
         status: 'active',
         invitedBy: invite.createdBy,
         joinedAt: now,
-        ...(invite.offeredOwnerRatePct !== undefined
-          ? { offeredOwnerRatePct: invite.offeredOwnerRatePct }
-          : {}),
+        ...offeredRate(held, invite, now),
         coveragePeriods: reopenPeriod(held.coveragePeriods, today),
         ...extra,
       };
@@ -403,7 +477,11 @@ export async function acceptInviteCore(
       collectorCorporationId: collector,
       feederCorporationId: feederCorp,
       rejoined,
-      undo: { inviteId, ...(priorRecord ? { priorRecord } : {}) },
+      undo: {
+        inviteId,
+        ...(priorRecord ? { priorRecord } : {}),
+        ...(pointer ? { priorPointer: pointer } : {}),
+      },
     };
   });
 }

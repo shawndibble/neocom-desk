@@ -15,7 +15,7 @@ import { ensureAnySession } from '@/sync/syncAuth';
 
 const COLLECTION = 'systemConditions';
 const DOC_ID = 'lawless';
-/** The function writes every 10 minutes: reading it more often only costs reads. */
+/** The function writes every 15 minutes: reading it more often only costs reads. */
 const REREAD_AFTER_MS = 5 * 60 * 1000;
 
 let lastRead: { at: number; data: unknown } | null = null;

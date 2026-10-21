@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { closePeriod, filterCovered, isDayCovered, reopenPeriod } from './coverage';
+import {
+  closePeriod,
+  filterCovered,
+  isDayCovered,
+  reopenPeriod,
+  splitByCoverage,
+} from './coverage';
 
 describe('isDayCovered', () => {
   it('covers an open period from its first day on', () => {
@@ -89,5 +95,43 @@ describe('filterCovered', () => {
     const periods = [{ from: '2026-07-10', to: '2026-07-12' }];
     const rows = [{ date: '2026-07-09' }, { date: '2026-07-10' }, { date: '2026-07-13' }];
     expect(filterCovered(rows, periods)).toEqual([{ date: '2026-07-10' }]);
+  });
+});
+
+describe('splitByCoverage (moon owner rows, #4618)', () => {
+  const BOOK = 98000001;
+  const OWNER = 98000002;
+  const feeders = [
+    {
+      corporationId: OWNER,
+      coveragePeriods: [{ from: '2026-07-10', to: '2026-07-12' }, { from: '2026-07-20' }],
+    },
+  ];
+  const fed = (date: string) => ({ date, sourceCorporationId: OWNER });
+
+  it('puts a moon owner row before its coverage starts outside coverage', () => {
+    const out = splitByCoverage([fed('2026-07-09')], BOOK, feeders);
+    expect(out.covered).toEqual([]);
+    expect(out.outsideCoverage).toEqual([fed('2026-07-09')]);
+  });
+
+  it('puts a moon owner row after its coverage ended outside coverage', () => {
+    expect(splitByCoverage([fed('2026-07-13')], BOOK, feeders).outsideCoverage).toEqual([
+      fed('2026-07-13'),
+    ]);
+  });
+
+  it('covers a row inside a rejoined second period, and still open', () => {
+    const out = splitByCoverage([fed('2026-07-20'), fed('2026-12-01')], BOOK, feeders);
+    expect(out.covered).toEqual([fed('2026-07-20'), fed('2026-12-01')]);
+    expect(out.outsideCoverage).toEqual([]);
+  });
+
+  it('never tests the book’s own rows, nor rows of a moon owner it has no record of', () => {
+    const own = [{ date: '2026-07-01' }, { date: '2026-07-01', sourceCorporationId: BOOK }];
+    const stranger = { date: '2026-07-01', sourceCorporationId: 98000099 };
+    const out = splitByCoverage([...own, stranger], BOOK, feeders);
+    expect(out.covered).toEqual([...own, stranger]);
+    expect(out.outsideCoverage).toEqual([]);
   });
 });

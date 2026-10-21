@@ -80,3 +80,45 @@ export function SettledOtherwiseDialog({
     </DialogShell>
   );
 }
+
+/** Start a removal: the 24-hour wait, who is mailed, and what stays. */
+export function RemoveMoonOwnerDialog({
+  ownerName,
+  accountingName,
+  hasPayee,
+  onClose,
+  onStart,
+}: {
+  ownerName: string;
+  accountingName: string;
+  /** Whether a payee is on record, so the list says they are mailed. */
+  hasPayee: boolean;
+  onClose: () => void;
+  onStart: () => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const k = (key: string) => `corpTaxBook.moons.moonOwners.dialogs.remove.${key}`;
+  return (
+    <DialogShell
+      open
+      onClose={onClose}
+      title={t(k('title'), { name: ownerName })}
+      confirmLabel={t(k('confirm'))}
+      canConfirm
+      danger
+      run={onStart}
+    >
+      <p>{t(k('body'), { accounting: accountingName })}</p>
+      <div className="space-y-1 rounded-xs border border-line p-3">
+        <p className="text-xs text-text-dim">{t(k('mailTo'))}</p>
+        <ul className="list-disc space-y-0.5 pl-5">
+          <li>{t(k('officers'), { accounting: accountingName })}</li>
+          <li>{t(k('ceo'), { name: ownerName })}</li>
+          {hasPayee && <li>{t(k('payee'), { name: ownerName })}</li>}
+        </ul>
+      </div>
+      <p className="text-xs text-text-dim">{t(k('kept'))}</p>
+      <p className="text-xs text-text-dim">{t(k('mailNote'))}</p>
+    </DialogShell>
+  );
+}

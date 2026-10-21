@@ -49,6 +49,9 @@ export interface FeederViewSummary {
   refineryCount: number;
   unpricedDays: number;
   dismissedAt: number | null;
+  /** A pending removal (#4520): when it started and, once its notice is out, when it takes effect. */
+  removalStartedAt?: number | null;
+  removalEffectiveAt?: number | null;
 }
 
 export interface FeederViewLine {

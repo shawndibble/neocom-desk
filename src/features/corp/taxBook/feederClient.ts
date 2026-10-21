@@ -5,6 +5,7 @@
  */
 import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
+import type { OutgoingDonation } from '@/engine/corpTaxBook/payouts';
 import { getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 
@@ -38,7 +39,8 @@ export interface FeederRefinery {
 }
 
 export type FeederStatus =
-  | { status: 'none' }
+  /** `ownBookFrom`: a former moon owner's earliest own-book start (UTC day). */
+  | { status: 'none'; ownBookFrom?: string }
   | {
       status: 'feeder';
       collectorCorporationId: number;
@@ -76,6 +78,21 @@ export async function getFeederStatus(
     if (reason === 'not-your-feeder') return { status: 'none' };
     throw error;
   }
+}
+
+/** What an invite link offers, for the consent screen. Fails with reason `invite-invalid` for a dead link. */
+export interface FeederInvitePreview {
+  collectorCorporationId: number;
+  /** The book's own name setting; null when never set. */
+  collectorName: string | null;
+  offeredOwnerRatePct: number | null;
+}
+
+export function previewFeederInvite(
+  characterId: number,
+  code: string
+): Promise<FeederInvitePreview> {
+  return call(characterId, 'previewCorpTaxBookFeederInviteCallable', { code });
 }
 
 /** Leave the accounting corporation: revokes the grant at SSO and deletes it. Immediate. */
@@ -143,6 +160,52 @@ export async function setFeederMode(
   });
 }
 
+/** "I've sent it": records a payout at once; the wallet journal attaches to it later. Whole ISK. */
+export async function recordFeederPayout(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  payout: { amount: number; date: string; method: 'donation' | 'contract' | 'other' }
+): Promise<{ id: string }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'recordCorpTaxBookFeederPayoutCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    ...payout,
+  });
+}
+
+/** Mark a detected payment "not a payout" (or put it back). It keeps its journal entry, so it is never found again. */
+export async function markFeederPayout(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  payoutId: string,
+  notAPayout: boolean
+): Promise<{ ok: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'markCorpTaxBookFeederPayoutCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    payoutId,
+    notAPayout,
+  });
+}
+
+/** Hands over the donations the wallet sent so they attach to recorded payouts. Uses the cached officer check. */
+export async function reconcileFeederPayouts(
+  characterId: number,
+  corporationId: number,
+  outgoing: readonly OutgoingDonation[]
+): Promise<{ attached: number; recorded: number }> {
+  return call(characterId, 'reconcileCorpTaxBookFeederPayoutsCallable', {
+    corporationId,
+    outgoing,
+  });
+}
+
 /** Revoke an open invite link. */
 export async function revokeFeederInvite(
   characterId: number,
@@ -168,4 +231,103 @@ export async function listFeederInvites(
     { corporationId }
   );
   return invites;
+}
+
+/** Removing a moon owner (#4520): the server's answer when a removal starts. */
+export interface StartedRemoval {
+  startedAt: number;
+  /** The code for the "Remove now" link in the mail; never shown elsewhere. */
+  code: string;
+  /** Character ids the one mail goes to. */
+  recipients: number[];
+  /**
+   * The moon owner's CEO and payee among them: only a copy to one of them starts the 24 hours
+   * (#4617). Absent from a server that predates the split.
+   */
+  ownerRecipients?: number[];
+}
+
+/** Start a 24-hour removal. The 24 hours begin when the notice is sent. */
+export async function startFeederRemoval(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number
+): Promise<StartedRemoval> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'startCorpTaxBookFeederRemovalCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+  });
+}
+
+/** The notice went out: the removal's 24 hours run from `sentAt`. The first notice wins. */
+export async function recordFeederRemovalSent(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  sentAt?: number
+): Promise<{ effectiveAt: number | null }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'recordCorpTaxBookFeederRemovalSentCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    ...(sentAt === undefined ? {} : { sentAt }),
+  });
+}
+
+/** Cancel a pending removal; returns whom the short cancellation mail goes to. */
+export async function cancelFeederRemoval(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number
+): Promise<{ recipients: number[] }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'cancelCorpTaxBookFeederRemovalCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+  });
+}
+
+/**
+ * The payee's "Remove now" page: one answer for a link that cannot be used, whatever the reason
+ * (expired, over, guarded, or the wrong person), with when the removal takes effect, if known.
+ */
+export type RemovalLinkState =
+  | { available: false; effectiveAt: number | null }
+  | {
+      available: true;
+      collectorCorporationId: number;
+      feederCorporationId: number;
+      effectiveAt: number | null;
+    };
+
+export function getRemovalLink(characterId: number, code: string): Promise<RemovalLinkState> {
+  return call(characterId, 'getCorpTaxBookRemovalLinkCallable', { code });
+}
+
+/** End the removal now, as the payee. `ended: false` is the same neutral answer as an expired link. */
+export function forceRemoval(
+  characterId: number,
+  code: string
+): Promise<{ ended: boolean; effectiveAt: number | null }> {
+  return call(characterId, 'forceCorpTaxBookRemovalCallable', { code });
+}
+
+/** Set a moon owner's payee; stamps when it changed. */
+export async function setFeederPayee(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  payee: { kind: 'corporation' | 'character'; id: number }
+): Promise<{ ok: true }> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'setCorpTaxBookFeederPayeeCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    payee,
+  });
 }

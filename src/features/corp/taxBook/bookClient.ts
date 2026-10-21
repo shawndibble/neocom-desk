@@ -318,6 +318,8 @@ export interface BookFeeder extends FeederReadClock {
   /** When it disconnected after 30 days stale (ms). */
   disconnectedAt?: number;
   payeeChangedAt?: number;
+  /** A pending removal (#4520): who started it and when; `effectiveAt` once its notice is out. */
+  removal?: { startedAt: number; startedBy: number; startedByName: string; effectiveAt?: number };
   viewDismissedAt?: number;
   requestedRatePct?: number;
   agreedRatePct?: number;
