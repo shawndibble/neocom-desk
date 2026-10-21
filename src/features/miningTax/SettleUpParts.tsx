@@ -37,7 +37,7 @@ export function SettleCopyRow({
       <Tooltip content={value}>
         <span
           className={cx(
-            'min-w-0 flex-1 truncate text-xs tabular-nums',
+            'min-w-0 flex-1 text-xs break-words tabular-nums',
             dim ? 'text-text-dim' : 'font-semibold'
           )}
         >

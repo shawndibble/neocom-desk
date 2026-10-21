@@ -188,7 +188,7 @@ function RateLine({
       </p>
       {onAskRate && (
         <button type="button" className={inlineLinkClassName} onClick={onAskRate}>
-          {t(k('ask'))}
+          {t(k(note.kind === 'none' ? 'askFirst' : 'ask'))}
         </button>
       )}
     </div>

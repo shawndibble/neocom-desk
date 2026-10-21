@@ -14564,6 +14564,7 @@
           "override": "Rate set to {{pct}}% by {{name}} on {{date}}. You asked for {{asked}}%.",
           "overrideUndated": "Rate set to {{pct}}% by {{name}}. You asked for {{asked}}%.",
           "ask": "Ask for a different rate…",
+          "askFirst": "Ask for a rate…",
           "dialogTitle": "Ask for a different rate",
           "field": "Rate you ask for (%)",
           "hint": "Asking changes nothing until they agree.",

@@ -89,7 +89,7 @@ export function FeederConsent({
       {part('cannot')}
       {part('stop')}
       <label className="block space-y-1">
-        <span className="text-xs text-text-dim">{t('corpTaxBook.moons.consent.rate')}</span>
+        <span className="block text-xs text-text-dim">{t('corpTaxBook.moons.consent.rate')}</span>
         <TextInput inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
       </label>
       <p className="text-xs text-text-dim">{t('corpTaxBook.moons.consent.accountant')}</p>
