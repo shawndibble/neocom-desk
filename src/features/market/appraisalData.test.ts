@@ -1,6 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
+import { R2_SNAPSHOT_ORIGIN } from '@/features/contractSearch/r2OfferSnapshot';
+import { resetMarketOpenPricesCache } from '@/features/market/marketOpenPrices';
+import { fallbackSourcesDown } from '@/test/fallbackSourcesDown';
 import { FUZZWORK_AGGREGATES_URL } from '@/market/fuzzwork';
 import { clearMarketPriceCache } from '@/market/prices';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS } from '@/market/hubs';
@@ -60,8 +63,10 @@ function skillsFixture(trained: [number, number][]): CorrectedSkills {
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeEach(() => server.use(...fallbackSourcesDown));
 afterEach(() => {
   server.resetHandlers();
+  resetMarketOpenPricesCache();
   clearMarketPriceCache();
   clearAppraisalCatalogue();
   clearMarketTypeIndex();
@@ -158,6 +163,25 @@ describe('appraisePaste', () => {
     expect(appraisal.rows[0].sellTotal).toBeNull();
     expect(appraisal.totals.sell).toBe(0);
     expect(appraisal.totals.unpricedRows).toBe(1);
+  });
+
+  it('prices from yesterday\u2019s close, flagged pricesStale, when only the R2 open prices answer', async () => {
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, () => HttpResponse.error()),
+      http.get(`${R2_SNAPSHOT_ORIGIN}/open-prices/34.json`, () =>
+        HttpResponse.json({
+          typeId: 34,
+          dates: ['2026-10-20'],
+          stations: { '60003760': { buy: [3], sell: [4] } },
+        })
+      )
+    );
+
+    const out = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100);
+
+    expect(out.pricesStale).toBe(true);
+    expect(out.pricesUnreachable).toBe(false);
+    expect(out.appraisal.rows[0].sellTotal).toBe(400);
   });
 
   it('flags pricesUnreachable when Fuzzwork is down, but not for a genuine no-orders answer', async () => {

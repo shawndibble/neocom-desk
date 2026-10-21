@@ -94,6 +94,11 @@ export interface AppraisalOutcome {
    * than "no orders": the panel shows a placeholder, not 0 ISK totals.
    */
   pricesUnreachable: boolean;
+  /**
+   * The prices are yesterday's close from the daily open prices, because no
+   * live source answered (docs/context/decisions/*-price-fallback-when-fuzzwork-is-down.md).
+   */
+  pricesStale?: boolean;
 }
 
 /**
@@ -206,7 +211,11 @@ export async function appraisePaste(
     ...new Set([...typeIds, ...materialTypeIds, ...(lpMatches?.requiredItemTypeIds ?? [])]),
   ];
   if (force) invalidateHubPrices(hub.stationId, allTypeIds);
-  const { prices, unreachable: pricesUnreachable } = await getHubPricesWithStatus(hub, allTypeIds);
+  const {
+    prices,
+    unreachable: pricesUnreachable,
+    stale: pricesStale,
+  } = await getHubPricesWithStatus(hub, allTypeIds);
   const sellPrices = new Map(
     [...prices].map(([typeId, agg]) => [typeId, agg.sellMin ?? undefined])
   );
@@ -270,6 +279,7 @@ export async function appraisePaste(
     accountingLevel: modifiers ? (modifiers.skills[SKILL_IDS.accounting] ?? 0) : null,
     brokerRelationsLevel: modifiers ? (modifiers.skills[SKILL_IDS.brokerRelations] ?? 0) : null,
     pricesUnreachable,
+    pricesStale,
   };
 }
 

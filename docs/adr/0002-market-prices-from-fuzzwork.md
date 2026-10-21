@@ -4,6 +4,9 @@
 
 Accepted (2026-08-29). Amended for `/market` by ADR 0003 —
 the Market Browser now reads ESI order books; Build Plan pricing is unchanged.
+Amended 2026-10-21: when Fuzzwork is down or empty, prices fall back to ESI
+orders, then the daily R2 open prices
+(docs/context/decisions/20261021-105546-price-fallback-when-fuzzwork-is-down.md).
 
 ## Context
 

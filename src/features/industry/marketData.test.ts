@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from 'vitest';
 import { http, HttpResponse, delay } from 'msw';
 import { db } from '@/db';
 import { setupServer } from 'msw/node';
+import { fallbackSourcesDown } from '@/test/fallbackSourcesDown';
 import { ESI_BASE_URL } from '@/esi/client';
 import { FUZZWORK_AGGREGATES_URL } from '@/market/fuzzwork';
 import { clearMarketPriceCache } from '@/market/prices';
@@ -11,6 +12,7 @@ import { loadMarketSnapshot, loadMarketSnapshots, clearCostIndexCache } from './
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeEach(() => server.use(...fallbackSourcesDown));
 afterEach(() => {
   server.resetHandlers();
   clearMarketPriceCache();
