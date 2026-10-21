@@ -12608,7 +12608,7 @@
       "cellLabel": "Target for {{name}}",
       "cellSet": "Set a stock target for {{name}}",
       "cellEdit": "Stock target for {{name}}: {{count}}. Edit",
-      "invalid": "Enter a whole number, or leave it empty to remove the target.",
+      "invalid": "Enter a whole number of at least 1, or leave it empty to remove the target.",
       "typeFallback": "Type {{id}}"
     }
   },

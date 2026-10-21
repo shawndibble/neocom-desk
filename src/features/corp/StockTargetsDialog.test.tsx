@@ -79,4 +79,25 @@ describe('StockTargetsDialog', () => {
     );
     await waitFor(() => expect(stored()).toEqual({}));
   });
+
+  it('removes a target when its field is cleared', async () => {
+    seed({ [CORP]: { '34': 1000 } });
+    renderDialog();
+    const field = await screen.findByRole('spinbutton', { name: 'Target for Tritanium' });
+    await userEvent.clear(field);
+    await userEvent.tab();
+    await waitFor(() => expect(stored()).toEqual({}));
+  });
+
+  it('offers no edits until the stored targets have loaded', () => {
+    seed({ [CORP]: { '34': 1000 } });
+    useCorpStockTargetsStore.setState({ hydrated: false });
+    renderDialog();
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+  });
+
+  it('offers no edits without a corporation', () => {
+    render(<StockTargetsDialog corporationId={null} open onOpenChange={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+  });
 });

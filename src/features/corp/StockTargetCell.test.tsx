@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { StockTargetCell } from './StockTargetCell';
@@ -86,5 +86,67 @@ describe('StockTargetCell', () => {
     await userEvent.type(screen.getByRole('spinbutton'), '-5{Enter}');
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent(/whole number/);
+  });
+
+  it.each(['0.5', '0'])('shows a visible message and keeps the target for %s', async (text) => {
+    const { onChange, onRemove } = setup(10);
+    await userEvent.click(screen.getByRole('button'));
+    await userEvent.clear(screen.getByRole('spinbutton'));
+    await userEvent.type(screen.getByRole('spinbutton'), `${text}{Enter}`);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onRemove).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toBeVisible();
+    expect(screen.getByRole('alert')).not.toHaveClass('sr-only');
+    expect(screen.getByRole('spinbutton')).toBeInTheDocument();
+  });
+
+  it('does not pull focus back when Tab leaves the field', async () => {
+    render(
+      <>
+        <StockTargetCell itemName="A" target={1} onChange={vi.fn()} onRemove={vi.fn()} />
+        <button type="button">next</button>
+      </>
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Stock target for A/ }));
+    await userEvent.tab();
+    expect(screen.getByRole('button', { name: 'next' })).toHaveFocus();
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    expect(screen.getByRole('button', { name: 'next' })).toHaveFocus();
+  });
+
+  it('lets a click on cell B take over from an open cell A', async () => {
+    const onA = vi.fn();
+    render(
+      <>
+        <StockTargetCell itemName="A" target={1} onChange={onA} onRemove={vi.fn()} />
+        <StockTargetCell itemName="B" target={2} onChange={vi.fn()} onRemove={vi.fn()} />
+      </>
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Stock target for A/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Stock target for B/ }));
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    expect(screen.getByRole('spinbutton', { name: 'Target for B' })).toHaveFocus();
+    expect(screen.queryByRole('spinbutton', { name: 'Target for A' })).not.toBeInTheDocument();
+  });
+
+  it('returns focus to the cell after Enter', async () => {
+    setup(10);
+    await userEvent.click(screen.getByRole('button'));
+    await userEvent.keyboard('{Enter}');
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    expect(screen.getByRole('button')).toHaveFocus();
+  });
+
+  it('treats unparsable text ("1e", reported by the browser as empty) as invalid, not as a removal', async () => {
+    const { onChange, onRemove } = setup(10);
+    await userEvent.click(screen.getByRole('button'));
+    const input = screen.getByRole('spinbutton');
+    // jsdom does not model badInput; a browser sets it for text a number field cannot parse.
+    Object.defineProperty(input, 'validity', { value: { badInput: true } });
+    fireEvent.change(input, { target: { value: '' } });
+    await userEvent.keyboard('{Enter}');
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onRemove).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toBeVisible();
   });
 });

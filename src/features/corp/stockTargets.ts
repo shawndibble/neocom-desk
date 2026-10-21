@@ -25,9 +25,10 @@ const isTarget = (v: unknown): v is number => typeof v === 'number' && Number.is
 
 /**
  * Runs on every value read back, including one another device wrote. Drops a
- * target that is not a whole number above zero (and a type id that is not a
- * number), but keeps every corporation id, even one with no targets left of
- * its own that this build cannot judge: a newer build may know more than this one.
+ * target that is not a whole number above zero and any entry whose type id is
+ * not a positive integer. Corporation ids are all kept, even ones this build
+ * knows nothing about and ones left with no targets, so a newer build's data
+ * survives an edit made here.
  */
 export function parseCorpStockTargets(raw: unknown): CorpStockTargets | null {
   if (!isRecord(raw)) return null;
@@ -36,7 +37,7 @@ export function parseCorpStockTargets(raw: unknown): CorpStockTargets | null {
     if (!isRecord(targets)) continue;
     const kept: TypeTargets = {};
     for (const [typeId, target] of Object.entries(targets)) {
-      if (Number.isInteger(Number(typeId)) && isTarget(target)) kept[typeId] = target;
+      if (/^[1-9]\d*$/.test(typeId) && isTarget(target)) kept[typeId] = target;
     }
     out[corporationId] = kept;
   }

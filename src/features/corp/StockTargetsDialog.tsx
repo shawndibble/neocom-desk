@@ -5,7 +5,7 @@
  * Edits save at once, as they do in the Target cell. The item search is the
  * market catalogue every other item picker reads.
  */
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -19,19 +19,14 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { loadTypeNames } from '@/features/character/typeNames';
-import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
+import { MarketTypePicker } from '@/features/stockTargets/MarketTypePicker';
 import { cx } from '@/lib/cx';
 import { formatNumber } from '@/lib/numberLocale';
-import { rankedSearch } from '@/lib/rankedSearch';
-import { useRetryableLoad } from '@/lib/useRetryableLoad';
-import { loadMarketTypes } from '@/sde/loadMarketSde';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
 import { useCorpStockTargets } from './stockTargets';
 
-const SEARCH_LIMIT = 8;
-
 export interface StockTargetsDialogProps {
-  corporationId: number;
+  corporationId: number | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Units the corporation owns per type (the ledger's usable stock), to show beside each target. */
@@ -45,7 +40,9 @@ export function StockTargetsDialog({
   ownedByTypeId,
 }: StockTargetsDialogProps) {
   const { t } = useTranslation();
-  const { targets, setTarget, removeTarget } = useCorpStockTargets(corporationId);
+  const { hydrated, targets, setTarget, removeTarget } = useCorpStockTargets(corporationId);
+  // A write before the stored value has loaded, or with no corporation, is lost: don't offer one.
+  const canEdit = hydrated && corporationId !== null;
   const names = useTypeNames(open ? [...targets.keys()] : []);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -72,6 +69,7 @@ export function StockTargetsDialog({
         <p className="text-sm text-text-dim">{t('corp.stockTargets.intro')}</p>
         <AddTarget
           searchRef={searchRef}
+          disabled={!canEdit}
           onAdd={(typeId, quantity) => setTarget(typeId, quantity)}
         />
         {rows.length === 0 ? (
@@ -86,6 +84,7 @@ export function StockTargetsDialog({
                 key={row.typeId}
                 name={row.name}
                 target={row.target}
+                disabled={!canEdit}
                 owned={ownedByTypeId ? (ownedByTypeId.get(row.typeId) ?? 0) : null}
                 onChange={(value) => setTarget(row.typeId, value)}
                 onRemove={() => removeTarget(row.typeId)}
@@ -126,12 +125,14 @@ function TargetRow({
   name,
   target,
   owned,
+  disabled,
   onChange,
   onRemove,
 }: {
   name: string;
   target: number;
   owned: number | null;
+  disabled: boolean;
   onChange: (value: number) => void;
   onRemove: () => void;
 }) {
@@ -142,9 +143,9 @@ function TargetRow({
     if (draft === null) return;
     const value = Math.floor(Number(draft));
     setDraft(null);
-    if (draft.trim() !== '' && Number.isFinite(value) && value >= 1 && value !== target) {
-      onChange(value);
-    }
+    // Clearing the field removes the target, as in the ledger's Target cell.
+    if (draft.trim() === '') onRemove();
+    else if (Number.isFinite(value) && value >= 1 && value !== target) onChange(value);
   }
 
   return (
@@ -163,6 +164,7 @@ function TargetRow({
         inputMode="numeric"
         aria-label={t('corp.stockTargets.cellLabel', { name })}
         className="w-28 text-right tabular-nums"
+        disabled={disabled}
         value={draft ?? String(target)}
         onFocus={(e) => e.currentTarget.select()}
         onChange={(e) => setDraft(e.target.value)}
@@ -182,6 +184,7 @@ function TargetRow({
       <IconButton
         label={t('corp.stockTargets.removeLabel', { name })}
         icon={<Icon.Close />}
+        disabled={disabled}
         onClick={onRemove}
       />
     </li>
@@ -190,84 +193,28 @@ function TargetRow({
 
 function AddTarget({
   searchRef,
+  disabled,
   onAdd,
 }: {
   searchRef: React.RefObject<HTMLInputElement | null>;
+  disabled: boolean;
   onAdd: (typeId: number, quantity: number) => void;
 }) {
   const { t } = useTranslation();
   const id = useId();
-  const listId = `${id}-results`;
   const quantityRef = useRef<HTMLInputElement>(null);
-  const [types, setTypes] = useState<readonly MarketTypeEntry[]>([]);
-  const [query, setQuery] = useState('');
-  const [highlight, setHighlight] = useState<number | null>(null);
   const [picked, setPicked] = useState<MarketTypeEntry | null>(null);
+  const [resetKey, setResetKey] = useState(0);
   const [quantity, setQuantity] = useState('');
   const [error, setError] = useState<{ field: 'item' | 'quantity'; text: string } | null>(null);
   const [added, setAdded] = useState<{ name: string; n: number } | null>(null);
-
-  // The catalogue is a lazy download, so offline it may be missing: say so.
-  const {
-    failed: typesFailed,
-    attempt: typesAttempt,
-    fail: failTypes,
-    clear: clearTypesFailure,
-    retry: retryTypes,
-  } = useRetryableLoad();
-  useEffect(() => {
-    let live = true;
-    clearTypesFailure();
-    loadMarketTypes().then(
-      (list) => {
-        if (live) setTypes(list);
-      },
-      () => {
-        if (live) failTypes();
-      }
-    );
-    return () => {
-      live = false;
-    };
-  }, [typesAttempt, failTypes, clearTypesFailure]);
-
-  const matches = useMemo(
-    () =>
-      picked
-        ? []
-        : rankedSearch(types, query, { primary: (type) => type.name, limit: SEARCH_LIMIT }),
-    [types, query, picked]
-  );
-  const listOpen = matches.length > 0;
-
-  function choose(type: MarketTypeEntry) {
-    setPicked(type);
-    setQuery(type.name);
-    setHighlight(null);
-    setError(null);
-    quantityRef.current?.focus();
-  }
-
-  function onSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (COMBOBOX_NAV_KEYS.includes(event.key)) {
-      event.preventDefault();
-      setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, matches.length));
-    } else if (event.key === 'Enter' && listOpen) {
-      event.preventDefault();
-      choose(matches[highlight ?? 0]);
-    } else if (event.key === 'Escape' && listOpen) {
-      // Closes the list, not the dialog.
-      event.preventDefault();
-      event.stopPropagation();
-      setQuery('');
-    }
-  }
 
   return (
     <form
       className="space-y-2"
       onSubmit={(e) => {
         e.preventDefault();
+        if (disabled) return;
         const amount = Math.floor(Number(quantity));
         if (!picked) {
           setError({ field: 'item', text: t('corp.stockTargets.pickItem') });
@@ -282,66 +229,31 @@ function AddTarget({
         onAdd(picked.typeId, amount);
         setAdded((prev) => ({ name: picked.name, n: (prev?.n ?? 0) + 1 }));
         setPicked(null);
-        setQuery('');
+        setResetKey((n) => n + 1);
         setQuantity('');
         setError(null);
         searchRef.current?.focus();
       }}
     >
       <div className="flex flex-wrap items-end gap-2">
-        <div className="relative min-w-48 flex-1 space-y-1">
-          <label className="block text-xs text-text-dim" htmlFor={`${id}-search`}>
-            {t('corp.stockTargets.searchLabel')}
-          </label>
-          <TextInput
-            ref={searchRef}
-            id={`${id}-search`}
-            role="combobox"
-            aria-expanded={listOpen}
-            aria-controls={listId}
-            aria-autocomplete="list"
-            aria-activedescendant={highlight === null ? undefined : `${listId}-${highlight}`}
-            autoComplete="off"
-            spellCheck={false}
-            aria-invalid={error?.field === 'item' || undefined}
-            aria-describedby={error?.field === 'item' ? `${id}-error` : undefined}
-            className="w-full"
-            value={query}
+        <div className="min-w-48 flex-1">
+          <MarketTypePicker
+            inputRef={searchRef}
+            label={t('corp.stockTargets.searchLabel')}
             placeholder={t('corp.stockTargets.searchPlaceholder')}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setPicked(null);
-              setHighlight(null);
+            unavailableText={t('corp.stockTargets.searchUnavailable')}
+            picked={picked}
+            resetKey={resetKey}
+            invalid={error?.field === 'item'}
+            describedBy={error?.field === 'item' ? `${id}-error` : undefined}
+            onPick={(type) => {
+              setPicked(type);
+              if (type) {
+                setError(null);
+                quantityRef.current?.focus();
+              }
             }}
-            onKeyDown={onSearchKeyDown}
           />
-          <ul
-            id={listId}
-            role="listbox"
-            aria-label={t('corp.stockTargets.searchLabel')}
-            hidden={!listOpen}
-            className="absolute z-20 mt-1 w-full overflow-hidden rounded-xs border border-line-bright bg-panel shadow-lg"
-          >
-            {matches.map((type, index) => (
-              <li
-                key={type.typeId}
-                id={`${listId}-${index}`}
-                role="option"
-                aria-selected={index === highlight}
-                className={cx(
-                  tappableRowClassName,
-                  'flex cursor-pointer items-center border-l-2 px-3 text-sm',
-                  index === highlight
-                    ? 'border-accent bg-panel-2 font-semibold'
-                    : 'border-transparent hover:bg-panel-2'
-                )}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => choose(type)}
-              >
-                {type.name}
-              </li>
-            ))}
-          </ul>
         </div>
         <div className="space-y-1">
           <label className="block text-xs text-text-dim" htmlFor={`${id}-quantity`}>
@@ -364,34 +276,17 @@ function AddTarget({
             }}
           />
         </div>
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="primary" disabled={disabled}>
           {t('corp.stockTargets.add')}
         </Button>
       </div>
-      {typesFailed && (
-        <div className="flex items-center gap-2 text-xs text-text-dim">
-          <span>{t('corp.stockTargets.searchUnavailable')}</span>
-          <Button
-            size="sm"
-            onClick={() => {
-              searchRef.current?.focus();
-              retryTypes();
-            }}
-          >
-            {t('common.retry')}
-          </Button>
-        </div>
-      )}
       {error !== null && (
         <FieldError id={`${id}-error`} className="block text-xs">
           {error.text}
         </FieldError>
       )}
-      {/* Always mounted, so a failure or an add is announced when it appears (DESIGN.md §7). */}
       <LiveStatus announceKey={added?.n}>
-        {typesFailed
-          ? t('corp.stockTargets.searchUnavailable')
-          : added && t('corp.stockTargets.added', { name: added.name })}
+        {added && t('corp.stockTargets.added', { name: added.name })}
       </LiveStatus>
     </form>
   );

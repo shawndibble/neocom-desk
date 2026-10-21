@@ -16,7 +16,21 @@ describe('parseCorpStockTargets', () => {
   });
 
   it('drops negative, zero, fractional, non-finite and non-numeric targets', () => {
-    const raw = { '98': { '1': -3, '2': 0, '3': 1.5, '4': null, '5': '7', '6': 8, abc: 9 } };
+    const raw = {
+      '98': {
+        '1': -3,
+        '2': 0,
+        '3': 1.5,
+        '4': null,
+        '5': '7',
+        '6': 8,
+        abc: 9,
+        '01': 4,
+        '1.5': 4,
+        '-7': 4,
+        '1e3': 4,
+      },
+    };
     expect(parseCorpStockTargets(raw)).toEqual({ '98': { '6': 8 } });
     expect(parseCorpStockTargets({ '98': { '1': Infinity, '2': NaN } })).toEqual({ '98': {} });
   });
