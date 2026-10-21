@@ -9,6 +9,7 @@ import {
   type FeederModeChange,
   type FeederPayout,
 } from './feederAccrual';
+import { payoutPeriod } from './payouts';
 import { effectiveOwnerRate, type OwnerRateEntry } from './ownerRate';
 import { resolveRate, type TaxRate } from './rates';
 import type { ObservedMiningEntry } from './types';
@@ -37,11 +38,11 @@ export interface MoonOwnerFeeder {
   requestedRatePct?: number;
   agreedRatePct?: number;
   offeredOwnerRatePct?: number;
+  /** Who a payment goes to: a corporation or a player. Absent: the moon owner itself. */
+  payee?: { kind: 'corporation' | 'character'; id: number };
   ownerRateHistory?: OwnerRateEntry[];
   modeChanges?: FeederModeChange[];
   coveragePeriods: CoveragePeriod[];
-  /** The payee on record, if any: the removal mail goes to it. */
-  payee?: { kind: 'corporation' | 'character'; id: number };
   /** A pending removal (#4520); `effectiveAt` is set once its notice is out. */
   removal?: { startedAt: number; startedByName: string; effectiveAt?: number };
   payouts: readonly MoonOwnerPayout[];
@@ -94,6 +95,10 @@ export interface MoonOwnerRow {
   mode: 'normal' | 'settled-otherwise';
 }
 
+/** Whether a row is on the pay list: whole ISK owed, on a normal (not settled otherwise) moon owner. */
+export const canPayMoonOwner = (row: Pick<MoonOwnerRow, 'mode' | 'owed'>) =>
+  row.mode === 'normal' && row.owed > 0;
+
 export interface MoonOwnerTotals {
   owed: number;
   paidThisMonth: number;
@@ -141,6 +146,8 @@ function statusOf(f: MoonOwnerFeeder, settledNow: boolean, ratePct: number | und
 interface Worked {
   row: MoonOwnerRow;
   accrued: number;
+  /** The days that accrued, for the payment's reason. */
+  accruedDays: { date: string }[];
   covered: ObservedMiningEntry[];
 }
 
@@ -153,7 +160,7 @@ function work(input: MoonOwnersInput, f: MoonOwnerFeeder): Worked {
     lastRead !== undefined && lastRead >= Date.parse(dayClosesAt(day, input.graceHours));
   const own = input.entries.filter((e) => e.sourceCorporationId === f.corporationId);
   const covered = own.filter((e) => isDayCovered(f.coveragePeriods, e.date));
-  const { accrued } = accrueFeeder({
+  const { accrued, byDay } = accrueFeeder({
     feederCorporationId: f.corporationId,
     entries: covered,
     coveragePeriods: f.coveragePeriods,
@@ -187,6 +194,7 @@ function work(input: MoonOwnersInput, f: MoonOwnerFeeder): Worked {
   });
   return {
     accrued,
+    accruedDays: byDay,
     covered,
     row: {
       id: String(f.corporationId),
@@ -270,12 +278,17 @@ export interface MoonOwnerDetail {
   mined: MoonOwnerMinedLine[];
   hasPayee: boolean;
   removal?: { startedAt: number; startedByName: string; effectiveAt?: number };
+  /** Who a payment goes to. */
+  payee: { kind: 'corporation' | 'character'; id: number };
+  /** The days a payment now covers, for its reason; absent when nothing accrued. */
+  period?: { from: string; to: string };
 }
 
 export function moonOwnerDetail(input: MoonOwnersInput, id: number): MoonOwnerDetail | undefined {
   const f = input.feeders.find((x) => x.corporationId === id);
   if (!f) return undefined;
-  const { row, accrued, covered } = work(input, f);
+  const { row, accrued, accruedDays, covered } = work(input, f);
+  const period = payoutPeriod(accruedDays, f.payouts);
   const history = deriveOwnerRateHistory(f);
   const today = input.now.slice(0, 10);
   const requested = [...history]
@@ -326,6 +339,8 @@ export function moonOwnerDetail(input: MoonOwnersInput, id: number): MoonOwnerDe
     mined,
     hasPayee: f.payee !== undefined,
     ...(f.status === 'pending-removal' && f.removal ? { removal: f.removal } : {}),
+    payee: f.payee ?? { kind: 'corporation', id: f.corporationId },
+    ...(period ? { period } : {}),
   };
 }
 

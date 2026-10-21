@@ -14,6 +14,12 @@ import {
   type FeederHealth,
 } from './feederHealth';
 import { accrueValuedDays, feederBalance, onPayList } from './feederAccrual';
+import {
+  buildRecordedPayout,
+  outgoingDonationsFromJournal,
+  reconcileOutgoing,
+  type OutgoingDonation,
+} from './payouts';
 import { DEFAULT_GRACE_HOURS, dayClosesAt } from './billable';
 import { DEFAULT_OVERDUE_DAYS } from './overdue';
 import { mergeObservedRows, observedRowKey } from './observed';
@@ -445,6 +451,52 @@ describe('feeder view mirror', () => {
           oreFormTypeId(raw, map, compressed)
         );
       }
+    }
+  });
+
+  it('reads, records and matches moon owner payouts identically', () => {
+    const journal = [
+      {
+        id: 1,
+        date: '2026-10-18T10:00:00Z',
+        ref_type: 'player_donation',
+        amount: -5e6,
+        first_party_id: 9,
+        second_party_id: 77,
+      },
+      {
+        id: 2,
+        date: '2026-10-19T10:00:00Z',
+        ref_type: 'player_donation',
+        amount: -6e6,
+        first_party_id: 9,
+        second_party_id: 77,
+      },
+      {
+        id: 3,
+        date: '2026-10-19T10:00:00Z',
+        ref_type: 'player_donation',
+        amount: 6e6,
+        first_party_id: 77,
+      },
+    ];
+    const outgoing: OutgoingDonation[] = outgoingDonationsFromJournal(journal, 1, 9);
+    expect(mirror.outgoingDonationsFromJournal(journal, 1, 9)).toEqual(outgoing);
+    const payouts = [
+      {
+        id: 'a',
+        date: '2026-10-17',
+        amount: 5e6,
+        method: 'donation' as const,
+        status: 'waiting-for-journal' as const,
+        notAPayout: false,
+      },
+    ];
+    const input = { payouts, outgoing, payeeIds: new Set([77]), since: '2026-10-01' };
+    expect(mirror.reconcileOutgoing(input)).toEqual(reconcileOutgoing(input));
+    for (const method of ['donation', 'contract', 'other'] as const) {
+      const rec = { amount: 12, date: '2026-10-18', method };
+      expect(mirror.buildRecordedPayout(rec)).toEqual(buildRecordedPayout(rec));
     }
   });
 });

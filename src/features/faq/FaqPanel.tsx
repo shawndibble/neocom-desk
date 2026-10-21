@@ -20,6 +20,14 @@ import {
 } from './whatWeStore';
 
 const LINK = inlineLinkClassName;
+const TRAIN_SKILLS_PATHS = [
+  'settings.faq.a.trainSkillsQueue',
+  'settings.faq.a.trainSkillsCertified',
+  'settings.faq.a.trainSkillsShip',
+  'settings.faq.a.trainSkillsFit',
+  'settings.faq.a.trainSkillsSearch',
+  'settings.faq.a.trainSkillsPaste',
+] as const;
 const LIST = 'list-disc space-y-1 pl-5 marker:text-text-faint';
 
 /** One store group's description and lines, as a question's answer. */
@@ -208,6 +216,20 @@ export function FaqPanel() {
       id: 'update',
       questionKey: 'settings.faq.q.update',
       answer: <p>{t('settings.faq.a.update')}</p>,
+    },
+    {
+      id: 'train-skills',
+      questionKey: 'settings.faq.q.trainSkills',
+      answer: (
+        <>
+          <p>{t('settings.faq.a.trainSkills')}</p>
+          <ul className={LIST}>
+            {TRAIN_SKILLS_PATHS.map((key) => (
+              <li key={key}>{t(key)}</li>
+            ))}
+          </ul>
+        </>
+      ),
     },
     {
       id: 'communities',

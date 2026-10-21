@@ -233,6 +233,20 @@ describe('syncCorpTaxBook', () => {
     expect(await run(d)).toMatchObject({ kind: 'synced', reassignError: 'assign refused' });
   });
 
+  it('hands the wallet to moon owner payouts once it read, and a refusal never fails the sync', async () => {
+    const reconcilePayouts = vi.fn(async () => {
+      throw new Error('refused');
+    });
+    expect(await run(deps({ reconcilePayouts }))).toMatchObject({ kind: 'synced' });
+    expect(reconcilePayouts).toHaveBeenCalledWith(5, CORP, [1]);
+  });
+
+  it('leaves payouts alone when the wallet could not be read', async () => {
+    const reconcilePayouts = vi.fn(async () => ({}));
+    await run(deps({ reconcilePayouts }), { ...all, canReadWallet: false });
+    expect(reconcilePayouts).not.toHaveBeenCalled();
+  });
+
   it('reports lost history and keeps earlier gaps on record', async () => {
     const d = deps({
       readBookState: async () =>

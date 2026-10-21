@@ -122,6 +122,7 @@ export interface JournalEntryLike {
   ref_type: string;
   amount?: number;
   first_party_id?: number;
+  second_party_id?: number;
   reason?: string;
 }
 

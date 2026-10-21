@@ -25,6 +25,7 @@ const detail = (over: Partial<MoonOwnerDetail> = {}): MoonOwnerDetail => ({
   paid: 0,
   mined: [],
   hasPayee: true,
+  payee: { kind: 'corporation', id: 98 },
   ...over,
 });
 

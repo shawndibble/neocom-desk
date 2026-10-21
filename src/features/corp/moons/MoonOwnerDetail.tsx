@@ -2,8 +2,18 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/ui';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
-import { deriveOwnerRateHistory, moonOwnerDetail } from '@/engine/corpTaxBook/moonOwners';
-import { recordFeederRemovalSent, setFeederMode, setFeederRate } from '../taxBook/feederClient';
+import {
+  canPayMoonOwner,
+  deriveOwnerRateHistory,
+  moonOwnerDetail,
+} from '@/engine/corpTaxBook/moonOwners';
+import {
+  markFeederPayout,
+  recordFeederRemovalSent,
+  setFeederMode,
+  setFeederRate,
+} from '../taxBook/feederClient';
+import { PayMoonOwnerHost } from './PayMoonOwnerHost';
 import { RemoveMoonOwnerDialog, SetRateDialog, SettledOtherwiseDialog } from './MoonOwnerDialogs';
 import { MoonOwnerPage } from './MoonOwnerPage';
 import { agreedRateChange, mailRateChange } from './rateChangeNotice';
@@ -22,7 +32,7 @@ export function MoonOwnerDetail({ id }: { id: string }) {
   const grantedScopes = useGrantedScopes();
   const accountingName = useCorporationName();
   const { input } = useMoonOwners();
-  const [dialog, setDialog] = useState<'rate' | 'settled' | 'remove' | null>(null);
+  const [dialog, setDialog] = useState<'rate' | 'settled' | 'remove' | 'pay' | 'add' | null>(null);
   const corp = Number(id);
   const detail = /^\d+$/.test(id) ? moonOwnerDetail(input, corp) : undefined;
   if (!detail) {
@@ -73,6 +83,12 @@ export function MoonOwnerDetail({ id }: { id: string }) {
                 : {}),
               onNoticeSent: () =>
                 afterEdit(() => recordFeederRemovalSent(characterId, corporationId, corp)),
+              onAddPayment: () => setDialog('add'),
+              onMarkPayout: (payoutId: string, notAPayout: boolean) =>
+                afterEdit(() =>
+                  markFeederPayout(characterId, corporationId, corp, payoutId, notAPayout)
+                ),
+              ...(canPayMoonOwner(detail.row) ? { onPay: () => setDialog('pay') } : {}),
             }
           : {})}
       />
@@ -83,6 +99,13 @@ export function MoonOwnerDetail({ id }: { id: string }) {
           hasPayee={detail.hasPayee}
           onClose={() => setDialog(null)}
           onStart={() => afterEdit(() => startRemovalAndMail(removal))}
+        />
+      )}
+      {(dialog === 'pay' || dialog === 'add') && (
+        <PayMoonOwnerHost
+          corporationId={corp}
+          manual={dialog === 'add'}
+          onClose={() => setDialog(null)}
         />
       )}
       {dialog === 'rate' && (

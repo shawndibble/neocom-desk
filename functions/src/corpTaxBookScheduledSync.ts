@@ -54,7 +54,13 @@ import {
   type SyncExtraction,
   type SyncGap,
 } from './corpTaxBookSyncEngine.js';
-import type { MirrorDismissal, ObservedRow } from './corpTaxBookEngine.js';
+import {
+  outgoingDonationsFromJournal,
+  type MirrorDismissal,
+  type ObservedRow,
+  type OutgoingDonation,
+} from './corpTaxBookEngine.js';
+import { reconcileFeederPayouts } from './corpTaxBookFeederPayouts.js';
 
 /** Same bounds the officer's client uses against the callable's caps (corpTaxBook.ts MAX_SYNC_*). */
 export const OBSERVED_PER_CALL = 2000;
@@ -244,12 +250,14 @@ export async function runBookSync(
   }
 
   const donations: JournalDonation[] = [];
+  const outgoing: OutgoingDonation[] = [];
   let donationsRead = true;
   for (const division of before.divisions) {
     const journal = await esi.journal(corporationId, division, accessToken);
     if (journal.kind === 'backoff') return { kind: 'skipped', reason: 'esi-budget' };
     if (journal.kind === 'ok') {
       donations.push(...donationsFromJournal(journal.data, division, corporationId));
+      outgoing.push(...outgoingDonationsFromJournal(journal.data, division, corporationId));
     } else {
       donationsRead = false;
     }
@@ -345,6 +353,13 @@ export async function runBookSync(
     : [];
   for (const ids of chunks(toSettle, SETTLE_PER_CALL)) {
     await edit({ action: 'settleStatements', statementIds: ids });
+  }
+
+  // --- Moon owner payouts: what the wallet sent, attached to what was recorded --------
+  try {
+    await reconcileFeederPayouts(deps, corporationId, outgoing);
+  } catch (e) {
+    console.error('moon owner payouts not reconciled', e instanceof Error ? e.message : e);
   }
 
   return {
