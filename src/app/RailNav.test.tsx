@@ -62,6 +62,14 @@ function setPhone(phone: boolean) {
 }
 
 beforeEach(async () => {
+  vi.mocked(useCorpAccess).mockReturnValue({
+    state: 'none',
+    capabilities: NO_CORP_CAPABILITIES,
+    missingScopes: [],
+    roles: [],
+    readFailed: false,
+    retry: () => {},
+  });
   setPhone(false);
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: true });
@@ -99,14 +107,6 @@ describe('the rail', () => {
     expect(names).not.toContain('Corp Assets');
     expect(names).not.toContain('Members');
     expect(within(group).getByRole('link', { name: 'Statements' })).toBeInTheDocument();
-    vi.mocked(useCorpAccess).mockReturnValue({
-      state: 'none',
-      capabilities: NO_CORP_CAPABILITIES,
-      missingScopes: [],
-      roles: [],
-      readFailed: false,
-      retry: () => {},
-    });
   });
 
   it('draws no Corporation group, heading included, without Corp Access', () => {

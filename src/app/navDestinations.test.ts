@@ -285,7 +285,7 @@ describe('listNavDestinations', () => {
       '/corp/members/members',
       '/corp/members/roles',
     ]);
-    expect(members(false)).toEqual(['/corp/members', '/corp/members/members']);
+    expect(members(false)).toEqual(['/corp/members']);
   });
 
   it("hides Settings' Corporation section with the Corp entry", () => {

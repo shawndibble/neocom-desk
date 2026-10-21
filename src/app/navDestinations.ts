@@ -404,7 +404,7 @@ export interface NavDestination {
 
 export interface ListNavDestinationsOptions {
   readonly locked: ReadonlySet<AppRoutePath>;
-  /** `useCorpNavVisible()` — `/corp` is left out entirely, never locked, when false. */
+  /** `useCorpNavVisible()` — every Corp page is left out entirely, never locked, when false. */
   readonly corpVisible: boolean;
   /** `useCorpAccess().capabilities` — each Corp view shows only for its capability, as the Corp pages and Roles tab are gated. */
   readonly corpCapabilities: Pick<CorpCapabilities, CorpViewCapability>;
@@ -462,10 +462,16 @@ export function listNavDestinations({
         ...(searchKeys && { keywords: searchKeys.map(t) }),
       };
     };
-    for (const tab of navTabs(page)) {
+    // Members without the role audit has one tab and draws no tab bar: list none.
+    const allTabs = navTabs(page);
+    const shownTabs = page.corpTabCapabilities
+      ? allTabs.filter((tab) => {
+          const needed = page.corpTabCapabilities?.[tab.id];
+          return !needed || corpCapabilities[needed];
+        })
+      : allTabs;
+    for (const tab of page.corpTabCapabilities && shownTabs.length < 2 ? [] : shownTabs) {
       if (page.corpTabs?.includes(tab.id) && !corpVisible) continue;
-      const tabCapability = page.corpTabCapabilities?.[tab.id];
-      if (tabCapability && !corpCapabilities[tabCapability]) continue;
       if (hiddenTabPaths?.has(tab.path)) continue;
       out.push(tabEntry(tab.path, tab.labelKey, pageLocked));
     }
