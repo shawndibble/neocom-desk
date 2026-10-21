@@ -87,9 +87,13 @@ export function refineryLabeler(sources: RefineryLabelSources): (structureId: nu
   };
 }
 
-/** Each refinery's system (when a row carried it) and its moon owner (absent: the book's own). */
+/**
+ * Each refinery's system (a row's, else one learned from a miner's own ledger)
+ * and its moon owner (absent: the book's own).
+ */
 export function refineryFacts(
-  rows: readonly Pick<ObservedRow, 'structureId' | 'solarSystemId' | 'sourceCorporationId'>[]
+  rows: readonly Pick<ObservedRow, 'structureId' | 'solarSystemId' | 'sourceCorporationId'>[],
+  learnedSystems?: ReadonlyMap<number, number>
 ): { systemOf: Map<number, number>; sourceOf: Map<number, number> } {
   const systemOf = new Map<number, number>();
   const sourceOf = new Map<number, number>();
@@ -99,7 +103,22 @@ export function refineryFacts(
     }
     if (r.sourceCorporationId !== undefined) sourceOf.set(r.structureId, r.sourceCorporationId);
   }
+  for (const [structureId, system] of learnedSystems ?? []) {
+    if (!systemOf.has(structureId)) systemOf.set(structureId, system);
+  }
   return { systemOf, sourceOf };
+}
+
+/** The systems learned for the moon owners' refineries, from their records, by structure id. */
+export function learnedSystemsOf(
+  feeders: readonly { refinerySystems?: Readonly<Record<string, number>> }[]
+): Map<number, number> {
+  const systems = new Map<number, number>();
+  for (const f of feeders)
+    for (const [id, system] of Object.entries(f.refinerySystems ?? {})) {
+      if (!systems.has(Number(id))) systems.set(Number(id), system);
+    }
+  return systems;
 }
 
 /** A label stored on a moon owner's record, keyed by structure id. */
@@ -155,4 +174,18 @@ export function learnRefinerySystems(
     learned[structureId] = system;
   }
   return learned;
+}
+
+/**
+ * What a miner's own ledger can teach the book: the systems of moon owner
+ * refineries whose rows carry none (a moon owner's grant is ledger-only).
+ */
+export function ownerRefinerySystemsToLearn(
+  entries: readonly ObservedMiningEntry[],
+  personal: readonly MiningLedgerEntry[]
+): Record<number, number> {
+  return learnRefinerySystems(
+    entries.filter((e) => e.sourceCorporationId !== undefined && e.solarSystemId === undefined),
+    personal
+  );
 }
