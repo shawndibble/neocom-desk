@@ -30,8 +30,11 @@ export const corpAssets: Builder = (feeds, { t }) => {
   if (!data.readable || data.summary === null || data.corporationId === null) {
     return corpUnreadable(ASSETS, feed, data.needsReauth, t);
   }
+  // Targets decide the Below target line and the all-clear: until they are hydrated, say nothing.
+  const targetFeed = feeds.corpStockTargets;
+  if (!targetFeed?.data) return blank(ASSETS, statusOf(targetFeed));
   const { summary } = data;
-  const targets = targetsForCorp(feeds.corpStockTargets?.data ?? {}, data.corporationId);
+  const targets = targetsForCorp(targetFeed.data, data.corporationId);
   const below = countShortTypes(targets, summary.usableByType);
 
   const all: Line[] = [
@@ -109,10 +112,9 @@ export const corpAssets: Builder = (feeds, { t }) => {
       lines.length === 0
         ? t(`${K}.summaryClear`)
         : t(`${K}.summary`, {
-            safety: summary.assetSafety.stacks,
-            impounded: summary.impounded.stacks,
-            deliveries: summary.deliveries.stacks,
-            below,
+            parts: lines
+              .map((line) => `${t(`${K}.line.${line.key}`)}: ${countText(line)}`)
+              .join(', '),
           }),
   };
 };

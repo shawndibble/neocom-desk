@@ -33,10 +33,16 @@ describe('summariseCorpAssets', () => {
     const s = summariseCorpAssets(classifyCorpAssets(inputs).items, { prices });
     expect(s.assetSafety).toEqual({ stacks: 2, value: 3000 });
     expect(s.impounded).toEqual({ stacks: 1, value: 70 });
-    expect(s.deliveries.stacks).toBe(1);
+    expect(s.deliveries).toEqual({ stacks: 1 });
     expect(s.totalStacks).toBe(6);
     expect(s.usableByType.get(34)).toBe(150);
     expect(s.usableByType.has(587)).toBe(false);
+  });
+
+  it('leaves values unknown when no prices could be read', () => {
+    const inputs = [asset(4, 587, 'AssetSafety')];
+    const s = summariseCorpAssets(classifyCorpAssets(inputs).items, { prices: new Map() });
+    expect(s.assetSafety).toEqual({ stacks: 1, value: null });
   });
 
   it('is all zero for an empty corporation', () => {

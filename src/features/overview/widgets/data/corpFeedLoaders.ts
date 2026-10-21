@@ -204,6 +204,7 @@ export async function loadCorpAssets(characterId: number): Promise<CorpAssetsFee
     summary: null,
     truncated: false,
   };
+  // Not `gate()`: this loader also needs `canReadBlueprints` from the same access.
   const resolved = await resolveCorpReadAccess(characterId);
   if (resolved === null || !resolved.can('canReadAssets')) return empty;
   const { corporationId } = resolved;
@@ -216,7 +217,8 @@ export async function loadCorpAssets(characterId: number): Promise<CorpAssetsFee
   const assets = result.cached.data;
   const canReadBlueprints = resolved.can('canReadBlueprints');
   const [prices, copyValues] = await Promise.all([
-    getAveragePriceByType(),
+    // A failed price read leaves counts without values, as the page does.
+    getAveragePriceByType().catch(() => new Map<number, number>()),
     loadAssetCopyValues(characterId, assets, async () =>
       canReadBlueprints
         ? ((await loadCorporationBlueprints(characterId, corporationId)).cached?.data ?? null)

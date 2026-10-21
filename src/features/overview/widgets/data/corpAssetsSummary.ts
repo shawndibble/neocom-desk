@@ -16,15 +16,15 @@ import {
 export interface StateTotal {
   /** Asset stacks (one per item row), the same count the page's tab badge shows. */
   stacks: number;
-  /** Estimated value in ISK, from the page's price and copy-value inputs. */
-  value: number;
+  /** Estimated value in ISK, from the page's price and copy-value inputs; null when no prices could be read. */
+  value: number | null;
 }
 
 export interface CorpAssetsSummary {
   assetSafety: StateTotal;
   impounded: StateTotal;
-  /** Value is carried for symmetry but the widget shows the count only. */
-  deliveries: StateTotal;
+  /** The widget shows the count only. */
+  deliveries: Pick<StateTotal, 'stacks'>;
   /** Every stack the corporation has, whatever its state: tells "no assets" from "all clear". */
   totalStacks: number;
   /** Usable stock (Offices + Corp deliveries, originals only) by type id; types with none are absent. */
@@ -44,6 +44,7 @@ function totalFor(
 ): StateTotal {
   const stacks = counts[state] ?? 0;
   if (stacks === 0) return { stacks, value: 0 };
+  if (options.prices.size === 0) return { stacks, value: null };
   const rows = buildItemLedger(items, { ...options, filter: { state } });
   return { stacks, value: rows.reduce((sum, row) => sum + row.estimatedValue, 0) };
 }
@@ -62,7 +63,7 @@ export function summariseCorpAssets(
   return {
     assetSafety: totalFor(items, 'assetSafety', counts, options),
     impounded: totalFor(items, 'impounded', counts, options),
-    deliveries: totalFor(items, 'deliveries', counts, options),
+    deliveries: { stacks: counts.deliveries ?? 0 },
     totalStacks: counts.all,
     usableByType,
   };

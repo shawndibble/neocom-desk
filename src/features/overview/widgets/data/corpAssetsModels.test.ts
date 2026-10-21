@@ -13,7 +13,7 @@ const ok = <T>(data: T): FeedState<T> => ({ data, error: false, loading: false }
 const summary = (over: Partial<CorpAssetsSummary> = {}): CorpAssetsSummary => ({
   assetSafety: { stacks: 0, value: 0 },
   impounded: { stacks: 0, value: 0 },
-  deliveries: { stacks: 0, value: 0 },
+  deliveries: { stacks: 0 },
   totalStacks: 10,
   usableByType: new Map([[34, 100]]),
   ...over,
@@ -51,7 +51,7 @@ describe('corpAssets', () => {
       feeds(
         summary({
           assetSafety: { stacks: 4, value: 2_000_000 },
-          deliveries: { stacks: 2, value: 5 },
+          deliveries: { stacks: 2 },
         }),
         { '98000001': { '34': 500, '35': 1 } }
       ),
@@ -85,8 +85,37 @@ describe('corpAssets', () => {
     expect(nothing.emptyMessage).toBe('overview.widgets.corpAssets.empty');
   });
 
+  it('stays loading until the targets are hydrated, never claiming all-clear', () => {
+    const f: Feeds = {
+      ...feeds(summary()),
+      corpStockTargets: { data: null, error: false, loading: true },
+    };
+    const view = corpAssets(f, ctx);
+    expect(view.status.loading).toBe(true);
+    expect(view.status.hasData).toBe(false);
+    expect(view.emptyMessage).toBeUndefined();
+    expect(corpAssets({ corpAssets: f.corpAssets }, ctx).status.loading).toBe(true);
+  });
+
+  it('omits a value it cannot price, and notes that a cut-short list may be incomplete', () => {
+    const view = corpAssets(
+      feeds(summary({ assetSafety: { stacks: 1, value: null } }), {}, { truncated: true }),
+      ctx
+    );
+    expect(view.table?.rows[0]?.cells[2]).toBe('');
+    expect(view.rows[0]?.detail).toBeUndefined();
+    expect(view.number.secondary?.text).toBe('overview.widgets.corpAssets.truncated');
+  });
+
+  it('summarises with plural-aware counts and no zero parts', () => {
+    const view = corpAssets(feeds(summary({ assetSafety: { stacks: 1, value: 5 } })), ctx);
+    expect(view.summary).toContain('corpAssets.safetyCount');
+    expect(view.summary).not.toContain('impounded');
+    expect(view.summary).not.toContain('belowTarget');
+  });
+
   it('warns only when just deliveries or targets need attention', () => {
-    const view = corpAssets(feeds(summary({ deliveries: { stacks: 1, value: 0 } })), ctx);
+    const view = corpAssets(feeds(summary({ deliveries: { stacks: 1 } })), ctx);
     expect(view.number.tone).toBe('warning');
   });
 });
