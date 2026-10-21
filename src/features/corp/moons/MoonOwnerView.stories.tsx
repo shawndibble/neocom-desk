@@ -68,6 +68,26 @@ export const PayeeSet: Story = {
   args: { view: fixtureView({ payee: { kind: 'character', id: 77 } }) },
 };
 
+/** @summary The accounting corporation changed the payee (#4653): the strip with Dismiss, and "Set by … on …" on the line. */
+export const PayeeChangedByAccounting: Story = {
+  args: {
+    view: fixtureView({
+      payee: { kind: 'character', id: 77 },
+      payeeSetBy: { side: 'accounting', at: Date.UTC(2026, 9, 21, 15) },
+    }),
+  },
+};
+
+/** @summary This side set the payee: "Set by you on …", no strip. */
+export const PayeeSetByYou: Story = {
+  args: {
+    view: fixtureView({
+      payee: { kind: 'character', id: 77 },
+      payeeSetBy: { side: 'moon-owner', at: Date.UTC(2026, 9, 21, 15) },
+    }),
+  },
+};
+
 /** @summary A grant from before refinery names were read (#4654): the optional Grant again prompt above the page. */
 export const RefineryNamesNotGranted: Story = {
   args: {

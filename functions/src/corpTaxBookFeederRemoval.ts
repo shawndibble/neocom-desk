@@ -13,7 +13,6 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
 import {
   FEEDER_OF_COLLECTION,
-  OFFICERS,
   REMOVAL_LINKS_COLLECTION,
   parseFeederTarget,
   type FeederTargetCall,
@@ -37,9 +36,9 @@ import { hashInviteCode, type FeederRecord } from './corpTaxBookFeeders.js';
 import {
   appendAudit,
   authorizeOfficer,
-  bookRef,
   fail,
   feederRef,
+  liveOfficerIds,
   type BookDeps,
   type Caller,
 } from './corpTaxBookStore.js';
@@ -115,13 +114,7 @@ async function recipientsFor(
   rec: FeederRecord,
   excludeCharacterId: number
 ): Promise<Recipients> {
-  const now = deps.now();
-  const officers = await bookRef(deps.db, collector).collection(OFFICERS).get();
-  const officerIds = officers.docs.flatMap((d) => {
-    const id = d.get('characterId');
-    const expires = d.get('expiresAt');
-    return typeof id === 'number' && typeof expires === 'number' && expires > now ? [id] : [];
-  });
+  const officerIds = await liveOfficerIds(deps, collector);
   const ceoOf = deps.corporationCeo ?? (async () => undefined);
   const ceoId = await ceoOf(rec.corporationId).catch(() => undefined);
   const payee = payeeOf(rec);
@@ -344,7 +337,11 @@ function isLinkedRemoval(rec: FeederRecord, link: RemovalLinkDoc, linkId: string
     rec.removal?.startedAt === link.startedAt &&
     // A link written before the record kept its id has none to compare.
     (rec.removalLinkId === undefined || rec.removalLinkId === linkId) &&
-    payeeMayForce({ payeeChangedAt: rec.payeeChangedAt, removalStartedAt: link.startedAt })
+    payeeMayForce({
+      payeeChangedAt: rec.payeeChangedAt,
+      removalStartedAt: link.startedAt,
+      payeeSetBy: rec.payeeSetBy?.side,
+    })
   );
 }
 

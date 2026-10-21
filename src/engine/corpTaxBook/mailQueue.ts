@@ -17,8 +17,12 @@ export const SEND_GAP_MAX_MS = 15_000;
 export const OFFLINE_RETRY_MS = 30_000;
 const MAX_RATE_LIMIT_WAIT_MS = 10 * 60_000;
 
-/** `rate-change` (#4515) and `removal`/`removalCancelled` (#4520) are moon owner mails, not Statements. */
-export type MailKind = 'statement' | 'reminder' | 'rate-change' | 'removal' | 'removalCancelled';
+/**
+ * `rate-change` (#4515), `removal`/`removalCancelled` (#4520) and `payee-change` (#4653) are moon
+ * owner mails, not Statements.
+ */
+export type MailKind =
+  'statement' | 'reminder' | 'rate-change' | 'payee-change' | 'removal' | 'removalCancelled';
 
 /** Only Statement mail is logged on a Statement; other kinds have none to log on. */
 export const isStatementMail = (kind: MailKind): kind is 'statement' | 'reminder' =>
@@ -33,7 +37,7 @@ export interface MailQueueItem {
   corporationId: number;
   statementId: string;
   kind: MailKind;
-  /** The moon owner a removal mail is about (#4520); absent on Statement mail. */
+  /** The moon owner a removal (#4520) or payee (#4653) mail is about; absent on Statement mail. */
   feederCorporationId?: number;
   /**
    * A removal notice to the moon owner's CEO or payee: sending it starts the removal's 24 hours

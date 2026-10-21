@@ -4,7 +4,7 @@ import {
   parseRemovalLinkCall,
   parseRemovalNoticeCall,
 } from './corpTaxBookFeederRemoval.js';
-import { parseSetFeederPayeeInput } from './corpTaxBookFeederViewCalls.js';
+import { parseSetFeederPayeeInput } from './corpTaxBookPayee.js';
 
 const book = { corporationId: 98000001, accessToken: 'tok' };
 

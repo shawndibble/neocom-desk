@@ -89,7 +89,7 @@ export interface BookDeps {
   readIdentity: IdentityReader;
   /** Prices the feeder view (issue #4512); absent in tests that never rebuild one. */
   openPrices?: OpenPricesReader;
-  /** A corporation's CEO (public ESI); only the removal callables (issue #4520) need it. */
+  /** A corporation's CEO (public ESI); the removal (#4520) and payee (#4653) callables need it. */
   corporationCeo?: (corporationId: number) => Promise<number | undefined>;
 }
 
@@ -108,6 +108,21 @@ export const feederRef = (db: Firestore, collector: number, feeder: number) =>
   bookRef(db, collector).collection(FEEDERS).doc(String(feeder));
 const sub = (db: Firestore, corporationId: number, name: string) =>
   bookRef(db, corporationId).collection(name);
+
+/** The book's officers whose access has not expired, once each: whom a moon owner's change is mailed to. */
+export async function liveOfficerIds(
+  deps: Pick<BookDeps, 'db' | 'now'>,
+  corporationId: number
+): Promise<number[]> {
+  const now = deps.now();
+  const officers = await sub(deps.db, corporationId, OFFICERS).get();
+  const ids = officers.docs.flatMap((d) => {
+    const id = d.get('characterId');
+    const expires = d.get('expiresAt');
+    return typeof id === 'number' && typeof expires === 'number' && expires > now ? [id] : [];
+  });
+  return [...new Set(ids)];
+}
 
 const rand = (bytes = 6) => randomBytes(bytes).toString('base64url');
 

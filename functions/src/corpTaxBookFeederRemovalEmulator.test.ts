@@ -9,7 +9,7 @@ import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
 import { type CorpSyncDeps } from './corpSyncGrant.js';
 import { acceptFeederInvite, createFeederInvite, type FeederRecord } from './corpTaxBookFeeders.js';
 import { leaveFeeder } from './corpTaxBookFeederGrant.js';
-import { setFeederPayee } from './corpTaxBookFeederViewCalls.js';
+import { setBookFeederPayee, setFeederPayee } from './corpTaxBookPayee.js';
 import {
   cancelFeederRemoval,
   finalizeDueRemovals,
@@ -156,7 +156,7 @@ async function clearEmulator(): Promise<void> {
   );
 }
 
-/** The moon owner's side, which alone sets its payee (#4619): its Director, live role check. */
+/** The moon owner's side sets its payee here: its Director, live role check. */
 const ownerDeps = (): CorpSyncDeps => ({
   ...syncDeps(),
   verify: deps().verifyToken,
@@ -371,6 +371,26 @@ suite('removing a moon owner', () => {
       const { code } = await start();
       await recordRemovalSent(deps(), who(ACCOUNTANT), target(ACCOUNTANT));
       expect((await force(code)).ended).toBe(true);
+    });
+
+    it('never lets a payee the accounting side named end it, however long ago', async () => {
+      now = T0 + 200 * H;
+      // Away and back, both from the accounting side, so the payee really changes.
+      for (const id of [STRANGER, PAYEE]) {
+        await setBookFeederPayee(
+          deps(),
+          who(ACCOUNTANT),
+          { ...target(ACCOUNTANT), payee: { kind: 'character', id } },
+          async () => 'character'
+        );
+      }
+      expect((await record())?.payeeSetBy?.side).toBe('accounting');
+      now += 500 * H;
+      const { code } = await start();
+      await recordRemovalSent(deps(), who(ACCOUNTANT), target(ACCOUNTANT));
+      expect(await getRemovalLink(deps(), who(PAYEE), { code })).toEqual({ available: false });
+      expect(await force(code)).toEqual({ ended: false });
+      expect((await record())?.status).toBe('pending-removal');
     });
 
     it('is blocked when the payee changed after the start', async () => {

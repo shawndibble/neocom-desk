@@ -7,12 +7,16 @@ import {
   deriveOwnerRateHistory,
   moonOwnerDetail,
 } from '@/engine/corpTaxBook/moonOwners';
+import { payeeChangeNotice, payeeNoticeKey } from '@/engine/corpTaxBook/payeeChange';
 import {
   markFeederPayout,
+  setBookFeederPayee,
   setFeederMode,
   setFeederRate,
   setRefineryLabel,
 } from '../taxBook/feederClient';
+import { ChangePayeeDialog, PayeeChangeStrip } from './MoonOwnerPayee';
+import { canMail, mailPayeeChange } from './payeeChangeMail';
 import { PayMoonOwnerHost } from './PayMoonOwnerHost';
 import { RemoveMoonOwnerDialog, SetRateDialog, SettledOtherwiseDialog } from './MoonOwnerDialogs';
 import { MoonOwnerPage } from './MoonOwnerPage';
@@ -37,7 +41,9 @@ export function MoonOwnerDetail({ id }: { id: string }) {
   const grantedScopes = useGrantedScopes();
   const accountingName = useCorporationName();
   const input = useMoonOwnersInput();
-  const [dialog, setDialog] = useState<'rate' | 'settled' | 'remove' | 'pay' | 'add' | null>(null);
+  const [dialog, setDialog] = useState<
+    'rate' | 'settled' | 'remove' | 'pay' | 'add' | 'payee' | null
+  >(null);
   const corp = Number(id);
   const detail = /^\d+$/.test(id) ? moonOwnerDetail(input, corp) : undefined;
   if (!detail) {
@@ -49,6 +55,19 @@ export function MoonOwnerDetail({ id }: { id: string }) {
     );
   }
   const name = names.corporation(corp);
+  const feeder = data.feeders?.find((f) => f.corporationId === corp);
+  const payeeName =
+    detail.payee.kind === 'character'
+      ? names.character(detail.payee.id)
+      : names.corporation(detail.payee.id);
+  // The server takes a payee only while the moon owner is active or being removed.
+  const payeeOpen = feeder?.status === 'active' || feeder?.status === 'pending-removal';
+  // The moon owner changed who gets paid (#4653): a strip until dismissed.
+  const notice = payeeChangeNotice({
+    payee: feeder?.payee,
+    payeeSetBy: feeder?.payeeSetBy,
+    viewer: 'accounting',
+  });
   const settled = detail.row.mode === 'settled-otherwise';
   const afterEdit = async (run: () => Promise<unknown>) => {
     try {
@@ -77,13 +96,19 @@ export function MoonOwnerDetail({ id }: { id: string }) {
         refineryName={names.ownerRefinery}
         oreName={names.ore}
         backTo={BACK}
-        payee={{
-          ...detail.payee,
-          name:
-            detail.payee.kind === 'character'
-              ? names.character(detail.payee.id)
-              : names.corporation(detail.payee.id),
-        }}
+        payee={{ ...detail.payee, name: payeeName }}
+        {...(notice && feeder?.status !== 'left' && feeder?.status !== 'removed'
+          ? {
+              payeeNotice: (
+                <PayeeChangeStrip
+                  storageKey={payeeNoticeKey(corporationId, corp)}
+                  at={notice.at}
+                  payeeName={payeeName}
+                  byName={name}
+                />
+              ),
+            }
+          : {})}
         {...(canEdit
           ? {
               refineryEdit: {
@@ -97,6 +122,7 @@ export function MoonOwnerDetail({ id }: { id: string }) {
                 },
               },
               onSetRate: () => setDialog('rate'),
+              ...(payeeOpen ? { onChangePayee: () => setDialog('payee') } : {}),
               onSettledOtherwise: () => setDialog('settled'),
               ...(removal
                 ? {
@@ -131,13 +157,43 @@ export function MoonOwnerDetail({ id }: { id: string }) {
           onClose={() => setDialog(null)}
         />
       )}
+      {dialog === 'payee' && (
+        <ChangePayeeDialog
+          characterId={characterId}
+          onClose={() => setDialog(null)}
+          onSave={(payee, newPayeeName) =>
+            afterEdit(async () => {
+              const out = await setBookFeederPayee(
+                characterId,
+                corporationId,
+                corp,
+                payee,
+                canMail(grantedScopes)
+              );
+              // After the save, and never awaited: the change does not wait on the mail.
+              if (out.changed && out.at !== undefined) {
+                void mailPayeeChange({
+                  grantedScopes,
+                  characterId,
+                  corporationId,
+                  feederCorporationId: corp,
+                  recipients: out.recipients ?? [],
+                  changedByName: accountingName ?? names.corporation(corporationId),
+                  moonOwnerName: name,
+                  payeeName: newPayeeName,
+                  at: out.at,
+                });
+              }
+            })
+          }
+        />
+      )}
       {dialog === 'rate' && (
         <SetRateDialog
           initial={detail.row.theirRatePct ?? null}
           onClose={() => setDialog(null)}
           onSave={(pct) =>
             afterEdit(async () => {
-              const feeder = data.feeders?.find((f) => f.corporationId === corp);
               const change = feeder
                 ? agreedRateChange(deriveOwnerRateHistory(feeder), pct, new Date())
                 : undefined;

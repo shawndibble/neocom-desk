@@ -650,8 +650,10 @@ describe('removal mirror (#4520)', () => {
   it('payeeMayForce agrees on the boundaries', () => {
     const start = 1000 * H;
     for (const changed of [undefined, start - 49 * H, start - 47 * H, start, start + H]) {
-      const input = { payeeChangedAt: changed, removalStartedAt: start };
-      expect(mirror.payeeMayForce(input)).toBe(removal.payeeMayForce(input));
+      for (const payeeSetBy of [undefined, 'accounting', 'moon-owner'] as const) {
+        const input = { payeeChangedAt: changed, removalStartedAt: start, payeeSetBy };
+        expect(mirror.payeeMayForce(input)).toBe(removal.payeeMayForce(input));
+      }
     }
   });
   it('the clock, due check and recipients agree', () => {

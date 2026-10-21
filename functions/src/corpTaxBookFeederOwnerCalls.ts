@@ -1,7 +1,7 @@
 // The accounting corporation's side of a moon owner (issue #4586, spec #4504): agree a rate,
 // switch to settled otherwise, and list open invite links. Officer-only, the same live role
-// check as creating an invite. The payee is the moon owner's to set (#4619), never this side's:
-// see `setFeederPayee` in corpTaxBookFeederViewCalls.ts. Failures carry a stable `reason`; no player-facing text lives here.
+// check as creating an invite. Either side sets the payee (#4653): see corpTaxBookPayee.ts.
+// Failures carry a stable `reason`; no player-facing text lives here.
 
 import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';

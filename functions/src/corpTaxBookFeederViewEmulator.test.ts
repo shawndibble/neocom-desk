@@ -17,8 +17,8 @@ import {
   dismissFeederHistory,
   getFeederViewAccess,
   requestFeederRate,
-  setFeederPayee,
 } from './corpTaxBookFeederViewCalls.js';
+import { setBookFeederPayee, setFeederPayee } from './corpTaxBookPayee.js';
 import type { FeederViewSummary } from './corpTaxBookFeederView.js';
 import {
   applyFeederPayoutPlan,
@@ -324,17 +324,151 @@ suite('moon owner view', () => {
     ).toBe('not-your-feeder');
   });
 
-  it('payee: the moon owner sets it, stamped and in the view (#4619)', async () => {
+  it('payee: the moon owner sets it, stamped and in the view, and names whom to tell (#4653)', async () => {
     await save(await newInvite());
     const payee = { kind: 'character' as const, id: 77 };
-    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee }, idCategory);
+    const out = await setFeederPayee(
+      deps(),
+      who(FEEDER_DIRECTOR),
+      { ...asDirector, payee, notify: true },
+      idCategory
+    );
+    // The accounting corporation's officers with book access hear about it.
+    expect(out).toEqual({ ok: true, changed: true, at: T0, recipients: [COLLECTOR_CEO] });
     const rec = (await feederRecord()) as (FeederRecord & { payeeHistory?: unknown }) | undefined;
     expect(rec?.payee).toEqual(payee);
     expect(rec?.payeeChangedAt).toBe(T0);
     expect(rec?.payeeHistory).toEqual([{ payee, from: T0 }]);
-    expect((await summary())?.payee).toEqual(payee);
+    expect(rec?.payeeSetBy).toEqual({ side: 'moon-owner', characterId: FEEDER_DIRECTOR, at: T0 });
+    expect(await summary()).toMatchObject({ payee, payeeSetBy: { side: 'moon-owner', at: T0 } });
     const audit = await collectorBook().collection('audit').get();
-    expect(audit.docs.filter((d) => d.get('action') === 'feederPayeeSet')).toHaveLength(1);
+    const set = audit.docs.filter((d) => d.get('action') === 'feederPayeeSet');
+    expect(set).toHaveLength(1);
+    expect(set[0]!.get('detail')).toMatchObject({ payee, side: 'moon-owner' });
+  });
+
+  describe('payee from the accounting side (#4653)', () => {
+    const FEEDER_CEO = 20;
+    const PAYEE_CORP = 98000009;
+    const PAYEE_CORP_CEO = 21;
+    const ceoDeps = (): BookDeps => ({
+      ...bookDeps(),
+      corporationCeo: async (id) =>
+        id === FEEDER ? FEEDER_CEO : id === PAYEE_CORP ? PAYEE_CORP_CEO : undefined,
+    });
+    const asCollector = (id = COLLECTOR_CEO) => ({
+      corporationId: COLLECTOR,
+      accessToken: `roles-${id}`,
+      feederCorporationId: FEEDER,
+    });
+
+    it('an officer sets it; both sides stamp it the same way and the last edit wins', async () => {
+      await save(await newInvite());
+      const corp = { kind: 'corporation' as const, id: PAYEE_CORP };
+      const out = await setBookFeederPayee(
+        ceoDeps(),
+        who(COLLECTOR_CEO),
+        { ...asCollector(), payee: corp, notify: true },
+        idCategory
+      );
+      // The moon owner's CEO, the old payee (none: the corporation itself) and the new one's CEO.
+      expect(out).toEqual({
+        ok: true,
+        changed: true,
+        at: T0,
+        recipients: [FEEDER_CEO, PAYEE_CORP_CEO],
+      });
+      let rec = (await feederRecord()) as (FeederRecord & { payeeHistory?: unknown }) | undefined;
+      expect(rec?.payee).toEqual(corp);
+      expect(rec?.payeeChangedAt).toBe(T0);
+      expect(rec?.payeeHistory).toEqual([{ payee: corp, from: T0 }]);
+      expect(rec?.payeeSetBy).toEqual({ side: 'accounting', characterId: COLLECTOR_CEO, at: T0 });
+      expect(await summary()).toMatchObject({
+        payee: corp,
+        payeeSetBy: { side: 'accounting', at: T0 },
+      });
+
+      const player = { kind: 'character' as const, id: 77 };
+      // A client that cannot mail is told nobody's ids.
+      const quiet = await setFeederPayee(
+        deps(),
+        who(FEEDER_DIRECTOR),
+        { ...asDirector, payee: player, notify: false },
+        idCategory
+      );
+      expect(quiet).toMatchObject({ changed: true, recipients: [] });
+      // Back on the accounting side: the old payee (the player) and the new one's CEO are told.
+      const back = await setBookFeederPayee(
+        ceoDeps(),
+        who(COLLECTOR_CEO),
+        { ...asCollector(), payee: corp, notify: true },
+        idCategory
+      );
+      expect(back.recipients).toEqual([FEEDER_CEO, 77, PAYEE_CORP_CEO]);
+      rec = (await feederRecord()) as FeederRecord & { payeeHistory?: unknown[] };
+      expect(rec?.payee).toEqual(corp);
+      expect(rec?.payeeHistory).toHaveLength(3);
+      const audit = await collectorBook().collection('audit').get();
+      expect(
+        audit.docs
+          .filter((d) => d.get('action') === 'feederPayeeSet')
+          .map((d) => d.get('detail.side'))
+          .sort()
+      ).toEqual(['accounting', 'accounting', 'moon-owner']);
+    });
+
+    it('naming the standing payee writes nothing and tells nobody', async () => {
+      await save(await newInvite());
+      const out = await setBookFeederPayee(
+        ceoDeps(),
+        who(COLLECTOR_CEO),
+        { ...asCollector(), payee: { kind: 'corporation', id: FEEDER }, notify: true },
+        idCategory
+      );
+      expect(out).toEqual({ ok: true, changed: false, recipients: [] });
+      expect((await feederRecord())?.payeeChangedAt).toBeUndefined();
+    });
+
+    it('refuses a junior accountant and an id of the wrong kind', async () => {
+      await save(await newInvite());
+      const payee = { kind: 'corporation' as const, id: PAYEE_CORP };
+      expect(
+        await reason(
+          setBookFeederPayee(
+            ceoDeps(),
+            who(COLLECTOR_JUNIOR),
+            { ...asCollector(COLLECTOR_JUNIOR), payee, notify: false },
+            idCategory
+          )
+        )
+      ).toBe('role-required');
+      expect(
+        await reason(
+          setBookFeederPayee(
+            ceoDeps(),
+            who(COLLECTOR_CEO),
+            { ...asCollector(), payee: { kind: 'character', id: PAYEE_CORP }, notify: false },
+            idCategory
+          )
+        )
+      ).toBe('payee-mismatch');
+      expect((await feederRecord())?.payee).toBeUndefined();
+    });
+
+    it('refuses a moon owner that left', async () => {
+      await save(await newInvite());
+      await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
+      expect(
+        await reason(
+          setBookFeederPayee(
+            ceoDeps(),
+            who(COLLECTOR_CEO),
+            { ...asCollector(), payee: { kind: 'character', id: 77 }, notify: false },
+            idCategory
+          )
+        )
+      ).toBe('feeder-ended');
+    });
   });
 
   it('payee: refuses an id that is not the kind it claims to be (#4621)', async () => {
@@ -364,9 +498,10 @@ suite('moon owner view', () => {
     expect(audit.docs.filter((d) => d.get('action') === 'feederPayeeSet')).toHaveLength(0);
   });
 
-  it('payee: refuses a junior, a nobody and every accounting officer (#4619)', async () => {
+  it('payee: the moon owner call refuses a junior, a nobody and anyone outside it', async () => {
     await save(await newInvite());
     const payee = { kind: 'corporation' as const, id: 98000009 };
+    // An accounting officer sets it through its own call (`setBookFeederPayee`), not this one.
     for (const id of [FEEDER_JUNIOR, FEEDER_NOBODY, COLLECTOR_CEO]) {
       expect(
         await reason(

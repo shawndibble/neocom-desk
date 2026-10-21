@@ -5,9 +5,10 @@
  */
 import { getValidAccessToken } from '@/auth/session';
 import type { FeederMode } from '@/engine/corpTaxBook/feederAccrual';
-import type { OutgoingDonation } from '@/engine/corpTaxBook/payouts';
+import type { OutgoingDonation, Payee } from '@/engine/corpTaxBook/payouts';
 import { callableErrorReason } from '@/lib/callableError';
 import { call } from './bookClient';
+import type { PayeeSetResult } from './feederViewClient';
 
 /** The query parameter an invite link carries its code in. */
 export const INVITE_PARAM = 'invite';
@@ -140,6 +141,25 @@ export async function setFeederRate(
     accessToken,
     feederCorporationId,
     pct,
+  });
+}
+
+/** Names who a moon owner is paid as, from the accounting side (#4653); the moon owner can too. */
+export async function setBookFeederPayee(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number,
+  payee: Payee,
+  /** This officer can mail: the answer names whom to tell. */
+  notify: boolean
+): Promise<PayeeSetResult> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'setCorpTaxBookFeederPayeeFromBookCallable', {
+    corporationId,
+    accessToken,
+    feederCorporationId,
+    payee,
+    notify,
   });
 }
 
