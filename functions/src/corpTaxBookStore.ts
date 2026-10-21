@@ -1047,7 +1047,6 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
       }
       const id = `w${now}_${rand(4)}`;
-      const uids = await minerUids(c, action.minerId);
       tx.create(col(c, WRITE_OFFS).doc(id), {
         id,
         minerId: action.minerId,
@@ -1055,7 +1054,6 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         reason: action.reason,
         by,
         at: iso,
-        uids,
         ...(action.statementId ? { statementId: action.statementId } : {}),
       });
       return {

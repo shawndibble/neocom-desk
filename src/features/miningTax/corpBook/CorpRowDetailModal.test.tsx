@@ -142,22 +142,23 @@ describe('CorpRowDetailModal', () => {
     expect(screen.queryByRole('button', { name: /settle up/i })).not.toBeInTheDocument();
   });
 
-  it("gives the corporation's reason for a correction, and calls a write-off one (#4622)", () => {
+  it("gives the corporation's reason for a correction (#4622)", () => {
     const corrected = {
       ...corp,
       view: {
         ...view,
         correction: {
-          kind: 'write-off' as const,
           before: 900_000,
-          after: 0,
-          reasons: ['Goodwill'],
+          after: 800_000,
+          reasons: ['Wrong hub price'],
         },
       },
     };
     renderModal({ corp: corrected });
     expect(
-      screen.getByText(/Written off by the corporation: 900,000 → 0\. Their reason: Goodwill/)
+      screen.getByText(
+        /Corrected by the corporation: 900,000 → 800,000\. Their reason: Wrong hub price/
+      )
     ).toBeInTheDocument();
   });
 });

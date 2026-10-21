@@ -19,10 +19,7 @@ export function CorpCorrectedAmount({
 }) {
   const { t } = useTranslation();
   const before = `${formatIsk(correction.before)} ISK`;
-  const note =
-    correction.kind === 'write-off'
-      ? t('miningTax.corpBook.line.writtenOff', { before })
-      : t('miningTax.corpBook.line.corrected', { before });
+  const note = t('miningTax.corpBook.line.corrected', { before });
   const reasons = correction.reasons.join(' · ');
   return (
     <HintText content={reasons ? `${note} ${reasons}` : note}>

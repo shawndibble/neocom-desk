@@ -3,7 +3,6 @@ import {
   readAdjustment,
   readBilledByPointer,
   readFeederCoverage,
-  readWriteOff,
   refineryNamesOf,
   readBookSettings,
   readDismissal,
@@ -194,7 +193,7 @@ describe('the miner-side copies (#4622)', () => {
     expect(readFeederCoverage('5', {})).toBeNull();
   });
 
-  it('reads an Adjustment and a write-off, and skips malformed ones', () => {
+  it('reads an Adjustment, and skips a malformed one', () => {
     expect(
       readAdjustment('a1', {
         minerId: 'solo:1',
@@ -214,10 +213,6 @@ describe('the miner-side copies (#4622)', () => {
       at: '2026-10-18T00:00:00Z',
     });
     expect(readAdjustment('a2', { minerId: 'solo:1', amount: 1 })).toBeNull();
-    expect(
-      readWriteOff('w1', { minerId: 'solo:1', amount: 5, reason: 'y', statementId: 's1' })
-    ).toEqual({ id: 'w1', minerId: 'solo:1', amount: 5, reason: 'y', statementId: 's1' });
-    expect(readWriteOff('w2', { minerId: 'solo:1' })).toBeNull();
   });
 
   it("names refineries from the Statements' own names, never a placeholder", () => {

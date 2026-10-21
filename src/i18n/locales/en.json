@@ -6251,12 +6251,10 @@
         "terms": "Terms are locked to the book: {{hub}} buy, {{form}} ore, {{pct}}% {{scope}} from {{from}}.",
         "disputeHint": "Your own record differs from the book.",
         "corrected": "Corrected by the corporation: {{before}} → {{after}}.",
-        "writtenOff": "Written off by the corporation: {{before}} → {{after}}.",
         "reason": "Their reason: {{reasons}}"
       },
       "line": {
         "corrected": "Corrected by the corporation, was {{before}}.",
-        "writtenOff": "Written off by the corporation, was {{before}}.",
         "overlap": "This ore is also on your own list for a payee. Open the line to sort it out."
       },
       "overlap": {

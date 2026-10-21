@@ -23,7 +23,6 @@ import type { TaxPayment } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
-import type { BookWriteOff } from '@/engine/corpTaxBook/personal';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
 import { loadStructureName } from '@/features/character/structures';
@@ -76,7 +75,6 @@ export interface LoadedCorpBook {
   feeders?: MemberFeederCoverage[];
   /** The tracked Characters' own corrections (#4622). */
   adjustments?: Adjustment[];
-  writeOffs?: BookWriteOff[];
   /** Refinery names, where a Statement or ESI gave one (#4622). */
   structureNames?: Record<number, string>;
 }
@@ -266,20 +264,6 @@ export function readAdjustment(id: string, d: Data): Adjustment | null {
   };
 }
 
-export function readWriteOff(id: string, d: Data): BookWriteOff | null {
-  const minerId = str(d.minerId);
-  const amount = num(d.amount);
-  if (!minerId || amount === undefined) return null;
-  const statementId = str(d.statementId);
-  return {
-    id,
-    minerId,
-    amount,
-    reason: str(d.reason) ?? '',
-    ...(statementId ? { statementId } : {}),
-  };
-}
-
 /** Refinery names the Statements were issued with; the officer side's "Refinery <id>" placeholder is no name. */
 export function refineryNamesOf(
   statements: readonly { refineryNames?: Record<string, string> }[]
@@ -354,7 +338,10 @@ export async function loadCorpBooks(
     try {
       const book = await underFirebaseSession(() => readOneBook(corporationId, [...characterIds]));
       if (!book) continue;
-      books.push({ ...book, memberCharacterIds: [...members] });
+      // ESI names what no Statement did; no Firebase session needed for that.
+      const named = book.structureNames ?? {};
+      const structureNames = { ...named, ...(await namesFromEsi(book.observed, named)) };
+      books.push({ ...book, structureNames, memberCharacterIds: [...members] });
       await rememberCorp(book.characterIds, corporationId);
     } catch {
       // Quiet by design: see above.
@@ -433,7 +420,6 @@ async function readOneBook(
   const statements: Statement[][] = [];
   const miners: Miner[][] = [];
   const adjustments: Adjustment[][] = [];
-  const writeOffs: BookWriteOff[][] = [];
   let feeders: MemberFeederCoverage[] | null = null;
   for (const characterId of characterIds) {
     const uid = await ensureSignedIn(characterId);
@@ -451,7 +437,6 @@ async function readOneBook(
       statementSnap,
       minerSnap,
       adjustmentSnap,
-      writeOffSnap,
       coverageSnap,
     ] = await Promise.all([
       getDocs(query(collection(fs, root, 'observed'), where('uid', '==', uid))),
@@ -460,13 +445,11 @@ async function readOneBook(
       getDocs(query(collection(fs, root, 'statements'), where('uids', 'array-contains', uid))),
       getDocs(query(collection(fs, root, 'miners'), where('uids', 'array-contains', uid))),
       own('adjustments'),
-      own('writeOffs'),
       coverageRead,
     ]);
     adjustments.push(
       adjustmentSnap?.docs.flatMap((d) => readAdjustment(d.id, d.data()) ?? []) ?? []
     );
-    writeOffs.push(writeOffSnap?.docs.flatMap((d) => readWriteOff(d.id, d.data()) ?? []) ?? []);
     if (coverageSnap) {
       feeders = coverageSnap.docs.flatMap((d) => readFeederCoverage(d.id, d.data()) ?? []);
     }
@@ -486,14 +469,12 @@ async function readOneBook(
     miners.push(minerSnap.docs.flatMap((d) => readMiner(d.id, d.data()) ?? []));
   }
   const merged = mergeById(statements);
-  const named = refineryNamesOf(merged as { refineryNames?: Record<string, string> }[]);
-  const structureNames = { ...named, ...(await namesFromEsi(rows, named)) };
+  const structureNames = refineryNamesOf(merged as { refineryNames?: Record<string, string> }[]);
   return {
     ...settings,
     observed: groupObservedEntries(rows),
     ...(feeders ? { feeders } : {}),
     adjustments: mergeById(adjustments),
-    writeOffs: mergeById(writeOffs),
     structureNames,
     payments: mergeById([payments]),
     held,

@@ -86,17 +86,6 @@ export interface PersonalBook {
   feeders?: readonly (FeederCoverage & Pick<FeederReadClock, 'lastReadWellAt'>)[];
   /** The member's own Adjustments the book lets them read (#4622). */
   adjustments?: readonly Adjustment[];
-  /** The member's own write-offs the book lets them read (#4622). */
-  writeOffs?: readonly BookWriteOff[];
-}
-
-/** The corporation forgave part of what a Miner owes: on one Statement, or oldest days first. */
-export interface BookWriteOff {
-  id: string;
-  minerId: string;
-  amount: number;
-  reason: string;
-  statementId?: string;
 }
 
 /** The miner's own listing of ore the corporation also bills (issue #4517). */
@@ -111,8 +100,6 @@ export interface BookOverlap {
 
 /** The corporation changed a number it had billed: the old one stays visible next to the new. */
 export interface BookCorrection {
-  /** An Adjustment of the day, or a write-off of what it owed. */
-  kind: 'adjustment' | 'write-off';
   before: number;
   after: number;
   /** The corporation's own words for each change. */
@@ -730,7 +717,6 @@ export function overlayCorpBooks(input: {
         }
       }
     }
-    applyWriteOffs(p.book.writeOffs ?? [], mine);
     // Donations sent and not yet credited cover the oldest Billed days.
     const inFlightTotal = p.book.inFlight.reduce((sum, d) => sum + d.amount, 0);
     const open = mine.filter((r) => r.state === 'billed' && (r.taxOwed ?? 0) > 0);
@@ -842,43 +828,9 @@ function applyAdjustments(p: Prepared, rows: readonly BookRowView[]): void {
     if (!row) continue;
     const before = row.taxOwed ?? 0;
     const after = Math.max(0, before + adjustment.amount);
-    row.correction = { kind: 'adjustment', before, after, reasons: adjustment.reasons };
+    row.correction = { before, after, reasons: adjustment.reasons };
     row.taxOwed = after;
     row.billed = after;
-  }
-}
-
-/** A write-off forgives the oldest open days of its Statement (or of the Miner); none left owing is waived. */
-function applyWriteOffs(writeOffs: readonly BookWriteOff[], rows: readonly BookRowView[]): void {
-  for (const w of [...writeOffs].sort((a, b) => a.id.localeCompare(b.id))) {
-    let left = w.amount;
-    const open = rows
-      .filter(
-        (r) =>
-          r.state === 'billed' &&
-          (r.taxOwed ?? 0) > 0 &&
-          r.minerId === w.minerId &&
-          (w.statementId === undefined || r.statementId === w.statementId)
-      )
-      .sort(byDateThenId);
-    for (const row of open) {
-      if (left <= 0) break;
-      const owed = row.taxOwed ?? 0;
-      const take = Math.min(owed, left);
-      left -= take;
-      const after = owed - take;
-      row.correction = {
-        kind: 'write-off',
-        before: row.correction?.before ?? owed,
-        after,
-        reasons: [...(row.correction?.reasons ?? []), ...(w.reason ? [w.reason] : [])],
-      };
-      row.taxOwed = after;
-      if (after <= 0) {
-        row.state = 'dismissed';
-        row.dismissalReason = w.reason;
-      }
-    }
   }
 }
 

@@ -1111,7 +1111,6 @@ describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
     ]);
     const row = overlay([entry()], [book({ statements: [statement] })]).rows[0];
     expect(row.correction).toEqual({
-      kind: 'adjustment',
       before: 900_000,
       after: 800_000,
       reasons: ['Wrong hub price'],
@@ -1139,7 +1138,6 @@ describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
       ]
     ).rows[0];
     const before = 43_050 * 148 * 0.15;
-    expect(row.correction?.kind).toBe('adjustment');
     expect(row.correction?.before).toBeCloseTo(before, 4);
     expect(row.correction?.after).toBeCloseTo(before + 50_000, 4);
     expect(row.correction?.reasons).toEqual(['Missed ore']);
@@ -1172,48 +1170,11 @@ describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
     expect(row.taxOwed).toBe(800_000);
   });
 
-  it('shows a write-off on the Statement days it forgives', () => {
-    const row = overlay(
-      [entry()],
-      [
-        book({
-          statements: [issued([mined])],
-          writeOffs: [
-            { id: 'w1', minerId: MINER, amount: 900_000, reason: 'Goodwill', statementId: 's1' },
-          ],
-        }),
-      ]
-    ).rows[0];
-    expect(row.correction).toEqual({
-      kind: 'write-off',
-      before: 900_000,
-      after: 0,
-      reasons: ['Goodwill'],
-    });
-    expect(row.taxOwed).toBe(0);
-    expect(row.state).toBe('dismissed');
-  });
-
-  it('applies a part write-off to the oldest day first', () => {
-    const row = overlay(
-      [entry()],
-      [
-        book({
-          statements: [issued([mined])],
-          writeOffs: [{ id: 'w1', minerId: MINER, amount: 400_000, reason: 'Goodwill' }],
-        }),
-      ]
-    ).rows[0];
-    expect(row.correction).toMatchObject({ kind: 'write-off', before: 900_000, after: 500_000 });
-    expect(row.state).toBe('billed');
-  });
-
   it("ignores another miner's corrections", () => {
     const row = overlay(
       [entry()],
       [
         book({
-          writeOffs: [{ id: 'w1', minerId: 'solo:1', amount: 400_000, reason: 'Goodwill' }],
           adjustments: [
             {
               id: 'a9',

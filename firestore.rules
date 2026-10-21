@@ -541,11 +541,6 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      match /writeOffs/{writeOffId} {
-        allow get, list: if isOfficer() || isOnOwnLine();
-        allow write: if false;
-      }
-
       // Each moon owner's coverage periods and read clock (issue #4622), server-written: the
       // miners this book bills (their `corpTaxBookBilledBy` pointer names it) read it to hold
       // the same days back the book does. No payee, rates, notes or names.
@@ -560,7 +555,7 @@ service cloud.firestore {
       }
 
       match /{officerOnly}/{docId} {
-        allow get, list: if officerOnly in ['extractions', 'declarations', 'rebills', 'meta', 'audit', 'feeders']
+        allow get, list: if officerOnly in ['extractions', 'declarations', 'writeOffs', 'rebills', 'meta', 'audit', 'feeders']
           && isOfficer();
         allow write: if false;
       }

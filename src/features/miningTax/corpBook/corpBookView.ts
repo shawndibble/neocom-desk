@@ -87,7 +87,6 @@ export function buildCorpBookView(
       payments: book.payments,
       ...(book.feeders ? { feeders: book.feeders } : {}),
       ...(book.adjustments ? { adjustments: book.adjustments } : {}),
-      ...(book.writeOffs ? { writeOffs: book.writeOffs } : {}),
       ...(book.structureNames ? { structureNames: book.structureNames } : {}),
       hubId: book.hubId,
       oreForm: book.oreForm,

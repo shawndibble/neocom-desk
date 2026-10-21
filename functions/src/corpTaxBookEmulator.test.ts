@@ -1077,7 +1077,7 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect(JSON.stringify(entries)).not.toContain('tok-');
     });
 
-    it("stamps an Adjustment and a write-off with the Miner's sign-ins (#4622)", async () => {
+    it("stamps an Adjustment with the Miner's sign-ins (#4622)", async () => {
       await turnOn();
       await edit(ACCOUNTANT, {
         action: 'addAdjustment',
@@ -1086,15 +1086,8 @@ suite('Corp Tax Book callables (emulator)', () => {
         amount: -100,
         reason: 'rounding',
       });
-      await edit(
-        ACCOUNTANT,
-        { action: 'writeOff', minerId: 'solo:50', amount: 5, reason: 'left' },
-        true
-      );
-      for (const kind of ['adjustments', 'writeOffs']) {
-        const docs = (await book().collection(kind).get()).docs.map((d) => d.data());
-        expect(docs.map((d) => d.uids)).toEqual([['char:50']]);
-      }
+      const docs = (await book().collection('adjustments').get()).docs.map((d) => d.data());
+      expect(docs.map((d) => d.uids)).toEqual([['char:50']]);
     });
   });
 
