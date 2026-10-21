@@ -62,6 +62,7 @@ export function formatBytes(bytes: number): string {
     value /= 1024;
     unit += 1;
   }
+  // eslint-disable-next-line no-restricted-syntax -- English unit names; the marks are swapped below.
   const text = new Intl.NumberFormat('en', {
     style: 'unit',
     unit: UNITS[unit],

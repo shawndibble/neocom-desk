@@ -70,7 +70,7 @@ function periodLabel(t: TFunction, group: Group, nowMs: number): string {
   if (group.id === 'week') return t('plans.periodWeek');
   if (group.id === 'month' || !group.monthStart) return t('plans.periodMonth');
   const sameYear = group.monthStart.getFullYear() === new Date(nowMs).getFullYear();
-  return group.monthStart.toLocaleString('en-US', {
+  return group.monthStart.toLocaleDateString('en-US', {
     month: 'long',
     ...(sameYear ? {} : { year: 'numeric' }),
   });
