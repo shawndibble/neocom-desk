@@ -3,23 +3,20 @@
  * in the link is the only credential, so neither needs a session. Firebase:
  * reach this only from the lazy verify route (`app/bootImportGraph.test.ts`).
  */
-import { httpsCallable } from 'firebase/functions';
-import { getSyncFunctions } from '@/sync/firebaseApp';
+import { callRouted } from '@/sync/routedCallable';
 import type { VerifyPayload } from '@/engine/corpTaxBook/verifyView';
 
 export async function readVerifyStatement(token: string): Promise<VerifyPayload> {
-  const result = await httpsCallable<{ token: string }, VerifyPayload>(
-    getSyncFunctions(),
-    'readCorpTaxBookStatementCallable'
-  )({ token });
-  return result.data;
+  return callRouted<{ token: string }, VerifyPayload>('readCorpTaxBookStatementCallable', {
+    token,
+  });
 }
 
 /** "Stop reminders": the monthly Statement still goes. Returns the stored state. */
 export async function setVerifyRemindersStopped(token: string, stopped: boolean): Promise<boolean> {
-  const result = await httpsCallable<{ token: string; stopped: boolean }, { stopped: boolean }>(
-    getSyncFunctions(),
-    'stopCorpTaxBookRemindersCallable'
-  )({ token, stopped });
-  return result.data.stopped;
+  const result = await callRouted<{ token: string; stopped: boolean }, { stopped: boolean }>(
+    'stopCorpTaxBookRemindersCallable',
+    { token, stopped }
+  );
+  return result.stopped;
 }

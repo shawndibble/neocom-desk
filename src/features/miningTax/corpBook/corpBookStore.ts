@@ -17,7 +17,6 @@ import {
   where,
   type QuerySnapshot,
 } from 'firebase/firestore/lite';
-import { httpsCallable } from 'firebase/functions';
 import { db as localDb } from '@/db';
 import type { RecordedWriteOff, TaxPayment } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
@@ -29,7 +28,8 @@ import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
 import { loadStructureName } from '@/features/character/structures';
 import type { ObservedMiningEntry, ObservedRow } from '@/engine/corpTaxBook/types';
-import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
+import { getSyncFirestore } from '@/sync/firebaseApp';
+import { callRouted } from '@/sync/routedCallable';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { underFirebaseSession } from '@/features/communities/pledgeWrites';
 import { refineryPlaceholder } from '@/features/corp/moons/moonsFormat';
@@ -535,14 +535,10 @@ export async function claimCorpTaxBookPayment(
 ): Promise<{ minerId: string }> {
   return underFirebaseSession(async () => {
     await ensureSignedIn(characterId);
-    const result = await httpsCallable<
-      { corporationId: number; paymentId: string },
-      { minerId: string }
-    >(
-      getSyncFunctions(),
-      'claimCorpTaxBookPaymentCallable'
-    )({ corporationId, paymentId });
-    return result.data;
+    return callRouted<{ corporationId: number; paymentId: string }, { minerId: string }>(
+      'claimCorpTaxBookPaymentCallable',
+      { corporationId, paymentId }
+    );
   });
 }
 
@@ -580,10 +576,10 @@ export async function teachRefinerySystems(
       try {
         await underFirebaseSession(async () => {
           await ensureSignedIn(characterId);
-          await httpsCallable<{ corporationId: number; systems: Record<string, number> }>(
-            getSyncFunctions(),
-            'learnCorpTaxBookRefinerySystemsCallable'
-          )({ corporationId: book.corporationId, systems: Object.fromEntries(fresh) });
+          await callRouted<{ corporationId: number; systems: Record<string, number> }, unknown>(
+            'learnCorpTaxBookRefinerySystemsCallable',
+            { corporationId: book.corporationId, systems: Object.fromEntries(fresh) }
+          );
         });
       } catch {
         // Quiet by design: a later load tries again.
