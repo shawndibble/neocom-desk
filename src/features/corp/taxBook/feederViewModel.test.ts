@@ -74,16 +74,50 @@ describe('rateNote', () => {
     });
   });
   it('is plain when agreed equals asked or only one exists', () => {
-    expect(rateNote({ ...base, requestedRatePct: 8 })).toEqual({ kind: 'plain', pct: 8 });
-    expect(rateNote({ ...base, agreedRatePct: null, effectiveRatePct: 6 })).toEqual({
+    const asked8 = [
+      { kind: 'requested' as const, pct: 8, effectiveFrom: '2026-10-01', recordedAt: '' },
+      { kind: 'agreed' as const, pct: 8, effectiveFrom: '2026-10-01', recordedAt: '' },
+    ];
+    expect(rateNote({ ...base, requestedRatePct: 8, rateHistory: asked8 })).toEqual({
+      kind: 'plain',
+      pct: 8,
+    });
+    expect(
+      rateNote({
+        ...base,
+        agreedRatePct: null,
+        effectiveRatePct: 6,
+        rateHistory: [base.rateHistory[0]!],
+      })
+    ).toEqual({
       kind: 'plain',
       pct: 6,
     });
-    expect(rateNote({ ...base, requestedRatePct: null })).toEqual({ kind: 'plain', pct: 8 });
+    expect(
+      rateNote({ ...base, requestedRatePct: null, rateHistory: [base.rateHistory[1]!] })
+    ).toEqual({ kind: 'plain', pct: 8 });
+  });
+  it('comes from the last rate change and shows what is asked for now', () => {
+    const history = [
+      ...base.rateHistory,
+      { kind: 'requested' as const, pct: 7, effectiveFrom: '2026-10-09', recordedAt: '2' },
+    ];
+    expect(rateNote({ ...base, requestedRatePct: 7, rateHistory: history })).toEqual({
+      kind: 'override',
+      agreedPct: 8,
+      since: '2026-10-01',
+      askedPct: 7,
+    });
   });
   it('says none when no rate is set', () => {
     expect(
-      rateNote({ ...base, agreedRatePct: null, requestedRatePct: null, effectiveRatePct: null })
+      rateNote({
+        ...base,
+        agreedRatePct: null,
+        requestedRatePct: null,
+        effectiveRatePct: null,
+        rateHistory: [],
+      })
     ).toEqual({ kind: 'none' });
   });
 });

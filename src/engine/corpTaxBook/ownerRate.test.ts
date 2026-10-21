@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   effectiveOwnerRate,
+  latestRateChange,
   ownerMargin,
   rateChangeEvent,
+  rateNotice,
   requestedOwnerRate,
   type OwnerRateEntry,
 } from './ownerRate';
@@ -130,5 +132,42 @@ describe('rateChangeEvent', () => {
     expect(
       rateChangeEvent({ before, after: [...before, req(5, '2026-10-08')], date: '2026-10-08' })
     ).toEqual({ date: '2026-10-08', oldPct: 6, newPct: 5, requestedPct: 5 });
+  });
+});
+
+describe('latestRateChange', () => {
+  it('is the last agreed change, with what is asked for now', () => {
+    const history = [req(6, '2026-10-01'), agreed(8, '2026-10-05'), req(7, '2026-10-08')];
+    expect(latestRateChange(history)).toEqual({
+      date: '2026-10-05',
+      oldPct: 6,
+      newPct: 8,
+      requestedPct: 7,
+    });
+  });
+
+  it('is undefined with a request alone or an agreement to the rate in force', () => {
+    expect(latestRateChange([req(6, '2026-10-01')])).toBeUndefined();
+    expect(latestRateChange([req(6, '2026-10-01'), agreed(6, '2026-10-05')])).toBeUndefined();
+  });
+
+  it('keeps the earlier change when a later agreement repeats the rate', () => {
+    const history = [agreed(8, '2026-10-05'), agreed(8, '2026-10-09')];
+    expect(latestRateChange(history)?.date).toBe('2026-10-05');
+  });
+});
+
+describe('rateNotice', () => {
+  it('carries the ask only when it differs from the new rate', () => {
+    expect(rateNotice({ date: '2026-10-05', newPct: 8, requestedPct: 6 })).toEqual({
+      pct: 8,
+      date: '2026-10-05',
+      askedPct: 6,
+    });
+    expect(rateNotice({ date: '2026-10-05', newPct: 8, requestedPct: 8 })).toEqual({
+      pct: 8,
+      date: '2026-10-05',
+    });
+    expect(rateNotice({ date: '2026-10-05', newPct: 8 })).toEqual({ pct: 8, date: '2026-10-05' });
   });
 });
