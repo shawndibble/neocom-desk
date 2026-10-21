@@ -46,7 +46,7 @@ export function ChangePayeeDialog({
   const fieldId = useId();
   const [text, setText] = useState('');
   const [picked, setPicked] = useState<PayeeEntityMatch | null>(null);
-  const alliance = picked?.kind === 'alliance';
+  const pickedAlliance = picked?.kind === 'alliance';
   const payee: FeederPayee | null =
     picked && picked.kind !== 'alliance' ? { kind: picked.kind, id: picked.id } : null;
   return (
@@ -78,7 +78,7 @@ export function ChangePayeeDialog({
           }}
         />
       </div>
-      {alliance ? (
+      {pickedAlliance ? (
         <p role="alert" className="text-xs text-warning">
           {t(k('alliance'))}
         </p>

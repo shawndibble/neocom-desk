@@ -307,6 +307,17 @@ suite('moon owner view', () => {
     expect(audit.docs.filter((d) => d.get('action') === 'feederPayeeSet')).toHaveLength(1);
   });
 
+  it('payee: naming the standing payee, or its own corporation when unset, writes nothing', async () => {
+    await save(await newInvite());
+    const own = { kind: 'corporation' as const, id: FEEDER };
+    await setFeederPayee(deps(), who(FEEDER_DIRECTOR), { ...asDirector, payee: own });
+    const rec = await feederRecord();
+    expect(rec?.payee).toBeUndefined();
+    expect(rec?.payeeChangedAt).toBeUndefined();
+    const audit = await collectorBook().collection('audit').get();
+    expect(audit.docs.filter((d) => d.get('action') === 'feederPayeeSet')).toHaveLength(0);
+  });
+
   it('payee: refuses a junior, a nobody and every accounting officer (#4619)', async () => {
     await save(await newInvite());
     const payee = { kind: 'corporation' as const, id: 98000009 };

@@ -91,6 +91,12 @@ describe('moon owner payee line', () => {
     expect(screen.queryByRole('button', { name: 'Change who gets paid…' })).toBeNull();
   });
 
+  it('has no Change… once the ledger link is disconnected', () => {
+    ownerView({ status: 'disconnected' });
+    expect(screen.getByText('Who gets paid: Ashfall Mining Collective')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Change who gets paid…' })).toBeNull();
+  });
+
   it('never explains a waiting period in the dialog', async () => {
     ownerView();
     await userEvent.setup().click(screen.getByRole('button', { name: 'Change who gets paid…' }));
@@ -131,13 +137,16 @@ describe('accounting side payee', () => {
         refineryName={String}
         oreName={String}
         backTo="/corp/moons/moon-owners"
-        payee={{ id: 77, name: 'Kestrel Vane' }}
+        payee={{ kind: 'character', id: 77, name: 'Kestrel Vane' }}
         onPay={vi.fn()}
       />,
       { wrapper: Router }
     );
     expect(screen.getByText('Paid to')).toBeVisible();
-    expect(screen.getByText('Kestrel Vane')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Kestrel Vane' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('info=character-77')
+    );
     expect(screen.getByRole('button', { name: 'Open in EVE: Kestrel Vane' })).toBeVisible();
     expect(screen.queryByRole('button', { name: /who gets paid/i })).toBeNull();
   });

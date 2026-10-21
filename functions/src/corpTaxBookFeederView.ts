@@ -27,6 +27,7 @@ import {
   type FeederModeChange,
   type FeederPayout,
   type OwnerRateEntry,
+  type Payee,
 } from './corpTaxBookEngine.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
 import { COMPRESSED_ORE_TYPE_IDS } from './data/compressedOreTypeIds.js';
@@ -67,7 +68,7 @@ export interface FeederViewSummary {
   removalStartedAt?: number | null;
   removalEffectiveAt?: number | null;
   /** Who the moon owner is paid as (#4619); null when unset, meaning the moon owner corporation. */
-  payee?: { kind: 'corporation' | 'character'; id: number } | null;
+  payee?: Payee | null;
 }
 
 export interface FeederViewDayLine {

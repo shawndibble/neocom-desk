@@ -77,7 +77,7 @@ const meta = {
     refineryName: (id: number) => REFINERIES[id] ?? `Refinery ${id}`,
     oreName: (id: number) => ORES[id] ?? `#${id}`,
     backTo: '/corp/moons/moon-owners',
-    payee: { id: 98, name: 'Ashfall Mining Collective' },
+    payee: { kind: 'corporation', id: 98, name: 'Ashfall Mining Collective' },
     onSetRate: () => {},
     onSettledOtherwise: () => {},
     onPay: () => {},
@@ -96,7 +96,7 @@ export const Active: Story = {};
 export const PaidToAPlayer: Story = {
   args: {
     detail: { ...detail, payee: { kind: 'character', id: 77 } },
-    payee: { id: 77, name: 'Kestrel Vane' },
+    payee: { kind: 'character', id: 77, name: 'Kestrel Vane' },
   },
 };
 

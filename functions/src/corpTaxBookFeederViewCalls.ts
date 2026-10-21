@@ -7,7 +7,7 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { record } from './communities.js';
 import { ACCESS_TTL_MS, FEEDERS } from './corpTaxBook.js';
 import { type CorpSyncDeps } from './corpSyncGrant.js';
-import { withPayee, withPayeeChange, type PayeeChange } from './corpTaxBookEngine.js';
+import { withPayee, withPayeeChange, type Payee, type PayeeChange } from './corpTaxBookEngine.js';
 import {
   authorizeFeederCaller,
   parseFeederCall,
@@ -57,7 +57,7 @@ export function parseRequestFeederRateInput(data: unknown): RequestFeederRateInp
 }
 
 export interface SetFeederPayeeInput extends FeederCall {
-  payee: { kind: 'corporation' | 'character'; id: number };
+  payee: Payee;
 }
 
 export function parseSetFeederPayeeInput(data: unknown): SetFeederPayeeInput {
@@ -170,6 +170,9 @@ export async function setFeederPayee(
     if (!rec || (rec.status !== 'active' && rec.status !== 'pending-removal')) {
       fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
     }
+    // Unset means the moon owner corporation: naming it (or the standing payee) changes nothing.
+    const current = rec.payee ?? { kind: 'corporation', id: input.corporationId };
+    if (current.kind === input.payee.kind && current.id === input.payee.id) return;
     const now = deps.now();
     const next = withPayee(rec, input.payee, now);
     tx.update(ref, {

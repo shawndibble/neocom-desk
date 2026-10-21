@@ -14,6 +14,8 @@ import type {
   MoonOwnerMinedLine,
   MoonOwnerPayout,
 } from '@/engine/corpTaxBook/moonOwners';
+import type { Payee } from '@/engine/corpTaxBook/payouts';
+import { CharacterLink, CorporationLink } from '@/features/entities/EntityLink';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import { formatCount } from '@/lib/formatCount';
 import { isk, shortDate } from './moonsFormat';
@@ -132,7 +134,7 @@ export function MoonOwnerPage({
   oreName: (typeId: number) => string;
   backTo: string;
   /** Who the moon owner is paid as, read-only here: only the moon owner sets it (#4619). */
-  payee?: { id: number; name: string };
+  payee?: Payee & { name: string };
   /** Absent for a viewer who may not edit. */
   onSetRate?: () => void;
   onSettledOtherwise?: () => void;
@@ -280,7 +282,11 @@ export function MoonOwnerPage({
       {payee && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           <span className="text-text-dim">{t(k('paidTo'))}</span>
-          <span className="font-medium">{payee.name}</span>
+          {payee.kind === 'character' ? (
+            <CharacterLink id={payee.id}>{payee.name}</CharacterLink>
+          ) : (
+            <CorporationLink id={payee.id}>{payee.name}</CorporationLink>
+          )}
           <OpenInEveButton kind="information" id={payee.id} name={payee.name} />
         </div>
       )}

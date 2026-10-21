@@ -8,6 +8,7 @@
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
 import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
+import type { Payee } from '@/engine/corpTaxBook/payouts';
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 
@@ -19,11 +20,8 @@ export interface FeederViewRateEntry {
   recordedAt: string;
 }
 
-/** Who a moon owner is paid as (#4619): a corporation or a player. */
-export interface FeederPayee {
-  kind: 'corporation' | 'character';
-  id: number;
-}
+/** Who a moon owner is paid as: a corporation or a player. */
+export type FeederPayee = Payee;
 
 /** `feederViews/{feeder}`. */
 export interface FeederViewSummary {

@@ -72,7 +72,7 @@ export function MoonOwnerDetail({ id }: { id: string }) {
         oreName={names.ore}
         backTo={BACK}
         payee={{
-          id: detail.payee.id,
+          ...detail.payee,
           name:
             detail.payee.kind === 'character'
               ? names.character(detail.payee.id)

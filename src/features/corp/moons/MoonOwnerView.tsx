@@ -7,6 +7,7 @@ import {
   isSettledAfterLeaving,
   minedRows,
   pageState,
+  payeeIdOf,
   parseRequestedRate,
   payoutRows,
   rateNote,
@@ -280,8 +281,9 @@ export function MoonOwnerView({
   const { t } = useTranslation();
   const [asking, setAsking] = useState(false);
   const [changingPayee, setChangingPayee] = useState(false);
-  const canSetPayee = canEdit && onSetPayee !== undefined && characterId !== undefined;
-  const payeeId = view.summary.payee?.id ?? view.summary.feederCorporationId;
+  // The server takes a payee only while the moon owner is active or being removed.
+  const payeeOpen = view.summary.status === 'active' || view.summary.status === 'pending-removal';
+  const canSetPayee = payeeOpen && canEdit && onSetPayee !== undefined && characterId !== undefined;
   const state = pageState(view.summary);
   const name = view.summary.collectorName ?? t('corpTaxBook.moons.owner.anonymous');
   const ended = state === 'ended';
@@ -316,7 +318,7 @@ export function MoonOwnerView({
                   onAskRate={canEdit ? () => setAsking(true) : undefined}
                 />
                 <PayeeLine
-                  name={names(payeeId)}
+                  name={names(payeeIdOf(view.summary))}
                   onChange={canSetPayee ? () => setChangingPayee(true) : undefined}
                 />
                 <Payments view={view} />
