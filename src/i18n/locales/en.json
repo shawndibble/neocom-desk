@@ -14599,7 +14599,7 @@
           "start-before-leave": "The book can start no earlier than the day the accounting corporation stopped handling your moons.",
           "survey-not-found": "That Survey could not be opened. Check the link, and that it has not expired.",
           "unknown-refinery": "That refinery has no mining for this corporation yet.",
-          "role-required": "Only a CEO, Director or Accountant can do this."
+          "role-required": "Your Character does not hold the corporation role this needs."
         }
       },
       "consent": {
