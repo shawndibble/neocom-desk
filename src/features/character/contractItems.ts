@@ -5,9 +5,19 @@
  * 6): baking every contract's items into the list fetch would pay for detail
  * nobody opens.
  */
-import { getCharacterContractItems, type ContractItem } from '@/esi/endpoints';
+import {
+  getCharacterContractItems,
+  getCorporationContractItems,
+  type ContractItem,
+} from '@/esi/endpoints';
 import { EsiError } from '@/esi/errors';
-import { conditionalFetch, loadWithCache, STALE_AFTER, type CachedResult } from '@/esi/cache';
+import {
+  conditionalFetch,
+  corpCacheKey,
+  loadWithCache,
+  STALE_AFTER,
+  type CachedResult,
+} from '@/esi/cache';
 
 function cacheKey(contractId: number): string {
   return `contract-items:${contractId}`;
@@ -30,10 +40,14 @@ export interface ContractItemsOutcome {
 
 export async function loadContractItemsDetailed(
   characterId: number,
-  contractId: number
+  contractId: number,
+  /** A corporation's contract: read through the corp route, filed under the corporation. */
+  corporationId?: number
 ): Promise<ContractItemsOutcome> {
   const { fetchLive, conditional } = conditionalFetch((options) =>
-    getCharacterContractItems(characterId, contractId, options)
+    corporationId === undefined
+      ? getCharacterContractItems(characterId, contractId, options)
+      : getCorporationContractItems(characterId, corporationId, contractId, options)
   );
   let networkRead = false;
   let failureStatus: number | undefined;
@@ -46,7 +60,11 @@ export async function loadContractItemsDetailed(
       throw err;
     }
   };
-  const result = await loadWithCache(characterId, cacheKey(contractId), observed, {
+  const key =
+    corporationId === undefined
+      ? cacheKey(contractId)
+      : corpCacheKey(corporationId, cacheKey(contractId));
+  const result = await loadWithCache(characterId, key, observed, {
     staleAfterMs: STALE_AFTER.static,
     conditional,
   });
