@@ -12354,6 +12354,7 @@
     "rolesUnavailableHint": "Neocom Desk reads your roles from EVE, and none are saved on this device yet. Try again, or connect if you're offline. It will retry when you're back online.",
     "title": "Corporation",
     "boardPageTitle": "Corp Board",
+    "assetsPageTitle": "Corp Assets",
     "membersTab": "Members",
     "assetsTab": "Assets",
     "walletTab": "Wallet",
@@ -12488,7 +12489,7 @@
       "noAccessHint": "EVE only opens the corporation wallet to a Director, Accountant or Junior Accountant. Roles can only be changed in game, and granting access here will not change that."
     },
     "assets": {
-      "title": "Corp Assets",
+      "title": "Corp assets",
       "refresh": "Refresh corp assets",
       "empty": "No corporation assets",
       "emptyHint": "EVE reported no assets for this corporation.",

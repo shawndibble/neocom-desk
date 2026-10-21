@@ -49,9 +49,9 @@ const ROUTE_TITLE_KEYS = {
   // A tabbed page (pageTabs.ts): its title leads, the tab follows it.
   '/corp/members': ['corp.members.title'],
   '/corp/wallet': ['corp.wallet.title'],
-  '/corp/assets': ['corp.assets.title'],
+  '/corp/assets': ['corp.assetsPageTitle'],
   '/corp/moons': ['corp.moons.title'],
-  '/corp/assets/*': ['corp.assets.title'],
+  '/corp/assets/*': ['corp.assetsPageTitle'],
   '/assets': ['assets.title'],
   '/mail': ['mail.title'],
   '/calendar': ['calendar.title'],

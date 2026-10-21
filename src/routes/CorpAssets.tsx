@@ -53,6 +53,7 @@ import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
 import { CorpDenied } from '@/features/corp/CorpDenied';
+import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { loadCorporationId } from '@/features/corp/boardData';
 import {
   EMPTY_CORP_ASSET_LABELS,
@@ -557,6 +558,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
       <div className="mx-auto max-w-6xl space-y-4">
         <PageHeader
           title={t('corp.assets.title')}
+          subNav={<CorpSubNav flush />}
           meta={
             data?.fetchedAt ? (
               <DataAgeBadge date={data.fetchedAt} note={t('corp.dataAgeNote')} />
