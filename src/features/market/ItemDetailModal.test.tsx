@@ -18,11 +18,11 @@ import { piFixture } from '@/sde/__fixtures__/pi';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { seedGrant } from '@/test/seed';
-
-const OPEN_WINDOW_CHARACTER = 4242;
 import { clearOrderBookCache } from './orderBook';
 import type { RegionOrder } from '@/esi/endpoints';
 import { LocationProbe } from '@/test/LocationProbe';
+
+const OPEN_WINDOW_CHARACTER = 4242;
 
 /** Jita/The Forge, the default Trade Hub the modal falls back to unhydrated. */
 const JITA_REGION_ID = 10000002;
