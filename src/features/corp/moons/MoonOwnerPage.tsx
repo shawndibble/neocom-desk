@@ -14,6 +14,7 @@ import type {
   MoonOwnerMinedLine,
   MoonOwnerPayout,
 } from '@/engine/corpTaxBook/moonOwners';
+import { formatCount } from '@/lib/formatCount';
 import { isk, shortDate } from './moonsFormat';
 import { Crumb } from './moonsParts';
 import { MoonOwnerStatusPill } from './MoonOwnersTable';
@@ -182,7 +183,7 @@ export function MoonOwnerPage({
       header: t(k('cols.quantity')),
       align: 'right',
       className: 'tabular-nums',
-      render: (m) => m.quantity.toLocaleString('en-US'),
+      render: (m) => formatCount(m.quantity),
       sortValue: (m) => m.quantity,
     },
     {

@@ -38,12 +38,38 @@ const radiusSyntax = [
 ];
 const withoutRadius = (list) => list.filter((r) => !radiusSyntax.includes(r));
 
+// Numbers on screen follow the Number format setting, so they go through
+// src/lib/numberLocale (createNumberFormat, formatNumber, formatCount), never a
+// raw Intl.NumberFormat or toLocaleString (scope decision 20261020-113345).
+// Syntax can't tell a Date from a number, so only `new Date(…).toLocaleString()`
+// passes; another Date uses toLocaleDateString / toLocaleTimeString or
+// src/lib/timestamp. Pinned by scripts/lib/numberFormatLint.test.mjs.
+const numberFormatMessage =
+  'Format numbers through src/lib/numberLocale (createNumberFormat, formatNumber) or formatCount / formatIsk, so they follow the Number format setting.';
+const numberFormatSyntax = [
+  {
+    selector: "NewExpression[callee.object.name='Intl'][callee.property.name='NumberFormat']",
+    message: numberFormatMessage,
+  },
+  {
+    selector: "CallExpression[callee.object.name='Intl'][callee.property.name='NumberFormat']",
+    message: numberFormatMessage,
+  },
+  {
+    selector:
+      "CallExpression[callee.property.name='toLocaleString']:not([callee.object.type='NewExpression'][callee.object.callee.name='Date'])",
+    message: `${numberFormatMessage} A Date: toLocaleDateString / toLocaleTimeString or src/lib/timestamp.`,
+  },
+];
+const withoutNumberFormat = (list) => list.filter((r) => !numberFormatSyntax.includes(r));
+
 // Shared by every non-primitive file. Flat config replaces a rule's options
 // rather than merging them, so a later block that adds selectors for a
 // narrower glob must re-list these.
 const restrictedSyntax = [
   ...rawInputSyntax,
   ...radiusSyntax,
+  ...numberFormatSyntax,
   {
     selector:
       "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='search']",
@@ -198,22 +224,53 @@ export default tseslint.config(
     },
   },
   {
+    // Code that formats in a fixed shape, not the pilot's Number format: the
+    // home of the number formatters, Date formatters, English K/M/B shorthand
+    // (marks swapped by hand), chat text pasted into EVE (stays English, per
+    // scope decision 20261020-113345), and mockup fixtures. CSV and clipboard
+    // code writes raw numbers or toFixed, so needs no entry.
+    files: [
+      'src/lib/numberLocale.ts',
+      'src/lib/timestamp.ts',
+      'src/lib/localDate.ts',
+      'src/lib/compactNumber.ts',
+      'src/engine/survey/chatMessage.ts',
+      'src/mockups/**/*.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': ['error', ...withoutNumberFormat(restrictedSyntax)],
+    },
+  },
+  {
     files: ['src/**/*.test.tsx'],
     ignores: ['src/components/ui/**'],
     rules: {
       'no-restricted-syntax': [
         'error',
-        ...withoutRadius(restrictedSyntax).filter((r) => !rawInputSyntax.includes(r)),
+        ...withoutNumberFormat(withoutRadius(restrictedSyntax)).filter(
+          (r) => !rawInputSyntax.includes(r)
+        ),
         ...sortArrowSyntax,
       ],
     },
   },
   {
-    // Stories are mockups and e2e/tests are fixtures: no house radius to keep.
+    // Stories are mockups and e2e/tests are fixtures: no house radius to keep,
+    // and their numbers are sample data, not the pilot's.
+    files: ['src/**/*.stories.tsx'],
+    ignores: ['src/components/ui/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...withoutNumberFormat(withoutRadius(restrictedSyntax)),
+        ...sortArrowSyntax,
+      ],
+    },
+  },
+  {
     // The Communities files still carry bare `rounded` on their chips; #4539
     // (surface-2) rewrites those lines and drops them from this list.
     files: [
-      'src/**/*.stories.tsx',
       'src/features/communities/CommunityInvites.tsx',
       'src/features/communities/ShareFittingsTab.tsx',
       'src/features/communities/SharedBlueprintTable.tsx',
@@ -228,7 +285,7 @@ export default tseslint.config(
   {
     files: ['src/**/*.test.ts', 'e2e/**/*.ts'],
     rules: {
-      'no-restricted-syntax': ['error', ...withoutRadius(restrictedSyntax)],
+      'no-restricted-syntax': ['error', ...withoutNumberFormat(withoutRadius(restrictedSyntax))],
     },
   },
   {
@@ -238,6 +295,13 @@ export default tseslint.config(
       'src/components/ui/DataTableSortPicker.tsx',
       'src/components/ui/DataTable.test.tsx',
     ],
+    rules: {
+      'no-restricted-syntax': ['error', ...sortArrowSyntax, ...numberFormatSyntax],
+    },
+  },
+  {
+    files: ['src/components/ui/**/*.test.tsx', 'src/components/ui/**/*.stories.tsx'],
+    ignores: ['src/components/ui/DataTable.test.tsx'],
     rules: {
       'no-restricted-syntax': ['error', ...sortArrowSyntax],
     },

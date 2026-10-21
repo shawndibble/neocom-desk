@@ -47,6 +47,7 @@ function Tile({
 
 /** "11.0M": one fixed decimal, like the ISK tile beside it, so a big field's volume isn't cropped. */
 function shortVolume(value: number): string {
+  // eslint-disable-next-line no-restricted-syntax -- English K/M/B; the mark is swapped below.
   const text = value.toLocaleString('en', {
     notation: 'compact',
     minimumFractionDigits: 1,
