@@ -422,14 +422,6 @@ const SPECS: Record<string, Spec> = {
     size: 'M',
     endpoints: ['getCorporationMemberRoles', 'getCorporationRoleHistory'],
   },
-  corpDoctrine: {
-    corp: 'corpPeople',
-    views: NT,
-    view: 'table',
-    size: 'M',
-    soon: true,
-    endpoints: [],
-  },
   corpJobs: {
     corp: 'corpIndustry',
     capabilities: ['canReadIndustry'],
@@ -458,7 +450,6 @@ const SPECS: Record<string, Spec> = {
     endpoints: ['getCorporationContracts'],
   },
   corpSrp: { corp: 'corpOps', views: NT, view: 'table', size: 'M', soon: true, endpoints: [] },
-  corpProjects: { corp: 'corpOps', views: NT, view: 'table', size: 'M', soon: true, endpoints: [] },
 };
 
 export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(SPECS).map(([id, s]) => ({

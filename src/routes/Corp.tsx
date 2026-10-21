@@ -38,6 +38,8 @@ import {
 } from '@/features/overview/OverviewHeader';
 import { useOverviewSummary } from '@/features/overview/useOverviewSummary';
 import { WidgetBoardContext } from '@/features/overview/widgets/board';
+import { CORP_DEFS } from '@/features/overview/widgets/data/corpModels';
+import { registerKindDefs } from '@/features/overview/widgets/data/models';
 import { OverviewRefreshProvider } from '@/features/overview/widgets/data/OverviewRefreshProvider';
 import { WidgetDataProvider } from '@/features/overview/widgets/data/WidgetDataProvider';
 import { useOverviewEdit } from '@/features/overview/widgets/editContext';
@@ -53,6 +55,9 @@ import { WidgetGrid } from '@/features/overview/widgets/WidgetGrid';
 import type { CorpCapabilities } from '@/engine/corpRoles';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useIsPhone } from '@/lib/useIsPhone';
+
+// The corp kinds' builders load with this route, not with the Overview's startup graph.
+registerKindDefs(CORP_DEFS);
 
 const CustomizeBar = lazy(() =>
   guarded(() => import('@/features/overview/widgets/CustomizeBar')).then((m) => ({

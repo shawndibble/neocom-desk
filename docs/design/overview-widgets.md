@@ -311,9 +311,9 @@ Customize, Gallery, menu and phone list are shared.
 - **Hourly cache.** No countdown shorter than the 1 h corp cache window; the
   data-age popover carries the note.
 - **No Show info links** from rows; tables link rows to pages.
-- **Coming soon (three):** Doctrine, SRP, Projects. They need new scopes or app-owned
-  data and are separate tickets; any new corp scope must be additive
-  (`ADDITIVE_CORP_CAPABILITIES`).
+- **Coming soon (one):** SRP, which needs app-owned data and an ADR first (#4608).
+  Doctrine readiness and Corporation projects were dropped (#4614, #4609). Any new
+  corp scope must be additive (`ADDITIVE_CORP_CAPABILITIES`).
 
 ## Appendix A. Default view and size per kind
 

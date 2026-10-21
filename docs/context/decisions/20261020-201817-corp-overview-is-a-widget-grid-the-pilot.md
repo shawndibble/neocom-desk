@@ -38,3 +38,5 @@ _Recorded 2026-10-20._
   audit, Doctrine, Kills, Contracts, SRP, Projects) need new ESI scopes or
   app-owned data and are separate tickets (#4606–#4614, umbrella #4615). No new corp scope in this change; any
   future one must be additive in ADR terms (`ADDITIVE_CORP_CAPABILITIES`).
+  Later: Doctrine readiness (#4614) and Corporation projects (#4609) were
+  rejected and left the catalogue; the rest shipped except SRP (#4608).
