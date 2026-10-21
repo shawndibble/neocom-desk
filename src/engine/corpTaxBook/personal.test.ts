@@ -758,7 +758,7 @@ describe('overlayCorpBooks: the miner side of a refinery book', () => {
     expect(out.rows[0].overlap).toBeUndefined();
   });
 
-  it('flags one overlap on the first line of the day when the miner listed the ore for a Payee', () => {
+  it('flags each refinery line of the day with its own share of the overlap', () => {
     const assigned = entry({
       freeOreLines: [],
       oreLines: [{ typeId: ZEO, quantity: 30_000 }],
@@ -775,11 +775,15 @@ describe('overlayCorpBooks: the miner side of a refinery book', () => {
       [assigned],
       [book({ observed: [refinery(1000, 10_000), refinery(2000, 20_000)] })]
     );
-    const flagged = out.rows.filter((r) => r.overlap);
-    expect(flagged).toHaveLength(1);
-    expect(flagged[0].overlap).toEqual({
+    const byStructure = new Map(out.rows.map((r) => [r.structureId, r.overlap]));
+    expect(byStructure.get(1000)).toEqual({
       payeeIds: ['ashfall'],
-      ore: [{ typeId: ZEO, quantity: 30_000 }],
+      ore: [{ typeId: ZEO, quantity: 10_000 }],
+      paid: false,
+    });
+    expect(byStructure.get(2000)).toEqual({
+      payeeIds: ['ashfall'],
+      ore: [{ typeId: ZEO, quantity: 20_000 }],
       paid: false,
     });
   });
@@ -834,7 +838,7 @@ describe('overlayCorpBooks: the miner side of a refinery book', () => {
     expect(out.rows).toEqual([]);
   });
 
-  it('keeps the old number and the new one when the corporation corrected a line', () => {
+  it('does not call late ore a correction', () => {
     const statement: Statement = {
       id: 's1',
       minerId: `solo:${ME}`,
@@ -875,7 +879,8 @@ describe('overlayCorpBooks: the miner side of a refinery book', () => {
       ],
     };
     const out = overlay([entry()], [book({ statements: [statement] })]);
-    expect(out.rows[0].correction).toEqual({ before: 900_000, after: 921_000 });
+    expect(out.rows[0].correction).toBeUndefined();
+    expect(out.rows[0].taxOwed).toBe(921_000);
   });
 
   it('shows no correction on a line billed once', () => {
@@ -1002,5 +1007,188 @@ describe('coverInFlight', () => {
     expect(coverInFlight(rows, 10)).toEqual(new Set());
     // Nothing in flight covers nothing, even a day smaller than the tolerance.
     expect(coverInFlight([{ id: 'c', date: '2026-10-03', taxOwed: 50_000 }], 0)).toEqual(new Set());
+  });
+});
+
+describe('overlayCorpBooks: a moon owner read clock (#4622)', () => {
+  const OWNER = 98000077;
+  const owned = (date = '2026-10-17') => ({
+    characterId: ME,
+    recordedCorporationId: CORP,
+    structureId: 3000,
+    date,
+    solarSystemId: SYSTEM,
+    oreLines: [{ typeId: ZEO, quantity: 20_000 }],
+    sourceCorporationId: OWNER,
+  });
+
+  it('holds back a day the moon owner ledger was not read well after', () => {
+    const out = overlay(
+      [entry()],
+      [
+        book({
+          observed: [owned()],
+          // Last good read before the day closed: the day is not Billable yet.
+          feeders: [{ corporationId: OWNER, lastReadWellAt: '2026-10-17T20:00:00Z' }],
+        }),
+      ]
+    );
+    expect(out.rows).toEqual([]);
+    // The miner's own ore still reads as waiting on the corporation, not plain Unassigned.
+    expect(out.labels.get(`${ME}:2026-10-17:${SYSTEM}`)?.state).toBe('pending');
+  });
+
+  it('holds the whole miner day, the book refinery included', () => {
+    const own = { ...owned(), structureId: 1000, sourceCorporationId: undefined };
+    const out = overlay(
+      [entry()],
+      [book({ observed: [owned(), own], feeders: [{ corporationId: OWNER }] })]
+    );
+    expect(out.rows).toEqual([]);
+  });
+
+  it('bills the day once the moon owner ledger was read well after it closed', () => {
+    const out = overlay(
+      [entry()],
+      [
+        book({
+          observed: [owned()],
+          feeders: [{ corporationId: OWNER, lastReadWellAt: '2026-10-18T07:00:00Z' }],
+        }),
+      ]
+    );
+    expect(out.rows.map((r) => r.state)).toEqual(['billed']);
+  });
+
+  it('bills as before when the read clock is not known to the reader', () => {
+    const out = overlay([entry()], [book({ observed: [owned()] })]);
+    expect(out.rows).toHaveLength(1);
+  });
+});
+
+describe('overlayCorpBooks: corrections by the corporation (#4622)', () => {
+  const MINER = `solo:${ME}`;
+  const KEY = `${ME}:1000:2026-10-17`;
+  const issued = (lines: Statement['lines']): Statement => ({
+    id: 's1',
+    minerId: MINER,
+    code: 'ABC',
+    periodStart: '2026-10-01',
+    periodEnd: '2026-10-31',
+    coversFrom: '2026-10-01',
+    coversThrough: '2026-10-17',
+    issuedAt: '2026-10-18T00:00:00Z',
+    hubId: 'jita',
+    oreForm: 'compressed',
+    amount: lines.reduce((sum, l) => sum + l.tax, 0),
+    lines,
+  });
+  const mined = {
+    kind: 'mined' as const,
+    date: '2026-10-17',
+    chargeKey: KEY,
+    characterId: ME,
+    structureId: 1000,
+    oreLines: [{ typeId: ZEO, quantity: 43_050 }],
+    unitPrices: { [ZEO]: 140 },
+    taxPct: 15,
+    estimatedValue: 6_000_000,
+    tax: 900_000,
+  };
+
+  it('shows a billed adjustment as before and after, with the reason', () => {
+    const statement = issued([
+      mined,
+      {
+        kind: 'correction',
+        date: '2026-10-17',
+        adjustmentId: 'a1',
+        oreLines: [],
+        estimatedValue: 0,
+        tax: -100_000,
+        reason: 'Wrong hub price',
+      },
+    ]);
+    const row = overlay([entry()], [book({ statements: [statement] })]).rows[0];
+    expect(row.correction).toEqual({
+      before: 900_000,
+      after: 800_000,
+      reasons: ['Wrong hub price'],
+    });
+    expect(row.taxOwed).toBe(800_000);
+  });
+
+  it('reads an adjustment not on a Statement yet', () => {
+    const row = overlay(
+      [entry()],
+      [
+        book({
+          adjustments: [
+            {
+              id: 'a2',
+              minerId: MINER,
+              date: '2026-10-17',
+              amount: 50_000,
+              reason: 'Missed ore',
+              by: 1,
+              at: '2026-10-18T13:00:00Z',
+            },
+          ],
+        }),
+      ]
+    ).rows[0];
+    const before = 43_050 * 148 * 0.15;
+    expect(row.correction?.before).toBeCloseTo(before, 4);
+    expect(row.correction?.after).toBeCloseTo(before + 50_000, 4);
+    expect(row.correction?.reasons).toEqual(['Missed ore']);
+  });
+
+  it('counts an adjustment once when it is both read and billed', () => {
+    const adjustment = {
+      id: 'a1',
+      minerId: MINER,
+      date: '2026-10-17',
+      amount: -100_000,
+      reason: 'Wrong hub price',
+      by: 1,
+      at: '2026-10-18T00:00:00Z',
+    };
+    const statement = issued([
+      mined,
+      {
+        kind: 'correction',
+        date: '2026-10-17',
+        adjustmentId: 'a1',
+        oreLines: [],
+        estimatedValue: 0,
+        tax: -100_000,
+        reason: 'Wrong hub price',
+      },
+    ]);
+    const row = overlay([entry()], [book({ statements: [statement], adjustments: [adjustment] })])
+      .rows[0];
+    expect(row.taxOwed).toBe(800_000);
+  });
+
+  it("ignores another miner's corrections", () => {
+    const row = overlay(
+      [entry()],
+      [
+        book({
+          adjustments: [
+            {
+              id: 'a9',
+              minerId: 'solo:1',
+              date: '2026-10-17',
+              amount: 1,
+              reason: 'x',
+              by: 1,
+              at: '2026-10-18T00:00:00Z',
+            },
+          ],
+        }),
+      ]
+    ).rows[0];
+    expect(row.correction).toBeUndefined();
   });
 });

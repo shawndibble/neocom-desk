@@ -592,6 +592,12 @@ function minerCharacters(minerId: string, miner: Data | undefined): number[] {
   return solo ? [Number(solo[1])] : [];
 }
 
+/** The sign-ins that read a Miner's own lines (`uids`): read in the transaction, before any write. */
+async function minerUids(c: EditCtx, minerId: string): Promise<string[]> {
+  const miner = (await c.tx.get(col(c, MINERS).doc(minerId))).data();
+  return minerCharacters(minerId, miner).map((id) => `char:${id}`);
+}
+
 const rateKey = (r: StoredRate): string =>
   r.scope === 'record'
     ? `record:${r.recordKey}`
@@ -1013,6 +1019,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'addAdjustment': {
       const id = `a${now}_${rand(4)}`;
+      // The Miner reads their own corrections on the personal tab (#4622).
+      const uids = await minerUids(c, action.minerId);
       tx.create(col(c, ADJUSTMENTS).doc(id), {
         id,
         minerId: action.minerId,
@@ -1021,6 +1029,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         reason: action.reason,
         by,
         at: iso,
+        uids,
       });
       return {
         detail: {

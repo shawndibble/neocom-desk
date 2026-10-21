@@ -1091,6 +1091,19 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect(entries[1]).toMatchObject({ by: ACCOUNTANT, byName: `Pilot ${ACCOUNTANT}` });
       expect(JSON.stringify(entries)).not.toContain('tok-');
     });
+
+    it("stamps an Adjustment with the Miner's sign-ins (#4622)", async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, {
+        action: 'addAdjustment',
+        minerId: 'solo:50',
+        date: '2026-10-05',
+        amount: -100,
+        reason: 'rounding',
+      });
+      const docs = (await book().collection('adjustments').get()).docs.map((d) => d.data());
+      expect(docs.map((d) => d.uids)).toEqual([['char:50']]);
+    });
   });
 
   describe('CEO reclaim', () => {

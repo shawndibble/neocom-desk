@@ -28,6 +28,7 @@ import {
 } from '@/features/miningTax/taxRowFormat';
 import { StatusPill } from '@/features/miningTax/StatusPill';
 import { CorpStatusPill } from '@/features/miningTax/corpBook/CorpStatusPill';
+import { CorpCorrectedAmount, CorpOverlapMark } from '@/features/miningTax/corpBook/CorpLineMarks';
 import type { CorpRowInfo } from '@/features/miningTax/corpBook/corpRows';
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
 import { OreIcon } from './OreIcon';
@@ -312,7 +313,14 @@ export function useTaxColumns({
           dr.assignment && !(dr.corp?.kind === 'row' && dr.corp.view.taxOwed === null)
             ? withDayLines(
                 dr,
-                `${formatIsk(taxOwedOf(dr))} ISK`,
+                dr.corp?.kind === 'row' && dr.corp.view.correction ? (
+                  // A correction keeps the old figure on the line (#4622).
+                  <CorpCorrectedAmount correction={dr.corp.view.correction}>
+                    {`${formatIsk(taxOwedOf(dr))} ISK`}
+                  </CorpCorrectedAmount>
+                ) : (
+                  `${formatIsk(taxOwedOf(dr))} ISK`
+                ),
                 (m) => `${formatIsk(m.assignment.taxOwed)} ISK`
               )
             : '—',
@@ -327,7 +335,10 @@ export function useTaxColumns({
         stackEdge: 'end',
         render: (dr) =>
           dr.corp ? (
-            <CorpStatusPill corp={dr.corp} />
+            <>
+              <CorpStatusPill corp={dr.corp} />
+              {dr.corp.kind === 'row' && dr.corp.view.overlap && <CorpOverlapMark />}
+            </>
           ) : (
             <StatusPill
               status={dr.status}
