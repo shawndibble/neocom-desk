@@ -12,7 +12,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
-import { focusRingClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  interactiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
 import { formatAge } from '@/lib/age';
@@ -48,7 +52,9 @@ export function WarBanner({ characterId }: { characterId: number }) {
           aria-haspopup="dialog"
           onClick={() => setOpen(true)}
           className={cx(
-            'flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xs border border-danger bg-danger/10 px-3 py-2.5 text-left transition-colors hover:bg-danger/15',
+            'flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xs border border-danger bg-danger/10 px-3 py-2 text-left hover:bg-danger/15',
+            tappableRowClassName,
+            interactiveClassName,
             focusRingClassName
           )}
         >
