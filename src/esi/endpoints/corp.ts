@@ -256,6 +256,70 @@ export function getCorporationMemberTracking(
   });
 }
 
+// --- GET /corporations/{corporation_id}/starbases (esi-corporations.read_starbases.v1) ---
+
+/** ESI's `state`; `offline` and `onlining` hold no fuel clock. */
+export type StarbaseState =
+  'offline' | 'online' | 'onlining' | 'reinforced' | 'unanchoring' | (string & {});
+
+export interface CorporationStarbase {
+  starbase_id: number;
+  system_id: number;
+  /** The tower's own type: Control Tower, Medium, Small, faction variants. */
+  type_id: number;
+  moon_id?: number;
+  onlined_since?: string;
+  /** Set while the tower is reinforced: when it comes out. */
+  reinforced_until?: string;
+  state?: StarbaseState;
+  unanchor_at?: string;
+}
+
+/** Director-only (`canReadStarbases`), cached 3600s, paginated (X-Pages). */
+export function getCorporationStarbases(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<PaginatedResult<CorporationStarbase>> {
+  return fetchAllPagesStatus<CorporationStarbase>(`/corporations/${corporationId}/starbases`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationStarbases',
+  });
+}
+
+// --- GET /corporations/{corporation_id}/starbases/{starbase_id} (esi-corporations.read_starbases.v1) ---
+
+/** One fuel or strontium line in a tower's bay. */
+export interface StarbaseFuel {
+  type_id: number;
+  quantity: number;
+}
+
+/** Only `fuels` is read here; the standing-and-permission fields are not. */
+export interface CorporationStarbaseDetail {
+  fuels?: StarbaseFuel[];
+}
+
+/** `system_id` is a required query parameter (the tower's system), not optional. */
+export function getCorporationStarbase(
+  characterId: number,
+  corporationId: number,
+  starbaseId: number,
+  systemId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationStarbaseDetail>> {
+  return esiFetch<CorporationStarbaseDetail>(
+    `/corporations/${corporationId}/starbases/${starbaseId}`,
+    {
+      ...options,
+      characterId,
+      query: { system_id: systemId },
+      endpointId: 'getCorporationStarbase',
+    }
+  );
+}
+
 // --- GET /corporations/{corporation_id}/customs_offices (esi-planets.read_customs_offices.v1) ---
 
 /**

@@ -125,6 +125,7 @@ async function openCorpOverview(page: Page): Promise<void> {
         },
       ]);
     }
+    if (path === `${corp}/starbases`) return json([]);
     if (path === `${corp}/members`) return json([CHARACTER_ID, 90000002, 90000003]);
     if (path === `${corp}/membertracking`) {
       return json([

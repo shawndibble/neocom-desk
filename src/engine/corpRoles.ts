@@ -63,6 +63,12 @@ export interface CorpCapabilities {
    */
   canReadBlueprints: boolean;
   /**
+   * GET /corporations/{id}/starbases and /starbases/{starbase_id} — each
+   * tower's state, fuel and strontium (issue #4610). Director-only:
+   * `x-required-roles` is ["Director"] on both.
+   */
+  canReadStarbases: boolean;
+  /**
    * GET /corporations/{id}/customs_offices — tax rates and reinforce window of
    * each customs office (issue #4611). Director-only: `x-required-roles` is
    * ["Director"] alone.
@@ -105,6 +111,7 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadIndustry',
   'canReadAssets',
   'canReadBlueprints',
+  'canReadStarbases',
   'canReadCustomsOffices',
   'canReadRoleAudit',
   'canReadContracts',
@@ -121,6 +128,7 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadIndustry: false,
   canReadAssets: false,
   canReadBlueprints: false,
+  canReadStarbases: false,
   canReadCustomsOffices: false,
   canReadRoleAudit: false,
   canReadContracts: false,
@@ -157,6 +165,8 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
   // ["Director"] alone (issue #839's own brief guessed Director/
   // Factory_Manager, which the live spec does not confirm).
   canReadBlueprints: [],
+  // ['Director'] alone on both starbases paths, so the Director clause covers it.
+  canReadStarbases: [],
   // `x-required-roles` on customs_offices is ["Director"] alone.
   canReadCustomsOffices: [],
   // `x-required-roles` on roles/history, titles and members/titles is ["Director"] alone.

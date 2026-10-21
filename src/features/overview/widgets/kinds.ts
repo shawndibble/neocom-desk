@@ -350,11 +350,11 @@ const SPECS: Record<string, Spec> = {
   },
   corpStarbases: {
     corp: 'corpClocks',
+    capabilities: ['canReadStarbases'],
     views: NT,
     view: 'table',
     size: 'M',
-    soon: true,
-    endpoints: [],
+    endpoints: ['getCorporationStarbases', 'getCorporationStarbase'],
   },
   corpCustomsOffices: {
     corp: 'corpClocks',
