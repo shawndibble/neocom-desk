@@ -24,9 +24,9 @@ import { allocatePayments, dismissalCredits, settleTolerance, type TaxPayment } 
 import { splitAcrossBooks, resolveBookShare, type BookObservation } from './attribution';
 import { dayClosesAt, isDayBillable, lastBillableDate } from './billable';
 import { buildDayCharges, type DayCharge, type Miner } from './charges';
-import { splitByCoverage, type FeederCoverage } from './coverage';
+import type { FeederCoverage } from './coverage';
 import { activeDismissalFor, type Dismissal } from './dismissals';
-import { withholdUnreadFeederDays, type FeederReadClock } from './feederHealth';
+import { splitByCoverageAndRead, type FeederReadClock } from './feederHealth';
 import { observedEntryKey } from './observed';
 import type { TaxRate, RateScope } from './rates';
 import {
@@ -263,19 +263,12 @@ interface Prepared {
 function prepare(book: PersonalBook, entries: readonly PersonalEntry[], now: string): Prepared {
   // A moon owner's day outside its coverage owes nothing (#4618); one its ledger was not read
   // well after is not Billable yet, and holds the miner's whole day with it (#4622).
-  const feeders = book.feeders ?? [];
-  const { covered } = splitByCoverage(book.observed, book.corporationId, feeders);
-  const readable = withholdUnreadFeederDays(covered, {
+  const { readable, unread } = splitByCoverageAndRead(book.observed, {
     now,
     bookCorporationId: book.corporationId,
-    feeders: feeders.map((f) => ({
-      corporationId: f.corporationId,
-      ...(f.lastReadWellAt !== undefined ? { lastReadWellAt: f.lastReadWellAt } : {}),
-    })),
+    feeders: book.feeders ?? [],
     ...(book.graceHours !== undefined ? { graceHours: book.graceHours } : {}),
   });
-  const kept = new Set(readable);
-  const unread = covered.filter((o) => !kept.has(o));
   const { charges, unrated } = buildDayCharges(readable, {
     corporationId: book.corporationId,
     startDate: book.startDate,

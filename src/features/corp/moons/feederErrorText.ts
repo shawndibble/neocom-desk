@@ -1,29 +1,25 @@
 import type { TFunction } from 'i18next';
+import { callableErrorReason } from '@/lib/callableError';
 
-const reasonOf = (e: unknown): string | null => {
-  const reason = (e as { details?: { reason?: unknown } } | null)?.details?.reason;
-  return typeof reason === 'string' ? reason : null;
-};
+const FAILED = 'corpTaxBook.moons.setup.failed';
 
 /**
- * A server refusal as text the player can read: the callable's `reason` mapped to
- * a `setup.failed` string, never the raw English `message`. Unknown reasons and
- * non-callable failures (network, popup) read as the generic one.
+ * A refusal as text the player can read: the callable's `reason` mapped to a
+ * `setup.failed` string, else the translated `fallbackKey`. Never the server's
+ * raw English `message`; network and popup failures read as the fallback.
  */
-export function feederErrorText(t: TFunction, e: unknown): string {
-  const reason = reasonOf(e);
-  return t(`corpTaxBook.moons.setup.failed.${reason ?? 'generic'}`, {
-    defaultValue: t('corpTaxBook.moons.setup.failed.generic'),
-  });
+export function callableErrorText(t: TFunction, e: unknown, fallbackKey: string): string {
+  const reason = callableErrorReason(e);
+  const known = reason === null ? '' : t(`${FAILED}.${reason}`, { defaultValue: '' });
+  return known === '' ? t(fallbackKey) : known;
 }
 
-/**
- * The mapped text when the refusal carries a reason we have a string for, else
- * null so the caller keeps its own fallback.
- */
-export function knownReasonText(t: TFunction, e: unknown): string | null {
-  const reason = reasonOf(e);
-  if (reason === null) return null;
-  const text = t(`corpTaxBook.moons.setup.failed.${reason}`, { defaultValue: '' });
-  return text === '' ? null : text;
+/** The setup flow's refusal text; an unknown reason reads as the generic "could not connect". */
+export function feederErrorText(t: TFunction, e: unknown): string {
+  return callableErrorText(t, e, `${FAILED}.generic`);
+}
+
+/** A local refusal carrying a `setup.failed` reason, so `callableErrorText` shows its text. */
+export function refusal(reason: string): Error {
+  return Object.assign(new Error(reason), { details: { reason } });
 }

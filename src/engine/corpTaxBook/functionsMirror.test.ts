@@ -14,7 +14,14 @@ import {
   disconnectedCoverage,
   type FeederHealth,
 } from './feederHealth';
-import { accrueValuedDays, feederBalance, onPayList } from './feederAccrual';
+import {
+  accrueValuedDays,
+  deriveModeChanges,
+  deriveOwnerRateHistory,
+  feederBalance,
+  feederBillableRule,
+  onPayList,
+} from './feederAccrual';
 import {
   balanceAfter,
   buildRecordedPayout,
@@ -452,6 +459,38 @@ describe('feeder view mirror', () => {
       }
     }
     expect(mirror.dayClosesAt('2026-06-01')).toBe(dayClosesAt('2026-06-01'));
+  });
+
+  it('applies the moon owner Billable rule the same', () => {
+    const closes = Date.parse(dayClosesAt('2026-06-30', 6));
+    for (const lastRead of [undefined, closes - 1, closes, closes + 1, Date.parse('2027-01-01')]) {
+      for (const grace of [0, 6, 30]) {
+        for (const day of ['2026-06-29', '2026-06-30', '2026-07-01', '2026-12-31']) {
+          expect(mirror.feederBillableRule(lastRead, grace)(day)).toBe(
+            feederBillableRule(lastRead, grace)(day)
+          );
+        }
+      }
+    }
+  });
+
+  it("derives a record's rate history and mode switches the same", () => {
+    const history = [
+      { kind: 'agreed' as const, pct: 5, effectiveFrom: '2026-06-02', recordedAt: 'x' },
+    ];
+    const modeChanges = [{ from: '2026-06-03', mode: 'normal' as const }];
+    const joinedAt = Date.parse('2026-06-01T23:59:59.999Z');
+    for (const record of [
+      { joinedAt, mode: 'normal' as const },
+      { joinedAt, mode: 'settled-otherwise' as const },
+      { joinedAt, mode: 'settled-otherwise' as const, modeChanges },
+      { joinedAt, requestedRatePct: 6 },
+      { joinedAt, requestedRatePct: 6, agreedRatePct: 8 },
+      { joinedAt, agreedRatePct: 8, ownerRateHistory: history },
+    ]) {
+      expect(mirror.deriveOwnerRateHistory(record)).toEqual(deriveOwnerRateHistory(record));
+      expect(mirror.deriveModeChanges(record)).toEqual(deriveModeChanges(record));
+    }
   });
 
   it("prices a moon owner's ore the same (#4621)", () => {

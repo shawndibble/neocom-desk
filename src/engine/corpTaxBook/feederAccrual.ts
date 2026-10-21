@@ -1,4 +1,5 @@
 import { computeAssignmentValue } from '../miningTax/valuation';
+import { dayClosesAt } from './billable';
 import { isDayCovered, type CoveragePeriod } from './coverage';
 import { effectiveOwnerRate, type OwnerRateEntry } from './ownerRate';
 import type { ObservedMiningEntry } from './types';
@@ -53,6 +54,51 @@ export interface FeederAccrualInput {
   /** The feeder's own Billable rule (its ledger read), see `withholdUnreadFeederDays`. */
   isBillable: (day: string) => boolean;
   pricesOn: (date: string) => ReadonlyMap<number, number>;
+}
+
+/**
+ * A moon owner's own Billable rule: a day at its refineries is Billable once a good read of its
+ * ledger (`lastReadWellAt`, ms) landed after the day closed. Mirrored in `functions/`.
+ */
+export function feederBillableRule(
+  lastReadWellAt: number | undefined,
+  graceHours: number
+): (day: string) => boolean {
+  return (day) =>
+    lastReadWellAt !== undefined && lastReadWellAt >= Date.parse(dayClosesAt(day, graceHours));
+}
+
+const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+/** What a feeder record holds of its rates and mode (the book's and the server's records fit). */
+export interface FeederRulesRecord {
+  joinedAt: number;
+  mode?: FeederMode;
+  requestedRatePct?: number;
+  agreedRatePct?: number;
+  ownerRateHistory?: OwnerRateEntry[];
+  modeChanges?: FeederModeChange[];
+}
+
+/** The record's rate history, or entries derived from its two rate fields (dated the join day). Mirrored in `functions/`. */
+export function deriveOwnerRateHistory(record: FeederRulesRecord): OwnerRateEntry[] {
+  if (record.ownerRateHistory) return record.ownerRateHistory;
+  const effectiveFrom = utcDay(record.joinedAt);
+  const recordedAt = new Date(record.joinedAt).toISOString();
+  const out: OwnerRateEntry[] = [];
+  if (record.requestedRatePct !== undefined)
+    out.push({ kind: 'requested', pct: record.requestedRatePct, effectiveFrom, recordedAt });
+  if (record.agreedRatePct !== undefined)
+    out.push({ kind: 'agreed', pct: record.agreedRatePct, effectiveFrom, recordedAt });
+  return out;
+}
+
+/** The record's mode switches, or settled-otherwise from the join day when only `mode` says so. Mirrored in `functions/`. */
+export function deriveModeChanges(record: FeederRulesRecord): FeederModeChange[] {
+  if (record.modeChanges) return record.modeChanges;
+  return record.mode === 'settled-otherwise'
+    ? [{ from: utcDay(record.joinedAt), mode: 'settled-otherwise' }]
+    : [];
 }
 
 export function isSettledOn(changes: readonly FeederModeChange[], day: string): boolean {

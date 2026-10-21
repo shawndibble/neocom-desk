@@ -6,11 +6,11 @@
  * margin. Player-facing text never says feeder or Collector.
  */
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
-import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
+import type { FeederMode } from '@/engine/corpTaxBook/feederAccrual';
 import type { Payee } from '@/engine/corpTaxBook/payouts';
-import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
-import { ensureSignedIn } from '@/sync/syncAuth';
+import { getSyncFirestore } from '@/sync/firebaseApp';
+import { call } from './bookClient';
 
 export interface FeederViewRateEntry {
   kind: 'requested' | 'agreed';
@@ -20,9 +20,6 @@ export interface FeederViewRateEntry {
   recordedAt: string;
 }
 
-/** Who a moon owner is paid as: a corporation or a player. */
-export type FeederPayee = Payee;
-
 /** `feederViews/{feeder}`. */
 export interface FeederViewSummary {
   schemaVersion: 1;
@@ -30,7 +27,7 @@ export interface FeederViewSummary {
   collectorCorporationId: number;
   collectorName: string | null;
   status: 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
-  mode: 'normal' | 'settled-otherwise';
+  mode: FeederMode;
   note: string | null;
   builtAt: number;
   coverageFrom: string | null;
@@ -57,7 +54,7 @@ export interface FeederViewSummary {
   removalStartedAt?: number | null;
   removalEffectiveAt?: number | null;
   /** Who the moon owner is paid as; null or absent (a view built before #4619) means the moon owner corporation. */
-  payee?: FeederPayee | null;
+  payee?: Payee | null;
 }
 
 export interface FeederViewLine {
@@ -113,11 +110,6 @@ export interface FeederViewAccess {
  */
 export const RECONNECT_CODE = 'reconnect-existing';
 
-async function call<In, Out>(characterId: number, name: string, data: In): Promise<Out> {
-  await ensureSignedIn(characterId);
-  return (await httpsCallable<In, Out>(getSyncFunctions(), name)(data)).data;
-}
-
 /** Live role check; records the 24h viewer access and builds the view when it is absent. */
 export async function getFeederViewAccess(
   characterId: number,
@@ -151,7 +143,7 @@ export async function requestFeederRate(
 export async function setFeederPayee(
   characterId: number,
   corporationId: number,
-  payee: FeederPayee
+  payee: Payee
 ): Promise<{ ok: true }> {
   const accessToken = await getValidAccessToken(characterId);
   return call(characterId, 'setCorpTaxBookFeederPayeeCallable', {

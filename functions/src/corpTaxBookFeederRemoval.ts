@@ -9,15 +9,14 @@
 
 import { randomBytes } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
-import { HttpsError, type FunctionsErrorCode } from 'firebase-functions/v2/https';
+import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
 import {
-  FEEDERS,
   FEEDER_OF_COLLECTION,
   OFFICERS,
   REMOVAL_LINKS_COLLECTION,
-  parseBookCall,
-  type BookCall,
+  parseFeederTarget,
+  type FeederTargetCall,
 } from './corpTaxBook.js';
 import {
   REMOVAL_WAIT_MS,
@@ -39,6 +38,8 @@ import {
   appendAudit,
   authorizeOfficer,
   bookRef,
+  fail,
+  feederRef,
   type BookDeps,
   type Caller,
 } from './corpTaxBookStore.js';
@@ -52,10 +53,6 @@ const LINK_SLACK_MS = 24 * 3_600_000;
  * out it runs to `effectiveAt` plus the slack instead (#4617), since the queue may send late.
  */
 const LINK_TTL_MS = REMOVAL_WAIT_MS + LINK_SLACK_MS;
-
-function fail(code: FunctionsErrorCode, message: string, reason: string): never {
-  throw new HttpsError(code, message, { reason });
-}
 
 /** No payee on record means the moon owner corporation itself is paid: its CEO acts for it. */
 const payeeOf = (rec: FeederRecord): NonNullable<FeederRecord['payee']> =>
@@ -76,17 +73,9 @@ export interface RemovalLinkDoc {
 
 // --- Input -----------------------------------------------------------------
 
-export interface RemovalCall extends BookCall {
-  feederCorporationId: number;
-}
+export type RemovalCall = FeederTargetCall;
 
-export function parseRemovalCall(data: unknown): RemovalCall {
-  const id = record(data).feederCorporationId;
-  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) {
-    throw new HttpsError('invalid-argument', 'feederCorporationId must be a corporation id');
-  }
-  return { ...parseBookCall(data), feederCorporationId: id };
-}
+export const parseRemovalCall = parseFeederTarget;
 
 export interface RemovalNoticeCall extends RemovalCall {
   /** When the mail went out (ms); clamped to the removal's start and now. */
@@ -170,9 +159,7 @@ export async function startFeederRemoval(
   input: RemovalCall
 ): Promise<StartRemovalResult> {
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
-  const ref = bookRef(deps.db, input.corporationId)
-    .collection(FEEDERS)
-    .doc(String(input.feederCorporationId));
+  const ref = feederRef(deps.db, input.corporationId, input.feederCorporationId);
   const code = randomBytes(24).toString('base64url');
   const linkId = hashInviteCode(code);
   const now = deps.now();
@@ -220,9 +207,7 @@ export async function recordRemovalSent(
   input: RemovalNoticeCall
 ): Promise<{ effectiveAt: number | null }> {
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
-  const ref = bookRef(deps.db, input.corporationId)
-    .collection(FEEDERS)
-    .doc(String(input.feederCorporationId));
+  const ref = feederRef(deps.db, input.corporationId, input.feederCorporationId);
   const now = deps.now();
   const effectiveAt = await deps.db.runTransaction(async (tx) => {
     const rec = (await tx.get(ref)).data() as FeederRecord | undefined;
@@ -261,9 +246,7 @@ export async function cancelFeederRemoval(
   input: RemovalCall
 ): Promise<{ recipients: number[] }> {
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
-  const ref = bookRef(deps.db, input.corporationId)
-    .collection(FEEDERS)
-    .doc(String(input.feederCorporationId));
+  const ref = feederRef(deps.db, input.corporationId, input.feederCorporationId);
   const rec = await deps.db.runTransaction(async (tx) => {
     const held = (await tx.get(ref)).data() as FeederRecord | undefined;
     if (!held) fail('not-found', 'No such moon owner', 'no-feeder');
@@ -330,10 +313,7 @@ async function resolveLink(deps: BookDeps, caller: Caller, code: string): Promis
   const copy = link.effectiveAt ?? null;
   if (deps.now() >= link.expiresAt) return UNAVAILABLE;
   const rec = (
-    await bookRef(deps.db, link.collectorCorporationId)
-      .collection(FEEDERS)
-      .doc(String(link.feederCorporationId))
-      .get()
+    await feederRef(deps.db, link.collectorCorporationId, link.feederCorporationId).get()
   ).data() as FeederRecord | undefined;
   if (!rec || !isLinkedRemoval(rec, link, linkId)) return UNAVAILABLE;
   const ceoOf = deps.corporationCeo ?? (async () => undefined);
@@ -426,10 +406,7 @@ export async function finalizeDueRemovals(
   )) {
     try {
       const rec = (
-        await bookRef(deps.db, collectorCorporationId)
-          .collection(FEEDERS)
-          .doc(String(feederCorporationId))
-          .get()
+        await feederRef(deps.db, collectorCorporationId, feederCorporationId).get()
       ).data() as FeederRecord | undefined;
       if (!rec || !isRemovalDue({ status: rec.status, removal: rec.removal }, deps.now())) {
         continue;

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, TextInput } from '@/components/ui';
+import { Button, Panel, TextInput } from '@/components/ui';
 import { useEntityName } from '@/features/character/useEntityName';
+import { callableErrorReason } from '@/lib/callableError';
 import { previewFeederInvite, type FeederInvitePreview } from '../taxBook/feederClient';
 
 /**
@@ -40,8 +41,7 @@ export function FeederConsent({
         if (!cancelled) setPreview(p);
       },
       (e: unknown) => {
-        const reason = (e as { details?: { reason?: unknown } } | null)?.details?.reason;
-        if (!cancelled && reason === 'invite-invalid') setPreview('invalid');
+        if (!cancelled && callableErrorReason(e) === 'invite-invalid') setPreview('invalid');
       }
     );
     return () => {
@@ -66,46 +66,48 @@ export function FeederConsent({
     </section>
   );
   return (
-    <div className="mx-auto max-w-md space-y-3 rounded-xs border border-line bg-panel p-4 text-sm">
-      <h2 className="text-base font-semibold">{t('corpTaxBook.moons.consent.title')}</h2>
-      {preview === 'invalid' && (
-        <p role="alert" className="text-danger">
-          {t('corpTaxBook.moons.setup.failed.invite-invalid')}
-        </p>
-      )}
-      {error && (
-        <p role="alert" className="text-danger">
-          {error}
-        </p>
-      )}
-      {name !== null && (
-        <p>
-          {t('corpTaxBook.moons.consent.from', { name })}
-          {offer?.offeredOwnerRatePct != null &&
-            ` ${t('corpTaxBook.moons.consent.offered', { pct: offer.offeredOwnerRatePct })}`}
-        </p>
-      )}
-      {part('sees')}
-      {part('cannot')}
-      {part('stop')}
-      <label className="block space-y-1">
-        <span className="block text-xs text-text-dim">{t('corpTaxBook.moons.consent.rate')}</span>
-        <TextInput inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
-      </label>
-      <p className="text-xs text-text-dim">{t('corpTaxBook.moons.consent.accountant')}</p>
-      <div className="flex gap-2">
-        <Button variant="ghost" onClick={onBack}>
-          {t('corpTaxBook.moons.setup.back')}
-        </Button>
-        <Button
-          variant="primary"
-          loading={busy}
-          disabled={!valid || preview === 'invalid'}
-          onClick={() => onContinue(rate.trim() === '' ? undefined : pct)}
-        >
-          {t('corpTaxBook.moons.consent.continue')}
-        </Button>
+    <Panel className="mx-auto max-w-md text-sm">
+      <div className="space-y-3">
+        <h2 className="text-base font-semibold">{t('corpTaxBook.moons.consent.title')}</h2>
+        {preview === 'invalid' && (
+          <p role="alert" className="text-danger">
+            {t('corpTaxBook.moons.setup.failed.invite-invalid')}
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="text-danger">
+            {error}
+          </p>
+        )}
+        {name !== null && (
+          <p>
+            {t('corpTaxBook.moons.consent.from', { name })}
+            {offer?.offeredOwnerRatePct != null &&
+              ` ${t('corpTaxBook.moons.consent.offered', { pct: offer.offeredOwnerRatePct })}`}
+          </p>
+        )}
+        {part('sees')}
+        {part('cannot')}
+        {part('stop')}
+        <label className="block space-y-1">
+          <span className="block text-xs text-text-dim">{t('corpTaxBook.moons.consent.rate')}</span>
+          <TextInput inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
+        </label>
+        <p className="text-xs text-text-dim">{t('corpTaxBook.moons.consent.accountant')}</p>
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={onBack}>
+            {t('corpTaxBook.moons.setup.back')}
+          </Button>
+          <Button
+            variant="primary"
+            loading={busy}
+            disabled={!valid || preview === 'invalid'}
+            onClick={() => onContinue(rate.trim() === '' ? undefined : pct)}
+          >
+            {t('corpTaxBook.moons.consent.continue')}
+          </Button>
+        </div>
       </div>
-    </div>
+    </Panel>
   );
 }

@@ -19,8 +19,8 @@ export function RemovalStrip({
   onNoticeSent,
 }: {
   removal: NonNullable<MoonOwnerDetail['removal']>;
-  onCancel?: ((() => Promise<void>) | undefined) | undefined;
-  onNoticeSent?: ((() => Promise<void>) | undefined) | undefined;
+  onCancel?: () => Promise<void>;
+  onNoticeSent?: () => Promise<void>;
 }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);

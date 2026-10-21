@@ -102,12 +102,16 @@ type Data = Record<string, unknown>;
 
 export const bookRef = (db: Firestore, corporationId: number) =>
   db.collection(BOOKS_COLLECTION).doc(String(corporationId));
+/** `corpTaxBooks/{collector}/feeders/{feeder}`: one moon owner's record. */
+export const feederRef = (db: Firestore, collector: number, feeder: number) =>
+  bookRef(db, collector).collection(FEEDERS).doc(String(feeder));
 const sub = (db: Firestore, corporationId: number, name: string) =>
   bookRef(db, corporationId).collection(name);
 
 const rand = (bytes = 6) => randomBytes(bytes).toString('base64url');
 
-function fail(code: FunctionsErrorCode, message: string, reason: string): never {
+/** Throws an HttpsError carrying a stable `reason` for the UI to map. */
+export function fail(code: FunctionsErrorCode, message: string, reason: string): never {
   throw new HttpsError(code, message, { reason });
 }
 
@@ -328,7 +332,7 @@ export async function ownBookFloor(
   if (typeof leftAt !== 'number') return null;
   const collector = previous.get('collectorCorporationId');
   if (typeof collector === 'number') {
-    const record = await get(bookRef(db, collector).collection(FEEDERS).doc(String(corporationId)));
+    const record = await get(feederRef(db, collector, corporationId));
     const periods = (record.get('coveragePeriods') ?? []) as CoveragePeriod[];
     const ends = periods.map((p) => p.to);
     if (ends.length > 0 && ends.every((to) => typeof to === 'string')) {

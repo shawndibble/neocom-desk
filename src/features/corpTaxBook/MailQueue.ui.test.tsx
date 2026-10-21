@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { MailQueueItem } from '@/engine/corpTaxBook/mailQueue';
 import { composeStatementMail } from '@/engine/corpTaxBook/statementMail';
+import { formatIsk } from '@/lib/isk';
 import { MailLimitNotice } from './MailLimitNotice';
 import { MailQueueChip } from './MailQueueChip';
 import { MailQueuePanel } from './MailQueuePanel';
@@ -84,6 +85,18 @@ describe('MailQueuePanel', () => {
     expect(screen.getByText('Done')).toBeInTheDocument();
     expect(screen.getByText(/Every mail is logged on its Miner/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Clear sent mail' })).toBeInTheDocument();
+  });
+
+  it('labels moon owner mail by kind and shows no amount for it', () => {
+    render(
+      <MailQueuePanel
+        items={[item(1, { kind: 'rate-change', amount: 0, recipientName: 'Owner CEO' })]}
+        now={NOW}
+        {...actions}
+      />
+    );
+    expect(screen.getAllByText('(Rate change)').length).toBeGreaterThan(0);
+    expect(screen.queryByText(formatIsk(0))).not.toBeInTheDocument();
   });
 });
 

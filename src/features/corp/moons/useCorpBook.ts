@@ -40,6 +40,7 @@ import {
   type OfficerVerdict,
 } from '../taxBook/bookClient';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
+import { refineryPlaceholder } from './moonsFormat';
 
 export interface BookNames {
   character: (id: number) => string;
@@ -146,7 +147,8 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
           [...typeIds],
           [data.settings.hubId],
           [...dates],
-          data.settings.oreForm === 'compressed'
+          data.settings.oreForm === 'compressed',
+          { moonOwner: true }
         );
         if (cancelled) return;
         setFetched({
@@ -325,7 +327,7 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
     () => ({
       character: (id) => names.characters.get(id) ?? `#${id}`,
       corporation: (id) => names.characters.get(id) ?? `#${id}`,
-      refinery: (id) => names.refineries.get(id) ?? `Refinery ${id}`,
+      refinery: (id) => names.refineries.get(id) ?? refineryPlaceholder(id),
       moon: (id) => names.moons.get(id) ?? `Moon ${id}`,
       ore: (typeId) => names.ores.get(typeId) ?? `#${typeId}`,
     }),

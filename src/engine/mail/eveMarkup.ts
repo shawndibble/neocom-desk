@@ -10,7 +10,8 @@
  *
  * Public API: `parseEveMarkup`, `serializeEveMarkup`, `eveMarkupLength`
  * (+ `EVE_MARKUP_LIMIT`), `classifyMarkupLink`, `markupColorToCss`,
- * `markupPlainText`, `splitMarkupLines`.
+ * `markupPlainText`, `splitMarkupLines`, and the `markupText` / `markupBr`
+ * node builders.
  */
 
 /** The game's body limit, counted over the markup as sent. */
@@ -27,6 +28,9 @@ export type MarkupNode =
   | { type: 'color'; color: string; children: MarkupNode[] }
   /** `href` has passed `classifyMarkupLink`; `target` is that classification, parsed once. */
   | { type: 'link'; href: string; target: MarkupLinkTarget; children: MarkupNode[] };
+
+export const markupText = (text: string): MarkupNode => ({ type: 'text', text });
+export const markupBr = (): MarkupNode => ({ type: 'br' });
 
 export type InertScheme = 'fitting' | 'contract' | 'killReport' | 'joinChannel' | 'localsvc';
 

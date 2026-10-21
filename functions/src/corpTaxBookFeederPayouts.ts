@@ -4,9 +4,16 @@
 // moon owner writes. Failures carry a stable `reason`; no player-facing text lives here.
 // Payouts never touch Tax Payment matching or Statements.
 
-import { HttpsError, type FunctionsErrorCode } from 'firebase-functions/v2/https';
+import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
-import { FEEDERS, parseBookCall, utcDate, type BookCall } from './corpTaxBook.js';
+import {
+  FEEDERS,
+  parseBookCall,
+  parseFeederTarget,
+  utcDate,
+  type BookCall,
+  type FeederTargetCall,
+} from './corpTaxBook.js';
 import {
   buildRecordedPayout,
   outgoingDonationsFromJournal,
@@ -24,6 +31,8 @@ import {
   appendAudit,
   authorizeOfficer,
   bookRef,
+  fail,
+  feederRef,
   type Actor,
   type BookDeps,
   type Caller,
@@ -39,23 +48,7 @@ export const PAYOUTS = 'payouts';
  */
 const PAYOUTS_WRITTEN_AT = 'payoutsWrittenAt';
 
-function fail(code: FunctionsErrorCode, message: string, reason: string): never {
-  throw new HttpsError(code, message, { reason });
-}
-
 // --- Input -----------------------------------------------------------------
-
-interface FeederTargetCall extends BookCall {
-  feederCorporationId: number;
-}
-
-function parseTarget(data: unknown): FeederTargetCall {
-  const id = record(data).feederCorporationId;
-  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) {
-    throw new HttpsError('invalid-argument', 'feederCorporationId must be a corporation id');
-  }
-  return { ...parseBookCall(data), feederCorporationId: id };
-}
 
 export interface RecordPayoutInput extends FeederTargetCall {
   amount: number;
@@ -64,7 +57,7 @@ export interface RecordPayoutInput extends FeederTargetCall {
 }
 
 export function parseRecordPayoutInput(data: unknown): RecordPayoutInput {
-  const target = parseTarget(data);
+  const target = parseFeederTarget(data);
   const d = record(data);
   if (d.method !== 'donation' && d.method !== 'contract' && d.method !== 'other') {
     throw new HttpsError('invalid-argument', 'method must be donation, contract or other');
@@ -84,7 +77,7 @@ export interface MarkPayoutInput extends FeederTargetCall {
 }
 
 export function parseMarkPayoutInput(data: unknown): MarkPayoutInput {
-  const target = parseTarget(data);
+  const target = parseFeederTarget(data);
   const d = record(data);
   if (typeof d.notAPayout !== 'boolean') {
     throw new HttpsError('invalid-argument', 'notAPayout must be true or false');
@@ -109,7 +102,7 @@ export function parseReconcilePayoutsInput(data: unknown): ReconcilePayoutsInput
 // --- Calls -----------------------------------------------------------------
 
 const payoutsOf = (deps: BookDeps, collector: number, feeder: number) =>
-  bookRef(deps.db, collector).collection(FEEDERS).doc(String(feeder)).collection(PAYOUTS);
+  feederRef(deps.db, collector, feeder).collection(PAYOUTS);
 
 /** A moon owner record with its payee history (#4617; absent on older records). */
 type FeederWithPayees = FeederRecord & { payeeHistory?: PayeeChange[] };
@@ -133,9 +126,7 @@ export async function recordFeederPayout(
   input: RecordPayoutInput
 ): Promise<{ id: string }> {
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
-  const feeder = bookRef(deps.db, input.corporationId)
-    .collection(FEEDERS)
-    .doc(String(input.feederCorporationId));
+  const feeder = feederRef(deps.db, input.corporationId, input.feederCorporationId);
   const payout = buildRecordedPayout(input);
   const col = payoutsOf(deps, input.corporationId, input.feederCorporationId);
   const fresh = col.doc();
@@ -215,10 +206,18 @@ export async function planFeederPayouts(
 ): Promise<OwnerPayoutPlan[]> {
   if (outgoing.length === 0) return [];
   const feeders = await bookRef(deps.db, collector).collection(FEEDERS).get();
+  // Only an owner some donation could go to (engine `payeeIdsAt`: its own corporation or any
+  // payee it ever named) can take one, so only those owners' payouts are read.
+  const recipients = new Set(outgoing.map((d) => d.recipientId));
+  const candidates = feeders.docs.flatMap((doc) => {
+    const rec = doc.data() as FeederWithPayees;
+    const corporationId = Number(doc.id);
+    const ids = [corporationId, rec.payee?.id, ...(rec.payeeHistory ?? []).map((h) => h.payee.id)];
+    return ids.some((id) => id !== undefined && recipients.has(id)) ? [{ rec, corporationId }] : [];
+  });
+  if (candidates.length === 0) return [];
   const owners = await Promise.all(
-    feeders.docs.map(async (doc) => {
-      const rec = doc.data() as FeederWithPayees;
-      const corporationId = Number(doc.id);
+    candidates.map(async ({ rec, corporationId }) => {
       const payouts = (await payoutsOf(deps, collector, corporationId).get()).docs.map(
         storedPayout
       );
@@ -266,7 +265,7 @@ export async function applyFeederPayoutPlan(
   actor: Actor
 ): Promise<{ attached: number; recorded: number }> {
   const corporationId = plan.owner.corporationId;
-  const feeder = bookRef(deps.db, collector).collection(FEEDERS).doc(String(corporationId));
+  const feeder = feederRef(deps.db, collector, corporationId);
   const col = payoutsOf(deps, collector, corporationId);
   const createRefs = new Set(plan.createRefs);
   const written = await deps.db.runTransaction(async (tx) => {

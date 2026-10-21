@@ -5,6 +5,7 @@
  * Its refresh token goes to the server and never into a device session.
  */
 import { completeFeederGrantLogin } from '@/auth/session';
+import { callableErrorReason } from '@/lib/callableError';
 import { reportFailure } from '@/observability/reportFailure';
 
 /** What the grant round trip hands back, as router state, to the Moons page. */
@@ -19,11 +20,6 @@ export type FeederGrantOutcome =
       /** The server's reason (`not-an-accountant`, `invite-used`, …) when it gave one. */
       reason?: string;
     };
-
-export function reasonOf(error: unknown): string | undefined {
-  const details = (error as { details?: { reason?: unknown } } | null)?.details;
-  return typeof details?.reason === 'string' ? details.reason : undefined;
-}
 
 /** Finish the round trip: the tokens live only in this call's locals. */
 export async function completeFeederGrant(params: {
@@ -43,7 +39,7 @@ export async function completeFeederGrant(params: {
     });
   } catch (error) {
     reportFailure('auth', error);
-    return { status: 'failed', reason: reasonOf(error) };
+    return { status: 'failed', reason: callableErrorReason(error) ?? undefined };
   }
   return { status: 'on', name: result.name };
 }

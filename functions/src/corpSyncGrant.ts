@@ -19,7 +19,6 @@ import { decryptRefreshToken, encryptRefreshToken, rotateStoredToken } from './a
 import { boundedString, record } from './communities.js';
 import { CORP_SYNC_SCOPES } from './corpSyncScopes.js';
 import {
-  FEEDERS,
   FEEDER_OF_COLLECTION,
   META,
   decideRoles,
@@ -31,6 +30,8 @@ import {
   appendAudit,
   authorizeOfficer,
   bookRef,
+  fail,
+  feederRef,
   type Actor,
   type BookDeps,
   type Caller,
@@ -135,14 +136,6 @@ const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
   readIdentity: deps.readIdentity,
   ...(deps.openPrices ? { openPrices: deps.openPrices } : {}),
 });
-
-function fail(
-  code: ConstructorParameters<typeof HttpsError>[0],
-  message: string,
-  reason: string
-): never {
-  throw new HttpsError(code, message, { reason });
-}
 
 function sameScopes(scopes: readonly string[]): boolean {
   return (
@@ -520,10 +513,7 @@ async function runFeederSyncs(
   )) {
     try {
       const record = (
-        await bookRef(deps.db, collectorCorporationId)
-          .collection(FEEDERS)
-          .doc(String(feederCorporationId))
-          .get()
+        await feederRef(deps.db, collectorCorporationId, feederCorporationId).get()
       ).data() as FeederRecord | undefined;
       if (!record || !READABLE_FEEDER_STATUSES.includes(record.status)) continue;
       if (!first) await sleep(options.gapMs ?? FEEDER_GAP_MS);
@@ -633,10 +623,7 @@ export async function syncOneFeeder(
   const latest = (await grantRef(deps.db, feederCorporationId).get()).data() as
     CorpSyncGrantDoc | undefined;
   const feederNow = (
-    await bookRef(deps.db, collectorCorporationId)
-      .collection(FEEDERS)
-      .doc(String(feederCorporationId))
-      .get()
+    await feederRef(deps.db, collectorCorporationId, feederCorporationId).get()
   ).data() as FeederRecord | undefined;
   if (
     latest?.encryptedRefreshToken !== live.encryptedRefreshToken ||

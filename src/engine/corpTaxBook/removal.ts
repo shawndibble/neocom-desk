@@ -5,6 +5,7 @@
  */
 
 import { moonOwnerMailRecipients } from './ownerRateMail';
+import type { Payee } from './payouts';
 
 const HOUR_MS = 3_600_000;
 
@@ -82,7 +83,7 @@ export function removalRecipients(input: {
   officerIds: readonly number[];
   startedBy: number;
   ceoId: number | null;
-  payee?: { kind: 'corporation' | 'character'; id: number };
+  payee?: Payee;
   /** The payee corporation's CEO, when the payee is a corporation. */
   payeeCeoId?: number | null;
 }): number[] {
@@ -110,7 +111,7 @@ export function payeeMayForce(input: {
  * CEO when it is a corporation.
  */
 export function isPayeeActor(input: {
-  payee: { kind: 'corporation' | 'character'; id: number } | undefined;
+  payee: Payee | undefined;
   characterId: number;
   payeeCorporationCeoId: number | undefined;
 }): boolean {
@@ -122,9 +123,9 @@ export function isPayeeActor(input: {
 }
 
 /** A payee set or changed: the new payee and when. Re-saving the same payee changes nothing. */
-export function withPayee<T extends { payee?: { kind: 'corporation' | 'character'; id: number } }>(
+export function withPayee<T extends { payee?: Payee }>(
   rec: T,
-  payee: { kind: 'corporation' | 'character'; id: number },
+  payee: Payee,
   now: number
 ): T & { payeeChangedAt?: number } {
   const same = rec.payee?.kind === payee.kind && rec.payee.id === payee.id;

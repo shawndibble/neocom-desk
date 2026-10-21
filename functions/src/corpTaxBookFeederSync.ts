@@ -11,7 +11,7 @@
 // returns a token.
 
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
-import { FEEDERS, REMOVAL_LINKS_COLLECTION } from './corpTaxBook.js';
+import { REMOVAL_LINKS_COLLECTION } from './corpTaxBook.js';
 import {
   BOOK_DEFAULTS,
   advanceFeederHealth,
@@ -21,7 +21,13 @@ import {
   type ObservedRow,
 } from './corpTaxBookEngine.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
-import { SCHEDULED_VIA, appendAudit, bookRef, type BookDeps } from './corpTaxBookStore.js';
+import {
+  SCHEDULED_VIA,
+  appendAudit,
+  bookRef,
+  feederRef,
+  type BookDeps,
+} from './corpTaxBookStore.js';
 import { observedRowsFromLedger } from './corpTaxBookSyncEngine.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 
@@ -117,9 +123,7 @@ export async function recordFeederRead(
   feederCorporationId: number,
   read: FeederReadRecord
 ): Promise<FeederReadResult | null> {
-  const ref = bookRef(deps.db, collectorCorporationId)
-    .collection(FEEDERS)
-    .doc(String(feederCorporationId));
+  const ref = feederRef(deps.db, collectorCorporationId, feederCorporationId);
   return deps.db.runTransaction(async (tx) => {
     const [snap, book] = await Promise.all([
       tx.get(ref),

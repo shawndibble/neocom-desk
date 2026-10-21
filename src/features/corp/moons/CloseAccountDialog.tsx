@@ -17,7 +17,7 @@ import {
 import { DialogShell, Effect, Label } from './BookDialogs';
 import { isk } from './moonsFormat';
 import { useBook } from './useBook';
-import { useCorporationName } from './statementMailing';
+import { statementRefineryNames, useCorporationName } from './statementMailing';
 
 type Basis = 'consent' | 'no-reply';
 
@@ -70,13 +70,7 @@ export function CloseAccountDialog({
               ...plan.statement,
               corporationName,
               minerName,
-              refineryNames: Object.fromEntries(
-                [
-                  ...new Set(
-                    plan.statement.lines.flatMap((l) => (l.structureId ? [l.structureId] : []))
-                  ),
-                ].map((id) => [String(id), names.refinery(id)])
-              ),
+              refineryNames: statementRefineryNames(plan.statement, names),
             }
           : undefined;
         await edit({

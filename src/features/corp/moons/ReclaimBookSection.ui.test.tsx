@@ -101,13 +101,25 @@ describe('ReclaimBookSection', () => {
     expect(onSettingsClose).not.toHaveBeenCalled();
   });
 
-  it("shows the server's refusal in the confirm step", async () => {
-    reclaimBook.mockRejectedValue(new Error('This corporation has no Corp Tax Book'));
+  it("shows the server's refusal in the confirm step, by its reason", async () => {
+    reclaimBook.mockRejectedValue(
+      Object.assign(new Error('raw server text'), { details: { reason: 'no-book' } })
+    );
     renderSection({ isCeo: true });
     await userEvent.click(openButton()!);
     await userEvent.click(screen.getByRole('button', { name: 'Reclaim the book' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'This corporation has no Corp Tax Book'
+      'This corporation has no active Corp Tax Book.'
+    );
+  });
+
+  it('never shows raw server text for a refusal with no known reason', async () => {
+    reclaimBook.mockRejectedValue(new Error('raw server text'));
+    renderSection({ isCeo: true });
+    await userEvent.click(openButton()!);
+    await userEvent.click(screen.getByRole('button', { name: 'Reclaim the book' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'That did not go through. Try again.'
     );
   });
 });

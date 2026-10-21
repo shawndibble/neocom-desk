@@ -2,7 +2,7 @@ import { moonOwnerDetail } from '@/engine/corpTaxBook/moonOwners';
 import { recordFeederPayout } from '../taxBook/feederClient';
 import { PayMoonOwnerDialog } from './PayMoonOwnerDialog';
 import { useBook } from './useBook';
-import { useMoonOwners } from './useMoonOwners';
+import { useMoonOwnersInput } from './useMoonOwners';
 
 /**
  * Pay… for one moon owner (or "Add a payment…" by hand), wired to the book:
@@ -20,7 +20,7 @@ export function PayMoonOwnerHost({
   onClose: () => void;
 }) {
   const { names, characterId, corporationId, reload } = useBook();
-  const { input } = useMoonOwners();
+  const input = useMoonOwnersInput();
   const detail = moonOwnerDetail(input, owner);
   if (!detail) return null;
   const payeeName =

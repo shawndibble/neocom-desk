@@ -80,6 +80,10 @@ export interface PayoutReconciliation {
 
 export type Payee = { kind: 'corporation' | 'character'; id: number };
 
+/** Who a payment to a moon owner goes to: its payee, else the moon owner corporation itself. */
+export const payeeOf = (owner: { corporationId: number; payee?: Payee }): Payee =>
+  owner.payee ?? { kind: 'corporation', id: owner.corporationId };
+
 /** One payee and when it took over (ms). `from: 0` is a payee set before history was kept. */
 export interface PayeeChange {
   payee: Payee;

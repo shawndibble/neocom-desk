@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import type { FeederStatus } from '../taxBook/feederClient';
+import type { FeederSetupStatus } from '../taxBook/feederClient';
 import { MoonOwnerPanel } from './MoonOwnerPanel';
 import { fixtureView } from './ownerViewFixtures';
 
@@ -25,7 +25,7 @@ vi.mock('../taxBook/feederClient', async (orig) => ({
   leaveFeeder: vi.fn().mockResolvedValue({ left: true, owedIsk: 1 }),
 }));
 
-const owner: Extract<FeederStatus, { status: 'feeder' }> = {
+const owner: Extract<FeederSetupStatus, { status: 'feeder' }> = {
   status: 'feeder',
   collectorCorporationId: 5,
   collectorName: 'Brass Meridian Logistics',

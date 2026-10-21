@@ -26,13 +26,13 @@ import {
   type CorpSyncGrantDoc,
 } from './corpSyncGrant.js';
 import {
-  FEEDERS,
   FEEDER_INVITES_COLLECTION,
   FEEDER_OF_COLLECTION,
   FEEDER_PREVIOUS_COLLECTION,
   OBSERVED,
   REMOVAL_LINKS_COLLECTION,
   decideRoles,
+  pctField,
   utcDate,
 } from './corpTaxBook.js';
 import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
@@ -52,6 +52,8 @@ import {
 import {
   appendAudit,
   bookRef,
+  fail,
+  feederRef,
   ownBookFloor,
   type BookDeps,
   type Caller,
@@ -75,14 +77,6 @@ const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
   ...(deps.openPrices ? { openPrices: deps.openPrices } : {}),
 });
 
-function fail(
-  code: ConstructorParameters<typeof HttpsError>[0],
-  message: string,
-  reason: string
-): never {
-  throw new HttpsError(code, message, { reason });
-}
-
 // --- Input -----------------------------------------------------------------
 
 export interface SaveFeederGrantInput {
@@ -102,10 +96,7 @@ export function parseSaveFeederGrantInput(data: unknown): SaveFeederGrantInput {
   };
   const rate = d.requestedRatePct;
   if (rate !== undefined && rate !== null) {
-    if (typeof rate !== 'number' || !Number.isFinite(rate) || rate < 0 || rate > 100) {
-      throw new HttpsError('invalid-argument', 'requestedRatePct must be 0-100');
-    }
-    out.requestedRatePct = rate;
+    out.requestedRatePct = pctField(rate, 'requestedRatePct');
   }
   return out;
 }
@@ -247,7 +238,7 @@ async function reconnectCore(
     if (typeof collector !== 'number') {
       fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
     }
-    const ref = bookRef(deps.db, collector).collection(FEEDERS).doc(String(feederCorp));
+    const ref = feederRef(deps.db, collector, feederCorp);
     const rec = (await tx.get(ref)).data() as FeederRecord | undefined;
     if (!rec || !RECONNECTABLE.includes(rec.status)) {
       fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
@@ -293,7 +284,7 @@ async function undoReconnect(
   feederCorp: number,
   undo: ReconnectUndo
 ): Promise<void> {
-  const ref = bookRef(deps.db, collector).collection(FEEDERS).doc(String(feederCorp));
+  const ref = feederRef(deps.db, collector, feederCorp);
   const back = (key: keyof FeederRecord) =>
     undo.prior[key] === undefined ? FieldValue.delete() : undo.prior[key];
   await deps.db.runTransaction(async (tx) => {
@@ -444,9 +435,7 @@ export async function saveFeederGrant(
   if (input.requestedRatePct !== undefined) {
     // A blank rate is a complete grant, so a rate that fails to save never fails it.
     try {
-      const ref = bookRef(deps.db, accepted.collectorCorporationId)
-        .collection(FEEDERS)
-        .doc(String(accepted.feederCorporationId));
+      const ref = feederRef(deps.db, accepted.collectorCorporationId, accepted.feederCorporationId);
       const rec = (await ref.get()).data() as FeederRecord | undefined;
       await ref.update({
         requestedRatePct: input.requestedRatePct,
@@ -455,7 +444,9 @@ export async function saveFeederGrant(
           : {}),
       });
     } catch (e) {
-      console.error('feeder requested rate not saved', e instanceof Error ? e.message : e);
+      deps.log('feeder requested rate not saved', {
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
   }
   await tryRebuildFeederView(
@@ -498,10 +489,10 @@ async function unwindAccept(
 ): Promise<void> {
   const grantSnap = await grantRef(deps.db, feederCorp).get();
   const held = grantSnap.data() as CorpSyncGrantDoc | undefined;
-  const feederRef = bookRef(deps.db, collector).collection(FEEDERS).doc(String(feederCorp));
+  const recordRef = feederRef(deps.db, collector, feederCorp);
   await deps.db.runTransaction(async (tx) => {
-    if (undo.priorRecord) tx.set(feederRef, undo.priorRecord);
-    else tx.delete(feederRef);
+    if (undo.priorRecord) tx.set(recordRef, undo.priorRecord);
+    else tx.delete(recordRef);
     const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp));
     if (undo.priorPointer) tx.set(pointerRef, undo.priorPointer);
     else tx.delete(pointerRef);
@@ -527,7 +518,7 @@ async function unwindAccept(
     if (undo.priorRecord) await tryRebuildFeederView(bookDeps(deps), collector, feederCorp);
     else await deps.db.recursiveDelete(feederViewRef(deps.db, collector, feederCorp));
   } catch (e) {
-    console.error('feeder view not restored', e instanceof Error ? e.message : e);
+    deps.log('feeder view not restored', { error: e instanceof Error ? e.message : String(e) });
   }
 }
 
@@ -588,7 +579,7 @@ export async function authorizeFeederCaller(
   }
   if (collector === undefined) return null;
   const [recordSnap, grantSnap] = await Promise.all([
-    bookRef(deps.db, collector).collection(FEEDERS).doc(String(input.corporationId)).get(),
+    feederRef(deps.db, collector, input.corporationId).get(),
     grantRef(deps.db, input.corporationId).get(),
   ]);
   const feeder = recordSnap.data() as FeederRecord | undefined;
@@ -692,7 +683,7 @@ async function finalLedgerRead(
  */
 export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Promise<void> {
   const { collectorCorporationId: collector, feederCorporationId: feederCorp } = input;
-  const feederRef = bookRef(deps.db, collector).collection(FEEDERS).doc(String(feederCorp));
+  const recordRef = feederRef(deps.db, collector, feederCorp);
   const pointerRef = deps.db.collection(FEEDER_OF_COLLECTION).doc(String(feederCorp));
   const previousRef = deps.db.collection(FEEDER_PREVIOUS_COLLECTION).doc(String(feederCorp));
   const gRef = grantRef(deps.db, feederCorp);
@@ -701,7 +692,7 @@ export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Prom
 
   const dropped = await deps.db.runTransaction(async (tx) => {
     const [recSnap, ptrSnap, grantSnap, prevSnap] = await Promise.all([
-      tx.get(feederRef),
+      tx.get(recordRef),
       tx.get(pointerRef),
       tx.get(gRef),
       tx.get(previousRef),
@@ -716,7 +707,7 @@ export async function endFeeder(deps: CorpSyncDeps, input: EndFeederInput): Prom
       fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
     }
     const grant = grantSnap.data() as CorpSyncGrantDoc | undefined;
-    tx.update(feederRef, {
+    tx.update(recordRef, {
       status: input.finalStatus,
       leftAt: now,
       coveragePeriods: closePeriod(rec.coveragePeriods, utcDate(input.effectiveAt)),

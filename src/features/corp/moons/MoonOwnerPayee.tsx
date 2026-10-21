@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { PayeeNameField } from '@/features/miningTax/PayeeNameField';
 import type { PayeeEntityMatch } from '@/features/miningTax/payeeEntitySearch';
-import type { FeederPayee } from '../taxBook/feederViewClient';
+import type { Payee } from '@/engine/corpTaxBook/payouts';
 import { DialogShell } from './BookDialogs';
 
 const k = (key: string) => `corpTaxBook.moons.ownerView.payee.${key}`;
@@ -35,14 +35,14 @@ export function ChangePayeeDialog({
   /** Whose token the name search runs under. */
   characterId: number;
   onClose: () => void;
-  onSave: (payee: FeederPayee) => Promise<void>;
+  onSave: (payee: Payee) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const fieldId = useId();
   const [text, setText] = useState('');
   const [picked, setPicked] = useState<PayeeEntityMatch | null>(null);
   const pickedAlliance = picked?.kind === 'alliance';
-  const payee: FeederPayee | null =
+  const payee: Payee | null =
     picked && picked.kind !== 'alliance' ? { kind: picked.kind, id: picked.id } : null;
   return (
     <DialogShell

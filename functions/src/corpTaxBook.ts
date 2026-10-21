@@ -160,6 +160,14 @@ function num(value: unknown, field: string, min: number, max: number): number {
   return value;
 }
 
+/** A rate in percent: a finite number 0-100. */
+export function pctField(value: unknown, name: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
+    throw new HttpsError('invalid-argument', `${name} must be 0-100`);
+  }
+  return value;
+}
+
 export function dateString(value: unknown, field: string): string {
   const text = typeof value === 'string' ? value : '';
   const parsed = /^\d{4}-\d{2}-\d{2}$/.test(text) ? Date.parse(`${text}T00:00:00Z`) : NaN;
@@ -205,6 +213,19 @@ export function parseBookCall(data: unknown): BookCall {
   const accessToken =
     d.accessToken === undefined ? undefined : boundedString(d.accessToken, 'accessToken', 8192);
   return { corporationId: int(d.corporationId, 'corporationId', 1, CORP_ID_MAX), accessToken };
+}
+
+/** A book call about one of its moon owners. */
+export interface FeederTargetCall extends BookCall {
+  feederCorporationId: number;
+}
+
+export function parseFeederTarget(data: unknown): FeederTargetCall {
+  const id = record(data).feederCorporationId;
+  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) {
+    throw new HttpsError('invalid-argument', 'feederCorporationId must be a corporation id');
+  }
+  return { ...parseBookCall(data), feederCorporationId: id };
 }
 
 export interface TurnOnInput extends BookCall {

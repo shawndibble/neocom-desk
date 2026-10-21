@@ -19,7 +19,8 @@ import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { TRADE_HUBS } from '@/market/hubs';
-import { editErrorMessage, useBook } from './useBook';
+import { callableErrorText } from './feederErrorText';
+import { useBook } from './useBook';
 import { isk } from './moonsFormat';
 import { AutomaticSyncSection } from './AutomaticSyncSection';
 import { DeleteBookSection } from './DeleteBookSection';
@@ -153,7 +154,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
     try {
       await fn();
     } catch (e) {
-      setError(editErrorMessage(e));
+      setError(callableErrorText(t, e, 'corpTaxBook.moons.dialogs.failed'));
     } finally {
       setBusy(false);
     }

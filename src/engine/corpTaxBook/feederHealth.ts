@@ -7,7 +7,7 @@
  */
 import { DAY_MS } from '@/lib/age';
 import { DEFAULT_GRACE_HOURS, isDayBillable, lastBillableDate } from './billable';
-import { closePeriod, type CoveragePeriod } from './coverage';
+import { closePeriod, splitByCoverage, type CoveragePeriod, type FeederCoverage } from './coverage';
 import { shiftDate } from '../miningTax/yieldRange';
 import type { ObservedMiningEntry } from './types';
 
@@ -111,4 +111,30 @@ export function withholdUnreadFeederDays<
   return held.size === 0
     ? [...entries]
     : entries.filter((e) => !held.has(`${e.characterId}:${e.date}`));
+}
+
+/**
+ * A book's observed rows against its moon owners: rows outside a moon owner's coverage owe
+ * nothing (#4618); of the covered, a day its ledger was not read well after is held, with the
+ * miner's whole day (#4622). Coverage first, so a day outside it never holds a miner's day.
+ */
+export function splitByCoverageAndRead<
+  T extends Pick<ObservedMiningEntry, 'characterId' | 'date' | 'sourceCorporationId'>,
+>(
+  rows: readonly T[],
+  clock: {
+    now: string;
+    graceHours?: number;
+    bookCorporationId: number;
+    feeders: readonly (FeederReadClock & FeederCoverage)[];
+  }
+): { readable: T[]; unread: T[]; outsideCoverage: T[] } {
+  const { covered, outsideCoverage } = splitByCoverage(
+    rows,
+    clock.bookCorporationId,
+    clock.feeders
+  );
+  const readable = withholdUnreadFeederDays(covered, clock);
+  const kept = new Set(readable);
+  return { readable, unread: covered.filter((r) => !kept.has(r)), outsideCoverage };
 }

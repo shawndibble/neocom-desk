@@ -14123,6 +14123,7 @@
         "statement": "Statement",
         "status": "Status",
         "reminder": "Reminder",
+        "rate-change": "Rate change",
         "removal": "Moon owner removal",
         "removalCancelled": "Removal cancelled"
       },
@@ -14317,7 +14318,6 @@
           "intro": "No extraction notification gave this chunk's ore. A Moon Ore Survey scanned before the chunk was mined can stand in for it.",
           "field": "Survey link or id",
           "confirm": "Link survey",
-          "notFound": "That Survey could not be opened. Check the link, and that it has not expired.",
           "effect": "The ore is estimated from the Survey's first scan and the chunk rate in Settings; it is an estimate, not what the structure holds."
         },
         "whoMined": "Who mined this chunk",
@@ -14531,7 +14531,6 @@
         "title": "Start a Corp Tax Book",
         "intro": "Track moon mining tax for the whole corporation: who mined, what they owe, who has paid. Every officer sees the same book.",
         "needsRefineries": "The book is fed by the corporation's refineries, so it only works for a corporation that owns some and lets an Accountant or Director read them.",
-        "startBeforeLeave": "The book can start no earlier than the day the accounting corporation stopped handling your moons.",
         "notDirector": "A Director has to turn the book on. Ask one to open this page.",
         "rate": "Corp default tax rate (%)",
         "hint": "Mining before the start date is kept as history and owes nothing. You can change the rate later; a new rate never reaches back over days already mined.",
@@ -14584,7 +14583,9 @@
           "not-removable": "This corporation cannot be removed right now.",
           "no-payout": "That payout was not found.",
           "too-many-invites": "Too many open invite links. Cancel one first.",
-          "ledger-unavailable": "Could not read your mining ledger just now. Try again in a few minutes; the invite still works."
+          "ledger-unavailable": "Could not read your mining ledger just now. Try again in a few minutes; the invite still works.",
+          "start-before-leave": "The book can start no earlier than the day the accounting corporation stopped handling your moons.",
+          "survey-not-found": "That Survey could not be opened. Check the link, and that it has not expired."
         }
       },
       "consent": {
@@ -14981,7 +14982,8 @@
           "intro": "The tax it waived is owed again.",
           "reason": "Reason (required)",
           "confirm": "Reverse"
-        }
+        },
+        "failed": "That did not go through. Try again."
       },
       "moonOwners": {
         "label": "Moon owners",

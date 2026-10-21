@@ -1,15 +1,18 @@
 import { computeAssignmentValue } from '../miningTax/valuation';
-import { dayClosesAt } from './billable';
 import { isDayCovered, type CoveragePeriod } from './coverage';
 import {
-  accrueFeeder,
+  accrueValuedDays,
+  deriveModeChanges,
+  deriveOwnerRateHistory,
   feederBalance,
+  feederBillableRule,
   isSettledOn,
   type BalanceDisplay,
+  type FeederMode,
   type FeederModeChange,
   type FeederPayout,
 } from './feederAccrual';
-import { payoutPeriod } from './payouts';
+import { payeeOf, payoutPeriod, type Payee } from './payouts';
 import { effectiveOwnerRate, type OwnerRateEntry } from './ownerRate';
 import { resolveRate, type TaxRate } from './rates';
 import type { ObservedMiningEntry } from './types';
@@ -17,7 +20,7 @@ import type { ObservedMiningEntry } from './types';
 /**
  * The accounting corporation's side of its moon owners (feeders): one row per
  * corporation for the Moon owners tab, one detail for its page. Pure; the
- * accrual is the engine's (`accrueFeeder`) and mirrors what the server writes
+ * accrual is the engine's (`accrueValuedDays`) and mirrors what the server writes
  * into the moon owner's own view, so both sides show the same figure.
  */
 
@@ -27,7 +30,7 @@ export type MoonOwnerPayout = FeederPayout & { id: string };
 export interface MoonOwnerFeeder {
   corporationId: number;
   status: 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
-  mode: 'normal' | 'settled-otherwise';
+  mode: FeederMode;
   note?: string;
   joinedAt: number;
   leftAt?: number;
@@ -39,7 +42,7 @@ export interface MoonOwnerFeeder {
   agreedRatePct?: number;
   offeredOwnerRatePct?: number;
   /** Who a payment goes to: a corporation or a player. Absent: the moon owner itself. */
-  payee?: { kind: 'corporation' | 'character'; id: number };
+  payee?: Payee;
   ownerRateHistory?: OwnerRateEntry[];
   modeChanges?: FeederModeChange[];
   coveragePeriods: CoveragePeriod[];
@@ -92,7 +95,7 @@ export interface MoonOwnerRow {
   balance: BalanceDisplay;
   lastReadWellAt?: string;
   staleSince?: number;
-  mode: 'normal' | 'settled-otherwise';
+  mode: FeederMode;
 }
 
 /** Whether a row is on the pay list: whole ISK owed, on a normal (not settled otherwise) moon owner. */
@@ -106,26 +109,7 @@ export interface MoonOwnerTotals {
   needALook: number;
 }
 
-/** The record's rate history, or entries derived from its two rate fields (dated the join day). Mirrors `functions/`. */
-export function deriveOwnerRateHistory(record: MoonOwnerFeeder): OwnerRateEntry[] {
-  if (record.ownerRateHistory) return record.ownerRateHistory;
-  const effectiveFrom = new Date(record.joinedAt).toISOString().slice(0, 10);
-  const recordedAt = new Date(record.joinedAt).toISOString();
-  const out: OwnerRateEntry[] = [];
-  if (record.requestedRatePct !== undefined)
-    out.push({ kind: 'requested', pct: record.requestedRatePct, effectiveFrom, recordedAt });
-  if (record.agreedRatePct !== undefined)
-    out.push({ kind: 'agreed', pct: record.agreedRatePct, effectiveFrom, recordedAt });
-  return out;
-}
-
-/** The record's mode switches, or settled-otherwise from the join day when only `mode` says so. */
-export function deriveModeChanges(record: MoonOwnerFeeder): FeederModeChange[] {
-  if (record.modeChanges) return record.modeChanges;
-  return record.mode === 'settled-otherwise'
-    ? [{ from: new Date(record.joinedAt).toISOString().slice(0, 10), mode: 'settled-otherwise' }]
-    : [];
-}
+export { deriveModeChanges, deriveOwnerRateHistory };
 
 const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
@@ -177,34 +161,54 @@ interface Worked {
   /** The days that accrued, for the payment's reason. */
   accruedDays: { date: string }[];
   covered: ObservedMiningEntry[];
+  /** Each covered entry's value at 100%, by index into `covered`. */
+  coveredValues: number[];
 }
 
-function work(input: MoonOwnersInput, f: MoonOwnerFeeder): Worked {
+/** The book's entries by the moon owner whose refinery recorded them, in their order. */
+function entriesBySource(entries: readonly ObservedMiningEntry[]) {
+  const out = new Map<number | undefined, ObservedMiningEntry[]>();
+  for (const e of entries) {
+    const list = out.get(e.sourceCorporationId);
+    if (list) list.push(e);
+    else out.set(e.sourceCorporationId, [e]);
+  }
+  return out;
+}
+
+function work(
+  input: MoonOwnersInput,
+  f: MoonOwnerFeeder,
+  own: readonly ObservedMiningEntry[]
+): Worked {
   const today = input.now.slice(0, 10);
   const history = deriveOwnerRateHistory(f);
   const modeChanges = deriveModeChanges(f);
-  const lastRead = f.lastReadWellAt === undefined ? undefined : Date.parse(f.lastReadWellAt);
-  const isBillable = (day: string) =>
-    lastRead !== undefined && lastRead >= Date.parse(dayClosesAt(day, input.graceHours));
-  const own = input.entries.filter((e) => e.sourceCorporationId === f.corporationId);
   const covered = own.filter((e) => isDayCovered(f.coveragePeriods, e.date));
-  const { accrued, byDay } = accrueFeeder({
-    feederCorporationId: f.corporationId,
-    entries: covered,
-    coveragePeriods: f.coveragePeriods,
-    ownerRateHistory: history,
-    modeChanges,
-    isBillable,
-    pricesOn: input.pricesOn,
-  });
+  // Each entry priced once: the accrual, `mined` and the detail's lines share it.
+  const coveredValues = covered.map(
+    (e) => computeAssignmentValue(e.oreLines, input.pricesOn(e.date), 100).estimatedValue
+  );
+  const valueByDay = new Map<string, number>();
+  covered.forEach((e, i) =>
+    valueByDay.set(e.date, (valueByDay.get(e.date) ?? 0) + coveredValues[i]!)
+  );
+  const { accrued, byDay } = accrueValuedDays(
+    [...valueByDay].map(([date, value]) => ({ date, value })),
+    {
+      coveragePeriods: f.coveragePeriods,
+      ownerRateHistory: history,
+      modeChanges,
+      isBillable: feederBillableRule(
+        f.lastReadWellAt === undefined ? undefined : Date.parse(f.lastReadWellAt),
+        input.graceHours
+      ),
+    }
+  );
   const settledNow = isSettledOn(modeChanges, today);
   const rate = effectiveOwnerRate(history, today);
   const { display } = feederBalance(accrued, f.payouts, settledNow);
-  const mined = covered.reduce(
-    (sum, e) =>
-      sum + computeAssignmentValue(e.oreLines, input.pricesOn(e.date), 100).estimatedValue,
-    0
-  );
+  const mined = coveredValues.reduce((sum, v) => sum + v, 0);
   const froms = f.coveragePeriods.map((p) => p.from).sort();
   const open = f.coveragePeriods.some((p) => p.to === undefined);
   const lastTo = f.coveragePeriods
@@ -217,6 +221,7 @@ function work(input: MoonOwnersInput, f: MoonOwnerFeeder): Worked {
     accrued,
     accruedDays: byDay,
     covered,
+    coveredValues,
     row: {
       id: String(f.corporationId),
       corporationId: f.corporationId,
@@ -251,7 +256,10 @@ export function buildMoonOwners(input: MoonOwnersInput): {
   rows: MoonOwnerRow[];
   totals: MoonOwnerTotals;
 } {
-  const rows = input.feeders.map((f) => work(input, f).row).filter(listed);
+  const bySource = entriesBySource(input.entries);
+  const rows = input.feeders
+    .map((f) => work(input, f, bySource.get(f.corporationId) ?? []).row)
+    .filter(listed);
   const month = input.now.slice(0, 7);
   const paidThisMonth = input.feeders.reduce(
     (sum, f) =>
@@ -300,7 +308,7 @@ export interface MoonOwnerDetail {
   hasPayee: boolean;
   removal?: { startedAt: number; startedByName: string; effectiveAt?: number };
   /** Who a payment goes to. */
-  payee: { kind: 'corporation' | 'character'; id: number };
+  payee: Payee;
   /** The days a payment now covers, for its reason; absent when nothing accrued. */
   period?: { from: string; to: string };
 }
@@ -308,7 +316,8 @@ export interface MoonOwnerDetail {
 export function moonOwnerDetail(input: MoonOwnersInput, id: number): MoonOwnerDetail | undefined {
   const f = input.feeders.find((x) => x.corporationId === id);
   if (!f) return undefined;
-  const { row, accrued, accruedDays, covered } = work(input, f);
+  const own = input.entries.filter((e) => e.sourceCorporationId === f.corporationId);
+  const { row, accrued, accruedDays, covered, coveredValues } = work(input, f, own);
   const period = payoutPeriod(accruedDays, f.payouts);
   const history = deriveOwnerRateHistory(f);
   const today = input.now.slice(0, 10);
@@ -320,7 +329,7 @@ export function moonOwnerDetail(input: MoonOwnersInput, id: number): MoonOwnerDe
     )[0];
 
   const groups = new Map<string, MoonOwnerMinedLine & { byType: Map<number, number> }>();
-  for (const e of covered) {
+  covered.forEach((e, i) => {
     const key = `${e.characterId}:${e.structureId}`;
     const g = groups.get(key) ?? {
       characterId: e.characterId,
@@ -334,9 +343,9 @@ export function moonOwnerDetail(input: MoonOwnersInput, id: number): MoonOwnerDe
       g.quantity += l.quantity;
       g.byType.set(l.typeId, (g.byType.get(l.typeId) ?? 0) + l.quantity);
     }
-    g.value += computeAssignmentValue(e.oreLines, input.pricesOn(e.date), 100).estimatedValue;
+    g.value += coveredValues[i]!;
     groups.set(key, g);
-  }
+  });
   const mined = [...groups.values()]
     .map(({ byType, ...g }) => ({
       ...g,
@@ -360,7 +369,7 @@ export function moonOwnerDetail(input: MoonOwnersInput, id: number): MoonOwnerDe
     mined,
     hasPayee: f.payee !== undefined,
     ...(f.status === 'pending-removal' && f.removal ? { removal: f.removal } : {}),
-    payee: f.payee ?? { kind: 'corporation', id: f.corporationId },
+    payee: payeeOf(f),
     ...(period ? { period } : {}),
   };
 }

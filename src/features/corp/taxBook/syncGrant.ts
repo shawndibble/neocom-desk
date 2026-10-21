@@ -6,6 +6,7 @@
  * record: the book's `meta/scheduledSync` says who holds it and whether it runs.
  */
 import { completeCorpSyncLogin, getValidAccessToken } from '@/auth/session';
+import { callableErrorReason } from '@/lib/callableError';
 import { reportFailure } from '@/observability/reportFailure';
 
 /** What a sync grant round trip hands back, as router state, to the page it was pressed on. */
@@ -27,11 +28,6 @@ export type CorpSyncGrantOutcome =
       /** The server's reason (`not-an-editor`, `wrong-corp`, `no-book`, …) when it gave one. */
       reason?: string;
     };
-
-function reasonOf(error: unknown): string | undefined {
-  const details = (error as { details?: { reason?: unknown } } | null)?.details;
-  return typeof details?.reason === 'string' ? details.reason : undefined;
-}
 
 /**
  * Finish a sync grant round trip. A match hands the refresh token to the server;
@@ -60,7 +56,11 @@ export async function completeCorpSyncGrant(params: {
     });
   } catch (error) {
     reportFailure('auth', error);
-    return { status: 'failed', characterId: result.characterId, reason: reasonOf(error) };
+    return {
+      status: 'failed',
+      characterId: result.characterId,
+      reason: callableErrorReason(error) ?? undefined,
+    };
   }
   return { status: 'on', characterId: result.characterId, name: result.name };
 }

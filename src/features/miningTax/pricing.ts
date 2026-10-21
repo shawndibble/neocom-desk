@@ -62,6 +62,7 @@ export interface UnitPrices {
   /**
    * Per-unit price by raw typeId for a moon owner's accrual (#4621): the saved open buy, else
    * the saved open sell, else 0 — never the live book, matching the moon owner's own page.
+   * Built only when asked for (`moonOwner`): the Corp Tax Book is its one reader.
    */
   moonOwner?: Map<number, number>;
 }
@@ -88,7 +89,8 @@ async function resolvePricesForHubAcrossDates(
   typeIds: readonly number[],
   hub: TradeHub,
   dates: readonly string[],
-  compressed: boolean
+  compressed: boolean,
+  withMoonOwner = false
 ): Promise<DatedHubResult> {
   const unique = [...new Set(typeIds)];
   const byDate = new Map<string, UnitPrices>();
@@ -112,7 +114,7 @@ async function resolvePricesForHubAcrossDates(
     const savedForDate = saved.get(date);
 
     const prices = new Map<number, number>();
-    const moonOwner = new Map<number, number>();
+    const moonOwner = withMoonOwner ? new Map<number, number>() : undefined;
     const unpriced = new Set<number>();
     const sellFallback = new Set<number>();
     const sources = new Map<number, TaxPriceSource>();
@@ -127,7 +129,7 @@ async function resolvePricesForHubAcrossDates(
       });
       const price = resolved.price ?? 0;
       prices.set(typeId, price);
-      moonOwner.set(typeId, moonOwnerUnitPrice(savedForDate?.get(pid)));
+      moonOwner?.set(typeId, moonOwnerUnitPrice(savedForDate?.get(pid)));
       sources.set(typeId, resolved.source);
       if (resolved.source === 'live-sell') sellFallback.add(typeId);
       // A quoted zero counts as unpriced: an order book that bids nothing
@@ -141,7 +143,7 @@ async function resolvePricesForHubAcrossDates(
       sellFallback,
       sources,
       liveUnreachable: live.unreachable,
-      moonOwner,
+      ...(moonOwner ? { moonOwner } : {}),
     });
   }
   return { byDate };
@@ -190,7 +192,7 @@ export interface DatedUnitPrices {
     TradeHub['id'],
     ReadonlyMap<string, ReadonlyMap<number, TaxPriceSource>>
   >;
-  /** Per hub, per date, a moon owner's prices — see `UnitPrices.moonOwner`. */
+  /** Per hub, per date, a moon owner's prices — see `UnitPrices.moonOwner`; only with `moonOwner`. */
   moonOwnerByHubAndDate?: ReadonlyMap<
     TradeHub['id'],
     ReadonlyMap<string, ReadonlyMap<number, number>>
@@ -281,7 +283,8 @@ export async function loadDatedUnitPricesByHub(
   typeIds: readonly number[],
   hubIds: Iterable<string | undefined>,
   dates: readonly string[],
-  compressed = true
+  compressed = true,
+  options: { moonOwner?: boolean } = {}
 ): Promise<DatedUnitPrices> {
   const hubs = new Map<TradeHub['id'], TradeHub>([[DEFAULT_TRADE_HUB.id, DEFAULT_TRADE_HUB]]);
   for (const hubId of hubIds) {
@@ -292,7 +295,16 @@ export async function loadDatedUnitPricesByHub(
   const loaded = await Promise.all(
     [...hubs.values()].map(
       async (hub) =>
-        [hub.id, await resolvePricesForHubAcrossDates(typeIds, hub, dates, compressed)] as const
+        [
+          hub.id,
+          await resolvePricesForHubAcrossDates(
+            typeIds,
+            hub,
+            dates,
+            compressed,
+            options.moonOwner === true
+          ),
+        ] as const
     )
   );
 

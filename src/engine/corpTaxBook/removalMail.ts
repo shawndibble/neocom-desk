@@ -7,7 +7,13 @@
  * effect because the 24 hours start when the queue sends a copy to the moon owner
  * (`fillTakesEffect`); every later copy states that recorded time.
  */
-import { serializeEveMarkup, type MarkupNode } from '../mail/eveMarkup';
+import {
+  markupBr as br,
+  markupText as text,
+  serializeEveMarkup,
+  type MarkupNode,
+} from '../mail/eveMarkup';
+import { MONTHS } from './monthNames';
 import { REMOVAL_WAIT_MS } from './removal';
 
 /** Where the send-time stands in a composed notice. */
@@ -28,9 +34,6 @@ export interface RemovalMail {
   subject: string;
   body: string;
 }
-
-const text = (t: string): MarkupNode => ({ type: 'text', text: t });
-const br = (): MarkupNode => ({ type: 'br' });
 
 export function composeRemovalMail(input: RemovalMailInput): RemovalMail {
   const { accountingName: acct, ownerName: owner } = input;
@@ -78,8 +81,6 @@ export function composeRemovalCancelledMail(input: Omit<RemovalMailInput, 'link'
     ]),
   };
 }
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** "18 Oct 2026 14:22 EVE time" for an instant. */
 export function eveTimeLabel(at: number): string {

@@ -8,7 +8,7 @@ import {
   INVITE_PARAM,
   getFeederStatus,
   parseInviteInput,
-  type FeederStatus,
+  type FeederSetupStatus,
 } from '../taxBook/feederClient';
 import type { FeederGrantCallbackState } from '../taxBook/feederGrant';
 import { feederErrorText } from './feederErrorText';
@@ -42,7 +42,7 @@ export function MoonsSetup({
   const location = useLocation();
   const navigate = useNavigate();
   const [owner, setOwner] = useState<
-    { state: 'loading' } | { state: 'failed' } | { state: 'ready'; v: FeederStatus }
+    { state: 'loading' } | { state: 'failed' } | { state: 'ready'; v: FeederSetupStatus }
   >({ state: 'loading' });
   const invited = new URLSearchParams(location.search).get(INVITE_PARAM);
   const [step, setStep] = useState<Step>(invited ? 'consent' : 'choices');

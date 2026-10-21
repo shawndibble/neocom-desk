@@ -4,15 +4,14 @@
  * rate, the date and what they asked for, and nothing else: never the miner
  * rate or the margin, and no dev terms.
  */
-import { serializeEveMarkup, type MarkupNode } from '../mail/eveMarkup';
+import { markupText as text, serializeEveMarkup, type MarkupNode } from '../mail/eveMarkup';
 import { rateNotice, type OwnerRateChange } from './ownerRate';
+import type { Payee } from './payouts';
 
 export interface RateChangeMail {
   subject: string;
   body: string;
 }
-
-const text = (t: string): MarkupNode => ({ type: 'text', text: t });
 
 const pctText = (pct: number) => `${Math.round(pct * 100) / 100}%`;
 
@@ -40,7 +39,7 @@ export function composeRateChangeMail(input: {
  */
 export function moonOwnerMailRecipients(input: {
   ceoId: number | null;
-  payee?: { kind: 'corporation' | 'character'; id: number };
+  payee?: Payee;
   /** The payee corporation's CEO, when the payee is a corporation. */
   payeeCeoId?: number | null;
 }): number[] {
