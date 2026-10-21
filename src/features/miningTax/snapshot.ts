@@ -9,6 +9,7 @@ import { recordLedgerArrivals } from './oreArrivalLog';
 import { loadPayees } from './payees';
 import { loadAssignments } from './assignments';
 import { reconcileAssignments } from './reconcile';
+import { applySurveyConnections } from './surveyConnections';
 import { readCompressedOre } from './oreForm';
 import { repriceForOreForm } from './oreFormReprice';
 import { coalesceAssignments } from './coalesce';
@@ -80,6 +81,11 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
   await Promise.all(
     ledgers.map((ledger) => coalesceAssignments(ledger.characterId, ledger.entries))
   );
+
+  // Before reconcile too: a connected moon Survey's ore must become its own
+  // Assignment (the entry's growth collector) before reconcile folds it into
+  // an earlier moon's Assignment on the same day and system.
+  await applySurveyConnections(ledgers).catch(() => []);
 
   await Promise.all(
     ledgers
