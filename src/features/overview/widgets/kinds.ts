@@ -350,19 +350,19 @@ const SPECS: Record<string, Spec> = {
   },
   corpStarbases: {
     corp: 'corpClocks',
+    capabilities: ['canReadStarbases'],
     views: NT,
     view: 'table',
     size: 'M',
-    soon: true,
-    endpoints: [],
+    endpoints: ['getCorporationStarbases', 'getCorporationStarbase'],
   },
   corpCustomsOffices: {
     corp: 'corpClocks',
+    capabilities: ['canReadCustomsOffices'],
     views: NT,
     view: 'table',
     size: 'M',
-    soon: true,
-    endpoints: [],
+    endpoints: ['getCorporationCustomsOffices'],
   },
   corpWallet: {
     corp: 'corpMoney',
@@ -390,7 +390,14 @@ const SPECS: Record<string, Spec> = {
     range: true,
     endpoints: ['getCorporationWalletJournal'],
   },
-  corpOrders: { corp: 'corpMoney', views: NT, view: 'table', size: 'M', soon: true, endpoints: [] },
+  corpOrders: {
+    corp: 'corpMoney',
+    capabilities: ['canReadOrders'],
+    views: NT,
+    view: 'table',
+    size: 'M',
+    endpoints: ['getCorporationOrders'],
+  },
   corpMembers: {
     corp: 'corpPeople',
     capabilities: ['canReadMembers'],
@@ -409,11 +416,11 @@ const SPECS: Record<string, Spec> = {
   },
   corpRoleAudit: {
     corp: 'corpPeople',
+    capabilities: ['canReadRoleAudit'],
     views: NT,
     view: 'table',
     size: 'M',
-    soon: true,
-    endpoints: [],
+    endpoints: ['getCorporationMemberRoles', 'getCorporationRoleHistory'],
   },
   corpDoctrine: {
     corp: 'corpPeople',

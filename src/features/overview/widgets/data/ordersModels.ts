@@ -74,7 +74,9 @@ export function ordersTable(
   t: Translate,
   rows: readonly OpenOrderRow[],
   now: number,
-  slots: { used: number; total: number } | null
+  slots: { used: number; total: number } | null,
+  /** Corp view: who placed each order (by order id), as an extra column before the station. */
+  issuedBy: ReadonlyMap<number, string> | null = null
 ): TableModel {
   const sorted = [...rows].sort(
     (a, b) =>
@@ -104,51 +106,71 @@ export function ordersTable(
     ],
     tone: PROBLEM_TONE[row.problem],
   }));
+  if (issuedBy) {
+    // Before the station: the last cell and sort key of each row.
+    tableRows.forEach((tableRow, i) => {
+      const name = issuedBy.get(sorted[i]!.orderId);
+      tableRow.cells.splice(-1, 0, name ?? UNKNOWN);
+      tableRow.sort?.splice(-1, 0, name);
+    });
+  }
+  const columns: TableModel['columns'] = [
+    {
+      key: 'item',
+      label: t(`${W}.orders.col.item`),
+      sortable: true,
+      priority: 0,
+      nameFloor: true,
+    },
+    {
+      key: 'side',
+      label: t(`${W}.orders.col.side`),
+      sortable: true,
+      priority: 4,
+      hideNarrow: true,
+    },
+    {
+      key: 'price',
+      label: t(`${W}.orders.col.price`),
+      sortable: true,
+      align: 'end',
+      priority: 2,
+    },
+    {
+      key: 'vsBest',
+      label: t(`${W}.orders.col.vsBest`),
+      sortable: true,
+      align: 'end',
+      priority: 1,
+    },
+    {
+      key: 'expires',
+      label: t(`${W}.orders.col.expires`),
+      sortable: true,
+      align: 'end',
+      priority: 3,
+    },
+    {
+      key: 'station',
+      label: t(`${W}.orders.col.station`),
+      sortable: true,
+      priority: 5,
+      hideNarrow: true,
+    },
+  ];
+  if (issuedBy) {
+    columns.splice(-1, 0, {
+      key: 'issuedBy',
+      label: t(`${W}.orders.col.issuedBy`),
+      sortable: true,
+      priority: 5,
+      hideNarrow: true,
+    });
+    const station = columns[columns.length - 1]!;
+    columns[columns.length - 1] = { ...station, priority: 6 };
+  }
   return {
-    columns: [
-      {
-        key: 'item',
-        label: t(`${W}.orders.col.item`),
-        sortable: true,
-        priority: 0,
-        nameFloor: true,
-      },
-      {
-        key: 'side',
-        label: t(`${W}.orders.col.side`),
-        sortable: true,
-        priority: 4,
-        hideNarrow: true,
-      },
-      {
-        key: 'price',
-        label: t(`${W}.orders.col.price`),
-        sortable: true,
-        align: 'end',
-        priority: 2,
-      },
-      {
-        key: 'vsBest',
-        label: t(`${W}.orders.col.vsBest`),
-        sortable: true,
-        align: 'end',
-        priority: 1,
-      },
-      {
-        key: 'expires',
-        label: t(`${W}.orders.col.expires`),
-        sortable: true,
-        align: 'end',
-        priority: 3,
-      },
-      {
-        key: 'station',
-        label: t(`${W}.orders.col.station`),
-        sortable: true,
-        priority: 5,
-        hideNarrow: true,
-      },
-    ],
+    columns,
     rows: tableRows,
     pageable: true,
     footer: slots ? t(`${W}.orders.slots`, slots) : undefined,

@@ -8,21 +8,28 @@
  * corp-scoped keys and the 403 handling are theirs, not a second copy.
  */
 import { diffRoster } from '@/engine/corp/members';
+import { summariseBay } from '@/engine/corp/starbases';
 import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCorporationId, MASTER_WALLET_DIVISION } from '@/features/corp/boardData';
 import { jobTypeIds } from '@/features/corp/boardSources';
 import { loadCorporationContracts } from '@/features/corp/contracts';
+import { loadCorporationOrders } from '@/features/corp/orders';
+import { loadStationBestPrices } from '@/features/market/orderCompetition';
+import { loadNpcStations } from '@/sde/loadMarketSde';
 import { CorpReadFailed } from '@/features/corp/corpRead';
 import { resolveCorpReadAccess, type CorpCapability } from '@/features/corp/corpReadAccess';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { walletDivisions } from '@/features/corp/divisions';
+import { loadRoleAudit } from '@/features/corp/roleAudit';
+import { loadCorporationCustomsOffices } from '@/features/corp/customsOffices';
 import { loadCorporationIndustryJobs } from '@/features/corp/jobs';
 import {
   loadCorporationMemberIds,
   loadCorporationMemberTracking,
   toMemberActivity,
 } from '@/features/corp/members';
+import { loadCorporationStarbases, loadStarbaseDetails } from '@/features/corp/starbases';
 import { readPreviousRoster } from '@/features/corp/rosterState';
 import { loadObserverFeed } from '@/features/corp/taxBook/esiFeed';
 import {
@@ -36,12 +43,17 @@ import { fetchCorporationStats } from '@/lib/zkillboard';
 import { parseInstant } from '@/engine/esiInstant';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import type {
+  CorpCustomsFeed,
+  CorpRoleAuditFeed,
   CorpContractsFeed,
   CorpJobsFeed,
   CorpJournalLine,
   CorpKillsFeed,
   CorpMembersFeed,
   CorpMiningFeed,
+  CorpStarbaseRow,
+  CorpStarbasesFeed,
+  CorpOrdersFeed,
   CorpWalletFeed,
 } from './corpFeeds';
 
@@ -137,6 +149,59 @@ export async function loadCorpJobs(characterId: number): Promise<CorpJobsFeed> {
   };
 }
 
+export async function loadCorpCustoms(characterId: number): Promise<CorpCustomsFeed> {
+  const empty: CorpCustomsFeed = {
+    ...UNREADABLE,
+    offices: [],
+    typeNames: new Map(),
+    systemNames: new Map(),
+  };
+  const access = await gate(characterId, 'canReadCustomsOffices');
+  if (access === null) return empty;
+  const result = await loadCorporationCustomsOffices(characterId, access.corporationId);
+  if (result.cached === null) {
+    if (result.needsReauth) return { ...empty, needsReauth: true };
+    throw new CorpReadFailed('customs offices');
+  }
+  const offices = result.cached.data;
+  const typeIds = [
+    ...new Set(offices.flatMap((office) => (office.type_id === undefined ? [] : [office.type_id]))),
+  ];
+  const [typeNames, systems] = await Promise.all([
+    typeIds.length === 0 ? new Map<number, string>() : loadTypeNames(typeIds),
+    import('@/sde/solarSystems').then((m) => m.loadSolarSystemsById()).catch(() => null),
+  ]);
+  const systemNames = new Map<number, string>();
+  for (const office of offices) {
+    const name = systems?.get(office.system_id)?.name;
+    if (name !== undefined) systemNames.set(office.system_id, name);
+  }
+  return {
+    readable: true,
+    needsReauth: false,
+    ...readAge([result]),
+    offices,
+    typeNames,
+    systemNames,
+  };
+}
+
+export async function loadCorpRoleAudit(characterId: number): Promise<CorpRoleAuditFeed> {
+  const empty: CorpRoleAuditFeed = { ...UNREADABLE, audit: null };
+  const access = await gate(characterId, 'canReadRoleAudit');
+  if (access === null) return empty;
+  const result = await loadRoleAudit(characterId, access.corporationId, { withTitles: false });
+  if ('needsReauth' in result) return { ...empty, needsReauth: true };
+  const { data } = result;
+  return {
+    readable: true,
+    needsReauth: false,
+    fetchedAt: data.fetchedAt,
+    fromCache: data.fromCache,
+    audit: data,
+  };
+}
+
 export async function loadCorpMembers(characterId: number): Promise<CorpMembersFeed> {
   const loadedAt = Date.now();
   const empty: CorpMembersFeed = {
@@ -221,6 +286,51 @@ export async function loadCorpMining(characterId: number): Promise<CorpMiningFee
   };
 }
 
+export async function loadCorpStarbases(characterId: number): Promise<CorpStarbasesFeed> {
+  const empty: CorpStarbasesFeed = {
+    ...UNREADABLE,
+    starbases: [],
+    typeNames: new Map(),
+    systemNames: new Map(),
+  };
+  const access = await gate(characterId, 'canReadStarbases');
+  if (access === null) return empty;
+  const { corporationId } = access;
+  const list = await loadCorporationStarbases(characterId, corporationId);
+  if (list.cached === null) {
+    if (list.needsReauth) return { ...empty, needsReauth: true };
+    throw new CorpReadFailed('starbases');
+  }
+  const towers = list.cached.data;
+  // Fuel and strontium live on the per-tower call, and only a tower burning fuel has a bay worth reading.
+  const online = towers.filter((tower) => tower.state === 'online');
+  const [details, typeNames, systemNames] = await Promise.all([
+    loadStarbaseDetails(characterId, corporationId, online),
+    loadTypeNames([...new Set(towers.map((tower) => tower.type_id))]),
+    resolveNames([...new Set(towers.map((tower) => tower.system_id))]),
+  ]);
+  const starbases = towers.map((tower): CorpStarbaseRow => {
+    const detail = details.get(tower.starbase_id)?.cached?.data;
+    return {
+      starbaseId: tower.starbase_id,
+      systemId: tower.system_id,
+      typeId: tower.type_id,
+      state: tower.state ?? 'unknown',
+      reinforcedUntilMs: parseInstant(tower.reinforced_until),
+      unanchorsAtMs: parseInstant(tower.unanchor_at),
+      bay: detail === undefined ? null : summariseBay(detail.fuels),
+    };
+  });
+  return {
+    readable: true,
+    needsReauth: false,
+    ...readAge([list, ...details.values()]),
+    starbases,
+    typeNames,
+    systemNames,
+  };
+}
+
 export async function loadCorpContracts(characterId: number): Promise<CorpContractsFeed> {
   const empty: CorpContractsFeed = { ...UNREADABLE, contracts: [], names: new Map() };
   const access = await gate(characterId, 'canReadContracts');
@@ -236,6 +346,50 @@ export async function loadCorpContracts(characterId: number): Promise<CorpContra
     ...new Set(open.flatMap((c) => [c.issuer_id, c.assignee_id]).filter((id) => id > 0)),
   ]);
   return { readable: true, needsReauth: false, ...readAge([result]), contracts, names };
+}
+
+export async function loadCorpOrders(characterId: number): Promise<CorpOrdersFeed> {
+  const empty: CorpOrdersFeed = {
+    ...UNREADABLE,
+    orders: [],
+    typeNames: new Map(),
+    stationNames: new Map(),
+    stationPrices: new Map(),
+    issuerNames: new Map(),
+  };
+  const access = await gate(characterId, 'canReadOrders');
+  if (access === null) return empty;
+  const result = await loadCorporationOrders(characterId, access.corporationId);
+  if (result.cached === null) {
+    if (result.needsReauth) return { ...empty, needsReauth: true };
+    throw new CorpReadFailed('market orders');
+  }
+  const orders = result.cached.data;
+  const typesByStation = new Map<number, Set<number>>();
+  for (const order of orders) {
+    const set = typesByStation.get(order.location_id) ?? new Set<number>();
+    set.add(order.type_id);
+    typesByStation.set(order.location_id, set);
+  }
+  const [typeNames, issuerNames, stationPrices, stations] = await Promise.all([
+    loadTypeNames([...new Set(orders.map((o) => o.type_id))]),
+    resolveNames([...new Set(orders.map((o) => o.issued_by ?? 0).filter((id) => id > 0))]),
+    loadStationBestPrices(
+      [...typesByStation].map(([stationId, ids]) => ({ stationId, typeIds: [...ids] }))
+    ),
+    // Offline first visit: the station file may be missing. Names then read as a structure.
+    loadNpcStations().catch(() => []),
+  ]);
+  return {
+    readable: true,
+    needsReauth: false,
+    ...readAge([result]),
+    orders,
+    typeNames,
+    stationNames: new Map(stations.map((s) => [s.id, s.name])),
+    stationPrices,
+    issuerNames,
+  };
 }
 
 /**

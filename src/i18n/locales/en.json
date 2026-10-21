@@ -4572,6 +4572,7 @@
           "side": "Side",
           "price": "Price",
           "vsBest": "vs best",
+          "issuedBy": "Issued by",
           "expires": "Expires",
           "station": "Station"
         }
@@ -4956,12 +4957,57 @@
       "corpStarbases": {
         "title": "Starbases",
         "description": "Starbase fuel, strontium and state",
-        "empty": "This widget is coming soon."
+        "empty": "The corporation has no starbases.",
+        "unit": "starbases",
+        "lowest": "{{name}} has {{duration}} of fuel",
+        "lowFuel_one": "{{count}} has under {{hours}} hours of fuel",
+        "lowFuel_other": "{{count}} have under {{hours}} hours of fuel",
+        "fuelCell": "{{blocks}} ({{duration}})",
+        "col": {
+          "tower": "Tower",
+          "system": "System",
+          "state": "State",
+          "fuel": "Fuel blocks",
+          "strontium": "Strontium",
+          "reinforced": "Reinforced for"
+        },
+        "state": {
+          "offline": "Offline",
+          "online": "Online",
+          "onlining": "Onlining",
+          "reinforced": "Reinforced",
+          "unanchoring": "Unanchoring"
+        },
+        "summary_one": "{{count}} starbase, {{low}} low on fuel.",
+        "summary_other": "{{count}} starbases, {{low}} low on fuel."
       },
       "corpCustomsOffices": {
         "title": "Customs offices",
-        "description": "Your customs offices, their tax rates and timers",
-        "empty": "This widget is coming soon."
+        "description": "Each customs office’s tax rates by standing and its reinforce exit window",
+        "empty": "Your corporation has no customs offices.",
+        "col": {
+          "office": "Office",
+          "system": "System",
+          "rates": "Tax rates",
+          "window": "Reinforce exit (UTC)"
+        },
+        "rate": {
+          "corporation": "Corporation",
+          "alliance": "Alliance",
+          "excellent": "Excellent",
+          "good": "Good",
+          "neutral": "Neutral",
+          "bad": "Bad",
+          "terrible": "Terrible"
+        },
+        "unit_one": "customs office",
+        "unit_other": "customs offices",
+        "systems_one": "in {{count}} system",
+        "systems_other": "in {{count}} systems",
+        "unknownType": "Customs office",
+        "window": "{{start}}:00 to {{end}}:00",
+        "summary_one": "{{count}} customs office. Systems covered: {{systems}}.",
+        "summary_other": "{{count}} customs offices. Systems covered: {{systems}}."
       },
       "corpWallet": {
         "title": "Corp wallet",
@@ -5042,7 +5088,13 @@
       "corpOrders": {
         "title": "Corp market orders",
         "description": "Open buy and sell orders, and the ISK held in escrow",
-        "empty": "This widget is coming soon."
+        "empty": "The corporation has no open market orders.",
+        "unit_one": "open order",
+        "unit_other": "open orders",
+        "escrow": "{{isk}} ISK in escrow",
+        "listed": "{{isk}} ISK listed",
+        "summary_one": "{{count}} open corp order, {{undercut}} undercut.",
+        "summary_other": "{{count}} open corp orders, {{undercut}} undercut."
       },
       "corpMembers": {
         "title": "Members",
@@ -5087,8 +5139,21 @@
       },
       "corpRoleAudit": {
         "title": "Roles audit",
-        "description": "Who holds Director and other roles, and recent role changes",
-        "empty": "This widget is coming soon."
+        "description": "Who holds Director and other sensitive roles, and recent role changes",
+        "empty": "No member holds a sensitive role.",
+        "col": {
+          "member": "Member",
+          "roles": "Sensitive roles",
+          "change": "Last change"
+        },
+        "unit_one": "Director",
+        "unit_other": "Directors",
+        "changes_one": "{{count}} role change in {{days}} days",
+        "changes_other": "{{count}} role changes in {{days}} days",
+        "changesUnknown": "Role changes unavailable",
+        "historyUnknown": "Role history could not be read, so last changes are not shown.",
+        "summary_one": "{{count}} Director. Members with a sensitive role: {{holders}}.",
+        "summary_other": "{{count}} Directors. Members with a sensitive role: {{holders}}."
       },
       "corpDoctrine": {
         "title": "Doctrine readiness",
@@ -12330,6 +12395,36 @@
       "shipFilterAll": "Any ship",
       "locationFilterLabel": "Location",
       "locationFilterAll": "Any location"
+    },
+    "roles": {
+      "tab": "Roles",
+      "refresh": "Refresh roles",
+      "holdersHeading": "Sensitive roles",
+      "holdersSummary_one": "{{directors}} Director. Members with a sensitive role: {{holders}}.",
+      "holdersSummary_other": "{{directors}} Directors. Members with a sensitive role: {{holders}}.",
+      "holdersEmpty": "No member holds a sensitive role",
+      "holdersEmptyHint": "Director, Accountant, Junior Accountant, Personnel Manager, Station Manager, Trader, Security Officer and the hangar and container take roles are checked.",
+      "tableLabel": "Members with sensitive roles",
+      "columnMember": "Member",
+      "columnRoles": "Sensitive roles",
+      "columnTitles": "Titles",
+      "columnLastChange": "Last change",
+      "columnWhen": "When",
+      "columnChange": "Change",
+      "columnIssuer": "Changed by",
+      "historyHeading": "Role changes",
+      "historyHint": "Sensitive roles granted or removed in the last {{days}} days. EVE keeps about a month of history.",
+      "historyLabel": "Role changes",
+      "historyEmpty": "No sensitive role changes in {{days}} days",
+      "historyEmptyHint": "Nothing was granted or removed in that time.",
+      "historyUnavailable": "Role history could not be read",
+      "historyUnavailableHint": "Who holds each role is shown above. Refresh to try the history again.",
+      "granted": "Granted {{roles}}",
+      "removed": "Removed {{roles}}",
+      "showOlder_one": "Show {{count}} older change",
+      "showOlder_other": "Show {{count}} older changes",
+      "loadFailedHint": "Roles are not saved on this device yet, so there is nothing to show. They load once EVE answers.",
+      "needsGrantHint": "The corporation permission needs to be granted again from Settings before roles can load."
     },
     "wallet": {
       "title": "Corp wallet",

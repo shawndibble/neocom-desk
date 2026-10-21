@@ -12,9 +12,16 @@
  * - a thrown load: the read was allowed and failed. The widget shows Retry.
  * - data, possibly an empty list: read fine.
  */
-import type { Contract, CorporationIndustryJob } from '@/esi/endpoints';
+import type {
+  Contract,
+  CorporationCustomsOffice,
+  CorporationIndustryJob,
+  CorporationOrder,
+} from '@/esi/endpoints';
+import type { HubAggregate } from '@/market/fuzzwork';
 import type { MemberActivity, RosterDiff } from '@/engine/corp/members';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
+import type { RoleAuditData } from '@/features/corp/roleAudit';
 import type { WalletDivision } from '@/features/corp/divisions';
 import type { PilotStats, ZkillFailureReason } from '@/lib/zkillboard';
 
@@ -55,6 +62,19 @@ export interface CorpJobsFeed extends CorpFeedBase {
   installerNames: ReadonlyMap<number, string>;
 }
 
+export interface CorpCustomsFeed extends CorpFeedBase {
+  offices: CorporationCustomsOffice[];
+  /** Office type names ("Customs Office", "Interbus Customs Office"...). */
+  typeNames: ReadonlyMap<number, string>;
+  /** Solar system names from the static data; a missing one degrades one cell. */
+  systemNames: ReadonlyMap<number, string>;
+}
+
+export interface CorpRoleAuditFeed extends CorpFeedBase {
+  /** Null when the feed is unreadable. */
+  audit: RoleAuditData | null;
+}
+
 export interface CorpMembersFeed extends CorpFeedBase {
   members: MemberActivity[];
   /**
@@ -82,11 +102,46 @@ export interface CorpMiningFeed extends CorpFeedBase {
   minerNames: ReadonlyMap<number, string>;
 }
 
+/** One tower, reduced to what the Starbases builder reads. */
+export interface CorpStarbaseRow {
+  starbaseId: number;
+  systemId: number;
+  /** The tower's own type: its size and faction decide the burn rate. */
+  typeId: number;
+  /** ESI's `state`; "unknown" when it sent none. */
+  state: string;
+  reinforcedUntilMs: number | null;
+  unanchorsAtMs: number | null;
+  /**
+   * What the bay held when read; null when no detail was read (the tower is not
+   * online, or its read failed): unknown, not empty.
+   */
+  bay: { fuelBlocks: number; strontium: number } | null;
+}
+
+export interface CorpStarbasesFeed extends CorpFeedBase {
+  starbases: CorpStarbaseRow[];
+  typeNames: ReadonlyMap<number, string>;
+  systemNames: ReadonlyMap<number, string>;
+}
+
 export interface CorpContractsFeed extends CorpFeedBase {
   /** Every contract ESI lists for the corporation, any status; the builder keeps the open ones. */
   contracts: Contract[];
   /** Names for every issuer and assignee, whether a pilot, a corporation or an alliance. */
   names: ReadonlyMap<number, string>;
+}
+
+export interface CorpOrdersFeed extends CorpFeedBase {
+  /** Every open order the corporation has, both sides. */
+  orders: CorporationOrder[];
+  typeNames: ReadonlyMap<number, string>;
+  /** NPC station names by location id; a location absent is a player structure. */
+  stationNames: ReadonlyMap<number, string>;
+  /** Best rival price per `${locationId}:${typeId}`, for the undercut status. */
+  stationPrices: ReadonlyMap<string, HubAggregate>;
+  /** Names of the Characters who issued the orders. */
+  issuerNames: ReadonlyMap<number, string>;
 }
 
 /**
@@ -122,12 +177,32 @@ export async function loadCorpMiningFeed(characterId: number): Promise<CorpMinin
   return loadCorpMining(characterId);
 }
 
+export async function loadCorpStarbasesFeed(characterId: number): Promise<CorpStarbasesFeed> {
+  const { loadCorpStarbases } = await import('./corpFeedLoaders');
+  return loadCorpStarbases(characterId);
+}
+
 export async function loadCorpContractsFeed(characterId: number): Promise<CorpContractsFeed> {
   const { loadCorpContracts } = await import('./corpFeedLoaders');
   return loadCorpContracts(characterId);
 }
 
+export async function loadCorpOrdersFeed(characterId: number): Promise<CorpOrdersFeed> {
+  const { loadCorpOrders } = await import('./corpFeedLoaders');
+  return loadCorpOrders(characterId);
+}
+
 export async function loadCorpKillsFeed(characterId: number): Promise<CorpKillsFeed> {
   const { loadCorpKills } = await import('./corpFeedLoaders');
   return loadCorpKills(characterId);
+}
+
+export async function loadCorpCustomsFeed(characterId: number): Promise<CorpCustomsFeed> {
+  const { loadCorpCustoms } = await import('./corpFeedLoaders');
+  return loadCorpCustoms(characterId);
+}
+
+export async function loadCorpRoleAuditFeed(characterId: number): Promise<CorpRoleAuditFeed> {
+  const { loadCorpRoleAudit } = await import('./corpFeedLoaders');
+  return loadCorpRoleAudit(characterId);
 }

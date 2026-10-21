@@ -141,6 +141,44 @@ export function getCharacterOrders(
   return characterGet<MarketOrder[]>('getCharacterOrders', characterId, options);
 }
 
+// --- GET /corporations/{corporation_id}/orders (esi-markets.read_corporation_orders.v1) ---
+
+/** A corporation's open order: ESI's character order shape plus who placed it. */
+export interface CorporationOrder {
+  order_id: number;
+  type_id: number;
+  region_id: number;
+  location_id: number;
+  is_buy_order?: boolean;
+  /** The Character who issued the order. */
+  issued_by?: number;
+  price: number;
+  volume_remain: number;
+  volume_total: number;
+  issued: string;
+  duration: number;
+  range: string;
+  min_volume?: number;
+  escrow?: number;
+  wallet_division?: number;
+}
+
+/**
+ * The corporation's open orders. Paginated (X-Pages), cached 1200s. Needs the
+ * Accountant or Trader in-game role.
+ */
+export function getCorporationOrders(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<TruncatableResult<CorporationOrder>> {
+  return fetchAllPagesStatus<CorporationOrder>(`/corporations/${corporationId}/orders`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationOrders',
+  });
+}
+
 // --- GET /characters/{character_id}/orders/history (esi-markets.read_character_orders.v1) ---
 
 export interface MarketOrderHistory extends MarketOrder {

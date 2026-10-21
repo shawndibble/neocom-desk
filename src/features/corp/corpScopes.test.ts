@@ -4,6 +4,7 @@ import { SCOPES, scopesForGroup } from '@/esi/scopes';
 import { CORP_SCOPES_FOR_CAPABILITY, corpGrantCoverage, missingCorpScopes } from './corpScopes';
 
 const CONTRACTS = 'esi-contracts.read_corporation_contracts.v1';
+const ORDERS = 'esi-markets.read_corporation_orders.v1';
 
 /**
  * `missingCorpScopes` without the contracts scope, which every member is asked for
@@ -189,7 +190,7 @@ describe('corpGrantCoverage', () => {
    */
   it('asks for an additive capability’s scope without blocking the rest', () => {
     const coverage = corpGrantCoverage(corpCapabilities(['Accountant']), WALLET_SCOPES);
-    expect(coverage.missingScopes).toEqual([MINING, CONTRACTS]);
+    expect(coverage.missingScopes).toEqual([MINING, CONTRACTS, ORDERS]);
     expect(coverage.blocking).toBe(false);
     expect(coverage.capabilities.canReadWallet).toBe(true);
     // Unreadable until granted, so nothing reads the ledger into a 403.
@@ -201,6 +202,7 @@ describe('corpGrantCoverage', () => {
       ...WALLET_SCOPES,
       MINING,
       CONTRACTS,
+      ORDERS,
     ]);
     expect(coverage).toEqual({
       missingScopes: [],
@@ -209,10 +211,24 @@ describe('corpGrantCoverage', () => {
     });
   });
 
+  /** Issue #4610: a Director who granted the corp group before starbases keeps every corp surface. */
+  it('keeps a Director who predates the starbase scope out of roles-without-grant', () => {
+    const STARBASES = 'esi-corporations.read_starbases.v1';
+    const coverage = corpGrantCoverage(
+      corpCapabilities(['Director']),
+      scopesForGroup('corp').filter((scope) => scope !== STARBASES)
+    );
+    expect(coverage.missingScopes).toEqual([STARBASES]);
+    expect(coverage.blocking).toBe(false);
+    expect(coverage.capabilities.canReadStarbases).toBe(false);
+    expect(coverage.capabilities.canReadWallet).toBe(true);
+    expect(coverage.capabilities.canReadAssets).toBe(true);
+  });
+
   it('still blocks when a non-additive capability lacks a scope', () => {
     const coverage = corpGrantCoverage(corpCapabilities(['Accountant']), [MINING]);
     expect(coverage.blocking).toBe(true);
-    expect(coverage.missingScopes).toEqual([...WALLET_SCOPES, CONTRACTS]);
+    expect(coverage.missingScopes).toEqual([...WALLET_SCOPES, CONTRACTS, ORDERS]);
   });
 
   // Added after members already reached `ready` (#4607): lacking it must not hide the corp UI.
@@ -236,6 +252,32 @@ describe('corpGrantCoverage', () => {
     ]);
     expect(coverage.missingScopes).toEqual([MINING]);
     expect(coverage.blocking).toBe(true);
+  });
+
+  it('keeps a Director’s older grant ready when only the customs scope is missing (#4611)', () => {
+    const CUSTOMS = 'esi-planets.read_customs_offices.v1';
+    expect(CORP_SCOPES_FOR_CAPABILITY.canReadCustomsOffices).toEqual([CUSTOMS]);
+    const coverage = corpGrantCoverage(
+      corpCapabilities(['Director']),
+      scopesForGroup('corp').filter((scope) => scope !== CUSTOMS)
+    );
+    expect(coverage.blocking).toBe(false);
+    expect(coverage.missingScopes).toEqual([CUSTOMS]);
+    expect(coverage.capabilities.canReadCustomsOffices).toBe(false);
+    expect(coverage.capabilities.canReadWallet).toBe(true);
+  });
+
+  it('keeps a Director’s older grant ready when only the titles scope is missing (#4613)', () => {
+    const TITLES = 'esi-corporations.read_titles.v1';
+    expect(CORP_SCOPES_FOR_CAPABILITY.canReadRoleAudit).toContain(TITLES);
+    const coverage = corpGrantCoverage(
+      corpCapabilities(['Director']),
+      scopesForGroup('corp').filter((scope) => scope !== TITLES)
+    );
+    expect(coverage.blocking).toBe(false);
+    expect(coverage.missingScopes).toEqual([TITLES]);
+    expect(coverage.capabilities.canReadRoleAudit).toBe(false);
+    expect(coverage.capabilities.canReadMembers).toBe(true);
   });
 
   it('reports the same missing set as missingCorpScopes', () => {

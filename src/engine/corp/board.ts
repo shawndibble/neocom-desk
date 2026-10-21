@@ -134,6 +134,27 @@ export interface BoardStructureService {
   state: 'online' | 'offline' | 'cleanup';
 }
 
+/**
+ * A starbase (POS), as the board reads it (issue #4610). Its clocks ride the
+ * structure kinds: the fuel running out is a `structureFuel`, a reinforcement
+ * or unanchor a `structureTimer`.
+ */
+export interface BoardStarbaseSource {
+  starbaseId: number;
+  name: string;
+  /**
+   * Epoch ms the fuel runs out, or `null` when that is not known: ESI gives a
+   * tower's quantity but not its burn rate, so a tower type with no rate in
+   * the static data has no fuel clock. Never `null` meaning "empty": an empty
+   * bay is a deadline already behind us.
+   */
+  fuelExpiresMs: number | null;
+  /** Epoch ms a reinforced tower comes out, or `null`. */
+  reinforcedUntilMs: number | null;
+  /** Epoch ms the tower finishes unanchoring, or `null`. */
+  unanchorsAtMs: number | null;
+}
+
 export interface BoardExtractionSource {
   structureId: number;
   /** The refinery the drill is on, already named. */
@@ -169,6 +190,7 @@ export interface CorpBoardSources {
    * board says nothing about jobs rather than claiming there are none.
    */
   structures?: readonly BoardStructureSource[];
+  starbases?: readonly BoardStarbaseSource[];
   extractions?: readonly BoardExtractionSource[];
   jobs?: readonly BoardJobSource[];
 }
@@ -300,6 +322,35 @@ function structureItems(
   return items;
 }
 
+function starbaseItems(
+  starbase: BoardStarbaseSource,
+  clock: Pick<CorpBoardSources, 'nowMs' | 'staleWindowMs'>
+): CorpBoardItem[] {
+  const items: CorpBoardItem[] = [];
+  const { starbaseId, name } = starbase;
+  const base = (prefix: string, kind: CorpBoardItemKind, detail: string): ItemBase => ({
+    id: `${prefix}:sb${starbaseId}`,
+    kind,
+    subject: name,
+    detail,
+    typeId: null,
+  });
+  if (starbase.fuelExpiresMs !== null) {
+    items.push(timedItem(base('fuel', 'structureFuel', ''), starbase.fuelExpiresMs, clock));
+  }
+  if (starbase.reinforcedUntilMs !== null) {
+    items.push(
+      timedItem(base('state', 'structureTimer', 'reinforced'), starbase.reinforcedUntilMs, clock)
+    );
+  }
+  if (starbase.unanchorsAtMs !== null) {
+    items.push(
+      timedItem(base('unanchor', 'structureTimer', 'unanchoring'), starbase.unanchorsAtMs, clock)
+    );
+  }
+  return items;
+}
+
 function extractionItem(
   extraction: BoardExtractionSource,
   clock: Pick<CorpBoardSources, 'nowMs' | 'staleWindowMs'>
@@ -371,6 +422,7 @@ export function buildCorpBoard(sources: CorpBoardSources): CorpBoardItem[] {
   const items: CorpBoardItem[] = [];
 
   for (const structure of sources.structures ?? []) items.push(...structureItems(structure, clock));
+  for (const starbase of sources.starbases ?? []) items.push(...starbaseItems(starbase, clock));
   for (const extraction of sources.extractions ?? []) items.push(extractionItem(extraction, clock));
   for (const job of sources.jobs ?? []) {
     // ESI often leaves a finished job's status at `active` past its end

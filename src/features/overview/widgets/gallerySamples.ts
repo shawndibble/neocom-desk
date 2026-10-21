@@ -555,6 +555,23 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ['Efa Athanor', 'Standup Reprocessing Facility I', t('overview.board.structureOffline')],
       ],
     },
+    corpStarbases: {
+      value: '4',
+      unit: t('overview.widgets.corpStarbases.unit'),
+      note: t('overview.widgets.corpStarbases.lowest', { name: 'Efa', duration: '1d 6h' }),
+      rows: [
+        [
+          'Caldari Control Tower',
+          'Efa',
+          t('overview.widgets.corpStarbases.fuelCell', { blocks: '1,248', duration: '1d 6h' }),
+        ],
+        [
+          'Amarr Control Tower Medium',
+          'Jita',
+          t('overview.widgets.corpStarbases.fuelCell', { blocks: '2,940', duration: '6d 3h' }),
+        ],
+      ],
+    },
     corpJobs: {
       value: '3',
       unit: t('overview.widgets.corpJobs.unit'),
@@ -690,6 +707,16 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ['Dax Orlen', 0.5, '24%'],
       ]),
     },
+    corpOrders: {
+      value: '14',
+      unit: t('overview.widgets.corpOrders.unit', { count: 14 }),
+      note: t('overview.widgets.corpOrders.escrow', { isk: '3.4B' }),
+      rows: [
+        ['Tritanium', 'Jita', '5.1'],
+        ['Compressed Veldspar', 'Amarr', '14.2'],
+        ['Nocxium', 'Jita', '1.9K'],
+      ],
+    },
     corpContracts: {
       value: '7',
       unit: t('overview.widgets.corpContracts.unit'),
@@ -698,6 +725,38 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ['Jita to Efa haul', t('contracts.typeCourier'), '5h 10m'],
         ['Rifter fleet stock', t('contracts.typeItemExchange'), '1d 3h'],
         ['Efa to Amarr haul', t('contracts.typeCourier'), '2d 8h'],
+      ],
+    },
+    corpCustomsOffices: {
+      value: '3',
+      unit: t('overview.widgets.corpCustomsOffices.unit', { count: 3 }),
+      note: t('overview.widgets.corpCustomsOffices.systems', { count: 2 }),
+      rows: [
+        [
+          'Customs Office',
+          'Efa',
+          t('overview.widgets.corpCustomsOffices.window', { start: '18', end: '20' }),
+        ],
+        [
+          'Customs Office',
+          'Niarja',
+          t('overview.widgets.corpCustomsOffices.window', { start: '02', end: '04' }),
+        ],
+        [
+          'Customs Office',
+          'Niarja',
+          t('overview.widgets.corpCustomsOffices.window', { start: '14', end: '16' }),
+        ],
+      ],
+    },
+    corpRoleAudit: {
+      value: '3',
+      unit: t('overview.widgets.corpRoleAudit.unit', { count: 3 }),
+      note: t('overview.widgets.corpRoleAudit.changes', { count: 2, days: 7 }),
+      rows: [
+        ['Aria Voss', 'Director', '2d 4h'],
+        ['Kerr Dane', 'Accountant, Trader', '5d 1h'],
+        ['Mina Oto', 'Station Manager', '—'],
       ],
     },
     corpKills: {

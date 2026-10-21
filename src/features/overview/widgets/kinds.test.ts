@@ -68,15 +68,7 @@ const CORP_IDS = [
   'corpProjects',
 ];
 
-const CORP_SOON = [
-  'corpStarbases',
-  'corpCustomsOffices',
-  'corpOrders',
-  'corpRoleAudit',
-  'corpDoctrine',
-  'corpSrp',
-  'corpProjects',
-];
+const CORP_SOON = ['corpDoctrine', 'corpSrp', 'corpProjects'];
 
 const overviewKinds = () => boardKinds('overview');
 
