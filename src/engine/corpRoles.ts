@@ -62,6 +62,12 @@ export interface CorpCapabilities {
    * `x-required-roles` on this route is `["Director"]` alone.
    */
   canReadBlueprints: boolean;
+  /**
+   * GET /corporations/{id}/contracts — contracts issued by or assigned to the
+   * corporation (issue #4607). ESI names no required role, so every member
+   * holds this; it alone never opens a corp surface (`hasAnyCorpCapability`).
+   */
+  canReadContracts: boolean;
 }
 
 export type CorpCapability = keyof CorpCapabilities;
@@ -82,6 +88,7 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadIndustry',
   'canReadAssets',
   'canReadBlueprints',
+  'canReadContracts',
 ];
 
 /** The answer for a Character with no roles — and the shape of "not loaded yet". */
@@ -94,6 +101,7 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadIndustry: false,
   canReadAssets: false,
   canReadBlueprints: false,
+  canReadContracts: false,
 };
 
 /**
@@ -126,7 +134,12 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
   // ["Director"] alone (issue #839's own brief guessed Director/
   // Factory_Manager, which the live spec does not confirm).
   canReadBlueprints: [],
+  // No `x-required-roles` on the contracts routes: handled as "every member" in `corpCapabilities`.
+  canReadContracts: [],
 };
+
+/** Capabilities every corp member holds: ESI names no role for them, so they say nothing about roles. */
+const OPEN_TO_MEMBERS: ReadonlySet<CorpCapability> = new Set(['canReadContracts']);
 
 /**
  * A Director implicitly holds every other role in game, and ESI does **not**
@@ -158,7 +171,9 @@ export function corpCapabilities(roles: readonly string[]): CorpCapabilities {
   const capabilities = { ...NO_CORP_CAPABILITIES };
   for (const capability of CORP_CAPABILITIES) {
     capabilities[capability] =
-      isDirector || ROLES_FOR_CAPABILITY[capability].some((role) => held.has(role));
+      isDirector ||
+      OPEN_TO_MEMBERS.has(capability) ||
+      ROLES_FOR_CAPABILITY[capability].some((role) => held.has(role));
   }
   return capabilities;
 }
@@ -180,5 +195,8 @@ export function canViewCorpTaxBook(roles: readonly string[]): boolean {
  * (GLOSSARY.md round 35).
  */
 export function hasAnyCorpCapability(capabilities: CorpCapabilities): boolean {
-  return CORP_CAPABILITIES.some((capability) => capabilities[capability]);
+  // A capability open to every member says nothing about this Character's roles.
+  return CORP_CAPABILITIES.some(
+    (capability) => capabilities[capability] && !OPEN_TO_MEMBERS.has(capability)
+  );
 }
