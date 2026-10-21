@@ -30,6 +30,7 @@ function tower(over: Partial<CorpStarbaseRow> = {}): CorpStarbaseRow {
     reinforcedUntilMs: null,
     unanchorsAtMs: null,
     bay: { fuelBlocks: 40 * 100, strontium: 400 },
+    bayReadAtMs: NOW,
     ...over,
   };
 }
@@ -116,9 +117,12 @@ describe('corpStarbases', () => {
   it('counts the countdown from when the bay was read, not from now', () => {
     const view = build(
       ok(
-        feedOf([tower({ bay: { fuelBlocks: 40 * 10, strontium: 0 } })], {
-          fetchedAt: new Date(NOW - 5 * HOUR),
-        })
+        feedOf(
+          [tower({ bay: { fuelBlocks: 40 * 10, strontium: 0 }, bayReadAtMs: NOW - 5 * HOUR })],
+          {
+            fetchedAt: new Date(NOW - 5 * HOUR),
+          }
+        )
       )
     );
     // 10 h of fuel read 5 h ago leaves 5 h.
@@ -150,12 +154,61 @@ describe('corpStarbases', () => {
   });
 });
 
+describe('per-tower read time', () => {
+  it('anchors each fuel clock to its own detail read, not the oldest read', () => {
+    const feed = feedOf(
+      [
+        tower({ starbaseId: 1, bayReadAtMs: NOW }),
+        tower({ starbaseId: 2, bayReadAtMs: NOW - 2 * DAY }),
+      ],
+      { fetchedAt: new Date(NOW - 2 * DAY) }
+    );
+    const [fresh, stale] = toBoardStarbases(feed, NOW);
+    // 100 hours of fuel from each tower's own read.
+    expect(fresh?.fuelExpiresMs).toBe(NOW + 100 * HOUR);
+    expect(stale?.fuelExpiresMs).toBe(NOW - 2 * DAY + 100 * HOUR);
+    const view = build(ok(feed));
+    expect(view.table?.rows.find((r) => r.key === '1')?.tone).toBe('clear');
+  });
+
+  it('reads an ended reinforcement as ended, never as out of fuel', () => {
+    const view = build(
+      ok(feedOf([tower({ state: 'reinforced', bay: null, reinforcedUntilMs: NOW - HOUR })]))
+    );
+    expect(view.table?.rows[0]?.cells[5]).toBe('overview.widgets.corpStarbases.reinforceEnded');
+  });
+
+  it('shows strontium for a reinforced tower whose bay was read', () => {
+    const view = build(
+      ok(
+        feedOf([
+          tower({
+            state: 'reinforced',
+            reinforcedUntilMs: NOW + DAY,
+            bay: { fuelBlocks: 0, strontium: 1234 },
+          }),
+        ])
+      )
+    );
+    expect(view.table?.rows[0]?.cells[4]).toBe('1,234');
+  });
+});
+
 describe('toBoardStarbases', () => {
   it('turns a bay into a fuel deadline from the read time and passes the timers through', () => {
     const [source] = toBoardStarbases(
-      feedOf([tower({ bay: { fuelBlocks: 400, strontium: 0 }, reinforcedUntilMs: NOW + DAY })], {
-        fetchedAt: new Date(NOW - HOUR),
-      }),
+      feedOf(
+        [
+          tower({
+            bay: { fuelBlocks: 400, strontium: 0 },
+            reinforcedUntilMs: NOW + DAY,
+            bayReadAtMs: NOW - HOUR,
+          }),
+        ],
+        {
+          fetchedAt: new Date(NOW - HOUR),
+        }
+      ),
       NOW
     );
     expect(source).toEqual({

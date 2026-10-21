@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -59,7 +59,9 @@ export function CorpContractsView() {
     undefined,
     { cacheKey: 'contracts-corp' }
   );
-  const [selected, setSelected] = useState<Contract | null>(null);
+  // The open contract belongs to the Character and corporation it was read under: a switch
+  // drops it, so the modal never pairs B's corporation with A's contract id.
+  const [picked, setPicked] = useState<{ scope: string; contract: Contract } | null>(null);
   const [params, setParams] = useUrlParams(CORP_FILTER_PARAMS);
   const filter = useMemo<ContractsFilter>(
     () => ({ text: params['corp.q'], status: params['corp.status'], type: params['corp.type'] }),
@@ -71,6 +73,12 @@ export function CorpContractsView() {
   const highlightedContractId = useHighlightParam();
 
   const corporationId = data?.corporationId ?? null;
+  const scope = `${activeCharacterId}:${corporationId}`;
+  const selected = picked?.scope === scope ? picked.contract : null;
+  const setSelected = useCallback(
+    (contract: Contract | null) => setPicked(contract && { scope, contract }),
+    [scope]
+  );
   const names = data?.names;
   const { columns, optionalColumns, columnVisibility, receiverFor } = useContractsHistoryColumns({
     // The corporation is "self" here: a contract it took or was offered is not worth a column cell.

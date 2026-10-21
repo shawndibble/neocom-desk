@@ -71,4 +71,17 @@ describe('OrdersTab', () => {
     renderTab('/market/orders?scope=corp');
     expect(await screen.findByText('corp orders')).toBeInTheDocument();
   });
+
+  it('holds a ?scope=corp visit while access resolves, mounting no Character panel', () => {
+    access('unknown', false);
+    renderTab('/market/orders?scope=corp');
+    expect(screen.queryByText('character orders')).toBeNull();
+    expect(screen.queryByText('corp orders')).toBeNull();
+  });
+
+  it('falls back to the Character view when access resolves without canReadOrders', () => {
+    access('none', false);
+    renderTab('/market/orders?scope=corp');
+    expect(screen.getByText('character orders')).toBeInTheDocument();
+  });
 });

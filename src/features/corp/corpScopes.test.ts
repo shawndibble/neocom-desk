@@ -225,6 +225,16 @@ describe('corpGrantCoverage', () => {
     expect(coverage.capabilities.canReadAssets).toBe(true);
   });
 
+  it('blocks a Trader-only Character whose only capability is ungranted', () => {
+    const coverage = corpGrantCoverage(corpCapabilities(['Trader']), []);
+    expect(coverage.blocking).toBe(true);
+    expect(coverage.missingScopes).toContain(ORDERS);
+  });
+
+  it('keeps a Trader ready once the orders scope is granted', () => {
+    expect(corpGrantCoverage(corpCapabilities(['Trader']), [ORDERS]).blocking).toBe(false);
+  });
+
   it('still blocks when a non-additive capability lacks a scope', () => {
     const coverage = corpGrantCoverage(corpCapabilities(['Accountant']), [MINING]);
     expect(coverage.blocking).toBe(true);

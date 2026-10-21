@@ -10,21 +10,37 @@
 import { conditionalPagedFetch } from '@/esi/cache';
 import { getCorporationContracts, type Contract } from '@/esi/endpoints';
 import type { StatusResult } from '@/esi/cache';
+import { withAcceptedCourierInProgress } from '@/engine/contracts/contractStatus';
 import { loadCorpPaginatedWithCacheStatus } from './corpRead';
 
 const KEY = 'contracts';
 
 export type CorpContractsLoadResult = StatusResult<Contract[]>;
 
-/** Contracts issued by or assigned to the corporation. ESI or cache. */
-export function loadCorporationContracts(
+/**
+ * Contracts issued by or assigned to the corporation. ESI or cache. The one read
+ * path for the widget and the Contracts page: an accepted courier stays
+ * `outstanding` in ESI, so it is read as `in_progress` here, once.
+ */
+export async function loadCorporationContracts(
   characterId: number,
   corporationId: number
 ): Promise<CorpContractsLoadResult> {
   const { fetchLive, conditional } = conditionalPagedFetch((options) =>
     getCorporationContracts(characterId, corporationId, options)
   );
-  return loadCorpPaginatedWithCacheStatus(characterId, corporationId, KEY, fetchLive, {
-    conditional,
-  });
+  const result = await loadCorpPaginatedWithCacheStatus(
+    characterId,
+    corporationId,
+    KEY,
+    fetchLive,
+    {
+      conditional,
+    }
+  );
+  if (result.cached === null) return result;
+  return {
+    ...result,
+    cached: { ...result.cached, data: result.cached.data.map(withAcceptedCourierInProgress) },
+  };
 }

@@ -82,6 +82,11 @@ vi.mock('@/features/character/location', () => ({
   loadCharacterSolarSystemId: vi.fn(async () => null),
 }));
 
+// The corp view has its own tests; here it is only a marker for "the corp view mounted".
+vi.mock('@/features/contracts/CorpContractsView', () => ({
+  CorpContractsView: () => <div>corp view</div>,
+}));
+
 const CHAR_ID = 91;
 
 const contractPage1 = [
@@ -687,6 +692,29 @@ describe('Time format preference', () => {
 
     expect(within(table).getByText(formatDateOnly(EXPIRES, 'UTC'))).toBeInTheDocument();
     expect(within(table).queryByText(formatDateOnly(EXPIRES))).not.toBeInTheDocument();
+  });
+});
+
+describe('Contracts corp deep link', () => {
+  it('shows the corp view for ?scope=corp without reading the Character contracts', async () => {
+    let characterReads = 0;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () => {
+        characterReads += 1;
+        return HttpResponse.json([]);
+      })
+    );
+    await db.tokens.update(CHAR_ID, {
+      scopes: [
+        'esi-contracts.read_character_contracts.v1',
+        'esi-contracts.read_corporation_contracts.v1',
+      ],
+    });
+    window.history.pushState({}, '', '/contracts/history?scope=corp');
+    render(<App />);
+    expect(await screen.findByText('corp view')).toBeInTheDocument();
+    expect(screen.queryByText('Rifter fit')).not.toBeInTheDocument();
+    expect(characterReads).toBe(0);
   });
 });
 

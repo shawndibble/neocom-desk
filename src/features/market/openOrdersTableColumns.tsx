@@ -46,38 +46,44 @@ export interface OpenOrderTableColumns {
 export function useOpenOrderTableColumns({
   showCharacter,
   visible,
+  workThrough = true,
 }: {
   /** More than one Character has orders: tag each row with its owner. */
   showCharacter: boolean;
   visible: readonly OpenOrderColumnId[];
+  /**
+   * The Character's own advice columns (What's wrong, Do this). Off for the
+   * read-only corp view, which has no cost basis to judge against.
+   */
+  workThrough?: boolean;
 }): OpenOrderTableColumns {
   const { t } = useTranslation();
   const defs = useMemo(() => {
-    const fixed: DataTableColumn<OpenOrderRow>[] = [
-      {
-        id: 'item',
-        header: t('orders.item'),
-        primary: true,
-        sortValue: (row) => row.typeName,
-        render: (row) => (
-          <span className="block min-w-0">
-            <span className={entityLinkClassName('font-medium')}>{row.typeName}</span>
-            <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-text-dim max-sm:hidden">
-              <span className="whitespace-nowrap">
-                {row.stationName === null
-                  ? t('market.unknownStructure')
-                  : stationShortName(row.stationName)}
-                {row.isBuyOrder && ` · ${t('market.orders.fixList.buyOrder')}`}
-              </span>
-              {showCharacter && (
-                <span className="-ml-1.5">
-                  <CharacterBadge characterName={row.characterName} />
-                </span>
-              )}
+    const item: DataTableColumn<OpenOrderRow> = {
+      id: 'item',
+      header: t('orders.item'),
+      primary: true,
+      sortValue: (row) => row.typeName,
+      render: (row) => (
+        <span className="block min-w-0">
+          <span className={entityLinkClassName('font-medium')}>{row.typeName}</span>
+          <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-text-dim max-sm:hidden">
+            <span className="whitespace-nowrap">
+              {row.stationName === null
+                ? t('market.unknownStructure')
+                : stationShortName(row.stationName)}
+              {row.isBuyOrder && ` · ${t('market.orders.fixList.buyOrder')}`}
             </span>
+            {showCharacter && (
+              <span className="-ml-1.5">
+                <CharacterBadge characterName={row.characterName} />
+              </span>
+            )}
           </span>
-        ),
-      },
+        </span>
+      ),
+    };
+    const advice: DataTableColumn<OpenOrderRow>[] = [
       {
         id: 'problem',
         header: t('market.orders.fixList.colProblem'),
@@ -100,11 +106,15 @@ export function useOpenOrderTableColumns({
         ),
       },
     ];
+    const fixed = workThrough ? [item, ...advice] : [item];
 
     const optional: Record<OpenOrderColumnId, DataTableColumn<OpenOrderRow>> = {
       price: {
         id: 'price',
-        header: t('market.orders.fixList.colPrice'),
+        // "Your price" is the pilot's own work-through; a corp order is the corporation's.
+        header: t(
+          workThrough ? 'market.orders.fixList.colPrice' : 'market.orders.fixList.colOrderPrice'
+        ),
         ...figure,
         sortValue: (row) => row.price,
         render: (row) => formatMarketIsk(row.price),
@@ -175,7 +185,7 @@ export function useOpenOrderTableColumns({
     };
 
     return { fixed, optional, tiedUp };
-  }, [t, showCharacter]);
+  }, [t, showCharacter, workThrough]);
 
   return useMemo(
     () => ({

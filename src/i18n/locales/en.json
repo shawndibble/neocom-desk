@@ -4979,7 +4979,8 @@
           "unanchoring": "Unanchoring"
         },
         "summary_one": "{{count}} starbase, {{low}} low on fuel.",
-        "summary_other": "{{count}} starbases, {{low}} low on fuel."
+        "summary_other": "{{count}} starbases, {{low}} low on fuel.",
+        "reinforceEnded": "Ended"
       },
       "corpCustomsOffices": {
         "title": "Customs offices",
@@ -11299,7 +11300,8 @@
         "healthy_other": "{{count}} healthy orders",
         "showHealthy": "Show",
         "standingsAssumed": "Fees assume base standings for {{name}}",
-        "notShared": "{{name}} hasn't shared their orders"
+        "notShared": "{{name}} hasn't shared their orders",
+        "colOrderPrice": "Price"
       },
       "assumesBaseStandingsHint": "Floor prices on this character's sell orders are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings."
     },

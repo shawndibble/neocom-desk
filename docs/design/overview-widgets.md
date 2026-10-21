@@ -298,8 +298,8 @@ Customize, Gallery, menu and phone list are shared.
 - **One layout per pilot**, `sync.corpOverviewLayout`; not per corporation or
   Character.
 - **No Role chooser, no first-run prompt.** Until the pilot edits, the page
-  draws `corpDefaultLayout(capabilities)` and never saves it: saving would
-  freeze one Character's roles into every device's layout. Reset rebuilds it.
+  draws the full `corpDefaultLayout()` and never saves it; `canDraw` decides
+  what each Character sees. Reset rebuilds it.
 - **Hide, don't lock.** A kind whose capability the Character lacks is not
   offered, drawn or fetched (`canDraw`); a saved one stays in the layout, undrawn.
   Coming-soon kinds are listed for everyone, not addable.
@@ -307,9 +307,11 @@ Customize, Gallery, menu and phone list are shared.
   one corporation.
 - **Gated reads.** Each corp loader calls `resolveCorpReadAccess` before it
   fetches. Unreadable (no role, or a lapsed grant), failed (Retry) and empty
-  stay distinct.
-- **Hourly cache.** No countdown shorter than the 1 h corp cache window; the
-  data-age popover carries the note.
+  stay distinct. One exception: Corp kills reads public zKillboard stats, so
+  it carries no capability and no gate.
+- **Cache window.** No countdown shorter than the read's cache window: 1 h for
+  the corp reads, 5 min for corp contracts (ESI caches that route for 300 s).
+  The data-age popover carries the hourly note.
 - **No Show info links** from rows; tables link rows to pages.
 - **Coming soon (one):** SRP, which needs app-owned data and an ADR first (#4608).
   Doctrine readiness and Corporation projects were dropped (#4614, #4609). Any new

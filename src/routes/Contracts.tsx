@@ -82,19 +82,6 @@ const HISTORY_SORT = { columnId: 'issued', direction: 'desc' } as const;
 /** Contracts: table with status chips, stale offers dimmed, detail on click. Read-only, cached for offline. */
 export function Contracts() {
   const { t } = useTranslation();
-  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
-    loadContractsSnapshot,
-    undefined,
-    { cacheKey: 'contracts' }
-  );
-
-  const contractsResult = data?.contractsResult ?? null;
-  const contractsNeedsReauth = data?.contractsNeedsReauth ?? false;
-  const contractsTruncated = data?.contractsTruncated ?? false;
-  const issuerNames = data?.issuerNames ?? NO_NAMES;
-  const receiverCategories = data?.receiverCategories ?? NO_CATEGORIES;
-  const standingIndex = data?.standingIndex ?? NO_STANDING_INDEX;
-  const issuerAffiliations = data?.issuerAffiliations ?? NO_AFFILIATIONS;
 
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [historyParams, setHistoryParams] = useUrlParams(HISTORY_FILTER_PARAMS);
@@ -159,6 +146,23 @@ export function Contracts() {
   const tab: 'search' | 'history' = tabId === 'history' ? 'history' : 'search';
   const corpView = tab === 'history' && corpAvailable && scopeParam === 'corp';
   const mode: ContractMode = tabId === 'search/courier' ? 'courier' : 'items';
+  // A `?scope=corp` link names the corp view before the grant is known. Hold that choice
+  // (no Character view, no Character snapshot read) until `granted` resolves.
+  const corpPending = tab === 'history' && scopeParam === 'corp' && granted === undefined;
+  const corpLike = corpView || corpPending;
+  const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
+    loadContractsSnapshot,
+    undefined,
+    { cacheKey: 'contracts', skip: corpLike }
+  );
+
+  const contractsResult = data?.contractsResult ?? null;
+  const contractsNeedsReauth = data?.contractsNeedsReauth ?? false;
+  const contractsTruncated = data?.contractsTruncated ?? false;
+  const issuerNames = data?.issuerNames ?? NO_NAMES;
+  const receiverCategories = data?.receiverCategories ?? NO_CATEGORIES;
+  const standingIndex = data?.standingIndex ?? NO_STANDING_INDEX;
+  const issuerAffiliations = data?.issuerAffiliations ?? NO_AFFILIATIONS;
   const selectTab = useCallback(
     (next: string) => {
       if (next === 'search/items' || next === 'search/courier') {
@@ -247,7 +251,7 @@ export function Contracts() {
       <PageHeader
         title={t('contracts.title')}
         meta={
-          corpView ? undefined : tab === 'history' ? (
+          corpLike ? undefined : tab === 'history' ? (
             contractsResult ? (
               <DataAgeBadge date={contractsResult.fetchedAt} />
             ) : undefined
@@ -256,7 +260,7 @@ export function Contracts() {
           ) : undefined
         }
         actions={
-          corpView ? undefined : tab === 'history' ? (
+          corpLike ? undefined : tab === 'history' ? (
             <>
               <TableActionsMenu
                 name={t('contracts.title')}
@@ -317,7 +321,7 @@ export function Contracts() {
           >
             <CorpContractsView />
           </Suspense>
-        ) : loading && !data ? (
+        ) : corpPending || (loading && !data) ? (
           <div className="flex justify-center py-16">
             <Spinner label={t('common.loading')} />
           </div>
@@ -372,7 +376,7 @@ export function Contracts() {
         )}
       </TabPanel>
 
-      {tab === 'history' && !corpView && selectedContract && activeCharacterId !== null && (
+      {tab === 'history' && !corpLike && selectedContract && activeCharacterId !== null && (
         <ContractDetailModal
           characterId={activeCharacterId}
           contract={selectedContract}

@@ -281,6 +281,7 @@ const pilotStatsCache = createTtlCache<PilotStatsParse>({
 /** Test seam: forget every cached pilot and corporation. */
 export function resetPilotStatsCache(): void {
   pilotStatsCache.clear();
+  statsFetchedAt.clear();
   failureReasons.clear();
 }
 
@@ -293,15 +294,51 @@ export function resetPilotStatsCache(): void {
  * a failure never is reused.
  */
 async function fetchEntityStats(entity: StatsEntity, id: number): Promise<PilotStatsResult> {
+  return (await fetchEntityStatsRead(entity, id)).result;
+}
+
+/** A stats answer plus when it was read and whether this call reused a cached read. */
+export interface PilotStatsRead {
+  result: PilotStatsResult;
+  fetchedAt: Date;
+  fromCache: boolean;
+}
+
+/** When each cached stats answer was actually fetched, keyed like `pilotStatsCache`. */
+const statsFetchedAt = new Map<string, number>();
+
+async function fetchEntityStatsRead(entity: StatsEntity, id: number): Promise<PilotStatsRead> {
   const key = `${entity}:${id}`;
+  let ranHere = false;
   const parsed = await pilotStatsCache.get(key, () =>
     guarded(key, async () => {
+      ranHere = true;
       const result = await zkillJson(`https://zkillboard.com/api/stats/${entity}/${id}/`);
       if (!result.ok) return settle(key, null, result.reason);
-      return settle(key, parsePilotStats(result.body), 'parse');
+      const value = settle(key, parsePilotStats(result.body), 'parse');
+      if (value !== null) {
+        statsFetchedAt.delete(key);
+        statsFetchedAt.set(key, Date.now());
+        if (statsFetchedAt.size > 500) {
+          const oldest = statsFetchedAt.keys().next().value;
+          if (oldest !== undefined) statsFetchedAt.delete(oldest);
+        }
+      }
+      return value;
     })
   );
-  return parsed ?? { kind: 'failed', reason: failureReason(key) };
+  if (parsed === null) {
+    return {
+      result: { kind: 'failed', reason: failureReason(key) },
+      fetchedAt: new Date(),
+      fromCache: false,
+    };
+  }
+  return {
+    result: parsed,
+    fetchedAt: new Date(statsFetchedAt.get(key) ?? Date.now()),
+    fromCache: !ranHere,
+  };
 }
 
 /** A pilot's zKillboard stats, for Pilot Lookup and the Show Info Character tab. */
@@ -317,6 +354,11 @@ export function fetchAllianceStats(allianceId: number): Promise<PilotStatsResult
 /** A corporation's zKillboard stats, for the Show Info Corporation tab. */
 export function fetchCorporationStats(corporationId: number): Promise<PilotStatsResult> {
   return fetchEntityStats('corporationID', corporationId);
+}
+
+/** Like `fetchCorporationStats`, with the read time and whether the cache answered. */
+export function fetchCorporationStatsRead(corporationId: number): Promise<PilotStatsRead> {
+  return fetchEntityStatsRead('corporationID', corporationId);
 }
 
 /** How many of a pilot's most recent kills and losses Pilot Lookup lists. */

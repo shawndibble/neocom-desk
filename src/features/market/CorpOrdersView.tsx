@@ -25,7 +25,7 @@ import { useOpenOrderTableColumns } from './openOrdersTableColumns';
 import { PageHeaderPortals } from './PageHeaderPortals';
 import type { PageHeaderSlots } from './pageHeaderSlots';
 
-/** The corp view's own columns beyond the fixed three: price, remaining, expiry. */
+/** The corp view's own columns beyond the Item column: price, remaining, expiry. */
 const CORP_OPTIONAL_COLUMNS = ['price', 'remaining', 'expires'] as const;
 const CORP_SORT = { columnId: 'iskTiedUp', direction: 'desc' } as const;
 const SEARCH_PARAM = textParam();
@@ -61,6 +61,7 @@ export function CorpOrdersView({ headerSlots }: { headerSlots: PageHeaderSlots }
   const { columns: baseColumns } = useOpenOrderTableColumns({
     showCharacter: false,
     visible: CORP_OPTIONAL_COLUMNS,
+    workThrough: false,
   });
   const columns = useMemo<DataTableColumn<OpenOrderRow>[]>(() => {
     const issuedByColumn: DataTableColumn<OpenOrderRow> = {

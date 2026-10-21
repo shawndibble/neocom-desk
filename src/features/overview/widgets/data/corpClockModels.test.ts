@@ -149,6 +149,7 @@ describe('corpDeadlines', () => {
           unanchorsAtMs: null,
           // 40 blocks an hour: 6 hours left.
           bay: { fuelBlocks: 240, strontium: 400 },
+          bayReadAtMs: NOW,
         },
       ],
       typeNames: new Map([[12235, 'Caldari Control Tower']]),
@@ -166,6 +167,46 @@ describe('corpDeadlines', () => {
 
     const waiting = corpDeadlines({ ...base, corpStarbases: loading<CorpStarbasesFeed>() }, ctx);
     expect(waiting.status.loading).toBe(true);
+  });
+
+  it('surfaces a failed starbase read like any other failed feed', () => {
+    const base: Feeds = {
+      structures: structuresFeed([structure({ fuelExpiresMs: NOW + 5 * HOUR })]),
+      moonChunks: moonFeed([]),
+      corpJobs: jobsFeed([]),
+    };
+    const failedTowers: FeedState<CorpStarbasesFeed> = { data: null, error: true, loading: false };
+    // Partial data still drawn, failure flagged.
+    const partial = corpDeadlines({ ...base, corpStarbases: failedTowers }, ctx);
+    expect(partial.number.value).toBe('1');
+    expect(partial.status.error).toBe(true);
+    // Nothing else readable: the failure is the answer.
+    const none = corpDeadlines(
+      {
+        structures: ok({ ...structuresFeed([]).data!, structures: null }),
+        moonChunks: ok({ ...moonFeed([]).data!, chunks: null }),
+        corpJobs: ok({ ...jobsFeed([]).data!, readable: false }),
+        corpStarbases: failedTowers,
+      },
+      ctx
+    );
+    expect(none.status.error).toBe(true);
+  });
+
+  it('flags any failed feed the same way while still drawing the rest', () => {
+    const failed = { data: null, error: true, loading: false };
+    const view = corpDeadlines(
+      {
+        structures: failed as Feeds['structures'],
+        moonChunks: moonFeed([]),
+        corpJobs: jobsFeed([
+          job({ status: 'ready', end_date: new Date(NOW - HOUR).toISOString() }),
+        ]),
+      },
+      ctx
+    );
+    expect(view.number.value).toBe('1');
+    expect(view.status.error).toBe(true);
   });
 
   it('is not blocked by a starbase read this Character may not make', () => {
