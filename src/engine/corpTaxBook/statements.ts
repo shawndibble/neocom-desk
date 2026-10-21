@@ -105,6 +105,32 @@ export interface Statement {
   amount: number;
 }
 
+/**
+ * The rate an issued day shows (D22). Each of its lines was billed at its own
+ * rate (a rate fix lands on later lines only), so the day shows one rate only
+ * when its lines share it, else the rate they came to (tax ÷ value) with no
+ * effective-from. `fallback` stands in for a line that carries no rate.
+ */
+export function frozenDayRate(
+  lines: readonly Pick<StatementLine, 'taxPct' | 'rateEffectiveFrom' | 'estimatedValue' | 'tax'>[],
+  fallback: { taxPct: number; rateEffectiveFrom?: string }
+): { taxPct: number; rateEffectiveFrom?: string } {
+  const first = lines[0];
+  const pcts = new Set(lines.map((l) => l.taxPct ?? fallback.taxPct));
+  if (pcts.size <= 1) {
+    const rateEffectiveFrom = first?.rateEffectiveFrom ?? fallback.rateEffectiveFrom;
+    return {
+      taxPct: first?.taxPct ?? fallback.taxPct,
+      ...(rateEffectiveFrom !== undefined ? { rateEffectiveFrom } : {}),
+    };
+  }
+  const value = lines.reduce((sum, l) => sum + l.estimatedValue, 0);
+  const tax = lines.reduce((sum, l) => sum + l.tax, 0);
+  return {
+    taxPct: value > 0 ? Math.round((tax / value) * 100 * 1e4) / 1e4 : fallback.taxPct,
+  };
+}
+
 /** Late ore on a paid Statement's day — logged, never billed (D22). */
 export interface WrittenOffOre {
   reason: 'recorded-after-payment';

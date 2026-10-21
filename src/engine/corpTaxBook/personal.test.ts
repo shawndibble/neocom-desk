@@ -721,6 +721,20 @@ describe('overlayCorpBooks: the miner side of a refinery book', () => {
     expect(out.rows.every((r) => r.dispute === undefined)).toBe(true);
   });
 
+  it('bills nothing for a moon owner row outside its coverage (#4618)', () => {
+    const OWNER = 98000077;
+    const out = overlay(
+      [entry({ oreLines: [{ typeId: ZEO, quantity: 30_000 }] })],
+      [
+        book({
+          observed: [refinery(1000, 10_000, OWNER), refinery(2000, 20_000)],
+          feeders: [{ corporationId: OWNER, coveragePeriods: [{ from: '2026-10-18' }] }],
+        }),
+      ]
+    );
+    expect(out.rows.map((r) => r.structureId)).toEqual([2000]);
+  });
+
   it('prices each refinery line at its own per-feeder rate', () => {
     const out = overlay(
       [entry({ oreLines: [{ typeId: ZEO, quantity: 30_000 }] })],
