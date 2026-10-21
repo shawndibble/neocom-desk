@@ -2,7 +2,8 @@
  * The scopes the Corp Tax Book sync grant asks for (ADR 0025). Kept apart from
  * `esi/scopes` on purpose, like `alertsScope.ts`: it is never part of a device
  * login's grant, so no Permission group may list it. The server checks the token
- * for exactly this set (`functions/src/corpSyncScopes.ts`; a test pins the two).
+ * for this set (`functions/src/corpSyncScopes.ts`; a test pins the two). A moon owner grant
+ * from before #4654 carries the mining scope only and is still accepted.
  */
 export const CORP_SYNC_SCOPES = [
   'esi-industry.read_corporation_mining.v1',
