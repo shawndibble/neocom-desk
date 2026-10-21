@@ -36,8 +36,18 @@ export function isNetworkFailure(error: unknown): boolean {
 }
 
 /**
+ * A dead SSO grant (revoked or expired refresh token) is the player's state,
+ * not a fault: the app already asks them to log in again. Matched by shape,
+ * like `isNetworkFailure`, so this module imports nothing from `auth`.
+ */
+function isDeadGrant(error: unknown): boolean {
+  const { name, code } = (error ?? {}) as { name?: unknown; code?: unknown };
+  return name === 'AuthError' && code === 'invalid_grant';
+}
+
+/**
  * Report an unexpected sync/esi/auth/backup failure to Sentry. Skips network
- * failures and repeats of a message already sent this window. The message and
+ * failures, dead SSO grants and repeats of a message already sent this window. The message and
  * stack go through `scrubEvent` (`beforeSend`); only the subsystem is tagged —
  * never a token, email or character name.
  */
@@ -46,7 +56,7 @@ export function reportFailure(
   error: unknown,
   now: number = Date.now()
 ): void {
-  if (isNetworkFailure(error)) return;
+  if (isNetworkFailure(error) || isDeadGrant(error)) return;
   const message = error instanceof Error ? error.message : String(error);
   const key = `${subsystem}:${message}`;
   const last = lastReported.get(key);

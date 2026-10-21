@@ -30,6 +30,15 @@ describe('reportFailure', () => {
     expect(captureException).not.toHaveBeenCalled();
   });
 
+  it('skips a dead SSO grant, but not other token endpoint failures', () => {
+    const authError = (code: string) =>
+      Object.assign(new Error(`${code}: x`), { name: 'AuthError', code });
+    reportFailure('sync', authError('invalid_grant'));
+    expect(captureException).not.toHaveBeenCalled();
+    reportFailure('sync', authError('unknown_error'));
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
   it('dedupes a repeated message inside the window, reports again after it', () => {
     reportFailure('sync', new Error('same'), 1_000);
     reportFailure('sync', new Error('same'), 2_000);
