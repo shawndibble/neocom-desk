@@ -764,6 +764,12 @@ export const ESI_REGISTRY = {
     scope: 'esi-contracts.read_corporation_contracts.v1',
     group: 'corp',
   },
+  /** One corp contract's items, read when a row is opened; same scope as the list. */
+  getCorporationContractItems: {
+    route: '/corporations/{corporation_id}/contracts/{contract_id}/items',
+    scope: 'esi-contracts.read_corporation_contracts.v1',
+    group: 'corp',
+  },
   /**
    * Customs offices (issue #4611): Director-only per `x-required-roles`
    * (`canReadCustomsOffices`); the scope is additive (`corpScopes.ts`).

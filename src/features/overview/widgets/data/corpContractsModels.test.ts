@@ -50,6 +50,13 @@ describe('corpContracts', () => {
     expect(view.emptyMessage).toBe('overview.board.corpUnreadable');
   });
 
+  it('links its title to the Contracts page Corp view', () => {
+    expect(corpContracts(feed([contract(1)]), ctx).to).toBe('/contracts/history?scope=corp');
+    expect(corpContracts(feed([], { readable: false }), ctx).to).toBe(
+      '/contracts/history?scope=corp'
+    );
+  });
+
   it('counts outstanding, flags expiring soon and totals courier collateral', () => {
     const view = corpContracts(
       feed([

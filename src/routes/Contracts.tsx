@@ -1,5 +1,5 @@
 import { NO_AFFILIATIONS, NO_NAMES } from '@/lib/emptyCollections';
-import { useCallback, useDeferredValue, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +12,7 @@ import {
   IconButton,
   PageHeader,
   Panel,
+  SegmentedControl,
   Spinner,
   Tabs,
   TabPanel,
@@ -45,12 +46,22 @@ import { contractsCsvColumns } from '@/features/character/contractsCsv';
 import type { Contract } from '@/esi/endpoints';
 import { useRememberedPageTab } from '@/lib/usePageTab';
 import { useContractSearchMode } from '@/features/contractSearch/contractSearchModePref';
-import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { useUrlParam, useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { optionalEnumParam, textParam } from '@/lib/urlState';
+import { useGrantedScopes } from '@/app/useGrantedScopes';
+import { ESI_REGISTRY } from '@/esi/registry';
 import { CONTRACTS_TABS } from '@/app/pageTabs';
 import { ContractsHistoryTable } from '@/features/contracts/ContractsHistoryTable';
 import { useContractsHistoryColumns } from '@/features/contracts/useContractsHistoryColumns';
 import { loadContractsSnapshot } from '@/features/contracts/contractsSnapshot';
+
+/** The corp view is its own chunk: its reads and loaders are for the pilots who can use them. */
+const CorpContractsView = lazy(() =>
+  import('@/features/contracts/CorpContractsView').then((m) => ({ default: m.CorpContractsView }))
+);
+const CORP_CONTRACTS_SCOPE = ESI_REGISTRY.getCorporationContracts.scope;
+/** `?scope=corp` on History: the corporation's contracts. Absent is the Character's own (ADR 0015). */
+const SCOPE_PARAM = optionalEnumParam(['corp'] as const);
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_CATEGORIES: ReadonlyMap<number, NameCategory> = new Map();
@@ -140,7 +151,13 @@ export function Contracts() {
    */
   const [tabId, setTabId] = useRememberedPageTab(CONTRACTS_TABS, rememberedTab);
   const tabsId = useTabsId();
+  // Hide, don't lock: no Corp choice for a Character without the grant. ESI asks for no
+  // in-game role on this read, so the scope alone is the gate (decision 20261020-215532).
+  const granted = useGrantedScopes();
+  const [scopeParam, setScopeParam] = useUrlParam('scope', SCOPE_PARAM);
+  const corpAvailable = granted?.includes(CORP_CONTRACTS_SCOPE) ?? false;
   const tab: 'search' | 'history' = tabId === 'history' ? 'history' : 'search';
+  const corpView = tab === 'history' && corpAvailable && scopeParam === 'corp';
   const mode: ContractMode = tabId === 'search/courier' ? 'courier' : 'items';
   const selectTab = useCallback(
     (next: string) => {
@@ -230,7 +247,7 @@ export function Contracts() {
       <PageHeader
         title={t('contracts.title')}
         meta={
-          tab === 'history' ? (
+          corpView ? undefined : tab === 'history' ? (
             contractsResult ? (
               <DataAgeBadge date={contractsResult.fetchedAt} />
             ) : undefined
@@ -239,7 +256,7 @@ export function Contracts() {
           ) : undefined
         }
         actions={
-          tab === 'history' ? (
+          corpView ? undefined : tab === 'history' ? (
             <>
               <TableActionsMenu
                 name={t('contracts.title')}
@@ -277,8 +294,29 @@ export function Contracts() {
         {/* Switched outside the history chain below, not inside it: Search needs
           neither this character's contracts nor its `contracts` scope, so a
           character with an empty history or a 403 must still reach it. */}
+        {tab === 'history' && corpAvailable && (
+          <SegmentedControl
+            label={t('contracts.scopeLabel')}
+            value={scopeParam ?? 'character'}
+            onChange={(next) => setScopeParam(next === 'corp' ? 'corp' : null)}
+            options={[
+              { value: 'character', label: t('contracts.characterScope') },
+              { value: 'corp', label: t('contracts.corpScope') },
+            ]}
+          />
+        )}
         {tab === 'search' ? (
           <ContractSearchPanel mode={mode} onStatusChange={setSearchStatus} />
+        ) : corpView ? (
+          <Suspense
+            fallback={
+              <div className="flex justify-center py-16">
+                <Spinner label={t('common.loading')} />
+              </div>
+            }
+          >
+            <CorpContractsView />
+          </Suspense>
         ) : loading && !data ? (
           <div className="flex justify-center py-16">
             <Spinner label={t('common.loading')} />
@@ -334,7 +372,7 @@ export function Contracts() {
         )}
       </TabPanel>
 
-      {tab === 'history' && selectedContract && activeCharacterId !== null && (
+      {tab === 'history' && !corpView && selectedContract && activeCharacterId !== null && (
         <ContractDetailModal
           characterId={activeCharacterId}
           contract={selectedContract}

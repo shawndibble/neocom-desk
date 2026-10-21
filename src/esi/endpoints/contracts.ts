@@ -97,6 +97,22 @@ export function getCharacterContractItems(
   });
 }
 
+// --- GET /corporations/{corporation_id}/contracts/{contract_id}/items (esi-contracts.read_corporation_contracts.v1) ---
+
+/** One corp contract's item lines; read only when its row is opened. Same shape as the character route's. */
+export function getCorporationContractItems(
+  characterId: number,
+  corporationId: number,
+  contractId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<ContractItem[]>> {
+  return esiFetch<ContractItem[]>(`/corporations/${corporationId}/contracts/${contractId}/items`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationContractItems',
+  });
+}
+
 // --- GET /contracts/public/items/{contract_id} (public) ---
 
 /**
