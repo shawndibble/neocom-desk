@@ -1,4 +1,3 @@
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -6,17 +5,13 @@ import {
   Caret,
   Checkbox,
   Disclosure,
-  FilterChip,
   Modal,
   IskInput,
   TextInput,
-  Tooltip,
   textActionClassName,
 } from '@/components/ui';
 import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
-import * as Icon from '@/components/ui/icons';
 import type { MiningTaxAssignmentRecord, MiningTaxPaymentMethod } from '@/db';
-import { writeToClipboard } from '@/lib/clipboard';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatLocalDate } from '@/lib/localDate';
@@ -24,7 +19,8 @@ import { unmaskNumber } from '@/lib/numberMask';
 import { buildSettleUpReason, formatDateRange } from './groupRows';
 import { settle, type PaymentInput } from './ledgerActions';
 import { systemLabel } from './names';
-import { PayeeOpenInEveButton } from './PayeeOpenInEveButton';
+import { SETTLE_FIELD_LABEL, useCopiedField } from './settleUpFields';
+import { SettleCopyRow, SettleSentOnAndMethod } from './SettleUpParts';
 import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
@@ -58,15 +54,11 @@ interface SettleUpDialogProps {
   arrivalCheck?: SettleUpRecheck;
 }
 
-const METHODS: readonly MiningTaxPaymentMethod[] = ['donation', 'contract', 'other'];
-
 /** The summary line's date span, in the same EVE `YYYY-MM-DD` form as every other date on the page. */
 function shortEveRange(sortedDates: readonly string[]): string {
   if (sortedDates.length === 0) return '';
   return formatDateRange([sortedDates[0], sortedDates[sortedDates.length - 1]]);
 }
-
-const FIELD_LABEL = eyebrowClassName;
 
 /**
  * Settle up (issue #523's lump-sum payment flow), on one screen: the itemized
@@ -98,7 +90,7 @@ export function SettleUpDialog({
   const [paidOn, setPaidOn] = useState(() => formatLocalDate(new Date()));
   const [method, setMethod] = useState<MiningTaxPaymentMethod>('donation');
   const [contractId, setContractId] = useState('');
-  const [copied, setCopied] = useState<string | null>(null);
+  const { copied, copy } = useCopiedField();
   const { pending: saving, error: saveError, run } = useLedgerAction();
   // "Sent a different amount?": the ids ticked when it opened, which each new
   // figure re-allocates over (and closing it restores). `null` while closed.
@@ -174,15 +166,6 @@ export function SettleUpDialog({
     tickOnly(differentBase, allocateOldestFirst(pool, amount).coveredIds);
   }
 
-  async function copy(kind: string, text: string) {
-    try {
-      await writeToClipboard(text);
-      setCopied(kind);
-    } catch {
-      setCopied(null);
-    }
-  }
-
   function paymentInput(): PaymentInput {
     const trimmed = contractId.trim();
     const parsedContract = Number(trimmed);
@@ -224,33 +207,15 @@ export function SettleUpDialog({
     dim = false,
     openInEve?: { name: string; entityId?: number; payeeId?: string }
   ) => (
-    <div key={key} className="flex min-w-0 items-center gap-2 px-2 py-1.5">
-      <span className={cx(FIELD_LABEL, 'w-14 shrink-0')}>{label}</span>
-      <Tooltip content={value}>
-        <span
-          className={cx(
-            'min-w-0 flex-1 truncate text-xs tabular-nums',
-            dim ? 'text-text-dim' : 'font-semibold'
-          )}
-        >
-          {value}
-        </span>
-      </Tooltip>
-      {openInEve && <PayeeOpenInEveButton {...openInEve} />}
-      <Button
-        size="sm"
-        className="shrink-0"
-        onClick={() => void copy(key, copyText)}
-        aria-label={t('miningTax.settleUp.copyNamed', { what: label })}
-      >
-        {copied === key ? (
-          <Icon.Done size={Icon.ICON_SIZE.sm} />
-        ) : (
-          <Icon.CopyToClipboard size={Icon.ICON_SIZE.sm} />
-        )}
-        {copied === key ? t('miningTax.settleUpCopied') : t('miningTax.settleUpCopy')}
-      </Button>
-    </div>
+    <SettleCopyRow
+      key={key}
+      label={label}
+      value={value}
+      copied={copied === key}
+      onCopy={() => void copy(key, copyText)}
+      dim={dim}
+      openInEve={openInEve}
+    />
   );
 
   // What the "Sent a different amount?" figure does to the ticked entries.
@@ -403,46 +368,28 @@ export function SettleUpDialog({
           )}
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-          <div className="space-y-1 sm:w-36 sm:shrink-0">
-            <p className={FIELD_LABEL}>{t('miningTax.settleUpPaidOnLabel')}</p>
-            <TextInput
-              type="date"
-              value={paidOn}
-              onChange={(e) => setPaidOn(e.target.value)}
-              aria-label={t('miningTax.settleUpPaidOnLabel')}
-              className="w-full"
-            />
-          </div>
-          <div className="min-w-0 space-y-1 sm:flex-1">
-            <p className={FIELD_LABEL}>{t('miningTax.settleUpMethodLabel')}</p>
-            <div className="flex gap-1.5">
-              {METHODS.map((m) => (
-                <FilterChip
-                  key={m}
-                  label={t(`miningTax.settleUpMethod.${m}`)}
-                  selected={method === m}
-                  onToggle={() => setMethod(m)}
-                  className="flex-1 justify-center"
+        <SettleSentOnAndMethod
+          paidOn={paidOn}
+          onPaidOn={setPaidOn}
+          method={method}
+          onMethod={setMethod}
+          extra={
+            method === 'contract' ? (
+              <div className="space-y-1 sm:w-32 sm:shrink-0">
+                <p className={SETTLE_FIELD_LABEL}>{t('miningTax.settleUpContractIdLabel')}</p>
+                <TextInput
+                  type="text"
+                  inputMode="numeric"
+                  value={contractId}
+                  onChange={(e) => setContractId(e.target.value)}
+                  placeholder={t('miningTax.settleUpContractIdPlaceholder')}
+                  aria-label={t('miningTax.settleUpContractIdLabel')}
+                  className="w-full"
                 />
-              ))}
-            </div>
-          </div>
-          {method === 'contract' && (
-            <div className="space-y-1 sm:w-32 sm:shrink-0">
-              <p className={FIELD_LABEL}>{t('miningTax.settleUpContractIdLabel')}</p>
-              <TextInput
-                type="text"
-                inputMode="numeric"
-                value={contractId}
-                onChange={(e) => setContractId(e.target.value)}
-                placeholder={t('miningTax.settleUpContractIdPlaceholder')}
-                aria-label={t('miningTax.settleUpContractIdLabel')}
-                className="w-full"
-              />
-            </div>
-          )}
-        </div>
+              </div>
+            ) : null
+          }
+        />
 
         <p className="text-xs text-text-dim">
           {t('miningTax.settleUp.hint')}

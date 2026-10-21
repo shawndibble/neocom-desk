@@ -19,6 +19,8 @@ const setFeederMode = vi.fn();
 const createFeederInvite = vi.fn();
 const listFeederInvites = vi.fn();
 const revokeFeederInvite = vi.fn();
+const recordFeederPayout = vi.fn();
+const markFeederPayout = vi.fn();
 vi.mock('../taxBook/feederClient', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../taxBook/feederClient')>()),
   setFeederRate: (...a: unknown[]) => setFeederRate(...a),
@@ -26,6 +28,8 @@ vi.mock('../taxBook/feederClient', async (importOriginal) => ({
   createFeederInvite: (...a: unknown[]) => createFeederInvite(...a),
   listFeederInvites: (...a: unknown[]) => listFeederInvites(...a),
   revokeFeederInvite: (...a: unknown[]) => revokeFeederInvite(...a),
+  recordFeederPayout: (...a: unknown[]) => recordFeederPayout(...a),
+  markFeederPayout: (...a: unknown[]) => markFeederPayout(...a),
 }));
 
 const BOOK = 98000000;
@@ -63,7 +67,7 @@ function order() {
 }
 
 describe('MoonOwnersTable', () => {
-  it('sorts on every numeric column and offers no Pay button yet', async () => {
+  it('sorts on every numeric column and offers no Pay button without a payer', async () => {
     render(
       <MoonOwnersTable
         rows={ROWS}
@@ -203,6 +207,8 @@ beforeEach(() => {
   createFeederInvite.mockReset().mockResolvedValue({ code: 'abcdefghij', inviteId: 'inv1' });
   listFeederInvites.mockReset().mockResolvedValue([]);
   revokeFeederInvite.mockReset().mockResolvedValue({ revoked: true });
+  recordFeederPayout.mockReset().mockResolvedValue({ id: 'new' });
+  markFeederPayout.mockReset().mockResolvedValue({ ok: true });
 });
 
 describe('MoonOwnersTab', () => {
@@ -322,5 +328,148 @@ describe('InviteMoonOwnerDialog', () => {
       await screen.findByRole('button', { name: /Revoke the link made 18 Oct/ })
     );
     expect(revokeFeederInvite).toHaveBeenCalledWith(7, BOOK, 'inv9');
+  });
+});
+
+const paid = (id: string, amount: number, over: Partial<BookFeeder['payouts'][number]> = {}) => ({
+  id,
+  date: '2026-10-10',
+  amount,
+  method: 'donation' as const,
+  status: 'matched' as const,
+  notAPayout: false,
+  ...over,
+});
+
+describe('Paying a moon owner', () => {
+  it('lists the pay list by what is owed and offers Pay… only where something is', async () => {
+    renderBook(<MoonOwnersTab />, [
+      // 1000 ore at 100 ISK: 8% is 8,000 less 7,000 paid = 1,000 owed.
+      feeder(ASH, { agreedRatePct: 8, payouts: [paid('a', 7000)] }),
+      // 500 ore at 100 ISK, 4%: 2,000 owed, so it leads.
+      feeder(CIN, { agreedRatePct: 4 }),
+    ]);
+    const table = screen.getByRole('table', { name: 'Moon owners' });
+    const names = within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .map((r) => /Ashfall Mining|Cinder Reach/.exec(r.textContent ?? '')?.[0]);
+    expect(names).toEqual(['Cinder Reach', 'Ashfall Mining']);
+    expect(within(table).getAllByRole('button', { name: /^Pay / })).toHaveLength(2);
+  });
+
+  it('has no Pay… for a moon owner with no rate or settled otherwise', () => {
+    renderBook(<MoonOwnersTab />, [
+      feeder(ASH),
+      feeder(CIN, {
+        agreedRatePct: 4,
+        mode: 'settled-otherwise',
+        modeChanges: [{ from: '2026-10-01', mode: 'settled-otherwise' }],
+      }),
+    ]);
+    expect(screen.queryByRole('button', { name: /^Pay / })).toBeNull();
+  });
+
+  it('records the whole balance from the table row without opening the page', async () => {
+    const { reload } = renderBook(<MoonOwnersTab />, [feeder(ASH, { agreedRatePct: 8 })]);
+    await userEvent.click(screen.getByRole('button', { name: 'Pay Ashfall Mining' }));
+    const dialog = screen.getByRole('dialog', { name: 'Pay Ashfall Mining' });
+    expect(within(dialog).getByText('8,000 ISK')).toBeInTheDocument();
+    expect(
+      within(dialog).getByText('Moon mining payout, 2026-10-05 to 2026-10-05')
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText(/Owed to them 8,000 → 0\./)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: "I've sent it" }));
+    expect(recordFeederPayout).toHaveBeenCalledWith(7, BOOK, ASH, {
+      amount: 8000,
+      date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      method: 'donation',
+    });
+    expect(reload).toHaveBeenCalled();
+  });
+
+  it('never says the rate or margin in the reason, nor feeder or collector anywhere', async () => {
+    renderBook(<MoonOwnersTab />, [feeder(ASH, { agreedRatePct: 8 })]);
+    await userEvent.click(screen.getByRole('button', { name: 'Pay Ashfall Mining' }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.textContent).not.toMatch(/8%|margin|feeder|collector/i);
+  });
+
+  it('records a different amount and shows what is left', async () => {
+    renderBook(<MoonOwnersTab />, [feeder(ASH, { agreedRatePct: 8 })]);
+    await userEvent.click(screen.getByRole('button', { name: 'Pay Ashfall Mining' }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Sent a different amount?' }));
+    await userEvent.type(within(dialog).getByLabelText('Amount you sent'), '3000');
+    expect(within(dialog).getByText(/Owed to them 8,000 → 5,000\./)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: "I've sent it" }));
+    expect(recordFeederPayout).toHaveBeenCalledWith(
+      7,
+      BOOK,
+      ASH,
+      expect.objectContaining({ amount: 3000 })
+    );
+  });
+
+  it('shows an overpayment as credit', async () => {
+    renderBook(<MoonOwnersTab />, [feeder(ASH, { agreedRatePct: 8 })]);
+    await userEvent.click(screen.getByRole('button', { name: 'Pay Ashfall Mining' }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Sent a different amount?' }));
+    await userEvent.type(within(dialog).getByLabelText('Amount you sent'), '9000');
+    expect(within(dialog).getByText(/→ credit of 1,000\./)).toBeInTheDocument();
+  });
+
+  it('adds a payment by hand from the moon owner page', async () => {
+    renderBook(
+      <MoonOwnerDetail id={String(ASH)} />,
+      [feeder(ASH, { agreedRatePct: 8 })],
+      `/corp/moons/moon-owners/${ASH}`
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Add a payment…' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: "I've sent it" })).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText('Amount you sent'), '1234');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Other' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: "I've sent it" }));
+    expect(recordFeederPayout).toHaveBeenCalledWith(
+      7,
+      BOOK,
+      ASH,
+      expect.objectContaining({ amount: 1234, method: 'other' })
+    );
+  });
+
+  it('pays from the moon owner page too', async () => {
+    renderBook(
+      <MoonOwnerDetail id={String(ASH)} />,
+      [feeder(ASH, { agreedRatePct: 8 })],
+      `/corp/moons/moon-owners/${ASH}`
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Pay…' }));
+    await userEvent.click(screen.getByRole('button', { name: "I've sent it" }));
+    expect(recordFeederPayout).toHaveBeenCalledWith(
+      7,
+      BOOK,
+      ASH,
+      expect.objectContaining({ amount: 8000 })
+    );
+  });
+
+  it('marks a detected payment not a payout, and counts it again', async () => {
+    renderBook(
+      <MoonOwnerDetail id={String(ASH)} />,
+      [
+        feeder(ASH, {
+          agreedRatePct: 8,
+          payouts: [paid('p1', 1000), paid('p2', 500, { notAPayout: true })],
+        }),
+      ],
+      `/corp/moons/moon-owners/${ASH}`
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Not a payout' }));
+    expect(markFeederPayout).toHaveBeenCalledWith(7, BOOK, ASH, 'p1', true);
+    await userEvent.click(screen.getByRole('button', { name: 'Count it' }));
+    expect(markFeederPayout).toHaveBeenCalledWith(7, BOOK, ASH, 'p2', false);
   });
 });
