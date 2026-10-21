@@ -284,4 +284,11 @@ describe('the real en.json against the real sources', () => {
     const shellBytes = JSON.stringify(plan.shell).length;
     expect(shellBytes / JSON.stringify(en).length).toBeLessThan(0.3);
   });
+
+  it('keeps the Corp overview widget builders, and so their copy, out of the startup graph', () => {
+    const corpBuilders = [...startup].filter((file) =>
+      /\/widgets\/data\/corp[A-Z]\w*Models\.ts$/.test(file)
+    );
+    expect(corpBuilders).toEqual([]);
+  });
 });

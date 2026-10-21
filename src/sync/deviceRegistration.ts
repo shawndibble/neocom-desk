@@ -23,6 +23,7 @@ import type { ProjectionRow } from '@/engine/projection';
 import { getFirebaseApp, getSyncFunctions } from './firebaseApp';
 import { getDeviceId } from './deviceId';
 import { readLocal, removeLocal, writeLocal } from '@/lib/safeLocalStorage';
+import type { QuietHoursPayload } from '@/features/notifications/quietTime';
 
 interface RegisterDeviceResponse {
   deviceId: string;
@@ -109,7 +110,8 @@ function registrationFingerprint(
   fcmToken: string,
   characterIds: readonly number[],
   projectionsByCharacter: ReadonlyMap<number, readonly ProjectionRow[]>,
-  eveTypesByCharacter: ReadonlyMap<number, readonly string[]>
+  eveTypesByCharacter: ReadonlyMap<number, readonly string[]>,
+  quietHours: QuietHoursPayload | null
 ): string {
   const characters = [...characterIds]
     .sort((a, b) => a - b)
@@ -129,7 +131,7 @@ function registrationFingerprint(
         ]),
       [...(eveTypesByCharacter.get(characterId) ?? NO_EVE_TYPES)].sort(),
     ]);
-  return digest(JSON.stringify([getDeviceId(), fcmToken, characters]));
+  return digest(JSON.stringify([getDeviceId(), fcmToken, characters, quietHours]));
 }
 
 /**
@@ -155,6 +157,13 @@ export interface RegisterDeviceOptions {
    * toggle is never skipped.
    */
   eveTypesByCharacter?: ReadonlyMap<number, readonly string[]>;
+  /**
+   * This device's quiet time (issue #4566), enforced by the server when it
+   * pushes. `null` (the default) sends no window, which clears a stored one.
+   * Part of the fingerprint, so changing it is never skipped. An older
+   * deployed function ignores the field.
+   */
+  quietHours?: QuietHoursPayload | null;
 }
 
 /**
@@ -175,7 +184,11 @@ export async function registerDeviceForWebPush(
   vapidKey: string,
   serviceWorkerRegistration: ServiceWorkerRegistration,
   projectionsByCharacter: ReadonlyMap<number, readonly ProjectionRow[]> = new Map(),
-  { skipIfUnchanged = false, eveTypesByCharacter = new Map() }: RegisterDeviceOptions = {}
+  {
+    skipIfUnchanged = false,
+    eveTypesByCharacter = new Map(),
+    quietHours = null,
+  }: RegisterDeviceOptions = {}
 ): Promise<RegisterDeviceResponse | null> {
   // Checked before `getToken`: a late rebuild on an emptied roster (after
   // Remove / Log out) must not mint a fresh FCM token just to discard it.
@@ -197,7 +210,8 @@ export async function registerDeviceForWebPush(
     fcmToken,
     characters.map((character) => character.characterId),
     projectionsByCharacter,
-    eveTypesByCharacter
+    eveTypesByCharacter,
+    quietHours
   );
   const now = Date.now();
   if (skipIfUnchanged) {
@@ -233,6 +247,7 @@ export async function registerDeviceForWebPush(
         projectionRows: readonly ProjectionRow[];
         eveTypes: readonly string[];
       }[];
+      quietHours: QuietHoursPayload | null;
     },
     RegisterDeviceResponse
   >(getSyncFunctions(), 'registerDevice');
@@ -249,6 +264,7 @@ export async function registerDeviceForWebPush(
     const result = await call({
       deviceId: getDeviceId(),
       fcmToken,
+      quietHours,
       characters: withAccessTokens.map((character) => ({
         ...character,
         projectionRows: projectionsByCharacter.get(character.characterId) ?? NO_PROJECTION_ROWS,

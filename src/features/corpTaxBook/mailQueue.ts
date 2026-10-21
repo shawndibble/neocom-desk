@@ -7,12 +7,18 @@
 import {
   isAlreadyQueued,
   reminderAllowed,
+  removalMailsToDrop,
   retryItem,
+  stampRemovalEffectiveAt,
   type MailKind,
   type MailQueueItem,
 } from '@/engine/corpTaxBook/mailQueue';
+import { composeRateChangeMail } from '@/engine/corpTaxBook/ownerRateMail';
+import { composePayeeChangeMail } from '@/engine/corpTaxBook/payeeChange';
+import type { OwnerRateChange } from '@/engine/corpTaxBook/ownerRate';
 import { composeStatementMail, type StatementMailInput } from '@/engine/corpTaxBook/statementMail';
-import { addToQueue, listQueue, nextOrder, saveItem } from './mailQueueStore';
+import { db } from '@/db';
+import { addToQueue, listQueue, nextOrder, saveItem, saveItems } from './mailQueueStore';
 
 /** What the queue needs to mail one Miner their Statement. */
 export interface StatementToMail extends Omit<
@@ -145,7 +151,172 @@ export async function enqueueReminder(
   return { ok: true, batchId, queued: added.length, skipped: skipped.length, missingLink };
 }
 
+export interface RemovalMailsInput {
+  corporationId: number;
+  feederCorporationId: number;
+  /** The officer's character the mail goes from. */
+  senderCharacterId: number;
+  kind: 'removal' | 'removalCancelled';
+  /** `startsClock`: a copy to the moon owner's CEO or payee (a removal notice only). */
+  recipients: readonly { id: number; name: string; startsClock?: boolean }[];
+  mail: { subject: string; body: string };
+  /** The removal a notice belongs to (`startedAt`); the queue re-checks it before sending (#4621). */
+  removalStartedAt?: number;
+}
+
+/**
+ * Queues the removal notice (or its cancellation) once per recipient. The queue sends them
+ * paced like any other mail; the first copy to the moon owner side starts the removal's 24 hours.
+ */
+export async function enqueueRemovalMails(input: RemovalMailsInput): Promise<number> {
+  const batchId = crypto.randomUUID();
+  const start = await nextOrder();
+  const stamp = Date.now();
+  const items: MailQueueItem[] = input.recipients.map((r, i) => ({
+    id: crypto.randomUUID(),
+    batchId,
+    corporationId: input.corporationId,
+    feederCorporationId: input.feederCorporationId,
+    statementId: `${input.kind}:${input.feederCorporationId}:${stamp}:${r.id}`,
+    kind: input.kind,
+    senderCharacterId: input.senderCharacterId,
+    recipientId: r.id,
+    recipientName: r.name,
+    ...(r.startsClock === undefined ? {} : { startsClock: r.startsClock }),
+    ...(input.removalStartedAt === undefined ? {} : { removalStartedAt: input.removalStartedAt }),
+    amount: 0,
+    subject: input.mail.subject,
+    body: input.mail.body,
+    order: start + i,
+    status: 'waiting',
+    createdAt: stamp,
+    attempts: 0,
+  }));
+  const { added } = await addToQueue(items);
+  return added.length;
+}
+
+/** A cancelled removal: its notices still waiting (or failed, awaiting Retry) never go out. */
+export async function dropRemovalMails(
+  corporationId: number,
+  feederCorporationId: number
+): Promise<void> {
+  const ids = removalMailsToDrop(await listQueue(), corporationId, feederCorporationId);
+  if (ids.length > 0) await db.corpMailQueue.bulkDelete(ids);
+}
+
+/** The removal's clock started: every copy still to send states that recorded time. */
+export async function stampRemovalMails(
+  corporationId: number,
+  feederCorporationId: number,
+  effectiveAt: number
+): Promise<void> {
+  const stamped = stampRemovalEffectiveAt(
+    await listQueue(),
+    corporationId,
+    feederCorporationId,
+    effectiveAt
+  );
+  if (stamped.length > 0) await saveItems(stamped);
+}
+
 /** Puts a failed mail back at the end of the line. */
 export async function retryMail(item: MailQueueItem): Promise<void> {
   await saveItem(retryItem(item, await nextOrder()));
+}
+
+/**
+ * Queues the short "your rate changed" mail, one per recipient. Never throws
+ * into the rate change: the caller has already saved it. A mail already queued
+ * for the same change and recipient is not queued twice.
+ */
+export async function enqueueRateChangeMail(input: {
+  corporationId: number;
+  accountingCorporationName: string;
+  senderCharacterId: number;
+  feederCorporationId: number;
+  change: OwnerRateChange;
+  recipients: readonly { id: number; name: string }[];
+}): Promise<{ queued: number }> {
+  const batchId = crypto.randomUUID();
+  const start = await nextOrder();
+  // The change is the edit that made it: 8% → 6% → 8% on one day is three mails, not two.
+  const { change } = input;
+  const event = change.recordedAt ?? `${change.date}:${change.newPct}`;
+  const items: MailQueueItem[] = input.recipients.map((r, i) => {
+    const mail = composeRateChangeMail({
+      accountingCorporationName: input.accountingCorporationName,
+      recipientName: r.name,
+      change: input.change,
+    });
+    return {
+      id: crypto.randomUUID(),
+      batchId,
+      corporationId: input.corporationId,
+      statementId: `rate:${input.feederCorporationId}:${event}:${r.id}`,
+      kind: 'rate-change',
+      senderCharacterId: input.senderCharacterId,
+      recipientId: r.id,
+      recipientName: r.name,
+      amount: 0,
+      subject: mail.subject,
+      body: mail.body,
+      order: start + i,
+      status: 'waiting',
+      createdAt: Date.now(),
+      attempts: 0,
+    };
+  });
+  const { added } = await addToQueue(items);
+  return { queued: added.length };
+}
+
+/**
+ * Queues the short "payments now go to" mail (#4653), one per recipient. Never throws into the
+ * payee change: the caller has already saved it. One change (`at`) is mailed once per recipient.
+ */
+export async function enqueuePayeeChangeMail(input: {
+  corporationId: number;
+  senderCharacterId: number;
+  feederCorporationId: number;
+  /** When the change was made (ms): one mail per change and recipient. */
+  at: number;
+  /** UTC day of the change. */
+  date: string;
+  changedByName: string;
+  moonOwnerName: string;
+  payeeName: string;
+  recipients: readonly { id: number; name: string }[];
+}): Promise<{ queued: number }> {
+  const batchId = crypto.randomUUID();
+  const start = await nextOrder();
+  const items: MailQueueItem[] = input.recipients.map((r, i) => {
+    const mail = composePayeeChangeMail({
+      recipientName: r.name,
+      changedByName: input.changedByName,
+      moonOwnerName: input.moonOwnerName,
+      payeeName: input.payeeName,
+      date: input.date,
+    });
+    return {
+      id: crypto.randomUUID(),
+      batchId,
+      corporationId: input.corporationId,
+      feederCorporationId: input.feederCorporationId,
+      statementId: `payee:${input.feederCorporationId}:${input.at}:${r.id}`,
+      kind: 'payee-change',
+      senderCharacterId: input.senderCharacterId,
+      recipientId: r.id,
+      recipientName: r.name,
+      amount: 0,
+      subject: mail.subject,
+      body: mail.body,
+      order: start + i,
+      status: 'waiting',
+      createdAt: Date.now(),
+      attempts: 0,
+    };
+  });
+  const { added } = await addToQueue(items);
+  return { queued: added.length };
 }

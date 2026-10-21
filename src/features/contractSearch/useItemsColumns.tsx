@@ -3,6 +3,7 @@
  * `ContractSearchPanel`. Also hands back the two cell helpers the panel's
  * detail modal and jumps readout share.
  */
+import { formatCount } from '@/lib/formatCount';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, type DataTableColumn } from '@/components/ui';
@@ -82,7 +83,7 @@ export function useItemsColumns({
    */
   const plexAskLabel = useCallback(
     (row: PublicContractOfferRow): string => {
-      const plex = (row.requestedPlex ?? 0).toLocaleString();
+      const plex = formatCount(row.requestedPlex ?? 0);
       return row.price > 0
         ? t('contractSearch.iskPlusPlexPrice', {
             isk: formatIskAuto(row.price, CONTRACT_ISK_CENTS_BELOW),
@@ -103,7 +104,7 @@ export function useItemsColumns({
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => row.quantity,
-        render: (row) => row.quantity.toLocaleString(),
+        render: (row) => formatCount(row.quantity),
         // The dense phone card has no header row, and a bare "12" beside a
         // system name says nothing about what it counts.
         stackAffix: { before: t('contractSearch.mobile.qtyAffix') },
@@ -140,7 +141,7 @@ export function useItemsColumns({
                   // since the contract itself asks for PLEX, not that much ISK.
                   <span className="block text-[0.625rem] text-text-dim">
                     {t('contractSearch.includesPlex', {
-                      plex: row.requestedPlex.toLocaleString(),
+                      plex: formatCount(row.requestedPlex),
                     })}
                   </span>
                 )
@@ -176,7 +177,7 @@ export function useItemsColumns({
           return (
             <>
               {/* Plain: the row opens the contract modal, which carries the system link. */}
-              <span className={entityLinkClassName()}>{location.systemName}</span>
+              <span>{location.systemName}</span>
               {location.security !== null && (
                 <>
                   {' '}

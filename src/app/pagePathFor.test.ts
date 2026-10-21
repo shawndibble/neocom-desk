@@ -29,6 +29,10 @@ describe('pagePathFor', () => {
     expect(pagePathFor('/industry/groups/g1')).toBe('/industry/groups/:groupId');
   });
 
+  it("never reports a removal link's code", () => {
+    expect(pagePathFor('/corp-tax-book/remove-now/abcDEF123_-xyz')).toBe('/*');
+  });
+
   it("never reports a verify link's token, the only secret keeping a Statement private", () => {
     expect(pagePathFor('/corp-tax-book/verify/abcDEF123_-xyz')).toBe('/*');
   });

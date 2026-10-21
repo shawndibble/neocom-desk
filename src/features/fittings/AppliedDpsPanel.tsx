@@ -34,6 +34,7 @@ import { STAT_FIELD_WIDTH } from './statKit';
 import { TargetProfilePicker } from './TargetProfilePicker';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
+import { fixed1 } from '@/lib/fixedFormat';
 
 const AppliedDpsChart = lazy(() => guarded(() => import('./AppliedDpsChart')));
 
@@ -142,9 +143,9 @@ export function AppliedDpsPanel({
     const read = (inputs: AppliedDpsInputs) => {
       const atRange = bestRange(appliedDpsVsRange(inputs, target, maxRange));
       return {
-        raw: rawDps(inputs).toFixed(1),
+        raw: fixed1(rawDps(inputs)),
         applied: t('fittings.appliedDps.appliedValue', {
-          value: appliedDps(inputs, target, atRange).toFixed(1),
+          value: fixed1(appliedDps(inputs, target, atRange)),
           km: kmValue(atRange),
         }),
       };

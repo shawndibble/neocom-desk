@@ -1,3 +1,4 @@
+import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { useCallback } from 'react';
@@ -320,5 +321,5 @@ async function hubRouteFigures(
 }
 
 function shownSecurityText(security: number): string {
-  return shownSecurity(security).toFixed(1);
+  return fixed1(shownSecurity(security));
 }

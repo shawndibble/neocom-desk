@@ -17,7 +17,8 @@ import {
   readCachedEntries,
   writeCachedMany,
 } from '@/esi/cache';
-import { fetchAggregates, type HubAggregate } from './fuzzwork';
+import type { HubAggregate } from './fuzzwork';
+import { fetchAggregatesWithFallback, resetPriceFallback } from './priceFallback';
 import { fetchAdjustedPrices, type AdjustedPrice } from './esiPrices';
 import type { TradeHub } from './hubs';
 
@@ -36,6 +37,12 @@ const NULL_AGGREGATE: HubAggregate = Object.freeze({
   buyVolume: 0,
 });
 
+/** An aggregate and whether it is yesterday's close (R2) rather than a live book. */
+interface PricedAggregate {
+  value: HubAggregate;
+  stale: boolean;
+}
+
 interface CacheEntry<V> {
   value: V;
   expiresAt: number;
@@ -51,7 +58,7 @@ let adjustedPriceCache: CacheEntry<Map<number, AdjustedPrice>> | null = null;
  * Per (station, type) fetches in flight. Resolves to the aggregate, or `null`
  * when the fetch failed (the caller serves a null aggregate, nothing cached).
  */
-const hubPricesInFlight = new Map<string, Promise<HubAggregate | null>>();
+const hubPricesInFlight = new Map<string, Promise<PricedAggregate | null>>();
 let adjustedPricesInFlight: Promise<Map<number, AdjustedPrice>> | null = null;
 /** Lapsed copy handed to `allowStale` callers while the refresh runs. */
 let adjustedStaleServed: Map<number, AdjustedPrice> | null = null;
@@ -115,6 +122,7 @@ export function clearMarketPriceCache(): void {
   regionSellInFlight.clear();
   adjustedPriceCache = null;
   hubPricesInFlight.clear();
+  resetPriceFallback();
   adjustedPricesInFlight = null;
   adjustedStaleServed = null;
   persistedBypass.clear();
@@ -155,9 +163,19 @@ export function invalidateHubPrices(stationId: number, typeIds: readonly number[
 export async function getStationPrices(
   stationId: number,
   typeIds: number[],
-  now: Clock = Date.now
+  now: Clock = Date.now,
+  options: PriceOptions = {}
 ): Promise<Map<number, HubAggregate>> {
-  return (await getStationPricesWithStatus(stationId, typeIds, now)).prices;
+  return (await getStationPricesWithStatus(stationId, typeIds, now, options)).prices;
+}
+
+export interface PriceOptions {
+  /**
+   * Accept yesterday's close when no live source answers (default true). A
+   * caller that compares a price with a live order, such as an alert or an
+   * undercut check, passes false: a stale type then reads as unreachable.
+   */
+  allowStale?: boolean;
 }
 
 /** A price lookup plus whether the price source could not be reached for it. */
@@ -169,6 +187,11 @@ export interface PricesWithStatus {
    * caller show "prices unavailable" rather than "no orders" / "0 ISK".
    */
   unreachable: boolean;
+  /**
+   * True when a price is yesterday's close from the daily open prices, served
+   * because no live source answered. Never cached, so the next ask retries.
+   */
+  stale: boolean;
 }
 
 /**
@@ -179,11 +202,23 @@ export interface PricesWithStatus {
 export async function getStationPricesWithStatus(
   stationId: number,
   typeIds: number[],
-  now: Clock = Date.now
+  now: Clock = Date.now,
+  { allowStale = true }: PriceOptions = {}
 ): Promise<PricesWithStatus> {
   const result = new Map<number, HubAggregate>();
   let unreachable = false;
+  let stale = false;
   const nowMs = now();
+
+  const take = (typeId: number, priced: PricedAggregate | null): void => {
+    if (!priced || (priced.stale && !allowStale)) {
+      unreachable = true;
+      result.set(typeId, NULL_AGGREGATE);
+      return;
+    }
+    if (priced.stale) stale = true;
+    result.set(typeId, priced.value);
+  };
 
   const readMemory = (typeId: number): boolean => {
     const cached = hubPriceCache.get(hubCacheKey(stationId, typeId));
@@ -193,7 +228,7 @@ export async function getStationPricesWithStatus(
   };
 
   const notInMemory = typeIds.filter((typeId) => !readMemory(typeId));
-  if (notInMemory.length === 0) return { prices: result, unreachable };
+  if (notInMemory.length === 0) return { prices: result, unreachable, stale };
 
   // A reload inside the TTL: the rows the last session wrote.
   const generation = persistedGeneration;
@@ -216,12 +251,7 @@ export async function getStationPricesWithStatus(
     if (readMemory(typeId)) continue;
     const inFlight = hubPricesInFlight.get(hubCacheKey(stationId, typeId));
     if (inFlight) {
-      pending.push(
-        inFlight.then((value) => {
-          if (!value) unreachable = true;
-          result.set(typeId, value ?? NULL_AGGREGATE);
-        })
-      );
+      pending.push(inFlight.then((priced) => take(typeId, priced)));
     } else {
       toFetch.push(typeId);
     }
@@ -232,57 +262,60 @@ export async function getStationPricesWithStatus(
     for (const typeId of toFetch) {
       const key = hubCacheKey(stationId, typeId);
       const perType = batch.then((fetched) =>
-        fetched ? (fetched.get(typeId) ?? NULL_AGGREGATE) : null
+        fetched ? (fetched.get(typeId) ?? { value: NULL_AGGREGATE, stale: false }) : null
       );
       hubPricesInFlight.set(key, perType);
       void perType.finally(() => {
         if (hubPricesInFlight.get(key) === perType) hubPricesInFlight.delete(key);
       });
-      pending.push(
-        perType.then((value) => {
-          if (!value) unreachable = true;
-          result.set(typeId, value ?? NULL_AGGREGATE);
-        })
-      );
+      pending.push(perType.then((priced) => take(typeId, priced)));
     }
   }
 
   await Promise.all(pending);
-  return { prices: result, unreachable };
+  return { prices: result, unreachable, stale };
 }
 
 /**
- * One Fuzzwork lookup, cached in both tiers on success. Never rejects: `null`
- * means Fuzzwork was unreachable, and then nothing is cached, so the next
- * refresh (open or manual button) retries instead of pinning "no price" for
- * the rest of the TTL.
+ * One price lookup (Fuzzwork, then the fallback chain), cached in both tiers
+ * on success. Never rejects: `null` means no source answered, and then nothing
+ * is cached, so the next refresh (open or manual button) retries instead of
+ * pinning "no price" for the rest of the TTL. A type served from yesterday's
+ * close is flagged `stale` and left out of both caches for the same reason.
  */
 async function fetchHubPrices(
   stationId: number,
   typeIds: number[],
   nowMs: number
-): Promise<Map<number, HubAggregate> | null> {
+): Promise<Map<number, PricedAggregate> | null> {
   const generation = persistedGeneration;
-  let fetched: Map<number, HubAggregate>;
+  let fetched: Awaited<ReturnType<typeof fetchAggregatesWithFallback>>;
   try {
     // Chunked internally; a failure partway through discards earlier
     // batches too. Acceptable: the retry re-fetches everything, nothing gets
     // cached as a false "no price".
-    fetched = await fetchAggregates(stationId, typeIds);
+    fetched = await fetchAggregatesWithFallback(stationId, typeIds);
   } catch {
     return null;
   }
-  if (generation !== persistedGeneration) return fetched;
-  const rows: Array<readonly [string, HubAggregate]> = [];
+  const priced = new Map<number, PricedAggregate>();
   for (const typeId of typeIds) {
+    priced.set(typeId, {
+      value: fetched.prices.get(typeId) ?? NULL_AGGREGATE,
+      stale: fetched.stale.has(typeId),
+    });
+  }
+  if (generation !== persistedGeneration) return priced;
+  const rows: Array<readonly [string, HubAggregate]> = [];
+  for (const [typeId, { value, stale }] of priced) {
+    if (stale) continue;
     const key = hubCacheKey(stationId, typeId);
-    const value = fetched.get(typeId) ?? NULL_AGGREGATE;
     hubPriceCache.set(key, { value, expiresAt: nowMs + HUB_PRICE_TTL_MS });
     persistedBypass.delete(key);
     rows.push([key, value]);
   }
   persist(rows, nowMs);
-  return fetched;
+  return priced;
 }
 
 /**
@@ -292,18 +325,20 @@ async function fetchHubPrices(
 export async function getHubPrices(
   hub: TradeHub,
   typeIds: number[],
-  now: Clock = Date.now
+  now: Clock = Date.now,
+  options: PriceOptions = {}
 ): Promise<Map<number, HubAggregate>> {
-  return getStationPrices(hub.stationId, typeIds, now);
+  return getStationPrices(hub.stationId, typeIds, now, options);
 }
 
 /** `getHubPrices` with the unreachable flag; see `getStationPricesWithStatus`. */
 export async function getHubPricesWithStatus(
   hub: TradeHub,
   typeIds: number[],
-  now: Clock = Date.now
+  now: Clock = Date.now,
+  options: PriceOptions = {}
 ): Promise<PricesWithStatus> {
-  return getStationPricesWithStatus(hub.stationId, typeIds, now);
+  return getStationPricesWithStatus(hub.stationId, typeIds, now, options);
 }
 
 /**
@@ -331,8 +366,8 @@ export async function getRegionSellPrices(
     else missing.push(typeId);
   }
   if (missing.length > 0) {
-    const fetch = fetchAggregates(regionId, missing, 'region').then(
-      (fetched) => fetched,
+    const fetch = fetchAggregatesWithFallback(regionId, missing, 'region').then(
+      (fetched) => fetched.prices,
       () => null
     );
     for (const typeId of missing) {

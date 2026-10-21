@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   allocatePayments,
   dismissalCredits,
+  isBeforeBook,
   matchDonation,
   settleTolerance,
   type TaxPayment,
@@ -297,5 +298,141 @@ describe('matchDonation', () => {
         { miners, statements: [JUNE], knownCharacterIds: new Set() }
       )
     ).toEqual({ kind: 'unmatched' });
+  });
+});
+
+describe('donations before the book (#4505)', () => {
+  const run = (at: string, extra: Partial<TaxPayment> = {}) =>
+    allocatePayments({
+      statements: [JUNE],
+      payments: [payment('p1', 12_000_000, at, extra)],
+      dismissalCredits: [],
+      startDate: '2026-06-01',
+    });
+
+  it('credits nothing for a donation dated the day before the start date', () => {
+    const result = run('2026-05-31T23:59:59Z');
+    expect(result.byStatement.get('s1')).toMatchObject({ credited: 0, settled: false });
+    expect(result.paymentCredits).toEqual([]);
+    expect(result.credit).toBe(0);
+  });
+
+  it('counts a donation on the start date', () => {
+    expect(run('2026-06-01T00:00:00Z').byStatement.get('s1')?.settled).toBe(true);
+  });
+
+  it('keeps crediting a manual payment dated before the start date', () => {
+    expect(run('2026-05-01T00:00:00Z', { source: 'manual' }).byStatement.get('s1')?.settled).toBe(
+      true
+    );
+  });
+
+  it('re-evaluates when the start date moves later', () => {
+    const input = {
+      statements: [JUNE],
+      payments: [payment('p1', 12_000_000, '2026-06-10T00:00:00Z')],
+      dismissalCredits: [],
+    };
+    expect(allocatePayments({ ...input, startDate: '2026-06-01' }).credit).toBe(2_000_000);
+    expect(allocatePayments({ ...input, startDate: '2026-06-11' }).credit).toBe(0);
+  });
+
+  it('isBeforeBook compares the UTC day', () => {
+    expect(isBeforeBook('2026-05-31T23:59:59Z', '2026-06-01')).toBe(true);
+    expect(isBeforeBook('2026-06-01T00:00:00Z', '2026-06-01')).toBe(false);
+  });
+});
+
+describe('officer write-offs (#4637)', () => {
+  const writeOff = (
+    id: string,
+    amount: number,
+    extra: { statementId?: string; at?: string } = {}
+  ) => ({
+    id,
+    amount,
+    at: extra.at ?? '2026-08-01T00:00:00Z',
+    ...(extra.statementId ? { statementId: extra.statementId } : {}),
+  });
+
+  it('reduces the Statement it names, and only that one; the rest is dropped, never credit', () => {
+    const result = allocatePayments({
+      statements: [JUNE, JULY],
+      payments: [],
+      dismissalCredits: [],
+      officerWriteOffs: [writeOff('w1', 12_000_000, { statementId: 's2' })],
+    });
+    expect(result.byStatement.get('s2')).toMatchObject({
+      forgiven: 8_000_000,
+      remaining: 0,
+      settled: true,
+    });
+    expect(result.byStatement.get('s1')).toMatchObject({ forgiven: 0, remaining: 10_000_000 });
+    expect(result.credit).toBe(0);
+    expect(result.balance).toBe(10_000_000);
+    expect(result.writeOffCredits).toEqual([
+      { writeOffId: 'w1', statementId: 's2', amount: 8_000_000 },
+    ]);
+  });
+
+  it('without a Statement, reduces open Statements oldest first', () => {
+    const result = allocatePayments({
+      statements: [JULY, JUNE],
+      payments: [],
+      dismissalCredits: [],
+      officerWriteOffs: [writeOff('w1', 12_000_000)],
+    });
+    expect(result.byStatement.get('s1')).toMatchObject({ forgiven: 10_000_000, settled: true });
+    expect(result.byStatement.get('s2')).toMatchObject({
+      forgiven: 2_000_000,
+      remaining: 6_000_000,
+      settled: false,
+    });
+    expect(result.balance).toBe(6_000_000);
+  });
+
+  it('applies after payments, so a payment stays on the Statement it paid', () => {
+    const result = allocatePayments({
+      statements: [JUNE, JULY],
+      payments: [payment('p1', 10_000_000, '2026-08-05T00:00:00Z')],
+      dismissalCredits: [],
+      // Recorded before the payment arrived; it still never moves the payment.
+      officerWriteOffs: [writeOff('w1', 9_000_000, { at: '2026-08-01T00:00:00Z' })],
+    });
+    expect(result.paymentCredits).toEqual([
+      { paymentId: 'p1', statementId: 's1', amount: 10_000_000 },
+    ]);
+    expect(result.byStatement.get('s1')).toMatchObject({ forgiven: 0, settled: true });
+    expect(result.byStatement.get('s2')).toMatchObject({ forgiven: 8_000_000, settled: true });
+    expect(result.credit).toBe(0);
+    expect(result.balance).toBe(0);
+  });
+
+  it('forgives nothing on a Statement already paid', () => {
+    const result = allocatePayments({
+      statements: [JUNE],
+      payments: [payment('p1', 10_000_000, '2026-07-05T00:00:00Z')],
+      dismissalCredits: [],
+      officerWriteOffs: [writeOff('w1', 1_000_000, { statementId: 's1' })],
+    });
+    expect(result.byStatement.get('s1')).toMatchObject({ forgiven: 0, settled: true });
+    expect(result.writeOffCredits).toEqual([]);
+    expect(result.credit).toBe(0);
+  });
+
+  it('applies several write-offs in the order they were recorded', () => {
+    const result = allocatePayments({
+      statements: [JUNE],
+      payments: [],
+      dismissalCredits: [],
+      officerWriteOffs: [
+        writeOff('w2', 4_000_000, { at: '2026-08-02T00:00:00Z' }),
+        writeOff('w1', 7_000_000, { at: '2026-08-01T00:00:00Z' }),
+      ],
+    });
+    expect(result.writeOffCredits).toEqual([
+      { writeOffId: 'w1', statementId: 's1', amount: 7_000_000 },
+      { writeOffId: 'w2', statementId: 's1', amount: 3_000_000 },
+    ]);
   });
 });

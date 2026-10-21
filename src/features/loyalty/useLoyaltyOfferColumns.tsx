@@ -1,3 +1,4 @@
+import { fixed1 } from '@/lib/fixedFormat';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, type DataTableColumn } from '@/components/ui';
@@ -10,6 +11,7 @@ import type { LpBasis } from '@/features/loyalty/lpBasis';
 import { LoyaltyItemName } from '@/features/loyalty/OfferDetail';
 import { iskPerLpTone } from '@/features/loyalty/offerRowDisplay';
 import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
+import { formatCount } from '@/lib/formatCount';
 
 /**
  * The offers table's columns: the identity column (never hidden) plus the optional
@@ -65,7 +67,7 @@ export function useLoyaltyOfferColumns({
           if (lpBasis === 'concord' && concordPending) return '—';
           if (lpBasis === 'concord' && !concord) return t('loyaltyStore.noConcordExchange');
           const value = shownIskPerLp(row);
-          return value === null ? '—' : value.toFixed(1);
+          return value === null ? '—' : fixed1(value);
         },
       },
     }),
@@ -91,7 +93,7 @@ export function useLoyaltyOfferColumns({
             )}
           </span>
           <span className="text-[0.6875rem] text-text-dim">
-            {row.offer.lp_cost.toLocaleString()} LP +{' '}
+            {formatCount(row.offer.lp_cost)} LP +{' '}
             <IskAmount value={row.offer.isk_cost} decimals={0} />
           </span>
         </span>

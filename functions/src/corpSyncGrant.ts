@@ -18,16 +18,38 @@ import { SsoRefreshError, type RefreshedTokens } from './alertGrant.js';
 import { decryptRefreshToken, encryptRefreshToken, rotateStoredToken } from './alertGrantCrypto.js';
 import { boundedString, record } from './communities.js';
 import { CORP_SYNC_SCOPES } from './corpSyncScopes.js';
-import { META, decideRoles, parseBookCall, type OfficerAccess } from './corpTaxBook.js';
+import {
+  FEEDER_OF_COLLECTION,
+  META,
+  decideRoles,
+  parseBookCall,
+  type OfficerAccess,
+} from './corpTaxBook.js';
 import {
   SCHEDULED_VIA,
   appendAudit,
   authorizeOfficer,
   bookRef,
+  fail,
+  feederRef,
   type Actor,
   type BookDeps,
   type Caller,
+  type OpenPricesReader,
+  mergeObservedInto,
 } from './corpTaxBookStore.js';
+import { tryRebuildFeederView } from './corpTaxBookFeederView.js';
+import {
+  FeederStorm,
+  READABLE_FEEDER_STATUSES,
+  feedersToRead,
+  outcomeOf,
+  readFeederLedger,
+  recordFeederRead,
+  refreshRefineryStructures,
+  type FeederReadRecord,
+} from './corpTaxBookFeederSync.js';
+import type { FeederRecord } from './corpTaxBookFeeders.js';
 import { runBookSync, type BookSyncResult, type StopReason } from './corpTaxBookScheduledSync.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
@@ -48,6 +70,20 @@ export interface CorpSyncGrantDoc {
   /** The client_id the token was issued to; SSO revoke needs it. */
   clientId: string;
   enabledAt: number;
+  /**
+   * 'feeder' is the second narrow grant kind: a feeder corporation's mining-only
+   * token (FEEDER_SYNC_SCOPES), keyed by the feeder's corporation id. Absent means 'book'.
+   */
+  kind?: 'book' | 'feeder';
+  /** Feeder grants: the signed-in Character who handed it over (the holder above may be their alt). */
+  grantedBy?: number;
+  /** Feeder grants: the Collector whose book the feeder feeds. */
+  collectorCorporationId?: number;
+  /**
+   * Feeder grants: the token also carries `esi-universe.read_structures.v1`, so the sync reads
+   * its refineries' names and systems (#4654). Absent on grants from before: never looked up.
+   */
+  readsStructures?: boolean;
 }
 
 /** `corpTaxBooks/{corp}/meta/scheduledSync`: officers read this, nobody writes it but the functions. */
@@ -81,13 +117,20 @@ export interface CorpSyncDeps {
   refresh: (clientId: string, refreshToken: string) => Promise<RefreshedTokens>;
   revoke: (clientId: string, refreshToken: string) => Promise<void>;
   readIdentity: IdentityReader;
+  /** Prices the moon owner's view, rebuilt after each ledger read (issue #4512). */
+  openPrices?: OpenPricesReader;
+  /**
+   * ESI for a moon owner's last ledger read before its grant is dropped (Leave, a removal
+   * taking effect). Without it the feed ends on the last scheduled read.
+   */
+  esi?: SyncEsi;
   /** Receives only messages and ids — never a token. */
   log: (message: string, data?: Record<string, unknown>) => void;
 }
 
 const PURPOSE = 'corpSyncGrant' as const;
 
-const grantRef = (db: Firestore, corporationId: number) =>
+export const grantRef = (db: Firestore, corporationId: number) =>
   db.collection(CORP_SYNC_GRANTS_COLLECTION).doc(String(corporationId));
 const statusRef = (db: Firestore, corporationId: number) =>
   bookRef(db, corporationId).collection(META).doc(SCHEDULED_SYNC_DOC);
@@ -97,15 +140,8 @@ const bookDeps = (deps: CorpSyncDeps): BookDeps => ({
   now: deps.now,
   verifyToken: deps.verify,
   readIdentity: deps.readIdentity,
+  ...(deps.openPrices ? { openPrices: deps.openPrices } : {}),
 });
-
-function fail(
-  code: ConstructorParameters<typeof HttpsError>[0],
-  message: string,
-  reason: string
-): never {
-  throw new HttpsError(code, message, { reason });
-}
 
 function sameScopes(scopes: readonly string[]): boolean {
   return (
@@ -195,6 +231,9 @@ export async function saveCorpSyncGrant(
   const previous = await deps.db.runTransaction(async (tx) => {
     const ref = grantRef(deps.db, input.corporationId);
     const held = (await tx.get(ref)).data() as CorpSyncGrantDoc | undefined;
+    if (held?.kind === 'feeder') {
+      fail('failed-precondition', 'This corporation feeds another book', 'feeder-grant-exists');
+    }
     const status = statusRef(deps.db, input.corporationId);
     const hadSystemIds = (await tx.get(status)).data()?.systemIds as
       Record<string, number> | undefined;
@@ -250,7 +289,7 @@ async function verifyGrantToken(deps: CorpSyncDeps, accessToken: string): Promis
 }
 
 /** Decrypt and revoke a stored token at SSO (unless it equals `keepToken`). False if it could not be done. */
-async function revokeStored(
+export async function revokeStored(
   deps: CorpSyncDeps,
   doc: CorpSyncGrantDoc,
   keepToken?: string
@@ -360,6 +399,13 @@ export async function deleteCorpSyncGrantsHeldBy(
   let count = 0;
   for (const doc of snap.docs) {
     const grant = doc.data() as CorpSyncGrantDoc;
+    if (grant.kind === 'feeder') {
+      // A feeder grant has no book status or audit entry here: drop the token and revoke it.
+      await doc.ref.delete();
+      await revokeStored(deps, grant);
+      count += 1;
+      continue;
+    }
     const removed = await removeGrant(
       deps,
       grant,
@@ -383,7 +429,18 @@ export interface RunSummary {
   stopped: number;
   /** True when ESI's shared budget made the run stop early. */
   budgetStopped: boolean;
+  /** The feeder pass (#4509): runs after every book, so a feeder never holds one up. */
+  feeders: { read: number; stale: number; skipped: number; disconnected: number };
 }
+
+export interface FeederRunOptions {
+  /** Pause between feeders so a run never bursts at ESI. */
+  gapMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/** Pause between one feeder's pull and the next. */
+export const FEEDER_GAP_MS = 1500;
 
 /**
  * Sync every opted-in corporation's book, one at a time (the ESI error budget is
@@ -391,13 +448,18 @@ export interface RunSummary {
  * A corporation that fails is skipped and tried again next run; a budget hit
  * ends the whole run.
  */
-export async function runScheduledCorpSyncs(deps: CorpSyncDeps, esi: SyncEsi): Promise<RunSummary> {
+export async function runScheduledCorpSyncs(
+  deps: CorpSyncDeps,
+  esi: SyncEsi,
+  feederOptions: FeederRunOptions = {}
+): Promise<RunSummary> {
   const summary: RunSummary = {
     grants: 0,
     synced: 0,
     skipped: 0,
     stopped: 0,
     budgetStopped: false,
+    feeders: { read: 0, stale: 0, skipped: 0, disconnected: 0 },
   };
   const snap = await deps.db.collection(CORP_SYNC_GRANTS_COLLECTION).get();
   summary.grants = snap.size;
@@ -408,6 +470,11 @@ export async function runScheduledCorpSyncs(deps: CorpSyncDeps, esi: SyncEsi): P
       continue;
     }
     const grant = doc.data() as CorpSyncGrantDoc;
+    // A feeder grant is not a book: the feeder pass below reads it.
+    if (grant.kind === 'feeder') {
+      summary.grants -= 1;
+      continue;
+    }
     try {
       const result = await runOne(deps, esi, grant);
       if (result.kind === 'synced') summary.synced += 1;
@@ -425,7 +492,187 @@ export async function runScheduledCorpSyncs(deps: CorpSyncDeps, esi: SyncEsi): P
       });
     }
   }
+  if (!summary.budgetStopped) await runFeederSyncs(deps, esi, summary, feederOptions);
   return summary;
+}
+
+// --- The feeder pass (#4509) ---------------------------------------------------
+
+/**
+ * Read every feeder's ledger, one at a time, after the books. Driven by the
+ * feeder → Collector pointers rather than the grant docs, so a feeder whose token
+ * died (grant doc gone) still ages toward disconnect. One feeder's failure never
+ * touches another or a book.
+ */
+async function runFeederSyncs(
+  deps: CorpSyncDeps,
+  esi: SyncEsi,
+  summary: RunSummary,
+  options: FeederRunOptions
+): Promise<void> {
+  const sleep = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const storm = new FeederStorm();
+  let first = true;
+  for (const { feederCorporationId, collectorCorporationId } of await feedersToRead(
+    deps.db,
+    FEEDER_OF_COLLECTION
+  )) {
+    try {
+      const record = (
+        await feederRef(deps.db, collectorCorporationId, feederCorporationId).get()
+      ).data() as FeederRecord | undefined;
+      if (!record || !READABLE_FEEDER_STATUSES.includes(record.status)) continue;
+      if (!first) await sleep(options.gapMs ?? FEEDER_GAP_MS);
+      first = false;
+      const budgetOut = summary.budgetStopped || esi.budgetLow();
+      const result = await syncOneFeeder(
+        deps,
+        esi,
+        collectorCorporationId,
+        feederCorporationId,
+        storm,
+        budgetOut
+      );
+      if (result.status === 'disconnected') summary.feeders.disconnected += 1;
+      if (result.outcome === 'ok') summary.feeders.read += 1;
+      else if (result.outcome === 'stale') summary.feeders.stale += 1;
+      else summary.feeders.skipped += 1;
+      if (result.budget) summary.budgetStopped = true;
+    } catch (err) {
+      summary.feeders.skipped += 1;
+      deps.log('Scheduled feeder sync failed', {
+        feederCorporationId,
+        collectorCorporationId,
+        error: err instanceof Error ? err.name : 'unknown',
+        ...(err instanceof HttpsError ? { code: err.code } : {}),
+      });
+    }
+  }
+}
+
+interface FeederRunResult {
+  outcome: 'ok' | 'stale' | 'none';
+  status: 'active' | 'disconnected' | null;
+  budget: boolean;
+}
+
+/**
+ * One feeder's pull. The first pull at grant time is this same call (the grant
+ * ticket, #4511, calls `syncOneFeeder`). A refusal keeps the token (a lost
+ * role can come back); a dead token drops it and the feeder stays stale.
+ */
+export async function syncOneFeeder(
+  deps: CorpSyncDeps,
+  esi: SyncEsi,
+  collectorCorporationId: number,
+  feederCorporationId: number,
+  storm: FeederStorm = new FeederStorm(),
+  skipEsi = false
+): Promise<FeederRunResult> {
+  const finish = async (
+    read: FeederReadRecord,
+    budget = false,
+    grant?: CorpSyncGrantDoc
+  ): Promise<FeederRunResult> => {
+    const recorded = await recordFeederRead(
+      bookDeps(deps),
+      collectorCorporationId,
+      feederCorporationId,
+      read
+    );
+    // A skip, or another refusal in a spell already stale, moved nothing the view shows.
+    if (recorded?.viewChanged) {
+      await tryRebuildFeederView(bookDeps(deps), collectorCorporationId, feederCorporationId);
+    }
+    const status = recorded?.status ?? null;
+    // At 30 days stale the feeder disconnects; its token has no further use.
+    if (status === 'disconnected' && grant) await dropFeederGrant(deps, grant);
+    return { outcome: read.outcome, status, budget };
+  };
+
+  const grantSnap = await grantRef(deps.db, feederCorporationId).get();
+  const grant = grantSnap.data() as CorpSyncGrantDoc | undefined;
+  if (!grant || grant.kind !== 'feeder') return finish({ outcome: 'stale', reason: 'no-grant' });
+  if (skipEsi || storm.tripped) {
+    return finish(
+      { outcome: 'none', reason: skipEsi ? 'esi-budget' : 'esi-backoff' },
+      skipEsi,
+      grant
+    );
+  }
+
+  const refreshed = await refreshGrant(deps, grant);
+  if (refreshed.kind === 'skip') {
+    return finish({ outcome: 'none', reason: 'esi-unavailable' }, false, grant);
+  }
+  if (refreshed.kind === 'dead' || refreshed.kind === 'unreadable') {
+    // A dead or unreadable token cannot be sent to SSO to revoke.
+    await dropFeederGrant(deps, grant, false);
+    return finish({
+      outcome: 'stale',
+      reason: refreshed.kind === 'dead' ? 'token-revoked' : 'grant-unreadable',
+    });
+  }
+
+  // SSO rotated the token: later writes guard on, and revoke, the rotated one.
+  const live = refreshed.grant;
+  const read = await readFeederLedger(esi, feederCorporationId, refreshed.accessToken);
+  const outcome = outcomeOf(read);
+  storm.record(outcome);
+  if (read.kind === 'refused') return finish({ outcome, reason: 'esi-refused' }, false, live);
+  if (read.kind === 'budget') return finish({ outcome, reason: 'esi-budget' }, true, live);
+  if (read.kind === 'unavailable') {
+    return finish({ outcome, reason: 'esi-unavailable' }, false, live);
+  }
+
+  // A revoke or replacement that landed during the (slow) reads must not leave this token writing.
+  const latest = (await grantRef(deps.db, feederCorporationId).get()).data() as
+    CorpSyncGrantDoc | undefined;
+  const feederNow = (
+    await feederRef(deps.db, collectorCorporationId, feederCorporationId).get()
+  ).data() as FeederRecord | undefined;
+  if (
+    latest?.encryptedRefreshToken !== live.encryptedRefreshToken ||
+    !feederNow ||
+    !READABLE_FEEDER_STATUSES.includes(feederNow.status)
+  ) {
+    return finish({ outcome: 'none', reason: 'esi-unavailable' }, false, live);
+  }
+  await mergeObservedInto(bookDeps(deps), collectorCorporationId, read.rows);
+  // Refinery names and systems (#4654): best effort, never part of the feeder's health.
+  try {
+    await refreshRefineryStructures(
+      bookDeps(deps),
+      esi,
+      collectorCorporationId,
+      feederCorporationId,
+      read.rows.map((r) => r.structureId),
+      refreshed.accessToken,
+      live.readsStructures === true
+    );
+  } catch (err) {
+    deps.log('Refinery structure lookup failed', {
+      feederCorporationId,
+      error: err instanceof Error ? err.name : 'unknown',
+    });
+  }
+  return finish({ outcome, refineries: read.refineries }, false, live);
+}
+
+/** Delete a feeder's token doc, guarded on the stored token, and revoke it at SSO unless it is dead. */
+async function dropFeederGrant(
+  deps: CorpSyncDeps,
+  grant: CorpSyncGrantDoc,
+  revoke = true
+): Promise<void> {
+  const removed = await deps.db.runTransaction(async (tx) => {
+    const ref = grantRef(deps.db, grant.corporationId);
+    const held = (await tx.get(ref)).data() as CorpSyncGrantDoc | undefined;
+    if (!held || held.encryptedRefreshToken !== grant.encryptedRefreshToken) return false;
+    tx.delete(ref);
+    return true;
+  });
+  if (removed && revoke) await revokeStored(deps, grant);
 }
 
 type RefreshOutcome =
@@ -466,16 +713,51 @@ async function refreshGrant(deps: CorpSyncDeps, grant: CorpSyncGrantDoc): Promis
   const written = await deps.db.runTransaction(async (tx) => {
     const ref = grantRef(deps.db, grant.corporationId);
     const latest = (await tx.get(ref)).data() as CorpSyncGrantDoc | undefined;
-    if (latest?.encryptedRefreshToken !== grant.encryptedRefreshToken) return false;
+    if (latest?.encryptedRefreshToken !== grant.encryptedRefreshToken) return latest ?? null;
     tx.update(ref, { encryptedRefreshToken: rotated });
     return true;
   });
-  if (!written) return { kind: 'skip' };
+  if (written !== true) {
+    // A re-grant, revoke or leave replaced the grant mid-refresh: the rotated token is live at
+    // SSO and stored nowhere, so it goes too, unless the grant now holds that very token.
+    await revokeUnlessHeld(deps, grant, tokens.refreshToken, written ?? undefined);
+    return { kind: 'skip' };
+  }
   return {
     kind: 'ok',
     accessToken: tokens.accessToken,
     grant: { ...grant, encryptedRefreshToken: rotated },
   };
+}
+
+/** Revoke `token` at SSO unless `held` stores it (best effort; never logs the token). */
+async function revokeUnlessHeld(
+  deps: CorpSyncDeps,
+  grant: CorpSyncGrantDoc,
+  token: string,
+  held: CorpSyncGrantDoc | undefined
+): Promise<void> {
+  if (held) {
+    try {
+      const stored = decryptRefreshToken(
+        held.encryptedRefreshToken,
+        held.characterId,
+        deps.key(),
+        PURPOSE
+      );
+      if (stored === token) return;
+    } catch {
+      // Unreadable: it cannot be this token.
+    }
+  }
+  try {
+    await deps.revoke(grant.clientId, token);
+  } catch (err) {
+    deps.log('Corp sync grant token revoke failed', {
+      corporationId: grant.corporationId,
+      error: err instanceof Error ? err.message : 'unknown',
+    });
+  }
 }
 
 async function runOne(

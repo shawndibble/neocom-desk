@@ -82,6 +82,7 @@ const fakeEsi = (): SyncEsi => ({
   ),
   journal: async () => (esiState.calls.push('journal'), esiState.journal as never),
   structureSystem: async () => (esiState.calls.push('system'), esiState.structureSystem),
+  structure: async () => (esiState.calls.push('structure'), { kind: 'unavailable' }),
   budgetLow: () => esiState.low,
 });
 
@@ -505,6 +506,27 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
       expect(
         (await audit()).some((a) => a.action === 'assignPayment' && a.via === 'scheduled sync')
       ).toBe(true);
+    });
+
+    it('syncs a book with no refineries of its own once it has moon owners (#4616)', async () => {
+      esiState.observers = ok([]);
+      await optIn(ACCOUNTANT);
+      expect((await runScheduledCorpSyncs(syncDeps(), fakeEsi())).skipped).toBe(1);
+      expect((await status())?.lastRun).toMatchObject({ reason: 'no-refineries' });
+
+      await book()
+        .collection('feeders')
+        .doc('98000002')
+        .set({
+          corporationId: 98000002,
+          status: 'active',
+          coveragePeriods: [{ from: '2026-10-01' }],
+        });
+      now = T0 + 3_600_000;
+      expect((await runScheduledCorpSyncs(syncDeps(), fakeEsi())).synced).toBe(1);
+      expect((await book().get()).data()?.lastSync).toMatchObject({ at: now, scheduled: true });
+      expect((await book().collection('payments').doc('j1_1').get()).exists).toBe(true);
+      expect(esiState.calls).not.toContain('ledger');
     });
 
     it('reads no extractions for an Accountant without Station_Manager, and still syncs', async () => {

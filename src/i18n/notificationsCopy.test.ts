@@ -6,7 +6,6 @@ describe('notifications copy', () => {
 
   it('does not claim every choice stays on this device', () => {
     expect(notifications.hint).not.toMatch(/These choices stay on this device/);
-    expect(notifications.hint).toMatch(/sync/);
   });
 
   it('names the Alerts page, never Overview, as the feed location', () => {

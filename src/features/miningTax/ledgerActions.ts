@@ -20,6 +20,7 @@
 import {
   db,
   type MiningTaxAssignmentRecord,
+  type MiningTaxOreLine,
   type MiningTaxPaymentLinkSource,
   type PayeeRecord,
 } from '@/db';
@@ -35,6 +36,9 @@ import {
   markAssignmentsPaid,
   moveAssignmentsToPayee,
   planNeedsReviewResolution,
+  loadReleasePrices,
+  releaseOreFromAssignment,
+  type ReleasePrices,
   splitAssignment,
   uncombineAssignments,
   unmarkAssignmentsPaid,
@@ -264,6 +268,23 @@ export function unsettle(
   assignments: readonly MiningTaxAssignmentRecord[]
 ): Promise<LedgerActionResult> {
   return commit(charactersOf(assignments), () => unmarkAssignmentsPaid(assignments));
+}
+
+/** Takes ore off the miner's own Assignments because the corporation bills it (#4517). */
+export async function releaseOre(
+  releases: readonly { assignment: MiningTaxAssignmentRecord; after: MiningTaxOreLine[] }[]
+): Promise<LedgerActionResult> {
+  // Priced before the write: pricing reads market data outside the ledger's transaction.
+  let priced: ReleasePrices[];
+  try {
+    priced = await Promise.all(releases.map((r) => loadReleasePrices(r.assignment, r.after)));
+  } catch (cause) {
+    return failure(cause);
+  }
+  return commit(charactersOf(releases.map((r) => r.assignment)), async () => {
+    for (const [i, r] of releases.entries())
+      await releaseOreFromAssignment(r.assignment, r.after, priced[i]!);
+  });
 }
 
 /** Splits part of one assigned day over to a second Payee. */

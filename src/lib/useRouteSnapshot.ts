@@ -79,6 +79,12 @@ export interface RouteSnapshotOptions {
    * previous one's rows.
    */
   staleWhileRevalidate?: boolean;
+  /**
+   * Run no load at all while true: no fetch, `loading` stays true. For a view
+   * that decides, from something still resolving, that it needs another
+   * loader's data instead of this one. The load starts the moment it flips false.
+   */
+  skip?: boolean;
 }
 
 export interface RouteSnapshot<T> {
@@ -128,6 +134,7 @@ export function useRouteSnapshot<T>(
 ): RouteSnapshot<T> {
   const staleWhileRevalidate = options?.staleWhileRevalidate ?? false;
   const cacheKey = options?.cacheKey;
+  const skip = options?.skip ?? false;
   const storeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const storeHydrated = useActiveCharacter((state) => state.hydrated);
   const activeCharacterId = propCharacterId ?? storeCharacterId;
@@ -218,7 +225,7 @@ export function useRouteSnapshot<T>(
 
   const { characterId, epoch } = lifecycle;
   useEffect(() => {
-    if (characterId === null) return;
+    if (characterId === null || skip) return;
     const signal: RouteSnapshotSignal<T> = {
       cancelled: false,
       publish(partial) {
@@ -273,7 +280,7 @@ export function useRouteSnapshot<T>(
     // declaration for why that distinction is what keeps the view from
     // blinking. `staleWhileRevalidate` is a primitive, stable per call site —
     // safe to depend on directly rather than routing it through a ref.
-  }, [characterId, epoch, revalidation, staleWhileRevalidate, cacheKey]);
+  }, [characterId, epoch, revalidation, staleWhileRevalidate, cacheKey, skip]);
 
   const current = snapshot?.epoch === epoch ? snapshot : null;
 

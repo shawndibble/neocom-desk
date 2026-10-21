@@ -12,6 +12,7 @@
  * a tap on the link navigates, so touch-and-hold stays the way to read it
  * (see `Tooltip`).
  */
+import { formatCount } from '@/lib/formatCount';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -63,7 +64,7 @@ export function JournalDescriptionCell({
   const reasonIsTaxLink = Boolean(miningTaxHref && entry.reason && !kills);
   const fill = transaction
     ? t(transaction.is_buy ? 'wallet.journalItemBought' : 'wallet.journalItemSold', {
-        quantity: transaction.quantity.toLocaleString(),
+        quantity: formatCount(transaction.quantity),
         unitPrice: formatIsk(transaction.unit_price, 2),
         total: formatIsk(Math.abs(transactionTotal(transaction)), 2),
       })
@@ -109,7 +110,7 @@ export function JournalDescriptionCell({
             <TypeIcon typeId={transaction.type_id} size={32} className="h-4 w-4 shrink-0" />
             <span>
               {itemName}
-              <span className="text-text-dim"> ×{transaction.quantity.toLocaleString()}</span>
+              <span className="text-text-dim"> ×{formatCount(transaction.quantity)}</span>
             </span>
           </ItemInfoLink>
         </Tooltip>

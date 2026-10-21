@@ -41,6 +41,17 @@
  * route offers the filter, a second, separate avatar had nothing left to
  * say. At `md` the trigger is the usual text button, at its tier's height;
  * there is room for the words there.
+ *
+ * `corporation` adds a third option, "Corporation", for a page that has a corp
+ * view of the same data (Market orders, Contracts): that view is a choice on
+ * this picker, not a separate switch. It emits `'corporation'`
+ * (`CharacterScopeChoice`, which widens `CharacterFilterValue` without
+ * changing it), and the phone trigger shows the `Corporation` glyph for it.
+ * `hideAll` drops "All characters" for a page that cannot sum Characters.
+ * The options follow from the Character count and those two props: one
+ * Character with no Corporation renders nothing; one Character with it offers
+ * This character / Corporation; several offer This / All (/ Corporation); a
+ * `hideAll` page never offers All.
  */
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
@@ -63,11 +74,20 @@ import {
 } from '@/components/ui/controlStyles';
 import { useResolvedCharacterFilter, type CharacterFilterValue } from './characterFilterValue';
 
-export interface CharacterFilterControlProps {
+/** The picker's value when a page offers a Corporation option: the Character filter plus `'corporation'`. */
+export type CharacterScopeChoice = CharacterFilterValue | 'corporation';
+
+export interface CharacterFilterControlProps<
+  V extends CharacterScopeChoice = CharacterFilterValue,
+> {
   /** Null with no active Character — `resolveCharacterFilter` then reads `'current'` as `'all'`, so the trigger and its "This character" option both fall away on their own. */
   activeCharacterId: number | null;
-  value: CharacterFilterValue;
-  onChange: (next: CharacterFilterValue) => void;
+  value: V;
+  onChange: (next: V) => void;
+  /** Adds the "Corporation" option (value `'corporation'`). Widen `V` to `CharacterScopeChoice` with it. */
+  corporation?: boolean;
+  /** Leaves out "All characters", for a page that cannot sum Characters. */
+  hideAll?: boolean;
   /**
    * The sibling touch tier this trigger's icon-only phone box must match,
    * mirroring `IconButtonSize`'s two below-`md` values (`size-9`/`size-11`) —
@@ -128,36 +148,57 @@ const triggerBaseClassName =
   `hover:bg-panel-2 hover:text-text md:w-auto md:gap-1.5 md:bg-transparent md:px-2.5 ` +
   `md:text-[0.6875rem] md:text-text md:hover:bg-panel-2`;
 
-export function CharacterFilterControl({
+export function CharacterFilterControl<V extends CharacterScopeChoice = CharacterFilterValue>({
   activeCharacterId,
   value,
   onChange,
+  corporation = false,
+  hideAll = false,
   size = 'sm',
   variant = 'icon',
   triggerLabel,
   characterCount,
   unreadByCharacter,
-}: CharacterFilterControlProps) {
+}: CharacterFilterControlProps<V>) {
   const { t } = useTranslation();
-  const resolved = useResolvedCharacterFilter(value, activeCharacterId);
-  const isAll = resolved === 'all';
+  const resolved = useResolvedCharacterFilter(
+    value === 'corporation' ? 'current' : value,
+    activeCharacterId
+  );
+  const isCorporation = corporation && value === 'corporation';
+  const isAll = !isCorporation && resolved === 'all';
   const allLabel =
     characterCount === undefined
       ? t('character.filter.allCharacters')
       : t('character.scope.all', { count: characterCount });
-  const label = isAll ? allLabel : t('character.filter.thisCharacter');
+  const corporationLabel = t('character.filter.corporation');
+  const label = isCorporation
+    ? corporationLabel
+    : isAll
+      ? allLabel
+      : t('character.filter.thisCharacter');
+  // What there is to choose among. "All" sums Characters, so it needs more than one
+  // (an unknown count keeps it, as every caller before `corporation` expected).
+  const soloCharacter = characterCount !== undefined && characterCount <= 1;
+  const showAll = !hideAll && !(corporation && soloCharacter);
+  const showCurrent = activeCharacterId !== null;
+  // One Character and no Corporation option: nothing to switch, so no picker.
+  if (!corporation && soloCharacter && variant === 'icon') return null;
   const options = (
     <DropdownMenuContent align="start" className={unreadByCharacter ? 'w-60' : 'w-48'}>
       <DropdownMenuRadioGroup
-        value={isAll ? 'all' : 'current'}
-        onValueChange={(next) => onChange(next as CharacterFilterValue)}
+        value={isCorporation ? 'corporation' : isAll ? 'all' : 'current'}
+        onValueChange={(next) => onChange(next as V)}
       >
-        {activeCharacterId !== null && (
+        {showCurrent && (
           <DropdownMenuRadioItem value="current">
             {t('character.filter.thisCharacter')}
           </DropdownMenuRadioItem>
         )}
-        <DropdownMenuRadioItem value="all">{allLabel}</DropdownMenuRadioItem>
+        {showAll && <DropdownMenuRadioItem value="all">{allLabel}</DropdownMenuRadioItem>}
+        {corporation && (
+          <DropdownMenuRadioItem value="corporation">{corporationLabel}</DropdownMenuRadioItem>
+        )}
       </DropdownMenuRadioGroup>
       {unreadByCharacter && unreadByCharacter.length > 0 && (
         <>
@@ -205,7 +246,9 @@ export function CharacterFilterControl({
           className={`${TRIGGER_BOX[size]} ${triggerBaseClassName}`}
         >
           <span aria-hidden="true" className="flex shrink-0 items-center justify-center md:hidden">
-            {isAll || activeCharacterId === null ? (
+            {isCorporation ? (
+              <Icon.Corporation size={ICON_SIZE.md} />
+            ) : isAll || activeCharacterId === null ? (
               <Icon.AllCharacters size={ICON_SIZE.md} />
             ) : (
               <CharacterAvatar

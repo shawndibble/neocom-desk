@@ -4,15 +4,17 @@ import { setupServer } from 'msw/node';
 import {
   completeAlertsLogin,
   completeCorpSyncLogin,
+  completeFeederGrantLogin,
   completeLogin,
   loginIntentFor,
   scopesForRetry,
   startAlertsLogin,
   startCorpSyncLogin,
+  startFeederGrantLogin,
   startLogin,
   LoginError,
 } from './session';
-import { CORP_SYNC_SCOPES } from './corpSyncScopes';
+import { CORP_SYNC_SCOPES, FEEDER_SYNC_SCOPES } from './corpSyncScopes';
 import { db } from '@/db';
 
 const cfg = { clientId: 'client-abc', redirectUri: 'https://app.example/neocom-desk/callback' };
@@ -120,6 +122,33 @@ describe('completeCorpSyncLogin', () => {
     await expect(completeCorpSyncLogin({ code: 'c', state: device }, cfg)).rejects.toBeInstanceOf(
       LoginError
     );
+    expect(await db.tokens.count()).toBe(0);
+  });
+});
+
+describe('moon owner grant round trip', () => {
+  it('asks for the observer ledger scope alone and carries the invite and rate', async () => {
+    const url = await startFeederGrantLogin(111, 'invite-code-1', 6, cfg);
+    expect(new URL(url).searchParams.get('scope')).toBe(FEEDER_SYNC_SCOPES.join(' '));
+    expect(loginIntentFor(stateOf(url))).toEqual({
+      kind: 'feederGrant',
+      characterId: 111,
+      inviteCode: 'invite-code-1',
+      requestedRatePct: 6,
+    });
+  });
+
+  it('accepts an alt the player did not press and stores nothing', async () => {
+    const state = stateOf(await startFeederGrantLogin(111, 'invite-code-1', undefined, cfg));
+    returnedCharacterId = 222;
+    const result = await completeFeederGrantLogin({ code: 'c', state }, cfg);
+    expect(result).toMatchObject({
+      expectedCharacterId: 111,
+      characterId: 222,
+      inviteCode: 'invite-code-1',
+      refreshToken: 'corp-sync-refresh',
+    });
+    expect(result.requestedRatePct).toBeUndefined();
     expect(await db.tokens.count()).toBe(0);
   });
 });

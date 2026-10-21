@@ -73,3 +73,63 @@ export function esiIdentityReader(fetchImpl: typeof fetch = fetch): IdentityRead
     };
   };
 }
+
+/** The public lookup of a corporation's CEO: no token, no scope. */
+export type CorporationCeoLookup = (corporationId: number) => Promise<number | undefined>;
+
+export function esiCorporationCeoLookup(fetchImpl: typeof fetch = fetch): CorporationCeoLookup {
+  return async (corporationId) => {
+    const corp = await getJson(`${ESI_BASE}/corporations/${corporationId}/`, null, fetchImpl);
+    const ceo = (corp as { ceo_id?: unknown } | null)?.ceo_id;
+    return typeof ceo === 'number' && ceo > 1 ? ceo : undefined;
+  };
+}
+
+/** The public lookup of which corporation a Character is in: no token, no scope. */
+export type CorporationLookup = (characterId: number) => Promise<number>;
+
+export function esiCorporationLookup(fetchImpl: typeof fetch = fetch): CorporationLookup {
+  return async (characterId) => {
+    const character = await getJson(`${ESI_BASE}/characters/${characterId}/`, null, fetchImpl);
+    const corporationId = (character as { corporation_id?: unknown } | null)?.corporation_id;
+    if (typeof corporationId !== 'number') {
+      throw new HttpsError('unavailable', 'ESI sent no corporation', { reason: 'esi-error' });
+    }
+    return corporationId;
+  };
+}
+
+/** What ESI calls an id (`character`, `corporation`, ...); undefined when ESI knows no such id. */
+export type IdCategoryLookup = (id: number) => Promise<string | undefined>;
+
+/** ESI's public `POST /universe/names/`: one id in, its category out. No token, no scope. */
+export function esiIdCategoryLookup(fetchImpl: typeof fetch = fetch): IdCategoryLookup {
+  return async (id) => {
+    const res = await fetchImpl(`${ESI_BASE}/universe/names/`, {
+      method: 'POST',
+      headers: {
+        'User-Agent': ESI_USER_AGENT,
+        'X-User-Agent': ESI_USER_AGENT,
+        'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify([id]),
+      signal: AbortSignal.timeout(15_000),
+    });
+    // ESI answers 404 when an id in the list is not a valid id.
+    if (res.status === 404) return undefined;
+    if (res.status === 420 || res.status === 429) {
+      throw new HttpsError('resource-exhausted', 'ESI is rate limiting; try again shortly', {
+        reason: 'esi-backoff',
+      });
+    }
+    if (!res.ok)
+      throw new HttpsError('unavailable', `ESI answered ${res.status}`, { reason: 'esi-error' });
+    const body = (await res.json().catch(() => null)) as unknown;
+    const hit = Array.isArray(body)
+      ? (body as { id?: unknown; category?: unknown }[]).find((e) => e?.id === id)
+      : undefined;
+    return typeof hit?.category === 'string' ? hit.category : undefined;
+  };
+}

@@ -25,51 +25,26 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Link } from 'react-router-dom';
-import { Button, Panel, EmptyState, SearchInput, Checkbox, InfoTooltip } from '@/components/ui';
-import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
-import { AlertsWhenClosedSection } from './AlertsWhenClosedSection';
+import { Panel, EmptyState, SearchInput } from '@/components/ui';
+import { NotificationsDelivery } from './NotificationsDelivery';
 import { NotificationEventList } from './NotificationEventList';
 import type { EventRowContext } from './eventRowSupport';
 import { MD_UP_QUERY, useMediaQuery } from '@/lib/useMediaQuery';
 import { db } from '@/db';
 import { useCharacters } from '@/features/character/useCharacters';
 import { NOTIFICATION_EVENT_IDS, eventLabelKey } from './events';
-import {
-  useNotificationPreferences,
-  hydrateNotificationPreferences,
-  setDeviceNotificationPrefs,
-  withMasterEnabled,
-  withBrowserEnabled,
-  withFeedEnabled,
-  isBrowserChannelEnabled,
-  isFeedChannelEnabled,
-  isDismissOnView,
-  withDismissOnView,
-} from './preferences';
+import { useNotificationPreferences, hydrateNotificationPreferences } from './preferences';
 import { extraEveTypes } from './eventSelection';
 import { filterNotificationEvents } from './notificationSearch';
 import { useSeenEveTypesStore } from './seenEveTypes';
 import { refreshAppBadge } from './appBadge';
-import {
-  useNotificationPermission,
-  useNotificationPromptState,
-  promptStateAfterAsk,
-  notificationsBlocked,
-} from './permission';
-import { tabPath } from '@/lib/pageTabs';
-import { SETTINGS_TABS } from '@/app/pageTabs';
-import { webPushSupport } from '@/sync/webPushSupport';
-import { enableWebPush } from './webPush';
-import { usePushFailure } from './pushFailure';
+import { useNotificationPermission, notificationsBlocked } from './permission';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
 import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
-import { androidNotificationSettingsUrl, isPlayStoreApp } from '@/lib/playStoreApp';
-import { assignLocation } from '@/app/navigation';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 
 /** Module scope so `useUrlParam` sees a stable codec identity across renders. */
@@ -120,39 +95,6 @@ export function NotificationsPanel() {
   }, [prefsValue]);
 
   const { permission, refresh: refreshPermission } = useNotificationPermission();
-  const setPromptState = useNotificationPromptState((state) => state.setValue);
-  const pushFailure = usePushFailure((state) => state.value);
-  const [retrying, setRetrying] = useState(false);
-  useHydratedStore(usePushFailure);
-
-  // Records the ask here too, so someone who ignored the one-time explainer and
-  // came to Settings instead is not offered it again on the next load.
-  async function enableNotifications() {
-    const { permission: outcome } = await enableWebPush();
-    await setPromptState(promptStateAfterAsk(outcome));
-    refreshPermission();
-  }
-
-  // Retry is the same call as Enable: permission is already granted, so it
-  // only re-registers, and the outcome files itself (cleared or re-recorded).
-  async function retryPushRegistration() {
-    setRetrying(true);
-    try {
-      await enableWebPush();
-    } finally {
-      setRetrying(false);
-    }
-  }
-
-  // iOS delivers Web Push only to an installed PWA (issue #356 AC1) — the
-  // Enable button would either do nothing or grant a permission that can
-  // never deliver anything, so this state shows why instead of the button.
-  const installRequired = webPushSupport() === 'requires-install';
-  // In the Play Store app Chrome delegates the grant to the Android app's own
-  // notification toggle (docs/ANDROID-TWA.md), so the blocked notice has to
-  // name that screen — browser site settings can't unblock it.
-  const [inPlayStoreApp] = useState(isPlayStoreApp);
-
   const [search, setSearch] = useUrlParam('search', SEARCH_PARAM);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const isDesktop = useMediaQuery(MD_UP_QUERY);
@@ -271,178 +213,22 @@ export function NotificationsPanel() {
   };
 
   return (
-    <Panel title={t('settings.notificationsTitle')}>
+    <Panel>
       <div className="space-y-3">
         <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
-        {browserBlocked &&
-          (inPlayStoreApp ? (
-            <div className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 px-3 py-2">
-              <p role="status" className="text-xs text-warning">
-                {t('settings.notifications.blockedNoticePlayApp')}
-              </p>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => assignLocation(androidNotificationSettingsUrl(window.location.href))}
-              >
-                {t('settings.notifications.openAndroidSettings')}
-              </Button>
-            </div>
-          ) : (
-            <p
-              role="status"
-              className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning"
-            >
-              {t('settings.notifications.blockedNotice')}
-            </p>
-          ))}
-        {pushFailure && permission === 'granted' && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xs border border-warning/60 bg-warning/10 px-3 py-2">
-            <p role="status" className="min-w-0 flex-1 text-xs text-warning">
-              {t(`settings.notifications.pushFailed.${pushFailure.reason}`)}
-            </p>
-            <Button
-              size="sm"
-              variant="primary"
-              loading={retrying}
-              onClick={() => void retryPushRegistration()}
-            >
-              {t('settings.notifications.pushRetryButton')}
-            </Button>
-          </div>
-        )}
-        {/*
-          `permission` reads 'unsupported' here, not 'default' — a
-          non-installed iOS Safari tab has no Notification API to ask at
-          all (issue #356 AC1). Gating this on 'default' alone would hide
-          the explanation on exactly the platform it exists for.
-        */}
-        {installRequired && (permission === 'default' || permission === 'unsupported') && (
-          <p
-            role="status"
-            className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-xs text-text-dim"
-          >
-            {t('settings.notifications.installRequiredNotice')}{' '}
-            <Link to={tabPath(SETTINGS_TABS, 'dataAge')} className={inlineLinkClassName}>
-              {t('settings.notifications.installRequiredLink')}
-            </Link>
-          </p>
-        )}
-        {permission === 'default' && !installRequired && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
-            <p className="min-w-0 flex-1 text-xs text-text-dim">
-              {t('settings.notifications.enableHint')}
-            </p>
-            <Button size="sm" variant="primary" onClick={() => void enableNotifications()}>
-              {t('settings.notifications.enableButton')}
-            </Button>
-          </div>
-        )}
-        {/*
-          One row: the master switch, then the two delivery channels it gates.
-          The channels are independent rather than a fallback chain: device
-          pop-ups need a permission grant and an OS that will raise one (never
-          iOS while the app is closed, ADR 0007), while the Alerts list works
-          everywhere and is the only channel some devices will ever see, so
-          switching one off must not touch the other. Their longer
-          explanations sit behind the info buttons (and in the sr-only text the
-          checkboxes are described by) instead of taking two paragraphs of the
-          page's first screen.
-        */}
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-0.5">
-          <label
-            className={`flex items-center gap-2 text-xs font-medium text-text ${tappableRowClassName}`}
-          >
-            <Checkbox
-              checked={prefsValue.masterEnabled}
-              onChange={() =>
-                void setDeviceNotificationPrefs(
-                  withMasterEnabled(prefsValue, !prefsValue.masterEnabled)
-                )
-              }
-            />
-            {t('settings.notifications.masterSwitchLabel')}
-          </label>
-          <fieldset disabled={!prefsValue.masterEnabled} className="contents">
-            <legend className="sr-only">{t('settings.notifications.channelsLegend')}</legend>
-            <span className="flex items-center gap-1.5">
-              <label
-                className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}
-              >
-                <Checkbox
-                  aria-describedby="notifications-browser-channel-hint"
-                  checked={isBrowserChannelEnabled(prefsValue) && !browserBlocked}
-                  disabled={browserBlocked}
-                  onChange={() =>
-                    void setDeviceNotificationPrefs(
-                      withBrowserEnabled(prefsValue, !isBrowserChannelEnabled(prefsValue))
-                    )
-                  }
-                />
-                {t('settings.notifications.browserChannelLabel')}
-              </label>
-              <InfoTooltip
-                label={t('settings.notifications.channelInfoLabel', {
-                  channel: t('settings.notifications.browserChannelLabel'),
-                })}
-                content={t('settings.notifications.browserChannelHint')}
-              />
-              <span id="notifications-browser-channel-hint" className="sr-only">
-                {t('settings.notifications.browserChannelHint')}
-              </span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <label
-                className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}
-              >
-                <Checkbox
-                  aria-describedby="notifications-feed-channel-hint"
-                  checked={isFeedChannelEnabled(prefsValue)}
-                  onChange={() =>
-                    void setDeviceNotificationPrefs(
-                      withFeedEnabled(prefsValue, !isFeedChannelEnabled(prefsValue))
-                    )
-                  }
-                />
-                {t('settings.notifications.feedChannelLabel')}
-              </label>
-              <InfoTooltip
-                label={t('settings.notifications.channelInfoLabel', {
-                  channel: t('settings.notifications.feedChannelLabel'),
-                })}
-                content={t('settings.notifications.feedChannelHint')}
-              />
-              <span id="notifications-feed-channel-hint" className="sr-only">
-                {t('settings.notifications.feedChannelHint')}
-              </span>
-            </span>
-          </fieldset>
-          <span className="flex items-center gap-1.5">
-            <label className={`flex items-center gap-2 text-xs text-text ${tappableRowClassName}`}>
-              <Checkbox
-                checked={isDismissOnView(prefsValue)}
-                onChange={() =>
-                  void setDeviceNotificationPrefs(
-                    withDismissOnView(prefsValue, !isDismissOnView(prefsValue))
-                  )
-                }
-              />
-              {t('settings.notifications.dismissOnViewLabel')}
-            </label>
-            <InfoTooltip
-              label={t('settings.notifications.channelInfoLabel', {
-                channel: t('settings.notifications.dismissOnViewLabel'),
-              })}
-              content={t('settings.notifications.dismissOnViewHint')}
-            />
-          </span>
-        </div>
+        <NotificationsDelivery
+          permission={permission}
+          refreshPermission={refreshPermission}
+          browserBlocked={browserBlocked}
+          alertsWhenClosedCharacters={
+            isSyncConfigured() && characterList.length > 0 ? characterRefs : null
+          }
+        />
 
         {characterList.length === 0 ? (
           <EmptyState title={t('settings.notifications.emptyTitle')} />
         ) : (
           <>
-            {isSyncConfigured() && <AlertsWhenClosedSection characters={characterRefs} />}
             <SearchInput
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -456,6 +242,7 @@ export function NotificationsPanel() {
                 eventIds={visibleEventIds}
                 context={rowContext}
                 extraTypesByCharacter={extraTypesByCharacter}
+                searching={filterResult !== null}
               />
             )}
           </>

@@ -46,10 +46,11 @@ dev`) — Shawn frequently has another agent working there at the same
 - Pure engines stay pure: no fetch/DOM/Dexie imports in `src/engine`.
 - ESI calls always send `X-Compatibility-Date` and a descriptive
   `X-User-Agent`; respect `X-Ratelimit-*` and `Retry-After`.
-- Refresh tokens live in Dexie only. The one exception is the opt-in Alerts
-  Grant (ADR 0020): its notifications-only refresh token is handed to the
-  `saveAlertGrant` callable. Never send any other refresh token to Firebase,
-  and never log any.
+- Refresh tokens live in Dexie only. The named exceptions are the opt-in
+  Alerts Grant (ADR 0020): its notifications-only refresh token is handed to
+  the `saveAlertGrant` callable; the Corp Tax Book sync grant (ADR 0025); and
+  a feeder's mining-only grant, its second narrow kind. Never send any other
+  refresh token to Firebase, and never log any.
 - **Never run the full suite (`npm run test:run`) or `npm run build` locally.** CI is
   the gate. While iterating: `npm run typecheck` and `npx vitest run <file>` for
   the files you touched, never a whole directory. `/code-review` sub-agents are

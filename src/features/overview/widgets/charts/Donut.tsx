@@ -28,8 +28,8 @@ export function Donut({ model, size }: { model: DonutChartModel; size: number })
                 fill="none"
                 strokeWidth="5"
                 stroke={CHART_COLOR[part.color]}
-                strokeDasharray={`${segment.dash.toFixed(2)} ${segment.gap.toFixed(2)}`}
-                strokeDashoffset={segment.offset.toFixed(2)}
+                strokeDasharray={`${segment.dash.toFixed(2)} ${segment.gap.toFixed(2)}`} // fixed format: SVG attribute
+                strokeDashoffset={segment.offset.toFixed(2)} // fixed format: SVG attribute
               />
             );
           })}

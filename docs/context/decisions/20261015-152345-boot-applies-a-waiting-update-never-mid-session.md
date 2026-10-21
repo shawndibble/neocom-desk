@@ -10,7 +10,7 @@ _Recorded 2026-10-15._
 
 - **A browser reload is the same path.** It loads the old precached bundle, which sees the waiting update at boot and swaps behind the boot screen. The old `beforeunload` skip-waiting is gone: it was racy and best effort.
 
-- **Settings → Data & storage → App updates → "Update now" stays.** It is explicit and labelled, and goes through the same boot-screen cover. In-app data-refresh buttons never reload the app.
+- **Settings nav → "Update app" stays.** It is explicit and labelled, and goes through the same boot-screen cover. In-app data-refresh buttons never reload the app.
 
 - **The `vite:preloadError` reload stays as a safety net.** A stale lazy chunk (for example an old tab claimed by a new worker through `clientsClaim` after another tab swapped) reloads, now shown through the boot screen.
 

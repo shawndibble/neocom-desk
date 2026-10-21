@@ -8,6 +8,7 @@ import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import { formatDuration as formatTotalTime } from '@/lib/duration';
+import { createNumberFormat, getDecimalMark } from '@/lib/numberLocale';
 import { useNow } from '@/lib/useNow';
 import type { SurveySummary } from '@/engine/survey/series';
 import { IskAmount, Tooltip } from '@/components/ui';
@@ -45,23 +46,26 @@ function Tile({
 }
 
 /** "11.0M": one fixed decimal, like the ISK tile beside it, so a big field's volume isn't cropped. */
-function shortVolume(value: number, locale: string): string {
-  return value.toLocaleString(locale, {
+function shortVolume(value: number): string {
+  // eslint-disable-next-line no-restricted-syntax -- English K/M/B; the mark is swapped below.
+  const text = value.toLocaleString('en', {
     notation: 'compact',
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   });
+  // The K/M/B suffixes are EVE's shorthand in every locale, so only the mark moves.
+  return getDecimalMark() === ',' ? text.replace('.', ',') : text;
 }
 
+const formatPace = createNumberFormat({ maximumFractionDigits: 1 });
+
 export function SurveyStats({ summary }: { summary: SurveySummary }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const now = useNow();
   const clock = useDoneAtClock();
   const local = clock === 'local';
   useHydratedStore(useDoneAtOverride);
   const setClock = useDoneAtOverride((state) => state.setValue);
-  const n = (value: number, digits = 0) =>
-    value.toLocaleString(i18n.language, { maximumFractionDigits: digits });
   // Once the field is cleared, the time it was marked cleared; until then, the estimate.
   const doneAt = summary.finished ? summary.finishedAt : summary.etaAt;
   // One row when the board is wide enough, else rows of three: never 4 + 2 or
@@ -73,9 +77,11 @@ export function SurveyStats({ summary }: { summary: SurveySummary }) {
     <div className="@container">
       <div className={`grid grid-cols-3 gap-x-2 gap-y-3 @md:gap-x-4 ${wideColumns}`}>
         {!summary.finished && (
-          <Tile label={t('survey.statLeft')}>{shortVolume(summary.leftVolume, i18n.language)}</Tile>
+          <Tile label={t('survey.statLeft')}>{shortVolume(summary.leftVolume)}</Tile>
         )}
-        <Tile label={t('survey.statPace')}>{summary.pace === null ? '–' : n(summary.pace, 1)}</Tile>
+        <Tile label={t('survey.statPace')}>
+          {summary.pace === null ? '–' : formatPace(summary.pace)}
+        </Tile>
         <Tile label={t('survey.statDone')} emphasis>
           {doneAt === null || clock === null ? (
             '–'

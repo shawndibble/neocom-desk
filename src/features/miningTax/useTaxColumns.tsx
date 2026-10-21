@@ -9,7 +9,6 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import {
   focusRingClassName,
   interactiveClassName,
@@ -29,9 +28,11 @@ import {
 } from '@/features/miningTax/taxRowFormat';
 import { StatusPill } from '@/features/miningTax/StatusPill';
 import { CorpStatusPill } from '@/features/miningTax/corpBook/CorpStatusPill';
+import { CorpCorrectedAmount, CorpOverlapMark } from '@/features/miningTax/corpBook/CorpLineMarks';
 import type { CorpRowInfo } from '@/features/miningTax/corpBook/corpRows';
 import { isBookRow } from '@/features/miningTax/corpBook/corpRows';
 import { OreIcon } from './OreIcon';
+import { formatCount } from '@/lib/formatCount';
 
 /** The tick-box column (and History's matching spacer): little room left of the box, the date cell's own padding as the gap after it. */
 const SELECT_COLUMN_CLASS = 'w-9 pl-2 pr-0';
@@ -160,7 +161,7 @@ export function useTaxColumns({
               {m.assignment.oreLines
                 .map(
                   (line) =>
-                    `${typeNames?.get(line.typeId) ?? `#${line.typeId}`} ${line.quantity.toLocaleString()}`
+                    `${typeNames?.get(line.typeId) ?? `#${line.typeId}`} ${formatCount(line.quantity)}`
                 )
                 .join(' · ')}
             </span>
@@ -205,9 +206,7 @@ export function useTaxColumns({
               headerCellClassName: 'sm:w-28',
               header: t('miningTax.characterColumn'),
               // Plain: the row opens the detail modal, which links the pilot (§6c).
-              render: (dr: DisplayRow) => (
-                <span className={entityLinkClassName()}>{dr.row.characterName}</span>
-              ),
+              render: (dr: DisplayRow) => <span>{dr.row.characterName}</span>,
               sortValue: (dr: DisplayRow) => dr.row.characterName,
             } satisfies DataTableColumn<DisplayRow>,
           ]
@@ -259,7 +258,7 @@ export function useTaxColumns({
         header: t('miningTax.systemColumn'),
         render: (dr) => (
           <DataTableDenseCell>
-            <span className={entityLinkClassName()}>{systemName(dr)}</span>
+            <span>{systemName(dr)}</span>
             <SecurityValue security={systemSecurityOf(dr)} />
           </DataTableDenseCell>
         ),
@@ -314,7 +313,14 @@ export function useTaxColumns({
           dr.assignment && !(dr.corp?.kind === 'row' && dr.corp.view.taxOwed === null)
             ? withDayLines(
                 dr,
-                `${formatIsk(taxOwedOf(dr))} ISK`,
+                dr.corp?.kind === 'row' && dr.corp.view.correction ? (
+                  // A correction keeps the old figure on the line (#4622).
+                  <CorpCorrectedAmount correction={dr.corp.view.correction}>
+                    {`${formatIsk(taxOwedOf(dr))} ISK`}
+                  </CorpCorrectedAmount>
+                ) : (
+                  `${formatIsk(taxOwedOf(dr))} ISK`
+                ),
                 (m) => `${formatIsk(m.assignment.taxOwed)} ISK`
               )
             : '—',
@@ -329,7 +335,10 @@ export function useTaxColumns({
         stackEdge: 'end',
         render: (dr) =>
           dr.corp ? (
-            <CorpStatusPill corp={dr.corp} />
+            <>
+              <CorpStatusPill corp={dr.corp} />
+              {dr.corp.kind === 'row' && dr.corp.view.overlap && <CorpOverlapMark />}
+            </>
           ) : (
             <StatusPill
               status={dr.status}

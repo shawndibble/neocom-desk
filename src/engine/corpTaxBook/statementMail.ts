@@ -6,7 +6,13 @@
  * verify link carries pricing, terms and payments credited, so none of that is
  * mailed. Pure: names and the link arrive from the caller.
  */
-import { EVE_MARKUP_LIMIT, serializeEveMarkup, type MarkupNode } from '../mail/eveMarkup';
+import {
+  EVE_MARKUP_LIMIT,
+  markupBr as br,
+  markupText as text,
+  serializeEveMarkup,
+  type MarkupNode,
+} from '../mail/eveMarkup';
 import { formatIsk } from '../../lib/isk';
 import type { MailKind } from './mailQueue';
 import type { StatementLine } from './statements';
@@ -49,8 +55,6 @@ interface Row {
   tax: number;
 }
 
-const text = (t: string): MarkupNode => ({ type: 'text', text: t });
-const br = (): MarkupNode => ({ type: 'br' });
 const bold = (t: string): MarkupNode => ({ type: 'b', children: [text(t)] });
 
 function rowsAt(input: StatementMailInput, level: MailDetailLevel): Row[] {

@@ -12,6 +12,7 @@
 
 import { verifyEveAccessToken, type VerifyOptions } from './verifyEveToken.js';
 import type { ProjectionRowInput } from './projectionRow.js';
+import { parseQuietHours, type QuietHours } from './quietHours.js';
 
 export type { ProjectionRowInput };
 
@@ -41,6 +42,11 @@ export interface RegisterDeviceInput {
   deviceId: string;
   fcmToken: string;
   characters: DeviceCharacterInput[];
+  /**
+   * This device's quiet time (issue #4566). Absent (an older client) leaves the
+   * stored window untouched; `null` clears it.
+   */
+  quietHours?: QuietHours | null;
 }
 
 export interface DeviceRegistrationDoc {
@@ -129,7 +135,7 @@ const DEVICE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
   if (!isRecord(data)) throw new Error('Request body must be an object');
 
-  const { deviceId, fcmToken, characters } = data;
+  const { deviceId, fcmToken, characters, quietHours } = data;
   if (typeof deviceId !== 'string' || deviceId.length === 0) {
     throw new Error('deviceId (non-empty string) is required');
   }
@@ -166,7 +172,12 @@ export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
     };
   });
 
-  return { deviceId, fcmToken, characters: parsedCharacters };
+  return {
+    deviceId,
+    fcmToken,
+    characters: parsedCharacters,
+    ...(quietHours !== undefined ? { quietHours: parseQuietHours(quietHours) } : {}),
+  };
 }
 
 /**

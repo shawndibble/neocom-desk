@@ -34,7 +34,8 @@
  * in-flight coalescing, ADR 0003) rather than adding a second cache layer —
  * see docs/ARCHITECTURE.md §7 step 3.
  */
-import { fetchAggregates, type HubAggregate } from '@/market/fuzzwork';
+import type { HubAggregate } from '@/market/fuzzwork';
+import { fetchAggregatesWithFallback } from '@/market/priceFallback';
 import { getOrderBook } from './orderBook';
 import { getStructureMarketOrders, type StructureMarketOrder } from '@/esi/endpoints';
 import { conditionalPagedFetch, loadPaginatedWithCache } from '@/esi/cache';
@@ -72,7 +73,12 @@ export async function loadStationBestPrices(
       if (uniqueTypeIds.length === 0) return;
 
       try {
-        const aggregates = await fetchAggregates(stationId, uniqueTypeIds);
+        const { prices: aggregates, stale } = await fetchAggregatesWithFallback(
+          stationId,
+          uniqueTypeIds
+        );
+        // Compared with a live order: yesterday's close would read as a false undercut.
+        if (stale.size > 0) return;
         for (const typeId of uniqueTypeIds) {
           const aggregate = aggregates.get(typeId);
           if (aggregate) result.set(stationPriceKey(stationId, typeId), aggregate);

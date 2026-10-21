@@ -8,6 +8,7 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
+import type { PayeeSetBy } from '@/engine/corpTaxBook/payeeChange';
 import {
   collection,
   doc,
@@ -19,6 +20,7 @@ import {
 } from 'firebase/firestore/lite';
 import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
+import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import type { Declaration } from '@/engine/corpTaxBook/overdue';
@@ -32,6 +34,15 @@ import type {
   SyncGap,
 } from '@/engine/corpTaxBook/sync';
 import { scheduledSyncFrom, type ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
+import type {
+  FeederMode,
+  FeederModeChange,
+  FeederPayout,
+} from '@/engine/corpTaxBook/feederAccrual';
+import type { FeederReadClock } from '@/engine/corpTaxBook/feederHealth';
+import type { RemovalNoticeRecord } from '@/engine/corpTaxBook/mailQueue';
+import type { OwnerRateEntry } from '@/engine/corpTaxBook/ownerRate';
+import type { StoredRefineryLabel, StoredRefineryStructure } from '@/engine/corpTaxBook/refinery';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -67,6 +78,8 @@ export interface BookState {
   extractions: SyncExtraction[];
   /** Statement ids settled so far (`meta/paid`), which only ever grows (D22). */
   paidStatementIds: Set<string>;
+  /** Officer write-offs (#4637): they reduce what a Miner owes. */
+  writeOffs?: RecordedWriteOff[];
 }
 
 export interface SyncUpload {
@@ -83,10 +96,39 @@ export interface SyncReceipt {
   donationsAdded: number;
 }
 
-async function call<In, Out>(characterId: number, name: string, data: In): Promise<Out> {
+/** One Corp Tax Book callable, signed in as `characterId`; the other taxBook clients share it. */
+export async function call<In, Out>(characterId: number, name: string, data: In): Promise<Out> {
   await ensureSignedIn(characterId);
   const result = await httpsCallable<In, Out>(getSyncFunctions(), name)(data);
   return result.data;
+}
+
+/**
+ * A moon owner's status and pending removal, read under the officer rules right before the send
+ * queue mails a removal notice (#4621). A lapsed officer record is renewed once.
+ */
+export async function readFeederRemovalState(
+  characterId: number,
+  corporationId: number,
+  feederCorporationId: number
+): Promise<RemovalNoticeRecord | undefined> {
+  await ensureSignedIn(characterId);
+  const ref = doc(
+    getSyncFirestore(),
+    'corpTaxBooks',
+    String(corporationId),
+    'feeders',
+    String(feederCorporationId)
+  );
+  const read = async () => (await getDoc(ref)).data() as RemovalNoticeRecord | undefined;
+  try {
+    return await read();
+  } catch (error) {
+    if (!String((error as { code?: unknown }).code ?? '').endsWith('permission-denied'))
+      throw error;
+    await verifyOfficer(characterId, corporationId);
+    return read();
+  }
 }
 
 /** Checks the Character's corporation and roles with ESI and records officer access for 24 hours (D7). */
@@ -188,14 +230,16 @@ export async function readBookState(
     collection(getSyncFirestore(), 'corpTaxBooks', String(corporationId), name);
   const list = async <T>(name: string): Promise<T[]> =>
     (await getDocs(root(name))).docs.map((d) => d.data() as T);
-  const [miners, statements, payments, dismissals, extractions, paid] = await Promise.all([
-    list<Miner>('miners'),
-    list<Statement>('statements'),
-    list<SettlePayment>('payments'),
-    list<Dismissal>('dismissals'),
-    list<SyncExtraction>('extractions'),
-    getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'paid')),
-  ]);
+  const [miners, statements, payments, dismissals, extractions, paid, writeOffs] =
+    await Promise.all([
+      list<Miner>('miners'),
+      list<Statement>('statements'),
+      list<SettlePayment>('payments'),
+      list<Dismissal>('dismissals'),
+      list<SyncExtraction>('extractions'),
+      getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'paid')),
+      list<RecordedWriteOff>('writeOffs'),
+    ]);
   return {
     book,
     miners,
@@ -204,6 +248,7 @@ export async function readBookState(
     dismissals,
     extractions,
     paidStatementIds: new Set((paid.data()?.ids as string[] | undefined) ?? []),
+    writeOffs,
   };
 }
 
@@ -293,6 +338,67 @@ export function groupingAnswersFrom(d: Record<string, unknown> | undefined): Gro
   });
 }
 
+/** A payout row with its document id. */
+export type FeederPayoutRow = FeederPayout & { id: string };
+
+/**
+ * One feeder's record as the officers read it (`corpTaxBooks/{book}/feeders/{corp}`), with its
+ * `payouts`. `lastReadWellAt` is an ISO string, as `FeederReadClock` carries it.
+ */
+export interface BookFeeder extends FeederReadClock {
+  status: 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
+  mode: FeederMode;
+  note?: string;
+  invitedBy: number;
+  joinedAt: number;
+  leftAt?: number;
+  grantHolder?: number;
+  grantedBy?: number;
+  lastSyncResult?: { at: number; outcome: 'synced' | 'skipped' | 'stale'; reason?: string };
+  /** When ESI first refused the ledger in the current spell (ms). */
+  staleSince?: number;
+  /** When it disconnected after 30 days stale (ms). */
+  disconnectedAt?: number;
+  payeeChangedAt?: number;
+  /** A pending removal (#4520): who started it and when; `effectiveAt` once its notice is out. */
+  removal?: { startedAt: number; startedBy: number; startedByName: string; effectiveAt?: number };
+  viewDismissedAt?: number;
+  requestedRatePct?: number;
+  agreedRatePct?: number;
+  offeredOwnerRatePct?: number;
+  payee?: { kind: 'corporation' | 'character'; id: number };
+  /** Which side set the payee last, who and when (#4653); absent on an older record. */
+  payeeSetBy?: PayeeSetBy & { characterId: number };
+  coveragePeriods: { from: string; to?: string }[];
+  /** Absent on records written before the history existed. */
+  ownerRateHistory?: OwnerRateEntry[];
+  /** Absent means derive from `mode`. */
+  modeChanges?: FeederModeChange[];
+  /** Refinery labels by structure id, set by either side's officers (#4640). */
+  refineryLabels?: Record<string, StoredRefineryLabel>;
+  /** Refinery systems by structure id, learned from miners' own ledgers (#4650). */
+  refinerySystems?: Record<string, number>;
+  /** Refinery names and systems the sync read with the moon owner's grant (#4654). */
+  refineryStructures?: Record<string, StoredRefineryStructure>;
+  /** The moon owner's grant reads refinery names (#4654); absent on a grant from before. */
+  readsStructureNames?: boolean;
+  payouts: FeederPayoutRow[];
+}
+
+type FeederDoc = Omit<BookFeeder, 'lastReadWellAt' | 'payouts'> & { lastReadWellAt?: number };
+
+/** A stored feeder record and its payouts as a `BookFeeder`. */
+export function bookFeederFrom(record: FeederDoc, payouts: FeederPayoutRow[]): BookFeeder {
+  const { lastReadWellAt, ...rest } = record;
+  return {
+    ...rest,
+    ...(typeof lastReadWellAt === 'number'
+      ? { lastReadWellAt: new Date(lastReadWellAt).toISOString() }
+      : {}),
+    payouts,
+  };
+}
+
 /** Everything `/corp/moons` renders from. Officer-only: verify first. */
 export interface BookData {
   settings: BookSettings;
@@ -300,10 +406,22 @@ export interface BookData {
   observed: ObservedRow[];
   declarations: Declaration[];
   adjustments: Adjustment[];
+  /** Each feeder's last good ledger read (#4509); a feeder's days are Billable only after one. */
+  feeders?: BookFeeder[];
   groupingAnswers?: GroupingAnswer[];
   /** The scheduled sync's public status (ADR 0025); null when it was never turned on or was revoked. */
   scheduledSync?: ScheduledSyncStatus | null;
 }
+
+const feederPayouts = (book: number, feeder: number) =>
+  collection(
+    getSyncFirestore(),
+    'corpTaxBooks',
+    String(book),
+    'feeders',
+    String(feeder),
+    'payouts'
+  );
 
 export async function readBookData(
   characterId: number,
@@ -327,6 +445,8 @@ export async function readBookData(
     adjustments,
     answers,
     scheduled,
+    feeders,
+    writeOffs,
   ] = await Promise.all([
     list<Miner>('miners'),
     list<Statement>('statements'),
@@ -341,7 +461,19 @@ export async function readBookData(
       doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'groupingAnswers')
     ),
     getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'scheduledSync')),
+    list<FeederDoc>('feeders'),
+    list<RecordedWriteOff>('writeOffs'),
   ]);
+  const feederRows = await Promise.all(
+    feeders.map(async (f) =>
+      bookFeederFrom(
+        f,
+        (await getDocs(feederPayouts(corporationId, f.corporationId))).docs.map(
+          (d) => ({ ...d.data(), id: d.id }) as FeederPayoutRow
+        )
+      )
+    )
+  );
   return {
     settings,
     state: {
@@ -352,10 +484,12 @@ export async function readBookData(
       dismissals,
       extractions,
       paidStatementIds: new Set((paid.data()?.ids as string[] | undefined) ?? []),
+      writeOffs,
     },
     observed,
     declarations,
     adjustments,
+    feeders: feederRows,
     groupingAnswers: groupingAnswersFrom(answers.data()),
     scheduledSync: scheduledSyncFrom(scheduled.data()),
   };

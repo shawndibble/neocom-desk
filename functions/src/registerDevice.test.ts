@@ -36,6 +36,30 @@ describe('parseRegisterDeviceInput', () => {
     });
   });
 
+  describe('quietHours (issue #4566)', () => {
+    const base = {
+      deviceId: 'device-1',
+      fcmToken: 'fcm-token',
+      characters: [{ characterId: 1, accessToken: 'a', projectionRows: [] }],
+    };
+    const window = { start: '22:00', end: '07:00', timeZone: 'Europe/Berlin', allowAttacks: true };
+
+    it('parses a window, and null (clear), and leaves absent absent', () => {
+      expect(parseRegisterDeviceInput({ ...base, quietHours: window }).quietHours).toEqual(window);
+      expect(parseRegisterDeviceInput({ ...base, quietHours: null }).quietHours).toBeNull();
+      expect('quietHours' in parseRegisterDeviceInput(base)).toBe(false);
+    });
+
+    it('rejects a bad time or zone instead of storing it', () => {
+      expect(() =>
+        parseRegisterDeviceInput({ ...base, quietHours: { ...window, start: '25:00' } })
+      ).toThrow(/quietHours/);
+      expect(() =>
+        parseRegisterDeviceInput({ ...base, quietHours: { ...window, timeZone: 'Nowhere/Land' } })
+      ).toThrow(/quietHours/);
+    });
+  });
+
   it('accepts projection rows on a character entry', () => {
     const input = parseRegisterDeviceInput({
       deviceId: 'device-1',

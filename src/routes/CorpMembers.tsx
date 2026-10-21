@@ -18,6 +18,7 @@
  * `useCorpRouteGate`'s, shared with `/corp` and `/corp/assets` — see that hook.
  */
 import { useMemo } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useTranslation } from 'react-i18next';
@@ -39,6 +40,8 @@ import {
   SelectValue,
   Spinner,
   CachedNotice,
+  Tabs,
+  useTabsId,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
@@ -46,6 +49,11 @@ import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
+import {
+  CorpRoleAudit,
+  MembersTabPanel,
+  type MembersTabsSlot,
+} from '@/features/corp/CorpRoleAudit';
 import {
   CorpRosterColumnPicker,
   CorpRosterStats,
@@ -82,6 +90,9 @@ import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapsh
 import { useUrlParams } from '@/lib/useUrlState';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
+import { tabPath } from '@/lib/pageTabs';
+import { usePageTab } from '@/lib/usePageTab';
+import { CORP_MEMBERS_TABS } from '@/features/corp/corpMembersTabs';
 
 /** The roster's filters, in the URL (ADR 0015); the table's sort is `CorpRosterTable`'s `?sort=`. */
 const FILTER_PARAMS = {
@@ -220,7 +231,7 @@ async function loadMembersSnapshot(
 }
 
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
-function CorpMembersView() {
+function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   const { t } = useTranslation();
   // The corp's own inactivity policy. Feeds `memberStanding` here so the
   // table's tone, the stat strip's count and the dark-only filter all narrow
@@ -329,119 +340,168 @@ function CorpMembersView() {
         }
       />
 
-      <DataGate
-        status={snapshot.loading && data === null ? 'busy' : loadFailed ? 'failed' : 'ok'}
-        title={t('common.couldntLoad')}
-        hint={t('corp.members.loadFailedHint')}
-        onRetry={snapshot.refresh}
-        resetKey={snapshot.activeCharacterId}
-        busy={<Spinner />}
-      >
-        <div className="space-y-2">
-          {data?.fromCache && (
-            <CachedNotice fetchedAt={data.fetchedAt} refreshFailed={snapshot.refreshCount > 0} />
-          )}
-          <FilterBar
-            value={rosterFilter}
-            onChange={(next) => setFilterParams(next)}
-            activeCount={activeFilterCount}
-            search={
-              <SearchInput
-                value={search}
-                onChange={(e) => setFilterParams({ q: e.target.value })}
-                placeholder={t('corp.members.searchPlaceholder')}
-                className="min-w-48 flex-1"
-              />
-            }
-            actions={<CorpRosterColumnPicker />}
-          >
-            {(draft, setDraft) => (
-              <>
-                <FilterChip
-                  label={t('corp.members.dark', { days: darkAfterDays })}
-                  count={darkCount}
-                  selected={draft.dark}
-                  onToggle={() => setDraft({ ...draft, dark: !draft.dark })}
-                  tooltip={t('corp.members.darkHint', { days: darkAfterDays })}
+      {tabs?.bar}
+
+      <MembersTabPanel slot={tabs}>
+        <DataGate
+          status={snapshot.loading && data === null ? 'busy' : loadFailed ? 'failed' : 'ok'}
+          title={t('common.couldntLoad')}
+          hint={t('corp.members.loadFailedHint')}
+          onRetry={snapshot.refresh}
+          resetKey={snapshot.activeCharacterId}
+          busy={<Spinner />}
+        >
+          <div className="space-y-2">
+            {data?.fromCache && (
+              <CachedNotice fetchedAt={data.fetchedAt} refreshFailed={snapshot.refreshCount > 0} />
+            )}
+            <FilterBar
+              value={rosterFilter}
+              onChange={(next) => setFilterParams(next)}
+              activeCount={activeFilterCount}
+              search={
+                <SearchInput
+                  value={search}
+                  onChange={(e) => setFilterParams({ q: e.target.value })}
+                  placeholder={t('corp.members.searchPlaceholder')}
+                  className="min-w-48 flex-1"
                 />
-                <FilterField label={t('corp.members.shipFilterLabel')}>
-                  <Select
-                    value={draft.ship === null ? ANY : String(draft.ship)}
-                    onValueChange={(value) =>
-                      setDraft({ ...draft, ship: value === ANY ? null : Number(value) })
-                    }
-                  >
-                    <SelectTrigger aria-label={t('corp.members.shipFilterLabel')} className="w-44">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ANY}>{t('corp.members.shipFilterAll')}</SelectItem>
-                      {shipOptions.map((option) => (
-                        <SelectItem key={option.id} value={String(option.id)}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FilterField>
-                <FilterField label={t('corp.members.locationFilterLabel')}>
-                  <Select
-                    value={draft.loc === null ? ANY : String(draft.loc)}
-                    onValueChange={(value) =>
-                      setDraft({ ...draft, loc: value === ANY ? null : Number(value) })
-                    }
-                  >
-                    <SelectTrigger
-                      aria-label={t('corp.members.locationFilterLabel')}
-                      className="w-56"
+              }
+              actions={<CorpRosterColumnPicker />}
+            >
+              {(draft, setDraft) => (
+                <>
+                  <FilterChip
+                    label={t('corp.members.dark', { days: darkAfterDays })}
+                    count={darkCount}
+                    selected={draft.dark}
+                    onToggle={() => setDraft({ ...draft, dark: !draft.dark })}
+                    tooltip={t('corp.members.darkHint', { days: darkAfterDays })}
+                  />
+                  <FilterField label={t('corp.members.shipFilterLabel')}>
+                    <Select
+                      value={draft.ship === null ? ANY : String(draft.ship)}
+                      onValueChange={(value) =>
+                        setDraft({ ...draft, ship: value === ANY ? null : Number(value) })
+                      }
                     >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ANY}>{t('corp.members.locationFilterAll')}</SelectItem>
-                      {locationOptions.map((option) => (
-                        <SelectItem key={option.id} value={String(option.id)}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FilterField>
-              </>
-            )}
-          </FilterBar>
-          <Panel padded={false}>
-            <div className="space-y-2 p-3">
-              <CorpRosterStats rows={rows} />
-              <CorpRosterSummary
-                diff={data?.diff ?? EMPTY_ROSTER_DIFF}
-                names={data?.labels.characters ?? EMPTY_MEMBER_LABELS.characters}
-              />
-            </div>
-            {rows.length > 0 && visibleRows.length === 0 ? (
-              // The roster has members; the search/filters hid them all. The
-              // table's own empty state says EVE sent nothing, which would be wrong here.
-              <EmptyState
-                title={t('corp.members.noFilterMatches')}
-                hint={t('corp.members.noFilterMatchesHint')}
-                className="py-8"
-                action={
-                  <Button
-                    size="sm"
-                    onClick={() => setFilterParams({ q: '', dark: false, ship: null, loc: null })}
-                  >
-                    {t('common.resetFilters')}
-                  </Button>
-                }
-              />
-            ) : (
-              <CorpRosterTable rows={visibleRows} tableProps={membersExport.tableProps} />
-            )}
-          </Panel>
-        </div>
-      </DataGate>
+                      <SelectTrigger
+                        aria-label={t('corp.members.shipFilterLabel')}
+                        className="w-44"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ANY}>{t('corp.members.shipFilterAll')}</SelectItem>
+                        {shipOptions.map((option) => (
+                          <SelectItem key={option.id} value={String(option.id)}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FilterField>
+                  <FilterField label={t('corp.members.locationFilterLabel')}>
+                    <Select
+                      value={draft.loc === null ? ANY : String(draft.loc)}
+                      onValueChange={(value) =>
+                        setDraft({ ...draft, loc: value === ANY ? null : Number(value) })
+                      }
+                    >
+                      <SelectTrigger
+                        aria-label={t('corp.members.locationFilterLabel')}
+                        className="w-56"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ANY}>{t('corp.members.locationFilterAll')}</SelectItem>
+                        {locationOptions.map((option) => (
+                          <SelectItem key={option.id} value={String(option.id)}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FilterField>
+                </>
+              )}
+            </FilterBar>
+            <Panel padded={false}>
+              <div className="space-y-2 p-3">
+                <CorpRosterStats rows={rows} />
+                <CorpRosterSummary
+                  diff={data?.diff ?? EMPTY_ROSTER_DIFF}
+                  names={data?.labels.characters ?? EMPTY_MEMBER_LABELS.characters}
+                />
+              </div>
+              {rows.length > 0 && visibleRows.length === 0 ? (
+                // The roster has members; the search/filters hid them all. The
+                // table's own empty state says EVE sent nothing, which would be wrong here.
+                <EmptyState
+                  title={t('corp.members.noFilterMatches')}
+                  hint={t('corp.members.noFilterMatchesHint')}
+                  className="py-8"
+                  action={
+                    <Button
+                      size="sm"
+                      onClick={() => setFilterParams({ q: '', dark: false, ship: null, loc: null })}
+                    >
+                      {t('common.resetFilters')}
+                    </Button>
+                  }
+                />
+              ) : (
+                <CorpRosterTable rows={visibleRows} tableProps={membersExport.tableProps} />
+              )}
+            </Panel>
+          </div>
+        </DataGate>
+      </MembersTabPanel>
     </div>
   );
+}
+
+/**
+ * Members, plus a Roles tab for a Director whose grant holds the titles scope
+ * (`canReadRoleAudit`; otherwise no tab bar at all: hide, do not lock, and the
+ * Roles path moves to the roster). Exactly one tab's view is mounted: the
+ * roster's loader records the roster baseline (`rosterState`), so it must not
+ * run, and consume a change unseen, while the Roles tab is the one on screen.
+ */
+function CorpMembersTabs({ canReadRoleAudit }: { canReadRoleAudit: boolean }) {
+  const { t } = useTranslation();
+  const tabsId = useTabsId();
+  const location = useLocation();
+  const [tab, selectTab] = usePageTab(CORP_MEMBERS_TABS);
+  if (!canReadRoleAudit) {
+    if (tab === 'roles') {
+      return (
+        <Navigate
+          replace
+          to={{ pathname: tabPath(CORP_MEMBERS_TABS, 'members'), search: location.search }}
+        />
+      );
+    }
+    return <CorpMembersView tabs={null} />;
+  }
+  const tabs: MembersTabsSlot = {
+    tabsId,
+    tabId: tab,
+    bar: (
+      <Tabs
+        tabsId={tabsId}
+        label={t('corp.members.title')}
+        value={tab}
+        onChange={(id) => selectTab(id as typeof tab)}
+        tabs={[
+          { id: 'members', label: t('corp.membersTab') },
+          { id: 'roles', label: t('corp.roles.tab') },
+        ]}
+      />
+    ),
+  };
+  return tab === 'roles' ? <CorpRoleAudit tabs={tabs} /> : <CorpMembersView tabs={tabs} />;
 }
 
 export function CorpMembers() {
@@ -459,7 +519,7 @@ export function CorpMembers() {
         />
       </div>
     ) : gate.status === 'ready' ? (
-      <CorpMembersView />
+      <CorpMembersTabs canReadRoleAudit={gate.capabilities.canReadRoleAudit} />
     ) : null;
 
   return <CorpRolesGate gate={gate}>{content}</CorpRolesGate>;

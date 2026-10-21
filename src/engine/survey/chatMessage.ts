@@ -315,6 +315,7 @@ export function surveyChatMessage(
 
   // Dearest unit first, as the page lists them.
   const present = summary.ores.filter((o) => o.rocks > 0);
+  // Chat message: fixed English format, not the Number format setting.
   const num = (n: number): string => Math.round(n).toLocaleString('en-US');
   const sidePx = textWidth(frame.side);
   // Everything that is "left" shares one line, each fact with its own unit; no facts, no "Left:".

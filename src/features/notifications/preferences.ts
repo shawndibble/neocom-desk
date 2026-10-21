@@ -14,6 +14,7 @@
  * of this store's own local row. See `syncedPreferences.ts`.
  */
 import { setSyncedSetting, scheduleSync } from '@/sync';
+import { quietHoursPayload } from './quietTime';
 import { scheduleProjectionRebuild } from './projectionRebuildScheduler';
 import {
   isEventEnabledFor,
@@ -150,7 +151,13 @@ function projectionInputs(value: NotificationPreferencesValue): string {
     // An all-default Character reads the same as an absent one.
     if (entry !== DEFAULT_PROJECTION_ENTRY) characters[id] = entry;
   }
-  return JSON.stringify([value.masterEnabled, isBrowserChannelEnabled(value), characters]);
+  // Quiet time rides the same upload as the Projection, so a change re-uploads.
+  return JSON.stringify([
+    value.masterEnabled,
+    isBrowserChannelEnabled(value),
+    characters,
+    quietHoursPayload(value),
+  ]);
 }
 
 /**

@@ -19,6 +19,7 @@
  *
  * On a phone the panel folds above the route, with chips naming the rules on.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useId, useState } from 'react';
@@ -161,9 +162,9 @@ function RouteJumpFields({
             options={[
               {
                 value: 'short' as const,
-                label: t('travel.jumpDrive.short', { ly: (maxLy * SHORT_JUMP_SHARE).toFixed(1) }),
+                label: t('travel.jumpDrive.short', { ly: fixed1(maxLy * SHORT_JUMP_SHARE) }),
               },
-              { value: 'max' as const, label: t('travel.jumpDrive.max', { ly: maxLy.toFixed(1) }) },
+              { value: 'max' as const, label: t('travel.jumpDrive.max', { ly: fixed1(maxLy) }) },
             ]}
             value={jump.range}
             onChange={jump.onRangeChange}

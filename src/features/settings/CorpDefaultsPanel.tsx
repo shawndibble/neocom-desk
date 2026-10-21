@@ -1,9 +1,14 @@
 import { useTranslation } from 'react-i18next';
-import { Fields, Panel, Spinner } from '@/components/ui';
+import { Fields, Panel } from '@/components/ui';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useDarkThreshold, DARK_AFTER_DAY_OPTIONS } from '@/features/corp/darkThreshold';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
-import { ChipRow, DefaultsSyncHint } from '@/features/settings/settingsFields';
+import {
+  ChipRow,
+  DefaultsSyncHint,
+  SettingsHint,
+  SettingsPanelLoading,
+} from '@/features/settings/settingsFields';
 
 /**
  * The corp roster's inactivity policy. The rail lists it only for a Character
@@ -21,21 +26,15 @@ export function CorpDefaultsPanel() {
   // Reachable by URL even when the rail hides it, so say why it is empty.
   if (access.state !== 'ready') {
     return (
-      <Panel title={t('settings.corpDefaultsTitle')}>
-        <p className="text-xs text-text-dim">{t('settings.corpUnavailable')}</p>
+      <Panel>
+        <SettingsHint>{t('settings.corpUnavailable')}</SettingsHint>
       </Panel>
     );
   }
-  if (!hydrated) {
-    return (
-      <Panel title={t('settings.corpDefaultsTitle')}>
-        <Spinner />
-      </Panel>
-    );
-  }
+  if (!hydrated) return <SettingsPanelLoading />;
 
   return (
-    <Panel title={t('settings.corpDefaultsTitle')}>
+    <Panel>
       <div className="space-y-4">
         <DefaultsSyncHint />
         <Fields variant="form">

@@ -4,6 +4,7 @@
  * for Fast Refresh to find) since these are plain render functions, not
  * components — same precedent as `route/jumpsCell.tsx`.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { HintText } from '@/components/ui/HintText';
 import type { TFunction } from 'i18next';
 import { Tooltip } from '@/components/ui';
@@ -15,6 +16,7 @@ import {
 } from '@/engine/market/orderBook';
 import { securityStatusColor } from '@/engine/securityStatus';
 import type { RegionOrder } from '@/esi/endpoints';
+import { formatCount } from '@/lib/formatCount';
 
 export interface LocationCellProps {
   order: RegionOrder;
@@ -56,7 +58,7 @@ export function LocationCell({
 /** Security dropped from `LocationCell` (see above) lives here instead, as its own optional column. */
 export function SecurityCell({ order, npcStations, solarSystems, t }: LocationCellProps) {
   const { security } = resolveOrderLocation(order, npcStations, solarSystems);
-  const value = security.toFixed(1);
+  const value = fixed1(security);
   return (
     <HintText
       content={t('market.securityAriaLabel', { value })}
@@ -76,7 +78,7 @@ export function SecurityCell({ order, npcStations, solarSystems, t }: LocationCe
  */
 export function BaitFlag({ multiple, t }: { multiple: number | null; t: TFunction }) {
   if (multiple === null) return null;
-  const times = Math.round(multiple).toLocaleString();
+  const times = formatCount(multiple);
   return (
     <Tooltip content={t('market.baitHint', { times })}>
       <span

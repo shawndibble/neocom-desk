@@ -25,7 +25,7 @@ describe('IndustrySettingsForm', () => {
 
     expect(
       await screen.findByRole('spinbutton', { name: /Assumed ME/ })
-    ).toHaveAccessibleDescription(/quoted at this ME/);
+    ).toHaveAccessibleDescription(/Quotes new plans and sub-builds at this ME/);
   });
 
   it('shows only assumed ME for Opportunities, the one input it prices with', async () => {

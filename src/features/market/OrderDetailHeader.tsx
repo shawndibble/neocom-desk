@@ -13,6 +13,7 @@ import { OrderDoThisText } from './OrderDoThisText';
 import { isOffHubStation } from './hubStation';
 import { CopyPriceButton } from './CopyablePrice';
 import { MarketItemLink } from './MarketItemLink';
+import { formatCount } from '@/lib/formatCount';
 
 /** The modal's top: who and where, the verdict (or the short call), Copy and the item's market links. */
 export function OrderDetailHeader({
@@ -54,8 +55,8 @@ export function OrderDetailHeader({
         {' · '}
         {t(row.isBuyOrder ? 'orders.buy' : 'orders.sell')} ·{' '}
         {t('market.orders.detail.unitsLeft', {
-          remain: row.volumeRemain.toLocaleString(),
-          total: row.volumeTotal.toLocaleString(),
+          remain: formatCount(row.volumeRemain),
+          total: formatCount(row.volumeTotal),
         })}
       </p>
 

@@ -1,3 +1,5 @@
+import { createNumberFormat } from '@/lib/numberLocale';
+import { formatCount } from '@/lib/formatCount';
 import { Fragment, useMemo, type ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -46,9 +48,9 @@ function capText(t: TFunction, capacitor: CapacitorStatus): string {
     : t('fittings.capGuide.emptyIn', { time: formatSeconds(capacitor.depletesInSeconds) });
 }
 
-const gjText = (gj: number) =>
-  gj.toLocaleString('en-US', { maximumFractionDigits: gj < 10 ? 1 : 0 });
-const iskGjText = (isk: number) => isk.toLocaleString('en-US', { maximumSignificantDigits: 2 });
+const gjOnePlace = createNumberFormat({ maximumFractionDigits: 1 });
+const gjText = (gj: number) => (gj < 10 ? gjOnePlace(gj) : formatCount(gj));
+const iskGjText = createNumberFormat({ maximumSignificantDigits: 2 });
 
 function rowLabel(t: TFunction, c: ChargeChoice, worse: ChargeChoice | null): string {
   const cap = c.cap!;

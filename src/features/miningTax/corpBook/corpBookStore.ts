@@ -8,19 +8,31 @@
  * engine's shapes. Every write is a callable; the only one a player makes is
  * claiming their own Unmatched donation.
  */
-import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore/lite';
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  type QuerySnapshot,
+} from 'firebase/firestore/lite';
 import { httpsCallable } from 'firebase/functions';
 import { db as localDb } from '@/db';
-import type { TaxPayment } from '@/engine/corpTaxBook/allocation';
+import type { RecordedWriteOff, TaxPayment } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
+import { ownerRefinerySystemsToLearn } from '@/engine/corpTaxBook/refinery';
+import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
-import type { Statement } from '@/engine/corpTaxBook/statements';
+import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
+import { loadStructureName } from '@/features/character/structures';
 import type { ObservedMiningEntry, ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { underFirebaseSession } from '@/features/communities/pledgeWrites';
+import { refineryPlaceholder } from '@/features/corp/moons/moonsFormat';
 
 type Data = Record<string, unknown>;
 
@@ -62,6 +74,21 @@ export interface LoadedCorpBook {
   characterIds: number[];
   /** Which of them are in the corporation now; none means every one has left (Leavers keep read access). */
   memberCharacterIds: number[];
+  /** Each moon owner's coverage and read clock, when the book lets this reader see them (#4622). */
+  feeders?: MemberFeederCoverage[];
+  /** The tracked Characters' own corrections (#4622). */
+  adjustments?: Adjustment[];
+  /** The tracked Characters' own officer write-offs (#4637). */
+  writeOffs?: RecordedWriteOff[];
+  /** Refinery names, where a Statement or ESI gave one (#4622). */
+  structureNames?: Record<number, string>;
+}
+
+/** A moon owner's coverage and read clock as the miner reads them: never a name, payee or rate. */
+export interface MemberFeederCoverage {
+  corporationId: number;
+  coveragePeriods: { from: string; to?: string }[];
+  lastReadWellAt?: string;
 }
 
 const num = (v: unknown): number | undefined =>
@@ -81,7 +108,9 @@ export function readBookSettings(corporationId: number, d: Data | undefined, now
     const rate = r as Data;
     return (
       num(rate.pct) !== undefined &&
-      ['corp', 'guest', 'miner', 'moon', 'record'].includes(String(rate.scope))
+      ['corp', 'guest', 'feeder', 'miner', 'moon', 'structure', 'record'].includes(
+        String(rate.scope)
+      )
     );
   });
   const syncedAt = num((d.lastSync as Data | null | undefined)?.at);
@@ -116,6 +145,7 @@ export function readObservedRow(d: Data): ObservedRow | null {
   }
   const solarSystemId = num(d.solarSystemId);
   const moonId = num(d.moonId);
+  const sourceCorporationId = num(d.sourceCorporationId);
   return {
     structureId,
     characterId,
@@ -126,6 +156,7 @@ export function readObservedRow(d: Data): ObservedRow | null {
     cachedAt: str(d.cachedAt) ?? '1970-01-01T00:00:00Z',
     ...(solarSystemId !== undefined ? { solarSystemId } : {}),
     ...(moonId !== undefined ? { moonId } : {}),
+    ...(sourceCorporationId !== undefined ? { sourceCorporationId } : {}),
   };
 }
 
@@ -205,6 +236,92 @@ export function readMiner(id: string, d: Data): Miner | null {
   return { id, characterIds, mainCharacterId: num(d.mainCharacterId) ?? characterIds[0] };
 }
 
+/** `corpTaxBooks/{book}/feederCoverage/{corp}`, written by the server (#4622). */
+export function readFeederCoverage(id: string, d: Data): MemberFeederCoverage | null {
+  const corporationId = Number(id);
+  if (!Number.isSafeInteger(corporationId) || corporationId <= 0) return null;
+  if (!Array.isArray(d.coveragePeriods)) return null;
+  const coveragePeriods = d.coveragePeriods.flatMap((p) => {
+    const from = str((p as Data | null)?.from);
+    if (!from) return [];
+    const to = str((p as Data).to);
+    return [{ from, ...(to !== undefined ? { to } : {}) }];
+  });
+  const readAt = num(d.lastReadWellAt);
+  return {
+    corporationId,
+    coveragePeriods,
+    ...(readAt !== undefined ? { lastReadWellAt: new Date(readAt).toISOString() } : {}),
+  };
+}
+
+export function readAdjustment(id: string, d: Data): Adjustment | null {
+  const minerId = str(d.minerId);
+  const date = str(d.date);
+  const amount = num(d.amount);
+  if (!minerId || !date || amount === undefined) return null;
+  return {
+    id,
+    minerId,
+    date,
+    amount,
+    reason: str(d.reason) ?? '',
+    by: num(d.by) ?? 0,
+    at: str(d.at) ?? '',
+  };
+}
+
+export function readWriteOff(id: string, d: Data): RecordedWriteOff | null {
+  const minerId = str(d.minerId);
+  const amount = num(d.amount);
+  const at = str(d.at);
+  if (!minerId || amount === undefined || !at) return null;
+  const statementId = str(d.statementId);
+  return {
+    id,
+    minerId,
+    amount,
+    at,
+    reason: str(d.reason) ?? '',
+    ...(statementId ? { statementId } : {}),
+  };
+}
+
+/** Refinery names the Statements were issued with; the officer side's placeholder (older Statements) is no name. */
+export function refineryNamesOf(
+  statements: readonly { refineryNames?: Record<string, string> }[]
+): Record<number, string> {
+  const out: Record<number, string> = {};
+  for (const s of statements) {
+    for (const [id, name] of Object.entries(s.refineryNames ?? {})) {
+      const structureId = Number(id);
+      if (!Number.isSafeInteger(structureId) || typeof name !== 'string') continue;
+      if (name.trim() === '' || name === refineryPlaceholder(id)) continue;
+      out[structureId] = name;
+    }
+  }
+  return out;
+}
+
+/** Names ESI gives the miner's own Characters for refineries no Statement named. Never throws. */
+async function namesFromEsi(
+  observed: readonly { structureId: number; characterId: number }[],
+  known: Record<number, string>
+): Promise<Record<number, string>> {
+  const out: Record<number, string> = {};
+  const asked = new Set<number>();
+  for (const o of observed) {
+    if (known[o.structureId] !== undefined || asked.has(o.structureId)) continue;
+    asked.add(o.structureId);
+    const name = await loadStructureName(o.characterId, o.structureId).catch(() => null);
+    if (name) out[o.structureId] = name;
+  }
+  return out;
+}
+
+/** A read the rules may not allow yet (a newer collection before its rules deploy): none, never a failed book. */
+const orNone = <T>(read: Promise<T>): Promise<T | null> => read.catch(() => null);
+
 function mergeById<T extends { id: string }>(lists: readonly (readonly T[])[]): T[] {
   return [...new Map(lists.flat().map((x) => [x.id, x])).values()];
 }
@@ -233,19 +350,53 @@ export async function loadCorpBooks(
     for (const corporationId of remembered[c.characterId] ?? []) {
       entry(corporationId).characterIds.add(c.characterId);
     }
+    // The books that bill this Character, whatever corporation they are in (#4517).
+    for (const corporationId of await readBilledBy(c.characterId)) {
+      entry(corporationId).characterIds.add(c.characterId);
+      entry(corporationId).members.add(c.characterId);
+    }
   }
   const books: LoadedCorpBook[] = [];
   for (const [corporationId, { characterIds, members }] of byCorp) {
     try {
       const book = await underFirebaseSession(() => readOneBook(corporationId, [...characterIds]));
       if (!book) continue;
-      books.push({ ...book, memberCharacterIds: [...members] });
+      // ESI names what no Statement did; no Firebase session needed for that.
+      const named = book.structureNames ?? {};
+      const structureNames = { ...named, ...(await namesFromEsi(book.observed, named)) };
+      books.push({ ...book, structureNames, memberCharacterIds: [...members] });
       await rememberCorp(book.characterIds, corporationId);
     } catch {
       // Quiet by design: see above.
     }
   }
   return books;
+}
+
+/**
+ * The corporations whose books bill a Character, from the pointer the sync writes
+ * (rules: only that Character reads it). A moon owner's miner is billed by a book
+ * that is not their corporation's; nothing else would lead the client to it.
+ */
+export function readBilledByPointer(d: Data | undefined): number[] {
+  const books = d?.books;
+  if (typeof books !== 'object' || books === null) return [];
+  return Object.keys(books)
+    .map(Number)
+    .filter((id) => Number.isInteger(id) && id > 0);
+}
+
+async function readBilledBy(characterId: number): Promise<number[]> {
+  try {
+    return await underFirebaseSession(async () => {
+      const uid = await ensureSignedIn(characterId);
+      const snap = await getDoc(doc(getSyncFirestore(), 'corpTaxBookBilledBy', uid));
+      return readBilledByPointer(snap.data());
+    });
+  } catch {
+    // Offline or signed out: the current and remembered corporations still load.
+    return [];
+  }
 }
 
 const REMEMBERED_KEY = 'corpTaxBookCorps';
@@ -291,15 +442,44 @@ async function readOneBook(
   const dismissals: Dismissal[][] = [];
   const statements: Statement[][] = [];
   const miners: Miner[][] = [];
+  const adjustments: Adjustment[][] = [];
+  const writeOffs: RecordedWriteOff[][] = [];
+  let feeders: MemberFeederCoverage[] | null = null;
   for (const characterId of characterIds) {
     const uid = await ensureSignedIn(characterId);
-    const [observedSnap, paymentSnap, dismissalSnap, statementSnap, minerSnap] = await Promise.all([
+    // Readable by a Character the book bills; any one of them will do.
+    const coverageRead: Promise<QuerySnapshot | null> =
+      feeders === null
+        ? orNone(getDocs(collection(fs, root, 'feederCoverage')))
+        : Promise.resolve(null);
+    const own = (name: string) =>
+      orNone(getDocs(query(collection(fs, root, name), where('uids', 'array-contains', uid))));
+    const [
+      observedSnap,
+      paymentSnap,
+      dismissalSnap,
+      statementSnap,
+      minerSnap,
+      adjustmentSnap,
+      writeOffSnap,
+      coverageSnap,
+    ] = await Promise.all([
       getDocs(query(collection(fs, root, 'observed'), where('uid', '==', uid))),
       getDocs(query(collection(fs, root, 'payments'), where('uid', '==', uid))),
       getDocs(query(collection(fs, root, 'dismissals'), where('uids', 'array-contains', uid))),
       getDocs(query(collection(fs, root, 'statements'), where('uids', 'array-contains', uid))),
       getDocs(query(collection(fs, root, 'miners'), where('uids', 'array-contains', uid))),
+      own('adjustments'),
+      own('writeOffs'),
+      coverageRead,
     ]);
+    adjustments.push(
+      adjustmentSnap?.docs.flatMap((d) => readAdjustment(d.id, d.data()) ?? []) ?? []
+    );
+    writeOffs.push(writeOffSnap?.docs.flatMap((d) => readWriteOff(d.id, d.data()) ?? []) ?? []);
+    if (coverageSnap) {
+      feeders = coverageSnap.docs.flatMap((d) => readFeederCoverage(d.id, d.data()) ?? []);
+    }
     for (const d of observedSnap.docs) {
       const row = readObservedRow(d.data());
       if (row) rows.push(row);
@@ -315,14 +495,20 @@ async function readOneBook(
     statements.push(statementSnap.docs.flatMap((d) => readStatement(d.id, d.data()) ?? []));
     miners.push(minerSnap.docs.flatMap((d) => readMiner(d.id, d.data()) ?? []));
   }
+  const merged = mergeById(statements);
+  const structureNames = refineryNamesOf(merged as { refineryNames?: Record<string, string> }[]);
   return {
     ...settings,
     observed: groupObservedEntries(rows),
+    ...(feeders ? { feeders } : {}),
+    adjustments: mergeById(adjustments),
+    writeOffs: mergeById(writeOffs),
+    structureNames,
     payments: mergeById([payments]),
     held,
     claimable: mergeById([claimable]),
     dismissals: mergeById(dismissals),
-    statements: mergeById(statements),
+    statements: merged,
     miners: mergeById(miners),
     characterIds: [...characterIds],
     memberCharacterIds: [...characterIds],
@@ -358,4 +544,51 @@ export async function claimCorpTaxBookPayment(
     )({ corporationId, paymentId });
     return result.data;
   });
+}
+
+/** The server's `MAX_LEARNED_SYSTEMS`: it refuses a longer call. */
+const MAX_LEARNED_SYSTEMS = 50;
+/** `corp:structure` already reported this session, so a reload does not send them again. */
+const reportedSystems = new Set<string>();
+
+/**
+ * Tells each book the systems the member's own ledger places its moon owner refineries in
+ * (#4650): a moon owner's rows rarely carry one, and only the miner holds their own ledger.
+ * Each Character reports under its own session, for the refineries it mined at. Never throws:
+ * the personal ledger never waits on, or breaks with, a book.
+ */
+export async function teachRefinerySystems(
+  books: readonly Pick<LoadedCorpBook, 'corporationId' | 'characterIds' | 'observed'>[],
+  personal: readonly MiningLedgerEntry[]
+): Promise<void> {
+  for (const book of books) {
+    for (const characterId of book.characterIds) {
+      // Matching is entries × ledger: skip what this session already reported first.
+      const entries = book.observed.filter(
+        (o) =>
+          o.characterId === characterId &&
+          !reportedSystems.has(`${book.corporationId}:${o.structureId}`)
+      );
+      if (entries.length === 0) continue;
+      const learned = ownerRefinerySystemsToLearn(
+        entries,
+        personal.filter((e) => e.characterId === characterId)
+      );
+      const fresh = Object.entries(learned).slice(0, MAX_LEARNED_SYSTEMS);
+      if (fresh.length === 0) continue;
+      for (const [id] of fresh) reportedSystems.add(`${book.corporationId}:${id}`);
+      try {
+        await underFirebaseSession(async () => {
+          await ensureSignedIn(characterId);
+          await httpsCallable<{ corporationId: number; systems: Record<string, number> }>(
+            getSyncFunctions(),
+            'learnCorpTaxBookRefinerySystemsCallable'
+          )({ corporationId: book.corporationId, systems: Object.fromEntries(fresh) });
+        });
+      } catch {
+        // Quiet by design: a later load tries again.
+        for (const [id] of fresh) reportedSystems.delete(`${book.corporationId}:${id}`);
+      }
+    }
+  }
 }

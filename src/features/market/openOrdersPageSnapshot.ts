@@ -68,6 +68,8 @@ export interface OpenOrdersPageSnapshot {
   /** Each order's own standing toward its station's NPC owner (issue #1238). Keyed orderId — see `openOrdersModel.ts`'s `standingsByOrder`. */
   standingsByOrder: Map<number, ResolvedStandings>;
   now: number;
+  /** Set only by the Corporation source (`corpOpenOrders.ts`). */
+  corporation?: { needsReauth: boolean };
 }
 
 export async function loadOpenOrdersSnapshot(

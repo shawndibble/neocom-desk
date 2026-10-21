@@ -18,6 +18,8 @@
  * items split on `is_included` into what the issuer hands over ("Included")
  * vs what the acceptor must supply ("Requested").
  */
+import { createNumberFormat } from '@/lib/numberLocale';
+import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { useEffect, useMemo, useState } from 'react';
@@ -75,8 +77,12 @@ import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { Contract, ContractItem } from '@/esi/endpoints';
 
+const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
+
 export interface ContractDetailModalProps {
   characterId: number;
+  /** Set for a corporation's contract: its items are read through the corp route. */
+  corporationId?: number;
   contract: Contract;
   issuerName: string;
   /** Omitted (not just null) by a caller that hasn't computed one — same as null, no tag renders. */
@@ -131,6 +137,7 @@ const HAS_ITEMS = new Set<Contract['type']>(['item_exchange', 'auction']);
 
 export function ContractDetailModal({
   characterId,
+  corporationId,
   contract,
   issuerName,
   issuerStanding = null,
@@ -196,7 +203,11 @@ export function ContractDetailModal({
     void (async () => {
       setItems(undefined);
       setItemsFailed(false);
-      const outcome = await loadContractItemsDetailed(characterId, contract.contract_id);
+      const outcome = await loadContractItemsDetailed(
+        characterId,
+        contract.contract_id,
+        corporationId
+      );
       if (outcome.result === null) {
         if (cancelled) return;
         // ESI answered 404: this contract has no item lines (it is gone, or never had
@@ -213,7 +224,7 @@ export function ContractDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [characterId, contract.type, contract.contract_id, itemsAttempt]);
+  }, [characterId, corporationId, contract.type, contract.contract_id, itemsAttempt]);
 
   const priceCheck = useOwnContractPriceCheck({
     contract,
@@ -260,7 +271,7 @@ export function ContractDetailModal({
       align: 'right',
       className: 'tabular-nums',
       sortValue: (item) => item.quantity,
-      render: (item) => item.quantity.toLocaleString(),
+      render: (item) => formatCount(item.quantity),
     },
   ];
 
@@ -282,7 +293,7 @@ export function ContractDetailModal({
   const hasItemLines = items !== undefined && items.list.length > 0;
   const volumeText =
     contract.volume !== undefined && contract.volume > 0
-      ? `${contract.volume.toLocaleString()} m³`
+      ? `${formatDecimal(contract.volume)} m³`
       : null;
   // A contract that can still be taken counts down; one that has lapsed or is
   // over shows the date instead, since "Expires in 0m" would say nothing.

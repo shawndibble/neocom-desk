@@ -7,9 +7,19 @@
  * `charges`, `statements`, `allocation`, `overdue` and `extraction`; this
  * module only joins them per Miner, per day and per Extraction.
  */
-import { allocatePayments, dismissalCredits, type Allocation, type TaxPayment } from './allocation';
+import {
+  allocatePayments,
+  dismissalCredits,
+  isBeforeBook,
+  type Allocation,
+  type DismissalCredit,
+  type RecordedWriteOff,
+  type TaxPayment,
+} from './allocation';
 import { lastBillableDate } from './billable';
+import { splitByCoverageAndRead, type FeederReadClock } from './feederHealth';
 import { buildDayCharges, type DayCharge, type Miner } from './charges';
+import type { FeederCoverage } from './coverage';
 import { activeDismissalFor, type Dismissal } from './dismissals';
 import {
   chunkRateFor,
@@ -23,6 +33,7 @@ import {
 import { overdueStatus, type Declaration } from './overdue';
 import {
   draftStatement,
+  frozenDayRate,
   issueStatement,
   statementPeriod,
   type Adjustment,
@@ -62,10 +73,24 @@ export interface BookViewInput {
   dismissals: readonly Dismissal[];
   declarations: readonly Declaration[];
   adjustments: readonly Adjustment[];
+  /** Officer write-offs (#4637): each reduces what its Miner owes. */
+  writeOffs?: readonly RecordedWriteOff[];
+  /**
+   * Feeders' last good ledger reads. A feeder's refinery days are withheld until
+   * one lands after the day's grace (#4509), and a day outside its coverage owes
+   * nothing (#4618); absent means no feeders.
+   */
+  feeders?: readonly (FeederReadClock & FeederCoverage)[];
   extractions: readonly SyncExtraction[];
   paidStatementIds: ReadonlySet<string>;
   /** The day's prices at the book's hub and Ore Form, by raw type id. */
   pricesOn: (date: string) => Pick<DayPrices, 'prices' | 'sources'>;
+  /**
+   * A moon owner's prices by raw type id (#4621): the server's rule for the moon owner's own
+   * page (`moonOwnerUnitPrice`), so the Moon owners tab, Pay… and that page owe one figure.
+   * Absent: `pricesOn`.
+   */
+  moonOwnerPricesOn?: (date: string) => ReadonlyMap<number, number>;
   /** Ore of chunks with no notification, estimated from a linked Moon Ore Survey (D13), by extraction id. */
   surveyOreLines?: ReadonlyMap<string, readonly OreLine[]>;
   /** Current members, when the viewer can read the roster; else standing comes from the ledger. */
@@ -166,6 +191,10 @@ export interface BookView {
   input: BookViewInput;
   charges: DayCharge[];
   beforeBook: ObservedMiningEntry[];
+  /** Moon owner rows outside their coverage: kept, owe nothing, like "Before the book". */
+  outsideCoverage: ObservedMiningEntry[];
+  /** Donations dated before the start date: counted for officers, never credited or listed. */
+  donationsBeforeBook: number;
   unrated: ObservedMiningEntry[];
   billableThrough: string | undefined;
   miners: MinerRow[];
@@ -220,26 +249,37 @@ function toTaxPayments(payments: readonly SettlePayment[], minerId: string): Tax
   return payments.filter((p): p is TaxPayment => p.minerId === minerId);
 }
 
-/** What the Statement lines billed for one day, as issued: summed quantities and tax, the first line's prices and rate. */
-function frozenDay(lines: readonly StatementLine[]) {
+/**
+ * What the Statement lines billed for one day, as issued: summed quantities and
+ * tax, the first line's prices, and the rate the lines came to (`frozenDayRate`).
+ */
+function frozenDay(lines: readonly StatementLine[], charge: DayCharge) {
   const first = lines[0];
   const byType = new Map<number, number>();
   for (const l of lines)
     for (const o of l.oreLines) byType.set(o.typeId, (byType.get(o.typeId) ?? 0) + o.quantity);
-  const taxPct = first?.taxPct;
+  // A line with no effective-from was a per-record override: never borrow today's.
+  const rate = frozenDayRate(lines, { taxPct: charge.taxPct });
   return {
     oreLines: [...byType].map(([typeId, quantity]) => ({ typeId, quantity })),
     unitPrices: first?.unitPrices ?? {},
     estimatedValue: lines.reduce((sum, l) => sum + l.estimatedValue, 0),
-    taxPct: taxPct ?? 0,
-    rateEffectiveFrom: first?.rateEffectiveFrom,
+    taxPct: rate.taxPct,
+    rateEffectiveFrom: rate.rateEffectiveFrom,
     tax: lines.reduce((sum, l) => sum + l.tax, 0),
   };
 }
 
 export function buildBookView(input: BookViewInput): BookView {
   const placeOf = placeOfFactory(input.extractions, input.structureExpiryHours);
-  const { charges, beforeBook, unrated } = buildDayCharges(input.entries, {
+  // Coverage first: a moon owner's day outside it owes nothing, so it never holds a miner's day.
+  const { readable: entries, outsideCoverage } = splitByCoverageAndRead(input.entries, {
+    now: input.now,
+    graceHours: input.graceHours,
+    bookCorporationId: input.corporationId,
+    feeders: input.feeders ?? [],
+  });
+  const { charges, beforeBook, unrated } = buildDayCharges(entries, {
     corporationId: input.corporationId,
     startDate: input.startDate,
     miners: input.miners,
@@ -278,14 +318,21 @@ export function buildBookView(input: BookViewInput): BookView {
     const characterIds = grouping?.characterIds ?? (solo ? [Number(solo[1])] : []);
     const mainCharacterId = grouping?.mainCharacterId ?? characterIds[0] ?? 0;
     const statements = input.statements.filter((s) => s.minerId === id);
-    const payments = toTaxPayments(input.payments, id);
+    // A donation before the book is neither credited nor shown as a payment.
+    const payments = toTaxPayments(input.payments, id).filter(
+      (p) => p.source !== 'donation' || !isBeforeBook(p.at, input.startDate)
+    );
     const mine = charges.filter((c) => c.minerId === id);
 
+    const credits = dismissalCredits(statements, input.dismissals, mine);
     const allocation = allocatePayments({
       statements,
       payments,
-      dismissalCredits: dismissalCredits(statements, input.dismissals, mine),
+      dismissalCredits: credits,
+      officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === id),
+      startDate: input.startDate,
     });
+    const forgivenKeys = forgivenDayKeys(statements, allocation, credits);
     const draft = draftStatement({
       minerId: id,
       startDate: input.startDate,
@@ -320,13 +367,14 @@ export function buildBookView(input: BookViewInput): BookView {
         if (dismissal || dismissedKeys.has(c.key)) status = 'dismissed';
         else if (writtenOffKeys.has(c.key)) status = 'written-off';
         else if (unbilledKeys.has(c.key)) status = 'unbilled';
+        else if (statement && forgivenKeys.has(c.key)) status = 'written-off';
         else if (statement)
           status = allocation.byStatement.get(statement.id)?.settled ? 'paid' : 'on-statement';
         else status = 'not-billable';
         // A day on an issued Statement is frozen (D22): its lines, never today's prices.
         const frozen =
-          statement && (status === 'on-statement' || status === 'paid')
-            ? frozenDay(linesBy.get(c.key) ?? [])
+          statement && (status === 'on-statement' || status === 'paid' || forgivenKeys.has(c.key))
+            ? frozenDay(linesBy.get(c.key) ?? [], c)
             : undefined;
         if (frozen) frozenByKey.set(c.key, frozen);
         const value = frozen ?? {
@@ -442,8 +490,10 @@ export function buildBookView(input: BookViewInput): BookView {
       });
     }
   }
+  let donationsBeforeBook = 0;
   for (const p of input.payments) {
-    if (!p.minerId) needsYou.push({ kind: 'unmatched', payment: p });
+    if (p.source === 'donation' && isBeforeBook(p.at, input.startDate)) donationsBeforeBook++;
+    else if (!p.minerId) needsYou.push({ kind: 'unmatched', payment: p });
   }
   // The same ordering the cards read in: declarations, then the oldest debt.
   const rank: Record<NeedsYouItem['kind'], number> = {
@@ -465,6 +515,8 @@ export function buildBookView(input: BookViewInput): BookView {
     input,
     charges,
     beforeBook,
+    outsideCoverage,
+    donationsBeforeBook,
     unrated,
     billableThrough,
     miners,
@@ -549,6 +601,48 @@ function buildExtractionRows(
     .sort((a, b) => a.chunkArrivalAt.localeCompare(b.chunkArrivalAt));
 }
 
+/**
+ * The Statement days an officer write-off forgave in full (#4637). Mirrors the order the
+ * allocation credits a Statement in: payments cover its oldest days, the write-off the next.
+ */
+function forgivenDayKeys(
+  statements: readonly Statement[],
+  allocation: Allocation,
+  credits: readonly DismissalCredit[]
+): Set<string> {
+  const keys = new Set<string>();
+  for (const s of statements) {
+    const settlement = allocation.byStatement.get(s.id);
+    if (!settlement || settlement.forgiven <= 0) continue;
+    const dismissed = credits.filter((c) => c.statementId === s.id);
+    const dismissedKeys = new Set(dismissed.map((c) => c.chargeKey));
+    let paid = Math.max(
+      0,
+      settlement.credited - settlement.forgiven - dismissed.reduce((sum, c) => sum + c.amount, 0)
+    );
+    let forgiven = settlement.forgiven;
+    const days = new Map<string, { date: string; tax: number }>();
+    for (const line of s.lines) {
+      if (!line.chargeKey || dismissedKeys.has(line.chargeKey)) continue;
+      const held = days.get(line.chargeKey) ?? { date: line.date, tax: 0 };
+      held.tax += line.tax;
+      days.set(line.chargeKey, held);
+    }
+    const oldestFirst = [...days].sort(
+      ([ka, a], [kb, b]) => a.date.localeCompare(b.date) || ka.localeCompare(kb)
+    );
+    for (const [key, day] of oldestFirst) {
+      if (day.tax <= 0) continue;
+      const fromPaid = Math.min(paid, day.tax);
+      paid -= fromPaid;
+      const fromForgiven = Math.min(forgiven, day.tax - fromPaid);
+      forgiven -= fromForgiven;
+      if (fromPaid === 0 && day.tax - fromForgiven < 0.01) keys.add(key);
+    }
+  }
+  return keys;
+}
+
 // --- Drill-downs -----------------------------------------------------------
 
 export interface MinerDetail {
@@ -560,6 +654,8 @@ export interface MinerDetail {
   toleranceWriteOffs: { statementId: string; amount: number }[];
   /** Lines recorded after payment, never billed (D22). */
   lateWriteOffs: { chargeKey: string; date: string; tax: number }[];
+  /** Officer write-offs (#4637), oldest first; `amount` is what each forgave, 0 when nothing was left. */
+  officerWriteOffs: { id: string; amount: number; reason: string; at: string }[];
   dismissals: Dismissal[];
   declarations: Declaration[];
   credit: number;
@@ -591,6 +687,17 @@ export function minerDetail(view: BookView, minerId: string): MinerDetail | unde
       date: w.date,
       tax: w.tax,
     })),
+    officerWriteOffs: (view.input.writeOffs ?? [])
+      .filter((w) => w.minerId === minerId)
+      .sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
+      .map((w) => ({
+        id: w.id,
+        amount: inner.allocation.writeOffCredits
+          .filter((c) => c.writeOffId === w.id)
+          .reduce((s, c) => s + c.amount, 0),
+        reason: w.reason,
+        at: w.at,
+      })),
     dismissals,
     declarations: view.input.declarations.filter((d) => statementIds.has(d.statementId)),
     credit: inner.allocation.credit,

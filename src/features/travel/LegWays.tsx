@@ -17,6 +17,7 @@
  * Facts only, never verdicts (decision `20260912-172628`): no way is called
  * better, safer or riskier than another.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,6 +32,7 @@ import { formatCountdown, formatDuration } from '@/lib/duration';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { RouteHolesState } from '@/features/route/useRouteHoles';
 import type { RouteSafetyLeg, RouteSafetyWay } from './useRouteSafety';
+import { formatNumber } from '@/lib/numberLocale';
 
 const badgeClassName = 'rounded-xs px-1 text-[0.625rem] tracking-widest text-text-dim uppercase';
 
@@ -75,8 +77,8 @@ function WayBox({
   if (jump) {
     facts.push(
       t('travel.jumpDrive.wayJumps', { count: jump.jumps }),
-      t('travel.jumpDrive.wayLy', { ly: jump.totalLy.toFixed(1) }),
-      t('travel.jumpDrive.fuelValue', { count: jump.fuel, fuel: jump.fuel.toLocaleString() }),
+      t('travel.jumpDrive.wayLy', { ly: fixed1(jump.totalLy) }),
+      t('travel.jumpDrive.fuelValue', { count: jump.fuel, fuel: formatNumber(jump.fuel) }),
       t('travel.jumpDrive.wayFatigue', {
         time: formatDuration(Math.round(jump.fatigueMinutes) * 60),
       })
@@ -84,7 +86,7 @@ function WayBox({
   }
   if (summary) {
     if (summary.lowestSecurity !== null) {
-      facts.push(t('travel.summary.lowest', { security: summary.lowestSecurity.toFixed(1) }));
+      facts.push(t('travel.summary.lowest', { security: fixed1(summary.lowestSecurity) }));
     }
     facts.push(t('travel.ways.lowsec', { count: summary.lowsec }));
     facts.push(t('travel.ways.nullsec', { count: summary.nullsec }));

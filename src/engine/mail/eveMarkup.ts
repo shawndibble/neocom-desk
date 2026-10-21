@@ -10,7 +10,8 @@
  *
  * Public API: `parseEveMarkup`, `serializeEveMarkup`, `eveMarkupLength`
  * (+ `EVE_MARKUP_LIMIT`), `classifyMarkupLink`, `markupColorToCss`,
- * `markupPlainText`, `splitMarkupLines`.
+ * `markupPlainText`, `splitMarkupLines`, and the `markupText` / `markupBr`
+ * node builders.
  */
 
 /** The game's body limit, counted over the markup as sent. */
@@ -27,6 +28,9 @@ export type MarkupNode =
   | { type: 'color'; color: string; children: MarkupNode[] }
   /** `href` has passed `classifyMarkupLink`; `target` is that classification, parsed once. */
   | { type: 'link'; href: string; target: MarkupLinkTarget; children: MarkupNode[] };
+
+export const markupText = (text: string): MarkupNode => ({ type: 'text', text });
+export const markupBr = (): MarkupNode => ({ type: 'br' });
 
 export type InertScheme = 'fitting' | 'contract' | 'killReport' | 'joinChannel' | 'localsvc';
 
@@ -87,7 +91,7 @@ function parseSize(raw: string): number | null {
 /** `#aarrggbb` as a CSS `rgba(...)` colour. */
 export function markupColorToCss(color: string): string {
   const [a, r, g, b] = [1, 3, 5, 7].map((i) => parseInt(color.slice(i, i + 2), 16));
-  return `rgba(${r}, ${g}, ${b}, ${Number((a / 255).toFixed(3))})`;
+  return `rgba(${r}, ${g}, ${b}, ${Number((a / 255).toFixed(3))})`; // fixed format: CSS rgba alpha
 }
 
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', nbsp: ' ' };

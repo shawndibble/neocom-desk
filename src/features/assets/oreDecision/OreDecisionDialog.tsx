@@ -8,6 +8,8 @@
  * Market Hub's buy price less sales tax, both exits taxed alike so they compare
  * like with like. The refining facility is an assumption the dialog states.
  */
+import { fixed1, fixed2 } from '@/lib/fixedFormat';
+import { formatCount } from '@/lib/formatCount';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -322,7 +324,7 @@ export function OreDecisionDialog({
       header: t('assets.oreDecision.unitsColumn'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (r) => r.quantity.toLocaleString(),
+      render: (r) => formatCount(r.quantity),
       sortValue: (r) => r.quantity,
     },
     {
@@ -347,7 +349,7 @@ export function OreDecisionDialog({
       header: t('assets.oreDecision.coveredColumn'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (r) => `${r.covered.toLocaleString()} / ${r.need.toLocaleString()}`,
+      render: (r) => `${formatCount(r.covered)} / ${formatCount(r.need)}`,
       sortValue: (r) => r.covered,
     },
     {
@@ -371,7 +373,7 @@ export function OreDecisionDialog({
     structureRate > 0
       ? t('assets.oreDecision.facilityStructure')
       : t('assets.oreDecision.facilityNpc');
-  const percentText = (efficiency * 100).toFixed(1);
+  const percentText = fixed1(efficiency * 100);
 
   return (
     <Modal
@@ -448,7 +450,7 @@ export function OreDecisionDialog({
                   {exits.unitsLeftOver > 0 && (
                     <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-warning">
                       {t('assets.oreDecision.leftOverHint', {
-                        units: exits.unitsLeftOver.toLocaleString(),
+                        units: formatCount(exits.unitsLeftOver),
                       })}
                     </p>
                   )}
@@ -489,7 +491,7 @@ export function OreDecisionDialog({
                       </div>
                       <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-text-dim">
                         {t('assets.oreDecision.notUsedHint', {
-                          units: inPlan.unitsNotUsed.toLocaleString(),
+                          units: formatCount(inPlan.unitsNotUsed),
                         })}
                       </p>
                     </>
@@ -507,7 +509,7 @@ export function OreDecisionDialog({
                   <p>
                     {t('assets.oreDecision.pricingBasis', {
                       hub: data.hub.name,
-                      tax: taxPct.toFixed(2),
+                      tax: fixed2(taxPct),
                     })}
                   </p>
                   <p className="flex flex-wrap items-center gap-2">
@@ -537,7 +539,7 @@ export function OreDecisionDialog({
                         max={100}
                         step={0.1}
                         className="w-24"
-                        defaultValue={structureRate > 0 ? (structureRate * 100).toFixed(1) : ''}
+                        defaultValue={structureRate > 0 ? (structureRate * 100).toFixed(1) : ''} // fixed format: type=number input needs '.'
                         placeholder="50"
                         onChange={(e) => {
                           const pct = Number(e.target.value);

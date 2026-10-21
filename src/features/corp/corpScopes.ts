@@ -16,6 +16,7 @@
  */
 import {
   CORP_CAPABILITIES,
+  hasAnyCorpCapability,
   NO_CORP_CAPABILITIES,
   type CorpCapabilities,
   type CorpCapability,
@@ -88,6 +89,26 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
    * read says nothing about the corp one.
    */
   canReadBlueprints: ['esi-corporations.read_blueprints.v1'],
+  /**
+   * The tower list and detail (issue #4610). Additive (below): a Director who
+   * granted the corp group before it existed keeps every corp surface and only
+   * the Starbases widget stays off until the scope arrives.
+   */
+  canReadStarbases: ['esi-corporations.read_starbases.v1'],
+  /** Director-only (issue #4611). Additive, so a Director's older corp grant keeps working. */
+  canReadCustomsOffices: ['esi-planets.read_customs_offices.v1'],
+  /**
+   * Director-only (issue #4613). `read_titles` is the new scope; the membership one
+   * is already held by any Director with `canReadMembers`. Additive.
+   */
+  canReadRoleAudit: [
+    'esi-corporations.read_corporation_membership.v1',
+    'esi-corporations.read_titles.v1',
+  ],
+  /** Open to every member; additive (below), so a corp grant made before it stays `ready`. */
+  canReadContracts: ['esi-contracts.read_corporation_contracts.v1'],
+  /** Accountant or Trader; additive (below), so a corp grant made before it stays `ready`. */
+  canReadOrders: ['esi-markets.read_corporation_orders.v1'],
 };
 
 /**
@@ -106,7 +127,14 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
  * the corp grant prompt's once-only ask on nothing (decision
  * `20261018-141225-additive-corp-capabilities-do-not-hide-corp-ui`).
  */
-const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set(['canReadMiningLedger']);
+const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set([
+  'canReadMiningLedger',
+  'canReadStarbases',
+  'canReadCustomsOffices',
+  'canReadRoleAudit',
+  'canReadContracts',
+  'canReadOrders',
+]);
 
 /**
  * Every scope the held capabilities need, deduplicated and in capability order.
@@ -170,6 +198,11 @@ export function corpGrantCoverage(
     // grant hides every corp surface regardless.
     covered[capability] = complete || !additive;
   }
+  // Every capability this Character holds is additive and ungranted (a
+  // Trader-only Character): nothing is readable, so corp UI would be an empty
+  // board. Treat that as blocking so the grant prompt fires. A Character with
+  // some granted capability keeps it; the additive ones stay off.
+  if (hasAnyCorpCapability(capabilities) && !hasAnyCorpCapability(covered)) blocking = true;
   return {
     missingScopes: missingCorpScopes(capabilities, granted),
     blocking,

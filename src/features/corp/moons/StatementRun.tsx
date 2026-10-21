@@ -29,7 +29,12 @@ import { editBook } from '../taxBook/bookClient';
 import { editErrorMessage, useBook } from './useBook';
 import { isk, periodLabel, shortDate } from './moonsFormat';
 import { TRADE_HUBS } from '@/market/hubs';
-import { mailTarget, mailsSent, useCorporationName } from './statementMailing';
+import {
+  mailTarget,
+  mailsSent,
+  statementRefineryNames,
+  useCorporationName,
+} from './statementMailing';
 
 type Step = 'check' | 'send' | 'done';
 
@@ -187,11 +192,7 @@ export function StatementRun() {
       for (const line of plan?.lines ?? []) {
         const statement = statementForLine(view, plan!, line);
         // A guest cannot look names up, so the verify page reads them off the Statement.
-        const refineryNames = Object.fromEntries(
-          [...new Set(statement.lines.flatMap((l) => (l.structureId ? [l.structureId] : [])))].map(
-            (id) => [String(id), names.refinery(id)]
-          )
-        );
+        const refineryNames = statementRefineryNames(statement, names);
         await editBook(characterId, corporationId, {
           action: 'issueStatement',
           statement: {

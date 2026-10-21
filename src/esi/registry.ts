@@ -335,6 +335,15 @@ export const ESI_REGISTRY = {
     scope: 'esi-markets.read_character_orders.v1',
     group: 'marketOrders',
   },
+  /**
+   * The corporation's open market orders. In-game role Accountant or Trader;
+   * the scope is additive (`corpScopes.ts`).
+   */
+  getCorporationOrders: {
+    route: '/corporations/{corporation_id}/orders',
+    scope: 'esi-markets.read_corporation_orders.v1',
+    group: 'corp',
+  },
   getCharacterOrderHistory: {
     route: '/characters/{character_id}/orders/history',
     scope: 'esi-markets.read_character_orders.v1',
@@ -752,6 +761,65 @@ export const ESI_REGISTRY = {
   getCorporationBlueprints: {
     route: '/corporations/{corporation_id}/blueprints',
     scope: 'esi-corporations.read_blueprints.v1',
+    group: 'corp',
+  },
+  /**
+   * The corp's starbases (POS) and one tower's detail (issue #4610): Director
+   * per `x-required-roles` (`canReadStarbases` in `engine/corpRoles.ts`).
+   */
+  getCorporationStarbases: {
+    route: '/corporations/{corporation_id}/starbases',
+    scope: 'esi-corporations.read_starbases.v1',
+    group: 'corp',
+  },
+  getCorporationStarbase: {
+    route: '/corporations/{corporation_id}/starbases/{starbase_id}',
+    scope: 'esi-corporations.read_starbases.v1',
+    group: 'corp',
+  },
+  /**
+   * Contracts issued by or assigned to the corporation. No in-game role is
+   * required (`x-required-roles` is absent), so `canReadContracts` is open to
+   * every member; the scope is additive (`corpScopes.ts`).
+   */
+  getCorporationContracts: {
+    route: '/corporations/{corporation_id}/contracts',
+    scope: 'esi-contracts.read_corporation_contracts.v1',
+    group: 'corp',
+  },
+  /** One corp contract's items, read when a row is opened; same scope as the list. */
+  getCorporationContractItems: {
+    route: '/corporations/{corporation_id}/contracts/{contract_id}/items',
+    scope: 'esi-contracts.read_corporation_contracts.v1',
+    group: 'corp',
+  },
+  /**
+   * Customs offices (issue #4611): Director-only per `x-required-roles`
+   * (`canReadCustomsOffices`); the scope is additive (`corpScopes.ts`).
+   */
+  getCorporationCustomsOffices: {
+    route: '/corporations/{corporation_id}/customs_offices',
+    scope: 'esi-planets.read_customs_offices.v1',
+    group: 'corp',
+  },
+  /**
+   * Role audit (issue #4613): Director-only per `x-required-roles`
+   * (`canReadRoleAudit`). History rides the membership scope; titles need
+   * `read_titles`, the additive one (`corpScopes.ts`).
+   */
+  getCorporationRoleHistory: {
+    route: '/corporations/{corporation_id}/roles/history',
+    scope: 'esi-corporations.read_corporation_membership.v1',
+    group: 'corp',
+  },
+  getCorporationTitles: {
+    route: '/corporations/{corporation_id}/titles',
+    scope: 'esi-corporations.read_titles.v1',
+    group: 'corp',
+  },
+  getCorporationMemberTitles: {
+    route: '/corporations/{corporation_id}/members/titles',
+    scope: 'esi-corporations.read_titles.v1',
     group: 'corp',
   },
 } as const satisfies Record<EndpointName, EsiEndpointSpec>;

@@ -1,4 +1,5 @@
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
+import { formatCount } from '@/lib/formatCount';
 /**
  * The Travel page's Hauling tab: what is worth
  * buying at one Trade Hub to sell at another, priced at what a hauler can expect to actually get rather than
@@ -498,7 +499,7 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const limitTextOf = (row: HaulingViewRow): string | undefined => {
     const line = lineOf.get(row.typeId);
     if (!line) return undefined;
-    const unit = line.volumeM3 > 0 ? `${Math.round(line.volumeM3).toLocaleString()} m³ · ` : '';
+    const unit = line.volumeM3 > 0 ? `${formatCount(line.volumeM3)} m³ · ` : '';
     // Unless the Cargo Space is one plain hold, say which the line rides in ("in Ammo hold, Cargo hold").
     const plainHold = plan.holds.length === 1 && plan.holds[0]!.kind === 'general';
     const holdsText =

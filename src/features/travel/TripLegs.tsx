@@ -11,6 +11,7 @@
  * Each open leg lists its ways to fly beside its rows (`LegBody`, issue
  * #2477), and clicking a way pins it to the leg.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret } from '@/components/ui';
@@ -63,7 +64,7 @@ export function TripLegs({
           parts.push(t('travel.legs.jumps', { count: leg.summary.jumps }));
           if (leg.summary.lowestSecurity !== null) {
             parts.push(
-              t('travel.summary.lowest', { security: leg.summary.lowestSecurity.toFixed(1) })
+              t('travel.summary.lowest', { security: fixed1(leg.summary.lowestSecurity) })
             );
           }
           if (leg.summary.chokepoints.length > 0) {

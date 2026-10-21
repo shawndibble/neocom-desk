@@ -284,6 +284,39 @@ across Characters · whether other alert types than danger raise the banner.
   `null` after hydration. Returning pilots with old hidden/order keys are
   migrated.
 
+## 13. Corp overview board
+
+`/corp` is the same engine on a second board (decision
+`docs/context/decisions/20261020-201817-corp-overview-is-a-widget-grid-the-pilot.md`).
+A `WidgetBoard` context (`widgets/board.ts`) carries what differs; the grid,
+Customize, Gallery, menu and phone list are shared.
+
+- **One catalogue.** One global kind table; corp-only ids start with `corp`.
+  Each kind lists the boards it is on; Structures and Moon extractions are on
+  both. Corp kinds carry `capabilities` (any one opens it) and sit in the corp
+  Gallery groups `CORP_KIND_CATEGORIES` (Clocks, Money, People, Industry, Ops).
+- **One layout per pilot**, `sync.corpOverviewLayout`; not per corporation or
+  Character.
+- **No Role chooser, no first-run prompt.** Until the pilot edits, the page
+  draws the full `corpDefaultLayout()` and never saves it; `canDraw` decides
+  what each Character sees. Reset rebuilds it.
+- **Hide, don't lock.** A kind whose capability the Character lacks is not
+  offered, drawn or fetched (`canDraw`); a saved one stays in the layout, undrawn.
+  Coming-soon kinds are listed for everyone, not addable.
+- **No Character scope menu** (`characterScope: false`): corp data belongs to
+  one corporation.
+- **Gated reads.** Each corp loader calls `resolveCorpReadAccess` before it
+  fetches. Unreadable (no role, or a lapsed grant), failed (Retry) and empty
+  stay distinct. One exception: Corp kills reads public zKillboard stats, so
+  it carries no capability and no gate.
+- **Cache window.** No countdown shorter than the read's cache window: 1 h for
+  the corp reads, 5 min for corp contracts (ESI caches that route for 300 s).
+  The data-age popover carries the hourly note.
+- **No Show info links** from rows; tables link rows to pages.
+- **Coming soon (one):** SRP, which needs app-owned data and an ADR first (#4608).
+  Doctrine readiness and Corporation projects were dropped (#4614, #4609). Any new
+  corp scope must be additive (`ADDITIVE_CORP_CAPABILITIES`).
+
 ## Appendix A. Default view and size per kind
 
 The owner's rule: not every widget opens as a Number. A kind opens in the view

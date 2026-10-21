@@ -13,7 +13,7 @@ D-numbers are the decision numbers in epic #4055.
   Form (Compressed by default), both printed on every Statement. No refined
   value.
 - **Rates: most specific wins (D3/D31).** Corp default → Guest default →
-  per-Miner → per-moon → per-record. Every rate has an effective-from date and
+  per-moon → per-Miner → per-record (Miner beats moon: see the 20261020 "miner rate beats the moon rate" decision). Every rate has an effective-from date and
   is never retroactive. A per-record override is a logged officer correction,
   only on a day not yet on a Statement. Per-rarity rates come later (#4069).
 - **Tax is owed per day per character, with a running balance per Miner

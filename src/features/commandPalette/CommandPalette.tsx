@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -89,7 +90,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
             ? Promise.resolve(NO_BALANCES)
             : readCachedLoyaltyBalances(activeCharacterId),
         navigate: (path) => void navigate(path),
-        balanceHint: (lp) => t('commandPalette.lpBalance', { lp: lp.toLocaleString() }),
+        balanceHint: (lp) => t('commandPalette.lpBalance', { lp: formatCount(lp) }),
       }),
     [activeCharacterId, navigate, t]
   );
@@ -131,13 +132,13 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
           asset.holders
             .map((holder) =>
               t('commandPalette.assetHolder', {
-                quantity: holder.quantity.toLocaleString(),
+                quantity: formatCount(holder.quantity),
                 character: holder.characterName,
               })
             )
             .join(' · '),
         quantityHint: (quantity) =>
-          t('commandPalette.assetQuantity', { quantity: quantity.toLocaleString() }),
+          t('commandPalette.assetQuantity', { quantity: formatCount(quantity) }),
       }),
       lpStores,
       createMarketItemsProvider({ catalogue: marketItemCatalogue, onSelect: onShowItem }),

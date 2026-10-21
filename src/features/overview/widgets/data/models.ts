@@ -51,8 +51,12 @@ export function kindSumsAcrossCharacters(kind: string): boolean {
   return SUMS_ACROSS.has(kind);
 }
 
-/** Every widget kind: the feeds it reads and the builder that draws it. */
-const KINDS: Readonly<Record<string, KindDef>> = {
+/**
+ * Every widget kind: the feeds it reads and the builder that draws it. The Corp
+ * overview's own kinds join through `registerKindDefs` when its route loads, so
+ * their builders and copy stay out of the startup graph the Overview loads.
+ */
+const KINDS: Record<string, KindDef> = {
   ...ACCOUNT_DEFS,
   training: { feeds: ['skills'], build: training },
   sp: { feeds: ['skills', 'spExtras'], build: sp },
@@ -61,10 +65,20 @@ const KINDS: Readonly<Record<string, KindDef>> = {
   ...KIND_DEFS,
 };
 
-/** Kind -> the feeds it reads. A kind absent here reads no feed and draws without data. */
-export const KIND_FEEDS: Readonly<Record<string, readonly FeedId[]>> = Object.fromEntries(
+const kindFeeds: Record<string, readonly FeedId[]> = Object.fromEntries(
   Object.entries(KINDS).map(([kind, def]) => [kind, def.feeds])
 );
+
+/** Kind -> the feeds it reads. A kind absent here reads no feed and draws without data. */
+export const KIND_FEEDS: Readonly<Record<string, readonly FeedId[]>> = kindFeeds;
+
+/** Adds kinds that load with their own route (the Corp overview's); idempotent. */
+export function registerKindDefs(defs: Readonly<Record<string, KindDef>>): void {
+  for (const [kind, def] of Object.entries(defs)) {
+    KINDS[kind] = def;
+    kindFeeds[kind] = def.feeds;
+  }
+}
 
 /**
  * Kinds still marked coming soon in the catalogue, and kinds a newer build

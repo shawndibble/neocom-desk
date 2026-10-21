@@ -12,6 +12,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
 import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
+import {
+  learnedSystemsOf,
+  officerLabelsOf,
+  refineryFacts,
+  structureNamesOf,
+  refineryLabeler,
+  type RefineryLabelSources,
+} from '@/engine/corpTaxBook/refinery';
 import { surveyFractions, estimateChunk, learnChunkRates } from '@/engine/corpTaxBook/extraction';
 import { measurable } from '@/engine/corpTaxBook/bookView';
 import { toEngineExtraction } from '@/engine/corpTaxBook/sync';
@@ -26,6 +34,7 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import {
   hubForPayee,
   loadDatedUnitPricesByHub,
+  moonOwnerPricesAtHubOnDate,
   pricesAtHubOnDate,
   sourcesAtHubOnDate,
 } from '@/features/miningTax/pricing';
@@ -39,10 +48,19 @@ import {
   type OfficerVerdict,
 } from '../taxBook/bookClient';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
+import { refineryPlaceholder } from './moonsFormat';
 
 export interface BookNames {
   character: (id: number) => string;
+  /** A corporation (a moon owner) by id. */
+  corporation: (id: number) => string;
+  /**
+   * A refinery through the label chain: an officer label, the structure name, the system, else
+   * "Refinery <id>". Never the moon owner's name, so it is safe on a miner's line or mail.
+   */
   refinery: (id: number) => string;
+  /** The same chain, falling back to the moon owner's name plus the id: officer screens about a moon owner only. */
+  ownerRefinery: (id: number) => string;
   moon: (id: number) => string;
   ore: (typeId: number) => string;
 }
@@ -64,6 +82,7 @@ type Fetched =
       verdict: OfficerVerdict;
       data: BookData;
       pricesOn: BookViewInput['pricesOn'];
+      moonOwnerPricesOn: NonNullable<BookViewInput['moonOwnerPricesOn']>;
     };
 
 export type CorpBookState =
@@ -142,7 +161,8 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
           [...typeIds],
           [data.settings.hubId],
           [...dates],
-          data.settings.oreForm === 'compressed'
+          data.settings.oreForm === 'compressed',
+          { moonOwner: true }
         );
         if (cancelled) return;
         setFetched({
@@ -154,6 +174,9 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
             const day = priceDay(prices, data.settings.hubId, date);
             return day.prices.size > 0 ? day : priceDay(prices, data.settings.hubId, loadedOn);
           },
+          // No fallback day: the moon owner's page prices an unsaved day at 0, so this does too.
+          moonOwnerPricesOn: (date) =>
+            moonOwnerPricesAtHubOnDate(prices, hubForPayee(data.settings.hubId).id, date),
         });
       } catch (error) {
         if (cancelled) return;
@@ -257,9 +280,12 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
       dismissals: data.state.dismissals,
       declarations: data.declarations,
       adjustments: data.adjustments,
+      ...(data.state.writeOffs ? { writeOffs: data.state.writeOffs } : {}),
+      feeders: data.feeders,
       extractions: data.state.extractions,
       paidStatementIds: data.state.paidStatementIds,
       pricesOn: fetched.pricesOn,
+      moonOwnerPricesOn: fetched.moonOwnerPricesOn,
       memberIds,
       surveyOreLines,
     });
@@ -272,8 +298,21 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
     const characterIds = new Set<number>();
     for (const m of view.miners) for (const id of m.characterIds) characterIds.add(id);
     for (const p of view.input.payments) characterIds.add(p.characterId);
-    if (fetched.status === 'loaded')
+    if (fetched.status === 'loaded') {
       for (const a of fetched.data.groupingAnswers ?? []) characterIds.add(a.characterId);
+      // Moon owners are corporations; the universe names lookup resolves both kinds.
+      // A payee the moon owner named is a player or another corporation.
+      for (const f of fetched.data.feeders ?? []) {
+        characterIds.add(f.corporationId);
+        if (f.payee) characterIds.add(f.payee.id);
+      }
+      // Systems too, for a refinery whose structure name is not readable (a moon owner's).
+      const facts = refineryFacts(
+        fetched.data.observed,
+        learnedSystemsOf(fetched.data.feeders ?? [])
+      );
+      for (const s of facts.systemOf.values()) characterIds.add(s);
+    }
     const refineryIds = new Set<number>([
       ...view.input.extractions.map((x) => x.structureId),
       ...view.charges.map((c) => c.structureId),
@@ -305,15 +344,44 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
     };
   }, [view, characterId, fetched]);
 
-  const bookNames: BookNames = useMemo(
-    () => ({
+  const refineries = useMemo(
+    () =>
+      fetched.status === 'loaded'
+        ? {
+            // A moon owner's rows rarely carry a system; miners' own ledgers teach it (#4650).
+            ...refineryFacts(fetched.data.observed, learnedSystemsOf(fetched.data.feeders ?? [])),
+            labels: officerLabelsOf(fetched.data.feeders ?? []),
+            // Read by the server with the moon owner's own grant (#4654).
+            structureNames: structureNamesOf(fetched.data.feeders ?? []),
+          }
+        : null,
+    [fetched]
+  );
+  const bookNames: BookNames = useMemo(() => {
+    const sources: RefineryLabelSources = {
+      officerLabels: (id) => refineries?.labels.get(id),
+      structureName: (id) => names.refineries.get(id) ?? refineries?.structureNames.get(id),
+      systemName: (id) => {
+        const system = refineries?.systemOf.get(id);
+        return system === undefined ? undefined : names.characters.get(system);
+      },
+      fallback: refineryPlaceholder,
+    };
+    return {
       character: (id) => names.characters.get(id) ?? `#${id}`,
-      refinery: (id) => names.refineries.get(id) ?? `Refinery ${id}`,
+      corporation: (id) => names.characters.get(id) ?? `#${id}`,
+      refinery: refineryLabeler(sources),
+      ownerRefinery: refineryLabeler({
+        ...sources,
+        ownerName: (id) => {
+          const owner = refineries?.sourceOf.get(id);
+          return owner === undefined ? undefined : names.characters.get(owner);
+        },
+      }),
       moon: (id) => names.moons.get(id) ?? `Moon ${id}`,
       ore: (typeId) => names.ores.get(typeId) ?? `#${typeId}`,
-    }),
-    [names]
-  );
+    };
+  }, [names, refineries]);
 
   const state: CorpBookState =
     fetched.status === 'loaded'

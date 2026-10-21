@@ -90,12 +90,25 @@ describe('registerDeviceForWebPush', () => {
     expect(call).toHaveBeenCalledWith({
       deviceId: 'device-1',
       fcmToken: 'fcm-token',
+      quietHours: null,
       characters: [
         { characterId: 1, accessToken: 'token-1', projectionRows: [], eveTypes: [] },
         { characterId: 2, accessToken: 'token-2', projectionRows: [], eveTypes: [] },
       ],
     });
     expect(result).toEqual({ deviceId: 'device-1', registered: [1], rejected: [] });
+  });
+
+  it('sends the quiet-time window it is given', async () => {
+    vi.spyOn(db.characters, 'toArray').mockResolvedValue([
+      { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
+    ] as never);
+    vi.mocked(getValidAccessToken).mockImplementation(async (id) => `token-${id}`);
+    const quietHours = { start: '22:00', end: '07:00', timeZone: 'UTC', allowAttacks: true };
+
+    await registerDeviceForWebPush('vapid-key', registration, new Map(), { quietHours });
+
+    expect(call).toHaveBeenCalledWith(expect.objectContaining({ quietHours }));
   });
 
   it('includes each Character’s Projection rows from the passed-in map, keyed by characterId', async () => {
@@ -119,6 +132,7 @@ describe('registerDeviceForWebPush', () => {
     expect(call).toHaveBeenCalledWith({
       deviceId: 'device-1',
       fcmToken: 'fcm-token',
+      quietHours: null,
       characters: [
         { characterId: 1, accessToken: 'token-1', projectionRows: [row], eveTypes: [] },
         { characterId: 2, accessToken: 'token-2', projectionRows: [], eveTypes: [] },
@@ -161,6 +175,7 @@ describe('registerDeviceForWebPush', () => {
     expect(call).toHaveBeenCalledWith({
       deviceId: 'device-1',
       fcmToken: 'fcm-token',
+      quietHours: null,
       characters: [
         { characterId: 1, accessToken: 'token-1', projectionRows: [], eveTypes: [] },
         { characterId: 3, accessToken: 'token-3', projectionRows: [], eveTypes: [] },

@@ -13,7 +13,7 @@ Adam4EVE, Ravworks/Slipway, EVE Tycoon, Janice, EVE Appraisal, Iron Whales
 Appraiser (every piece gated — see Killed), EVE Blue Desk, SolCore Dynamics, EvE
 Blueprint, EVE Courier, Fuzzwork, EVE Ref, EVE Retroindustry, ISK.GG, EVE Miner
 Hub, EQM, EveLens, EVE Horizon, EVE Forge, EVE-Industry-Scanner-Tool, EVE-HUB,
-EVE TradeLooper, EVE Night Trade Tools, IndustrialEVE (PI alerts fully covered —
+EVE TradeLooper, EVE Night Trade Tools, TradeRelay, ForgeWire (forgewire.space: Build, 4-hub Market, zKill Predictions, owned-BPC Arsenal, Doctrine fit restock, Freight — all covered except #4550), IndustrialEVE (PI alerts fully covered —
 kill-tests 12 and 17, #956), jEveAssets, EVEAIO, MONW, Mudoteve, Solo Industry
 App, ArmedATLAS V2, PlanetFlow.APP, Cradle of War, EVE Balance, EVE Data Site,
 PIM, EVE PI Manager, Web-based PI Tracker, JitaStocks, Indeve, EVE Fleet Mining
@@ -277,6 +277,8 @@ Numbering is stable — later runs cite these by number. Append, never renumber.
 
 ## Filed candidates
 
+#4550 NARROW — Fittings: several Fittings x hull counts into one netted shortfall (fit set; not named "Doctrine").
+
 **Verdict is the hostile review's, not the ticket's fate.** `SHIP` means the
 reviewer cleared it, never that Shawn accepted it — #858 carries `SHIP` and was
 closed "the quickbar already has enough". Check `gh issue view <n> --comments`.
@@ -348,6 +350,12 @@ NARROW — History margin/broker totals, By day, All characters FIFO, Trading
 profit widget. #3987 → #3990 NARROW — invention reopened (SDE kept only
 activities 1/11) as a Blueprint Acquisition tier per decryptor.
 
+**EVE Console 0.9.17 re-read (GPL-3, live):** its earlier gaps all shipped
+since (stock targets, net worth, jump planner); the one unexplored feature was
+Corp Projects (`esi-corporations.read_projects.v1`). #4530 NARROW — Corp Projects
+tab: open projects, pool, reward per contribution, my cap use, build cost vs
+reward on manufacture rows; no alerts, no contributors list, no mining compare.
+
 **Janice open GitHub issues (appraisal sweep):** #4022 NARROW — Appraisal paste
 reads dot/space/apostrophe-grouped quantities and flags unreadable ones instead
 of pricing them as 1 (Janice #34/#28/#22).
@@ -355,6 +363,15 @@ of pricing them as 1 (Janice #34/#28/#22).
 ## Killed / dropped candidates (never filed)
 
 Grouped by the test that killed them; the reason is what stops a re-pitch.
+
+- **Hull demand board** (ForgeWire Predictions): needs a new killmail ingest job and archive dependency while Functions are not auto-deployed; popular fits and route safety read zKillboard client-side by decision; loss rate is an input, not a build decision Opportunities/Market don't already make.
+- **Structured WTS/WTB listing board** (TradeRelay, early test, no replies): a cross-player listing book needs a server holding every user's listings — the cross-player aggregation wall in a local-first PWA. Settlement is plain EVE contracts, which the app already reads.
+- **Build-cost history series** (EVE Console): realized margin, Production Log and
+  price history already exist; a per-item daily series is gappy per device, and a
+  stored cost is only comparable with the ME/TE/rig/tax inputs stored beside it.
+- **Multi-format sale post** (Slack/Discord/BBCode matrix; EVE Console): Appraisal
+  Copy sell list + share links cover it; only a single Markdown copy option
+  would be defensible. Storefront and webhooks stay out of scope.
 
 - **Janice-issue seeds, Appraisal:** already shipped — remembered hub and Price
   Percent plus `?hub=`/`?percent=` (#33/#24/#48), Price % as the multiplier

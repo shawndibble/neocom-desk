@@ -12,6 +12,7 @@ import type { TradeHub } from '@/market/hubs';
 import { cx } from '@/lib/cx';
 import { materialPriceBasisOf } from './priceBasis';
 import { rigFitSummaryLabel } from './rigFitLabels';
+import { formatCount } from '@/lib/formatCount';
 
 interface PlanSetupFactsProps {
   plan: BuildPlanRecord;
@@ -67,7 +68,7 @@ export function PlanSetupFacts({
   );
   return (
     <dl className="flex flex-wrap gap-x-6 gap-y-2">
-      {fact(t('industry.runs'), plan.runs.toLocaleString())}
+      {fact(t('industry.runs'), formatCount(plan.runs))}
       {activity === 'manufacturing' && lacksBlueprintRow && (
         <>
           {fact(t('industry.setupChipMe'), `${resolvedMe}%`)}

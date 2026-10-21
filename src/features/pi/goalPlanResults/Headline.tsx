@@ -25,7 +25,7 @@ import { customsRatePercent } from '../customsRate';
 import type { TotalColonyEarnings } from '../colonyEarningsModel';
 import { commodityName } from '../goalPlannerFormat';
 import type { GoalAttainment, PlanCaveats } from '../goalPlanView';
-import { HOURS_PER_DAY, PERCENT_FORMAT, namesList, signedCompact, type PlanNames } from './format';
+import { HOURS_PER_DAY, formatPercent, namesList, signedCompact, type PlanNames } from './format';
 
 /** A signed ISK/day figure. Zero is neutral: the sign is the whole point of a Lift. */
 function SignedIsk({ perHour }: { perHour: number }) {
@@ -94,7 +94,7 @@ function attainmentText(attainment: GoalAttainment, pi: PiData, t: TFunction): s
       .map((goal) =>
         t('piPlan.shortAchievedGoal', {
           name: commodityName(goal.typeId, pi),
-          percent: PERCENT_FORMAT.format(goal.fraction * 100),
+          percent: formatPercent(goal.fraction * 100),
         })
       )
       .join(', '),

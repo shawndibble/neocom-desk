@@ -5,6 +5,7 @@ import type { TaxPriceSource } from '@/engine/miningTax/priceBasis';
 import { formatIsk } from '@/lib/isk';
 import { useMiningTaxCompressedOre } from './oreForm';
 import { hubForPayee } from './pricing';
+import { formatCount } from '@/lib/formatCount';
 
 export interface PriceBreakdownInput {
   assignment: MiningTaxAssignmentRecord;
@@ -63,7 +64,7 @@ export function usePriceBreakdown({
     ...breakdown.lines.map((l) =>
       t('miningTax.detail.breakdown.lineText', {
         name: name(l.typeId),
-        quantity: l.quantity.toLocaleString(),
+        quantity: formatCount(l.quantity),
         unit: unitText(l.overridden ? undefined : l.unitPrice),
         value: formatIsk(l.lineValue),
         source: sourceLabel(l),

@@ -18,6 +18,11 @@ import {
   type AlertsGrantOutcome,
 } from '@/features/notifications/alertsGrant';
 import {
+  completeFeederGrant,
+  type FeederGrantCallbackState,
+  type FeederGrantOutcome,
+} from '@/features/corp/taxBook/feederGrant';
+import {
   completeCorpSyncGrant,
   type CorpSyncCallbackState,
   type CorpSyncGrantOutcome,
@@ -125,6 +130,24 @@ export function Callback() {
           status: 'failed',
           characterId: alertsIntent.characterId,
         }))
+        .then(land);
+      return;
+    }
+
+    // A moon owner's grant is the same kind of round trip, and lands back on the Moons page.
+    if (alertsIntent?.kind === 'feederGrant') {
+      const land = (feederGrant: FeederGrantCallbackState['feederGrant']) => {
+        navigate(takeLoginReturnTo() ?? '/corp/moons', {
+          replace: true,
+          state: { feederGrant } satisfies FeederGrantCallbackState,
+        });
+      };
+      if (ssoError || !code || !state) {
+        land({ status: 'cancelled' });
+        return;
+      }
+      void completeFeederGrant({ code, state })
+        .catch((): FeederGrantOutcome => ({ status: 'failed' }))
         .then(land);
       return;
     }

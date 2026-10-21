@@ -5,6 +5,7 @@
  * contract snapshot or prices it at the hub — the Hauling widget's rule
  * (#3579).
  */
+import { formatCount } from '@/lib/formatCount';
 import type { TFunction } from 'i18next';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 import { createLocalSetting } from '@/lib/useLocalSetting';
@@ -19,7 +20,7 @@ export function belowMarketItemLabel(
   const base = lead.isBlueprintCopy
     ? t('contractSearch.belowMarket.copyItem', { name, count: lead.runs ?? 0 })
     : name;
-  return lead.quantity > 1 ? `${base} ×${lead.quantity.toLocaleString()}` : base;
+  return lead.quantity > 1 ? `${base} ×${formatCount(lead.quantity)}` : base;
 }
 
 export interface BelowMarketSummaryContract {

@@ -1,5 +1,6 @@
 import type { FittingStats } from '@/engine/fittings/types';
 import { kmValue } from '../rangeText';
+import { fmt1 } from './fixedFormat';
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
@@ -7,7 +8,7 @@ type Translate = (key: string, options?: Record<string, unknown>) => string;
 export function supportMeta(s: FittingStats, t: Translate): string {
   const { remoteRepair, rows } = s.support;
   const repair = remoteRepair.shield + remoteRepair.armor + remoteRepair.hull;
-  if (repair > 0) return t('fittings.stats.unit.hpPerSecond', { value: repair.toFixed(1) });
+  if (repair > 0) return t('fittings.stats.unit.hpPerSecond', { value: fmt1(repair) });
   return t('fittings.stats.support.modules', {
     count: rows.reduce((sum, row) => sum + row.count, 0),
   });

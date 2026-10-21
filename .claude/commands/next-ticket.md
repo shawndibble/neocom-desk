@@ -95,6 +95,30 @@ back to the main checkout, `git worktree remove "$WORKTREE_PATH" --force`,
 `git worktree prune`, then stop per that step's instructions (report and
 STOP, or continue to pick a different ticket, as stated).
 
+## Never wait for a human
+
+This run is headless. Nobody answers a question, so a final message that
+offers "your options" and stops strands the ticket (the `in-progress` claim
+stays, the worktree keeps orphaned work, and no later run can pick it up).
+Never end a run on a question or on a choice for the user. When something
+blocks you, decide, act, and finish with a `RESULT` line.
+
+When a commit is rejected by the pre-commit hook:
+
+1. If the failure is in a file you did not touch, `develop` is the likely
+   cause, and it may already be fixed. Run the sync-with-main procedure
+   (`node scripts/next-ticket/sync-main.mjs`), then commit again. A failure
+   that reproduces on a clean `origin/develop` is not yours: step 2 applies.
+2. If you cannot fix it inside the ticket's scope, follow the abandon
+   procedure: comment on the issue with the exact error and the file names,
+   then stop with `status=blocked`. Do not leave the claim in place.
+3. Never `HUSKY=0`, `--no-verify`, or any other way around the hook. A denied
+   attempt is final: do not look for another way around it, and do not ask
+   the user to allow it.
+
+The same rule covers any other blocker: pick the recommended path, or abandon
+cleanly. Never hand the decision back.
+
 ## Resilience: merge conflicts
 
 Merge conflicts are expected, not exceptional — concurrent `/next-ticket`

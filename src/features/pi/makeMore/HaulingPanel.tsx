@@ -1,12 +1,14 @@
+import { fixed1 } from '@/lib/fixedFormat';
 import { useId, useState } from 'react';
 import { formatCount } from '@/lib/formatCount';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel, StatChip, StatChips } from '@/components/ui';
 import { HAUL_SHIPS } from '@/engine/pi/planHaul';
 import type { HaulView } from '../planView';
+import { formatNumber } from '@/lib/numberLocale';
 
 function formatTrips(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return Number.isInteger(value) ? String(value) : fixed1(value);
 }
 
 export function HaulingPanel({ hauling, hubName }: { hauling: HaulView; hubName: string }) {
@@ -124,7 +126,7 @@ export function HaulingPanel({ hauling, hubName }: { hauling: HaulView; hubName:
                   return (
                     <li key={ship.id} className={ship.fits ? 'text-success' : 'text-text-dim'}>
                       <span aria-hidden="true">{ship.fits ? '✓' : '✕'}</span>{' '}
-                      {t(`piPlan.make.ship.${ship.id}`, { m3: spec.m3.toLocaleString('en') })}
+                      {t(`piPlan.make.ship.${ship.id}`, { m3: formatNumber(spec.m3) })}
                       <span className="sr-only">
                         {' '}
                         {ship.fits ? t('piPlan.make.shipFits') : t('piPlan.make.shipNoFit')}

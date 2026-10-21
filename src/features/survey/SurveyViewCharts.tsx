@@ -31,6 +31,7 @@ import type { SurveySummary } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { FULL_HEIGHT, MARGIN, makeScanDot, timeAxis, yAxis } from './surveyChartParts';
 import { oreTone } from './surveyTones';
+import { formatCount } from '@/lib/formatCount';
 
 const PERCENT_TICKS = [0, 25, 50, 75, 100];
 const formatPercent = (v: number) => `${v}%`;
@@ -192,8 +193,7 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
   const { xAxis } = timeAxis(summary);
   const label = t('survey.chartIsk');
   const scanRows = rows.slice(0, summary.points.length);
-  const isk = (v: number | undefined) =>
-    v === undefined ? '' : `${Math.round(v).toLocaleString()} ISK`;
+  const isk = (v: number | undefined) => (v === undefined ? '' : `${formatCount(v)} ISK`);
 
   const columns = useMemo<DataTableColumn<SurveySeriesRow>[]>(
     () => [

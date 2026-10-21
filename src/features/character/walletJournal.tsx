@@ -28,6 +28,7 @@ export const JOURNAL_SORT_COLUMN_IDS = [
   'date',
   'character',
   'refType',
+  'player',
   'description',
   'amount',
   'balance',
@@ -86,7 +87,9 @@ export function useJournalColumnsBuilder(): (
   nameFor: (typeId: number) => string,
   miningTaxHrefFor?: (entry: JournalLine) => string | undefined,
   /** Set in the multi-Character view: adds a Character column. */
-  characterNameFor?: (characterId: number) => string
+  characterNameFor?: (characterId: number) => string,
+  /** Set on the corp journal: adds a Player column, who did it. */
+  playerNameFor?: (entry: JournalRow) => string
 ) => DataTableColumn<JournalRow>[] {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -95,7 +98,8 @@ export function useJournalColumnsBuilder(): (
       linkFor: (entry: JournalLine) => WalletTransactionCommon | undefined,
       nameFor: (typeId: number) => string,
       miningTaxHrefFor?: (entry: JournalLine) => string | undefined,
-      characterNameFor?: (characterId: number) => string
+      characterNameFor?: (characterId: number) => string,
+      playerNameFor?: (entry: JournalRow) => string
     ): DataTableColumn<JournalRow>[] => {
       const nameOf = (entry: JournalRow) =>
         characterNameFor && entry.characterId !== undefined
@@ -110,6 +114,18 @@ export function useJournalColumnsBuilder(): (
               headerClassName: 'max-sm:px-1',
               render: nameOf,
               sortValue: nameOf,
+            },
+          ]
+        : [];
+      const playerColumn: DataTableColumn<JournalRow>[] = playerNameFor
+        ? [
+            {
+              id: 'player',
+              header: t('wallet.playerColumn'),
+              className: 'max-sm:px-1 sm:whitespace-nowrap',
+              headerClassName: 'max-sm:px-1',
+              render: playerNameFor,
+              sortValue: playerNameFor,
             },
           ]
         : [];
@@ -143,6 +159,7 @@ export function useJournalColumnsBuilder(): (
           render: (entry) => journalRefLabel(journalRefKey(entry), t),
           sortValue: (entry) => journalRefLabel(journalRefKey(entry), t),
         },
+        ...playerColumn,
         {
           id: 'description',
           header: t('wallet.description'),

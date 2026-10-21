@@ -2,6 +2,7 @@
 import {
   startAlertsLogin,
   startCorpSyncLogin,
+  startFeederGrantLogin,
   startLogin,
   scopesForRetry,
   takeRetryBudget,
@@ -122,6 +123,20 @@ export async function beginCorpSyncLogin(
 }
 
 /**
+ * Grant a moon owner's ledger to an accounting corporation (ADR 0025 amendment):
+ * a separate SSO round trip where the player picks the Accountant Character on
+ * EVE's login screen, returning to the page it was pressed on.
+ */
+export async function beginFeederGrantLogin(
+  characterId: number,
+  inviteCode: string,
+  requestedRatePct?: number
+): Promise<void> {
+  rememberThisPage();
+  assignLocation(await startFeederGrantLogin(characterId, inviteCode, requestedRatePct));
+}
+
+/**
  * Stash the current page as the post-login landing. `/callback` is never
  * remembered: its query is the spent code, and its error panel restarts
  * through `retryLastLogin`, which keeps the failed login's own landing. A
@@ -143,7 +158,8 @@ function rememberThisPage(): void {
  * before it starts (#3075), and `/communities/join`, whose invite page does the
  * same so a visitor lands back on the invite after EVE's login, and
  * `/corp-tax-book/verify`, where a guest signs in as the character they are
- * confirming into a grouping and returns to the Statement (#4210).
+ * confirming into a grouping and returns to the Statement (#4210), and
+ * `/corp-tax-book/remove-now`, where a payee signs in and returns to the link (#4520).
  */
 const LANDING_KEEPING_ROUTES = [
   '/login',
@@ -152,6 +168,7 @@ const LANDING_KEEPING_ROUTES = [
   '/share',
   '/communities/join',
   '/corp-tax-book/verify',
+  '/corp-tax-book/remove-now',
 ];
 
 function forgetStrayLanding(): void {

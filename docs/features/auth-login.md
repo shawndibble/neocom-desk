@@ -22,7 +22,7 @@ Sign in with EVE SSO (first Character, or add an alt), choose how much to grant,
 - **Top jobs (ranked):** 1. "What will this do for me, and is it safe to give it my EVE login?" (the page sells the shipped product, `20260907-010343`; trust cards list the writes, `20260924-165646`; the fifth, Autopilot waypoints, is `20261003-175151`, the sixth, Open in EVE, `20261014-130951`). 2. "Log in, or add an alt." 3. "Grant only what I am comfortable with" (Customize permissions, `20260924-143410`).
 - **Device and cadence:** desktop primary, since the app is used mainly at the desk beside the EVE client (owner, 2026-10-11); once per Character. Phone parity: the Play Store variant is a bare phone screen (`isPlayStoreApp`). New visitors land here from `/`.
 - **Above the fold:** heading, tagline, Log in with EVE Online, the custom-permissions link, then the preview board.
-- **Not for:** changing grants later (Settings › Permissions); logging out (Settings › Data & storage).
+- **Not for:** changing grants later (Settings › Permissions); logging out (Settings › Log out & delete).
 - **Sources:** owner, 2026-10-11 (desktop primary, phone for one-off lookups); decisions `20260907-010343`, `20260924-165646`, `20260924-143410`, `20260925-182747`, `20260909-101500`, `20261003-175151`; ADR 0001; #295, #649, #1522, #1771.
 - **Unconfirmed:** none.
 
@@ -106,7 +106,7 @@ Dexie `characters`, `tokens` (refresh token never leaves device). `sessionStorag
 - Stale "13" text: `src/app/loginFlow.ts:146` ("Customize offers all 13 either way") and `CustomizePermissionsDialog.tsx:11` ("all 13 Permissions") vs `SCOPE_GROUPS` = 15 (`registry.ts:53`); the dialog renders all 15 (`:146`, test "every one of the 15"); `loginFlow.test.ts:359` also says "all 13".
 - Landing preview uses hard-coded sample data (`Login.tsx:PREVIEW`).
 - Landing permission copy is prose (`login.permissionsHint`), not generated from `PERMISSIONS`.
-- No logout control here (Settings > Data & storage).
+- No logout control here (Settings > Log out & delete).
 
 ## Improvement ideas
 

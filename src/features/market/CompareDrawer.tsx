@@ -12,6 +12,7 @@
  * drawer open on Attributes (`useCompareSet`'s `openIn`) instead of opening
  * a separate modal that covered the order book.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import {
@@ -399,7 +400,7 @@ export function CompareDrawer({
         render: (row) => {
           if (row.loading) return '…';
           const { spreadPct } = marginFor(row);
-          return spreadPct != null ? `${spreadPct.toFixed(1)}%` : '—';
+          return spreadPct != null ? `${fixed1(spreadPct)}%` : '—';
         },
         sortValue: (row) => marginFor(row).spreadPct ?? undefined,
       },

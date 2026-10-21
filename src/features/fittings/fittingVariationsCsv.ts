@@ -2,6 +2,7 @@ import type { CsvColumn } from '@/lib/csv';
 import { formatSeconds } from '@/lib/duration';
 import { type StatChange, STAT_DIGITS } from '@/engine/fittings/variationDelta';
 import type { VariationRow } from './useModuleVariations';
+import { fixed0 } from '@/lib/fixedFormat';
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -15,7 +16,7 @@ function formatDelta(change: StatChange): number {
 export function changeLabel(change: StatChange, t: Translate): string {
   if (change.key === 'capacitor') {
     return change.after >= 0
-      ? t('fittings.variations.stat.capacitorStable', { pct: change.after.toFixed(0) })
+      ? t('fittings.variations.stat.capacitorStable', { pct: fixed0(change.after) })
       : t('fittings.variations.stat.capacitorUnstable', {
           time: formatSeconds(-change.after),
         });
@@ -49,7 +50,7 @@ export function fittingVariationsCsvColumns(t: Translate): CsvColumn<VariationRo
         if (row.fits) return t('fittings.variations.fitsYes');
         return row.overage
           ? t('fittings.variations.stillOverBy', {
-              amount: row.overage.amount.toFixed(1),
+              amount: row.overage.amount.toFixed(1), // fixed format: CSV
               resource: t(`fittings.list.${row.overage.resource}`),
             })
           : t('fittings.variations.fitsNo');

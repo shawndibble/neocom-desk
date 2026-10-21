@@ -23,6 +23,17 @@ import type {
   StructuresBoardData,
 } from '../../data/boardData';
 import type { IncursionsBoardData } from '../../data/incursionsBoard';
+import type { CorpContractsFeed, CorpOrdersFeed } from './corpFeeds';
+import type {
+  CorpCustomsFeed,
+  CorpRoleAuditFeed,
+  CorpJobsFeed,
+  CorpKillsFeed,
+  CorpMembersFeed,
+  CorpMiningFeed,
+  CorpStarbasesFeed,
+  CorpWalletFeed,
+} from './corpFeeds';
 import type { BoardDeadline } from '../nextDeadline';
 import type { WidgetStateInput } from '../state';
 import type { CalendarEventsChoice, WidgetRange } from '../layout';
@@ -250,6 +261,16 @@ export interface FeedMap {
   kills: KillsWidgetData;
   omega: OmegaWidgetData;
   tradingProfit: TradingProfitWidgetData;
+  corpWallet: CorpWalletFeed;
+  corpJobs: CorpJobsFeed;
+  corpCustoms: CorpCustomsFeed;
+  corpRoleAudit: CorpRoleAuditFeed;
+  corpMembers: CorpMembersFeed;
+  corpMining: CorpMiningFeed;
+  corpStarbases: CorpStarbasesFeed;
+  corpContracts: CorpContractsFeed;
+  corpOrders: CorpOrdersFeed;
+  corpKills: CorpKillsFeed;
 }
 
 export type FeedId = keyof FeedMap;

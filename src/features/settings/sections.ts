@@ -3,7 +3,7 @@ import type { SETTINGS_TABS } from '@/app/pageTabs';
 export type SettingsSectionId = (typeof SETTINGS_TABS)['tabs'][number]['id'];
 
 export interface SettingsGroup {
-  readonly id: 'app' | 'defaults' | 'alerts' | 'data';
+  readonly id: 'preferences' | 'defaults' | 'account' | 'data';
   /** i18next key for the group heading in the rail. */
   readonly labelKey: string;
   readonly sections: readonly SettingsSectionId[];
@@ -17,16 +17,20 @@ export interface SettingsGroup {
  */
 export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
-    id: 'app',
-    labelKey: 'settings.groups.app',
-    sections: ['display', 'permissions'],
+    id: 'preferences',
+    labelKey: 'settings.groups.preferences',
+    sections: ['display', 'notifications'],
   },
   {
     id: 'defaults',
     labelKey: 'settings.groups.defaults',
-    sections: ['industry', 'market', 'miningTax', 'characters', 'corporation', 'travel'],
+    sections: ['industry', 'pi', 'market', 'miningTax', 'characters', 'corporation', 'travel'],
   },
-  { id: 'alerts', labelKey: 'settings.groups.alerts', sections: ['notifications'] },
+  {
+    id: 'account',
+    labelKey: 'settings.groups.account',
+    sections: ['permissions', 'app', 'device'],
+  },
   {
     id: 'data',
     labelKey: 'settings.groups.data',

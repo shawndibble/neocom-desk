@@ -154,6 +154,12 @@ describe('parsers', () => {
     expect(kept).toMatchObject({ solarSystemId: 30003838, moonId: 40000001 });
     const [bare] = parseSyncInput({ corporationId: 9, observed: [row] }, now).observed;
     expect('solarSystemId' in bare).toBe(false);
+    expect('sourceCorporationId' in bare).toBe(false);
+    const [fed] = parseSyncInput(
+      { corporationId: 9, observed: [{ ...row, sourceCorporationId: 98000002 }] },
+      now
+    ).observed;
+    expect(fed.sourceCorporationId).toBe(98000002);
     expect(() =>
       parseSyncInput({ corporationId: 9, observed: [{ ...row, solarSystemId: 5 }] }, now)
     ).toThrow();
@@ -335,6 +341,51 @@ describe('linkSurvey', () => {
     });
     expect(() =>
       parseEditAction({ action: 'linkSurvey', extractionId: 'x_1', surveyId: '../s' })
+    ).toThrow();
+  });
+});
+
+describe('per-refinery rate (#4621)', () => {
+  it('parses a structure-scoped rate with its structure id', () => {
+    expect(
+      parseEditAction({
+        action: 'addRate',
+        rate: {
+          scope: 'structure',
+          structureId: 1035000000001,
+          pct: 4,
+          effectiveFrom: '2026-10-18',
+        },
+      })
+    ).toEqual({
+      action: 'addRate',
+      rate: { scope: 'structure', structureId: 1035000000001, pct: 4, effectiveFrom: '2026-10-18' },
+    });
+    expect(() =>
+      parseEditAction({
+        action: 'addRate',
+        rate: { scope: 'structure', pct: 4, effectiveFrom: '2026-10-18' },
+      })
+    ).toThrow();
+  });
+});
+
+describe('per-moon-owner miner rate', () => {
+  it('parses a feeder-scoped rate with its moon owner corporation id', () => {
+    expect(
+      parseEditAction({
+        action: 'addRate',
+        rate: { scope: 'feeder', feederId: 98000002, pct: 9, effectiveFrom: '2026-10-21' },
+      })
+    ).toEqual({
+      action: 'addRate',
+      rate: { scope: 'feeder', feederId: 98000002, pct: 9, effectiveFrom: '2026-10-21' },
+    });
+    expect(() =>
+      parseEditAction({
+        action: 'addRate',
+        rate: { scope: 'feeder', pct: 9, effectiveFrom: '2026-10-21' },
+      })
     ).toThrow();
   });
 });

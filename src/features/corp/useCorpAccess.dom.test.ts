@@ -219,7 +219,16 @@ describe('useCorpAccess — roles-without-grant', () => {
     expect(result.current.missingScopes).toEqual([
       'esi-corporations.read_structures.v1',
       'esi-industry.read_corporation_mining.v1',
+      'esi-contracts.read_corporation_contracts.v1',
     ]);
+  });
+
+  it('lands a Trader-only Character on roles-without-grant so it is asked to grant', async () => {
+    mockedGrantedScopes.mockReturnValue([ROLES_SCOPE]);
+    mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Trader']));
+    const { result } = renderHook(() => useCorpAccess());
+    await waitFor(() => expect(result.current.state).toBe('roles-without-grant'));
+    expect(result.current.missingScopes).toContain('esi-markets.read_corporation_orders.v1');
   });
 
   it('does not ask a Factory_Manager for scopes only an Accountant could use', async () => {
@@ -227,7 +236,10 @@ describe('useCorpAccess — roles-without-grant', () => {
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Factory_Manager']));
     const { result } = renderHook(() => useCorpAccess());
     await waitFor(() => expect(result.current.state).toBe('roles-without-grant'));
-    expect(result.current.missingScopes).toEqual(['esi-industry.read_corporation_jobs.v1']);
+    expect(result.current.missingScopes).toEqual([
+      'esi-industry.read_corporation_jobs.v1',
+      'esi-contracts.read_corporation_contracts.v1',
+    ]);
   });
 });
 
@@ -247,6 +259,11 @@ describe('useCorpAccess — ready', () => {
       canReadIndustry: true,
       canReadAssets: true,
       canReadBlueprints: true,
+      canReadStarbases: true,
+      canReadCustomsOffices: true,
+      canReadRoleAudit: true,
+      canReadContracts: true,
+      canReadOrders: true,
     });
   });
 
@@ -275,13 +292,19 @@ describe('useCorpAccess — ready', () => {
     await waitFor(() => expect(result.current.state).toBe('ready'));
     expect(result.current.capabilities.canReadWallet).toBe(true);
     expect(result.current.capabilities.canReadMiningLedger).toBe(false);
-    expect(result.current.missingScopes).toEqual(['esi-industry.read_corporation_mining.v1']);
+    expect(result.current.missingScopes).toEqual([
+      'esi-industry.read_corporation_mining.v1',
+      'esi-contracts.read_corporation_contracts.v1',
+      'esi-markets.read_corporation_orders.v1',
+    ]);
   });
 
   it('opens the mining ledger to an Accountant once the mining scope is granted', async () => {
     mockedGrantedScopes.mockReturnValue([
       ...CORP_SCOPES_FOR_CAPABILITY.canReadWallet,
       ...CORP_SCOPES_FOR_CAPABILITY.canReadMiningLedger,
+      ...CORP_SCOPES_FOR_CAPABILITY.canReadContracts,
+      ...CORP_SCOPES_FOR_CAPABILITY.canReadOrders,
       ROLES_SCOPE,
     ]);
     mockedLoadRoles.mockResolvedValue(rolesResolvingTo(['Accountant']));

@@ -28,6 +28,13 @@ export type EsiRead<T> =
   | { kind: 'backoff' }
   | { kind: 'unavailable' };
 
+/** A refinery's name and system (#4654); `denied` is ESI's 403 or 404: no docking access, or gone. */
+export type StructureLookup =
+  | { kind: 'ok'; name: string; solarSystemId: number }
+  | { kind: 'denied' }
+  | { kind: 'backoff' }
+  | { kind: 'unavailable' };
+
 export interface EsiNotificationLike {
   type: string;
   timestamp: string;
@@ -51,6 +58,8 @@ export interface SyncEsi {
   ): Promise<EsiRead<JournalEntryLike[]>>;
   /** The refinery's solar system, or `unavailable` when this Character is not on its ACL. */
   structureSystem(structureId: number, accessToken: string): Promise<EsiRead<number>>;
+  /** A moon owner refinery's name and system, read with the moon owner's own token. */
+  structure(structureId: number, accessToken: string): Promise<StructureLookup>;
   /** True once ESI's headers say the next call risks the shared budget. */
   budgetLow(): boolean;
 }
@@ -62,7 +71,8 @@ export function esiSyncReader(fetchImpl: typeof fetch = fetch): SyncEsi {
     path: string,
     accessToken: string
   ): Promise<
-    { kind: 'ok'; body: unknown; pages: number } | { kind: 'fail'; read: EsiRead<never> }
+    | { kind: 'ok'; body: unknown; pages: number }
+    | { kind: 'fail'; read: EsiRead<never>; status?: number }
   > {
     let res: Response;
     try {
@@ -81,13 +91,13 @@ export function esiSyncReader(fetchImpl: typeof fetch = fetch): SyncEsi {
     }
     if (isBudgetLow(res.headers)) low = true;
     if (res.status === 401 || res.status === 403) {
-      return { kind: 'fail', read: { kind: 'forbidden' } };
+      return { kind: 'fail', read: { kind: 'forbidden' }, status: res.status };
     }
     if (res.status === 420 || res.status === 429) {
       low = true;
       return { kind: 'fail', read: { kind: 'backoff' } };
     }
-    if (!res.ok) return { kind: 'fail', read: { kind: 'unavailable' } };
+    if (!res.ok) return { kind: 'fail', read: { kind: 'unavailable' }, status: res.status };
     const body: unknown = await res.json().catch(() => null);
     if (body === null) return { kind: 'fail', read: { kind: 'unavailable' } };
     const pages = Number(res.headers.get('X-Pages'));
@@ -169,6 +179,18 @@ export function esiSyncReader(fetchImpl: typeof fetch = fetch): SyncEsi {
       const system = (res.body as { solar_system_id?: unknown } | null)?.solar_system_id;
       if (typeof system !== 'number') return { kind: 'unavailable' };
       return { kind: 'ok', data: system, fetchedAt: new Date().toISOString(), truncated: false };
+    },
+    async structure(structureId, accessToken) {
+      const res = await get(`/universe/structures/${structureId}/`, accessToken);
+      if (res.kind === 'fail') {
+        if (res.status === 403 || res.status === 404) return { kind: 'denied' };
+        return res.read.kind === 'backoff' ? { kind: 'backoff' } : { kind: 'unavailable' };
+      }
+      const body = res.body as { name?: unknown; solar_system_id?: unknown } | null;
+      if (typeof body?.name !== 'string' || typeof body.solar_system_id !== 'number') {
+        return { kind: 'unavailable' };
+      }
+      return { kind: 'ok', name: body.name, solarSystemId: body.solar_system_id };
     },
     budgetLow: () => low,
   };

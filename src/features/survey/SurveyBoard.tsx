@@ -44,6 +44,7 @@ import { SurveyViewSelect } from './SurveyViewSelect';
 import { useSurveyChatOptions } from './surveyPref';
 import { useOrePrices } from './useOrePrices';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { formatCount } from '@/lib/formatCount';
 
 const NONE: ReadonlySet<string> = new Set();
 
@@ -224,13 +225,13 @@ export function SurveyBoard({
             </span>
             <span className="text-sm text-text-dim tabular-nums">
               {t('survey.seenOf', {
-                volume: Math.round(summary.startVolume).toLocaleString(i18n.language),
+                volume: formatCount(summary.startVolume),
               })}
             </span>
           </div>
 
           {scans.length <= 1 && (
-            <div className="flex h-56 items-center justify-center rounded-md border border-dashed border-line px-4 text-center text-sm text-text-dim">
+            <div className="flex h-56 items-center justify-center rounded-xs border border-dashed border-line px-4 text-center text-sm text-text-dim">
               {t('survey.addSecondScan')}
             </div>
           )}

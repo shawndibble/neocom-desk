@@ -19,11 +19,15 @@ import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { TRADE_HUBS } from '@/market/hubs';
-import { editErrorMessage, useBook } from './useBook';
+import { callableErrorText } from './feederErrorText';
+import { useBook } from './useBook';
 import { isk } from './moonsFormat';
 import { AutomaticSyncSection } from './AutomaticSyncSection';
 import { DeleteBookSection } from './DeleteBookSection';
 import { ReclaimBookSection } from './ReclaimBookSection';
+import { createNumberFormat } from '@/lib/numberLocale';
+
+const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -48,14 +52,23 @@ const displayDate = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, { timeZone: 'UTC' });
 
 const DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
-const RATE_SCOPES = ['corp', 'guest', 'miner', 'moon'] as const;
+const RATE_SCOPES = ['corp', 'guest', 'miner', 'moon', 'structure', 'feeder'] as const;
 
-function rateLabel(rate: TaxRate, character: (minerId: string) => string): string {
+function rateLabel(
+  rate: TaxRate,
+  character: (minerId: string) => string,
+  refinery: (structureId: number) => string,
+  corporation: (corporationId: number) => string
+): string {
   switch (rate.scope) {
     case 'miner':
       return character(rate.minerId);
     case 'moon':
       return `Moon ${rate.moonId}`;
+    case 'structure':
+      return refinery(rate.structureId);
+    case 'feeder':
+      return corporation(rate.feederId);
     case 'record':
       return rate.recordKey;
     default:
@@ -65,14 +78,14 @@ function rateLabel(rate: TaxRate, character: (minerId: string) => string): strin
 
 /**
  * The book's settings (D21: from the page header's gear): the dated rates
- * (corp default, Guest default, per-Miner, per-moon), hub and Ore Form, grace,
+ * (corp default, Guest default, per-Miner, per-moon, per-refinery, per-moon-owner), hub and Ore Form, grace,
  * minimum Statement, Overdue days, divisions, cadence, chunk rate, per-structure
  * expiry and the dismissal approval limit. A rate is never retroactive, so a
  * new one starts today or later; everything else saves as one patch.
  */
 export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
-  const { settings, view, names, edit, canEdit, verdict } = useBook();
+  const { settings, view, names, edit, canEdit, verdict, data } = useBook();
   const [hubId, setHubId] = useState(settings.hubId);
   const [oreForm, setOreForm] = useState(settings.oreForm);
   const [grace, setGrace] = useState(String(settings.graceHours));
@@ -100,6 +113,8 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
   const [rateScope, setRateScope] = useState<(typeof RATE_SCOPES)[number]>('corp');
   const [rateMiner, setRateMiner] = useState('');
   const [rateMoon, setRateMoon] = useState('');
+  const [rateRefinery, setRateRefinery] = useState('');
+  const [rateOwner, setRateOwner] = useState('');
   const [ratePct, setRatePct] = useState('');
   const today = new Date().toISOString().slice(0, 10);
   const [rateFrom, setRateFrom] = useState(today);
@@ -112,6 +127,22 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
     () => [...new Set(view.input.extractions.map((x) => x.moonId))],
     [view.input.extractions]
   );
+  // Every refinery the book reads, a moon owner's included: its rows never carry a moon (#4621).
+  const refineries = useMemo(
+    () =>
+      [...new Set([...structures, ...view.input.entries.map((e) => e.structureId)])].sort(
+        (a, b) => a - b
+      ),
+    [structures, view.input.entries]
+  );
+  // The moon owners still in the book: one that left or was removed mines here no more.
+  const owners = useMemo(
+    () =>
+      (data.feeders ?? [])
+        .filter((f) => f.status !== 'left' && f.status !== 'removed')
+        .map((f) => f.corporationId),
+    [data.feeders]
+  );
   const minerName = (id: string) => {
     const m = view.miners.find((x) => x.id === id);
     return m ? names.character(m.mainCharacterId) : id;
@@ -123,7 +154,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
     try {
       await fn();
     } catch (e) {
-      setError(editErrorMessage(e));
+      setError(callableErrorText(t, e, 'corpTaxBook.moons.dialogs.failed'));
     } finally {
       setBusy(false);
     }
@@ -163,7 +194,11 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
           ? { scope: 'miner', minerId: rateMiner, ...base }
           : rateScope === 'moon'
             ? { scope: 'moon', moonId: Number(rateMoon), ...base }
-            : { scope: rateScope, ...base };
+            : rateScope === 'structure'
+              ? { scope: 'structure', structureId: Number(rateRefinery), ...base }
+              : rateScope === 'feeder'
+                ? { scope: 'feeder', feederId: Number(rateOwner), ...base }
+                : { scope: rateScope, ...base };
       await edit({ action: 'addRate', rate });
       setRatePct('');
     });
@@ -174,7 +209,9 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
     Number(ratePct) <= 100 &&
     rateFrom >= today &&
     (rateScope !== 'miner' || rateMiner !== '') &&
-    (rateScope !== 'moon' || rateMoon !== '');
+    (rateScope !== 'moon' || rateMoon !== '') &&
+    (rateScope !== 'structure' || rateRefinery !== '') &&
+    (rateScope !== 'feeder' || rateOwner !== '');
   const rates = [...settings.rates]
     .filter((r): r is Exclude<TaxRate, { scope: 'record' }> => r.scope !== 'record')
     .sort(
@@ -213,12 +250,13 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
           <ul className="divide-y divide-line">
             {rates.map((r) => (
               <li
-                key={`${r.scope}-${'minerId' in r ? r.minerId : ''}-${'moonId' in r ? r.moonId : ''}-${r.effectiveFrom}`}
+                key={`${r.scope}-${'minerId' in r ? r.minerId : ''}-${'moonId' in r ? r.moonId : ''}-${'structureId' in r ? r.structureId : ''}-${'feederId' in r ? r.feederId : ''}-${r.effectiveFrom}`}
                 className="flex flex-wrap justify-between gap-2 py-1.5"
               >
                 <span>
                   {t(`corpTaxBook.moons.settings.rateScope.${r.scope}`)}
-                  {rateLabel(r, minerName) && ` · ${rateLabel(r, minerName)}`}
+                  {rateLabel(r, minerName, names.refinery, names.corporation) &&
+                    ` · ${rateLabel(r, minerName, names.refinery, names.corporation)}`}
                 </span>
                 <span className="tabular-nums text-text-dim">
                   {r.pct}% ·{' '}
@@ -241,7 +279,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {RATE_SCOPES.map((s) => (
+                    {RATE_SCOPES.filter((s) => s !== 'feeder' || owners.length > 0).map((s) => (
                       <SelectItem key={s} value={s}>
                         {t(`corpTaxBook.moons.settings.rateScope.${s}`)}
                       </SelectItem>
@@ -281,6 +319,44 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
                       {moons.map((m) => (
                         <SelectItem key={m} value={String(m)}>
                           {names.moon(m)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Label>
+              )}
+              {rateScope === 'structure' && (
+                <Label text={t('corpTaxBook.moons.settings.rateScope.structure')}>
+                  <Select value={rateRefinery} onValueChange={setRateRefinery}>
+                    <SelectTrigger
+                      aria-label={t('corpTaxBook.moons.settings.rateScope.structure')}
+                      className="w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {refineries.map((id) => (
+                        <SelectItem key={id} value={String(id)}>
+                          {names.refinery(id)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Label>
+              )}
+              {rateScope === 'feeder' && (
+                <Label text={t('corpTaxBook.moons.settings.rateScope.feeder')}>
+                  <Select value={rateOwner} onValueChange={setRateOwner}>
+                    <SelectTrigger
+                      aria-label={t('corpTaxBook.moons.settings.rateScope.feeder')}
+                      className="w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {owners.map((id) => (
+                        <SelectItem key={id} value={String(id)}>
+                          {names.corporation(id)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -442,15 +518,14 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
                     {learned
                       ? t('corpTaxBook.moons.settings.measured', {
                           name: names.refinery(id),
-                          rate: learned.m3PerHour.toLocaleString('en'),
+                          rate: formatDecimal(learned.m3PerHour),
                           count: learned.cycles,
                         })
                       : t('corpTaxBook.moons.settings.notMeasured', {
                           name: names.refinery(id),
-                          rate: chunkRateFor(
-                            undefined,
-                            settings.chunkM3PerHour ?? undefined
-                          ).m3PerHour.toLocaleString('en'),
+                          rate: formatDecimal(
+                            chunkRateFor(undefined, settings.chunkM3PerHour ?? undefined).m3PerHour
+                          ),
                         })}
                   </li>
                 );

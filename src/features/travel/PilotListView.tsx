@@ -57,6 +57,7 @@ import { THREAT_LEVEL_TONE, THREAT_ROW_CLASS } from './threatTone';
 import { PilotStandingTag } from './PilotStandingTag';
 import { AGE_TEXT, SPACE_TEXT } from './pilotListStyles';
 import { useHereSpace, type HereSpace } from './useHereSpace';
+import { formatNumber } from '@/lib/numberLocale';
 
 type LocalPaste = Extract<PilotPaste, { kind: 'local' }>;
 type DscanPaste = Extract<PilotPaste, { kind: 'dscan' }>;
@@ -551,7 +552,7 @@ export function DscanShareControl({
   }
 
   const tooltip = tooLarge
-    ? t('travel.pilot.dscan.shareTooLarge', { max: MAX_DSCAN_SNAPSHOT_CHARS.toLocaleString() })
+    ? t('travel.pilot.dscan.shareTooLarge', { max: formatNumber(MAX_DSCAN_SNAPSHOT_CHARS) })
     : share.status === 'saving'
       ? t('travel.pilot.dscan.shareSaving')
       : share.status === 'failed'

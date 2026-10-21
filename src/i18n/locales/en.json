@@ -14,7 +14,7 @@
       "pasteFit": "Paste a fit or an item list outside a text box and Neocom Desk opens it in Fittings or Appraisal.",
       "pasteLocal": "Paste a Local list or a D-Scan outside a text box to check the pilots in Pilot Lookup.",
       "pasteBack": "After a paste takes you to a page, the browser's Back button returns you to where you were.",
-      "backup": "Settings › Data & storage exports a password-protected backup of every character on this device.",
+      "backup": "Settings › App & backup exports a password-protected backup of every character on this device.",
       "timeFormat": "Settings › Display switches timers between your local time and EVE time.",
       "textSize": "Settings › Display changes the text size on this device.",
       "numberFormat": "Settings › Display switches numbers between 1,234.56 and 1.234,56.",
@@ -3864,7 +3864,7 @@
       },
       "delete": {
         "q": "Can I leave and delete my data?",
-        "a": "Yes. Settings › Data & storage › Delete all data deletes every character's synced data from our server, then erases everything on this device. Anything you shared with a Community is removed by leaving that Community."
+        "a": "Yes. Settings › Log out & delete › Delete all data deletes every character's synced data from our server, then erases everything on this device. Anything you shared with a Community is removed by leaving that Community."
       },
       "phone": {
         "q": "Does it work on a phone?",
@@ -3907,7 +3907,8 @@
     "filter": {
       "thisCharacter": "This character",
       "allCharacters": "All characters",
-      "unreadFor": "{{name}} · {{count}} unread"
+      "unreadFor": "{{name}} · {{count}} unread",
+      "corporation": "Corporation"
     }
   },
   "characters": {
@@ -4925,6 +4926,314 @@
           "profit": "Profit",
           "jumps": "Jumps"
         }
+      },
+      "corpDeadlines": {
+        "title": "Due soon",
+        "description": "Every corp clock in one place: fuel, timers, moon chunks and finished jobs",
+        "empty": "Nothing is due.",
+        "col": {
+          "subject": "Subject",
+          "what": "What",
+          "when": "When"
+        },
+        "next": "Next: {{name}}, {{when}}",
+        "chartNote": "Deadlines per day, next {{days}} days",
+        "summary_one": "{{count}} corp clock is due in 24 hours, {{overdue}} already overdue.",
+        "summary_other": "{{count}} corp clocks are due in 24 hours, {{overdue}} already overdue."
+      },
+      "corpServices": {
+        "title": "Offline services",
+        "description": "Structure services that are switched off",
+        "empty": "Every structure service is online.",
+        "col": {
+          "structure": "Structure",
+          "service": "Service"
+        },
+        "unit": "offline",
+        "most": "{{name}} has {{count}}",
+        "summary_one": "{{count}} structure service is offline.",
+        "summary_other": "{{count}} structure services are offline across {{structures}} structures."
+      },
+      "corpStarbases": {
+        "title": "Starbases",
+        "description": "Starbase fuel, strontium and state",
+        "empty": "The corporation has no starbases.",
+        "unit": "starbases",
+        "lowest": "{{name}} has {{duration}} of fuel",
+        "lowFuel_one": "{{count}} has under {{hours}} hours of fuel",
+        "lowFuel_other": "{{count}} have under {{hours}} hours of fuel",
+        "fuelCell": "{{blocks}} ({{duration}})",
+        "col": {
+          "tower": "Tower",
+          "system": "System",
+          "state": "State",
+          "fuel": "Fuel blocks",
+          "strontium": "Strontium",
+          "reinforced": "Reinforced for"
+        },
+        "state": {
+          "offline": "Offline",
+          "online": "Online",
+          "onlining": "Onlining",
+          "reinforced": "Reinforced",
+          "unanchoring": "Unanchoring"
+        },
+        "summary_one": "{{count}} starbase, {{low}} low on fuel.",
+        "summary_other": "{{count}} starbases, {{low}} low on fuel.",
+        "reinforceEnded": "Ended"
+      },
+      "corpCustomsOffices": {
+        "title": "Customs offices",
+        "description": "Each customs office’s tax rates by standing and its reinforce exit window",
+        "empty": "Your corporation has no customs offices.",
+        "col": {
+          "office": "Office",
+          "system": "System",
+          "rates": "Tax rates",
+          "window": "Reinforce exit (UTC)"
+        },
+        "rate": {
+          "corporation": "Corporation",
+          "alliance": "Alliance",
+          "excellent": "Excellent",
+          "good": "Good",
+          "neutral": "Neutral",
+          "bad": "Bad",
+          "terrible": "Terrible"
+        },
+        "unit_one": "customs office",
+        "unit_other": "customs offices",
+        "systems_one": "in {{count}} system",
+        "systems_other": "in {{count}} systems",
+        "unknownType": "Customs office",
+        "window": "{{start}}:00 to {{end}}:00",
+        "summary_one": "{{count}} customs office. Systems covered: {{systems}}.",
+        "summary_other": "{{count}} customs offices. Systems covered: {{systems}}."
+      },
+      "corpWallet": {
+        "title": "Corp wallet",
+        "description": "The balance of each wallet division",
+        "empty": "There are no wallet divisions to show.",
+        "col": {
+          "division": "Division",
+          "balance": "Balance",
+          "share": "Share"
+        },
+        "summary_one": "{{isk}} ISK in {{count}} wallet division.",
+        "summary_other": "{{isk}} ISK across {{count}} wallet divisions.",
+        "biggest": "{{name}} holds {{share}}% of it",
+        "chartNote": "Share of the corporation's ISK by division"
+      },
+      "corpCashFlow": {
+        "title": "Cash flow",
+        "description": "Money into and out of the master wallet, and how long it lasts",
+        "empty": "No master wallet activity in this window.",
+        "col": {
+          "day": "Day",
+          "in": "In",
+          "out": "Out",
+          "net": "Net"
+        },
+        "unit": "net ISK",
+        "runway_one": "Runway {{count}} day at current spending",
+        "runway_other": "Runway {{count}} days at current spending",
+        "runwayUnknown": "Runway unknown",
+        "runwayWindow": "Runway uses the last {{count}} days of spending.",
+        "unavailable": "The master wallet journal couldn't load, so net and runway are unknown.",
+        "coverage_one": "The journal reaches back {{count}} day.",
+        "coverage_other": "The journal reaches back {{count}} days.",
+        "chartNote": "Net ISK per day",
+        "summary": "Net {{isk}} ISK over {{count}} days: {{income}} in, {{spending}} out."
+      },
+      "corpIncome": {
+        "title": "Income by source",
+        "description": "Where the master wallet’s money comes from: bounties, taxes, market and more",
+        "empty": "No income in this window.",
+        "col": {
+          "source": "Source",
+          "amount": "Amount",
+          "share": "Share"
+        },
+        "unit": "ISK in",
+        "top": "{{name}} brings in {{share}}%",
+        "unavailable": "The master wallet journal couldn't load, so income is unknown.",
+        "coverage_one": "The journal reaches back {{count}} day.",
+        "coverage_other": "The journal reaches back {{count}} days.",
+        "chartNote": "Share of income by source",
+        "summary_one": "{{isk}} ISK income over {{days}} days from {{count}} source.",
+        "summary_other": "{{isk}} ISK income over {{days}} days from {{count}} sources.",
+        "refType": {
+          "bounty_prizes": "Bounty prizes",
+          "ess_escrow_transfer": "ESS payout",
+          "corporate_reward_payout": "Corporate reward payout",
+          "market_transaction": "Market sales",
+          "player_donation": "Donations",
+          "planetary_export_tax": "Planetary export tax",
+          "planetary_import_tax": "Planetary import tax",
+          "industry_job_tax": "Industry job tax",
+          "reprocessing_tax": "Reprocessing tax",
+          "brokers_fee": "Broker's fee refund",
+          "structure_gate_jump": "Structure gate jumps",
+          "corporation_account_withdrawal": "Corporation account transfer",
+          "corporation_dividend_payment": "Dividend payment",
+          "contract_reward": "Contract reward",
+          "contract_price": "Contract sale",
+          "contract_collateral": "Contract collateral",
+          "project_discovery_reward": "Project Discovery reward",
+          "insurance": "Insurance payout",
+          "daily_goal_payouts": "Daily goal payouts",
+          "agent_mission_reward": "Mission reward",
+          "office_rental_fee": "Office rental"
+        }
+      },
+      "corpOrders": {
+        "title": "Corp market orders",
+        "description": "Open buy and sell orders, and the ISK held in escrow",
+        "empty": "The corporation has no open market orders.",
+        "unit_one": "open order",
+        "unit_other": "open orders",
+        "escrow": "{{isk}} ISK in escrow",
+        "listed": "{{isk}} ISK listed",
+        "summary_one": "{{count}} open corp order, {{undercut}} undercut.",
+        "summary_other": "{{count}} open corp orders, {{undercut}} undercut."
+      },
+      "corpMembers": {
+        "title": "Members",
+        "description": "Headcount, and who joined or left since you last looked",
+        "empty": "There are no members to show.",
+        "unit_one": "member",
+        "unit_other": "members",
+        "secondary": "{{joined}} joined · {{left}} left since you last looked",
+        "joined": "Joined",
+        "left": "Left",
+        "col": {
+          "member": "Member",
+          "change": "Change"
+        },
+        "noChange": "No one joined or left since you last looked.",
+        "unknownDiff": "Joins and leaves are unknown: the member list could not be read.",
+        "summary_one": "{{count}} member.",
+        "summary_other": "{{count}} members.",
+        "chart": {
+          "note": "Members by month joined",
+          "max": "max {{value}}",
+          "monthsAgo_one": "{{count}} month ago",
+          "monthsAgo_other": "{{count}} months ago",
+          "thisMonth": "This month",
+          "joined": "Joined",
+          "summary": "{{count}} current members joined in the last {{months}} months. By month: {{items}}."
+        }
+      },
+      "corpInactive": {
+        "title": "Inactive members",
+        "description": "Members who have not logged in for a while",
+        "empty": "Every member has logged in recently.",
+        "unit_one": "inactive",
+        "unit_other": "inactive",
+        "threshold": "Over {{days}} days",
+        "col": {
+          "member": "Member",
+          "lastSeen": "Last seen"
+        },
+        "summary_one": "{{count}} member has not logged in for {{days}} days or more.",
+        "summary_other": "{{count}} members have not logged in for {{days}} days or more."
+      },
+      "corpRoleAudit": {
+        "title": "Roles audit",
+        "description": "Who holds Director and other sensitive roles, and recent role changes",
+        "empty": "No member holds a sensitive role.",
+        "col": {
+          "member": "Member",
+          "roles": "Sensitive roles",
+          "change": "Last change"
+        },
+        "unit_one": "Director",
+        "unit_other": "Directors",
+        "changes_one": "{{count}} role change in {{days}} days",
+        "changes_other": "{{count}} role changes in {{days}} days",
+        "changesUnknown": "Role changes unavailable",
+        "historyUnknown": "Role history could not be read, so last changes are not shown.",
+        "summary_one": "{{count}} Director. Members with a sensitive role: {{holders}}.",
+        "summary_other": "{{count}} Directors. Members with a sensitive role: {{holders}}."
+      },
+      "corpJobs": {
+        "title": "Corp industry jobs",
+        "description": "Jobs running in the corporation’s name, and when they finish",
+        "empty": "No corp industry jobs are running.",
+        "col": {
+          "product": "Product",
+          "ends": "Ends in",
+          "installer": "Installer",
+          "activity": "Activity"
+        },
+        "unit": "running",
+        "ready_one": "{{count}} ready to deliver",
+        "ready_other": "{{count}} ready to deliver",
+        "next": "Next: {{name}} in {{duration}}",
+        "chartNote": "Time left on each corp job",
+        "summary": "{{running}} corp jobs running, {{ready}} ready to deliver."
+      },
+      "corpMining": {
+        "title": "Moon mining ledger",
+        "description": "Who mined how much at your refineries",
+        "empty": "Nothing was mined at your refineries in this window.",
+        "unit": "units mined",
+        "topMiner": "Top miner {{name}}, {{share}} of units",
+        "percent": "{{value}}%",
+        "underOne": "<1%",
+        "col": {
+          "miner": "Miner",
+          "units": "Units",
+          "share": "Share",
+          "ore": "Top ore"
+        },
+        "noRefineries": "Your corporation has no refineries with a mining ledger.",
+        "truncated": "Some of the ledger could not be read, so figures may be low.",
+        "covered": "The ledger only holds about {{covered}} of the last {{count}} days.",
+        "chart": {
+          "note": "Share of units mined, last {{count}} days"
+        },
+        "summary_one": "{{units}} units mined by {{count}} miner in the last {{days}} days.",
+        "summary_other": "{{units}} units mined by {{count}} miners in the last {{days}} days."
+      },
+      "corpKills": {
+        "title": "Corp kills",
+        "description": "Kills, losses and ISK efficiency, all time",
+        "empty": "zKillboard has no kills or losses for your corporation.",
+        "npc": "NPC corporations have no killboard.",
+        "unavailable": "zKillboard could not be reached. Try again in a bit.",
+        "unit_one": "kill",
+        "unit_other": "kills",
+        "secondary": "{{losses}} lost · {{efficiency}} ISK efficiency",
+        "allTime": "All time, from zKillboard",
+        "summary": "{{kills}} kills, {{losses}} losses, {{efficiency}} ISK efficiency, all time."
+      },
+      "corpContracts": {
+        "title": "Corp contracts",
+        "description": "Outstanding courier and item exchange contracts",
+        "empty": "No courier or item exchange contracts are outstanding.",
+        "unit": "outstanding",
+        "expiringSoon_one": "{{count}} expiring within a day",
+        "expiringSoon_other": "{{count}} expiring within a day",
+        "collateral": "{{amount}} ISK courier collateral at stake",
+        "untitled": "{{type}} #{{id}}",
+        "overdue": "Overdue",
+        "underCache": "Under 5 min",
+        "col": {
+          "contract": "Contract",
+          "expiry": "Expires in",
+          "type": "Type",
+          "issuer": "Issuer",
+          "assignee": "Assignee",
+          "collateral": "Collateral"
+        },
+        "summary_one": "{{count}} outstanding corp contract, {{soon}} expiring within a day.",
+        "summary_other": "{{count}} outstanding corp contracts, {{soon}} expiring within a day."
+      },
+      "corpSrp": {
+        "title": "Ship replacement",
+        "description": "SRP claims waiting and paid",
+        "empty": "This widget is coming soon."
       }
     },
     "header": {
@@ -5004,7 +5313,12 @@
         "industry": "Industry and mining",
         "planets": "Planets and structures",
         "space": "Space and travel",
-        "messages": "Messages and schedule"
+        "messages": "Messages and schedule",
+        "corpClocks": "Structures and timers",
+        "corpMoney": "Money",
+        "corpPeople": "Members",
+        "corpIndustry": "Industry and mining",
+        "corpOps": "Operations"
       },
       "add": "Add",
       "addAnother": "Add another",
@@ -5398,6 +5712,9 @@
     "balanceByCharacter": "Balance by character",
     "totalBalance": "Total",
     "balanceCharacterColumn": "Character",
+    "playerColumn": "Player",
+    "playerFilterLabel": "Player",
+    "playerFilterAll": "Any player",
     "everMarks": "EverMarks",
     "everMarksTooltipLabel": "About EverMarks",
     "everMarksTooltip": "EverMarks are loyalty points for the Paragon corporation, spent in its own LP Store — separate from the per-corporation LP under Loyalty Points.",
@@ -5961,7 +6278,8 @@
         "sentWaitingShort": "Sent, waiting",
         "conflict": "Conflict",
         "unattributed": "Unattributed",
-        "dismissed": "Dismissed by corp"
+        "dismissed": "Dismissed by corp",
+        "waived": "Waived"
       },
       "hint": {
         "pending": "{{corp}} has not closed this day in its book yet. Until it does, your own allocation applies and nothing is owed to the corp.",
@@ -5970,6 +6288,7 @@
         "conflict": "You gave this ore to another Payee, and {{corp}}'s book also recorded it. It is not owed; it resolves to {{corp}} on {{date}} unless you sort it out first.",
         "unattributed": "No Corp Tax Book claims this ore, so nobody is owed for it.",
         "dismissed": "{{corp}} dismissed this day: {{reason}}",
+        "waived": "{{corp}} wrote this day off: {{reason}}",
         "paid": "Credited by {{corp}}'s book."
       },
       "sync": {
@@ -6004,6 +6323,8 @@
         "guest": "guest rate",
         "miner": "per-Miner rate",
         "moon": "per-moon rate",
+        "structure": "per-refinery rate",
+        "feeder": "per-moon-owner rate",
         "record": "correction for this day"
       },
       "detail": {
@@ -6012,7 +6333,24 @@
         "onStatement": "It is on {{corp}}'s Statement, which never changes.",
         "decides": "The book decides this day: it is Billable ({{corp}} synced {{ago}}, after its grace period) and goes on {{corp}}'s next Statement.",
         "terms": "Terms are locked to the book: {{hub}} buy, {{form}} ore, {{pct}}% {{scope}} from {{from}}.",
-        "disputeHint": "Your own record differs from the book."
+        "disputeHint": "Your own record differs from the book.",
+        "corrected": "Corrected by the corporation: {{before}} → {{after}}.",
+        "reason": "Their reason: {{reasons}}"
+      },
+      "line": {
+        "corrected": "Corrected by the corporation, was {{before}}.",
+        "overlap": "This ore is also on your own list for a payee. Open the line to sort it out."
+      },
+      "overlap": {
+        "notice": "This ore is also on your list for <strong>{{payee}}</strong>. <strong>{{corp}}</strong> bills it.",
+        "noticePaid": "You marked this paid to {{payee}}. {{corp}} still bills it. If that was the same payment, say so.",
+        "letBill": "Let the corporation bill it",
+        "paidOther": "I paid it another way",
+        "previewTitle": "This is what changes on your list:",
+        "previewLine": "{{payee}}: {{before}} → {{after}}",
+        "nothingLeft": "nothing",
+        "confirm": "Take it off my list",
+        "region": "This ore is also billed by the corporation"
       },
       "pay": {
         "title": "Pay {{corp}}",
@@ -7520,7 +7858,7 @@
       "optInLabel": "About hauling between planets",
       "introLabel": "About Bigger chains",
       "whatIfIntroLabel": "About adding a planet",
-      "optInHint": "Adds a Bigger chains section: P3 and P4 made across several of your planets. Your picks and totals stay one planet each.",
+      "optInHint": "Adds a Bigger chains section: P3 and P4 made across several of your planets. Picks and totals stay one planet each.",
       "title": "Bigger chains",
       "meta": "Multi-planet · needs hauling",
       "intro": "P3 and P4 made across several of your planets, because you haul between them. Kept apart from the one-planet picks and totals above.",
@@ -8498,6 +8836,14 @@
     "title": "Contracts",
     "tabsLabel": "Contracts sections",
     "historyTab": "History",
+    "corpReauthTitle": "Corp contracts need a new grant",
+    "corpReauthHint": "Grant corporation contracts access to read the contracts issued by or assigned to your corporation.",
+    "corpEmptyTitle": "No corp contracts cached",
+    "corpEmptyHint": "Couldn't load your corporation's contracts yet. Try again shortly.",
+    "corpEmptyFetchedTitle": "No corp contracts",
+    "allEmptyHint": "Couldn't load your characters' contracts yet. Try again shortly.",
+    "character": "Character",
+    "notShared": "{{name}} hasn't shared their contracts",
     "itemSearchTab": "Item search",
     "courierTab": "Courier",
     "refresh": "Refresh",
@@ -10413,6 +10759,7 @@
       "refineLeftoverHint_one": "{{count}} unit is too few for a full refine batch. It sells at the buy price for {{isk}} ISK. With it, refining beats the {{buyTotal}} ISK buy total.",
       "refineLeftoverHint_other": "{{count}} units are too few for a full refine batch. They sell at the buy price for {{isk}} ISK. With them, refining beats the {{buyTotal}} ISK buy total.",
       "refinePartialHint": "At least one material has no price at this hub, so this total is a floor rather than the full value.",
+      "pricesFromYesterday": "The live price source is down, so these are yesterday's closing prices.",
       "refineUnpriced_one": "{{count}} refine value has an unpriced material, so it is a floor rather than the full total.",
       "refineUnpriced_other": "{{count}} refine values have an unpriced material, so they are floors rather than the full total.",
       "lpTotalCell": "{{isk}} + {{lp}} LP ({{corp}})",
@@ -10656,6 +11003,15 @@
       "errorHint": "Try again, or reload the page."
     },
     "orders": {
+      "corp": {
+        "issuedBy": "Issued by",
+        "reauthTitle": "Corp orders need a new grant",
+        "reauthHint": "Grant corporation market orders access to see your corporation's open buy and sell orders.",
+        "reauthAction": "Grant access",
+        "emptyTitle": "No corp orders cached",
+        "emptyHint": "Couldn't load your corporation's orders yet. Try again shortly.",
+        "emptyFetchedTitle": "No corp orders"
+      },
       "tableName": "Open orders",
       "scopeOverByPct": "I am over by (%)",
       "badge": {
@@ -11169,21 +11525,24 @@
       "display": "Display",
       "permissions": "Permissions",
       "industry": "Industry",
+      "pi": "Planetary Industry",
+      "app": "App & backup",
+      "device": "Log out & delete",
       "market": "Market",
-      "miningTax": "Moon Mining Tax",
+      "miningTax": "Moon mining tax",
       "characters": "Characters",
       "corporation": "Corporation",
       "travel": "Travel",
       "notifications": "Notifications",
-      "data": "Data & storage",
+      "data": "Cached data",
       "offline": "Offline data",
-      "activity": "Activity Log"
+      "activity": "Activity log"
     },
     "groups": {
-      "app": "App",
+      "preferences": "Preferences",
       "defaults": "Defaults",
-      "alerts": "Alerts",
-      "data": "Data & device"
+      "account": "Account & device",
+      "data": "Data"
     },
     "navLabel": "Settings sections",
     "backToList": "Settings",
@@ -11199,31 +11558,37 @@
       "travel_one": "{{preference}}, {{count}} avoided system",
       "travel_other": "{{preference}}, {{count}} avoided systems"
     },
-    "industryDefaultsTitle": "Industry defaults",
-    "marketDefaultsTitle": "Market defaults",
+    "industryBlueprintTitle": "Blueprint assumptions",
     "lpValueLabel": "Your LP value (ISK per LP)",
-    "lpValueHint": "Leave blank (0) to price each store’s LP at its market rate — what its offers sell for at this hub, after fees. Type your own rate to use it for every store instead.",
+    "lpValueHint": "Blank (0) prices each store’s LP at its market rate. Type a rate to use it for every store.",
     "lpValueUseMarket": "Use market rates",
     "avoidedSystems": {
       "title": "Avoided systems",
-      "hint": "Systems you keep off your routes. Every jump count and route in the app goes around them where it can. The game doesn't share its own autopilot avoidance list, so enter yours here. Kept across your devices.",
+      "hint": "Routes avoid these where possible. The game won't share its autopilot list, so enter yours.",
       "add": "Add",
       "addLabel": "Add an avoided system",
       "remove": "Remove {{name}}",
       "empty": "No systems avoided yet.",
-      "enabled": "Keep routes out of these systems"
+      "enabled": "Keep routes out of these systems",
+      "summary_one": "{{count}} system",
+      "summary_other": "{{count}} systems",
+      "summaryOff_one": "{{count}} system, off",
+      "summaryOff_other": "{{count}} systems, off",
+      "show": "Show avoided systems",
+      "hide": "Hide avoided systems"
     },
     "travel": {
       "routeTitle": "Route planning",
       "networkTitle": "Wormholes and jump bridges",
-      "networkHint": "Whether routes may fly through Thera / Turnur wormholes and Ansiblex jump bridges. Like the rules above, every jump count in the app follows them, so a number always matches the route Route Safety draws.",
-      "hint": "The in-game autopilot's route settings, for planning. Every jump count and route in the app follows them; a page with its own route picker starts from the preference here. Kept across your devices.",
+      "networkHint": "Allow Thera / Turnur wormholes and Ansiblex jump bridges.",
+      "hint": "Your in-game autopilot route settings, for planning. Every route and jump count follows them.",
       "preferenceLabel": "Default route preference",
       "preferenceHint": "Which trip to plan, as the game's autopilot offers it.",
       "penaltyLabel": "Security penalty",
-      "penaltyHint": "How hard the preference bends the route, 0 to 100 — the game's slider. At the default 50 one unwanted jump outweighs a long detour; lower it to accept a few for a much shorter trip.",
-      "penaltyShorterHint": "Prefer shorter counts jumps only, so the security penalty does not apply.",
+      "penaltyHint": "0 to 100, like the game's slider. At 50 one unwanted jump outweighs a long detour.",
+      "penaltyShorterHint": "Prefer shorter counts jumps only; no security penalty.",
       "avoidTitle": "Also avoid",
+      "avoidSummary": "{{count}} of {{total}} on",
       "avoidEdencom_one": "EDENCOM systems ({{count}} system)",
       "avoidEdencom_other": "EDENCOM systems ({{count}} systems)",
       "avoidTriglavian_one": "Triglavian minor victory systems ({{count}} system)",
@@ -11233,32 +11598,35 @@
       "podKillsAtLeast": "At least",
       "podKillsSuffix_one": "pod kill in the last hour",
       "podKillsSuffix_other": "pod kills in the last hour",
-      "avoidHint": "Avoided systems cost more than any security penalty, but a trip only possible through one still gets a route. Pod kills come from ESI's last-hour kill report and refresh with it.",
+      "avoidHint": "Avoided systems cost more than any security penalty, but a trip that needs one still gets a route. Pod kills use ESI's last-hour report.",
       "podKillsUnavailable": "ESI's kill report can't be read right now, so routes aren't avoiding pod-kill systems."
     },
-    "miningTaxDefaultsTitle": "Moon Mining Tax defaults",
     "miningTaxCompressedOreLabel": "Value and show ore as compressed",
-    "miningTaxCompressedOreHint": "Prices ore, moon ore and ice at their Compressed version and shows the Compressed names. Off uses the raw ore. Ore with no Compressed version always uses the raw ore. Unpaid entries re-price when you change this; paid ones keep the ISK they were paid at.",
+    "miningTaxCompressedOreHint": "Prices and names ore as Compressed where it exists. Unpaid entries re-price; paid ones keep their ISK.",
     "miningTaxOreValueModeLabel": "Edit ore values individually",
-    "miningTaxOreValueModeHint": "When editing an entry, enter each ore's own total ISK value instead of one value per day — useful for matching a corp's moon-tax tool line by line. Estimated Value and Tax Owed are calculated from them.",
+    "miningTaxOreValueModeHint": "Enter each ore's ISK total when editing an entry, to match a corp's moon-tax tool line by line.",
     "miningTaxAutoContinueLabel": "Continue sessions across midnight UTC automatically",
-    "miningTaxAutoContinueHint": "When you keep mining past midnight UTC, add the new EVE day to the same session without asking, with an Undo. Set on this device only, unlike the rest of this section.",
-    "characterDefaultsTitle": "Character defaults",
-    "piDefaultsTitle": "Planetary Industry",
+    "miningTaxAutoContinueHint": "Past midnight UTC, add the new EVE day to the same session, with Undo.",
     "bpcSourcingDefaultsTitle": "BPC Sourcing",
     "corpUnavailable": "Corporation defaults appear once the active character can see a corporation.",
     "installTitle": "Install this app",
-    "installHint": "Add Neocom Desk to your device for quicker access. On iPhone and iPad, notifications only work from the installed app.",
+    "installHint": "Add Neocom Desk to your device. On iPhone and iPad, notifications need the installed app.",
     "installMenuSteps": "Open your browser's menu and choose Install app (or Add to Home Screen). If you don't see it, this browser may not support installing.",
     "installInstalled": "Neocom Desk is installed on this device.",
-    "updateAction": "Update app",
+    "updateTitle": "App updates",
+    "updateAction": "Update now",
+    "update": {
+      "checking": "Checking for updates…",
+      "current": "No updates at this time",
+      "available": "Update available",
+      "offline": "Offline, couldn't check"
+    },
     "updateFailed": "Could not check for a new version. Check your connection and try again.",
     "analyticsTitle": "Analytics",
     "analyticsLabel": "Send page views",
-    "analyticsHint": "Sends only the name of the page you are on to Google Analytics, never character, corporation or other IDs. Stored on this device only.",
+    "analyticsHint": "Sends only the page name to Google Analytics. Never character, corporation or other IDs.",
     "offline": {
-      "title": "Offline data",
-      "hint": "Large reference files download the first time a page needs them. Download them all here to use the app with no connection.",
+      "hint": "Large reference files download when a page first needs them. Download all to work offline.",
       "packsLabel": "Downloaded on this device",
       "packs": {
         "itemInfo": "Item info",
@@ -11274,14 +11642,14 @@
       "storageLabel": "Storage used",
       "storageValue": "{{used}} of {{quota}} this browser allows the app",
       "persistLabel": "Keep data on this device",
-      "persistedYes": "Protected. The browser will not clear this app's data when the device runs low on space.",
-      "persistedNo": "Not protected. When the device runs low on space, the browser may clear this app's downloaded data.",
+      "persistedYes": "Protected. The browser will not clear this data when space runs low.",
+      "persistedNo": "Not protected. The browser may clear downloaded data when space runs low.",
       "persistedUnknown": "Your browser cannot say whether this data is protected.",
       "persistAction": "Protect this data",
-      "persistDenied": "The browser declined. It tends to agree once the app is installed or used regularly.",
+      "persistDenied": "The browser declined. It tends to agree once the app is installed.",
       "persistGranted": "Storage is now protected.",
       "downloadLabel": "Download everything",
-      "downloadHint": "Fetches every file listed above now, even on mobile data or with Data Saver on.",
+      "downloadHint": "Fetches every file above now, even on mobile data or Data Saver.",
       "downloadAction": "Download everything for offline",
       "starting": "Downloading…",
       "progress": "Downloading {{done}} of {{total}}…",
@@ -11294,13 +11662,12 @@
       "failed_other": "{{count}} items could not be downloaded.",
       "retry": "Retry"
     },
-    "deviceTitle": "Log out and delete",
     "deviceCharacters_one": "{{count}} character is logged in on this device.",
     "deviceCharacters_other": "{{count}} characters are logged in on this device.",
     "deviceCharactersNone": "No characters are logged in on this device.",
     "deviceLogoutLabel": "Log out of all characters",
-    "deviceLogoutHint": "Removes every character's login and locally stored data from this device, and deletes any Alerts when closed token our server holds for them. Sync settings and everything already synced stay, and come back when you log a character in again.",
-    "deviceLogoutHintLocalOnly": "Removes every character's login and locally stored data from this device. Sync is not set up here, so plans and other data stored only on this device are deleted too.",
+    "deviceLogoutHint": "Removes all logins and local data from this device, and deletes any Alerts when closed token on our server. Synced data stays and returns on login.",
+    "deviceLogoutHintLocalOnly": "Removes all logins and local data from this device, including plans and data stored only here.",
     "deviceLogoutAction": "Log out",
     "deviceLogoutOpen": "Log out…",
     "deviceLogoutFailed": "Could not log out. Try again, or reload the page.",
@@ -11308,25 +11675,25 @@
     "deviceLogoutConfirm_one": "This removes {{count}} character's login and local data from this device. You will be taken to the login page.",
     "deviceLogoutConfirm_other": "This removes {{count}} characters' logins and local data from this device. You will be taken to the login page.",
     "deviceDeleteLabel": "Delete all data",
-    "deviceDeleteHint": "Deletes every character's synced data (skill plans, build plans, fittings and more) from the sync server, then erases everything the app stores on this device, settings included, and reloads to the login screen. Another device still logged in keeps its own copy and can sync it back. This can't be undone.",
-    "deviceDeleteHintLocalOnly": "Erases everything the app stores on this device — every character, their data, and settings — and reloads to the login screen. Sync isn't set up here, so nothing else is affected. This can't be undone.",
+    "deviceDeleteHint": "Deletes all synced data from the sync server and everything this app stores here, then reloads. Can't be undone.",
+    "deviceDeleteHintLocalOnly": "Erases all characters, data and settings from this device, then reloads. Can't be undone.",
     "deviceDeleteAction": "Delete all",
     "deviceDeleteOpen": "Delete all…",
     "deviceDeleteFinish": "Finish deleting",
     "deviceDeleteFailed": "Could not finish deleting. Close Neocom Desk in any other tab, reload this page, and try again.",
     "deviceDeleteConfirmTitle": "Delete all data?",
-    "deviceDeleteConfirm_one": "This permanently deletes {{count}} character's synced data from the sync server and erases all of this app's data and settings from this device. The page reloads to the login screen.",
-    "deviceDeleteConfirm_other": "This permanently deletes {{count}} characters' synced data from the sync server and erases all of this app's data and settings from this device. The page reloads to the login screen.",
-    "deviceDeleteConfirmLocalOnly_one": "This permanently erases {{count}} character and all of this app's data and settings from this device. The page reloads to the login screen.",
-    "deviceDeleteConfirmLocalOnly_other": "This permanently erases {{count}} characters and all of this app's data and settings from this device. The page reloads to the login screen.",
+    "deviceDeleteConfirm_one": "This permanently deletes {{count}} character's synced data from the sync server and erases all app data from this device. The page then reloads.",
+    "deviceDeleteConfirm_other": "This permanently deletes {{count}} characters' synced data from the sync server and erases all app data from this device. The page then reloads.",
+    "deviceDeleteConfirmLocalOnly_one": "This permanently erases {{count}} character and all app data from this device. The page then reloads.",
+    "deviceDeleteConfirmLocalOnly_other": "This permanently erases {{count}} characters and all app data from this device. The page then reloads.",
     "deviceDeleteLeaveCommunities": "Also leave my Communities",
-    "deviceDeleteAdministered": "You run {{names}}: delete it or hand it over in Communities first. It is not left.",
-    "deviceDeleteLeaveFailed_one": "{{names}} could not leave its Communities (offline, or the login has expired). Its shared items stay there until it leaves or goes 90 days without a sync.",
-    "deviceDeleteLeaveFailed_other": "{{names}} could not leave their Communities (offline, or the logins have expired). Their shared items stay there until they leave or go 90 days without a sync.",
-    "deviceDeleteUnpurged_one": "The synced data for {{names}} could not be deleted from the sync server (offline, or the login has expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this device's data.",
-    "deviceDeleteUnpurged_other": "The synced data for {{names}} could not be deleted from the sync server (offline, or the logins have expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this device's data.",
+    "deviceDeleteAdministered": "You run {{names}}: delete it or hand it over in Communities first.",
+    "deviceDeleteLeaveFailed_one": "{{names}} could not leave its Communities (offline, or the login has expired). Its shared items stay until it leaves or goes 90 days without a sync.",
+    "deviceDeleteLeaveFailed_other": "{{names}} could not leave their Communities (offline, or the logins have expired). Their shared items stay until they leave or go 90 days without a sync.",
+    "deviceDeleteUnpurged_one": "The synced data for {{names}} could not be deleted from the sync server (offline, or the login has expired). The server deletes it after 90 days without a sync; Finish deleting to erase this device's data.",
+    "deviceDeleteUnpurged_other": "The synced data for {{names}} could not be deleted from the sync server (offline, or the logins have expired). The server deletes it after 90 days without a sync; Finish deleting to erase this device's data.",
     "faq": {
-      "storeIntro": "We store what you make in the app. What we read from EVE stays on this device. The exceptions are listed below: alerts you have seen, push and Alerts when closed if you turn them on, a Corp Tax Book's Automatic sync if an officer turns it on, anything you choose to share with a Community, and Share Links you create.",
+      "storeIntro": "What you make here syncs between your devices. What we read from EVE stays on this one. Exceptions are listed below.",
       "groups": {
         "using": "Using Neocom Desk",
         "data": "Your data"
@@ -11338,6 +11705,7 @@
         "characters": "Can I use several Characters?",
         "phone": "Does it work on a phone?",
         "communities": "What is a Community, and what do Members see?",
+        "trainSkills": "How do I find skills to train?",
         "synced": "What syncs between my devices?",
         "local": "What stays on this device?",
         "communityData": "What do Communities share?",
@@ -11352,16 +11720,23 @@
         "backups": "How do backups work?"
       },
       "a": {
-        "delete": "Settings › Data & storage › Delete all data deletes every character's synced data from our server, then erases everything on this device. Another device still logged in keeps its own copy and can sync it back. Log out of all characters clears this device only. Delete all data also offers to leave your Communities (ticked by default), which deletes your shared data and your Requests and Pledges there right away; untick it to stay in them. A Community's admin can't leave, so a Community you run is skipped: hand it to someone else, or delete it, which deletes it for every Member. A Character no device has synced in 90 days is removed from its Communities automatically.",
-        "install": "<link>Settings › Data & storage › Install this app</link> shows the steps for your browser, or an Install button where your browser offers one. On iPhone and iPad this is also what makes notifications work.",
-        "update": "The app updates itself in the background. To get a new version now, open Settings and press Update app: it checks and reloads.",
-        "pushKinds": "Alerts whose time is known ahead: a skill level finishing, training stopping or a queue ending, an industry job finishing (yours or your corporation's), a courier delivery due, a contract about to expire, market orders about to lapse, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Alerts when closed adds EVE's own notifications, such as a structure under attack, for each Character you turn it on for. Everything else, including Community alerts, needs the app open. Turn them on in Settings › Notifications.",
-        "permissions": "Plain login asks for everything the pages read from EVE, because EVE grants permissions only at login and a page can't read what you haven't granted. You don't have to accept the lot: <custom>Log in with custom permissions</custom> on the login page lets you pick, and only skills, the skill queue and structure lookup are required. Add more later in Settings › Permissions. To take one away, revoke it on <ccp>EVE's authorized apps page</ccp>. Corporation data, structure markets and jump fatigue are never in the plain login; each is a separate opt-in grant, and Alerts when closed is a further, notifications-only grant per Character.",
-        "dataLag": "Neocom Desk reads EVE's ESI, not the game client, and ESI is not live. For a Character's own data it reuses what it fetched in the last 10 minutes (a day for game constants such as item names), or until EVE says the data may change if that is later, so moving between pages doesn't ask again. EVE itself caches some data for minutes and corporation data for about an hour, so a short timer may already have happened. The age badge by a page's title shows how old the data is: amber after an hour, red after a day. It is hidden on a narrow screen, so <data>Settings › Data & storage</data> lists the last update of every source. Where a page has a Refresh button, it asks EVE again straight away.",
-        "alerts": "Alerts are the bell panel (press A). While the app is open it checks each Character and raises an Alert for the events you switched on in Settings › Notifications. With the app closed you get two things. Alerts whose time is known ahead, such as a skill finishing, are scheduled up to 72 hours in advance and pushed to a device that has notifications on. And Alerts when closed, which is off until you turn it on per Character: you authorize that Character a second time for notifications only, and our server then checks EVE's notifications about every 15 minutes and pushes the types you enabled, with their text, through Google's push service. The server doesn't keep the notifications. Turn off deletes that token. On iPhone and iPad, install the app first.",
-        "characters": "Yes. Each Character logs in on its own: Characters › Add character (press C to open Characters). Pick which Character you are looking at from the switcher, and sort or group them on the Characters page. Alerts, Alerts when closed and Community membership are per Character, and some pages, such as Contacts, can show all your Characters together.",
-        "phone": "Yes. In a phone browser, or installed to the home screen, the same pages use a narrower layout with a bottom navigation. Neocom Desk is designed first for a desktop beside the game, so dense tables and editors are easier on a larger screen, and the age badge is hidden on a phone. On iPhone and iPad, notifications only work once the app is installed.",
-        "communities": "A Community is a named group of Characters under one admin, up to 100 Members, with each Character in up to 10 Communities. You create one or join with an invite link, and the admin can require approval first. Each Character joins on its own and shares only what you pick: blueprints, Fittings and Skill Plans. Members can also post Requests for items and Pledge to fill each other's. Every Member sees the roster of Character names, and what each Member shared, Requests and Pledges, as listed under What do Communities share? The admin also sees who is waiting to join, can remove Members, Requests and Pledges, and can delete the Community. Leaving deletes what you shared there right away."
+        "delete": "Settings › Log out & delete › Delete all data removes every Character's synced data from our server, then erases this device. Another logged-in device keeps its own copy and can sync it back. Log out of all characters clears this device only. Delete all data also offers to leave your Communities (ticked by default), which deletes what you shared there, plus your Requests and Pledges, right away; untick it to stay in them. A Community's admin can't leave, so a Community you run is skipped: hand it over or delete it, which deletes it for every Member. A Character with no sync for 90 days is removed from its Communities automatically.",
+        "install": "<link>Settings › App & backup › Install this app</link> shows the steps for your browser, or an Install button if it has one. On iPhone and iPad, installing is also what makes notifications work.",
+        "update": "The app updates itself in the background. For a new version now: Settings › App & backup › Update now: it checks and reloads.",
+        "pushKinds": "Alerts with a known time: a skill level finishing, training stopping or a queue ending, an industry job finishing (yours or your corporation's), a courier delivery due, a contract or market order about to expire, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Alerts when closed adds EVE's own notifications, such as a structure under attack, for each Character you turn it on for. Everything else, including Community alerts, needs the app open. Quiet time (a daily no-push window, set per device) silences both kinds; the alerts still appear in your Alerts list. Turn them on in Settings › Notifications.",
+        "permissions": "EVE grants permissions only at login, so plain login asks for everything the pages read. You can pick instead: <custom>Log in with custom permissions</custom> on the login page. Only skills, the skill queue and structure lookup are required. Add more later in Settings › Permissions; revoke on <ccp>EVE's authorized apps page</ccp>. Corporation data, structure markets and jump fatigue are never in the plain login; each is a separate opt-in. So is Alerts when closed, a notifications-only grant per Character.",
+        "dataLag": "Neocom Desk reads EVE's ESI, which is not live. A Character's own data is reused for 10 minutes (a day for game constants such as item names), or until EVE says it may change, if later, so moving between pages doesn't ask again. EVE also caches some data for minutes and corporation data for about an hour, so a short timer may already have happened. The age badge by a page's title shows data age: amber after an hour, red after a day. It's hidden on narrow screens; <data>Settings › Cached data</data> lists every source. A Refresh button asks EVE again right away.",
+        "alerts": "Alerts are the bell panel (press A). With the app open, it checks each Character and raises Alerts for the events you enabled in Settings › Notifications. With it closed, known-time alerts such as a skill finishing are scheduled up to 72 hours ahead and pushed to devices with notifications on. Alerts when closed is off until you enable it per Character: you authorize that Character a second time, notifications only, and our server checks EVE's notifications about every 15 minutes and pushes the types you chose, with their text, via Google's push service. It doesn't keep them, and turning it off deletes that token. Quiet time, set per device, pauses pushes for a daily window (you can let attacks through); its times and time zone are stored with the device registration. On iPhone and iPad, install the app first.",
+        "characters": "Yes. Each Character logs in on its own: Characters › Add character (press C). Switch between them in the switcher; sort or group them on the Characters page. Alerts, Alerts when closed and Community membership are per Character. Some pages, such as Contacts, can show all Characters together.",
+        "phone": "Yes. A phone browser or home-screen install gets a narrower layout with bottom navigation. It's designed desktop-first, beside the game, so dense tables and editors are easier on a big screen. The age badge is hidden on a phone. On iPhone and iPad, notifications need the installed app.",
+        "trainSkills": "Every Add button puts the skill in your target Skill Plan. Ways to start:",
+        "trainSkillsQueue": "Copy your in-game queue: Skills › Plans › a plan › Import › From skill queue.",
+        "trainSkillsCertified": "Follow a CCP career path: Skills › Plans › the arrow beside New plan › From a Certified Plan.",
+        "trainSkillsShip": "Fly a hull: Ships › Tree › a ship › Skills & Mastery.",
+        "trainSkillsFit": "Improve a fit: the Missing skills chip and What to train panel in Fittings.",
+        "trainSkillsSearch": "Know the name: search in the plan editor, or browse Skills › Trained and add the next level.",
+        "trainSkillsPaste": "Bring a plan from elsewhere: Import › From text or file (skill lists, .emp, .xml, EFT fits).",
+        "communities": "A Community is a named group of Characters under one admin: up to 100 Members, and each Character in up to 10 Communities. Create one or join by invite link; the admin can require approval. Each Character joins separately and shares only what you pick: blueprints, Fittings, Skill Plans. Members can post Requests for items and Pledge to fill them. Every Member sees the roster of Character names, what each Member shared, and Requests and Pledges (see What do Communities share?). The admin also sees who is waiting to join, can remove Members, Requests and Pledges, and can delete the Community. Leaving deletes what you shared right away."
       },
       "store": {
         "synced": {
@@ -11388,7 +11763,7 @@
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
-            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
+            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your corporation overview layout, hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs. The notes you wrote on solar systems (up to 500 characters each, so don't put anything private in them)."
           }
         },
@@ -11419,11 +11794,11 @@
         },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
-          "crashes": "Crash reports: the error, the page it happened on and the addresses of recent requests, which can include EVE character or item IDs. The app doesn't attach your IP address; request and response bodies are never captured; EVE tokens are stripped first. Usage statistics: each page you open is counted in Google Analytics by the page's name only, never an ID or a search, and not tied to your character. Turn this off in Settings › Data & storage › Analytics.",
+          "crashes": "Crash reports: the error, the page it happened on and the addresses of recent requests, which can include EVE character or item IDs. The app doesn't attach your IP address; request and response bodies are never captured; EVE tokens are stripped first. Usage statistics: each page you open is counted in Google Analytics by the page's name only, never an ID or a search, and not tied to your character. Turn this off in Settings › App & backup › Analytics.",
           "shareLinks": "Share Links: the appraisal, Fitting, D-Scan or Survey you shared (items, scan text, a Survey's location and notes, and the Character names of whoever started it or pasted a scan), under a random link ID with no account or Character ID. Anyone with the link can read it, and anyone with a Survey link can add scans. It stops working after 7 days and is then deleted automatically, up to a day later. It can't be deleted sooner.",
-          "removal": "Removing a character clears it from this device only; adding it back restores its synced copy. That copy is deleted after 90 days with no device syncing it, or right away from Settings › Data & storage › Delete all data.",
+          "removal": "Removing a character clears it from this device only; adding it back restores its synced copy. That copy is deleted after 90 days with no device syncing it, or right away from Settings › Log out & delete › Delete all data.",
           "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written.",
-          "export": "Backups (Settings › Data & storage) are password-encrypted files, login tokens included. One is written only when you press the button, and saved only where you put it. We never see it."
+          "export": "Backups (Settings › App & backup) are password-encrypted files, login tokens included. One is written only when you press the button, and saved only where you put it. We never see it."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
       },
@@ -11483,37 +11858,36 @@
       "thanksTitle": "Say thanks",
       "thanksBody": "In game: <pilot>Mero Otichoda</pilot>.",
       "thanksHint": "Donations welcome, never expected. The app stays free.",
-      "skillsTitle": "Finding skills to train",
-      "skillsIntro": "Every Add button puts the skill in your target Skill Plan. Ways to start:",
-      "skillsQueue": "Copy your in-game queue: Skills > Plans > a plan > Import > From skill queue.",
-      "skillsCertified": "Follow a CCP career path: Skills > Plans > the arrow beside New plan > From a Certified Plan.",
-      "skillsShip": "Fly a hull: Ships > Tree > a ship > Skills & Mastery.",
-      "skillsFit": "Improve a fit: the Missing skills chip and What to train panel in Fittings.",
-      "skillsSearch": "Know the name: search in the plan editor, or browse Skills > Trained and add the next level.",
-      "skillsPaste": "Bring a plan from elsewhere: Import > From text or file (skill lists, .emp, .xml, EFT fits).",
       "tabShortcuts": "Shortcuts"
     },
-    "displayTitle": "Display",
     "fontScaleLabel": "Text size",
     "singleKeyShortcutsLabel": "Single-key shortcuts",
-    "singleKeyShortcutsHint": "G then a letter jumps between pages, and ? lists them, anywhere outside a text field. Turn them off if you set them off by accident, for example with speech input. Stays on this device.",
-    "singleKeyShortcutsOffNote": "Single-key shortcuts are off. Esc still closes an open dialog, and the command palette still opens from its key. Stays on this device.",
-    "fontScaleHint": "Scales text and controls together. Applies immediately and stays on this device.",
+    "singleKeyShortcutsHint": "G then a letter jumps to a page; ? lists them. Turn off if speech input triggers them.",
+    "singleKeyShortcutsOffNote": "Single-key shortcuts are off. Esc still closes an open dialog, and the command palette still opens from its key.",
+    "fontScaleHint": "Scales text and controls.",
     "fontScaleSmall": "Small",
     "fontScaleDefault": "Default",
     "fontScaleLarge": "Large",
     "fontScaleExtraLarge": "Extra large",
-    "notificationsTitle": "Notifications",
     "notifications": {
-      "hint": "Device raises a pop-up. Alerts adds a row to the Alerts page. Device choices stay on this device; Alerts choices and warn-ahead times sync across your devices.",
+      "hint": "Device raises a pop-up. Alerts adds a row to the Alerts page.",
       "blockedNotice": "Notifications are blocked — enable them in your device's settings, then return here.",
+      "quietTime": {
+        "label": "Quiet time",
+        "hint": "No pop-ups from the closed app in this window. Alerts still reach your Alerts list.",
+        "start": "From",
+        "end": "To",
+        "allowAttacks": "Let attacks through"
+      },
       "alertsWhenClosed": {
         "title": "Alerts when closed",
+        "manage": "Manage",
+        "manageFor": "Manage Alerts when closed",
         "summary": "{{on}} of {{total}} characters",
         "needsReauthCount_one": "{{count}} needs re-authorizing",
         "needsReauthCount_other": "{{count}} need re-authorizing",
         "more": "+{{count}} more",
-        "hint": "Get EVE notifications, like a structure under attack, on this device while the app is closed. Turning it on sends you to EVE to authorize one Character for notifications only. Our server keeps an encrypted, notifications-only token for each Character you turn on. It can read nothing else, and Turn off deletes it.",
+        "hint": "EVE notifications, like a structure under attack, while the app is closed. Authorizes one Character for notifications only; Turn off deletes our encrypted token.",
         "stores": "Stores an encrypted, notifications-only token on our server.",
         "state": {
           "off": "Off",
@@ -11555,44 +11929,44 @@
       "needsPermission": "Needs the {{permission}} permission",
       "corpCapabilityHint": "This character doesn't hold the in-game corporation role this notification needs. Re-authorizing won't fix it — a corp Director has to grant the role.",
       "event": {
-        "skillLevelComplete": "Skill Level Complete",
-        "characterNotTraining": "Character Not Training",
-        "skillQueueEnding": "Skill Queue Ending",
-        "spExtractionReady": "SP Extraction Ready",
-        "industryJobComplete": "Industry Job Complete",
-        "cloneJumpReady": "Clone Jump Ready",
-        "newMail": "New Mail",
-        "planetaryExtractionDone": "Planetary Extraction Done",
-        "planetaryExtractorExpiring": "Planetary Extractor Expiring",
-        "marketOrderFilled": "Sell Order Filled",
-        "marketOrderUndercut": "Market Order Undercut",
-        "newCalendarEvent": "New Calendar Event",
-        "calendarEventStarting": "Calendar Event Starting",
-        "contractAccepted": "Contract Accepted",
-        "contractCompleted": "Contract Completed",
-        "contractFailed": "Contract Failed",
-        "courierDeliveryDue": "Courier Delivery Due",
-        "contractExpiring": "Contract Expiring",
-        "ordersLapsing": "Orders Lapsing",
-        "walletBalanceChanged": "Wallet Balance Changed",
-        "eveNotification": "EVE Notifications",
-        "structureFuelLow": "Structure Fuel Low",
-        "corpIndustryJobReady": "Corp Industry Job Ready",
-        "corpMemberJoined": "Member Joined",
-        "corpMemberLeft": "Member Left",
-        "corpWalletThreshold": "Corp Wallet Threshold",
+        "skillLevelComplete": "Skill level complete",
+        "characterNotTraining": "Character not training",
+        "skillQueueEnding": "Skill queue ending",
+        "spExtractionReady": "SP extraction ready",
+        "industryJobComplete": "Industry job complete",
+        "cloneJumpReady": "Clone jump ready",
+        "newMail": "New mail",
+        "planetaryExtractionDone": "Planetary extraction done",
+        "planetaryExtractorExpiring": "Planetary extractor expiring",
+        "marketOrderFilled": "Sell order filled",
+        "marketOrderUndercut": "Market order undercut",
+        "newCalendarEvent": "New calendar event",
+        "calendarEventStarting": "Calendar event starting",
+        "contractAccepted": "Contract accepted",
+        "contractCompleted": "Contract completed",
+        "contractFailed": "Contract failed",
+        "courierDeliveryDue": "Courier delivery due",
+        "contractExpiring": "Contract expiring",
+        "ordersLapsing": "Orders lapsing",
+        "walletBalanceChanged": "Wallet balance changed",
+        "eveNotification": "EVE notifications",
+        "structureFuelLow": "Structure fuel low",
+        "corpIndustryJobReady": "Corp industry job ready",
+        "corpMemberJoined": "Member joined",
+        "corpMemberLeft": "Member left",
+        "corpWalletThreshold": "Corp wallet threshold",
         "stockBelowTarget": "Stock target running low",
         "incursionNearby": "Incursion nearby",
         "communityJoinRequest": "Community join request",
         "communityMemberJoined": "Community member joined",
         "communityRequestPledged": "Pledge on your Request",
-        "priceAlertTriggered": "Quickbar Price Alert"
+        "priceAlertTriggered": "Quickbar price alert"
       },
-      "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled for notifications — open the app at least that often to keep it current. The Planetary Industry page always shows the real expiry.",
-      "marketOrderUndercutStationOnlyHint": "Only checks your order's own station, and only while the app is open — it does not compare prices across the wider system or region.",
+      "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Planetary Industry always shows the real expiry.",
+      "marketOrderUndercutStationOnlyHint": "Checks your order's own station only, and only while the app is open.",
       "corpGroup": "Corp notifications",
-      "corpEventBestEffortHint": "Best-effort: fires only while the app is open. Not a substitute for in-game alerts.",
-      "scheduledPushBadge": "Arrives even with the app closed — the backend schedules this one up to 72 hours ahead. Needs notification permission, and on iPhone and iPad the app installed to the home screen. Every other event needs the app open.",
+      "corpEventBestEffortHint": "Best effort: fires only while the app is open. Not a substitute for in-game alerts.",
+      "scheduledPushBadge": "Arrives even with the app closed, up to 72 hours ahead. Needs notification permission; on iPhone and iPad, the installed app.",
       "extractorExpiringLeadTimeLabel": "Warn this far before an extractor expires:",
       "extractorExpiringLeadTimeOption_one": "{{count}} hour",
       "extractorExpiringLeadTimeOption_other": "{{count}} hours",
@@ -11611,23 +11985,23 @@
       "incursionNearbyJumpsLabel": "Alert when an Incursion is within:",
       "incursionNearbyJumpsOption_one": "{{count}} jump",
       "incursionNearbyJumpsOption_other": "{{count}} jumps",
-      "incursionNearbyRouteRulesHint": "Jumps are counted from your current system with Route Safety's route rules: your route preference, avoided systems, and its wormhole and jump bridge settings. Fires once per Incursion, and only while the app is open.",
+      "incursionNearbyRouteRulesHint": "Jumps counted from your current system with Route Safety's route rules (preference, avoided systems, wormholes, jump bridges). Fires once per Incursion, only while the app is open.",
       "structureFuelLowThresholdLabel": "Warn when fuel remaining drops below:",
       "structureFuelLowThresholdOption_one": "{{count}} day",
       "structureFuelLowThresholdOption_other": "{{count}} days",
-      "structureFuelLowNotDuplicateHint": "This is separate from EVE's own low-fuel alert, which fires later at a fixed point — not a copy of it, an earlier warning of your choosing.",
+      "structureFuelLowNotDuplicateHint": "Separate from EVE's own low-fuel alert, which fires later. This is an earlier warning you choose.",
       "corpWalletBalanceFloorLabel": "Balance floor (ISK):",
       "corpWalletTransactionCeilingLabel": "Transaction ceiling (ISK):",
       "walletFoldIntoContractLabel": "When a contract caused the change:",
       "walletFoldIntoContractOption_one": "Show it in the contract alert only",
       "walletFoldIntoContractOption_other": "Also send a wallet alert",
       "walletBalanceChangedThresholdLabel": "Minimum ISK change",
-      "walletBalanceChangedThresholdHint": "Accepts shorthand: 10.5m, 10,500,000, or 10500000 (b = billion, m = million, t = thousand).",
+      "walletBalanceChangedThresholdHint": "Shorthand works: 10.5m, 10,500,000 (b billion, m million, t thousand).",
       "channelsLegend": "Delivery channels",
       "channelInfoLabel": "About {{channel}}",
-      "browserChannelLabel": "Device notifications",
-      "browserChannelHint": "Pop-ups from your operating system. Needs permission. Events with a known future time can arrive up to 72 hours ahead even with the app closed, once installed on iPhone and iPad; the rest need the app open.",
-      "feedChannelLabel": "Alerts notifications",
+      "browserChannelLabel": "Device pop-ups",
+      "browserChannelHint": "Pop-ups from your operating system. Needs permission.",
+      "feedChannelLabel": "Alerts list",
       "dismissOnViewLabel": "Dismiss on View",
       "dismissOnViewHint": "When clicking the view button, dismiss it from the alerts.",
       "feedChannelHint": "A dismissible list on the Alerts page. Works on every device.",
@@ -11635,6 +12009,15 @@
         "browser": "Device",
         "feed": "Alerts"
       },
+      "columnWarnAhead": "Warn ahead",
+      "columnCharacters": "Characters",
+      "topicsLabel": "Topics",
+      "backToTopics": "All topics",
+      "topicState": "Device {{device}} · Alerts {{alerts}} of {{total}}",
+      "topicNeedsCorpPermission": "Needs Corporation permission",
+      "applyToAll": "Apply to all",
+      "applyToAllLabel": "Apply to all characters: {{event}}",
+      "applyToAllHint": "Sets every character to what most of them have.",
       "toggleLabel": {
         "browser": "{{event}}, device notifications",
         "feed": "{{event}}, Alerts list"
@@ -11663,6 +12046,7 @@
         "market": "Market and contracts",
         "mailCalendar": "Mail and calendar",
         "world": "Space and community",
+        "corp": "Corp",
         "eve": "EVE notifications"
       },
       "permissionNote_one": "{{count}} character hasn't granted {{permission}}.",
@@ -11676,13 +12060,13 @@
         "feed": "Toggle all Alerts notifications for {{family}} for every character"
       },
       "columnEvent": "Event",
-      "eveTypesHint": "EVE’s own in-game notifications, grouped by family. These default to the Alerts page only, except the attack and loss alerts, which also raise a device pop-up — flip any of them per column.",
+      "eveTypesHint": "EVE’s in-game notifications, by family. Default: Alerts page only; attack and loss alerts also raise a device pop-up.",
       "family": {
         "structures": "Structures",
         "war": "War",
-        "corpGovernance": "Corp Governance",
+        "corpGovernance": "Corp governance",
         "bills": "Bills",
-        "moonMining": "Moon Mining",
+        "moonMining": "Moon mining",
         "pi": "PI",
         "other": "Other"
       },
@@ -11692,24 +12076,24 @@
       }
     },
     "dataTitle": "Data",
-    "dataHint": "Clear locally cached EVE data if a view looks stale or you're troubleshooting. Pages fetch from ESI again the next time you open them, which needs a connection — offline, the cache is the only copy of that data.",
+    "dataHint": "Clear cached EVE data if a view looks stale. Pages re-fetch from ESI, which needs a connection.",
     "clearCache": "Clear cached ESI data…",
     "clearCacheTitle": "Clear cached ESI data?",
-    "clearCacheBody": "This removes every character's cached game data from this device. Each page fetches what it needs from ESI again the next time you open it.",
-    "clearCacheBodyOffline": "This removes every character's cached game data from this device. You're offline, so nothing can be fetched again until you reconnect: the cached data is the only copy you have. Reconnect first if you can.",
+    "clearCacheBody": "Removes all cached game data from this device. Pages re-fetch it from ESI when opened.",
+    "clearCacheBodyOffline": "Removes every character's cached game data from this device. You're offline, so nothing can be fetched again until you reconnect: the cached data is the only copy you have.",
     "clearCacheFailed": "Could not clear the cache. Try again.",
     "clearCacheAction": "Clear cache",
     "clearCacheConfirm": "Cache cleared.",
     "backup": {
       "exportTitle": "Export backup",
-      "exportHint": "Download every character on this device — including login tokens — as one password-encrypted file. Import it on another device to add these characters there without re-doing EVE SSO for each one.",
-      "passwordWarning": "The password is the only protection on this file — anyone who has both the file and the password can log in as these characters. Choose one you can remember; there is no recovery if you lose it.",
+      "exportHint": "Download every character here, login tokens included, as one password-encrypted file. Import it on another device to skip EVE SSO.",
+      "passwordWarning": "Anyone with the file and password can log in as these characters. Choose a password you can remember; there is no recovery.",
       "passwordLabel": "Password",
       "exportButton": "Download backup",
       "exportDone": "Backup downloaded.",
       "exportError": "Couldn't create the backup. Try again.",
       "importTitle": "Import backup",
-      "importHint": "Pick a backup file exported from Neocom Desk and enter its password. A character already on this device is left untouched; only new characters are added.",
+      "importHint": "Pick a backup file and enter its password. Characters already here are untouched.",
       "fileLabel": "Backup file",
       "chooseFile": "Choose file",
       "noFileChosen": "No file chosen",
@@ -11718,30 +12102,33 @@
       "importSummary": "Added {{added}} character(s); skipped {{skipped}} already on this device.",
       "importReloading": "Reloading to pick up the imported data…"
     },
-    "defaultsSyncHint": "Kept across your devices — set these once, on whichever one you have to hand.",
-    "corpDefaultsTitle": "Corporation",
+    "scope": {
+      "synced": "Kept across your devices — set these once, on whichever one you have to hand.",
+      "device": "Stays on this device.",
+      "deviceField": "This device only."
+    },
     "timeFormatLabel": "Time format",
-    "timeFormatHint": "EVE runs on UTC — the clock other players quote timers in. Calendar keeps your local days either way.",
+    "timeFormatHint": "EVE runs on UTC, the clock other players quote timers in. Calendar keeps your local days.",
     "timeFormat": {
       "local": "My local time",
       "eve": "EVE time (UTC)"
     },
     "numberFormatLabel": "Number format",
-    "numberFormatHint": "How numbers are written on this device. Pasted numbers are read in either format, so a list copied from a client set to another language still works.",
+    "numberFormatHint": "How numbers are written. Pasted numbers read in either format.",
     "numberFormat": {
       "auto": "Match my browser ({{example}})",
       "period": "Period decimal ({{example}})",
       "comma": "Comma decimal ({{example}})"
     },
     "weekStartLabel": "Week starts on",
-    "weekStartHint": "Changes the first day of the week in the Calendar's Month and Fortnight grids. EVE's own in-game calendar starts the week on Monday.",
+    "weekStartHint": "First day of the week in the Calendar's Month and Fortnight grids.",
     "weekStart": {
       "monday": "Monday",
       "sunday": "Sunday"
     },
     "mobileTabs": {
       "title": "Phone tab bar",
-      "hint": "Pick the four links the bottom bar shows on a phone. The More menu lists every page. Stays on this device.",
+      "hint": "Pick the four links the bottom bar shows on a phone.",
       "group": "Phone tab bar links",
       "chosen": "{{count}} of {{total}} picked",
       "full": "Unpick one first — the bar holds four.",
@@ -11749,33 +12136,34 @@
     },
     "tradeHubLabel": "Default trade hub",
     "courierCollateralLabel": "Flag courier collateral at",
-    "courierCollateralHint": "A courier contract whose collateral reaches this many times its reward gets a High collateral warning in its details.",
+    "courierCollateralHint": "Warns High collateral when a courier contract's collateral reaches this many times its reward.",
     "courierCollateralOption": "{{count}}× reward",
     "bpcMarketHubLabel": "Market hub",
-    "bpcMarketHubHint": "The hub BPC Sourcing checks for market BPOs and prices LP store offers at. It is the same Default trade hub as Settings → Market defaults, so changing it here changes it there. You can still pick another region in the filter bar for one search.",
+    "bpcMarketHubHint": "Where BPC Sourcing checks BPO prices and LP offers. Same as the Market default trade hub.",
     "bpcHideAuctionsLabel": "Hide auctions",
     "bpcHidePlexLabel": "Hide PLEX contracts",
-    "bpcHideHint": "Sets where BPC Sourcing starts. You can still switch either back in its filter bar for one search.",
-    "tradeHubHint": "Prices shown in the LP store and item lookups, and where Hauling Opportunities starts from. The Market browser remembers its own hub per device. Moon mining tax uses each payee’s own hub.",
+    "bpcHideAuctionsHint": "Hides auction contracts when BPC Sourcing opens.",
+    "bpcHideHint": "Hides PLEX contracts when BPC Sourcing opens. Toggle it in the filter bar per search.",
+    "tradeHubHint": "Prices LP offers and item lookups; Hauling Opportunities starts here. Moon mining tax uses each payee’s own hub.",
     "assumedMeLabel": "Assumed ME for blueprints you don’t own",
-    "assumedMeHint": "New plans and sub-builds are quoted at this ME. A blueprint you do own always uses its real ME instead.",
+    "assumedMeHint": "Quotes new plans and sub-builds at this ME. A blueprint you own uses its real ME.",
     "assumedTeLabel": "Assumed TE for blueprints you don’t own",
-    "assumedTeHint": "New plans start at this TE — an invented copy comes out at TE 4. A blueprint you do own always uses its real TE instead. Sub-builds are still timed at TE 0.",
-    "piSellAtHint": "Where Planetary Industry prices and sells its output. A corp buyback pays a percentage of the chosen hub's price.",
+    "assumedTeHint": "Starts new plans at this TE; sub-builds stay at TE 0. A blueprint you own uses its real TE.",
+    "piSellAtHint": "Where Planetary Industry prices and sells output. A corp buyback pays a percentage of this hub's price.",
     "piBuyTiersLabel": "Buy at the hub when short",
-    "piBuyTiersHint": "Off by default, because buying assumes a hub within reach. With a tier on, the Goal Planner buys it to finish a chain your colonies cannot, at the lowest tier that closes the gap. Priced at the ask, with import customs at the colony.",
+    "piBuyTiersHint": "Lets the Goal Planner buy a ticked tier at the hub's ask price to finish a chain your colonies can't.",
     "piRestartLabel": "Restart extractors every",
-    "piRestartHint": "Extractor output falls the longer a program runs, so this sets how much comes out of the ground.",
+    "piRestartHint": "Extractor output falls the longer a program runs; this sets how much comes out.",
     "piHaulLabel": "Haul every",
     "piHaulHint": "How long a colony fills before you empty it. A full Launchpad stops extraction.",
     "piExpiringLabel": "Warn me an extractor is expiring",
     "piExpiringHint": "How far ahead the Colonies list flags an extractor — and sorts it to the top.",
     "defaultCharacterFilterLabel": "Default characters shown",
-    "defaultCharacterFilterHint": "The starting choice for the This character / All characters filter. Each page then remembers the last pick you made on it.",
+    "defaultCharacterFilterHint": "Starting choice for the This character / All characters filter. Each page then remembers its last pick.",
     "spExtractionEnabledLabel": "SP extraction monitoring",
-    "spExtractionEnabledHint": "Flags a character on the Characters table, and alerts you, once they've banked enough spare skill points to safely use a Skill Extractor. Off by default.",
+    "spExtractionEnabledHint": "Flags a character and alerts you when they hold enough spare SP for a Skill Extractor.",
     "spExtractionThresholdLabel": "SP extraction threshold",
-    "spExtractionThresholdHint": "How much spare SP (above the 5,000,000 floor a character can never drop below) counts as \"ready.\" One Skill Extractor pulls 500,000 SP.",
+    "spExtractionThresholdHint": "Spare SP above the 5,000,000 floor that counts as \"ready.\" One Skill Extractor pulls 500,000 SP.",
     "darkThresholdLabel": "Members go dark after",
     "darkThresholdHint": "Your corp’s inactivity policy. Sets the roster’s Dark filter and its count.",
     "hours_one": "{{count}} hour",
@@ -11783,14 +12171,14 @@
     "days_one": "{{count}} day",
     "days_other": "{{count}} days",
     "resetViewPrefs": "Reset saved view preferences",
-    "resetViewPrefsHint": "Pages remember sorts, filters and expanded sections as you use them. This puts them all back to their defaults. Your characters, groups, plans and saved comparisons are untouched.",
+    "resetViewPrefsHint": "Resets every page's remembered sorts, filters and expanded sections. Characters, groups and plans stay.",
     "resetViewPrefsConfirm": "View preferences reset.",
     "permissions": {
-      "title": "Permissions",
-      "hint": "What this character lets Neocom Desk read from EVE. Grant adds one permission and keeps the rest. Tick several to add them in one login. To take one away, revoke it on <ccp>EVE's own site</ccp>.",
+      "hint": "What this character lets Neocom Desk read from EVE. Grant adds permissions in one login; revoke on <ccp>EVE's own site</ccp>.",
       "selectCharacter": "Select a character to see its permissions.",
       "checking": "Checking…",
       "granted": "Granted",
+      "grantedGroup": "Granted ({{count}})",
       "missing": "Not granted",
       "grant": "Grant",
       "grantAria": "Grant {{permission}}",
@@ -11894,8 +12282,8 @@
     }
   },
   "activityLog": {
-    "title": "Activity Log",
-    "hint": "Recent requests this device has made to EVE's servers — useful for your own reference, or for a support conversation. Clears on reload. New entries appear automatically as you use the app.",
+    "title": "Activity log",
+    "hint": "Recent requests this device made to EVE's servers, for your reference or support. Clears on reload.",
     "columnEndpoint": "Endpoint",
     "columnCharacter": "Character",
     "columnTime": "Time",
@@ -11910,8 +12298,8 @@
     "clearedConfirm": "Log cleared."
   },
   "dataAge": {
-    "title": "Data Age",
-    "hint": "The most recent successful update behind each view, so this stays available on a phone even though the on-screen badge doesn't show there. Session-only, cleared on reload.",
+    "title": "Data age",
+    "hint": "The latest successful update behind each view, for phones where the badge is hidden. Cleared on reload.",
     "columnEndpoint": "Endpoint",
     "columnCharacter": "Character",
     "columnUpdated": "Last updated",
@@ -12019,6 +12407,36 @@
       "locationFilterLabel": "Location",
       "locationFilterAll": "Any location"
     },
+    "roles": {
+      "tab": "Roles",
+      "refresh": "Refresh roles",
+      "holdersHeading": "Sensitive roles",
+      "holdersSummary_one": "{{directors}} Director. Members with a sensitive role: {{holders}}.",
+      "holdersSummary_other": "{{directors}} Directors. Members with a sensitive role: {{holders}}.",
+      "holdersEmpty": "No member holds a sensitive role",
+      "holdersEmptyHint": "Director, Accountant, Junior Accountant, Personnel Manager, Station Manager, Trader, Security Officer and the hangar and container take roles are checked.",
+      "tableLabel": "Members with sensitive roles",
+      "columnMember": "Member",
+      "columnRoles": "Sensitive roles",
+      "columnTitles": "Titles",
+      "columnLastChange": "Last change",
+      "columnWhen": "When",
+      "columnChange": "Change",
+      "columnIssuer": "Changed by",
+      "historyHeading": "Role changes",
+      "historyHint": "Sensitive roles granted or removed in the last {{days}} days. EVE keeps about a month of history.",
+      "historyLabel": "Role changes",
+      "historyEmpty": "No sensitive role changes in {{days}} days",
+      "historyEmptyHint": "Nothing was granted or removed in that time.",
+      "historyUnavailable": "Role history could not be read",
+      "historyUnavailableHint": "Who holds each role is shown above. Refresh to try the history again.",
+      "granted": "Granted {{roles}}",
+      "removed": "Removed {{roles}}",
+      "showOlder_one": "Show {{count}} older change",
+      "showOlder_other": "Show {{count}} older changes",
+      "loadFailedHint": "Roles are not saved on this device yet, so there is nothing to show. They load once EVE answers.",
+      "needsGrantHint": "The corporation permission needs to be granted again from Settings before roles can load."
+    },
     "wallet": {
       "title": "Corp wallet",
       "divisionsTitle": "Divisions",
@@ -12116,6 +12534,26 @@
       "title": "Moons",
       "noAccessTitle": "Moons need the Accountant role",
       "noAccessHint": "EVE only opens the refinery ledger to an Accountant, Director or CEO, so the Corp Tax Book is not available to your roles."
+    },
+    "grid": {
+      "customize": {
+        "barLabel": "Customize the corporation overview",
+        "emptyTitle": "Your corporation overview is empty",
+        "emptyBody": "Add widgets to track what your corporation needs."
+      },
+      "gallery": {
+        "subtitle": "{{total}} widgets · {{onBoard}} on your corporation overview",
+        "onBoard": "On your corporation overview ×{{count}}"
+      },
+      "menu": {
+        "remove": "Remove from corporation overview"
+      },
+      "header": {
+        "breakdownCaption": "When each widget on the corporation overview last read its data"
+      },
+      "widgets": {
+        "noWidgets": "There are no widgets to show on this corporation overview."
+      }
     }
   },
   "publicInfo": {
@@ -13581,6 +14019,22 @@
     }
   },
   "corpTaxBook": {
+    "removeNow": {
+      "title": "End a removal now",
+      "checking": "Checking this link…",
+      "intro": "{{accounting}} started removing {{owner}} as a moon owner. It takes effect {{time}}. You can end it now instead.",
+      "introNoTime": "{{accounting}} started removing {{owner}} as a moon owner. You can end it now instead.",
+      "hint": "Mining at {{owner}}'s refineries stops being counted from today. What {{accounting}} owes {{owner}} stays owed.",
+      "confirm": "Remove now",
+      "unavailable": "This can't be done right now.",
+      "done": "Done. {{owner}} is no longer a moon owner of {{accounting}}. What is owed stays owed.",
+      "signIn": "Log in with the character this link was meant for.",
+      "login": "Log in with EVE",
+      "failed": "That did not go through. Try again.",
+      "retry": "Try again",
+      "theAccounting": "the accounting corporation",
+      "theOwner": "the moon owner"
+    },
     "verify": {
       "title": "Your Statement",
       "readOnly": "Read-only · no login needed",
@@ -13611,6 +14065,7 @@
       "balanceDue": "Balance due",
       "balanceSum": "Billed {{billed}} − paid {{paid}}.",
       "dismissed": "{{amount}} was waived by an officer.",
+      "forgiven": "{{amount}} was written off by an officer.",
       "writtenOff": "{{amount}} short of the Statement was written off.",
       "howToPay": "Donate ISK to {{corp}}; any of your characters counts.",
       "payCodeLead": "Put the code",
@@ -13679,7 +14134,11 @@
         "to": "To",
         "statement": "Statement",
         "status": "Status",
-        "reminder": "Reminder"
+        "reminder": "Reminder",
+        "rate-change": "Rate change",
+        "payee-change": "Who gets paid changed",
+        "removal": "Moon owner removal",
+        "removalCancelled": "Removal cancelled"
       },
       "status": {
         "sent": "Sent",
@@ -13725,10 +14184,16 @@
     },
     "moons": {
       "title": "Moons",
+      "payeeNotice": {
+        "title": "Who gets paid changed",
+        "body": "Payments now go to {{payee}}. {{by}} changed this on {{date}}.",
+        "dismiss": "Dismiss"
+      },
       "tabs": {
         "extractions": "Extractions",
         "miners": "Miners",
-        "statements": "Statements"
+        "statements": "Statements",
+        "moonOwners": "Moon owners"
       },
       "neverSynced": "Never synced",
       "syncedBy": "Synced {{age}} by {{name}}",
@@ -13817,6 +14282,10 @@
         "outstanding": "Outstanding",
         "issued": "Issued"
       },
+      "beforeBook": {
+        "donations_one": "Before the book: {{count}} donation dated before the start date is not counted",
+        "donations_other": "Before the book: {{count}} donations dated before the start date are not counted"
+      },
       "chips": {
         "inChunks": "Est. value in chunks",
         "inChunksTip": "Chunks still there to mine; Expired ones are not counted",
@@ -13867,7 +14336,6 @@
           "intro": "No extraction notification gave this chunk's ore. A Moon Ore Survey scanned before the chunk was mined can stand in for it.",
           "field": "Survey link or id",
           "confirm": "Link survey",
-          "notFound": "That Survey could not be opened. Check the link, and that it has not expired.",
           "effect": "The ore is estimated from the Survey's first scan and the chunk rate in Settings; it is an estimate, not what the structure holds."
         },
         "whoMined": "Who mined this chunk",
@@ -13959,7 +14427,7 @@
         "writtenOff": "Written off",
         "writtenOffValue_one": "{{tolerance}} + {{count}} line",
         "writtenOffValue_other": "{{tolerance}} + {{count}} lines",
-        "writtenOffTip": "What payments within tolerance left over, and lines recorded after a Statement was paid ({{late}}). Paid days are closed for good; both are logged."
+        "writtenOffTip": "What officers wrote off, what payments within tolerance left over, and lines recorded after a Statement was paid ({{late}}). Paid days are closed for good; all are logged."
       },
       "activity": {
         "button": "Activity",
@@ -14000,6 +14468,7 @@
         }
       },
       "health": {
+        "hiddenFromMembers": "Hidden from members until {{date}}",
         "gap": "Gap: {{from}} – {{to}}, {{refinery}} — unrecoverable",
         "gapDetail": "No officer synced in time and ESI no longer returns these days for this refinery. Whatever was mined is missing from the book and cannot be billed.",
         "unrated_one": "{{count}} day has no rate yet",
@@ -14085,6 +14554,208 @@
         "hint": "Mining before the start date is kept as history and owes nothing. You can change the rate later; a new rate never reaches back over days already mined.",
         "confirm": "Turn the book on"
       },
+      "setup": {
+        "back": "Back",
+        "paste": "Paste an invite link or code",
+        "granted": "Connected through {{name}}.",
+        "left": "You have left. Nothing already collected was deleted. You can turn on your own book or pick another option.",
+        "own": {
+          "title": "Run our own book",
+          "hint": "Track the moon mining tax for our own refineries in this app.",
+          "action": "Turn on our own book"
+        },
+        "handled": {
+          "title": "Let an accounting corporation handle it",
+          "hint": "Another corporation keeps the book and bills the miners. You only share who mined at your refineries.",
+          "action": "Continue"
+        },
+        "collect": {
+          "title": "Collect tax for other corporations",
+          "hint": "Run the book for moons other corporations own. You get an invite link to send them. No refineries needed.",
+          "action": "Start collecting",
+          "noRefineries": "This book needs no refineries of its own. The moon owners you invite share their mining ledgers with it.",
+          "ready": "Your book is on. Send this link to a moon owner.",
+          "linkHint": "Anyone with this link can connect as a moon owner, so send it only to the corporation you mean. You can make more links later.",
+          "done": "Open the book"
+        },
+        "failed": {
+          "generic": "Could not connect. Try again, or ask for a new invite link.",
+          "not-an-accountant": "That Character is not an Accountant. In EVE's login, pick a Character that holds the Accountant role in the corporation that owns the moons.",
+          "invite-invalid": "That invite link or code is not valid.",
+          "invite-revoked": "That invite link was cancelled. Ask for a new one.",
+          "invite-used": "That invite link was already used. Ask for a new one.",
+          "own-book-exists": "This corporation already keeps its own book. Delete it before letting another corporation handle the tax.",
+          "already-feeder": "This corporation is already handled by an accounting corporation.",
+          "feeder-active": "This corporation is already connected.",
+          "token-mismatch": "That login did not match your logged-in account. Try again.",
+          "no-book": "This corporation has no active Corp Tax Book.",
+          "wrong-scopes": "EVE did not grant exactly the permissions needed. Try again and keep every box ticked.",
+          "missing-scope": "That login is missing a permission. Try again and keep every box ticked.",
+          "not-signed-in": "Log in first, then try again.",
+          "not-your-feeder": "This corporation is not handled by your book.",
+          "no-feeder": "This corporation is not handled by your book.",
+          "collector-gone": "The accounting corporation's book is gone.",
+          "feeder-ended": "This connection has already ended.",
+          "payee-mismatch": "That isn't a corporation or player of that kind. Pick one from the list again.",
+          "not-ended": "This connection has not ended yet.",
+          "not-pending": "No removal is pending for this corporation.",
+          "not-removable": "This corporation cannot be removed right now.",
+          "no-payout": "That payout was not found.",
+          "too-many-invites": "Too many open invite links. Cancel one first.",
+          "ledger-unavailable": "Could not read your mining ledger just now. Try again in a few minutes; the invite still works.",
+          "start-before-leave": "The book can start no earlier than the day the accounting corporation stopped handling your moons.",
+          "survey-not-found": "That Survey could not be opened. Check the link, and that it has not expired.",
+          "unknown-refinery": "That refinery has no mining for this corporation yet.",
+          "role-required": "Your Character does not hold the corporation role this needs."
+        }
+      },
+      "consent": {
+        "title": "Share your mining ledger",
+        "sees": {
+          "title": "They will see",
+          "body": "Who mined at your refineries, how much and what, and when. We also read your refineries' names and systems."
+        },
+        "cannot": {
+          "title": "They cannot",
+          "body": "Read your wallet, mail, assets or skills, or move any ISK."
+        },
+        "stop": {
+          "title": "To stop",
+          "body": "Leave any time. Nothing already collected is deleted. It re-syncs about every 6 hours."
+        },
+        "rate": "Rate you ask for (%, optional)",
+        "from": "{{name}} will handle the tax on your moons.",
+        "offered": "They offer you {{pct}}% of the value of ore mined at your refineries.",
+        "accountant": "Next, EVE asks you to log in. Pick a Character that is an Accountant in your corporation.",
+        "continue": "Continue to EVE"
+      },
+      "owner": {
+        "title": "{{name}} handles the tax on your moons",
+        "waiting": "Waiting for the first sync.",
+        "synced": "Last synced {{date}}.",
+        "noRate": "No rate set.",
+        "rate": "Your rate is {{pct}}%.",
+        "noMining": "Nobody has mined at your refineries yet.",
+        "anonymous": "The accounting corporation",
+        "volume": "{{volume}} units mined",
+        "leave": {
+          "open": "Leave",
+          "title": "Leave this accounting corporation?",
+          "confirm": "Leave",
+          "owed": "{{name}} keeps {{isk}} ISK for you until it is settled. Nothing is deleted.",
+          "owedUnknown": "{{name}} keeps whatever it owes you until it is settled. Nothing is deleted.",
+          "nothingOwed": "{{name}} owes you nothing right now. Nothing is deleted.",
+          "body": "This stops the sync at once and revokes the access. To run your own book instead, turn it on afterwards from this page."
+        }
+      },
+      "refineryLabels": {
+        "title": "Refineries",
+        "edit": "Label {{name}}",
+        "editTooltip": "Edit label",
+        "field": "Refinery label",
+        "hint": "Both corporations see this label, and miners see it on their tax lines. Leave it empty to use the default name.",
+        "failed": "Could not save the label. Try again."
+      },
+      "ownerView": {
+        "statement": {
+          "intro": "{{name}} handles the tax on your moons.",
+          "noRate": "No rate is set, so nothing is owed to you yet. Ask for one below.",
+          "owed": "is owed to you for ore mined at your refineries since {{since}}, at your rate of {{pct}}%.",
+          "owedUndated": "is owed to you for ore mined at your refineries, at your rate of {{pct}}%.",
+          "credit": "more than is owed has been paid to you for ore mined at your refineries, at your rate of {{pct}}%.",
+          "even": "Nothing is owed to you right now, at your rate of {{pct}}%.",
+          "paid": "They have paid {{paid}} so far; the last payment was {{amount}} on {{date}}.",
+          "notPaid": "They have not paid you yet.",
+          "unpriced_one": "{{count}} day of mining had ore without a price yet, so it is not counted.",
+          "unpriced_other": "{{count}} days of mining had ore without a price yet, so they are not counted."
+        },
+        "stale": {
+          "title": "We can't read your mining ledger since {{date}}",
+          "hint": "The character who gave access lost the Accountant role or revoked it. Mining since then is not counted until it is reconnected.",
+          "action": "Reconnect"
+        },
+        "refineryNames": {
+          "title": "Refinery names not shared",
+          "hint": "Grant again to show your refinery names.",
+          "action": "Grant again"
+        },
+        "removal": {
+          "title": "Removal pending, takes effect {{time}}",
+          "titleNoTime": "Removal pending",
+          "body": "{{name}} started this on {{date}}. If you did not expect it, end it now and get in touch with them.",
+          "action": "End it now",
+          "confirmTitle": "End the removal now?",
+          "confirmBody": "{{name}} stops handling the tax on your moons from today. What it owes you stays owed. To run your own book instead, turn it on afterwards from this page."
+        },
+        "settledOtherwise": {
+          "title": "How you are paid",
+          "intro": "You are settled with {{name}} another way.",
+          "nothingOwed": "Nothing is owed in ISK, so no balance builds up."
+        },
+        "previous": {
+          "title": "Previously handled by {{name}}",
+          "owes": "{{name}} owes you",
+          "owesFor": "for mining before {{date}}. It stays here until they pay it; nothing is deleted.",
+          "owesForUndated": "for mining while they handled your moons. It stays here until they pay it; nothing is deleted.",
+          "yours": "Mining from {{date}} is yours to tax.",
+          "settled": "Settled: they paid you everything owed for mining before {{date}}.",
+          "settledUndated": "Settled: they paid you everything owed for the mining they handled.",
+          "dismiss": "Dismiss",
+          "dismissFailed": "Could not dismiss this. Try again."
+        },
+        "rate": {
+          "none": "No rate is set.",
+          "plain": "Your rate is {{pct}}%.",
+          "asked": "You asked for {{pct}}%. Nothing changes until they agree.",
+          "override": "Rate set to {{pct}}% by {{name}} on {{date}}. You asked for {{asked}}%.",
+          "overrideUndated": "Rate set to {{pct}}% by {{name}}. You asked for {{asked}}%.",
+          "set": "Rate set to {{pct}}% by {{name}} on {{date}}.",
+          "ask": "Ask for a different rate…",
+          "askFirst": "Ask for a rate…",
+          "dialogTitle": "Ask for a different rate",
+          "field": "Rate you ask for (%)",
+          "hint": "Asking changes nothing until they agree.",
+          "confirm": "Ask for this rate"
+        },
+        "payee": {
+          "line": "Who gets paid: {{name}}",
+          "setBy": "Set by {{name}} on {{date}}",
+          "setByYou": "Set by you on {{date}}",
+          "change": "Change…",
+          "changeLabel": "Change who gets paid…",
+          "dialogTitle": "Who gets paid",
+          "field": "Corporation or player",
+          "hint": "Pick a corporation or a player from the list.",
+          "alliance": "An alliance can't be paid. Pick a corporation or a player.",
+          "confirm": "Save"
+        },
+        "payments": {
+          "none": "No payments yet.",
+          "method": {
+            "donation": "Donation",
+            "other": "Other"
+          },
+          "status": {
+            "recorded": "Recorded",
+            "waiting-for-journal": "Waiting for the wallet journal",
+            "matched": "Matched in the wallet journal"
+          }
+        },
+        "mined": "Mined at your refineries",
+        "minedWhile": "Mined while they handled it",
+        "paymentsAndRate": "Payments and rate",
+        "paymentsToYou": "Payments to you",
+        "minedValue": "Mined at your moons",
+        "minedVolume": "Volume mined",
+        "units": "{{volume}} units",
+        "since": "Since",
+        "cols": {
+          "character": "Character",
+          "refinery": "Refinery",
+          "volume": "Units",
+          "value": "Value"
+        }
+      },
       "autoSync": {
         "title": "Automatic sync",
         "hint": "Every 6 hours our server syncs this book for you, so it stays current when no officer visits. It reads the refinery ledger, Extractions and moon notifications, and donations into the selected wallet divisions, and settles Statements that donations now cover. It never issues a Statement and never sends mail.",
@@ -14141,12 +14812,14 @@
         "open": "Corp Tax Book settings",
         "title": "Corp Tax Book settings",
         "rates": "Tax rates",
-        "ratesHint": "The most specific rate wins: moon, then Miner, then Guest default, then the corp default. A rate starts on its date and never reaches back.",
+        "ratesHint": "The most specific rate wins: Miner, then moon, then refinery, then moon owner, then Guest default, then the corp default. A rate starts on its date and never reaches back.",
         "rateScope": {
           "corp": "Corp default",
           "guest": "Guest default",
           "miner": "Miner",
-          "moon": "Moon"
+          "moon": "Moon",
+          "structure": "Refinery",
+          "feeder": "Moon owner"
         },
         "from": "from {{date}}",
         "rateFor": "Applies to",
@@ -14345,6 +15018,175 @@
           "intro": "The tax it waived is owed again.",
           "reason": "Reason (required)",
           "confirm": "Reverse"
+        },
+        "failed": "That did not go through. Try again."
+      },
+      "moonOwners": {
+        "label": "Moon owners",
+        "invite": "Invite a moon owner…",
+        "cols": {
+          "owner": "Moon owner",
+          "status": "Status",
+          "mined": "Mined",
+          "theirRate": "Their rate",
+          "minerRate": "Miner rate",
+          "owed": "Owed to them"
+        },
+        "chips": {
+          "owed": "Owed to moon owners",
+          "paid": "Paid out this month",
+          "count": "Moon owners",
+          "needLook": "Need a look"
+        },
+        "status": {
+          "active": "Active",
+          "cant-read": "Can't read ledger",
+          "removal-pending": "Removal pending",
+          "settled-otherwise": "Settled otherwise",
+          "no-rate": "No rate set",
+          "disconnected": "Disconnected",
+          "left": "Left",
+          "removed": "Removed"
+        },
+        "refineries_one": "{{count}} refinery",
+        "refineries_other": "{{count}} refineries",
+        "synced": "Synced {{age}}",
+        "cantReadSince": "Can't read their ledger since {{date}}",
+        "since": "since {{date}}",
+        "until": "until {{date}}",
+        "notSet": "Not set",
+        "nothingDue": "Nothing due",
+        "summary": "{{shown}} moon owners",
+        "empty": {
+          "title": "No moon owners yet",
+          "hint": "Invite a corporation that owns moons. It shares its mining ledger, and you account to it for what was mined."
+        },
+        "page": {
+          "notFound": "That moon owner is not in this book",
+          "owed": "Owed to them",
+          "accrued": "Accrued",
+          "paid": "Paid",
+          "mined": "Mined",
+          "rates": "Rates",
+          "theirRate": "Their rate (what you owe them)",
+          "minerRate": "Miner rate (what miners pay)",
+          "minerHint": "Never shown to them",
+          "margin": "Your margin",
+          "marginHint": "Miner rate − their rate",
+          "asked": "They asked for {{pct}}%. Yours stands.",
+          "askedSame": "They asked for {{pct}}%.",
+          "noRate": "No rate set. Nothing is due until you set one.",
+          "notSet": "Not set",
+          "history": {
+            "agreed": "Rate set to {{pct}}%",
+            "agreedBy": "Rate set to {{pct}}% by {{by}}",
+            "requested": "{{name}} asked for {{pct}}%",
+            "joined": "Joined from an invite offering {{pct}}%"
+          },
+          "setRate": "Set rate…",
+          "remove": "Remove from this book…",
+          "settledOtherwise": "Settled otherwise…",
+          "settledNote": "Settled otherwise: nothing is due and no balance is kept.",
+          "stale": "Can't read their ledger since {{date}}. Their days wait until it reads again.",
+          "removal": {
+            "title": "Removal pending, takes effect {{time}}",
+            "titleNoTime": "Removal pending",
+            "body": "Started by {{name}} on {{date}}. They were mailed. Mining is still read until then.",
+            "bodyNoTime": "Started by {{name}} on {{date}}. The 24 hours start when the notice is sent. Mining is still read until then.",
+            "cancel": "Cancel removal",
+            "sentIt": "I sent the notice",
+            "failed": "That did not go through. Try again."
+          },
+          "disconnected": "Disconnected. Their ledger could not be read for 30 days.",
+          "payouts": {
+            "title": "Payments",
+            "none": "Nothing paid yet.",
+            "date": "Date",
+            "amount": "Amount",
+            "how": "How",
+            "status": "Status",
+            "method": {
+              "donation": "Donation",
+              "other": "Other"
+            },
+            "state": {
+              "recorded": "Recorded",
+              "waiting-for-journal": "Waiting for the wallet journal",
+              "matched": "Matched in the wallet journal",
+              "not-a-payout": "Not a payout"
+            },
+            "add": "Add a payment…",
+            "notAPayout": "Not a payout",
+            "countIt": "Count it"
+          },
+          "minedTitle": "Mined at their refineries",
+          "minedNone": "Nothing mined at their refineries yet.",
+          "cols": {
+            "character": "Character",
+            "refinery": "Refinery",
+            "ore": "Ore",
+            "quantity": "Quantity",
+            "value": "Value"
+          },
+          "pay": "Pay…",
+          "paidTo": "Paid to"
+        },
+        "dialogs": {
+          "rate": {
+            "title": "Set their rate",
+            "field": "Rate (%)",
+            "hint": "Your rate wins over what they asked for, from today. Their requests are kept and change nothing.",
+            "confirm": "Set rate"
+          },
+          "settled": {
+            "title": "Settled otherwise",
+            "toggle": "We settle with them another way (fuel, rock access…)",
+            "note": "Note (optional)",
+            "onHint": "Nothing is due and no balance is kept from today.",
+            "offHint": "Switching this off resumes accrual from today. Past days are not backfilled.",
+            "confirm": "Save"
+          },
+          "remove": {
+            "title": "Remove {{name}} from this book?",
+            "body": "It takes effect in 24 hours, once the mail below has been sent. Until then they stay active and mining is still read. Anyone in {{accounting}} who can manage the book can cancel it, and they can end it at once from their side.",
+            "mailTo": "One mail goes to",
+            "officers": "{{accounting}}'s other officers",
+            "ceo": "{{name}}'s CEO",
+            "payee": "{{name}}'s payee",
+            "kept": "Nothing is deleted. What they are owed stays until you settle it, and mining from the day this takes effect is no longer yours to bill.",
+            "mailNote": "If the mail cannot be sent, the removal stays pending and the send queue offers Open in EVE.",
+            "confirm": "Start removal"
+          },
+          "invite": {
+            "title": "Invite a moon owner",
+            "intro": "Make a link to send in EVE chat or mail. The moon owner opens it and shares its mining ledger with this book.",
+            "offer": "Rate to offer (%), optional",
+            "make": "Make a link",
+            "link": "Invite link",
+            "copy": "Copy link",
+            "copied": "Copied",
+            "warning": "Anyone with this link can connect as a moon owner. Send it only to the corporation you mean.",
+            "open": "Open links",
+            "none": "No open links.",
+            "made": "Made {{date}} by {{name}}",
+            "offering": "offering {{pct}}%",
+            "revoke": "Revoke",
+            "revokeLabel": "Revoke the link made {{date}}",
+            "codeNote": "Only a link made now can be copied. Older links can only be revoked.",
+            "loadFailed": "Could not load the open links.",
+            "done": "Done"
+          }
+        },
+        "payAction": "Pay…",
+        "payNamed": "Pay {{name}}",
+        "pay": {
+          "title": "Pay {{name}}",
+          "addTitle": "Add a payment to {{name}}",
+          "intro": "Send this in the EVE client; the app cannot move ISK. Record it once it is sent.",
+          "reasonPrefix": "Moon mining payout",
+          "confirm": "I've sent it",
+          "change": "Owed to them {{before}} → {{after}}. The wallet journal confirms it later and never counts it twice.",
+          "afterCredit": "credit of {{amount}}"
         }
       }
     }

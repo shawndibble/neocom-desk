@@ -7,6 +7,7 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { onReconnect, useOnline } from '@/stores/network';
 import { readPersisted, requestPersistence } from '@/lib/persistStorage';
 import { formatBytes } from './offlinePacks';
+import { SettingsHint } from '@/features/settings/settingsFields';
 import {
   cancelDownload,
   downloadEverything,
@@ -39,7 +40,7 @@ const REFRESH_EVERY_FILES = 8;
  * is really there, not what a past download reported.
  */
 export function OfflineDataPanel() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const online = useOnline();
   const [status, setStatus] = useState<OfflineStatus | null>(null);
   const [estimate, setEstimate] = useState<StorageEstimate | null>(null);
@@ -152,10 +153,10 @@ export function OfflineDataPanel() {
   }
 
   return (
-    <Panel title={t('settings.offline.title')}>
+    <Panel>
       <LiveStatus announceKey={announceKey}>{announcement}</LiveStatus>
       <div className="space-y-4">
-        <p className="max-w-2xl text-xs text-text-dim">{t('settings.offline.hint')}</p>
+        <SettingsHint>{t('settings.offline.hint')}</SettingsHint>
         <Fields variant="form">
           <Field label={t('settings.offline.packsLabel')}>
             {status && (
@@ -185,28 +186,26 @@ export function OfflineDataPanel() {
             <Field label={t('settings.offline.storageLabel')}>
               <p className="text-xs">
                 {t('settings.offline.storageValue', {
-                  used: formatBytes(estimate.usage, i18n.language),
-                  quota: formatBytes(estimate.quota, i18n.language),
+                  used: formatBytes(estimate.usage),
+                  quota: formatBytes(estimate.quota),
                 })}
               </p>
             </Field>
           )}
           <Field label={t('settings.offline.persistLabel')}>
             <div ref={persistRef} tabIndex={-1} className="space-y-1.5 outline-none">
-              <p className="max-w-2xl text-xs text-text-dim">
+              <SettingsHint>
                 {persisted === null
                   ? t('settings.offline.persistedUnknown')
                   : t(persisted ? 'settings.offline.persistedYes' : 'settings.offline.persistedNo')}
-              </p>
+              </SettingsHint>
               {persisted === false && (
                 <Button size="sm" loading={persisting} onClick={() => void protect()}>
                   {t('settings.offline.persistAction')}
                 </Button>
               )}
               {persisted === false && persistDenied && (
-                <p className="max-w-2xl text-xs text-text-dim">
-                  {t('settings.offline.persistDenied')}
-                </p>
+                <SettingsHint>{t('settings.offline.persistDenied')}</SettingsHint>
               )}
             </div>
           </Field>

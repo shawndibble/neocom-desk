@@ -4,11 +4,11 @@ Route `/help` (`src/routes/Help.tsx`), a footer-group page (`src/app/navDestinat
 
 Command palette (`src/features/commandPalette`) is covered elsewhere; here only its link to Help: the `?` key and the palette's shortcuts command both land on `/help/shortcuts`.
 
-| Tab       | Component                                            | Content                                                                |
-| --------- | ---------------------------------------------------- | ---------------------------------------------------------------------- |
-| Shortcuts | `src/features/help/ShortcutsPanel.tsx`               | Every key the app answers to, from the same array that dispatches them |
-| FAQ       | `src/features/faq/FaqPanel.tsx` (+ `whatWeStore.ts`) | 8 collapsible questions; "what we store" commitments                   |
-| Support   | `src/features/help/HelpPanel.tsx`                    | Discord, source, say thanks                                            |
+| Tab       | Component                                            | Content                                                                                          |
+| --------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Shortcuts | `src/features/help/ShortcutsPanel.tsx`               | Every key the app answers to, from the same array that dispatches them                           |
+| FAQ       | `src/features/faq/FaqPanel.tsx` (+ `whatWeStore.ts`) | collapsible questions, one of them "How do I find skills to train?"; "what we store" commitments |
+| Support   | `src/features/help/HelpPanel.tsx`                    | Discord, source, say thanks                                                                      |
 
 ## Purpose and user goal
 
@@ -47,7 +47,7 @@ Three panels (Keyboard shortcuts, Paste anywhere, On a page), definition lists (
   1. What syncs between my devices? (`WHAT_WE_STORE_GROUPS` "synced"): Skill Plans; Build Plans; Production Runs (with linked sales/orders); Market Quickbar; pinned stations/structures in Assets; PI resource picks; Moon Mining payees and assignments (incl. the ore and ISK snapshot); saved Fittings (name + share code); already-seen alerts (kept 30 days); synced preferences with sub-bullets (notifications, defaults, industry, market, skills incl. Alpha/Omega, fittings, PI and mining tax, layout incl. Overview cards and hidden nav pages, travel and Route Safety). Filed under each character's EVE ID, never a name or email.
   2. What stays on this device? ("local"): all ESI character data (assets, wallet, contracts, mail, contacts, clones, calendar, skills, queue, jobs, colonies); corporation data; market prices/books/LP stores; 90 days of mining ledger; the EVE login token (never leaves); display settings and remembered sorts/filters/sections; Ansiblex jump gate list.
   3. Does Neocom Desk change anything in EVE? The six writes (mail read flag, calendar response, mail send, Fitting save, autopilot waypoints, Open in EVE). Text `settings.faq.store.notes.writes`.
-  4. How do I delete my data? Settings > Data & storage > Delete all data (remote then device); Log out of all characters clears the device only; plus the removal note (removing a Character clears the device only; remote copy deleted after 90 days idle).
+  4. How do I delete my data? Settings > Log out & delete > Delete all data (remote then device); Log out of all characters clears the device only; plus the removal note (removing a Character clears the device only; remote copy deleted after 90 days idle).
   5. How do I force an update? Settings > Update app (checks and reloads).
   6. What notifications arrive when the app is closed? Only alerts with a time known ahead (skill level done, training stopped/queue ending, industry job done, courier due, clone jump ready, PI extraction/expiry, calendar start, structure low fuel, EVE timers); everything else needs the app open; push stores token, character IDs and 72 h of alert text; turn on in Settings > Notifications.
   7. Do you collect crash reports? Error and page only; no IPs; no request/response bodies; EVE tokens stripped.
@@ -75,7 +75,7 @@ No ESI, no scope, no Dexie, no Firestore, no URL state beyond the tab path. Stat
 ## Tests assert
 
 - `HelpPanel.test.tsx`: Support has the "Bugs, ideas and chat" panel with a Discord link (`DISCORD_URL`, `target=_blank`, `rel` has `noopener`); "Source code" links `REPO_URL` the same way and says report bugs and ideas on Discord not GitHub; "Say thanks" names Mero Otichoda and says donations are "never expected".
-- `FaqPanel.test.tsx` ("What We Store"): every synced collection in the registry maps to an existing FAQ line and every synced line maps to a collection; synced lines keep their reading order; every synced setting key has words in the FAQ; questions render closed (`aria-expanded=false`), exact question count, delete and update questions exist; opening renders every group and line once; how-to answers say where to go ("press Update app", push kinds text); exactly two groups and no group listing things we do not hold; states the cases where something leaves the device (push, crash reports, writes to EVE); says when a removed character's synced copy leaves our servers; does not claim EVE data is uploaded; points to the Help Support tab.
+- `FaqPanel.test.tsx` ("What We Store"): every synced collection in the registry maps to an existing FAQ line and every synced line maps to a collection; synced lines keep their reading order; every synced setting key has words in the FAQ; questions render closed (`aria-expanded=false`), exact question count, delete and update questions exist; opening renders every group and line once; how-to answers say where to go ("Update now", push kinds text); exactly two groups and no group listing things we do not hold; states the cases where something leaves the device (push, crash reports, writes to EVE); says when a removed character's synced copy leaves our servers; does not claim EVE data is uploaded; points to the Help Support tab.
 - `legacyPaths.test.ts`: `/settings/faq` -> `/help/faq`, `/settings/help` -> `/help/support`; unknown paths and prefix-only matches are left alone.
 
 ## Observed gaps
@@ -95,7 +95,7 @@ No ESI, no scope, no Dexie, no Firestore, no URL state beyond the tab path. Stat
 4. How is the FAQ kept honest? `whatWeStore.ts` mirrors `syncedCollections.ts` (typed `faqItem`), `SYNCED_SETTING_KEYS` and Sentry config; decision `20260907-205018`.
 5. What syncs vs stays local? See FAQ answers 1-2 above; ESI data and tokens never sync.
 6. What does the app write to EVE? Six writes listed in FAQ 3 and on Login.
-7. How do you delete data? Settings > Data & storage; remote purge then device wipe; removal leaves remote 90 days.
+7. How do you delete data? Settings > Log out & delete; remote purge then device wipe; removal leaves remote 90 days.
 8. What reaches us from a push device? Token, character IDs, next 72 h of alert text.
 9. How do you get an update now? Settings > Update app.
 10. Which shortcut opens the palette? Cmd/Ctrl+K (works in text fields); `?` opens Shortcuts.

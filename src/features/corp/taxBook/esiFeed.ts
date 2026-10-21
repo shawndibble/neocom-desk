@@ -20,6 +20,7 @@ import {
   type MoonNotification,
 } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
+import { outgoingDonationsFromJournal, type OutgoingDonation } from '@/engine/corpTaxBook/payouts';
 import { loadStructureSystemId } from '@/features/character/structures';
 import { loadCharacterNotifications } from '@/features/character/notifications';
 import { loadCorporationMiningExtractions } from '../boardData';
@@ -94,7 +95,8 @@ export async function loadObserverFeed(
     const rows = observedRowsFromLedger(
       observer.observer_id,
       ledger.cached.data,
-      ledger.cached.fetchedAt.toISOString()
+      ledger.cached.fetchedAt.toISOString(),
+      corporationId
     );
     const systemId = await loadStructureSystemId(characterId, observer.observer_id).catch(
       () => null
@@ -124,6 +126,22 @@ export async function loadDonations(
     const journal = await loadCorporationWalletJournal(characterId, corporationId, division);
     if (journal.cached) {
       found.push(...donationsFromJournal(journal.cached.data, division, corporationId));
+    }
+  }
+  return found;
+}
+
+/** Donations the corporation's wallet sent, for attaching to a moon owner's recorded payouts. */
+export async function loadOutgoingDonations(
+  characterId: number,
+  corporationId: number,
+  divisions: readonly number[]
+): Promise<OutgoingDonation[]> {
+  const found: OutgoingDonation[] = [];
+  for (const division of divisions) {
+    const journal = await loadCorporationWalletJournal(characterId, corporationId, division);
+    if (journal.cached) {
+      found.push(...outgoingDonationsFromJournal(journal.cached.data, division, corporationId));
     }
   }
   return found;

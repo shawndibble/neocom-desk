@@ -323,7 +323,7 @@ export function StopsPanel({
               <p className="text-text-dim">{t('travel.stops.optimizeBlocked')}</p>
             )}
             {orderNote !== null && (
-              <p role="status" className="rounded-sm border border-dashed border-line px-2 py-1.5">
+              <p role="status" className="rounded-xs border border-dashed border-line px-2 py-1.5">
                 {orderNote}
               </p>
             )}

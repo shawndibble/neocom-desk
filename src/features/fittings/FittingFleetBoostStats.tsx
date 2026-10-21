@@ -3,6 +3,7 @@ import type { FittingStats } from '@/engine/fittings/types';
 import { kmValue } from './rangeText';
 import { StatGroup, StatRow, StatRows } from './StatFacts';
 import { joinDetail } from './statKit';
+import { fixed0, fixed1 } from '@/lib/fixedFormat';
 
 /**
  * Fleet boosts: each running burst with the charge it carries, how strong,
@@ -20,7 +21,7 @@ export function FleetBoostFacts({
   const { t } = useTranslation();
   const { bursts, compressors, core } = stats.fleetSupport;
   const km = (meters: number) => t('fittings.stats.unit.km', { value: kmValue(meters) });
-  const seconds = (value: number) => t('fittings.stats.unit.seconds', { value: value.toFixed(1) });
+  const seconds = (value: number) => t('fittings.stats.unit.seconds', { value: fixed1(value) });
   const every = (cycleSeconds: number) =>
     t('fittings.stats.fleetBoosts.every', { cycle: seconds(cycleSeconds) });
 
@@ -50,7 +51,7 @@ export function FleetBoostFacts({
                     ])
               }
               detailTone={burst.chargeTypeId === undefined ? 'warning' : undefined}
-              figure={burst.strengths.map((value) => `${value.toFixed(1)}%`).join(' · ') || '—'}
+              figure={burst.strengths.map((value) => `${fixed1(value)}%`).join(' · ') || '—'}
             />
           ))}
         </StatRows>
@@ -74,7 +75,7 @@ export function FleetBoostFacts({
                 name={typeName(core.typeId)}
                 detail={every(core.cycleSeconds)}
                 figure={t('fittings.stats.fleetBoosts.fuel', {
-                  value: core.fuelPerCycle.toFixed(0),
+                  value: fixed0(core.fuelPerCycle),
                   fuel: typeName(core.fuelTypeId),
                 })}
               />

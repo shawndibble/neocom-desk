@@ -17,7 +17,16 @@ export const SEND_GAP_MAX_MS = 15_000;
 export const OFFLINE_RETRY_MS = 30_000;
 const MAX_RATE_LIMIT_WAIT_MS = 10 * 60_000;
 
-export type MailKind = 'statement' | 'reminder';
+/**
+ * `rate-change` (#4515), `removal`/`removalCancelled` (#4520) and `payee-change` (#4653) are moon
+ * owner mails, not Statements.
+ */
+export type MailKind =
+  'statement' | 'reminder' | 'rate-change' | 'payee-change' | 'removal' | 'removalCancelled';
+
+/** Only Statement mail is logged on a Statement; other kinds have none to log on. */
+export const isStatementMail = (kind: MailKind): kind is 'statement' | 'reminder' =>
+  kind === 'statement' || kind === 'reminder';
 export type MailStatus = 'waiting' | 'sent' | 'failed';
 export type MailFailureReason = 'cspa' | 'auth' | 'other';
 
@@ -28,6 +37,17 @@ export interface MailQueueItem {
   corporationId: number;
   statementId: string;
   kind: MailKind;
+  /** The moon owner a removal (#4520) or payee (#4653) mail is about; absent on Statement mail. */
+  feederCorporationId?: number;
+  /**
+   * A removal notice to the moon owner's CEO or payee: sending it starts the removal's 24 hours
+   * (#4617). False on the accounting corporation's own copies; absent on items queued before.
+   */
+  startsClock?: boolean;
+  /** When the removal takes effect, once its clock has started: the notice states this time. */
+  effectiveAt?: number;
+  /** The removal a notice belongs to (`removal.startedAt`, #4621); absent on items queued before. */
+  removalStartedAt?: number;
   /** The character the mail is sent from (an officer with the mail scope). */
   senderCharacterId: number;
   recipientId: number;
@@ -240,6 +260,63 @@ export function isAlreadyQueued(
     (i) =>
       i.statementId === statementId &&
       i.kind === kind &&
-      (kind === 'statement' ? true : i.status === 'waiting')
+      (kind === 'reminder' ? i.status === 'waiting' : true)
   );
+}
+
+// --- Removal notices (#4617) ---------------------------------------------------
+
+/** Sending this copy starts the removal's 24 hours. An item queued before the flag counts. */
+export const startsRemovalClock = (item: MailQueueItem): boolean =>
+  item.kind === 'removal' && item.startsClock !== false;
+
+const unsentNoticeFor = (item: MailQueueItem, corporationId: number, feeder: number) =>
+  item.kind === 'removal' &&
+  item.corporationId === corporationId &&
+  item.feederCorporationId === feeder &&
+  item.status !== 'sent';
+
+/** The removal notices still to send for a moon owner: a cancel drops them. */
+export function removalMailsToDrop(
+  items: readonly MailQueueItem[],
+  corporationId: number,
+  feederCorporationId: number
+): string[] {
+  return items
+    .filter((i) => unsentNoticeFor(i, corporationId, feederCorporationId))
+    .map((i) => i.id);
+}
+
+/** The unsent notices for a moon owner, now stating the recorded time it takes effect. */
+export function stampRemovalEffectiveAt(
+  items: readonly MailQueueItem[],
+  corporationId: number,
+  feederCorporationId: number,
+  effectiveAt: number
+): MailQueueItem[] {
+  return items
+    .filter(
+      (i) => unsentNoticeFor(i, corporationId, feederCorporationId) && i.effectiveAt !== effectiveAt
+    )
+    .map((i) => ({ ...i, effectiveAt }));
+}
+
+/** What the send queue reads of a moon owner's record before sending a removal notice. */
+export interface RemovalNoticeRecord {
+  status: string;
+  removal?: { startedAt: number };
+}
+
+/**
+ * Whether a removal notice may still go out (#4621): only while its removal is still pending.
+ * Another officer's cancel, a Leave, a forced removal or a disconnect clears the removal in
+ * Firestore but not in this browser's queue. Every other kind of mail is always due.
+ */
+export function removalNoticeStillDue(
+  item: MailQueueItem,
+  record: RemovalNoticeRecord | undefined
+): boolean {
+  if (item.kind !== 'removal') return true;
+  if (record?.status !== 'pending-removal') return false;
+  return item.removalStartedAt === undefined || record.removal?.startedAt === item.removalStartedAt;
 }

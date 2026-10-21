@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -56,7 +57,7 @@ export function FittingAppraisalModal({ open, onClose, price }: Props) {
       header: t('fittings.appraisal.quantity'),
       align: 'right',
       className: 'tabular-nums',
-      render: (row) => row.quantity.toLocaleString(),
+      render: (row) => formatCount(row.quantity),
     },
     {
       id: 'unit',

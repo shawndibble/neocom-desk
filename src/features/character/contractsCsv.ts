@@ -13,7 +13,7 @@ import { contractAmount } from './contractAmount';
 export function contractsCsvColumns(
   t: CsvTranslate,
   nameFor: (issuerId: number) => string,
-  selfId?: number
+  selfId?: number | ((contract: Contract) => number | undefined)
 ): CsvColumn<Contract>[] {
   return [
     { header: t('contracts.type'), value: (contract) => contract.title || contract.type },
@@ -22,7 +22,8 @@ export function contractsCsvColumns(
     {
       header: t('contracts.receiver'),
       value: (contract) => {
-        const receiver = selfId === undefined ? null : contractReceiver(contract, selfId);
+        const self = typeof selfId === 'function' ? selfId(contract) : selfId;
+        const receiver = self === undefined ? null : contractReceiver(contract, self);
         return receiver ? nameFor(receiver.id) : null;
       },
     },

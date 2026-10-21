@@ -23,7 +23,7 @@ import { backwardBucketSums } from './chartSeries';
 import { rollingTitles, signTone } from './chartTips';
 import type { NetWorthCharacter } from './kindLoaders';
 import { STOCK_PATH, UNKNOWN } from './builderKit';
-import { fractionBar, signedCell } from './cellKit';
+import { fractionBar, shareCell, signedCell } from './cellKit';
 import type { NumberSecondary, TableCell, TableModel, Translate } from './types';
 
 const W = 'overview.widgets';
@@ -170,12 +170,6 @@ export function flowBars(
 /** A column that only ever runs one way: ISK in is good, ISK out is bad; zero is plain. */
 function directionCell(text: string, value: number, tone: 'good' | 'bad'): TableCell {
   return value > 0 ? { text, tone } : text;
-}
-
-/** `part` of `whole` as a whole percent with its bar; the text states the share, the bar only draws it. */
-function shareCell(part: number, whole: number): TableCell {
-  const share = fractionBar(Math.max(0, part), whole);
-  return share === undefined ? '0%' : { text: `${Math.round(share * 100)}%`, bar: share };
 }
 
 /** Per ref type: net, what came in, what went out, and its share of all the ISK that moved. */

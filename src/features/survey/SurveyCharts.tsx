@@ -40,6 +40,10 @@ import {
 } from './surveyChartParts';
 import { DepletionChart, IskChart } from './SurveyViewCharts';
 import { oreTone } from './surveyTones';
+import { formatCount } from '@/lib/formatCount';
+import { createNumberFormat } from '@/lib/numberLocale';
+
+const formatVolume = createNumberFormat({ maximumFractionDigits: 3 });
 
 interface ScanTableRow {
   at: number;
@@ -152,17 +156,17 @@ export function SurveyCharts({
       {
         id: 'total',
         header: t('survey.chartTotal'),
-        render: (r) => `${r.total.toLocaleString()} m³`,
+        render: (r) => `${formatVolume(r.total)} m³`,
       },
       {
         id: 'mined',
         header: t('survey.tableMined'),
-        render: (r) => (r.mined === null ? '' : `${r.mined.toLocaleString()} m³`),
+        render: (r) => (r.mined === null ? '' : `${formatVolume(r.mined)} m³`),
       },
       ...summary.oreNames.map((ore) => ({
         id: `ore:${ore}`,
         header: ore,
-        render: (r: ScanTableRow) => `${(r.byOre[ore] ?? 0).toLocaleString()} m³`,
+        render: (r: ScanTableRow) => `${formatVolume(r.byOre[ore] ?? 0)} m³`,
       })),
     ],
     [summary.oreNames, t]
@@ -174,7 +178,7 @@ export function SurveyCharts({
       {
         id: 'rate',
         header: t('survey.tableRate'),
-        render: (i) => `${Math.round(i.rate).toLocaleString()} m³/s`,
+        render: (i) => `${formatCount(i.rate)} m³/s`,
       },
     ],
     [t]
@@ -370,7 +374,7 @@ export function SurveyCharts({
                     fill="var(--color-text)"
                     fontSize="0.625rem"
                     formatter={(value: unknown) =>
-                      typeof value === 'number' ? Math.round(value).toLocaleString() : ''
+                      typeof value === 'number' ? formatCount(value) : ''
                     }
                   />
                 </Line>

@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, EmptyState, Panel, Spinner, StatChip, StatChips } from '@/components/ui';
@@ -179,6 +180,8 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
   const due = dueDate(statement.issuedAt, overdueDays);
   const credited = payload.payments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = settlement?.remaining ?? Math.max(0, statement.amount - credited);
+  const forgiven = settlement?.forgiven ?? 0;
+  const dismissed = settlement ? settlement.credited - credited - forgiven : 0;
   const rates = ratesUsed(rows);
 
   const lastDeclaration = payload.declarations.at(-1);
@@ -284,12 +287,8 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
               billed: isk(statement.amount),
               paid: isk(credited),
             })}
-            {settlement && settlement.credited - credited > 0 && (
-              <>
-                {' '}
-                {t('corpTaxBook.verify.dismissed', { amount: isk(settlement.credited - credited) })}
-              </>
-            )}
+            {dismissed > 0 && <> {t('corpTaxBook.verify.dismissed', { amount: isk(dismissed) })}</>}
+            {forgiven > 0 && <> {t('corpTaxBook.verify.forgiven', { amount: isk(forgiven) })}</>}
             {settlement && settlement.writtenOff > 0 && (
               <> {t('corpTaxBook.verify.writtenOff', { amount: isk(settlement.writtenOff) })}</>
             )}
@@ -428,7 +427,7 @@ function MinedDay({
               className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 md:grid-cols-[minmax(0,1fr)_10rem_14rem]"
             >
               <span>
-                {oreNames.get(o.typeId) ?? `#${o.typeId}`} × {o.quantity.toLocaleString(locale)}
+                {oreNames.get(o.typeId) ?? `#${o.typeId}`} × {formatCount(o.quantity)}
               </span>
               <span className="text-right tabular-nums">
                 {o.unitPrice === undefined ? '—' : isk(o.unitPrice, 2)}

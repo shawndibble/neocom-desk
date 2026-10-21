@@ -1,6 +1,7 @@
 import * as Icon from '@/components/ui/icons';
 import type { MakeMethod, MakeOrBuy } from '@/engine/industry/makeOrBuy';
 import { formatIsk } from '@/lib/isk';
+import { formatCount } from '@/lib/formatCount';
 
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 export type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -60,7 +61,7 @@ export function makeOrBuyReason(advice: MakeOrBuy, remaining: number, t: Transla
     parts.push(
       t('industry.makeOrBuy.savings', {
         amount: formatIsk(advice.savings),
-        quantity: remaining.toLocaleString(),
+        quantity: formatCount(remaining),
       })
     );
   }

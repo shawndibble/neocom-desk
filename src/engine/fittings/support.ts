@@ -247,6 +247,7 @@ export function extractSupport(
     if (!what) return;
     // A scripted module and an unscripted one of the same type do different
     // things, so each set of effects is a row of its own.
+    // fixed format: dedupe key, never shown
     const signature = what.effects.map((e) => `${e.effect}=${e.amount.toFixed(4)}`).join(',');
     const key = `${what.kind}:${item.type_id}:${signature}`;
     const row = rows.get(key);

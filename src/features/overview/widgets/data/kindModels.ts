@@ -5,6 +5,7 @@
  * time, the widget's range applied here over data shared by every widget of
  * the kind.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { LAYER_LABEL_KEYS } from '@/features/netWorth/layerMeta';
 import { CLONE_NOTE_KEY } from '@/features/character/cloneVerdictGate';
 import { journalRefTypeBreakdown } from '@/features/character/walletJournalFilter';
@@ -42,6 +43,7 @@ import {
 import { journalCoverageDays, withinRange } from './chartSeries';
 import { dayTitle, rollingTitles } from './chartTips';
 import type { ListRow, NumberModel, TableCell } from './types';
+import { formatNumber } from '@/lib/numberLocale';
 
 const D = 'overview.widgets.data';
 const C = 'overview.widgets.chart';
@@ -403,7 +405,7 @@ const belowMarket: Builder = (feeds, { t }) => {
     fetchedAt: data.fetchedAt,
     number: best
       ? {
-          value: data.count.toLocaleString(),
+          value: formatNumber(data.count),
           unit: t(`${D}.belowMarket.unit`),
           secondary: {
             text:
@@ -601,7 +603,7 @@ const location: Builder = (feeds, { t }) => {
   const security =
     system?.security === null || system?.security === undefined
       ? undefined
-      : t(`${D}.location.security`, { value: system.security.toFixed(1) });
+      : t(`${D}.location.security`, { value: fixed1(system.security) });
   const rows: ListRow[] = system
     ? [
         {

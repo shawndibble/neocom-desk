@@ -255,3 +255,177 @@ export function getCorporationMemberTracking(
     endpointId: 'getCorporationMemberTracking',
   });
 }
+
+// --- GET /corporations/{corporation_id}/starbases (esi-corporations.read_starbases.v1) ---
+
+/** ESI's `state`; `offline` and `onlining` hold no fuel clock. */
+export type StarbaseState =
+  'offline' | 'online' | 'onlining' | 'reinforced' | 'unanchoring' | (string & {});
+
+export interface CorporationStarbase {
+  starbase_id: number;
+  system_id: number;
+  /** The tower's own type: Control Tower, Medium, Small, faction variants. */
+  type_id: number;
+  moon_id?: number;
+  onlined_since?: string;
+  /** Set while the tower is reinforced: when it comes out. */
+  reinforced_until?: string;
+  state?: StarbaseState;
+  unanchor_at?: string;
+}
+
+/** Director-only (`canReadStarbases`), cached 3600s, paginated (X-Pages). */
+export function getCorporationStarbases(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<PaginatedResult<CorporationStarbase>> {
+  return fetchAllPagesStatus<CorporationStarbase>(`/corporations/${corporationId}/starbases`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationStarbases',
+  });
+}
+
+// --- GET /corporations/{corporation_id}/starbases/{starbase_id} (esi-corporations.read_starbases.v1) ---
+
+/** One fuel or strontium line in a tower's bay. */
+export interface StarbaseFuel {
+  type_id: number;
+  quantity: number;
+}
+
+/** Only `fuels` is read here; the standing-and-permission fields are not. */
+export interface CorporationStarbaseDetail {
+  fuels?: StarbaseFuel[];
+}
+
+/** `system_id` is a required query parameter (the tower's system), not optional. */
+export function getCorporationStarbase(
+  characterId: number,
+  corporationId: number,
+  starbaseId: number,
+  systemId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationStarbaseDetail>> {
+  return esiFetch<CorporationStarbaseDetail>(
+    `/corporations/${corporationId}/starbases/${starbaseId}`,
+    {
+      ...options,
+      characterId,
+      query: { system_id: systemId },
+      endpointId: 'getCorporationStarbase',
+    }
+  );
+}
+
+// --- GET /corporations/{corporation_id}/customs_offices (esi-planets.read_customs_offices.v1) ---
+
+/**
+ * One customs office. Tax rates are fractions (0.05 is 5%). A standing rate is
+ * present only when that level is allowed, and `standing_level` and the
+ * standing rates only when `allow_access_with_standings`. The reinforce window
+ * is two whole UTC hours of the day, not a timer.
+ */
+export interface CorporationCustomsOffice {
+  office_id: number;
+  system_id: number;
+  type_id?: number;
+  reinforce_exit_start: number;
+  reinforce_exit_end: number;
+  allow_alliance_access: boolean;
+  allow_access_with_standings: boolean;
+  standing_level?: 'bad' | 'excellent' | 'good' | 'neutral' | 'terrible';
+  corporation_tax_rate?: number;
+  alliance_tax_rate?: number;
+  excellent_standing_tax_rate?: number;
+  good_standing_tax_rate?: number;
+  neutral_standing_tax_rate?: number;
+  bad_standing_tax_rate?: number;
+  terrible_standing_tax_rate?: number;
+}
+
+/** Director-only (`canReadCustomsOffices`), cached 3600s, paginated (X-Pages). */
+export function getCorporationCustomsOffices(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<PaginatedResult<CorporationCustomsOffice>> {
+  return fetchAllPagesStatus<CorporationCustomsOffice>(
+    `/corporations/${corporationId}/customs_offices`,
+    { ...options, characterId, endpointId: 'getCorporationCustomsOffices' }
+  );
+}
+
+// --- GET /corporations/{corporation_id}/roles/history (esi-corporations.read_corporation_membership.v1) ---
+
+/**
+ * One role change. ESI keeps about a month, newest page first, cached 3600s,
+ * Director-only. `role_type` is `roles` for the corporation-wide grant, the
+ * `roles_at_*` and `grantable_*` variants otherwise.
+ */
+export interface CorporationRoleHistory {
+  changed_at: string;
+  character_id: number;
+  issuer_id: number;
+  role_type: string;
+  old_roles: string[];
+  new_roles: string[];
+}
+
+export function getCorporationRoleHistory(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<PaginatedResult<CorporationRoleHistory>> {
+  return fetchAllPagesStatus<CorporationRoleHistory>(
+    `/corporations/${corporationId}/roles/history`,
+    {
+      ...options,
+      characterId,
+      endpointId: 'getCorporationRoleHistory',
+    }
+  );
+}
+
+// --- GET /corporations/{corporation_id}/titles (esi-corporations.read_titles.v1) ---
+
+/** A corporation title: a named bundle of roles. Director-only, cached 3600s. */
+export interface CorporationTitle {
+  title_id: number;
+  name?: string;
+  roles?: string[];
+}
+
+export function getCorporationTitles(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationTitle[]>> {
+  return esiFetch<CorporationTitle[]>(`/corporations/${corporationId}/titles`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationTitles',
+  });
+}
+
+// --- GET /corporations/{corporation_id}/members/titles (esi-corporations.read_titles.v1) ---
+
+/** The title ids each member holds. Director-only, cached 3600s. */
+export interface CorporationMemberTitles {
+  character_id: number;
+  titles: number[];
+}
+
+export function getCorporationMemberTitles(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationMemberTitles[]>> {
+  return esiFetch<CorporationMemberTitles[]>(`/corporations/${corporationId}/members/titles`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationMemberTitles',
+  });
+}

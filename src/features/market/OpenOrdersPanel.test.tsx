@@ -30,6 +30,10 @@ import { orderFloor } from '@/engine/market/orderFloor';
 import { roundPriceUp } from '@/engine/market/priceTick';
 import { formatMarketIsk } from '@/lib/isk';
 import { useVisibleOpenOrderColumns } from './openOrdersColumns';
+import {
+  loadCorpOrdersFeed,
+  type CorpOrdersFeed,
+} from '@/features/overview/widgets/data/corpFeeds';
 
 vi.mock('./openOrdersData', () => ({ loadAllCharactersOpenOrders: vi.fn() }));
 vi.mock('./orderCostBasis', () => ({
@@ -46,6 +50,7 @@ vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
 vi.mock('@/sde/loadMarketSde', () => ({ loadNpcStations: vi.fn() }));
 vi.mock('@/features/skills/correctedSkills', () => ({ loadCorrectedSkills: vi.fn() }));
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn() }));
+vi.mock('@/features/overview/widgets/data/corpFeeds', () => ({ loadCorpOrdersFeed: vi.fn() }));
 
 const mockedLoadAll = vi.mocked(loadAllCharactersOpenOrders);
 const mockedCostBases = vi.mocked(loadOrderCostBases);
@@ -1011,6 +1016,109 @@ describe('OpenOrdersPanel', () => {
       await findMatchCount('No orders match your filters.');
       expect(screen.queryByRole('table')).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('OpenOrdersPanel — Corporation source', () => {
+  const corpFeed = (orders: MarketOrder[], issuers: [number, string][]): CorpOrdersFeed => ({
+    readable: true,
+    needsReauth: false,
+    fetchedAt: new Date(),
+    fromCache: false,
+    orders: orders.map((o, i) => ({ ...o, issued_by: issuers[i % issuers.length]![0] })),
+    typeNames: TYPE_NAMES,
+    stationNames: new Map([[STATION_A, 'Jita IV - Moon 4']]),
+    // A rival sells below 500: the order is undercut at the station.
+    stationPrices: new Map([
+      [stationPriceKey(STATION_A, 34), { sellMin: 400, buyMax: 100, sellVolume: 5, buyVolume: 5 }],
+    ]),
+    issuerNames: new Map(issuers),
+  });
+
+  function renderCorp(callbacks: { onLeaveCorporation?: () => void } = {}) {
+    return render(
+      <MemoryRouter initialEntries={['/market/orders?scope=corp']}>
+        <CurrentSearch />
+        <FakeItemActions actions={actions}>
+          {withOrderDetailLoaders(
+            <WithPageHeaderSlots>
+              {(slots) => (
+                <OpenOrdersPanel
+                  headerSlots={slots}
+                  corporation
+                  onChooseCorporation={() => {}}
+                  {...callbacks}
+                />
+              )}
+            </WithPageHeaderSlots>,
+            loaders
+          )}
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+  }
+
+  function headers(table: HTMLElement) {
+    return within(table)
+      .getAllByRole('columnheader')
+      .map((h) => h.textContent);
+  }
+
+  it('draws the same columns, tabs and toolbar as the Character source', async () => {
+    mockedLoadAll.mockResolvedValue(snapshot([entry([BELOW_FLOOR_ORDER])]));
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+    const first = renderPanel();
+    const characterHeaders = headers(await screen.findByRole('table', NEEDS_YOU_TABLE));
+    first.unmount();
+
+    vi.mocked(loadCorpOrdersFeed).mockResolvedValue(corpFeed([BELOW_FLOOR_ORDER], [[7, 'Efa']]));
+    renderCorp();
+    const table = await screen.findByRole('table', NEEDS_YOU_TABLE);
+    expect(headers(table)).toEqual(characterHeaders);
+    expect(screen.getByRole('button', { name: /^Watch/ })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox')).toBeInTheDocument();
+    // Undercut advice rests on market prices alone, so it reads the same.
+    expect(within(table).getByRole('row', { name: /Tritanium/ })).toHaveTextContent(/undercut/i);
+  });
+
+  it('names the issuer where the Character source names the Character', async () => {
+    vi.mocked(loadCorpOrdersFeed).mockResolvedValue(
+      corpFeed(
+        [BELOW_FLOOR_ORDER, EXPIRING_ORDER],
+        [
+          [7, 'Efa Astrahus'],
+          [8, 'Bea Astrahus'],
+        ]
+      )
+    );
+    renderCorp();
+    const table = await screen.findByRole('table', NEEDS_YOU_TABLE);
+    expect(within(table).getByRole('row', { name: /Tritanium/ })).toHaveTextContent('Efa Astrahus');
+    expect(within(table).getByRole('row', { name: /Mexallon/ })).toHaveTextContent('Bea Astrahus');
+    // Never the Character read.
+    expect(mockedLoadAll).not.toHaveBeenCalled();
+  });
+
+  it('goes straight to This character or All characters, with issuer rows shown whatever the Character pick', async () => {
+    vi.mocked(loadCorpOrdersFeed).mockResolvedValue(corpFeed([BELOW_FLOOR_ORDER], [[7, 'Efa']]));
+    const onLeaveCorporation = vi.fn();
+    const user = userEvent.setup();
+    await db.characters.bulkPut([
+      { characterId: 1, name: 'Alpha' },
+      { characterId: 2, name: 'Bravo' },
+    ] as never);
+    renderCorp({ onLeaveCorporation });
+    // Issuer 7 is no Character on the device: its rows show whatever the pick.
+    await screen.findByRole('table', NEEDS_YOU_TABLE);
+
+    await user.click(
+      within(screen.getByRole('banner')).getByRole('button', { name: 'Corporation' })
+    );
+    expect(screen.getByRole('menuitemradio', { name: 'Corporation' })).toBeChecked();
+    await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
+    expect(onLeaveCorporation).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('location-search')).toHaveTextContent('orders.characters=1');
+    await db.characters.clear();
   });
 });
 

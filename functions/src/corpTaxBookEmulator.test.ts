@@ -268,6 +268,16 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect((await book().get()).get('lastSync')).toMatchObject({ byCharacterId: ACCOUNTANT });
     });
 
+    it('points each observed Character at the book, refreshed on every sync', async () => {
+      await turnOn();
+      await sync(ACCOUNTANT, { observed: [row(100, '2026-10-18T10:00:00Z')] });
+      const pointer = db.collection('corpTaxBookBilledBy').doc('char:50');
+      const first = (await pointer.get()).get(`books.${CORP}`);
+      expect(first).toEqual(expect.any(Number));
+      await sync(ACCOUNTANT, { observed: [row(100, '2026-10-18T10:00:00Z')] });
+      expect((await pointer.get()).get(`books.${CORP}`)).toBeGreaterThanOrEqual(first);
+    });
+
     it('needs an editor, and Station_Manager for extractions', async () => {
       await turnOn();
       expect(await reason(sync(JUNIOR, { observed: [row(1, '2026-10-18T10:00:00Z')] }))).toBe(
@@ -374,6 +384,21 @@ suite('Corp Tax Book callables (emulator)', () => {
         )
       ).toBe('day-on-statement');
       expect((await book().get()).get('rates')).toHaveLength(3);
+    });
+
+    it('keeps a per-refinery rate for each refinery on one day (#4621)', async () => {
+      await turnOn();
+      for (const structureId of [1035000000001, 1035000000002]) {
+        await edit(ACCOUNTANT, {
+          action: 'addRate',
+          rate: { scope: 'structure', structureId, pct: 4, effectiveFrom: '2026-10-18' },
+        });
+      }
+      expect(
+        ((await book().get()).get('rates') as { scope: string; structureId?: number }[])
+          .filter((r) => r.scope === 'structure')
+          .map((r) => r.structureId)
+      ).toEqual([1035000000001, 1035000000002]);
     });
 
     it('re-checks the role live for dismiss, write-off, rebill and not tax', async () => {
@@ -1066,6 +1091,26 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect(entries[1]).toMatchObject({ by: ACCOUNTANT, byName: `Pilot ${ACCOUNTANT}` });
       expect(JSON.stringify(entries)).not.toContain('tok-');
     });
+
+    it("stamps an Adjustment and a write-off with the Miner's sign-ins (#4622)", async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, {
+        action: 'addAdjustment',
+        minerId: 'solo:50',
+        date: '2026-10-05',
+        amount: -100,
+        reason: 'rounding',
+      });
+      await edit(
+        ACCOUNTANT,
+        { action: 'writeOff', minerId: 'solo:50', amount: 5, reason: 'left' },
+        true
+      );
+      for (const kind of ['adjustments', 'writeOffs']) {
+        const docs = (await book().collection(kind).get()).docs.map((d) => d.data());
+        expect(docs.map((d) => d.uids)).toEqual([['char:50']]);
+      }
+    });
   });
 
   describe('CEO reclaim', () => {
@@ -1236,6 +1281,27 @@ suite('Corp Tax Book callables (emulator)', () => {
       });
       await book().collection('miners').doc('solo:50').set({ closedAt: '2026-11-05T00:00:00Z' });
       expect((await readStatementByToken(deps(), String(verifyToken))).accountClosed).toBe(true);
+    });
+
+    it("reduces the Statement by an officer's write-off (#4637)", async () => {
+      await turnOn();
+      const { verifyToken } = await edit(ACCOUNTANT, {
+        action: 'issueStatement',
+        statement: statement('s1'),
+      });
+      await edit(
+        ACCOUNTANT,
+        {
+          action: 'writeOff',
+          minerId: 'solo:50',
+          statementId: 's1',
+          amount: 4_000_000,
+          reason: 'r',
+        },
+        true
+      );
+      const view = await readStatementByToken(deps(), String(verifyToken));
+      expect(view.settlement).toMatchObject({ forgiven: 4_000_000, remaining: 6_000_000 });
     });
 
     describe('moon and Extraction dismissals (#4184)', () => {

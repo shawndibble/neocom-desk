@@ -1,5 +1,5 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, InfoTooltip, Modal } from '@/components/ui';
 import { SecurityValue } from '@/features/assets/assetBrowserRows';
@@ -18,6 +18,7 @@ import type { CorpBookViewBook } from './corpBookView';
 import { CorpStatusPill } from './CorpStatusPill';
 import { useCorpStateHint } from './useCorpStateText';
 import type { CorpRowInfo } from './corpRows';
+import { formatCount } from '@/lib/formatCount';
 
 interface Props {
   open: boolean;
@@ -30,6 +31,8 @@ interface Props {
   typeNames: ReadonlyMap<number, string>;
   /** Opens the corp pay dialog; absent when nothing is owed. */
   onPay?: () => void;
+  /** The overlap notice for a day the miner's own list shares with the corporation's bill. */
+  notice?: ReactNode;
 }
 
 /**
@@ -49,6 +52,7 @@ export function CorpRowDetailModal({
   systemSecurity,
   typeNames,
   onPay,
+  notice,
 }: Props) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -131,10 +135,10 @@ export function CorpRowDetailModal({
                     <span className="text-text-dim tabular-nums">
                       {you !== undefined && you !== line.quantity
                         ? t('miningTax.corpBook.detail.bookAndYou', {
-                            book: line.quantity.toLocaleString(),
-                            you: you.toLocaleString(),
+                            book: formatCount(line.quantity),
+                            you: formatCount(you),
                           })
-                        : line.quantity.toLocaleString()}
+                        : formatCount(line.quantity)}
                     </span>
                   </li>
                 );
@@ -160,8 +164,7 @@ export function CorpRowDetailModal({
                     <OreLink typeId={line.typeId}>{typeLabel(typeNames, line.typeId)}</OreLink>
                   </span>
                   <span className="text-text-dim tabular-nums">
-                    {line.quantity.toLocaleString()} ×{' '}
-                    {formatIsk(view.unitPrices[line.typeId] ?? 0)}
+                    {formatCount(line.quantity)} × {formatIsk(view.unitPrices[line.typeId] ?? 0)}
                   </span>
                   <span className="text-text-dim">
                     {t(
@@ -191,6 +194,21 @@ export function CorpRowDetailModal({
             })}
           </p>
 
+          {view.correction && (
+            <p className="rounded-xs border border-line p-2 text-xs">
+              {t('miningTax.corpBook.detail.corrected', {
+                before: formatIsk(view.correction.before),
+                after: formatIsk(view.correction.after),
+              })}
+              {view.correction.reasons.length > 0 &&
+                ` ${t('miningTax.corpBook.detail.reason', {
+                  reasons: view.correction.reasons.join(' · '),
+                })}`}
+            </p>
+          )}
+
+          {notice}
+
           {view.dispute && (
             <div className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs">
               <p className="font-semibold text-warning uppercase">
@@ -201,8 +219,8 @@ export function CorpRowDetailModal({
                     })
                   : view.dispute.quantity && !view.dispute.rate
                     ? t('miningTax.corpBook.disputed.quantity', {
-                        you: view.dispute.personalQuantity.toLocaleString(),
-                        book: view.dispute.bookQuantity.toLocaleString(),
+                        you: formatCount(view.dispute.personalQuantity),
+                        book: formatCount(view.dispute.bookQuantity),
                       })
                     : t('miningTax.corpBook.disputed.both')}
               </p>

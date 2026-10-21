@@ -10,6 +10,7 @@
  * caller's too: Pilot Lookup opens the modal, the modal switches tabs.
  * Neither links to the modal's Character tab, which would only repeat this view.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -204,7 +205,7 @@ function PilotIdentity({
             <b className="font-medium text-text tabular-nums">
               {profile.securityStatus === null
                 ? t('common.unknown')
-                : profile.securityStatus.toFixed(1)}
+                : fixed1(profile.securityStatus)}
             </b>
           </span>
           <span>

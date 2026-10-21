@@ -11,6 +11,7 @@ import {
   dismissalCredits,
   moonOnDay,
   shiftDate,
+  type AllocWriteOff,
   type MirrorDismissal,
   type MirrorExtraction,
   type ObservedRow,
@@ -32,7 +33,8 @@ export interface LedgerRowLike {
 export function observedRowsFromLedger(
   structureId: number,
   rows: readonly LedgerRowLike[],
-  cachedAt: string
+  cachedAt: string,
+  sourceCorporationId?: number
 ): ObservedRow[] {
   return rows
     .filter(
@@ -46,6 +48,7 @@ export function observedRowsFromLedger(
       date: r.last_updated,
       quantity: r.quantity,
       cachedAt,
+      ...(sourceCorporationId !== undefined ? { sourceCorporationId } : {}),
     }));
 }
 
@@ -120,6 +123,7 @@ export interface JournalEntryLike {
   ref_type: string;
   amount?: number;
   first_party_id?: number;
+  second_party_id?: number;
   reason?: string;
 }
 
@@ -514,6 +518,7 @@ export interface SettlePayment {
   at: string;
   statementId?: string;
   notTaxAmount?: number;
+  source?: 'donation' | 'manual';
 }
 
 /** Engine `planSettlements`: the Statements now settled that the book does not yet hold as paid. */
@@ -523,6 +528,9 @@ export function planSettlements(input: {
   dismissals: readonly MirrorDismissal[];
   alreadyPaid: ReadonlySet<string>;
   extractions: readonly MirrorExtraction[];
+  /** Officer write-offs (#4637): a Statement one forgives in full is settled. */
+  writeOffs?: readonly (AllocWriteOff & { minerId: string })[];
+  startDate?: string;
 }): string[] {
   const settled: string[] = [];
   const minerIds = [...new Set(input.statements.map((s) => s.minerId))];
@@ -539,6 +547,8 @@ export function planSettlements(input: {
         extractions: input.extractions,
         expiryHours: {},
       }),
+      officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId),
+      startDate: input.startDate,
     });
     for (const s of statements) {
       if (allocation.byStatement.get(s.id)?.settled && !input.alreadyPaid.has(s.id)) {

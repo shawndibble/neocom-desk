@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { CorpRowInfo } from './corpRows';
 
 export type PillState =
-  'pending' | 'billed' | 'sent-waiting' | 'conflict' | 'unattributed' | 'dismissed';
+  'pending' | 'billed' | 'sent-waiting' | 'conflict' | 'unattributed' | 'dismissed' | 'waived';
 
 export const PILL_KEY: Record<PillState, string> = {
   pending: 'pending',
@@ -12,6 +12,7 @@ export const PILL_KEY: Record<PillState, string> = {
   conflict: 'conflict',
   unattributed: 'unattributed',
   dismissed: 'dismissed',
+  waived: 'waived',
 };
 
 /** The conflict's resolution day, as the row prints it. */

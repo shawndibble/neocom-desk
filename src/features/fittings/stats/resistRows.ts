@@ -2,6 +2,7 @@ import { resistPct, unheatedIfChanged } from '@/engine/fittings/stats';
 import type { FittingStats } from '@/engine/fittings/types';
 import type { ResistRow } from './ResistTable';
 import { RESIST_TYPES, RESONANCE_KEY, formatEhp } from './resistFormat';
+import { fmt0 } from './fixedFormat';
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
@@ -22,7 +23,7 @@ export function resistRows(
     // "Overheat all": the cells heat changed, with what they read unheated.
     const unheated: NonNullable<ResistRow['unheated']> = {};
     for (const type of RESIST_TYPES) {
-      const was = unheatedIfChanged(s, (x) => resistPct(x[key][RESONANCE_KEY[type]]).toFixed(0));
+      const was = unheatedIfChanged(s, (x) => fmt0(resistPct(x[key][RESONANCE_KEY[type]])));
       if (was !== null) unheated[type] = `${was}%`;
     }
     const wasEhp = unheatedIfChanged(s, (x) => formatEhp(x[key].ehp));
@@ -30,7 +31,7 @@ export function resistRows(
     rows.push({
       key,
       label,
-      sub: t('fittings.stats.layerHp', { hp: layer.hp.toFixed(0) }),
+      sub: t('fittings.stats.layerHp', { hp: fmt0(layer.hp) }),
       resonances: layer,
       ehp: layer.ehp,
       unheated,

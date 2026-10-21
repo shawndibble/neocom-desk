@@ -141,4 +141,24 @@ describe('CorpRowDetailModal', () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /settle up/i })).not.toBeInTheDocument();
   });
+
+  it("gives the corporation's reason for a correction (#4622)", () => {
+    const corrected = {
+      ...corp,
+      view: {
+        ...view,
+        correction: {
+          before: 900_000,
+          after: 800_000,
+          reasons: ['Wrong hub price'],
+        },
+      },
+    };
+    renderModal({ corp: corrected });
+    expect(
+      screen.getByText(
+        /Corrected by the corporation: 900,000 → 800,000\. Their reason: Wrong hub price/
+      )
+    ).toBeInTheDocument();
+  });
 });

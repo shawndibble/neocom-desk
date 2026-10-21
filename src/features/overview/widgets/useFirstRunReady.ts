@@ -1,5 +1,5 @@
 /**
- * True once an absent Overview Layout really means "this pilot has none": the
+ * True once an absent layout (the Overview's, or the board `layoutKey` names) means "none": the
  * settings store has hydrated, the first sync pull has landed (or cannot), and
  * Dexie itself holds no layout row. See `firstRun.ts` for why.
  *
@@ -19,7 +19,8 @@ import { OVERVIEW_LAYOUT_KEY, parseLayout } from './layoutStore';
 
 const INITIAL: SyncStatus = { state: 'idle', lastSyncedAt: null, error: null };
 
-export function useFirstRunReady(hydrated: boolean): boolean {
+/** `layoutKey`: which board's layout row to look for (the Overview's by default). */
+export function useFirstRunReady(hydrated: boolean, layoutKey = OVERVIEW_LAYOUT_KEY): boolean {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const syncConfigured = isSyncConfigured();
   const [status, setStatus] = useState<SyncStatus>(INITIAL);
@@ -54,7 +55,7 @@ export function useFirstRunReady(hydrated: boolean): boolean {
     if (!hydrated || !settled) return;
     let cancelled = false;
     void db.settings
-      .get(OVERVIEW_LAYOUT_KEY)
+      .get(layoutKey)
       .then((row) => {
         if (cancelled) return;
         setRowChecked(row !== undefined && parseLayout(row.value) !== null ? 'present' : 'absent');
@@ -65,7 +66,7 @@ export function useFirstRunReady(hydrated: boolean): boolean {
     return () => {
       cancelled = true;
     };
-  }, [hydrated, settled]);
+  }, [hydrated, settled, layoutKey]);
 
   return hydrated && settled && rowChecked === 'absent';
 }

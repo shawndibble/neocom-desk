@@ -32,7 +32,7 @@ export function flexRule(size: WidgetSize, phone: boolean): FlexRule {
   return {
     flexGrow: 1,
     flexShrink: 1,
-    flexBasis: `calc(${(basis * 100).toFixed(3)}% - ${GRID_GAP}px)`,
+    flexBasis: `calc(${(basis * 100).toFixed(3)}% - ${GRID_GAP}px)`, // fixed format: CSS calc
     minWidth,
   };
 }

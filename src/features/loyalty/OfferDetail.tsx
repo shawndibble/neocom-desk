@@ -2,6 +2,7 @@
  * The selected offer's profit breakdown (right pane on desktop, bottom sheet on a
  * phone), plus the row-level helpers it shares with the offers table.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -27,6 +28,7 @@ import type { LpBasis } from './lpBasis';
 import type { LoyaltyOfferRow } from './offerRows';
 import { iskPerLpTone, resolveLoyaltyRowItem } from './offerRowDisplay';
 import { loyaltyOfferMaterialsCsvColumns } from './loyaltyStoreCsv';
+import { formatCount } from '@/lib/formatCount';
 
 /**
  * Item name: plain text. The row's click selects it for the detail pane, so
@@ -100,7 +102,7 @@ export function OfferDetail({
         align: 'right',
         className: 'tabular-nums text-text-dim',
         sortValue: (material) => material.quantity,
-        render: (material) => material.quantity.toLocaleString(),
+        render: (material) => formatCount(material.quantity),
       },
       {
         id: 'owned',
@@ -108,7 +110,7 @@ export function OfferDetail({
         align: 'right',
         className: 'tabular-nums text-text-dim',
         sortValue: (material) => material.ownedQuantity,
-        render: (material) => material.ownedQuantity.toLocaleString(),
+        render: (material) => formatCount(material.ownedQuantity),
       },
       {
         id: 'buyCost',
@@ -177,7 +179,7 @@ export function OfferDetail({
               ? t('loyaltyStore.noConcordExchange')
               : shownIskPerLp === null
                 ? '—'
-                : shownIskPerLp.toFixed(1)}
+                : fixed1(shownIskPerLp)}
           </div>
         </div>
         <div>
@@ -202,7 +204,7 @@ export function OfferDetail({
         <div className="flex justify-between gap-4 text-text-dim">
           <dt>{t('loyaltyStore.storeCost')}</dt>
           <dd className="tabular-nums text-text">
-            {row.offer.lp_cost.toLocaleString()} LP + {formatIsk(row.offer.isk_cost)} ISK
+            {formatCount(row.offer.lp_cost)} LP + {formatIsk(row.offer.isk_cost)} ISK
           </dd>
         </div>
         {row.requiredItems.length > 0 && (
@@ -224,7 +226,7 @@ export function OfferDetail({
                   className="flex justify-between gap-4 text-[0.6875rem] text-text-dim"
                 >
                   <dt>
-                    {item.quantity.toLocaleString()} ×{' '}
+                    {formatCount(item.quantity)} ×{' '}
                     <MarketItemLink typeId={item.typeId} hubId={hubId}>
                       {item.name}
                     </MarketItemLink>
@@ -262,7 +264,7 @@ export function OfferDetail({
       {profit.affordableLp === false && playerLp !== null && (
         <p className="text-xs text-text-dim">
           {t('loyaltyStore.needMoreLp', {
-            amount: (row.offer.lp_cost - playerLp).toLocaleString(),
+            amount: formatCount(row.offer.lp_cost - playerLp),
           })}
         </p>
       )}

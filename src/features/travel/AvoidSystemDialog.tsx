@@ -14,6 +14,7 @@
  * the preview counts it switched on and the dialog offers to switch it on
  * along with the add.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Spinner } from '@/components/ui';
@@ -26,6 +27,7 @@ import {
 import { addAvoidedSystem, useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useAvoidedSystemsEnabled } from '@/features/route/routeRules';
 import type { AvoidTripResult, RouteSafetyLeg, RouteSafetyState } from './useRouteSafety';
+import { formatNumber } from '@/lib/numberLocale';
 
 export interface AvoidTarget {
   systemId: number;
@@ -39,8 +41,8 @@ const legRows = (trip: { legs: readonly RouteSafetyLeg[] }) => trip.legs.map((le
 
 /** "+3", "−2", "+0": the change always carries a sign, so +0 reads as no change. */
 function formatJumpDelta(delta: number): string {
-  if (delta < 0) return `−${Math.abs(delta).toLocaleString()}`;
-  return `+${delta.toLocaleString()}`;
+  if (delta < 0) return `−${formatNumber(Math.abs(delta))}`;
+  return `+${formatNumber(delta)}`;
 }
 
 function PreviewText({ preview, name }: { preview: AvoidPreview; name: string }) {
@@ -56,7 +58,7 @@ function PreviewText({ preview, name }: { preview: AvoidPreview; name: string })
           : t('travel.avoid.becomesLowest', {
               count: preview.jumps,
               delta,
-              security: preview.lowestSecurity.toFixed(1),
+              security: fixed1(preview.lowestSecurity),
             })}
       </p>
       {preview.stillCrosses && <p>{t('travel.avoid.noWayAround', { name })}</p>}

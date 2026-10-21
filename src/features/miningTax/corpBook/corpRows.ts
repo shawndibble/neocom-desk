@@ -60,6 +60,8 @@ const STATUS_OF_STATE: Record<BookRowView['state'], MiningTaxAssignmentStatus> =
   conflict: 'needs-review',
   paid: 'paid',
   dismissed: 'dismissed',
+  // Forgiven in full by an officer write-off (#4637): not owed, like a dismissal.
+  waived: 'dismissed',
 };
 
 function minusLines(from: readonly OreLine[], take: readonly OreLine[] | undefined): OreLine[] {
@@ -82,6 +84,8 @@ function syntheticRow(view: BookRowView, characterName: string, corpName: string
     estimatedValue: view.estimatedValue,
     taxOwed: view.taxOwed ?? 0,
     status: STATUS_OF_STATE[view.state],
+    // The refinery, read beside the corporation in the Payee column (spec #4504).
+    ...(view.refineryLabel ? { label: view.refineryLabel } : {}),
     updatedAt: 0,
   };
   const row: MoonMiningTaxRow = {

@@ -10,7 +10,13 @@
  */
 import type { EveNotificationPayload } from '../eveNotificationPayload';
 import { shiftDate } from '../miningTax/yieldRange';
-import { allocatePayments, dismissalCredits, matchDonation, type TaxPayment } from './allocation';
+import {
+  allocatePayments,
+  dismissalCredits,
+  matchDonation,
+  type RecordedWriteOff,
+  type TaxPayment,
+} from './allocation';
 import type { Miner } from './charges';
 import type { Dismissal } from './dismissals';
 import { MOON_ORE_M3_PER_UNIT, extractionStatus, type Extraction } from './extraction';
@@ -48,7 +54,8 @@ export interface LedgerRowLike {
 export function observedRowsFromLedger(
   structureId: number,
   rows: readonly LedgerRowLike[],
-  cachedAt: string
+  cachedAt: string,
+  sourceCorporationId?: number
 ): ObservedRow[] {
   return rows
     .filter(
@@ -62,6 +69,7 @@ export function observedRowsFromLedger(
       date: r.last_updated,
       quantity: r.quantity,
       cachedAt,
+      ...(sourceCorporationId !== undefined ? { sourceCorporationId } : {}),
     }));
 }
 
@@ -182,6 +190,7 @@ export interface JournalEntryLike {
   ref_type: string;
   amount?: number;
   first_party_id?: number;
+  second_party_id?: number;
   reason?: string;
 }
 
@@ -329,7 +338,11 @@ export interface SettleInput {
   alreadyPaid: ReadonlySet<string>;
   /** Lets a moon or Extraction dismissal reach the days it covers. */
   extractions?: readonly SyncExtraction[];
+  /** Officer write-offs (#4637): a Statement one forgives in full is settled. */
+  writeOffs?: readonly RecordedWriteOff[];
   now?: string;
+  /** The book's start date; a donation dated before it credits nothing. */
+  startDate?: string;
 }
 
 /**
@@ -365,6 +378,8 @@ export function planSettlements(input: SettleInput): string[] {
       statements,
       payments,
       dismissalCredits: dismissalCredits(statements, input.dismissals, charges),
+      officerWriteOffs: (input.writeOffs ?? []).filter((w) => w.minerId === minerId),
+      startDate: input.startDate,
     });
     for (const s of statements) {
       if (allocation.byStatement.get(s.id)?.settled && !input.alreadyPaid.has(s.id)) {

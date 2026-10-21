@@ -494,8 +494,73 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Collector books (issue #4510): what the Collector has paid a feeder. Callable-written.
+      match /feeders/{feederCorp}/payouts/{payoutId} {
+        allow get, list: if isOfficer();
+        allow write: if false;
+      }
+
+      // Collector books (issue #4512): the moon owner's read model, server-written. A moon owner
+      // reads it through its own access record (`viewers/{uid}`, CEO / Director / Accountant,
+      // live role check, 24h), which is NOT an `officers` doc: it never unlocks the raw book.
+      // It must match the feeder in the path, so one moon owner never reads another's view.
+      // Written out because the officer-only wildcard below is two segments deep and so does
+      // not cover `feederViews/{x}/days/{d}`.
+      function viewerPath(feederCorp) {
+        return /databases/$(database)/documents/corpTaxBooks/$(corporationId)/feederViews/$(feederCorp)/viewers/$(request.auth.uid);
+      }
+      function isMoonOwnerOf(feederCorp) {
+        return isCharacter()
+          && exists(viewerPath(feederCorp))
+          && get(viewerPath(feederCorp)).data.canView == true
+          && get(viewerPath(feederCorp)).data.ownerHash == request.auth.token.ownerHash
+          && get(viewerPath(feederCorp)).data.corporationId == int(feederCorp)
+          && get(viewerPath(feederCorp)).data.expiresAt > request.time.toMillis();
+      }
+
+      match /feederViews/{feederCorp} {
+        allow get: if isMoonOwnerOf(feederCorp);
+        allow list, write: if false;
+      }
+
+      match /feederViews/{feederCorp}/viewers/{viewerUid} {
+        allow get: if isCharacter() && request.auth.uid == viewerUid
+          && resource.data.ownerHash == request.auth.token.ownerHash;
+        allow list, write: if false;
+      }
+
+      match /feederViews/{feederCorp}/{viewCollection}/{viewDoc} {
+        allow get, list: if viewCollection in ['days', 'refineries', 'payouts']
+          && isMoonOwnerOf(feederCorp);
+        allow write: if false;
+      }
+
+      // A Miner's own corrections (issue #4622): the personal tab shows each one, never silently.
+      match /adjustments/{adjustmentId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      match /writeOffs/{writeOffId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      // Each moon owner's coverage periods and read clock (issue #4622), server-written: the
+      // miners this book bills (their `corpTaxBookBilledBy` pointer names it) read it to hold
+      // the same days back the book does. No payee, rates, notes or names.
+      function isBilledHere() {
+        let pointer = /databases/$(database)/documents/corpTaxBookBilledBy/$(request.auth.uid);
+        return isCharacter() && exists(pointer) && corporationId in get(pointer).data.books;
+      }
+
+      match /feederCoverage/{feederCorp} {
+        allow get, list: if isOfficer() || isBilledHere();
+        allow write: if false;
+      }
+
       match /{officerOnly}/{docId} {
-        allow get, list: if officerOnly in ['extractions', 'declarations', 'adjustments', 'writeOffs', 'rebills', 'meta', 'audit']
+        allow get, list: if officerOnly in ['extractions', 'declarations', 'rebills', 'meta', 'audit', 'feeders']
           && isOfficer();
         allow write: if false;
       }
@@ -503,6 +568,30 @@ service cloud.firestore {
 
     match /corpTaxBookTokens/{token} {
       allow read, write: if false;
+    }
+
+    // Collector books (issue #4507): feeder invite links (keyed by the code's hash)
+    // and the feeder → Collector pointer. Function-only; a client never reads either.
+    match /corpTaxBookFeederInvites/{inviteId} {
+      allow read, write: if false;
+    }
+    match /corpTaxBookFeederOf/{corporationId} {
+      allow read, write: if false;
+    }
+    // Set when a feeder leaves, so its after-leaving view still finds the Collector (issue #4512).
+    match /corpTaxBookFeederPrevious/{corporationId} {
+      allow read, write: if false;
+    }
+    // The link in a removal's mail (issue #4520), keyed by the code's hash. Function-only.
+    match /corpTaxBookRemovalLinks/{linkId} {
+      allow read, write: if false;
+    }
+
+    // Which Corp Tax Books bill a Character (issue #4517): written by the sync only,
+    // readable by that Character's own sign-in and nobody else, officers included.
+    match /corpTaxBookBilledBy/{characterUid} {
+      allow get: if request.auth != null && request.auth.uid == characterUid;
+      allow list, write: if false;
     }
 
     // Corp Tax Book sync grants (issue #4068, ADR 0025): one doc per corporation

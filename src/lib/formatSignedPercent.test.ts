@@ -1,7 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { setDecimalMark } from './numberLocale';
 import { formatSignedPercent, percentDirection } from './formatSignedPercent';
 
 describe('formatSignedPercent', () => {
+  afterEach(() => setDecimalMark('.'));
+
+  it('follows the Number format setting', () => {
+    setDecimalMark(',');
+    expect(formatSignedPercent(-6.9447)).toBe('−6,9%');
+    expect(formatSignedPercent(1234.56)).toBe('+1.234,6%');
+  });
+
   it('prints a sign, one decimal and a true minus for a drop', () => {
     expect(formatSignedPercent(-6.9447)).toBe('−6.9%');
     expect(formatSignedPercent(2.43)).toBe('+2.4%');

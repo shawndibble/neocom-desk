@@ -9,12 +9,12 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { ENDPOINT_ROUTES } from '@/esi/endpointRoutes';
 import { useActivityLog, type ActivityLogEntry } from '@/stores/activityLog';
 import type { ActivityOutcome } from '@/esi/activityLog';
+import { ActionResult, SettingsHint } from '@/features/settings/settingsFields';
 import {
   activityLogCsvColumns,
   characterCell,
   OUTCOME_LABEL_KEYS,
 } from '@/features/settings/activityLogCsv';
-import { ActionConfirmation } from '@/features/settings/ActionConfirmation';
 import { CharacterNameCell } from '@/features/settings/CharacterNameCell';
 
 const OUTCOME_TONE: Record<ActivityOutcome, string> = {
@@ -88,7 +88,6 @@ export function ActivityLogPanel() {
 
   return (
     <Panel
-      title={t('activityLog.title')}
       actions={
         <>
           <Button size="sm" onClick={handleClear} aria-disabled={entries.length === 0}>
@@ -101,8 +100,10 @@ export function ActivityLogPanel() {
       }
     >
       <div className="space-y-2">
-        <p className="text-xs text-text-dim">{t('activityLog.hint')}</p>
-        {clearedConfirm && <ActionConfirmation message={t('activityLog.clearedConfirm')} />}
+        <SettingsHint>{t('activityLog.hint')}</SettingsHint>
+        {clearedConfirm && (
+          <ActionResult kind="success">{t('activityLog.clearedConfirm')}</ActionResult>
+        )}
         {entries.length === 0 ? (
           <EmptyState title={t('activityLog.emptyTitle')} hint={t('activityLog.emptyHint')} />
         ) : (

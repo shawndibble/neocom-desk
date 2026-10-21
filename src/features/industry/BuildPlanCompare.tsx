@@ -6,6 +6,8 @@
  * plan was open before compare mode started (GLOSSARY.md round 25's two-pane
  * idiom: this is a state of the detail pane, not a separate route).
  */
+import { createNumberFormat } from '@/lib/numberLocale';
+import { formatCount } from '@/lib/formatCount';
 import { useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
@@ -56,6 +58,8 @@ import {
 import { hubOrderKey, useHubOrderCounts, type HubOrderTarget } from './useHubOrderCounts';
 import { useHubDailyOrders } from './useHubDailyOrders';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+
+const formatOnePlace = createNumberFormat({ maximumFractionDigits: 1 });
 
 interface BuildPlanCompareProps {
   plans: readonly BuildPlanRecord[];
@@ -182,7 +186,7 @@ export function BuildPlanCompare({
   const hubCell = (row: ComparedBuildRow, pick: (c: HubOrderCounts) => number): ReactNode => {
     if (row.loading || hubOrders.loading) return '…';
     const counts = hubCountsFor(row);
-    return counts ? pick(counts).toLocaleString() : unknown;
+    return counts ? formatCount(pick(counts)) : unknown;
   };
   const hubSort = (row: ComparedBuildRow, pick: (c: HubOrderCounts) => number) => {
     const counts = hubCountsFor(row);
@@ -370,9 +374,7 @@ export function BuildPlanCompare({
       render: (row) => {
         if (row.loading || dailyOrders.loading) return '…';
         const perDay = ordersPerDayFor(row);
-        return perDay === undefined
-          ? unknown
-          : perDay.toLocaleString(undefined, { maximumFractionDigits: 1 });
+        return perDay === undefined ? unknown : formatOnePlace(perDay);
       },
     },
     {

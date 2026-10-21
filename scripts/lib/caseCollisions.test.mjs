@@ -24,8 +24,39 @@ describe('findCaseCollisions', () => {
     expect(findCaseCollisions(['src/Foo', 'src/foo/a.ts'])).toEqual([['src/Foo', 'src/foo']]);
   });
 
-  it('does not flag different extensions or names', () => {
-    expect(findCaseCollisions(['src/LandingFaq.tsx', 'src/landingFaq.ts'])).toEqual([]);
+  it('flags files in one folder that differ only in case once the extension is dropped', () => {
+    expect(findCaseCollisions(['src/LandingFaq.tsx', 'src/landingFaq.ts'])).toEqual([
+      ['src/LandingFaq.tsx', 'src/landingFaq.ts'],
+    ]);
+  });
+
+  it('reports a source pair and its test pair as separate groups', () => {
+    expect(
+      findCaseCollisions(['a/Foo.tsx', 'a/Foo.test.tsx', 'a/foo.ts', 'a/foo.test.ts'])
+    ).toEqual([
+      ['a/Foo.test.tsx', 'a/foo.test.ts'],
+      ['a/Foo.tsx', 'a/foo.ts'],
+    ]);
+  });
+
+  it('does not flag same-case names with different extensions', () => {
+    expect(findCaseCollisions(['src/foo.ts', 'src/foo.tsx', 'src/foo.test.ts'])).toEqual([]);
+  });
+
+  it('does not flag same-case stems in different folders', () => {
+    expect(findCaseCollisions(['a/Foo.ts', 'b/foo.tsx'])).toEqual([]);
+  });
+
+  it('does not report a stem group twice when full paths already collide', () => {
+    expect(findCaseCollisions(['src/Foo.ts', 'src/foo.ts'])).toEqual([
+      ['src/Foo.ts', 'src/foo.ts'],
+    ]);
+  });
+
+  it('ignores dotfiles when working out the stem', () => {
+    expect(findCaseCollisions(['.gitignore', '.GitIgnore'])).toEqual([
+      ['.GitIgnore', '.gitignore'],
+    ]);
   });
 
   it('reports each colliding group once, sorted', () => {

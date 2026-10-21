@@ -1,555 +1,188 @@
 /**
- * `/corp` — the corp ops board.
+ * `/corp` — the Corp overview: a grid of corp widgets the pilot chooses,
+ * sizes, orders, renames and removes, like the Overview (`routes/Overview.tsx`).
  *
- * A corp manager does not browse, they triage, and everything that matters to
- * them is a clock. This route reads four endpoints, hands them to
- * `engine/corp/board.ts`, and renders the one ordered list that comes back.
+ * A corp manager does not browse, they triage, and the default layout says so:
+ * Due soon and the structure and moon clocks lead, money and people follow.
+ * Everything after that is the pilot's choice (`features/corp/grid`).
  *
  * Three rules shape it:
  *
- * - **Each panel is gated on its own capability.** A Station Manager who is not
- *   an Accountant sees structures and no wallet rail, with no error and no
- *   empty-state noise (AC3). The gate is `useCorpRouteGate()`'s resolved
- *   `capabilities`, never a role string, and it decides what is *fetched* as
- *   well as what is drawn — an ungated read buys a guaranteed 403.
- * - **`unknown` renders neutrally here, and nothing in the nav.** The
- *   asymmetry is deliberate: a nav item that flickers into existence is worse
- *   than one a beat late (GLOSSARY.md round 35), but bouncing a Director who
- *   deep-linked before their roles read landed is simply a bug.
+ * - **Each widget is gated on its own capability.** A Station Manager who is
+ *   not an Accountant gets clocks and no wallet widgets, with no error and no
+ *   empty-state noise. The gate is `useCorpRouteGate()`'s resolved
+ *   `capabilities`, never a role string, and it decides what is offered and
+ *   drawn; each read is gated again in its loader before it fetches, since an
+ *   ungated read buys a guaranteed 403.
+ * - **`unknown` renders neutrally here, and nothing in the nav.** A nav item
+ *   that flickers into existence is worse than one a beat late (GLOSSARY.md
+ *   round 35), but bouncing a Director who deep-linked before their roles read
+ *   landed is simply a bug.
  * - **Hour-stale data is stated, not hidden.** CCP caches these endpoints for
- *   about an hour, which every multi-day clock survives and no short one does.
- *   The `DataAgeBadge` note says so, and the board refuses to print a countdown
- *   shorter than the window.
+ *   about an hour. The data-age popover says so, and no widget prints a
+ *   countdown shorter than that window.
  */
-import { useMemo } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  CachedNotice,
-  DataAgeBadge,
-  IconButton,
-  LoadFailedState,
-  PageHeader,
-  Panel,
-  Spinner,
-} from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
-import { cx } from '@/lib/cx';
+import { PageHeader, Spinner } from '@/components/ui';
+import { guarded } from '@/app/routeChunks';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
 import { CorpDenied } from '@/features/corp/CorpDenied';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
-import { CorpVitalsRail } from '@/features/corp/CorpVitalsRail';
-import { CorpStanding } from '@/features/corp/CorpStanding';
-import { CorpKindCards } from '@/features/corp/CorpKindCards';
-import { useCorpViewCapabilities } from '@/features/corp/useCorpViewCapabilities';
-import { unreadableCardKinds } from '@/features/corp/cardReadability';
-import { CorpOfflineServices } from '@/features/corp/CorpOfflineServices';
-import { CorpPeopleRail } from '@/features/corp/CorpPeopleRail';
-import { LOOSEST_DARK_AFTER_DAYS } from '@/features/corp/darkThreshold';
-// The board's "open in-game" context menu action (issue #419) is this same
-// modal Market/Industry/Assets already use for "Show info" — item info never
-// existed as a real in-game protocol link in a browser (`showinfo:` is dead
-// here, see `engine/market/itemDescription.ts`), so this modal already *is*
-// the established substitute, not a fifth pattern. Rendered by
-// `ItemActionsProvider` now, not this route directly.
-import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
-import { usePageItemActions } from '@/features/market/usePageItemActions';
+import { corpDefaultLayout, corpWidgetBoard } from '@/features/corp/grid/corpGrid';
 import {
-  MASTER_WALLET_DIVISION,
-  loadCorporationId,
-  loadCorporationMiningExtractions,
-  loadCorporationStructures,
-} from '@/features/corp/boardData';
-// The wallet, divisions, journal and industry-jobs reads already exist (#298)
-// and are used as they are: the board is a second consumer of those modules,
-// not a second copy of them.
+  OverviewCachedNotice,
+  OverviewCustomize,
+  OverviewDataAge,
+} from '@/features/overview/OverviewHeader';
+import { useOverviewSummary } from '@/features/overview/useOverviewSummary';
+import { WidgetBoardContext } from '@/features/overview/widgets/board';
+import { CORP_DEFS } from '@/features/overview/widgets/data/corpModels';
+import { registerKindDefs } from '@/features/overview/widgets/data/models';
+import { OverviewRefreshProvider } from '@/features/overview/widgets/data/OverviewRefreshProvider';
+import { WidgetDataProvider } from '@/features/overview/widgets/data/WidgetDataProvider';
+import { useOverviewEdit } from '@/features/overview/widgets/editContext';
+import type { OverviewLayout } from '@/features/overview/widgets/layout';
 import {
-  loadCorporationDivisions,
-  loadCorporationWalletJournal,
-  loadCorporationWallets,
-} from '@/features/corp/wallet';
-import { loadCorporationIndustryJobs } from '@/features/corp/jobs';
-// The roster reads and their boundary adaptation are #297's, used the same way
-// (#345). The People rail is a second consumer of that module, not a second
-// copy of it — same functions, so the same `corpCacheKey` rows and the same
-// `detectCorpAuthFailure` treatment of a 403.
-import {
-  loadCorporationMemberIds,
-  loadCorporationMemberTracking,
-  toMemberActivity,
-} from '@/features/corp/members';
-import { readPreviousRoster } from '@/features/corp/rosterState';
-import { walletDivisions, type WalletDivision } from '@/features/corp/divisions';
-import {
-  jobTypeIds,
-  structureName,
-  toBoardExtractions,
-  toBoardJobs,
-  toBoardStructures,
-  toVitalsJournal,
-} from '@/features/corp/boardSources';
-import { loadTypeNames } from '@/features/character/typeNames';
-import { resolveNames } from '@/features/character/names';
-import { buildCorpBoard } from '@/engine/corp/board';
-import {
-  DEADLINE_STRIP_DAYS,
-  deadlinesByDay,
-  dueSoon,
-  groupBoardByKind,
-} from '@/engine/corp/deadlines';
-import {
-  NO_PEOPLE_HIGHLIGHTS,
-  diffRoster,
-  peopleHighlightIds,
-  PEOPLE_HIGHLIGHT_LIMIT,
-  peopleHighlights,
-  type MemberActivity,
-  type PeopleHighlights,
-  type RosterDiff,
-} from '@/engine/corp/members';
-import { vitalsFigures, type VitalsJournalEntry } from '@/engine/corp/vitals';
+  CORP_OVERVIEW_LAYOUT_KEY,
+  useCorpOverviewLayout,
+} from '@/features/overview/widgets/layoutStore';
+import { useFirstRunReady } from '@/features/overview/widgets/useFirstRunReady';
+import { OverviewEditProvider } from '@/features/overview/widgets/OverviewEditProvider';
+import { distinctKinds, visibleWidgets } from '@/features/overview/widgets/visibility';
+import { WidgetGrid } from '@/features/overview/widgets/WidgetGrid';
 import type { CorpCapabilities } from '@/engine/corpRoles';
-import type {
-  CorporationIndustryJob,
-  CorporationMiningExtraction,
-  CorporationStructure,
-} from '@/esi/endpoints';
-import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useIsPhone } from '@/lib/useIsPhone';
 
-/**
- * How stale this board's data can be — ESI's own `Expires` on the corp
- * endpoints, which is what `esi/cache.ts` resolves `STALE_AFTER` to for them
- * (the window is a floor; whichever is later wins). Sizes the engine's
- * short-timer judgement and is the number the badge's note describes.
- */
-const CORP_CACHE_WINDOW_MS = 3_600_000;
+// The corp kinds' builders load with this route, not with the Overview's startup graph.
+registerKindDefs(CORP_DEFS);
 
-/**
- * A panel that could not be read is `null`, never `[]`.
- *
- * The distinction is the whole of AC3: `[]` means "read fine, nothing there"
- * and earns an empty state, while `null` means "this Character cannot see
- * this" and must render nothing at all. Collapsing them would show a Station
- * Manager a "No industry jobs" card about an endpoint they were never allowed
- * to ask.
- */
-interface CorpSnapshot {
-  corporationId: number | null;
-  structures: CorporationStructure[] | null;
-  extractions: CorporationMiningExtraction[] | null;
-  jobs: CorporationIndustryJob[] | null;
-  /** Balances joined to the corporation's own division names (#298). */
-  wallets: WalletDivision[] | null;
-  /** `null` when the journal read failed: net and runway are unknown, not 0. */
-  journal: VitalsJournalEntry[] | null;
-  /** Tracking rows for the People rail, or `null` when unread (#345). */
-  members: MemberActivity[] | null;
-  /**
-   * Joins/leaves since this device last opened the roster — read, never
-   * consumed. `null` when the member-id list could not be read, which is not
-   * the same answer as an empty diff: see the loader.
-   */
-  rosterDiff: RosterDiff | null;
-  typeNames: ReadonlyMap<number, string>;
-  /** The few members the People panel names, and their names (#566). */
-  peopleHighlights: PeopleHighlights;
-  memberNames: ReadonlyMap<number, string>;
-  /** Oldest `fetchedAt` across the panels actually read — see `Corp` below. */
-  oldestFetchedAt: Date | null;
-  /** Any of those panels fell back to its saved copy. */
-  fromCache: boolean;
-  /** Captured in the loader: `Date.now()` in render is impure. */
-  loadedAt: number;
-}
+const CustomizeBar = lazy(() =>
+  guarded(() => import('@/features/overview/widgets/CustomizeBar')).then((m) => ({
+    default: m.CustomizeBar,
+  }))
+);
+const Gallery = lazy(() =>
+  guarded(() => import('@/features/overview/widgets/Gallery')).then((m) => ({
+    default: m.Gallery,
+  }))
+);
+const PhoneCustomizeList = lazy(() =>
+  guarded(() => import('@/features/overview/widgets/PhoneCustomizeList')).then((m) => ({
+    default: m.PhoneCustomizeList,
+  }))
+);
 
-const EMPTY_SNAPSHOT: CorpSnapshot = {
-  corporationId: null,
-  structures: null,
-  extractions: null,
-  jobs: null,
-  wallets: null,
-  journal: null,
-  members: null,
-  rosterDiff: null,
-  typeNames: new Map(),
-  peopleHighlights: NO_PEOPLE_HIGHLIGHTS,
-  memberNames: new Map(),
-  oldestFetchedAt: null,
-  fromCache: false,
-  loadedAt: 0,
-};
-
-async function loadCorpSnapshot(
-  characterId: number,
-  capabilities: CorpCapabilities,
-  signal: RouteSnapshotSignal
-): Promise<CorpSnapshot> {
-  const corporationId = await loadCorporationId(characterId);
-  const loadedAt = Date.now();
-  // Without a corporation id there is no corp-scoped cache key to read under,
-  // and inventing one would file rows under `corp:undefined:` — a real row that
-  // survives a corporation change, which is exactly what #293 exists to stop.
-  if (corporationId === null || signal.cancelled) {
-    return { ...EMPTY_SNAPSHOT, corporationId, loadedAt };
-  }
-
-  // Each read is fired only for the capability that opens it, so an unheld one
-  // costs no request rather than a 403.
-  const [structures, extractions, jobs, wallets, divisions, journal, roster, tracking] =
-    await Promise.all([
-      capabilities.canReadStructures
-        ? loadCorporationStructures(characterId, corporationId)
-        : Promise.resolve(null),
-      capabilities.canReadMoonExtractions
-        ? loadCorporationMiningExtractions(characterId, corporationId)
-        : Promise.resolve(null),
-      capabilities.canReadIndustry
-        ? loadCorporationIndustryJobs(characterId, corporationId)
-        : Promise.resolve(null),
-      capabilities.canReadWallet
-        ? loadCorporationWallets(characterId, corporationId)
-        : Promise.resolve(null),
-      capabilities.canReadWallet
-        ? loadCorporationDivisions(characterId, corporationId)
-        : Promise.resolve(null),
-      capabilities.canReadWallet
-        ? loadCorporationWalletJournal(characterId, corporationId, MASTER_WALLET_DIVISION)
-        : Promise.resolve(null),
-      capabilities.canReadMembers
-        ? loadCorporationMemberIds(characterId, corporationId)
-        : Promise.resolve(null),
-      capabilities.canReadMembers
-        ? loadCorporationMemberTracking(characterId, corporationId)
-        : Promise.resolve(null),
-    ]);
-
-  /**
-   * The baseline is read and *not* replaced. That is the whole of the summary's
-   * agreement with `/corp/members`.
-   *
-   * `rosterState.ts` stores what this device has already reported, and
-   * `CorpMembersView` reads it and records the new roster in the same pass so
-   * each change is announced exactly once. If the overview recorded too,
-   * whichever surface the user opened first would consume the change and the
-   * other would show nothing — the same failure that module's note rules out
-   * for #299's background poller.
-   *
-   * So the overview only ever asks. The figure therefore stands until the user
-   * follows the link, which is the right behaviour for a tile whose job is
-   * "should I go look": it stops saying so once you have looked, and not before.
-   */
-  const memberIds = roster?.cached?.data ?? null;
-  // `null`, not `EMPTY_ROSTER_DIFF`: an id list we could not read is "unknown",
-  // and printing it as "nothing changed" would be the rail stating a fact it
-  // does not have. `/corp/members` renders no summary in that case
-  // (`isEmptyRosterDiff`), so a confident zero here would be exactly the drift
-  // AC2 forbids — with the tracking read still fine, so the rail is up.
-  const rosterDiff =
-    memberIds === null
-      ? null
-      : diffRoster(await readPreviousRoster(characterId, corporationId), memberIds);
-
-  const jobRows = jobs?.cached?.data ?? null;
-  // Only the type names this board will actually print. `loadTypeNames` reads
-  // the SDE snapshot first and only falls back to ESI for what it misses.
-  const typeNames = jobRows === null ? new Map() : await loadTypeNames(jobTypeIds(jobRows));
-
-  /**
-   * The People panel's named lists (#566).
-   *
-   * Selected first, resolved second, and capped by the engine — so this costs
-   * one `/universe/names` call for at most nine ids however large the
-   * corporation is. `resolveNames` is the app's own cached bulk resolver, so a
-   * revisit usually costs none.
-   */
-  const memberActivity =
-    tracking?.cached === undefined || tracking.cached === null
-      ? null
-      : toMemberActivity(tracking.cached.data);
-  const highlights =
-    memberActivity === null
-      ? NO_PEOPLE_HIGHLIGHTS
-      : // The *loosest* threshold the setting offers, not the one in force. The
-        // dark threshold is a device preference (`darkThreshold.ts`) that the
-        // loader cannot read reliably — it hydrates asynchronously — and a
-        // name the panel wants but the loader never asked for prints as `#id`.
-        // Selecting at 14 days and re-filtering in the panel cannot go wrong in
-        // that direction: `peopleHighlights` sorts by absence, so a stricter
-        // policy only trims this list's tail.
-        peopleHighlights(
-          memberActivity,
-          rosterDiff,
-          loadedAt,
-          PEOPLE_HIGHLIGHT_LIMIT,
-          LOOSEST_DARK_AFTER_DAYS
-        );
-  const highlightIds = peopleHighlightIds(highlights);
-  const memberNames = highlightIds.length === 0 ? new Map() : await resolveNames(highlightIds);
-
-  // The oldest of the panels that were read, not the newest: the badge is a
-  // promise about the whole view, and a fresh wallet must not vouch for an
-  // hour-old structure list.
-  const reads = [structures, extractions, jobs, wallets, divisions, journal, roster, tracking];
-  const fromCache = reads.some((result) => result?.cached?.fromCache);
-  const fetchedAts = reads
-    .map((result) => result?.cached?.fetchedAt)
-    .filter((date): date is Date => date !== undefined);
-  const oldestFetchedAt =
-    fetchedAts.length === 0
-      ? null
-      : fetchedAts.reduce((oldest, date) => (date < oldest ? date : oldest));
-
-  return {
-    corporationId,
-    structures: structures?.cached?.data ?? null,
-    extractions: extractions?.cached?.data ?? null,
-    jobs: jobRows,
-    // Driven by the wallet read, not the divisions one: the balances are the
-    // data, and `read_divisions` can fail on its own — a missing name degrades
-    // one label, a missing division would hide a wallet (`divisions.ts`).
-    wallets:
-      wallets?.cached === undefined || wallets.cached === null
-        ? null
-        : walletDivisions(wallets.cached.data, divisions?.cached?.data ?? null),
-    journal: journal?.cached ? toVitalsJournal(journal.cached.data) : null,
-    // `null`, not `[]`, for the same reason every other panel here is: a
-    // tracking read that did not happen must hide the rail, where a corporation
-    // that genuinely returned no rows is a rail reading zero. The member count
-    // comes from tracking rather than from the id list because that is what
-    // `/corp/members` counts — counting the ids instead would drift from the
-    // page this links to whenever the two reads disagree.
-    members: memberActivity,
-    rosterDiff,
-    peopleHighlights: highlights,
-    memberNames,
-    typeNames,
-    oldestFetchedAt,
-    fromCache,
-    loadedAt,
-  };
-}
-
-/**
- * The board proper, mounted only once Corp Access has resolved to `ready`.
- *
- * That split is load-bearing, not tidiness. `useRouteSnapshot` fires its loader
- * on mount and re-runs it only for a character change or a refresh — it reads
- * the loader through a latest-ref, so a loader that *closes over* something
- * changing (here, `capabilities`) never re-runs for that change. On a cold load
- * `useCorpAccess` reports `unknown` with no capabilities for the first frames,
- * so a loader mounted at that moment would fetch nothing and never be asked
- * again: an empty board for every user, permanently.
- *
- * Mounting on `ready` means the first run already has the real capability set.
- * A character switch is covered by the same rule from the other side —
- * `useCorpAccess` returns to `unknown` while the new character's roles read is
- * in flight, so this unmounts and comes back with that character's answer.
- */
-function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
-  const moonsVisible = useCorpViewCapabilities().canReadMiningLedger;
+/** The header, edit bar and grid, below the providers. */
+function CorpGrid({ layout }: { layout: OverviewLayout }) {
   const { t } = useTranslation();
-  const canReadAnything =
-    capabilities.canReadStructures ||
-    capabilities.canReadMoonExtractions ||
-    capabilities.canReadIndustry;
-
-  const snapshot = useRouteSnapshot<CorpSnapshot>(
-    (characterId, signal) => loadCorpSnapshot(characterId, capabilities, signal),
-    undefined,
-    // Keeps the board on screen during a manual refresh (issue #418) — a
-    // triage-oriented view losing its rows on every refresh defeats the point.
-    // `cacheKey` extends that across a navigation, which the inline loader
-    // above could never key on by identity.
-    { staleWhileRevalidate: true, cacheKey: 'corp' }
-  );
-  const data = snapshot.data;
-
-  // The board row's "Show info" action (issue #419) — same Item Actions
-  // Industry/Assets/Market already provide.
-  const itemActions = usePageItemActions({ activeCharacterId: snapshot.activeCharacterId });
-
-  const items = useMemo(() => {
-    if (data === null) return [];
-    const structures = data.structures ?? [];
-    const names = new Map(
-      structures.map((structure) => [structure.structure_id, structureName(structure)])
-    );
-    return buildCorpBoard({
-      nowMs: data.loadedAt,
-      staleWindowMs: CORP_CACHE_WINDOW_MS,
-      // `undefined`, not `[]`: an unreadable source contributes no items and
-      // says nothing, where an empty one is a positive statement of "none".
-      structures: data.structures === null ? undefined : toBoardStructures(data.structures),
-      extractions:
-        data.extractions === null ? undefined : toBoardExtractions(data.extractions, names),
-      jobs: data.jobs === null ? undefined : toBoardJobs(data.jobs, data.typeNames),
-    });
-  }, [data]);
-
-  /**
-   * The board, split by kind and summarised — #566's three derived reads.
-   *
-   * All three come out of `engine/corp/deadlines.ts` and none of them re-ranks
-   * anything: `groupBoardByKind` filters, and the two summaries count. The
-   * single merged ordering `buildCorpBoard` produced is still the only ordering
-   * on this page.
-   */
-  const grouped = useMemo(() => groupBoardByKind(items), [items]);
-  // Per kind, a read that failed: those cards say "couldn't load" rather than
-  // "nothing due".
-  const unreadable = useMemo(() => unreadableCardKinds(data), [data]);
-  const clocks = useMemo(
-    () =>
-      data === null || !canReadAnything
-        ? null
-        : {
-            due: dueSoon(items, data.loadedAt),
-            days: deadlinesByDay(items, data.loadedAt, DEADLINE_STRIP_DAYS),
-          },
-    [items, data, canReadAnything]
-  );
-
-  if (!snapshot.hydrated) return <Spinner />;
-
-  const showVitals = capabilities.canReadWallet && data !== null;
-  const showPeople = capabilities.canReadMembers && data !== null && data.members !== null;
-
-  /**
-   * Standing's money half, or `null` — the figure-by-figure half of AC3. Read
-   * through the engine's own composition rather than recomputed here, so the
-   * runway this panel prints is the runway the rail prints
-   * (`vitalsFigures`, #566).
-   */
-  const walletDivisionsRead = data?.wallets ?? null;
-  const money =
-    showVitals && walletDivisionsRead !== null
-      ? {
-          ...vitalsFigures(
-            walletDivisionsRead,
-            data.journal,
-            MASTER_WALLET_DIVISION,
-            data.loadedAt
-          ),
-          divisionCount: walletDivisionsRead.length,
-        }
-      : null;
+  const edit = useOverviewEdit();
+  const { editing } = edit;
+  const isPhone = useIsPhone();
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const summary = useOverviewSummary(layout.widgets);
 
   return (
-    <ItemActionsProvider page={itemActions}>
-      <div className="mx-auto max-w-6xl space-y-4">
-        {/*
-        Title, tabs, data age and the refresh action on one 36px line (#566).
-        The three stacked bands this replaces — `PageHeader`, then `CorpSubNav`,
-        then the board panel's own header — were about 110px of chrome before
-        any data, on the one route in the app whose whole job is triage.
+    <div className="mx-auto max-w-6xl space-y-4">
+      {/*
+        Title, tabs, data age and Customize on one line. No Next deadline
+        button: it squeezed the five tabs off the line, and Due soon already
+        names the next clock.
       */}
-        <PageHeader
-          title={t('corp.title')}
-          meta={
-            data?.oldestFetchedAt ? (
-              <DataAgeBadge date={data.oldestFetchedAt} note={t('corp.dataAgeNote')} />
-            ) : undefined
-          }
-          subNav={<CorpSubNav flush />}
-          actions={
-            <IconButton
-              icon={<Icon.Refresh />}
-              label={t('corp.refresh')}
-              onClick={snapshot.refresh}
-              disabled={snapshot.loading}
-            />
-          }
+      <PageHeader
+        title={t('corp.title')}
+        meta={<OverviewDataAge summary={summary} note={t('corp.dataAgeNote')} />}
+        subNav={<CorpSubNav flush />}
+        actions={<OverviewCustomize />}
+      />
+      <OverviewCachedNotice summary={summary} />
+      {editing && (
+        <Suspense fallback={null}>
+          <CustomizeBar onAdd={() => setGalleryOpen(true)} />
+        </Suspense>
+      )}
+      {editing && isPhone && layout.widgets.length > 0 ? (
+        <Suspense fallback={null}>
+          <PhoneCustomizeList />
+        </Suspense>
+      ) : (
+        <WidgetGrid
+          widgets={layout.widgets}
+          editing={editing}
+          onRemove={edit.remove}
+          onAdd={() => setGalleryOpen(true)}
         />
+      )}
+      <Suspense fallback={null}>
+        {galleryOpen && <Gallery open onClose={() => setGalleryOpen(false)} />}
+      </Suspense>
+    </div>
+  );
+}
 
-        {data?.fromCache && (
-          <CachedNotice
-            fetchedAt={data.oldestFetchedAt}
-            refreshFailed={snapshot.refreshCount > 0}
-          />
-        )}
+/**
+ * The grid, mounted only once Corp Access has resolved to `ready`.
+ *
+ * That split is load-bearing. On a cold load `useCorpAccess` reports `unknown`
+ * with no capabilities for the first frames; a board built then would offer and
+ * draw nothing. Mounting on `ready` means the first render already has the
+ * real capability set, and a character switch returns to `unknown` while the
+ * new character's roles read is in flight, so this unmounts and comes back
+ * with that character's answer.
+ */
+function CorpGridView({ capabilities }: { capabilities: CorpCapabilities }) {
+  const { t } = useTranslation();
+  const isPhone = useIsPhone();
+  const stored = useCorpOverviewLayout((state) => state.value);
+  const setLayout = useCorpOverviewLayout((state) => state.setValue);
+  const hydrated = useHydratedStore(useCorpOverviewLayout);
+  const board = useMemo(() => corpWidgetBoard(capabilities), [capabilities]);
+  const fallback = useMemo(() => corpDefaultLayout(), []);
 
-        {snapshot.loading && data === null ? (
-          <Spinner />
-        ) : (
-          <div className="space-y-3">
-            {/*
-            Answer first. Standing carries the figures a manager acts on and the
-            Deadline Strip that says when — and each figure is gated on its own
-            source, so a Station Manager who is not an Accountant gets the
-            clocks with no money figures beside them rather than two holes
-            (AC3). With neither readable the panel renders nothing at all.
-          */}
-            <CorpStanding clocks={clocks} money={money} />
+  // The default draws at once, but a first edit over it is only saved once this device's first
+  // pull has had its say: written earlier, it would overwrite the layout another device synced.
+  // Until then it is held here; if a synced layout lands meanwhile, that one wins.
+  const firstRunReady = useFirstRunReady(hydrated, CORP_OVERVIEW_LAYOUT_KEY);
+  const [pending, setPending] = useState<OverviewLayout | null>(null);
+  const canSave = stored !== null || firstRunReady;
+  const canSaveRef = useRef(canSave);
+  useEffect(() => {
+    canSaveRef.current = canSave;
+  }, [canSave]);
+  // Once stored, `stored` wins over `pending`, so `pending` never needs clearing.
+  useEffect(() => {
+    if (pending !== null && canSave && stored === null) void setLayout(pending);
+  }, [pending, canSave, stored, setLayout]);
+  const onLayoutChange = useCallback(
+    (next: OverviewLayout) => (canSaveRef.current ? void setLayout(next) : setPending(next)),
+    [setLayout]
+  );
+  const layout = stored ?? pending ?? fallback;
+  const kinds = useMemo(
+    () => distinctKinds(visibleWidgets(layout.widgets, isPhone, board.canDraw)),
+    [layout.widgets, isPhone, board]
+  );
 
-            {/*
-            AC3's harder half, unchanged in substance from the flat board it
-            replaces. "Not permitted", "read failed" and "read fine, nothing due"
-            are different answers and must look different: a card exists only for
-            a kind whose own capability is held; a failed read there says
-            "couldn't load", and only a successful empty one says "nothing due".
-            Collapsing them would put "No moon chunks" in front of someone who
-            was never allowed to ask, or whose read never came back.
-          */}
-            <CorpKindCards
-              grouped={grouped}
-              capabilities={capabilities}
-              unreadable={unreadable}
-              moonsHref={moonsVisible ? '/corp/moons' : undefined}
-            />
-
-            {/*
-            The board's one untimed kind, on the one surface that suits it. Absent
-            entirely when every service is online — see `CorpOfflineServices`.
-          */}
-            {capabilities.canReadStructures && (
-              <CorpOfflineServices items={grouped.get('serviceOffline') ?? []} />
-            )}
-
-            {/*
-            Money and People along the bottom, each simply absent without its
-            capability — no placeholder and no "you cannot see this". Their own
-            reads were never fired either (see the loader). Two half-width
-            panels rather than the 18rem rail they used to share: the rail ran
-            out of content two-thirds down the page, which was most of the empty
-            space #566 exists to remove.
-          */}
-            {(showVitals || showPeople) && data !== null && (
-              <div
-                className={cx(
-                  'grid min-w-0 gap-3',
-                  showVitals && showPeople && 'lg:grid-cols-2 lg:items-start'
-                )}
-              >
-                {showVitals &&
-                  (data.wallets === null ? (
-                    // The wallet read failed: an empty rail would print 0 ISK as if
-                    // the corporation were broke.
-                    <Panel title={t('corp.vitalsTitle')}>
-                      <LoadFailedState onRetry={snapshot.refresh} />
-                    </Panel>
-                  ) : (
-                    <CorpVitalsRail
-                      divisions={data.wallets}
-                      journal={data.journal}
-                      journalDivision={MASTER_WALLET_DIVISION}
-                      nowMs={data.loadedAt}
-                    />
-                  ))}
-                {showPeople && (
-                  <CorpPeopleRail
-                    members={data.members ?? []}
-                    highlights={data.peopleHighlights}
-                    names={data.memberNames}
-                    diff={data.rosterDiff}
-                    nowMs={data.loadedAt}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        )}
+  if (!hydrated) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner label={t('common.loading')} />
       </div>
-    </ItemActionsProvider>
+    );
+  }
+
+  return (
+    <WidgetBoardContext.Provider value={board}>
+      <OverviewRefreshProvider>
+        <OverviewEditProvider layout={layout} onLayoutChange={onLayoutChange}>
+          <WidgetDataProvider kinds={kinds}>
+            <CorpGrid layout={layout} />
+          </WidgetDataProvider>
+        </OverviewEditProvider>
+      </OverviewRefreshProvider>
+    </WidgetBoardContext.Provider>
   );
 }
 
@@ -578,7 +211,7 @@ export function Corp() {
         />
       </div>
     ) : gate.status === 'ready' ? (
-      <CorpBoardView capabilities={gate.capabilities} />
+      <CorpGridView capabilities={gate.capabilities} />
     ) : null;
 
   return <CorpRolesGate gate={gate}>{content}</CorpRolesGate>;

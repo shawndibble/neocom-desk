@@ -5,6 +5,7 @@
  * decide what survives a narrow widget. Pure: figures and a translate function
  * in, a `TableModel` out.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import type { DeadlineSeverity } from '@/engine/character/severity';
 import { extractableSp, extractorCount } from '@/engine/skills/spExtraction';
 import type { SkillQueueEntry } from '@/esi/endpoints';
@@ -19,6 +20,10 @@ import { UNKNOWN } from './builderKit';
 import { fractionBar } from './cellKit';
 import { placeHead, shortPlaceName } from './placeName';
 import type { SpExtras, TableCell, TableModel, TableRowModel, Translate } from './types';
+import { createNumberFormat, formatNumber } from '@/lib/numberLocale';
+
+// Part-trained levels bank fractional SP; the old default printed up to 3 decimals.
+const formatSp = createNumberFormat({ maximumFractionDigits: 3 });
 
 const W = 'overview.widgets';
 
@@ -103,13 +108,13 @@ export function spTable(t: Translate, input: SpTableInput): TableModel {
   const rows: TableRowModel[] = [
     {
       key: 'total',
-      cells: [t('skills.totalSp'), totalSp.toLocaleString(), ''],
+      cells: [t('skills.totalSp'), formatSp(totalSp), ''],
     },
     {
       key: 'unallocated',
       cells: [
         t('skills.unallocatedSp'),
-        unallocatedSp === null ? UNKNOWN : unallocatedSp.toLocaleString(),
+        unallocatedSp === null ? UNKNOWN : formatNumber(unallocatedSp),
         '',
       ],
     },
@@ -340,7 +345,7 @@ export function locationTable(
       key: 'security',
       cells: [
         t(`${D}.location.securityLabel`),
-        { text: input.security.toFixed(1), tone: securityTone(input.security) },
+        { text: fixed1(input.security), tone: securityTone(input.security) },
       ],
     });
   }

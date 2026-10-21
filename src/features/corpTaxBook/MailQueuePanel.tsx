@@ -6,6 +6,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/DataTable';
 import * as Icon from '@/components/ui/icons';
 import {
   displayStatus,
+  isStatementMail,
   summarize,
   type DisplayStatus,
   type MailQueueItem,
@@ -116,9 +117,9 @@ export function MailQueueTable({
       render: (row) => (
         <span>
           {row.recipientName}
-          {row.kind === 'reminder' && (
+          {row.kind !== 'statement' && (
             <span className="ml-1 text-xs text-text-dim">
-              ({t('corpTaxBook.mailQueue.table.reminder')})
+              ({t(`corpTaxBook.mailQueue.table.${row.kind}`)})
             </span>
           )}
         </span>
@@ -130,7 +131,8 @@ export function MailQueueTable({
       align: 'right',
       className: 'tabular-nums',
       phoneHidden: true,
-      render: (row) => formatIsk(row.amount),
+      // Only Statement mail carries an amount; moon owner mail has none.
+      render: (row) => (isStatementMail(row.kind) ? formatIsk(row.amount) : '—'),
     },
     {
       id: 'status',

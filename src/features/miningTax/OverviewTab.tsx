@@ -11,7 +11,6 @@
  * tab's `MiningLedgerEntry`/`Assignment`/`Payee` model).
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
@@ -93,6 +92,7 @@ import { UnpricedIsk } from './UnpricedIsk';
 import { systemLabel } from './names';
 import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { formatCount } from '@/lib/formatCount';
 
 const LazyMiningYieldCharts = lazy(() => guarded(() => import('./MiningYieldCharts')));
 
@@ -352,7 +352,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
       id: 'character',
       header: t('miningTax.characterColumn'),
       // Plain: the row opens the detail modal, which links the pilot and system (§6c).
-      render: (row) => <span className={entityLinkClassName()}>{row.characterName}</span>,
+      render: (row) => <span>{row.characterName}</span>,
       sortValue: (row) => row.characterName,
     },
     system: {
@@ -360,7 +360,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
       header: t('miningTax.systemColumn'),
       render: (row) => (
         <DataTableDenseCell>
-          <span className={entityLinkClassName()}>{systemName(row)}</span>
+          <span>{systemName(row)}</span>
           <SecurityValue security={data?.systemSecurity.get(row.entry.solarSystemId)} />
         </DataTableDenseCell>
       ),
@@ -425,7 +425,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
       header: t('miningTax.overview.unitsColumn'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => sumUnits(row.entry.oreLines).toLocaleString(),
+      render: (row) => formatCount(sumUnits(row.entry.oreLines)),
       sortValue: (row) => sumUnits(row.entry.oreLines),
       stackAffix: { after: ` ${t('miningTax.overview.unitsColumn').toLowerCase()}` },
     },

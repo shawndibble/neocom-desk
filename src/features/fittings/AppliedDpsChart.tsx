@@ -24,6 +24,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { STAT_EYEBROW } from './statKit';
+import { fixed0, fixed1, fixedFormat } from '@/lib/fixedFormat';
 
 export interface AppliedDpsRow {
   /** Metres (range graph) or m/s (speed graph). */
@@ -45,7 +46,7 @@ const STROKE = 'var(--color-accent)';
 const OVERLAY_DASH = '4 3';
 
 function formatKm(metres: number): string {
-  return (metres / 1000).toFixed(metres % 1000 === 0 ? 0 : 1);
+  return fixedFormat(metres % 1000 === 0 ? 0 : 1)(metres / 1000);
 }
 
 function Swatch({ dashed, label }: { dashed: boolean; label: string }) {
@@ -80,7 +81,7 @@ function DpsTooltip({
       <p className="font-semibold text-text">{formatX(row.x)}</p>
       {payload.map((entry) => (
         <p key={String(entry.dataKey)}>
-          {entry.name}: {Number(entry.value).toFixed(1)}
+          {entry.name}: {fixed1(Number(entry.value))}
         </p>
       ))}
     </ChartTooltipShell>
@@ -106,14 +107,14 @@ function Graph({
   const columns = useMemo<DataTableColumn<AppliedDpsRow>[]>(
     () => [
       { id: 'x', header: xHeader, render: (row) => formatX(row.x) },
-      { id: 'primary', header: primaryName, render: (row) => row.primary.toFixed(1) },
+      { id: 'primary', header: primaryName, render: (row) => fixed1(row.primary) },
       ...(overlayName === undefined
         ? []
         : [
             {
               id: 'overlay',
               header: overlayName,
-              render: (row: AppliedDpsRow) => (row.overlay ?? 0).toFixed(1),
+              render: (row: AppliedDpsRow) => fixed1(row.overlay ?? 0),
             },
           ]),
     ],
@@ -141,7 +142,7 @@ function Graph({
               stroke="var(--color-text-dim)"
               tick={{ fontSize: '0.6875rem', fill: 'var(--color-text-dim)' }}
               width={scalePx(40)}
-              tickFormatter={(value: number) => value.toFixed(0)}
+              tickFormatter={(value: number) => fixed0(value)}
             />
             <Tooltip content={(props) => <DpsTooltip {...props} formatX={formatX} />} />
             <Line
@@ -194,7 +195,7 @@ export default function AppliedDpsChart({
     [t]
   );
   const formatSpeed = useMemo(
-    () => (x: number) => t('fittings.appliedDps.speed', { value: x.toFixed(0) }),
+    () => (x: number) => t('fittings.appliedDps.speed', { value: fixed0(x) }),
     [t]
   );
 

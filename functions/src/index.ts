@@ -12,7 +12,9 @@ import { getAuth } from 'firebase-admin/auth';
 import { getMessaging } from 'firebase-admin/messaging';
 import { firestore } from './firestore.js';
 import { runPurgeNotificationFeed, runPurgeStaleAccounts } from './purgeJobs.js';
-import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY } from './r2Publish.js';
+import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, r2ConfigOrThrow } from './r2Publish.js';
+import { openPricesR2Key } from './r2DailySnapshots.js';
+import { createR2Get } from './r2Publisher.js';
 import { runSyncLawlessSystems, runSyncMarketOpenPrices } from './marketHistoryJob.js';
 import {
   runSyncLpStoreOffers,
@@ -52,15 +54,83 @@ import {
   parseToken,
   parseTurnOnInput,
 } from './corpTaxBook.js';
-import { esiIdentityReader } from './corpTaxBookEsi.js';
+import {
+  esiCorporationCeoLookup,
+  esiIdCategoryLookup,
+  esiCorporationLookup,
+  esiIdentityReader,
+} from './corpTaxBookEsi.js';
 import {
   parseSaveCorpSyncGrantInput,
-  dropCorpSyncGrant,
   revokeCorpSyncGrant,
   runScheduledCorpSyncs,
   saveCorpSyncGrant,
   type CorpSyncDeps,
 } from './corpSyncGrant.js';
+import {
+  acceptFeederInvite,
+  createFeederInvite,
+  parseAcceptFeederInviteInput,
+  parseCreateFeederInviteInput,
+  parsePreviewFeederInviteInput,
+  parseRevokeFeederInviteInput,
+  previewFeederInvite,
+  revokeFeederInvite,
+} from './corpTaxBookFeeders.js';
+import {
+  dropBookGrants,
+  getFeederStatus,
+  leaveFeeder,
+  parseFeederCall,
+  parseSaveFeederGrantInput,
+  saveFeederGrant,
+} from './corpTaxBookFeederGrant.js';
+import {
+  dismissFeederHistory,
+  getFeederViewAccess,
+  parseRequestFeederRateInput,
+  requestFeederRate,
+} from './corpTaxBookFeederViewCalls.js';
+import {
+  parseSetBookFeederPayeeInput,
+  parseSetFeederPayeeInput,
+  setBookFeederPayee,
+  setFeederPayee,
+} from './corpTaxBookPayee.js';
+import {
+  markFeederPayout,
+  parseMarkPayoutInput,
+  parseReconcilePayoutsInput,
+  parseRecordPayoutInput,
+  reconcileFeederPayoutsCall,
+  recordFeederPayout,
+} from './corpTaxBookFeederPayouts.js';
+import {
+  listFeederInvites,
+  parseSetFeederModeInput,
+  parseSetFeederRateInput,
+  setFeederMode,
+  setFeederRate,
+} from './corpTaxBookFeederOwnerCalls.js';
+import {
+  learnRefinerySystems,
+  parseLearnRefinerySystemsInput,
+  parseSetOwnRefineryLabelInput,
+  parseSetRefineryLabelInput,
+  setOwnRefineryLabel,
+  setRefineryLabel,
+} from './corpTaxBookRefineryLabels.js';
+import {
+  cancelFeederRemoval,
+  finalizeDueRemovals,
+  forceRemovalNow,
+  getRemovalLink,
+  parseRemovalCall,
+  parseRemovalLinkCall,
+  parseRemovalNoticeCall,
+  recordRemovalSent,
+  startFeederRemoval,
+} from './corpTaxBookFeederRemoval.js';
 import { esiSyncReader } from './corpTaxBookSyncEsi.js';
 import {
   claimPayment,
@@ -201,6 +271,7 @@ export const registerDevice = onCall<unknown>({ maxInstances: 5 }, async (reques
     characterIds: registration.characterIds,
     projections,
     eveTypesByCharacter,
+    quietHours: input.quietHours,
   });
 
   // The types the server has seen for each Character (alertGrants, ADR 0020),
@@ -585,6 +656,48 @@ const corpTaxBookDeps = (): BookDeps => ({
 
 const CORP_TAX_BOOK_OPTIONS = { maxInstances: 5 };
 
+// Collector books (issue #4507): invite links for a feeder corporation. Codes only; the UI maps them later.
+export const createCorpTaxBookFeederInviteCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    createFeederInvite(
+      corpTaxBookDeps(),
+      callerOf(request),
+      parseCreateFeederInviteInput(request.data)
+    )
+);
+
+export const revokeCorpTaxBookFeederInviteCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    revokeFeederInvite(
+      corpTaxBookDeps(),
+      callerOf(request),
+      parseRevokeFeederInviteInput(request.data)
+    )
+);
+
+// The consent screen's preview of a link: the accounting corporation and the offered rate.
+export const previewCorpTaxBookFeederInviteCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    previewFeederInvite(
+      corpTaxBookDeps(),
+      callerOf(request),
+      parsePreviewFeederInviteInput(request.data)
+    )
+);
+
+export const acceptCorpTaxBookFeederInviteCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    acceptFeederInvite(
+      corpTaxBookDeps(),
+      callerOf(request),
+      parseAcceptFeederInviteInput(request.data)
+    )
+);
+
 // Scheduled Corp Tax Book sync (issue #4068, ADR 0025). The second server-held EVE
 // token: an opt-in, narrow-scope grant per corporation, encrypted under the same
 // `ALERTS_TOKEN_KEY` secret (bound to its own purpose, so blobs do not cross
@@ -594,14 +707,23 @@ function corpSyncDeps(): CorpSyncDeps {
   return {
     db: firestore(),
     now: Date.now,
+    esi: esiSyncReader(),
     key: () => parseAlertsKey(ALERTS_TOKEN_KEY.value()),
     verify: (accessToken) => verifyEveAccessToken(accessToken, verifyOptions),
     refresh: (clientId, refreshToken) => refreshAtSso(clientId, refreshToken),
     revoke: (clientId, refreshToken) => revokeAtSso(clientId, refreshToken),
     readIdentity: esiIdentityReader(),
+    openPrices: r2OpenPrices,
     log: (message, data) => logWarn(message, data),
   };
 }
+
+// The moon owner's view values ore at the book hub's daily open price in R2 (issue #4512).
+// Lazy, so a function without the R2 secrets only fails when it rebuilds a view.
+function r2OpenPrices(typeId: number): Promise<unknown | null> {
+  return createR2Get(r2ConfigOrThrow())(openPricesR2Key(typeId));
+}
+const FEEDER_VIEW_SECRETS = [ALERTS_TOKEN_KEY, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY];
 
 // Proven by the signed-in Character AND the grant's own access token, which must be
 // for that same Character; the corporation and its roles are read with the grant.
@@ -609,6 +731,190 @@ export const saveCorpTaxBookSyncGrantCallable = onCall<unknown>(
   { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
   (request) =>
     saveCorpSyncGrant(corpSyncDeps(), callerOf(request), parseSaveCorpSyncGrantInput(request.data))
+);
+
+// Collector books (issue #4511): the moon owner's side. The grant is a separate SSO login by
+// the Accountant alt (mining scope only); the first ledger pull is the role check.
+export const saveCorpTaxBookFeederGrantCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
+  (request) =>
+    saveFeederGrant(
+      { ...corpSyncDeps(), esi: esiSyncReader(), lookupCorporation: esiCorporationLookup() },
+      callerOf(request),
+      parseSaveFeederGrantInput(request.data)
+    )
+);
+
+export const leaveCorpTaxBookFeederCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
+  (request) => leaveFeeder(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
+);
+
+export const getCorpTaxBookFeederStatusCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
+  (request) => getFeederStatus(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
+);
+
+// The moon owner's view (issue #4512): its officers (CEO, Director, Accountant; live role check)
+// get a 24h access record the rules read, may ask for a rate, and dismiss the after-leaving view.
+export const getCorpTaxBookFeederViewAccessCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
+  (request) => getFeederViewAccess(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
+);
+
+export const requestCorpTaxBookFeederRateCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
+  (request) =>
+    requestFeederRate(corpSyncDeps(), callerOf(request), parseRequestFeederRateInput(request.data))
+);
+
+// The moon owner names its payee: its own CEO, Directors and Accountants. The accounting
+// corporation's officers set it too (#4653), through `setCorpTaxBookFeederPayeeFromBookCallable`.
+export const setCorpTaxBookFeederPayeeCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
+  (request) =>
+    setFeederPayee(
+      corpSyncDeps(),
+      callerOf(request),
+      parseSetFeederPayeeInput(request.data),
+      esiIdCategoryLookup()
+    )
+);
+
+export const dismissCorpTaxBookFeederHistoryCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
+  (request) =>
+    dismissFeederHistory(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
+);
+
+// The accounting corporation's side of a moon owner (issue #4586): officers agree a rate, settle
+// otherwise and list open invite links. The view rebuild prices ore from R2, so these carry its secrets.
+const feederOwnerDeps = (): BookDeps => ({ ...corpTaxBookDeps(), openPrices: r2OpenPrices });
+const FEEDER_OWNER_OPTIONS = { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS };
+
+export const setCorpTaxBookFeederRateCallable = onCall<unknown>(FEEDER_OWNER_OPTIONS, (request) =>
+  setFeederRate(feederOwnerDeps(), callerOf(request), parseSetFeederRateInput(request.data))
+);
+
+export const setCorpTaxBookFeederModeCallable = onCall<unknown>(FEEDER_OWNER_OPTIONS, (request) =>
+  setFeederMode(feederOwnerDeps(), callerOf(request), parseSetFeederModeInput(request.data))
+);
+
+// Refinery labels (issue #4640): the accounting side passes `feederCorporationId`; the moon owner's
+// own officers do not.
+export const setCorpTaxBookRefineryLabelCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    setRefineryLabel(feederOwnerDeps(), callerOf(request), parseSetRefineryLabelInput(request.data))
+);
+
+export const setCorpTaxBookOwnRefineryLabelCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    setOwnRefineryLabel(
+      corpSyncDeps(),
+      callerOf(request),
+      parseSetOwnRefineryLabelInput(request.data)
+    )
+);
+
+// A refinery's system (issue #4650): a miner's client reports what its own ledger placed it in.
+export const learnCorpTaxBookRefinerySystemsCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    learnRefinerySystems(
+      corpTaxBookDeps(),
+      callerOf(request),
+      parseLearnRefinerySystemsInput(request.data)
+    )
+);
+
+// Removing a moon owner (issue #4520): start, notice sent, cancel (officers), the payee's link.
+const removalDeps = (): BookDeps => ({
+  ...feederOwnerDeps(),
+  corporationCeo: esiCorporationCeoLookup(),
+});
+
+// Either side sets a moon owner's payee (#4653): this is the accounting corporation's officers'
+// side (Accountant or higher, live role check). The CEO lookup names whom the change is mailed to.
+export const setCorpTaxBookFeederPayeeFromBookCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    setBookFeederPayee(
+      removalDeps(),
+      callerOf(request),
+      parseSetBookFeederPayeeInput(request.data),
+      esiIdCategoryLookup()
+    )
+);
+
+export const startCorpTaxBookFeederRemovalCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) => startFeederRemoval(removalDeps(), callerOf(request), parseRemovalCall(request.data))
+);
+
+export const recordCorpTaxBookFeederRemovalSentCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    recordRemovalSent(removalDeps(), callerOf(request), parseRemovalNoticeCall(request.data))
+);
+
+export const cancelCorpTaxBookFeederRemovalCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) => cancelFeederRemoval(removalDeps(), callerOf(request), parseRemovalCall(request.data))
+);
+
+export const getCorpTaxBookRemovalLinkCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
+  getRemovalLink(removalDeps(), callerOf(request), parseRemovalLinkCall(request.data))
+);
+
+export const forceCorpTaxBookRemovalCallable = onCall<unknown>(
+  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
+  (request) =>
+    forceRemovalNow(
+      corpSyncDeps(),
+      callerOf(request),
+      parseRemovalLinkCall(request.data),
+      esiCorporationCeoLookup()
+    )
+);
+
+/** Ends every removal whose 24 hours are up. Deploy is manual, like the other schedules. */
+export const finalizeCorpTaxBookRemovals = onSchedule(
+  { schedule: 'every 1 hours', secrets: FEEDER_VIEW_SECRETS, maxInstances: 1 },
+  async () => {
+    const summary = await finalizeDueRemovals(corpSyncDeps());
+    logInfo('finalizeCorpTaxBookRemovals finished', { ...summary });
+  }
+);
+
+// Paying a moon owner (issue #4514): record a payout, mark a journal row not a payout, and attach
+// the wallet journal's outgoing donations to the records. Each rebuilds the moon owner's view.
+export const recordCorpTaxBookFeederPayoutCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    recordFeederPayout(feederOwnerDeps(), callerOf(request), parseRecordPayoutInput(request.data))
+);
+
+export const markCorpTaxBookFeederPayoutCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    markFeederPayout(feederOwnerDeps(), callerOf(request), parseMarkPayoutInput(request.data))
+);
+
+export const reconcileCorpTaxBookFeederPayoutsCallable = onCall<unknown>(
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    reconcileFeederPayoutsCall(
+      { ...feederOwnerDeps(), esi: esiSyncReader() },
+      callerOf(request),
+      parseReconcilePayoutsInput(request.data)
+    )
+);
+
+export const listCorpTaxBookFeederInvitesCallable = onCall<unknown>(
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => listFeederInvites(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 // The holder revokes their own; the CEO revokes anyone's (live role check, so it carries an access token).
@@ -626,7 +932,7 @@ export const revokeCorpTaxBookSyncGrantCallable = onCall<unknown>(
 export const syncCorpTaxBooks = onSchedule(
   {
     schedule: 'every 6 hours',
-    secrets: [ALERTS_TOKEN_KEY],
+    secrets: FEEDER_VIEW_SECRETS,
     timeoutSeconds: 540,
     maxInstances: 1,
   },
@@ -649,7 +955,7 @@ export const deleteCorpTaxBookCallable = onCall<unknown>(
   { ...CORP_TAX_BOOK_OPTIONS, secrets: [ALERTS_TOKEN_KEY] },
   (request) =>
     deleteBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data), (corporationId) =>
-      dropCorpSyncGrant(corpSyncDeps(), corporationId)
+      dropBookGrants(corpSyncDeps(), corporationId)
     )
 );
 
@@ -749,8 +1055,8 @@ export const sweepCommunityRequests = onSchedule(
 /**
  * syncLawlessSystems (issue #2870): Route Safety's "lawless" badge. CCP's
  * insurgency feed is CORS-locked to eveonline.com, so this fetches it every
- * 10 minutes (its own cache window) and stores the lawless system ids for the
- * app to read. A failed fetch writes nothing: the doc just ages, and the app
+ * 15 minutes (CCP caches it for 10; cost: it was every 10) and stores the
+ * lawless system ids for the app to read. A failed fetch writes nothing: the doc just ages, and the app
  * hides the badge once `updatedAt` passes its staleness limit. An unchanged
  * list is not rewritten each run (issue #4272): only when it changes or the
  * `LAWLESS_HEARTBEAT_MS` refresh is due, so `updatedAt` means "last confirmed".
@@ -758,7 +1064,7 @@ export const sweepCommunityRequests = onSchedule(
  * Another Cloud Scheduler job past the free three, like the jobs above.
  */
 export const syncLawlessSystems = onSchedule(
-  { schedule: 'every 10 minutes' },
+  { schedule: 'every 15 minutes' },
   runSyncLawlessSystems
 );
 

@@ -12,6 +12,7 @@
  * an undecided/unresolvable state and an aria-label this component does not,
  * so it stays separate rather than wrapping this one.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { securityStatusColor, shownSecurity } from '@/engine/securityStatus';
 import { cx } from '@/lib/cx';
 
@@ -26,7 +27,7 @@ export function SecurityStatus({ security, className }: SecurityStatusProps) {
       className={cx('font-semibold tabular-nums', className)}
       style={{ color: securityStatusColor(security) }}
     >
-      {shownSecurity(security).toFixed(1)}
+      {fixed1(shownSecurity(security))}
     </span>
   );
 }

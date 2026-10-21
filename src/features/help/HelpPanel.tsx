@@ -6,15 +6,6 @@ import { DISCORD_URL, REPO_URL } from '@/lib/links';
 /** No width cap of its own: the Help page narrows itself to a readable measure (`routes/Help.tsx`). */
 const PROSE = 'space-y-3 text-sm';
 
-const SKILLS_PATHS = [
-  'settings.help.skillsQueue',
-  'settings.help.skillsCertified',
-  'settings.help.skillsShip',
-  'settings.help.skillsFit',
-  'settings.help.skillsSearch',
-  'settings.help.skillsPaste',
-] as const;
-
 /**
  * Help › Support: Discord is the one destination for bug
  * reports, feature requests, and discussion — GitHub is for reading the
@@ -59,17 +50,6 @@ export function HelpPanel() {
             />
           </p>
           <p className="text-text-dim">{t('settings.help.sourceHint')}</p>
-        </div>
-      </Panel>
-
-      <Panel title={t('settings.help.skillsTitle')}>
-        <div className={PROSE}>
-          <p>{t('settings.help.skillsIntro')}</p>
-          <ul className="list-disc space-y-1 pl-5">
-            {SKILLS_PATHS.map((key) => (
-              <li key={key}>{t(key)}</li>
-            ))}
-          </ul>
         </div>
       </Panel>
 

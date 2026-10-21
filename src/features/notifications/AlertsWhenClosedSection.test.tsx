@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { db } from '@/db';
@@ -14,6 +14,7 @@ vi.mock('@/sync/alertsGrantApi', () => ({
 }));
 
 import { AlertsWhenClosedSection } from './AlertsWhenClosedSection';
+import { DEFAULT_NOTIFICATION_PREFERENCES, useNotificationPreferences } from './preferences';
 import { markAlertsNeedReauth, readAlertsGrants } from './alertsGrant';
 import { queueAlertsForAll } from './alertsGrant';
 
@@ -22,7 +23,7 @@ const characters = [
   { characterId: 2, name: 'Beta' },
 ];
 
-/** The list starts closed (the page used to open on N rows); most tests need the rows, so they open it. */
+/** The grant screen starts closed (a dialog off Delivery's summary); most tests need the rows, so they open it. */
 async function renderSection(state?: unknown, { open = true } = {}) {
   const result = render(
     <MemoryRouter initialEntries={[{ pathname: '/settings/notifications', state }]}>
@@ -45,6 +46,7 @@ async function turnOn(characterId: number) {
 beforeEach(async () => {
   vi.clearAllMocks();
   sessionStorage.clear();
+  useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES });
   await db.settings.clear();
   login.begin.mockResolvedValue(undefined);
   remote.del.mockResolvedValue(undefined);
@@ -55,13 +57,34 @@ describe('AlertsWhenClosedSection', () => {
     await renderSection(undefined, { open: false });
     expect(await screen.findByText('0 of 2 characters')).toBeInTheDocument();
     expect(screen.queryByTestId('alerts-state-1')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Alerts when closed/ })).toHaveAttribute(
-      'aria-expanded',
-      'false'
+      'aria-haspopup',
+      'dialog'
     );
   });
 
-  it('closed, it names the Characters that are on and counts the ones needing re-auth', async () => {
+  it('opens the grant screen from the summary and closes it again', async () => {
+    await renderSection(undefined, { open: false });
+    await userEvent.click(await screen.findByRole('button', { name: /Alerts when closed/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Alerts when closed' });
+    expect(within(dialog).getByTestId('alerts-state-1')).toHaveTextContent('Off');
+    await userEvent.click(within(dialog).getAllByRole('button', { name: /close/i })[0]);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('opens by itself on arrival from EVE, so the outcome is not lost behind a closed screen', async () => {
+    await renderSection(
+      { alertsGrant: { status: 'on', characterId: 1, name: 'Alpha' } },
+      { open: false }
+    );
+    expect(await screen.findByRole('dialog', { name: 'Alerts when closed' })).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Alerts when closed is on for Alpha'
+    );
+  });
+
+  it('closed, it counts the Characters that are on and the ones needing re-auth', async () => {
     await db.settings.put({
       key: 'alertsGrants',
       value: {
@@ -72,7 +95,6 @@ describe('AlertsWhenClosedSection', () => {
     await renderSection(undefined, { open: false });
     expect(await screen.findByText(/1 of 2 characters/)).toBeInTheDocument();
     expect(screen.getByText(/1 needs re-authorizing/)).toBeInTheDocument();
-    expect(screen.getByText('Alpha')).toBeInTheDocument();
   });
 
   it('starts every Character off, saying what is stored', async () => {
@@ -170,5 +192,30 @@ describe('AlertsWhenClosedSection', () => {
     unmount();
     await renderSection({ alertsGrant: { status: 'failed', characterId: 2 } });
     expect(await screen.findByRole('status')).toHaveTextContent(/Could not turn on .* Beta/);
+  });
+});
+
+describe('Quiet time (issue #4566)', () => {
+  it('shows the switch and its help; the times appear only when on', async () => {
+    await renderSection();
+    const quiet = screen.getByTestId('quiet-time');
+    expect(within(quiet).getByText(/No pop-ups from the closed app/)).toBeInTheDocument();
+    expect(within(quiet).queryByLabelText('From')).not.toBeInTheDocument();
+
+    await userEvent.click(within(quiet).getByRole('checkbox', { name: 'Quiet time' }));
+
+    expect(await within(quiet).findByLabelText('From')).toHaveValue('22:00');
+    expect(within(quiet).getByLabelText('To')).toHaveValue('07:00');
+    expect(within(quiet).getByRole('checkbox', { name: 'Let attacks through' })).not.toBeChecked();
+  });
+
+  it('turning it off hides the times again', async () => {
+    await renderSection();
+    const quiet = screen.getByTestId('quiet-time');
+    const toggle = within(quiet).getByRole('checkbox', { name: 'Quiet time' });
+    await userEvent.click(toggle);
+    await within(quiet).findByLabelText('From');
+    await userEvent.click(toggle);
+    await waitFor(() => expect(within(quiet).queryByLabelText('From')).not.toBeInTheDocument());
   });
 });

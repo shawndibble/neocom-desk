@@ -1,3 +1,4 @@
+import { formatCount } from '@/lib/formatCount';
 import { eyebrowClassName as MICRO_LABEL } from '@/components/ui/eyebrowClassName';
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -380,6 +381,7 @@ export function FittingRing({
                 key={`ghost-${rack}-${index}`}
                 aria-hidden="true"
                 className="absolute border border-line/60 bg-bg/40"
+                // fixed format: CSS angle
                 style={{ ...tilePosition(angle), transform: `rotate(${angle.toFixed(1)}deg)` }}
               />
             );
@@ -500,7 +502,7 @@ export function FittingRing({
                   count={item.quantity}
                   tooltip={t('fittings.ring.cargoTile', {
                     name: nameOf(item.typeId),
-                    quantity: item.quantity.toLocaleString(),
+                    quantity: formatCount(item.quantity),
                   })}
                 />
               ))}

@@ -8,6 +8,7 @@
 import { randomBytes } from 'node:crypto';
 import {
   FieldValue,
+  type DocumentSnapshot,
   type DocumentReference,
   type Firestore,
   type QueryDocumentSnapshot,
@@ -22,6 +23,11 @@ import {
   DECLARATIONS,
   DISMISSALS,
   EXTRACTIONS,
+  FEEDER_INVITES_COLLECTION,
+  BILLED_BY_COLLECTION,
+  FEEDERS,
+  FEEDER_OF_COLLECTION,
+  FEEDER_PREVIOUS_COLLECTION,
   MEMBER_SETUP_MS,
   META,
   MINERS,
@@ -62,6 +68,9 @@ import {
   isRetroactiveRate,
   mergeObservedRows,
   observedRowKey,
+  shiftDate,
+  writeOffForAllocation,
+  type CoveragePeriod,
   type DismissableLine,
   type MirrorDismissal,
   type MirrorExtraction,
@@ -70,11 +79,18 @@ import {
 import { ROLES_SCOPE, type IdentityReader } from './corpTaxBookEsi.js';
 import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
 
+/** One type's parsed R2 `open-prices/<typeId>.json` object, or null when R2 has none. Throws on a failed read. */
+export type OpenPricesReader = (typeId: number) => Promise<unknown | null>;
+
 export interface BookDeps {
   db: Firestore;
   now: () => number;
   verifyToken: (accessToken: string) => Promise<EveTokenClaims>;
   readIdentity: IdentityReader;
+  /** Prices the feeder view (issue #4512); absent in tests that never rebuild one. */
+  openPrices?: OpenPricesReader;
+  /** A corporation's CEO (public ESI); the removal (#4520) and payee (#4653) callables need it. */
+  corporationCeo?: (corporationId: number) => Promise<number | undefined>;
 }
 
 /** Who is calling: the Firebase uid `char:{id}` and the ownerHash claim. */
@@ -87,12 +103,31 @@ type Data = Record<string, unknown>;
 
 export const bookRef = (db: Firestore, corporationId: number) =>
   db.collection(BOOKS_COLLECTION).doc(String(corporationId));
+/** `corpTaxBooks/{collector}/feeders/{feeder}`: one moon owner's record. */
+export const feederRef = (db: Firestore, collector: number, feeder: number) =>
+  bookRef(db, collector).collection(FEEDERS).doc(String(feeder));
 const sub = (db: Firestore, corporationId: number, name: string) =>
   bookRef(db, corporationId).collection(name);
 
+/** The book's officers whose access has not expired, once each: whom a moon owner's change is mailed to. */
+export async function liveOfficerIds(
+  deps: Pick<BookDeps, 'db' | 'now'>,
+  corporationId: number
+): Promise<number[]> {
+  const now = deps.now();
+  const officers = await sub(deps.db, corporationId, OFFICERS).get();
+  const ids = officers.docs.flatMap((d) => {
+    const id = d.get('characterId');
+    const expires = d.get('expiresAt');
+    return typeof id === 'number' && typeof expires === 'number' && expires > now ? [id] : [];
+  });
+  return [...new Set(ids)];
+}
+
 const rand = (bytes = 6) => randomBytes(bytes).toString('base64url');
 
-function fail(code: FunctionsErrorCode, message: string, reason: string): never {
+/** Throws an HttpsError carrying a stable `reason` for the UI to map. */
+export function fail(code: FunctionsErrorCode, message: string, reason: string): never {
   throw new HttpsError(code, message, { reason });
 }
 
@@ -267,6 +302,17 @@ export async function turnOnBook(deps: BookDeps, caller: Caller, input: TurnOnIn
   await deps.db.runTransaction(async (tx) => {
     if ((await tx.get(ref)).exists)
       fail('already-exists', 'This corporation already has a Corp Tax Book', 'book-exists');
+    // A corporation feeds another book or runs its own, never both (#4507).
+    if (
+      (await tx.get(deps.db.collection(FEEDER_OF_COLLECTION).doc(String(input.corporationId))))
+        .exists
+    )
+      fail('failed-precondition', 'This corporation feeds another book', 'is-a-feeder');
+    // A former moon owner's book starts no earlier than the leave day: the accounting
+    // corporation covered every day before it, and an earlier start would bill them twice.
+    const floor = await ownBookFloor((r) => tx.get(r), deps.db, input.corporationId);
+    if (floor !== null && input.startDate < floor)
+      fail('invalid-argument', 'The start date is before the leave day', 'start-before-leave');
     tx.create(ref, {
       ...defaultSettings(input.startDate, input.startRatePct),
       corporationId: input.corporationId,
@@ -285,6 +331,31 @@ export async function turnOnBook(deps: BookDeps, caller: Caller, input: TurnOnIn
     });
   });
   return { corporationId: input.corporationId };
+}
+
+/**
+ * The earliest own-book start of a corporation an accounting corporation handled before: the
+ * day after its last coverage ended (a removal can take effect before it is processed), else
+ * the UTC day it left (no closed coverage, or the book that held it is gone). Null if never.
+ */
+export async function ownBookFloor(
+  get: (ref: DocumentReference) => Promise<DocumentSnapshot>,
+  db: Firestore,
+  corporationId: number
+): Promise<string | null> {
+  const previous = await get(db.collection(FEEDER_PREVIOUS_COLLECTION).doc(String(corporationId)));
+  const leftAt = previous.get('leftAt');
+  if (typeof leftAt !== 'number') return null;
+  const collector = previous.get('collectorCorporationId');
+  if (typeof collector === 'number') {
+    const record = await get(feederRef(db, collector, corporationId));
+    const periods = (record.get('coveragePeriods') ?? []) as CoveragePeriod[];
+    const ends = periods.map((p) => p.to);
+    if (ends.length > 0 && ends.every((to) => typeof to === 'string')) {
+      return shiftDate((ends as string[]).sort().at(-1)!, 1);
+    }
+  }
+  return utcDate(leftAt);
 }
 
 /**
@@ -317,6 +388,14 @@ export async function deleteBook(
     .where('corporationId', '==', call.corporationId)
     .get();
   await Promise.all(links.docs.map((d) => d.ref.delete()));
+  // Invite links and feeder pointers live outside the book; the feeder records go with it.
+  for (const name of [FEEDER_INVITES_COLLECTION, FEEDER_OF_COLLECTION]) {
+    const stray = await deps.db
+      .collection(name)
+      .where('collectorCorporationId', '==', call.corporationId)
+      .get();
+    await Promise.all(stray.docs.map((d) => d.ref.delete()));
+  }
   await deps.db.recursiveDelete(ref);
   // A scheduled sync that loaded its grant before it was dropped may still have been writing.
   await deps.db.recursiveDelete(ref);
@@ -363,6 +442,62 @@ export async function syncBook(deps: BookDeps, caller: Caller, input: SyncInput)
 }
 
 /**
+ * Merge Observed Rows into a book monotonically (a stale row never replaces a
+ * fresher one). Shared by an officer's or the scheduled sync and a feeder's pull,
+ * which must not touch the book's `lastSync` or gaps.
+ */
+export async function mergeObservedInto(
+  deps: BookDeps,
+  corporationId: number,
+  rows: readonly ObservedRow[]
+): Promise<number> {
+  let observedChanged = 0;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const col = sub(deps.db, corporationId, OBSERVED);
+    observedChanged += await deps.db.runTransaction(async (tx) => {
+      const unique = [...new Map(chunk.map((r) => [obsId(r), r])).values()];
+      const refs = unique.map((r) => col.doc(obsId(r)));
+      const snaps = refs.length > 0 ? await tx.getAll(...refs) : [];
+      const existing = snaps.filter((s) => s.exists).map((s) => s.data() as ObservedRow);
+      const { changed } = mergeObservedRows(existing, chunk);
+      const last = new Map(changed.map((r) => [observedRowKey(r), r]));
+      for (const row of last.values()) {
+        tx.set(col.doc(obsId(row)), { ...row, uid: `char:${row.characterId}` });
+      }
+      return last.size;
+    });
+  }
+  await writeBilledByPointers(deps, corporationId, rows);
+  return observedChanged;
+}
+
+/**
+ * Points each Character the book observed at the book (`corpTaxBookBilledBy`), so
+ * the miner's client finds it whatever corporation they are in now. Refreshed on
+ * every sync; a failure never fails the sync, the next one writes it again.
+ */
+async function writeBilledByPointers(
+  deps: BookDeps,
+  corporationId: number,
+  rows: readonly ObservedRow[]
+): Promise<void> {
+  const characterIds = [...new Set(rows.map((r) => r.characterId))];
+  const at = Date.now();
+  for (let i = 0; i < characterIds.length; i += CHUNK) {
+    const batch = deps.db.batch();
+    for (const characterId of characterIds.slice(i, i + CHUNK)) {
+      batch.set(
+        deps.db.collection(BILLED_BY_COLLECTION).doc(`char:${characterId}`),
+        { books: { [String(corporationId)]: at } },
+        { merge: true }
+      );
+    }
+    await batch.commit().catch(() => undefined);
+  }
+}
+
+/**
  * The sync once the caller is established. The scheduled sync (ADR 0025) calls
  * this with the role check it just made with the grant holder's token, and
  * `scheduled` makes the audit entry and `lastSync` say so.
@@ -384,23 +519,7 @@ export async function syncBookAs(
     );
   }
 
-  let observedChanged = 0;
-  for (let i = 0; i < input.observed.length; i += CHUNK) {
-    const chunk = input.observed.slice(i, i + CHUNK);
-    const col = sub(deps.db, input.corporationId, OBSERVED);
-    observedChanged += await deps.db.runTransaction(async (tx) => {
-      const unique = [...new Map(chunk.map((r) => [obsId(r), r])).values()];
-      const refs = unique.map((r) => col.doc(obsId(r)));
-      const snaps = refs.length > 0 ? await tx.getAll(...refs) : [];
-      const existing = snaps.filter((s) => s.exists).map((s) => s.data() as ObservedRow);
-      const { changed } = mergeObservedRows(existing, chunk);
-      const last = new Map(changed.map((r) => [observedRowKey(r), r]));
-      for (const row of last.values()) {
-        tx.set(col.doc(obsId(row)), { ...row, uid: `char:${row.characterId}` });
-      }
-      return last.size;
-    });
-  }
+  const observedChanged = await mergeObservedInto(deps, input.corporationId, input.observed);
 
   const extractions = sub(deps.db, input.corporationId, EXTRACTIONS);
   for (const x of input.extractions) {
@@ -493,10 +612,18 @@ function minerCharacters(minerId: string, miner: Data | undefined): number[] {
   return solo ? [Number(solo[1])] : [];
 }
 
+/** The sign-ins that read a Miner's own lines (`uids`): read in the transaction, before any write. */
+async function minerUids(c: EditCtx, minerId: string): Promise<string[]> {
+  const miner = (await c.tx.get(col(c, MINERS).doc(minerId))).data();
+  return minerCharacters(minerId, miner).map((id) => `char:${id}`);
+}
+
 const rateKey = (r: StoredRate): string =>
   r.scope === 'record'
     ? `record:${r.recordKey}`
-    : `${r.scope}:${'minerId' in r ? r.minerId : ''}:${'moonId' in r ? r.moonId : ''}:${r.effectiveFrom}`;
+    : `${r.scope}:${'minerId' in r ? r.minerId : ''}:${'moonId' in r ? r.moonId : ''}:${r.effectiveFrom}` +
+      (r.scope === 'structure' ? `:${r.structureId}` : '') +
+      (r.scope === 'feeder' ? `:${r.feederId}` : '');
 
 /** The characters an officer unlinked: automatic grouping (D26) leaves them alone. */
 const DECLINED_DOC = 'declinedAutoGroup';
@@ -913,6 +1040,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
     }
     case 'addAdjustment': {
       const id = `a${now}_${rand(4)}`;
+      // The Miner reads their own corrections on the personal tab (#4622).
+      const uids = await minerUids(c, action.minerId);
       tx.create(col(c, ADJUSTMENTS).doc(id), {
         id,
         minerId: action.minerId,
@@ -921,6 +1050,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         reason: action.reason,
         by,
         at: iso,
+        uids,
       });
       return {
         detail: {
@@ -939,6 +1069,8 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
       }
       const id = `w${now}_${rand(4)}`;
+      // The book applies it (#4637), and the Miner reads it on the personal tab.
+      const uids = await minerUids(c, action.minerId);
       tx.create(col(c, WRITE_OFFS).doc(id), {
         id,
         minerId: action.minerId,
@@ -946,6 +1078,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         reason: action.reason,
         by,
         at: iso,
+        uids,
         ...(action.statementId ? { statementId: action.statementId } : {}),
       });
       return {
@@ -1181,11 +1314,12 @@ async function closeAccount(
     fail('invalid-argument', "Statement is another Miner's", 'wrong-miner');
 
   // The credit the guest is left with once the final Statement is counted.
-  const [statements, payments, dismissals, extractions] = await Promise.all([
+  const [statements, payments, dismissals, extractions, writeOffs] = await Promise.all([
     tx.get(col(c, STATEMENTS).where('minerId', '==', action.minerId)),
     tx.get(col(c, PAYMENTS).where('minerId', '==', action.minerId)),
     tx.get(col(c, DISMISSALS)),
     tx.get(col(c, EXTRACTIONS)),
+    tx.get(col(c, WRITE_OFFS).where('minerId', '==', action.minerId)),
   ]);
   const held = statements.docs.map((d) => d.data() as Data);
   const allocation = allocatePayments({
@@ -1205,6 +1339,8 @@ async function closeAccount(
       extractions: extractions.docs.map((d) => d.data() as MirrorExtraction),
       expiryHours: (c.book.structureExpiryHours as Record<string, number> | undefined) ?? {},
     }),
+    officerWriteOffs: writeOffs.docs.flatMap((d) => writeOffForAllocation(d.data()) ?? []),
+    startDate: c.book.startDate as string | undefined,
   });
   const credit = Math.max(0, allocation.credit);
   const owed = [...allocation.byStatement.values()]
@@ -1257,6 +1393,9 @@ function paymentForAllocation(id: string, p: Data) {
     id,
     amount: p.amount as number,
     at: p.at as string,
+    ...(p.source === 'donation' || p.source === 'manual'
+      ? { source: p.source as 'donation' | 'manual' }
+      : {}),
     ...(typeof p.statementId === 'string' ? { statementId: p.statementId } : {}),
     ...(typeof p.notTaxAmount === 'number' ? { notTaxAmount: p.notTaxAmount } : {}),
   };
@@ -1484,17 +1623,27 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
     statementId: string;
     minerId: string;
   };
-  const [book, statements, payments, dismissals, extractions, paid, declarations, miner] =
-    await Promise.all([
-      bookRef(deps.db, corporationId).get(),
-      sub(deps.db, corporationId, STATEMENTS).where('minerId', '==', minerId).get(),
-      sub(deps.db, corporationId, PAYMENTS).where('minerId', '==', minerId).get(),
-      sub(deps.db, corporationId, DISMISSALS).get(),
-      sub(deps.db, corporationId, EXTRACTIONS).get(),
-      sub(deps.db, corporationId, META).doc(PAID_DOC).get(),
-      sub(deps.db, corporationId, DECLARATIONS).where('statementId', '==', statementId).get(),
-      sub(deps.db, corporationId, MINERS).doc(minerId).get(),
-    ]);
+  const [
+    book,
+    statements,
+    payments,
+    dismissals,
+    extractions,
+    paid,
+    declarations,
+    miner,
+    writeOffs,
+  ] = await Promise.all([
+    bookRef(deps.db, corporationId).get(),
+    sub(deps.db, corporationId, STATEMENTS).where('minerId', '==', minerId).get(),
+    sub(deps.db, corporationId, PAYMENTS).where('minerId', '==', minerId).get(),
+    sub(deps.db, corporationId, DISMISSALS).get(),
+    sub(deps.db, corporationId, EXTRACTIONS).get(),
+    sub(deps.db, corporationId, META).doc(PAID_DOC).get(),
+    sub(deps.db, corporationId, DECLARATIONS).where('statementId', '==', statementId).get(),
+    sub(deps.db, corporationId, MINERS).doc(minerId).get(),
+    sub(deps.db, corporationId, WRITE_OFFS).where('minerId', '==', minerId).get(),
+  ]);
   const thisStatement = statements.docs.find((d) => d.id === statementId);
   if (!thisStatement) fail('not-found', 'Verify link is not valid', 'invalid-token');
   const s = thisStatement.data() as Data;
@@ -1542,6 +1691,8 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
       extractions: extractions.docs.map((d) => d.data() as MirrorExtraction),
       expiryHours: (b.structureExpiryHours as Record<string, number> | undefined) ?? {},
     }),
+    officerWriteOffs: writeOffs.docs.flatMap((d) => writeOffForAllocation(d.data()) ?? []),
+    startDate: b.startDate as string | undefined,
   });
   const here = allocation.paymentCredits.filter((c) => c.statementId === statementId);
   const bySource = new Map(payments.docs.map((d) => [d.id, d.data()]));

@@ -81,7 +81,7 @@ describe('AlertsPanel', () => {
     expect(await screen.findByText('Alerts, 3 new')).toBeInTheDocument();
     const rows = screen.getAllByRole('listitem');
     expect(rows).toHaveLength(2);
-    const mailRow = screen.getByText('New Mail').closest('li') as HTMLElement;
+    const mailRow = screen.getByText('New mail').closest('li') as HTMLElement;
     expect(within(mailRow).getByText('New Mail body')).toBeInTheDocument();
     expect(within(mailRow).getByText('2 alerts')).toBeInTheDocument();
     expect(within(mailRow).getByText('5m ago')).toBeInTheDocument();
@@ -108,7 +108,7 @@ describe('AlertsPanel', () => {
     await db.notificationFeed.bulkPut([ATTACK, MAIL]);
     renderPanel();
 
-    const row = (await screen.findByText('New Mail')).closest('li') as HTMLElement;
+    const row = (await screen.findByText('New mail')).closest('li') as HTMLElement;
     await userEvent.click(within(row).getByRole('button', { name: /^Dismiss/ }));
     await waitFor(async () => expect(await liveIds()).toEqual(['attack']));
   });
@@ -125,7 +125,7 @@ describe('AlertsPanel', () => {
   it('filters the rows by chip', async () => {
     await db.notificationFeed.bulkPut([ATTACK, MAIL, PRICE]);
     renderPanel();
-    await screen.findByText('New Mail');
+    await screen.findByText('New mail');
 
     await userEvent.click(screen.getByRole('button', { name: 'Mail' }));
     expect(screen.getByRole('button', { name: 'Mail' })).toHaveAttribute('aria-pressed', 'true');
@@ -143,20 +143,20 @@ describe('AlertsPanel', () => {
   it('shows no chips when there is nothing to filter, and drops a chip once its alerts are gone', async () => {
     await db.notificationFeed.bulkPut([MAIL]);
     renderPanel();
-    await screen.findByText('New Mail');
+    await screen.findByText('New mail');
     expect(screen.queryByRole('group', { name: 'Alert types' })).not.toBeInTheDocument();
 
     await db.notificationFeed.bulkPut([ATTACK]);
     await userEvent.click(await screen.findByRole('button', { name: 'Mail' }));
     await userEvent.click(
-      within((await screen.findByText('New Mail')).closest('li') as HTMLElement).getByRole(
+      within((await screen.findByText('New mail')).closest('li') as HTMLElement).getByRole(
         'button',
         {
           name: /^Dismiss/,
         }
       )
     );
-    await waitFor(() => expect(screen.queryByText('New Mail')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('New mail')).not.toBeInTheDocument());
     expect(screen.getByText('Structure Under Attack')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Mail' })).not.toBeInTheDocument();
   });
@@ -165,13 +165,13 @@ describe('AlertsPanel', () => {
     await db.notificationFeed.bulkPut([MAIL, PRICE]);
     renderPanel();
 
-    const mailRow = (await screen.findByText('New Mail')).closest('li') as HTMLElement;
+    const mailRow = (await screen.findByText('New mail')).closest('li') as HTMLElement;
     expect(within(mailRow).queryByRole('button', { name: /Snooze/ })).not.toBeInTheDocument();
 
-    const priceRow = screen.getByText('Quickbar Price Alert').closest('li') as HTMLElement;
+    const priceRow = screen.getByText('Quickbar price alert').closest('li') as HTMLElement;
     await userEvent.click(within(priceRow).getByRole('button', { name: /Snooze/ }));
 
-    await waitFor(() => expect(screen.queryByText('Quickbar Price Alert')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText('Quickbar price alert')).not.toBeInTheDocument());
     expect(useSnoozeStore.getState().value['event:priceAlertTriggered']).toBeGreaterThan(
       Date.now()
     );
@@ -221,7 +221,7 @@ describe('AlertsPanel', () => {
     await db.notificationFeed.bulkPut([MAIL]);
     renderPanel('sheet');
 
-    await screen.findByText('New Mail');
+    await screen.findByText('New mail');
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^View/ })).toHaveClass('h-11');
   });
@@ -263,6 +263,28 @@ describe('AlertsPanel', () => {
       await waitFor(async () => expect(await liveIds()).toEqual(['cal-1', 'cal-3']));
       expect(await screen.findByText('Alerts, 2 new')).toBeInTheDocument();
     });
+
+    it.each([
+      [false, ['cal-1', 'cal-2', 'cal-3']],
+      [true, ['cal-1', 'cal-3']],
+    ])(
+      'following one fire link with Dismiss on View %s dismisses only that fire',
+      async (dismissOnView, remaining) => {
+        await db.notificationFeed.bulkPut([cal(1), cal(2), cal(3)]);
+        useNotificationPreferences.setState({
+          value: { ...DEFAULT_NOTIFICATION_PREFERENCES, dismissOnView },
+          hydrated: true,
+        });
+        const { onClose } = renderPanel();
+
+        await userEvent.click(await screen.findByRole('button', { name: '3 alerts' }));
+        const fireRow = screen.getByText('Event 2 body').closest('li') as HTMLElement;
+        await userEvent.click(within(fireRow).getByRole('link', { name: 'Event 2 body' }));
+
+        expect(onClose).toHaveBeenCalled();
+        await waitFor(async () => expect(await liveIds()).toEqual(remaining));
+      }
+    );
 
     it('lists fires newest first and closes the list when one is left', async () => {
       await db.notificationFeed.bulkPut([cal(3), cal(1), cal(2)]);

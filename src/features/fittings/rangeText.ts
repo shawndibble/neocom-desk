@@ -1,3 +1,5 @@
+import { fixed1 } from '@/lib/fixedFormat';
+
 /**
  * How the stats column reads a distance, and a weapon's or module's reach:
  * the way the game's HUD tooltip says it, so a pilot sees the numbers they
@@ -7,7 +9,7 @@ type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 /** Metres as km to one decimal — the number alone, for a label to place. */
 export function kmValue(metres: number): string {
-  return (metres / 1000).toFixed(1);
+  return fixed1(metres / 1000);
 }
 
 /**

@@ -10,6 +10,7 @@
  * column is hidden then). Both bars read and write one `BrowserFilterValue`,
  * so they can never disagree.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { JumpsLink } from '@/features/route/JumpsLink';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -274,7 +275,7 @@ export function OrderBookScopeBar({
                 className="font-semibold tabular-nums"
                 style={{ color: securityStatusColor(scope.security) }}
               >
-                {scope.security.toFixed(1)}
+                {fixed1(scope.security)}
               </span>
             )}
             {scope.jumpsAway !== null && originName !== null && (

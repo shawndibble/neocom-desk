@@ -4,6 +4,7 @@
  * only.
  */
 import type { PilotStats } from '@/lib/zkillboard';
+import { formatNumber } from '@/lib/numberLocale';
 
 export interface StatTileItem {
   label: string;
@@ -38,12 +39,12 @@ export function killFigures(
   return {
     kills: {
       label: t('travel.pilot.kills'),
-      value: s ? s.kills.toLocaleString() : '—',
+      value: s ? formatNumber(s.kills) : '—',
       tone: s ? 'positive' : undefined,
     },
     losses: {
       label: t('travel.pilot.losses'),
-      value: s ? s.losses.toLocaleString() : '—',
+      value: s ? formatNumber(s.losses) : '—',
       tone: s ? 'negative' : undefined,
     },
     iskDestroyed: {

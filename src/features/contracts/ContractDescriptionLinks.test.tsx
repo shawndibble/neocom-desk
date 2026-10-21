@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@/i18n';
 import { ContractDescriptionLinks } from './ContractDescriptionLinks';
-import { contractDescriptionLinks } from './contractDescriptionLinks';
+import { contractDescriptionLinks } from './descriptionLinkParts';
 
 describe('contractDescriptionLinks', () => {
   it('finds each http(s) link once, without trailing punctuation', () => {

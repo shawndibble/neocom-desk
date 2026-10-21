@@ -16,10 +16,11 @@ import {
 import { cx } from '@/lib/cx';
 import { formatAge } from '@/lib/age';
 import type { FetchRow } from './widgets/headerSummary';
+import { boardKey, useWidgetBoard } from './widgets/board';
 import { getKind } from './widgets/kinds';
 
 /**
- * The button on the Overview's tab row ("Data updated 2m ago") and the popover
+ * The button on a board's tab row ("Data updated 2m ago") and the popover
  * it opens: one row per widget kind with its own age, and Refresh all. Drawn
  * from plain props so the signed-out landing page's demo shows the very same
  * control over sample reads (`OverviewDataAge` feeds it the live ones).
@@ -32,6 +33,7 @@ export function DataAgePopover({
   breakdown,
   now,
   onRefresh,
+  note,
 }: {
   /** The stalest read, which sets the age the button shows. */
   fetchedAt: Date;
@@ -39,8 +41,11 @@ export function DataAgePopover({
   breakdown: readonly FetchRow[];
   now: number;
   onRefresh: () => void;
+  /** A line about how fresh the data can be at all (the Corp overview's hourly cache). */
+  note?: string;
 }) {
   const { t } = useTranslation();
+  const board = useWidgetBoard();
   const title = (kind: string) => {
     const def = getKind(kind);
     return def ? t(def.titleKey) : kind;
@@ -73,7 +78,7 @@ export function DataAgePopover({
       </Tooltip>
       <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-0">
         <table className="w-full text-xs">
-          <caption className="sr-only">{t('overview.header.breakdownCaption')}</caption>
+          <caption className="sr-only">{t(boardKey(board, 'header.breakdownCaption'))}</caption>
           <thead>
             <tr className="border-b border-line text-left text-text-dim uppercase">
               <th scope="col" className="px-3 py-2 font-semibold tracking-widest">
@@ -101,6 +106,7 @@ export function DataAgePopover({
             ))}
           </tbody>
         </table>
+        {note && <p className="border-t border-line px-3 py-2 text-xs text-text-dim">{note}</p>}
         <div className="border-t border-line p-2">
           <Button size="sm" onClick={onRefresh} className="w-full">
             <Icon.Refresh aria-hidden="true" />

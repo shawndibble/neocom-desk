@@ -5,7 +5,12 @@ import { resolveNames } from '@/features/character/names';
 import { loadDatedUnitPricesByHub, type DatedUnitPrices } from '@/features/miningTax/pricing';
 import type { MadePayment } from '../paymentLinks';
 import type { MoonMiningTaxRow, TrackedCharacter } from '../snapshot';
-import { loadCorpBooks, trackedCharacterCorporations, type LoadedCorpBook } from './corpBookStore';
+import {
+  loadCorpBooks,
+  teachRefinerySystems,
+  trackedCharacterCorporations,
+  type LoadedCorpBook,
+} from './corpBookStore';
 import { buildCorpBookView, type CorpBookView } from './corpBookView';
 
 interface Args {
@@ -88,6 +93,15 @@ export function useCorpBookView({
       cancelled = true;
     };
   }, [loaded, activeCharacterId]);
+
+  // The member's own ledger places the moon owner refineries the book cannot (#4650).
+  useEffect(() => {
+    if (rows === undefined || loaded.length === 0) return;
+    void teachRefinerySystems(
+      loaded,
+      rows.map((r) => r.entry)
+    );
+  }, [rows, loaded]);
 
   const view = useMemo(
     () =>

@@ -50,6 +50,18 @@ const loadMarketSnapshot = vi.hoisted(() =>
 // The "vs 90d" figures read market history; nothing here is about them.
 vi.mock('@/features/market/priceVsMedian', () => ({ loadPriceVsMedian: async () => null }));
 vi.mock('./marketData', () => ({ loadMarketSnapshot }));
+// The blueprint-offer and invention loaders price through Fuzzwork directly,
+// and there is no msw server here: unmocked, the Break Even button's profit
+// (and `pricesReady`) rode on a live request for the Rifter Blueprint's region
+// sell price, so it flaked with Fuzzwork's latency on CI. 150M is the figure the
+// Break Even tests' comments assume.
+vi.mock('@/market/prices', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/market/prices')>()),
+  getHubPrices: async (_hub: unknown, ids: number[]) =>
+    new Map(ids.map((id) => [id, { sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 }])),
+  getRegionSellPrices: async (_regionId: number, ids: readonly number[]) =>
+    new Map(ids.map((id) => [id, id === 638 ? 150_000_000 : null])),
+}));
 
 // The build-system field resolves a typed name through ESI. Mocked here for the
 // same reason as the snapshot: the panel under test needs an answer, not a network.

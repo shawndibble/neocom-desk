@@ -22,5 +22,8 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 |---|---|---|
 | [wallet-balance-trend](wallet-balance-trend/README.md) | worked example | story `mockups-wallet--proposed`, today vs proposed |
 | [corp-tax-book](corp-tax-book/README.md) | Issue #4056 (UI: #4063, #4064, #4065, #4066) | Final: A's drill-down pages, C's timeline + Needs you + Statement run, B's mail preview (dialog) and guest page, queue chip with % badge on phone, personal tab = today's Tax tab + corp states |
+| [collector-books](collector-books/README.md) | Spec #4504 (UI: #4512, #4513, #4514, #4520) | List A (sortable Moon owners table) for the accounting corporation, Page B (plain statement first) for the moon owner |
+| [corp-projects](corp-projects/README.md) | Issue #4530 | Industry › Projects as the fifth tab; summary strip, chips, read-only table; grant and empty states |
+| [fittings-restock](fittings-restock/README.md) | Issue #4550 | Appraisal's card title becomes a source select (Paste / From my Fittings); Fittings with hull-count steppers; Send to Build Group… in the actions menu; Appraise and Clear inline on phone |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.

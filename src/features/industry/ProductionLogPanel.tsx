@@ -64,6 +64,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { formatPercent } from './format';
 import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
 import { isoDateParam, optionalSortParam, type UrlSort } from '@/lib/urlState';
+import { formatCount } from '@/lib/formatCount';
 
 /**
  * Dynamic import, not a static one: `ProductionProfitChart.tsx` statically
@@ -394,7 +395,7 @@ export function ProductionLogPanel({
         align: 'right',
         className: 'tabular-nums',
         sortValue: (r) => r.runsLogged,
-        render: (r) => r.runsLogged.toLocaleString(),
+        render: (r) => formatCount(r.runsLogged),
       },
       {
         id: 'unitsProduced',
@@ -402,7 +403,7 @@ export function ProductionLogPanel({
         align: 'right',
         className: 'tabular-nums',
         sortValue: (r) => r.unitsProduced,
-        render: (r) => r.unitsProduced.toLocaleString(),
+        render: (r) => formatCount(r.unitsProduced),
       },
       {
         id: 'unitsSold',
@@ -410,7 +411,7 @@ export function ProductionLogPanel({
         align: 'right',
         className: 'tabular-nums',
         sortValue: (r) => r.unitsSold,
-        render: (r) => r.unitsSold.toLocaleString(),
+        render: (r) => formatCount(r.unitsSold),
       },
       {
         id: 'realizedProfit',

@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { guarded } from '@/app/routeChunks';
 import { Spinner } from '@/components/ui';
 
 /**
@@ -28,7 +29,7 @@ export interface MailBodyEditorProps {
 }
 
 // The rich editor (Tiptap + ProseMirror) is its own chunk: nothing loads until a composer opens.
-const RichMailBodyEditor = lazy(() => import('./mailEditor/RichMailBodyEditor'));
+const RichMailBodyEditor = lazy(() => guarded(() => import('./mailEditor/RichMailBodyEditor')));
 
 /** The mail body editor: WYSIWYG with a format bar and a Source view, loaded on first use. */
 export function MailBodyEditor(props: MailBodyEditorProps) {

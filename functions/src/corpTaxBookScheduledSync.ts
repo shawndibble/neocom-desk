@@ -23,6 +23,8 @@ import {
   DISMISSALS,
   EXTRACTIONS,
   OBSERVED,
+  FEEDERS,
+  WRITE_OFFS,
 } from './corpTaxBook.js';
 import {
   SCHEDULED_VIA,
@@ -54,7 +56,15 @@ import {
   type SyncExtraction,
   type SyncGap,
 } from './corpTaxBookSyncEngine.js';
-import type { MirrorDismissal, ObservedRow } from './corpTaxBookEngine.js';
+import {
+  outgoingDonationsFromJournal,
+  writeOffForAllocation,
+  type AllocWriteOff,
+  type MirrorDismissal,
+  type ObservedRow,
+  type OutgoingDonation,
+} from './corpTaxBookEngine.js';
+import { reconcileFeederPayouts } from './corpTaxBookFeederPayouts.js';
 
 /** Same bounds the officer's client uses against the callable's caps (corpTaxBook.ts MAX_SYNC_*). */
 export const OBSERVED_PER_CALL = 2000;
@@ -107,6 +117,8 @@ export interface AdminBookState {
   dismissals: MirrorDismissal[];
   extractions: SyncExtraction[];
   paidStatementIds: Set<string>;
+  /** Officer write-offs (#4637): a Statement one forgives in full settles. */
+  writeOffs?: (AllocWriteOff & { minerId: string })[];
 }
 
 /** The sync's reads of the book, with the admin SDK (the client reads the same collections under the rules). */
@@ -119,14 +131,16 @@ export async function readBookStateAdmin(
   if (!snap.exists || snap.get('active') !== true) return null;
   const list = async <T>(name: string): Promise<T[]> =>
     (await ref.collection(name).get()).docs.map((d) => d.data() as T);
-  const [miners, statements, payments, dismissals, extractions, paid] = await Promise.all([
-    list<AdminBookState['miners'][number]>(MINERS),
-    list<AdminBookState['statements'][number]>(STATEMENTS),
-    list<AdminBookState['payments'][number]>(PAYMENTS),
-    list<MirrorDismissal>(DISMISSALS),
-    list<SyncExtraction>(EXTRACTIONS),
-    ref.collection(META).doc(PAID_DOC).get(),
-  ]);
+  const [miners, statements, payments, dismissals, extractions, paid, writeOffDocs] =
+    await Promise.all([
+      list<AdminBookState['miners'][number]>(MINERS),
+      list<AdminBookState['statements'][number]>(STATEMENTS),
+      list<AdminBookState['payments'][number]>(PAYMENTS),
+      list<MirrorDismissal>(DISMISSALS),
+      list<SyncExtraction>(EXTRACTIONS),
+      ref.collection(META).doc(PAID_DOC).get(),
+      list<Record<string, unknown>>(WRITE_OFFS),
+    ]);
   const data = snap.data() as Data;
   return {
     startDate: String(data.startDate ?? ''),
@@ -138,6 +152,10 @@ export async function readBookStateAdmin(
     dismissals,
     extractions,
     paidStatementIds: new Set((paid.data()?.ids as string[] | undefined) ?? []),
+    writeOffs: writeOffDocs.flatMap((d) => {
+      const w = writeOffForAllocation(d);
+      return w && typeof d.minerId === 'string' ? [{ ...w, minerId: d.minerId }] : [];
+    }),
   };
 }
 
@@ -189,8 +207,12 @@ export async function runBookSync(
   if (observers.kind === 'forbidden') return { kind: 'skipped', reason: 'esi-refused' };
   if (observers.kind === 'backoff') return { kind: 'skipped', reason: 'esi-budget' };
   if (observers.kind !== 'ok') return { kind: 'skipped', reason: 'esi-unavailable' };
-  // An empty list is not a successful sync: say so rather than recording a silent success.
-  if (observers.data.length === 0) return { kind: 'skipped', reason: 'no-refineries' };
+  // An empty list is not a successful sync (decision 20261020-103802), unless the book has
+  // moon owners: then its own refineries are not what it reads, and the journal, settling
+  // and payouts still run (#4616).
+  if (observers.data.length === 0 && !(await hasMoonOwners(db, corporationId))) {
+    return { kind: 'skipped', reason: 'no-refineries' };
+  }
 
   const feed: Feed = {
     rows: [],
@@ -205,7 +227,7 @@ export async function runBookSync(
     if (ledger.kind === 'backoff') return { kind: 'skipped', reason: 'esi-budget' };
     // A refinery that did not answer is a missing read, not an empty ledger: abandon the run.
     if (ledger.kind !== 'ok') return { kind: 'skipped', reason: 'esi-unavailable' };
-    const rows = observedRowsFromLedger(structureId, ledger.data, ledger.fetchedAt);
+    const rows = observedRowsFromLedger(structureId, ledger.data, ledger.fetchedAt, corporationId);
     feed.rows.push(...rows);
     feed.truncated ||= ledger.truncated;
     feed.oldestEsiDate[structureId] = rows.map((r) => r.date).sort()[0];
@@ -244,12 +266,14 @@ export async function runBookSync(
   }
 
   const donations: JournalDonation[] = [];
+  const outgoing: OutgoingDonation[] = [];
   let donationsRead = true;
   for (const division of before.divisions) {
     const journal = await esi.journal(corporationId, division, accessToken);
     if (journal.kind === 'backoff') return { kind: 'skipped', reason: 'esi-budget' };
     if (journal.kind === 'ok') {
       donations.push(...donationsFromJournal(journal.data, division, corporationId));
+      outgoing.push(...outgoingDonationsFromJournal(journal.data, division, corporationId));
     } else {
       donationsRead = false;
     }
@@ -340,10 +364,19 @@ export async function runBookSync(
         dismissals: after.dismissals,
         alreadyPaid: after.paidStatementIds,
         extractions: after.extractions,
+        ...(after.writeOffs ? { writeOffs: after.writeOffs } : {}),
+        startDate: after.startDate,
       })
     : [];
   for (const ids of chunks(toSettle, SETTLE_PER_CALL)) {
     await edit({ action: 'settleStatements', statementIds: ids });
+  }
+
+  // --- Moon owner payouts: what the wallet sent, attached to what was recorded --------
+  try {
+    await reconcileFeederPayouts(deps, corporationId, outgoing);
+  } catch (e) {
+    console.error('moon owner payouts not reconciled', e instanceof Error ? e.message : e);
   }
 
   return {
@@ -384,6 +417,12 @@ async function reassignUnmatched(
     // A failed re-match is not the sync's: report it, the next run tries again.
     return { assigned, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/** Whether the book holds any moon owner record, current or past (payouts to a past one still reconcile). */
+async function hasMoonOwners(db: Firestore, corporationId: number): Promise<boolean> {
+  const snap = await bookRef(db, corporationId).collection(FEEDERS).limit(1).get();
+  return !snap.empty;
 }
 
 /** The system a refinery's stored rows already carry, if any. */

@@ -15,6 +15,7 @@ import type { CorporationMemberTracking } from '@/esi/endpoints';
 import * as boardData from '@/features/corp/boardData';
 import * as corpMembers from '@/features/corp/members';
 import * as rosterState from '@/features/corp/rosterState';
+import * as roleAudit from '@/features/corp/roleAudit';
 import * as download from '@/lib/download';
 import { configureClipboard } from '@/lib/clipboard';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
@@ -37,6 +38,10 @@ vi.mock('@/features/corp/members', async (importOriginal) => ({
   loadCorporationMemberRoles: vi.fn(),
   loadCorporationMemberTracking: vi.fn(),
   loadMemberLabels: vi.fn(),
+}));
+vi.mock('@/features/corp/roleAudit', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/corp/roleAudit')>()),
+  loadRoleAudit: vi.fn(),
 }));
 vi.mock('@/features/corp/rosterState', () => ({
   readPreviousRoster: vi.fn(),
@@ -802,5 +807,84 @@ describe('filters and sort in the URL (issue #1306)', () => {
       'descending'
     );
     expect(within(table).getByText('Jita Local')).toBeInTheDocument();
+  });
+});
+
+describe('Roles tab (#4613)', () => {
+  const audit = {
+    data: {
+      holders: [{ characterId: 1001, roles: ['Director', 'Trader'], titles: ['CEO'] }],
+      changes: [
+        {
+          characterId: 1001,
+          issuerId: 1002,
+          changedAtMs: NOW - 2 * DAY,
+          granted: ['Trader'],
+          removed: [],
+        },
+        {
+          characterId: 1002,
+          issuerId: 1001,
+          changedAtMs: NOW - 40 * DAY,
+          granted: [],
+          removed: ['Accountant'],
+        },
+      ],
+      titlesKnown: true,
+      names: NAMES,
+      fetchedAt: new Date(NOW),
+      fromCache: false,
+    },
+  };
+
+  beforeEach(() => {
+    vi.mocked(roleAudit.loadRoleAudit).mockResolvedValue(audit);
+    mockedAccess.mockReturnValue(
+      accessOf('ready', { canReadMembers: true, canReadRoleAudit: true })
+    );
+  });
+
+  it('draws no tab bar without the capability', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
+    await rosterTable();
+    expect(screen.queryByRole('tab', { name: 'Roles' })).toBeNull();
+  });
+
+  it('offers the tab, and writes it to the URL', async () => {
+    const user = userEvent.setup();
+    await rosterTable();
+    await user.click(screen.getByRole('tab', { name: 'Roles' }));
+    expect(currentLocation()).toBe('/corp/members/roles');
+    expect(
+      await screen.findByRole('table', { name: 'Members with sensitive roles' })
+    ).toBeVisible();
+  });
+
+  it('shows sensitive holders and recent changes, older ones behind a button', async () => {
+    const user = userEvent.setup();
+    renderMembers('/corp/members/roles');
+    const holders = await screen.findByRole('table', { name: 'Members with sensitive roles' });
+    expect(within(holders).getByText('Director, Trader')).toBeInTheDocument();
+    expect(within(holders).getByText('CEO')).toBeInTheDocument();
+    const history = screen.getByRole('table', { name: 'Role changes' });
+    expect(within(history).getByText('Granted Trader')).toBeInTheDocument();
+    expect(within(history).queryByText('Removed Accountant')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Show 1 older change' }));
+    expect(within(history).getByText('Removed Accountant')).toBeInTheDocument();
+  });
+
+  it('never reads or records the roster while the Roles tab is open', async () => {
+    renderMembers('/corp/members/roles');
+    await screen.findByRole('table', { name: 'Members with sensitive roles' });
+    expect(mocked.loadCorporationMemberTracking).not.toHaveBeenCalled();
+    expect(mocked.recordRoster).not.toHaveBeenCalled();
+  });
+
+  it('moves the Roles path to the roster without the capability', async () => {
+    mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
+    renderMembers('/corp/members/roles');
+    await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
+    expect(currentLocation()).toBe('/corp/members/members');
+    expect(roleAudit.loadRoleAudit).not.toHaveBeenCalled();
   });
 });

@@ -9,6 +9,7 @@
  */
 import { loadCorporationStructures } from '@/features/corp/boardData';
 import { toBoardStructures } from '@/features/corp/boardSources';
+import { CorpReadFailed } from '@/features/corp/corpRead';
 import { resolveCorpReadAccess } from '@/features/corp/corpReadAccess';
 import { loadMoonChunks } from '@/features/character/calendarMoonChunks';
 import type { MoonChunksBoardData, StructuresBoardData } from './boardData';
@@ -24,7 +25,11 @@ export async function loadStructuresBoardData(characterId: number): Promise<Stru
   const access = await resolveCorpReadAccess(characterId);
   if (access === null || !access.can('canReadStructures')) return UNREADABLE_STRUCTURES;
   const result = await loadCorporationStructures(characterId, access.corporationId);
-  if (result.cached === null) return { ...UNREADABLE_STRUCTURES, needsReauth: result.needsReauth };
+  if (result.cached === null) {
+    if (result.needsReauth) return { ...UNREADABLE_STRUCTURES, needsReauth: true };
+    // Allowed and empty-handed: an outage, so the widget offers Retry rather than "your roles don't cover this".
+    throw new CorpReadFailed('structures');
+  }
   const structures = result.cached.data;
   return {
     structures: toBoardStructures(structures),
@@ -37,9 +42,11 @@ export async function loadStructuresBoardData(characterId: number): Promise<Stru
 /** The Calendar's moon read, as-is: it already gates, names refineries and picks arrival or decay. */
 export async function loadMoonChunksBoardData(characterId: number): Promise<MoonChunksBoardData> {
   const loadedAt = Date.now();
-  const { result, sources } = await loadMoonChunks(characterId, loadedAt);
+  const { result, sources, extractions, failed } = await loadMoonChunks(characterId, loadedAt);
+  if (failed) throw new CorpReadFailed('moon extractions');
   return {
     chunks: sources ?? null,
+    extractions,
     needsReauth: result.needsReauth,
     fetchedAt: result.cached?.fetchedAt ?? null,
     loadedAt,

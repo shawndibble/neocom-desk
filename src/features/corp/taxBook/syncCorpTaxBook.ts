@@ -39,12 +39,14 @@ import {
 } from './bookClient';
 import {
   loadDonations,
+  loadOutgoingDonations,
   loadEsiExtractions,
   loadMoonNotifications,
   loadObserverFeed,
   type FeedFailure,
   type ObserverFeed,
 } from './esiFeed';
+import { reconcileFeederPayouts } from './feederClient';
 
 /** The server accepts at most this many observer rows in one sync call. */
 export const OBSERVED_PER_CALL = 2000;
@@ -73,6 +75,12 @@ export interface SyncDeps {
     divisions: readonly number[]
   ) => Promise<JournalDonation[]>;
   uploadSync: (characterId: number, upload: SyncUpload) => Promise<SyncReceipt>;
+  /** Attaches the wallet's outgoing donations to the moon owner payouts recorded (no-op without moon owners). */
+  reconcilePayouts?: (
+    characterId: number,
+    corporationId: number,
+    divisions: readonly number[]
+  ) => Promise<unknown>;
   settleStatements: (
     characterId: number,
     corporationId: number,
@@ -105,6 +113,10 @@ export const defaultSyncDeps: SyncDeps = {
   loadMoonNotifications,
   loadDonations,
   uploadSync,
+  reconcilePayouts: async (characterId, corporationId, divisions) => {
+    const outgoing = await loadOutgoingDonations(characterId, corporationId, divisions);
+    if (outgoing.length > 0) await reconcileFeederPayouts(characterId, corporationId, outgoing);
+  },
   settleStatements: (characterId, corporationId, statementIds) =>
     editBook(characterId, corporationId, { action: 'settleStatements', statementIds }),
   loadAccountCharacters: async () =>
@@ -263,6 +275,13 @@ export async function syncCorpTaxBook(
     await deps.uploadSync(characterId, { corporationId, extractions: rest, gaps });
   }
 
+  // What the wallet sent a moon owner is its own books: a failure here is not the sync's.
+  if (capabilities.canReadWallet && donations !== null) {
+    await deps
+      .reconcilePayouts?.(characterId, corporationId, before.book.divisions)
+      .catch(() => undefined);
+  }
+
   // D26: this account's own Characters in the corporation share one Miner, so one payment covers them.
   const { grouped: autoGrouped, error: autoGroupError } = await autoGroup(
     deps,
@@ -297,6 +316,8 @@ export async function syncCorpTaxBook(
         miners: after.miners,
         alreadyPaid: after.paidStatementIds,
         extractions: after.extractions,
+        ...(after.writeOffs ? { writeOffs: after.writeOffs } : {}),
+        startDate: after.book.startDate,
       })
     : [];
   for (const ids of chunks(toSettle, SETTLE_PER_CALL)) {

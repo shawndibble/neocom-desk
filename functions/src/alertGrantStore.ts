@@ -9,7 +9,7 @@ import {
   type RefreshedTokens,
 } from './alertGrant.js';
 import { rotateStoredToken, decryptRefreshToken } from './alertGrantCrypto.js';
-import { DEVICE_REGISTRATIONS_COLLECTION } from './projectionStore.js';
+import { DEVICE_REGISTRATIONS_COLLECTION, readQuietHours } from './projectionStore.js';
 import type { PollDevice, PollerStore } from './pollEveNotifications.js';
 
 export const ALERT_GRANTS_COLLECTION = 'alertGrants';
@@ -109,6 +109,7 @@ export function firestorePollerStore(
           deviceId: doc.id,
           fcmToken: data.fcmToken,
           eveTypes: Array.isArray(types) ? types.filter((t) => typeof t === 'string') : [],
+          quietHours: readQuietHours(data.quietHours),
         });
       }
       return devices;

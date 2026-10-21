@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { esiIdentityReader } from './corpTaxBookEsi.js';
+import { esiIdCategoryLookup, esiIdentityReader } from './corpTaxBookEsi.js';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
@@ -36,5 +36,32 @@ describe('esiIdentityReader', () => {
     await expect(reader(403)).rejects.toMatchObject({ code: 'permission-denied' });
     await expect(reader(429)).rejects.toMatchObject({ code: 'resource-exhausted' });
     await expect(reader(502)).rejects.toMatchObject({ code: 'unavailable' });
+  });
+});
+
+describe('esiIdCategoryLookup (#4621)', () => {
+  it('posts the id to universe/names with ESI headers and returns its category', async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return json([{ id: 77, category: 'character', name: 'Someone' }]);
+    });
+    expect(await esiIdCategoryLookup(fetchMock as unknown as typeof fetch)(77)).toBe('character');
+    expect(calls[0].url).toMatch(/\/universe\/names\/$/);
+    expect(calls[0].init.method).toBe('POST');
+    expect(calls[0].init.body).toBe('[77]');
+    const headers = calls[0].init.headers as Record<string, string>;
+    expect(headers['X-Compatibility-Date']).toBeTruthy();
+    expect(headers['X-User-Agent']).toBeTruthy();
+  });
+
+  it('an id ESI does not know has no category', async () => {
+    const fetchMock = vi.fn(async () => json({ error: 'Ensure all IDs are valid' }, 404));
+    expect(await esiIdCategoryLookup(fetchMock as unknown as typeof fetch)(5)).toBeUndefined();
+  });
+
+  it('ESI failing is an error, never a guess', async () => {
+    const fetchMock = vi.fn(async () => json({}, 502));
+    await expect(esiIdCategoryLookup(fetchMock as unknown as typeof fetch)(5)).rejects.toThrow();
   });
 });

@@ -15,6 +15,9 @@ import {
   getCharacterPublicInfo,
   getCorporationPublicInfo,
   getCorporationMiningObservers,
+  getCorporationContracts,
+  getCorporationContractItems,
+  getCorporationOrders,
   getCorporationMiningObserver,
   getAlliancePublicInfo,
   getUniverseType,
@@ -709,6 +712,70 @@ describe('corp mining observers', () => {
 
     expect(ledger.items).toEqual([row(1), row(2)]);
     expect(ledger.truncated).toBe(false);
+  });
+});
+
+describe('corp orders', () => {
+  const CORPORATION_ID = 98000001;
+
+  it('getCorporationOrders lists the corporation’s open orders, across pages', async () => {
+    const row = (id: number) => ({ order_id: id, type_id: 34, issued_by: 7 });
+    server.use(
+      http.get(`${ESI_BASE_URL}/corporations/${CORPORATION_ID}/orders`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        const page = new URL(request.url).searchParams.get('page');
+        return HttpResponse.json(page === '2' ? [row(2)] : [row(1)], {
+          headers: { 'X-Pages': '2' },
+        });
+      })
+    );
+
+    const result = await getCorporationOrders(CHARACTER_ID, CORPORATION_ID);
+
+    expect(result.items).toEqual([row(1), row(2)]);
+    expect(result.truncated).toBe(false);
+  });
+});
+
+describe('corp contracts', () => {
+  const CORPORATION_ID = 98000001;
+
+  it('getCorporationContracts lists the corporation’s contracts, across pages', async () => {
+    const contract = (id: number) => ({ contract_id: id, type: 'courier', status: 'outstanding' });
+    server.use(
+      http.get(`${ESI_BASE_URL}/corporations/${CORPORATION_ID}/contracts`, ({ request }) => {
+        const bad = rejectBadEsiHeaders(request);
+        if (bad) return bad;
+        const page = new URL(request.url).searchParams.get('page');
+        return HttpResponse.json(page === '2' ? [contract(2)] : [contract(1)], {
+          headers: { 'X-Pages': '2' },
+        });
+      })
+    );
+
+    const result = await getCorporationContracts(CHARACTER_ID, CORPORATION_ID);
+
+    expect(result.items).toEqual([contract(1), contract(2)]);
+    expect(result.truncated).toBe(false);
+  });
+
+  it('getCorporationContractItems reads one contract’s items under the corporation', async () => {
+    const items = [{ record_id: 1, type_id: 34, quantity: 5, is_included: true }];
+    server.use(
+      http.get(
+        `${ESI_BASE_URL}/corporations/${CORPORATION_ID}/contracts/77/items`,
+        ({ request }) => {
+          const bad = rejectBadEsiHeaders(request);
+          if (bad) return bad;
+          return HttpResponse.json(items);
+        }
+      )
+    );
+
+    const result = await getCorporationContractItems(CHARACTER_ID, CORPORATION_ID, 77);
+
+    expect(result.data).toEqual(items);
   });
 });
 

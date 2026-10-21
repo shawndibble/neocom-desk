@@ -8,22 +8,44 @@ import {
   type CorpCapability,
 } from './corpRoles';
 
-/** Every capability that is true, sorted — terser than asserting four booleans. */
+/**
+ * Every role-gated capability that is true — terser than asserting each boolean.
+ * `canReadContracts` is left out: ESI names no role for it, so everyone holds it
+ * (its own test below).
+ */
 function held(roles: readonly string[]): CorpCapability[] {
   const capabilities = corpCapabilities(roles);
-  return CORP_CAPABILITIES.filter((capability) => capabilities[capability]);
+  return CORP_CAPABILITIES.filter(
+    (capability) => capability !== 'canReadContracts' && capabilities[capability]
+  );
 }
 
 describe('corpCapabilities', () => {
   it('grants nothing to a character with no roles', () => {
-    expect(corpCapabilities([])).toEqual(NO_CORP_CAPABILITIES);
+    expect(held([])).toEqual([]);
+    expect(corpCapabilities([])).toEqual({ ...NO_CORP_CAPABILITIES, canReadContracts: true });
     expect(hasAnyCorpCapability(corpCapabilities([]))).toBe(false);
+  });
+
+  // The contracts routes carry no `x-required-roles`: any member reads them, and
+  // that alone never opens a corp surface.
+  it('grants contracts to every member, without opening any corp surface', () => {
+    for (const roles of [[], ['Accountant'], ['Personnel_Manager']]) {
+      expect(corpCapabilities(roles).canReadContracts, roles.join()).toBe(true);
+    }
+    expect(hasAnyCorpCapability({ ...NO_CORP_CAPABILITIES, canReadContracts: true })).toBe(false);
   });
 
   // GET /corporations/{id}/wallets (+ journal, transactions) declares
   // x-required-roles ["Accountant", "Junior_Accountant"] — either one alone.
   it('grants wallet and mining-ledger access to an Accountant', () => {
-    expect(held(['Accountant'])).toEqual(['canReadWallet', 'canReadMiningLedger']);
+    expect(held(['Accountant'])).toEqual(['canReadWallet', 'canReadMiningLedger', 'canReadOrders']);
+  });
+
+  // GET /corporations/{id}/orders declares x-required-roles ["Accountant", "Trader"].
+  it('grants market orders to a Trader alone, and not to a Junior_Accountant', () => {
+    expect(held(['Trader'])).toEqual(['canReadOrders']);
+    expect(corpCapabilities(['Junior_Accountant']).canReadOrders).toBe(false);
   });
 
   it('grants wallet access to a Junior_Accountant', () => {
@@ -90,6 +112,15 @@ describe('corpCapabilities', () => {
   it('grants corp blueprint access only to a Director', () => {
     expect(corpCapabilities(['Factory_Manager']).canReadBlueprints).toBe(false);
     expect(corpCapabilities(['Director']).canReadBlueprints).toBe(true);
+    expect(corpCapabilities(['Factory_Manager']).canReadCustomsOffices).toBe(false);
+    expect(corpCapabilities(['Director']).canReadCustomsOffices).toBe(true);
+    expect(corpCapabilities(['Factory_Manager']).canReadRoleAudit).toBe(false);
+    expect(corpCapabilities(['Director']).canReadRoleAudit).toBe(true);
+  });
+
+  it('opens the starbase reads to a Director alone', () => {
+    expect(corpCapabilities(['Station_Manager']).canReadStarbases).toBe(false);
+    expect(corpCapabilities(['Director']).canReadStarbases).toBe(true);
   });
 
   /**
@@ -99,7 +130,10 @@ describe('corpCapabilities', () => {
    * frequently just `["Director"]`.
    */
   it('grants every capability to a Director, who is not listed under any other role', () => {
-    expect(held(['Director'])).toEqual([...CORP_CAPABILITIES]);
+    expect(held(['Director'])).toEqual(
+      CORP_CAPABILITIES.filter((capability) => capability !== 'canReadContracts')
+    );
+    expect(corpCapabilities(['Director']).canReadContracts).toBe(true);
     expect(hasAnyCorpCapability(corpCapabilities(['Director']))).toBe(true);
   });
 
@@ -108,6 +142,7 @@ describe('corpCapabilities', () => {
       'canReadWallet',
       'canReadMiningLedger',
       'canReadIndustry',
+      'canReadOrders',
     ]);
   });
 

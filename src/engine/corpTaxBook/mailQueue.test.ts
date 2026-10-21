@@ -9,10 +9,14 @@ import {
   markSent,
   nextStep,
   reminderAllowed,
+  removalMailsToDrop,
   retryItem,
   sendGapMs,
+  stampRemovalEffectiveAt,
+  startsRemovalClock,
   summarize,
   type MailQueueItem,
+  removalNoticeStillDue,
 } from './mailQueue';
 
 function item(n: number, patch: Partial<MailQueueItem> = {}): MailQueueItem {
@@ -204,5 +208,81 @@ describe('isAlreadyQueued', () => {
     const r = item(1, { kind: 'reminder', status: 'sent' });
     expect(isAlreadyQueued([r], 's1', 'reminder')).toBe(false);
     expect(isAlreadyQueued([{ ...r, status: 'waiting' }], 's1', 'reminder')).toBe(true);
+  });
+});
+
+describe('removal notices (#4617)', () => {
+  const notice = (n: number, patch: Partial<MailQueueItem> = {}) =>
+    item(n, { kind: 'removal', feederCorporationId: 5, ...patch });
+
+  it('only a copy to the moon owner side starts the 24 hours', () => {
+    expect(startsRemovalClock(notice(1, { startsClock: true }))).toBe(true);
+    expect(startsRemovalClock(notice(1, { startsClock: false }))).toBe(false);
+    // Queued before the flag existed: as before, any copy starts it.
+    expect(startsRemovalClock(notice(1))).toBe(true);
+    expect(startsRemovalClock(item(1))).toBe(false);
+    expect(startsRemovalClock(notice(1, { kind: 'removalCancelled' }))).toBe(false);
+  });
+
+  it('a cancel drops the unsent notices for that moon owner only', () => {
+    const items = [
+      notice(1),
+      notice(2, { status: 'failed' }),
+      notice(3, { status: 'sent' }),
+      notice(4, { feederCorporationId: 6 }),
+      notice(5, { corporationId: 1 }),
+      notice(6, { kind: 'removalCancelled' }),
+      item(7),
+    ];
+    expect(removalMailsToDrop(items, 98000001, 5)).toEqual(['m1', 'm2']);
+  });
+
+  it('once the clock starts, every unsent copy carries the recorded time', () => {
+    const items = [
+      notice(1, { status: 'sent' }),
+      notice(2),
+      notice(3, { status: 'failed' }),
+      notice(4, { feederCorporationId: 6 }),
+      notice(5, { effectiveAt: 99 }),
+    ];
+    expect(
+      stampRemovalEffectiveAt(items, 98000001, 5, 99).map((i) => [i.id, i.effectiveAt])
+    ).toEqual([
+      ['m2', 99],
+      ['m3', 99],
+    ]);
+  });
+});
+
+describe('removalNoticeStillDue (#4621)', () => {
+  const notice = (patch: Partial<MailQueueItem> = {}) =>
+    item(1, { kind: 'removal', feederCorporationId: 98000002, removalStartedAt: 500, ...patch });
+  it('sends while the same removal is still pending', () => {
+    expect(
+      removalNoticeStillDue(notice(), { status: 'pending-removal', removal: { startedAt: 500 } })
+    ).toBe(true);
+  });
+  it('drops it once cancelled, ended or disconnected, by anyone', () => {
+    for (const status of ['active', 'removed', 'left', 'disconnected']) {
+      expect(removalNoticeStillDue(notice(), { status })).toBe(false);
+    }
+    expect(removalNoticeStillDue(notice(), undefined)).toBe(false);
+  });
+  it('drops a notice for an earlier removal when a new one started', () => {
+    expect(
+      removalNoticeStillDue(notice(), { status: 'pending-removal', removal: { startedAt: 900 } })
+    ).toBe(false);
+  });
+  it('an item queued before the removal was recorded on it only needs a pending removal', () => {
+    expect(
+      removalNoticeStillDue(notice({ removalStartedAt: undefined }), {
+        status: 'pending-removal',
+        removal: { startedAt: 900 },
+      })
+    ).toBe(true);
+  });
+  it('never holds back any other kind of mail', () => {
+    expect(removalNoticeStillDue(item(1), undefined)).toBe(true);
+    expect(removalNoticeStillDue(item(1, { kind: 'removalCancelled' }), undefined)).toBe(true);
   });
 });

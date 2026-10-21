@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { formatIsk } from '@/lib/isk';
 import { usePriceBreakdown, type PriceBreakdownInput } from './usePriceBreakdown';
 import { OreLink } from './OreIcon';
+import { formatCount } from '@/lib/formatCount';
 
 /**
  * What the estimate was built from — per-ore unit price and where it came
@@ -32,7 +33,7 @@ export function PriceBreakdownCard(props: PriceBreakdownInput) {
               <OreLink typeId={l.typeId}>{name(l.typeId)}</OreLink>
             </span>
             <span className="tabular-nums text-text-dim">
-              {l.quantity.toLocaleString()} × {unitText(l.overridden ? undefined : l.unitPrice)}
+              {formatCount(l.quantity)} × {unitText(l.overridden ? undefined : l.unitPrice)}
             </span>
             <span className="text-text-dim">{sourceLabel(l)}</span>
           </li>

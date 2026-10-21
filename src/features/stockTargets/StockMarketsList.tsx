@@ -27,6 +27,7 @@ import type { TradeHub } from '@/market/hubs';
 import { StockNeedPill } from './StockStatus';
 import { STOCK_PATH } from './StockMarketPage';
 import { loadStockMarkets, type StockMarketRow, type StockMarketsData } from './stockTargetsData';
+import { formatNumber } from '@/lib/numberLocale';
 
 export function StockMarketsList({
   lists,
@@ -117,7 +118,7 @@ export function StockMarketsList({
       // Leads the phone card's meta line, so a stocked market's card still says something.
       render: (market) => (
         <>
-          {market.items.toLocaleString()}
+          {formatNumber(market.items)}
           <span className="sm:hidden">
             {' '}
             {t('stockTargets.markets.itemsAffix', { count: market.items })}

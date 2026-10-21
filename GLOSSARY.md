@@ -19,6 +19,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Acquisition Verdict**: Whether a Build Plan's product costs less to build
   than to buy outright at the trade hub. A personal-use comparison — no
   sales tax or broker fee applies, because nothing is being sold.
+- **Agreed rate**: What the **Collector** set as a **Feeder**'s **Owner rate**. When one exists it wins over the **Requested rate**. Player-facing: "your rate" or "their rate".
 - **Alert**: One fired Notification Event as it appears in the Notification
   Feed and in the bell panel, grouped by _type_ (the EVE notification type, or
   the event id otherwise). A danger type nobody has acknowledged also raises
@@ -34,8 +35,17 @@ here — they go one per file in `docs/context/decisions/`.
   worth", Compare answers "which of these is cheaper". Its "Compare hubs"
   section prices the same pile at all 5 Trade Hubs ("where is it worth the
   most") and is not the **Compare** drawer.
+- **Collector**: A corporation whose **Corp Tax Book** also collects moon mining tax for moons it does not own, billing the miners and accounting to each **Feeder**. Dev term: to a moon owner it is "the accounting corporation".
+- **Coverage period**: A run of UTC days (`from`, optional `to`, both inclusive) during which a **Feeder**'s mined volume counts toward a **Collector**'s book; a rejoin adds a new one on the same record, and rows outside every period owe nothing.
+- **Disconnected**: A **Feeder**'s status after 30 days of a stale grant. Player-facing: "Disconnected".
+- **Feeder**: A moon-owning corporation whose mining ledger a **Collector** reads. Dev term: player-facing, "moon owner".
+- **Feeder view**: What a **Feeder** sees of the **Collector**'s book: its own mined volume, rate, amount due and payouts, never the miner debts, **Miner rate** or margin. Player-facing: the moon owner's page.
+- **Miner rate**: What miners pay in a **Collector**'s book, with a per-**Feeder** tier in its chain. Never shown to a **Feeder**. Player-facing: "miner rate".
 - **Omega coverage**: Overview widget: how many Omega subscriptions ("accounts") a pilot's net ISK income per rolling 7, 30 or 90 days (the widget range; 30 by default) could pay for, at PLEX's price, against one account's cost for that window. Its "accounts" are EVE subscriptions counted from ISK, not the **Account** UI grouping of Characters.
 - **Open in EVE**: A button or menu item that asks the running EVE client to open a window (the information window for a character, corporation or alliance; an item's market window; or a contract) through `esi-ui.open_window.v1`. A write only in that it reaches the game: nothing in EVE changes. Its own default-on **Permission**, "Open in EVE".
+- **Owner rate**: What a **Feeder** is owed, kept as its own effective-dated history: the **Agreed rate** if one exists, else the **Requested rate**. Player-facing: "their rate" or "your rate".
+- **Payout**: ISK a **Collector** sent a **Feeder** for what it is owed. Distinct from a **Tax Payment**. Player-facing: "payment".
+- **Pending removal**: A **Collector**-started removal of a **Feeder** while it waits out its 24 hours. Player-facing: "Removal pending".
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.
@@ -266,6 +276,16 @@ here — they go one per file in `docs/context/decisions/`.
 - **Corp Capability**: What a Character can actually _see_ — wallet,
   structures, members, industry — derived from their Corp Roles. The unit
   every consumer branches on; none compares role strings itself.
+- **Corp overview**: `/corp`, a **Widget board** of corp **Widgets** the pilot
+  chooses, sizes, orders, renames and removes, on the same engine as the
+  Overview. Replaces the fixed Corp Ops Board (Standing, Deadline Strip, Kind
+  Cards, Offline services, Money, People). Each kind is gated on its own Corp
+  Capability: hidden, never locked.
+- **Corp overview layout**: The ordered list of **Widgets** on the **Corp
+  overview**. One per pilot, not per corporation or Character, synced as
+  `sync.corpOverviewLayout`. Until the pilot edits it the page draws the full
+  default and never saves it; each Character sees the widgets its Corp
+  Capabilities open. No Role chooser.
 - **Corp Role**: An in-game corporation role (Director, Accountant,
   Station_Manager, Factory_Manager, ...) held by a Character. A second,
   invisible access axis alongside granted scopes: CCP role-gates the
@@ -317,10 +337,11 @@ here — they go one per file in `docs/context/decisions/`.
   row of day columns, each with its weekday, date, a count and a bar segmented
   by **Clock Kind**, in place of a grid that would take the width the **Coming
   Up Rail** needs.
-- **Deadline Strip**: The corp overview's bar per local calendar day, each
-  counting the Corp Board Items falling due on it and coloured by the worst
-  Board Severity landing there. Exists to pay for what Kind Cards give up: four
-  cards can each look calm while, between them, they hide one bad day.
+- **Deadline Strip**: The bar per local calendar day in the **Corp overview**'s
+  Due soon **Widget**'s Chart **View**, each counting the Corp Board Items
+  falling due on it and coloured by the worst Board Severity landing there.
+  Exists so that several calm-looking lists cannot hide one bad day. It was a
+  fixed panel on the Corp Ops Board before that became a widget grid.
 - **Editable Data**: Data created inside the app (Skill Plans, Build Plans, Production Runs, settings). Synced across devices. Everything else is API-derived and re-pulled per device.
 - **Effective Skill Level**: The level this character can use right now: the
   lower of the trained level and the active level, each corrected for what the
@@ -363,6 +384,8 @@ here — they go one per file in `docs/context/decisions/`.
   **Appraisal**, which reads it for what the loadout costs to buy.
 - **Fitting**: One ship hull plus everything loaded into it — modules, charges, drones, fighters, cargo — under a name. Its numbers are worked out for the active Character's skills, so switching Character re-states the same Fitting for the new pilot. The implants and combat boosters in play are the set the Fitting itself carries when it carries one, and that Character's own clone otherwise. The exception is a **Fitting Share Code** or **Share Link** opened with nobody logged in, which is stated at every skill level V. Distinct from an **In-game Fitting**, which is a Fitting as the game itself stores it on a Character, and from **Fit Import**, which turns fit text into Build Plans.
 - **Fleet boosts**: The Fittings stats section for what a command ship gives its fleet — each running command or mining foreman burst and an industrial core's compression. Only shown on a fit that has one. Distinct from **Support out**, which is what a fit's modules do to another ship (remote repair, webs, ewar), and from **Projected effects**, which is what other ships do to this one.
+- **Requested rate**: The **Owner rate** a **Feeder** asks for, which stands only until the **Collector** sets an **Agreed rate**. Player-facing: "you asked for 6%".
+- **Settled otherwise**: A **Feeder** mode in which it is compensated another way, such as fuel or rock access: nothing is due and no balance is kept. Player-facing: "Settled otherwise".
 - **Skill Comparison**: The drawer over Skills › Trained that sets several **Character**s' trained skills against one **Baseline Character**, skill by skill, with saved selections. Opened by "Compare with…"; not a page or a tab. Distinct from Market **Compare**, Appraisal's **Compare hubs**, **Fitting Compare** and **Build Plan Compare**: it shares nothing with them.
 - **Baseline Character**: The **Character** in a **Skill Comparison** every other column is measured against (`+2`, `−3`, `missing`). Defaults to the active Character; any selected Character can be set as it.
 - **Fitting Compare**: The Ships section's page showing up to three **Fitting**s side by side, their stats worked out for the active Character's skills. The whole comparison lives in the URL as **Fitting Share Code**s. Distinct from Market **Compare** / **Compare Set**, Appraisal's **Compare hubs**, and **Build Plan Compare**: it shares nothing with them.
@@ -379,8 +402,10 @@ here — they go one per file in `docs/context/decisions/`.
   It suppresses its own browser notification for an occurrence the
   Notification Feed already shows as delivered.
 - **Freshness Window**: how long a cached row is served without asking ESI again. Ten minutes for a Character's own data, a day for game constants. Distinct from **Data Age**, which reports how old the shown data is; the window decides whether to go and get newer.
-- **Gallery**: The Overview's "Add a widget" drawer: the **Widget Kind**
-  catalogue with search and category chips. A kind may be added more than once.
+- **Gallery**: A **Widget board**'s "Add a widget" drawer: that board's
+  **Widget Kinds** with search and category chips. A kind may be added more
+  than once. On the **Corp overview** it never offers a kind whose Corp
+  Capability the Character lacks.
 - **Gank Chokepoint**: one of the named systems haulers are most often killed in — Uedama, Sivala, Aufay, Balle, Tama, Rancer, Ahbazon. A property of _traffic_, not of security status. An explicit list rather than a derived rule. States where a haul goes, never that anything will happen to the hauler there.
 - **Goal Plan**: the PI Plan tab's answer to "here are my colonies and the products I want per day — what does each colony do?". Goals (products at a units/day rate) are expanded into demand, and a greedy solver assigns each enabled colony a role — extract and refine P0 to P1, host the P2+ factories, or sit idle. Measured against the **Baseline**: every colony selling the best P1 it can make by itself; the plan's **Lift** is its net ISK minus the Baseline. What it cannot cover is a **Shortfall**, either a **Type gap** (no enabled colony's planet type yields that P0) or a **Budget gap** (colonies that could yield it are full). Its output is a change list against what each colony runs today, never a fresh layout.
 - **Chain estimate**: a P3 or P4's ISK a day as a whole multi-planet chain: the Goal Plan's solver run on new planets the pilot would add. Always labelled "multi-planet, needs hauling" and an estimate, and never ranked against one-planet figures, except in Plan's opt-in **Bigger chain** section.
@@ -447,7 +472,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Job Fee**: The ISK ESI charges to install a manufacturing job, separate from material cost. Sized from EIV, the system's **Cost Index**, a fixed SCC surcharge, and the facility's tax.
 - **Jump Basis**: The one set of rules every jump count in the app is worked out under: the Travel Settings plus Route Safety's saved Thera / Turnur hole and Ansiblex jump-bridge settings. It is how Assets, Market, BPC Sourcing, Contract Search and Courier agree with the route Route Safety draws.
 - **Jump Range**: The distance filter on Market Browser, Contract Search's Items and **BPC Sourcing**: Any, the **Current System** only, or within a set number of stargate jumps of it. Counted on the local stargate graph under the **Jump Basis**. A row the app cannot place (a player structure) drops out once a range is set.
-- **Kind Card**: One `/corp` overview panel per kind of Corp Board Item (Fuel, Structure timers, Moon chunks, Industry jobs), showing that kind's most urgent few and counting the rest.
+- **Kind Card**: Retired. One panel per kind of Corp Board Item on the old Corp Ops Board; the **Corp overview** now draws those kinds as **Widgets**.
 - **Load**: Bringing a **Fitting** into the Ships section's Fittings tab from any outside source — EFT text, a DNA or in-game chat link, an exported fittings file, an **In-game Fitting**, a share link, another site's fit link, a killmail, a **Popular fit**, or an **EVE Workbench fit**. Loading stores nothing; only an explicit save does. Distinct from **Fit Import**, which turns fit text into Build Plans.
 - **Local Draw**: What a PI colony's own factories take an hour off the products that colony makes, by input typeID. The subtrahend of the **Exportable Rate**.
 - **Location Mode**: The Market Browser's one location control, in one of two mutually exclusive modes: **Region** (every station in that region) or **Trade Hub** (that hub's region, filtered to the hub's station). Region mode can also be **All regions**: the selected item's order book merged from every Market Region.
@@ -490,7 +515,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Notification Family**: A presentation grouping over the **Notification Allow-List** — Structures, War, Corp Governance, Bills, Moon Mining, PI. How Settings arranges the list and nothing more: it carries no defaults and gates no delivery.
 - **Observed Mining Entry**: One row of a **Corp Tax Book**: everything one character mined at one of the corporation's refineries on one EVE/UTC date, summed per ore type, as the refinery itself recorded it. The corp-side counterpart of a **Mining Ledger Entry**, valued the same way, so both sides reach the same tax.
 - **Occurrence Key**: The deterministic identity of one notification occurrence, derived from the Character, the **Notification Event** and the natural id of the thing that happened. Devices and the backend observing the same occurrence all compute the same key, which is what makes de-duplication possible. Distinct from the Notification Feed's row id.
-- **Offline Services**: The `/corp` overview's strip for the board's one untimed kind: a structure service that is off. A standing fault with no instant, so it has no place in a **Kind Card**'s ordering or on the Deadline Strip.
+- **Offline Services**: A structure service that is off: the one untimed kind of Corp Board Item, a standing fault with no instant. Listed by the **Corp overview**'s Offline services **Widget**; it has no place on the Deadline Strip.
 - **Open Price**: The highest buy order and the lowest sell order standing _at a Trade Hub station_ (Jita 4-4, not The Forge) at the end of one UTC day, read from that day's final EVE Ref market-order snapshot (normally 23:45) and stored per item, every hub station in one object, at `open-prices/<typeId>.json` in R2. Only orders placed in the station count; a buy order's range is ignored. Drawn on **Price History** as the Buy and Sell lines ("Jita 4-4 buy") of the five Trade Hub Regions, each from its hub station. Distinct from ESI's daily average price, which is what was actually paid across the day, and from the live **Order Book**, which is what is standing right now.
 - **Optimize Modes**: Skill Plan optimizer actions in one "Optimize" dropdown: "optimize for me" (the default: reorder, then place remaps on the new order), "reorder only" (honours prerequisites and **Plan Priority**, keeps current remaps), "place remaps only" (keeps current order), and "use my remap markers" (best attribute spread per segment between **Remap Markers**). Every mode previews; nothing applies silently.
 - **Order Count**: How many orders ticked for an item in a Region on one day. A read on how many parties were trading, not on how much moved; **Traded Volume** answers that.
@@ -509,7 +534,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **Overdue**: A **Statement** that is still unpaid a set number of days after it was issued (14 by default; settable per book). No interest accrues, and reminders are sent by hand. A Miner's declaration that they paid another way pauses it for at most 14 days.
 - **Overview Layout**: The ordered list of **Widgets** on the Overview, with
   each one's size, view, rename, character scope and range. One per pilot, not
-  per Character, and synced as a whole.
+  per Character, and synced as a whole. The **Corp overview** has its own, the
+  **Corp overview layout**.
 - **Owned-Stock Offer**: A materials row's "Use assets" offer: the owned quantity it would write (detected stock in the owned-stock scope, less any **Group Stock Claim** ahead of the plan, capped at what the row needs), or none. "Use all" is every row's offer at once; "Use none" clears every row. One rule for a Build Plan and a Build Group alike.
 - **Group Stock Claim**: A Build Group member's set Have, read as a hold on the detected stock its owned-stock scope shares with another member. A member's **Owned-Stock Offer** leaves out the claims of members ahead of it (plan id order, the order the group page lists them); claims together past the stock show an amber warning on each claiming member. Display-only: never written into another plan, and separate from the **Group Owned Overlay**.
 - **Payee**: Who the Moon Mining Tax ledger owes: user-managed name, default tax %, optional moon/system tag, optional Trade Hub. The tag lets the app suggest the Payee and rate for a future **Mining Ledger Entry** from that system. The Trade Hub is the order book this Payee's ore is valued at (absent means Jita). May also carry `entityId`, the EVE character or corporation the ISK goes to, learned when a **Made Payment** to that recipient is confirmed, or set by picking the Payee from the name search. Then it also carries `entityKind` (character, corporation or alliance), which marks it verified; a name that matches none stays an unverified free-text label (a moon or place), and Settle up opens a verified Payee in EVE.
@@ -612,7 +638,7 @@ here — they go one per file in `docs/context/decisions/`.
   one row. Not a height; its content sets that. Also sets how much a **View**
   shows.
 - **Stale-Serve**: Showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Signalled for a **Published Snapshot**, where a long window encodes a publish cadence; silent for a game constant, whose long window asserts the value cannot change. One that fails to revalidate must say so on the next read.
-- **Standing (corp)**: The `/corp` overview's top panel: the figures a corp manager acts on (clocks due inside a day, Runway, 30-day net), beside the Deadline Strip. Degrades figure by figure on Corp Capability.
+- **Standing (corp)**: Retired. The old Corp Ops Board's top panel of figures (clocks due inside a day, Runway, 30-day net); the **Corp overview**'s Due soon, Corp wallet and Cash flow **Widgets** carry them now.
 - **Starred Character**: A Character the user has marked to float to the top of its group on the Characters page. Device-local, never synced. Called "starred", not "pinned", because **Pin** already means a planetary structure (and a **Station Pin**).
 - **Statement**: One miner's bill from a **Corp Tax Book** for one billing period: what they mined, where and when, its value, the tax due, and what they have paid. What gets mailed to the miner.
 - **Stock List**: A market the pilot stocks: the station or structure they sell at, and the **Stock Targets** it should have listed. Account-wide: it counts every Character's own sell orders there (listed) and their hangars at the same location (ready to list). Shared by link as a copy, never with the sender's counts. Called a "market" in the UI.
@@ -633,7 +659,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Throughput** (planetary): A second budget, independent of the **Pin Budget**: whether the colony's links can carry the material flow and whether a buffer cycle fits in the Launchpad and Storage Facility. A layout can clear the Pin Budget and still stall.
 - **Triage Board**: The Overview as it was before the widget grid: a fixed board
   with one card per domain. Retired; the Overview is now an **Overview Layout**
-  the pilot builds. Distinct from the **Corp Ops Board** (`/corp`), which
+  the pilot builds. Distinct from the **Corp overview** (`/corp`), which
   answers the same question for a corporation.
 - **Trade Hub**: A market station/region the user picks for price lookups in a Build Plan.
 - **Hauling Opportunities**: The Travel page's Hauling tab: items worth buying at one **Trade Hub** to sell at another, scanned per market category, priced at an **Expected Sell Price** and sized to a **Trip Plan**. Not a price-gap list.
@@ -658,12 +684,19 @@ here — they go one per file in `docs/context/decisions/`.
   its **Widget Kind** has. Chosen in the widget's settings menu.
 - **What We Store**: The section of Settings' FAQ tab that tells a pilot, in their own words, what leaves their device. Not documentation but a **commitment**: the **Synced Collection** registry is the authoritative set, and every synced collection must be accounted for. Names its own exceptions (Notification Feed rows, Scheduled Push occurrences, crash reports) rather than rounding them off.
 - **What-If Implants**: Optimizer override that assumes a hypothetical implant set instead of the clone's current implants: five independent per-attribute bonuses (+0..+5 each), since EVE's attribute hardwirings are per slot. The matched sets (+1..+5 in every slot) remain one-click **presets** over those five values. Stored on the Skill Plan and synced with it.
-- **Widget**: One tile on the Overview: an instance of a **Widget Kind** with
+- **Widget**: One tile on a **Widget board** (the Overview or the **Corp overview**): an instance of a **Widget Kind** with
   its own **Size**, **View**, optional rename, character scope and range. The
   same kind may appear more than once. Always in one **Widget State**.
-- **Widget Kind**: An entry in the catalogue of what the Overview can show
-  (Wallet, Orders, Planetary...): its title, category, which **Views** it has,
-  default **Size** and the ESI permission it needs. A kind not built yet is
-  "coming soon": listed in the **Gallery**, not addable.
+- **Widget board**: A page drawn as a **Widget** grid: the Overview or the
+  **Corp overview**. One engine (grid, Customize, **Gallery**, menu) with the
+  board's differences read from a context: which kinds it offers, which a
+  Character may see, whether a widget has a character scope, and the default
+  layout.
+- **Widget Kind**: An entry in the one global catalogue of what a **Widget
+  board** can show (Wallet, Orders, Planetary, Corp wallet...): its title,
+  category, which **Views** it has, default **Size**, the ESI permission it
+  needs and, for a corp kind, the Corp Capabilities that open it. Corp-only ids
+  are prefixed `corp`; Structures and Moon extractions are on both boards. A
+  kind not built yet is "coming soon": listed in the **Gallery**, not addable.
 - **Widget State**: Which of five things a **Widget** is showing: loading,
   needs permission, failed, empty or ok.

@@ -46,6 +46,34 @@ export const MINERS = 'miners';
 export const META = 'meta';
 export const PAID_DOC = 'paid';
 export const AUDIT = 'audit';
+/** `corpTaxBooks/{collector}/feeders/{feederCorp}`: a feeder's record (issue #4507). */
+export const FEEDERS = 'feeders';
+/** `corpTaxBookFeederInvites/{sha256(code)}`: invite links, function-only. */
+export const FEEDER_INVITES_COLLECTION = 'corpTaxBookFeederInvites';
+/**
+ * `corpTaxBookFeederOf/{feederCorp}`: points a corporation that feeds a book at its
+ * Collector, function-only. Lets "is this corporation a feeder?" be a plain read.
+ */
+export const FEEDER_OF_COLLECTION = 'corpTaxBookFeederOf';
+/**
+ * `corpTaxBookFeederPrevious/{feederCorp}`: `{ collectorCorporationId, leftAt }`, written when a
+ * feeder leaves (the `FEEDER_OF` pointer is deleted then). Function-only; resolves the
+ * Collector for the after-leaving view (issue #4512).
+ */
+export const FEEDER_PREVIOUS_COLLECTION = 'corpTaxBookFeederPrevious';
+/**
+ * `corpTaxBookRemovalLinks/{sha256(code)}`: the link in a removal's mail (issue #4520); only the
+ * hash is stored. Function-only: a client never reads it.
+ */
+export const REMOVAL_LINKS_COLLECTION = 'corpTaxBookRemovalLinks';
+/** `corpTaxBooks/{collector}/feederViews/{feederCorp}`: the moon owner's read model (issue #4512). */
+export const FEEDER_VIEWS = 'feederViews';
+/**
+ * `corpTaxBookBilledBy/{char:id}`: which books bill a Character, `books[collectorCorp]`
+ * the epoch ms of the last sync that saw them there. Written by the sync, readable by
+ * that Character only, so a miner in a moon owner's corporation finds the book (#4517).
+ */
+export const BILLED_BY_COLLECTION = 'corpTaxBookBilledBy';
 
 /** Roles are trusted for at most this long without a live check (D7). */
 export const ROLE_CACHE_MS = 10 * 60_000;
@@ -118,7 +146,7 @@ export function utcDate(nowMs: number): string {
   return new Date(nowMs).toISOString().slice(0, 10);
 }
 
-function int(value: unknown, field: string, min = 1, max = Number.MAX_SAFE_INTEGER): number {
+export function int(value: unknown, field: string, min = 1, max = Number.MAX_SAFE_INTEGER): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
     throw new HttpsError('invalid-argument', `${field} must be a whole number ${min}-${max}`);
   }
@@ -128,6 +156,14 @@ function int(value: unknown, field: string, min = 1, max = Number.MAX_SAFE_INTEG
 function num(value: unknown, field: string, min: number, max: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max) {
     throw new HttpsError('invalid-argument', `${field} must be a number ${min}-${max}`);
+  }
+  return value;
+}
+
+/** A rate in percent: a finite number 0-100. */
+export function pctField(value: unknown, name: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
+    throw new HttpsError('invalid-argument', `${name} must be 0-100`);
   }
   return value;
 }
@@ -179,6 +215,19 @@ export function parseBookCall(data: unknown): BookCall {
   return { corporationId: int(d.corporationId, 'corporationId', 1, CORP_ID_MAX), accessToken };
 }
 
+/** A book call about one of its moon owners. */
+export interface FeederTargetCall extends BookCall {
+  feederCorporationId: number;
+}
+
+export function parseFeederTarget(data: unknown): FeederTargetCall {
+  const id = record(data).feederCorporationId;
+  if (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1) {
+    throw new HttpsError('invalid-argument', 'feederCorporationId must be a corporation id');
+  }
+  return { ...parseBookCall(data), feederCorporationId: id };
+}
+
 export interface TurnOnInput extends BookCall {
   startDate: string;
   /** The corp-default rate, dated at the start date. */
@@ -198,17 +247,31 @@ export type StoredRate =
   | { scope: 'corp' | 'guest'; pct: number; effectiveFrom: string }
   | { scope: 'miner'; minerId: string; pct: number; effectiveFrom: string }
   | { scope: 'moon'; moonId: number; pct: number; effectiveFrom: string }
+  | { scope: 'structure'; structureId: number; pct: number; effectiveFrom: string }
+  | { scope: 'feeder'; feederId: number; pct: number; effectiveFrom: string }
   | { scope: 'record'; recordKey: string; pct: number };
 
 export function parseDatedRate(data: unknown): Exclude<StoredRate, { scope: 'record' }> {
   const d = record(data);
-  const scope = oneOf(d.scope, 'scope', ['corp', 'guest', 'miner', 'moon'] as const);
+  const scope = oneOf(d.scope, 'scope', [
+    'corp',
+    'guest',
+    'miner',
+    'moon',
+    'structure',
+    'feeder',
+  ] as const);
   const base = {
     pct: num(d.pct, 'pct', 0, 100),
     effectiveFrom: dateString(d.effectiveFrom, 'effectiveFrom'),
   };
   if (scope === 'miner') return { scope, minerId: docId(d.minerId, 'minerId'), ...base };
   if (scope === 'moon') return { scope, moonId: int(d.moonId, 'moonId'), ...base };
+  // A refinery by structure id (#4621): a moon owner's ledger-only rows never carry a moon.
+  if (scope === 'structure')
+    return { scope, structureId: int(d.structureId, 'structureId'), ...base };
+  // Every refinery of one moon owner corporation: the miner rate chain's per-feeder tier.
+  if (scope === 'feeder') return { scope, feederId: int(d.feederId, 'feederId'), ...base };
   return { scope, ...base };
 }
 
@@ -706,6 +769,7 @@ export interface SyncInput extends BookCall {
     cachedAt: string;
     solarSystemId?: number;
     moonId?: number;
+    sourceCorporationId?: number;
   }[];
   extractions: {
     structureId: number;
@@ -757,6 +821,16 @@ export function parseSyncInput(data: unknown, nowMs: number): SyncInput {
         ? {}
         : { solarSystemId: int(row.solarSystemId, 'solarSystemId', 30_000_000, 32_000_000) }),
       ...(row.moonId === undefined ? {} : { moonId: int(row.moonId, 'moonId') }),
+      ...(row.sourceCorporationId === undefined
+        ? {}
+        : {
+            sourceCorporationId: int(
+              row.sourceCorporationId,
+              'sourceCorporationId',
+              1,
+              CORP_ID_MAX
+            ),
+          }),
     };
   });
   const extractions = list(d.extractions ?? [], 'extractions', MAX_SYNC_EXTRACTIONS).map((r) => {

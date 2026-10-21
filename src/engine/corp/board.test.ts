@@ -5,6 +5,7 @@ import {
   severityForRemaining,
   type BoardExtractionSource,
   type BoardJobSource,
+  type BoardStarbaseSource,
   type BoardStructureSource,
   type CorpBoardItem,
 } from './board';
@@ -506,5 +507,54 @@ describe('CORP_BOARD_ITEM_KINDS', () => {
     });
     const produced = new Set(items.map((item) => item.kind));
     expect([...produced].sort()).toEqual([...CORP_BOARD_ITEM_KINDS].sort());
+  });
+});
+
+describe('starbases', () => {
+  const starbase = (over: Partial<BoardStarbaseSource> = {}): BoardStarbaseSource => ({
+    starbaseId: 7,
+    name: 'Efa - Moon 1',
+    fuelExpiresMs: null,
+    reinforcedUntilMs: null,
+    unanchorsAtMs: null,
+    ...over,
+  });
+
+  const sbBoard = (starbases: BoardStarbaseSource[]) =>
+    board({ nowMs: NOW, staleWindowMs: STALE_WINDOW, starbases });
+
+  it('puts nothing on the board for a tower with no known fuel clock or timer', () => {
+    expect(sbBoard([starbase()])).toEqual([]);
+  });
+
+  it('ranks a fuel clock as structure fuel, like any other deadline', () => {
+    const [item] = sbBoard([starbase({ fuelExpiresMs: at(5 * HOUR) })]);
+    expect(item).toMatchObject({
+      kind: 'structureFuel',
+      subject: 'Efa - Moon 1',
+      deadlineMs: at(5 * HOUR),
+      timing: 'timed',
+    });
+  });
+
+  it('shows an empty bay as an overdue clock, not an unknown one', () => {
+    const [item] = sbBoard([starbase({ fuelExpiresMs: at(-2 * HOUR) })]);
+    expect(item!.severity).toBe('critical');
+    expect(item!.remainingMs).toBe(-2 * HOUR);
+  });
+
+  it('adds reinforcement and unanchor timers as structure timers', () => {
+    const items = sbBoard([
+      starbase({ reinforcedUntilMs: at(3 * DAY), unanchorsAtMs: at(4 * DAY) }),
+    ]);
+    expect(items.map((i) => [i.kind, i.detail])).toEqual([
+      ['structureTimer', 'reinforced'],
+      ['structureTimer', 'unanchoring'],
+    ]);
+  });
+
+  it('does not tick a reinforcement shorter than the cache window', () => {
+    const [item] = sbBoard([starbase({ reinforcedUntilMs: at(20 * MINUTE) })]);
+    expect(item!.withinStaleWindow).toBe(true);
   });
 });

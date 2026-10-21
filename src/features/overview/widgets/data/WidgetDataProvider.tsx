@@ -58,6 +58,18 @@ import {
   loadTradingProfitWidget,
   loadSurveyWidget,
 } from './kindLoaders';
+import {
+  loadCorpCustomsFeed,
+  loadCorpJobsFeed,
+  loadCorpKillsFeed,
+  loadCorpMembersFeed,
+  loadCorpRoleAuditFeed,
+  loadCorpMiningFeed,
+  loadCorpStarbasesFeed,
+  loadCorpContractsFeed,
+  loadCorpOrdersFeed,
+  loadCorpWalletFeed,
+} from './corpFeeds';
 import { feedsFor } from './models';
 import { useOverviewRefresh } from './refreshContext';
 import type { FeedId, FeedMap } from './types';
@@ -269,6 +281,49 @@ function Source({ feed }: { feed: FeedId }) {
           accountWide
         />
       );
+    // The Corp overview's reads: keyed `corp:` so they never share a row with a character read.
+    case 'corpWallet':
+      return <SnapshotSource feed="corpWallet" load={loadCorpWalletFeed} cacheKey="corp:wallet" />;
+    case 'corpJobs':
+      return <SnapshotSource feed="corpJobs" load={loadCorpJobsFeed} cacheKey="corp:jobs" />;
+    case 'corpCustoms':
+      return (
+        <SnapshotSource feed="corpCustoms" load={loadCorpCustomsFeed} cacheKey="corp:customs" />
+      );
+    case 'corpRoleAudit':
+      return (
+        <SnapshotSource
+          feed="corpRoleAudit"
+          load={loadCorpRoleAuditFeed}
+          cacheKey="corp:roleAudit"
+        />
+      );
+    case 'corpMembers':
+      return (
+        <SnapshotSource feed="corpMembers" load={loadCorpMembersFeed} cacheKey="corp:members" />
+      );
+    case 'corpMining':
+      return <SnapshotSource feed="corpMining" load={loadCorpMiningFeed} cacheKey="corp:mining" />;
+    case 'corpStarbases':
+      return (
+        <SnapshotSource
+          feed="corpStarbases"
+          load={loadCorpStarbasesFeed}
+          cacheKey="corp:starbases"
+        />
+      );
+    case 'corpContracts':
+      return (
+        <SnapshotSource
+          feed="corpContracts"
+          load={loadCorpContractsFeed}
+          cacheKey="corp:contracts"
+        />
+      );
+    case 'corpOrders':
+      return <SnapshotSource feed="corpOrders" load={loadCorpOrdersFeed} cacheKey="corp:orders" />;
+    case 'corpKills':
+      return <SnapshotSource feed="corpKills" load={loadCorpKillsFeed} cacheKey="corp:kills" />;
     case 'incursions':
       return <IncursionsSource />;
     case 'spExtras':

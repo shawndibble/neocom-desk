@@ -8,6 +8,7 @@ import { MODULE_STATE_STYLE } from '../moduleStateStyle';
 import { type Budget, GaugeSwatch } from './RimGauge';
 import { budgetValue } from './ringFormat';
 import { eyebrowClassName as MICRO_LABEL } from '@/components/ui/eyebrowClassName';
+import { fmt1 } from '../stats/fixedFormat';
 
 export function Readout({
   gauge,
@@ -48,7 +49,7 @@ export function Readout({
         </p>
         {overBudget && (
           <p className="text-danger">
-            {t('fittings.list.overBy', { amount: flash.overage.toFixed(1) })}
+            {t('fittings.list.overBy', { amount: fmt1(flash.overage) })}
           </p>
         )}
       </div>

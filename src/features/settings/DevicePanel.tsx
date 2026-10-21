@@ -7,6 +7,7 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { logoutAllCharacters } from '@/features/character/logoutAll';
 import { UnsyncedChangesWarning } from '@/features/character/UnsyncedChangesWarning';
 import { RemoveSharedOption } from '@/features/communities/RemoveSharedOption';
+import { ActionResult, SettingsHint } from '@/features/settings/settingsFields';
 import {
   deleteAllLocalData,
   leaveAllCommunities,
@@ -103,13 +104,13 @@ export function DevicePanel() {
   const administered = (communities ?? []).filter((entry) => entry.administered);
 
   return (
-    <Panel title={t('settings.deviceTitle')}>
+    <Panel>
       <div className="space-y-4">
-        <p className="max-w-2xl text-xs text-text-dim">
+        <SettingsHint>
           {loggedIn > 0
             ? t('settings.deviceCharacters', { count: loggedIn })
             : t('settings.deviceCharactersNone')}
-        </p>
+        </SettingsHint>
         <Fields variant="form">
           <Field
             label={t('settings.deviceLogoutLabel')}
@@ -164,9 +165,9 @@ export function DevicePanel() {
           syncConfigured={syncConfigured}
         />
         {failed && (
-          <p role="alert" className="mt-2 text-xs text-danger">
+          <ActionResult kind="error" className="mt-2">
             {t('settings.deviceLogoutFailed')}
-          </p>
+          </ActionResult>
         )}
         <div className="mt-3 flex justify-end gap-2">
           <Button
@@ -238,9 +239,9 @@ export function DevicePanel() {
           </>
         )}
         {failed && (
-          <p role="alert" className="mt-2 text-xs text-danger">
+          <ActionResult kind="error" className="mt-2">
             {t('settings.deviceDeleteFailed')}
-          </p>
+          </ActionResult>
         )}
         <div className="mt-3 flex justify-end gap-2">
           {!unpurged && (

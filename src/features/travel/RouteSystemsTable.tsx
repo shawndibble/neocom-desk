@@ -24,6 +24,7 @@
  * an info tip giving the reason, since ESI does not report wormhole space; zKillboard still
  * lists it.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SystemNote } from './SystemNote';
@@ -53,6 +54,7 @@ import { LawlessTag } from './LawlessTag';
 import { routeSystemName } from './routeSystemName';
 import type { RouteKillsCell } from './useRouteKills';
 import type { RouteSafetyTripRow } from './useRouteSafety';
+import { formatNumber } from '@/lib/numberLocale';
 
 type TableRow = RouteSafetyTripRow | HoleStep | BridgeStep;
 
@@ -91,7 +93,7 @@ function withHoleSteps(rows: readonly RouteSafetyTripRow[]): TableRow[] {
 const DASH = '—';
 
 function count(value: number | null): string {
-  return value === null ? DASH : value.toLocaleString();
+  return value === null ? DASH : formatNumber(value);
 }
 
 /** A zKillboard figure the fold can trust: loading and unavailable are unknown, never zero. */
@@ -319,7 +321,7 @@ export function RouteSystemsTable({
             count: members.length,
             from: first ? routeSystemName(first) : '',
             to: last ? routeSystemName(last) : '',
-            security: lowest === undefined ? DASH : lowest.toFixed(1),
+            security: lowest === undefined ? DASH : fixed1(lowest),
           })}
         </span>
       );

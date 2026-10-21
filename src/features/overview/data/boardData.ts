@@ -40,7 +40,11 @@ import { useMarketHub } from '@/features/market/hub';
 import { loadPriceVsMedian } from '@/features/market/priceVsMedian';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { payeesOwed, type PayeeOwed } from './miningTaxPayees';
-import type { BoardStructureSource, CorpBoardItem } from '@/engine/corp/board';
+import type {
+  BoardExtractionSource,
+  BoardStructureSource,
+  CorpBoardItem,
+} from '@/engine/corp/board';
 import type { BoardClockSource } from '@/engine/character/board';
 import type { CalendarEventSummary } from '@/esi/endpoints';
 
@@ -554,6 +558,11 @@ export async function loadStructuresBoard(characterId: number): Promise<Structur
 export interface MoonChunksBoardData {
   /** One clock per drill (arrival, or decay once landed), or null when unreadable. */
   chunks: BoardClockSource[] | null;
+  /**
+   * The same drills as the corp board ranks them (arrival and natural decay
+   * both known), for the Corp overview's Due soon; absent when unreadable.
+   */
+  extractions?: BoardExtractionSource[];
   needsReauth: boolean;
   fetchedAt: Date | null;
   loadedAt: number;
