@@ -15,6 +15,7 @@ import { runPurgeNotificationFeed, runPurgeStaleAccounts } from './purgeJobs.js'
 import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, r2ConfigOrThrow } from './r2Publish.js';
 import { openPricesR2Key } from './r2DailySnapshots.js';
 import { createR2Get } from './r2Publisher.js';
+import { runSyncActiveWars } from './activeWarsJob.js';
 import { runSyncLawlessSystems, runSyncMarketOpenPrices } from './marketHistoryJob.js';
 import {
   runSyncLpStoreOffers,
@@ -1066,6 +1067,27 @@ export const sweepCommunityRequests = onSchedule(
 export const syncLawlessSystems = onSchedule(
   { schedule: 'every 15 minutes' },
   runSyncLawlessSystems
+);
+
+/**
+ * syncActiveWars: the War banner's data (`systemConditions/activeWars`). ESI
+ * cannot list one corporation's wars, so this keeps every war that is still
+ * running and the app picks its own out of the list. Twice a day: a new
+ * declaration also reaches a pilot sooner through their Alerts, and a war has
+ * a 24-hour wait before it starts, so 12 hours is a fine cadence for the
+ * pilot who had no alerts on.
+ *
+ * Each run reads new war ids, re-reads the wars it holds, and spends the rest
+ * of its allowance seeding backward from the newest id (`activeWars.ts`), so the
+ * first runs fill in about a year of history. ESI gives `/wars/{id}` 3,600
+ * tokens per 15 minutes; a run stops short of emptying that window. It can be
+ * run again by hand from Cloud Scheduler to seed faster.
+ *
+ * Another Cloud Scheduler job past the free three, like the jobs above.
+ */
+export const syncActiveWars = onSchedule(
+  { schedule: 'every 12 hours', timeoutSeconds: 540, maxInstances: 1 },
+  runSyncActiveWars
 );
 
 /**
