@@ -8,6 +8,7 @@
  * corp-scoped keys and the 403 handling are theirs, not a second copy.
  */
 import { diffRoster } from '@/engine/corp/members';
+import { summariseBay } from '@/engine/corp/starbases';
 import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCorporationId, MASTER_WALLET_DIVISION } from '@/features/corp/boardData';
@@ -28,6 +29,7 @@ import {
   loadCorporationMemberTracking,
   toMemberActivity,
 } from '@/features/corp/members';
+import { loadCorporationStarbases, loadStarbaseDetails } from '@/features/corp/starbases';
 import { readPreviousRoster } from '@/features/corp/rosterState';
 import { loadObserverFeed } from '@/features/corp/taxBook/esiFeed';
 import {
@@ -49,6 +51,8 @@ import type {
   CorpKillsFeed,
   CorpMembersFeed,
   CorpMiningFeed,
+  CorpStarbaseRow,
+  CorpStarbasesFeed,
   CorpOrdersFeed,
   CorpWalletFeed,
 } from './corpFeeds';
@@ -279,6 +283,51 @@ export async function loadCorpMining(characterId: number): Promise<CorpMiningFee
     truncated: feed.truncated,
     typeNames,
     minerNames,
+  };
+}
+
+export async function loadCorpStarbases(characterId: number): Promise<CorpStarbasesFeed> {
+  const empty: CorpStarbasesFeed = {
+    ...UNREADABLE,
+    starbases: [],
+    typeNames: new Map(),
+    systemNames: new Map(),
+  };
+  const access = await gate(characterId, 'canReadStarbases');
+  if (access === null) return empty;
+  const { corporationId } = access;
+  const list = await loadCorporationStarbases(characterId, corporationId);
+  if (list.cached === null) {
+    if (list.needsReauth) return { ...empty, needsReauth: true };
+    throw new CorpReadFailed('starbases');
+  }
+  const towers = list.cached.data;
+  // Fuel and strontium live on the per-tower call, and only a tower burning fuel has a bay worth reading.
+  const online = towers.filter((tower) => tower.state === 'online');
+  const [details, typeNames, systemNames] = await Promise.all([
+    loadStarbaseDetails(characterId, corporationId, online),
+    loadTypeNames([...new Set(towers.map((tower) => tower.type_id))]),
+    resolveNames([...new Set(towers.map((tower) => tower.system_id))]),
+  ]);
+  const starbases = towers.map((tower): CorpStarbaseRow => {
+    const detail = details.get(tower.starbase_id)?.cached?.data;
+    return {
+      starbaseId: tower.starbase_id,
+      systemId: tower.system_id,
+      typeId: tower.type_id,
+      state: tower.state ?? 'unknown',
+      reinforcedUntilMs: parseInstant(tower.reinforced_until),
+      unanchorsAtMs: parseInstant(tower.unanchor_at),
+      bay: detail === undefined ? null : summariseBay(detail.fuels),
+    };
+  });
+  return {
+    readable: true,
+    needsReauth: false,
+    ...readAge([list, ...details.values()]),
+    starbases,
+    typeNames,
+    systemNames,
   };
 }
 

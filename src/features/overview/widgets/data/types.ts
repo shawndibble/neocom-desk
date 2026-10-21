@@ -31,6 +31,7 @@ import type {
   CorpKillsFeed,
   CorpMembersFeed,
   CorpMiningFeed,
+  CorpStarbasesFeed,
   CorpWalletFeed,
 } from './corpFeeds';
 import type { BoardDeadline } from '../nextDeadline';
@@ -266,6 +267,7 @@ export interface FeedMap {
   corpRoleAudit: CorpRoleAuditFeed;
   corpMembers: CorpMembersFeed;
   corpMining: CorpMiningFeed;
+  corpStarbases: CorpStarbasesFeed;
   corpContracts: CorpContractsFeed;
   corpOrders: CorpOrdersFeed;
   corpKills: CorpKillsFeed;

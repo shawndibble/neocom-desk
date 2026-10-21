@@ -311,8 +311,7 @@ Customize, Gallery, menu and phone list are shared.
 - **Hourly cache.** No countdown shorter than the 1 h corp cache window; the
   data-age popover carries the note.
 - **No Show info links** from rows; tables link rows to pages.
-- **Coming soon (eight):** Starbases, Customs offices, Role audit,
-  Doctrine, Kills, Contracts, SRP, Projects. They need new scopes or app-owned
+- **Coming soon (three):** Doctrine, SRP, Projects. They need new scopes or app-owned
   data and are separate tickets; any new corp scope must be additive
   (`ADDITIVE_CORP_CAPABILITIES`).
 

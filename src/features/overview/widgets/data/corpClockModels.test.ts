@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { BoardExtractionSource, BoardStructureSource } from '@/engine/corp/board';
 import type { CorporationIndustryJob } from '@/esi/endpoints';
 import type { MoonChunksBoardData, StructuresBoardData } from '../../data/boardData';
-import type { CorpJobsFeed } from './corpFeeds';
+import type { CorpJobsFeed, CorpStarbasesFeed } from './corpFeeds';
 import { corpDeadlines, corpJobs, corpServices } from './corpClockModels';
 import type { BuildContext, FeedState, Feeds } from './types';
 
@@ -131,6 +131,59 @@ describe('corpDeadlines', () => {
     expect(view.table?.rows[0]?.cells[0]).toBe('Rifter');
     expect(view.status.isEmpty).toBe(false);
     expect(view.to).toBeNull();
+  });
+
+  it('adds the starbase fuel and reinforcement clocks, and waits for them while they load', () => {
+    const towers = ok<CorpStarbasesFeed>({
+      readable: true,
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+      fromCache: false,
+      starbases: [
+        {
+          starbaseId: 9,
+          systemId: 100,
+          typeId: 12235,
+          state: 'online',
+          reinforcedUntilMs: null,
+          unanchorsAtMs: null,
+          // 40 blocks an hour: 6 hours left.
+          bay: { fuelBlocks: 240, strontium: 400 },
+        },
+      ],
+      typeNames: new Map([[12235, 'Caldari Control Tower']]),
+      systemNames: new Map([[100, 'Efa']]),
+    });
+    const base: Feeds = {
+      structures: structuresFeed([]),
+      moonChunks: moonFeed([]),
+      corpJobs: jobsFeed([]),
+    };
+    const view = corpDeadlines({ ...base, corpStarbases: towers }, ctx);
+    expect(view.number.value).toBe('1');
+    expect(view.table?.rows[0]?.cells[0]).toBe('Caldari Control Tower (Efa)');
+    expect(view.table?.rows[0]?.cells[1]).toBe('corp.board.detail.fuel');
+
+    const waiting = corpDeadlines({ ...base, corpStarbases: loading<CorpStarbasesFeed>() }, ctx);
+    expect(waiting.status.loading).toBe(true);
+  });
+
+  it('is not blocked by a starbase read this Character may not make', () => {
+    const feeds: Feeds = {
+      structures: structuresFeed([structure({ fuelExpiresMs: NOW + 5 * HOUR })]),
+      moonChunks: moonFeed([]),
+      corpJobs: jobsFeed([]),
+      corpStarbases: ok<CorpStarbasesFeed>({
+        readable: false,
+        needsReauth: false,
+        fetchedAt: null,
+        fromCache: false,
+        starbases: [],
+        typeNames: new Map(),
+        systemNames: new Map(),
+      }),
+    };
+    expect(corpDeadlines(feeds, ctx).number.value).toBe('1');
   });
 
   it('never prints a countdown shorter than the one-hour cache window', () => {

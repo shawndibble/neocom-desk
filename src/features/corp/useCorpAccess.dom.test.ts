@@ -251,6 +251,7 @@ describe('useCorpAccess — ready', () => {
       canReadIndustry: true,
       canReadAssets: true,
       canReadBlueprints: true,
+      canReadStarbases: true,
       canReadCustomsOffices: true,
       canReadRoleAudit: true,
       canReadContracts: true,

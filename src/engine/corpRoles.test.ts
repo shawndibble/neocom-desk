@@ -118,6 +118,11 @@ describe('corpCapabilities', () => {
     expect(corpCapabilities(['Director']).canReadRoleAudit).toBe(true);
   });
 
+  it('opens the starbase reads to a Director alone', () => {
+    expect(corpCapabilities(['Station_Manager']).canReadStarbases).toBe(false);
+    expect(corpCapabilities(['Director']).canReadStarbases).toBe(true);
+  });
+
   /**
    * The case a naive `roles.includes('Accountant')` gets wrong for the most
    * important user. In EVE a Director implicitly holds every other role, and
