@@ -14573,7 +14573,7 @@
           "no-book": "This corporation has no active Corp Tax Book.",
           "wrong-scopes": "EVE did not grant exactly the permissions needed. Try again and keep every box ticked.",
           "missing-scope": "That login is missing a permission. Try again and keep every box ticked.",
-          "not-signed-in": "Sign in first, then try again.",
+          "not-signed-in": "Log in first, then try again.",
           "not-your-feeder": "This corporation is not handled by your book.",
           "no-feeder": "This corporation is not handled by your book.",
           "collector-gone": "The accounting corporation's book is gone.",
