@@ -13772,7 +13772,8 @@
       "tabs": {
         "extractions": "Extractions",
         "miners": "Miners",
-        "statements": "Statements"
+        "statements": "Statements",
+        "moonOwners": "Moon owners"
       },
       "neverSynced": "Never synced",
       "syncedBy": "Synced {{age}} by {{name}}",
@@ -14540,6 +14541,136 @@
           "intro": "The tax it waived is owed again.",
           "reason": "Reason (required)",
           "confirm": "Reverse"
+        }
+      },
+      "moonOwners": {
+        "label": "Moon owners",
+        "invite": "Invite a moon owner…",
+        "cols": {
+          "owner": "Moon owner",
+          "status": "Status",
+          "mined": "Mined",
+          "theirRate": "Their rate",
+          "minerRate": "Miner rate",
+          "owed": "Owed to them"
+        },
+        "chips": {
+          "owed": "Owed to moon owners",
+          "paid": "Paid out this month",
+          "count": "Moon owners",
+          "needLook": "Need a look"
+        },
+        "status": {
+          "active": "Active",
+          "cant-read": "Can't read ledger",
+          "removal-pending": "Removal pending",
+          "settled-otherwise": "Settled otherwise",
+          "no-rate": "No rate set",
+          "disconnected": "Disconnected",
+          "left": "Left",
+          "removed": "Removed"
+        },
+        "refineries_one": "{{count}} refinery",
+        "refineries_other": "{{count}} refineries",
+        "synced": "Synced {{age}}",
+        "cantReadSince": "Can't read their ledger since {{date}}",
+        "since": "since {{date}}",
+        "until": "until {{date}}",
+        "notSet": "Not set",
+        "nothingDue": "Nothing due",
+        "summary": "{{shown}} moon owners",
+        "empty": {
+          "title": "No moon owners yet",
+          "hint": "Invite a corporation that owns moons. It shares its mining ledger, and you account to it for what was mined."
+        },
+        "page": {
+          "notFound": "That moon owner is not in this book",
+          "owed": "Owed to them",
+          "accrued": "Accrued",
+          "paid": "Paid",
+          "mined": "Mined",
+          "rates": "Rates",
+          "theirRate": "Their rate (what you owe them)",
+          "minerRate": "Miner rate (what miners pay)",
+          "minerHint": "Never shown to them",
+          "margin": "Your margin",
+          "marginHint": "Miner rate − their rate",
+          "asked": "They asked for {{pct}}%. Yours stands.",
+          "askedSame": "They asked for {{pct}}%.",
+          "noRate": "No rate set. Nothing is due until you set one.",
+          "notSet": "Not set",
+          "history": {
+            "agreed": "Rate set to {{pct}}%",
+            "requested": "{{name}} asked for {{pct}}%",
+            "joined": "Joined from an invite offering {{pct}}%"
+          },
+          "setRate": "Set rate…",
+          "settledOtherwise": "Settled otherwise…",
+          "settledNote": "Settled otherwise: nothing is due and no balance is kept.",
+          "stale": "Can't read their ledger since {{date}}. Their days wait until it reads again.",
+          "pending": "Removal pending. It ends when its 24-hour wait is over.",
+          "disconnected": "Disconnected. Their ledger could not be read for 30 days.",
+          "payouts": {
+            "title": "Payments",
+            "none": "Nothing paid yet.",
+            "date": "Date",
+            "amount": "Amount",
+            "how": "How",
+            "status": "Status",
+            "method": {
+              "donation": "Donation",
+              "other": "Other"
+            },
+            "state": {
+              "recorded": "Recorded",
+              "waiting-for-journal": "Waiting for the wallet journal",
+              "matched": "Matched in the wallet journal"
+            }
+          },
+          "minedTitle": "Mined at their refineries",
+          "minedNone": "Nothing mined at their refineries yet.",
+          "cols": {
+            "character": "Character",
+            "refinery": "Refinery",
+            "ore": "Ore",
+            "quantity": "Quantity",
+            "value": "Value"
+          }
+        },
+        "dialogs": {
+          "rate": {
+            "title": "Set their rate",
+            "field": "Rate (%)",
+            "hint": "Your rate wins over what they asked for, from today. Their requests are kept and change nothing.",
+            "confirm": "Set rate"
+          },
+          "settled": {
+            "title": "Settled otherwise",
+            "toggle": "We settle with them another way (fuel, rock access…)",
+            "note": "Note (optional)",
+            "onHint": "Nothing is due and no balance is kept from today.",
+            "offHint": "Switching this off resumes accrual from today. Past days are not backfilled.",
+            "confirm": "Save"
+          },
+          "invite": {
+            "title": "Invite a moon owner",
+            "intro": "Make a link to send in EVE chat or mail. The moon owner opens it and shares its mining ledger with this book.",
+            "offer": "Rate to offer (%), optional",
+            "make": "Make a link",
+            "link": "Invite link",
+            "copy": "Copy link",
+            "copied": "Copied",
+            "warning": "Anyone with this link can connect as a moon owner. Send it only to the corporation you mean.",
+            "open": "Open links",
+            "none": "No open links.",
+            "made": "Made {{date}} by {{name}}",
+            "offering": "offering {{pct}}%",
+            "revoke": "Revoke",
+            "revokeLabel": "Revoke the link made {{date}}",
+            "codeNote": "Only a link made now can be copied. Older links can only be revoked.",
+            "loadFailed": "Could not load the open links.",
+            "done": "Done"
+          }
         }
       }
     }

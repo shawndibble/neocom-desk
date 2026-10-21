@@ -42,6 +42,8 @@ import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 
 export interface BookNames {
   character: (id: number) => string;
+  /** A corporation (a moon owner) by id. */
+  corporation: (id: number) => string;
   refinery: (id: number) => string;
   moon: (id: number) => string;
   ore: (typeId: number) => string;
@@ -273,8 +275,11 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
     const characterIds = new Set<number>();
     for (const m of view.miners) for (const id of m.characterIds) characterIds.add(id);
     for (const p of view.input.payments) characterIds.add(p.characterId);
-    if (fetched.status === 'loaded')
+    if (fetched.status === 'loaded') {
       for (const a of fetched.data.groupingAnswers ?? []) characterIds.add(a.characterId);
+      // Moon owners are corporations; the universe names lookup resolves both kinds.
+      for (const f of fetched.data.feeders ?? []) characterIds.add(f.corporationId);
+    }
     const refineryIds = new Set<number>([
       ...view.input.extractions.map((x) => x.structureId),
       ...view.charges.map((c) => c.structureId),
@@ -309,6 +314,7 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
   const bookNames: BookNames = useMemo(
     () => ({
       character: (id) => names.characters.get(id) ?? `#${id}`,
+      corporation: (id) => names.characters.get(id) ?? `#${id}`,
       refinery: (id) => names.refineries.get(id) ?? `Refinery ${id}`,
       moon: (id) => names.moons.get(id) ?? `Moon ${id}`,
       ore: (typeId) => names.ores.get(typeId) ?? `#${typeId}`,

@@ -73,6 +73,7 @@ function renderPanel(
           view,
           names: {
             character: (id) => `Pilot ${id}`,
+            corporation: (id) => `Corp ${id}`,
             refinery: () => 'Refinery',
             moon: (id) => `Moon ${id}`,
             ore: () => 'Sylvite',

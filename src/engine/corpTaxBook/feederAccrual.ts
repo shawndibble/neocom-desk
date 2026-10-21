@@ -55,7 +55,7 @@ export interface FeederAccrualInput {
   pricesOn: (date: string) => ReadonlyMap<number, number>;
 }
 
-function isSettledOn(changes: readonly FeederModeChange[], day: string): boolean {
+export function isSettledOn(changes: readonly FeederModeChange[], day: string): boolean {
   let latest: FeederModeChange | undefined;
   for (const c of changes) if (c.from <= day && (!latest || c.from >= latest.from)) latest = c;
   return latest?.mode === 'settled-otherwise';
