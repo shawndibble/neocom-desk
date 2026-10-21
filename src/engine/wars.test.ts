@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { parseStoredWars, warsAgainst, warStatus, type StoredWar, type WarEntityIds } from './wars';
+import {
+  parseEsiWar,
+  parseStoredWars,
+  warsAgainst,
+  warStatus,
+  type StoredWar,
+  type WarEntityIds,
+} from './wars';
 
 const HOUR = 3_600_000;
 const NOW = Date.UTC(2026, 9, 21, 12);
@@ -113,5 +120,43 @@ describe('parseStoredWars', () => {
   it('drops a malformed row and keeps the rest', () => {
     const doc = { updatedAt: NOW, wars: [war(), { id: 'bad' }, null] };
     expect(parseStoredWars(doc)?.wars).toEqual([war()]);
+  });
+});
+
+describe('parseEsiWar', () => {
+  const esi = {
+    id: 763512,
+    declared: '2026-10-20T06:00:00Z',
+    started: '2026-10-21T06:00:00Z',
+    mutual: false,
+    open_for_allies: true,
+    aggressor: { alliance_id: 99, isk_destroyed: 1.5e9, ships_killed: 4 },
+    defender: { corporation_id: 7, isk_destroyed: 2e8, ships_killed: 1 },
+    allies: [{ corporation_id: 5 }, { alliance_id: 6 }],
+  };
+
+  it('maps ESI snake_case to a war, times to epoch ms', () => {
+    expect(parseEsiWar(esi)).toEqual({
+      id: 763512,
+      declared: Date.UTC(2026, 9, 20, 6),
+      started: Date.UTC(2026, 9, 21, 6),
+      mutual: false,
+      openForAllies: true,
+      aggressor: { allianceId: 99, iskDestroyed: 1.5e9, shipsKilled: 4 },
+      defender: { corporationId: 7, iskDestroyed: 2e8, shipsKilled: 1 },
+      allies: [{ corporationId: 5 }, { allianceId: 6 }],
+    });
+  });
+
+  it('keeps finished and treats missing allies as none', () => {
+    const war = parseEsiWar({ ...esi, finished: '2026-10-25T06:00:00Z', allies: undefined });
+    expect(war?.finished).toBe(Date.UTC(2026, 9, 25, 6));
+    expect(war?.allies).toEqual([]);
+  });
+
+  it('is null for a body that is not a war', () => {
+    expect(parseEsiWar(null)).toBeNull();
+    expect(parseEsiWar({ id: 1 })).toBeNull();
+    expect(parseEsiWar({ ...esi, declared: 'nope' })).toBeNull();
   });
 });

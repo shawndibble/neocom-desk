@@ -152,3 +152,53 @@ export function parseStoredWars(doc: unknown): StoredWars | null {
   if (!isRecord(doc) || !isNum(doc.updatedAt) || !Array.isArray(doc.wars)) return null;
   return { updatedAt: doc.updatedAt, wars: doc.wars.filter(isStoredWar) };
 }
+
+function isoMs(value: unknown): number | undefined {
+  if (typeof value !== 'string') return undefined;
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? undefined : ms;
+}
+
+function entityIds(value: Record<string, unknown>): WarAlly {
+  return {
+    ...(isNum(value.corporation_id) ? { corporationId: value.corporation_id } : {}),
+    ...(isNum(value.alliance_id) ? { allianceId: value.alliance_id } : {}),
+  };
+}
+
+function esiParty(value: unknown): WarParty | null {
+  if (!isRecord(value)) return null;
+  return {
+    ...entityIds(value),
+    iskDestroyed: isNum(value.isk_destroyed) ? value.isk_destroyed : 0,
+    shipsKilled: isNum(value.ships_killed) ? value.ships_killed : 0,
+  };
+}
+
+/**
+ * One `GET /wars/{id}` body as a war, or null when it is not one. The same
+ * mapping `syncActiveWars` applies (`functions/src/activeWars.ts`), kept here
+ * as well because the functions package shares no code with the app.
+ */
+export function parseEsiWar(body: unknown): StoredWar | null {
+  if (!isRecord(body)) return null;
+  const declared = isoMs(body.declared);
+  const aggressor = esiParty(body.aggressor);
+  const defender = esiParty(body.defender);
+  if (!isNum(body.id) || declared === undefined || aggressor === null || defender === null) {
+    return null;
+  }
+  const started = isoMs(body.started);
+  const finished = isoMs(body.finished);
+  return {
+    id: body.id,
+    declared,
+    ...(started === undefined ? {} : { started }),
+    ...(finished === undefined ? {} : { finished }),
+    mutual: body.mutual === true,
+    openForAllies: body.open_for_allies === true,
+    aggressor,
+    defender,
+    allies: Array.isArray(body.allies) ? body.allies.filter(isRecord).map(entityIds) : [],
+  };
+}

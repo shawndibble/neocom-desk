@@ -3,6 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { db } from '@/db';
 import type { StoredWar } from '@/engine/wars';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { WarBanner } from './WarBanner';
@@ -11,6 +12,11 @@ const loadActiveWars = vi.fn<(characterId: number) => Promise<readonly StoredWar
 vi.mock('./activeWars', () => ({
   ACTIVE_WARS_POLL_MS: 3_600_000,
   loadActiveWars: (characterId: number) => loadActiveWars(characterId),
+}));
+const loadRecentWars = vi.fn<() => Promise<readonly StoredWar[]>>();
+vi.mock('./recentWars', () => ({
+  RECENT_WARS_REREAD_MS: 1_800_000,
+  loadRecentWars: () => loadRecentWars(),
 }));
 vi.mock('@/features/character/useEntityName', () => ({
   useEntityName: (id: number | undefined) => (id === 100 ? 'Hostile Corp' : null),
@@ -41,7 +47,10 @@ function renderBanner() {
   );
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  await db.notificationFeed.clear();
+  loadRecentWars.mockReset();
+  loadRecentWars.mockResolvedValue([]);
   loadActiveWars.mockReset();
   usePublicInfo.setState({
     byCharacterId: { 91: { corporationName: 'Mine', allianceName: null, corporationId: 200 } },
@@ -97,5 +106,28 @@ describe('WarBanner', () => {
       'href',
       'https://zkillboard.com/war/777/'
     );
+  });
+
+  it('does not ask ESI for recent wars with no war-declared Alert', async () => {
+    loadActiveWars.mockResolvedValue([]);
+    renderBanner();
+    await waitFor(() => expect(loadActiveWars).toHaveBeenCalled());
+    expect(loadRecentWars).not.toHaveBeenCalled();
+  });
+
+  it('shows a war from ESI right after a war-declared Alert, before the sweep has it', async () => {
+    await db.notificationFeed.add({
+      id: 'n1',
+      characterId: 91,
+      eventId: 'eveNotification',
+      eveType: 'WarDeclared',
+      title: 'War declared',
+      body: 'Hostile Corp declared war',
+      firedAt: Date.now() - HOUR,
+    });
+    loadActiveWars.mockResolvedValue([]);
+    loadRecentWars.mockResolvedValue([war()]);
+    renderBanner();
+    expect(await screen.findByText('At war with Hostile Corp')).toBeInTheDocument();
   });
 });
