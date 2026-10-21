@@ -63,23 +63,37 @@ import {
   type WalletJournalColumnId,
 } from './walletJournalColumns';
 
+/** A character id (as the filter holds it) and the name the dropdown shows. */
+export interface PlayerOption {
+  id: string;
+  name: string;
+}
+
 interface JournalFilterBarProps {
   filter: WalletJournalFilter;
   onChange: (filter: WalletJournalFilter) => void;
   refTypeOptions: string[];
+  /** The corp journal's players, by name; absent on the personal journal, which has no Player filter. */
+  playerOptions?: readonly PlayerOption[];
   /** The column picker, inline between the search box and the funnel. */
   actions?: ReactNode;
 }
 
 /**
- * "Any ref type" sentinel. Prefixed so it cannot collide with a real ESI
+ * "Any ref type" / "Any player" sentinel. Prefixed so it cannot collide with a real ESI
  * `ref_type`, which is what fills the rest of the list; Radix needs some value
  * here, and the empty string reads to it as "nothing selected".
  */
-const ALL_REF_TYPES = '__all';
+const ALL_OPTION = '__all';
 
 /** The ref-type / date-range / text filter row above a journal table (issue #413). */
-function JournalFilterBar({ filter, onChange, refTypeOptions, actions }: JournalFilterBarProps) {
+function JournalFilterBar({
+  filter,
+  onChange,
+  refTypeOptions,
+  playerOptions,
+  actions,
+}: JournalFilterBarProps) {
   const { t } = useTranslation();
   return (
     <FilterBar
@@ -102,16 +116,16 @@ function JournalFilterBar({ filter, onChange, refTypeOptions, actions }: Journal
         <>
           <FilterField label={t('wallet.refTypeFilterLabel')}>
             <Select
-              value={draft.refType ?? ALL_REF_TYPES}
+              value={draft.refType ?? ALL_OPTION}
               onValueChange={(value) =>
-                setDraft({ ...draft, refType: value === ALL_REF_TYPES ? null : value })
+                setDraft({ ...draft, refType: value === ALL_OPTION ? null : value })
               }
             >
               <SelectTrigger aria-label={t('wallet.refTypeFilterLabel')} className="w-44">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL_REF_TYPES}>{t('wallet.refTypeFilterAll')}</SelectItem>
+                <SelectItem value={ALL_OPTION}>{t('wallet.refTypeFilterAll')}</SelectItem>
                 {refTypeOptions.map((refType) => (
                   <SelectItem key={refType} value={refType}>
                     {journalRefLabel(refType, t)}
@@ -120,6 +134,34 @@ function JournalFilterBar({ filter, onChange, refTypeOptions, actions }: Journal
               </SelectContent>
             </Select>
           </FilterField>
+          {playerOptions && (
+            <FilterField label={t('wallet.playerFilterLabel')}>
+              <Select
+                value={draft.player ?? ALL_OPTION}
+                onValueChange={(value) =>
+                  setDraft({ ...draft, player: value === ALL_OPTION ? null : value })
+                }
+              >
+                <SelectTrigger aria-label={t('wallet.playerFilterLabel')} className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_OPTION}>{t('wallet.playerFilterAll')}</SelectItem>
+                  {/* A deep-linked id with no line in this division still needs an option to show. */}
+                  {[
+                    ...playerOptions,
+                    ...(draft.player !== null && !playerOptions.some((p) => p.id === draft.player)
+                      ? [{ id: draft.player, name: `#${draft.player}` }]
+                      : []),
+                  ].map((player) => (
+                    <SelectItem key={player.id} value={player.id}>
+                      {player.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+          )}
           <DateRangeFields
             from={draft.startDate}
             to={draft.endDate}
@@ -145,6 +187,8 @@ interface JournalTableProps {
   filter: WalletJournalFilter;
   onFilterChange: (filter: WalletJournalFilter) => void;
   refTypeOptions: string[];
+  /** Set on the corp journal: adds the Player filter. */
+  playerOptions?: readonly PlayerOption[];
   filteredJournal: readonly JournalRow[];
   /** The journal under the date range and text filters only, for the panel's ref-type list. */
   breakdownJournal: readonly JournalRow[];
@@ -211,13 +255,14 @@ const CARD_SORT_COLUMNS = new Set(['date', 'amount', 'refType']);
 const OPEN_DAYS = 3;
 
 /** Columns that are not in the picker's catalog and so are never hidden by it. */
-const ALWAYS_SHOWN_COLUMNS = new Set(['refType', 'character']);
+const ALWAYS_SHOWN_COLUMNS = new Set(['refType', 'character', 'player']);
 
 /** The filter bar plus its result — either the table or a filtered-empty message. Shared by the personal and corp journal panels (issue #413). */
 export function JournalTable({
   filter,
   onFilterChange,
   refTypeOptions,
+  playerOptions,
   filteredJournal,
   breakdownJournal,
   chartJournal,
@@ -367,6 +412,7 @@ export function JournalTable({
         filter={filter}
         onChange={onFilterChange}
         refTypeOptions={refTypeOptions}
+        playerOptions={playerOptions}
         actions={
           <>
             <IconButton
