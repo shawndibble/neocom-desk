@@ -7,7 +7,7 @@ import {
   deriveOwnerRateHistory,
   moonOwnerDetail,
 } from '@/engine/corpTaxBook/moonOwners';
-import { payeeChangeNotice } from '@/engine/corpTaxBook/payeeChange';
+import { payeeChangeNotice, payeeNoticeKey } from '@/engine/corpTaxBook/payeeChange';
 import {
   markFeederPayout,
   setBookFeederPayee,
@@ -16,7 +16,7 @@ import {
   setRefineryLabel,
 } from '../taxBook/feederClient';
 import { ChangePayeeDialog, PayeeChangeStrip } from './MoonOwnerPayee';
-import { mailPayeeChange } from './payeeChangeMail';
+import { canMail, mailPayeeChange } from './payeeChangeMail';
 import { PayMoonOwnerHost } from './PayMoonOwnerHost';
 import { RemoveMoonOwnerDialog, SetRateDialog, SettledOtherwiseDialog } from './MoonOwnerDialogs';
 import { MoonOwnerPage } from './MoonOwnerPage';
@@ -97,11 +97,11 @@ export function MoonOwnerDetail({ id }: { id: string }) {
         oreName={names.ore}
         backTo={BACK}
         payee={{ ...detail.payee, name: payeeName }}
-        {...(notice
+        {...(notice && feeder?.status !== 'left' && feeder?.status !== 'removed'
           ? {
               payeeNotice: (
                 <PayeeChangeStrip
-                  storageKey={`${corporationId}.${corp}`}
+                  storageKey={payeeNoticeKey(corporationId, corp)}
                   at={notice.at}
                   payeeName={payeeName}
                   byName={name}
@@ -163,18 +163,25 @@ export function MoonOwnerDetail({ id }: { id: string }) {
           onClose={() => setDialog(null)}
           onSave={(payee, newPayeeName) =>
             afterEdit(async () => {
-              const out = await setBookFeederPayee(characterId, corporationId, corp, payee);
+              const out = await setBookFeederPayee(
+                characterId,
+                corporationId,
+                corp,
+                payee,
+                canMail(grantedScopes)
+              );
               // After the save, and never awaited: the change does not wait on the mail.
-              if (out.changed && accountingName) {
+              if (out.changed && out.at !== undefined) {
                 void mailPayeeChange({
                   grantedScopes,
                   characterId,
                   corporationId,
                   feederCorporationId: corp,
                   recipients: out.recipients ?? [],
-                  changedByName: accountingName,
+                  changedByName: accountingName ?? names.corporation(corporationId),
                   moonOwnerName: name,
                   payeeName: newPayeeName,
+                  at: out.at,
                 });
               }
             })

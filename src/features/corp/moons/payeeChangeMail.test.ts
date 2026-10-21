@@ -15,7 +15,7 @@ const base = {
   moonOwnerName: 'Rock Holders',
   payeeName: 'Kara Vex',
   recipients: [501, 700],
-  now: new Date('2026-10-21T12:00:00Z'),
+  at: Date.parse('2026-10-21T12:00:00Z'),
 };
 
 describe('mailPayeeChange', () => {
@@ -46,9 +46,16 @@ describe('mailPayeeChange', () => {
     expect(await db.corpMailQueue.count()).toBe(0);
   });
 
+  it('mails one change once per recipient', async () => {
+    const input = { ...base, grantedScopes: [SEND_MAIL_SCOPE] };
+    await mailPayeeChange(input);
+    await mailPayeeChange(input);
+    expect(await db.corpMailQueue.count()).toBe(2);
+  });
+
   it('never throws into the change', async () => {
     await expect(
-      mailPayeeChange({ ...base, grantedScopes: [SEND_MAIL_SCOPE], now: new Date(NaN) })
+      mailPayeeChange({ ...base, grantedScopes: [SEND_MAIL_SCOPE], at: NaN })
     ).resolves.toBeUndefined();
   });
 });

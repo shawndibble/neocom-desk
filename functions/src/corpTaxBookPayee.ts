@@ -49,58 +49,75 @@ function parsePayee(data: unknown): Payee {
   return { kind, id };
 }
 
+/** The changing officer's client can mail (#4653): only then does the answer name whom to tell. */
+const parseNotify = (data: unknown): boolean => record(data).notify === true;
+
 /** The moon owner's own officer names its payee. */
 export interface SetFeederPayeeInput extends FeederCall {
   payee: Payee;
+  /** Absent: false. */
+  notify?: boolean;
 }
 
 export function parseSetFeederPayeeInput(data: unknown): SetFeederPayeeInput {
-  return { ...parseFeederCall(data), payee: parsePayee(data) };
+  return { ...parseFeederCall(data), payee: parsePayee(data), notify: parseNotify(data) };
 }
 
 /** The accounting corporation's officer names a moon owner's payee. */
 export interface SetBookFeederPayeeInput extends FeederTargetCall {
   payee: Payee;
+  /** Absent: false. */
+  notify?: boolean;
 }
 
 export function parseSetBookFeederPayeeInput(data: unknown): SetBookFeederPayeeInput {
-  return { ...parseFeederTarget(data), payee: parsePayee(data) };
+  return { ...parseFeederTarget(data), payee: parsePayee(data), notify: parseNotify(data) };
 }
 
-export interface PayeeSetResult {
-  ok: true;
-  /** False when the payee named is the one already in force: nothing written, nobody told. */
-  changed: boolean;
-  /** Character ids the changing officer's client mails: the other side. */
-  recipients: number[];
-}
+export type PayeeSetResult =
+  /** The payee named is the one already in force: nothing written, nobody told. */
+  | { ok: true; changed: false; recipients: [] }
+  | {
+      ok: true;
+      changed: true;
+      /** When it changed (ms), the stamp on the record: one mail per change and recipient. */
+      at: number;
+      /** Character ids the changing officer's client mails (the other side); empty unless `notify`. */
+      recipients: number[];
+    };
+
+const UNCHANGED: PayeeSetResult = { ok: true, changed: false, recipients: [] };
 
 type PayeeRecord = FeederRecord & { payeeHistory?: PayeeChange[] };
+
+interface PayeeWrite {
+  collector: number;
+  feeder: number;
+  payee: Payee;
+  actor: Actor & { characterId: number };
+  side: PayeeSetBy['side'];
+}
 
 /**
  * One write for either side: the id is checked against ESI first (#4621), then the payee, its
  * stamp, history and who set it go in one transaction with the audit entry. Returns the payee
- * that was in force before, or null when nothing changed.
+ * in force before and the change's time, or null when nothing changed.
  */
 async function writePayee(
   deps: BookDeps,
-  collector: number,
-  feeder: number,
-  payee: Payee,
-  actor: Actor & { characterId: number },
-  side: PayeeSetBy['side'],
+  w: PayeeWrite,
   idCategory: IdCategoryLookup
-): Promise<{ before: Payee | undefined } | null> {
+): Promise<{ before: Payee | undefined; at: number } | null> {
   // The id must be the kind it claims (#4621): a character stored as a corporation would send
   // payouts and the removal link to the wrong place. ESI down fails the call; nothing is written.
-  if ((await idCategory(payee.id)) !== payee.kind) {
+  if ((await idCategory(w.payee.id)) !== w.payee.kind) {
     fail(
       'invalid-argument',
       'That id is not a corporation or player of that kind',
       'payee-mismatch'
     );
   }
-  const ref = feederRef(deps.db, collector, feeder);
+  const ref = feederRef(deps.db, w.collector, w.feeder);
   const out = await deps.db.runTransaction(async (tx) => {
     const rec = (await tx.get(ref)).data() as PayeeRecord | undefined;
     if (!rec) fail('not-found', 'No such moon owner', 'no-feeder');
@@ -108,25 +125,25 @@ async function writePayee(
       fail('failed-precondition', 'This moon owner has left', 'feeder-ended');
     }
     // Unset means the moon owner corporation: naming it (or the standing payee) changes nothing.
-    const current = rec.payee ?? { kind: 'corporation', id: feeder };
-    if (current.kind === payee.kind && current.id === payee.id) return null;
+    const current = rec.payee ?? { kind: 'corporation', id: w.feeder };
+    if (current.kind === w.payee.kind && current.id === w.payee.id) return null;
     const now = deps.now();
-    const next = withPayee(rec, payee, now);
-    const setBy: PayeeSetBy = { side, characterId: actor.characterId, at: now };
+    const next = withPayee(rec, w.payee, now);
+    const setBy: PayeeSetBy = { side: w.side, characterId: w.actor.characterId, at: now };
     tx.update(ref, {
-      payee,
+      payee: w.payee,
       ...(next.payeeChangedAt !== undefined ? { payeeChangedAt: next.payeeChangedAt } : {}),
-      payeeHistory: withPayeeChange(rec, payee, now),
+      payeeHistory: withPayeeChange(rec, w.payee, now),
       payeeSetBy: setBy,
     });
-    appendAudit(tx, deps, collector, actor, 'feederPayeeSet', {
-      feederCorporationId: feeder,
-      payee,
-      side,
+    appendAudit(tx, deps, w.collector, w.actor, 'feederPayeeSet', {
+      feederCorporationId: w.feeder,
+      payee: w.payee,
+      side: w.side,
     });
-    return { before: rec.payee };
+    return { before: rec.payee, at: now };
   });
-  if (out) await tryRebuildFeederView(deps, collector, feeder);
+  if (out) await tryRebuildFeederView(deps, w.collector, w.feeder);
   return out;
 }
 
@@ -146,25 +163,24 @@ export async function setFeederPayee(
   if (!ctx)
     fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
   const book = feederBookDeps(deps);
-  const out = await writePayee(
-    book,
-    ctx.collectorCorporationId,
-    input.corporationId,
-    input.payee,
-    { characterId: ctx.callerId, name: 'Moon owner' },
-    'moon-owner',
-    idCategory
-  ).catch((err: unknown) => {
+  const write: PayeeWrite = {
+    collector: ctx.collectorCorporationId,
+    feeder: input.corporationId,
+    payee: input.payee,
+    actor: { characterId: ctx.callerId, name: 'Moon owner' },
+    side: 'moon-owner',
+  };
+  const out = await writePayee(book, write, idCategory).catch((err: unknown) => {
     // The moon owner's officer only ever hears that it is not handled any more.
-    const reason = (err as HttpsError).details as { reason?: string } | undefined;
+    const reason = err instanceof HttpsError ? (err.details as { reason?: string }) : undefined;
     if (reason?.reason === 'no-feeder' || reason?.reason === 'feeder-ended') {
       fail('failed-precondition', 'This corporation is not feeding a book', 'not-your-feeder');
     }
     throw err;
   });
-  if (!out) return { ok: true, changed: false, recipients: [] };
-  const officers = await liveOfficerIds(book, ctx.collectorCorporationId);
-  return { ok: true, changed: true, recipients: without(officers, ctx.callerId) };
+  if (!out) return UNCHANGED;
+  const officers = input.notify ? await liveOfficerIds(book, ctx.collectorCorporationId) : [];
+  return { ok: true, changed: true, at: out.at, recipients: without(officers, ctx.callerId) };
 }
 
 /**
@@ -180,14 +196,17 @@ export async function setBookFeederPayee(
   const access = await authorizeOfficer(deps, caller, input, 'edit', { live: true });
   const out = await writePayee(
     deps,
-    input.corporationId,
-    input.feederCorporationId,
-    input.payee,
-    { characterId: access.characterId, name: access.characterName },
-    'accounting',
+    {
+      collector: input.corporationId,
+      feeder: input.feederCorporationId,
+      payee: input.payee,
+      actor: { characterId: access.characterId, name: access.characterName },
+      side: 'accounting',
+    },
     idCategory
   );
-  if (!out) return { ok: true, changed: false, recipients: [] };
+  if (!out) return UNCHANGED;
+  if (!input.notify) return { ok: true, changed: true, at: out.at, recipients: [] };
   const ceoOf = deps.corporationCeo ?? (async () => undefined);
   const ceo = (id: number) => ceoOf(id).catch(() => undefined);
   const ceoId = (await ceo(input.feederCorporationId)) ?? null;
@@ -198,5 +217,5 @@ export async function setBookFeederPayee(
       payeeCeoId: payee?.kind === 'corporation' ? ((await ceo(payee.id)) ?? null) : null,
     });
   const ids = [...new Set([...(await toldOf(out.before)), ...(await toldOf(input.payee))])];
-  return { ok: true, changed: true, recipients: without(ids, access.characterId) };
+  return { ok: true, changed: true, at: out.at, recipients: without(ids, access.characterId) };
 }

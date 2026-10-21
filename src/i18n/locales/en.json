@@ -14136,7 +14136,7 @@
         "status": "Status",
         "reminder": "Reminder",
         "rate-change": "Rate change",
-        "payee-change": "Payee change",
+        "payee-change": "Who gets paid changed",
         "removal": "Moon owner removal",
         "removalCancelled": "Removal cancelled"
       },
@@ -14185,7 +14185,7 @@
     "moons": {
       "title": "Moons",
       "payeeNotice": {
-        "title": "Payee changed",
+        "title": "Who gets paid changed",
         "body": "Payments now go to {{payee}}. {{by}} changed this on {{date}}.",
         "dismiss": "Dismiss"
       },
@@ -14596,6 +14596,7 @@
           "no-feeder": "This corporation is not handled by your book.",
           "collector-gone": "The accounting corporation's book is gone.",
           "feeder-ended": "This connection has already ended.",
+          "payee-mismatch": "That isn't a corporation or player of that kind. Pick one from the list again.",
           "not-ended": "This connection has not ended yet.",
           "not-pending": "No removal is pending for this corporation.",
           "not-removable": "This corporation cannot be removed right now.",

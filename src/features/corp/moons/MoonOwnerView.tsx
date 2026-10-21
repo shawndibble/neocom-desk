@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, Panel, StatChip, StatChips, TextInput } from '@/components/ui';
 import { Button } from '@/components/ui/Button';
-import { payeeChangeNotice } from '@/engine/corpTaxBook/payeeChange';
+import { payeeChangeNotice, payeeNoticeKey } from '@/engine/corpTaxBook/payeeChange';
 import type { Payee } from '@/engine/corpTaxBook/payouts';
 import type { FeederView } from '../taxBook/feederViewClient';
 import {
@@ -335,7 +335,10 @@ export function MoonOwnerView({
       {banner}
       {payeeNotice && !ended && (
         <PayeeChangeStrip
-          storageKey={`${view.summary.collectorCorporationId}.${view.summary.feederCorporationId}`}
+          storageKey={payeeNoticeKey(
+            view.summary.collectorCorporationId,
+            view.summary.feederCorporationId
+          )}
           at={payeeNotice.at}
           payeeName={names(payeeNotice.payee.id)}
           byName={name}

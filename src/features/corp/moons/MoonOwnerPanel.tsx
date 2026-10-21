@@ -19,7 +19,7 @@ import { MoonOwnerView } from './MoonOwnerView';
 import { OwnerStaleBanner } from './OwnerStaleBanner';
 import { OwnerStatusStrip } from './OwnerStatusStrip';
 import { shortDate } from './moonsFormat';
-import { mailPayeeChange } from './payeeChangeMail';
+import { canMail, mailPayeeChange } from './payeeChangeMail';
 import { useFeederView } from './useFeederView';
 
 type Owner = Extract<FeederSetupStatus, { status: 'feeder' }>;
@@ -95,9 +95,14 @@ export function MoonOwnerPanel({
         }}
         characterId={characterId}
         onSetPayee={async (payee, payeeName) => {
-          const out = await setFeederPayee(characterId, corporationId, payee);
+          const out = await setFeederPayee(
+            characterId,
+            corporationId,
+            payee,
+            canMail(grantedScopes)
+          );
           // After the save, and never awaited: the change does not wait on the mail.
-          if (out.changed) {
+          if (out.changed && out.at !== undefined) {
             const ownName = load.nameOf?.(corporationId) ?? `#${corporationId}`;
             void mailPayeeChange({
               grantedScopes,
@@ -108,6 +113,7 @@ export function MoonOwnerPanel({
               changedByName: ownName,
               moonOwnerName: ownName,
               payeeName,
+              at: out.at,
             });
           }
           reload();

@@ -166,6 +166,9 @@ export interface PayeeSetResult {
   ok: true;
   /** Absent from a server that predates #4653. */
   changed?: boolean;
+  /** When it changed (ms), the record's stamp. */
+  at?: number;
+  /** Whom to mail; only asked for with `notify`. */
   recipients?: number[];
 }
 
@@ -173,13 +176,16 @@ export interface PayeeSetResult {
 export async function setFeederPayee(
   characterId: number,
   corporationId: number,
-  payee: Payee
+  payee: Payee,
+  /** This officer can mail: the answer names whom to tell. */
+  notify: boolean
 ): Promise<PayeeSetResult> {
   const accessToken = await getValidAccessToken(characterId);
   return call(characterId, 'setCorpTaxBookFeederPayeeCallable', {
     corporationId,
     accessToken,
     payee,
+    notify,
   });
 }
 

@@ -329,11 +329,11 @@ suite('moon owner view', () => {
     const out = await setFeederPayee(
       deps(),
       who(FEEDER_DIRECTOR),
-      { ...asDirector, payee },
+      { ...asDirector, payee, notify: true },
       idCategory
     );
     // The accounting corporation's officers with book access hear about it.
-    expect(out).toEqual({ ok: true, changed: true, recipients: [COLLECTOR_CEO] });
+    expect(out).toEqual({ ok: true, changed: true, at: T0, recipients: [COLLECTOR_CEO] });
     const rec = (await feederRecord()) as (FeederRecord & { payeeHistory?: unknown }) | undefined;
     expect(rec?.payee).toEqual(payee);
     expect(rec?.payeeChangedAt).toBe(T0);
@@ -367,11 +367,16 @@ suite('moon owner view', () => {
       const out = await setBookFeederPayee(
         ceoDeps(),
         who(COLLECTOR_CEO),
-        { ...asCollector(), payee: corp },
+        { ...asCollector(), payee: corp, notify: true },
         idCategory
       );
       // The moon owner's CEO, the old payee (none: the corporation itself) and the new one's CEO.
-      expect(out).toEqual({ ok: true, changed: true, recipients: [FEEDER_CEO, PAYEE_CORP_CEO] });
+      expect(out).toEqual({
+        ok: true,
+        changed: true,
+        at: T0,
+        recipients: [FEEDER_CEO, PAYEE_CORP_CEO],
+      });
       let rec = (await feederRecord()) as (FeederRecord & { payeeHistory?: unknown }) | undefined;
       expect(rec?.payee).toEqual(corp);
       expect(rec?.payeeChangedAt).toBe(T0);
@@ -383,17 +388,19 @@ suite('moon owner view', () => {
       });
 
       const player = { kind: 'character' as const, id: 77 };
-      await setFeederPayee(
+      // A client that cannot mail is told nobody's ids.
+      const quiet = await setFeederPayee(
         deps(),
         who(FEEDER_DIRECTOR),
-        { ...asDirector, payee: player },
+        { ...asDirector, payee: player, notify: false },
         idCategory
       );
+      expect(quiet).toMatchObject({ changed: true, recipients: [] });
       // Back on the accounting side: the old payee (the player) and the new one's CEO are told.
       const back = await setBookFeederPayee(
         ceoDeps(),
         who(COLLECTOR_CEO),
-        { ...asCollector(), payee: corp },
+        { ...asCollector(), payee: corp, notify: true },
         idCategory
       );
       expect(back.recipients).toEqual([FEEDER_CEO, 77, PAYEE_CORP_CEO]);
@@ -414,7 +421,7 @@ suite('moon owner view', () => {
       const out = await setBookFeederPayee(
         ceoDeps(),
         who(COLLECTOR_CEO),
-        { ...asCollector(), payee: { kind: 'corporation', id: FEEDER } },
+        { ...asCollector(), payee: { kind: 'corporation', id: FEEDER }, notify: true },
         idCategory
       );
       expect(out).toEqual({ ok: true, changed: false, recipients: [] });
@@ -429,7 +436,7 @@ suite('moon owner view', () => {
           setBookFeederPayee(
             ceoDeps(),
             who(COLLECTOR_JUNIOR),
-            { ...asCollector(COLLECTOR_JUNIOR), payee },
+            { ...asCollector(COLLECTOR_JUNIOR), payee, notify: false },
             idCategory
           )
         )
@@ -439,7 +446,7 @@ suite('moon owner view', () => {
           setBookFeederPayee(
             ceoDeps(),
             who(COLLECTOR_CEO),
-            { ...asCollector(), payee: { kind: 'character', id: PAYEE_CORP } },
+            { ...asCollector(), payee: { kind: 'character', id: PAYEE_CORP }, notify: false },
             idCategory
           )
         )
@@ -455,7 +462,7 @@ suite('moon owner view', () => {
           setBookFeederPayee(
             ceoDeps(),
             who(COLLECTOR_CEO),
-            { ...asCollector(), payee: { kind: 'character', id: 77 } },
+            { ...asCollector(), payee: { kind: 'character', id: 77 }, notify: false },
             idCategory
           )
         )

@@ -85,7 +85,7 @@ describe('moon owner payee line', () => {
       payeeSetBy: { side: 'moon-owner', at: AT },
     });
     expect(screen.getByText('Set by you on 21 Oct')).toBeVisible();
-    expect(screen.queryByRole('status', { name: /payee changed/i })).toBeNull();
+    expect(screen.queryByRole('status', { name: /who gets paid changed/i })).toBeNull();
   });
 
   it('shows a notice when the accounting corporation changed it, until dismissed', async () => {
@@ -96,17 +96,17 @@ describe('moon owner payee line', () => {
     };
     ownerView(over);
     expect(screen.getByText('Set by Brass Meridian Logistics on 21 Oct')).toBeVisible();
-    const notice = screen.getByRole('status', { name: 'Payee changed' });
+    const notice = screen.getByRole('status', { name: 'Who gets paid changed' });
     expect(notice).toHaveTextContent(
       'Payments now go to Kestrel Vane. Brass Meridian Logistics changed this on 21 Oct.'
     );
     expect(notice.textContent).not.toMatch(/48|hour|wait|remov|feeder|collector/i);
     await userEvent.setup().click(screen.getByRole('button', { name: 'Dismiss' }));
-    expect(screen.queryByRole('status', { name: 'Payee changed' })).toBeNull();
+    expect(screen.queryByRole('status', { name: 'Who gets paid changed' })).toBeNull();
     // Dismissed on this device: it stays gone on the next visit.
     cleanup();
     ownerView(over);
-    expect(screen.queryByRole('status', { name: 'Payee changed' })).toBeNull();
+    expect(screen.queryByRole('status', { name: 'Who gets paid changed' })).toBeNull();
   });
 
   it('saves nothing typed but not picked, and refuses an alliance', async () => {
@@ -217,7 +217,7 @@ describe('accounting side payee', () => {
         byName="Ashfall Mining Collective"
       />
     );
-    expect(screen.getByRole('status', { name: 'Payee changed' })).toHaveTextContent(
+    expect(screen.getByRole('status', { name: 'Who gets paid changed' })).toHaveTextContent(
       'Payments now go to Kestrel Vane. Ashfall Mining Collective changed this on 21 Oct.'
     );
   });

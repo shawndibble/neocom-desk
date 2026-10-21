@@ -7,6 +7,7 @@ import type { Payee } from '@/engine/corpTaxBook/payouts';
 import { DialogShell } from './BookDialogs';
 import { shortDate } from './moonsFormat';
 import { OwnerStatusStrip } from './OwnerStatusStrip';
+import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
 
 const k = (key: string) => `corpTaxBook.moons.ownerView.payee.${key}`;
 
@@ -114,14 +115,6 @@ export function ChangePayeeDialog({
 
 const DISMISSED = 'neocom-desk.payeeNotice.';
 
-function readDismissed(storageKey: string): string | null {
-  try {
-    return localStorage.getItem(DISMISSED + storageKey);
-  } catch {
-    return null;
-  }
-}
-
 /**
  * The other side changed the payee (#4653): one strip on the page until an officer dismisses it
  * on this device. A later change shows again. Never says anything about timing.
@@ -141,15 +134,14 @@ export function PayeeChangeStrip({
   byName: string;
 }) {
   const { t } = useTranslation();
-  const [dismissed, setDismissed] = useState(() => readDismissed(storageKey));
-  if (dismissed === String(at)) return null;
+  // Read every render: the same strip may be handed another page's key.
+  const [dismissedNow, setDismissedNow] = useState<string | null>(null);
+  const seen = `${storageKey}:${at}`;
+  if (dismissedNow === seen || readLocal(DISMISSED + storageKey) === String(at)) return null;
   const dismiss = () => {
-    try {
-      localStorage.setItem(DISMISSED + storageKey, String(at));
-    } catch {
-      // Private window or blocked storage: dismissed for this visit only.
-    }
-    setDismissed(String(at));
+    // Blocked storage: dismissed for this visit only.
+    writeLocal(DISMISSED + storageKey, String(at));
+    setDismissedNow(seen);
   };
   return (
     <OwnerStatusStrip

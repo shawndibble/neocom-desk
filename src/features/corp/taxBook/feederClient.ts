@@ -149,7 +149,9 @@ export async function setBookFeederPayee(
   characterId: number,
   corporationId: number,
   feederCorporationId: number,
-  payee: Payee
+  payee: Payee,
+  /** This officer can mail: the answer names whom to tell. */
+  notify: boolean
 ): Promise<PayeeSetResult> {
   const accessToken = await getValidAccessToken(characterId);
   return call(characterId, 'setCorpTaxBookFeederPayeeFromBookCallable', {
@@ -157,6 +159,7 @@ export async function setBookFeederPayee(
     accessToken,
     feederCorporationId,
     payee,
+    notify,
   });
 }
 

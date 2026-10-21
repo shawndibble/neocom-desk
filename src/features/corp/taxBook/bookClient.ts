@@ -8,6 +8,7 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
+import type { PayeeSetBy } from '@/engine/corpTaxBook/payeeChange';
 import {
   collection,
   doc,
@@ -361,7 +362,7 @@ export interface BookFeeder extends FeederReadClock {
   offeredOwnerRatePct?: number;
   payee?: { kind: 'corporation' | 'character'; id: number };
   /** Which side set the payee last, who and when (#4653); absent on an older record. */
-  payeeSetBy?: { side: 'accounting' | 'moon-owner'; characterId: number; at: number };
+  payeeSetBy?: PayeeSetBy & { characterId: number };
   coveragePeriods: { from: string; to?: string }[];
   /** Absent on records written before the history existed. */
   ownerRateHistory?: OwnerRateEntry[];

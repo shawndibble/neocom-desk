@@ -3,6 +3,7 @@
  * other side hears about it, in-app and by a very short mail. Pure. The mail says who gets paid
  * now, for whom, who changed it and when; never a rate, the margin or any timing rule.
  */
+import { utcDay } from '../localDay';
 import { markupText as text, serializeEveMarkup } from '../mail/eveMarkup';
 import type { Payee } from './payouts';
 
@@ -36,10 +37,14 @@ export function payeeChangeNotice(input: {
   return {
     payee,
     by: payeeSetBy.side,
-    date: new Date(payeeSetBy.at).toISOString().slice(0, 10),
+    date: utcDay(payeeSetBy.at),
     at: payeeSetBy.at,
   };
 }
+
+/** The notice's dismissal key: one per book and moon owner, the same on both sides' pages. */
+export const payeeNoticeKey = (collectorCorporationId: number, feederCorporationId: number) =>
+  `${collectorCorporationId}.${feederCorporationId}`;
 
 export interface PayeeChangeMail {
   subject: string;

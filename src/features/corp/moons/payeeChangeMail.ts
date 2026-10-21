@@ -4,7 +4,12 @@
  * fails the change, and without the mail permission it does nothing (both pages carry the
  * in-app notice).
  */
+import { utcDay } from '@/engine/localDay';
 import { SEND_MAIL_SCOPE } from './rateChangeNotice';
+
+/** Whether this officer's token can send the mail, so the change asks whom to tell. */
+export const canMail = (grantedScopes: readonly string[] | undefined): boolean =>
+  grantedScopes?.includes(SEND_MAIL_SCOPE) ?? false;
 
 export async function mailPayeeChange(input: {
   grantedScopes: readonly string[] | undefined;
@@ -19,22 +24,22 @@ export async function mailPayeeChange(input: {
   changedByName: string;
   moonOwnerName: string;
   payeeName: string;
-  now?: Date;
+  /** When it changed (ms): the server's stamp, so one change is mailed once per recipient. */
+  at: number;
 }): Promise<void> {
-  if (!input.grantedScopes?.includes(SEND_MAIL_SCOPE) || input.recipients.length === 0) return;
+  if (!canMail(input.grantedScopes) || input.recipients.length === 0) return;
   try {
     const [{ resolveNames }, { enqueuePayeeChangeMail }] = await Promise.all([
       import('@/features/character/names'),
       import('@/features/corpTaxBook/mailQueue'),
     ]);
     const names = await resolveNames([...input.recipients]);
-    const now = input.now ?? new Date();
     await enqueuePayeeChangeMail({
       corporationId: input.corporationId,
       senderCharacterId: input.characterId,
       feederCorporationId: input.feederCorporationId,
-      at: now.getTime(),
-      date: now.toISOString().slice(0, 10),
+      at: input.at,
+      date: utcDay(input.at),
       changedByName: input.changedByName,
       moonOwnerName: input.moonOwnerName,
       payeeName: input.payeeName,
