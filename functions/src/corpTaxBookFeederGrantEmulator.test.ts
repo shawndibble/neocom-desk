@@ -46,8 +46,15 @@ const ok = <T>(data: T): EsiRead<T> => ({
   fetchedAt: new Date(T0).toISOString(),
   truncated: false,
 });
+/** The scopes a `mine-` token carries; a test may drop to the pre-#4654 mining scope only. */
+let mineScopes: string[] = [...FEEDER_SYNC_SCOPES];
 const esi = (): SyncEsi =>
   ({
+    structure: async (id: number) => ({
+      kind: 'ok',
+      name: `Refinery ${id}`,
+      solarSystemId: 30004000,
+    }),
     observers: async () => {
       await duringPull?.();
       if (ledger === 'unavailable') return { kind: 'unavailable' };
@@ -78,7 +85,7 @@ const deps = (): FeederGrantDeps => ({
       characterId: id,
       ownerHash: `h${id}`,
       name: `Pilot ${id}`,
-      scopes: m[1] === 'mine' ? [...FEEDER_SYNC_SCOPES] : [ROLES_SCOPE],
+      scopes: m[1] === 'mine' ? [...mineScopes] : [ROLES_SCOPE],
       clientId: 'c',
     };
   },
@@ -154,6 +161,7 @@ suite('moon owner onboarding', () => {
   beforeEach(async () => {
     await clearEmulator();
     ledger = 'ok';
+    mineScopes = [...FEEDER_SYNC_SCOPES];
     now = T0;
     duringPull = undefined;
     revoked.length = 0;
@@ -187,6 +195,24 @@ suite('moon owner onboarding', () => {
       grantHolder: ALT,
     });
     expect((await collectorBook().collection('observed').get()).size).toBe(1);
+  });
+
+  it('the first pull reads refinery names when the grant carries the structure scope (#4654)', async () => {
+    await save(await newInvite());
+    expect(await grant()).toMatchObject({ readsStructures: true });
+    expect(await feederRecord()).toMatchObject({
+      readsStructureNames: true,
+      refineryStructures: { '4001': { name: 'Refinery 4001', solarSystemId: 30004000 } },
+    });
+  });
+
+  it('still takes a grant with the mining scope only, and reads no names (#4654)', async () => {
+    mineScopes = [FEEDER_SYNC_SCOPES[0]];
+    await save(await newInvite());
+    expect(await grant()).toMatchObject({ readsStructures: false });
+    const rec = await feederRecord();
+    expect(rec).toMatchObject({ status: 'active', readsStructureNames: false });
+    expect(rec?.refineryStructures).toBeUndefined();
   });
 
   it('unwinds a refused first pull and leaves the invite usable', async () => {

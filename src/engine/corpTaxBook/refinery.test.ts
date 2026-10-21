@@ -8,6 +8,7 @@ import {
   refineryLabel,
   refineryLabeler,
   sourceCorporationOf,
+  structureNamesOf,
 } from './refinery';
 import { groupObservedEntries, mergeObservedRows, observedRowKey } from './observed';
 import type { ObservedRow } from './types';
@@ -204,6 +205,63 @@ describe('learnedSystemsOf', () => {
       [TATARA, 30002187],
       [ATHANOR, 30000142],
     ]);
+  });
+
+  it('prefers the system the structure lookup read over the one a miner taught', () => {
+    const systems = learnedSystemsOf([
+      {
+        refinerySystems: { [String(TATARA)]: 30002187, [String(ATHANOR)]: 30000142 },
+        refineryStructures: {
+          [String(TATARA)]: { name: 'Efa VII - Tatara', solarSystemId: 30004000, checkedAt: 1 },
+          // A refused lookup carries no system: the learned one stays.
+          [String(ATHANOR)]: { checkedAt: 1, denied: true },
+        },
+      },
+    ]);
+    expect(systems.get(TATARA)).toBe(30004000);
+    expect(systems.get(ATHANOR)).toBe(30000142);
+  });
+});
+
+describe('structureNamesOf', () => {
+  it('collects the structure names the moon owner lookups read, skipping refused ones', () => {
+    const names = structureNamesOf([
+      {
+        refineryStructures: {
+          [String(TATARA)]: { name: 'Efa VII - Tatara', solarSystemId: 30004000, checkedAt: 1 },
+          [String(ATHANOR)]: { checkedAt: 1, denied: true },
+        },
+      },
+      {},
+    ]);
+    expect([...names]).toEqual([[TATARA, 'Efa VII - Tatara']]);
+  });
+});
+
+describe('the moon owner refinery label chain', () => {
+  const feeders = [
+    {
+      refinerySystems: { [String(TATARA)]: 30002187, [String(ATHANOR)]: 30002187 },
+      refineryStructures: {
+        [String(TATARA)]: { name: 'Efa VII - Tatara', solarSystemId: 30004000, checkedAt: 1 },
+        [String(ATHANOR)]: { solarSystemId: 30004000, checkedAt: 1 },
+      },
+    },
+  ];
+  const systemNames = new Map([
+    [30002187, 'Learned'],
+    [30004000, 'Looked up'],
+  ]);
+  const systems = learnedSystemsOf(feeders);
+  const structures = structureNamesOf(feeders);
+  const label = refineryLabeler({
+    structureName: (id) => structures.get(id),
+    systemName: (id) => systemNames.get(systems.get(id) ?? 0),
+  });
+
+  it('reads the structure name first, then the looked-up system over the learned one', () => {
+    expect(label(TATARA)).toBe('Efa VII - Tatara');
+    expect(label(ATHANOR)).toBe('Looked up');
   });
 });
 

@@ -109,16 +109,50 @@ export function refineryFacts(
   return { systemOf, sourceOf };
 }
 
-/** The systems learned for the moon owners' refineries, from their records, by structure id. */
-export function learnedSystemsOf(
-  feeders: readonly { refinerySystems?: Readonly<Record<string, number>> }[]
-): Map<number, number> {
+/**
+ * What the server's `/universe/structures` lookup read for one moon owner refinery (#4654),
+ * with the moon owner's own token. `denied`: ESI said 403 or 404 (no docking access, gone).
+ */
+export interface StoredRefineryStructure {
+  name?: string;
+  solarSystemId?: number;
+  /** When it was last looked up (ms). */
+  checkedAt: number;
+  denied?: boolean;
+}
+
+interface MoonOwnerRefineryFacts {
+  refinerySystems?: Readonly<Record<string, number>>;
+  refineryStructures?: Readonly<Record<string, StoredRefineryStructure>>;
+}
+
+/**
+ * Each moon owner refinery's system, from their records, by structure id: the one the structure
+ * lookup read wins over the one learned from a miner's own ledger (#4654).
+ */
+export function learnedSystemsOf(feeders: readonly MoonOwnerRefineryFacts[]): Map<number, number> {
   const systems = new Map<number, number>();
-  for (const f of feeders)
+  for (const f of feeders) {
+    for (const [id, s] of Object.entries(f.refineryStructures ?? {})) {
+      if (s.solarSystemId !== undefined && !systems.has(Number(id))) {
+        systems.set(Number(id), s.solarSystemId);
+      }
+    }
     for (const [id, system] of Object.entries(f.refinerySystems ?? {})) {
       if (!systems.has(Number(id))) systems.set(Number(id), system);
     }
+  }
   return systems;
+}
+
+/** The structure names the lookups read for the moon owners' refineries, by structure id. */
+export function structureNamesOf(feeders: readonly MoonOwnerRefineryFacts[]): Map<number, string> {
+  const names = new Map<number, string>();
+  for (const f of feeders)
+    for (const [id, s] of Object.entries(f.refineryStructures ?? {})) {
+      if (s.name && !names.has(Number(id))) names.set(Number(id), s.name);
+    }
+  return names;
 }
 
 /** A label stored on a moon owner's record, keyed by structure id. */

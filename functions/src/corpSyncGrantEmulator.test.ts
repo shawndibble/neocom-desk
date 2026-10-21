@@ -82,6 +82,7 @@ const fakeEsi = (): SyncEsi => ({
   ),
   journal: async () => (esiState.calls.push('journal'), esiState.journal as never),
   structureSystem: async () => (esiState.calls.push('system'), esiState.structureSystem),
+  structure: async () => (esiState.calls.push('structure'), { kind: 'unavailable' }),
   budgetLow: () => esiState.low,
 });
 

@@ -124,6 +124,11 @@ export interface FeederViewSummary {
   removalEffectiveAt?: number | null;
   /** Who the moon owner is paid as (#4619); null when unset, meaning the moon owner corporation. */
   payee?: Payee | null;
+  /**
+   * The grant reads refinery names (#4654). False on a grant from before, so the page offers to
+   * grant again; absent on a view built before it existed.
+   */
+  refineryNamesGranted?: boolean;
 }
 
 export interface FeederViewDayLine {
@@ -148,6 +153,8 @@ export interface FeederViewRefinery {
   label: string | null;
   labelSetAt: string | null;
   solarSystemId: number | null;
+  /** The structure's name, read with the moon owner's grant (#4654); null when not readable. */
+  structureName: null | string;
 }
 
 export interface FeederViewPayout {
@@ -242,6 +249,8 @@ export type FeederViewRecord = Pick<
   | 'payee'
   | 'refineryLabels'
   | 'refinerySystems'
+  | 'refineryStructures'
+  | 'readsStructureNames'
 >;
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -333,6 +342,7 @@ export function buildFeederView(input: FeederViewInput): FeederView {
         label: set?.label ?? null,
         labelSetAt: set?.setAt ?? null,
         solarSystemId: r.solarSystemId ?? null,
+        structureName: null,
       });
     } else if (known.solarSystemId === null && r.solarSystemId !== undefined) {
       known.solarSystemId = r.solarSystemId;
@@ -434,16 +444,26 @@ export function buildFeederView(input: FeederViewInput): FeederView {
     removalEffectiveAt:
       record.status === 'pending-removal' ? (record.removal?.effectiveAt ?? null) : null,
     payee: record.payee ?? null,
+    refineryNamesGranted: record.readsStructureNames === true,
   };
   return {
     summary,
     days,
-    // A row's own system, else the one learned from a miner's ledger (#4650).
+    // A row's own system, else the structure lookup's (#4654), else one learned from a miner's
+    // ledger (#4650).
     refineries: [...refineries.values()]
-      .map((r) => ({
-        ...r,
-        solarSystemId: r.solarSystemId ?? record.refinerySystems?.[String(r.structureId)] ?? null,
-      }))
+      .map((r) => {
+        const looked = record.refineryStructures?.[String(r.structureId)];
+        return {
+          ...r,
+          solarSystemId:
+            r.solarSystemId ??
+            looked?.solarSystemId ??
+            record.refinerySystems?.[String(r.structureId)] ??
+            null,
+          structureName: looked?.name ?? null,
+        };
+      })
       .sort((a, b) => a.structureId - b.structureId),
     payouts: counted
       .map((p) => ({

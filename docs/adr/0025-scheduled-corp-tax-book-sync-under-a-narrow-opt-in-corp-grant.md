@@ -144,3 +144,8 @@ A Collector book's feeder corporation hands over a mining-only offline grant
 (`kind: 'feeder'`, scope `esi-industry.read_corporation_mining.v1`), held in the
 same collection under the same rules. See
 `docs/context/decisions/20261020-135239-collector-books-feeder-records-coverage-periods-and-the.md`.
+
+Amended by #4654: the moon owner grant also carries `esi-universe.read_structures.v1`,
+so the sync reads each refinery's name and system with the moon owner's own token. A
+grant with the mining scope only still syncs and is never stale for lacking it. See
+`docs/context/decisions/20261021-084219-moon-owner-grant-also-reads-refinery-names-esi.md`.

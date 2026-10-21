@@ -14605,7 +14605,7 @@
         "title": "Share your mining ledger",
         "sees": {
           "title": "They will see",
-          "body": "Who mined at your refineries, how much and what, and when."
+          "body": "Who mined at your refineries, how much and what, and when. We also read your refineries' names and systems."
         },
         "cannot": {
           "title": "They cannot",
@@ -14665,6 +14665,11 @@
           "title": "We can't read your mining ledger since {{date}}",
           "hint": "The character who gave access lost the Accountant role or revoked it. Mining since then is not counted until it is reconnected.",
           "action": "Reconnect"
+        },
+        "refineryNames": {
+          "title": "Refinery names not shared",
+          "hint": "Grant again to show your refinery names.",
+          "action": "Grant again"
         },
         "removal": {
           "title": "Removal pending, takes effect {{time}}",

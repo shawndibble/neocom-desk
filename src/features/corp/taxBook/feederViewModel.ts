@@ -128,8 +128,8 @@ export function characterIdsOf(days: readonly FeederViewDay[]): number[] {
 
 /**
  * Each refinery cell on the moon owner's own page, through the label chain (#4640): the label
- * either side set, the system its rows recorded, then the moon owner's name plus the id. The
- * structure name is not readable here (the grant is ledger-only).
+ * either side set, the structure name the grant read (#4654), the system, then the moon owner's
+ * name plus the id.
  */
 export function viewRefineryLabeler(
   refineries: readonly FeederViewRefinery[],
@@ -142,6 +142,7 @@ export function viewRefineryLabeler(
       const r = byId.get(id);
       return r?.label ? [{ label: r.label, setAt: r.labelSetAt ?? '' }] : undefined;
     },
+    structureName: (id) => byId.get(id)?.structureName ?? undefined,
     systemName: (id) => {
       const system = byId.get(id)?.solarSystemId;
       return system == null ? undefined : names.systemName?.(system);
