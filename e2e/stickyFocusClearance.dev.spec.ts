@@ -61,6 +61,13 @@ async function focusedBox(page: Page, insideSelector: string) {
   }, insideSelector);
 }
 
+/**
+ * The first assertion after a `goto` waits out the dev server's cold compile of
+ * the route (seen failing the Plan editor test at the default 5s on a CI shard).
+ * Same allowance as segmentedSelectedCue.dev.spec.ts.
+ */
+const COLD_LOAD = { timeout: 15_000 };
+
 test('Skills > Trained: Shift+Tab through rows never lands under the sticky search bar', async ({
   page,
 }) => {
@@ -86,7 +93,7 @@ test('Skills > Trained: Shift+Tab through rows never lands under the sticky sear
   await page.goto('./skills/trained');
 
   const search = page.getByPlaceholder(/search/i).first();
-  await expect(search).toBeVisible();
+  await expect(search).toBeVisible(COLD_LOAD);
   await page.getByRole('button', { name: 'Expand all' }).click();
 
   const bar = search.locator('xpath=ancestor::div[contains(@class,"sticky")][1]');
@@ -127,7 +134,7 @@ test('Plan editor: Shift+Tab / Tab through the entry list never lands under the 
   await page.setViewportSize({ width: 1280, height: 700 });
   await page.goto('./skills/plans/e2e-sticky-plan');
 
-  await expect(page.getByPlaceholder('Search skills…')).toBeVisible();
+  await expect(page.getByPlaceholder('Search skills…')).toBeVisible(COLD_LOAD);
   const header = page.locator('[class*="lg:sticky"]').first();
   await expect(header).toBeVisible();
 
