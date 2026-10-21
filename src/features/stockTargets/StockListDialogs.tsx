@@ -3,19 +3,14 @@
  * add items to one by searching for each, or by pasting a whole list the way
  * Appraisal takes a paste.
  */
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FieldError, LiveStatus, Modal, TextArea, TextInput } from '@/components/ui';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
 import { matchAppraisalEntries, type AppraisalMatch } from '@/engine/market/appraisalMatch';
 import { loadAppraisalCatalogue } from '@/features/market/appraisalData';
-import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
-import { cx } from '@/lib/cx';
-import { useRetryableLoad } from '@/lib/useRetryableLoad';
-import { rankedSearch } from '@/lib/rankedSearch';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
-import { loadMarketTypes } from '@/sde/loadMarketSde';
+import { MarketTypePicker } from './MarketTypePicker';
 
 export function StockListNameDialog({
   title,
@@ -121,8 +116,6 @@ export function DeleteStockListDialog({
   );
 }
 
-const SEARCH_LIMIT = 8;
-
 /**
  * "Add items…": search the market catalogue for one item at a time, give it a
  * quantity, Add. The dialog stays open for the next item, saying what was
@@ -139,72 +132,13 @@ export function AddStockItemDialog({
 }) {
   const { t } = useTranslation();
   const id = useId();
-  const listId = `${id}-results`;
   const searchRef = useRef<HTMLInputElement>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
-  const [types, setTypes] = useState<readonly MarketTypeEntry[]>([]);
-  const [query, setQuery] = useState('');
-  const [highlight, setHighlight] = useState<number | null>(null);
   const [picked, setPicked] = useState<MarketTypeEntry | null>(null);
+  const [resetKey, setResetKey] = useState(0);
   const [quantity, setQuantity] = useState('');
   const [error, setError] = useState<{ field: 'item' | 'quantity'; text: string } | null>(null);
   const [added, setAdded] = useState<{ name: string; quantity: number; n: number } | null>(null);
-
-  // The catalogue is a lazy download, so offline it may be missing: say so,
-  // rather than letting the search sit silently empty.
-  const {
-    failed: typesFailed,
-    attempt: typesAttempt,
-    fail: failTypes,
-    clear: clearTypesFailure,
-    retry: retryTypes,
-  } = useRetryableLoad();
-  useEffect(() => {
-    let live = true;
-    clearTypesFailure();
-    loadMarketTypes().then(
-      (list) => {
-        if (live) setTypes(list);
-      },
-      () => {
-        if (live) failTypes();
-      }
-    );
-    return () => {
-      live = false;
-    };
-  }, [typesAttempt, failTypes, clearTypesFailure]);
-
-  const matches = useMemo(
-    () =>
-      picked
-        ? []
-        : rankedSearch(types, query, { primary: (type) => type.name, limit: SEARCH_LIMIT }),
-    [types, query, picked]
-  );
-  const open = matches.length > 0;
-
-  function choose(type: MarketTypeEntry) {
-    setPicked(type);
-    setQuery(type.name);
-    setHighlight(null);
-    setError(null);
-  }
-
-  function onSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (COMBOBOX_NAV_KEYS.includes(event.key)) {
-      event.preventDefault();
-      setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, matches.length));
-    } else if (event.key === 'Enter' && open) {
-      event.preventDefault();
-      choose(matches[highlight ?? 0]);
-    } else if (event.key === 'Escape' && open) {
-      // Closes the list, not the dialog.
-      event.preventDefault();
-      event.stopPropagation();
-      setQuery('');
-    }
-  }
 
   return (
     <Modal
@@ -231,83 +165,26 @@ export function AddStockItemDialog({
           onAdd(picked.typeId, amount);
           setAdded((prev) => ({ name: picked.name, quantity: amount, n: (prev?.n ?? 0) + 1 }));
           setPicked(null);
-          setQuery('');
+          setResetKey((n) => n + 1);
           setQuantity('');
           setError(null);
           searchRef.current?.focus();
         }}
       >
-        <div className="relative space-y-1">
-          <label className="block text-xs text-text-dim" htmlFor={`${id}-search`}>
-            {t('stockTargets.add.searchLabel')}
-          </label>
-          <TextInput
-            ref={searchRef}
-            id={`${id}-search`}
-            role="combobox"
-            aria-expanded={open}
-            aria-controls={listId}
-            aria-autocomplete="list"
-            aria-activedescendant={highlight === null ? undefined : `${listId}-${highlight}`}
-            autoComplete="off"
-            spellCheck={false}
-            aria-invalid={error?.field === 'item' || undefined}
-            aria-describedby={error?.field === 'item' ? `${id}-error` : undefined}
-            className="w-full"
-            value={query}
-            placeholder={t('stockTargets.add.searchPlaceholder')}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setPicked(null);
-              setHighlight(null);
-            }}
-            onKeyDown={onSearchKeyDown}
-          />
-          {typesFailed && (
-            <div className="flex items-center gap-2 text-xs text-text-dim">
-              <span>{t('stockTargets.add.searchUnavailable')}</span>
-              <Button
-                size="sm"
-                onClick={() => {
-                  // The note unmounts into the retry; focus goes on to the search field it serves.
-                  searchRef.current?.focus();
-                  retryTypes();
-                }}
-              >
-                {t('common.retry')}
-              </Button>
-            </div>
-          )}
-          {/* Always mounted, so the failure is announced when it appears (DESIGN.md §7). */}
-          <LiveStatus>{typesFailed ? t('stockTargets.add.searchUnavailable') : null}</LiveStatus>
-          <ul
-            id={listId}
-            role="listbox"
-            aria-label={t('stockTargets.add.searchLabel')}
-            hidden={!open}
-            className="absolute z-20 mt-1 w-full overflow-hidden rounded-xs border border-line-bright bg-panel shadow-lg"
-          >
-            {matches.map((type, index) => (
-              <li
-                key={type.typeId}
-                id={`${listId}-${index}`}
-                role="option"
-                aria-selected={index === highlight}
-                className={cx(
-                  tappableRowClassName,
-                  'flex cursor-pointer items-center border-l-2 px-3 text-sm',
-                  index === highlight
-                    ? 'border-accent bg-panel-2 font-semibold'
-                    : 'border-transparent hover:bg-panel-2'
-                )}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => choose(type)}
-              >
-                {type.name}
-              </li>
-            ))}
-          </ul>
-        </div>
+        <MarketTypePicker
+          inputRef={searchRef}
+          label={t('stockTargets.add.searchLabel')}
+          placeholder={t('stockTargets.add.searchPlaceholder')}
+          unavailableText={t('stockTargets.add.searchUnavailable')}
+          picked={picked}
+          resetKey={resetKey}
+          invalid={error?.field === 'item'}
+          describedBy={error?.field === 'item' ? `${id}-error` : undefined}
+          onPick={(type) => {
+            setPicked(type);
+            if (type) setError(null);
+          }}
+        />
         <div className="space-y-1">
           <label className="block text-xs text-text-dim" htmlFor={`${id}-quantity`}>
             {t('stockTargets.dialog.quantity')}

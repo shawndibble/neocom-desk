@@ -237,6 +237,14 @@
 // not drawn, so one Character's edit never drops another's widgets. No
 // `legacyKey`: new.
 //
+// sync.corpStockTargets (issue #4671): the minimum quantity the pilot wants a
+// corporation to hold of each item type, as {corporationId: {typeId: quantity}}.
+// Account-wide, not per Character: the targets belong to the corporation, so
+// whichever Character reads its assets sees the same ones. Its parse drops
+// targets that are not whole numbers above zero and keeps corporation ids this
+// build knows nothing about. Never deleted via deleteSyncedSetting: removing the
+// last target writes {}. No `legacyKey`: new. See features/corp/stockTargets.ts.
+//
 // sync.avoidedSystems: the solar system ids the pilot keeps off their routes,
 // managed from Settings → Travel (features/route/avoidedSystems.ts). One list
 // for the whole account — "I never fly through Uedama" is about the pilot, not
@@ -335,6 +343,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.overviewHiddenCards',
   'sync.overviewLayout',
   'sync.corpOverviewLayout',
+  'sync.corpStockTargets',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
   'sync.podKillThreshold',
