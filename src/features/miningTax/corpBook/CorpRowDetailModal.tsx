@@ -196,10 +196,19 @@ export function CorpRowDetailModal({
 
           {view.correction && (
             <p className="rounded-xs border border-line p-2 text-xs">
-              {t('miningTax.corpBook.detail.corrected', {
-                before: formatIsk(view.correction.before),
-                after: formatIsk(view.correction.after),
-              })}
+              {t(
+                view.correction.kind === 'write-off'
+                  ? 'miningTax.corpBook.detail.writtenOff'
+                  : 'miningTax.corpBook.detail.corrected',
+                {
+                  before: formatIsk(view.correction.before),
+                  after: formatIsk(view.correction.after),
+                }
+              )}
+              {view.correction.reasons.length > 0 &&
+                ` ${t('miningTax.corpBook.detail.reason', {
+                  reasons: view.correction.reasons.join(' · '),
+                })}`}
             </p>
           )}
 

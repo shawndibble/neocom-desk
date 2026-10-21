@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  readAdjustment,
   readBilledByPointer,
+  readFeederCoverage,
+  readWriteOff,
+  refineryNamesOf,
   readBookSettings,
   readDismissal,
   readMiner,
@@ -164,5 +168,65 @@ describe('readBilledByPointer', () => {
     expect(readBilledByPointer(undefined)).toEqual([]);
     expect(readBilledByPointer({ books: 'x' })).toEqual([]);
     expect(readBilledByPointer({ books: { nope: 1, '-3': 1 } })).toEqual([]);
+  });
+});
+
+describe('the miner-side copies (#4622)', () => {
+  it("reads a moon owner's coverage and read clock as ISO", () => {
+    expect(
+      readFeederCoverage('98000077', {
+        coveragePeriods: [{ from: '2026-10-01', to: '2026-10-09' }, { from: '2026-10-12' }],
+        lastReadWellAt: Date.parse('2026-10-18T07:00:00Z'),
+      })
+    ).toEqual({
+      corporationId: 98000077,
+      coveragePeriods: [{ from: '2026-10-01', to: '2026-10-09' }, { from: '2026-10-12' }],
+      lastReadWellAt: '2026-10-18T07:00:00.000Z',
+    });
+  });
+
+  it('reads a copy with no read clock, and skips a malformed one', () => {
+    expect(readFeederCoverage('5', { coveragePeriods: [] })).toEqual({
+      corporationId: 5,
+      coveragePeriods: [],
+    });
+    expect(readFeederCoverage('x', { coveragePeriods: [] })).toBeNull();
+    expect(readFeederCoverage('5', {})).toBeNull();
+  });
+
+  it('reads an Adjustment and a write-off, and skips malformed ones', () => {
+    expect(
+      readAdjustment('a1', {
+        minerId: 'solo:1',
+        date: '2026-10-17',
+        amount: -5,
+        reason: 'x',
+        by: 2,
+        at: '2026-10-18T00:00:00Z',
+      })
+    ).toEqual({
+      id: 'a1',
+      minerId: 'solo:1',
+      date: '2026-10-17',
+      amount: -5,
+      reason: 'x',
+      by: 2,
+      at: '2026-10-18T00:00:00Z',
+    });
+    expect(readAdjustment('a2', { minerId: 'solo:1', amount: 1 })).toBeNull();
+    expect(
+      readWriteOff('w1', { minerId: 'solo:1', amount: 5, reason: 'y', statementId: 's1' })
+    ).toEqual({ id: 'w1', minerId: 'solo:1', amount: 5, reason: 'y', statementId: 's1' });
+    expect(readWriteOff('w2', { minerId: 'solo:1' })).toBeNull();
+  });
+
+  it("names refineries from the Statements' own names, never a placeholder", () => {
+    expect(
+      refineryNamesOf([
+        { refineryNames: { '1000': 'Ikao - Moon Drill', '2000': 'Refinery 2000' } },
+        { refineryNames: { '3000': 'Ikao - Second Drill' } },
+        {},
+      ])
+    ).toEqual({ 1000: 'Ikao - Moon Drill', 3000: 'Ikao - Second Drill' });
   });
 });
