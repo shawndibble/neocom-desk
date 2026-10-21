@@ -62,6 +62,12 @@ export interface CorpCapabilities {
    * `x-required-roles` on this route is `["Director"]` alone.
    */
   canReadBlueprints: boolean;
+  /**
+   * GET /corporations/{id}/customs_offices — tax rates and reinforce window of
+   * each customs office (issue #4611). Director-only: `x-required-roles` is
+   * ["Director"] alone.
+   */
+  canReadCustomsOffices: boolean;
 }
 
 export type CorpCapability = keyof CorpCapabilities;
@@ -82,6 +88,7 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadIndustry',
   'canReadAssets',
   'canReadBlueprints',
+  'canReadCustomsOffices',
 ];
 
 /** The answer for a Character with no roles — and the shape of "not loaded yet". */
@@ -94,6 +101,7 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadIndustry: false,
   canReadAssets: false,
   canReadBlueprints: false,
+  canReadCustomsOffices: false,
 };
 
 /**
@@ -126,6 +134,8 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
   // ["Director"] alone (issue #839's own brief guessed Director/
   // Factory_Manager, which the live spec does not confirm).
   canReadBlueprints: [],
+  // `x-required-roles` on customs_offices is ["Director"] alone.
+  canReadCustomsOffices: [],
 };
 
 /**

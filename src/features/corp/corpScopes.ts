@@ -88,6 +88,8 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
    * read says nothing about the corp one.
    */
   canReadBlueprints: ['esi-corporations.read_blueprints.v1'],
+  /** Director-only (issue #4611). Additive, so a Director's older corp grant keeps working. */
+  canReadCustomsOffices: ['esi-planets.read_customs_offices.v1'],
 };
 
 /**
@@ -106,7 +108,10 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
  * the corp grant prompt's once-only ask on nothing (decision
  * `20261018-141225-additive-corp-capabilities-do-not-hide-corp-ui`).
  */
-const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set(['canReadMiningLedger']);
+const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set([
+  'canReadMiningLedger',
+  'canReadCustomsOffices',
+]);
 
 /**
  * Every scope the held capabilities need, deduplicated and in capability order.

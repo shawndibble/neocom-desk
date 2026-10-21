@@ -24,6 +24,7 @@ import type {
 } from '../../data/boardData';
 import type { IncursionsBoardData } from '../../data/incursionsBoard';
 import type {
+  CorpCustomsFeed,
   CorpJobsFeed,
   CorpKillsFeed,
   CorpMembersFeed,
@@ -259,6 +260,7 @@ export interface FeedMap {
   tradingProfit: TradingProfitWidgetData;
   corpWallet: CorpWalletFeed;
   corpJobs: CorpJobsFeed;
+  corpCustoms: CorpCustomsFeed;
   corpMembers: CorpMembersFeed;
   corpMining: CorpMiningFeed;
   corpKills: CorpKillsFeed;

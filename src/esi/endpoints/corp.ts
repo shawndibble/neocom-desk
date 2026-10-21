@@ -255,3 +255,41 @@ export function getCorporationMemberTracking(
     endpointId: 'getCorporationMemberTracking',
   });
 }
+
+// --- GET /corporations/{corporation_id}/customs_offices (esi-planets.read_customs_offices.v1) ---
+
+/**
+ * One customs office. Tax rates are fractions (0.05 is 5%). A standing rate is
+ * present only when that level is allowed, and `standing_level` and the
+ * standing rates only when `allow_access_with_standings`. The reinforce window
+ * is two whole UTC hours of the day, not a timer.
+ */
+export interface CorporationCustomsOffice {
+  office_id: number;
+  system_id: number;
+  type_id?: number;
+  reinforce_exit_start: number;
+  reinforce_exit_end: number;
+  allow_alliance_access: boolean;
+  allow_access_with_standings: boolean;
+  standing_level?: 'bad' | 'excellent' | 'good' | 'neutral' | 'terrible';
+  corporation_tax_rate?: number;
+  alliance_tax_rate?: number;
+  excellent_standing_tax_rate?: number;
+  good_standing_tax_rate?: number;
+  neutral_standing_tax_rate?: number;
+  bad_standing_tax_rate?: number;
+  terrible_standing_tax_rate?: number;
+}
+
+/** Director-only (`canReadCustomsOffices`), cached 3600s, paginated (X-Pages). */
+export function getCorporationCustomsOffices(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<PaginatedResult<CorporationCustomsOffice>> {
+  return fetchAllPagesStatus<CorporationCustomsOffice>(
+    `/corporations/${corporationId}/customs_offices`,
+    { ...options, characterId, endpointId: 'getCorporationCustomsOffices' }
+  );
+}

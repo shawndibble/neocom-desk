@@ -4960,8 +4960,31 @@
       },
       "corpCustomsOffices": {
         "title": "Customs offices",
-        "description": "Your customs offices, their tax rates and timers",
-        "empty": "This widget is coming soon."
+        "description": "Each customs office’s tax rates by standing and its reinforce exit window",
+        "empty": "Your corporation has no customs offices.",
+        "col": {
+          "office": "Office",
+          "system": "System",
+          "rates": "Tax rates",
+          "window": "Reinforce exit (UTC)"
+        },
+        "rate": {
+          "corporation": "Corporation",
+          "alliance": "Alliance",
+          "excellent": "Excellent",
+          "good": "Good",
+          "neutral": "Neutral",
+          "bad": "Bad",
+          "terrible": "Terrible"
+        },
+        "unit_one": "customs office",
+        "unit_other": "customs offices",
+        "systems_one": "in {{count}} system",
+        "systems_other": "in {{count}} systems",
+        "unknownType": "Customs office",
+        "window": "{{start}}:00 to {{end}}:00",
+        "summary_one": "{{count}} customs office. Systems covered: {{systems}}.",
+        "summary_other": "{{count}} customs offices. Systems covered: {{systems}}."
       },
       "corpWallet": {
         "title": "Corp wallet",

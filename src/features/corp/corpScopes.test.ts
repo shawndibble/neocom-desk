@@ -217,6 +217,19 @@ describe('corpGrantCoverage', () => {
     expect(coverage.blocking).toBe(true);
   });
 
+  it('keeps a Director’s older grant ready when only the customs scope is missing (#4611)', () => {
+    const CUSTOMS = 'esi-planets.read_customs_offices.v1';
+    expect(CORP_SCOPES_FOR_CAPABILITY.canReadCustomsOffices).toEqual([CUSTOMS]);
+    const coverage = corpGrantCoverage(
+      corpCapabilities(['Director']),
+      scopesForGroup('corp').filter((scope) => scope !== CUSTOMS)
+    );
+    expect(coverage.blocking).toBe(false);
+    expect(coverage.missingScopes).toEqual([CUSTOMS]);
+    expect(coverage.capabilities.canReadCustomsOffices).toBe(false);
+    expect(coverage.capabilities.canReadWallet).toBe(true);
+  });
+
   it('reports the same missing set as missingCorpScopes', () => {
     for (const roles of [['Director'], ['Accountant'], ['Station_Manager'], []]) {
       const capabilities = corpCapabilities(roles);

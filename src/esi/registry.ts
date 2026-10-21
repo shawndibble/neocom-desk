@@ -754,6 +754,16 @@ export const ESI_REGISTRY = {
     scope: 'esi-corporations.read_blueprints.v1',
     group: 'corp',
   },
+  /**
+   * Customs offices (issue #4611): Director-only per `x-required-roles`
+   * (`canReadCustomsOffices`). The scope is the corp twin of nothing in the
+   * Base Grant, and additive (`corpScopes.ts`).
+   */
+  getCorporationCustomsOffices: {
+    route: '/corporations/{corporation_id}/customs_offices',
+    scope: 'esi-planets.read_customs_offices.v1',
+    group: 'corp',
+  },
 } as const satisfies Record<EndpointName, EsiEndpointSpec>;
 
 export type EsiEndpointId = keyof typeof ESI_REGISTRY;
