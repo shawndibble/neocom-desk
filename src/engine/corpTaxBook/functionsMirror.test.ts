@@ -17,7 +17,10 @@ import { accrueValuedDays, feederBalance, onPayList } from './feederAccrual';
 import {
   buildRecordedPayout,
   outgoingDonationsFromJournal,
-  reconcileOutgoing,
+  payeeIdsAt,
+  payoutToMerge,
+  reconcileBookOutgoing,
+  withPayeeChange,
   type OutgoingDonation,
 } from './payouts';
 import { DEFAULT_GRACE_HOURS, dayClosesAt } from './billable';
@@ -492,8 +495,33 @@ describe('feeder view mirror', () => {
         notAPayout: false,
       },
     ];
-    const input = { payouts, outgoing, payeeIds: new Set([77]), since: '2026-10-01' };
-    expect(mirror.reconcileOutgoing(input)).toEqual(reconcileOutgoing(input));
+    const history = [
+      { payee: { kind: 'character' as const, id: 70 }, from: 0 },
+      { payee: { kind: 'character' as const, id: 77 }, from: Date.parse('2026-10-19T00:00:00Z') },
+    ];
+    const input = {
+      owners: [
+        {
+          corporationId: 5,
+          payee: { kind: 'character' as const, id: 77 },
+          payouts,
+          since: '2026-10-01',
+        },
+        { corporationId: 6, payeeHistory: history, payouts: [], since: '2026-10-01' },
+      ],
+      outgoing,
+    };
+    expect(mirror.reconcileBookOutgoing(input)).toEqual(reconcileBookOutgoing(input));
+    for (const at of ['2026-10-18T10:00:00Z', '2026-10-19T10:00:00Z']) {
+      expect(mirror.payeeIdsAt(input.owners[1]!, at)).toEqual(payeeIdsAt(input.owners[1]!, at));
+    }
+    const legacy = { payee: { kind: 'character' as const, id: 70 }, payeeChangedAt: 3 };
+    expect(mirror.withPayeeChange(legacy, { kind: 'character', id: 77 }, 9)).toEqual(
+      withPayeeChange(legacy, { kind: 'character', id: 77 }, 9)
+    );
+    const auto = [{ ...payouts[0]!, id: 'j1_1', status: 'matched' as const, journalRef: 1 }];
+    const recorded = { amount: 5e6, date: '2026-10-19', method: 'donation' as const };
+    expect(mirror.payoutToMerge(auto, recorded)).toBe(payoutToMerge(auto, recorded));
     for (const method of ['donation', 'contract', 'other'] as const) {
       const rec = { amount: 12, date: '2026-10-18', method };
       expect(mirror.buildRecordedPayout(rec)).toEqual(buildRecordedPayout(rec));

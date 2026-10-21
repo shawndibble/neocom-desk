@@ -5,6 +5,7 @@ import {
   composeRemovalMail,
   eveTimeLabel,
   fillTakesEffect,
+  removalTakesEffectAt,
 } from './removalMail';
 
 const input = {
@@ -29,6 +30,10 @@ describe('composeRemovalMail', () => {
   it('never mentions rates, margins, the guard or the developer terms', () => {
     expect(`${mail.subject}\n${mail.body}`).not.toMatch(FORBIDDEN);
   });
+  it('says mining stops counting from the day it takes effect, not that it is still counted (#4617)', () => {
+    expect(mail.body).not.toContain('still counted');
+    expect(mail.body).toContain('from that day on is no longer counted');
+  });
   it('leaves the link line out without a link', () => {
     expect(composeRemovalMail({ ...input, link: undefined as never }).body).not.toContain(
       'end it now here'
@@ -48,11 +53,16 @@ describe('composeRemovalCancelledMail', () => {
 });
 
 describe('fillTakesEffect', () => {
-  it('counts 24 hours from the send, not from the compose', () => {
+  it('counts 24 hours from the send while the clock has not started', () => {
     const sentAt = Date.parse('2026-10-17T14:22:00Z');
-    const body = fillTakesEffect(composeRemovalMail(input).body, sentAt);
+    const body = fillTakesEffect(composeRemovalMail(input).body, removalTakesEffectAt({}, sentAt));
     expect(body).toContain(eveTimeLabel(Date.parse('2026-10-18T14:22:00Z')));
     expect(body).not.toContain(TAKES_EFFECT_TOKEN);
+  });
+  it('a later or retried copy states the recorded time, not its own send time (#4617)', () => {
+    const effectiveAt = Date.parse('2026-10-18T14:22:00Z');
+    const late = Date.parse('2026-10-17T18:00:00Z');
+    expect(removalTakesEffectAt({ effectiveAt }, late)).toBe(effectiveAt);
   });
   it('formats an EVE time label', () => {
     expect(eveTimeLabel(Date.parse('2026-10-18T09:05:00Z'))).toBe('18 Oct 2026 09:05 EVE time');

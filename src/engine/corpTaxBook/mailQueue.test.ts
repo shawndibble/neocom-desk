@@ -9,8 +9,11 @@ import {
   markSent,
   nextStep,
   reminderAllowed,
+  removalMailsToDrop,
   retryItem,
   sendGapMs,
+  stampRemovalEffectiveAt,
+  startsRemovalClock,
   summarize,
   type MailQueueItem,
 } from './mailQueue';
@@ -204,5 +207,48 @@ describe('isAlreadyQueued', () => {
     const r = item(1, { kind: 'reminder', status: 'sent' });
     expect(isAlreadyQueued([r], 's1', 'reminder')).toBe(false);
     expect(isAlreadyQueued([{ ...r, status: 'waiting' }], 's1', 'reminder')).toBe(true);
+  });
+});
+
+describe('removal notices (#4617)', () => {
+  const notice = (n: number, patch: Partial<MailQueueItem> = {}) =>
+    item(n, { kind: 'removal', feederCorporationId: 5, ...patch });
+
+  it('only a copy to the moon owner side starts the 24 hours', () => {
+    expect(startsRemovalClock(notice(1, { startsClock: true }))).toBe(true);
+    expect(startsRemovalClock(notice(1, { startsClock: false }))).toBe(false);
+    // Queued before the flag existed: as before, any copy starts it.
+    expect(startsRemovalClock(notice(1))).toBe(true);
+    expect(startsRemovalClock(item(1))).toBe(false);
+    expect(startsRemovalClock(notice(1, { kind: 'removalCancelled' }))).toBe(false);
+  });
+
+  it('a cancel drops the unsent notices for that moon owner only', () => {
+    const items = [
+      notice(1),
+      notice(2, { status: 'failed' }),
+      notice(3, { status: 'sent' }),
+      notice(4, { feederCorporationId: 6 }),
+      notice(5, { corporationId: 1 }),
+      notice(6, { kind: 'removalCancelled' }),
+      item(7),
+    ];
+    expect(removalMailsToDrop(items, 98000001, 5)).toEqual(['m1', 'm2']);
+  });
+
+  it('once the clock starts, every unsent copy carries the recorded time', () => {
+    const items = [
+      notice(1, { status: 'sent' }),
+      notice(2),
+      notice(3, { status: 'failed' }),
+      notice(4, { feederCorporationId: 6 }),
+      notice(5, { effectiveAt: 99 }),
+    ];
+    expect(
+      stampRemovalEffectiveAt(items, 98000001, 5, 99).map((i) => [i.id, i.effectiveAt])
+    ).toEqual([
+      ['m2', 99],
+      ['m3', 99],
+    ]);
   });
 });

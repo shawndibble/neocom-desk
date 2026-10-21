@@ -224,6 +224,11 @@ export interface StartedRemoval {
   code: string;
   /** Character ids the one mail goes to. */
   recipients: number[];
+  /**
+   * The moon owner's CEO and payee among them: only a copy to one of them starts the 24 hours
+   * (#4617). Absent from a server that predates the split.
+   */
+  ownerRecipients?: number[];
 }
 
 /** Start a 24-hour removal. The 24 hours begin when the notice is sent. */

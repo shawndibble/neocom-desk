@@ -3,7 +3,6 @@ import {
   parseMarkPayoutInput,
   parseReconcilePayoutsInput,
   parseRecordPayoutInput,
-  payeeIdsOf,
 } from './corpTaxBookFeederPayouts.js';
 
 const base = { corporationId: 9, accessToken: 't', feederCorporationId: 5 };
@@ -60,14 +59,5 @@ describe('parseReconcilePayoutsInput', () => {
         outgoing: Array.from({ length: 501 }, () => row),
       })
     ).toThrow();
-  });
-});
-
-describe('payeeIdsOf', () => {
-  it('is the payee, else the corporation itself', () => {
-    expect(payeeIdsOf({ corporationId: 5, payee: { kind: 'character', id: 77 } })).toEqual(
-      new Set([77])
-    );
-    expect(payeeIdsOf({ corporationId: 5 })).toEqual(new Set([5]));
   });
 });

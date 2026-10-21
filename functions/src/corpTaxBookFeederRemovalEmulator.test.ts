@@ -168,6 +168,9 @@ suite('removing a moon owner', () => {
       [CEO, OTHER_ACCOUNTANT, FEEDER_CEO, PAYEE].sort()
     );
     expect(result.recipients).not.toContain(ACCOUNTANT);
+    // The moon owner side comes first; only a copy to it starts the clock (#4617).
+    expect([...result.ownerRecipients].sort()).toEqual([FEEDER_CEO, PAYEE].sort());
+    expect(result.recipients.slice(0, 2).sort()).toEqual([FEEDER_CEO, PAYEE].sort());
     const links = await db.collection('corpTaxBookRemovalLinks').get();
     expect(links.size).toBe(1);
     expect(JSON.stringify(links.docs[0]!.data())).not.toContain(result.code);
@@ -333,6 +336,16 @@ suite('removing a moon owner', () => {
       expect((await force(code, PAYEE_CORP_CEO)).ended).toBe(true);
     });
 
+    it('keeps working until the removal takes effect when the notice went out late (#4617)', async () => {
+      const { code } = await start();
+      now += 40 * H;
+      const { effectiveAt } = await recordRemovalSent(deps(), who(ACCOUNTANT), target(ACCOUNTANT));
+      // Past the old 48 hours from the start, still before it takes effect.
+      now = effectiveAt! - H;
+      expect(await getRemovalLink(deps(), who(PAYEE), { code })).toMatchObject({ available: true });
+      expect((await force(code)).ended).toBe(true);
+    });
+
     it('is the same neutral answer for a stranger and an unknown code', async () => {
       const { code } = await start();
       const stranger = await getRemovalLink(deps(), who(STRANGER), { code });
@@ -351,5 +364,11 @@ suite('removing a moon owner', () => {
     expect((await record())?.payeeChangedAt).toBe(first);
     await setPayee({ kind: 'corporation', id: PAYEE_CORP });
     expect((await record())?.payeeChangedAt).toBe(now);
+    // Who was paid when, for matching a donation to the payee in force on its date (#4617).
+    const history = ((await record()) as { payeeHistory?: unknown } | undefined)?.payeeHistory;
+    expect(history).toEqual([
+      { payee: { kind: 'character', id: PAYEE }, from: first },
+      { payee: { kind: 'corporation', id: PAYEE_CORP }, from: now },
+    ]);
   });
 });

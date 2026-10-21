@@ -57,7 +57,8 @@ export function outgoingDonationsFromJournal(
   return out;
 }
 
-type StoredPayout = FeederPayout & { id: string };
+/** `confirmedAt`: an officer's own record was folded into this journal row (#4617). */
+type StoredPayout = FeederPayout & { id: string; confirmedAt?: number };
 
 export interface PayoutReconciliation {
   /** Journal entries that are the payment an officer already recorded. */
@@ -66,52 +67,120 @@ export interface PayoutReconciliation {
   create: { id: string; payout: FeederPayout }[];
 }
 
+export type Payee = { kind: 'corporation' | 'character'; id: number };
+
+/** One payee and when it took over (ms). `from: 0` is a payee set before history was kept. */
+export interface PayeeChange {
+  payee: Payee;
+  from: number;
+}
+
 /**
- * Attach each outgoing donation to the recorded payout with the same amount,
- * date (within the window) and recipient; a donation with no such record is
- * recorded as a payout. A journal entry that already counts (attached, or
- * marked "not a payout") is never counted again.
+ * Who a donation sent at `at` may go to for this moon owner: the payee in force then, and the
+ * moon owner corporation itself. A record with no history falls back to its current payee.
  */
-export function reconcileOutgoing(input: {
+export function payeeIdsAt(
+  owner: { corporationId: number; payee?: Payee; payeeHistory?: readonly PayeeChange[] },
+  at: string
+): Set<number> {
+  const ids = new Set([owner.corporationId]);
+  const history = owner.payeeHistory;
+  if (!history || history.length === 0) {
+    if (owner.payee) ids.add(owner.payee.id);
+    return ids;
+  }
+  const t = Date.parse(at);
+  const inForce = history.filter((h) => h.from <= t).at(-1);
+  if (inForce) ids.add(inForce.payee.id);
+  return ids;
+}
+
+/** The payee history after setting `payee` at `now`; seeds it from a record that had none. */
+export function withPayeeChange(
+  rec: { payee?: Payee; payeeChangedAt?: number; payeeHistory?: readonly PayeeChange[] },
+  payee: Payee,
+  now: number
+): PayeeChange[] {
+  const history: PayeeChange[] = rec.payeeHistory
+    ? [...rec.payeeHistory]
+    : rec.payee
+      ? [{ payee: rec.payee, from: rec.payeeChangedAt ?? 0 }]
+      : [];
+  const last = history.at(-1)?.payee;
+  if (last?.kind === payee.kind && last.id === payee.id) return history;
+  return [...history, { payee, from: now }];
+}
+
+/** One moon owner's side of the book-wide reconcile. */
+export interface OwnerOutgoing {
+  corporationId: number;
+  payee?: Payee;
+  payeeHistory?: readonly PayeeChange[];
   payouts: readonly StoredPayout[];
-  outgoing: readonly OutgoingDonation[];
-  /** The feeder's payee ids; only a donation to one of them counts. */
-  payeeIds: ReadonlySet<number>;
   /** First covered day: older donations are never auto-recorded. */
   since: string;
-}): PayoutReconciliation {
+}
+
+const dayGap = (date: string, at: string) => Math.abs(dayIndex(date) - dayIndex(at));
+
+/**
+ * Attach each outgoing donation to the recorded payout with the same amount, date (within the
+ * window) and recipient; a donation with no such record is recorded as a payout. One pass over
+ * the whole book: a journal entry counts once across every moon owner, and a donation whose
+ * recipient is the payee of more than one moon owner is never auto-recorded (an officer adds it
+ * by hand). Only a donation payout takes a journal donation.
+ */
+export function reconcileBookOutgoing(input: {
+  owners: readonly OwnerOutgoing[];
+  outgoing: readonly OutgoingDonation[];
+}): (PayoutReconciliation & { corporationId: number })[] {
+  const results = input.owners.map((o) => ({
+    corporationId: o.corporationId,
+    attach: [] as PayoutReconciliation['attach'],
+    create: [] as PayoutReconciliation['create'],
+  }));
   const seen = new Set(
-    input.payouts.flatMap((p) => (p.journalRef === undefined ? [] : [p.journalRef]))
+    input.owners.flatMap((o) =>
+      o.payouts.flatMap((p) => (p.journalRef === undefined ? [] : [p.journalRef]))
+    )
   );
-  const open = input.payouts.filter((p) => p.journalRef === undefined && !p.notAPayout);
+  const open = input.owners.map((o) =>
+    o.payouts.filter((p) => p.journalRef === undefined && !p.notAPayout && p.method === 'donation')
+  );
   const taken = new Set<string>();
-  const attach: PayoutReconciliation['attach'] = [];
-  const create: PayoutReconciliation['create'] = [];
   const sorted = [...input.outgoing].sort((a, b) => a.at.localeCompare(b.at) || a.refId - b.refId);
   for (const d of sorted) {
-    if (!input.payeeIds.has(d.recipientId) || seen.has(d.refId)) continue;
+    if (seen.has(d.refId)) continue;
+    const owners = input.owners.flatMap((o, i) =>
+      payeeIdsAt(o, d.at).has(d.recipientId) ? [i] : []
+    );
+    if (owners.length === 0) continue;
     seen.add(d.refId);
     const amount = Math.round(d.amount);
-    const near = open
+    const near = owners
+      .flatMap((i) =>
+        (open[i] ?? []).map((p) => ({ i, p, key: `${input.owners[i]!.corporationId}:${p.id}` }))
+      )
       .filter(
-        (p) =>
-          !taken.has(p.id) &&
-          p.amount === amount &&
-          Math.abs(dayIndex(p.date) - dayIndex(d.at)) <= PAYOUT_LINK_WINDOW_DAYS
+        ({ p, key }) =>
+          !taken.has(key) && p.amount === amount && dayGap(p.date, d.at) <= PAYOUT_LINK_WINDOW_DAYS
       )
       .sort(
         (a, b) =>
-          Math.abs(dayIndex(a.date) - dayIndex(d.at)) -
-            Math.abs(dayIndex(b.date) - dayIndex(d.at)) || a.id.localeCompare(b.id)
+          dayGap(a.p.date, d.at) - dayGap(b.p.date, d.at) ||
+          input.owners[a.i]!.corporationId - input.owners[b.i]!.corporationId ||
+          a.p.id.localeCompare(b.p.id)
       )[0];
     if (near) {
-      taken.add(near.id);
-      attach.push({ id: near.id, journalRef: d.refId });
+      taken.add(near.key);
+      results[near.i]!.attach.push({ id: near.p.id, journalRef: d.refId });
       continue;
     }
+    if (owners.length > 1) continue;
+    const i = owners[0]!;
     const date = d.at.slice(0, 10);
-    if (date < input.since) continue;
-    create.push({
+    if (date < input.owners[i]!.since) continue;
+    results[i]!.create.push({
       id: payoutId(d),
       payout: {
         date,
@@ -123,7 +192,36 @@ export function reconcileOutgoing(input: {
       },
     });
   }
-  return { attach, create };
+  return results;
+}
+
+const AUTO_RECORDED = /^j\d+_\d+$/;
+
+/**
+ * "I've sent it" or a manual add after the journal already auto-recorded the same payment: the
+ * journal row with the same amount within the matching window, which the officer's record then
+ * confirms instead of counting it twice. Only a donation, and only a row not yet confirmed.
+ */
+export function payoutToMerge(
+  stored: readonly StoredPayout[],
+  recorded: { amount: number; date: string; method: 'donation' | 'contract' | 'other' }
+): string | undefined {
+  if (recorded.method !== 'donation') return undefined;
+  return stored
+    .filter(
+      (p) =>
+        AUTO_RECORDED.test(p.id) &&
+        p.journalRef !== undefined &&
+        !p.notAPayout &&
+        p.confirmedAt === undefined &&
+        p.method === 'donation' &&
+        p.amount === recorded.amount &&
+        dayGap(p.date, recorded.date) <= PAYOUT_LINK_WINDOW_DAYS
+    )
+    .sort(
+      (a, b) =>
+        dayGap(a.date, recorded.date) - dayGap(b.date, recorded.date) || a.id.localeCompare(b.id)
+    )[0]?.id;
 }
 
 /** A payout an officer says they sent ("I've sent it", or added by hand). A contract counts as other. */

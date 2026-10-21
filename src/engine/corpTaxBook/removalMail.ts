@@ -4,7 +4,8 @@
  *
  * Player-facing wording only: "moon owner" and "accounting corporation". Neither mail ever
  * names the miner rate or the margin. The notice carries a placeholder for when it takes
- * effect because the 24 hours start when the queue sends it (`fillTakesEffect`).
+ * effect because the 24 hours start when the queue sends a copy to the moon owner
+ * (`fillTakesEffect`); every later copy states that recorded time.
  */
 import { serializeEveMarkup, type MarkupNode } from '../mail/eveMarkup';
 import { REMOVAL_WAIT_MS } from './removal';
@@ -38,7 +39,7 @@ export function composeRemovalMail(input: RemovalMailInput): RemovalMail {
     br(),
     br(),
     text(
-      `It takes effect ${TAKES_EFFECT_TOKEN}. Until then mining at ${owner}'s refineries is still counted. ` +
+      `It takes effect ${TAKES_EFFECT_TOKEN}. Mining at ${owner}'s refineries from that day on is no longer counted. ` +
         `Nothing is deleted, and what ${acct} owes ${owner} stays owed.`
     ),
     br(),
@@ -89,7 +90,15 @@ export function eveTimeLabel(at: number): string {
   return `${d.getUTCDate()} ${month} ${d.getUTCFullYear()} ${hh}:${mm} EVE time`;
 }
 
-/** The notice as sent at `sentAt`: its 24 hours run from then. */
-export function fillTakesEffect(body: string, sentAt: number): string {
-  return body.replaceAll(TAKES_EFFECT_TOKEN, eveTimeLabel(sentAt + REMOVAL_WAIT_MS));
+/**
+ * When a copy sent at `now` says the removal takes effect: the recorded time once the clock has
+ * started, else 24 hours from this send (which is what starts it).
+ */
+export function removalTakesEffectAt(item: { effectiveAt?: number }, now: number): number {
+  return item.effectiveAt ?? now + REMOVAL_WAIT_MS;
+}
+
+/** The notice with its "takes effect" time filled in. */
+export function fillTakesEffect(body: string, effectiveAt: number): string {
+  return body.replaceAll(TAKES_EFFECT_TOKEN, eveTimeLabel(effectiveAt));
 }

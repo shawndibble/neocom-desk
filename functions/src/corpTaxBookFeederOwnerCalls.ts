@@ -12,7 +12,13 @@ import {
   utcDate,
   type BookCall,
 } from './corpTaxBook.js';
-import { withPayee, type FeederModeChange, type OwnerRateEntry } from './corpTaxBookEngine.js';
+import {
+  withPayee,
+  withPayeeChange,
+  type FeederModeChange,
+  type OwnerRateEntry,
+  type PayeeChange,
+} from './corpTaxBookEngine.js';
 import {
   deriveModeChanges,
   deriveOwnerRateHistory,
@@ -215,6 +221,12 @@ export function setFeederPayee(
       update: {
         payee: input.payee,
         ...(next.payeeChangedAt !== undefined ? { payeeChangedAt: next.payeeChangedAt } : {}),
+        // Who was paid when: a donation matches the payee in force on its date (#4617).
+        payeeHistory: withPayeeChange(
+          rec as FeederRecord & { payeeHistory?: PayeeChange[] },
+          input.payee,
+          now
+        ),
       },
       action: 'feederPayeeSet',
       detail: { payee: input.payee },

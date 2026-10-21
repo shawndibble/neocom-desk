@@ -24,6 +24,7 @@ import {
   canStartRemoval,
   isPayeeActor,
   isRemovalDue,
+  moonOwnerMailRecipients,
   payeeMayForce,
   recordRemovalNotice,
   removalRecipients,
@@ -43,8 +44,14 @@ import {
 } from './corpTaxBookStore.js';
 import { characterIdForUid } from './verifyEveToken.js';
 
-/** How long the mail's link stays valid, from the start: the wait plus a day of slack for the mail. */
-const LINK_TTL_MS = REMOVAL_WAIT_MS + 24 * 3_600_000;
+/** Slack on the link past the wait, for a mail read late. */
+const LINK_SLACK_MS = 24 * 3_600_000;
+
+/**
+ * How long the mail's link stays valid, from the start: the wait plus slack. Once the notice is
+ * out it runs to `effectiveAt` plus the slack instead (#4617), since the queue may send late.
+ */
+const LINK_TTL_MS = REMOVAL_WAIT_MS + LINK_SLACK_MS;
 
 function fail(code: FunctionsErrorCode, message: string, reason: string): never {
   throw new HttpsError(code, message, { reason });
@@ -106,12 +113,19 @@ export function parseRemovalLinkCall(data: unknown): RemovalLinkCall {
 
 // --- Recipients ------------------------------------------------------------
 
+interface Recipients {
+  /** Everyone the one mail goes to: the moon owner side first, then the other officers. */
+  all: number[];
+  /** The moon owner's CEO and payee: a copy to one of them starts the clock (#4617). */
+  owner: number[];
+}
+
 async function recipientsFor(
   deps: BookDeps,
   collector: number,
   rec: FeederRecord,
   excludeCharacterId: number
-): Promise<number[]> {
+): Promise<Recipients> {
   const now = deps.now();
   const officers = await bookRef(deps.db, collector).collection(OFFICERS).get();
   const officerIds = officers.docs.flatMap((d) => {
@@ -124,13 +138,14 @@ async function recipientsFor(
   const payee = payeeOf(rec);
   const payeeCeoId =
     payee.kind === 'corporation' ? await ceoOf(payee.id).catch(() => undefined) : undefined;
-  return removalRecipients({
+  const input = {
     officerIds,
     startedBy: excludeCharacterId,
     ceoId: ceoId ?? null,
     payee,
     payeeCeoId: payeeCeoId ?? null,
-  });
+  };
+  return { all: removalRecipients(input), owner: moonOwnerMailRecipients(input) };
 }
 
 // --- Start, notice, cancel --------------------------------------------------
@@ -139,8 +154,13 @@ export interface StartRemovalResult {
   startedAt: number;
   /** The code for the link in the mail; shown nowhere else and never stored. */
   code: string;
-  /** Character ids the one mail goes to. */
+  /** Character ids the one mail goes to, the moon owner side first. */
   recipients: number[];
+  /**
+   * The moon owner's CEO and payee among them (#4617): only a copy to one of these starts the
+   * 24 hours. Empty when neither could be found; the removal then waits on "I sent the notice".
+   */
+  ownerRecipients: number[];
 }
 
 /** Start a removal. The status flips at once; the 24 hours wait for the notice (`recordRemovalSent`). */
@@ -186,8 +206,8 @@ export async function startFeederRemoval(
     return held;
   });
   await tryRebuildFeederView(deps, input.corporationId, input.feederCorporationId);
-  const recipients = await recipientsFor(deps, input.corporationId, rec, access.characterId);
-  return { startedAt: now, code, recipients };
+  const { all, owner } = await recipientsFor(deps, input.corporationId, rec, access.characterId);
+  return { startedAt: now, code, recipients: all, ownerRecipients: owner };
 }
 
 /**
@@ -214,7 +234,11 @@ export async function recordRemovalSent(
     if (next.removal === rec.removal) return rec.removal.effectiveAt ?? null;
     tx.update(ref, { removal: next.removal });
     if (rec.removalLinkId) {
-      tx.update(linkRef(deps.db, rec.removalLinkId), { effectiveAt: next.removal.effectiveAt });
+      // The link lives until the removal takes effect, however late the notice went out.
+      tx.update(linkRef(deps.db, rec.removalLinkId), {
+        effectiveAt: next.removal.effectiveAt,
+        expiresAt: next.removal.effectiveAt + LINK_SLACK_MS,
+      });
     }
     appendAudit(
       tx,
@@ -263,7 +287,8 @@ export async function cancelFeederRemoval(
     return held;
   });
   await tryRebuildFeederView(deps, input.corporationId, input.feederCorporationId);
-  return { recipients: await recipientsFor(deps, input.corporationId, rec, access.characterId) };
+  const { all } = await recipientsFor(deps, input.corporationId, rec, access.characterId);
+  return { recipients: all };
 }
 
 // --- The payee's link ---------------------------------------------------------
