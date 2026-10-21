@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton, IskFigureGroup, TextInput, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -10,7 +10,7 @@ import { IskAmount } from '@/components/ui';
 import { sumImplantValue } from '@/engine/implantValue';
 import { formatDuration } from '@/lib/duration';
 import { MIN_JUMP_GAIN_SECONDS, type CloneRow } from '@/engine/clone/cloneVerdict';
-import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
+import { useInPlaceEdit } from '@/lib/useInPlaceEdit';
 import type { AttributeName } from '@/engine/types';
 
 /** 44px tap box on a phone; stacked wrapped links must not overlap, so no negative margins here. */
@@ -139,30 +139,19 @@ export function CloneCard({
   current?: boolean;
 }) {
   const { t } = useTranslation();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
-  const pencilRef = useRef<HTMLButtonElement>(null);
-  // Set once Enter or Esc has settled the field, so the blur that follows does not save again.
-  const settled = useRef(false);
   const hintId = useId();
-  const focusAfterCommit = useFocusAfterCommit();
+  const {
+    editing,
+    start: startRename,
+    triggerRef: pencilRef,
+    inputProps,
+  } = useInPlaceEdit({
+    initial: () => rename?.value ?? '',
+    onCommit: (draft) => rename?.onSave(draft),
+  });
   const value = prices ? sumImplantValue(implantIds, prices) : null;
   const delta = training?.row?.deltaSeconds ?? null;
   const showSlot = implantIds.some((id) => implantDetails.get(id)?.slot !== undefined);
-
-  function startRename() {
-    settled.current = false;
-    setDraft(rename?.value ?? '');
-    setEditing(true);
-  }
-  // Enter and Escape hand focus back to the pencil; blur does not, the pilot is already moving on.
-  function close(save: boolean, refocus: boolean) {
-    if (settled.current) return;
-    settled.current = true;
-    setEditing(false);
-    if (save && rename && draft.trim() !== rename.value) rename.onSave(draft);
-    if (refocus) focusAfterCommit(pencilRef);
-  }
 
   return (
     <li
@@ -174,27 +163,11 @@ export function CloneCard({
         {editing && rename ? (
           <TextInput
             size="sm"
-            autoFocus
-            value={draft}
+            {...inputProps}
             maxLength={CLONE_NICKNAME_MAX}
             placeholder={rename.placeholder}
             aria-label={t('clones.nameField')}
             aria-describedby={hintId}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={() => close(true, false)}
-            onKeyDown={(e) => {
-              // An Enter that confirms an IME candidate is not a save.
-              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                // Focus moves to a button mid-keystroke: its keypress must not click it.
-                e.preventDefault();
-                close(true, true);
-              }
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                e.stopPropagation();
-                close(false, true);
-              }
-            }}
             className="min-w-0 flex-1"
           />
         ) : (

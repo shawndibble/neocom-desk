@@ -205,6 +205,13 @@ export const RefineryLabels: Story = {
   },
 };
 
+/** @summary A refinery with no label and no readable structure name reads as the system a miner's own ledger placed it in (#4650), not the moon owner's name plus its id. */
+export const LearnedSystem: Story = {
+  args: {
+    refineryName: (id: number) => (id === 10 ? 'Efa - Ashfall Tatara' : 'Ikao'),
+  },
+};
+
 /** @summary A viewer who may not edit: no Pay, Set rate, Settled otherwise or payment actions. */
 export const ReadOnly: Story = {
   args: {

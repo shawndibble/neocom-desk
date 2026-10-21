@@ -1,8 +1,8 @@
-import { useId, useRef, useState } from 'react';
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IconButton, Panel, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
+import { useInPlaceEdit } from '@/lib/useInPlaceEdit';
 import { callableErrorText } from './feederErrorText';
 
 /** The server's `MAX_REFINERY_LABEL`: it refuses anything longer. */
@@ -28,63 +28,26 @@ function RefineryRow({
   edit?: RefineryLabelEdit;
 }) {
   const { t } = useTranslation();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const pencilRef = useRef<HTMLButtonElement>(null);
-  // Set once Enter or Esc has settled the field, so the blur that follows does not save again.
-  const settled = useRef(false);
   const hintId = useId();
-  const focusAfterCommit = useFocusAfterCommit();
-
-  function start() {
-    if (!edit) return;
-    settled.current = false;
-    setError(null);
-    setDraft(edit.current(structureId));
-    setEditing(true);
-  }
-  // Enter and Escape hand focus back to the pencil; blur does not, the officer is already moving on.
-  function close(save: boolean, refocus: boolean) {
-    if (settled.current || !edit) return;
-    settled.current = true;
-    setEditing(false);
-    if (refocus) focusAfterCommit(pencilRef);
-    const next = draft.trim();
-    if (!save || next === edit.current(structureId).trim()) return;
-    edit.onSave(structureId, next === '' ? null : next).catch((e: unknown) => {
-      setError(callableErrorText(t, e, k('failed')));
-      // Reopen with the draft kept, so a refusal never costs the officer what they typed.
-      settled.current = false;
-      setEditing(true);
-    });
-  }
+  const { editing, start, triggerRef, failure, inputProps } = useInPlaceEdit({
+    initial: () => edit?.current(structureId) ?? '',
+    onCommit: (draft) => {
+      const next = draft.trim();
+      return edit?.onSave(structureId, next === '' ? null : next);
+    },
+  });
+  const error = failure === undefined ? null : callableErrorText(t, failure, k('failed'));
 
   return (
     <li className="space-y-1 px-3 py-2">
       {editing ? (
         <TextInput
           size="sm"
-          autoFocus
-          value={draft}
+          {...inputProps}
           maxLength={REFINERY_LABEL_MAX}
           placeholder={name}
           aria-label={t(k('field'))}
           aria-describedby={hintId}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => close(true, false)}
-          onKeyDown={(e) => {
-            // An Enter that confirms an IME candidate is not a save.
-            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              close(true, true);
-            }
-            if (e.key === 'Escape') {
-              e.preventDefault();
-              e.stopPropagation();
-              close(false, true);
-            }
-          }}
           className="w-full max-w-md"
         />
       ) : (
@@ -92,7 +55,7 @@ function RefineryRow({
           <span className="[overflow-wrap:anywhere]">{name}</span>
           {edit && (
             <IconButton
-              ref={pencilRef}
+              ref={triggerRef}
               size="row"
               variant="plain"
               icon={<Icon.Rename size={Icon.ICON_SIZE.sm} className="text-text-faint" />}
