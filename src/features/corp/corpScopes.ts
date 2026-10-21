@@ -16,6 +16,7 @@
  */
 import {
   CORP_CAPABILITIES,
+  hasAnyCorpCapability,
   NO_CORP_CAPABILITIES,
   type CorpCapabilities,
   type CorpCapability,
@@ -197,6 +198,11 @@ export function corpGrantCoverage(
     // grant hides every corp surface regardless.
     covered[capability] = complete || !additive;
   }
+  // Every capability this Character holds is additive and ungranted (a
+  // Trader-only Character): nothing is readable, so corp UI would be an empty
+  // board. Treat that as blocking so the grant prompt fires. A Character with
+  // some granted capability keeps it; the additive ones stay off.
+  if (hasAnyCorpCapability(capabilities) && !hasAnyCorpCapability(covered)) blocking = true;
   return {
     missingScopes: missingCorpScopes(capabilities, granted),
     blocking,

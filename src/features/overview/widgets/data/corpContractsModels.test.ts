@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '@/esi/endpoints';
+import { withAcceptedCourierInProgress } from '@/engine/contracts/contractStatus';
 import { corpContracts } from './corpContractsModels';
 import type { CorpContractsFeed } from './corpFeeds';
 import type { BuildContext, FeedState, Feeds } from './types';
@@ -26,6 +27,12 @@ const contract = (id: number, over: Partial<Contract> = {}): Contract => ({
   date_expired: iso(NOW + 72 * HOUR),
   ...over,
 });
+
+/** An accepted courier as ESI sends it: still `outstanding`, with an acceptor, read once as the loader does. */
+const accepted = (id: number, over: Partial<Contract> = {}): Contract =>
+  withAcceptedCourierInProgress(
+    contract(id, { acceptor_id: 555, date_accepted: iso(NOW), ...over })
+  );
 
 const feed = (contracts: Contract[], over: Partial<CorpContractsFeed> = {}): Feeds => ({
   corpContracts: ok<CorpContractsFeed>({
@@ -97,8 +104,7 @@ describe('corpContracts', () => {
     const view = corpContracts(
       feed([
         contract(1, { date_expired: iso(NOW + 120_000) }),
-        contract(2, {
-          status: 'in_progress',
+        accepted(2, {
           days_to_complete: 1,
           date_accepted: iso(NOW - 48 * HOUR),
         }),

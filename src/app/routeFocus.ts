@@ -40,7 +40,10 @@ export const HEADING_WAIT_MS = 2000;
  * is a page change from the library it was opened from.
  */
 export function focusKeyFor(pathname: string): string {
-  if (tabbedPageFor(pathname) !== null) return pageKeyFor(pathname);
+  if (tabbedPageFor(pathname) !== null) {
+    const key = pageKeyFor(pathname);
+    return SUB_NAV_PAGES[key as AppRoutePath] ?? key;
+  }
   const pattern = pagePathFor(pathname);
   if (pattern === '/*') return pathname;
   const route = pattern.replace(/\/\*$/, '') as AppRoutePath;

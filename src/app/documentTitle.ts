@@ -45,7 +45,8 @@ const ROUTE_TITLE_KEYS = {
   '/planetary-industry/advisor': ['pi.title'],
   '/employment-history': ['employmentHistory.title'],
   '/corp': ['corp.title'],
-  '/corp/members': ['corp.title', 'corp.members.title'],
+  // A tabbed page (pageTabs.ts): its title leads, the tab follows it.
+  '/corp/members': ['corp.members.title', 'corp.title'],
   '/corp/wallet': ['corp.title', 'corp.wallet.title'],
   '/corp/assets': ['corp.title', 'corp.assets.title'],
   // A tabbed page (pageTabs.ts): its title leads, the tab follows it.

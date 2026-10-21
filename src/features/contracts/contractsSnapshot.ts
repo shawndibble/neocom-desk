@@ -30,27 +30,51 @@ export interface ContractsSnapshot {
   issuerAffiliations: Map<number, CharacterAffiliation>;
 }
 
-export async function loadContractsSnapshot(
-  characterId: number,
+/** One Character's contracts and the lookups that depend on who is viewing them. */
+export interface ContractGroup {
+  ownerId: number;
+  contracts: readonly Contract[];
+  /** Read this owner's contact list for standings. A Character without the scope must pass false. */
+  withStandings: boolean;
+}
+
+export interface ContractLookups {
+  issuerNames: Map<number, string>;
+  receiverCategories: Map<number, NameCategory>;
+  /** Each owner's own contact list, indexed. Empty (never missing) when not read. */
+  standingIndexByOwner: Map<number, ContactStandingIndex>;
+  issuerAffiliations: Map<number, CharacterAffiliation>;
+}
+
+/**
+ * Names, receiver kinds, standings and affiliations for contracts grouped by the
+ * Character each was read for: a receiver is "the other party" relative to its
+ * own owner, and a standing is that owner's own contact entry.
+ */
+export async function resolveContractLookups(
+  groups: readonly ContractGroup[],
   signal: RouteSnapshotSignal
-): Promise<ContractsSnapshot> {
-  const { cached: contractsResult, needsReauth: contractsNeedsReauth } =
-    await loadContracts(characterId);
-  const contractsTruncated = contractsResult?.truncated ?? false;
+): Promise<ContractLookups> {
   // Already superseded: skip the name/standing lookups, their results would be discarded.
-  const contracts = signal.cancelled ? [] : (contractsResult?.data ?? []);
-  const issuers = contracts.map(contractIssuer);
+  const live = signal.cancelled ? groups.map((g) => ({ ...g, contracts: [] })) : groups;
+  const issuers = live.flatMap((g) => g.contracts.map(contractIssuer));
   // Receivers share the name map; their kind comes from the resolved category.
-  const receiverIds = contracts.flatMap((c) => contractReceiver(c, characterId)?.id ?? []);
+  const receiverIds = live.flatMap((g) =>
+    g.contracts.flatMap((c) => contractReceiver(c, g.ownerId)?.id ?? [])
+  );
   // Contacts and the names don't depend on the categories, so they run alongside.
-  const contactsPromise = signal.cancelled ? Promise.resolve(null) : loadContacts(characterId);
+  const contactsPromise = Promise.all(
+    live.map(async (g) =>
+      signal.cancelled || !g.withStandings ? null : await loadContacts(g.ownerId)
+    )
+  );
   const namesPromise = resolveNames([...issuers.map((i) => i.id), ...receiverIds]);
   const receiverCategories = await resolveCategories(receiverIds);
-  const receivers = contracts.flatMap(
-    (c) => contractReceiver(c, characterId, receiverCategories) ?? []
+  const receivers = live.flatMap((g) =>
+    g.contracts.flatMap((c) => contractReceiver(c, g.ownerId, receiverCategories) ?? [])
   );
   // Only characters have affiliations/standings.
-  const [issuerNames, contactsStatus, issuerAffiliations] = await Promise.all([
+  const [issuerNames, contactsStatuses, issuerAffiliations] = await Promise.all([
     namesPromise,
     contactsPromise,
     resolveAffiliations([
@@ -58,14 +82,35 @@ export async function loadContractsSnapshot(
       ...receivers.filter((r) => r.kind === 'character').map((r) => r.id),
     ]),
   ]);
-  const standingIndex = buildContactStandingIndex(contactsStatus?.cached?.data ?? []);
+  const standingIndexByOwner = new Map<number, ContactStandingIndex>();
+  live.forEach((g, i) =>
+    standingIndexByOwner.set(
+      g.ownerId,
+      buildContactStandingIndex(contactsStatuses[i]?.cached?.data ?? [])
+    )
+  );
+  return { issuerNames, receiverCategories, standingIndexByOwner, issuerAffiliations };
+}
+
+export async function loadContractsSnapshot(
+  characterId: number,
+  signal: RouteSnapshotSignal
+): Promise<ContractsSnapshot> {
+  const { cached: contractsResult, needsReauth: contractsNeedsReauth } =
+    await loadContracts(characterId);
+  const contractsTruncated = contractsResult?.truncated ?? false;
+  const { issuerNames, receiverCategories, standingIndexByOwner, issuerAffiliations } =
+    await resolveContractLookups(
+      [{ ownerId: characterId, contracts: contractsResult?.data ?? [], withStandings: true }],
+      signal
+    );
   return {
     contractsResult,
     contractsNeedsReauth,
     contractsTruncated,
     issuerNames,
     receiverCategories,
-    standingIndex,
+    standingIndex: standingIndexByOwner.get(characterId) ?? new Map(),
     issuerAffiliations,
   };
 }

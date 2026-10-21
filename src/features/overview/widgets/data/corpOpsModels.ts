@@ -3,13 +3,15 @@
  * derived at render time. The totals are zKillboard's all-time figures (the
  * stats call has no date range), so the widget is a Number, labelled "all time".
  */
+import { formatEntityInfo } from '@/lib/entityInfo';
 import { formatNumber } from '@/lib/numberLocale';
 import { blank, statusOf, UNKNOWN, type Builder } from './builderKit';
 
 const K = 'overview.widgets.corpKills';
 
 /** The Public info modal's Corporation tab, over the current page (`/corp`). */
-const infoPath = (corporationId: number) => `/corp?info=corporation-${corporationId}`;
+const infoPath = (corporationId: number) =>
+  `/corp?info=${formatEntityInfo({ kind: 'corporation', id: corporationId })}`;
 
 export const corpKills: Builder = (feeds, { t }) => {
   const feed = feeds.corpKills;

@@ -5,6 +5,7 @@ import {
   PILOT_TOP_SHIPS,
   fetchAllianceStats,
   fetchCorporationStats,
+  fetchCorporationStatsRead,
   fetchPilotStats,
   parsePilotStats,
   resetPilotStatsCache,
@@ -132,6 +133,18 @@ describe('fetchPilotStats', () => {
       NO_HEADERS
     );
     expect(result.kind).toBe('stats');
+  });
+
+  it('reports the real read time and cache flag of a corporation read', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-20T10:00:00Z'));
+    stubFetch(okBody(recorded));
+    const first = await fetchCorporationStatsRead(9);
+    expect(first.fromCache).toBe(false);
+    vi.setSystemTime(new Date('2026-10-20T10:05:00Z'));
+    const second = await fetchCorporationStatsRead(9);
+    expect(second.fromCache).toBe(true);
+    expect(second.fetchedAt).toEqual(new Date('2026-10-20T10:00:00Z'));
   });
 
   it('reports a failed request, a network error and an unreadable body as failed', async () => {

@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { CharacterFilterControl } from './CharacterFilterControl';
+import { IconButton } from '@/components/ui';
+import { CharacterFilterControl, type CharacterScopeChoice } from './CharacterFilterControl';
 
 async function openMenu() {
   const user = userEvent.setup();
@@ -167,6 +168,104 @@ describe('CharacterFilterControl', () => {
       );
       expect(screen.getByRole('button')).toHaveClass('md:h-9', 'touch:h-11');
       expect(screen.getByRole('button')).not.toHaveClass('md:h-7');
+    });
+  });
+
+  it("adds a Corporation option that emits 'corporation', for one Character too", async () => {
+    const onChange = vi.fn();
+    render(
+      <CharacterFilterControl<CharacterScopeChoice>
+        activeCharacterId={1}
+        value="current"
+        corporation
+        hideAll
+        onChange={onChange}
+      />
+    );
+    const user = await openMenu();
+    expect(screen.queryByRole('menuitemradio', { name: 'All characters' })).toBeNull();
+    await user.click(screen.getByRole('menuitemradio', { name: 'Corporation' }));
+    expect(onChange).toHaveBeenCalledWith('corporation');
+  });
+
+  it('labels the trigger and swaps the phone glyph for Corporation', () => {
+    const { container } = render(
+      <CharacterFilterControl<CharacterScopeChoice>
+        activeCharacterId={1}
+        value="corporation"
+        corporation
+        onChange={() => {}}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Corporation' })).toBeInTheDocument();
+    expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('md trigger carries the same height classes as a default-size IconButton', () => {
+    render(
+      <>
+        <CharacterFilterControl<CharacterScopeChoice>
+          size="md"
+          activeCharacterId={1}
+          value="current"
+          corporation
+          onChange={() => {}}
+        />
+        <IconButton icon={<span />} label="Sibling" />
+      </>
+    );
+    const trigger = screen.getByRole('button', { name: 'This character' }).className.split(/\s+/);
+    const sibling = screen.getByRole('button', { name: 'Sibling' }).className.split(/\s+/);
+    // IconButton's md box is size-N; the trigger's height is the same N at every tier.
+    for (const tier of ['', 'md:', 'touch:']) {
+      const size = sibling.find((c) => c.startsWith(`${tier}size-`));
+      const height = trigger.find((c) => c.startsWith(`${tier}h-`));
+      expect(size && height).toBeTruthy();
+      expect(height!.slice(tier.length + 2)).toBe(size!.slice(tier.length + 5));
+    }
+  });
+
+  describe('option rules', () => {
+    const options = async (props: { count: number; corporation?: boolean; hideAll?: boolean }) => {
+      render(
+        <CharacterFilterControl<CharacterScopeChoice>
+          activeCharacterId={1}
+          value="current"
+          characterCount={props.count}
+          corporation={props.corporation}
+          hideAll={props.hideAll}
+          onChange={() => {}}
+        />
+      );
+      if (!screen.queryByRole('button')) return null;
+      await openMenu();
+      return screen.getAllByRole('menuitemradio').map((el) => el.textContent?.replace(/^✓/, ''));
+    };
+
+    it('one Character, no corp: no picker', async () => {
+      expect(await options({ count: 1 })).toBeNull();
+    });
+    it('one Character + corp: This character / Corporation', async () => {
+      expect(await options({ count: 1, corporation: true })).toEqual([
+        'This character',
+        'Corporation',
+      ]);
+    });
+    it('several, no corp: This / All', async () => {
+      expect(await options({ count: 3 })).toEqual(['This character', 'All characters · 3']);
+    });
+    it('several + corp: This / All / Corporation', async () => {
+      expect(await options({ count: 3, corporation: true })).toEqual([
+        'This character',
+        'All characters · 3',
+        'Corporation',
+      ]);
+    });
+    it('a page that cannot sum Characters never shows All', async () => {
+      expect(await options({ count: 3, corporation: true, hideAll: true })).toEqual([
+        'This character',
+        'Corporation',
+      ]);
     });
   });
 });

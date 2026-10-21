@@ -22,11 +22,11 @@ const W = 'overview.widgets.corpStarbases';
 const HOUR_MS = 3_600_000;
 const KNOWN_STATES = new Set(['offline', 'online', 'onlining', 'reinforced', 'unanchoring']);
 
-/** When the fuel runs out, from the moment the bay was read; null when it cannot be told. */
-function fuelExpiresMs(row: CorpStarbaseRow, readAtMs: number): number | null {
+/** When the fuel runs out, from the moment this tower's bay was read; null when it cannot be told. */
+function fuelExpiresMs(row: CorpStarbaseRow, fallbackReadAtMs: number): number | null {
   if (row.state !== 'online' || row.bay === null) return null;
   const hours = fuelHoursLeft(row.typeId, row.bay.fuelBlocks);
-  return hours === null ? null : readAtMs + hours * HOUR_MS;
+  return hours === null ? null : (row.bayReadAtMs ?? fallbackReadAtMs) + hours * HOUR_MS;
 }
 
 /** Due soon's view of the towers: each fuel clock and each reinforcement or unanchor timer. */
@@ -124,10 +124,12 @@ export const corpStarbases: Builder = (feeds, { t, now }) => {
   };
   const strontiumText = (tower: Tower) =>
     tower.row.bay === null ? UNKNOWN : formatNumber(tower.row.bay.strontium);
-  const reinforceText = (tower: Tower) =>
-    tower.row.reinforcedUntilMs === null
-      ? UNKNOWN
-      : untilText(t, tower.row.reinforcedUntilMs - now);
+  const reinforceText = (tower: Tower) => {
+    const until = tower.row.reinforcedUntilMs;
+    if (until === null) return UNKNOWN;
+    // A passed timer is over, which is not the tower being out of fuel.
+    return until <= now ? t(`${W}.reinforceEnded`) : untilText(t, until - now);
+  };
 
   const lowFuel = towers.filter(
     (tower) => tower.expiresMs !== null && fuelTone(tower.expiresMs - now) !== 'clear'

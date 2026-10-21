@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Contract } from '@/esi/endpoints';
+import { withAcceptedCourierInProgress } from '@/engine/contracts/contractStatus';
 import { summarizeCorpContracts } from './corpContracts';
 
 const NOW = Date.parse('2026-10-20T12:00:00Z');
@@ -21,13 +22,19 @@ const contract = (id: number, over: Partial<Contract> = {}): Contract => ({
   ...over,
 });
 
+/** An accepted courier as ESI sends it: still `outstanding`, with an acceptor, read once as the loader does. */
+const accepted = (id: number, over: Partial<Contract> = {}): Contract =>
+  withAcceptedCourierInProgress(
+    contract(id, { acceptor_id: 555, date_accepted: iso(NOW), ...over })
+  );
+
 describe('summarizeCorpContracts', () => {
   it('counts outstanding and in-progress courier and item-exchange contracts only', () => {
     const summary = summarizeCorpContracts(
       [
         contract(1),
         contract(2, { type: 'item_exchange' }),
-        contract(3, { status: 'in_progress', days_to_complete: 7, date_accepted: iso(NOW) }),
+        accepted(3, { days_to_complete: 7 }),
         contract(4, { status: 'finished' }),
         contract(5, { type: 'auction' }),
         contract(6, { type: 'loan' }),
@@ -49,8 +56,7 @@ describe('summarizeCorpContracts', () => {
       [
         contract(1, { date_expired: iso(NOW + 5 * HOUR) }),
         contract(2),
-        contract(3, {
-          status: 'in_progress',
+        accepted(3, {
           days_to_complete: 1,
           date_accepted: iso(NOW - 48 * HOUR),
           date_expired: iso(NOW + 100 * HOUR),
@@ -68,7 +74,7 @@ describe('summarizeCorpContracts', () => {
     const summary = summarizeCorpContracts(
       [
         contract(1, { collateral: 500 }),
-        contract(2, { status: 'in_progress', collateral: 250, date_accepted: iso(NOW) }),
+        accepted(2, { collateral: 250 }),
         contract(3, { type: 'item_exchange', price: 99 }),
       ],
       NOW

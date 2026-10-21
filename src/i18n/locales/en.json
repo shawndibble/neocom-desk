@@ -3907,7 +3907,8 @@
     "filter": {
       "thisCharacter": "This character",
       "allCharacters": "All characters",
-      "unreadFor": "{{name}} · {{count}} unread"
+      "unreadFor": "{{name}} · {{count}} unread",
+      "corporation": "Corporation"
     }
   },
   "characters": {
@@ -4572,7 +4573,6 @@
           "side": "Side",
           "price": "Price",
           "vsBest": "vs best",
-          "issuedBy": "Issued by",
           "expires": "Expires",
           "station": "Station"
         }
@@ -4979,7 +4979,8 @@
           "unanchoring": "Unanchoring"
         },
         "summary_one": "{{count}} starbase, {{low}} low on fuel.",
-        "summary_other": "{{count}} starbases, {{low}} low on fuel."
+        "summary_other": "{{count}} starbases, {{low}} low on fuel.",
+        "reinforceEnded": "Ended"
       },
       "corpCustomsOffices": {
         "title": "Customs offices",
@@ -8835,14 +8836,14 @@
     "title": "Contracts",
     "tabsLabel": "Contracts sections",
     "historyTab": "History",
-    "scopeLabel": "Whose contracts",
-    "characterScope": "Character",
-    "corpScope": "Corp",
     "corpReauthTitle": "Corp contracts need a new grant",
     "corpReauthHint": "Grant corporation contracts access to read the contracts issued by or assigned to your corporation.",
     "corpEmptyTitle": "No corp contracts cached",
     "corpEmptyHint": "Couldn't load your corporation's contracts yet. Try again shortly.",
     "corpEmptyFetchedTitle": "No corp contracts",
+    "allEmptyHint": "Couldn't load your characters' contracts yet. Try again shortly.",
+    "character": "Character",
+    "notShared": "{{name}} hasn't shared their contracts",
     "itemSearchTab": "Item search",
     "courierTab": "Courier",
     "refresh": "Refresh",
@@ -11002,12 +11003,7 @@
     },
     "orders": {
       "corp": {
-        "scopeLabel": "Whose orders",
-        "characterScope": "Character",
-        "corpScope": "Corp",
-        "tableName": "Corp open orders",
         "issuedBy": "Issued by",
-        "searchPlaceholder": "Search by item, station or issuer…",
         "reauthTitle": "Corp orders need a new grant",
         "reauthHint": "Grant corporation market orders access to see your corporation's open buy and sell orders.",
         "reauthAction": "Grant access",

@@ -18,6 +18,7 @@
  * `useCorpRouteGate`'s, shared with `/corp` and `/corp/assets` — see that hook.
  */
 import { useMemo } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useTranslation } from 'react-i18next';
@@ -88,7 +89,10 @@ import { DataGate } from '@/components/DataGate';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
-import { boolParam, enumParam, optionalIdParam, textParam } from '@/lib/urlState';
+import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
+import { tabPath } from '@/lib/pageTabs';
+import { usePageTab } from '@/lib/usePageTab';
+import { CORP_MEMBERS_TABS } from '@/features/corp/corpMembersTabs';
 
 /** The roster's filters, in the URL (ADR 0015); the table's sort is `CorpRosterTable`'s `?sort=`. */
 const FILTER_PARAMS = {
@@ -458,22 +462,29 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
   );
 }
 
-const TAB_PARAMS = { tab: enumParam(['members', 'roles'] as const, 'members') };
-
 /**
  * Members, plus a Roles tab for a Director whose grant holds the titles scope
- * (`canReadRoleAudit`; otherwise no tab bar at all: hide, do not lock). The tab
- * is `?tab=` rather than a path segment so every existing `/corp/members` link
- * and its filters keep working. Exactly one tab's view is mounted: the roster's
- * loader records the roster baseline (`rosterState`), so it must not run, and
- * consume a change unseen, while the Roles tab is the one on screen.
+ * (`canReadRoleAudit`; otherwise no tab bar at all: hide, do not lock, and the
+ * Roles path moves to the roster). Exactly one tab's view is mounted: the
+ * roster's loader records the roster baseline (`rosterState`), so it must not
+ * run, and consume a change unseen, while the Roles tab is the one on screen.
  */
 function CorpMembersTabs({ canReadRoleAudit }: { canReadRoleAudit: boolean }) {
   const { t } = useTranslation();
   const tabsId = useTabsId();
-  const [{ tab: asked }, setParams] = useUrlParams(TAB_PARAMS);
-  const tab = canReadRoleAudit ? asked : 'members';
-  if (!canReadRoleAudit) return <CorpMembersView tabs={null} />;
+  const location = useLocation();
+  const [tab, selectTab] = usePageTab(CORP_MEMBERS_TABS);
+  if (!canReadRoleAudit) {
+    if (tab === 'roles') {
+      return (
+        <Navigate
+          replace
+          to={{ pathname: tabPath(CORP_MEMBERS_TABS, 'members'), search: location.search }}
+        />
+      );
+    }
+    return <CorpMembersView tabs={null} />;
+  }
   const tabs: MembersTabsSlot = {
     tabsId,
     tabId: tab,
@@ -482,8 +493,7 @@ function CorpMembersTabs({ canReadRoleAudit }: { canReadRoleAudit: boolean }) {
         tabsId={tabsId}
         label={t('corp.members.title')}
         value={tab}
-        // `?tab=` is one place Back can return to, so a switch pushes (unlike a filter).
-        onChange={(id) => setParams({ tab: id as typeof tab }, { push: true })}
+        onChange={(id) => selectTab(id as typeof tab)}
         tabs={[
           { id: 'members', label: t('corp.membersTab') },
           { id: 'roles', label: t('corp.roles.tab') },

@@ -68,7 +68,7 @@ describe('corpRoleAudit', () => {
     expect(view.number.secondary?.text).toBe(
       'overview.widgets.corpRoleAudit.changes{"count":1,"days":7}'
     );
-    expect(view.to).toBe('/corp/members?tab=roles');
+    expect(view.to).toBe('/corp/members/roles');
   });
 
   it('lists Directors first, then by name, with the last change per member', () => {
