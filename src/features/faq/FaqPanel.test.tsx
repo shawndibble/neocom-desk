@@ -78,6 +78,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.overviewCardOrder': /hidden and reordered Overview cards/i,
   'sync.overviewLayout': /your Overview layout/i,
   'sync.corpOverviewLayout': /your corporation overview layout/i,
+  'sync.corpStockTargets': /stock targets you set on corporation assets/i,
   'sync.avoidedSystems': /avoided systems/i,
   'sync.systemNotes': /notes you wrote on solar systems/i,
   'sync.avoidedSystemsEnabled': /whether the list is on/i,

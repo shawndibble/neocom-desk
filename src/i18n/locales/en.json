@@ -11796,7 +11796,7 @@
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
-            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your corporation overview layout, hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
+            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your corporation overview layout, the stock targets you set on corporation assets, hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs. The notes you wrote on solar systems (up to 500 characters each, so don't put anything private in them)."
           }
         },
@@ -12587,6 +12587,29 @@
       "widgets": {
         "noWidgets": "There are no widgets to show on this corporation overview."
       }
+    },
+    "stockTargets": {
+      "title": "Stock targets",
+      "intro": "The least your corporation should hold of each item. Owned counts Offices and Corp deliveries; Impounded, Asset safety and In space items don't count.",
+      "listLabel": "Stock targets",
+      "emptyTitle": "No stock targets yet",
+      "emptyHint": "Search for an item above and give it a quantity.",
+      "searchLabel": "Item",
+      "searchPlaceholder": "Search items…",
+      "searchUnavailable": "Item search needs a one-time download. Connect once to use it.",
+      "quantityLabel": "Target",
+      "pickItem": "Pick an item from the list.",
+      "quantityRequired": "Enter a whole number of at least 1.",
+      "add": "Add",
+      "added": "Added a stock target for {{name}}.",
+      "done": "Done",
+      "owned": "{{formatted}} owned",
+      "removeLabel": "Remove the stock target for {{name}}",
+      "cellLabel": "Target for {{name}}",
+      "cellSet": "Set a stock target for {{name}}",
+      "cellEdit": "Stock target for {{name}}: {{count}}. Edit",
+      "invalid": "Enter a whole number, or leave it empty to remove the target.",
+      "typeFallback": "Type {{id}}"
     }
   },
   "publicInfo": {
