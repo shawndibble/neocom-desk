@@ -722,6 +722,16 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ],
       ],
     },
+    corpRoleAudit: {
+      value: '3',
+      unit: t('overview.widgets.corpRoleAudit.unit', { count: 3 }),
+      note: t('overview.widgets.corpRoleAudit.changes', { count: 2, days: 7 }),
+      rows: [
+        ['Aria Voss', 'Director', '2d 4h'],
+        ['Kerr Dane', 'Accountant, Trader', '5d 1h'],
+        ['Mina Oto', 'Station Manager', '—'],
+      ],
+    },
     corpKills: {
       value: '1,284',
       unit: t('overview.widgets.corpKills.unit', { count: 1284 }),
