@@ -23,6 +23,8 @@ import type { TaxPayment } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
 import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
+import { ownerRefinerySystemsToLearn } from '@/engine/corpTaxBook/refinery';
+import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
 import { loadStructureName } from '@/features/character/structures';
@@ -519,4 +521,51 @@ export async function claimCorpTaxBookPayment(
     )({ corporationId, paymentId });
     return result.data;
   });
+}
+
+/** The server's `MAX_LEARNED_SYSTEMS`: it refuses a longer call. */
+const MAX_LEARNED_SYSTEMS = 50;
+/** `corp:structure` already reported this session, so a reload does not send them again. */
+const reportedSystems = new Set<string>();
+
+/**
+ * Tells each book the systems the member's own ledger places its moon owner refineries in
+ * (#4650): a moon owner's rows rarely carry one, and only the miner holds their own ledger.
+ * Each Character reports under its own session, for the refineries it mined at. Never throws:
+ * the personal ledger never waits on, or breaks with, a book.
+ */
+export async function teachRefinerySystems(
+  books: readonly Pick<LoadedCorpBook, 'corporationId' | 'characterIds' | 'observed'>[],
+  personal: readonly MiningLedgerEntry[]
+): Promise<void> {
+  for (const book of books) {
+    for (const characterId of book.characterIds) {
+      // Matching is entries × ledger: skip what this session already reported first.
+      const entries = book.observed.filter(
+        (o) =>
+          o.characterId === characterId &&
+          !reportedSystems.has(`${book.corporationId}:${o.structureId}`)
+      );
+      if (entries.length === 0) continue;
+      const learned = ownerRefinerySystemsToLearn(
+        entries,
+        personal.filter((e) => e.characterId === characterId)
+      );
+      const fresh = Object.entries(learned).slice(0, MAX_LEARNED_SYSTEMS);
+      if (fresh.length === 0) continue;
+      for (const [id] of fresh) reportedSystems.add(`${book.corporationId}:${id}`);
+      try {
+        await underFirebaseSession(async () => {
+          await ensureSignedIn(characterId);
+          await httpsCallable<{ corporationId: number; systems: Record<string, number> }>(
+            getSyncFunctions(),
+            'learnCorpTaxBookRefinerySystemsCallable'
+          )({ corporationId: book.corporationId, systems: Object.fromEntries(fresh) });
+        });
+      } catch {
+        // Quiet by design: a later load tries again.
+        for (const [id] of fresh) reportedSystems.delete(`${book.corporationId}:${id}`);
+      }
+    }
+  }
 }

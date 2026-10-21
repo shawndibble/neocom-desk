@@ -22,6 +22,7 @@ import { gripHitAreaClassName } from '@/components/ui/controlStyles';
 import { rowStateClassName } from './planRowStyles';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useLiftAfterHoldGuard } from '@/components/ui/liftAfterHold';
+import { useInPlaceEdit } from '@/lib/useInPlaceEdit';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildGroup } from './buildGroups';
@@ -49,29 +50,18 @@ export function RenameField({
   onRename: (name: string) => void;
   onDone: () => void;
 }) {
-  const [draft, setDraft] = useState(value);
+  // Mounted only while renaming: the parent's `onDone` unmounts it.
+  const { inputProps } = useInPlaceEdit({
+    open: true,
+    initial: () => value,
+    onCommit: (draft) => {
+      const name = draft.trim();
+      if (name) onRename(name);
+    },
+    onClose: onDone,
+  });
 
-  function commit() {
-    onDone();
-    const name = draft.trim();
-    if (name && name !== value) onRename(name);
-  }
-
-  return (
-    <TextInput
-      size="sm"
-      autoFocus
-      value={draft}
-      aria-label={label}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') commit();
-        if (e.key === 'Escape') onDone();
-      }}
-      className="flex-1"
-    />
-  );
+  return <TextInput size="sm" {...inputProps} aria-label={label} className="flex-1" />;
 }
 
 type PlanRowProps = {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_LEARNED_SYSTEMS,
   MAX_REFINERY_LABEL,
+  parseLearnRefinerySystemsInput,
   parseSetOwnRefineryLabelInput,
   parseSetRefineryLabelInput,
 } from './corpTaxBookRefineryLabels.js';
@@ -42,5 +44,28 @@ describe('parseSetOwnRefineryLabelInput', () => {
         label: 'Ours',
       })
     ).toMatchObject({ corporationId: 5, structureId: 4001, label: 'Ours' });
+  });
+});
+
+describe('parseLearnRefinerySystemsInput (#4650)', () => {
+  it('reads the book and each system by structure id', () => {
+    expect(
+      parseLearnRefinerySystemsInput({ corporationId: 9, systems: { '4001': 30002187 } })
+    ).toEqual({ corporationId: 9, systems: { '4001': 30002187 } });
+  });
+  it('rejects a bad id, a non-system, none or too many', () => {
+    const call = (systems: unknown) => () =>
+      parseLearnRefinerySystemsInput({ corporationId: 9, systems });
+    expect(call({ abc: 30002187 })).toThrow();
+    expect(call({ '4001': 60003760 })).toThrow();
+    expect(call({})).toThrow();
+    expect(
+      call(
+        Object.fromEntries(
+          Array.from({ length: MAX_LEARNED_SYSTEMS + 1 }, (_, i) => [String(i + 1), 30002187])
+        )
+      )
+    ).toThrow();
+    expect(() => parseLearnRefinerySystemsInput({ systems: { '4001': 30002187 } })).toThrow();
   });
 });

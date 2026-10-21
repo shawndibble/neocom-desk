@@ -241,6 +241,7 @@ export type FeederViewRecord = Pick<
   | 'removal'
   | 'payee'
   | 'refineryLabels'
+  | 'refinerySystems'
 >;
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -437,7 +438,13 @@ export function buildFeederView(input: FeederViewInput): FeederView {
   return {
     summary,
     days,
-    refineries: [...refineries.values()].sort((a, b) => a.structureId - b.structureId),
+    // A row's own system, else the one learned from a miner's ledger (#4650).
+    refineries: [...refineries.values()]
+      .map((r) => ({
+        ...r,
+        solarSystemId: r.solarSystemId ?? record.refinerySystems?.[String(r.structureId)] ?? null,
+      }))
+      .sort((a, b) => a.structureId - b.structureId),
     payouts: counted
       .map((p) => ({
         id: p.id,

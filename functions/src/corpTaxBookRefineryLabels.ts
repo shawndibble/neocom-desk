@@ -1,11 +1,19 @@
 // Refinery labels (issue #4640, spec #4504): either side's officers label a moon owner's refinery.
 // Written to the record and the view's refinery doc in one transaction, so a failed price read in a
 // rebuild can't hold it back; the rest of the label chain is the client's. Failures carry a `reason`.
+// A refinery's system (issue #4650) is learned by a miner's client from its own ledger and kept the
+// same way, on the record and the view's refinery doc.
 
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { record } from './communities.js';
-import { OBSERVED, parseFeederTarget, type FeederTargetCall } from './corpTaxBook.js';
+import {
+  int,
+  OBSERVED,
+  parseBookCall,
+  parseFeederTarget,
+  type FeederTargetCall,
+} from './corpTaxBook.js';
 import type { CorpSyncDeps } from './corpSyncGrant.js';
 import {
   authorizeFeederCaller,
@@ -16,6 +24,7 @@ import { FEEDER_VIEW_REFINERIES, feederViewRef } from './corpTaxBookFeederView.j
 import { ENDED } from './corpTaxBookFeederOwnerCalls.js';
 import { feederBookDeps } from './corpTaxBookFeederViewCalls.js';
 import type { FeederRecord, RefineryLabelDoc } from './corpTaxBookFeeders.js';
+import { characterIdForUid } from './verifyEveToken.js';
 import {
   appendAudit,
   authorizeOfficer,
@@ -155,4 +164,95 @@ export async function setOwnRefineryLabel(
     { characterId: ctx.callerId, name: 'Moon owner' },
     'moon-owner'
   );
+}
+
+/** The most refineries one learning call may name. */
+export const MAX_LEARNED_SYSTEMS = 50;
+
+/** A miner's client reports the systems its own ledger placed a book's moon owner refineries in. */
+export interface LearnRefinerySystemsInput {
+  /** The book's corporation. */
+  corporationId: number;
+  /** System by structure id. */
+  systems: Record<string, number>;
+}
+
+export function parseLearnRefinerySystemsInput(data: unknown): LearnRefinerySystemsInput {
+  const { corporationId } = parseBookCall(data);
+  const entries = Object.entries(record(record(data).systems));
+  if (entries.length === 0 || entries.length > MAX_LEARNED_SYSTEMS) {
+    throw new HttpsError(
+      'invalid-argument',
+      `systems must name 1 to ${MAX_LEARNED_SYSTEMS} refineries`
+    );
+  }
+  const systems: Record<string, number> = {};
+  for (const [id, system] of entries) {
+    if (String(int(Number(id), 'structureId')) !== id) {
+      throw new HttpsError('invalid-argument', 'systems must be keyed by structure id');
+    }
+    systems[id] = int(system, 'solarSystemId', 30_000_000, 32_000_000);
+  }
+  return { corporationId, systems };
+}
+
+/**
+ * Keeps each system a miner's own ledger placed a moon owner's refinery in. Only a refinery the
+ * caller's Character has a row at, from a moon owner, whose rows carry no system; the first one
+ * learned stays. Says nothing about which it kept, so the call leaks nothing about the book.
+ */
+export async function learnRefinerySystems(
+  deps: BookDeps,
+  caller: Caller,
+  input: LearnRefinerySystemsInput
+): Promise<{ ok: true }> {
+  const characterId = characterIdForUid(caller.uid);
+  if (characterId === undefined) {
+    fail('unauthenticated', 'Log in with a Character first', 'not-signed-in');
+  }
+  const book = bookRef(deps.db, input.corporationId);
+  const ids = Object.keys(input.systems);
+  const own = await Promise.all(
+    ids.map((id) =>
+      book
+        .collection(OBSERVED)
+        .where('uid', '==', caller.uid)
+        .where('structureId', '==', Number(id))
+        .limit(1)
+        .get()
+    )
+  );
+  for (const [i, id] of ids.entries()) {
+    const system = input.systems[id];
+    const row = own[i].docs[0];
+    const feeder: unknown = row?.get('sourceCorporationId');
+    if (typeof feeder !== 'number' || typeof row.get('solarSystemId') === 'number') continue;
+    const ref = feederRef(deps.db, input.corporationId, feeder);
+    const field = new FieldPath('refinerySystems', id);
+    const viewRefinery = feederViewRef(deps.db, input.corporationId, feeder)
+      .collection(FEEDER_VIEW_REFINERIES)
+      .doc(id);
+    await deps.db.runTransaction(async (tx) => {
+      const [recSnap, viewSnap] = await Promise.all([tx.get(ref), tx.get(viewRefinery)]);
+      if (!recSnap.exists || recSnap.get(field) !== undefined) return;
+      tx.update(ref, field, system);
+      // Absent until the view's first build, which then reads it off the record.
+      if (viewSnap.exists && typeof viewSnap.get('solarSystemId') !== 'number') {
+        tx.update(viewRefinery, { solarSystemId: system });
+      }
+      appendAudit(
+        tx,
+        deps,
+        input.corporationId,
+        { characterId, name: '' },
+        'refinerySystemLearned',
+        {
+          feederCorporationId: feeder,
+          structureId: Number(id),
+          solarSystemId: system,
+        }
+      );
+    });
+  }
+  return { ok: true };
 }

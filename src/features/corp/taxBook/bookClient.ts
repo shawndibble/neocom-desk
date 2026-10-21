@@ -367,6 +367,8 @@ export interface BookFeeder extends FeederReadClock {
   modeChanges?: FeederModeChange[];
   /** Refinery labels by structure id, set by either side's officers (#4640). */
   refineryLabels?: Record<string, StoredRefineryLabel>;
+  /** Refinery systems by structure id, learned from miners' own ledgers (#4650). */
+  refinerySystems?: Record<string, number>;
   payouts: FeederPayoutRow[];
 }
 

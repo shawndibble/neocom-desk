@@ -1471,7 +1471,7 @@ Ship Tree golds (§1), also used as text, on `bg` / `panel` / `panel-2`:
   unmounts while loading calls `hold` instead of `arm`: the always-mounted wrapper takes
   focus at the click, so it never sits on `<body>` during the load) —
   which uses `focus:outline-none`: a ring there reads as a control that isn't one.
-- When an action removes the control that ran it, focus moves to the next row, else the previous row, else the section heading. A control that swaps with its counterpart (Edit rail and Done, Add and Undo, a rename field and its Rename button) hands focus to the counterpart. Use `useFocusAfterCommit`, or `firstConnected` as a dialog's `returnFocusFallback`.
+- When an action removes the control that ran it, focus moves to the next row, else the previous row, else the section heading. A control that swaps with its counterpart (Edit rail and Done, Add and Undo, a rename field and its Rename button) hands focus to the counterpart. Use `useFocusAfterCommit`, or `firstConnected` as a dialog's `returnFocusFallback`. A value edited in place (the faint pencil) uses `useInPlaceEdit`: Enter or blur saves, Escape cancels, focus returns to the pencil.
 - Color never the sole signal: ISK deltas keep signs, statuses keep words/icons,
   clock kinds keep their glyph and their written name.
 - **The nominal palette (§1) is reinforcement, never the signal.** Eight hues cannot be

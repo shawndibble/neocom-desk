@@ -146,7 +146,7 @@ export function utcDate(nowMs: number): string {
   return new Date(nowMs).toISOString().slice(0, 10);
 }
 
-function int(value: unknown, field: string, min = 1, max = Number.MAX_SAFE_INTEGER): number {
+export function int(value: unknown, field: string, min = 1, max = Number.MAX_SAFE_INTEGER): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < min || value > max) {
     throw new HttpsError('invalid-argument', `${field} must be a whole number ${min}-${max}`);
   }

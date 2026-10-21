@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { buildBookView, type BookView, type BookViewInput } from '@/engine/corpTaxBook/bookView';
 import { groupObservedEntries } from '@/engine/corpTaxBook/observed';
 import {
+  learnedSystemsOf,
   officerLabelsOf,
   refineryFacts,
   refineryLabeler,
@@ -304,7 +305,11 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
         if (f.payee) characterIds.add(f.payee.id);
       }
       // Systems too, for a refinery whose structure name is not readable (a moon owner's).
-      for (const s of refineryFacts(fetched.data.observed).systemOf.values()) characterIds.add(s);
+      const facts = refineryFacts(
+        fetched.data.observed,
+        learnedSystemsOf(fetched.data.feeders ?? [])
+      );
+      for (const s of facts.systemOf.values()) characterIds.add(s);
     }
     const refineryIds = new Set<number>([
       ...view.input.extractions.map((x) => x.structureId),
@@ -341,7 +346,8 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
     () =>
       fetched.status === 'loaded'
         ? {
-            ...refineryFacts(fetched.data.observed),
+            // A moon owner's rows rarely carry a system; miners' own ledgers teach it (#4650).
+            ...refineryFacts(fetched.data.observed, learnedSystemsOf(fetched.data.feeders ?? [])),
             labels: officerLabelsOf(fetched.data.feeders ?? []),
           }
         : null,

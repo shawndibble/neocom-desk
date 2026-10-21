@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   learnRefinerySystems,
+  learnedSystemsOf,
   officerLabelsOf,
+  ownerRefinerySystemsToLearn,
   refineryFacts,
   refineryLabel,
   refineryLabeler,
@@ -144,6 +146,65 @@ describe('refineryFacts', () => {
     expect(facts.sourceOf.get(TATARA)).toBe(FEEDER);
     expect(facts.sourceOf.has(ATHANOR)).toBe(false);
   });
+
+  it('a moon owner refinery with no system on its rows gets one once a miner’s own ledger row matches it', () => {
+    const rows = [row({ structureId: TATARA, sourceCorporationId: FEEDER, quantity: 700 })];
+    expect(refineryFacts(rows).systemOf.has(TATARA)).toBe(false);
+    const learned = ownerRefinerySystemsToLearn(groupObservedEntries(rows), [
+      {
+        characterId: 90000001,
+        date: '2026-10-01',
+        solarSystemId: 30002187,
+        oreLines: [{ typeId: 45490, quantity: 700 }],
+      },
+    ]);
+    expect(learned).toEqual({ [TATARA]: 30002187 });
+    const stored = learnedSystemsOf([{ refinerySystems: { [String(TATARA)]: 30002187 } }]);
+    expect(refineryFacts(rows, stored).systemOf.get(TATARA)).toBe(30002187);
+  });
+
+  it('a system a row carries wins over a learned one', () => {
+    const rows = [row({ structureId: ATHANOR, solarSystemId: 30000142 })];
+    expect(refineryFacts(rows, new Map([[ATHANOR, 30002187]])).systemOf.get(ATHANOR)).toBe(
+      30000142
+    );
+  });
+});
+
+describe('ownerRefinerySystemsToLearn', () => {
+  const own = {
+    characterId: 90000001,
+    date: '2026-10-01',
+    solarSystemId: 30002187,
+    oreLines: [{ typeId: 45490, quantity: 700 }],
+  };
+
+  it("leaves out the book's own refineries and those whose rows carry a system", () => {
+    const entries = groupObservedEntries([
+      row({ structureId: ATHANOR, quantity: 700 }),
+      row({
+        structureId: TATARA,
+        sourceCorporationId: FEEDER,
+        solarSystemId: 30000142,
+        quantity: 700,
+      }),
+    ]);
+    expect(ownerRefinerySystemsToLearn(entries, [own])).toEqual({});
+  });
+});
+
+describe('learnedSystemsOf', () => {
+  it("collects the systems learned on each moon owner's record", () => {
+    const systems = learnedSystemsOf([
+      { refinerySystems: { [String(TATARA)]: 30002187 } },
+      {},
+      { refinerySystems: { [String(ATHANOR)]: 30000142 } },
+    ]);
+    expect([...systems]).toEqual([
+      [TATARA, 30002187],
+      [ATHANOR, 30000142],
+    ]);
+  });
 });
 
 describe('officerLabelsOf', () => {
@@ -201,5 +262,18 @@ describe('learnRefinerySystems', () => {
         personal(90000001, '2026-10-03', 30000142, 900),
       ])
     ).toEqual({ [ATHANOR]: 30000142 });
+  });
+
+  it('learns nothing on a tie', () => {
+    const entries = groupObservedEntries([
+      row({ quantity: 700 }),
+      row({ quantity: 800, date: '2026-10-02' }),
+    ]);
+    expect(
+      learnRefinerySystems(entries, [
+        personal(90000001, '2026-10-01', 30000144, 700),
+        personal(90000001, '2026-10-02', 30000142, 800),
+      ])
+    ).toEqual({});
   });
 });
