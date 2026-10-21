@@ -9,8 +9,14 @@ import { cx } from '@/lib/cx';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { useHiddenTabPaths } from './useHiddenTabPaths';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
+import { useCorpViewCapabilities } from '@/features/corp/useCorpViewCapabilities';
 import { useCommandPalette } from '@/features/commandPalette/store';
-import { listNavDestinations, railGroups, type NavPage } from './navDestinations';
+import {
+  isNavPageAvailable,
+  listNavDestinations,
+  railGroups,
+  type NavPage,
+} from './navDestinations';
 import { canHide, FOOTER_PAGES, recentNavFor, viewPathFor } from './navRail';
 import { useHiddenNav, useRecentNav } from './navPreferences';
 import { NavHideToggle, NavItem } from './NavItem';
@@ -25,6 +31,7 @@ const ALL_CORP_VIEWS = {
   canReadWallet: true,
   canReadAssets: true,
   canReadMiningLedger: true,
+  canReadRoleAudit: true,
 };
 
 const TILE_GRID = 'grid grid-cols-4 gap-1.5';
@@ -53,7 +60,7 @@ interface MobileMoreSheetProps {
  *
  * Pages the pilot hid fold into one row that opens in place, so the sheet
  * still reaches every page (“never in neither”). Corp
- * shows only while the Character has corp access; Settings, Help and the
+ * pages show only while the Character has corp access, each for its own capability; Settings, Help and the
  * Character link have permanent rows at the foot.
  *
  * A real modal: it covers the viewport, so the tab bar underneath must not stay
@@ -68,6 +75,7 @@ export function MobileMoreSheet({
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const corpVisible = useCorpNavVisible();
+  const corpCapabilities = useCorpViewCapabilities();
   const hiddenTabPaths = useHiddenTabPaths();
   const hidden = useHiddenNav((state) => state.value);
   const recent = useRecentNav((state) => state.value);
@@ -94,7 +102,9 @@ export function MobileMoreSheet({
   );
 
   const inSheet = (page: NavPage) =>
-    page.gating === 'corp' ? corpVisible : page.path !== '/characters';
+    page.gating === 'corp'
+      ? isNavPageAvailable(page, corpVisible, corpCapabilities)
+      : page.path !== '/characters';
   const hiddenSet = new Set(hidden);
   const groups = SHEET_GROUPS.map((group) => ({
     ...group,
