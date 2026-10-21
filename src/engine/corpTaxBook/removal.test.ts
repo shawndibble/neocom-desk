@@ -62,16 +62,37 @@ describe('cancelRemoval', () => {
 describe('removalRecipients', () => {
   it('is the other officers, the CEO and the payee, once each', () => {
     expect(
-      removalRecipients({ officerIds: [7, 8, 9, 8], startedBy: 7, ceoId: 20, payeeId: 21 })
+      removalRecipients({
+        officerIds: [7, 8, 9, 8],
+        startedBy: 7,
+        ceoId: 20,
+        payee: { kind: 'character', id: 21 },
+      })
     ).toEqual([8, 9, 20, 21]);
   });
   it('merges a CEO who is also the payee or an officer', () => {
-    expect(removalRecipients({ officerIds: [8], startedBy: 7, ceoId: 8, payeeId: 8 })).toEqual([8]);
+    expect(
+      removalRecipients({
+        officerIds: [8],
+        startedBy: 7,
+        ceoId: 8,
+        payee: { kind: 'character', id: 8 },
+      })
+    ).toEqual([8]);
+  });
+  it('reaches the CEO of a payee corporation', () => {
+    expect(
+      removalRecipients({
+        officerIds: [8],
+        startedBy: 7,
+        ceoId: 20,
+        payee: { kind: 'corporation', id: 99 },
+        payeeCeoId: 30,
+      })
+    ).toEqual([8, 20, 30]);
   });
   it('copes with no CEO or payee known', () => {
-    expect(
-      removalRecipients({ officerIds: [8], startedBy: 7, ceoId: undefined, payeeId: undefined })
-    ).toEqual([8]);
+    expect(removalRecipients({ officerIds: [8], startedBy: 7, ceoId: null })).toEqual([8]);
   });
 });
 

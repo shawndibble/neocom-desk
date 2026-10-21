@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import type { FittingStats, LocalRepair } from '@/engine/fittings/types';
 import { Facts, HeatFigure, StatGroup, StatNote, type Fact } from './StatFacts';
+import { fixed0, fixed1, fixedFormat } from '@/lib/fixedFormat';
 
 const REPAIR_LAYERS: readonly (keyof LocalRepair)[] = ['shield', 'armor', 'hull'];
 
 /** A signed rate: "+" for what the capacitor gains, "−" (a true minus) for what it loses. */
 function signed(value: number, digits: number): string {
-  const magnitude = Math.abs(value).toFixed(digits);
+  const magnitude = fixedFormat(digits)(Math.abs(value));
   if (Number(magnitude) === 0) return magnitude;
   return value < 0 ? `−${magnitude}` : `+${magnitude}`;
 }
@@ -31,7 +32,7 @@ export function TankFacts({
     <HeatFigure stats={stats} format={format} />
   );
   const perSecond = (value: number) =>
-    t('fittings.stats.unit.hpPerSecond', { value: value.toFixed(1) });
+    t('fittings.stats.unit.hpPerSecond', { value: fixed1(value) });
   const facts: Fact[] = [
     ...REPAIR_LAYERS.filter((layer) => stats.repair[layer] > 0).map((layer) => ({
       label: t(`fittings.stats.repair.${layer}`),
@@ -52,8 +53,8 @@ export function TankFacts({
         // The same repairer unheated: the ancillary rows line up.
         const same = s.tank.ancillary[index] ?? row;
         return t('fittings.stats.tank.ancillary', {
-          loaded: same.loaded.toFixed(1),
-          empty: same.empty.toFixed(1),
+          loaded: fixed1(same.loaded),
+          empty: fixed1(same.empty),
         });
       }),
     })),
@@ -62,14 +63,14 @@ export function TankFacts({
           {
             label: t('fittings.stats.tank.burst'),
             value: figure((s) =>
-              t('fittings.stats.unit.ehpPerSecond', { value: s.tank.burstEffective.toFixed(1) })
+              t('fittings.stats.unit.ehpPerSecond', { value: fixed1(s.tank.burstEffective) })
             ),
           },
           {
             label: t('fittings.stats.tank.sustained'),
             value: figure((s) =>
               t('fittings.stats.unit.ehpPerSecond', {
-                value: s.tank.sustainedEffective.toFixed(1),
+                value: fixed1(s.tank.sustainedEffective),
               })
             ),
           },
@@ -84,7 +85,7 @@ export function TankFacts({
       </StatGroup>
       {hasTank && tank.capFraction < 1 && (
         <StatNote tone="warning">
-          {t('fittings.stats.tank.capLimited', { pct: (tank.capFraction * 100).toFixed(0) })}
+          {t('fittings.stats.tank.capLimited', { pct: fixed0(tank.capFraction * 100) })}
         </StatNote>
       )}
       {hasTank && <StatNote>{t('fittings.stats.tank.estimateNote')}</StatNote>}
@@ -105,21 +106,19 @@ export function CapacitorFacts({ stats }: { stats: FittingStats }) {
       items={[
         {
           label: t('fittings.stats.fact.capacity'),
-          value: figure((s) =>
-            t('fittings.stats.unit.gj', { value: s.capacitorCapacity.toFixed(0) })
-          ),
+          value: figure((s) => t('fittings.stats.unit.gj', { value: fixed0(s.capacitorCapacity) })),
         },
         {
           label: t('fittings.stats.fact.recharge'),
           value: figure((s) =>
             t('fittings.stats.unit.seconds', {
-              value: (s.capacitorRechargeTime / 1000).toFixed(0),
+              value: fixed0(s.capacitorRechargeTime / 1000),
             })
           ),
         },
         {
           label: t('fittings.stats.cap.peakRecharge'),
-          value: figure((s) => perSecond(s.capacitorBudget.peakRecharge.toFixed(1))),
+          value: figure((s) => perSecond(fixed1(s.capacitorBudget.peakRecharge))),
         },
         {
           label: t('fittings.stats.cap.drain'),
@@ -157,7 +156,7 @@ export function CapacitorFacts({ stats }: { stats: FittingStats }) {
                   s.capacitorBudget.secondsPerBoosterCharge === null
                     ? ''
                     : t('fittings.stats.cap.chargeEvery', {
-                        seconds: s.capacitorBudget.secondsPerBoosterCharge.toFixed(1),
+                        seconds: fixed1(s.capacitorBudget.secondsPerBoosterCharge),
                       })
                 ),
               },
@@ -186,7 +185,7 @@ export function SustainedTankReadout({
       <span className="text-text-dim">{t('fittings.stats.tank.sustained')}</span>{' '}
       <span>
         {t('fittings.stats.unit.ehpPerSecond', {
-          value: stats.tank.sustainedEffective.toFixed(1),
+          value: fixed1(stats.tank.sustainedEffective),
         })}
       </span>
     </p>

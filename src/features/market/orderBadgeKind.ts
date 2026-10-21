@@ -13,6 +13,7 @@
  * for i18n stays with the caller — this only decides *which* badge and what
  * short, already-formatted detail string (if any) goes beside it.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import type { OrderAdviceInput } from './orderRowSummary';
 import type { OrderBadgeKind } from './OrderProblemBadge';
 
@@ -48,14 +49,14 @@ export function orderBadgeFor(row: OrderAdviceInput): OrderBadgeChoice | null {
     case 'belowFloor': {
       if (!row.floor) return null;
       const pct = ((row.floor.relist - row.price) / row.floor.relist) * 100;
-      return { kind: 'belowFloor', detail: `-${pct.toFixed(1)}%` };
+      return { kind: 'belowFloor', detail: `-${fixed1(pct)}%` };
     }
     case 'undercutStation':
-      return { kind: 'undercutStation', detail: `-${row.station.gapPct.toFixed(1)}%` };
+      return { kind: 'undercutStation', detail: `-${fixed1(row.station.gapPct)}%` };
     case 'undercutSystem':
     case 'undercutRegion': {
       const pct = row.deepUndercut?.worst?.gapPct;
-      return { kind: row.problem, detail: pct !== undefined ? `-${pct.toFixed(1)}%` : undefined };
+      return { kind: row.problem, detail: pct !== undefined ? `-${fixed1(pct)}%` : undefined };
     }
     case 'expiringOrStale': {
       const days = row.expiry?.daysLeft;
@@ -67,7 +68,7 @@ export function orderBadgeFor(row: OrderAdviceInput): OrderBadgeChoice | null {
     case 'outbid': {
       const pct =
         row.worstScope === 'station' ? row.station.gapPct : row.deepUndercut?.worst?.gapPct;
-      return { kind: 'outbid', detail: pct !== undefined ? `+${pct.toFixed(1)}%` : undefined };
+      return { kind: 'outbid', detail: pct !== undefined ? `+${fixed1(pct)}%` : undefined };
     }
     case 'healthy':
     default:

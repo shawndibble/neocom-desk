@@ -1,6 +1,7 @@
 import type { FittingStats } from '@/engine/fittings/types';
 import type { Fact } from '../StatFacts';
 import type { Figure } from './statFigures';
+import { fmt0, fmt1, fmt2 } from './fixedFormat';
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
@@ -14,23 +15,21 @@ export function resourceFacts(
   const facts: Fact[] = [
     {
       label: t('fittings.stats.fact.cargo'),
-      value: figure((x) =>
-        t('fittings.stats.unit.cubicMetres', { value: x.holds.cargo.toFixed(0) })
-      ),
+      value: figure((x) => t('fittings.stats.unit.cubicMetres', { value: fmt0(x.holds.cargo) })),
     },
   ];
   if (s.holds.fleetHangar > 0)
     facts.push({
       label: t('fittings.stats.fact.fleetHangar'),
       value: figure((x) =>
-        t('fittings.stats.unit.cubicMetres', { value: x.holds.fleetHangar.toFixed(0) })
+        t('fittings.stats.unit.cubicMetres', { value: fmt0(x.holds.fleetHangar) })
       ),
     });
   if (s.holds.miningHold > 0)
     facts.push({
       label: t('fittings.stats.fact.miningHold'),
       value: figure((x) =>
-        t('fittings.stats.unit.cubicMetres', { value: x.holds.miningHold.toFixed(0) })
+        t('fittings.stats.unit.cubicMetres', { value: fmt0(x.holds.miningHold) })
       ),
     });
   if (s.sensor.type !== null)
@@ -38,7 +37,7 @@ export function resourceFacts(
       label: t('fittings.stats.fact.sensorStrength'),
       value: figure((x) =>
         t('fittings.stats.unit.sensor', {
-          value: x.sensor.strength.toFixed(1),
+          value: fmt1(x.sensor.strength),
           type: t(`fittings.stats.sensorType.${x.sensor.type}`),
         })
       ),
@@ -50,7 +49,7 @@ export function resourceFacts(
         label: t('fittings.stats.fact.jumpRange'),
         value: figure((x) =>
           t('fittings.stats.unit.lightYears', {
-            value: (x.jumpDrive?.rangeLightYears ?? 0).toFixed(2),
+            value: fmt2(x.jumpDrive?.rangeLightYears ?? 0),
           })
         ),
       },
@@ -58,7 +57,7 @@ export function resourceFacts(
         label: t('fittings.stats.fact.jumpFuel'),
         value: figure((x) =>
           t('fittings.stats.unit.fuelPerLightYear', {
-            value: (x.jumpDrive?.fuelPerLightYear ?? 0).toFixed(0),
+            value: fmt0(x.jumpDrive?.fuelPerLightYear ?? 0),
             fuel: typeName(fuelTypeId),
           })
         ),

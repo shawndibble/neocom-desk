@@ -468,7 +468,13 @@ describe('removal mirror (#4520)', () => {
     for (const now of [9, 9 + 24 * H, 9 + 25 * H]) {
       expect(mirror.isRemovalDue(sent, now)).toBe(removal.isRemovalDue(sent, now));
     }
-    const rec = { officerIds: [1, 2, 3], startedBy: 1, ceoId: 3, payeeId: 4 };
+    const rec = {
+      officerIds: [1, 2, 3],
+      startedBy: 1,
+      ceoId: 3,
+      payee: { kind: 'corporation' as const, id: 9 },
+      payeeCeoId: 4,
+    };
     expect(mirror.removalRecipients(rec)).toEqual(removal.removalRecipients(rec));
   });
 });

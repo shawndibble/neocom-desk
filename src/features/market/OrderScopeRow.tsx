@@ -1,3 +1,4 @@
+import { fixed1 } from '@/lib/fixedFormat';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { formatMarketIsk } from '@/lib/isk';
@@ -107,7 +108,7 @@ export function ScopeRow({
         <span className="text-[0.6875rem] text-text-dim">
           {t('market.orders.scopeOverBy')}:{' '}
           <span className="text-danger tabular-nums">
-            {formatMarketIsk(rival.gapIsk)} · {rival.gapPct.toFixed(1)}%
+            {formatMarketIsk(rival.gapIsk)} · {fixed1(rival.gapPct)}%
           </span>
         </span>
         {distanceText !== '' && (

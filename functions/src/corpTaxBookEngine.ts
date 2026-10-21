@@ -627,20 +627,32 @@ export function isRemovalDue(state: RemovalState, now: number): boolean {
   return state.status === 'pending-removal' && at !== undefined && at <= now;
 }
 
+/** Engine `moonOwnerMailRecipients` (ownerRateMail.ts): CEO and payee, once each. */
+export function moonOwnerMailRecipients(input: {
+  ceoId: number | null;
+  payee?: { kind: 'corporation' | 'character'; id: number };
+  payeeCeoId?: number | null;
+}): number[] {
+  const payeeId = input.payee?.kind === 'character' ? input.payee.id : (input.payeeCeoId ?? null);
+  return [...new Set([input.ceoId, payeeId].filter((id): id is number => typeof id === 'number'))];
+}
+
 /**
- * Whom the one mail goes to: the book's other officers, the moon owner's CEO and
- * its payee. The officer who started it is not mailed; nobody twice.
+ * Whom the one mail goes to: the book's other officers, plus the moon owner's CEO and its
+ * payee through the engine's shared `moonOwnerMailRecipients` (#4515). The officer who started it is
+ * not mailed; nobody twice.
  */
 export function removalRecipients(input: {
   officerIds: readonly number[];
   startedBy: number;
-  ceoId: number | undefined;
-  payeeId: number | undefined;
+  ceoId: number | null;
+  payee?: { kind: 'corporation' | 'character'; id: number };
+  /** The payee corporation's CEO, when the payee is a corporation. */
+  payeeCeoId?: number | null;
 }): number[] {
   const out = new Set<number>();
   for (const id of input.officerIds) if (id !== input.startedBy) out.add(id);
-  if (input.ceoId !== undefined) out.add(input.ceoId);
-  if (input.payeeId !== undefined) out.add(input.payeeId);
+  for (const id of moonOwnerMailRecipients(input)) out.add(id);
   return [...out];
 }
 

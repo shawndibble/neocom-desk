@@ -17,8 +17,12 @@ export const SEND_GAP_MAX_MS = 15_000;
 export const OFFLINE_RETRY_MS = 30_000;
 const MAX_RATE_LIMIT_WAIT_MS = 10 * 60_000;
 
-/** `removal` and `removalCancelled` (#4520) are moon owner mails, not Statements. */
-export type MailKind = 'statement' | 'reminder' | 'removal' | 'removalCancelled';
+/** `rate-change` (#4515) and `removal`/`removalCancelled` (#4520) are moon owner mails, not Statements. */
+export type MailKind = 'statement' | 'reminder' | 'rate-change' | 'removal' | 'removalCancelled';
+
+/** Only Statement mail is logged on a Statement; other kinds have none to log on. */
+export const isStatementMail = (kind: MailKind): kind is 'statement' | 'reminder' =>
+  kind === 'statement' || kind === 'reminder';
 export type MailStatus = 'waiting' | 'sent' | 'failed';
 export type MailFailureReason = 'cspa' | 'auth' | 'other';
 
@@ -243,6 +247,6 @@ export function isAlreadyQueued(
     (i) =>
       i.statementId === statementId &&
       i.kind === kind &&
-      (kind === 'statement' ? true : i.status === 'waiting')
+      (kind === 'reminder' ? i.status === 'waiting' : true)
   );
 }

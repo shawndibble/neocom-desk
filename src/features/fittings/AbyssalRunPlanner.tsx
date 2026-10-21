@@ -31,6 +31,7 @@ import { changeLabel } from './fittingVariationsCsv';
 import { StatField, StatFields, StatNote } from './StatFacts';
 import { STAT_FIELD_WIDTH } from './statKit';
 import { kmValue } from './rangeText';
+import { fixed1 } from '@/lib/fixedFormat';
 
 export type WeatherCompare = (
   weatherTypeId: number
@@ -164,7 +165,7 @@ export function AbyssalRunPlanner({
                 <SelectItem key={band} value={String(band)}>
                   {band === 0
                     ? t('fittings.abyssalRun.securityBelow')
-                    : t('fittings.abyssalRun.securityOption', { value: (band / 10).toFixed(1) })}
+                    : t('fittings.abyssalRun.securityOption', { value: fixed1(band / 10) })}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -189,7 +190,7 @@ export function AbyssalRunPlanner({
           {t('fittings.abyssalRun.timer', {
             minutes: ABYSSAL_RUN_MINUTES,
             pockets: ABYSSAL_POCKETS,
-            perPocket: (ABYSSAL_RUN_MINUTES / ABYSSAL_POCKETS).toFixed(1),
+            perPocket: fixed1(ABYSSAL_RUN_MINUTES / ABYSSAL_POCKETS),
           })}
         </li>
         {filamentId !== null && hull.eligible && (

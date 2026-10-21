@@ -52,6 +52,7 @@ import {
   fittingCompareModulesCsvColumns,
 } from '@/features/fittings/fittingCompareCsv';
 import { useModuleDiffNames } from '@/features/fittings/useModuleDiffNames';
+import { fixed0 } from '@/lib/fixedFormat';
 
 /**
  * Fitting vs Fitting compare: up to three Fittings, entirely in the URL
@@ -262,7 +263,7 @@ export function FittingCompare() {
             {overage
               ? t('fittings.compare.overBy', {
                   resource: t(`fittings.list.${overage.resource}`),
-                  amount: overage.amount.toFixed(0),
+                  amount: fixed0(overage.amount),
                 })
               : t('fittings.compare.fitsYes')}
           </span>

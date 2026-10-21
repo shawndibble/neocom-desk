@@ -117,12 +117,17 @@ async function recipientsFor(
   });
   const ceoOf = deps.corporationCeo ?? (async () => undefined);
   const ceoId = await ceoOf(rec.corporationId).catch(() => undefined);
-  let payeeId: number | undefined;
-  if (rec.payee?.kind === 'character') payeeId = rec.payee.id;
-  else if (rec.payee?.kind === 'corporation') {
-    payeeId = await ceoOf(rec.payee.id).catch(() => undefined);
-  }
-  return removalRecipients({ officerIds, startedBy: excludeCharacterId, ceoId, payeeId });
+  const payeeCeoId =
+    rec.payee?.kind === 'corporation'
+      ? await ceoOf(rec.payee.id).catch(() => undefined)
+      : undefined;
+  return removalRecipients({
+    officerIds,
+    startedBy: excludeCharacterId,
+    ceoId: ceoId ?? null,
+    ...(rec.payee ? { payee: rec.payee } : {}),
+    payeeCeoId: payeeCeoId ?? null,
+  });
 }
 
 // --- Start, notice, cancel --------------------------------------------------

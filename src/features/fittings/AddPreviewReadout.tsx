@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { changeLabel } from './fittingVariationsCsv';
 import type { AddPreview } from './useModuleAddPreview';
+import { fixed1 } from '@/lib/fixedFormat';
 
 /** Most changed stats listed; the rest collapse into "and N more". */
 const MAX_LISTED = 6;
@@ -51,7 +52,7 @@ export function AddPreviewReadout({ preview, name }: AddPreviewReadoutProps) {
             ? t('fittings.variations.fitsYes')
             : overage
               ? t('fittings.variations.stillOverBy', {
-                  amount: overage.amount.toFixed(1),
+                  amount: fixed1(overage.amount),
                   resource: t(`fittings.list.${overage.resource}`),
                 })
               : t('fittings.variations.fitsNo'),

@@ -11,6 +11,8 @@ import {
   type MailKind,
   type MailQueueItem,
 } from '@/engine/corpTaxBook/mailQueue';
+import { composeRateChangeMail } from '@/engine/corpTaxBook/ownerRateMail';
+import type { OwnerRateChange } from '@/engine/corpTaxBook/ownerRate';
 import { composeStatementMail, type StatementMailInput } from '@/engine/corpTaxBook/statementMail';
 import { addToQueue, listQueue, nextOrder, saveItem } from './mailQueueStore';
 
@@ -188,4 +190,47 @@ export async function enqueueRemovalMails(input: RemovalMailsInput): Promise<num
 /** Puts a failed mail back at the end of the line. */
 export async function retryMail(item: MailQueueItem): Promise<void> {
   await saveItem(retryItem(item, await nextOrder()));
+}
+
+/**
+ * Queues the short "your rate changed" mail, one per recipient. Never throws
+ * into the rate change: the caller has already saved it. A mail already queued
+ * for the same change and recipient is not queued twice.
+ */
+export async function enqueueRateChangeMail(input: {
+  corporationId: number;
+  accountingCorporationName: string;
+  senderCharacterId: number;
+  feederCorporationId: number;
+  change: OwnerRateChange;
+  recipients: readonly { id: number; name: string }[];
+}): Promise<{ queued: number }> {
+  const batchId = crypto.randomUUID();
+  const start = await nextOrder();
+  const items: MailQueueItem[] = input.recipients.map((r, i) => {
+    const mail = composeRateChangeMail({
+      accountingCorporationName: input.accountingCorporationName,
+      recipientName: r.name,
+      change: input.change,
+    });
+    return {
+      id: crypto.randomUUID(),
+      batchId,
+      corporationId: input.corporationId,
+      statementId: `rate:${input.feederCorporationId}:${input.change.date}:${input.change.newPct}:${r.id}`,
+      kind: 'rate-change',
+      senderCharacterId: input.senderCharacterId,
+      recipientId: r.id,
+      recipientName: r.name,
+      amount: 0,
+      subject: mail.subject,
+      body: mail.body,
+      order: start + i,
+      status: 'waiting',
+      createdAt: Date.now(),
+      attempts: 0,
+    };
+  });
+  const { added } = await addToQueue(items);
+  return { queued: added.length };
 }

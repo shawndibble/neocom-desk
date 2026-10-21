@@ -249,6 +249,7 @@ export function gaugeArc(
 }
 
 function coordinate(value: number): string {
+  // fixed format: SVG coordinates.
   // No "-0.0" from a sine that is zero bar rounding.
   return (Math.abs(value) < 0.05 ? 0 : value).toFixed(1);
 }

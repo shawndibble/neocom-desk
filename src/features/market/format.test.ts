@@ -1,5 +1,16 @@
-import { describe, it, expect } from 'vitest';
-import { formatVsMedianPct } from './format';
+import { afterEach, describe, it, expect } from 'vitest';
+import { setDecimalMark } from '@/lib/numberLocale';
+import { formatSignedPct, formatVsMedianPct } from './format';
+
+describe('formatSignedPct', () => {
+  afterEach(() => setDecimalMark('.'));
+  it('signs and uses the active decimal mark', () => {
+    expect(formatSignedPct(12.54, 1)).toBe('+12.5%');
+    setDecimalMark(',');
+    expect(formatSignedPct(-3, 1)).toBe('-3,0%');
+    expect(formatSignedPct(0.01, 1)).toBe('0,0%');
+  });
+});
 
 describe('formatVsMedianPct', () => {
   it('signs a whole percent with a plus or a real minus', () => {

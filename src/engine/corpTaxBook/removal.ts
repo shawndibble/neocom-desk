@@ -4,6 +4,8 @@
  * it early. Pure. Mirrored in `functions/src/corpTaxBookEngine.ts` (parity test).
  */
 
+import { moonOwnerMailRecipients } from './ownerRateMail';
+
 const HOUR_MS = 3_600_000;
 
 /** How long a removal waits once its mail is sent. */
@@ -72,19 +74,21 @@ export function isRemovalDue(state: RemovalState, now: number): boolean {
 }
 
 /**
- * Whom the one mail goes to: the book's other officers, the moon owner's CEO and
- * its payee. The officer who started it is not mailed; nobody twice.
+ * Whom the one mail goes to: the book's other officers, plus the moon owner's CEO and its
+ * payee through the shared `moonOwnerMailRecipients` (#4515). The officer who started it is
+ * not mailed; nobody twice.
  */
 export function removalRecipients(input: {
   officerIds: readonly number[];
   startedBy: number;
-  ceoId: number | undefined;
-  payeeId: number | undefined;
+  ceoId: number | null;
+  payee?: { kind: 'corporation' | 'character'; id: number };
+  /** The payee corporation's CEO, when the payee is a corporation. */
+  payeeCeoId?: number | null;
 }): number[] {
   const out = new Set<number>();
   for (const id of input.officerIds) if (id !== input.startedBy) out.add(id);
-  if (input.ceoId !== undefined) out.add(input.ceoId);
-  if (input.payeeId !== undefined) out.add(input.payeeId);
+  for (const id of moonOwnerMailRecipients(input)) out.add(id);
   return [...out];
 }
 

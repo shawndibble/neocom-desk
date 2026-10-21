@@ -1,3 +1,4 @@
+import { fixed2 } from '@/lib/fixedFormat';
 import { useCallback, useEffect, useRef, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -158,7 +159,7 @@ export function useContactsStandings(characterId: number, enabled: boolean) {
         render: (row) => (
           <span className="inline-flex items-center gap-1.5">
             <StandingIcon value={row.standing} />
-            <span className="tabular-nums">{row.standing.toFixed(2)}</span>
+            <span className="tabular-nums">{fixed2(row.standing)}</span>
           </span>
         ),
         sortValue: (row) => row.standing,

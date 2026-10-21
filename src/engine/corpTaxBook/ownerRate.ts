@@ -101,3 +101,47 @@ export function rateChangeEvent(input: {
     ...(requestedPct !== undefined ? { requestedPct } : {}),
   };
 }
+
+/**
+ * The last time the accounting corporation moved the effective rate: replays
+ * each agreed entry in the order recorded and keeps the last that changed it.
+ * A request alone is never an event, and neither is an agreement to the rate
+ * already in force. `requestedPct` is what the moon owner asks for now.
+ */
+export function latestRateChange(history: readonly OwnerRateEntry[]): OwnerRateChange | undefined {
+  const ordered = [...history].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt));
+  let last: OwnerRateChange | undefined;
+  ordered.forEach((entry, i) => {
+    if (entry.kind !== 'agreed') return;
+    const event = rateChangeEvent({
+      before: ordered.slice(0, i),
+      after: ordered.slice(0, i + 1),
+      date: entry.effectiveFrom,
+    });
+    if (event) last = event;
+  });
+  if (!last) return undefined;
+  const asked = requestedOwnerRate(history, '9999-12-31');
+  return {
+    date: last.date,
+    ...(last.oldPct !== undefined ? { oldPct: last.oldPct } : {}),
+    newPct: last.newPct,
+    ...(asked !== undefined ? { requestedPct: asked } : {}),
+  };
+}
+
+/** What the moon owner's page says about a rate change; `askedPct` only when it differs from the new rate. */
+export interface RateNotice {
+  pct: number;
+  date: string;
+  askedPct?: number;
+}
+
+export function rateNotice(change: OwnerRateChange): RateNotice {
+  const asked = change.requestedPct;
+  return {
+    pct: change.newPct,
+    date: change.date,
+    ...(asked !== undefined && asked !== change.newPct ? { askedPct: asked } : {}),
+  };
+}

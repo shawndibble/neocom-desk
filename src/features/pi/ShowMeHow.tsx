@@ -9,6 +9,7 @@
  * Route Safety links with the security colour plus its number, "Highsec only"
  * is a checkbox, and the panel takes focus when it opens.
  */
+import { fixed1 } from '@/lib/fixedFormat';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { formatCount } from '@/lib/formatCount';
 import { useEffect, useRef, type ReactNode } from 'react';
@@ -100,7 +101,7 @@ function SystemRow({
           className="ml-auto tabular-nums"
           style={{ color: securityStatusColor(system.security) }}
         >
-          {shownSecurity(system.security).toFixed(1)}{' '}
+          {fixed1(shownSecurity(system.security))}{' '}
           <span className="text-text-dim">
             {t(`piPlan.find.band.${securityBand(system.security)}`)}
           </span>

@@ -2,6 +2,7 @@ import type { useTranslation } from 'react-i18next';
 import type { HardpointKind } from '@/engine/fittings/hardpoints';
 import { RING_VIEW } from '@/engine/fittings/ringLayout';
 import type { Budget } from './RimGauge';
+import { fmt1 } from '../stats/fixedFormat';
 
 /**
  * A kind's hardpoints in words — the tooltip, and the text a screen reader
@@ -29,5 +30,5 @@ export function budgetValue(
 ): string | null {
   const { used, total } = budget;
   if (used === null || total === null) return null;
-  return t(budget.valueKey, { used: used.toFixed(1), total: total.toFixed(1) });
+  return t(budget.valueKey, { used: fmt1(used), total: fmt1(total) });
 }

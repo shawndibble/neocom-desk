@@ -88,7 +88,7 @@ export function isUntargetable(system: JumpSystem): boolean {
 /** Fuel one leg burns; `fuelPerLightYear` is `JumpDriveStats`'s skill-adjusted figure. */
 export function jumpFuel(distanceLy: number, fuelPerLightYear: number): number {
   // Round away float noise first so 4 ly x 1000 does not become 4001.
-  return Math.ceil(Number((distanceLy * fuelPerLightYear).toFixed(6)));
+  return Math.ceil(Number((distanceLy * fuelPerLightYear).toFixed(6))); // fixed format: rounding before ceil, not display
 }
 
 export interface JumpFatigueInput {
