@@ -25,6 +25,7 @@ import type {
 import type { IncursionsBoardData } from '../../data/incursionsBoard';
 import type {
   CorpJobsFeed,
+  CorpKillsFeed,
   CorpMembersFeed,
   CorpMiningFeed,
   CorpStarbasesFeed,
@@ -262,6 +263,7 @@ export interface FeedMap {
   corpMembers: CorpMembersFeed;
   corpMining: CorpMiningFeed;
   corpStarbases: CorpStarbasesFeed;
+  corpKills: CorpKillsFeed;
 }
 
 export type FeedId = keyof FeedMap;

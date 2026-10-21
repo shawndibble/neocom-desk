@@ -60,6 +60,7 @@ import {
 } from './kindLoaders';
 import {
   loadCorpJobsFeed,
+  loadCorpKillsFeed,
   loadCorpMembersFeed,
   loadCorpMiningFeed,
   loadCorpStarbasesFeed,
@@ -295,6 +296,8 @@ function Source({ feed }: { feed: FeedId }) {
           cacheKey="corp:starbases"
         />
       );
+    case 'corpKills':
+      return <SnapshotSource feed="corpKills" load={loadCorpKillsFeed} cacheKey="corp:kills" />;
     case 'incursions':
       return <IncursionsSource />;
     case 'spExtras':

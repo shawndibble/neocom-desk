@@ -5159,8 +5159,15 @@
       },
       "corpKills": {
         "title": "Corp kills",
-        "description": "Kills, losses and ISK efficiency",
-        "empty": "This widget is coming soon."
+        "description": "Kills, losses and ISK efficiency, all time",
+        "empty": "zKillboard has no kills or losses for your corporation.",
+        "npc": "NPC corporations have no killboard.",
+        "unavailable": "zKillboard could not be reached. Try again in a bit.",
+        "unit_one": "kill",
+        "unit_other": "kills",
+        "secondary": "{{losses}} lost · {{efficiency}} ISK efficiency",
+        "allTime": "All time, from zKillboard",
+        "summary": "{{kills}} kills, {{losses}} losses, {{efficiency}} ISK efficiency, all time."
       },
       "corpContracts": {
         "title": "Corp contracts",

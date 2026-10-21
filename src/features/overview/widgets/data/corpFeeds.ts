@@ -16,6 +16,7 @@ import type { CorporationIndustryJob } from '@/esi/endpoints';
 import type { MemberActivity, RosterDiff } from '@/engine/corp/members';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { WalletDivision } from '@/features/corp/divisions';
+import type { PilotStats, ZkillFailureReason } from '@/lib/zkillboard';
 
 interface CorpFeedBase {
   readable: boolean;
@@ -104,6 +105,19 @@ export interface CorpStarbasesFeed extends CorpFeedBase {
   systemNames: ReadonlyMap<number, string>;
 }
 
+/**
+ * The corporation's zKillboard all-time totals: not an ESI read, so no role or
+ * scope gates it. `readable: false` means the widget has nothing to ask about
+ * (an NPC corporation, whose killboard the modal skips, or an unknown one).
+ */
+export interface CorpKillsFeed extends CorpFeedBase {
+  corporationId: number | null;
+  /** The totals; null when zKillboard has no kill or loss for it, or could not be reached. */
+  stats: PilotStats | null;
+  /** zKillboard could not be reached or read: a note, never an error. */
+  failed: ZkillFailureReason | null;
+}
+
 export async function loadCorpWalletFeed(characterId: number): Promise<CorpWalletFeed> {
   const { loadCorpWallet } = await import('./corpFeedLoaders');
   return loadCorpWallet(characterId);
@@ -127,4 +141,9 @@ export async function loadCorpMiningFeed(characterId: number): Promise<CorpMinin
 export async function loadCorpStarbasesFeed(characterId: number): Promise<CorpStarbasesFeed> {
   const { loadCorpStarbases } = await import('./corpFeedLoaders');
   return loadCorpStarbases(characterId);
+}
+
+export async function loadCorpKillsFeed(characterId: number): Promise<CorpKillsFeed> {
+  const { loadCorpKills } = await import('./corpFeedLoaders');
+  return loadCorpKills(characterId);
 }

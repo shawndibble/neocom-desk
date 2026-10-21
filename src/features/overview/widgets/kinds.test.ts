@@ -73,7 +73,6 @@ const CORP_SOON = [
   'corpOrders',
   'corpRoleAudit',
   'corpDoctrine',
-  'corpKills',
   'corpContracts',
   'corpSrp',
   'corpProjects',
@@ -108,8 +107,12 @@ describe('widget kind catalogue', () => {
   });
 
   it('gates every available corp kind on a capability, and only corp kinds', () => {
+    // Corp kills reads zKillboard, not corp ESI: no role or scope can gate it.
+    const UNGATED = new Set(['corpKills']);
     for (const k of boardKinds('corp')) {
-      if (k.availability === 'available') expect(k.capabilities.length, k.id).toBeGreaterThan(0);
+      if (k.availability === 'available' && !UNGATED.has(k.id)) {
+        expect(k.capabilities.length, k.id).toBeGreaterThan(0);
+      }
     }
     for (const k of overviewKinds()) {
       if (k.boards.corp === undefined) expect(k.capabilities, k.id).toEqual([]);
@@ -188,6 +191,8 @@ describe('widget kind catalogue', () => {
     // No per-payee breakdown exists, so there is nothing honest to chart.
     expect(v('miningTax')).toEqual(['number', 'table']);
     expect(v('wallet')).toEqual(['number', 'chart', 'table']);
+    // zKillboard sends all-time totals only: no series to chart, no range to pick.
+    expect(v('corpKills')).toEqual(['number']);
     expect(v('netWorth')).toEqual(['number', 'chart', 'table']);
   });
 
