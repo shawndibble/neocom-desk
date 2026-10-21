@@ -14337,7 +14337,7 @@
         "open": "Corp Tax Book settings",
         "title": "Corp Tax Book settings",
         "rates": "Tax rates",
-        "ratesHint": "The most specific rate wins: moon, then Miner, then Guest default, then the corp default. A rate starts on its date and never reaches back.",
+        "ratesHint": "The most specific rate wins: Miner, then moon, then Guest default, then the corp default. A rate starts on its date and never reaches back.",
         "rateScope": {
           "corp": "Corp default",
           "guest": "Guest default",
