@@ -147,7 +147,7 @@ describe('loadCorporationAssets', () => {
 });
 
 describe('toCorpAssetInputs', () => {
-  it('adapts ESI snake_case rows into the engine-native shape buildCorpAssetTree takes', () => {
+  it('adapts ESI snake_case rows into the engine-native shape the ledger takes', () => {
     expect(toCorpAssetInputs(ASSETS)).toEqual([
       {
         itemId: 1001,

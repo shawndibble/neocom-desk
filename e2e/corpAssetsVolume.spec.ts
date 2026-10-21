@@ -1,14 +1,5 @@
 /**
- * Corp Assets item rows show a real M³ figure (issue #2216).
- *
- * `CorpAssets.tsx`'s `NodeRowView` used to hardcode `unitVolume={undefined}`
- * on every item row, so the shared `ItemRow` component (the same one
- * `/assets` uses) always rendered "-" there regardless of whether the SDE
- * snapshot actually knew the type's volume. This pins that a known type (34,
- * Tritanium — 0.01 m³ in the slim snapshot, same fixture `assetsItemColumns
- * .spec.ts` uses for `/assets`) now resolves a real figure here too, and that
- * an unresolvable type degrades that one row to "-" rather than failing the
- * page.
+ * Corp Assets' Volume column shows a real m³ figure (issues #2216, #4671).
  *
  * Corp Assets is Director-only (`engine/corpRoles.ts`), so this needs a JWT
  * carrying the corp scope group plus a `/roles` override granting Director —
@@ -88,7 +79,7 @@ test.describe('Corp Assets — item row volume', () => {
   });
 
   for (const width of [1440, 1024]) {
-    test(`shows the real M³ figure for a known type at ${width}px, "-" for an unknown one`, async ({
+    test(`shows a real m³ total once Volume is ticked at ${width}px, a dash for an unknown type`, async ({
       page,
     }) => {
       await page.goto('./');
@@ -97,29 +88,19 @@ test.describe('Corp Assets — item row volume', () => {
 
       await page.setViewportSize({ width, height: 900 });
       await page.goto('./corp/assets');
-      await page.getByRole('link', { name: /Division 1/i }).click();
+      await expect(page.getByRole('link', { name: 'Tritanium' })).toBeVisible();
 
-      await expect(page.getByText('Tritanium')).toBeVisible();
-      await expect(page.getByText('0.01 m³')).toBeVisible();
+      // Volume starts off; the column picker adds it.
+      await page.getByRole('button', { name: 'Columns' }).click();
+      await page.getByRole('menuitemcheckbox', { name: 'Volume' }).click();
+      await page.keyboard.press('Escape');
 
-      const unknownRow = page
-        .locator('[data-virtual-scroll-root] [data-index]')
-        .filter({ hasText: 'Type #999999' });
-      await expect(unknownRow).toBeVisible();
-      // The volume dash comes first; the unpriced value cell shows one too (#3116).
-      await expect(unknownRow.getByText('-', { exact: true }).first()).toBeVisible();
+      const known = page.getByRole('row').filter({ hasText: 'Tritanium' });
+      // 500 Tritanium at 0.01 m³ each; the header names the unit.
+      await expect(known.getByRole('cell', { name: '5', exact: true })).toBeVisible();
+      const unknown = page.getByRole('row').filter({ hasText: 'Type #999999' });
+      await expect(unknown).toBeVisible();
+      await expect(unknown.getByText('—', { exact: true }).first()).toBeVisible();
     });
   }
-
-  test('the label strip is absent below md', async ({ page }) => {
-    await page.goto('./');
-    await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
-    await expect(page).toHaveURL(/\/overview$/);
-
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('./corp/assets');
-    await page.getByRole('link', { name: /Division 1/i }).click();
-    await expect(page.getByText('Tritanium')).toBeVisible();
-    await expect(page.getByTestId('item-column-labels')).toBeHidden();
-  });
 });

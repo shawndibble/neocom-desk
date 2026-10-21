@@ -12481,23 +12481,10 @@
       "noAccessHint": "EVE only opens the corporation wallet to a Director, Accountant or Junior Accountant. Roles can only be changed in game, and granting access here will not change that."
     },
     "assets": {
-      "title": "Corp assets",
+      "title": "Corp Assets",
       "refresh": "Refresh corp assets",
       "empty": "No corporation assets",
       "emptyHint": "EVE reported no assets for this corporation.",
-      "divisionEmpty": "Nothing in this division",
-      "treeLabel": "Corporation assets",
-      "tableLabel": "{{group}} assets",
-      "columnItem": "Item",
-      "columnQuantity": "Quantity",
-      "columnLocation": "Location",
-      "itemCount_one": "{{count, number}} item",
-      "itemCount_other": "{{count, number}} items",
-      "levelHeading": {
-        "itemsSuffix": ", {{items}}"
-      },
-      "groupCount_one": "{{count}} group",
-      "groupCount_other": "{{count}} groups",
       "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this corporation has more.",
       "noAccessTitle": "Corp assets need Director",
       "noAccessHint": "EVE only opens the corporation asset list to a Director. No other corporation role can see it, and granting access here will not change that.",
@@ -12505,13 +12492,78 @@
       "loadFailedHint": "The corporation asset read failed and nothing is cached yet. Try refreshing.",
       "searchPlaceholder": "Search items…",
       "unknownLocation": "Location #{{locationId}}",
-      "flag": {
-        "officeFolder": "Office",
-        "corpDeliveries": "Deliveries",
+      "unknownPlace": "Unknown location",
+      "tabsLabel": "Asset state",
+      "tab": {
+        "all": "All",
+        "offices": "Offices",
+        "deliveries": "Corp deliveries",
+        "inSpace": "In space",
         "impounded": "Impounded",
-        "assetSafety": "Asset Safety",
+        "assetSafety": "Asset safety",
+        "lockdown": "Lockdown",
+        "capsuleerDeliveries": "Capsuleer deliveries"
+      },
+      "state": {
+        "offices": "Office",
+        "deliveries": "Corp deliveries",
+        "inSpace": "In space",
+        "impounded": "Impounded",
+        "assetSafety": "Asset safety",
+        "lockdown": "Lockdown",
+        "capsuleerDeliveries": "Capsuleer deliveries",
         "other": "Other"
-      }
+      },
+      "column": {
+        "item": "Item",
+        "quantity": "Qty",
+        "target": "Target",
+        "shortBy": "Short by",
+        "where": "Where",
+        "value": "Est. value",
+        "volume": "Volume",
+        "group": "Group",
+        "place": "Office › division",
+        "items": "Items",
+        "largest": "Largest stacks"
+      },
+      "csv": {
+        "kind": "Blueprint",
+        "place": "Location"
+      },
+      "itemTableLabel": "Corporation assets by item",
+      "locationTableLabel": "Corporation assets by location",
+      "noneOwned": "none owned",
+      "morePlacements": "+{{count}} more",
+      "noStacks": "The corporation owns none of this item right now.",
+      "assembled": "Assembled",
+      "packaged": "Packaged",
+      "moreStacks_one": "and {{count}} more stack",
+      "moreStacks_other": "and {{count}} more stacks",
+      "groupTotals_one": "{{count, number}} item · {{value}} ISK",
+      "groupTotals_other": "{{count, number}} items · {{value}} ISK",
+      "emptyOffice": "Empty office",
+      "noMatchesTitle": "Nothing matches",
+      "noMatchesHint": "Clear the search or a filter, or pick another tab.",
+      "filtersTitle": "Filters",
+      "filter": {
+        "location": "Location",
+        "division": "Division",
+        "category": "Category",
+        "anyLocation": "Any location",
+        "anyDivision": "Any division",
+        "anyCategory": "Any category"
+      },
+      "groupBy": {
+        "label": "Group by",
+        "item": "Item",
+        "location": "Location"
+      },
+      "belowTarget": "Below target",
+      "belowTargetCount_one": "{{count}} item type below target",
+      "belowTargetCount_other": "{{count}} item types below target",
+      "belowTargetNone": "Set a stock target first.",
+      "stockTargetsButton": "Stock targets…"
     },
     "grantPromptTitle": "Corporation access",
     "grantPromptBody": "You hold {{roles}} in {{corporation}}. Grant corp access so Neocom Desk can show your corporation's data?",

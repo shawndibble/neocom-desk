@@ -17,6 +17,12 @@ export interface TabItem {
    * after the label (§6c). Part of the tab's name, never a control or a status.
    */
   count?: number;
+  /**
+   * Tints the count's ring and number: `warning` for work waiting on the pilot,
+   * `danger` for what needs recovering. The number always prints, so the tint
+   * is never the only signal. Only with `count`.
+   */
+  countTone?: 'warning' | 'danger';
 }
 
 interface TabPanelProps {
@@ -170,7 +176,10 @@ export function Tabs({
                 <span
                   className={cx(
                     'ml-1.5 inline-grid h-4.5 min-w-4.5 place-items-center rounded-full border px-1 text-[0.625rem] tracking-normal tabular-nums',
-                    active ? 'border-accent-dim text-text' : 'border-line-bright'
+                    tab.countTone === 'danger' && 'border-danger text-danger',
+                    tab.countTone === 'warning' && 'border-warning text-warning',
+                    tab.countTone === undefined &&
+                      (active ? 'border-accent-dim text-text' : 'border-line-bright')
                   )}
                 >
                   {tab.count}

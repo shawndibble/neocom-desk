@@ -264,6 +264,9 @@ export function routePatternFor(path: AppRoutePath): string {
  * A `standalone` tab keeps its own path. Anything else passes through.
  */
 export function pageKeyFor(pathname: string): string {
+  // Corp assets' state tabs are path segments but not a `PAGE_TABS` page (All is the bare path, which
+  // must not redirect), so collapse them here: a tab switch is not a page change.
+  if (pathname === '/corp/assets' || pathname.startsWith('/corp/assets/')) return '/corp/assets';
   const page = tabbedPageFor(pathname);
   if (page === null) return pathname;
   const id = tabFromPathname(page, pathname);

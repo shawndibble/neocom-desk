@@ -1,59 +1,60 @@
 /**
- * `/corp/assets` — every item the corporation owns, browsed the same
- * virtualized, URL-addressable way `/assets` is (issue #779).
+ * `/corp/assets` — the corporation's inventory ledger (issue #4671): every
+ * item the corporation owns, classified the way the in-game Corporation Assets
+ * window does (Offices, Corp deliveries, In space, Impounded, Asset safety,
+ * Lockdown, Capsuleer deliveries) and read either by item (with stock targets
+ * and the shortfall against them) or by location (office › division).
+ * `docs/context/decisions/` records why this replaced the division-first tree.
  *
- * Round 41/44 (GLOSSARY.md) rejected this: a hangar division has no `item_id`
- * for `engine/assetPath.ts` to key a URL on, and `engine/assetTree.ts` had no
- * grouping level between a station and a container to express one. Neither
- * held up against the fact the tree engine already solves an identical
- * problem for bay nodes — grouped by `location_flag`, addressed by kind
- * rather than an asset id it doesn't have. `buildCorpAssetTree`
- * (`engine/corp/assetDivisions.ts`) and `resolveCorpAssetPath`
- * (`engine/corp/assetPath.ts`) generalize exactly that mechanism to
- * divisions/flag groups as the top axis, in place of `groupCorpAssets`'s flat
- * `DataTable`-per-`Disclosure` grouping. See `docs/context/decisions/` for
- * the decision reversing round 41/44.
+ * URL (ADR 0015): the tab is the path (`/corp/assets/impounded`, the bare path
+ * is All; `features/corp/corpAssetsTabs.ts`) and the view state is the query —
+ * `q` search, `group=location` (absent: by item), `loc` a station/structure
+ * id, `div` a hangar division 1–7, `cat` a top-level market group id (the
+ * Category filter and Group column), `below=1` the Below target filter. The
+ * Corp overview's Corp assets widget links to these. An unknown path under
+ * `/corp/assets/*`, such as an old tree deep link, redirects to `/corp/assets`
+ * keeping the query.
  *
  * **Director-only, and the whole page rather than a panel**, for the same
  * reason `/corp/members` is: `canReadAssets` (`engine/corpRoles.ts`) answers
  * to `Director` alone, so anyone else following an Assets tab would land on
- * an explanation instead of a division list. The `unknown`/`ready` split and
- * the mount-on-`ready` reasoning live in `useCorpRouteGate`, shared with
- * `/corp` and `/corp/members`.
+ * an explanation instead of a ledger. The `unknown`/`ready` split and the
+ * mount-on-`ready` reasoning live in `useCorpRouteGate`.
  *
- * Deliberately smaller than `/assets`: no cross-character merge (a
- * corporation has one asset list, not one per character), no station
- * pinning, security/jumps-away badges, or "all items" flat toggle (no
- * corp-side need identified for this ticket — a plain search already
- * flattens every division into one result list on demand). Blueprint/build
- * plan linking stays explicitly disabled (`blueprintTypeID={null}`), same as
- * before this rework — corp assets still never loads the blueprint catalog.
+ * Blueprint/build plan linking stays explicitly disabled
+ * (`blueprintTypeID={null}`): corp assets never loads the blueprint catalog.
  */
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { cx } from '@/lib/cx';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { useAssetRowVirtualizer } from '@/features/assets/useAssetRowVirtualizer';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { useUrlParam } from '@/lib/useUrlState';
-import { textParam } from '@/lib/urlState';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  CachedNotice,
   DataAgeBadge,
   EmptyState,
+  FilterBar,
+  FilterChip,
+  FilterField,
   IconButton,
   LiveStatus,
   PageHeader,
   Panel,
   SearchInput,
+  SegmentedControl,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
-  CachedNotice,
+  TabPanel,
+  Tabs,
+  useTabsId,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
 import { CorpDenied } from '@/features/corp/CorpDenied';
-import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { loadCorporationId } from '@/features/corp/boardData';
 import {
   EMPTY_CORP_ASSET_LABELS,
@@ -64,78 +65,94 @@ import {
 } from '@/features/corp/assets';
 import { loadCorporationDivisions } from '@/features/corp/wallet';
 import { hangarDivisions } from '@/features/corp/divisions';
+import { HANGAR_DIVISIONS, type CorpAssetInput } from '@/engine/corp/assetDivisions';
 import {
-  buildCorpAssetTree,
-  corpAssetLocationId,
-  type CorpAssetGroupId,
-  type CorpAssetInput,
-} from '@/engine/corp/assetDivisions';
+  buildItemLedger,
+  buildLocationLedger,
+  classifyCorpAssets,
+  countLedgerByState,
+  evaluateStockTargets,
+  type ClassifiedAsset,
+  type ItemLedgerRow,
+} from '@/engine/corp/assetLedger';
 import {
-  corpAssetPathHref,
-  parseCorpAssetPath,
-  resolveCorpAssetPath,
-} from '@/engine/corp/assetPath';
-import { assetNodeSegment } from '@/engine/assetPath';
+  CORP_ASSET_TABS,
+  corpAssetTabFromPath,
+  corpAssetTabPath,
+  tabForState,
+  type CorpAssetTab,
+} from '@/features/corp/corpAssetsTabs';
+import { loadTypeCategories, type AssetCategory } from '@/features/corp/assetCategories';
 import {
-  assetStackValue,
-  collectGroupItemIds,
-  collectItemIds,
-  type AssetTreeGroup,
-  type AssetTreeNode,
-} from '@/engine/assetTree';
-import {
-  namesForSelection,
-  selectAll,
-  selectionStateForIds,
-  toggleSelection,
-} from '@/features/assets/assetSelection';
-import { NodeContainerRow, NodeItemRow } from '@/features/assets/AssetBrowseRows';
-import { ItemColumnLabels, LocationRow, SearchResultRow } from '@/features/assets/assetBrowserRows';
-import { hasItemRows } from '@/features/assets/assetBrowserFormat';
+  buildLocationRows,
+  filterClassified,
+  makeLedgerLabels,
+  type LocationRow,
+} from '@/features/corp/assetLedgerView';
+import { CorpAssetItemTable, type ItemTableRow } from '@/features/corp/CorpAssetItemTable';
+import { CorpAssetLocationTable } from '@/features/corp/CorpAssetLocationTable';
+import { useCorpStockTargets } from '@/features/corp/stockTargets';
+import { StockTargetsDialog } from '@/features/corp/StockTargetsDialog';
 import { loadTypeVolumes } from '@/features/character/typeNames';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { addQuickbarItem } from '@/features/market/quickbar';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
 import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useBlueprintTypeIds } from '@/features/character/useBlueprintTypeIds';
-import { assetBlueprintKind } from '@/engine/blueprintKind';
 import { useCompareSet } from '@/features/market/compareSet';
 import { writeToClipboard } from '@/lib/clipboard';
-import { TableActionsMenu, TableExportProvider } from '@/components/ui/TableExport';
-import type { TableExport } from '@/components/ui/useTableExport';
-import { assetCsvRows, assetsCsvColumns, type AssetCsvRow } from '@/features/assets/assetsCsv';
 import { getAveragePriceByType } from '@/market/prices';
 import { loadCorporationBlueprints } from '@/features/corp/blueprints';
 import { loadAssetCopyValues } from '@/features/assets/assetCopyValues';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { useFocusHeading } from '@/lib/useFocusHeading';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
+import { useUrlParams } from '@/lib/useUrlState';
+import { boolParam, enumParam, optionalIntParam, textParam } from '@/lib/urlState';
 
-const SEARCH_PARAM = textParam();
+const URL_PARAMS = {
+  q: textParam(),
+  group: enumParam(['item', 'location'] as const, 'item'),
+  loc: optionalIntParam({ min: 1 }),
+  div: optionalIntParam({ min: 1, max: 7 }),
+  cat: optionalIntParam({ min: 1 }),
+  below: boolParam(),
+};
+
 const EMPTY_PRICES: ReadonlyMap<number, number> = new Map();
-const EMPTY_VOLUMES: ReadonlyMap<number, number> = new Map();
 const EMPTY_DIVISION_NAMES: ReadonlyMap<number, string | null> = new Map();
+const EMPTY_CATEGORIES: ReadonlyMap<number, AssetCategory> = new Map();
+const ALL = 'all';
+
+const TAB_LABEL_KEY: Readonly<Record<CorpAssetTab, string>> = {
+  all: 'corp.assets.tab.all',
+  offices: 'corp.assets.tab.offices',
+  deliveries: 'corp.assets.tab.deliveries',
+  inSpace: 'corp.assets.tab.inSpace',
+  impounded: 'corp.assets.tab.impounded',
+  assetSafety: 'corp.assets.tab.assetSafety',
+  lockdown: 'corp.assets.tab.lockdown',
+  capsuleerDeliveries: 'corp.assets.tab.capsuleerDeliveries',
+};
 
 interface AssetsSnapshot {
   corporationId: number | null;
-  /** Raw, ESI-shaped input — kept alongside `groups` so bulk actions and search can look an item up by id without re-walking the tree. */
-  inputs: CorpAssetInput[] | null;
   /**
    * `null` means the assets read itself did not come back — offline,
    * uncached, or a 403 the role gate swallowed — and is distinct from a
    * corporation that was read successfully and genuinely owns nothing.
    */
-  groups: AssetTreeGroup<CorpAssetGroupId>[] | null;
+  inputs: CorpAssetInput[] | null;
   /** Division number -> the corp's own name for it, or null if unnamed/unresolved. */
   divisionNames: ReadonlyMap<number, string | null>;
   labels: CorpAssetLabels;
-  /** Global average market price per type, best-effort — an outage degrades ISK badges to 0 rather than the whole page. */
+  /** Global average market price per type, best-effort — an outage degrades ISK figures to 0 rather than the whole page. */
   priceByTypeId: ReadonlyMap<number, number>;
   /** Each blueprint copy's own value by item id (`engine/blueprintCopyValue.ts`) — a copy never takes its type's average price. */
   copyValueByItemId: ReadonlyMap<number, number>;
   /** Physical volume (m3, unpackaged) per type, best-effort from the slim SDE snapshot. */
   volumeByTypeId: ReadonlyMap<number, number>;
+  /** Top-level market group per type, best-effort from the market catalogue. */
+  categoryByTypeId: ReadonlyMap<number, AssetCategory>;
   /** The page cap was hit or a page was missing — corp holdings are the likelier of the two lists to hit it. */
   truncated: boolean;
   assetsShown: number;
@@ -148,12 +165,12 @@ interface AssetsSnapshot {
 const EMPTY_SNAPSHOT: AssetsSnapshot = {
   corporationId: null,
   inputs: null,
-  groups: null,
   divisionNames: new Map(),
   labels: EMPTY_CORP_ASSET_LABELS,
   priceByTypeId: new Map(),
   copyValueByItemId: new Map(),
   volumeByTypeId: new Map(),
+  categoryByTypeId: new Map(),
   truncated: false,
   assetsShown: 0,
   fetchedAt: null,
@@ -181,9 +198,10 @@ async function loadAssetsSnapshot(
   const assets = assetsResult.cached?.data ?? null;
   const inputs = assets === null ? null : toCorpAssetInputs(assets);
   const typeIds = inputs === null ? [] : [...new Set(inputs.map((i) => i.typeId))];
-  const [labels, volumeByTypeId, copyValueByItemId] = await Promise.all([
+  const [labels, volumeByTypeId, categoryByTypeId, copyValueByItemId] = await Promise.all([
     assets === null ? EMPTY_CORP_ASSET_LABELS : loadCorpAssetLabels(characterId, assets),
     loadTypeVolumes(typeIds),
+    loadTypeCategories(typeIds),
     // Director-only endpoint: without the role a copy still prices, at ME0/TE0.
     loadAssetCopyValues(characterId, assets ?? [], async () =>
       canReadBlueprints
@@ -191,13 +209,9 @@ async function loadAssetsSnapshot(
         : null
     ),
   ]);
-  const groups =
-    inputs === null ? null : buildCorpAssetTree(inputs, priceByTypeId, copyValueByItemId);
   const divisionNames = new Map(
     hangarDivisions(divisionsResult.cached?.data ?? null).map((d) => [d.division, d.name])
   );
-  const truncated = assetsResult.cached?.truncated ?? false;
-  const assetsShown = assets?.length ?? 0;
 
   const fetchedAts = [assetsResult, divisionsResult]
     .map((result) => result.cached?.fetchedAt)
@@ -210,137 +224,40 @@ async function loadAssetsSnapshot(
   return {
     corporationId,
     inputs,
-    groups,
     divisionNames,
     labels,
     priceByTypeId,
     copyValueByItemId,
     volumeByTypeId,
-    truncated,
-    assetsShown,
+    categoryByTypeId,
+    truncated: assetsResult.cached?.truncated ?? false,
+    assetsShown: assets?.length ?? 0,
     fetchedAt,
     fromCache: [assetsResult, divisionsResult].some((result) => result.cached?.fromCache),
   };
 }
 
-/** `location_flag`s a personal asset list never sees, each with a fixed label. */
-const FLAG_LABEL_KEY: Readonly<Record<Exclude<CorpAssetGroupId, number>, string>> = {
-  officeFolder: 'corp.assets.flag.officeFolder',
-  corpDeliveries: 'corp.assets.flag.corpDeliveries',
-  impounded: 'corp.assets.flag.impounded',
-  assetSafety: 'corp.assets.flag.assetSafety',
-  other: 'corp.assets.flag.other',
-};
+const rowKeyOf = (row: ItemLedgerRow) => `${row.typeId}:${row.isBlueprintCopy ? 'c' : 'o'}`;
 
-type Translate = (key: string, opts?: Record<string, unknown>) => string;
-
-function groupLabel(
-  t: Translate,
-  id: CorpAssetGroupId,
-  divisionNames: ReadonlyMap<number, string | null>
-): string {
-  if (typeof id === 'number') {
-    return divisionNames.get(id) ?? t('corp.vitals.division', { division: id });
-  }
-  return t(FLAG_LABEL_KEY[id]);
-}
-
-/** The resolved type name, else the raw id — every item-name lookup on this page goes through this one place so they cannot drift apart from each other. */
-function typeDisplayName(typeId: number, typeNames: ReadonlyMap<number, string>): string {
-  return typeNames.get(typeId) ?? `Type #${typeId}`;
-}
-
-function nodeLabel(
-  node: AssetTreeNode,
-  typeNames: ReadonlyMap<number, string>,
-  locationNames: ReadonlyMap<number, string>,
-  t: Translate
-): string {
-  if (node.kind === 'bay') return t(`assets.bay.${node.bay}`);
-  const locationId = corpAssetLocationId(node);
-  if (locationId !== null) {
-    return locationNames.get(locationId) ?? t('corp.assets.unknownLocation', { locationId });
-  }
-  return typeDisplayName(node.asset.type_id, typeNames);
-}
-
-interface CorpAssetMatch {
-  node: Extract<AssetTreeNode, { kind: 'item' }>;
-  name: string;
-  /** Ancestor labels, outermost first: the division/flag-group label, then any container/ship names. */
-  trail: string[];
-  groupId: CorpAssetGroupId;
-  /** Segments from the group root down to (not including) this item — where the search hit lives, for its link. */
-  segments: string[];
-}
-
-/** Walks every group's tree once, collecting a name-matching leaf as a hit with its full ancestor trail — search leaves the drill-down and reports across every division at once. */
-function searchCorpAssetGroups(
-  groups: readonly AssetTreeGroup<CorpAssetGroupId>[],
-  typeNames: ReadonlyMap<number, string>,
-  locationNames: ReadonlyMap<number, string>,
-  divisionNames: ReadonlyMap<number, string | null>,
-  t: Translate,
-  query: string
-): CorpAssetMatch[] {
-  const q = query.trim().toLowerCase();
-  const matches: CorpAssetMatch[] = [];
-
-  function walk(
-    groupId: CorpAssetGroupId,
-    nodes: readonly AssetTreeNode[],
-    trail: string[],
-    segments: string[]
-  ) {
-    for (const node of nodes) {
-      if (node.kind === 'item') {
-        const name = typeDisplayName(node.asset.type_id, typeNames);
-        if (!q || name.toLowerCase().includes(q))
-          matches.push({ node, name, trail, groupId, segments });
-        continue;
-      }
-      walk(
-        groupId,
-        node.children,
-        [...trail, nodeLabel(node, typeNames, locationNames, t)],
-        [...segments, assetNodeSegment(node)]
-      );
-    }
-  }
-
-  for (const group of groups)
-    walk(group.id, group.children, [groupLabel(t, group.id, divisionNames)], []);
-  return matches;
-}
-
-type BrowseRow =
-  | { kind: 'group'; key: string; group: AssetTreeGroup<CorpAssetGroupId> }
-  | { kind: 'node'; key: string; node: AssetTreeNode }
-  | { kind: 'match'; key: string; match: CorpAssetMatch };
-
-/** A drill-down href that keeps the page's query string, as on the Assets page. */
-function corpAssetHref(
-  groupId: CorpAssetGroupId | null,
-  segments: readonly string[],
-  query: string
-): string {
-  return corpAssetPathHref(groupId, segments) + query;
-}
-
-function baseRowHeight(row: BrowseRow): number {
-  switch (row.kind) {
-    case 'group':
-    case 'match':
-      return 64;
-    case 'node':
-      return 48;
-  }
+/** The by-item filters' draft: the three the funnel holds (search, group-by and Below target sit outside it). */
+interface PlaceFilter {
+  loc: number | null;
+  div: number | null;
+  cat: number | null;
 }
 
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
-function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
+function CorpAssetsView({
+  tab,
+  canReadBlueprints,
+}: {
+  tab: CorpAssetTab;
+  canReadBlueprints: boolean;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const tabsId = useTabsId();
   // `useRouteSnapshot` keys its reload on the Character and refresh only, so
   // this loader must not close over changing state: the parent remounts this
   // view (`key`) when `canReadBlueprints` flips instead.
@@ -356,209 +273,358 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
   });
   const data = snapshot.data;
 
-  const wildcard = useParams()['*'] ?? '';
-  const { groupId: pathGroupId, segments: pathSegments } = useMemo(
-    () => parseCorpAssetPath(wildcard),
-    [wildcard]
-  );
+  const [params, setParams] = useUrlParams(URL_PARAMS);
+  const [debouncedQuery] = useDebouncedValue(params.q);
+  const query = debouncedQuery.trim().toLowerCase();
+  const byLocation = params.group === 'location';
 
-  // Level-heading focus (issue #1485), same mechanism and same reasoning as
-  // `Assets.tsx`: a division/container link, or Back, unmounts the control
-  // the pilot just activated, so focus needs somewhere to land. Shared by
-  // whichever of the two header blocks below is rendered (root division list
-  // / drilled level) — only one exists at a time.
-  const levelHeadingRef = useRef<HTMLHeadingElement>(null);
-  useFocusHeading(levelHeadingRef, wildcard);
-
-  const groups = data?.groups ?? null;
   const typeNames = data?.labels.types ?? EMPTY_CORP_ASSET_LABELS.types;
   const locationNames = data?.labels.locations ?? EMPTY_CORP_ASSET_LABELS.locations;
   const divisionNames = data?.divisionNames ?? EMPTY_DIVISION_NAMES;
+  const categoryByTypeId = data?.categoryByTypeId ?? EMPTY_CATEGORIES;
   const blueprintTypeIds = useBlueprintTypeIds(typeNames);
-
-  const resolved = useMemo(
-    () => resolveCorpAssetPath(groups ?? [], pathGroupId, pathSegments),
-    [groups, pathGroupId, pathSegments]
+  const labels = useMemo(
+    () => makeLedgerLabels({ t, typeNames, locationNames, divisionNames }),
+    [t, typeNames, locationNames, divisionNames]
   );
 
-  // In the query string (ADR 0015), beside the drill-down in the path: a
-  // search reports across every division, so the two compose rather than
-  // one replacing the other.
-  const [search, setSearch] = useUrlParam('q', SEARCH_PARAM);
-  const searchRef = useRef<HTMLInputElement>(null);
-  // Query string carried onto every drill-down link, as on the Assets page.
-  const { search: query } = useLocation();
-  const [debouncedSearch] = useDebouncedValue(search);
-  const searchActive = debouncedSearch.trim().length > 0;
+  const classified = useMemo(() => classifyCorpAssets(data?.inputs ?? []), [data?.inputs]);
+  const counts = useMemo(() => countLedgerByState(classified.items), [classified.items]);
 
-  const searchMatches = useMemo(
-    () =>
-      searchActive && groups
-        ? searchCorpAssetGroups(groups, typeNames, locationNames, divisionNames, t, debouncedSearch)
-        : [],
-    [searchActive, groups, typeNames, locationNames, divisionNames, t, debouncedSearch]
+  const targetsApi = useCorpStockTargets(data?.corporationId ?? null);
+  const stock = useMemo(
+    () => evaluateStockTargets(targetsApi.targets, classified.items),
+    [targetsApi.targets, classified.items]
+  );
+  const shortTypeIds = useMemo(
+    () => new Set([...stock].filter(([, s]) => s.status !== 'met').map(([typeId]) => typeId)),
+    [stock]
+  );
+  const ownedByTypeId = useMemo(
+    () => new Map([...stock].map(([typeId, s]) => [typeId, s.owned])),
+    [stock]
+  );
+  const [targetsOpen, setTargetsOpen] = useState(false);
+
+  const valuation = useMemo(
+    () => ({
+      prices: data?.priceByTypeId ?? EMPTY_PRICES,
+      copyValues: data?.copyValueByItemId ?? EMPTY_PRICES,
+      volumes: data?.volumeByTypeId ?? EMPTY_PRICES,
+    }),
+    [data?.priceByTypeId, data?.copyValueByItemId, data?.volumeByTypeId]
   );
 
-  const rows = useMemo<BrowseRow[]>(() => {
-    if (searchActive) {
-      return searchMatches.map((match) => ({
-        kind: 'match' as const,
-        key: `m:${match.node.asset.item_id}`,
-        match,
+  const itemRows = useMemo<ItemTableRow[]>(() => {
+    if (byLocation) return [];
+    const ledger = buildItemLedger(classified.items, {
+      ...valuation,
+      filter: {
+        state: tab,
+        locationId: params.loc ?? undefined,
+        division: (params.div ?? undefined) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | undefined,
+      },
+      targets: targetsApi.targets,
+    });
+    return ledger
+      .filter((row) => {
+        if (params.below && !shortTypeIds.has(row.typeId)) return false;
+        if (params.below && row.isBlueprintCopy) return false;
+        if (params.cat !== null && categoryByTypeId.get(row.typeId)?.id !== params.cat) {
+          return false;
+        }
+        return query === '' || labels.typeName(row.typeId).toLowerCase().includes(query);
+      })
+      .map((row) => ({
+        key: rowKeyOf(row),
+        ledger: row,
+        name: labels.typeName(row.typeId),
+        categoryName: categoryByTypeId.get(row.typeId)?.name ?? null,
       }));
+  }, [
+    byLocation,
+    classified.items,
+    valuation,
+    tab,
+    params.loc,
+    params.div,
+    params.below,
+    params.cat,
+    targetsApi.targets,
+    shortTypeIds,
+    categoryByTypeId,
+    query,
+    labels,
+  ]);
+
+  const locationRows = useMemo<LocationRow[]>(() => {
+    if (!byLocation) return [];
+    const items: ClassifiedAsset[] = filterClassified(classified.items, {
+      query,
+      categoryId: params.cat,
+      categoryOf: (typeId) => categoryByTypeId.get(typeId)?.id ?? null,
+      onlyTypeIds: params.below ? shortTypeIds : null,
+      typeName: labels.typeName,
+    });
+    const ledger = buildLocationLedger({ ...classified, items }, valuation);
+    return buildLocationRows(ledger, {
+      tab,
+      locationId: params.loc,
+      division: (params.div ?? null) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | null,
+      labels,
+    });
+  }, [
+    byLocation,
+    classified,
+    valuation,
+    tab,
+    params.loc,
+    params.div,
+    params.below,
+    params.cat,
+    shortTypeIds,
+    categoryByTypeId,
+    query,
+    labels,
+  ]);
+
+  // Filter options come from the whole corporation, not the current narrowing.
+  const locationOptions = useMemo(() => {
+    const ids = new Set<number>(classified.officeLocationIds);
+    for (const item of classified.items) {
+      if (item.locationId !== null) ids.add(item.locationId);
     }
-    if (pathGroupId !== null) {
-      return resolved.children.map((node) => ({
-        kind: 'node' as const,
-        key: assetNodeSegment(node),
-        node,
-      }));
+    return [...ids]
+      .map((id) => ({ id, label: labels.placeName(id) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [classified, labels]);
+  const categoryOptions = useMemo(() => {
+    const seen = new Map<number, string>();
+    for (const item of classified.items) {
+      const category = categoryByTypeId.get(item.input.typeId);
+      if (category) seen.set(category.id, category.name);
     }
-    return (groups ?? []).map((group) => ({
-      kind: 'group' as const,
-      key: `g:${group.id}`,
-      group,
-    }));
-  }, [searchActive, searchMatches, pathGroupId, resolved.children, groups]);
+    return [...seen]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [classified.items, categoryByTypeId]);
 
-  const showItemColumns = !searchActive && hasItemRows(rows);
-
-  const { scrollParentRef, rowVirtualizer } = useAssetRowVirtualizer({
-    rows,
-    baseRowHeight,
-    resetKey: `${wildcard}|${searchActive}`,
-  });
-
-  // Multi-select + bulk actions (same shape as /assets' issue #90).
+  // Multi-select + bulk actions (same shape as /assets' issue #90), by item only.
   const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<ReadonlySet<number>>(new Set());
+  const [selectedKeys, setSelectedKeys] = useState<ReadonlySet<string>>(new Set());
   const toggleSelectMode = useCallback(() => {
     setSelectMode((prev) => {
-      if (prev) setSelectedIds(new Set());
+      if (prev) setSelectedKeys(new Set());
       return !prev;
     });
   }, []);
-  const toggleNodeSelection = useCallback((ids: readonly number[]) => {
-    setSelectedIds((prev) => toggleSelection(prev, ids));
+  const toggleKey = useCallback((key: string) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
   }, []);
-
-  const assetsByItemId = useMemo(
-    () =>
-      new Map(
-        (data?.inputs ?? []).map((a) => [a.itemId, { type_id: a.typeId, quantity: a.quantity }])
-      ),
-    [data?.inputs]
-  );
 
   const itemActions = usePageItemActions({ activeCharacterId: snapshot.activeCharacterId });
   const isAbyssalType = useMutaplasmidLookup()?.isAbyssalType;
+  const selectedTypeIds = [...selectedKeys].map((key) => Number(key.split(':')[0]));
 
-  function collectRowItemIds(): number[] {
-    return rows.flatMap((row) => {
-      switch (row.kind) {
-        case 'match':
-          return [row.match.node.asset.item_id];
-        case 'node':
-          return collectItemIds(row.node);
-        case 'group':
-          return collectGroupItemIds(row.group);
-      }
-    });
-  }
-  function handleSelectAllInView() {
-    setSelectedIds((prev) => selectAll(prev, collectRowItemIds()));
-  }
-  function handleDeselectAll() {
-    setSelectedIds(new Set());
-  }
   function handleBulkAddToQuickbar() {
     // One write: `quickbar.add` closes over the rendered list, so looping it keeps only the last.
     let items = itemActions.quickbar.items;
-    for (const id of selectedIds) {
-      const asset = assetsByItemId.get(id);
+    for (const typeId of selectedTypeIds) {
       // Abyssal: no market; the row menu skips Quickbar too.
-      if (!asset || isAbyssalType?.(asset.type_id)) continue;
-      items = addQuickbarItem(items, {
-        typeId: asset.type_id,
-        name: typeDisplayName(asset.type_id, typeNames),
-      });
+      if (isAbyssalType?.(typeId)) continue;
+      items = addQuickbarItem(items, { typeId, name: labels.typeName(typeId) });
     }
     void itemActions.quickbar.write(items);
   }
   function handleBulkAddToCompare() {
     const addToCompare = useCompareSet.getState().add;
-    for (const id of selectedIds) {
-      const asset = assetsByItemId.get(id);
-      if (!asset) continue;
-      addToCompare({
-        typeId: asset.type_id,
-        itemName: typeDisplayName(asset.type_id, typeNames),
-      });
+    for (const typeId of selectedTypeIds) {
+      addToCompare({ typeId, itemName: labels.typeName(typeId) });
     }
   }
   function handleBulkCopyNames() {
-    const names = namesForSelection([...selectedIds], assetsByItemId, typeNames);
-    void writeToClipboard(names.join('\n'));
+    void writeToClipboard(selectedTypeIds.map((typeId) => labels.typeName(typeId)).join('\n'));
   }
 
-  // Not `useTableExport`: the browse list isn't a DataTable, and `getRows`
-  // builds every group's rows lazily, only when an export actually runs.
-  const assetsCsvColumnList = useMemo(() => assetsCsvColumns(t), [t]);
-  const assetsExport: TableExport<AssetCsvRow> = {
-    surface: 'corp-assets',
-    columns: assetsCsvColumnList,
-    truncated: data?.truncated ?? false,
-    qualifier: 'corp',
-    getRows: () =>
-      assetCsvRows(
-        (groups ?? []).map((group) => ({
-          label: groupLabel(t, group.id, divisionNames),
-          entries: collectGroupItemIds(group).map((itemId) => {
-            const asset = assetsByItemId.get(itemId);
-            // asset is always found here — assetsByItemId and the tree both
-            // come from the same snapshot's asset list — but the id, not a
-            // type id, is the only thing left to fall back to if that
-            // invariant is ever wrong, so it gets its own distinct shape.
-            return {
-              name: asset ? typeDisplayName(asset.type_id, typeNames) : `#${itemId}`,
-              quantity: asset?.quantity ?? 0,
-            };
-          }),
-        }))
-      ),
-  };
+  const hasAnyAssets = (data?.inputs ?? []).length > 0;
 
-  const hasAnyAssets = (groups ?? []).some((group) => group.children.length > 0);
+  function selectTab(id: string) {
+    void navigate({
+      pathname: corpAssetTabPath(id as CorpAssetTab),
+      search: location.search,
+    });
+  }
+
+  /** A division, deliveries or place row opens the by-item view narrowed to it. */
+  function openLocationRow(row: LocationRow) {
+    const next = new URLSearchParams(location.search);
+    next.delete('group');
+    next.delete('lsort');
+    if (row.locationId === null) next.delete('loc');
+    else next.set('loc', String(row.locationId));
+    if (row.division === null) next.delete('div');
+    else next.set('div', String(row.division));
+    const search = next.toString();
+    void navigate({
+      pathname: corpAssetTabPath(row.kind === 'division' ? tab : tabForState(row.state)),
+      search: search === '' ? '' : `?${search}`,
+    });
+  }
 
   if (!snapshot.hydrated) return <Spinner />;
 
-  const parentHref =
-    resolved.trail.length > 0
-      ? corpAssetHref(pathGroupId, resolved.trail.slice(0, -1).map(assetNodeSegment), query)
-      : corpAssetHref(null, [], query);
-  const currentLabel =
-    resolved.trail.length > 0
-      ? nodeLabel(resolved.trail[resolved.trail.length - 1], typeNames, locationNames, t)
-      : resolved.group
-        ? groupLabel(t, resolved.group.id, divisionNames)
-        : '';
-  // For the level heading's sr-only item-count suffix (issue #1485) — a leaf
-  // item never actually appears in `resolved.trail` (nothing drills into
-  // one), but the type still allows it, hence the `kind !== 'item'` narrow.
-  const lastTrailNode = resolved.trail[resolved.trail.length - 1];
-  const currentItemCount =
-    lastTrailNode !== undefined
-      ? lastTrailNode.kind !== 'item'
-        ? lastTrailNode.itemCount
-        : null
-      : (resolved.group?.itemCount ?? null);
+  const placeFilter: PlaceFilter = { loc: params.loc, div: params.div, cat: params.cat };
+  const activeFilterCount = [params.loc, params.div, params.cat].filter((v) => v !== null).length;
+  const shownCount = byLocation ? locationRows.length : itemRows.length;
+
+  const tabs = CORP_ASSET_TABS.filter(
+    (id) => id === 'all' || id === 'offices' || id === tab || counts[id] > 0
+  ).map((id) => ({
+    id,
+    label: t(TAB_LABEL_KEY[id]),
+    count: counts[id],
+    ...(id === 'impounded' || id === 'assetSafety'
+      ? { countTone: 'danger' as const }
+      : id === 'deliveries'
+        ? { countTone: 'warning' as const }
+        : {}),
+  }));
+
+  const noMatches = (
+    <EmptyState
+      title={t('corp.assets.noMatchesTitle')}
+      hint={t('corp.assets.noMatchesHint')}
+      className="py-8"
+    />
+  );
+
+  const renderToolbar = (columnPicker: ReactNode, exportMenu: ReactNode) => (
+    <div className="space-y-2">
+      <FilterBar<PlaceFilter>
+        value={placeFilter}
+        onChange={(next) => setParams({ loc: next.loc, div: next.div, cat: next.cat })}
+        activeCount={activeFilterCount}
+        title={t('corp.assets.filtersTitle')}
+        search={
+          <SearchInput
+            value={params.q}
+            onChange={(e) => setParams({ q: e.target.value })}
+            placeholder={t('corp.assets.searchPlaceholder')}
+            className="min-w-48 flex-1"
+          />
+        }
+        actions={
+          <>
+            {columnPicker}
+            {exportMenu}
+          </>
+        }
+      >
+        {(draft, setDraft) => (
+          <>
+            <FilterField label={t('corp.assets.filter.location')}>
+              <Select
+                value={draft.loc === null ? ALL : String(draft.loc)}
+                onValueChange={(v) => setDraft({ ...draft, loc: v === ALL ? null : Number(v) })}
+              >
+                <SelectTrigger aria-label={t('corp.assets.filter.location')} className="w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>{t('corp.assets.filter.anyLocation')}</SelectItem>
+                  {locationOptions.map((o) => (
+                    <SelectItem key={o.id} value={String(o.id)}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label={t('corp.assets.filter.division')}>
+              <Select
+                value={draft.div === null ? ALL : String(draft.div)}
+                onValueChange={(v) => setDraft({ ...draft, div: v === ALL ? null : Number(v) })}
+              >
+                <SelectTrigger aria-label={t('corp.assets.filter.division')} className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>{t('corp.assets.filter.anyDivision')}</SelectItem>
+                  {HANGAR_DIVISIONS.map((d) => (
+                    <SelectItem key={d} value={String(d)}>
+                      {labels.divisionName(d)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label={t('corp.assets.filter.category')}>
+              <Select
+                value={draft.cat === null ? ALL : String(draft.cat)}
+                onValueChange={(v) => setDraft({ ...draft, cat: v === ALL ? null : Number(v) })}
+              >
+                <SelectTrigger aria-label={t('corp.assets.filter.category')} className="w-52">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>{t('corp.assets.filter.anyCategory')}</SelectItem>
+                  {categoryOptions.map((o) => (
+                    <SelectItem key={o.id} value={String(o.id)}>
+                      {o.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+          </>
+        )}
+      </FilterBar>
+      <div className="flex flex-wrap items-center gap-2">
+        <SegmentedControl
+          label={t('corp.assets.groupBy.label')}
+          value={params.group}
+          onChange={(group) => setParams({ group })}
+          options={[
+            { value: 'item', label: t('corp.assets.groupBy.item') },
+            { value: 'location', label: t('corp.assets.groupBy.location') },
+          ]}
+          uppercase={false}
+        />
+        <FilterChip
+          size="md"
+          label={t('corp.assets.belowTarget')}
+          selected={params.below}
+          onToggle={() => setParams({ below: !params.below })}
+          count={shortTypeIds.size}
+          countLabel={t('corp.assets.belowTargetCount', { count: shortTypeIds.size })}
+          disabled={targetsApi.targets.size === 0 && !params.below}
+          tooltip={
+            targetsApi.targets.size === 0 && !params.below
+              ? t('corp.assets.belowTargetNone')
+              : undefined
+          }
+        />
+        <Button
+          size="sm"
+          className="ml-auto"
+          disabled={!targetsApi.hydrated || data?.corporationId == null}
+          onClick={() => setTargetsOpen(true)}
+        >
+          {t('corp.assets.stockTargetsButton')}
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <ItemActionsProvider page={itemActions}>
       <div className="mx-auto max-w-6xl space-y-4">
         <PageHeader
           title={t('corp.assets.title')}
-          subNav={<CorpSubNav flush />}
           meta={
             data?.fetchedAt ? (
               <DataAgeBadge date={data.fetchedAt} note={t('corp.dataAgeNote')} />
@@ -566,17 +632,14 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
           }
           actions={
             <div className="ml-auto flex items-center gap-1.5">
-              <IconButton
-                icon={<Icon.Select />}
-                label={t('assets.select.toggle')}
-                pressed={selectMode}
-                onClick={toggleSelectMode}
-              />
-              <TableActionsMenu
-                name={t('corp.assets.title')}
-                tableExport={assetsExport}
-                size="md"
-              />
+              {!byLocation && (
+                <IconButton
+                  icon={<Icon.Select />}
+                  label={t('assets.select.toggle')}
+                  pressed={selectMode}
+                  onClick={toggleSelectMode}
+                />
+              )}
               <IconButton
                 icon={<Icon.Refresh />}
                 label={t('corp.assets.refresh')}
@@ -589,7 +652,7 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
 
         {snapshot.loading && data === null ? (
           <Spinner />
-        ) : data === null || data.groups === null ? (
+        ) : data === null || data.inputs === null ? (
           <EmptyState
             title={t('corp.assets.loadFailedTitle')}
             hint={t('corp.assets.loadFailedHint')}
@@ -608,312 +671,122 @@ function CorpAssetsView({ canReadBlueprints }: { canReadBlueprints: boolean }) {
               </p>
             )}
             <LiveStatus>
-              {selectMode && selectedIds.size > 0
-                ? t('assets.select.selectedCount', { count: selectedIds.size })
-                : searchActive
-                  ? t('assets.search.resultCount', { count: searchMatches.length })
+              {selectMode && selectedKeys.size > 0
+                ? t('assets.select.selectedCount', { count: selectedKeys.size })
+                : query !== ''
+                  ? t('assets.search.resultCount', { count: shownCount })
                   : null}
             </LiveStatus>
-            <SearchInput
-              ref={searchRef}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('corp.assets.searchPlaceholder')}
+            <Tabs
+              tabsId={tabsId}
+              tabs={tabs}
+              value={tab}
+              onChange={selectTab}
+              label={t('corp.assets.tabsLabel')}
+              activation="manual"
             />
-
-            {selectMode && (
-              <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
-                {selectedIds.size > 0 && (
-                  <span aria-hidden="true" className="text-[0.6875rem] text-text-dim tabular-nums">
-                    {t('assets.select.selectedCount', { count: selectedIds.size })}
-                  </span>
-                )}
-                <Button size="sm" onClick={handleSelectAllInView}>
-                  {t('assets.select.selectAllInView')}
-                </Button>
-                <Button size="sm" disabled={selectedIds.size === 0} onClick={handleDeselectAll}>
-                  {t('assets.select.deselectAll')}
-                </Button>
-                {selectedIds.size > 0 && (
-                  <>
-                    <Button
-                      size="sm"
-                      disabled={!itemActions.quickbar.available}
-                      onClick={handleBulkAddToQuickbar}
+            <TabPanel tabsId={tabsId} tabId={tab} className="space-y-2">
+              {selectMode && !byLocation && (
+                <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
+                  {selectedKeys.size > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className="text-[0.6875rem] text-text-dim tabular-nums"
                     >
-                      {t('assets.select.addToQuickbar')}
-                    </Button>
-                    <Button size="sm" onClick={handleBulkAddToCompare}>
-                      {t('assets.select.addToCompare')}
-                    </Button>
-                    <Button size="sm" onClick={handleBulkCopyNames}>
-                      {t('assets.select.copyNames')}
-                    </Button>
-                  </>
-                )}
-              </div>
-            )}
-
-            <Panel padded={false} className="flex min-h-0 flex-col">
-              {!searchActive && pathGroupId !== null && (
-                <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 py-1.5 pr-3 pl-1">
-                  <IconButton
-                    icon={<Icon.Back size={Icon.ICON_SIZE.lg} />}
-                    label={t('assets.breadcrumb.back')}
-                    variant="plain"
-                    onClick={() => void navigate(parentHref)}
-                  />
-                  <h2
-                    ref={levelHeadingRef}
-                    tabIndex={-1}
-                    className="min-w-0 flex-1 truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  >
-                    {currentLabel}
-                    {currentItemCount !== null && (
-                      <span className="sr-only">
-                        {t('corp.assets.levelHeading.itemsSuffix', {
-                          items: t('corp.assets.itemCount', { count: currentItemCount }),
-                        })}
-                      </span>
-                    )}
-                  </h2>
-                </div>
-              )}
-              {!searchActive && pathGroupId === null && (
-                <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
-                  <h2
-                    ref={levelHeadingRef}
-                    tabIndex={-1}
-                    className={cx(
-                      eyebrowClassName,
-                      'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
-                    )}
-                  >
-                    {/* "Groups" on purpose, not "divisions": `groups` here is
-                      the seven hangar divisions plus any non-empty flag
-                      groups (Office, Deliveries, Impounded, Asset Safety,
-                      Other) — a corp with an office folder would otherwise
-                      read a division count that undercounts what's actually
-                      listed below. */}
-                    {t('corp.assets.groupCount', { count: (groups ?? []).length })}
-                  </h2>
-                </div>
-              )}
-              {searchActive && (
-                <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
-                  <span className={eyebrowClassName}>
-                    {t('assets.search.resultCount', { count: searchMatches.length })}
-                  </span>
-                  <IconButton
-                    icon={<Icon.Close />}
-                    label={t('assets.search.clear')}
-                    variant="plain"
+                      {t('assets.select.selectedCount', { count: selectedKeys.size })}
+                    </span>
+                  )}
+                  <Button
                     size="sm"
-                    className="ml-auto"
-                    onClick={() => {
-                      setSearch('');
-                      searchRef.current?.focus();
-                    }}
+                    onClick={() =>
+                      setSelectedKeys((prev) => new Set([...prev, ...itemRows.map((r) => r.key)]))
+                    }
+                  >
+                    {t('assets.select.selectAllInView')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={selectedKeys.size === 0}
+                    onClick={() => setSelectedKeys(new Set())}
+                  >
+                    {t('assets.select.deselectAll')}
+                  </Button>
+                  {selectedKeys.size > 0 && (
+                    <>
+                      <Button
+                        size="sm"
+                        disabled={!itemActions.quickbar.available}
+                        onClick={handleBulkAddToQuickbar}
+                      >
+                        {t('assets.select.addToQuickbar')}
+                      </Button>
+                      <Button size="sm" onClick={handleBulkAddToCompare}>
+                        {t('assets.select.addToCompare')}
+                      </Button>
+                      <Button size="sm" onClick={handleBulkCopyNames}>
+                        {t('assets.select.copyNames')}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+              <Panel padded={false} className="flex min-h-0 flex-col">
+                {byLocation ? (
+                  <CorpAssetLocationTable
+                    rows={locationRows}
+                    labels={labels}
+                    onOpenRow={openLocationRow}
+                    renderToolbar={(picker, exportMenu) => (
+                      <div className="border-b border-line p-3">
+                        {renderToolbar(picker, exportMenu)}
+                      </div>
+                    )}
+                    truncated={data.truncated}
+                    emptyState={noMatches}
                   />
-                </div>
-              )}
-
-              {resolved.unresolved.length > 0 ? (
-                <EmptyState
-                  title={t('assets.staleLink.title')}
-                  hint={t('assets.staleLink.hint')}
-                  className="py-8"
-                  action={
-                    <Button size="sm" onClick={() => void navigate(corpAssetHref(null, [], query))}>
-                      {t('assets.staleLink.action')}
-                    </Button>
-                  }
-                />
-              ) : rows.length === 0 ? (
-                <EmptyState
-                  title={searchActive ? t('assets.noResults') : t('corp.assets.divisionEmpty')}
-                  className="py-8"
-                />
-              ) : (
-                <div
-                  ref={scrollParentRef}
-                  data-virtual-scroll-root
-                  role="region"
-                  aria-label={t('corp.assets.treeLabel')}
-                  className="min-h-0 overflow-y-auto"
-                >
-                  {showItemColumns && <ItemColumnLabels t={t} />}
-                  <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
-                    <TableExportProvider tableExport={assetsExport}>
-                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                        const row = rows[virtualRow.index];
-                        return (
-                          <div
-                            key={virtualRow.key}
-                            data-index={virtualRow.index}
-                            ref={rowVirtualizer.measureElement}
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              width: '100%',
-                              transform: `translateY(${virtualRow.start}px)`,
-                            }}
-                          >
-                            <BrowseRowView
-                              row={row}
-                              t={t}
-                              typeNames={typeNames}
-                              locationNames={locationNames}
-                              divisionNames={divisionNames}
-                              selectMode={selectMode}
-                              selectedIds={selectedIds}
-                              onToggleSelection={toggleNodeSelection}
-                              pathGroupId={pathGroupId}
-                              pathSegments={pathSegments}
-                              query={query}
-                              priceByTypeId={data?.priceByTypeId ?? EMPTY_PRICES}
-                              copyValueByItemId={data?.copyValueByItemId ?? EMPTY_PRICES}
-                              blueprintTypeIds={blueprintTypeIds}
-                              volumeByTypeId={data?.volumeByTypeId ?? EMPTY_VOLUMES}
-                            />
-                          </div>
-                        );
-                      })}
-                    </TableExportProvider>
-                  </div>
-                </div>
-              )}
-            </Panel>
+                ) : (
+                  <CorpAssetItemTable
+                    rows={itemRows}
+                    labels={labels}
+                    below={params.below}
+                    blueprintTypeIds={blueprintTypeIds}
+                    selectMode={selectMode}
+                    selectedKeys={selectedKeys}
+                    onToggleKey={toggleKey}
+                    canEditTargets={targetsApi.hydrated && data.corporationId !== null}
+                    onSetTarget={targetsApi.setTarget}
+                    onRemoveTarget={targetsApi.removeTarget}
+                    renderToolbar={(picker, exportMenu) => (
+                      <div className="border-b border-line p-3">
+                        {renderToolbar(picker, exportMenu)}
+                      </div>
+                    )}
+                    truncated={data.truncated}
+                    emptyState={noMatches}
+                  />
+                )}
+              </Panel>
+            </TabPanel>
           </div>
         )}
+        <StockTargetsDialog
+          corporationId={data?.corporationId ?? null}
+          open={targetsOpen}
+          onOpenChange={setTargetsOpen}
+          ownedByTypeId={ownedByTypeId}
+        />
       </div>
     </ItemActionsProvider>
   );
 }
 
-interface BrowseRowViewProps {
-  row: BrowseRow;
-  t: Translate;
-  typeNames: ReadonlyMap<number, string>;
-  locationNames: ReadonlyMap<number, string>;
-  divisionNames: ReadonlyMap<number, string | null>;
-  selectMode: boolean;
-  selectedIds: ReadonlySet<number>;
-  onToggleSelection: (ids: readonly number[]) => void;
-  pathGroupId: CorpAssetGroupId | null;
-  pathSegments: readonly string[];
-  /** Current query string (`?q=…` or empty), kept on drill-down links. */
-  query: string;
-  priceByTypeId: ReadonlyMap<number, number>;
-  copyValueByItemId: ReadonlyMap<number, number>;
-  volumeByTypeId: ReadonlyMap<number, number>;
-  /** Blueprint typeIDs for the BPO badge; null until loaded, or when nothing listed can be a blueprint. */
-  blueprintTypeIds: ReadonlySet<number> | null;
-}
-
-/** Dispatches one virtualized row to the right presentation component. */
-function BrowseRowView(props: BrowseRowViewProps) {
-  const { row, t } = props;
-
-  if (row.kind === 'group') {
-    const { group } = row;
-    return (
-      <LocationRow
-        href={corpAssetHref(group.id, [], props.query)}
-        label={groupLabel(t, group.id, props.divisionNames)}
-        security={undefined}
-        jumpsAway={undefined}
-        itemCount={group.itemCount}
-        estimatedValue={group.estimatedValue}
-        pinState="unpinned"
-        onTogglePin={() => {}}
-        showPin={false}
-        selectMode={props.selectMode}
-        selectionState={selectionStateForIds(collectGroupItemIds(group), props.selectedIds)}
-        onToggleSelection={() => props.onToggleSelection(collectGroupItemIds(group))}
-        t={t}
-      />
-    );
-  }
-
-  if (row.kind === 'node') {
-    return <NodeRowView {...props} node={row.node} />;
-  }
-
-  const { match } = row;
-  return (
-    <SearchResultRow
-      name={match.name}
-      quantity={match.node.asset.quantity}
-      estimatedValue={assetStackValue(
-        match.node.asset,
-        props.priceByTypeId,
-        props.copyValueByItemId
-      )}
-      trail={match.trail}
-      security={undefined}
-      href={corpAssetHref(match.groupId, match.segments, props.query)}
-      characterBadge={null}
-      blueprintKind={assetBlueprintKind(match.node.asset, props.blueprintTypeIds)}
-      t={t}
-    />
-  );
-}
-
-function NodeRowView({
-  node,
-  t,
-  typeNames,
-  locationNames,
-  selectMode,
-  selectedIds,
-  onToggleSelection,
-  pathGroupId,
-  pathSegments,
-  query,
-  priceByTypeId,
-  copyValueByItemId,
-  volumeByTypeId,
-  blueprintTypeIds,
-}: BrowseRowViewProps & { node: AssetTreeNode }) {
-  const label = nodeLabel(node, typeNames, locationNames, t);
-
-  if (node.kind !== 'item') {
-    return (
-      <NodeContainerRow
-        node={node}
-        href={corpAssetHref(pathGroupId, [...pathSegments, assetNodeSegment(node)], query)}
-        label={label}
-        characterBadge={null}
-        selectMode={selectMode}
-        selectedIds={selectedIds}
-        onToggleSelection={onToggleSelection}
-        t={t}
-      />
-    );
-  }
-
-  const { asset } = node;
-  return (
-    <NodeItemRow
-      asset={asset}
-      label={label}
-      unitVolume={volumeByTypeId.get(asset.type_id)}
-      estimatedValue={assetStackValue(asset, priceByTypeId, copyValueByItemId)}
-      characterBadge={null}
-      blueprintKind={assetBlueprintKind(asset, blueprintTypeIds)}
-      selectMode={selectMode}
-      selectedIds={selectedIds}
-      onToggleSelection={onToggleSelection}
-      t={t}
-      wrap={(children) => (
-        <ItemContextMenu typeId={asset.type_id} itemName={label} blueprintTypeID={null}>
-          {children}
-        </ItemContextMenu>
-      )}
-    />
-  );
+/** Reads the tab off the path; an unknown path (an old tree link) goes to `/corp/assets`, keeping the query. */
+function CorpAssetsRoute({ canReadBlueprints }: { canReadBlueprints: boolean }) {
+  const wildcard = useParams()['*'] ?? '';
+  const { search } = useLocation();
+  const tab = corpAssetTabFromPath(wildcard);
+  if (tab === null) return <Navigate replace to={{ pathname: '/corp/assets', search }} />;
+  return <CorpAssetsView tab={tab} canReadBlueprints={canReadBlueprints} />;
 }
 
 export function CorpAssets() {
@@ -931,7 +804,7 @@ export function CorpAssets() {
         />
       </div>
     ) : gate.status === 'ready' ? (
-      <CorpAssetsView
+      <CorpAssetsRoute
         key={String(gate.capabilities.canReadBlueprints)}
         canReadBlueprints={gate.capabilities.canReadBlueprints}
       />
