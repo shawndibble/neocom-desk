@@ -26,3 +26,7 @@ _Recorded 2026-10-21._
   drops the pilot's work-through columns (no cost basis, no relist advice).
 - **Corp views of a character page are a third option ("Corporation") on the
   Character filter picker**, not a separate Character / Corp switch.
+- **Contracts History gains All characters.** One `loadContracts` read per
+  Character holding the contracts scope (the rest are skipped, noted), deduped by
+  `contract_id`, each row read relative to its own Character, with a Character
+  column in that mode only. Corporation is a third data source of the same table.
