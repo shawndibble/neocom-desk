@@ -1,9 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, TextInput } from '@/components/ui';
 import { editErrorMessage } from './useBook';
 import { turnOnBook, type OfficerVerdict } from '../taxBook/bookClient';
 import { createFeederInvite, inviteLink } from '../taxBook/feederClient';
+import { loadFeederView } from '../taxBook/feederViewClient';
+
+/**
+ * The leave day (UTC) of a corporation an accounting corporation handled before, or null.
+ * Its own book starts no earlier: every day before it was covered there.
+ */
+function useLeaveDay(characterId: number, corporationId: number): string | null {
+  const [day, setDay] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    loadFeederView(characterId, corporationId).then(
+      ({ view }) => {
+        const leftAt = view?.summary.leftAt;
+        if (!cancelled && leftAt != null) setDay(new Date(leftAt).toISOString().slice(0, 10));
+      },
+      // Never handled, or not readable: no floor beyond the server's own check.
+      () => undefined
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [characterId, corporationId]);
+  return day;
+}
 
 /**
  * D10: a Director picks the start date (and the corp's default rate) to turn the book on.
@@ -25,7 +49,10 @@ export function TurnOnBook({
 }) {
   const { t } = useTranslation();
   const today = new Date().toISOString().slice(0, 10);
-  const [startDate, setStartDate] = useState(today);
+  const leaveDay = useLeaveDay(characterId, corporationId);
+  // Untouched, it is the leave day once known (also the earliest pick), else today.
+  const [picked, setStartDate] = useState<string | null>(null);
+  const startDate = picked ?? leaveDay ?? today;
   const [rate, setRate] = useState('10');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +66,12 @@ export function TurnOnBook({
     );
   }
   const pct = Number(rate);
-  const valid = startDate <= today && rate !== '' && pct >= 0 && pct <= 100;
+  const valid =
+    startDate <= today &&
+    (leaveDay === null || startDate >= leaveDay) &&
+    rate !== '' &&
+    pct >= 0 &&
+    pct <= 100;
   const submit = async () => {
     setBusy(true);
     setError(null);
@@ -76,6 +108,7 @@ export function TurnOnBook({
         <TextInput
           type="date"
           max={today}
+          {...(leaveDay !== null ? { min: leaveDay } : {})}
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
         />

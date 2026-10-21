@@ -16,7 +16,11 @@ const sync = {
   sync: vi.fn(),
 } as unknown as CorpTaxBookSync;
 
-function renderStrip(scheduledSync: ScheduledSyncStatus | null, strip: CorpTaxBookSync = sync) {
+function renderStrip(
+  scheduledSync: ScheduledSyncStatus | null,
+  strip: CorpTaxBookSync = sync,
+  feeders: unknown[] = []
+) {
   render(
     <MemoryRouter>
       <BookProvider
@@ -26,7 +30,7 @@ function renderStrip(scheduledSync: ScheduledSyncStatus | null, strip: CorpTaxBo
             corporationId: 98000001,
             view: { unrated: [], billableThrough: null, input: { graceHours: 6 } },
             names: { refinery: () => 'Efa - Brass Anvil' },
-            data: { scheduledSync },
+            data: { scheduledSync, feeders },
             verdict: { canEdit: true },
             reload: vi.fn(),
           } as unknown as Omit<BookContextValue, 'edit' | 'canEdit'>
@@ -47,6 +51,20 @@ describe('BookHealthStrip, no readable refineries', () => {
     } as unknown as CorpTaxBookSync);
     expect(screen.getByText(/no refineries the book can read/)).toBeInTheDocument();
     expect(screen.queryByText(/Last synced/)).not.toBeInTheDocument();
+  });
+
+  it('reads as synced for a book that collects for moon owners', () => {
+    renderStrip(
+      null,
+      {
+        status: { kind: 'fresh', ageMs: 1000, byName: 'Pilot 9', scheduled: false, gaps: [] },
+        run: { phase: 'done', outcome: { kind: 'synced', noRefineries: true } },
+        sync: vi.fn(),
+      } as unknown as CorpTaxBookSync,
+      [{ corporationId: 98000002, status: 'active' }]
+    );
+    expect(screen.queryByText(/no refineries the book can read/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Last synced/)).toBeInTheDocument();
   });
 });
 

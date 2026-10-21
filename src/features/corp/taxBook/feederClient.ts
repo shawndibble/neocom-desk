@@ -79,6 +79,21 @@ export async function getFeederStatus(
   }
 }
 
+/** What an invite link offers, for the consent screen. Fails with reason `invite-invalid` for a dead link. */
+export interface FeederInvitePreview {
+  collectorCorporationId: number;
+  /** The book's own name setting; null when never set. */
+  collectorName: string | null;
+  offeredOwnerRatePct: number | null;
+}
+
+export function previewFeederInvite(
+  characterId: number,
+  code: string
+): Promise<FeederInvitePreview> {
+  return call(characterId, 'previewCorpTaxBookFeederInviteCallable', { code });
+}
+
 /** Leave the accounting corporation: revokes the grant at SSO and deletes it. Immediate. */
 export async function leaveFeeder(
   characterId: number,

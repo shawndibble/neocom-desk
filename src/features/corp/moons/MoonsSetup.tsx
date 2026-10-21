@@ -153,6 +153,8 @@ export function MoonsSetup({
   if (step === 'consent' && code)
     return (
       <FeederConsent
+        characterId={characterId}
+        code={code}
         busy={busy}
         onBack={() => setStep('choices')}
         onContinue={(rate) => {

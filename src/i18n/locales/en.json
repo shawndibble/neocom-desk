@@ -14208,6 +14208,8 @@
         },
         "moonNames": "If the Character you pick is also a Station Manager, moon names come free. Otherwise add a Station Manager to see which moon.",
         "rate": "Rate you ask for (%, optional)",
+        "from": "{{name}} will handle the tax on your moons.",
+        "offered": "They offer you {{pct}}% of the value of ore mined at your refineries.",
         "accountant": "Next, EVE asks you to log in. Pick a Character that is an Accountant in your corporation.",
         "continue": "Continue to EVE"
       },
