@@ -94,6 +94,8 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
    * the Starbases widget stays off until the scope arrives.
    */
   canReadStarbases: ['esi-corporations.read_starbases.v1'],
+  /** Director-only (issue #4611). Additive, so a Director's older corp grant keeps working. */
+  canReadCustomsOffices: ['esi-planets.read_customs_offices.v1'],
   /** Open to every member; additive (below), so a corp grant made before it stays `ready`. */
   canReadContracts: ['esi-contracts.read_corporation_contracts.v1'],
 };
@@ -117,6 +119,7 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
 const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set([
   'canReadMiningLedger',
   'canReadStarbases',
+  'canReadCustomsOffices',
   'canReadContracts',
 ]);
 

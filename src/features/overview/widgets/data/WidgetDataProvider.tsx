@@ -59,6 +59,7 @@ import {
   loadSurveyWidget,
 } from './kindLoaders';
 import {
+  loadCorpCustomsFeed,
   loadCorpJobsFeed,
   loadCorpKillsFeed,
   loadCorpMembersFeed,
@@ -283,6 +284,10 @@ function Source({ feed }: { feed: FeedId }) {
       return <SnapshotSource feed="corpWallet" load={loadCorpWalletFeed} cacheKey="corp:wallet" />;
     case 'corpJobs':
       return <SnapshotSource feed="corpJobs" load={loadCorpJobsFeed} cacheKey="corp:jobs" />;
+    case 'corpCustoms':
+      return (
+        <SnapshotSource feed="corpCustoms" load={loadCorpCustomsFeed} cacheKey="corp:customs" />
+      );
     case 'corpMembers':
       return (
         <SnapshotSource feed="corpMembers" load={loadCorpMembersFeed} cacheKey="corp:members" />

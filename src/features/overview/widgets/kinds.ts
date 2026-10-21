@@ -358,11 +358,11 @@ const SPECS: Record<string, Spec> = {
   },
   corpCustomsOffices: {
     corp: 'corpClocks',
+    capabilities: ['canReadCustomsOffices'],
     views: NT,
     view: 'table',
     size: 'M',
-    soon: true,
-    endpoints: [],
+    endpoints: ['getCorporationCustomsOffices'],
   },
   corpWallet: {
     corp: 'corpMoney',

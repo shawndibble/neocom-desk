@@ -106,6 +106,8 @@ describe('corpCapabilities', () => {
   it('grants corp blueprint access only to a Director', () => {
     expect(corpCapabilities(['Factory_Manager']).canReadBlueprints).toBe(false);
     expect(corpCapabilities(['Director']).canReadBlueprints).toBe(true);
+    expect(corpCapabilities(['Factory_Manager']).canReadCustomsOffices).toBe(false);
+    expect(corpCapabilities(['Director']).canReadCustomsOffices).toBe(true);
   });
 
   it('opens the starbase reads to a Director alone', () => {
