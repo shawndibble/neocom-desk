@@ -5,6 +5,7 @@
 
 import { onCall, HttpsError, type CallableOptions } from 'firebase-functions/v2/https';
 import { createActionGroup, type CallableHandler } from './callableRouter.js';
+import { runDailyHousekeeping } from './dailyHousekeeping.js';
 import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { error as logError, info as logInfo, warn as logWarn } from 'firebase-functions/logger';
@@ -249,50 +250,61 @@ export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
 // (client-generated, device-local) id, never a token-keyed doc — that is what
 // makes re-registering after an FCM token rotation replace the entry instead
 // of accumulating one per token.
-export const registerDevice = onCall<unknown>({ maxInstances: 5 }, async (request) => {
-  let input;
-  try {
-    input = parseRegisterDeviceInput(request.data);
-  } catch (err) {
-    throw new HttpsError(
-      'invalid-argument',
-      err instanceof Error ? err.message : 'Invalid request body'
+const alertsActions = createActionGroup();
+const alertsCallable = (name: string, options: CallableOptions, handler: CallableHandler) =>
+  onCall<unknown>(options, alertsActions.register(name, handler));
+
+export const registerDevice = alertsCallable(
+  'registerDevice',
+  { maxInstances: 5 },
+  async (request) => {
+    let input;
+    try {
+      input = parseRegisterDeviceInput(request.data);
+    } catch (err) {
+      throw new HttpsError(
+        'invalid-argument',
+        err instanceof Error ? err.message : 'Invalid request body'
+      );
+    }
+
+    const { registration, rejected, projections, eveTypesByCharacter } =
+      await buildDeviceRegistration(input, verifyOptions, logError);
+
+    if (registration.characterIds.length === 0) {
+      throw new HttpsError('unauthenticated', 'No character access token could be verified');
+    }
+
+    await writeDeviceRegistration(firestore(), {
+      deviceId: input.deviceId,
+      fcmToken: registration.fcmToken,
+      characterIds: registration.characterIds,
+      projections,
+      eveTypesByCharacter,
+      quietHours: input.quietHours,
+    });
+
+    // The types the server has seen for each Character (alertGrants, ADR 0020),
+    // so the client can offer a toggle for them. Only `seenTypes` is read out.
+    const { store } = alertGrantDeps();
+    const seenTypes: Record<string, string[]> = {};
+    await Promise.all(
+      registration.characterIds.map(async (characterId) => {
+        try {
+          seenTypes[String(characterId)] = (await store.get(characterId))?.seenTypes ?? [];
+        } catch (err) {
+          // The registration already landed; a failed read only delays new toggles.
+          logError('Device registration: seenTypes read failed', {
+            characterId,
+            error: String(err),
+          });
+        }
+      })
     );
+
+    return { deviceId: input.deviceId, registered: registration.characterIds, rejected, seenTypes };
   }
-
-  const { registration, rejected, projections, eveTypesByCharacter } =
-    await buildDeviceRegistration(input, verifyOptions, logError);
-
-  if (registration.characterIds.length === 0) {
-    throw new HttpsError('unauthenticated', 'No character access token could be verified');
-  }
-
-  await writeDeviceRegistration(firestore(), {
-    deviceId: input.deviceId,
-    fcmToken: registration.fcmToken,
-    characterIds: registration.characterIds,
-    projections,
-    eveTypesByCharacter,
-    quietHours: input.quietHours,
-  });
-
-  // The types the server has seen for each Character (alertGrants, ADR 0020),
-  // so the client can offer a toggle for them. Only `seenTypes` is read out.
-  const { store } = alertGrantDeps();
-  const seenTypes: Record<string, string[]> = {};
-  await Promise.all(
-    registration.characterIds.map(async (characterId) => {
-      try {
-        seenTypes[String(characterId)] = (await store.get(characterId))?.seenTypes ?? [];
-      } catch (err) {
-        // The registration already landed; a failed read only delays new toggles.
-        logError('Device registration: seenTypes read failed', { characterId, error: String(err) });
-      }
-    })
-  );
-
-  return { deviceId: input.deviceId, registered: registration.characterIds, rejected, seenTypes };
-});
+);
 
 // Alerts Grant custody (issue #3753, ADR 0020). `ALERTS_TOKEN_KEY` is a Firebase
 // secret (base64, 32 bytes): `firebase functions:secrets:set ALERTS_TOKEN_KEY`.
@@ -320,7 +332,8 @@ function alertGrantHttpsError(err: unknown): never {
 
 // The device's full-scope session is not involved: the callable's proof is the
 // notifications-only access token itself, verified like registerDevice does.
-export const saveAlertGrant = onCall<unknown>(
+export const saveAlertGrant = alertsCallable(
+  'saveAlertGrant',
   { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
   async (request) => {
     try {
@@ -333,7 +346,8 @@ export const saveAlertGrant = onCall<unknown>(
 
 // Deleting needs the Character's own signed-in session, so one Character
 // cannot drop another's grant.
-export const deleteAlertGrant = onCall<unknown>(
+export const deleteAlertGrant = alertsCallable(
+  'deleteAlertGrant',
   { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
   async (request) => {
     const { uid } = callerOf(request);
@@ -345,11 +359,18 @@ export const deleteAlertGrant = onCall<unknown>(
   }
 );
 
+// The device and Alerts Grant router (see callableRouter.ts). Clients call this; the per-name exports
+// above go once none do. The secret is only used by the grant actions.
+export const alertsCall = onCall<unknown>(
+  { maxInstances: 10, secrets: [ALERTS_TOKEN_KEY] },
+  alertsActions.route
+);
+
 /**
  * dispatchProjections: fires whatever is due (issue #358, ADR 0010,
  * GLOSSARY.md round 45). Runs every 5 minutes, matching the Foreground
  * Poller's own cadence (`POLL_INTERVAL_MS`). One of this deployment's two
- * Cloud Scheduler jobs — `purgeNotificationFeed` below is the other.
+ * Cloud Scheduler jobs — `dailyHousekeeping` below is the other.
  *
  * Holds no EVE token and makes no ESI call: every row already carries
  * rendered title/body text, uploaded by a device that read the real data
@@ -395,43 +416,6 @@ export const pollEveNotifications = onSchedule(
     });
     logInfo('pollEveNotifications finished', { ...summary });
   }
-);
-
-/**
- * purgeNotificationFeed: server-side expiry for the remote Notification Feed
- * (issue #595), on the same 30 days the client rule and the fired-projection
- * purge already use.
- *
- * #582 made `syncFeed` delete a remote row fired outside the window, which
- * bounds the collection for any account that still syncs. It cannot reach an
- * account whose devices were all uninstalled without the Characters being
- * removed: nothing signs in as that uid again, so nothing runs the rule. This
- * job does, and reaches pre-existing rows too — it is a *collection group*
- * query, so one pass covers every `characters/{uid}/notificationFeed` without
- * enumerating accounts.
- *
- * Daily rather than every 5 minutes: the retention is 30 days, so the tick
- * only has to be small against that. It needs the collection-group index on
- * `firedAt` in firestore.indexes.json — deploy indexes before this function,
- * or the query fails FAILED_PRECONDITION until the index finishes building.
- */
-export const purgeNotificationFeed = onSchedule('every 24 hours', runPurgeNotificationFeed);
-
-/**
- * purgeStaleAccounts: deletes the synced data of accounts with no successful
- * sync in 90 days (issue #2065). Retention is by inactivity, not by Character
- * removal, so it reaches accounts whose devices are all gone.
- *
- * Enumerates `characters/{uid}` with `listDocuments()` (which includes uids
- * that only have subcollections and no parent doc), then per uid: seeds the
- * heartbeat if absent, or, when stale, empties every subcollection in bounded
- * batches and finally deletes the parent doc. The run-wide pass cap leaves a
- * large backlog for the next tick; the parent doc survives until its
- * subcollections are empty, so a half-purged account stays stale.
- */
-export const purgeStaleAccounts = onSchedule(
-  { schedule: 'every 24 hours', secrets: [ALERTS_TOKEN_KEY] },
-  () => runPurgeStaleAccounts({ alertGrantDeps, corpSyncDeps })
 );
 
 // Communities (issue #3596, ADR 0018). Every write that enforces a cap or
@@ -1133,26 +1117,46 @@ export const corpTaxBookCall = onCall<unknown>(
 );
 
 /**
- * sweepCommunityRequests (issue #3812, ADR 0021): deletes Requests expired a
- * week ago and Requests closed a week ago, with their Pledges. Bounded to 500
- * deletes a run; a backlog continues on the next tick. Up to 500 sequential
- * read and recursive deletes, so it takes the 9-minute maximum timeout.
+ * dailyHousekeeping (was three scheduled functions, to stay under the deploy quota and the
+ * Cloud Scheduler free tier):
+ * - the Notification Feed purge (`runPurgeNotificationFeed`, issue #595): daily rather than every
+ *   5 minutes since the retention is 30 days. It needs the collection-group index on `firedAt` in
+ *   firestore.indexes.json: deploy indexes before this function.
+ * - purgeStaleAccounts (issue #2065): deletes the synced data of accounts with no successful sync
+ *   in 90 days. Retention is by inactivity, not by Character removal, so it reaches accounts whose
+ *   devices are all gone. The run-wide pass cap leaves a large backlog for the next tick.
+ * - sweepCommunityRequests (issue #3812, ADR 0021): deletes Requests expired a week ago and
+ *   Requests closed a week ago, with their Pledges. Bounded to 500 deletes a run; up to 500
+ *   sequential reads and recursive deletes, so the function takes the 9-minute maximum timeout.
  */
-export const sweepCommunityRequests = onSchedule(
-  { schedule: 'every 24 hours', timeoutSeconds: 540 },
-  async () => {
-    const result = await sweepRequests(firestore(), Date.now());
-    const { deleted, failed, truncated } = result;
-    if (failed > 0 || truncated) {
-      logWarn('Community Request sweep incomplete, continues next run', {
-        deleted,
-        failed,
-        truncated,
-      });
-    } else {
-      logInfo('Community Request sweep done', { deleted, failed, truncated });
-    }
-  }
+export const dailyHousekeeping = onSchedule(
+  { schedule: 'every 24 hours', secrets: [ALERTS_TOKEN_KEY], timeoutSeconds: 540 },
+  () =>
+    runDailyHousekeeping(
+      [
+        { name: 'purgeNotificationFeed', run: runPurgeNotificationFeed },
+        {
+          name: 'purgeStaleAccounts',
+          run: () => runPurgeStaleAccounts({ alertGrantDeps, corpSyncDeps }),
+        },
+        {
+          name: 'sweepCommunityRequests',
+          run: async () => {
+            const { deleted, failed, truncated } = await sweepRequests(firestore(), Date.now());
+            if (failed > 0 || truncated) {
+              logWarn('Community Request sweep incomplete, continues next run', {
+                deleted,
+                failed,
+                truncated,
+              });
+            } else {
+              logInfo('Community Request sweep done', { deleted, failed, truncated });
+            }
+          },
+        },
+      ],
+      logError
+    )
 );
 
 /**
@@ -1238,7 +1242,7 @@ export const syncActiveWars = onSchedule(
  * rather than a config bump. `rowCount` is the early warning for that too.
  *
  * It is the third of the deployment's Cloud Scheduler jobs, alongside
- * `dispatchProjections` and `purgeNotificationFeed` — back inside the 3 free
+ * `dispatchProjections` and `dailyHousekeeping` — back inside the 3 free
  * per billing account ADR 0013 budgeted against, now that the blueprint-only
  * sync it briefly ran beside is gone.
  */

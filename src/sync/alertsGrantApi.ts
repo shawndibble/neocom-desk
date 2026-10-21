@@ -7,26 +7,23 @@
  * it needs no Firebase session. `deleteAlertGrant` is the opposite: it acts on
  * the signed-in Character, so one Character cannot drop another's grant.
  */
-import { httpsCallable } from 'firebase/functions';
-import { getSyncFunctions } from './firebaseApp';
+import { callRouted } from './routedCallable';
 import { ensureSignedIn } from './syncAuth';
 
 export async function saveAlertGrantRemote(tokens: {
   accessToken: string;
   refreshToken: string;
 }): Promise<void> {
-  const call = httpsCallable<typeof tokens, { characterId: number; enabledAt: number }>(
-    getSyncFunctions(),
-    'saveAlertGrant'
+  await callRouted<typeof tokens, { characterId: number; enabledAt: number }>(
+    'saveAlertGrant',
+    tokens
   );
-  await call(tokens);
 }
 
 export async function deleteAlertGrantRemote(characterId: number): Promise<void> {
   await ensureSignedIn(characterId);
-  const call = httpsCallable<Record<string, never>, { deleted: boolean; revoked: boolean }>(
-    getSyncFunctions(),
-    'deleteAlertGrant'
+  await callRouted<Record<string, never>, { deleted: boolean; revoked: boolean }>(
+    'deleteAlertGrant',
+    {}
   );
-  await call({});
 }

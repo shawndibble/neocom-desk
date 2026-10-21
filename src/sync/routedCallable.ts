@@ -1,14 +1,17 @@
 /**
  * Calls a backend callable through its group's router. The backend serves the
- * community and Corp Tax Book callables from one deployed function each
- * (`communityCall`, `corpTaxBookCall`; functions/src/callableRouter.ts), so a
+ * community, Corp Tax Book and device/Alerts Grant callables from one deployed function each
+ * (`communityCall`, `corpTaxBookCall`, `alertsCall`; functions/src/callableRouter.ts), so a
  * deploy stays under Cloud Functions' per-minute mutation quota. `name` is the
  * callable's own name; `data` is what that callable takes.
  */
 import { httpsCallable } from 'firebase/functions';
 import { getSyncFunctions } from './firebaseApp';
 
-export function routerFor(name: string): 'communityCall' | 'corpTaxBookCall' {
+const ALERTS_CALLABLES = new Set(['registerDevice', 'saveAlertGrant', 'deleteAlertGrant']);
+
+export function routerFor(name: string): 'communityCall' | 'corpTaxBookCall' | 'alertsCall' {
+  if (ALERTS_CALLABLES.has(name)) return 'alertsCall';
   if (name.includes('CorpTaxBook') || name === 'verifyCorpOfficerCallable')
     return 'corpTaxBookCall';
   if (name.includes('Communit')) return 'communityCall';

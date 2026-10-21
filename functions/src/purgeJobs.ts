@@ -19,7 +19,7 @@ import {
   lastSyncedAtOf,
 } from './purgeStaleAccounts.js';
 
-/** Body of purgeNotificationFeed (see its doc in index.ts). */
+/** The Notification Feed purge, a task of `dailyHousekeeping` (see its doc in index.ts). */
 export async function runPurgeNotificationFeed(): Promise<void> {
   const db = firestore();
   // Mirrors purgeFeed.ts's `isPurgeableFeedRow` (and so dispatchProjections'
@@ -61,7 +61,7 @@ export interface StaleAccountPurgeDeps {
   corpSyncDeps: () => CorpSyncDeps;
 }
 
-/** Body of purgeStaleAccounts (see its doc in index.ts). */
+/** The stale-account purge, a task of `dailyHousekeeping` (see its doc in index.ts). */
 export async function runPurgeStaleAccounts({
   alertGrantDeps,
   corpSyncDeps,
