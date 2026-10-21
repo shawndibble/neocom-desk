@@ -12355,6 +12355,7 @@
     "title": "Corporation",
     "boardPageTitle": "Corp Board",
     "assetsPageTitle": "Corp Assets",
+    "overviewTab": "Overview",
     "membersTab": "Members",
     "assetsTab": "Assets",
     "walletTab": "Wallet",
