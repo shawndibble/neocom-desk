@@ -39,7 +39,8 @@ export interface FeederRefinery {
 }
 
 export type FeederStatus =
-  | { status: 'none' }
+  /** `ownBookFrom`: a former moon owner's earliest own-book start (UTC day). */
+  | { status: 'none'; ownBookFrom?: string }
   | {
       status: 'feeder';
       collectorCorporationId: number;
@@ -77,6 +78,21 @@ export async function getFeederStatus(
     if (reason === 'not-your-feeder') return { status: 'none' };
     throw error;
   }
+}
+
+/** What an invite link offers, for the consent screen. Fails with reason `invite-invalid` for a dead link. */
+export interface FeederInvitePreview {
+  collectorCorporationId: number;
+  /** The book's own name setting; null when never set. */
+  collectorName: string | null;
+  offeredOwnerRatePct: number | null;
+}
+
+export function previewFeederInvite(
+  characterId: number,
+  code: string
+): Promise<FeederInvitePreview> {
+  return call(characterId, 'previewCorpTaxBookFeederInviteCallable', { code });
 }
 
 /** Leave the accounting corporation: revokes the grant at SSO and deletes it. Immediate. */

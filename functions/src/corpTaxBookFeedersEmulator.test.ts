@@ -1,4 +1,4 @@
-// Collector books: feeder invites against the Firestore emulator (issue #4507).
+// Collector books: feeder invites against the Firestore emulator (issues #4507, #4616).
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
@@ -6,6 +6,7 @@ import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseTurnOnInput } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
+import { encryptRefreshToken } from './alertGrantCrypto.js';
 import {
   CORP_SYNC_GRANTS_COLLECTION,
   deleteCorpSyncGrantsHeldBy,
@@ -17,9 +18,12 @@ import {
   acceptFeederInvite,
   createFeederInvite,
   hashInviteCode,
+  previewFeederInvite,
   revokeFeederInvite,
   type FeederRecord,
 } from './corpTaxBookFeeders.js';
+import { dropBookGrants } from './corpTaxBookFeederGrant.js';
+import { recordFeederRead } from './corpTaxBookFeederSync.js';
 import { listFeederInvites, setFeederMode, setFeederRate } from './corpTaxBookFeederOwnerCalls.js';
 import { deleteBook, turnOnBook, type BookDeps, type Caller } from './corpTaxBookStore.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
@@ -154,6 +158,8 @@ suite('feeder invites', () => {
     });
 
     it('needs the edit role, checked live', async () => {
+      // A held officer check, so the token-less call reaches the live-check branch.
+      await invite();
       expect(
         await reason(
           createFeederInvite(deps(), who(COLLECTOR_JUNIOR), {
@@ -228,6 +234,43 @@ suite('feeder invites', () => {
       expect(await reason(accept(code))).toBe('invite-used');
     });
 
+    it('takes the offered rate as the agreed rate from the join day', async () => {
+      await accept((await invite(5)).code);
+      const rec = await feederRecord();
+      expect(rec?.agreedRatePct).toBe(5);
+      expect(rec?.ownerRateHistory).toEqual([
+        {
+          kind: 'agreed',
+          pct: 5,
+          effectiveFrom: '2026-10-18',
+          recordedAt: new Date(T0).toISOString(),
+        },
+      ]);
+      // A link with no offered rate sets none.
+      const plain = await invite();
+      await db.collection('corpTaxBookFeederOf').doc(String(FEEDER)).delete();
+      await collectorBook().collection('feeders').doc(String(FEEDER)).delete();
+      await accept(plain.code);
+      expect((await feederRecord())?.agreedRatePct).toBeUndefined();
+    });
+
+    it('previews a link: the accounting corporation and the offered rate, nothing for a used one', async () => {
+      await collectorBook().update({ corporationName: 'B-UH Accounting' });
+      const { code } = await invite(4);
+      expect(await previewFeederInvite(deps(), who(FEEDER_DIRECTOR), { code })).toEqual({
+        collectorCorporationId: COLLECTOR,
+        collectorName: 'B-UH Accounting',
+        offeredOwnerRatePct: 4,
+      });
+      await accept(code);
+      expect(await reason(previewFeederInvite(deps(), who(FEEDER_DIRECTOR), { code }))).toBe(
+        'invite-invalid'
+      );
+      expect(
+        await reason(previewFeederInvite(deps(), who(FEEDER_DIRECTOR), { code: 'nope' }))
+      ).toBe('invite-invalid');
+    });
+
     it('refuses an unknown code and a caller without the edit role', async () => {
       expect(await reason(accept('nope'))).toBe('invite-invalid');
       const { code } = await invite();
@@ -287,6 +330,11 @@ suite('feeder invites', () => {
         coveragePeriods: [{ from: '2026-10-18', to: '2026-10-19' }],
         mode: 'settled-otherwise',
         payee: { kind: 'character', id: 99 },
+        lastReadWellAt: T0,
+        staleSince: T0 - 40 * DAY,
+        disconnectedAt: T0 - 5 * DAY,
+        lastSyncResult: { at: T0, outcome: 'stale', reason: 'esi-refused' },
+        viewDismissedAt: T0 + 3 * DAY,
       });
       await db.collection('corpTaxBookFeederOf').doc(String(FEEDER)).delete();
       now = T0 + 5 * DAY;
@@ -299,8 +347,38 @@ suite('feeder invites', () => {
         mode: 'settled-otherwise',
         payee: { kind: 'character', id: 99 },
         coveragePeriods: [{ from: '2026-10-18', to: '2026-10-19' }, { from: '2026-10-23' }],
+        lastReadWellAt: T0,
       });
-      expect(record).not.toHaveProperty('leftAt');
+      for (const gone of [
+        'leftAt',
+        'staleSince',
+        'disconnectedAt',
+        'lastSyncResult',
+        'viewDismissedAt',
+      ]) {
+        expect(record).not.toHaveProperty(gone);
+      }
+      // The old stale spell does not disconnect the new period on the next refused read.
+      expect(
+        await recordFeederRead(deps(), COLLECTOR, FEEDER, { outcome: 'stale', reason: 'x' })
+      ).toBe('active');
+    });
+
+    it('takes a disconnected moon owner back only with a new grant', async () => {
+      await accept((await invite()).code);
+      await collectorBook()
+        .collection('feeders')
+        .doc(String(FEEDER))
+        .update({
+          status: 'disconnected',
+          disconnectedAt: T0 + DAY,
+          staleSince: T0 - 29 * DAY,
+          coveragePeriods: [{ from: '2026-10-18', to: '2026-10-18' }],
+        });
+      now = T0 + 3 * DAY;
+      // The roles-scope accept stores no grant, so it cannot take a disconnected owner back.
+      expect(await reason(accept((await invite()).code))).toBe('already-feeder');
+      expect((await feederRecord())?.status).toBe('disconnected');
     });
   });
 
@@ -473,14 +551,87 @@ suite('feeder invites', () => {
   it('deleting the Collector book drops its links and feeder pointers', async () => {
     const { code, inviteId } = await invite();
     await accept(code);
-    await deleteBook(deps(), who(COLLECTOR_CEO), {
-      corporationId: COLLECTOR,
-      accessToken: tok(COLLECTOR_CEO),
-    });
+    const revoked: string[] = [];
+    await db
+      .collection(CORP_SYNC_GRANTS_COLLECTION)
+      .doc(String(FEEDER))
+      .set({
+        corporationId: FEEDER,
+        characterId: FEEDER_DIRECTOR,
+        characterName: 'Pilot',
+        encryptedRefreshToken: encryptRefreshToken(
+          'rt-feeder',
+          FEEDER_DIRECTOR,
+          Buffer.alloc(32, 7),
+          'corpSyncGrant'
+        ),
+        clientId: 'c',
+        enabledAt: T0,
+        kind: 'feeder',
+        collectorCorporationId: COLLECTOR,
+      });
+    const grantDeps: CorpSyncDeps = {
+      ...deps(),
+      key: () => Buffer.alloc(32, 7),
+      verify: deps().verifyToken,
+      refresh: async () => {
+        throw new Error('unused');
+      },
+      revoke: async (_c, token) => {
+        revoked.push(token);
+      },
+      log: () => undefined,
+    };
+    await deleteBook(
+      deps(),
+      who(COLLECTOR_CEO),
+      { corporationId: COLLECTOR, accessToken: tok(COLLECTOR_CEO) },
+      (corporationId) => dropBookGrants(grantDeps, corporationId)
+    );
+    // Each moon owner's grant is revoked and dropped, and its after-leaving pointer written.
+    expect(revoked).toEqual(['rt-feeder']);
+    expect(
+      (await db.collection(CORP_SYNC_GRANTS_COLLECTION).doc(String(FEEDER)).get()).exists
+    ).toBe(false);
+    expect(
+      (await db.collection('corpTaxBookFeederPrevious').doc(String(FEEDER)).get()).data()
+    ).toMatchObject({ collectorCorporationId: COLLECTOR, leftAt: T0 });
     expect((await db.collection('corpTaxBookFeederInvites').doc(inviteId).get()).exists).toBe(
       false
     );
     expect(await pointer()).toBeUndefined();
     expect(await feederRecord()).toBeUndefined();
+  });
+
+  it("a former moon owner's own book starts no earlier than the day its coverage ended", async () => {
+    // A removal finalised late: coverage ended on the 14th, the record was closed on the 18th.
+    await db
+      .collection('corpTaxBookFeederPrevious')
+      .doc(String(FEEDER))
+      .set({ collectorCorporationId: COLLECTOR, leftAt: T0 });
+    await collectorBook()
+      .collection('feeders')
+      .doc(String(FEEDER))
+      .set({
+        corporationId: FEEDER,
+        status: 'removed',
+        coveragePeriods: [{ from: '2026-10-01', to: '2026-10-14' }],
+      });
+    const turnOn = (startDate: string) =>
+      turnOnBook(
+        deps(),
+        who(FEEDER_DIRECTOR),
+        parseTurnOnInput({
+          corporationId: FEEDER,
+          accessToken: tok(FEEDER_DIRECTOR),
+          startDate,
+          startRatePct: 10,
+        })
+      );
+    expect(await reason(turnOn('2026-10-14'))).toBe('start-before-leave');
+    await turnOn('2026-10-15');
+    expect((await db.collection('corpTaxBooks').doc(String(FEEDER)).get()).get('startDate')).toBe(
+      '2026-10-15'
+    );
   });
 });

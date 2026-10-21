@@ -23,6 +23,7 @@ import {
   DISMISSALS,
   EXTRACTIONS,
   OBSERVED,
+  FEEDERS,
 } from './corpTaxBook.js';
 import {
   SCHEDULED_VIA,
@@ -195,8 +196,12 @@ export async function runBookSync(
   if (observers.kind === 'forbidden') return { kind: 'skipped', reason: 'esi-refused' };
   if (observers.kind === 'backoff') return { kind: 'skipped', reason: 'esi-budget' };
   if (observers.kind !== 'ok') return { kind: 'skipped', reason: 'esi-unavailable' };
-  // An empty list is not a successful sync: say so rather than recording a silent success.
-  if (observers.data.length === 0) return { kind: 'skipped', reason: 'no-refineries' };
+  // An empty list is not a successful sync (decision 20261020-103802), unless the book has
+  // moon owners: then its own refineries are not what it reads, and the journal, settling
+  // and payouts still run (#4616).
+  if (observers.data.length === 0 && !(await hasMoonOwners(db, corporationId))) {
+    return { kind: 'skipped', reason: 'no-refineries' };
+  }
 
   const feed: Feed = {
     rows: [],
@@ -400,6 +405,12 @@ async function reassignUnmatched(
     // A failed re-match is not the sync's: report it, the next run tries again.
     return { assigned, error: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/** Whether the book holds any moon owner record, current or past (payouts to a past one still reconcile). */
+async function hasMoonOwners(db: Firestore, corporationId: number): Promise<boolean> {
+  const snap = await bookRef(db, corporationId).collection(FEEDERS).limit(1).get();
+  return !snap.empty;
 }
 
 /** The system a refinery's stored rows already carry, if any. */

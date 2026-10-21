@@ -14,10 +14,12 @@ vi.mock('@/app/loginFlow', () => ({
 }));
 const getFeederStatus = vi.fn();
 const leaveFeeder = vi.fn();
+const previewFeederInvite = vi.fn();
 vi.mock('../taxBook/feederClient', async (orig) => ({
   ...(await orig<typeof import('../taxBook/feederClient')>()),
   getFeederStatus: (...a: unknown[]) => getFeederStatus(...a),
   leaveFeeder: (...a: unknown[]) => leaveFeeder(...a),
+  previewFeederInvite: (...a: unknown[]) => previewFeederInvite(...a),
 }));
 
 vi.mock('@/features/character/names', () => ({
@@ -64,6 +66,7 @@ beforeEach(() => {
   getFeederStatus.mockReset().mockResolvedValue({ status: 'none' });
   loadFeederView.mockReset().mockRejectedValue(new Error('not-your-feeder'));
   leaveFeeder.mockReset().mockResolvedValue({ left: true, owedIsk: null });
+  previewFeederInvite.mockReset().mockRejectedValue(new Error('offline'));
 });
 
 describe('MoonsSetup', () => {
@@ -98,6 +101,37 @@ describe('MoonsSetup', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Continue to EVE' }));
     expect(beginFeederGrantLogin).toHaveBeenCalledWith(7, 'abc123DEF456', undefined);
+  });
+
+  it('names the accounting corporation and the rate the link offers', async () => {
+    previewFeederInvite.mockResolvedValue({
+      collectorCorporationId: 5,
+      collectorName: 'B-UH Accounting',
+      offeredOwnerRatePct: 6,
+    });
+    renderSetup(undefined, '?invite=abc123DEF456');
+    expect(await screen.findByText(/B-UH Accounting will handle/)).toBeInTheDocument();
+    expect(screen.getByText(/They offer you 6%/)).toBeInTheDocument();
+    expect(previewFeederInvite).toHaveBeenCalledWith(7, 'abc123DEF456');
+  });
+
+  it('says so when the link is no longer valid, and stops there', async () => {
+    previewFeederInvite.mockRejectedValue(
+      Object.assign(new Error('gone'), { details: { reason: 'invite-invalid' } })
+    );
+    renderSetup(undefined, '?invite=abc123DEF456');
+    expect(await screen.findByRole('alert')).toHaveTextContent(/not valid/);
+    expect(screen.getByRole('button', { name: 'Continue to EVE' })).toBeDisabled();
+  });
+
+  it("starts a former moon owner's own book on the day its coverage ended", async () => {
+    getFeederStatus.mockResolvedValue({ status: 'none', ownBookFrom: '2026-10-12' });
+    renderSetup();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Turn on our own book' }));
+    const date = screen.getByLabelText('Start date');
+    expect(date).toHaveValue('2026-10-12');
+    expect(date).toHaveAttribute('min', '2026-10-12');
   });
 
   it('explains a refused non-Accountant alt in plain words', async () => {
