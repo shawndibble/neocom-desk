@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/db';
 import {
   isStatementMail,
   startsRemovalClock,
@@ -21,16 +22,23 @@ function liveDeps(sending: (id: string | undefined) => void): QueueDeps {
     random: Math.random,
     list: () => listQueue(),
     save: saveItems,
-    send: (item) =>
-      sendMail(
+    send: async (item) => {
+      // The recorded time once the clock runs (re-read: a log earlier in this step may have
+      // just stamped it); else 24 hours from this send, which starts it.
+      const body =
+        item.kind === 'removal'
+          ? fillTakesEffect(
+              item.body,
+              removalTakesEffectAt((await db.corpMailQueue.get(item.id)) ?? item, Date.now())
+            )
+          : item.body;
+      return sendMail(
         item.senderCharacterId,
         [{ recipient_id: item.recipientId, recipient_type: 'character' }],
         item.subject,
-        // The recorded time once the clock runs; else 24 hours from this send, which starts it.
-        item.kind === 'removal'
-          ? fillTakesEffect(item.body, removalTakesEffectAt(item, Date.now()))
-          : item.body
-      ),
+        body
+      );
+    },
     log: async (item) => {
       if (item.kind === 'removalCancelled') return;
       if (item.kind === 'removal') {
