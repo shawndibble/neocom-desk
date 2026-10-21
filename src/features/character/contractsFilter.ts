@@ -29,7 +29,8 @@ export function filterContracts(
   contracts: readonly Contract[],
   filter: ContractsFilter,
   issuerNames: ReadonlyMap<number, string>,
-  selfId?: number
+  /** Whose receiver a row has: one id, or per row for a list read for several Characters. */
+  selfId?: number | ((contract: Contract) => number | undefined)
 ): Contract[] {
   const text = filter.text.trim().toLowerCase();
   return contracts.filter((contract) => {
@@ -37,7 +38,8 @@ export function filterContracts(
     if (filter.type !== null && contract.type !== filter.type) return false;
     if (text !== '') {
       const issuerName = issuerNames.get(contractIssuer(contract).id) ?? '';
-      const receiver = selfId === undefined ? null : contractReceiver(contract, selfId);
+      const self = typeof selfId === 'function' ? selfId(contract) : selfId;
+      const receiver = self === undefined ? null : contractReceiver(contract, self);
       const receiverName = receiver ? (issuerNames.get(receiver.id) ?? '') : '';
       const title = contract.title ?? '';
       if (

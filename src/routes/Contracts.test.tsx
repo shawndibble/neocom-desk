@@ -82,10 +82,9 @@ vi.mock('@/features/character/location', () => ({
   loadCharacterSolarSystemId: vi.fn(async () => null),
 }));
 
-// The corp view has its own tests; here it is only a marker for "the corp view mounted".
-vi.mock('@/features/contracts/CorpContractsView', () => ({
-  CorpContractsView: () => <div>corp view</div>,
-}));
+// The corp read is mocked: its own loaders have tests; here it only feeds the one History table.
+const loadCorpContractsSnapshot = vi.hoisted(() => vi.fn());
+vi.mock('@/features/contracts/corpContractsSnapshot', () => ({ loadCorpContractsSnapshot }));
 
 const CHAR_ID = 91;
 
@@ -695,8 +694,30 @@ describe('Time format preference', () => {
   });
 });
 
-describe('Contracts corp deep link', () => {
-  it('shows the corp view for ?scope=corp without reading the Character contracts', async () => {
+const CORP_SCOPES = [
+  'esi-contracts.read_character_contracts.v1',
+  'esi-contracts.read_corporation_contracts.v1',
+];
+
+describe('Contracts corp source', () => {
+  beforeEach(() => {
+    loadCorpContractsSnapshot.mockReset();
+    loadCorpContractsSnapshot.mockResolvedValue({
+      corporationId: 77,
+      contractsResult: {
+        data: [{ ...contractPage1[0], contract_id: 90, title: 'Corp haul' }],
+        fetchedAt: new Date(),
+        fromCache: false,
+        truncated: false,
+      },
+      needsReauth: false,
+      truncated: false,
+      names: new Map([[500001, 'Some Trader']]),
+      receiverCategories: new Map(),
+    });
+  });
+
+  it('shows the corp contracts for ?scope=corp without reading the Character contracts', async () => {
     let characterReads = 0;
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () => {
@@ -704,40 +725,85 @@ describe('Contracts corp deep link', () => {
         return HttpResponse.json([]);
       })
     );
-    await db.tokens.update(CHAR_ID, {
-      scopes: [
-        'esi-contracts.read_character_contracts.v1',
-        'esi-contracts.read_corporation_contracts.v1',
-      ],
-    });
+    await db.tokens.update(CHAR_ID, { scopes: CORP_SCOPES });
     window.history.pushState({}, '', '/contracts/history?scope=corp');
     render(<App />);
-    expect(await screen.findByText('corp view')).toBeInTheDocument();
+    expect(await screen.findByText('Corp haul')).toBeInTheDocument();
     expect(screen.queryByText('Rifter fit')).not.toBeInTheDocument();
     expect(characterReads).toBe(0);
   });
-});
 
-describe('Contracts corp picker', () => {
-  it('switches to the corp view from the Character picker and back', async () => {
-    await db.tokens.update(CHAR_ID, {
-      scopes: [
-        'esi-contracts.read_character_contracts.v1',
-        'esi-contracts.read_corporation_contracts.v1',
-      ],
-    });
+  it('switches from the Character picker and back, in the same table', async () => {
+    await db.tokens.update(CHAR_ID, { scopes: CORP_SCOPES });
     window.history.pushState({}, '', '/contracts/history');
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText('Rifter fit');
     await user.click(screen.getByRole('button', { name: 'This character' }));
     await user.click(screen.getByRole('menuitemradio', { name: 'Corporation' }));
-    expect(await screen.findByText('corp view')).toBeInTheDocument();
+    expect(await screen.findByText('Corp haul')).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: 'Contracts' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Status' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Character' })).not.toBeInTheDocument();
     expect(window.location.search).toBe('?scope=corp');
     await user.click(screen.getByRole('button', { name: 'Corporation' }));
     await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
     expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
     expect(window.location.search).toBe('');
+  });
+});
+
+describe('Contracts All characters source', () => {
+  const ALT_ID = 92;
+  beforeEach(async () => {
+    await db.characters.put({
+      characterId: ALT_ID,
+      name: 'Pilot Two',
+      ownerHash: 'o2',
+      addedAt: 2,
+    });
+    await db.tokens.put({
+      characterId: ALT_ID,
+      accessToken: 'access-token',
+      refreshToken: 'refresh',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: ['esi-contracts.read_character_contracts.v1'],
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${ALT_ID}/contracts`, () =>
+        HttpResponse.json([
+          // Also on Pilot One's list: one row, not two.
+          contractPage1[0],
+          { ...contractPage1[0], contract_id: 77, title: 'Alt trade' },
+        ])
+      )
+    );
+  });
+
+  it("lists every Character's contracts once, with a Character column only here", async () => {
+    window.history.pushState({}, '', '/contracts/history?history.chars=all');
+    render(<App />);
+    expect(await screen.findByText('Alt trade')).toBeInTheDocument();
+    expect(screen.getAllByText('Rifter fit')).toHaveLength(1);
+    expect(screen.getByRole('columnheader', { name: 'Character' })).toBeInTheDocument();
+  });
+
+  it('has no Character column for This character', async () => {
+    window.history.pushState({}, '', '/contracts/history');
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    expect(screen.queryByRole('columnheader', { name: 'Character' })).not.toBeInTheDocument();
+  });
+
+  it('offers This character and All characters', async () => {
+    window.history.pushState({}, '', '/contracts/history');
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    await user.click(screen.getByRole('button', { name: 'This character' }));
+    expect(
+      screen.getAllByRole('menuitemradio').map((el) => el.textContent?.replace(/^✓/, ''))
+    ).toEqual(['This character', 'All characters · 2']);
   });
 });
 

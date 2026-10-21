@@ -38,10 +38,14 @@ const STATUS_TONE: Record<Contract['status'], string> = {
 };
 
 interface Options {
-  activeCharacterId: number | null;
+  /** The party a row is read relative to; null when unknown. */
+  ownerOf: (contract: Contract) => number | null;
+  /** That owner's own contact list. */
+  standingIndexFor: (ownerId: number) => ContactStandingIndex;
+  /** Adds the Character column (All characters): who the contract belongs to. */
+  characterNameOf: ((contract: Contract) => string) | null;
   issuerNames: ReadonlyMap<number, string>;
   receiverCategories: ReadonlyMap<number, NameCategory>;
-  standingIndex: ContactStandingIndex;
   issuerAffiliations: ReadonlyMap<number, CharacterAffiliation>;
   /** Opens the detail modal from the identity column. */
   onOpen: (contract: Contract) => void;
@@ -53,10 +57,11 @@ interface Options {
  * `CONTRACTS_HISTORY_COLUMN_IDS` order.
  */
 export function useContractsHistoryColumns({
-  activeCharacterId,
+  ownerOf,
+  standingIndexFor,
+  characterNameOf,
   issuerNames,
   receiverCategories,
-  standingIndex,
   issuerAffiliations,
   onOpen,
 }: Options) {
@@ -68,11 +73,23 @@ export function useContractsHistoryColumns({
   );
 
   const receiverFor = useCallback(
-    (contract: Contract) =>
-      activeCharacterId === null
-        ? null
-        : contractReceiver(contract, activeCharacterId, receiverCategories),
-    [activeCharacterId, receiverCategories]
+    (contract: Contract) => {
+      const owner = ownerOf(contract);
+      return owner === null ? null : contractReceiver(contract, owner, receiverCategories);
+    },
+    [ownerOf, receiverCategories]
+  );
+  /** The standing of `id` on the contact list of whoever this row is read for. */
+  const standingFor = useCallback(
+    (contract: Contract, id: number) => {
+      const owner = ownerOf(contract);
+      return characterStanding(
+        owner === null ? new Map() : standingIndexFor(owner),
+        id,
+        issuerAffiliations
+      );
+    },
+    [ownerOf, standingIndexFor, issuerAffiliations]
   );
   const optionalColumns = useMemo<Record<ContractsHistoryColumnId, DataTableColumn<Contract>>>(
     () => ({
@@ -106,9 +123,7 @@ export function useContractsHistoryColumns({
                 </CharacterLink>
               )}
               {issuer.kind === 'character' && (
-                <StandingTag
-                  standing={characterStanding(standingIndex, issuer.id, issuerAffiliations)}
-                />
+                <StandingTag standing={standingFor(contract, issuer.id)} />
               )}
             </span>
           );
@@ -135,11 +150,7 @@ export function useContractsHistoryColumns({
             <ContractReceiverLink
               receiver={receiver}
               name={receiver ? (issuerNames.get(receiver.id) ?? `#${receiver.id}`) : ''}
-              standing={
-                receiver?.kind === 'character'
-                  ? characterStanding(standingIndex, receiver.id, issuerAffiliations)
-                  : null
-              }
+              standing={receiver?.kind === 'character' ? standingFor(contract, receiver.id) : null}
             />
           );
         },
@@ -190,7 +201,7 @@ export function useContractsHistoryColumns({
         },
       },
     }),
-    [t, issuerNames, timeZone, standingIndex, issuerAffiliations, receiverFor]
+    [t, issuerNames, timeZone, standingFor, receiverFor]
   );
   const columns = useMemo<DataTableColumn<Contract>[]>(
     () => [
@@ -220,7 +231,7 @@ export function useContractsHistoryColumns({
                   STATUS_TONE[contract.status]
                 )}
               />
-              <ContractIdentity contract={contract} characterId={activeCharacterId} />
+              <ContractIdentity contract={contract} characterId={ownerOf(contract)} />
             </button>
           );
           // A title is the only free-text (so truncatable) identity; the full
@@ -228,11 +239,22 @@ export function useContractsHistoryColumns({
           return contract.title ? <Tooltip content={contract.title}>{opener}</Tooltip> : opener;
         },
       },
+      ...(characterNameOf
+        ? [
+            {
+              id: 'character',
+              header: t('contracts.character'),
+              className: 'whitespace-nowrap',
+              sortValue: characterNameOf,
+              render: (contract: Contract) => characterNameOf(contract),
+            } satisfies DataTableColumn<Contract>,
+          ]
+        : []),
       ...CONTRACTS_HISTORY_COLUMN_IDS.filter(columnVisibility.isVisible).map(
         (id) => optionalColumns[id]
       ),
     ],
-    [t, optionalColumns, columnVisibility.isVisible, activeCharacterId, onOpen]
+    [t, optionalColumns, columnVisibility.isVisible, ownerOf, characterNameOf, onOpen]
   );
 
   return { columns, optionalColumns, columnVisibility, receiverFor };
