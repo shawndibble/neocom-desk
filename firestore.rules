@@ -535,8 +535,32 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // A Miner's own corrections (issue #4622): the personal tab shows each one, never silently.
+      match /adjustments/{adjustmentId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      match /writeOffs/{writeOffId} {
+        allow get, list: if isOfficer() || isOnOwnLine();
+        allow write: if false;
+      }
+
+      // Each moon owner's coverage periods and read clock (issue #4622), server-written: the
+      // miners this book bills (their `corpTaxBookBilledBy` pointer names it) read it to hold
+      // the same days back the book does. No payee, rates, notes or names.
+      function isBilledHere() {
+        let pointer = /databases/$(database)/documents/corpTaxBookBilledBy/$(request.auth.uid);
+        return isCharacter() && exists(pointer) && corporationId in get(pointer).data.books;
+      }
+
+      match /feederCoverage/{feederCorp} {
+        allow get, list: if isOfficer() || isBilledHere();
+        allow write: if false;
+      }
+
       match /{officerOnly}/{docId} {
-        allow get, list: if officerOnly in ['extractions', 'declarations', 'adjustments', 'writeOffs', 'rebills', 'meta', 'audit', 'feeders']
+        allow get, list: if officerOnly in ['extractions', 'declarations', 'rebills', 'meta', 'audit', 'feeders']
           && isOfficer();
         allow write: if false;
       }

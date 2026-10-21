@@ -32,6 +32,7 @@ import {
 } from './corpTaxBookEngine.js';
 import { ROLES_SCOPE } from './corpTaxBookEsi.js';
 import { appendAgreedRate } from './corpTaxBookFeederOwnerCalls.js';
+import { refreshMemberCoverage } from './corpTaxBookFeederView.js';
 import {
   appendAudit,
   authorizeOfficer,
@@ -329,6 +330,12 @@ export async function acceptFeederInvite(
     name: claims.name,
     feederCorp: identity.corporationId,
   });
+  // A join or rejoin opens coverage; the miners' copy follows (#4622).
+  await refreshMemberCoverage(
+    deps.db,
+    accepted.collectorCorporationId,
+    accepted.feederCorporationId
+  );
   return {
     collectorCorporationId: accepted.collectorCorporationId,
     feederCorporationId: accepted.feederCorporationId,
