@@ -6241,6 +6241,7 @@
         "guest": "guest rate",
         "miner": "per-Miner rate",
         "moon": "per-moon rate",
+        "structure": "per-refinery rate",
         "record": "correction for this day"
       },
       "detail": {
@@ -14639,7 +14640,8 @@
           "corp": "Corp default",
           "guest": "Guest default",
           "miner": "Miner",
-          "moon": "Moon"
+          "moon": "Moon",
+          "structure": "Refinery"
         },
         "from": "from {{date}}",
         "rateFor": "Applies to",

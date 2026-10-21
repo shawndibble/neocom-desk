@@ -130,6 +130,47 @@ describe('per-feeder tier', () => {
   });
 });
 
+describe('per-refinery (structure) tier (#4621)', () => {
+  const FEEDER = 98000077;
+  const REFINERY = 1035000000001;
+  const refinery: TaxRate = {
+    scope: 'structure',
+    structureId: REFINERY,
+    pct: 6,
+    effectiveFrom: '2026-07-01',
+  };
+  const feeder: TaxRate = {
+    scope: 'feeder',
+    feederId: FEEDER,
+    pct: 8,
+    effectiveFrom: '2026-07-01',
+  };
+  // A moon owner's ledger-only row: no moon is ever known.
+  const at = { ...ctx, moonId: undefined, feederId: FEEDER, structureId: REFINERY };
+
+  it('prices a refinery with no known moon, beating the per-moon-owner rate', () => {
+    expect(resolveRate([CORP, feeder, refinery], at)).toEqual({
+      pct: 6,
+      scope: 'structure',
+      effectiveFrom: '2026-07-01',
+    });
+  });
+
+  it('loses to a per-Miner rate and to a per-moon rate', () => {
+    const miner: TaxRate = { scope: 'miner', minerId: 'm1', pct: 4, effectiveFrom: '2026-07-01' };
+    const moon: TaxRate = { scope: 'moon', moonId: 40000001, pct: 3, effectiveFrom: '2026-07-01' };
+    expect(resolveRate([CORP, refinery, miner], at)?.scope).toBe('miner');
+    expect(resolveRate([CORP, refinery, moon], { ...at, moonId: 40000001 })?.scope).toBe('moon');
+  });
+
+  it('ignores another refinery and a row with no refinery given', () => {
+    expect(resolveRate([CORP, refinery], { ...at, structureId: 1035000000002 })?.scope).toBe(
+      'corp'
+    );
+    expect(resolveRate([CORP, refinery], ctx)?.scope).toBe('corp');
+  });
+});
+
 describe('isRetroactiveRate', () => {
   it('flags a new rate dated before today', () => {
     expect(isRetroactiveRate('2026-07-11', '2026-07-12')).toBe(true);
