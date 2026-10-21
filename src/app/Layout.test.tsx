@@ -717,7 +717,7 @@ describe('Layout corp nav entry', () => {
       mockIsSyncConfigured.mockReturnValue(false);
       mockedCorpAccess.mockReturnValue(corpAccess(state));
       renderLayout();
-      expect(screen.queryByRole('link', { name: 'Corporation' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Corp Board' })).not.toBeInTheDocument();
     }
   );
 
@@ -735,7 +735,7 @@ describe('Layout corp nav entry', () => {
     await db.characters.put({ characterId: 42, name: 'Pilot', ownerHash: 'h', addedAt: 0 });
     renderLayout();
     await waitFor(() => expect(screen.getByText('page content')).toBeInTheDocument());
-    expect(screen.queryByRole('link', { name: 'Corporation' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Corp Board' })).not.toBeInTheDocument();
   });
 
   it('renders the entry once corp access is ready and the corporation is known', async () => {
@@ -750,7 +750,7 @@ describe('Layout corp nav entry', () => {
       corporationId: 98000001,
     });
     renderLayout();
-    const link = await screen.findByRole('link', { name: 'Corporation' });
+    const link = await screen.findByRole('link', { name: 'Corp Board' });
     expect(link).toHaveAttribute('href', '/corp');
     // No lock marker: there is no state in which this renders and is unusable,
     // so the amber dot would offer a re-login for a role nobody can grant here.
@@ -1072,7 +1072,7 @@ describe("Layout mobile tab bar follows the pilot's choice", () => {
     await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
     const sheet = screen.getByRole('dialog', { name: 'More' });
 
-    expect(await within(sheet).findByRole('link', { name: 'Corporation' })).toBeInTheDocument();
+    expect(await within(sheet).findByRole('link', { name: 'Corp Board' })).toBeInTheDocument();
     expect(await within(sheet).findByRole('link', { name: 'Settings' })).toBeInTheDocument();
     expect(within(sheet).getByRole('link', { name: 'Pilot One' })).toBeInTheDocument();
   });
