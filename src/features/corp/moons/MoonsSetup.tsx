@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, LoadFailedState, Spinner, TextInput } from '@/components/ui';
+import { LoadFailedState, Spinner } from '@/components/ui';
 import { beginFeederGrantLogin } from '@/app/loginFlow';
 import type { OfficerVerdict } from '../taxBook/bookClient';
 import {
@@ -11,7 +11,9 @@ import {
   type FeederStatus,
 } from '../taxBook/feederClient';
 import type { FeederGrantCallbackState } from '../taxBook/feederGrant';
+import { feederErrorText } from './feederErrorText';
 import { FeederConsent } from './FeederConsent';
+import { MoonsChoices } from './MoonsChoices';
 import { MoonOwnerPanel } from './MoonOwnerPanel';
 import { MoonOwnerPrevious } from './MoonOwnerPrevious';
 import { TurnOnBook } from './TurnOnBook';
@@ -40,9 +42,7 @@ export function MoonsSetup({
   const location = useLocation();
   const navigate = useNavigate();
   const [owner, setOwner] = useState<
-    | { state: 'loading' }
-    | { state: 'failed'; message: string }
-    | { state: 'ready'; v: FeederStatus }
+    { state: 'loading' } | { state: 'failed' } | { state: 'ready'; v: FeederStatus }
   >({ state: 'loading' });
   const invited = new URLSearchParams(location.search).get(INVITE_PARAM);
   const [step, setStep] = useState<Step>(invited ? 'consent' : 'choices');
@@ -73,9 +73,8 @@ export function MoonsSetup({
       (v) => {
         if (!cancelled) setOwner({ state: 'ready', v });
       },
-      (e: unknown) => {
-        if (!cancelled)
-          setOwner({ state: 'failed', message: e instanceof Error ? e.message : String(e) });
+      () => {
+        if (!cancelled) setOwner({ state: 'failed' });
       }
     );
     return () => {
@@ -95,13 +94,7 @@ export function MoonsSetup({
       </div>
     );
   if (owner.state === 'failed')
-    return (
-      <LoadFailedState
-        title={t('corpTaxBook.moons.failed')}
-        hint={owner.message}
-        onRetry={reloadOwner}
-      />
-    );
+    return <LoadFailedState title={t('corpTaxBook.moons.failed')} onRetry={reloadOwner} />;
 
   const status = owner.v;
   if (
@@ -159,88 +152,30 @@ export function MoonsSetup({
         characterId={characterId}
         code={code}
         busy={busy}
+        error={error}
         onBack={() => setStep('choices')}
         onContinue={(rate) => {
           setBusy(true);
           beginFeederGrantLogin(characterId, code, rate).catch((e: unknown) => {
             setBusy(false);
-            setError(e instanceof Error ? e.message : String(e));
+            setError(feederErrorText(t, e));
           });
         }}
       />
     );
 
-  const canOwn = verdict.isDirector;
   const choices = (
-    <div className="mx-auto max-w-4xl space-y-4">
-      {left && (
-        <p role="status" className="text-center text-sm">
-          {t('corpTaxBook.moons.setup.left')}
-        </p>
-      )}
-      {error && (
-        <p role="alert" className="text-center text-sm text-danger">
-          {error}
-        </p>
-      )}
-      <div className="grid gap-3 sm:grid-cols-3">
-        {(
-          [
-            ['own', 'own', canOwn],
-            ['handled', 'consent', true],
-            ['collect', 'collect', canOwn],
-          ] as const
-        ).map(([key, next, enabled]) => (
-          <div
-            key={key}
-            className="flex flex-col justify-between gap-3 rounded-xs border border-line bg-panel p-4 text-sm"
-          >
-            <div className="space-y-1">
-              <h2 className="text-base font-semibold">
-                {t(`corpTaxBook.moons.setup.${key}.title`)}
-              </h2>
-              <p className="text-text-dim">{t(`corpTaxBook.moons.setup.${key}.hint`)}</p>
-            </div>
-            {key === 'handled' ? (
-              <div className="space-y-2">
-                <label className="block space-y-1">
-                  <span className="text-xs text-text-dim">
-                    {t('corpTaxBook.moons.setup.paste')}
-                  </span>
-                  <TextInput value={paste} onChange={(e) => setPaste(e.target.value)} />
-                </label>
-                <Button
-                  variant="primary"
-                  disabled={parseInviteInput(paste) === null}
-                  onClick={() => {
-                    setError(null);
-                    setStep(next);
-                  }}
-                >
-                  {t('corpTaxBook.moons.setup.handled.action')}
-                </Button>
-              </div>
-            ) : (
-              <Button
-                variant="primary"
-                disabled={!enabled}
-                onClick={() => {
-                  setError(null);
-                  setStep(next);
-                }}
-              >
-                {t(`corpTaxBook.moons.setup.${key}.action`)}
-              </Button>
-            )}
-          </div>
-        ))}
-      </div>
-      {!canOwn && (
-        <p className="text-center text-xs text-text-dim">
-          {t('corpTaxBook.moons.off.notDirector')}
-        </p>
-      )}
-    </div>
+    <MoonsChoices
+      canOwn={verdict.isDirector}
+      left={left}
+      error={error}
+      paste={paste}
+      onPaste={setPaste}
+      onChoose={(next) => {
+        setError(null);
+        setStep(next);
+      }}
+    />
   );
   // A corporation an accounting corporation handled before sees that history above the choice.
   return (

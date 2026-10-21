@@ -67,6 +67,7 @@ export function MoonOwnerDetail({ id }: { id: string }) {
       <MoonOwnerPage
         detail={detail}
         name={name}
+        {...(accountingName ? { accountingName } : {})}
         characterName={names.character}
         refineryName={names.refinery}
         oreName={names.ore}

@@ -75,7 +75,9 @@ function HistoryLines({
   offeredPct,
   joinedAt,
   ownerName,
+  accountingName,
 }: {
+  accountingName?: string;
   history: readonly OwnerRateEntry[];
   offeredPct: number | undefined;
   joinedAt: number;
@@ -88,7 +90,9 @@ function HistoryLines({
         <li key={`${h.kind}:${h.recordedAt}`}>
           {shortDate(h.effectiveFrom)} ·{' '}
           {h.kind === 'agreed'
-            ? t(k('history.agreed'), { pct: h.pct })
+            ? accountingName
+              ? t(k('history.agreedBy'), { pct: h.pct, by: accountingName })
+              : t(k('history.agreed'), { pct: h.pct })
             : t(k('history.requested'), { name: ownerName, pct: h.pct })}
         </li>
       ))}
@@ -110,6 +114,7 @@ function HistoryLines({
 export function MoonOwnerPage({
   detail,
   name,
+  accountingName,
   characterName,
   refineryName,
   oreName,
@@ -125,6 +130,8 @@ export function MoonOwnerPage({
 }: {
   detail: MoonOwnerDetail;
   name: string;
+  /** The accounting corporation's own name: who set an agreed rate. */
+  accountingName?: string;
   characterName: (id: number) => string;
   refineryName: (id: number) => string;
   oreName: (typeId: number) => string;
@@ -308,6 +315,7 @@ export function MoonOwnerPage({
             offeredPct={detail.offeredOwnerRatePct}
             joinedAt={detail.joinedAt}
             ownerName={name}
+            accountingName={accountingName}
           />
         </div>
       </Panel>

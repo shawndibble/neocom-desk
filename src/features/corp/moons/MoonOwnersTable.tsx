@@ -138,7 +138,12 @@ export function MoonOwnersTable({
         ) : r.theirRatePct === undefined ? (
           <span className="text-text-dim">{t(k('nothingDue'))}</span>
         ) : (
-          isk(r.owed)
+          <>
+            <span className="hidden text-[0.625rem] tracking-widest text-text-dim uppercase [.dt-stacked_&]:block">
+              {t(k('cols.owed'))}
+            </span>
+            {isk(r.owed)}
+          </>
         ),
       sortValue: (r) => r.owed,
     },

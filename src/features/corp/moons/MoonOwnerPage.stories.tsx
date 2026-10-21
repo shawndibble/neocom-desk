@@ -73,6 +73,7 @@ const meta = {
   args: {
     detail,
     name: 'Ashfall Mining Collective',
+    accountingName: 'Brass Meridian Logistics',
     characterName: (id: number) => CHARACTERS[id] ?? `#${id}`,
     refineryName: (id: number) => REFINERIES[id] ?? `Refinery ${id}`,
     oreName: (id: number) => ORES[id] ?? `#${id}`,
@@ -80,6 +81,7 @@ const meta = {
     onSetRate: () => {},
     onSettledOtherwise: () => {},
     onPay: () => {},
+    onRemove: () => {},
     onAddPayment: () => {},
     onMarkPayout: () => {},
   },
@@ -88,7 +90,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Active, with a rate they asked for that the book overrode. */
+/** @summary Active, with a rate they asked for that the book overrode; an officer who may edit sees Pay…, Set rate…, Settled otherwise… and Remove from this book…. */
 export const Active: Story = {};
 
 /** @summary Their ledger cannot be read: the warning names the date. */
@@ -161,9 +163,6 @@ export const RemovalPendingNoticeUnsent: Story = {
   },
 };
 
-/** @summary An officer who may edit sees Remove from this book… beside Settled otherwise…. */
-export const WithRemoveButton: Story = { args: { onRemove: () => {} } };
-
 /** @summary A detected payment an officer marked "not a payout": it stays listed and can be counted again. */
 export const NotAPayout: Story = {
   args: {
@@ -190,6 +189,7 @@ export const ReadOnly: Story = {
   args: {
     onSetRate: undefined,
     onSettledOtherwise: undefined,
+    onRemove: undefined,
     onPay: undefined,
     onAddPayment: undefined,
     onMarkPayout: undefined,
