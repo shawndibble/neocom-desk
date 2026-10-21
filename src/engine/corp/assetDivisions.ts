@@ -96,6 +96,8 @@ export interface CorpAssetInput {
   locationFlag: string;
   /** Carried so a copy is valued per item, not at its original's type price (`assetStackValue`). */
   isBlueprintCopy?: boolean;
+  /** ESI `is_singleton`: assembled (true) vs packaged (false). Absent when the source does not say. */
+  isSingleton?: boolean;
 }
 
 function toEngineAsset(asset: CorpAssetInput): EngineAsset {

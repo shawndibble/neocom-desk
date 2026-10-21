@@ -60,11 +60,11 @@ export function loadCorporationAssets(
  * The boundary adaptation (ARCHITECTURE.md): ESI's snake_case
  * `CorporationAsset` becomes `engine/corp/assetDivisions.ts`'s
  * `CorpAssetInput`, the same split `members.ts`'s `toMemberActivity` makes
- * for `MemberActivity`. `is_singleton` is still
- * dropped — the tree engine tells a container from a leaf by whether
- * anything else's `location_id` points at it, not by this flag — but
- * `location_type` now carries through: `buildCorpAssetTree` (issue #779)
- * needs it to tell a division's own top-level roots from an asset nested
+ * for `MemberActivity`. `is_singleton`
+ * carries through for the ledger (`assetLedger.ts`); the tree engine tells a
+ * container from a leaf by whether anything else's `location_id` points at
+ * it, not by this flag. `location_type` carries through too:
+ * `buildCorpAssetTree` (issue #779) needs it to tell a division's own top-level roots from an asset nested
  * inside a container placed in one, and `is_blueprint_copy` does too, so a
  * copy is valued on its own rather than at its original's type price.
  */
@@ -77,6 +77,7 @@ export function toCorpAssetInputs(assets: readonly CorporationAsset[]): CorpAsse
     locationType: asset.location_type,
     locationFlag: asset.location_flag,
     ...(asset.is_blueprint_copy ? { isBlueprintCopy: true } : {}),
+    ...(typeof asset.is_singleton === 'boolean' ? { isSingleton: asset.is_singleton } : {}),
   }));
 }
 
