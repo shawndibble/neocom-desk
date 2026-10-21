@@ -17,6 +17,7 @@ import {
 import { lastBillableDate } from './billable';
 import { withholdUnreadFeederDays, type FeederReadClock } from './feederHealth';
 import { buildDayCharges, type DayCharge, type Miner } from './charges';
+import { splitByCoverage, type FeederCoverage } from './coverage';
 import { activeDismissalFor, type Dismissal } from './dismissals';
 import {
   chunkRateFor,
@@ -30,6 +31,7 @@ import {
 import { overdueStatus, type Declaration } from './overdue';
 import {
   draftStatement,
+  frozenDayRate,
   issueStatement,
   statementPeriod,
   type Adjustment,
@@ -71,9 +73,10 @@ export interface BookViewInput {
   adjustments: readonly Adjustment[];
   /**
    * Feeders' last good ledger reads. A feeder's refinery days are withheld until
-   * one lands after the day's grace (#4509); absent means no feeders.
+   * one lands after the day's grace (#4509), and a day outside its coverage owes
+   * nothing (#4618); absent means no feeders.
    */
-  feeders?: readonly FeederReadClock[];
+  feeders?: readonly (FeederReadClock & FeederCoverage)[];
   extractions: readonly SyncExtraction[];
   paidStatementIds: ReadonlySet<string>;
   /** The day's prices at the book's hub and Ore Form, by raw type id. */
@@ -178,6 +181,8 @@ export interface BookView {
   input: BookViewInput;
   charges: DayCharge[];
   beforeBook: ObservedMiningEntry[];
+  /** Moon owner rows outside their coverage: kept, owe nothing, like "Before the book". */
+  outsideCoverage: ObservedMiningEntry[];
   /** Donations dated before the start date: counted for officers, never credited or listed. */
   donationsBeforeBook: number;
   unrated: ObservedMiningEntry[];
@@ -234,26 +239,36 @@ function toTaxPayments(payments: readonly SettlePayment[], minerId: string): Tax
   return payments.filter((p): p is TaxPayment => p.minerId === minerId);
 }
 
-/** What the Statement lines billed for one day, as issued: summed quantities and tax, the first line's prices and rate. */
-function frozenDay(lines: readonly StatementLine[]) {
+/**
+ * What the Statement lines billed for one day, as issued: summed quantities and
+ * tax, the first line's prices, and the rate the lines came to (`frozenDayRate`).
+ */
+function frozenDay(lines: readonly StatementLine[], charge: DayCharge) {
   const first = lines[0];
   const byType = new Map<number, number>();
   for (const l of lines)
     for (const o of l.oreLines) byType.set(o.typeId, (byType.get(o.typeId) ?? 0) + o.quantity);
-  const taxPct = first?.taxPct;
+  // A line with no effective-from was a per-record override: never borrow today's.
+  const rate = frozenDayRate(lines, { taxPct: charge.taxPct });
   return {
     oreLines: [...byType].map(([typeId, quantity]) => ({ typeId, quantity })),
     unitPrices: first?.unitPrices ?? {},
     estimatedValue: lines.reduce((sum, l) => sum + l.estimatedValue, 0),
-    taxPct: taxPct ?? 0,
-    rateEffectiveFrom: first?.rateEffectiveFrom,
+    taxPct: rate.taxPct,
+    rateEffectiveFrom: rate.rateEffectiveFrom,
     tax: lines.reduce((sum, l) => sum + l.tax, 0),
   };
 }
 
 export function buildBookView(input: BookViewInput): BookView {
   const placeOf = placeOfFactory(input.extractions, input.structureExpiryHours);
-  const entries = withholdUnreadFeederDays(input.entries, {
+  // Coverage first: a moon owner's day outside it owes nothing, so it never holds a miner's day.
+  const { covered, outsideCoverage } = splitByCoverage(
+    input.entries,
+    input.corporationId,
+    input.feeders ?? []
+  );
+  const entries = withholdUnreadFeederDays(covered, {
     now: input.now,
     graceHours: input.graceHours,
     bookCorporationId: input.corporationId,
@@ -350,7 +365,7 @@ export function buildBookView(input: BookViewInput): BookView {
         // A day on an issued Statement is frozen (D22): its lines, never today's prices.
         const frozen =
           statement && (status === 'on-statement' || status === 'paid')
-            ? frozenDay(linesBy.get(c.key) ?? [])
+            ? frozenDay(linesBy.get(c.key) ?? [], c)
             : undefined;
         if (frozen) frozenByKey.set(c.key, frozen);
         const value = frozen ?? {
@@ -491,6 +506,7 @@ export function buildBookView(input: BookViewInput): BookView {
     input,
     charges,
     beforeBook,
+    outsideCoverage,
     donationsBeforeBook,
     unrated,
     billableThrough,

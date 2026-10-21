@@ -387,3 +387,99 @@ describe('buildBookView with a feeder', () => {
     expect(view.miners.map((m) => m.id)).toEqual(['solo:2']);
   });
 });
+
+describe('buildBookView: moon owner coverage (#4618)', () => {
+  const OWNER = 98000002;
+  const fed = (characterId: number, date: string, quantity: number) => ({
+    ...entry(characterId, date, quantity),
+    structureId: 2002,
+    sourceCorporationId: OWNER,
+  });
+  const read = '2026-09-18T12:00:00Z';
+
+  it('bills nothing for moon owner rows before, between and after coverage; bills inside a rejoined period', () => {
+    const view = buildBookView(
+      input({
+        entries: [
+          fed(1, '2026-08-20', 1000), // before the first period
+          fed(1, '2026-09-01', 1000), // inside the first period
+          fed(1, '2026-09-05', 1000), // the gap after it ended
+          fed(1, '2026-09-10', 1000), // inside the rejoined period
+        ],
+        feeders: [
+          {
+            corporationId: OWNER,
+            lastReadWellAt: read,
+            coveragePeriods: [{ from: '2026-08-25', to: '2026-09-02' }, { from: '2026-09-08' }],
+          },
+        ],
+      })
+    );
+    expect(view.charges.map((c) => c.date).sort()).toEqual(['2026-09-01', '2026-09-10']);
+    expect(view.outsideCoverage.map((e) => e.date).sort()).toEqual(['2026-08-20', '2026-09-05']);
+    const days = minerDetail(view, 'solo:1')!.days;
+    expect(days.map((d) => d.date).sort()).toEqual(['2026-09-01', '2026-09-10']);
+    expect(view.miners[0].unbilled).toBe(200_000);
+  });
+
+  it('bills nothing after coverage ended, and the book’s own refinery rows are untouched', () => {
+    const view = buildBookView(
+      input({
+        entries: [fed(1, '2026-09-10', 1000), entry(1, '2026-09-10', 1000)],
+        feeders: [
+          {
+            corporationId: OWNER,
+            lastReadWellAt: read,
+            coveragePeriods: [{ from: '2026-08-01', to: '2026-09-09' }],
+          },
+        ],
+      })
+    );
+    expect(view.charges.map((c) => c.structureId)).toEqual([1001]);
+    expect(view.outsideCoverage.map((e) => e.structureId)).toEqual([2002]);
+  });
+
+  it('a disconnected moon owner’s unread last day never holds the miner’s own-refinery day', () => {
+    // Read well at 12 Sep 00:00: 11 Sep never closed for it, so coverage ended on 10 Sep.
+    const view = buildBookView(
+      input({
+        entries: [fed(1, '2026-09-11', 1000), entry(1, '2026-09-11', 1000)],
+        feeders: [
+          {
+            corporationId: OWNER,
+            lastReadWellAt: '2026-09-12T00:00:00Z',
+            coveragePeriods: [{ from: '2026-08-01', to: '2026-09-10' }],
+          },
+        ],
+      })
+    );
+    expect(view.charges.map((c) => c.structureId)).toEqual([1001]);
+  });
+});
+
+describe('a mixed-rate day on an issued Statement (#4618)', () => {
+  it('shows the rate its lines came to, not the first line’s, and no effective-from', () => {
+    const base = input({ entries: [entry(1, '2026-08-10', 1000)] });
+    const first = buildBookView(base);
+    const plan = planStatementRun(first, { start: '2026-08-01', end: '2026-08-31' });
+    const statement = statementForLine(first, plan, plan.lines[0]);
+    const mined = statement.lines[0];
+    // Late ore billed after a rate fix: its own line, at its own rate.
+    const late = {
+      ...mined,
+      kind: 'late-ore' as const,
+      oreLines: [{ typeId: ORE, quantity: 1000 }],
+      taxPct: 20,
+      rateEffectiveFrom: '2026-08-05',
+      estimatedValue: 1_000_000,
+      tax: 200_000,
+    };
+    const mixed = { ...statement, lines: [mined, late], amount: mined.tax + late.tax };
+    const view = buildBookView({ ...base, statements: [mixed] });
+    const day = minerDetail(view, 'solo:1')!.days[0];
+    expect(day.tax).toBe(300_000);
+    expect(day.estimatedValue).toBe(2_000_000);
+    expect(day.taxPct).toBe(15);
+    expect(day.rateEffectiveFrom).toBeUndefined();
+  });
+});
