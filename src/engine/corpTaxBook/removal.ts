@@ -74,9 +74,9 @@ export function isRemovalDue(state: RemovalState, now: number): boolean {
 }
 
 /**
- * Whom the one mail goes to: the book's other officers, plus the moon owner's CEO and its
- * payee through the shared `moonOwnerMailRecipients` (#4515). The officer who started it is
- * not mailed; nobody twice.
+ * Whom the one mail goes to: the moon owner's CEO and its payee through the shared
+ * `moonOwnerMailRecipients` (#4515) first, since a copy to one of them starts the clock (#4617),
+ * then the book's other officers. The officer who started it is not mailed; nobody twice.
  */
 export function removalRecipients(input: {
   officerIds: readonly number[];
@@ -86,9 +86,8 @@ export function removalRecipients(input: {
   /** The payee corporation's CEO, when the payee is a corporation. */
   payeeCeoId?: number | null;
 }): number[] {
-  const out = new Set<number>();
+  const out = new Set<number>(moonOwnerMailRecipients(input));
   for (const id of input.officerIds) if (id !== input.startedBy) out.add(id);
-  for (const id of moonOwnerMailRecipients(input)) out.add(id);
   return [...out];
 }
 

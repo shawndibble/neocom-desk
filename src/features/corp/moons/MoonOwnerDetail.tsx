@@ -7,18 +7,18 @@ import {
   deriveOwnerRateHistory,
   moonOwnerDetail,
 } from '@/engine/corpTaxBook/moonOwners';
-import {
-  markFeederPayout,
-  recordFeederRemovalSent,
-  setFeederMode,
-  setFeederRate,
-} from '../taxBook/feederClient';
+import { markFeederPayout, setFeederMode, setFeederRate } from '../taxBook/feederClient';
 import { PayMoonOwnerHost } from './PayMoonOwnerHost';
 import { RemoveMoonOwnerDialog, SetRateDialog, SettledOtherwiseDialog } from './MoonOwnerDialogs';
 import { MoonOwnerPage } from './MoonOwnerPage';
 import { agreedRateChange, mailRateChange } from './rateChangeNotice';
 import { Crumb } from './moonsParts';
-import { cancelRemovalAndMail, startRemovalAndMail, type RemovalContext } from './removalFlow';
+import {
+  cancelRemovalAndMail,
+  recordRemovalNoticeSent,
+  startRemovalAndMail,
+  type RemovalContext,
+} from './removalFlow';
 import { useCorporationName } from './statementMailing';
 import { useBook } from './useBook';
 import { useMoonOwners } from './useMoonOwners';
@@ -82,7 +82,7 @@ export function MoonOwnerDetail({ id }: { id: string }) {
                   }
                 : {}),
               onNoticeSent: () =>
-                afterEdit(() => recordFeederRemovalSent(characterId, corporationId, corp)),
+                afterEdit(() => recordRemovalNoticeSent(characterId, corporationId, corp)),
               onAddPayment: () => setDialog('add'),
               onMarkPayout: (payoutId: string, notAPayout: boolean) =>
                 afterEdit(() =>
