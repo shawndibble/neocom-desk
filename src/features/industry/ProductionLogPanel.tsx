@@ -209,9 +209,10 @@ function buildRollup(
   catalog: BlueprintCatalog,
   planIds: ReadonlySet<string>,
   /** Each run's own Build Plan's Trade Hub standing (issue #1238), keyed by `run.buildPlanId` — see `standingByPlanId` below. */
-  standingByPlanId: ReadonlyMap<string, ResolvedStandings>
+  standingByPlanId: ReadonlyMap<string, ResolvedStandings>,
+  timeZone?: string
 ): Rollup {
-  const filteredRuns = filterProductionRunsByDate(runs, filter);
+  const filteredRuns = filterProductionRunsByDate(runs, filter, timeZone);
   const saleLinksByRun = groupByRunId(saleLinks);
   const orderWatchesByRun = groupByRunId(orderWatches);
   const lossesByRun = groupByRunId(losses);
@@ -361,9 +362,21 @@ export function ProductionLogPanel({
         skills,
         catalog,
         planIds,
-        standingByPlanId
+        standingByPlanId,
+        timeZone
       ),
-    [runs, saleLinks, orderWatches, losses, filter, skills, catalog, planIds, standingByPlanId]
+    [
+      runs,
+      saleLinks,
+      orderWatches,
+      losses,
+      filter,
+      skills,
+      catalog,
+      planIds,
+      standingByPlanId,
+      timeZone,
+    ]
   );
 
   const profitHistoryPoints = useMemo(

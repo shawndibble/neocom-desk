@@ -30,6 +30,8 @@ import {
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import { formatAge } from '@/lib/age';
+import { useTimeZone } from '@/lib/timeFormat';
+import { formatDateOnly } from '@/lib/timestamp';
 import {
   DASH,
   isEmptyRosterDiff,
@@ -145,6 +147,7 @@ const ROSTER_SORT = { columnId: 'lastSeen', direction: 'desc' } as const;
 /** Every roster column, hidden or not — the table and its column picker both read it. */
 function useRosterColumns(): DataTableColumn<RosterRow>[] {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   return useMemo<DataTableColumn<RosterRow>[]>(
     () => [
       {
@@ -235,7 +238,8 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
         id: 'joined',
         header: t('corp.members.columnJoined'),
         className: 'whitespace-nowrap tabular-nums text-text-dim',
-        render: (row) => (row.startMs === null ? DASH : new Date(row.startMs).toLocaleDateString()),
+        render: (row) =>
+          row.startMs === null ? DASH : formatDateOnly(new Date(row.startMs), timeZone),
         sortValue: (row) => row.startMs ?? undefined,
       },
       {
@@ -246,7 +250,7 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
         sortValue: (row) => rolesText(row.roles) ?? undefined,
       },
     ],
-    [t]
+    [t, timeZone]
   );
 }
 

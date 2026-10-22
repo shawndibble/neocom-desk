@@ -1,9 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SystemNote } from './SystemNote';
 import { useSystemNotes } from './systemNotes';
 import '@/i18n';
+import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
+import { formatDateOnly } from '@/lib/timestamp';
 
 function Row() {
   return (
@@ -67,5 +69,33 @@ describe('SystemNote', () => {
     render(<Row />);
     await user.click(screen.getByRole('button', { name: 'Add a note on Tama' }));
     expect(screen.getByRole('textbox')).toHaveAttribute('maxlength', '500');
+  });
+
+  describe('updated date follows the Time format setting', () => {
+    const NEAR_MIDNIGHT = Date.UTC(2026, 2, 10, 23, 30);
+    const zone = process.env.TZ;
+    afterEach(() => {
+      process.env.TZ = zone;
+      useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: true });
+    });
+
+    it.each(['local', 'eve'] as const)('shows the %s day', async (format) => {
+      process.env.TZ = 'Pacific/Auckland';
+      useTimeFormat.setState({ value: format, hydrated: true });
+      const user = userEvent.setup();
+      await useSystemNotes
+        .getState()
+        .setValue({ 30002813: { text: 'x', updatedAt: NEAR_MIDNIGHT } });
+      render(<Row />);
+      await user.click(screen.getByRole('button', { name: 'Open your note on Tama' }));
+      const expected = formatDateOnly(
+        new Date(NEAR_MIDNIGHT),
+        format === 'eve' ? 'UTC' : undefined
+      );
+      expect(screen.getByText(`Updated ${expected}`)).toBeInTheDocument();
+      expect(formatDateOnly(new Date(NEAR_MIDNIGHT), 'UTC')).not.toBe(
+        formatDateOnly(new Date(NEAR_MIDNIGHT))
+      );
+    });
   });
 });

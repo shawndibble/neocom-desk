@@ -7,6 +7,8 @@ import type { OpenOrderRow } from './openOrdersModel';
 import type { OrderDetailView } from './orderDetailView';
 import { CopyablePrice } from './CopyablePrice';
 import { formatCount } from '@/lib/formatCount';
+import { useTimeZone } from '@/lib/timeFormat';
+import { formatDateOnly } from '@/lib/timestamp';
 
 /** "What it cost you" once a cost basis is known: build run or wallet buys, fees, floor. */
 export function CostLedger({
@@ -21,6 +23,7 @@ export function CostLedger({
   floorShown: number | null;
 }) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   return (
     <>
       <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 text-xs">
@@ -37,8 +40,8 @@ export function CostLedger({
             <LedgerRow
               label={t('market.orders.walletBasisRange')}
               value={t('market.orders.walletBasisRangeValue', {
-                from: new Date(costBasis.oldestBuy).toLocaleDateString(),
-                to: new Date(costBasis.newestBuy).toLocaleDateString(),
+                from: formatDateOnly(new Date(costBasis.oldestBuy), timeZone),
+                to: formatDateOnly(new Date(costBasis.newestBuy), timeZone),
               })}
             />
           </>
@@ -74,7 +77,7 @@ export function CostLedger({
                   {t('market.orders.walletBasisBuyLine', {
                     quantity: formatCount(buy.quantity),
                     price: formatMarketIsk(buy.unitPrice),
-                    date: new Date(buy.date).toLocaleDateString(),
+                    date: formatDateOnly(new Date(buy.date), timeZone),
                   })}
                 </li>
               ))}

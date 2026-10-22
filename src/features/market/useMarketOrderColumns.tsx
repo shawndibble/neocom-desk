@@ -36,6 +36,8 @@ import { formatMarketIsk } from '@/lib/isk';
 import { rangeLabel } from '@/features/market/orderBookCsv';
 import { sellOutlierMultiple } from '@/engine/market/orderBookDepth';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useTimeZone } from '@/lib/timeFormat';
+import { formatDateOnly } from '@/lib/timestamp';
 
 /**
  * Ordinal rank for an order's `range`: station, then solarsystem, then a
@@ -98,6 +100,7 @@ export function useMarketOrderColumns({
   hideLocation,
   feeContext,
 }: UseMarketOrderColumnsArgs): MarketOrderColumns {
+  const timeZone = useTimeZone();
   const pickedOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
   const visibleOrderColumns = useMemo(
     () => pickedOrderColumns.filter((id) => !isColumnWithheld(id, { hideLocation, feeContext })),
@@ -252,7 +255,7 @@ export function useMarketOrderColumns({
         // card keeps it too, behind a word saying what the date is.
         className: 'whitespace-nowrap text-text-dim',
         stackAffix: { before: t('market.expiryAffix') },
-        render: (o) => orderExpiry(o).toLocaleDateString(),
+        render: (o) => formatDateOnly(orderExpiry(o), timeZone),
         sortValue: (o) => orderExpiry(o).getTime(),
       },
       range: {
@@ -288,6 +291,7 @@ export function useMarketOrderColumns({
       locationSqueezed,
       visibleOrderColumns,
       feeContext,
+      timeZone,
     ]
   );
 
