@@ -4,7 +4,7 @@
  * Quickbar it does not sync and does not survive a reload, so this is a plain
  * zustand store with no Dexie backing, local to this feature like `hub.ts`.
  *
- * `view`/`openRequest` (issue #1425): the drawer's Prices/Attributes switch
+ * `view`/`openRequest` (issue #1425): the drawer's Prices/Trade hubs/Attributes switch
  * and the signal that a caller (Variations "Compare") wants the drawer open
  * on a given view, not just the items in it. `openRequest` is a counter
  * rather than a boolean so two `openIn` calls in a row (e.g. two different
@@ -27,7 +27,7 @@ export interface CompareSetItem {
   itemName: string;
 }
 
-export type CompareView = 'prices' | 'attributes';
+export type CompareView = 'prices' | 'hubs' | 'attributes';
 
 interface CompareSetState {
   items: CompareSetItem[];
