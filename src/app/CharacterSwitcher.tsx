@@ -94,7 +94,11 @@ export function CharacterSwitcher({
                   <span className="block truncate text-sm">{row.name}</span>
                   <button
                     type="button"
-                    aria-label={t('nav.permissionsFor', { name: row.name })}
+                    aria-label={t('nav.permissionsFor', {
+                      granted: row.granted,
+                      total: row.total,
+                      name: row.name,
+                    })}
                     onClick={() =>
                       pick(row.characterId, () => {
                         onNavigate?.();

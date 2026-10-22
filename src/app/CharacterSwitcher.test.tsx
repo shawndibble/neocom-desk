@@ -52,11 +52,11 @@ describe('CharacterSwitcher', () => {
       'aria-current',
       'true'
     );
-    expect(within(dialog).getByRole('button', { name: 'Permissions for Aria' })).toHaveTextContent(
+    expect(within(dialog).getByRole('button', { name: /Permissions for Aria$/ })).toHaveTextContent(
       `${TOTAL} of ${TOTAL} Permissions`
     );
     expect(
-      within(dialog).getByRole('button', { name: 'Permissions for Marsha' })
+      within(dialog).getByRole('button', { name: /Permissions for Marsha$/ })
     ).toHaveTextContent(`1 of ${TOTAL} Permissions`);
     expect(within(dialog).queryByRole('progressbar')).toBeNull();
   });
@@ -72,7 +72,7 @@ describe('CharacterSwitcher', () => {
   it('opens Permissions from a row count, switching to that Character first', async () => {
     show();
     await userEvent.click(await screen.findByRole('button', { name: 'Characters' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Permissions for Marsha' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Permissions for Marsha$/ }));
     await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(3));
     // The navigation follows the switch by a tick.
     await waitFor(() =>
@@ -84,7 +84,7 @@ describe('CharacterSwitcher', () => {
     const onNavigate = vi.fn();
     show(onNavigate);
     await userEvent.click(await screen.findByRole('button', { name: 'Characters' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Permissions for Marsha' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Permissions for Marsha$/ }));
     await waitFor(() => expect(onNavigate).toHaveBeenCalledTimes(1));
     await userEvent.click(await screen.findByRole('button', { name: 'Characters' }));
     await userEvent.click(await screen.findByRole('link', { name: 'Manage characters' }));

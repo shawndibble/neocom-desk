@@ -61,7 +61,7 @@
     "characterSwitcher": "Characters",
     "characterActive": "Active",
     "permissionsCount": "{{granted}} of {{total}} Permissions",
-    "permissionsFor": "Permissions for {{name}}",
+    "permissionsFor": "{{granted}} of {{total}} Permissions for {{name}}",
     "manageCharacters": "Manage characters",
     "more": "More",
     "mobileLabel": "Mobile navigation",
