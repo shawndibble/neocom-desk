@@ -307,6 +307,7 @@ export const TAB_ENDPOINTS: Readonly<Record<string, readonly EsiEndpointId[]>> =
   '/market/history': ['getCharacterWalletTransactions'],
   '/wallet/journal': ['getCharacterWalletJournal'],
   '/contracts/history': ['getCharacterContracts'],
+  '/contacts/standings': ['getCharacterStandings'],
 };
 
 /** `requiredScopesForRoute` for a route or a `TAB_ENDPOINTS` tab path. */

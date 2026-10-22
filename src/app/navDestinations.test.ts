@@ -120,6 +120,7 @@ describe('NAV_LOCK_PATHS', () => {
         '/market/history',
         '/wallet/journal',
         '/contracts/history',
+        '/contacts/standings',
       ].toSorted()
     );
   });

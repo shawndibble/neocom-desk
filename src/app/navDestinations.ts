@@ -335,7 +335,8 @@ export function navTabs(page: NavPage): readonly NavTab[] {
 
 /**
  * Every scope-gated destination the shell asks `useLockedRoutes` about: the
- * scope-gated pages (the rail's amber lock dots) and their sub-views. Corp
+ * scope-gated pages (the rail's amber lock dots), their sub-views, and the
+ * `TAB_ENDPOINTS` tabs of ungated pages. Corp
  * paths are absent — corp hides rather than locks. Module-level, so the
  * hook's memo sees one array.
  */
