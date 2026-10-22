@@ -80,14 +80,13 @@ beforeEach(async () => {
 });
 
 describe('NetWorthPanel, several Characters', () => {
-  it('totals only Characters with every permission, and names who is left out', async () => {
+  // Who is left out also rides in the page header's Character picker (`useNetWorthMissingNames`).
+  it('totals only Characters with every permission, and flags who is left out on their row', async () => {
     await seed({ covered: [1, 2] });
     renderPanel();
 
     // (100 + 1000 + 200 + 30 + 4) + (500 + 1000 + 200 + 30 + 4) = 3068
     await vi.waitFor(() => expect(netWorthFigure()).toHaveTextContent(/^2,668$/));
-    expect(screen.getByLabelText(/All characters · 2 of 3/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Not included: Cy/)).toBeInTheDocument();
     const table = screen.getByRole('table', { name: 'Balance by character' });
     expect(
       within(table).getByRole('link', { name: 'Grant missing Permissions' })
@@ -212,13 +211,15 @@ describe('NetWorthPanel, several Characters', () => {
 });
 
 describe('NetWorthPanel, one Character', () => {
-  it('shows a crumb back when drilled, and no per-layer table', async () => {
+  it("shows a crumb back and the drilled Character's name when drilled, and no per-layer table", async () => {
     const user = userEvent.setup();
     await seed({ covered: [1] });
     const { onBack } = renderPanel({ mode: 'single', characters: [A], drilled: true });
 
-    await screen.findByRole('heading', { name: 'Worth' });
+    const heading = await screen.findByRole('heading', { name: 'Worth' });
     expect(screen.queryByRole('table', { name: 'Net worth by layer' })).toBeNull();
+    // The page picker still reads "All characters": the title bar names the drilled one.
+    expect(within(heading.closest('header')!).getByText('Ava only')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /All characters/ }));
     expect(onBack).toHaveBeenCalled();

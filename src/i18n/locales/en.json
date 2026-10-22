@@ -7011,7 +7011,6 @@
     "security": {
       "ariaLabel": "Security status: {{value}}"
     },
-    "crossCharacterLoading": "Searching other characters…",
     "crossCharacterBadge": "From {{character}}",
     "crossCharacterCsvNote": "CSV export only includes this character's own items.",
     "blueprintBadge": {

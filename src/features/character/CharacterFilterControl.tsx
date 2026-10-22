@@ -1,6 +1,6 @@
 /**
  * The "This Character / All Characters" toggle shared by the cross-character
- * Wallet Balance and Industry Active Jobs views, by Open Orders' character
+ * Wallet and Assets pages (in their `PageHeader` `scope`), the Industry Active Jobs view, by Open Orders' character
  * strip, and by the synced default in Settings (issue #607).
  *
  * Used to also offer a hand-picked subset of specific characters (a
@@ -47,7 +47,7 @@
  * `IconButton` uses in whichever row it rides in — `size="sm"` (the panel
  * `meta` hosts: Active Jobs, Open Orders, Mining Tax) by default, `size="md"`
  * where a `PageHeader`'s own `actions` cluster sits at its default (larger)
- * touch tier instead (Assets, Mining Tax Overview) — rather than a
+ * touch tier instead (Mining Tax Overview) — rather than a
  * full-width text pill. The active Character's own portrait for "current,"
  * the generic `AllCharacters` glyph for "all." That box also absorbed the
  * phone-only "whose data is this" avatar `PageHeader` used to float in its
@@ -118,8 +118,8 @@ export interface CharacterFilterControlProps<
    * (default) for a panel's own `meta` row, where the `IconButton`s beside it
    * (Active Jobs, Open Orders, Mining Tax) are themselves `size="sm"`.
    * `'md'` for a `PageHeader`'s `meta`, where that header's own `actions`
-   * cluster sits at `IconButton`'s default (larger) tier instead (Assets,
-   * Mining Tax Overview) — see `PageHeader`'s own doc comment. Inside a
+   * cluster sits at `IconButton`'s default (larger) tier instead (Mining Tax
+   * Overview) — see `PageHeader`'s own doc comment. Inside a
    * `PageHeader`'s `scope` slot this prop is ignored: the header's
    * `'md'` tier always applies (`PageHeaderClusterContext`).
    */
