@@ -11,14 +11,10 @@
  * Default `'local'`, which is what every `formatTimestamp` surface already
  * did, so nothing moves until the pilot asks it to.
  *
- * Three deliberate exclusions, recorded as a scope decision
- * (`docs/context/decisions/`):
+ * Two deliberate exclusions, recorded as a scope decision
+ * (`docs/context/decisions/`). The Calendar was a third until its day
+ * bucketing moved with the clock (`engine/localDay.ts`'s `dayStart`).
  *
- * - **The Calendar grids.** `lib/calendarGrid.ts` buckets events into
- *   *local-day* cells. Switching only the rendered string would put a
- *   23:00-local event in today's cell labelled with tomorrow's UTC hour.
- *   Converting those needs the bucketing to move too — a follow-up, not a
- *   silent half-conversion.
  * - **Industry's Active Jobs "Ends" column.** It stays on `formatEveDateTime`
  *   unconditionally. That column's whole purpose is reading back to the game
  *   client, and making it follow a preference defaulting to `'local'` would

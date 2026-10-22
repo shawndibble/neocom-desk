@@ -2,7 +2,7 @@ import type { CsvColumn, CsvTranslate } from '@/lib/csv';
 import type { CalendarEventSummary } from '@/esi/endpoints';
 import type { CharacterBoardItemKind } from '@/engine/character/board';
 import { parseInstant } from '@/engine/esiInstant';
-import { localMidnight } from '@/engine/localDay';
+import { dayStart, type DayZone } from '@/engine/localDay';
 
 const RESPONSE_KEY: Record<CalendarEventSummary['event_response'], string> = {
   accepted: 'calendar.responseAccepted',
@@ -26,17 +26,18 @@ export function calendarCsvColumns(t: CsvTranslate): CsvColumn<CalendarEventSumm
 
 /**
  * The events the Coming Up rail lists for calendar events: none while that kind
- * is hidden, only the selected local day when one is picked, else all.
+ * is hidden, only the selected day (on the Time format's clock) when one is picked, else all.
  */
 export function calendarExportEvents(
   events: readonly CalendarEventSummary[],
   hiddenKinds: readonly CharacterBoardItemKind[],
-  selectedDayMs: number | null
+  selectedDayMs: number | null,
+  zone?: DayZone
 ): CalendarEventSummary[] {
   if (hiddenKinds.includes('calendarEvent')) return [];
   if (selectedDayMs === null) return [...events];
   return events.filter((event) => {
     const ms = parseInstant(event.event_date);
-    return ms !== null && localMidnight(ms) === selectedDayMs;
+    return ms !== null && dayStart(ms, zone) === selectedDayMs;
   });
 }
