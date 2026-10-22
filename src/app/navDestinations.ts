@@ -14,7 +14,7 @@
 import { tabBarTabs, tabPath } from '@/lib/pageTabs';
 import { PAGE_TABS } from './pageTabs';
 import type { CorpCapabilities } from '@/engine/corpRoles';
-import type { AppRoutePath } from './routeScopes';
+import { TAB_ENDPOINTS, type AppRoutePath } from './routeScopes';
 
 /**
  * - `scope`: an ordinary page; a missing grant marks it locked (never hidden,
@@ -335,13 +335,17 @@ export function navTabs(page: NavPage): readonly NavTab[] {
 
 /**
  * Every scope-gated destination the shell asks `useLockedRoutes` about: the
- * scope-gated pages (the rail's amber lock dots) and their sub-views. Corp
+ * scope-gated pages (the rail's amber lock dots), their sub-views, and the
+ * `TAB_ENDPOINTS` tabs of ungated pages. Corp
  * paths are absent — corp hides rather than locks. Module-level, so the
  * hook's memo sees one array.
  */
-export const NAV_LOCK_PATHS: readonly AppRoutePath[] = (NAV_PAGES as readonly NavPage[])
-  .filter((page) => page.gating === 'scope')
-  .flatMap((page) => [page.path, ...(page.subViews ?? []).map((view) => view.path)]);
+export const NAV_LOCK_PATHS: readonly string[] = [
+  ...(NAV_PAGES as readonly NavPage[])
+    .filter((page) => page.gating === 'scope')
+    .flatMap((page) => [page.path, ...(page.subViews ?? []).map((view) => view.path)]),
+  ...Object.keys(TAB_ENDPOINTS),
+];
 
 const LABEL_KEY_BY_PATH = Object.fromEntries(
   NAV_PAGES.map((page) => [page.path, page.labelKey])
@@ -414,7 +418,7 @@ export interface NavDestination {
 }
 
 export interface ListNavDestinationsOptions {
-  readonly locked: ReadonlySet<AppRoutePath>;
+  readonly locked: ReadonlySet<string>;
   /** `useCorpNavVisible()` — every Corp page is left out entirely, never locked, when false. */
   readonly corpVisible: boolean;
   /** `useCorpAccess().capabilities` — each Corp view shows only for its capability, as the Corp pages and Roles tab are gated. */
@@ -484,7 +488,7 @@ export function listNavDestinations({
     for (const tab of page.corpTabCapabilities && shownTabs.length < 2 ? [] : shownTabs) {
       if (page.corpTabs?.includes(tab.id) && !corpVisible) continue;
       if (hiddenTabPaths?.has(tab.path)) continue;
-      out.push(tabEntry(tab.path, tab.labelKey, pageLocked));
+      out.push(tabEntry(tab.path, tab.labelKey, pageLocked || locked.has(tab.path)));
     }
     for (const view of page.subViews ?? []) {
       out.push(tabEntry(view.path, view.labelKey, locked.has(view.path), view.searchKeys));

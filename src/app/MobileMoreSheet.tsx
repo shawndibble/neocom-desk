@@ -20,12 +20,11 @@ import {
 import { canHide, FOOTER_PAGES, recentNavFor, viewPathFor } from './navRail';
 import { useHiddenNav, useRecentNav } from './navPreferences';
 import { NavHideToggle, NavItem } from './NavItem';
-import type { AppRoutePath } from './routeScopes';
 
 export const MORE_SHEET_ID = 'mobile-more-sheet';
 
 const SHEET_GROUPS = railGroups();
-const NO_LOCKS: ReadonlySet<AppRoutePath> = new Set();
+const NO_LOCKS: ReadonlySet<string> = new Set();
 const ALL_CORP_VIEWS = {
   canReadMembers: true,
   canReadWallet: true,
@@ -40,7 +39,7 @@ const HEADING = 'text-[0.625rem] font-semibold tracking-widest text-text-dim upp
 interface MobileMoreSheetProps {
   open: boolean;
   onClose: () => void;
-  locked: ReadonlySet<AppRoutePath>;
+  locked: ReadonlySet<string>;
   /**
    * The active Character's portrait link, which `Layout` owns, given the page
    * to return to once a Character is picked (#1764).
