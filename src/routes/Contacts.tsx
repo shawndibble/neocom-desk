@@ -46,7 +46,6 @@ import { CharacterFilterControl } from '@/features/character/CharacterFilterCont
 import { usePublicInfoModal } from '@/stores/publicInfoModal';
 import { type AcrossCharactersRow } from '@/features/character/contactsAcrossCharacters';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
-import { useIsDesktop } from '@/lib/useIsDesktop';
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam, enumSetParam, textParam } from '@/lib/urlState';
@@ -79,7 +78,6 @@ const FILTER_PARAMS = {
 
 /** Contacts: standings, blocked/watched state, searchable and filterable by type and standing. */
 export function Contacts() {
-  const isDesktop = useIsDesktop();
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadContactsSnapshot,
@@ -271,10 +269,7 @@ export function Contacts() {
         meta={
           tab === 'standings'
             ? standings.meta
-            : contactsResult && (
-                // Dot only between md and lg, where the picker's pill leaves the title little room.
-                <DataAgeBadge date={contactsResult.fetchedAt} dotOnly={!isDesktop} />
-              )
+            : contactsResult && <DataAgeBadge date={contactsResult.fetchedAt} />
         }
         // Not on Standings: that tab reads the active Character's standings only.
         scope={
