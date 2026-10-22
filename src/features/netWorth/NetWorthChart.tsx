@@ -30,7 +30,7 @@ import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { formatDateOnly } from '@/lib/timestamp';
 import { timeAxisTicks } from '@/engine/wallet/timeTicks';
-import { lineKey, type LineRow, type StackRow } from '@/engine/netWorth/chartRows';
+import { lineKey, tooltipLines, type LineRow, type StackRow } from '@/engine/netWorth/chartRows';
 import { LAYER_IDS, type LayerId } from '@/engine/netWorth/series';
 import { CharacterSwatch } from './CharacterSwatch';
 import { LAYER_COLOR, LAYER_LABEL_KEYS, characterStroke } from './layerMeta';
@@ -115,17 +115,16 @@ function LinesTooltip({
   return (
     <ChartTooltipShell>
       <p className="font-semibold text-text">{dayLabel(row.x)}</p>
-      {lines.map((line, index) => {
-        const value = row[lineKey(line.characterId)];
-        return typeof value === 'number' ? (
+      {tooltipLines(row, lines).map(({ line, colorIndex, value }) =>
+        value === null ? null : (
           <p key={line.characterId} className="flex items-center gap-1.5">
-            <CharacterSwatch index={index} />
+            <CharacterSwatch index={colorIndex} />
             <span>
               {line.name}: {formatIsk(value)}
             </span>
           </p>
-        ) : null;
-      })}
+        )
+      )}
     </ChartTooltipShell>
   );
 }
