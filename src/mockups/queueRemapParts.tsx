@@ -13,26 +13,30 @@ import { queueAdvice, savesTime } from './queueRemapAdvice';
 const DAY_MS = 86_400_000;
 
 /**
- * Puts the proposed button into the real Skill Plan panel (the mockup can't
- * edit the page): a line of its own right under the action row, ending under
- * New plan. Re-attaches when the panel re-renders (desktop and phone are
- * different branches of `SkillPlanCard`).
+ * Puts the proposed button into the real Attributes card (the mockup can't
+ * edit the page): after the "Remaps: …" line on desktop, after the attribute
+ * chips on a phone (which shows the chips bare). Re-attaches when the card
+ * re-renders as its data arrives.
  */
-function IntoPlanCardActions({ children }: { children: ReactNode }) {
+function IntoAttributesCard({ children }: { children: ReactNode }) {
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   useEffect(() => {
     let made: HTMLElement | null = null;
+    const host = () => {
+      const remapLine = [...document.querySelectorAll('aside p')].find((p) =>
+        p.textContent?.startsWith('Remaps:')
+      );
+      return (
+        remapLine?.parentElement ?? document.querySelector('aside section[aria-label="Attributes"]')
+      );
+    };
     const attach = () => {
       if (made?.isConnected) return;
-      const newPlan = [...document.querySelectorAll('button')].find(
-        (b) => b.textContent?.trim().toLowerCase() === 'new plan'
-      );
-      const row = newPlan?.parentElement?.parentElement;
-      if (!row?.parentElement) return;
+      const target = host();
+      if (!target) return;
       made?.remove();
       made = document.createElement('div');
-      made.className = 'mt-2 flex justify-end';
-      row.parentElement.insertBefore(made, row.nextSibling);
+      target.appendChild(made);
       setSlot(made);
     };
     attach();
@@ -47,31 +51,36 @@ function IntoPlanCardActions({ children }: { children: ReactNode }) {
 }
 
 /**
- * Proposed: Optimize queue, under New plan. An existing `Button` (the
- * Optimize button's icon); one press makes the plan, so no "…". With an empty
- * queue it stays focusable (`aria-disabled`) and says why in its tooltip.
+ * Proposed: Optimize queue, at the foot of the Attributes card under the remap
+ * budget it spends, past a divider, at the card's full width. An existing
+ * `Button` with the Optimize button's icon; one press makes the plan, so no
+ * "…". With an empty queue it stays focusable (`aria-disabled`) and says why
+ * in its tooltip.
  */
 export function OptimizeQueueButton({ emptyQueue = false }: { emptyQueue?: boolean }) {
   const button = (
     <Button
       size="sm"
+      align="start"
+      className={emptyQueue ? 'w-full cursor-not-allowed opacity-40' : 'w-full'}
       aria-disabled={emptyQueue || undefined}
-      className={emptyQueue ? 'cursor-not-allowed opacity-40' : undefined}
     >
       <span aria-hidden="true" className="shrink-0 text-text-dim">
         <Icon.OptimizeRemaps size={Icon.ICON_SIZE.sm} />
       </span>
-      Optimize queue
+      <span className="flex-1">Optimize queue</span>
     </Button>
   );
   return (
-    <IntoPlanCardActions>
-      {emptyQueue ? (
-        <Tooltip content="Your skill queue is empty: nothing to optimize.">{button}</Tooltip>
-      ) : (
-        button
-      )}
-    </IntoPlanCardActions>
+    <IntoAttributesCard>
+      <div className="mt-3 border-t border-line pt-3">
+        {emptyQueue ? (
+          <Tooltip content="Your skill queue is empty: nothing to optimize.">{button}</Tooltip>
+        ) : (
+          button
+        )}
+      </div>
+    </IntoAttributesCard>
   );
 }
 

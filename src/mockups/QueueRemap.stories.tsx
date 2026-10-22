@@ -159,8 +159,8 @@ const openOptimize = async ({ canvasElement }: { canvasElement: HTMLElement }) =
 
 /**
  * Issue #4701: remap advice for the current skill queue. Chosen flow (Shawn,
- * 2026-10-21): one press of **Optimize queue**, under New plan in the Skill
- * Plan panel, makes a plan from the queue, runs the optimizer (`placeRemaps`,
+ * 2026-10-21): one press of **Optimize queue**, at the foot of the Attributes
+ * card, makes a plan from the queue, runs the optimizer (`placeRemaps`,
  * leaving out the level training now as the editor does), places its remaps
  * as Remap Markers and opens that plan, with an Undo toast naming what it did.
  *
@@ -168,8 +168,8 @@ const openOptimize = async ({ canvasElement }: { canvasElement: HTMLElement }) =
  * missile pilot (`queueRemapFixtures.ts`); every figure is the planner's own.
  *
  * New components in this mockup: none. The button is an existing `Button`
- * on its own line under New plan, and the landing
- * note is the existing `Toast`.
+ * at the Attributes card's full width under the remap budget, past a divider;
+ * the landing note is the existing `Toast`.
  */
 const meta = {
   title: 'mockups/QueueRemap',
@@ -194,13 +194,13 @@ export const TodayPlanOptimize: Story = {
   play: openOptimize,
 };
 
-/** @summary Optimize queue under New plan, no plans yet. */
+/** @summary Optimize queue at the foot of the Attributes card, no plans yet. */
 export const Button: Story = { render: () => withButton() };
 
-/** @summary Optimize queue under New plan on a phone. */
+/** @summary Optimize queue under the attribute chips on a phone. */
 export const ButtonPhone: Story = { render: () => withButton(), globals: phone };
 
-/** @summary Optimize queue with plans already kept: All plans and New plan unchanged, Optimize queue under New plan. */
+/** @summary With plans already kept: the Skill Plan panel is untouched, Optimize queue stays in Attributes. */
 export const ButtonWithPlans: Story = {
   parameters: { shell: queuePage('ready', seedExistingPlans) },
   render: () => withButton(),
