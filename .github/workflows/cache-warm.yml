@@ -1,0 +1,88 @@
+name: Cache warm
+
+# Saves ci.yml's dependency caches under `develop`, the only scope every PR
+# can read. GitHub lets a PR run restore caches made by its own earlier runs or
+# by its base branch, and ci.yml only runs on PRs, so without this every PR's
+# first run missed every cache: each of ~12 jobs ran a cold `npm ci` (~30s)
+# and each e2e shard then spent ~25s saving a cache no other PR could read —
+# 13–16 runner-minutes per PR, and ~750MB of single-use caches each, enough to
+# keep the repo over its 10GB cache quota and evicting.
+#
+# Each job here mirrors one cache in ci.yml: same path, same key, same runner
+# image, since the cache version hashes the path and the compression tool and
+# any difference is a silent miss. Change a key in ci.yml, change it here.
+#
+# Runs on `develop` only when a key can change (a lockfile, or ci.yml itself).
+# The weekly and by-hand runs use the default branch (`main`), whose caches
+# every branch can read as well. A hit saves nothing, so a run with nothing new
+# costs seconds. PR restores count as use, so a busy cache is never evicted
+# for age.
+on:
+  push:
+    branches: [develop]
+    paths:
+      - package-lock.json
+      - functions/package-lock.json
+      - .github/workflows/ci.yml
+      - .github/workflows/cache-warm.yml
+  schedule:
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cache-warm
+  cancel-in-progress: true
+
+jobs:
+  # `static`, `build`, `test-shard` and `rules` in ci.yml.
+  node-modules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/cache@v4
+        id: node-modules
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      # `rules`: firebase-tools (npx's download) and the Firestore emulator
+      # jar. The version is the one pinned in the `test:rules` script.
+      - uses: actions/cache@v4
+        id: firebase-tools
+        with:
+          path: |
+            ~/.npm/_npx
+            ~/.cache/firebase
+          key: firebase-tools-14.27.0-${{ runner.os }}
+      - if: steps.firebase-tools.outputs.cache-hit != 'true'
+        run: npx --yes firebase-tools@14.27.0 setup:emulators:firestore
+
+  # `e2e-shard` in ci.yml: same container image, so the same compression tool
+  # and therefore the same cache version.
+  node-modules-container:
+    runs-on: ubuntu-latest
+    container:
+      # Keep in sync with ci.yml's `e2e-shard` image.
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+      options: --init --ipc=host
+    steps:
+      - uses: actions/checkout@v4
+      # Root over a runner-owned checkout; see ci.yml's `e2e-shard`.
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/cache@v4
+        id: node-modules
+        with:
+          path: node_modules
+          key: node-modules-container-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
