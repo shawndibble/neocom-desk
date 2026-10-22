@@ -77,3 +77,32 @@ export function lineRows(
   }
   return rows;
 }
+
+export interface TooltipLine<L> {
+  line: L;
+  /** The line's position in the chart's own order: what picks its colour and dash. */
+  colorIndex: number;
+  value: number | null;
+}
+
+/**
+ * One day's tooltip entries, highest value first so the list reads in the
+ * order the dots stack. Ties keep chart line order; Characters with no point
+ * that day go last.
+ */
+export function tooltipLines<L extends { characterId: number }>(
+  row: LineRow,
+  lines: readonly L[]
+): TooltipLine<L>[] {
+  return lines
+    .map((line, colorIndex) => {
+      const value = row[lineKey(line.characterId)];
+      return { line, colorIndex, value: typeof value === 'number' ? value : null };
+    })
+    .sort((a, b) => {
+      if (a.value === null || b.value === null) {
+        return (a.value === null ? 1 : 0) - (b.value === null ? 1 : 0);
+      }
+      return b.value - a.value;
+    });
+}
