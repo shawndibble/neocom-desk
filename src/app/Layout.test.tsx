@@ -1127,7 +1127,7 @@ describe('Layout Characters switch carries the page it started from (#1764)', ()
     expect(screen.getByTestId('characters-page-from')).toHaveTextContent('/market');
   });
 
-  it("the desktop rail's Character link carries no origin — desktop behavior is unchanged", async () => {
+  it("the desktop rail's Character link carries the current page as its origin (#4691)", async () => {
     mockIsSyncConfigured.mockReturnValue(false);
     const user = userEvent.setup();
     renderLayoutWithRoutes('/market');
@@ -1137,6 +1137,6 @@ describe('Layout Characters switch carries the page it started from (#1764)', ()
     await user.click(within(rail).getByRole('link', { name: 'Switch character' }));
 
     expect(await screen.findByText('characters page')).toBeInTheDocument();
-    expect(screen.getByTestId('characters-page-from')).toHaveTextContent('');
+    expect(screen.getByTestId('characters-page-from')).toHaveTextContent('/market');
   });
 });

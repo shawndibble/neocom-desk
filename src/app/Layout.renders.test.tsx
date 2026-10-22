@@ -169,4 +169,16 @@ describe('Layout render isolation from the query string', () => {
 
     expect(await screen.findByText('characters page, from: /market')).toBeInTheDocument();
   });
+
+  it("points the rail's Character portrait back at the current page and its query (#4691)", async () => {
+    const user = userEvent.setup();
+    renderShell();
+    await screen.findByText(/wallet page, filter:/);
+    await user.click(screen.getByRole('button', { name: 'filter' }));
+    await screen.findByText('wallet page, filter: x');
+
+    await user.click(railLink('Switch character'));
+
+    expect(await screen.findByText('characters page, from: /wallet?q=x')).toBeInTheDocument();
+  });
 });
