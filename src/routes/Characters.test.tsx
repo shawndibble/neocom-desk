@@ -479,6 +479,19 @@ describe('Characters', () => {
     expect((await db.settings.get(ACTIVE_CHARACTER_KEY))?.value).toBe(91);
   });
 
+  it('clicking the card body selects, but the star button does not', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: /^Star Pilot One/ }));
+    await user.click(screen.getByRole('button', { name: /^Remove Pilot One/ }));
+    expect(screen.queryByText('overview page')).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    await user.click(await screen.findByText('Test Corp'));
+    expect(await screen.findByText('overview page')).toBeInTheDocument();
+    expect(useActiveCharacter.getState().activeCharacterId).toBe(91);
+  });
+
   it('selecting a character returns to the page the switch started from (#1764)', async () => {
     const user = userEvent.setup();
     renderCharacters({ pathname: '/characters', state: { from: '/mail' } });
