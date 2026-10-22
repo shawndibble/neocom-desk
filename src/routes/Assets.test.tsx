@@ -1650,6 +1650,24 @@ describe('cross-character search (issue #85)', () => {
       expect(within(panel).getByRole('columnheader', { name: /character/i })).toBeVisible();
     });
 
+    it('names no one as missing on Ships while the picker reads This character', async () => {
+      // The active Character's own read is skipped: that is the body's "couldn't load", not a
+      // "Not included" on a filter that never asked for anyone else.
+      server.use(
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+          HttpResponse.json({ error: 'not found' }, { status: 404 })
+        )
+      );
+      const user = userEvent.setup();
+      window.history.replaceState({}, '', '/assets/ships');
+      render(<App />);
+      await screen.findAllByText("Couldn't load");
+      const picker = within(pageHeader()).getByRole('button', { name: 'This character' });
+      await user.click(picker);
+      await screen.findByRole('menuitemradio', { name: 'This character' });
+      expect(screen.queryByText(/Not included/)).not.toBeInTheDocument();
+    });
+
     it('marks the header picker, not the body, when All leaves someone out on Ships and Move', async () => {
       await db.characters.put({
         characterId: 93,

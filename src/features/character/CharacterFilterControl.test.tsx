@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { db } from '@/db';
@@ -439,8 +439,40 @@ describe('CharacterFilterControl', () => {
     it('names who is missing in a non-interactive note in the open menu', async () => {
       render(<CharacterFilterControl {...partial} value="all" />);
       await openMenu();
-      const note = screen.getByText('Not included: Bob Vale and Cy Rho');
+      const note = within(screen.getByRole('menu')).getByText('Not included: Bob Vale and Cy Rho');
       expect(note.closest('[role="menuitem"],[role="menuitemradio"]')).toBeNull();
+    });
+
+    it('announces who is missing in a polite live region beside the trigger, not inside it', async () => {
+      render(<CharacterFilterControl {...partial} value="all" />);
+      const status = await screen.findByRole('status');
+      await waitFor(() => expect(status).toHaveTextContent('Not included: Bob Vale and Cy Rho'));
+      expect(screen.getByRole('button').contains(status)).toBe(false);
+    });
+
+    it('announces nothing with full coverage or on "This character"', async () => {
+      const { rerender } = render(
+        <CharacterFilterControl {...partial} missingNames={[]} value="all" />
+      );
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(screen.getByRole('status')).toHaveTextContent('');
+      rerender(<CharacterFilterControl {...partial} value="current" />);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(screen.getByRole('status')).toHaveTextContent('');
+    });
+
+    it('shows no "Not included" note in the menu on "This character"', async () => {
+      render(<CharacterFilterControl {...partial} value="current" />);
+      await openMenu();
+      expect(screen.queryByText(/Not included/)).not.toBeInTheDocument();
+    });
+
+    it("rings the dot in the trigger's fill when pressed as well as at rest", () => {
+      render(<CharacterFilterControl {...partial} value="all" />);
+      const trigger = screen.getByRole('button');
+      const dot = trigger.querySelector('[data-partial-dot]');
+      expect(trigger).toHaveClass('group', 'bg-panel-2', 'active:bg-panel');
+      expect(dot).toHaveClass('ring-panel-2', 'group-active:ring-panel');
     });
 
     it('keeps the plain label and no dot for "This character"', () => {

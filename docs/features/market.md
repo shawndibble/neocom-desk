@@ -176,7 +176,7 @@ What: fix list of every authenticated character's open market orders, each filed
 - Cached: `useRouteSnapshot` cacheKey `market:open-orders`; `DataAgeBadge` shows oldest fetch; "offline" label when any entry from cache.
 - No active character -> `<Navigate to="/characters">` (panel :524).
 
-**Page header** (portaled from the panel via `PageHeaderPortals.tsx`, no panel title bar): `CharacterFilterControl` in the `scope` slot, first in the cluster (avatar stack of the Characters with orders, words in its tooltip and accessible name; only when >1 character has orders or a Corporation option exists; a dot + "Not included" menu note for Characters that never shared orders), refresh icon and `TableActionsMenu` (CSV/export) beside the bell; `DataAgeBadge` beside the page title.
+**Page header** (portaled from the panel via `PageHeaderPortals.tsx`, no panel title bar): `CharacterFilterControl` in the `scope` slot, first in the cluster (avatar stack of the Characters with orders, words in its tooltip and accessible name; only when >1 character has orders or a Corporation option exists; a dot + "Not included" menu note for Characters that never shared orders), `TableActionsMenu` (CSV/export download icon) then the refresh icon, beside the bell (Export → Refresh, as on every header); `DataAgeBadge` beside the page title.
 
 **Headline** (`OpenOrdersFixListParts.tsx FixListSummary`): "N orders need you" (h2; "Nothing needs you" at 0), quiet line "<IskAmount> ISK tied up in them · N to watch · N fine", then the work-through's "Work through (N)" / "3 of 12 · Stop". Counts follow the funnel.
 

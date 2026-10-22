@@ -38,6 +38,7 @@ export function AssetsPageHeader({
     viewedCharacterId,
     activeCharacterId,
     crossCharacterFilter,
+    shipsFilterIsAll,
     crossCharacterCandidates,
     otherCharacterIds,
     activeCrossCharacterData,
@@ -58,7 +59,12 @@ export function AssetsPageHeader({
         onChange={(chars: CharacterFilterValue) => setView({ chars })}
         characterCount={crossCharacterCandidates.length}
         missingNames={
-          tab === 'items' ? activeCrossCharacterData?.skipped.map((c) => c.name) : tabMissingNames
+          tab === 'items'
+            ? activeCrossCharacterData?.skipped.map((c) => c.name)
+            : // Only "All" leaves anyone out; a This-character read that failed is the tab's own error.
+              shipsFilterIsAll
+              ? tabMissingNames
+              : undefined
         }
         loading={otherCharacterIds.length > 0 && crossCharacterLoading}
       />

@@ -99,6 +99,7 @@ import {
 } from '@/components/ui/DropdownMenu';
 import { characterPortraitUrl } from '@/lib/eveImages';
 import { Spinner } from '@/components/ui/Spinner';
+import { LiveStatus } from '@/components/ui/LiveStatus';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cx } from '@/lib/cx';
 import { CorporationLogoGlyph } from './CorporationLogoGlyph';
@@ -190,7 +191,7 @@ const FACE_RING = 'rounded-full ring-2 ring-panel-2';
  * composed because composing it would pull in its coupled `size-*` too.
  */
 const triggerBaseClassName =
-  `relative inline-flex shrink-0 items-center rounded-xs border border-line px-1 ` +
+  `group relative inline-flex shrink-0 items-center rounded-xs border border-line px-1 ` +
   `${interactiveClassName} ${focusRingClassName} ` +
   `bg-panel-2 text-text-dim hover:border-line-bright hover:text-text active:bg-panel`;
 
@@ -269,7 +270,8 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
           <DropdownMenuRadioItem value="corporation">{corporationLabel}</DropdownMenuRadioItem>
         )}
       </DropdownMenuRadioGroup>
-      {showAll && missingNote && (
+      {/* Only for "All", like the dot: "This character" never says who it leaves out. */}
+      {isPartial && (
         <>
           <DropdownMenuSeparator />
           <p className="px-2 py-1.5 text-xs text-text-dim">{missingNote}</p>
@@ -377,38 +379,46 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
   );
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <StackTrigger
-          tooltip={accessibleName}
-          aria-label={accessibleName}
-          aria-busy={loading || undefined}
-          className={`${controlHeightClassName[size]} ${triggerBaseClassName}`}
-        >
-          {/* The faces at every width. A spinner stands over them while loading,
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <StackTrigger
+            tooltip={accessibleName}
+            aria-label={accessibleName}
+            aria-busy={loading || undefined}
+            className={`${controlHeightClassName[size]} ${triggerBaseClassName}`}
+          >
+            {/* The faces at every width. A spinner stands over them while loading,
               the faces kept (invisible) so the trigger never changes width. */}
-          <span className="relative flex items-center">
-            <span aria-hidden="true" className={cx('flex items-center', loading && 'invisible')}>
-              {faces}
+            <span className="relative flex items-center">
+              <span aria-hidden="true" className={cx('flex items-center', loading && 'invisible')}>
+                {faces}
+              </span>
+              {loading && (
+                <span className="absolute inset-0 flex items-center justify-center">{spinner}</span>
+              )}
             </span>
-            {loading && (
-              <span className="absolute inset-0 flex items-center justify-center">{spinner}</span>
+            <Icon.Expanded size="0.75rem" aria-hidden="true" className="shrink-0" />
+            {isPartial && (
+              // The trigger has no words, so the dot is the visible cue. Inset inside the
+              // trigger box: as the last control on a phone header it must not spill past the edge.
+              <span
+                data-partial-dot
+                aria-hidden="true"
+                className="absolute top-0.5 right-0.5 size-2 rounded-full bg-warning ring-2 ring-panel-2 group-active:ring-panel"
+              />
             )}
-          </span>
-          <Icon.Expanded size="0.75rem" aria-hidden="true" className="shrink-0" />
-          {isPartial && (
-            // The trigger has no words, so the dot is the visible cue. Inset inside the
-            // trigger box: as the last control on a phone header it must not spill past the edge.
-            <span
-              data-partial-dot
-              aria-hidden="true"
-              className="absolute top-0.5 right-0.5 size-2 rounded-full bg-warning ring-2 ring-panel-2"
-            />
-          )}
-        </StackTrigger>
-      </DropdownMenuTrigger>
-      {options}
-    </DropdownMenu>
+          </StackTrigger>
+        </DropdownMenuTrigger>
+        {options}
+      </DropdownMenu>
+      {/* The dot is visual only: say who "All" leaves out once, politely, when that
+          list appears or changes. A sibling, not inside the button, so it is not
+          folded into the trigger's name. */}
+      <LiveStatus announceKey={isPartial ? (missingNote ?? undefined) : undefined}>
+        {isPartial ? missingNote : null}
+      </LiveStatus>
+    </>
   );
 }
 

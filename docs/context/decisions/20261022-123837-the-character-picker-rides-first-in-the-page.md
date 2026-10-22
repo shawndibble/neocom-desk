@@ -76,7 +76,13 @@ _Recorded 2026-10-22. Supersedes the placement half of
   move into it: with `missingNames` and the value "all", a warning dot marks
   the trigger at every width, its accessible name adds "Not included: {names}",
   and the open menu shows that line as a non-interactive note. The label does
-  not change: no "3 of 4" on the trigger. `loading` swaps the glyph for a
+  not change: no "3 of 4" on the trigger. The dot and the menu note need the
+  value "all": "This character" never says who it leaves out. Because the dot
+  is visual only, the control also renders a polite `LiveStatus` beside (not
+  inside) the trigger that announces "Not included: {names}" once when that
+  list appears or changes, so the cue reaches a screen reader on every page
+  without each page keeping its own announcement (amended 2026-10-22).
+  `loading` swaps the glyph for a
   `Spinner` in the same box, so the trigger never resizes.
 
 - **Out of scope:** the Overview's per-widget scope readouts
