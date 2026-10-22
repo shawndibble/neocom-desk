@@ -16,8 +16,9 @@ export const EMPTY_PRODUCTION_LOG_FILTER: ProductionLogFilter = {
 
 /**
  * `formatLocalDate`, not `toISOString().slice(0, 10)`: `loggedAt` is
- * `Date.now()` at logging time (a local instant), and a `<input
- * type="date">` bound also reads/writes the browser's local calendar day.
+ * `Date.now()` at logging time (an instant), and a `<input type="date">`
+ * bound reads/writes a calendar day on the clock the Logs table displays
+ * (the host's by default, UTC under EVE time, see `timeZone` below).
  * Converting through UTC first would shift a run logged late at night onto
  * the wrong side of a day boundary for every timezone that isn't UTC+0 —
  * unlike `filterWalletJournal`'s equivalent comparison, which is safe
