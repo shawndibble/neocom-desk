@@ -200,7 +200,7 @@ describe('the rail', () => {
   });
 
   it('leaves out what the pilot hid, unless it is where they are', () => {
-    useHiddenNav.setState({ value: ['/mining', '/planetary-industry', '/travel/hauling'] });
+    useHiddenNav.setState({ value: ['/mining', '/planetary-industry', '/market/hauling'] });
     renderAt('/planetary-industry');
 
     expect(within(rail()).queryByRole('link', { name: 'Mining' })).not.toBeInTheDocument();

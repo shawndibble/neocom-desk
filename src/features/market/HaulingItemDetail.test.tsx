@@ -93,7 +93,7 @@ function instantRow(): HaulingViewRow {
 function renderDetail(row: HaulingViewRow, line?: TripLine) {
   const actions = fakeItemActions();
   render(
-    <MemoryRouter initialEntries={['/travel/hauling']}>
+    <MemoryRouter initialEntries={['/market/hauling']}>
       <FakeItemActions actions={actions}>
         <HaulingItemDetail row={row} line={line} loadNote="5 m³ · limited by space" />
       </FakeItemActions>
@@ -120,7 +120,7 @@ function line(quantity: number): TripLine {
 describe('HaulingItemDetail — listing', () => {
   it('without its title row, puts the given actions on the flags and lane line', () => {
     render(
-      <MemoryRouter initialEntries={['/travel/hauling']}>
+      <MemoryRouter initialEntries={['/market/hauling']}>
         <FakeItemActions actions={fakeItemActions()}>
           <HaulingItemDetail
             row={listRow()}

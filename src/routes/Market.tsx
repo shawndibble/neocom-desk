@@ -3,12 +3,15 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactElement
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { guarded } from '@/app/routeChunks';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
 import { MARKET_TABS } from '@/app/pageTabs';
+import { tabPath } from '@/lib/pageTabs';
+import { HaulingPanel, type HaulingRefreshInfo } from '@/features/market/HaulingPanel';
 import {
   Button,
   Caret,
+  DataAgeBadge,
   EmptyState,
   FilterChip,
   IconButton,
@@ -302,6 +305,10 @@ export function Market() {
   const { t } = useTranslation();
   const location = useLocation();
   const [tab, setTab] = usePageTab(MARKET_TABS);
+  const navigate = useNavigate();
+  // Hauling's reload and its scan's Data Age sit in this page's title bar rather
+  // than the panel header: the panel hands them up through this callback.
+  const [haulingRefresh, setHaulingRefresh] = useState<HaulingRefreshInfo | null>(null);
   // Issue #726: true only immediately after the Quickbar's "View in
   // Appraisal" action, so the panel mounts with its Compare Hubs section
   // already open instead of collapsed.
@@ -310,7 +317,13 @@ export function Market() {
   // only `handleViewQuickbarInAppraisal` passes `true`, and only that call's
   // own value should reach the next `AppraisalPanel` mount.
   function changeTab(next: MarketTab, expandCompare = false) {
-    setTab(next);
+    // The query string rides along between tabs, but Hauling's `from`/`to`/`cat`
+    // are its own: crossing into or out of Hauling starts the other tab clean.
+    if (next !== tab && (next === 'hauling' || tab === 'hauling')) {
+      navigate(tabPath(MARKET_TABS, next));
+    } else {
+      setTab(next);
+    }
     setExpandCompareOnAppraisal(expandCompare);
   }
   const isPhone = useIsPhone();
@@ -826,7 +839,16 @@ export function Market() {
         {tab === 'orders' && <FromWalletCrumb />}
         <PageHeader
           title={t('market.title')}
-          meta={tabOwnsHeader ? metaSlot : undefined}
+          meta={
+            tabOwnsHeader ? (
+              metaSlot
+            ) : tab === 'hauling' && haulingRefresh?.fetchedAt != null ? (
+              <DataAgeBadge
+                date={new Date(haulingRefresh.fetchedAt)}
+                note={t('market.hauling.dataAgeNote')}
+              />
+            ) : undefined
+          }
           actions={
             usesHubPicker(tab) ? (
               <>
@@ -902,6 +924,13 @@ export function Market() {
               </>
             ) : tabOwnsHeader ? (
               actionsSlot
+            ) : tab === 'hauling' && haulingRefresh ? (
+              <IconButton
+                icon={<Icon.Refresh />}
+                label={t('market.refresh')}
+                onClick={haulingRefresh.refresh}
+                disabled={haulingRefresh.disabled}
+              />
             ) : undefined
           }
         />
@@ -936,6 +965,10 @@ export function Market() {
               />
             )}
           </Suspense>
+
+          {/* Hauling picks its own From/To hubs, so the header hub picker
+              (`usesHubPicker`) stays off it. */}
+          {tab === 'hauling' && <HaulingPanel onRefreshInfoChange={setHaulingRefresh} />}
 
           {tab === 'browser' && (
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
