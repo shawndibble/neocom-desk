@@ -196,7 +196,7 @@ describe('HaulingItemDetail — listing', () => {
     expect(screen.getByText('Profit each')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'the lower of what listings recently sold for (23,500,000) and one tick under the cheapest listing (23,160,000).'
+        'lower of recent sales (23,500,000) and one tick under the cheapest listing (23,160,000).'
       )
     ).toBeInTheDocument();
     expect(
@@ -204,11 +204,15 @@ describe('HaulingItemDetail — listing', () => {
     ).toBeInTheDocument();
   });
 
-  it('links Show info, the destination market and Route Safety for the lane', () => {
+  it('links Show info, both end markets and Route Safety for the lane', () => {
     renderDetail(listRow());
-    expect(screen.getByRole('link', { name: 'Price history and orders in Jita' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Jita market' })).toHaveAttribute(
       'href',
-      expect.stringContaining('/market/browser?')
+      expect.stringContaining('hub=jita')
+    );
+    expect(screen.getByRole('link', { name: 'Amarr market' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('hub=amarr')
     );
     const route = screen.getByRole('link', { name: 'Route safety' }).getAttribute('href')!;
     expect(route).toContain(`from=${AMARR.systemId}`);
