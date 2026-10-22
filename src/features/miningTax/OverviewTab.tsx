@@ -77,13 +77,14 @@ import { readCompressedOre, useRefreshOnOreFormChange } from './oreForm';
 import {
   BuybackRateInput,
   ChartMetricControl,
-  MobileSettings,
+  SettingsSheet,
   PriceBasisOptions,
   RangeControl,
   ShowRefiningToggle,
   ValueMenu,
 } from './OverviewSettings';
 import { basisSummary } from './basisLabel';
+import { useMediaQuery } from '@/lib/useMediaQuery';
 import { YieldDetailModal } from './YieldDetailModal';
 import { yieldOverviewCsvColumns } from './yieldCsv';
 import { sumVolume, volumeDisplayMode } from './volume';
@@ -99,6 +100,14 @@ const LazyMiningYieldCharts = lazy(() => guarded(() => import('./MiningYieldChar
 const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
 
 const OVERVIEW_CHARACTER_FILTER_PARAM = characterFilterParam('all');
+/**
+ * From `xl` the header row holds the range, chart metric and Value menu
+ * inline beside the picker; from `lg` the range alone (the rest truncated
+ * the title at 1024); below `lg` none of them (the range alone, beside the
+ * nav rail and the icon-box picker, truncated the title at 768).
+ */
+const WIDE_HEADER_QUERY = '(min-width: 80rem)';
+const MID_HEADER_QUERY = '(min-width: 64rem)';
 const OVERVIEW_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
 
 /** A row's mined m³ — units times the type's own unit volume for each ore line. */
@@ -183,6 +192,12 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   const today = eveToday(new Date(nowMs));
 
   const characters = data?.characters ?? [];
+  // The Characters the ledger tracks, which can be fewer than the roster: the
+  // picker's faces and "+N" follow them, matching its "· N".
+  const characterIds = useMemo(() => (data?.characters ?? []).map((c) => c.characterId), [data]);
+  const isWide = useMediaQuery(WIDE_HEADER_QUERY);
+  const isMid = useMediaQuery(MID_HEADER_QUERY);
+  const headerLayout: 'narrow' | 'mid' | 'wide' = isWide ? 'wide' : isMid ? 'mid' : 'narrow';
   const showCharacterColumn = characters.length > 1;
   // The reprocessing recipes are a lazy download: when they couldn't load, the
   // refined side is left out and said to be unavailable rather than shown as zero.
@@ -488,49 +503,58 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
           header whose actions drive it. */}
       <PageHeader
         title={t('miningTax.title')}
-        // `CharacterFilterControl` rides here rather than in `actions` per
-        // `docs/context/decisions/20260908-192806-the-character-filter-rides-in-the-panel-header.md`
-        // — this tab has no titled inner `Panel` to attach it to, so it
-        // takes the page-level title band instead, the same "names whose
-        // data this is" role the decision describes for a panel's own
-        // `meta`.
-        meta={
-          <>
-            {data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
-            {characters.length > 0 && (
-              <CharacterFilterControl
-                activeCharacterId={activeCharacterId}
-                value={characterFilter}
-                onChange={setCharacterFilter}
-                characterCount={characters.length}
-                // Rides in this route's own `PageHeader` meta (no titled
-                // inner `Panel`); its `actions` cluster (the Refresh button
-                // below) sits at `IconButton`'s default touch tier.
-                size="md"
-              />
-            )}
-          </>
+        meta={data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
+        scope={
+          characters.length > 0 && (
+            <CharacterFilterControl
+              activeCharacterId={activeCharacterId}
+              value={characterFilter}
+              onChange={setCharacterFilter}
+              characterCount={characters.length}
+              allCharacterIds={characterIds}
+            />
+          )
         }
         actions={
           <>
-            <div className="hidden items-center gap-2 sm:flex">
-              <RangeControl value={range} onChange={(next) => void setRange(next)} />
-              <ChartMetricControl
-                value={chartMetric}
-                onChange={(next) => void setChartMetric(next)}
-              />
-              <ValueMenu basis={basis} buybackRate={buybackRate}>
-                <PriceBasisOptions value={basis} onChange={(next) => void setBasis(next)} />
-                <BuybackRateInput
-                  value={buybackRate}
-                  onChange={(next) => void setBuybackRate(next)}
+            {/* The header row never wraps (it has a picker), so what fits
+                decides what is inline (measured at 390/768/1024/1280):
+                everything from `xl`; the range alone, with the other view
+                settings behind the gear, from `lg`; below that the range
+                joins them. */}
+            {headerLayout === 'wide' ? (
+              <>
+                <RangeControl value={range} onChange={(next) => void setRange(next)} />
+                <ChartMetricControl
+                  value={chartMetric}
+                  onChange={(next) => void setChartMetric(next)}
                 />
-                <ShowRefiningToggle value={showRefining} onChange={handleShowRefiningChange} />
-              </ValueMenu>
-            </div>
-            <div className="sm:hidden">
-              <MobileSettings range={range} basis={basis} buybackRate={buybackRate}>
-                <RangeControl value={range} onChange={(next) => void setRange(next)} fill />
+                <ValueMenu basis={basis} buybackRate={buybackRate}>
+                  <PriceBasisOptions value={basis} onChange={(next) => void setBasis(next)} />
+                  <BuybackRateInput
+                    value={buybackRate}
+                    onChange={(next) => void setBuybackRate(next)}
+                  />
+                  <ShowRefiningToggle value={showRefining} onChange={handleShowRefiningChange} />
+                </ValueMenu>
+              </>
+            ) : (
+              headerLayout === 'mid' && (
+                <RangeControl value={range} onChange={(next) => void setRange(next)} />
+              )
+            )}
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('miningTax.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
+            {/* The gear takes the ⋮'s slot: last before the bell, after Refresh. */}
+            {headerLayout !== 'wide' && (
+              <SettingsSheet>
+                {headerLayout === 'narrow' && (
+                  <RangeControl value={range} onChange={(next) => void setRange(next)} fill />
+                )}
                 <ChartMetricControl
                   value={chartMetric}
                   onChange={(next) => void setChartMetric(next)}
@@ -542,14 +566,8 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                   onChange={(next) => void setBuybackRate(next)}
                 />
                 <ShowRefiningToggle value={showRefining} onChange={handleShowRefiningChange} />
-              </MobileSettings>
-            </div>
-            <IconButton
-              icon={<Icon.Refresh />}
-              label={t('miningTax.refresh')}
-              onClick={refresh}
-              disabled={loading}
-            />
+              </SettingsSheet>
+            )}
           </>
         }
       />
@@ -618,7 +636,16 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
               />
             ) : (
               <>
-                <p className="text-xs text-text-dim">{basisSummary(t, basis, buybackRate)}</p>
+                <p className="text-xs text-text-dim">
+                  {/* Below `lg` the range lives in the settings sheet, so the
+                      summary names it: the page must say what span it shows. */}
+                  {headerLayout === 'narrow'
+                    ? t('miningTax.overview.rangeSummary', {
+                        range: t(`miningTax.overview.range.${range}`),
+                        summary: basisSummary(t, basis, buybackRate),
+                      })
+                    : basisSummary(t, basis, buybackRate)}
+                </p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <Panel>
                     <p className={eyebrowClassName}>{t('miningTax.overview.totalValueStat')}</p>

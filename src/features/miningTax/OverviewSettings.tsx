@@ -1,14 +1,16 @@
 /**
  * The Mining Yield Overview's page settings (issues #1278, #1279, #1280):
  * the date range, and the price basis and buyback rate inside a "Value"
- * menu. On desktop the range sits in the header and the rest in a popover;
- * on a phone all three live in one bottom sheet behind a single header
- * button.
+ * menu. On a wide desktop the range and chart metric sit in the header and
+ * the value settings in a popover; narrower, everything but the range moves
+ * into one sheet behind a header gear, and narrower still the range joins
+ * them (`OverviewTab`'s header).
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  IconButton,
   Modal,
   Popover,
   PopoverContent,
@@ -26,6 +28,7 @@ import {
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { MINING_YIELD_RANGES, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import { basisSide, isNowBasis, type PriceBasis } from '@/engine/miningTax/priceBasis';
 import { CHART_METRICS, type ChartMetric } from './chartMetricPref';
@@ -204,36 +207,33 @@ export function ValueMenu({
   );
 }
 
-/** Phone: one header button ("30d · 90% · Jita buy") opening every page setting in a bottom sheet. */
-export function MobileSettings({
-  range,
-  basis,
-  buybackRate,
-  children,
-}: {
-  range: MiningYieldRange;
-  basis: PriceBasis;
-  buybackRate: number;
-  children: ReactNode;
-}) {
+/**
+ * The view settings sheet: the Overview's view settings that don't fit the
+ * header row, behind one icon-only gear in the ⋮'s slot (after Refresh). Its header shares a line with the
+ * Character picker and never wraps, and a text trigger ("30d · Jita buy")
+ * beside the range truncated the title at 1024. These are
+ * view settings, not actions, so they live here, not in a ⋮.
+ */
+export function SettingsSheet({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
   const [open, setOpen] = useState(false);
+  const title = t('miningTax.overview.settingsTitle');
   return (
     <>
-      <button
-        type="button"
-        className={triggerClassName}
+      <IconButton
+        icon={<Icon.Settings />}
+        label={title}
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-      >
-        {t(`miningTax.overview.range.${range}`)} · {valueButtonLabel(t, basis, buybackRate)}
-        {triggerCaret}
-      </button>
+      />
+      {/* A bottom sheet on a phone, a centred dialog from `sm` up — how
+          `PageSettingsModal` opens a page's settings. */}
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title={t('miningTax.overview.settingsTitle')}
-        placement="sheet"
+        title={title}
+        placement={isPhone ? 'sheet' : 'center'}
       >
         <div className="space-y-4">{children}</div>
       </Modal>

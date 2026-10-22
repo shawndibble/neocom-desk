@@ -17,14 +17,18 @@ _Recorded 2026-10-22. Supersedes the placement half of
   still describes the control; it just loses to a position that never moves.
 
 - **One picker per page.** A page whose panels each had their own picker gets
-  one page-level picker that drives them all. Industry merges its two
-  (`jobs.chars` on Active Jobs and `opps.chars` on Opportunities) into one in
-  a later PR.
+  one page-level picker that drives them all. Industry merged its two
+  (`jobs.chars` on Active Jobs and `opps.chars` on Opportunities) into one,
+  `industry.chars`, in the Industry header on every Industry page; the old
+  params still open a link, and the old per-panel remembered picks seed the
+  merged one (`industryCharacterFilter.ts`).
 
 - **The cluster's order is fixed:** picker → text-labelled page actions
   (Compose, Payees, a labelled Export…) → icon-only actions (Refresh) → ⋮
-  More actions (`HeaderMoreMenu`) → `AlertsBell`. Words on the left, icons on
-  the right; the ⋮ is always the last action, just before the bell.
+  More actions (`HeaderMoreMenu`) or a settings gear → `AlertsBell`. Words on
+  the left, icons on the right; the ⋮ or gear is always the last action, just
+  before the bell, after Refresh (Mining Overview's view-settings gear,
+  Industry's per-tab settings gear).
 
 - **Same height as the icons beside it, enforced.** Inside a `PageHeader`
   cluster the picker takes the header's touch tier on its own
@@ -52,6 +56,17 @@ _Recorded 2026-10-22. Supersedes the placement half of
   never by rendering both and hiding one with CSS. A ⋮ still needs two or more
   real actions, and Refresh stays a standalone icon. `subNav` keeps its own
   line below `md`. Without `scope` the header wraps as before.
+
+- **On a scope header that cannot fit them, view settings fold into one
+  settings sheet, chosen in JS.** Scope and mode controls (DESIGN.md §6c
+  tier 1) normally keep a visible label at every width, but they are view
+  settings, not actions, so they never go in the ⋮. Mining › Overview is the
+  case: its Range, Chart metric and Value menu are inline from `xl`, the
+  Range alone from `lg`, and below that all of them sit in one "View
+  settings" gear (a bottom sheet on a phone, a centred dialog above), in the
+  ⋮'s slot. A setting that leaves the header is still named on the page: the
+  Overview's summary line reads the range ("30d · Valued at Jita buy…")
+  whenever the Range control is in the sheet.
 
 - **Partial coverage and loading ride in the trigger, not beside it.** The
   "Not included: …" readouts and the spinners pages put next to the picker

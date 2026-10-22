@@ -12,6 +12,7 @@ import { useDefaultCharacterFilter } from '@/features/character/defaultCharacter
 import { useCharacterFilterPicks } from '@/features/character/characterFilterPicks';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
+import { IndustryCharacterPicker } from './IndustryCharacterPicker';
 import * as corpJobsModule from './corpJobs';
 import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 
@@ -1188,6 +1189,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     render(
       <MemoryRouter>
         <FakeItemActions>
+          <IndustryCharacterPicker activeCharacterId={CHAR_ID} />
           <ActiveJobsPanel characterId={CHAR_ID} />
         </FakeItemActions>
       </MemoryRouter>
@@ -1199,7 +1201,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     expect(screen.queryByRole('button', { name: 'This character' })).toBeNull();
   });
 
-  it('puts the character filter in the panel header, so a folded panel is still one line', async () => {
+  it('carries no character filter of its own — the Industry page header holds the one picker', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(NOW);
     await seedSecondCharacter();
@@ -1212,30 +1214,8 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
       </MemoryRouter>
     );
 
-    // Beside the summary in the header, not in a row of its own below it: the
-    // fold hides the body, so a body-row picker leaves the "collapsed" panel
-    // two rows tall with a stray control under the summary it qualifies.
-    const trigger = await screen.findByRole('button', { name: 'This character' });
-    expect(trigger.closest('header')).not.toBeNull();
-    expect(screen.queryByRole('table', { name: 'Jobs' })).toBeNull();
-  });
-
-  it('keeps the character filter when nothing is running — an empty panel is where the cross-character view most needs finding', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(NOW);
-    await seedSecondCharacter();
-    server.use(http.get(jobsUrl(), () => HttpResponse.json([])));
-
-    render(
-      <MemoryRouter>
-        <FakeItemActions>
-          <ActiveJobsPanel characterId={CHAR_ID} />
-        </FakeItemActions>
-      </MemoryRouter>
-    );
-
-    expect(await screen.findByText('None')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'This character' }).closest('header')).not.toBeNull();
+    expect(await screen.findByRole('button', { name: 'Show job list' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'This character' })).toBeNull();
   });
 
   it('defaults to "This character" and never fetches the other character\'s jobs', async () => {
@@ -1247,6 +1227,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     render(
       <MemoryRouter>
         <FakeItemActions>
+          <IndustryCharacterPicker activeCharacterId={CHAR_ID} />
           <ActiveJobsPanel characterId={CHAR_ID} />
         </FakeItemActions>
       </MemoryRouter>
@@ -1266,13 +1247,14 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     render(
       <MemoryRouter>
         <FakeItemActions>
+          <IndustryCharacterPicker activeCharacterId={CHAR_ID} />
           <ActiveJobsPanel characterId={CHAR_ID} />
         </FakeItemActions>
       </MemoryRouter>
     );
 
     await user.click(await screen.findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters · 2' }));
 
     await expandJobs(user);
     expect(await screen.findByText('Pilot One')).toBeInTheDocument();
@@ -1297,13 +1279,14 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     render(
       <MemoryRouter>
         <FakeItemActions>
+          <IndustryCharacterPicker activeCharacterId={CHAR_ID} />
           <ActiveJobsPanel characterId={CHAR_ID} />
         </FakeItemActions>
       </MemoryRouter>
     );
 
     await user.click(await screen.findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters · 3' }));
     await expandJobs(user);
 
     // All three selected: Pilot Three's skipped notice shows.
@@ -1315,7 +1298,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     // Narrow the filter back to "This character" — the notice list must
     // follow the same filter the job rows do (issue #607 CodeRabbit review),
     // not just keep listing every skipped Character regardless.
-    await user.click(screen.getByRole('button', { name: 'All characters' }));
+    await user.click(screen.getByRole('button', { name: 'All characters · 3' }));
     await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
 
     expect(screen.queryByText(/Pilot Three —/)).not.toBeInTheDocument();
@@ -1341,13 +1324,14 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     render(
       <MemoryRouter>
         <FakeItemActions>
+          <IndustryCharacterPicker activeCharacterId={CHAR_ID} />
           <ActiveJobsPanel characterId={CHAR_ID} />
         </FakeItemActions>
       </MemoryRouter>
     );
 
     await user.click(await screen.findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters · 2' }));
 
     expect(await screen.findByText('Pilot Two — Log in again to see jobs')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Log in again with EVE Online' }));
@@ -1367,13 +1351,14 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     render(
       <MemoryRouter>
         <FakeItemActions>
+          <IndustryCharacterPicker activeCharacterId={CHAR_ID} />
           <ActiveJobsPanel characterId={CHAR_ID} />
         </FakeItemActions>
       </MemoryRouter>
     );
 
     await user.click(await screen.findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters · 2' }));
 
     // "No data cached", not "None" — a failed read must not read as an answer
     // of zero running jobs.
@@ -1421,6 +1406,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     const { container } = render(
       <MemoryRouter>
         <FakeItemActions>
+          <IndustryCharacterPicker activeCharacterId={CHAR_ID} />
           <ActiveJobsPanel characterId={CHAR_ID} />
         </FakeItemActions>
       </MemoryRouter>
@@ -1433,7 +1419,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters · 2' }));
 
     // Both: 4+2=6 max, 2 running -> 4 open. Science/reaction stay at the
     // untrained 1/1 for both characters (base slot only), summed to 2/2.

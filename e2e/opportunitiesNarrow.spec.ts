@@ -51,8 +51,8 @@ async function seedOwnedBlueprint(page: Page): Promise<void> {
  * straight into Dexie rather than driven through a second login — `data.ts`'s
  * `loadCharacterBlueprints` reads cache-first (`esi/cache.ts`), so a fresh
  * row here is served without ever needing a live token for this character.
- * `characters.toArray().length > 1` is also what makes
- * `OpportunitiesPanel`'s Character filter render at all.
+ * `characters.toArray().length > 1` is also what makes the Industry
+ * header's Character picker (`IndustryCharacterPicker`) render at all.
  */
 async function seedSecondCharacterBlueprint(page: Page): Promise<void> {
   await page.evaluate(
