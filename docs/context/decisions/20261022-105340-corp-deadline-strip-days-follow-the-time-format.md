@@ -2,8 +2,6 @@
 
 _Recorded 2026-10-22._
 
-- **<Decision>.** <Why, and what it rules out.>
-
 - **The Corp Deadline Strip (Overview `corpDeadlines` widget) cuts and labels
   its days on the Time format's clock.** With `eve` selected a bar is a UTC
   day and its label (`formatDateOnly`) is read in UTC; with `local` nothing
