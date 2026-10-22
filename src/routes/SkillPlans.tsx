@@ -1,13 +1,21 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { db } from '@/db';
-import { DataAgeBadge, Spinner, CachedNotice } from '@/components/ui';
+import { DataAgeBadge, Spinner, CachedNotice, Toast } from '@/components/ui';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { scheduleSync } from '@/sync';
-import type { SkillPlanImportState } from '@/lib/shortcuts';
+import type { OptimizeQueueToastState, SkillPlanImportState } from '@/lib/shortcuts';
+import { parseSkillQueue } from '@/engine/skills/queueImport';
+import { romanLevel } from '@/engine/projection';
+import { formatLocalDate } from '@/lib/localDate';
+import { loadCharacterSkillQueue } from '@/features/skills/data';
+import { optimizeQueueMadeMessage } from '@/features/skills/planner/optimizeHelpers';
+import { optimizeQueuePlan } from '@/features/skills/planner/optimizeQueuePlan';
+import { dedupeEntries } from '@/features/skills/planner/reorder';
+import { useCloneStates, cloneStateFor } from '@/features/skills/cloneState';
 import { newPlan } from '@/features/skills/planner/newPlan';
 import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
@@ -121,6 +129,61 @@ export function SkillPlans() {
       .catch(() => undefined);
   }, [hydrated, activeCharacterId, importText, remapCount, navigate, t]);
 
+  // "Optimize queue": a plan made from the live skill queue with its best
+  // remaps placed, opened at once. One press, no dialog; Undo lands on the
+  // new plan's editor (a toast closes on a route change, so it is raised there).
+  const cloneStates = useCloneStates((state) => state.value);
+  useHydratedStore(useCloneStates);
+  const optimizing = useRef(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const optimizeQueue = useCallback(async () => {
+    if (optimizing.current || activeCharacterId === null || !scheduleInputs) return;
+    optimizing.current = true;
+    setNotice(null);
+    try {
+      const result = await loadCharacterSkillQueue(activeCharacterId);
+      if (!result) {
+        setNotice(t('plans.optimizeQueueFailed'));
+        return;
+      }
+      const nowMs = Date.now();
+      const entries = dedupeEntries(parseSkillQueue(result.data));
+      const existing = await db.skillPlans.where('characterId').equals(activeCharacterId).toArray();
+      const taken = new Set(existing.map((plan) => plan.name));
+      const base = t('plans.optimizeQueuePlanName', { date: formatLocalDate(new Date(nowMs)) });
+      let name = base;
+      for (let n = 2; taken.has(name); n++) name = `${base} (${n})`;
+      const outcome = optimizeQueuePlan({
+        entries,
+        inputs: { ...scheduleInputs, cloneState: cloneStateFor(cloneStates, activeCharacterId) },
+        remapInfo,
+        nowMs,
+        characterId: activeCharacterId,
+        name,
+      });
+      if (outcome.kind !== 'plan') {
+        setNotice(t('plans.optimizeQueueOptimal'));
+        return;
+      }
+      await db.skillPlans.add(outcome.plan);
+      if (isSyncConfigured()) scheduleSync(activeCharacterId);
+      const skill = outcome.firstRemapEntry
+        ? `${scheduleInputs.catalog.engineSkills.get(outcome.firstRemapEntry.skillTypeID)?.name ?? ''} ${romanLevel(outcome.firstRemapEntry.targetLevel)}`
+        : '';
+      void navigate(`/skills/plans/${outcome.plan.id}`, {
+        state: {
+          optimizeQueueMessage: optimizeQueueMadeMessage(t, name, outcome, skill),
+        } satisfies OptimizeQueueToastState,
+      });
+    } catch (err) {
+      // Malformed queue data or storage refusing the plan: say so, stay on the list.
+      setNotice(t('plans.optimizeQueueFailed'));
+      console.error(err);
+    } finally {
+      optimizing.current = false;
+    }
+  }, [activeCharacterId, scheduleInputs, cloneStates, remapInfo, navigate, t]);
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -157,6 +220,8 @@ export function SkillPlans() {
             implantBonuses={implants}
             attributeBaseline={attributeBaseline}
             remapInfo={remapInfo}
+            onOptimizeQueue={scheduleInputs ? () => void optimizeQueue() : undefined}
+            queueEmpty={queueResult != null && queueResult.data.length === 0}
           />
         </aside>
         {catalog && (
@@ -168,6 +233,7 @@ export function SkillPlans() {
           />
         )}
       </div>
+      {notice && <Toast message={notice} onClose={() => setNotice(null)} />}
     </div>
   );
 }

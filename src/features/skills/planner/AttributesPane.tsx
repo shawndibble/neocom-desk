@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, Panel } from '@/components/ui';
+import { Button, DataAgeBadge, Panel, Tooltip } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { AttributeChips } from '@/features/skills/AttributeChips';
 import type { CachedResult } from '@/features/skills/data';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
@@ -17,6 +18,10 @@ interface AttributesPaneProps {
   attributeBaseline?: AttributeBaseline | null;
   /** Live remap availability, same source the plan editor costs against; null when unreadable. */
   remapInfo: RemapAvailability | null;
+  /** Makes a plan from the live skill queue with its best remaps placed; omitted hides the button. */
+  onOptimizeQueue?: () => void;
+  /** The in-game queue has nothing in it: the button stays focusable and says why. */
+  queueEmpty?: boolean;
   className?: string;
 }
 
@@ -37,6 +42,8 @@ export function AttributesPane({
   implantBonuses,
   attributeBaseline = null,
   remapInfo,
+  onOptimizeQueue,
+  queueEmpty = false,
   className,
 }: AttributesPaneProps) {
   const { t } = useTranslation();
@@ -50,11 +57,38 @@ export function AttributesPane({
       short
     />
   );
+  const optimizeQueue = () => {
+    if (!onOptimizeQueue) return null;
+    const button = (
+      <Button
+        size="sm"
+        align="start"
+        className={queueEmpty ? 'w-full cursor-not-allowed opacity-40' : 'w-full'}
+        aria-disabled={queueEmpty || undefined}
+        onClick={queueEmpty ? undefined : onOptimizeQueue}
+      >
+        <span aria-hidden="true" className="shrink-0 text-text-dim">
+          <Icon.OptimizeRemaps size={Icon.ICON_SIZE.sm} />
+        </span>
+        <span className="flex-1">{t('plans.optimizeQueue')}</span>
+      </Button>
+    );
+    return (
+      <div className="mt-3 border-t border-line pt-3">
+        {queueEmpty ? (
+          <Tooltip content={t('plans.optimizeQueueEmptyTip')}>{button}</Tooltip>
+        ) : (
+          button
+        )}
+      </div>
+    );
+  };
   if (!isDesktop) {
     // One line, no card. The remap note and data age are desktop reference.
     return (
       <section aria-label={t('skills.attributes')} className="px-1">
         {chips()}
+        {optimizeQueue()}
       </section>
     );
   }
@@ -79,6 +113,7 @@ export function AttributesPane({
             }`}
           </p>
         )}
+        {optimizeQueue()}
       </Panel>
     </>
   );

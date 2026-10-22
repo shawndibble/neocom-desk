@@ -111,3 +111,21 @@ export function anchorKeysOf(
 ): (StepKey | undefined)[] {
   return segments.map((segment) => stepKeys[segment.startIndex]);
 }
+
+/** The toast "Optimize queue" leaves behind for a plan it made. */
+export function optimizeQueueMadeMessage(
+  t: TFunction,
+  name: string,
+  made: { savingsSeconds: number; remapsPlaced: number; yearlyRemapAfter?: Date },
+  firstSkill: string
+): string {
+  const duration = formatCountdown(made.savingsSeconds);
+  const what =
+    made.remapsPlaced > 1
+      ? t('plans.optimizeQueueWhatMany', { count: made.remapsPlaced, duration })
+      : t('plans.optimizeQueueWhatOne', { skill: firstSkill, duration });
+  const wait = made.yearlyRemapAfter
+    ? t('plans.optimizeQueueYearlyWait', { date: formatLocalDate(made.yearlyRemapAfter) })
+    : '';
+  return t('plans.optimizeQueueMade', { name, what, wait });
+}
