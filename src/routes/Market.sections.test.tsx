@@ -62,7 +62,9 @@ const openOrder = {
   price: 5.5,
   volume_remain: 100,
   volume_total: 200,
-  issued: '2026-08-01T00:00:00Z',
+  // Issued a day ago, not on a fixed date: a fixed date drifts into "expiring
+  // soon" as the calendar moves, and the order stops being Fine.
+  issued: new Date(Date.now() - 86_400_000).toISOString(),
   duration: 90,
   range: 'region',
 };
