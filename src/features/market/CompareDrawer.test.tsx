@@ -31,6 +31,12 @@ vi.mock('@/sde/loadSde', () => ({
 const narrowState = vi.hoisted(() => ({ narrow: false }));
 vi.mock('@/lib/useIsNarrow', () => ({ useIsNarrow: () => narrowState.narrow }));
 
+const hubPrices = vi.hoisted(() => ({ fetch: vi.fn() }));
+vi.mock('@/market/prices', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/market/prices')>()),
+  getHubPricesWithStatus: hubPrices.fetch,
+}));
+
 vi.mock('@/features/character/characterModifiers', () => ({
   loadCharacterModifiers: vi.fn(),
 }));
@@ -105,6 +111,19 @@ beforeEach(() => {
   vi.clearAllMocks();
   useCompareSet.setState({ items: [], view: 'prices', openRequest: 0 });
   narrowState.narrow = false;
+  // Jita sells Tritanium at 100 (buy 80), Amarr at 90 (buy 85); the rest have no orders.
+  hubPrices.fetch.mockImplementation(async (hub: { id: string }) => {
+    const quotes: Record<string, { sellMin: number; buyMax: number }> = {
+      jita: { sellMin: 100, buyMax: 80 },
+      amarr: { sellMin: 90, buyMax: 85 },
+    };
+    const quote = quotes[hub.id];
+    return {
+      prices: new Map(quote ? [[ITEM_A.typeId, { ...quote, sellVolume: 5, buyVolume: 5 }]] : []),
+      unreachable: false,
+      stale: false,
+    };
+  });
   mockedLoadDictionary.mockResolvedValue({
     9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
   });
@@ -197,6 +216,8 @@ describe('CompareDrawer', () => {
     renderDrawer(null);
     await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
     const region = await screen.findByRole('region', { name: 'Compare' });
+    // A lone item opens on Trade hubs.
+    await user.click(within(region).getByRole('button', { name: 'Prices' }));
     await within(region).findByText('25.0%');
 
     const row = within(region).getByText('Tritanium').closest('tr') as HTMLElement;
@@ -213,6 +234,7 @@ describe('CompareDrawer', () => {
     renderDrawer(90000001);
     await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
     const region = await screen.findByRole('region', { name: 'Compare' });
+    await user.click(within(region).getByRole('button', { name: 'Prices' }));
 
     // 20 spread - 3.375 tax on 100 - two 100 ISK minimum broker fees.
     expect(
@@ -362,6 +384,63 @@ describe('CompareDrawer', () => {
       within(region).queryByRole('button', { name: 'Export Attributes' })
     ).not.toBeInTheDocument();
     expect(within(region).queryByText('Structure Hitpoints')).not.toBeInTheDocument();
+  });
+
+  it('switches to Trade hubs: five hub columns, best marks, and the hub-scoped cell link', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A, ITEM_B] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (2)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    expect(hubPrices.fetch).not.toHaveBeenCalled();
+
+    await user.click(within(region).getByRole('button', { name: 'Trade hubs' }));
+
+    const amarrCell = await within(region).findByRole('link', {
+      name: 'Tritanium at Amarr: best sell 90.00',
+    });
+    expect(amarrCell).toHaveAttribute('href', expect.stringContaining('type=34'));
+    expect(amarrCell).toHaveAttribute('href', expect.stringContaining('hub=amarr'));
+    for (const hub of ['Jita', 'Amarr', 'Dodixie', 'Rens', 'Hek']) {
+      expect(
+        within(region).getByRole('columnheader', { name: new RegExp(hub) })
+      ).toBeInTheDocument();
+    }
+    expect(within(region).getByText('Lowest')).toBeInTheDocument();
+    expect(within(region).getByText('Highest')).toBeInTheDocument();
+    expect(within(region).getAllByText('No sellers').length).toBeGreaterThan(0);
+    expect(within(region).getByText(/your hub: Jita/)).toBeInTheDocument();
+    expect(within(region).getByRole('button', { name: 'Export Trade hubs' })).toBeInTheDocument();
+    expect(hubPrices.fetch).toHaveBeenCalledTimes(5);
+
+    // Leaving the view stops fetching: no further reads on a switch back.
+    await user.click(within(region).getByRole('button', { name: 'Prices' }));
+    expect(hubPrices.fetch).toHaveBeenCalledTimes(5);
+  });
+
+  it('opens on Trade hubs when the Compare Set holds a single item', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    expect(within(region).getByRole('button', { name: 'Trade hubs' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(
+      await within(region).findByRole('link', { name: /Tritanium at Jita/ })
+    ).toBeInTheDocument();
+  });
+
+  it('labels the Trade hubs view "Hubs" on a phone', async () => {
+    narrowState.narrow = true;
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A, ITEM_B] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (2)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    expect(within(region).getByRole('button', { name: 'Hubs' })).toBeInTheDocument();
   });
 
   it('a pending open request from before mount (Variations "Compare") opens straight to the requested view', async () => {

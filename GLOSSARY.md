@@ -250,7 +250,7 @@ here — they go one per file in `docs/context/decisions/`.
   cannot be copied.
 - **Compare**: A resizable bottom drawer over the **Compare Set**, not a tab —
   it opens beside the order book, since comparing happens _while_ browsing.
-  Shows Prices and Attributes views. Distinct from **Appraisal**'s **Compare
+  Shows Prices, Trade hubs and Attributes views. Distinct from **Appraisal**'s **Compare
   hubs**, which prices one pasted pile across the five trade hubs, and from
   **Fitting Compare**, which never touches the Compare Set.
 - **Compare Set**: The short-lived selection of items being priced against each
