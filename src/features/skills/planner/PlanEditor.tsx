@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type DragEvent,
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
@@ -91,6 +92,8 @@ import { PlanHeader } from './PlanHeader';
 import { planProgress } from '@/engine/skills/planProgress';
 import { assumptionsSummary } from './assumptionsSummary';
 import { PlanEditorLayout } from './PlanEditorLayout';
+import { importOutcome, type ClipboardImportPreview } from './clipboardImport';
+import { previewImportFile, previewImportText } from './importPreview';
 import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { InjectorFactsPanel } from './InjectorFactsPanel';
 import { SkillsToBuyPanel } from './SkillsToBuyPanel';
@@ -279,7 +282,9 @@ export function PlanEditor({
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [importMenuOpen, setImportMenuOpen] = useState(false);
   const openImportDialogAfterMenuRef = useRef(false);
-  const [importOpen, setImportOpen] = useState(importSeed !== null);
+  const [importOpen, setImportOpen] = useState(false);
+  // What a pasted or dropped import found when it needs a look before applying.
+  const [importPreview, setImportPreview] = useState<ClipboardImportPreview | undefined>();
   const [importConfirm, setImportConfirm] = useState<string | null>(null);
   // `cancel` covers the early-cancel-on-Undo case below; `show` supersedes a
   // pending confirmation rather than racing it (Append's 4s vs. Replace's
@@ -951,6 +956,71 @@ export function PlanEditor({
     setPendingQueueImport(null);
   }
 
+  /**
+   * Clipboard/file import's commit: append, with an Undo beside the confirmation
+   * since nothing was previewed first. The snapshot is the same one Replace
+   * takes, so one Undo handler serves both.
+   */
+  function applyTextImport(entries: PlanEntry[]) {
+    setUndoImport({
+      entries: editable.entries,
+      markers: editable.markers ?? [],
+      markerAttributes: editable.markerAttributes ?? [],
+    });
+    onUpdate(appendImport(editable, entries));
+    // Long enough to use the Undo it carries, like Replace's.
+    showImportConfirm(appendedCountMessage(t, trainedSkills, entries), 10000);
+    setImportOpen(false);
+    setImportSeed(null);
+    setImportPreview(undefined);
+  }
+
+  const applyTextImportRef = useRef(applyTextImport);
+  useEffect(() => {
+    applyTextImportRef.current = applyTextImport;
+  });
+
+  /**
+   * A pasted skill plan or a dropped plan file: applied without a dialog when
+   * every line parsed, otherwise the dialog opens on what was and wasn't read.
+   */
+  async function importWithoutDialog(previewing: Promise<ClipboardImportPreview>, openOn?: string) {
+    let result: ClipboardImportPreview;
+    try {
+      result = await previewing;
+    } catch {
+      // The catalogs would not load: open the dialog on the text so Import can retry.
+      setImportSeed(openOn ?? null);
+      setImportOpen(true);
+      return;
+    }
+    if (importOutcome(result) === 'apply') {
+      // The plan may have changed while the catalogs loaded: apply through the latest render.
+      applyTextImportRef.current(result.entries);
+      return;
+    }
+    setImportSeed(openOn ?? null);
+    setImportPreview(result);
+    setImportOpen(true);
+  }
+
+  // A skill plan pasted elsewhere (the seed): spent at once, so a re-render
+  // can't import it twice.
+  const seedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (importSeed === null || seedRef.current === importSeed) return;
+    seedRef.current = importSeed;
+    void importWithoutDialog(previewImportText(importSeed), importSeed);
+  }, [importSeed]);
+
+  /** A plan file dropped on the editor goes through the same import as the dialog's. */
+  function handleEditorDrop(e: DragEvent<HTMLDivElement>) {
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    e.preventDefault();
+    void importWithoutDialog(previewImportFile(file));
+  }
+
   /** Replace choice on the queue-import Modal (#1402): swaps entries, clears Remap Markers, leaves an Undo. */
   function confirmQueueImportReplace() {
     if (!pendingQueueImport) return;
@@ -1571,198 +1641,206 @@ export function PlanEditor({
 
   return (
     <>
-      <PlanEditorLayout
-        sidebar={
-          isDesktop ? (
-            <>
-              {listPane}
-              {toolsPane}
-            </>
-          ) : undefined
-        }
+      <div
+        onDragOver={(e) => {
+          // Only a file is ours to take; a text or row drag keeps its own handlers.
+          if (e.dataTransfer.types.includes('Files')) e.preventDefault();
+        }}
+        onDrop={handleEditorDrop}
       >
-        <PlanHeader
-          totalSeconds={totalSeconds}
-          skillCount={scheduledSkillCount}
-          projectedFinish={planFinish}
-          badge={headerBadge}
-          nextMilestone={headerNextMilestone}
-          progress={headerProgress}
-          whatIf={
-            currentLensTotalSeconds !== null && !error
-              ? {
-                  lens:
-                    whatIf.kind === 'custom'
-                      ? t('plans.whatIfCustom')
-                      : whatIf.preset === 'none'
-                        ? t('plans.whatIfNone')
-                        : whatIf.preset,
-                  verdict: whatIfVerdict(currentLensTotalSeconds, totalSeconds),
-                }
-              : null
+        <PlanEditorLayout
+          sidebar={
+            isDesktop ? (
+              <>
+                {listPane}
+                {toolsPane}
+              </>
+            ) : undefined
           }
-          savingsShrankWithImplants={remapSavingsShrank(
-            headerBadge?.savingsSeconds ?? null,
-            realLensSavingsSeconds
-          )}
-          trainedKnown={trainedSkillsKnown}
-          name={plan.name}
-          onRename={isDesktop ? undefined : (name) => onUpdate({ name })}
-          focusName={focusName}
-        />
+        >
+          <PlanHeader
+            totalSeconds={totalSeconds}
+            skillCount={scheduledSkillCount}
+            projectedFinish={planFinish}
+            badge={headerBadge}
+            nextMilestone={headerNextMilestone}
+            progress={headerProgress}
+            whatIf={
+              currentLensTotalSeconds !== null && !error
+                ? {
+                    lens:
+                      whatIf.kind === 'custom'
+                        ? t('plans.whatIfCustom')
+                        : whatIf.preset === 'none'
+                          ? t('plans.whatIfNone')
+                          : whatIf.preset,
+                    verdict: whatIfVerdict(currentLensTotalSeconds, totalSeconds),
+                  }
+                : null
+            }
+            savingsShrankWithImplants={remapSavingsShrank(
+              headerBadge?.savingsSeconds ?? null,
+              realLensSavingsSeconds
+            )}
+            trainedKnown={trainedSkillsKnown}
+            name={plan.name}
+            onRename={isDesktop ? undefined : (name) => onUpdate({ name })}
+            focusName={focusName}
+          />
 
-        {implantsAssumed && <ImplantsAssumedNote hint={t('plans.assumesNoImplantsHint')} />}
+          {implantsAssumed && <ImplantsAssumedNote hint={t('plans.assumesNoImplantsHint')} />}
 
-        {/* Plan Milestones (GLOSSARY.md) whose entry was removed from the plan
+          {/* Plan Milestones (GLOSSARY.md) whose entry was removed from the plan
             entirely — no row exists to flag any more, so they surface here
             instead of vanishing silently. */}
-        <div>
-          <Button size="sm" onClick={() => setFitGoalOpen(true)}>
-            {t('plans.fitGoal.add')}
-          </Button>
-        </div>
-        {orphanedMilestones.length > 0 && (
-          <div className="flex flex-wrap gap-2 text-xs">
-            {orphanedMilestones.map((status) => (
-              <span
-                key={status.milestone.id}
-                className="inline-flex items-center gap-1.5 text-warning"
-              >
-                {t('plans.milestone.orphanedNotice', { name: status.milestone.name })}
-                <IconButton
-                  icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
-                  label={t('plans.milestone.removeLabel', { name: status.milestone.name })}
-                  onClick={() => {
-                    handleRemoveMilestone(status.milestone.id);
-                    focusAfterCommit(entriesHeadingRef);
-                  }}
-                  size="sm"
-                  tone="danger"
-                />
-              </span>
-            ))}
+          <div>
+            <Button size="sm" onClick={() => setFitGoalOpen(true)}>
+              {t('plans.fitGoal.add')}
+            </Button>
           </div>
-        )}
+          {orphanedMilestones.length > 0 && (
+            <div className="flex flex-wrap gap-2 text-xs">
+              {orphanedMilestones.map((status) => (
+                <span
+                  key={status.milestone.id}
+                  className="inline-flex items-center gap-1.5 text-warning"
+                >
+                  {t('plans.milestone.orphanedNotice', { name: status.milestone.name })}
+                  <IconButton
+                    icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
+                    label={t('plans.milestone.removeLabel', { name: status.milestone.name })}
+                    onClick={() => {
+                      handleRemoveMilestone(status.milestone.id);
+                      focusAfterCommit(entriesHeadingRef);
+                    }}
+                    size="sm"
+                    tone="danger"
+                  />
+                </span>
+              ))}
+            </div>
+          )}
 
-        {/* Below `lg` the plan tools are one collapsed row, which would bury
+          {/* Below `lg` the plan tools are one collapsed row, which would bury
             the one output worth reading first; this row sits outside them. */}
-        {!isDesktop && <Panel padded={false}>{skillsToBuy(true)}</Panel>}
+          {!isDesktop && <Panel padded={false}>{skillsToBuy(true)}</Panel>}
 
-        {!isDesktop && toolsPane}
+          {!isDesktop && toolsPane}
 
-        <Panel title={t('plans.yourEntries')} headingRef={entriesHeadingRef}>
-          <div className="space-y-3">
-            <LiveQueueLead
-              projection={queueProjection}
-              fetchedAt={queueFetchedAt}
-              nameFor={nameFor}
-            />
-            <SkillPicker
-              skills={pickerSkills}
-              catalog={catalog}
-              trainedSkills={trainedSkills}
-              planEntries={plan.entries}
-              onAdd={(entry) => onUpdate(addEntry(editable, entry))}
-              controls={
-                // Group-by and Columns are this list's own view controls —
-                // riding the search bar's row keeps them off the page
-                // header, which Import/Export already fills.
-                <>
-                  <label className="flex items-center gap-1">
-                    {t('plans.groupBy')}
-                    <Select
-                      value={groupingMode}
-                      onValueChange={(value) => void setGroupingMode(value as GroupingMode)}
-                    >
-                      <SelectTrigger
-                        size="sm"
-                        aria-label={t('plans.groupBy')}
-                        className="w-36 lg:scroll-mt-40"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {GROUPING_MODES.map((mode) => (
-                          <SelectItem key={mode} value={mode}>
-                            {mode === 'priority'
-                              ? t('plans.groupByPriority')
-                              : t('plans.groupByAttributePair')}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </label>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <IconButton
-                        icon={<Icon.ColumnsPicker />}
-                        label={t('plans.columns')}
-                        className="lg:scroll-mt-40"
-                      />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {(
-                        [
-                          ['attributePair', 'plans.columnAttributePair'],
-                          ['priority', 'plans.columnPriority'],
-                          ['perLevelTime', 'plans.columnPerLevel'],
-                          ['cumulativeTime', 'plans.columnCumulative'],
-                        ] as const
-                      ).map(([key, labelKey]) => (
-                        <DropdownMenuCheckboxItem
-                          key={key}
-                          checked={columnVisibility[key]}
-                          onSelect={(event) => event.preventDefault()}
-                          onCheckedChange={(checked) =>
-                            void setColumnVisibility({ ...columnVisibility, [key]: checked })
-                          }
-                        >
-                          {t(labelKey)}
-                        </DropdownMenuCheckboxItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
-              }
-            />
-            {dropError && (
-              <p role="alert" className="text-xs text-danger">
-                {dropError}
-              </p>
-            )}
-            {promoteConfirm && confirmation(promoteConfirm)}
-            {error ? (
-              <p className="text-xs text-danger">{t('plans.computeError', { message: error })}</p>
-            ) : (
-              <EntryList
-                rows={mergedRows}
-                bandsAt={bandsAt}
+          <Panel title={t('plans.yourEntries')} headingRef={entriesHeadingRef}>
+            <div className="space-y-3">
+              <LiveQueueLead
+                projection={queueProjection}
+                fetchedAt={queueFetchedAt}
                 nameFor={nameFor}
-                attributesFor={attributesFor}
-                columns={columnVisibility}
-                boostedSteps={boostedSteps}
-                alphaCappedSteps={alphaCappedSteps}
-                startDate={startDate}
-                onReorder={handleDrop}
-                onPromotePrereq={handlePromotePrereq}
-                onRemove={requestRemoveEntry}
-                onStageSkillDetail={handleStageSkillDetail}
-                removalBlockedReason={removalBlockedReason}
-                pinnedInProgress={pinnedInProgress}
-                onRemoveMarker={handleRemoveMarker}
-                markerAttributesFor={markerAttributesFor}
-                markerImplants={effectiveImplants}
-                onEditMarker={setEditingMarkerIndex}
-                onSetPriority={handleSetPriority}
-                milestoneStatusFor={milestoneStatusFor}
-                onAddMilestone={handleAddMilestone}
-                onRenameMilestone={handleRenameMilestone}
-                onRemoveMilestone={handleRemoveMilestone}
               />
-            )}
-          </div>
-        </Panel>
-      </PlanEditorLayout>
+              <SkillPicker
+                skills={pickerSkills}
+                catalog={catalog}
+                trainedSkills={trainedSkills}
+                planEntries={plan.entries}
+                onAdd={(entry) => onUpdate(addEntry(editable, entry))}
+                controls={
+                  // Group-by and Columns are this list's own view controls —
+                  // riding the search bar's row keeps them off the page
+                  // header, which Import/Export already fills.
+                  <>
+                    <label className="flex items-center gap-1">
+                      {t('plans.groupBy')}
+                      <Select
+                        value={groupingMode}
+                        onValueChange={(value) => void setGroupingMode(value as GroupingMode)}
+                      >
+                        <SelectTrigger
+                          size="sm"
+                          aria-label={t('plans.groupBy')}
+                          className="w-36 lg:scroll-mt-40"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {GROUPING_MODES.map((mode) => (
+                            <SelectItem key={mode} value={mode}>
+                              {mode === 'priority'
+                                ? t('plans.groupByPriority')
+                                : t('plans.groupByAttributePair')}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </label>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <IconButton
+                          icon={<Icon.ColumnsPicker />}
+                          label={t('plans.columns')}
+                          className="lg:scroll-mt-40"
+                        />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {(
+                          [
+                            ['attributePair', 'plans.columnAttributePair'],
+                            ['priority', 'plans.columnPriority'],
+                            ['perLevelTime', 'plans.columnPerLevel'],
+                            ['cumulativeTime', 'plans.columnCumulative'],
+                          ] as const
+                        ).map(([key, labelKey]) => (
+                          <DropdownMenuCheckboxItem
+                            key={key}
+                            checked={columnVisibility[key]}
+                            onSelect={(event) => event.preventDefault()}
+                            onCheckedChange={(checked) =>
+                              void setColumnVisibility({ ...columnVisibility, [key]: checked })
+                            }
+                          >
+                            {t(labelKey)}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
+                }
+              />
+              {dropError && (
+                <p role="alert" className="text-xs text-danger">
+                  {dropError}
+                </p>
+              )}
+              {promoteConfirm && confirmation(promoteConfirm)}
+              {error ? (
+                <p className="text-xs text-danger">{t('plans.computeError', { message: error })}</p>
+              ) : (
+                <EntryList
+                  rows={mergedRows}
+                  bandsAt={bandsAt}
+                  nameFor={nameFor}
+                  attributesFor={attributesFor}
+                  columns={columnVisibility}
+                  boostedSteps={boostedSteps}
+                  alphaCappedSteps={alphaCappedSteps}
+                  startDate={startDate}
+                  onReorder={handleDrop}
+                  onPromotePrereq={handlePromotePrereq}
+                  onRemove={requestRemoveEntry}
+                  onStageSkillDetail={handleStageSkillDetail}
+                  removalBlockedReason={removalBlockedReason}
+                  pinnedInProgress={pinnedInProgress}
+                  onRemoveMarker={handleRemoveMarker}
+                  markerAttributesFor={markerAttributesFor}
+                  markerImplants={effectiveImplants}
+                  onEditMarker={setEditingMarkerIndex}
+                  onSetPriority={handleSetPriority}
+                  milestoneStatusFor={milestoneStatusFor}
+                  onAddMilestone={handleAddMilestone}
+                  onRenameMilestone={handleRenameMilestone}
+                  onRemoveMilestone={handleRemoveMilestone}
+                />
+              )}
+            </div>
+          </Panel>
+        </PlanEditorLayout>
+      </div>
 
       {/* Import/Export: the route's page-level actions cluster, "far top
           right corner" like every other route (Wallet.tsx, Assets.tsx) —
@@ -1856,20 +1934,14 @@ export function PlanEditor({
 
       {importOpen && (
         <ImportClipboardDialog
-          onApply={(entries) => {
-            onUpdate(appendImport(editable, entries));
-            // A pending Undo describes a Replace this doesn't touch — see
-            // confirmQueueImportAppend's comment above.
-            setUndoImport(null);
-            showImportConfirm(appendedCountMessage(t, trainedSkills, entries), 4000);
-            setImportOpen(false);
-            setImportSeed(null);
-          }}
+          onApply={applyTextImport}
           onClose={() => {
             setImportOpen(false);
             setImportSeed(null);
+            setImportPreview(undefined);
           }}
           initialText={importSeed ?? undefined}
+          initialPreview={importPreview}
           nameFor={nameFor}
           trainedSkills={trainedSkills}
         />
