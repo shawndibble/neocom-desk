@@ -65,6 +65,30 @@ describe('OpenInEveButton', () => {
     );
   });
 
+  it('stays, disabled with a Switch link, when another character has the permission', async () => {
+    await db.tokens.update(ONE, { scopes: [] });
+    await db.characters.put({ characterId: 92, name: 'Alt Pilot', ownerHash: 'o2', addedAt: 2 });
+    await db.tokens.put({
+      characterId: 92,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: ['esi-ui.open_window.v1'],
+    });
+    render(
+      <MemoryRouter>
+        <OpenInEveButton kind="information" id={1} />
+      </MemoryRouter>
+    );
+    const button = await screen.findByRole('button', { name: 'Open in EVE' });
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).toHaveAccessibleDescription(/Pilot hasn't granted Open in EVE\./);
+    await userEvent.click(button);
+    expect(info).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Switch to Alt Pilot' }));
+    await vi.waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(92));
+  });
+
   it('renders nothing without a character', () => {
     useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
     render(
