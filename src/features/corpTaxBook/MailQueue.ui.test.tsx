@@ -73,7 +73,7 @@ describe('MailQueuePanel', () => {
     expect(await screen.findByText('Opened in your EVE client.')).toBeInTheDocument();
   });
 
-  it('labels the sent time as EVE time on a 24-hour clock, whatever the Time format', () => {
+  it('labels the sent time as EVE time on a 24-hour clock', () => {
     render(<MailQueuePanel items={[items[0]]} now={NOW} {...actions} />);
     expect(screen.getByText('14:02 EVE')).toBeInTheDocument();
   });
