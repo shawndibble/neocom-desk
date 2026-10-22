@@ -10485,6 +10485,7 @@
       "title": "Hauling",
       "from": "From",
       "to": "To",
+      "swapHubs": "Swap origin and destination",
       "anyHub": "Any hub",
       "category": "Category",
       "categoryAll": "Everything",
