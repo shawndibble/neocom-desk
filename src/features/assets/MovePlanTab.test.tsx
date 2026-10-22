@@ -121,12 +121,22 @@ describe('MovePlanTab', () => {
     skippedCharacters.noEntries = false;
   });
 
-  it('names the Characters whose assets did not load instead of dropping them silently', async () => {
+  it('hands the Characters whose assets did not load up to the header picker', async () => {
     skippedCharacters.list = [{ characterId: 2, name: 'Bob' }];
-    await open();
-    expect(
-      screen.getAllByText("Couldn't load assets for Bob — they are missing here.")
-    ).not.toHaveLength(0);
+    const onSkippedChange = vi.fn();
+    render(
+      <MemoryRouter>
+        <MovePlanTab
+          onClose={() => {}}
+          characterIds={[1, 2]}
+          activeCharacterId={1}
+          onSkippedChange={onSkippedChange}
+        />
+      </MemoryRouter>
+    );
+    await screen.findByText('Alice');
+    await waitFor(() => expect(onSkippedChange).toHaveBeenLastCalledWith(['Bob']));
+    expect(screen.queryByText(/missing here/)).not.toBeInTheDocument();
   });
 
   it("does not say there is nothing to move when no Character's assets loaded", async () => {

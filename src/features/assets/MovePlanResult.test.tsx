@@ -94,7 +94,6 @@ describe('PlanResult', () => {
             destinationStation: 'Amarr VIII',
             pickupSystems: new Map(),
           }}
-          scope={{ characters: [], activeCharacterId: null } as never}
           compareOpen={false}
           headingRef={{ current: null }}
           onToggleCompare={vi.fn()}
@@ -134,7 +133,6 @@ describe('PlanResult', () => {
             destinationStation: 'Amarr VIII',
             pickupSystems: new Map(),
           }}
-          scope={{ characters: [], activeCharacterId: null } as never}
           compareOpen={false}
           headingRef={{ current: null }}
           onToggleCompare={vi.fn()}
@@ -197,7 +195,6 @@ describe('PlanResult', () => {
             destinationStation: 'Amarr VIII',
             pickupSystems: new Map(),
           }}
-          scope={{ characters: [], activeCharacterId: null } as never}
           compareOpen={false}
           headingRef={{ current: null }}
           onToggleCompare={vi.fn()}
@@ -244,7 +241,6 @@ describe('PlanResult', () => {
             destinationStation: 'Amarr VIII',
             pickupSystems: new Map(),
           }}
-          scope={{ characters: [], activeCharacterId: null } as never}
           compareOpen={false}
           headingRef={{ current: null }}
           onToggleCompare={vi.fn()}
@@ -301,7 +297,6 @@ describe('PlanResult', () => {
             destinationStation: 'Amarr VIII',
             pickupSystems: new Map(),
           }}
-          scope={{ characters: [], activeCharacterId: null } as never}
           compareOpen={false}
           headingRef={{ current: null }}
           onToggleCompare={vi.fn()}
@@ -339,7 +334,6 @@ describe('PlanResult', () => {
               destinationStation: 'Amarr VIII',
               pickupSystems: new Map(),
             }}
-            scope={{ characters: [], activeCharacterId: null } as never}
             compareOpen={false}
             headingRef={{ current: null }}
             onToggleCompare={vi.fn()}
@@ -393,7 +387,6 @@ describe('PlanResult', () => {
               destinationStation: 'Amarr VIII',
               pickupSystems: new Map(),
             }}
-            scope={{ characters: [], activeCharacterId: null } as never}
             compareOpen={false}
             headingRef={{ current: null }}
             onToggleCompare={vi.fn()}
@@ -455,7 +448,6 @@ describe('PlanResult', () => {
               destinationStation: 'Amarr VIII',
               pickupSystems: new Map(),
             }}
-            scope={{ characters: [], activeCharacterId: null } as never}
             compareOpen={false}
             headingRef={{ current: null }}
             onToggleCompare={vi.fn()}

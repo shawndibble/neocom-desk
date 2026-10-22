@@ -1650,6 +1650,37 @@ describe('cross-character search (issue #85)', () => {
       expect(within(panel).getByRole('columnheader', { name: /character/i })).toBeVisible();
     });
 
+    it('marks the header picker, not the body, when All leaves someone out on Ships and Move', async () => {
+      await db.characters.put({
+        characterId: 93,
+        name: 'Pilot Three',
+        ownerHash: 'oh3',
+        addedAt: 3,
+      });
+      await db.tokens.put({
+        characterId: 93,
+        accessToken: 'access-token-3',
+        refreshToken: 'refresh-3',
+        expiresAt: Date.now() + 3_600_000,
+        scopes: [],
+      });
+      const user = userEvent.setup();
+      render(<App />);
+      const panel = await openMyShips(user);
+      await within(panel).findByText('Rifter');
+      await user.click(within(pageHeader()).getByRole('button', { name: 'This character' }));
+      await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
+
+      const partial = /^All characters · 3\. Not included: Pilot Three$/;
+      expect(await within(pageHeader()).findByRole('button', { name: partial })).toBeVisible();
+      expect(screen.queryByText(/missing here/)).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('tab', { name: 'Move' }));
+      await screen.findByRole('region', { name: 'Plan a move' });
+      expect(await within(pageHeader()).findByRole('button', { name: partial })).toBeVisible();
+      expect(screen.queryByText(/missing here/)).not.toBeInTheDocument();
+    });
+
     it('shows the ship class under the name, with sortable columns and a search', async () => {
       server.use(
         http.get('https://esi.evetech.net/universe/groups/25', () =>

@@ -88,7 +88,7 @@ Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) are a separate inventory l
 
 `PageHeader` title "Assets":
 
-- Meta: `DataAgeBadge` (assets fetch); a `?char=` link's "Name only" readout. The Character filter (`CharacterFilterControl`; hidden for one-Character accounts and while a `?char=` link names the Character) rides first in the right-hand cluster (`PageHeader` `scope`), one picker for all three tabs; its trigger spins while cross-character data loads and carries the "Not included" dot for skipped Characters.
+- Meta: `DataAgeBadge` (assets fetch); a `?char=` link's "Name only" readout. The Character filter (`CharacterFilterControl`; hidden for one-Character accounts and while a `?char=` link names the Character) rides first in the right-hand cluster (`PageHeader` `scope`), one picker for all three tabs; its trigger spins while cross-character data loads and carries the "Not included" dot for skipped Characters: on Items from the cross-character search, on Ships and Move from that tab's own read (`useReportSkipped`), with no line about them in the tab body.
 - Actions (right): one labelled **Tools** menu (`TableActionsMenu` with `triggerText`: grid icon, the word, caret) holding All items, Select, **Refresh** (with the data's age) and Export table ▸ — Items tab only. **Plan a move** is the Move tab (`MovePlanTab`: tick items per Character and pickup, pick any system or one of your stations, get totals, a suggested hauler and a Route Safety link per pickup).
 - Below: `SearchInput` "Search items…" — only shown when assets are loaded and no re-login needed. Debounced 250 ms for matching; input stays instant.
 - Select-mode bar (when on) between search and list.

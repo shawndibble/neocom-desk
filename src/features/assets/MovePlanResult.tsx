@@ -6,10 +6,6 @@ import { Link } from 'react-router-dom';
 import { Button, Checkbox, Disclosure, Modal } from '@/components/ui';
 import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import type { MovePlan } from '@/engine/assets/movePlan';
-import {
-  CharacterScopeReadout,
-  type CharacterScopeReadoutProps,
-} from '@/features/character/CharacterScopeReadout';
 import { useSystemName } from '@/features/route/useSolarSystems';
 import { routeToHref } from '@/features/route/routeSafetyLink';
 import { firstConnected, useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
@@ -45,7 +41,6 @@ export interface PlanState {
 
 interface PlanResultProps {
   state: PlanState;
-  scope: CharacterScopeReadoutProps;
   compareOpen: boolean;
   onToggleCompare: () => void;
   /** The plan's screen-reader heading, where focus lands once the plan shows. */
@@ -72,7 +67,6 @@ interface PlanResultProps {
  */
 export function PlanResult({
   state,
-  scope,
   compareOpen,
   onToggleCompare,
   headingRef,
@@ -143,12 +137,10 @@ export function PlanResult({
 
   return (
     <div className="flex flex-1 flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h3 ref={headingRef} tabIndex={-1} className="sr-only focus:outline-none">
-          {t('assets.movePlan.title')}
-        </h3>
-        <CharacterScopeReadout {...scope} />
-      </div>
+      {/* Whose assets the plan covers is the header picker's to say. */}
+      <h3 ref={headingRef} tabIndex={-1} className="sr-only focus:outline-none">
+        {t('assets.movePlan.title')}
+      </h3>
       {plan.suggested ? (
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1 rounded-xs border border-accent-dim bg-accent/10 px-3.5 py-3">
           <div className="row-span-2 min-w-14 text-center text-4xl leading-none font-bold text-accent tabular-nums">

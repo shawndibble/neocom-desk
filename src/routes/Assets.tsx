@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -37,6 +38,9 @@ export function Assets() {
     itemActions,
   } = assetsData;
   const { assetsRoute } = assetsRows;
+  // Ships and Move each read the Characters themselves; they report whom they
+  // skipped so the header picker names them (`useReportSkipped`).
+  const [tabMissingNames, setTabMissingNames] = useState<readonly string[] | undefined>();
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -63,7 +67,12 @@ export function Assets() {
         )}
       >
         <FromWalletCrumb />
-        <AssetsPageHeader tab={tab} assetsData={assetsData} assetsRows={assetsRows} />
+        <AssetsPageHeader
+          tab={tab}
+          assetsData={assetsData}
+          assetsRows={assetsRows}
+          tabMissingNames={tabMissingNames}
+        />
         <Tabs
           tabsId={tabsId}
           label={t('assets.title')}
@@ -84,6 +93,7 @@ export function Assets() {
               }
               hrefFor={(locationId) => assetHref(locationId, [], query)}
               route={assetsRoute}
+              onSkippedChange={setTabMissingNames}
             />
           )}
 
@@ -92,6 +102,7 @@ export function Assets() {
               onClose={() => setTab('items')}
               characterIds={shipCharacterIds}
               activeCharacterId={activeCharacterId}
+              onSkippedChange={setTabMissingNames}
             />
           )}
 

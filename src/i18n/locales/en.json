@@ -6881,7 +6881,6 @@
       "ships": "Ships",
       "move": "Move"
     },
-    "skippedCharacters": "Couldn't load assets for {{names}} — they are missing here.",
     "skippedAllHint": "Their assets aren't saved on this device yet. They load once ESI answers.",
     "movePlan": {
       "title": "Plan a move",

@@ -1,6 +1,7 @@
 import { idSetKey } from '@/lib/idSetKey';
 import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useReportSkipped } from './useReportSkipped';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, LiveStatus, Spinner } from '@/components/ui';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
@@ -116,6 +117,8 @@ interface MovePlanTabProps {
   /** The Characters the page's filter names. */
   characterIds: readonly number[];
   activeCharacterId: number | null;
+  /** Reports the Characters this tab's read skipped, for the header picker's `missingNames`. */
+  onSkippedChange?: (names: readonly string[] | undefined) => void;
 }
 
 /**
@@ -129,7 +132,12 @@ export function MovePlanTab(props: MovePlanTabProps) {
   return <MovePlanTabBody key={idSetKey(props.characterIds)} {...props} />;
 }
 
-function MovePlanTabBody({ onClose, characterIds, activeCharacterId }: MovePlanTabProps) {
+function MovePlanTabBody({
+  onClose,
+  characterIds,
+  activeCharacterId,
+  onSkippedChange,
+}: MovePlanTabProps) {
   const { t } = useTranslation();
   // Frozen for this mount: a different Character set remounts the tab (`key` below).
   const [ids] = useState(characterIds);
@@ -364,10 +372,8 @@ function MovePlanTabBody({ onClose, characterIds, activeCharacterId }: MovePlanT
     setResult((r) => (r ? { ...r, plan: planMove({ ...base, packedShipIds: next }) } : r));
   }
 
-  const skippedMessage =
-    loaded && loaded.skipped.length > 0
-      ? t('assets.skippedCharacters', { names: loaded.skipped.map((c) => c.name).join(', ') })
-      : '';
+  // Who the read left out is the header picker's to say (its dot and "Not included" note).
+  useReportSkipped(loaded ? loaded.skipped.map((c) => c.name) : undefined, onSkippedChange);
   const name = (typeId: number) => loaded?.typeNames.get(typeId) ?? `#${typeId}`;
   const placeLabel = (id: number) => loaded?.places.get(id) ?? String(id);
   const hueOf = (id: number) => loaded?.hues.get(id) ?? 0;
@@ -387,11 +393,7 @@ function MovePlanTabBody({ onClose, characterIds, activeCharacterId }: MovePlanT
       <div className="flex min-h-full flex-col gap-3 text-sm">
         <HullSource characterId={activeCharacterId} intoRef={hullSource} />
         <LiveStatus>
-          {failed
-            ? t('assets.movePlan.failed')
-            : planFailed
-              ? t('assets.movePlan.planFailed')
-              : skippedMessage}
+          {failed ? t('assets.movePlan.failed') : planFailed ? t('assets.movePlan.planFailed') : ''}
         </LiveStatus>
         {failed ? (
           <p className="text-text-dim">{t('assets.movePlan.failed')}</p>
@@ -400,15 +402,6 @@ function MovePlanTabBody({ onClose, characterIds, activeCharacterId }: MovePlanT
         ) : result ? (
           <PlanResult
             state={result}
-            scope={
-              loaded.sources.length === 1
-                ? {
-                    scope: 'one',
-                    characterId: loaded.sources[0].characterId,
-                    characterName: loaded.sources[0].name,
-                  }
-                : { scope: 'all', total: loaded.sources.length }
-            }
             compareOpen={compareOpen}
             onToggleCompare={() => setCompareOpen((v) => !v)}
             headingRef={planHeadingRef}
@@ -488,9 +481,6 @@ function MovePlanTabBody({ onClose, characterIds, activeCharacterId }: MovePlanT
                   </span>
                 )}
               </div>
-              {loaded.skipped.length > 0 && (
-                <p className="text-xs text-warning">{skippedMessage}</p>
-              )}
               {loaded.stacks.length === 0 &&
                 (loaded.sources.length === 0 && loaded.skipped.length > 0 ? (
                   <p className="text-text-dim">{t('assets.skippedAllHint')}</p>
