@@ -374,6 +374,11 @@ export function haulingFixtureRoutes(): FixtureRoute[] {
   const regionOf = (url: URL) => Number(url.pathname.split('/')[2]);
   return [
     ...walletFixtureRoutes(),
+    // Market reads the pilot's location for its header; docked at Amarr.
+    {
+      path: at('/location'),
+      respond: () => ({ body: { solar_system_id: 30002187, station_id: 60008494 } }),
+    },
     { path: at('/standings/'), respond: () => ({ body: STANDINGS }) },
     {
       path: at('/skills'),
