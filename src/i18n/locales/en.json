@@ -12247,6 +12247,16 @@
     "permissions": {
       "hint": "What this character lets Neocom Desk read from EVE. Grant adds permissions in one login; revoke on <ccp>EVE's own site</ccp>.",
       "selectCharacter": "Select a character to see its permissions.",
+      "character": {
+        "label": "Character",
+        "choose": "Choose a character",
+        "count": "{{granted}} of {{total}}",
+        "missing": "{{count}} missing",
+        "search": "Find a character",
+        "needs": "Needs permissions · {{count}}",
+        "complete": "All granted · {{count}}",
+        "noMatch": "No characters match."
+      },
       "checking": "Checking…",
       "granted": "Granted",
       "grantedGroup": "Granted ({{count}})",

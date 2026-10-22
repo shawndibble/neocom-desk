@@ -43,6 +43,7 @@ import {
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel';
+import { CharacterPermissionStrip } from '@/features/permissions/CharacterPermissionStrip';
 import { PermissionsPanel } from '@/features/permissions/PermissionsPanel';
 
 /**
@@ -209,7 +210,12 @@ export function Settings() {
             rather than locked), which is why `#corp-access` keeps redirecting
             to this section.
           */}
-          {section === 'permissions' && <PermissionsPanel />}
+          {section === 'permissions' && (
+            <>
+              <CharacterPermissionStrip />
+              <PermissionsPanel />
+            </>
+          )}
           {section === 'industry' && (
             <>
               <IndustryDefaultsPanel />
