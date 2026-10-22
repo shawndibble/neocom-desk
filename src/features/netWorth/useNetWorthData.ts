@@ -91,3 +91,25 @@ export function useNetWorthData(characterIds: readonly number[]): NetWorthData {
     ready: rows !== undefined && coveredIds !== undefined && walletIds !== undefined,
   };
 }
+
+const NO_MISSING: readonly string[] = [];
+
+/**
+ * The names of the `characters` net worth leaves out for want of a
+ * snapshot permission (`covered` in `useNetWorthData`), for the page's
+ * Character picker (`missingNames`). Empty until the permissions are read.
+ *
+ * The permission read covers every Character, not just `characters`: a
+ * `useLiveQuery` keyed on the ids would hand back the previous ids' result for
+ * a render after they change, and the picker would flash everyone as missing.
+ */
+export function useNetWorthMissingNames(
+  characters: readonly { characterId: number; name: string }[]
+): readonly string[] {
+  const coveredIds = useCharacterIdsWithScopes(REQUIRED_SCOPES);
+  return useMemo(() => {
+    if (!coveredIds) return NO_MISSING;
+    const missing = characters.filter((c) => !coveredIds.has(c.characterId)).map((c) => c.name);
+    return missing.length === 0 ? NO_MISSING : missing;
+  }, [characters, coveredIds]);
+}

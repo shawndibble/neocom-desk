@@ -5,13 +5,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuItem,
   PageHeader,
-  Spinner,
 } from '@/components/ui';
-import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
+import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import type { CharacterFilterValue } from '@/features/character/characterFilterValue';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { formatAge } from '@/lib/age';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTranslation } from 'react-i18next';
+import { useIsNarrow } from '@/lib/useIsNarrow';
 import type { AssetsData } from './useAssetsData';
 import type { AssetsRows } from './useAssetsRows';
 
@@ -31,7 +32,10 @@ export function AssetsPageHeader({
     crossCharacterLoading,
     allItemsView,
     viewedCharacter,
-    crossCharacterFilterMeta,
+    viewedCharacterId,
+    activeCharacterId,
+    crossCharacterFilter,
+    crossCharacterCandidates,
     otherCharacterIds,
     activeCrossCharacterData,
     assetsResult,
@@ -39,17 +43,26 @@ export function AssetsPageHeader({
   } = assetsData;
   const { selectMode, toggleSelectMode } = assetsRows;
   const { t } = useTranslation();
+  const isNarrow = useIsNarrow();
+  // One picker for all three tabs. Absent while a `?char=<id>` link names the
+  // page's Character (a fixed subject, named in `meta` instead) and for a
+  // one-Character account, where both options resolve to the same pilot.
+  const scope =
+    viewedCharacterId === undefined && crossCharacterCandidates.length > 1 ? (
+      <CharacterFilterControl
+        activeCharacterId={activeCharacterId}
+        value={crossCharacterFilter}
+        onChange={(chars: CharacterFilterValue) => setView({ chars })}
+        characterCount={crossCharacterCandidates.length}
+        missingNames={activeCrossCharacterData?.skipped.map((c) => c.name)}
+        loading={otherCharacterIds.length > 0 && crossCharacterLoading}
+      />
+    ) : undefined;
   return (
     <PageHeader
       title={t('assets.title')}
-      // `CharacterFilterControl` rides here rather than in `actions` per
-      // `docs/context/decisions/20260908-192806-the-character-filter-rides-in-the-panel-header.md`
-      // — Assets has no titled inner `Panel` to attach it to, so it takes
-      // the page-level title band instead, the same "names whose data this
-      // is" role the decision describes for a panel's own `meta`.
       meta={
         <>
-          <WalletOriginCrumb />
           {viewedCharacter && (
             <CharacterScopeReadout
               scope="one"
@@ -58,31 +71,19 @@ export function AssetsPageHeader({
             />
           )}
           {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
-          {crossCharacterFilterMeta}
-          {activeCrossCharacterData && activeCrossCharacterData.skipped.length > 0 && (
-            <CharacterScopeReadout
-              scope="all"
-              total={
-                activeCrossCharacterData.entries.length +
-                activeCrossCharacterData.skipped.length +
-                1
-              }
-              missing={activeCrossCharacterData.skipped.map((c) => c.name)}
-            />
-          )}
-          {otherCharacterIds.length > 0 && crossCharacterLoading && (
-            <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
-          )}
         </>
       }
+      scope={scope}
       actions={
         <>
           {tab === 'items' && (
-            <div className="ml-auto flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5">
               <TableActionsMenu
                 name={t('assets.title')}
                 label={t('assets.tools.label')}
-                triggerText={t('assets.tools.label')}
+                // Below `md` the word wrapped the title row (a `?char=` link's
+                // "<name> only" readout beside it): the menu takes its icon-only ⋮ form.
+                triggerText={isNarrow ? undefined : t('assets.tools.label')}
                 tableExport={assetsExport}
                 size="md"
               >

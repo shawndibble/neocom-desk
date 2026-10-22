@@ -29,6 +29,7 @@ import { WALLET_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { FromWalletCrumb } from '@/features/netWorth/FromWalletCrumb';
+import { useNetWorthMissingNames } from '@/features/netWorth/useNetWorthData';
 import { WalletBalanceTab } from '@/features/character/WalletBalanceTab';
 import { WalletJournalPanel } from '@/features/character/WalletJournalPanel';
 import { useWalletBalances } from '@/features/character/useWalletBalances';
@@ -39,6 +40,7 @@ import { usePickedLoyalty } from '@/features/character/usePickedLoyalty';
 import { loadWalletSnapshot } from '@/features/character/walletSnapshot';
 
 const WALLET_CHARACTER_PARAMS = { char: characterFilterParam('current') };
+const NO_PILOTS: readonly { characterId: number; name: string }[] = [];
 
 /**
  * Wallet: the pilot's own ISK — balance and journal, for the active Character
@@ -84,7 +86,6 @@ export function Wallet() {
     rememberedCharacterFilter
   );
   const walletCharacterFilter = walletParams.char;
-  const setWalletCharacterFilter = (char: CharacterFilterValue) => setWalletParams({ char });
 
   // A Character named in the URL is the one page subject: the balance panel
   // follows it rather than a stored "all" default.
@@ -98,6 +99,12 @@ export function Wallet() {
     !resolvedWalletFilter.has(activeCharacterId ?? -1);
 
   const drill = useWalletDrill();
+  // A new pick from the header picker ends a drill: the drilled panel would
+  // otherwise keep showing one Character the picker no longer describes.
+  const setWalletCharacterFilter = (char: CharacterFilterValue) => {
+    setWalletParams({ char });
+    if (drill.drilledId !== 0) drill.clearDrill();
+  };
 
   const allCharacters = useCharacters();
   const activeCharacter = allCharacters.find((c) => c.characterId === activeCharacterId);
@@ -113,23 +120,29 @@ export function Wallet() {
     () => allCharacters.map((c) => ({ characterId: c.characterId, characterName: c.name })),
     [allCharacters]
   );
+  // Who the Balance tab's net worth leaves out (no snapshot permissions): the
+  // picker's warning dot and menu note, only while it lists every picked Character.
+  const netWorthMissingNames = useNetWorthMissingNames(
+    tab === 'balance' && showingBeyondActive && !drilledCharacter ? multiCharacters : NO_PILOTS
+  );
   /**
-   * The Balance panel's `meta`, so the picker rides in the panel's own title
-   * bar instead of a bare row floating above it — and so it survives the swap
-   * between the single-Character panel and the per-Character table below,
-   * which are two different `Panel`s (`ActiveJobsPanel`'s placement).
+   * The page's one Character picker, in the `PageHeader`'s `scope` slot for
+   * both tabs (decision 20261022-123837), so it no longer has to ride along
+   * between the Balance tab's two `Panel`s. A Character named in the URL is
+   * the page subject, so the picker reads "This character" then.
    *
    * Absent for a one-Character account: "This character" and "All characters"
    * then resolve to the same pilot, leaving a control that cannot change
    * anything (`OpenOrdersPanel`'s `showCharacterStrip` precedent).
    */
-  const walletCharacterFilterMeta =
+  const walletScopePicker =
     walletFilterCandidates.length > 1 ? (
       <CharacterFilterControl
         activeCharacterId={activeCharacterId}
-        value={walletCharacterFilter}
+        value={viewedCharacterId === undefined ? walletCharacterFilter : 'current'}
         onChange={setWalletCharacterFilter}
         characterCount={walletFilterCandidates.length}
+        missingNames={netWorthMissingNames}
       />
     ) : undefined;
 
@@ -237,6 +250,7 @@ export function Wallet() {
       <PageHeader
         title={t('wallet.title')}
         meta={oldestFetchedAt ? <DataAgeBadge date={oldestFetchedAt} /> : undefined}
+        scope={walletScopePicker}
         actions={
           <IconButton
             icon={<Icon.Refresh />}
@@ -286,7 +300,6 @@ export function Wallet() {
             balances={balances}
             drill={drill}
             loyalty={loyalty}
-            filterMeta={walletCharacterFilterMeta}
             balanceResult={balanceResult}
             balanceNeedsReauth={balanceNeedsReauth}
             loyaltyResult={loyaltyResult}
@@ -302,7 +315,6 @@ export function Wallet() {
             activeCharacterId={activeCharacterId}
             showingBeyondActive={showingBeyondActive}
             iskPanelOpen={iskPanelOpen}
-            filterMeta={walletCharacterFilterMeta}
             refreshCount={refreshCount}
             archive={data?.archive}
             journalResult={journalResult}
