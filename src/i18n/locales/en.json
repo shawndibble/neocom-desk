@@ -14306,6 +14306,7 @@
     },
     "mailQueue": {
       "title": "Statement mail",
+      "sentAt": "{{time}} EVE",
       "minutes_one": "{{count}} minute",
       "minutes_other": "{{count}} minutes",
       "chip": {
