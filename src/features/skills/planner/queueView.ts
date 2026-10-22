@@ -1,5 +1,5 @@
 import type { SkillQueueEntry } from '@/esi/endpoints';
-import { addWeeks, startOfWeek, type WeekStart } from '@/lib/calendarGrid';
+import type { WeekStart } from '@/lib/calendarGrid';
 import type { ClassifiedQueueEntry } from '@/engine/skills/queueStatus';
 
 /** A queue row plus how long it adds to the queue on its own. */
@@ -11,7 +11,11 @@ export interface QueueRowView extends ClassifiedQueueEntry {
 export interface QueuePeriodGroup {
   /** Stable key: `week`, `month` (the rest of this calendar month) or `YYYY-MM`. */
   id: string;
-  /** Calendar month (local time) of a `YYYY-MM` group; undefined for week and month. */
+  /**
+   * First of the calendar month (on the chosen clock) of a `YYYY-MM` group, as
+   * UTC midnight of that date so it reads back the same in any zone; undefined
+   * for week and month.
+   */
   monthStart?: Date;
   rows: QueueRowView[];
   /** Time the group adds to the queue: the sum of its rows' own durations. */
@@ -41,17 +45,35 @@ export interface QueueView {
 function bucketOf(
   finishMs: number,
   nowMs: number,
-  weekStart: WeekStart
+  weekStart: WeekStart,
+  timeZone: 'UTC' | undefined
 ): { id: string; monthStart?: Date } {
-  const now = new Date(nowMs);
-  if (finishMs < addWeeks(startOfWeek(now, weekStart), 1).getTime()) return { id: 'week' };
-  const finish = new Date(finishMs);
-  const monthStart = new Date(finish.getFullYear(), finish.getMonth(), 1);
-  if (monthStart.getFullYear() === now.getFullYear() && monthStart.getMonth() === now.getMonth()) {
-    return { id: 'month' };
-  }
-  const id = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`;
-  return { id, monthStart };
+  const now = calendarDay(nowMs, timeZone);
+  const finish = calendarDay(finishMs, timeZone);
+  // Whole calendar days on the chosen clock, so DST never shifts a boundary.
+  const weekOffset = (now.weekday - (weekStart === 'sunday' ? 0 : 1) + 7) % 7;
+  if (finish.dayIndex < now.dayIndex - weekOffset + 7) return { id: 'week' };
+  if (finish.year === now.year && finish.month === now.month) return { id: 'month' };
+  const id = `${finish.year}-${String(finish.month + 1).padStart(2, '0')}`;
+  return { id, monthStart: new Date(Date.UTC(finish.year, finish.month, 1)) };
+}
+
+/**
+ * The calendar date of an instant on the chosen clock: the host zone, or UTC
+ * (EVE time). `dayIndex` counts whole days so two dates subtract cleanly.
+ */
+function calendarDay(ms: number, timeZone: 'UTC' | undefined) {
+  const d = new Date(ms);
+  const utc = timeZone === 'UTC';
+  const year = utc ? d.getUTCFullYear() : d.getFullYear();
+  const month = utc ? d.getUTCMonth() : d.getMonth();
+  const day = utc ? d.getUTCDate() : d.getDate();
+  return {
+    year,
+    month,
+    weekday: utc ? d.getUTCDay() : d.getDay(), // 0 = Sunday
+    dayIndex: Date.UTC(year, month, day) / 86_400_000,
+  };
 }
 
 /**
@@ -63,7 +85,8 @@ function bucketOf(
 export function buildQueueView(
   rows: readonly ClassifiedQueueEntry[],
   nowMs: number,
-  weekStart: WeekStart
+  weekStart: WeekStart,
+  timeZone?: 'UTC'
 ): QueueView {
   const finished = rows.filter((r) => r.status === 'completed');
   const undated = rows.filter((r) => r.status === 'paused');
@@ -80,7 +103,7 @@ export function buildQueueView(
   const hero = dated[0]?.status === 'training' ? dated[0] : null;
   const groups: QueuePeriodGroup[] = [];
   for (const row of hero ? dated.slice(1) : dated) {
-    const bucket = bucketOf(nowMs + (row.secondsRemaining ?? 0) * 1000, nowMs, weekStart);
+    const bucket = bucketOf(nowMs + (row.secondsRemaining ?? 0) * 1000, nowMs, weekStart, timeZone);
     let group = groups.find((g) => g.id === bucket.id);
     if (!group) {
       group = { ...bucket, rows: [], totalSeconds: 0 };

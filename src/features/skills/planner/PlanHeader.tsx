@@ -4,6 +4,7 @@ import { Panel, StatChip, StatChips, TextInput, Tooltip, type StatChipTone } fro
 import { focusRingClassName } from '@/components/ui/controlStyles';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
+import { useTimeZone } from '@/lib/timeFormat';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import type { PlanProgress } from '@/engine/skills/planProgress';
 import { MIN_MEANINGFUL_SAVINGS_SECONDS, type OptimizationBadge } from './planHeaderStats';
@@ -72,6 +73,7 @@ export function PlanHeader({
   focusName = false,
 }: PlanHeaderProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const nameRef = useRef<HTMLInputElement>(null);
   // null while not editing, so the field shows `name` itself and follows a
   // rename made elsewhere (the list) or a switch to another plan.
@@ -129,7 +131,9 @@ export function PlanHeader({
         <StatChip label={t('plans.headerSkillCount')} value={skillCount} />
         <StatChip
           label={t('plans.headerProjectedFinish')}
-          value={projectedFinish ? formatLocalDate(projectedFinish) : t('plans.headerNoFinish')}
+          value={
+            projectedFinish ? formatLocalDate(projectedFinish, timeZone) : t('plans.headerNoFinish')
+          }
         />
         {progress && progressFraction !== null && (
           <StatChip
@@ -164,7 +168,9 @@ export function PlanHeader({
                     {nextMilestone.name}
                   </span>
                 </Tooltip>{' '}
-                <span className="text-text-dim">{formatLocalDate(nextMilestone.finish)}</span>
+                <span className="text-text-dim">
+                  {formatLocalDate(nextMilestone.finish, timeZone)}
+                </span>
               </>
             }
           />

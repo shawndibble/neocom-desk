@@ -9,6 +9,7 @@ import {
 import type { StepKey } from '@/engine/skills/skillPlanSchedule';
 import type { EngineSkill, PlanStep, TrainedSkill } from '@/engine/types';
 import type { SkillPlanRecord } from '@/db';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useAutoDismiss } from '@/lib/useAutoDismiss';
 import {
   anchorKeysOf,
@@ -71,6 +72,7 @@ export function useOptimizeRemaps({
   stepKeys,
 }: UseOptimizeRemapsArgs) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const [optimizeResult, setOptimizeResult] = useScopedState<OptimizeRun>(costingScope);
   // Why each result came out the way it did (optimizeVerdict.ts). Held
   // beside the result rather than derived at render: the verdict depends on
@@ -109,7 +111,7 @@ export function useOptimizeRemaps({
       yearlyRemapAfter,
     });
     setOptimizeVerdict(verdict);
-    showOptimizeConfirm(confirmRemapOutcome(t, verdict, yearlyRemapAfter));
+    showOptimizeConfirm(confirmRemapOutcome(t, verdict, yearlyRemapAfter, timeZone));
   }
 
   /**
