@@ -189,10 +189,7 @@ function CharacterFooterLink({
   size?: 'sm';
   className?: string;
   onClick?: () => void;
-  /**
-   * The page to return to once a Character is picked (#1764) — omitted on
-   * the desktop rail, whose own link keeps today's always-Overview behavior.
-   */
+  /** The page to return to once a Character is picked (#1764). */
   originPath?: string;
 }) {
   const { t } = useTranslation();
@@ -207,6 +204,20 @@ function CharacterFooterLink({
       <CharacterTriggerFace activeCharacter={activeCharacter} size={size} />
     </Link>
   );
+}
+
+/**
+ * The rail's `CharacterFooterLink`, carrying the current page (path and
+ * query) as its origin (#4691). Its own component because it reads the
+ * location, which `Layout` must not.
+ */
+function RailCharacterFooterLink({
+  activeCharacter,
+}: {
+  activeCharacter: ActiveCharacter | undefined;
+}) {
+  const { pathname, search } = useLocation();
+  return <CharacterFooterLink activeCharacter={activeCharacter} originPath={pathname + search} />;
 }
 
 /**
@@ -396,7 +407,7 @@ export const Layout = memo(function Layout() {
                 <NavItem key={page.path} to={page.path} label={t(page.labelKey)} locked={false} />
               ))}
             </div>
-            <CharacterFooterLink activeCharacter={activeCharacter} />
+            <RailCharacterFooterLink activeCharacter={activeCharacter} />
           </aside>
 
           <main className="min-w-0 flex-1 px-2 py-4 pb-[max(calc(5rem_+_env(safe-area-inset-bottom)),var(--compare-drawer-space,0px),calc(var(--sticky-clearance)_+_var(--bottom-nav-clearance)_+_1rem))] md:px-4 md:pb-[max(1rem,var(--compare-drawer-space,0px),calc(var(--sticky-clearance)_+_1rem))]">

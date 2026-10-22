@@ -106,7 +106,8 @@ export function NavItem({
   // Only `/characters` carries an origin — it is the one destination a
   // pilot needs to come back *from* (#1764); every other nav item is a
   // destination in its own right.
-  const originState = to === '/characters' ? { from: location.pathname } : undefined;
+  const originState =
+    to === '/characters' ? { from: location.pathname + location.search } : undefined;
   /*
    * Compose this route's snapshot while the pointer is still travelling to the
    * link (`routeWarm.ts`). `focus` covers the keyboard, where tabbing to a link

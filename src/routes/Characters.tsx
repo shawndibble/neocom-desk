@@ -74,6 +74,7 @@ import { useCharactersHousekeeping } from '@/features/character/useCharactersHou
 import { characterLastSynced } from '@/features/character/rosterQueueChip';
 import { useCharactersView, activeRosterFilterCount } from '@/features/character/useCharactersView';
 import { buildColumns } from '@/features/character/charactersTableColumns';
+import { returnPathAfterSwitch } from '@/features/character/characterSwitchReturn';
 
 const DENSITY_LABEL_KEYS = {
   0.875: 'characters.densityCompact',
@@ -229,12 +230,10 @@ export function Characters() {
 
   async function select(characterId: number) {
     await setActiveCharacter(characterId);
-    // Return to wherever the switch started (the tab bar, or the More
-    // sheet's portrait+name row) — falling back to Overview when there is
-    // nowhere to return to (a fresh load) or the origin was this page itself
-    // (#1764).
+    // Return to wherever the switch started (the rail portrait, the tab bar,
+    // or the More sheet's portrait+name row) — see `returnPathAfterSwitch`.
     const from = (location.state as { from?: string } | null)?.from;
-    navigate(from && from !== '/characters' ? from : '/overview');
+    navigate(returnPathAfterSwitch(from));
   }
 
   function handleToggleColumn(id: CharacterColumnId) {
