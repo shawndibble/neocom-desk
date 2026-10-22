@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { MarginGap } from '@/engine/market/realizedMargin';
 import type { WalletTransaction } from '@/esi/endpoints';
 import { summarizeTrading, tradingWindow } from './tradingSummary';
 
@@ -60,5 +61,22 @@ describe('summarizeTrading', () => {
       summarizeTrading(fills, margins, journal, dates, Date.parse('2025-06-01T00:00:00Z'))
         .archiveSince
     ).toBeNull();
+  });
+
+  it('counts the sales shown that have a gap, and their revenue', () => {
+    const three = [...fills, { ...sale(3, '2026-01-07T10:00:00Z'), quantity: 5, unit_price: 20 }];
+    const gaps = new Map<number, MarginGap>([
+      [2, 'noBuy'],
+      [3, 'noTax'],
+    ]);
+    const s = summarizeTrading(three, margins, journal, NO_DATES, null, gaps);
+    expect(s.uncosted).toEqual({ sales: 2, revenue: 10 + 100 });
+  });
+
+  it('reports no uncosted sales without gaps', () => {
+    expect(summarizeTrading(fills, margins, journal, NO_DATES, null).uncosted).toEqual({
+      sales: 0,
+      revenue: 0,
+    });
   });
 });

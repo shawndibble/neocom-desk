@@ -33,6 +33,21 @@ interface Lot {
 }
 
 /**
+ * Why a personal sale has no margin, as the engine decides it:
+ * - `noBuy`: the wallet buys before it don't cover every unit sold.
+ * - `outside`: covered, but another sale of the item outran its buys, so which
+ *   stock this one used can't be told.
+ * - `noTax`: covered, but its sales tax line wasn't found.
+ */
+export type MarginGap = 'noBuy' | 'outside' | 'noTax';
+
+export interface RealizedMarginReport {
+  margins: Map<number, RealizedMargin>;
+  /** Every personal sale without a margin, with the reason; a sale with a margin is absent. */
+  gaps: Map<number, MarginGap>;
+}
+
+/**
  * Margin per sale, keyed by transaction id. `salesTaxByTransactionId` holds
  * each sale's sales tax as a positive amount; a sale absent from it gets no
  * margin.
@@ -41,7 +56,16 @@ export function realizedMargins(
   transactions: readonly WalletTrade[],
   salesTaxByTransactionId: ReadonlyMap<number, number>
 ): Map<number, RealizedMargin> {
+  return realizedMarginReport(transactions, salesTaxByTransactionId).margins;
+}
+
+/** `realizedMargins` plus the reason each personal sale without a margin has none. */
+export function realizedMarginReport(
+  transactions: readonly WalletTrade[],
+  salesTaxByTransactionId: ReadonlyMap<number, number>
+): RealizedMarginReport {
   const result = new Map<number, RealizedMargin>();
+  const gaps = new Map<number, MarginGap>();
   const trades = transactions
     .filter((t) => t.isPersonal && t.quantity > 0)
     .flatMap((t) => {
@@ -76,11 +100,15 @@ export function realizedMargins(
     }
     if (toSell > 0) {
       outranTypes.add(trade.typeId);
+      gaps.set(trade.transactionId, 'noBuy');
       continue;
     }
-    const salesTax = salesTaxByTransactionId.get(trade.transactionId);
-    if (salesTax === undefined) continue;
     typeBySale.set(trade.transactionId, trade.typeId);
+    const salesTax = salesTaxByTransactionId.get(trade.transactionId);
+    if (salesTax === undefined) {
+      gaps.set(trade.transactionId, 'noTax');
+      continue;
+    }
     result.set(trade.transactionId, {
       unitCost: cost / trade.quantity,
       salesTax,
@@ -88,7 +116,9 @@ export function realizedMargins(
     });
   }
   for (const [transactionId, typeId] of typeBySale) {
-    if (outranTypes.has(typeId)) result.delete(transactionId);
+    if (!outranTypes.has(typeId)) continue;
+    result.delete(transactionId);
+    gaps.set(transactionId, 'outside');
   }
-  return result;
+  return { margins: result, gaps };
 }

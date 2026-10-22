@@ -289,18 +289,44 @@ describe('TransactionsPanel — margin', () => {
     expect(marginCell(row)).toHaveTextContent('132,634');
   });
 
-  it('shows a dash, never a zero-cost margin, for a sale no wallet buy covers', async () => {
+  it('says no wallet buy covers a sale, never showing a zero-cost margin', async () => {
     load([taxFor(2, -49_766.4), taxFor(3, -100)]);
     renderPanel();
     const row = await screen.findByRole('row', { name: /Tritanium/ });
-    expect(marginCell(row)).toHaveTextContent('—');
+    expect(marginCell(row)).toHaveTextContent('No wallet buy covers it');
   });
 
-  it('shows a dash when the journal did not load, rather than a tax-free margin', async () => {
+  it('says no sales tax line was found when the journal did not load, rather than a tax-free margin', async () => {
     load(null);
     renderPanel();
     const row = await screen.findByRole('row', { name: /Damage Control II.*Sell/ });
-    expect(marginCell(row)).toHaveTextContent('—');
+    expect(marginCell(row)).toHaveTextContent('No sales tax line found');
+  });
+
+  it('totals the sales without a margin under the figures', async () => {
+    load([taxFor(2, -49_766.4), taxFor(3, -100)]);
+    renderPanel();
+    const strip = await screen.findByRole('region', { name: /Totals/ });
+    // Only the built Tritanium sale has no margin.
+    expect(strip).toHaveTextContent('1 sale uncosted ·');
+  });
+
+  it('omits the uncosted line when every sale has a margin', async () => {
+    mockTransactions({
+      data: [BUY, SALE],
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+    });
+    mockedLoadJournal.mockResolvedValue({
+      data: [taxFor(2, -49_766.4)],
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+    });
+    renderPanel();
+    const strip = await screen.findByRole('region', { name: /Totals/ });
+    expect(strip).not.toHaveTextContent('uncosted');
   });
 
   it('leaves Margin out of the totals when no sale has one', async () => {
@@ -381,6 +407,8 @@ describe('TransactionsPanel — phone', () => {
     const row = screen.getAllByRole('row')[1];
     expect(row.querySelector('td[data-label="Side"]')).toHaveClass('max-sm:hidden');
     expect(row.querySelector('td[data-label="Date"]')).not.toHaveClass('max-sm:hidden');
+    // Date over time: the date and the time are separate block spans below `sm`.
+    expect(row.querySelectorAll('td[data-label="Date"] span.max-sm\\:block')).toHaveLength(2);
     expect(row.querySelector('td[data-label="Margin"]')).toHaveClass('max-sm:hidden');
     expect(row.querySelector('td[data-label="Total"]')).not.toHaveClass('max-sm:hidden');
     const summary = screen.getByRole('region', { name: 'Totals for the transactions shown' });

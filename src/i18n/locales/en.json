@@ -5819,12 +5819,24 @@
     "net": "Net",
     "transactionsSummaryLabel": "Totals for the transactions shown",
     "margin": "Margin",
-    "marginTooltip": "Sale total less the wallet buys it used up (oldest first) and its sales tax. Broker fees aren't taken off. A dash means no wallet buy covers it — stock you built, say — its tax isn't in your journal, or some of that item's stock came from outside this history.",
+    "marginTooltip": "Sale total less the wallet buys it used up (oldest first) and its sales tax. Broker fees aren't taken off. A sale without a margin says why in its own cell.",
+    "marginGap": {
+      "noBuy": "No wallet buy covers it",
+      "noTax": "No sales tax line found",
+      "outside": "Stock came from outside this history"
+    },
+    "marginGapHint": {
+      "noBuy": "No earlier wallet buy covers all of these units, so there is no cost to take off.",
+      "noTax": "This sale's tax isn't in your journal, so a margin would overstate it.",
+      "outside": "Another sale of this item used more units than your wallet buys, so we can't tell which stock this one used."
+    },
     "marginWorking": "Cost {{unitCost}} each from your wallet buys\nSales tax {{salesTax}}",
     "transactionsRange": "{{from}} – {{to}}",
     "tradingMargin": "Margin",
     "tradingMatched_one": "{{matched}} of {{count}} sale matched",
     "tradingMatched_other": "{{matched}} of {{count}} sales matched",
+    "tradingUncosted_one": "{{count}} sale uncosted · {{isk}} ISK",
+    "tradingUncosted_other": "{{count}} sales uncosted · {{isk}} ISK",
     "brokerFees": "Broker fees",
     "brokerFeesTooltip": "Broker fees paid over the same dates, from your journal. They aren't taken off the margin — a fee can't be tied to a sale.",
     "archiveSince": "Since {{date}} — your wallet archive starts there.",
