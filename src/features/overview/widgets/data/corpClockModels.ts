@@ -11,6 +11,7 @@ import {
   dueSoon,
   groupBoardByKind,
 } from '@/engine/corp/deadlines';
+import type { DayZone } from '@/engine/localDay';
 import type { CorporationIndustryJob } from '@/esi/endpoints';
 import { structureStateLabel, toBoardJobs } from '@/features/corp/boardSources';
 import { activityI18nKey, isCompletingSoon } from '@/features/industry/jobs';
@@ -68,13 +69,14 @@ function whenOf(item: CorpBoardItem, t: Translate): string {
 function dayChart(
   t: Translate,
   items: readonly CorpBoardItem[],
-  now: number
+  now: number,
+  zone: DayZone
 ): BarsChartModel | undefined {
-  const days = deadlinesByDay(items, now, DEADLINE_STRIP_DAYS);
+  const days = deadlinesByDay(items, now, DEADLINE_STRIP_DAYS, zone);
   const total = days.reduce((sum, day) => sum + day.count, 0);
   if (total === 0) return undefined;
   const labelOf = (startMs: number, index: number) =>
-    index === 0 ? t('corp.standing.strip.today') : formatDateOnly(new Date(startMs));
+    index === 0 ? t('corp.standing.strip.today') : formatDateOnly(new Date(startMs), zone);
   const severityOf = (severity: DeadlineSeverity | null) =>
     t(`corp.board.severity.${severity ?? 'clear'}`);
   const detail = days
@@ -93,7 +95,7 @@ function dayChart(
     values: days.map((day) => day.count),
     max: String(Math.max(...days.map((day) => day.count))),
     xStart: t('corp.standing.strip.today'),
-    xEnd: formatDateOnly(new Date(days[days.length - 1]!.startMs)),
+    xEnd: formatDateOnly(new Date(days[days.length - 1]!.startMs), zone),
     tips: days.map((day, index) => ({
       title: labelOf(day.startMs, index),
       rows: [{ label: severityOf(day.severity), value: String(day.count) }],
@@ -103,7 +105,7 @@ function dayChart(
   };
 }
 
-export const corpDeadlines: Builder = (feeds, { t, now }) => {
+export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
   const list = [feeds.structures, feeds.moonChunks, feeds.corpJobs] as const;
   // A feed still on its first load: nothing to say until every read has an answer.
   const pending = list.find((feed) => !feed || (!feed.data && feed.loading));
@@ -230,7 +232,7 @@ export const corpDeadlines: Builder = (feeds, { t, now }) => {
       count: due.total,
       overdue: due.overdue,
     }),
-    chart: dayChart(t, items, now),
+    chart: dayChart(t, items, now, zone),
   };
 };
 
