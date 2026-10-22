@@ -4,6 +4,7 @@ import { userEvent, within } from 'storybook/test';
 import { db } from '@/db';
 import { writeLocal } from '@/lib/safeLocalStorage';
 import { formatLocalDate } from '@/lib/localDate';
+import { loadSkillCatalog } from '@/features/skills/skillMap';
 import { SkillPlans } from '@/routes/SkillPlans';
 import { SkillPlanEditor } from '@/routes/SkillPlanEditor';
 import { SAMPLE_ACTIVE_CHARACTER } from '@/storybook/sampleData';
@@ -13,10 +14,12 @@ import {
   queueRemapRoutes,
   type ScenarioName,
 } from './queueRemapFixtures';
-import { IntoAttributesPanel, QueueRemapAdviceModal, RemapAdviceAction } from './queueRemapParts';
+import { adviceMarkers, queueAdvice } from './queueRemapAdvice';
+import { OptimizeQueueButton, OptimizeQueueToast } from './queueRemapParts';
 
 const PLAN_ID = 'mockup-queue-plan';
 const characterId = SAMPLE_ACTIVE_CHARACTER.characterId;
+const PLAN_NAME = `Skill queue · ${formatLocalDate(new Date())}`;
 
 /** The standings notice is another page's concern; it would push the queue down every shot. */
 function quietShell() {
@@ -26,6 +29,33 @@ function quietShell() {
 async function seedNoPlans() {
   quietShell();
   await db.skillPlans.clear();
+}
+
+/** Two plans the pilot already keeps, so the panel shows its current plan and All plans. */
+async function seedExistingPlans() {
+  quietShell();
+  await db.skillPlans.clear();
+  await db.skillPlans.bulkPut([
+    {
+      id: 'mockup-golem',
+      characterId,
+      name: 'Golem',
+      entries: [
+        { skillTypeID: 3338, targetLevel: 5 },
+        { skillTypeID: 20212, targetLevel: 4 },
+      ],
+      remapCount: 1,
+      updatedAt: Date.now(),
+    },
+    {
+      id: 'mockup-drones',
+      characterId,
+      name: 'Drone support',
+      entries: [{ skillTypeID: 3441, targetLevel: 5 }],
+      remapCount: 1,
+      updatedAt: Date.now() - 86_400_000,
+    },
+  ]);
 }
 
 const queueEntries = MIXED_QUEUE.map((s) => ({ skillTypeID: s.skillTypeID, targetLevel: s.level }));
@@ -45,41 +75,31 @@ async function seedImportedPlan() {
 }
 
 /**
- * Option A's hand-off: the queue saved as a plan, the advice kept as a Remap
- * Marker. Fixed rather than computed in the seed (the SDE can't load in the
- * jsdom story test): it is what `placeRemaps` answers for this queue with one
- * remap, as `AdviceReady` shows: remap before Shield Management V (entry 6).
+ * What one press of Optimize queue writes: the queue as a plan, the
+ * optimizer's remaps placed as Remap Markers. The markers come from the same
+ * `placeRemaps` run as the toast; where the SDE can't load (the jsdom story
+ * test) the plan is written without them.
  */
-async function seedSavedAdvice() {
+const seedLanding = (scenario: ScenarioName) => async () => {
   quietShell();
+  let markers = {};
+  try {
+    const { engineSkills } = await loadSkillCatalog();
+    markers = adviceMarkers(queueAdvice(scenario, engineSkills, Date.now()));
+  } catch {
+    // No SDE in jsdom: the story still renders the editor.
+  }
   await db.skillPlans.clear();
   await db.skillPlans.put({
     id: PLAN_ID,
     characterId,
-    name: `Skill queue · ${formatLocalDate(new Date())}`,
+    name: PLAN_NAME,
     entries: queueEntries,
     remapCount: 1,
-    markers: [6],
-    markerAttributes: [
-      { memory: 27, intelligence: 21, perception: 17, willpower: 17, charisma: 17 },
-    ],
+    ...markers,
     updatedAt: Date.now(),
   });
-}
-
-/** Option B's landing: the queue saved as a plan, nothing optimized yet. */
-async function seedOptimizeInPlan() {
-  quietShell();
-  await db.skillPlans.clear();
-  await db.skillPlans.put({
-    id: PLAN_ID,
-    characterId,
-    name: `Skill queue · ${formatLocalDate(new Date())}`,
-    entries: queueEntries,
-    remapCount: 1,
-    updatedAt: Date.now(),
-  });
-}
+};
 
 // Module-level so the shell's effect sees stable references.
 const ROUTES: Record<ScenarioName, ReturnType<typeof queueRemapRoutes>> = {
@@ -89,17 +109,22 @@ const ROUTES: Record<ScenarioName, ReturnType<typeof queueRemapRoutes>> = {
   optimal: queueRemapRoutes('optimal'),
   empty: queueRemapRoutes('empty'),
 };
+const SEEDS = {
+  ready: seedLanding('ready'),
+  cooldown: seedLanding('cooldown'),
+  bonus: seedLanding('bonus'),
+};
 
-const queuePage = (scenario: ScenarioName) => ({
+const queuePage = (scenario: ScenarioName, seed = seedNoPlans) => ({
   path: '/skills/plans',
   routes: ROUTES[scenario],
   scopes: QUEUE_REMAP_SCOPES,
-  seed: seedNoPlans,
+  seed,
 });
 
-const editorPage = (seed: () => Promise<void>) => ({
+const editorPage = (scenario: ScenarioName, seed: () => Promise<void>) => ({
   path: `/skills/plans/${PLAN_ID}`,
-  routes: ROUTES.ready,
+  routes: ROUTES[scenario],
   scopes: QUEUE_REMAP_SCOPES,
   seed,
 });
@@ -111,19 +136,17 @@ const pages = (
   </Routes>
 );
 
-const withAction = (label?: string) => (
+const withButton = (emptyQueue = false) => (
   <>
     {pages}
-    <IntoAttributesPanel>
-      <RemapAdviceAction label={label} />
-    </IntoAttributesPanel>
+    <OptimizeQueueButton emptyQueue={emptyQueue} />
   </>
 );
 
-const withAdvice = (scenario: ScenarioName) => (
+const landing = (scenario: ScenarioName) => (
   <>
-    {withAction()}
-    <QueueRemapAdviceModal scenario={scenario} />
+    {pages}
+    <OptimizeQueueToast scenario={scenario} planName={PLAN_NAME} />
   </>
 );
 
@@ -135,21 +158,18 @@ const openOptimize = async ({ canvasElement }: { canvasElement: HTMLElement }) =
 };
 
 /**
- * Issue #4701: attribute remap advice for the current skill queue.
+ * Issue #4701: remap advice for the current skill queue. Chosen flow (Shawn,
+ * 2026-10-21): one press of **Optimize queue**, under New plan in the Skill
+ * Plan panel, makes a plan from the queue, runs the optimizer (`placeRemaps`,
+ * leaving out the level training now as the editor does), places its remaps
+ * as Remap Markers and opens that plan, with an Undo toast naming what it did.
  *
- * Today, the optimizer lives only in the Skill Plan editor: make a plan,
- * Import › From skill queue, then Optimize. The real pages render here against
- * a sample missile pilot (`queueRemapFixtures.ts`); every figure in the
- * proposed modal is the planner's own `placeRemaps` run on that queue.
+ * The real Skills › Plans page and Plan editor render against a sample
+ * missile pilot (`queueRemapFixtures.ts`); every figure is the planner's own.
  *
- * Option A, "Preview from queue": a Remap advice button in the Attributes
- * panel opens the advice for the queue as it stands. Option B: the same spot
- * holds "Optimize in a plan", which saves the queue as a plan and opens the
- * editor with Optimize ready.
- *
- * New components in this mockup:
- * - `Remap advice action`: an existing `Button` in a new place (Attributes panel, under the remap budget).
- * - `QueueRemapAdvice`: the modal body; `RemapPreviewModal`'s layout with a queue framing and no Accept.
+ * New components in this mockup: none. The button is an existing `Button`
+ * on its own line under New plan, and the landing
+ * note is the existing `Toast`.
  */
 const meta = {
   title: 'mockups/QueueRemap',
@@ -170,54 +190,76 @@ export const TodayPhone: Story = { globals: phone };
 
 /** @summary Today: the queue imported into a plan, Optimize menu open, the only way to a remap. */
 export const TodayPlanOptimize: Story = {
-  parameters: { shell: editorPage(seedImportedPlan) },
+  parameters: { shell: editorPage('ready', seedImportedPlan) },
   play: openOptimize,
 };
 
-/** @summary A: Remap advice under the remap budget in the Attributes panel. New component: Remap advice action. */
-export const AdviceAction: Story = { render: () => withAction() };
+/** @summary Optimize queue under New plan, no plans yet. */
+export const Button: Story = { render: () => withButton() };
 
-/** @summary A on a phone: the button under the attribute chips. */
-export const AdviceActionPhone: Story = { render: () => withAction(), globals: phone };
+/** @summary Optimize queue under New plan on a phone. */
+export const ButtonPhone: Story = { render: () => withButton(), globals: phone };
 
-/** @summary A: yearly remap ready. Remap now to Perception/Willpower. New component: QueueRemapAdvice. */
-export const AdviceReady: Story = { render: () => withAdvice('ready') };
-
-/** @summary A on a phone, yearly remap ready. */
-export const AdviceReadyPhone: Story = { render: () => withAdvice('ready'), globals: phone };
-
-/** @summary A: yearly remap on cooldown. Keep current attributes, then remap once it's ready. */
-export const AdviceCooldown: Story = {
-  parameters: { shell: queuePage('cooldown') },
-  render: () => withAdvice('cooldown'),
+/** @summary Optimize queue with plans already kept: All plans and New plan unchanged, Optimize queue under New plan. */
+export const ButtonWithPlans: Story = {
+  parameters: { shell: queuePage('ready', seedExistingPlans) },
+  render: () => withButton(),
 };
 
-/** @summary A: a bonus remap plus the yearly one. Two remaps, one per attribute block. */
-export const AdviceBonus: Story = {
-  parameters: { shell: queuePage('bonus') },
-  render: () => withAdvice('bonus'),
+/** @summary The same with plans on a phone. */
+export const ButtonWithPlansPhone: Story = {
+  parameters: { shell: queuePage('ready', seedExistingPlans) },
+  render: () => withButton(),
+  globals: phone,
 };
 
-/** @summary A: attributes already suit the queue. Nothing to save. */
-export const AdviceOptimal: Story = {
-  parameters: { shell: queuePage('optimal') },
-  render: () => withAdvice('optimal'),
-};
-
-/** @summary A: empty queue. */
-export const AdviceEmpty: Story = {
+/** @summary Empty queue: Optimize queue is aria-disabled and its tooltip says why. */
+export const EmptyQueue: Story = {
   parameters: { shell: queuePage('empty') },
-  render: () => withAdvice('empty'),
+  render: () => withButton(true),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const button = await canvas.findByRole(
+      'button',
+      { name: /optimize queue/i },
+      { timeout: 10_000 }
+    );
+    button.focus();
+  },
 };
 
-/** @summary A: after Save as skill plan. A new plan named for the queue, the advice placed as Remap Markers, its editor open. */
-export const AdviceSavedAsPlan: Story = { parameters: { shell: editorPage(seedSavedAdvice) } };
+/** @summary Landing: the new plan, its Remap Marker before Shield Management V, Remap savings in the header, an Undo toast. */
+export const Landing: Story = {
+  parameters: { shell: editorPage('ready', SEEDS.ready) },
+  render: () => landing('ready'),
+};
 
-/** @summary B: the same spot reads Optimize in a plan. */
-export const AltAction: Story = { render: () => withAction('Optimize in a plan') };
+/** @summary Landing on a phone. */
+export const LandingPhone: Story = {
+  parameters: { shell: editorPage('ready', SEEDS.ready) },
+  render: () => landing('ready'),
+  globals: phone,
+};
 
-/** @summary B's landing: the queue saved as a plan, its editor open with Optimize ready. */
-export const AltLanding: Story = {
-  parameters: { shell: editorPage(seedOptimizeInPlan) },
-  play: openOptimize,
+/** @summary Landing with the yearly remap on cooldown: the marker waits for its date, and the toast says so. */
+export const LandingCooldown: Story = {
+  parameters: { shell: editorPage('cooldown', SEEDS.cooldown) },
+  render: () => landing('cooldown'),
+};
+
+/** @summary Landing with a bonus remap too: two markers, one per attribute block. */
+export const LandingBonus: Story = {
+  parameters: { shell: editorPage('bonus', SEEDS.bonus) },
+  render: () => landing('bonus'),
+};
+
+/** @summary Attributes already suit the queue: no plan is made, a plain toast on the Plans page says why. */
+export const AlreadyOptimal: Story = {
+  parameters: { shell: queuePage('optimal') },
+  render: () => (
+    <>
+      {withButton()}
+      <OptimizeQueueToast scenario="optimal" planName={PLAN_NAME} />
+    </>
+  ),
 };
