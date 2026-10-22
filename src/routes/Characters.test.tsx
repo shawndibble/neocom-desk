@@ -483,7 +483,9 @@ describe('Characters', () => {
     const user = userEvent.setup();
     renderCharacters();
     await user.click(await screen.findByRole('button', { name: /^Star Pilot One/ }));
+    await user.click(screen.getByRole('button', { name: /^Remove Pilot One/ }));
     expect(screen.queryByText('overview page')).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
 
     await user.click(await screen.findByText('Test Corp'));
     expect(await screen.findByText('overview page')).toBeInTheDocument();
