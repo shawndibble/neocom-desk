@@ -14,7 +14,8 @@
  */
 import { useTranslation } from 'react-i18next';
 import type { DayLoad } from '@/engine/character/deadlines';
-import { localMidnight } from '@/engine/character/deadlines';
+import { cellDayStart, dayStart } from '@/engine/localDay';
+import { useTimeZone } from '@/lib/timeFormat';
 import type { GridDay } from '@/lib/calendarGrid';
 import { cx } from '@/lib/cx';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
@@ -39,7 +40,8 @@ export function CalendarDayTicker({
   const { t, i18n } = useTranslation();
   const weekday = new Intl.DateTimeFormat(i18n.language, { weekday: 'short' });
   const dayLabel = useDayLoadLabel();
-  const todayMs = localMidnight(nowMs);
+  const zone = useTimeZone();
+  const todayMs = dayStart(nowMs, zone);
 
   return (
     <div
@@ -48,7 +50,7 @@ export function CalendarDayTicker({
       className="flex gap-1 overflow-x-auto overscroll-x-contain"
     >
       {days.map((day) => {
-        const dayStartMs = localMidnight(day.date.getTime());
+        const dayStartMs = cellDayStart(day.date, zone);
         const load = loads.get(dayStartMs);
         const isSelected = selectedDayMs === dayStartMs;
         const isPast = dayStartMs < todayMs;

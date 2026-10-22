@@ -1,7 +1,9 @@
 /**
- * Pure date-grid math for the Calendar's Month/Week views. Local time
- * throughout, matching `lib/timestamp.ts`'s display of ESI's UTC event
- * timestamps — no fetch/DOM/Dexie imports.
+ * Pure date-grid math for the Calendar's Month/Week views. A cell is a
+ * `Date` at local midnight whose calendar fields are the day it stands for;
+ * which instants fall in it (the pilot's local day or the EVE day, per the
+ * Time format) is `engine/localDay.ts`'s `cellDayStart` — no
+ * fetch/DOM/Dexie imports.
  */
 
 /** Which day a week grid starts on. Default is Monday, EVE's own in-game calendar value. */

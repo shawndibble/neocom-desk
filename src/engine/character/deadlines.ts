@@ -15,7 +15,7 @@
 
 import type { CharacterBoardItem, CharacterBoardItemKind } from './board';
 import { CHARACTER_BOARD_ITEM_KINDS } from './board';
-import { localMidnight, nextLocalDay } from '../localDay';
+import { dayStart, localMidnight, nextDay, type DayZone } from '../localDay';
 
 export { localMidnight };
 
@@ -37,17 +37,20 @@ export interface DayLoad {
 }
 
 /**
- * Keyed by local-midnight epoch ms, and **only for days that hold something**.
+ * Keyed by the epoch ms of each day's midnight on the given clock (local unless `zone` is `'UTC'`), and **only for days that hold something**.
  *
  * A sparse map rather than a dense range: the map grid and the ticker each
  * decide their own span, and handing them a range would mean this module
  * agreeing with both about what "the next fortnight" is. They walk their own
  * days and look each one up.
  */
-export function countsByDay(items: readonly CharacterBoardItem[]): Map<number, DayLoad> {
+export function countsByDay(
+  items: readonly CharacterBoardItem[],
+  zone?: DayZone
+): Map<number, DayLoad> {
   const seen = new Map<number, { count: number; kinds: Set<CharacterBoardItemKind> }>();
   for (const item of items) {
-    const key = localMidnight(item.deadlineMs);
+    const key = dayStart(item.deadlineMs, zone);
     const existing = seen.get(key);
     if (existing) {
       existing.count += 1;
@@ -78,10 +81,10 @@ export interface DayGroup {
  * day changes, so the groups come out chronological because the board was —
  * not because anything here sorted them again.
  */
-export function groupByDay(items: readonly CharacterBoardItem[]): DayGroup[] {
+export function groupByDay(items: readonly CharacterBoardItem[], zone?: DayZone): DayGroup[] {
   const groups: DayGroup[] = [];
   for (const item of items) {
-    const dayStartMs = localMidnight(item.deadlineMs);
+    const dayStartMs = dayStart(item.deadlineMs, zone);
     const current = groups[groups.length - 1];
     if (current && current.dayStartMs === dayStartMs) current.items.push(item);
     else groups.push({ dayStartMs, items: [item] });
@@ -97,10 +100,14 @@ export function groupByDay(items: readonly CharacterBoardItem[]): DayGroup[] {
  * Calendar days, not a rolling 24 hours: at 23:30 the next half-hour is
  * tomorrow, and a group the user reads as dates must agree with the dates.
  */
-export function relativeDayFor(dayStartMs: number, nowMs: number): 'today' | 'tomorrow' | 'other' {
-  const today = localMidnight(nowMs);
+export function relativeDayFor(
+  dayStartMs: number,
+  nowMs: number,
+  zone?: DayZone
+): 'today' | 'tomorrow' | 'other' {
+  const today = dayStart(nowMs, zone);
   if (dayStartMs === today) return 'today';
-  return dayStartMs === nextLocalDay(today) ? 'tomorrow' : 'other';
+  return dayStartMs === nextDay(today, zone) ? 'tomorrow' : 'other';
 }
 
 /**

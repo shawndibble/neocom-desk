@@ -23,6 +23,7 @@ import type { CharacterBoardItem, CharacterBoardItemKind } from '@/engine/charac
 import { isProjectedKind, pastDeadlineLabelKey } from '@/engine/character/board';
 import { formatDuration } from '@/lib/duration';
 import { formatTimeOfDay } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
@@ -52,6 +53,7 @@ export interface CharacterBoardRowProps {
 
 export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProps) {
   const { t } = useTranslation();
+  const zone = useTimeZone();
   const KindIcon = KIND_ICON[item.kind];
   const overdue = item.remainingMs <= 0;
 
@@ -110,7 +112,7 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
         </span>
         <span className="mt-0.5 block truncate text-sm font-semibold">{item.subject}</span>
         <span className="mt-0.5 block truncate text-xs text-text-dim">
-          {formatTimeOfDay(new Date(item.deadlineMs))} · {t(KIND_LABEL[item.kind])}
+          {formatTimeOfDay(new Date(item.deadlineMs), zone)} · {t(KIND_LABEL[item.kind])}
           {item.detail && ` · ${t(`calendar.detail.${item.kind}.${item.detail}`, item.detail)}`}
         </span>
       </span>

@@ -7435,7 +7435,6 @@
     },
     "filter": {
       "title": "Event types",
-      "visibleLabel": "Filter",
       "open": "Filter event types",
       "openWithCount": "Filter event types ({{count}} hidden)",
       "notGranted": "Not granted",
@@ -12220,7 +12219,7 @@
       "deviceField": "This device only."
     },
     "timeFormatLabel": "Time format",
-    "timeFormatHint": "EVE runs on UTC, the clock other players quote timers in. Calendar keeps your local days.",
+    "timeFormatHint": "EVE runs on UTC, the clock other players quote timers in.",
     "timeFormat": {
       "local": "My local time",
       "eve": "EVE time (UTC)"

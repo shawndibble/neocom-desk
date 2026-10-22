@@ -37,6 +37,7 @@ import { downloadTextFile } from '@/lib/download';
 import { GrantBanner } from '@/app/GrantNote';
 import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import type { CachedResult } from '@/esi/cache';
 import type {
   CalendarEventDetail,
@@ -107,6 +108,7 @@ export function EventDetailModal({
   onResponded,
 }: EventDetailModalProps) {
   const { t } = useTranslation();
+  const zone = useTimeZone();
   // `retry` (Try again) re-runs the load in place — closing and reopening
   // was otherwise the only way back to the network.
   const load = useAsyncLoad(
@@ -186,7 +188,7 @@ export function EventDetailModal({
               className={`size-4 shrink-0 ${KIND_TEXT.calendarEvent}`}
               aria-hidden="true"
             />
-            {formatCalendarTimestamp(new Date(state.detail.data.date))}
+            {formatCalendarTimestamp(new Date(state.detail.data.date), zone)}
             {state.detail.data.importance > 0 && <> · {t('calendar.important')}</>}
           </p>
           <p className="rounded-xs border border-line bg-panel-2 p-2 whitespace-pre-wrap text-text-dim">
