@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { detectMode, previewClipboardImport, type ClipboardImportDeps } from './clipboardImport';
+import {
+  detectMode,
+  importOutcome,
+  previewClipboardImport,
+  type ClipboardImportDeps,
+  type ClipboardImportPreview,
+} from './clipboardImport';
 import type { UniverseType } from '@/esi/endpoints';
 
 describe('detectMode', () => {
@@ -204,5 +210,39 @@ describe('previewClipboardImport: EFT fit', () => {
         reason: 'invalid or missing fit header, expected "[Ship Name]" or "[Ship Name, Fit Name]"',
       },
     ]);
+  });
+});
+
+describe('importOutcome', () => {
+  const entry = { skillTypeID: 3300, targetLevel: 3 } as ClipboardImportPreview['entries'][number];
+  const preview = (over: Partial<ClipboardImportPreview>): ClipboardImportPreview => ({
+    mode: 'skillPlan',
+    entries: [entry],
+    warnings: [],
+    errors: [],
+    ...over,
+  });
+
+  it('applies a preview where every line parsed', () => {
+    expect(importOutcome(preview({}))).toBe('apply');
+  });
+
+  it('asks for review when any line failed or an item was dropped', () => {
+    expect(importOutcome(preview({ errors: [{ line: 2, text: 'x', reason: 'unknown' }] }))).toBe(
+      'review'
+    );
+    expect(importOutcome(preview({ mode: 'eftFit', warnings: ['Unknown item: X'] }))).toBe(
+      'review'
+    );
+  });
+
+  it('asks for review when a file could not be read, so its error shows', () => {
+    expect(importOutcome(preview({ entries: [], documentErrorCode: 'malformedXml' }))).toBe(
+      'review'
+    );
+  });
+
+  it('reports empty when nothing parsed and nothing failed', () => {
+    expect(importOutcome(preview({ entries: [] }))).toBe('empty');
   });
 });

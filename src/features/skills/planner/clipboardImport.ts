@@ -139,3 +139,18 @@ export async function previewClipboardImport(
 ): Promise<ClipboardImportPreview> {
   return detectMode(text) === 'eftFit' ? previewEftFit(text, deps) : previewSkillPlan(text, deps);
 }
+
+/**
+ * What an Import should do with a preview. A clean parse applies without being
+ * looked at; any failed line, dropped item or unreadable file is put in front
+ * of the pilot first, since applying would silently lose it; a parse that
+ * found nothing at all has nothing to apply or show.
+ */
+export type ImportOutcome = 'apply' | 'review' | 'empty';
+
+export function importOutcome(preview: ClipboardImportPreview): ImportOutcome {
+  if (preview.documentErrorCode || preview.errors.length > 0 || preview.warnings.length > 0) {
+    return 'review';
+  }
+  return preview.entries.length === 0 ? 'empty' : 'apply';
+}
