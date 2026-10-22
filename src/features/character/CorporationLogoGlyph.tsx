@@ -28,10 +28,13 @@ const BOX: Record<CharacterAvatarSize, string> = {
 export function CorporationLogoGlyph({
   characterId,
   size,
+  boxClassName,
   className,
 }: {
   characterId: number | null;
   size: CharacterAvatarSize;
+  /** Replaces the portrait box `size` gives, for a caller that steps the box per breakpoint. */
+  boxClassName?: string;
   className?: string;
 }) {
   const corporationId = useLiveQuery(
@@ -50,7 +53,11 @@ export function CorporationLogoGlyph({
   return (
     <span
       aria-hidden="true"
-      className={cx('relative flex items-center justify-center', BOX[size], className)}
+      className={cx(
+        'relative flex items-center justify-center',
+        boxClassName ?? BOX[size],
+        className
+      )}
     >
       {!loaded && <Icon.Corporation data-corp-fallback size={Icon.ICON_SIZE.md} />}
       {showImg && (

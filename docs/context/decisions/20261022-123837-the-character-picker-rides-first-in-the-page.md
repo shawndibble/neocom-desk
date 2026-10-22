@@ -28,11 +28,11 @@ _Recorded 2026-10-22. Supersedes the placement half of
 
 - **Same height as the icons beside it, enforced.** Inside a `PageHeader`
   cluster the picker takes the header's touch tier on its own
-  (`PageHeaderClusterContext`): a 44px square below `md`, a 36px square from
-  `md`, 36px tall from `lg` up, whatever `size` the page passes. `HeaderMoreMenu` has no size prop and
+  (`PageHeaderClusterContext`): 44px tall below `md` and on a touch pointer,
+  36px from `md`, whatever `size` the page passes. `HeaderMoreMenu` has no size prop and
   always draws at that tier.
 
-- **The trigger's look.** Below `lg` it stays the icon-only box, the same
+- **The trigger's look** (superseded by the avatar stack below). Below `lg` it stays the icon-only box, the same
   square as the `IconButton`s beside it (44px below `md`, 36px from `md`) (the
   active Character's portrait, the `AllCharacters` glyph, or for Corporation
   the active Character's own corporation logo). The logo comes from the
@@ -74,3 +74,18 @@ _Recorded 2026-10-22. Supersedes the placement half of
   clipped. Between `md` and `lg` the trigger is now the 36px icon square, with
   the same glyph, warning dot and spinner. The words show from `lg`, where the
   row has room for them.
+
+- **An avatar stack replaces the pill (amended 2026-10-22).** The trigger has
+  no words at any width. It shows the same faces and a small caret
+  everywhere, at the `IconButton`s' height:
+  - This character: the active Character's portrait.
+  - All characters: up to three overlapping portraits of the Characters it
+    covers, the active one first, then roster order, with a "+N" chip for
+    the rest. Characters in `missingNames` are left out of the stack.
+  - Corporation: the corp logo.
+
+  The full words stay in the accessible name and in a hover/focus tooltip,
+  and the open menu keeps its text options. The warning dot and the spinner
+  stay; the spinner stands over the faces, so the trigger never changes
+  width. This supersedes "words only from `lg`" above. The `field` variant
+  in Settings is unchanged.
