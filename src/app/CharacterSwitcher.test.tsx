@@ -48,33 +48,31 @@ describe('CharacterSwitcher', () => {
     show();
     await userEvent.click(await screen.findByRole('button', { name: 'Characters' }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByRole('button', { name: /^Aria/ })).toHaveTextContent(
-      `${TOTAL} of ${TOTAL}`
-    );
-    expect(within(dialog).getByRole('button', { name: /^Kestrel/ })).toHaveAttribute(
+    expect(within(dialog).getByRole('button', { name: 'Kestrel' })).toHaveAttribute(
       'aria-current',
       'true'
     );
-    expect(within(dialog).getByRole('button', { name: /^Marsha/ })).toHaveTextContent(
-      `1 of ${TOTAL}`
+    expect(within(dialog).getByRole('button', { name: /Permissions for Aria$/ })).toHaveTextContent(
+      `${TOTAL} of ${TOTAL} Permissions`
     );
+    expect(
+      within(dialog).getByRole('button', { name: /Permissions for Marsha$/ })
+    ).toHaveTextContent(`1 of ${TOTAL} Permissions`);
+    expect(within(dialog).queryByRole('progressbar')).toBeNull();
   });
 
   it('switches Character on a row press and stays on the page', async () => {
     show();
     await userEvent.click(await screen.findByRole('button', { name: 'Characters' }));
-    await userEvent.click(await screen.findByRole('button', { name: /^Aria/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Aria' }));
     await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(1));
     expect(screen.getByTestId('where')).toHaveTextContent('/overview');
   });
 
-  it('offers Fix… only on a Character with missing Permissions, which switches and opens Permissions', async () => {
+  it('opens Permissions from a row count, switching to that Character first', async () => {
     show();
     await userEvent.click(await screen.findByRole('button', { name: 'Characters' }));
-    expect(screen.queryByRole('button', { name: 'Fix permissions for Aria' })).toBeNull();
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Fix permissions for Marsha' })
-    );
+    await userEvent.click(await screen.findByRole('button', { name: /Permissions for Marsha$/ }));
     await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(3));
     // The navigation follows the switch by a tick.
     await waitFor(() =>
@@ -82,13 +80,11 @@ describe('CharacterSwitcher', () => {
     );
   });
 
-  it('tells a host sheet to close when Fix… or Manage characters leaves the page', async () => {
+  it('tells a host sheet to close when Permissions or Manage characters leaves the page', async () => {
     const onNavigate = vi.fn();
     show(onNavigate);
     await userEvent.click(await screen.findByRole('button', { name: 'Characters' }));
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Fix permissions for Marsha' })
-    );
+    await userEvent.click(await screen.findByRole('button', { name: /Permissions for Marsha$/ }));
     await waitFor(() => expect(onNavigate).toHaveBeenCalledTimes(1));
     await userEvent.click(await screen.findByRole('button', { name: 'Characters' }));
     await userEvent.click(await screen.findByRole('link', { name: 'Manage characters' }));

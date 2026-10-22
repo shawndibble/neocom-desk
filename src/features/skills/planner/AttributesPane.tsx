@@ -7,6 +7,7 @@ import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBa
 import type { CharacterAttributes } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
 import { formatLocalDate } from '@/lib/localDate';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { RemapAvailability } from './remapAvailability';
 
@@ -47,6 +48,7 @@ export function AttributesPane({
   className,
 }: AttributesPaneProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const isDesktop = useIsDesktop();
   const chips = () => (
     <AttributeChips
@@ -108,7 +110,9 @@ export function AttributesPane({
               remapInfo.yearlyReady
                 ? t('plans.remapBudgetYearlyReady')
                 : t('plans.remapBudgetYearlyFrom', {
-                    date: remapInfo.cooldownUntil ? formatLocalDate(remapInfo.cooldownUntil) : '',
+                    date: remapInfo.cooldownUntil
+                      ? formatLocalDate(remapInfo.cooldownUntil, timeZone)
+                      : '',
                   })
             }`}
           </p>

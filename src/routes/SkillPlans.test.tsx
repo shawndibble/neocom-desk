@@ -352,24 +352,48 @@ describe('SkillPlans CRUD', () => {
     expect(screen.queryByRole('link', { name: /Old plan/ })).not.toBeInTheDocument();
   });
 
-  it('makes a plan for a pasted skill plan and opens its Import dialog already parsed', async () => {
+  it('imports a cleanly pasted skill plan into a new plan with no dialog, and offers Undo', async () => {
     // What GlobalPasteRouter navigates with: react-router keeps location state under `usr`.
     window.history.replaceState(
       { usr: { skillPlanImportText: 'Gunnery V' }, key: 'paste', idx: 0 },
       '',
       '/skills/plans'
     );
+    const user = userEvent.setup();
     render(<App />);
 
-    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
-    expect(await within(dialog).findByText(/Detected: skill plan/)).toBeInTheDocument();
-    expect(within(dialog).getByRole('textbox', { name: /paste/i })).toHaveValue('Gunnery V');
+    expect(await screen.findByText('Added 1 skill(s)')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Import plan' })).not.toBeInTheDocument();
 
     const stored = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
     expect(stored).toHaveLength(1);
     expect(window.location.pathname).toBe(`/skills/plans/${stored[0].id}`);
-    // Spent: a reload must not reopen the dialog or make a second plan.
+    await waitFor(async () => {
+      expect((await db.skillPlans.get(stored[0].id))?.entries).toHaveLength(1);
+    });
+    // Spent: a reload must not import again or make a second plan.
     expect((window.history.state as { usr: unknown }).usr).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: /undo/i }));
+    await waitFor(async () => {
+      expect((await db.skillPlans.get(stored[0].id))?.entries).toHaveLength(0);
+    });
+  });
+
+  it('opens the Import dialog on the preview when a pasted skill plan has a line that fails', async () => {
+    window.history.replaceState(
+      { usr: { skillPlanImportText: 'Gunnery V\nNot A Skill 4' }, key: 'paste', idx: 0 },
+      '',
+      '/skills/plans'
+    );
+    render(<App />);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
+    expect(await within(dialog).findByText(/^Line 2:/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Apply' })).toBeEnabled();
+    expect(within(dialog).getByRole('textbox', { name: /paste/i })).toHaveValue(
+      'Gunnery V\nNot A Skill 4'
+    );
   });
 
   it('renames a plan from the list, scheduling a sync', async () => {
@@ -1792,10 +1816,9 @@ describe('SkillPlans editor: import from clipboard', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     await user.type(textarea, 'Gunnery III\nNot A Real Skill II');
-    await user.click(within(dialog).getByRole('button', { name: 'Parse' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Import' }));
 
-    expect(await within(dialog).findByText('Detected: skill plan')).toBeInTheDocument();
-    expect(within(dialog).getByText('Gunnery III')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Gunnery III')).toBeInTheDocument();
     expect(within(dialog).getByText(/unknown skill: Not A Real Skill/)).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
@@ -1828,16 +1851,12 @@ describe('SkillPlans editor: import from clipboard', () => {
     // user.type() treats [ ] { } as special key syntax — paste() takes the
     // literal fit text as-is instead.
     await user.paste('[Rifter, Test Fit]\n[Empty High slot]');
-    await user.click(within(dialog).getByRole('button', { name: 'Parse' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Import' }));
 
-    expect(await within(dialog).findByText('Detected: EFT fit')).toBeInTheDocument();
     // Rifter's fixture dogma requires skill typeID 1 (Gunnery) at level 3.
-    expect(within(dialog).getByText('Gunnery III')).toBeInTheDocument();
-    expect(within(dialog).queryByText(/unknown item/i)).not.toBeInTheDocument();
-
-    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // Every item resolved, so it applies with no preview.
     expect(await screen.findByText('Added 1 skill(s)')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     // "Gunnery III" is applied as one entry and split into its per-level rows
     // by a second write, so wait for the settled list rather than whichever
@@ -1872,8 +1891,9 @@ describe('SkillPlans editor: import from clipboard', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     // Gunnery III: already trained to V. Spaceship Command I: not trained.
-    await user.type(textarea, 'Gunnery III\nSpaceship Command I');
-    await user.click(within(dialog).getByRole('button', { name: 'Parse' }));
+    // The unknown line is what puts the preview up.
+    await user.type(textarea, 'Gunnery III\nSpaceship Command I\nNot A Real Skill II');
+    await user.click(within(dialog).getByRole('button', { name: 'Import' }));
 
     expect(await within(dialog).findByText('Gunnery III')).toBeInTheDocument();
     expect(within(dialog).getByText('Already trained')).toBeInTheDocument();
@@ -1910,10 +1930,7 @@ describe('SkillPlans editor: import from clipboard', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     await user.type(textarea, 'Gunnery III');
-    await user.click(within(dialog).getByRole('button', { name: 'Parse' }));
-    await within(dialog).findByText('Already trained');
-
-    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Import' }));
     expect(await screen.findByText('0 added — all trained')).toBeInTheDocument();
   });
 });

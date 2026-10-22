@@ -6,6 +6,8 @@ import en from '@/i18n/locales/en.json';
 import { db } from '@/db';
 import { EsiError } from '@/esi/errors';
 import { MailInvitePanel } from './MailInvitePanel';
+import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
+import { formatTimestamp } from '@/lib/timestamp';
 
 const store = vi.hoisted(() => ({
   reserveMailInvite: vi.fn(),
@@ -191,6 +193,27 @@ describe('Invite by mail panel', () => {
     render(<MailInvitePanel community={community} characterId={ME} />);
     expect(await screen.findByText('0 mail invites left today')).toBeInTheDocument();
     expect(screen.getByLabelText(m.nameLabel)).toBeDisabled();
+  });
+
+  it('shows the sent time in EVE time when the Time format says so', async () => {
+    const originalTz = process.env.TZ;
+    process.env.TZ = 'Pacific/Auckland';
+    useTimeFormat.setState({ value: 'eve', hydrated: true });
+    try {
+      const sentAt = Date.UTC(2026, 9, 12, 12);
+      store.loadMailInviteStatus.mockResolvedValue({
+        remaining: 18,
+        sent: [{ targetCharacterId: 42, targetName: 'Bob', sentAt }],
+      });
+      render(<MailInvitePanel community={community} characterId={ME} />);
+      expect(await screen.findByText('Bob')).toBeInTheDocument();
+      expect(
+        screen.getByText(`Sent ${formatTimestamp(new Date(sentAt), 'UTC')}`)
+      ).toBeInTheDocument();
+    } finally {
+      process.env.TZ = originalTz;
+      useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: true });
+    }
   });
 
   it('lists the invites already sent with their time', async () => {

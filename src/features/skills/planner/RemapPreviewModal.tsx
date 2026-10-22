@@ -5,6 +5,7 @@ import type { OptimizeForMeResult, RemapSegment } from '@/engine/optimizer';
 import type { StepKey } from '@/engine/skills/skillPlanSchedule';
 import type { Implants, PlanStep } from '@/engine/types';
 import { formatCountdown } from '@/lib/duration';
+import { useTimeZone } from '@/lib/timeFormat';
 import { yearlyRemapAfterNote } from './optimizeHelpers';
 import type { OptimizeVerdict } from './optimizeVerdict';
 import { remapInstruction } from './remapInstruction';
@@ -30,6 +31,7 @@ function RemapSegmentList({
   implants,
 }: RemapSegmentListProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const lastRemapIndex = yearlyRemapAfter
     ? segments.reduce((last, segment, index) => (segment.remap ? index : last), -1)
     : -1;
@@ -53,7 +55,7 @@ function RemapSegmentList({
                 : t('plans.segmentCurrent', { skill: stepLabel(anchor) })}
             </p>
             {index === lastRemapIndex && yearlyRemapAfter && (
-              <p className="text-text-dim">{yearlyRemapAfterNote(t, yearlyRemapAfter)}</p>
+              <p className="text-text-dim">{yearlyRemapAfterNote(t, yearlyRemapAfter, timeZone)}</p>
             )}
           </li>
         );

@@ -28,7 +28,8 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
 import type { DayLoad } from '@/engine/character/deadlines';
-import { localMidnight } from '@/engine/character/deadlines';
+import { cellDayStart, dayStart } from '@/engine/localDay';
+import { useTimeZone } from '@/lib/timeFormat';
 import { weekdayLabels, type GridDay, type WeekStart } from '@/lib/calendarGrid';
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
@@ -68,7 +69,8 @@ export function CalendarMap({
   const { t } = useTranslation();
   const labels = weekdayLabels(weekStart);
   const dayLabel = useDayLoadLabel();
-  const todayMs = localMidnight(nowMs);
+  const zone = useTimeZone();
+  const todayMs = dayStart(nowMs, zone);
 
   return (
     <>
@@ -94,7 +96,7 @@ export function CalendarMap({
           </div>
         ))}
         {days.map((day) => {
-          const dayStartMs = localMidnight(day.date.getTime());
+          const dayStartMs = cellDayStart(day.date, zone);
           const load = loads.get(dayStartMs);
           // The hatch claims a day is *structurally incapable* of holding
           // anything — ESI returns events from now only. A past day that holds

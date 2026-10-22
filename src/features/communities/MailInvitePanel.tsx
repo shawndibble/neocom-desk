@@ -8,6 +8,8 @@ import { resolvePilotByName } from '@/features/travel/pilotLookup';
 import { mailSafe } from '@/lib/mailSafe';
 import { callableErrorReason } from './callableError';
 import { sendAndSettle } from './mailSettle';
+import { useTimeZone } from '@/lib/timeFormat';
+import { formatTimestamp } from '@/lib/timestamp';
 import {
   communityInviteUrl,
   confirmMailInvite,
@@ -44,7 +46,8 @@ export function MailInvitePanel({
   community: CommunitySummary;
   characterId: number;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const inputId = useId();
   const lacksScope = useCharacterLacksEndpoints(characterId, SEND_MAIL);
   const [name, setName] = useState('');
@@ -211,7 +214,7 @@ export function MailInvitePanel({
               <span className="min-w-0 flex-1 truncate">{invite.targetName}</span>
               <span className="text-text-dim">
                 {t('communities.mailInvite.sentAt', {
-                  when: new Date(invite.sentAt).toLocaleString(i18n.language),
+                  when: formatTimestamp(new Date(invite.sentAt), timeZone),
                 })}
               </span>
             </li>

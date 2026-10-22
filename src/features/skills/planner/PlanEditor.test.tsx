@@ -1,6 +1,6 @@
 import { useEffect, useState, type ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
@@ -16,6 +16,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { SkillCatalog } from '../skillMap';
 import type { RemapAvailability } from './remapAvailability';
 import { PlanEditor } from './PlanEditor';
+import { previewImportFile } from './importPreview';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
@@ -34,6 +35,10 @@ vi.mock('@/market/prices', async (importOriginal) => ({
   getRegionSellPrices: vi.fn(async () => new Map<number, number | null>()),
 }));
 
+vi.mock('./importPreview', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./importPreview')>()),
+  previewImportFile: vi.fn(),
+}));
 vi.mock('./jumpCloneImplants', () => ({ useJumpCloneImplantSets: () => [] }));
 
 vi.mock('../data', () => ({
@@ -371,6 +376,48 @@ describe('PlanEditor tools pane', () => {
     await user.click(screen.getByRole('menuitem', { name: 'From text or file…' }));
 
     expect(await screen.findByRole('dialog', { name: 'Import plan' })).toBeInTheDocument();
+  });
+
+  it('imports a plan file dropped on the editor without opening the dialog, with Undo', async () => {
+    vi.mocked(previewImportFile).mockResolvedValueOnce({
+      mode: 'planXml',
+      entries: [{ skillTypeID: 10, targetLevel: 3 }],
+      warnings: [],
+      errors: [],
+    });
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    renderEditor(onUpdate);
+
+    const file = new File(['<plan/>'], 'p.xml');
+    fireEvent.drop(screen.getByText('Your entries'), {
+      dataTransfer: { files: [file], types: ['Files'] },
+    });
+
+    expect(await screen.findByText(/^Added/)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Import plan' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /undo/i }));
+    expect(onUpdate).toHaveBeenLastCalledWith(expect.objectContaining({ entries: PLAN.entries }));
+  });
+
+  it('opens the dialog on the preview when a dropped plan file has entries that fail', async () => {
+    vi.mocked(previewImportFile).mockResolvedValueOnce({
+      mode: 'planXml',
+      entries: [{ skillTypeID: 10, targetLevel: 3 }],
+      warnings: [],
+      errors: [{ line: 2, text: 'entry[1]', reason: 'unknown skill' }],
+    });
+    const onUpdate = vi.fn();
+    renderEditor(onUpdate);
+
+    fireEvent.drop(screen.getByText('Your entries'), {
+      dataTransfer: { files: [new File(['<plan/>'], 'p.xml')], types: ['Files'] },
+    });
+
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
+    expect(within(dialog).getByRole('button', { name: 'Apply' })).toBeEnabled();
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 
   it("doesn't render Import/Export when the caller has no header-actions slot to portal into", () => {

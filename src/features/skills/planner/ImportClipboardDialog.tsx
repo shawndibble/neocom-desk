@@ -1,23 +1,12 @@
 import { romanLevel } from '@/engine/projection';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  LiveStatus,
-  Modal,
-  TabPanel,
-  Tabs,
-  TextArea,
-  useTabsId,
-  type TabItem,
-} from '@/components/ui';
+import { Button, FieldError, LiveStatus, Modal, TextArea } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
-import { readFromClipboard } from '@/lib/clipboard';
 import type { PlanXmlDocumentErrorCode } from './planXmlDocument';
-import { loadTypeDetail } from '../typeDetail';
-import { loadItemNameMap, loadSkillNameMap } from '../typeCatalog';
-import { previewClipboardImport, type ClipboardImportPreview } from './clipboardImport';
-import { previewPlanXmlImport } from './planXmlImport';
+import { importOutcome, type ClipboardImportPreview } from './clipboardImport';
+import { previewImportFile, previewImportText } from './importPreview';
 
 interface ImportClipboardDialogProps {
   onApply: (entries: PlanEntry[]) => void;
@@ -26,8 +15,10 @@ interface ImportClipboardDialogProps {
   nameFor: (skillTypeID: number) => string;
   /** To tag preview rows the character has already trained to (or past) the requested level (UX-REVIEW #7). */
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
-  /** Text to open on, already previewed — a skill plan pasted elsewhere in the app. */
+  /** Text to open on — a skill plan pasted elsewhere in the app. */
   initialText?: string;
+  /** What importing `initialText` (or a dropped file) found, when it needs a look before it is applied. */
+  initialPreview?: ClipboardImportPreview;
 }
 
 /** True when the character is already trained to (or past) the entry's requested level. */
@@ -48,17 +39,12 @@ const DOCUMENT_ERROR_KEYS: Record<PlanXmlDocumentErrorCode, string> = {
   multiPlanUnsupported: 'plans.importFileMultiPlanUnsupported',
 };
 
-const IMPORT_MODE_KEYS = {
-  eftFit: 'plans.importModeEft',
-  skillPlan: 'plans.importModeSkillPlan',
-  planXml: 'plans.importModePlanXml',
-} as const;
-
 /**
- * "Import from clipboard": paste an EFT fit or skill-plan text, or pick/drop
- * a plan file (.emp/.xml) exported by another planner — preview the parsed
- * entries (plus warnings/errors) before committing anything. Paste-mode
- * format (EFT vs. skill plan) is auto-detected — see clipboardImport.ts.
+ * "Import plan": paste an EFT fit or skill-plan text, or choose/drop a plan
+ * file (.emp/.xml) exported by another planner. Import applies at once when
+ * every line parsed; when some did not, the preview (what was read, what was
+ * skipped) comes up first and Apply commits it. Paste format (EFT vs. skill
+ * plan) is auto-detected — see clipboardImport.ts.
  */
 export function ImportClipboardDialog({
   onApply,
@@ -66,216 +52,151 @@ export function ImportClipboardDialog({
   nameFor,
   trainedSkills,
   initialText,
+  initialPreview,
 }: ImportClipboardDialogProps) {
   const { t } = useTranslation();
-  const tabsId = useTabsId();
-  const tabs: TabItem[] = [
-    { id: 'paste', label: t('plans.importPasteTab') },
-    { id: 'file', label: t('plans.importFileTab') },
-  ];
-  const [tab, setTab] = useState<'paste' | 'file'>('paste');
   const [text, setText] = useState(initialText ?? '');
-  const [preview, setPreview] = useState<ClipboardImportPreview | null>(null);
-  const [parsing, setParsing] = useState(initialText !== undefined);
+  const [preview, setPreview] = useState<ClipboardImportPreview | null>(initialPreview ?? null);
+  const [importing, setImporting] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [pasteError, setPasteError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
 
-  /**
-   * The Clipboard API's `readText` needs an explicit user gesture and
-   * permission the browser may deny — unlike the textarea's own native
-   * Ctrl+V, which always works. A failure here falls back to that existing
-   * path rather than blocking the import, so it degrades to "manually paste
-   * into the textarea", not "can't import."
-   */
-  async function handlePasteFromClipboard() {
-    setPasteError(false);
-    try {
-      const clipboardText = await readFromClipboard();
-      setText(clipboardText);
-      setPreview(null);
-    } catch {
-      setPasteError(true);
-    }
-  }
+  const empty = preview !== null && importOutcome(preview) === 'empty';
+  const needsReview = preview !== null && importOutcome(preview) === 'review';
 
-  async function previewText(source: string) {
+  /** Preview, then apply straight away unless something needs a look. */
+  async function run(previewing: Promise<ClipboardImportPreview>) {
+    setImporting(true);
     try {
-      const [skillByName, typeByName] = await Promise.all([loadSkillNameMap(), loadItemNameMap()]);
-      const result = await previewClipboardImport(source, {
-        skillByName,
-        typeByName,
-        loadType: (typeId) => loadTypeDetail(typeId, { retry: true }),
-      });
-      setPreview(result);
+      const result = await previewing;
+      if (importOutcome(result) === 'apply') onApply(result.entries);
+      else setPreview(result);
     } finally {
-      setParsing(false);
+      setImporting(false);
     }
   }
 
-  function handleParse() {
-    setParsing(true);
-    return previewText(text);
+  function handleImport() {
+    if (importing || text.trim() === '') return;
+    void run(previewImportText(text));
   }
 
-  // A pasted skill plan arrives ready to review: the Parse click is the step
-  // the pilot already took by pasting. Mount-only — `initialText` seeds the
-  // textarea (and `parsing`) once and is never re-sent.
-  useEffect(() => {
-    if (initialText) void previewText(initialText);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only, see comment above
-  }, []);
-
-  async function handleFile(file: File) {
-    setParsing(true);
-    try {
-      const skillByName = await loadSkillNameMap();
-      const result = await previewPlanXmlImport(file, skillByName);
-      setPreview(result);
-    } catch {
-      // previewPlanXmlImport/parsePlanXmlFile are designed never to throw,
-      // but a failure here (e.g. the catalog load itself) must still surface
-      // as an inline error rather than an unhandled rejection — this call
-      // site is always invoked as a floating promise (file input/drop
-      // handlers can't await).
-      setPreview({
-        mode: 'planXml',
-        entries: [],
-        warnings: [],
-        errors: [],
-        documentErrorCode: 'readFailed',
-      });
-    } finally {
-      setParsing(false);
-    }
+  function handleFile(file: File) {
+    if (importing) return;
+    void run(previewImportFile(file));
   }
 
   return (
     // `open` is literal: PlanEditor mounts this component only while the import
     // is open, so mounting is the open signal.
-    <Modal open onClose={onClose} title={t('plans.importDialogTitle')}>
-      <div className="space-y-3">
-        <Tabs
-          tabsId={tabsId}
-          tabs={tabs}
-          value={tab}
-          onChange={(id) => {
-            setTab(id as 'paste' | 'file');
-            setPreview(null);
-          }}
-          label={t('plans.importDialogTitle')}
-        />
-
-        <TabPanel tabsId={tabsId} tabId={tab} className="space-y-3">
-          {tab === 'paste' && (
-            <>
-              <label className="block text-xs text-text-dim" htmlFor="clipboard-import-text">
-                {t('plans.importPaste')}
-              </label>
-              <TextArea
-                id="clipboard-import-text"
-                value={text}
-                onChange={(e) => {
-                  setText(e.target.value);
-                  setPreview(null);
-                }}
-                onSubmitChord={() => {
-                  if (!parsing && text.trim() !== '') void handleParse();
-                }}
-                rows={8}
-                className="text-xs"
-              />
-
-              <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" variant="ghost" onClick={() => void handlePasteFromClipboard()}>
-                  {t('plans.pasteFromClipboard')}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => void handleParse()}
-                  disabled={text.trim() === ''}
-                  aria-disabled={parsing || undefined}
-                >
-                  {t('plans.importParse')}
-                </Button>
-              </div>
-              {pasteError && (
-                <p role="alert" className="text-xs text-danger">
-                  {t('plans.pasteFromClipboardFailed')}
-                </p>
-              )}
-            </>
-          )}
-
-          {tab === 'file' && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".emp,.xml"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = '';
-                  if (file) void handleFile(file);
-                }}
-              />
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOver(true);
-                }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragOver(false);
-                  const file = e.dataTransfer.files?.[0];
-                  if (file) void handleFile(file);
-                }}
-                className={`rounded-xs border border-dashed bg-panel-2 p-4 text-center text-xs text-text-dim ${
-                  dragOver ? 'border-accent' : 'border-line'
-                }`}
-              >
-                <p>{t('plans.importFileDrop')}</p>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={parsing}
-                >
-                  {t('plans.importFileBrowse')}
-                </Button>
-              </div>
-            </>
-          )}
-        </TabPanel>
-
-        {/* One wrapper: the status region sits beside Cancel, never as the
-            container's new last child while no preview shows. */}
-        <div className="flex">
+    <Modal
+      open
+      onClose={onClose}
+      title={t('plans.importDialogTitle')}
+      initialFocusRef={textRef}
+      footer={
+        <div className="flex items-center gap-2">
           <Button size="sm" onClick={onClose}>
             {t('plans.importCancel')}
           </Button>
-
-          <LiveStatus>
-            {preview && !preview.documentErrorCode
-              ? t('plans.importPreviewSummary', {
-                  ready: preview.entries.length,
-                  warnings: preview.warnings.length,
-                  errors: preview.errors.length,
-                })
-              : null}
-          </LiveStatus>
+          {/* One primary: Import until something needs a look, then Apply commits what was read. */}
+          {needsReview ? (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => onApply(preview.entries)}
+              disabled={preview.entries.length === 0}
+            >
+              {t('plans.importApply')}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={handleImport}
+              disabled={text.trim() === ''}
+              loading={importing}
+            >
+              {t('plans.importAction')}
+            </Button>
+          )}
         </div>
+      }
+    >
+      <div
+        className={`space-y-3 ${dragOver ? 'outline-1 outline-dashed outline-accent' : ''}`}
+        onDragOver={(e) => {
+          // Only a file is ours to take; dragged text still drops into the textarea.
+          if (!e.dataTransfer.types.includes('Files')) return;
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          // Crossing onto a child fires a leave too; only leaving the body counts.
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false);
+        }}
+        onDrop={(e) => {
+          setDragOver(false);
+          const file = e.dataTransfer.files?.[0];
+          if (!file) return;
+          e.preventDefault();
+          handleFile(file);
+        }}
+      >
+        <label className="block text-xs text-text-dim" htmlFor="clipboard-import-text">
+          {t('plans.importPaste')}
+        </label>
+        <TextArea
+          ref={textRef}
+          id="clipboard-import-text"
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setPreview(null);
+          }}
+          onSubmitChord={() => {
+            if (!needsReview) handleImport();
+          }}
+          rows={8}
+          className="text-xs"
+          aria-describedby={empty ? 'clipboard-import-empty' : undefined}
+        />
+        {empty && <FieldError id="clipboard-import-empty">{t('plans.importEmpty')}</FieldError>}
 
-        {preview && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".emp,.xml"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (file) handleFile(file);
+          }}
+        />
+        <p className="text-xs text-text-dim">
+          <button
+            type="button"
+            className={inlineLinkClassName}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {t('plans.importFileChoose')}
+          </button>
+        </p>
+
+        <LiveStatus>
+          {needsReview && !preview.documentErrorCode
+            ? t('plans.importPreviewSummary', {
+                ready: preview.entries.length,
+                warnings: preview.warnings.length,
+                errors: preview.errors.length,
+              })
+            : null}
+        </LiveStatus>
+
+        {needsReview && (
           <div className="space-y-2 border-t border-line pt-2 text-xs">
-            <p className="text-xs font-semibold tracking-widest text-text-dim uppercase">
-              {t(IMPORT_MODE_KEYS[preview.mode])}
-              {preview.planName ? ` — ${preview.planName}` : ''}
-            </p>
-
             {preview.documentErrorCode ? (
               <p role="alert" className="text-danger">
                 {t(DOCUMENT_ERROR_KEYS[preview.documentErrorCode])}
@@ -343,15 +264,6 @@ export function ImportClipboardDialog({
                     </ul>
                   </div>
                 )}
-
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => onApply(preview.entries)}
-                  disabled={preview.entries.length === 0}
-                >
-                  {t('plans.importApply')}
-                </Button>
               </>
             )}
           </div>

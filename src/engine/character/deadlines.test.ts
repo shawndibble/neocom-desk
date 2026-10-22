@@ -44,6 +44,26 @@ describe('localMidnight', () => {
 });
 
 describe('countsByDay', () => {
+  it('buckets on EVE (UTC) days when asked, whatever the machine zone', () => {
+    const board = buildCharacterBoard({
+      nowMs: Date.UTC(2026, 8, 7, 12),
+      industryJobs: [
+        clock('a', Date.UTC(2026, 8, 7, 23, 30)),
+        clock('b', Date.UTC(2026, 8, 8, 0, 30)),
+      ],
+    });
+
+    const days = countsByDay(board, 'UTC');
+
+    expect(days.get(Date.UTC(2026, 8, 7))?.count).toBe(1);
+    expect(days.get(Date.UTC(2026, 8, 8))?.count).toBe(1);
+    expect(groupByDay(board, 'UTC').map((group) => group.dayStartMs)).toEqual([
+      Date.UTC(2026, 8, 7),
+      Date.UTC(2026, 8, 8),
+    ]);
+    expect(relativeDayFor(Date.UTC(2026, 8, 8), Date.UTC(2026, 8, 7, 23), 'UTC')).toBe('tomorrow');
+  });
+
   it('counts what lands on each local day, and skips the days nothing lands on', () => {
     const board = buildCharacterBoard({
       nowMs: NOW,

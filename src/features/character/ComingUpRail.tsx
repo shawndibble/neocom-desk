@@ -16,6 +16,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, LiveStatus, Panel, textActionClassName } from '@/components/ui';
 import type { CharacterBoardItem } from '@/engine/character/board';
+import { useTimeZone } from '@/lib/timeFormat';
 import { groupByDay, relativeDayFor } from '@/engine/character/deadlines';
 import { CharacterBoardRow } from './CharacterBoardRow';
 
@@ -39,22 +40,24 @@ export function ComingUpRail({
   noKindsSelected,
 }: ComingUpRailProps) {
   const { t, i18n } = useTranslation();
-  const groups = useMemo(() => groupByDay(items), [items]);
+  const zone = useTimeZone();
+  const groups = useMemo(() => groupByDay(items, zone), [items, zone]);
 
   const dayHeading = useMemo(() => {
     const formatter = new Intl.DateTimeFormat(i18n.language, {
       weekday: 'short',
       day: 'numeric',
       month: 'short',
+      timeZone: zone,
     });
     return (dayStartMs: number) => {
-      const relative = relativeDayFor(dayStartMs, nowMs);
+      const relative = relativeDayFor(dayStartMs, nowMs, zone);
       const date = formatter.format(dayStartMs);
       if (relative === 'today') return t('calendar.day.today', { date });
       if (relative === 'tomorrow') return t('calendar.day.tomorrow', { date });
       return date;
     };
-  }, [i18n.language, nowMs, t]);
+  }, [i18n.language, nowMs, t, zone]);
 
   /**
    * Three states, and they are three different sentences.

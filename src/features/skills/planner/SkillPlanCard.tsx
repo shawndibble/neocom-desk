@@ -7,6 +7,7 @@ import { Button, Panel, Popover, PopoverContent, PopoverTrigger } from '@/compon
 import * as Icon from '@/components/ui/icons';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { NewPlanSplitButton } from './NewPlanSplitButton';
 import { PlanListPane } from './PlanListPane';
@@ -34,6 +35,7 @@ export function SkillPlanCard({
   scheduleInputs,
 }: SkillPlanCardProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const isDesktop = useIsDesktop();
   const plans = useLiveQuery(
     async () => db.skillPlans.where('characterId').equals(activeCharacterId).toArray(),
@@ -55,7 +57,7 @@ export function SkillPlanCard({
     : currentStats.finish
       ? t('plans.planCardMeta', {
           duration: formatCountdown(currentStats.totalSeconds),
-          date: formatLocalDate(currentStats.finish),
+          date: formatLocalDate(currentStats.finish, timeZone),
         })
       : t('plans.listRowNothingToTrain');
 
@@ -121,7 +123,7 @@ export function SkillPlanCard({
         >
           <span className="truncate text-sm text-accent">{current.name}</span>
           <span className="flex shrink-0 items-center gap-1 text-xs text-text-dim">
-            {currentStats?.finish && formatLocalDate(currentStats.finish)}
+            {currentStats?.finish && formatLocalDate(currentStats.finish, timeZone)}
             <Icon.Descend size={Icon.ICON_SIZE.sm} />
           </span>
         </Link>
