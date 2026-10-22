@@ -13,6 +13,7 @@ import {
 } from '@/engine/corpTaxBook/mailQueue';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
+import { formatTimeOfDay } from '@/lib/timestamp';
 
 const TONE: Record<DisplayStatus, string> = {
   sent: 'text-success',
@@ -165,11 +166,7 @@ export function MailQueueTable({
               {status === 'sent' && <span aria-hidden="true"> ✓</span>}
               {status === 'sent' && row.sentAt !== undefined && (
                 <span className="font-normal text-text-dim">
-                  {new Date(row.sentAt).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    timeZone: 'UTC',
-                  })}
+                  {formatTimeOfDay(new Date(row.sentAt), 'UTC')}
                 </span>
               )}
             </span>
