@@ -1646,7 +1646,8 @@ describe('Market Browser order row context menu (issue #6)', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'Show info' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Rifter' });
-    expect(within(dialog).getByText('Structure Hitpoints')).toBeInTheDocument();
+    // The dialog opens on a spinner; its body waits on the mocked type lookup.
+    expect(await within(dialog).findByText('Structure Hitpoints')).toBeInTheDocument();
   });
 
   it("Add to Skill Plan from the item's Required skills creates the plan and shows it was added", async () => {
