@@ -166,7 +166,9 @@ export function MailQueueTable({
               {status === 'sent' && <span aria-hidden="true"> ✓</span>}
               {status === 'sent' && row.sentAt !== undefined && (
                 <span className="font-normal text-text-dim">
-                  {formatTimeOfDay(new Date(row.sentAt), 'UTC')}
+                  {t('corpTaxBook.mailQueue.sentAt', {
+                    time: formatTimeOfDay(new Date(row.sentAt), 'UTC'),
+                  })}
                 </span>
               )}
             </span>
