@@ -1,7 +1,7 @@
 /**
  * The Character switcher beside the rail's (and the More sheet's) Character
  * link: every Character with how many Permissions it has granted, one press to
- * switch, and "Fix…" on any with Permissions missing, which switches to it and
+ * switch, and "x of N Permissions" link on each, which switches to it and
  * opens Settings › Permissions. The link itself still goes to the Characters
  * page; this sits next to it, so a pilot with several Characters changes the
  * active one without leaving the page. Absent with a single Character.
@@ -9,20 +9,16 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  IconButton,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  ProgressBar,
-} from '@/components/ui';
+import { IconButton, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { Pill } from '@/components/ui/Pill';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { pickerTone } from '@/features/permissions/permissionCounts';
+import {
+  focusRingInsetClassName,
+  inlineLinkClassName,
+  rowInteractiveClassName,
+} from '@/components/ui/controlStyles';
 import { useCharacterPermissionCounts } from '@/features/permissions/useCharacterPermissionCounts';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { grantMissingPath } from './grantMissingPath';
@@ -32,7 +28,7 @@ export function CharacterSwitcher({
   onNavigate,
 }: {
   className?: string;
-  /** Called when Fix… or Manage characters leaves the page, so a sheet the switcher sits in can close. */
+  /** Called when the Permissions link or Manage characters leaves the page, so a sheet the switcher sits in can close. */
   onNavigate?: () => void;
 }) {
   const { t } = useTranslation();
@@ -73,60 +69,45 @@ export function CharacterSwitcher({
           }
         />
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 max-w-[90vw] p-0">
+      <PopoverContent align="start" className="w-max min-w-56 max-w-[90vw] p-0">
         <ul className="max-h-80 divide-y divide-line overflow-y-auto">
           {rows.map((row) => {
             const active = row.characterId === activeId;
-            const missing = row.total - row.granted;
             return (
-              <li key={row.characterId} className="flex items-center gap-1 pr-2">
+              <li
+                key={row.characterId}
+                className={cx(
+                  'relative flex min-h-11 items-center gap-2 px-3 py-2 md:min-h-9 touch:min-h-11',
+                  rowInteractiveClassName,
+                  active && 'bg-panel-2'
+                )}
+              >
                 <button
                   type="button"
                   aria-current={active || undefined}
+                  aria-label={row.name}
                   onClick={() => pick(row.characterId)}
-                  className={cx(
-                    'flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left md:min-h-9 touch:min-h-11',
-                    rowInteractiveClassName,
-                    focusRingInsetClassName,
-                    active && 'bg-panel-2'
-                  )}
-                >
-                  <CharacterAvatar characterId={row.characterId} size="sm" selected={active} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm">{row.name}</span>
-                    <span className="flex items-center gap-2">
-                      <ProgressBar
-                        label={row.name}
-                        value={row.granted}
-                        max={row.total}
-                        tone={pickerTone(row)}
-                        size="xs"
-                        className="w-14"
-                      />
-                      <span className="text-xs tabular-nums text-text-dim">
-                        {t('settings.permissions.character.count', {
-                          granted: row.granted,
-                          total: row.total,
-                        })}
-                      </span>
-                    </span>
-                  </span>
-                  {active && <Pill>{t('nav.characterActive')}</Pill>}
-                </button>
-                {missing > 0 && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    aria-label={t('nav.fixPermissionsFor', { name: row.name })}
+                  className={cx('absolute inset-0', focusRingInsetClassName)}
+                />
+                <CharacterAvatar characterId={row.characterId} size="sm" selected={active} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm">{row.name}</span>
+                  <button
+                    type="button"
+                    aria-label={t('nav.permissionsFor', { name: row.name })}
                     onClick={() =>
                       pick(row.characterId, () => {
                         onNavigate?.();
                         navigate(grantMissingPath([]));
                       })
                     }
+                    className={cx(inlineLinkClassName, 'relative p-0 text-xs tabular-nums')}
                   >
-                    {t('nav.fixPermissions')}
-                  </Button>
+                    {t('nav.permissionsCount', { granted: row.granted, total: row.total })}
+                  </button>
+                </span>
+                {active && (
+                  <Pill className="pointer-events-none relative">{t('nav.characterActive')}</Pill>
                 )}
               </li>
             );
