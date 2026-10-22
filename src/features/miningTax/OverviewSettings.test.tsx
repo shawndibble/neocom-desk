@@ -96,6 +96,6 @@ describe('Value menu triggers (issue #3816)', () => {
         <div />
       </SettingsSheet>
     );
-    expect(screen.getByRole('button', { name: 'Page settings' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View settings' })).toBeInTheDocument();
   });
 });

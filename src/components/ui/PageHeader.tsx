@@ -43,10 +43,10 @@ interface PageHeaderProps {
   /**
    * The page's controls, after `scope`, in this fixed order: text-labelled
    * page actions (Compose, Payees, a labelled Export…), then icon-only ones
-   * (Refresh), then the `HeaderMoreMenu` ⋮ last. The `AlertsBell` follows on
-   * its own.
+   * (Refresh), then the `HeaderMoreMenu` ⋮ or a settings gear last. The
+   * `AlertsBell` follows on its own.
    *
-   * @summary Right-aligned control cluster: text actions, icon actions (Refresh), then ⋮.
+   * @summary Right-aligned control cluster: text actions, icon actions (Refresh), then ⋮ or gear.
    */
   actions?: ReactNode;
   /**
@@ -89,8 +89,8 @@ interface PageHeaderProps {
  *
  * The right-hand cluster's order is fixed on every page: `scope` (the
  * Character picker) → text-labelled page actions → icon-only actions
- * (Refresh) → ⋮ More actions (`HeaderMoreMenu`) → `AlertsBell`: words on the
- * left, icons on the right. With `scope` set the whole title row
+ * (Refresh) → ⋮ More actions (`HeaderMoreMenu`) or a settings gear →
+ * `AlertsBell`: words on the left, icons on the right. With `scope` set the whole title row
  * stays on one line (see that prop); without it the row wraps as it always
  * has.
  *

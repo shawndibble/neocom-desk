@@ -20,11 +20,11 @@
  * Not `chars`: that name is the Assets/Wallet filter's, and
  * `viewedCharacter.ts` still reads it as a legacy viewed-Character param.
  */
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
+import { create } from 'zustand';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useHydratedStore } from '@/lib/useHydratedStore';
-import type { UrlParamCodec } from '@/lib/urlState';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import {
   useCharacterFilterPick,
@@ -42,20 +42,17 @@ export const INDUSTRY_CHARACTER_PARAM = 'industry.chars';
 const LEGACY_PARAMS = ['jobs.chars', 'opps.chars'] as const;
 
 const legacyCodec = characterFilterParam('current');
-/**
- * Written whatever the value, never dropped as a default: the remembered pick
- * can be `all`, so an absent param does not mean `current` here.
- */
-const pageCodec: UrlParamCodec<CharacterFilterValue> = {
-  parse: legacyCodec.parse,
-  serialize: (value) => value,
-};
 
-const SCHEMA = {
-  [INDUSTRY_CHARACTER_PARAM]: pageCodec,
-  'jobs.chars': legacyCodec,
-  'opps.chars': legacyCodec,
-};
+/**
+ * The value a change just chose, keyed to the location entry it was chosen
+ * on. A URL write lands in a transition, so for a frame or a slow navigation
+ * the location still holds the old value; every consumer (the trigger,
+ * Active Jobs, Opportunities) shows this one instead until the location
+ * moves to a new entry (the write, or any other navigation).
+ */
+const usePendingIndustryFilter = create<{
+  pending: { value: CharacterFilterValue; locationKey: string } | null;
+}>(() => ({ pending: null }));
 
 /** The filter a link names, or null when it names none. */
 export function linkedIndustryCharacterFilter(search: string): CharacterFilterValue | null {
@@ -78,20 +75,41 @@ export function useIndustryCharacterFilter(): [
   CharacterFilterValue,
   (next: CharacterFilterValue) => void,
 ] {
-  const { search } = useLocation();
-  const [, setParams] = useUrlParams(SCHEMA);
+  const { search, key: locationKey } = useLocation();
   const picks = useCharacterFilterPicks((state) => state.value);
   const storedDefault = useDefaultCharacterFilter((state) => state.value);
   useHydratedStore(useCharacterFilterPicks, useDefaultCharacterFilter);
   const { remember } = useCharacterFilterPick('industry');
+  const pick = industryCharacterPick(picks, fromStoredCharacterFilterValue(storedDefault));
+
+  // The remembered pick is what an absent `industry.chars` means, so it is
+  // dropped rather than written (`useRememberedUrlParams`' rule); `current`
+  // is the old params' default, so writing it drops them.
+  const schema = useMemo(
+    () => ({
+      [INDUSTRY_CHARACTER_PARAM]: characterFilterParam(pick),
+      'jobs.chars': legacyCodec,
+      'opps.chars': legacyCodec,
+    }),
+    [pick]
+  );
+  const [, setParams] = useUrlParams(schema);
 
   const linked = useMemo(() => linkedIndustryCharacterFilter(search), [search]);
-  const value =
-    linked ?? industryCharacterPick(picks, fromStoredCharacterFilterValue(storedDefault));
+  const pending = usePendingIndustryFilter((state) => state.pending);
+  // Dropped once the location moves on, so an old entry never resurfaces
+  // when a later entry happens to reuse its key (a router's first entry is
+  // always "default").
+  useEffect(() => {
+    if (pending && pending.locationKey !== locationKey) {
+      usePendingIndustryFilter.setState({ pending: null });
+    }
+  }, [pending, locationKey]);
+  const value = pending && pending.locationKey === locationKey ? pending.value : (linked ?? pick);
 
   const setValue = useCallback(
     (next: CharacterFilterValue) => {
-      // `current` is the old params' default, so writing it drops them.
+      usePendingIndustryFilter.setState({ pending: { value: next, locationKey } });
       setParams({
         [INDUSTRY_CHARACTER_PARAM]: next,
         'jobs.chars': 'current',
@@ -99,7 +117,7 @@ export function useIndustryCharacterFilter(): [
       });
       void remember(next);
     },
-    [setParams, remember]
+    [setParams, remember, locationKey]
   );
   return [value, setValue];
 }

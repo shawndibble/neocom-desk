@@ -535,27 +535,9 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
                 </ValueMenu>
               </>
             ) : (
-              <>
-                {headerLayout === 'mid' && (
-                  <RangeControl value={range} onChange={(next) => void setRange(next)} />
-                )}
-                <SettingsSheet>
-                  {headerLayout === 'narrow' && (
-                    <RangeControl value={range} onChange={(next) => void setRange(next)} fill />
-                  )}
-                  <ChartMetricControl
-                    value={chartMetric}
-                    onChange={(next) => void setChartMetric(next)}
-                    fill
-                  />
-                  <PriceBasisOptions value={basis} onChange={(next) => void setBasis(next)} />
-                  <BuybackRateInput
-                    value={buybackRate}
-                    onChange={(next) => void setBuybackRate(next)}
-                  />
-                  <ShowRefiningToggle value={showRefining} onChange={handleShowRefiningChange} />
-                </SettingsSheet>
-              </>
+              headerLayout === 'mid' && (
+                <RangeControl value={range} onChange={(next) => void setRange(next)} />
+              )
             )}
             <IconButton
               icon={<Icon.Refresh />}
@@ -563,6 +545,25 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
               onClick={refresh}
               disabled={loading}
             />
+            {/* The gear takes the ⋮'s slot: last before the bell, after Refresh. */}
+            {headerLayout !== 'wide' && (
+              <SettingsSheet>
+                {headerLayout === 'narrow' && (
+                  <RangeControl value={range} onChange={(next) => void setRange(next)} fill />
+                )}
+                <ChartMetricControl
+                  value={chartMetric}
+                  onChange={(next) => void setChartMetric(next)}
+                  fill
+                />
+                <PriceBasisOptions value={basis} onChange={(next) => void setBasis(next)} />
+                <BuybackRateInput
+                  value={buybackRate}
+                  onChange={(next) => void setBuybackRate(next)}
+                />
+                <ShowRefiningToggle value={showRefining} onChange={handleShowRefiningChange} />
+              </SettingsSheet>
+            )}
           </>
         }
       />
@@ -631,7 +632,16 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
               />
             ) : (
               <>
-                <p className="text-xs text-text-dim">{basisSummary(t, basis, buybackRate)}</p>
+                <p className="text-xs text-text-dim">
+                  {/* Below `lg` the range lives in the settings sheet, so the
+                      summary names it: the page must say what span it shows. */}
+                  {headerLayout === 'narrow'
+                    ? t('miningTax.overview.rangeSummary', {
+                        range: t(`miningTax.overview.range.${range}`),
+                        summary: basisSummary(t, basis, buybackRate),
+                      })
+                    : basisSummary(t, basis, buybackRate)}
+                </p>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <Panel>
                     <p className={eyebrowClassName}>{t('miningTax.overview.totalValueStat')}</p>

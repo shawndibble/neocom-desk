@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { MINING_YIELD_RANGES, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import { basisSide, isNowBasis, type PriceBasis } from '@/engine/miningTax/priceBasis';
 import { CHART_METRICS, type ChartMetric } from './chartMetricPref';
@@ -207,14 +208,15 @@ export function ValueMenu({
 }
 
 /**
- * The settings sheet: the Overview's view settings that don't fit the header
- * row, behind one icon-only gear. Its header shares a line with the
+ * The view settings sheet: the Overview's view settings that don't fit the
+ * header row, behind one icon-only gear in the ⋮'s slot (after Refresh). Its header shares a line with the
  * Character picker and never wraps, and a text trigger ("30d · Jita buy")
  * beside the range truncated the title at 1024. These are
  * view settings, not actions, so they live here, not in a ⋮.
  */
 export function SettingsSheet({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
   const [open, setOpen] = useState(false);
   const title = t('miningTax.overview.settingsTitle');
   return (
@@ -225,7 +227,14 @@ export function SettingsSheet({ children }: { children: ReactNode }) {
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
       />
-      <Modal open={open} onClose={() => setOpen(false)} title={title} placement="sheet">
+      {/* A bottom sheet on a phone, a centred dialog from `sm` up — how
+          `PageSettingsModal` opens a page's settings. */}
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={title}
+        placement={isPhone ? 'sheet' : 'center'}
+      >
         <div className="space-y-4">{children}</div>
       </Modal>
     </>

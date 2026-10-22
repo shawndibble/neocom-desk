@@ -132,10 +132,10 @@ export interface CharacterFilterControlProps<
    * mirroring `IconButtonSize`'s two below-`md` values (`size-9`/`size-11`) —
    * not the full `IconButtonSize` (there is no `'row'` tier here). `'sm'`
    * (default) for a panel's own `meta` row, where the `IconButton`s beside it
-   * (Active Jobs, Open Orders, Mining Tax) are themselves `size="sm"`.
+   * (Open Orders) are themselves `size="sm"`.
    * `'md'` for a `PageHeader`'s `meta`, where that header's own `actions`
-   * cluster sits at `IconButton`'s default (larger) tier instead (Mining Tax
-   * Overview) — see `PageHeader`'s own doc comment. Inside a
+   * cluster sits at `IconButton`'s default (larger) tier instead — see
+   * `PageHeader`'s own doc comment. Inside a
    * `PageHeader`'s `scope` slot this prop is ignored: the header's
    * `'md'` tier always applies (`PageHeaderClusterContext`).
    */

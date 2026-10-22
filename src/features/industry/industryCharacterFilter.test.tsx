@@ -115,6 +115,23 @@ describe('useIndustryCharacterFilter', () => {
     await waitFor(() => expect(useCharacterFilterPicks.getState().hydrated).toBe(true));
     act(() => result.current.jobs[1]('current'));
     await waitFor(() => expect(result.current.jobs[0]).toBe('current'));
-    expect(new URLSearchParams(result.current.search).has('opps.chars')).toBe(false);
+    const params = new URLSearchParams(result.current.search);
+    expect(params.has('opps.chars')).toBe(false);
+    // The remembered pick is what an absent param already means.
+    expect(params.has('industry.chars')).toBe(false);
+  });
+
+  it('writes no param when the pick is the remembered one', async () => {
+    await db.settings.put({ key: 'characterFilterPicks', value: { industry: 'all' } });
+    const { result } = renderHook(useProbe, {
+      wrapper: wrapper('/industry?industry.chars=current&tab=plans'),
+    });
+    await waitFor(() => expect(useCharacterFilterPicks.getState().hydrated).toBe(true));
+    expect(result.current.jobs[0]).toBe('current');
+    act(() => result.current.jobs[1]('all'));
+    await waitFor(() => expect(result.current.opportunities[0]).toBe('all'));
+    const params = new URLSearchParams(result.current.search);
+    expect(params.has('industry.chars')).toBe(false);
+    expect(params.get('tab')).toBe('plans');
   });
 });
