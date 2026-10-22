@@ -8,7 +8,9 @@ import {
   loadCharacterLoyaltyPoints,
   PARAGON_CORPORATION_ID,
   readCachedLoyaltyBalances,
+  combineLoyaltyStatuses,
   splitEverMarks,
+  sumLoyaltyByCorporation,
 } from './loyalty';
 
 const CHAR_ID = 91;
@@ -115,5 +117,85 @@ describe('readCachedLoyaltyBalances', () => {
 
   it('is empty when nothing is cached yet', async () => {
     expect((await readCachedLoyaltyBalances(CHAR_ID)).size).toBe(0);
+  });
+});
+
+describe('sumLoyaltyByCorporation', () => {
+  it("adds each corporation's points across every list", () => {
+    const summed = sumLoyaltyByCorporation([
+      [
+        { corporation_id: 1000035, loyalty_points: 100 },
+        { corporation_id: PARAGON_CORPORATION_ID, loyalty_points: 5 },
+      ],
+      [
+        { corporation_id: 1000035, loyalty_points: 250 },
+        { corporation_id: 1000180, loyalty_points: 40 },
+        { corporation_id: PARAGON_CORPORATION_ID, loyalty_points: 7 },
+      ],
+    ]);
+    expect(summed).toEqual([
+      { corporation_id: 1000035, loyalty_points: 350 },
+      { corporation_id: PARAGON_CORPORATION_ID, loyalty_points: 12 },
+      { corporation_id: 1000180, loyalty_points: 40 },
+    ]);
+  });
+
+  it('passes one list through unchanged and gives an empty list for none', () => {
+    const one = [{ corporation_id: 1000035, loyalty_points: 100 }];
+    expect(sumLoyaltyByCorporation([one])).toEqual(one);
+    expect(sumLoyaltyByCorporation([])).toEqual([]);
+  });
+});
+
+describe('combineLoyaltyStatuses', () => {
+  const at = (iso: string) => new Date(iso);
+  const cached = (points: number, fetchedAt: Date, fromCache = false) => ({
+    data: [{ corporation_id: 1000035, loyalty_points: points }],
+    fetchedAt,
+    fromCache,
+    truncated: false,
+  });
+
+  it('sums the readable Characters and names the ones needing a new grant', () => {
+    const combined = combineLoyaltyStatuses([
+      {
+        characterId: 1,
+        status: { cached: cached(100, at('2026-10-21T10:00Z')), needsReauth: false },
+      },
+      {
+        characterId: 2,
+        status: { cached: cached(50, at('2026-10-21T08:00Z'), true), needsReauth: false },
+      },
+      { characterId: 3, status: { cached: null, needsReauth: true } },
+    ]);
+    expect(combined.reauthCharacterIds).toEqual([3]);
+    expect(combined.result).toEqual({
+      data: [{ corporation_id: 1000035, loyalty_points: 150 }],
+      // As fresh as the stalest list in the sum.
+      fetchedAt: at('2026-10-21T08:00Z'),
+      fromCache: true,
+      truncated: false,
+    });
+  });
+
+  it('leaves out a stale cached list behind a revoked grant', () => {
+    const combined = combineLoyaltyStatuses([
+      {
+        characterId: 1,
+        status: { cached: cached(100, at('2026-10-21T10:00Z')), needsReauth: false },
+      },
+      {
+        characterId: 2,
+        status: { cached: cached(70, at('2026-10-20T10:00Z'), true), needsReauth: true },
+      },
+    ]);
+    expect(combined.reauthCharacterIds).toEqual([2]);
+    expect(combined.result?.data).toEqual([{ corporation_id: 1000035, loyalty_points: 100 }]);
+  });
+
+  it('has no result when no Character could be read', () => {
+    expect(
+      combineLoyaltyStatuses([{ characterId: 1, status: { cached: null, needsReauth: false } }])
+    ).toEqual({ result: null, reauthCharacterIds: [] });
   });
 });

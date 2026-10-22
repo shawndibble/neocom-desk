@@ -7,7 +7,10 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { GrantBanner } from '@/app/GrantNote';
 import { NetWorthPanel, type NetWorthCharacter } from '@/features/netWorth/NetWorthPanel';
-import { WalletLoyaltyPanel } from '@/features/character/WalletLoyaltyPanel';
+import {
+  WalletLoyaltyPanel,
+  type LoyaltyReauthCharacter,
+} from '@/features/character/WalletLoyaltyPanel';
 import type { useWalletBalances } from '@/features/character/useWalletBalances';
 import type { useWalletDrill } from '@/features/character/useWalletDrill';
 import type { useWalletLoyalty } from '@/features/character/useWalletLoyalty';
@@ -29,8 +32,10 @@ interface WalletBalanceTabProps {
   filterMeta: ReactNode;
   balanceResult: CachedResult<number> | null;
   balanceNeedsReauth: boolean;
+  /** The picked Characters' loyalty points, summed per corporation. */
   loyaltyResult: CachedResult<CharacterLoyaltyPoints[]> | null;
-  loyaltyNeedsReauth: boolean;
+  loyaltyReauthCharacters: readonly LoyaltyReauthCharacter[];
+  loyaltyLoading: boolean;
   journalNeedsReauth: boolean;
   journalTruncated: boolean;
   oldestFetchedAt: Date | null;
@@ -54,7 +59,8 @@ export function WalletBalanceTab({
   balanceResult,
   balanceNeedsReauth,
   loyaltyResult,
-  loyaltyNeedsReauth,
+  loyaltyReauthCharacters,
+  loyaltyLoading,
   journalNeedsReauth,
   journalTruncated,
   oldestFetchedAt,
@@ -94,6 +100,22 @@ export function WalletBalanceTab({
     return map;
   }, [balances.snapshot, activeCharacterId, balanceResult, balanceNeedsReauth]);
 
+  // Summed over the same picked Characters as the loyalty points table.
+  const everMarksStat = (
+    <div>
+      <p className={cx(eyebrowClassName, 'flex items-center gap-1')}>
+        {t('wallet.everMarks')}
+        <InfoTooltip
+          label={t('wallet.everMarksTooltipLabel')}
+          content={t('wallet.everMarksTooltip')}
+        />
+      </p>
+      <p className="text-xl font-medium tabular-nums">
+        {loyaltyResult && !loyaltyLoading ? formatCount(loyalty.everMarks) : t('common.unknown')}
+      </p>
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       {/*
@@ -121,6 +143,7 @@ export function WalletBalanceTab({
           mode="multi"
           characters={pickedCharacters}
           liveWallet={liveWallet}
+          stats={everMarksStat}
           notices={
             balances.cachedAt !== null && (
               <CachedNotice
@@ -153,22 +176,7 @@ export function WalletBalanceTab({
           onDrill={drillInto}
           onBack={leaveDrill}
           headingRef={panelHeadingRef}
-          stats={
-            <div>
-              <p className={cx(eyebrowClassName, 'flex items-center gap-1')}>
-                {t('wallet.everMarks')}
-                <InfoTooltip
-                  label={t('wallet.everMarksTooltipLabel')}
-                  content={t('wallet.everMarksTooltip')}
-                />
-              </p>
-              <p className="text-xl font-medium tabular-nums">
-                {loyaltyResult && !loyaltyNeedsReauth
-                  ? formatCount(loyalty.everMarks)
-                  : t('common.unknown')}
-              </p>
-            </div>
-          }
+          stats={everMarksStat}
           notices={
             <>
               {balanceNeedsReauth && (
@@ -212,9 +220,9 @@ export function WalletBalanceTab({
       )}
 
       <WalletLoyaltyPanel
-        activeCharacterId={activeCharacterId}
         loyaltyResult={loyaltyResult}
-        loyaltyNeedsReauth={loyaltyNeedsReauth}
+        reauthCharacters={loyaltyReauthCharacters}
+        loading={loyaltyLoading}
         otherLoyalty={loyalty.otherLoyalty}
         columns={loyalty.columns}
         sortProps={loyalty.sortProps}
