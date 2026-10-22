@@ -25,5 +25,6 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [collector-books](collector-books/README.md) | Spec #4504 (UI: #4512, #4513, #4514, #4520) | List A (sortable Moon owners table) for the accounting corporation, Page B (plain statement first) for the moon owner |
 | [corp-projects](corp-projects/README.md) | Issue #4530 | Industry › Projects as the fifth tab; summary strip, chips, read-only table; grant and empty states |
 | [fittings-restock](fittings-restock/README.md) | Issue #4550 | Appraisal's card title becomes a source select (Paste / From my Fittings); Fittings with hull-count steppers; Send to Build Group… in the actions menu; Appraise and Clear inline on phone |
+| [compare-trade-hubs](compare-trade-hubs/README.md) | Issue #4696 (build: #4697) | Proposed: third Compare view "Trade hubs", items × hubs, best sell over best buy, LOWEST/HIGHEST words, jumps in headers; awaiting Shawn's pick |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
