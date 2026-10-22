@@ -38,6 +38,8 @@ describe('HeaderMoreMenu', () => {
     const { container } = render(
       <HeaderMoreMenu>
         {narrow && <DropdownMenuItem>Export</DropdownMenuItem>}
+        {0}
+        {''}
         <>{null}</>
       </HeaderMoreMenu>
     );

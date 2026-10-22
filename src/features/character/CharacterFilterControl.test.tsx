@@ -278,13 +278,13 @@ describe('CharacterFilterControl', () => {
       activeCharacterId: 1,
       onChange: () => {},
       characterCount: 4,
-      missingNames: ['Bob Vale'],
+      missingNames: ['Bob Vale', 'Cy Rho'],
     } as const;
 
     it('keeps the label as "All characters" and adds who is missing to the accessible name', () => {
       render(<CharacterFilterControl {...partial} value="all" />);
       const trigger = screen.getByRole('button', {
-        name: 'All characters · 4. Not included: Bob Vale',
+        name: 'All characters · 4. Not included: Bob Vale and Cy Rho',
       });
       expect(trigger.children[1]).toHaveTextContent(/^All characters · 4$/);
     });
@@ -300,7 +300,7 @@ describe('CharacterFilterControl', () => {
     it('names who is missing in a non-interactive note in the open menu', async () => {
       render(<CharacterFilterControl {...partial} value="all" />);
       await openMenu();
-      const note = screen.getByText('Not included: Bob Vale');
+      const note = screen.getByText('Not included: Bob Vale and Cy Rho');
       expect(note.closest('[role="menuitem"],[role="menuitemradio"]')).toBeNull();
     });
 
@@ -316,24 +316,28 @@ describe('CharacterFilterControl', () => {
       expect(screen.getByRole('button').querySelector('[data-partial-dot]')).toBeNull();
     });
 
-    it('shows a spinner inside the trigger while loading, keeping the box size', () => {
-      render(
-        <CharacterFilterControl
-          activeCharacterId={1}
-          value="current"
-          onChange={() => {}}
-          size="md"
-          loading
-        />
-      );
+    it('shows a hidden spinner inside the trigger while loading, the box unchanged', () => {
+      const props = {
+        activeCharacterId: 1,
+        value: 'current',
+        onChange: () => {},
+        size: 'md',
+      } as const;
+      const { rerender } = render(<CharacterFilterControl {...props} />);
+      const idle = screen.getByRole('button', { name: 'This character' }).className;
+      rerender(<CharacterFilterControl {...props} loading />);
       const trigger = screen.getByRole('button', { name: 'This character' });
-      expect(trigger).toHaveClass('h-11', 'w-11');
-      expect(trigger.querySelector('[role="status"]')).toBeInTheDocument();
+      expect(trigger.className).toBe(idle);
+      expect(trigger).toHaveAttribute('aria-busy', 'true');
+      const spinner = trigger.querySelector('[role="status"]');
+      expect(spinner).toBeInTheDocument();
+      expect(spinner?.closest('[aria-hidden="true"]')).not.toBeNull();
     });
 
     it('draws no spinner when not loading', () => {
       render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
       expect(screen.getByRole('button').querySelector('[role="status"]')).toBeNull();
+      expect(screen.getByRole('button')).not.toHaveAttribute('aria-busy');
     });
   });
 

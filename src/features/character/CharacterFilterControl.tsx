@@ -27,7 +27,8 @@
  * Where it goes: one per page, in the `PageHeader`'s `scope` slot — the first
  * item of the header's right-hand control cluster, before the page's actions
  * (the AlertsBell stays last) — and not at all for a caller with one
- * Character to offer. Pass `size="md"` there, the header's touch tier. A
+ * Character to offer. The slot sets the header's touch tier itself
+ * (`PageHeaderClusterContext`), so no `size` is needed there. A
  * page's partial-coverage readout and its loading spinner ride in this
  * trigger (`missingNames`, `loading`), not beside it. See
  * `docs/context/decisions/20261022-123837-the-character-picker-rides-first-in-the-page.md`
@@ -119,7 +120,7 @@ export interface CharacterFilterControlProps<
    * `'md'` for a `PageHeader`'s `meta`, where that header's own `actions`
    * cluster sits at `IconButton`'s default (larger) tier instead (Assets,
    * Mining Tax Overview) — see `PageHeader`'s own doc comment. Inside a
-   * `PageHeader`'s `scope` or `actions` this prop is ignored: the header's
+   * `PageHeader`'s `scope` slot this prop is ignored: the header's
    * `'md'` tier always applies (`PageHeaderClusterContext`).
    */
   size?: 'sm' | 'md';
@@ -194,7 +195,7 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
   missingNames,
   loading = false,
 }: CharacterFilterControlProps<V>) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // In a `PageHeader` cluster the header's touch tier wins, so the trigger is
   // always level with the `IconButton`s beside it.
   const size = useContext(PageHeaderClusterContext) ? 'md' : sizeProp;
@@ -210,7 +211,9 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
       : t('character.scope.all', { count: characterCount });
   const missingNote =
     missingNames && missingNames.length > 0
-      ? t('character.scope.missing', { names: missingNames.join(', ') })
+      ? t('character.scope.missing', {
+          names: new Intl.ListFormat(i18n.language, { type: 'conjunction' }).format(missingNames),
+        })
       : null;
   const corporationLabel = t('character.filter.corporation');
   const label = isCorporation
@@ -263,7 +266,12 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
     </DropdownMenuContent>
   );
 
-  const spinner = <Spinner size="sm" label={t('common.loading')} />;
+  // Hidden from assistive tech: the trigger's `aria-busy` says it, without a live region inside a button.
+  const spinner = (
+    <span aria-hidden="true" className="flex">
+      <Spinner size="sm" label={t('common.loading')} />
+    </span>
+  );
 
   if (variant === 'field') {
     return (
@@ -292,7 +300,10 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={isPartial ? `${label}. ${missingNote}` : label}
+          aria-label={
+            isPartial ? t('character.scope.triggerPartial', { label, missing: missingNote }) : label
+          }
+          aria-busy={loading || undefined}
           className={`relative ${TRIGGER_BOX[size]} ${triggerBaseClassName}`}
         >
           {/* The glyph at every width: the whole trigger below `md`, the pill's leading icon from `md` up (a fixed 20px slot there, so a spinner swap never resizes the pill). */}

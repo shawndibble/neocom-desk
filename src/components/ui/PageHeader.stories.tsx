@@ -6,7 +6,6 @@ import * as Icon from './icons';
 import { Button } from './Button';
 import { HeaderMoreMenu } from './HeaderMoreMenu';
 import { DropdownMenuItem } from './DropdownMenu';
-import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 
 const meta = {
   title: 'ui/PageHeader',
@@ -49,28 +48,33 @@ export const Phone: Story = {
   globals: { viewport: { value: 'phone390', isRotated: false } },
 };
 
-const picker = (
-  <CharacterFilterControl
-    activeCharacterId={null}
-    value="all"
-    onChange={() => {}}
-    characterCount={4}
-    missingNames={['Bob Vale']}
-  />
+/**
+ * A stand-in for the page's Character picker, at the header tier the `scope`
+ * slot gives the real one (44px square below `md`, 36px tall from `md` up).
+ * `ui` stories don't import `@/features`; the real picker in this slot is
+ * `character/CharacterFilterControl`'s InPageHeader stories.
+ */
+const scopeStandIn = (
+  <button
+    type="button"
+    className="inline-flex h-11 w-11 shrink-0 items-center justify-center gap-1.5 rounded-xs border border-line bg-panel-2 text-text-dim md:h-9 md:w-auto md:px-2.5 md:text-[0.6875rem] md:font-semibold md:tracking-widest md:uppercase"
+  >
+    <Icon.AllCharacters aria-hidden="true" />
+    <span className="hidden md:inline">All characters</span>
+  </button>
 );
 
 /**
- * The cluster's fixed order: picker → text buttons → icon buttons (Refresh)
- * → ⋮ → bell. The picker takes the header's tier on its own, so it is the
- * same height as the `IconButton`s beside it: 36px here, 44px on a phone.
+ * The cluster's fixed order: scope → text buttons → icon buttons (Refresh)
+ * → ⋮ → bell, every control the same height.
  *
- * @summary `scope` slot: the Character picker first in the cluster, level with the icon buttons, one line.
+ * @summary `scope` slot (stand-in trigger): first in the cluster, level with the icon buttons, one line.
  */
 export const WithScope: Story = {
   args: {
     title: 'Market orders',
     meta: <DataAgeBadge date={new Date(Date.now() - 12 * 60_000)} />,
-    scope: picker,
+    scope: scopeStandIn,
     actions: (
       <>
         <Button variant="ghost">Export</Button>
@@ -93,7 +97,7 @@ export const WithScope: Story = {
 export const WithScopePhone: Story = {
   args: {
     title: 'Market orders and history',
-    scope: picker,
+    scope: scopeStandIn,
     actions: (
       <>
         <IconButton label="Refresh" icon={<Icon.Refresh />} />

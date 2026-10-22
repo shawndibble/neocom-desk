@@ -1035,6 +1035,12 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                 {t('miningTax.managePayeesAction')}
               </Button>
             )}
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('miningTax.refresh')}
+              onClick={refresh}
+              disabled={loading}
+            />
             <HeaderMoreMenu>
               <DropdownMenuItem onSelect={() => setOreTagsOpen(true)}>
                 {t('miningTax.oreTagsAction')}
@@ -1043,12 +1049,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                 {t('pageSettings.menuItem')}
               </DropdownMenuItem>
             </HeaderMoreMenu>
-            <IconButton
-              icon={<Icon.Refresh />}
-              label={t('miningTax.refresh')}
-              onClick={refresh}
-              disabled={loading}
-            />
           </>
         }
       />

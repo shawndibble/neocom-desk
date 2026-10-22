@@ -61,9 +61,12 @@ describe('PageHeader', () => {
       const cluster = screen.getByRole('button', { name: 'All characters' }).parentElement;
       expect(cluster).toHaveClass('shrink-0', 'flex-nowrap');
       expect(cluster).not.toHaveClass('flex-wrap');
+      // Clips, but keeps room for a focus ring and never collapses to nothing.
       expect(screen.getByText('12m ago').parentElement).toHaveClass(
-        'min-w-0',
+        'min-w-10',
         'overflow-hidden',
+        'p-1',
+        '-m-1',
         'whitespace-nowrap'
       );
     });

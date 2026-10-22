@@ -3912,7 +3912,8 @@
       "allPartial": "All characters · {{covered}} of {{total}}",
       "one": "{{name}} only",
       "corp": "Corp · {{division}}",
-      "missing": "Not included: {{names}}"
+      "missing": "Not included: {{names}}",
+      "triggerPartial": "{{label}}. {{missing}}"
     },
     "crumb": {
       "wallet": "Wallet"

@@ -19,7 +19,7 @@ interface PageHeaderProps {
   /**
    * The page's one `CharacterFilterControl` (This character / All characters
    * / Corporation), rendered first in the right-hand cluster, before
-   * `actions`. Inside the cluster the control takes the header's touch tier
+   * `actions`. In this slot the control takes the header's touch tier
    * (44px square below `md`, 36px tall from `md` up) on its own, through
    * `PageHeaderClusterContext`, so it is always level with the `IconButton`s
    * beside it.
@@ -30,6 +30,11 @@ interface PageHeaderProps {
    * phone row holds moves the rare ones into a `HeaderMoreMenu` below the
    * breakpoint, deciding in JS rather than with CSS. See
    * `docs/context/decisions/20261022-123837-the-character-picker-rides-first-in-the-page.md`.
+   *
+   * The lock keys on the prop, not on what renders: a picker that renders
+   * nothing (a one-Character account) still leaves the header single-line.
+   * That is intended — a page must fit its row through the ⋮ either way, so
+   * its layout does not change when a second Character is added.
    *
    * @summary The page's Character picker, first in the right-hand cluster; locks the header to one line.
    */
@@ -135,7 +140,10 @@ export function PageHeader({
         {singleLine
           ? meta && (
               // Shrinks before the title does (the larger factor), and clips.
-              <div className="flex min-w-0 shrink-[4] items-center gap-2 overflow-hidden whitespace-nowrap">
+              // `p-1 -m-1`: room inside the clip for a focusable item's focus
+              // ring (the `DataAgeBadge`'s `<time tabIndex=0>`); `min-w-10`
+              // keeps a tabbable item from collapsing to nothing.
+              <div className="-m-1 flex min-w-10 shrink-[4] items-center gap-2 overflow-hidden p-1 whitespace-nowrap">
                 {meta}
               </div>
             )
@@ -151,10 +159,11 @@ export function PageHeader({
             subNav ? 'md:pb-1' : undefined
           )}
         >
+          {/* Only `scope`: the context would otherwise reach through portals into modals an action opens. */}
           <PageHeaderClusterContext.Provider value={true}>
             {scope}
-            {actions}
           </PageHeaderClusterContext.Provider>
+          {actions}
           <AlertsBell />
         </div>
       </div>

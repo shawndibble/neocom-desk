@@ -32,16 +32,19 @@ import { IconButton } from './IconButton';
 import * as Icon from './icons';
 
 interface HeaderMoreMenuProps {
-  /** @summary `DropdownMenuItem`s; falsy children are dropped, and with none left nothing renders. */
+  /** @summary `DropdownMenuItem`s; non-element children (`false`, `0`, strings) are dropped, and with none left nothing renders. */
   children?: ReactNode;
 }
 
-/** Whether `node` holds anything that renders, looking through fragments. */
+/**
+ * Whether `node` holds a menu item, looking through fragments. Only elements
+ * count: a stray `0` or string from `{count && …}` never draws an empty ⋮.
+ */
 function hasItems(node: ReactNode): boolean {
-  return Children.toArray(node).some((child) =>
-    isValidElement<{ children?: ReactNode }>(child) && child.type === Fragment
-      ? hasItems(child.props.children)
-      : true
+  return Children.toArray(node).some(
+    (child) =>
+      isValidElement<{ children?: ReactNode }>(child) &&
+      (child.type !== Fragment || hasItems(child.props.children))
   );
 }
 
