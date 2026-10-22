@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
+import { formatTimestamp } from '@/lib/timestamp';
 import { buildDscanSnapshot, parseDscanSnapshot } from '@/engine/pilotList/dscanSnapshot';
 import { classifyPilotPaste } from '@/engine/pilotList/parsePilotPaste';
 
@@ -30,7 +32,12 @@ async function openFullScan() {
   await userEvent.click(await screen.findByRole('button', { name: /^Full scan/ }));
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  process.env.TZ = originalTz;
+  useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: true });
+});
+const originalTz = process.env.TZ;
 
 describe('Shared D-Scan', () => {
   it('rebuilds the same roles and ship list the sender saw', async () => {
@@ -69,6 +76,18 @@ describe('Shared D-Scan', () => {
     expect(recipientSections).toEqual(senderSections);
     expect(senderSections).toHaveLength(3);
     expect(screen.getByText(/Expires/)).toBeTruthy();
+  });
+
+  it("shows the expiry on the pilot's Time format clock", () => {
+    process.env.TZ = 'Pacific/Auckland';
+    useTimeFormat.setState({ value: 'eve', hydrated: true });
+    const expiresAt = Date.UTC(2026, 9, 15, 23, 30);
+    render(
+      <MemoryRouter>
+        <DscanShareScreen state={{ status: 'ready', rows: [] }} expiresAt={expiresAt} />
+      </MemoryRouter>
+    );
+    expect(screen.getByText(formatTimestamp(new Date(expiresAt), 'UTC'))).toBeInTheDocument();
   });
 
   it('offers a visitor with no Character a login, with permissions to choose first', async () => {

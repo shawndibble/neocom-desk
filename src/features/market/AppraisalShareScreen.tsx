@@ -1,4 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
+import { useTimeZone } from '@/lib/timeFormat';
+import { formatTimestamp } from '@/lib/timestamp';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
@@ -58,6 +60,7 @@ interface AppraisalShareScreenProps {
  */
 export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalShareScreenProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const shareRows = state.status === 'ready' ? state.view.appraisal.rows : NO_ROWS;
   const csvColumns = useMemo(() => appraisalCsvColumns(t), [t]);
   const tableExport = useTableExport({
@@ -156,11 +159,11 @@ export function AppraisalShareScreen({ state, expiresAt, openInApp }: AppraisalS
             <AppraisalVolumeChip totals={state.view.appraisal.totals} />
             <StatChip
               label={t('appraisalShare.generatedLabel')}
-              value={new Date(state.view.generatedAt * 1000).toLocaleString()}
+              value={formatTimestamp(new Date(state.view.generatedAt * 1000), timeZone)}
             />
             <StatChip
               label={t('appraisalShare.expiresLabel')}
-              value={new Date(expiresAt).toLocaleString()}
+              value={formatTimestamp(new Date(expiresAt), timeZone)}
             />
           </StatChips>
 

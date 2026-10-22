@@ -1,9 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { exportRows } from '@/lib/downloadCsv';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
+import { formatTimestamp } from '@/lib/timestamp';
 import { CorpTransactionsPanel } from './CorpTransactionsPanel';
 import { EMPTY_WALLET_TRANSACTION_FILTER } from '@/features/character/walletTransactionFilter';
 import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__/itemActions';
@@ -70,6 +72,26 @@ describe('CorpTransactionsPanel — a read-only ledger row', () => {
     fireEvent.contextMenu(row);
     expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'View in Market' })).not.toBeInTheDocument();
+  });
+});
+
+describe('CorpTransactionsPanel — Time format', () => {
+  const originalTz = process.env.TZ;
+  afterEach(() => {
+    process.env.TZ = originalTz;
+    useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: true });
+  });
+
+  it('prints the date column in EVE time when the preference says so', () => {
+    process.env.TZ = 'Pacific/Auckland';
+    useTimeFormat.setState({ value: 'eve', hydrated: true });
+    const iso = '2026-10-15T23:30:00Z';
+    renderPanel({
+      transactions: [transaction({ date: iso })],
+      filteredTransactions: [transaction({ date: iso })],
+    });
+    expect(screen.getByText(formatTimestamp(new Date(iso), 'UTC'))).toBeInTheDocument();
+    expect(screen.queryByText(formatTimestamp(new Date(iso)))).not.toBeInTheDocument();
   });
 });
 

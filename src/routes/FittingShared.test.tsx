@@ -9,7 +9,9 @@ import { configureClipboard } from '@/lib/clipboard';
 import { encodeFittingShare } from '@/engine/fittings/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
-import { FittingShared } from './FittingShared';
+import { FittingShared, FittingShareView } from './FittingShared';
+import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
+import { formatTimestamp } from '@/lib/timestamp';
 
 const sde = vi.hoisted(() => ({
   loadSkills: vi.fn(async () => [{ typeID: 3300, name: 'Gunnery' }]),
@@ -42,6 +44,7 @@ const RIFTER: Fitting = {
   cargo: [],
 };
 
+const originalTz = process.env.TZ;
 let clipboardText: string | null;
 
 beforeEach(async () => {
@@ -57,6 +60,8 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  process.env.TZ = originalTz;
+  useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: true });
   configureClipboard(null);
 });
 
@@ -106,6 +111,22 @@ describe('FittingShared', () => {
     expect(clipboardText).toContain('125mm Gatling AutoCannon I');
     // The button label swap alone is silent; the status region says it.
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/copied/i));
+  });
+
+  it("shows a Share Link expiry on the pilot's Time format clock", async () => {
+    process.env.TZ = 'Pacific/Auckland';
+    useTimeFormat.setState({ value: 'eve', hydrated: true });
+    const encoded = await encodeFittingShare(fittingToShareInput(RIFTER));
+    if (!encoded.ok) throw new Error('encode failed');
+    const expiresAt = Date.UTC(2026, 9, 15, 23, 30);
+    render(
+      <MemoryRouter>
+        <FittingShareView code={encoded.payload} expiresAt={expiresAt} />
+      </MemoryRouter>
+    );
+    expect(
+      await screen.findByText(formatTimestamp(new Date(expiresAt), 'UTC'))
+    ).toBeInTheDocument();
   });
 
   it('announces a failed copy', async () => {
