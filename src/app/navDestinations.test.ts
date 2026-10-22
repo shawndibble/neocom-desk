@@ -115,6 +115,11 @@ describe('NAV_LOCK_PATHS', () => {
         '/skills/plans',
         '/skills/trained',
         '/skills/certificates',
+        // Tabs of an ungated page that are only a re-login banner without their scope.
+        '/market/orders',
+        '/market/history',
+        '/wallet/journal',
+        '/contracts/history',
       ].toSorted()
     );
   });
@@ -140,6 +145,19 @@ describe('listNavDestinations', () => {
     t,
   });
   const byPath = (path: string) => all.find((entry) => entry.path === path);
+
+  it('locks only the scope-bound tab, not its page or siblings', () => {
+    const locked = listNavDestinations({
+      locked: new Set(['/market/history']),
+      corpVisible: true,
+      corpCapabilities: ALL_CORP_VIEWS,
+      t,
+    });
+    const flag = (path: string) => locked.find((entry) => entry.path === path)?.locked;
+    expect(flag('/market/history')).toBe(true);
+    expect(flag('/market/orders')).toBe(false);
+    expect(flag('/market')).toBe(false);
+  });
 
   it('leaves out a tab whose path is in hiddenTabPaths', () => {
     const without = listNavDestinations({
