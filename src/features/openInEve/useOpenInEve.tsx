@@ -60,9 +60,34 @@ export interface OpenInEveLookup {
   unresolvedText: string;
 }
 
-export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLookup): OpenInEve {
+export interface OpenInEveOptions {
+  /**
+   * Send from this Character instead of the active one (Settle up's payer).
+   * Without the permission it never falls back to another Character: the
+   * button stays, blocked, with a link to grant it — unless no Character
+   * holds the permission at all, when it hides as usual.
+   */
+  characterId?: number;
+}
+
+export function useOpenInEve(
+  { kind, id }: OpenInEveTarget,
+  lookup?: OpenInEveLookup,
+  options?: OpenInEveOptions
+): OpenInEve {
   const { t } = useTranslation();
-  const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
+  const activeCharacterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
+  const fixedCharacter = options?.characterId !== undefined;
+  const characterId = options?.characterId ?? activeCharacterId;
+  /** Permissions shows the active Character, so a fixed one's grant link switches to it first. */
+  const grantLink = (
+    <GrantMissingLink
+      groups={MISSING_GROUPS}
+      asCharacter={
+        fixedCharacter && characterId !== activeCharacterId ? (characterId ?? undefined) : undefined
+      }
+    />
+  );
   const lacksScope = useCharacterLacksEndpoints(characterId, OPEN_IN_EVE_ENDPOINTS);
   const online = useOnline();
   const holders = useCharacterIdsWithScopes(OPEN_IN_EVE_SCOPES);
@@ -79,7 +104,11 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
   }, [outcome]);
 
   const otherId =
-    lacksScope && holders !== undefined && characterId !== null && names.has(characterId)
+    !fixedCharacter &&
+    lacksScope &&
+    holders !== undefined &&
+    characterId !== null &&
+    names.has(characterId)
       ? [...holders].find((id) => id !== characterId && names.has(id))
       : undefined;
   const switchTo = otherId === undefined ? null : { id: otherId, name: names.get(otherId) ?? '' };
@@ -98,8 +127,12 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
             {t('openInEve.switchTo', { name: switchTo.name })}
           </button>
         </>
+      ) : fixedCharacter ? (
+        <>
+          {t('openInEve.notGranted', { name: names.get(characterId) ?? '' })} {grantLink}
+        </>
       ) : (
-        <GrantMissingLink groups={MISSING_GROUPS} />
+        grantLink
       )
     ) : !online ? (
       t('common.needsConnection')
@@ -126,11 +159,9 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
       } else {
         setOutcome({
           tone: 'alert',
-          text: result.needsPermission ? (
-            <GrantMissingLink groups={MISSING_GROUPS} />
-          ) : (
-            t('openInEve.failed', { message: result.message ?? t('openInEve.unknownError') })
-          ),
+          text: result.needsPermission
+            ? grantLink
+            : t('openInEve.failed', { message: result.message ?? t('openInEve.unknownError') }),
         });
       }
     } catch {
@@ -147,7 +178,12 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
 
   return {
     blockedReason,
-    unavailable: characterId === null || (lacksScope && switchTo === null),
+    unavailable:
+      characterId === null ||
+      (lacksScope &&
+        (fixedCharacter
+          ? holders === undefined || ![...holders].some((holder) => names.has(holder))
+          : switchTo === null)),
     switchTo,
     switchCharacter,
     offline: characterId !== null && !lacksScope && !online,

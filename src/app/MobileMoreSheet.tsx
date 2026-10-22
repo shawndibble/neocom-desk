@@ -73,7 +73,7 @@ export function MobileMoreSheet({
   renderCharacterLink,
 }: MobileMoreSheetProps) {
   const { t } = useTranslation();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const corpVisible = useCorpNavVisible();
   const corpCapabilities = useCorpViewCapabilities();
   const hiddenTabPaths = useHiddenTabPaths();
@@ -295,7 +295,7 @@ export function MobileMoreSheet({
               />
             ))}
           </div>
-          {renderCharacterLink(pathname)}
+          {renderCharacterLink(pathname + search)}
         </div>
       </div>
     </Modal>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -7,6 +7,12 @@ import {
   Disclosure,
   Modal,
   IskInput,
+  SegmentedControl,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   TextInput,
   textActionClassName,
 } from '@/components/ui';
@@ -25,6 +31,8 @@ import { allocateOldestFirst } from './settleAllocation';
 import { useLedgerAction } from './useLedgerAction';
 import { LedgerActionError } from './LedgerActionError';
 import { OreArrivalNotice } from './OreArrivalNotice';
+import { PayeeOpenInEveButton } from './PayeeOpenInEveButton';
+import { payerOptions } from './settlePayer';
 import type { SettleUpRecheck } from './useSettleUpRecheck';
 import { toggleInSet } from '@/lib/sets';
 
@@ -49,10 +57,23 @@ interface SettleUpDialogProps {
    * for when the transfer already shows in the journal. The button shows only
    * when this is given.
    */
-  onPickFromWallet?: () => void;
+  onPickFromWallet?: (tickedIds: ReadonlySet<string>) => void;
   /** The fresh ledger pull behind the "Ore still arriving" line; absent, the line judges what is already loaded. */
   arrivalCheck?: SettleUpRecheck;
+  /**
+   * The Character paying (`settlePayer.defaultPayer`, or a row's own). Only
+   * its entries start ticked; absent, the Character owing most.
+   */
+  payerId?: number;
+  /**
+   * Opened from one entry: only these start ticked, and the payer's other
+   * entries wait unticked under "Also pay N other entries".
+   */
+  focusIds?: ReadonlySet<string>;
 }
+
+/** More Characters than this pick from a list instead of a segmented row (DESIGN §4). */
+const MAX_SEGMENTED_PAYERS = 4;
 
 /** The summary line's date span, in the same EVE `YYYY-MM-DD` form as every other date on the page. */
 function shortEveRange(sortedDates: readonly string[]): string {
@@ -82,10 +103,40 @@ export function SettleUpDialog({
   onPaid,
   onPickFromWallet,
   arrivalCheck,
+  payerId,
+  focusIds,
 }: SettleUpDialogProps) {
   const { t } = useTranslation();
-  const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
-  const [entriesOpen, setEntriesOpen] = useState(rows.length >= 2);
+  // Rows can refresh while open (`liveSettleUpRows`) but never change who's in them.
+  const payers = useMemo(() => payerOptions(rows), [rows]);
+  const [payer, setPayer] = useState<number | null>(
+    () => (payers.some((p) => p.characterId === payerId) ? payerId : payers[0]?.characterId) ?? null
+  );
+  // A focus naming none of the payer's offered entries would open with nothing ticked: drop it.
+  const [focus, setFocus] = useState<ReadonlySet<string> | null>(() =>
+    focusIds !== undefined &&
+    rows.some((r) => r.assignment.characterId === payer && focusIds.has(r.assignment.id))
+      ? focusIds
+      : null
+  );
+  const fromId = useId();
+  const startsTicked = (r: SettleUpRow, who: number | null, only: ReadonlySet<string> | null) =>
+    (who === null || r.assignment.characterId === who) &&
+    (only === null || only.has(r.assignment.id));
+  const [excluded, setExcluded] = useState<ReadonlySet<string>>(
+    () => new Set(rows.filter((r) => !startsTicked(r, payer, focus)).map((r) => r.assignment.id))
+  );
+  const primaryRows = rows.filter((r) => startsTicked(r, payer, focus));
+  const sameCharacterRest =
+    focus === null
+      ? []
+      : rows.filter((r) => r.assignment.characterId === payer && !focus.has(r.assignment.id));
+  const otherCharacterRows =
+    payer === null ? [] : rows.filter((r) => r.assignment.characterId !== payer);
+  const payerName = payers.find((p) => p.characterId === payer)?.characterName;
+  const [entriesOpen, setEntriesOpen] = useState(primaryRows.length >= 2);
+  const [restOpen, setRestOpen] = useState(false);
+  const [othersOpen, setOthersOpen] = useState(false);
   // The date the pilot paid, in their own calendar — a local date, not an EVE one.
   const [paidOn, setPaidOn] = useState(() => formatLocalDate(new Date()));
   const [method, setMethod] = useState<MiningTaxPaymentMethod>('donation');
@@ -128,6 +179,18 @@ export function SettleUpDialog({
 
   function toggle(id: string) {
     setExcluded((previous) => toggleInSet(previous, id));
+  }
+
+  /** A new payer ticks exactly its own entries; a half-entered different amount starts over. */
+  function changePayer(next: number) {
+    setPayer(next);
+    setFocus(null);
+    setExcluded(
+      new Set(rows.filter((r) => r.assignment.characterId !== next).map((r) => r.assignment.id))
+    );
+    setEntriesOpen(rows.filter((r) => r.assignment.characterId === next).length >= 2);
+    setDifferentBase(null);
+    setSentText('');
   }
 
   /** Ticks exactly `keep`, out of the entries in `base`. */
@@ -199,14 +262,7 @@ export function SettleUpDialog({
     );
   }
 
-  const copyRow = (
-    key: string,
-    label: string,
-    value: string,
-    copyText: string,
-    dim = false,
-    openInEve?: { name: string; entityId?: number; payeeId?: string }
-  ) => (
+  const copyRow = (key: string, label: string, value: string, copyText: string, dim = false) => (
     <SettleCopyRow
       key={key}
       label={label}
@@ -214,8 +270,81 @@ export function SettleUpDialog({
       copied={copied === key}
       onCopy={() => void copy(key, copyText)}
       dim={dim}
-      openInEve={openInEve}
     />
+  );
+
+  // Its own row: the label names the paying Character, too long to share the To row.
+  // Empty (and hidden) when no Character holds the Open in EVE permission.
+  const openInEveRow = (p: { name: string; entityId?: number; payeeId?: string }) => (
+    <div key={`open:${p.name}`} className="flex px-2 py-1.5 empty:hidden">
+      <PayeeOpenInEveButton
+        name={p.name}
+        entityId={p.entityId}
+        payeeId={p.payeeId}
+        fromCharacter={
+          payer === null || payerName === undefined ? undefined : { id: payer, name: payerName }
+        }
+      />
+    </div>
+  );
+
+  const entryRow = (r: SettleUpRow, showCharacter: boolean) => {
+    const on = !excluded.has(r.assignment.id);
+    return (
+      <li key={r.assignment.id}>
+        <label
+          className={cx(
+            'flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs',
+            tappableRowClassName
+          )}
+        >
+          <Checkbox
+            checked={on}
+            onChange={() => toggle(r.assignment.id)}
+            aria-label={t('miningTax.settleUpIncludeLabel', {
+              date: r.assignment.date,
+            })}
+          />
+          <span className="w-20 shrink-0 tabular-nums">{r.assignment.date}</span>
+          <span className="min-w-0 flex-1 truncate text-text-dim">
+            {systemName(r.assignment.solarSystemId)}
+            {showCharacter && ` · ${r.characterName}`}
+            {allPayeeNames.length > 1 && ` · ${r.payeeName}`}
+          </span>
+          <span className={cx('shrink-0 tabular-nums', !on && 'text-text-dim')}>
+            {formatIsk(r.assignment.taxOwed)} ISK
+          </span>
+        </label>
+      </li>
+    );
+  };
+
+  const sumOwed = (list: readonly SettleUpRow[]) =>
+    list.reduce((sum, r) => sum + r.assignment.taxOwed, 0);
+  const primaryTicked = primaryRows.filter((r) => !excluded.has(r.assignment.id));
+
+  /** One collapsible list of tickable entries: the payer's, or an "Also pay" group. */
+  const entryGroup = (
+    label: string,
+    trailingIsk: number,
+    list: readonly SettleUpRow[],
+    [expanded, setExpanded]: [boolean, (update: (open: boolean) => boolean) => void],
+    showCharacter: boolean,
+    footer?: ReactNode
+  ) => (
+    <Disclosure
+      key={label}
+      className="overflow-hidden rounded-xs border border-line"
+      label={label}
+      trailing={`${formatIsk(trailingIsk)} ISK`}
+      expanded={expanded}
+      onToggle={() => setExpanded((v) => !v)}
+    >
+      <ul className="divide-y divide-line">
+        {list.map((r) => entryRow(r, showCharacter))}
+        {footer}
+      </ul>
+    </Disclosure>
   );
 
   // What the "Sent a different amount?" figure does to the ticked entries.
@@ -252,64 +381,82 @@ export function SettleUpDialog({
           checking={arrivalCheck?.checking ?? false}
           pullStartedAt={arrivalCheck?.pullStartedAt ?? null}
         />
-        <Disclosure
-          className="overflow-hidden rounded-xs border border-line"
-          label={t('miningTax.settleUp.entriesSummary', {
-            count: included.length,
-            range: shortEveRange(sortedDates),
-          })}
-          trailing={`${formatIsk(total)} ISK`}
-          expanded={entriesOpen}
-          onToggle={() => setEntriesOpen((v) => !v)}
-        >
-          <ul className="divide-y divide-line">
-            {rows.map((r) => {
-              const on = !excluded.has(r.assignment.id);
-              return (
-                <li key={r.assignment.id}>
-                  <label
-                    className={cx(
-                      'flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs',
-                      tappableRowClassName
-                    )}
-                  >
-                    <Checkbox
-                      checked={on}
-                      onChange={() => toggle(r.assignment.id)}
-                      aria-label={t('miningTax.settleUpIncludeLabel', {
-                        date: r.assignment.date,
+        {payers.length > 1 && payer !== null && (
+          <div className="space-y-1">
+            <p id={fromId} className={SETTLE_FIELD_LABEL}>
+              {t('miningTax.settleUp.fromLabel')}
+            </p>
+            {payers.length <= MAX_SEGMENTED_PAYERS ? (
+              <SegmentedControl
+                label={t('miningTax.settleUp.fromLabel')}
+                uppercase={false}
+                fill
+                options={payers.map((p) => ({
+                  value: String(p.characterId),
+                  label: t('miningTax.settleUp.fromOption', {
+                    name: p.characterName,
+                    amount: formatIsk(p.subtotal, 0),
+                  }),
+                }))}
+                value={String(payer)}
+                onChange={(value) => changePayer(Number(value))}
+              />
+            ) : (
+              <Select value={String(payer)} onValueChange={(value) => changePayer(Number(value))}>
+                <SelectTrigger aria-labelledby={fromId}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {payers.map((p) => (
+                    <SelectItem key={p.characterId} value={String(p.characterId)}>
+                      {t('miningTax.settleUp.fromOption', {
+                        name: p.characterName,
+                        amount: formatIsk(p.subtotal, 0),
                       })}
-                    />
-                    <span className="w-20 shrink-0 tabular-nums">{r.assignment.date}</span>
-                    <span className="min-w-0 flex-1 truncate text-text-dim">
-                      {systemName(r.assignment.solarSystemId)} · {r.characterName}
-                      {allPayeeNames.length > 1 && ` · ${r.payeeName}`}
-                    </span>
-                    <span className={cx('shrink-0 tabular-nums', !on && 'text-text-dim')}>
-                      {formatIsk(r.assignment.taxOwed)} ISK
-                    </span>
-                  </label>
-                </li>
-              );
-            })}
-            <li className="px-2 py-1.5 text-[0.6875rem] text-text-dim">
-              {t('miningTax.settleUpUntickHint')}
-            </li>
-          </ul>
-        </Disclosure>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        )}
+        {entryGroup(
+          t('miningTax.settleUp.entriesSummary', {
+            count: primaryTicked.length,
+            range: shortEveRange(primaryTicked.map((r) => r.assignment.date).sort()),
+          }),
+          sumOwed(primaryTicked),
+          primaryRows,
+          [entriesOpen, setEntriesOpen],
+          // With no picker, the row itself names who mined it; with one, the picker does.
+          payers.length === 1,
+          <li className="px-2 py-1.5 text-[0.6875rem] text-text-dim">
+            {t('miningTax.settleUpUntickHint')}
+          </li>
+        )}
+        {sameCharacterRest.length > 0 &&
+          entryGroup(
+            t('miningTax.settleUp.alsoPayRest', { count: sameCharacterRest.length }),
+            sumOwed(sameCharacterRest),
+            sameCharacterRest,
+            [restOpen, setRestOpen],
+            false
+          )}
+        {otherCharacterRows.length > 0 &&
+          entryGroup(
+            t('miningTax.settleUp.alsoPayOthers', { count: otherCharacterRows.length }),
+            sumOwed(otherCharacterRows),
+            otherCharacterRows,
+            [othersOpen, setOthersOpen],
+            true
+          )}
 
         <div className="divide-y divide-line rounded-xs border border-line bg-panel-2">
           {perPayee.length <= 1 ? (
             <>
               {perPayee.length === 1 &&
-                copyRow(
-                  'to',
-                  t('miningTax.settleUp.toLabel'),
-                  perPayee[0].name,
-                  perPayee[0].name,
-                  false,
-                  perPayee[0]
-                )}
+                copyRow('to', t('miningTax.settleUp.toLabel'), perPayee[0].name, perPayee[0].name)}
+              {perPayee.length === 1 && openInEveRow(perPayee[0])}
               {copyRow(
                 'amount',
                 t('miningTax.settleUp.amountLabel'),
@@ -320,7 +467,8 @@ export function SettleUpDialog({
           ) : (
             perPayee.map((p) => (
               <div key={p.name} className="divide-y divide-line">
-                {copyRow(`to:${p.name}`, t('miningTax.settleUp.toLabel'), p.name, p.name, false, p)}
+                {copyRow(`to:${p.name}`, t('miningTax.settleUp.toLabel'), p.name, p.name)}
+                {openInEveRow(p)}
                 {copyRow(
                   `amount:${p.name}`,
                   t('miningTax.settleUp.amountLabel'),
@@ -396,7 +544,11 @@ export function SettleUpDialog({
           {onPickFromWallet && (
             <>
               {' '}
-              <button type="button" className={inlineLinkClassName} onClick={onPickFromWallet}>
+              <button
+                type="button"
+                className={inlineLinkClassName}
+                onClick={() => onPickFromWallet(new Set(included.map((r) => r.assignment.id)))}
+              >
                 {t('miningTax.settleUp.pickFromWallet')}
               </button>
             </>

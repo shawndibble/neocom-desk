@@ -35,6 +35,7 @@ import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/csr/ArrowCount
 import { ArrowDown } from '@phosphor-icons/react/dist/csr/ArrowDown';
 import { ArrowLineDown } from '@phosphor-icons/react/dist/csr/ArrowLineDown';
 import { ArrowLineUp } from '@phosphor-icons/react/dist/csr/ArrowLineUp';
+import { ArrowRight } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { DiscordLogo } from '@phosphor-icons/react/dist/csr/DiscordLogo';
 import { GithubLogo } from '@phosphor-icons/react/dist/csr/GithubLogo';
 import { ArrowSquareOut } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
@@ -231,6 +232,12 @@ export const BuildGroup = withWeight(FolderSimple);
  * controls away on the same page.
  */
 export const Compare = withWeight(Scales);
+/**
+ * The arrow between a lane's two ends (Hauling's From → To), pressed to swap
+ * them. A plain right arrow, not `Route`'s pair: at rest it still has to say
+ * which end is the origin, since the hub pickers carry no caption.
+ */
+export const SwapEnds = withWeight(ArrowRight);
 /** Route preference (shortest vs safest). */
 export const Route = withWeight(ArrowsLeftRight);
 /** Bulk-writes a chosen hub/facility/security/build-system onto every plan in a Build Group (issue #632) — the same crosshair `PriceAlert` uses, for retargeting a group. */

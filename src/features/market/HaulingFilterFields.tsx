@@ -18,7 +18,7 @@ import { HAULING_CATEGORY_OPTIONS } from './haulingCategories';
 import { HAUL_MODES, type HaulMode } from './haulingData';
 import { ANY_HUB, type HaulingHubChoice } from './haulingHubs';
 
-/** A hub picker. Uncaptioned: the `→` between From and To says which is which; the name is its `aria-label`. */
+/** A hub picker. Uncaptioned: the → button between From and To (which swaps them) says which is which; the name is its `aria-label`. */
 export function HubField({
   label,
   value,

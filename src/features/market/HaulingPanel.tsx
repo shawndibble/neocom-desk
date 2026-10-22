@@ -28,6 +28,7 @@ import {
   EmptyState,
   FilterBar,
   FilterField,
+  IconButton,
   Modal,
   SlideOver,
   Panel,
@@ -58,6 +59,7 @@ import { loadMarketGroups } from '@/sde/loadMarketSde';
 import type { MarketGroupNode } from '@/sde/marketTypes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { TableActionsMenu } from '@/components/ui/TableExport';
+import * as Icon from '@/components/ui/icons';
 import { HaulingCargoControl } from './HaulingCargoControl';
 import { HubField, IskCapField, CategorySelect, ModeSelect } from './HaulingFilterFields';
 import { useHaulingExport, useHaulingPlanState } from './useHaulingPlanState';
@@ -904,9 +906,13 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
                   setParams(pickHaulingHub({ from: params.from, to: params.to }, 'from', id))
                 }
               />
-              <span aria-hidden="true" className="text-text-faint">
-                →
-              </span>
+              <IconButton
+                variant="plain"
+                size="sm"
+                icon={<Icon.SwapEnds size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
+                label={t('market.hauling.swapHubs')}
+                onClick={() => setParams({ from: params.to, to: params.from })}
+              />
               <HubField
                 label={t('market.hauling.to')}
                 value={params.to}
