@@ -9,7 +9,9 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { seedCharacter, seedGrant } from '@/test/seed';
 import { CharacterPermissionStrip } from './CharacterPermissionStrip';
 
-const TOTAL = SCOPE_GROUPS.length;
+// Corporation is left out of the count.
+const COUNTED = SCOPE_GROUPS.filter((group) => group !== 'corp');
+const TOTAL = COUNTED.length;
 const allScopes = SCOPE_GROUPS.flatMap((group) => [...scopesForGroup(group)]);
 
 /** A Character granting the first `n` Permissions. */
@@ -17,7 +19,7 @@ async function seed(id: number, name: string, n: number) {
   await seedCharacter(id, name, { addedAt: id });
   await seedGrant(
     id,
-    SCOPE_GROUPS.slice(0, n).flatMap((group) => [...scopesForGroup(group)])
+    COUNTED.slice(0, n).flatMap((group) => [...scopesForGroup(group)])
   );
 }
 

@@ -3,30 +3,41 @@ import { SCOPE_GROUPS } from '@/esi/registry';
 import { SCOPES, scopesForGroup } from '@/esi/scopes';
 import { countGrantedPermissions, orderForPicker, pickerTone } from './permissionCounts';
 
+const COUNTED = SCOPE_GROUPS.filter((group) => group !== 'corp');
+
 describe('countGrantedPermissions', () => {
-  it('counts none for an empty grant, out of every Permission', () => {
-    expect(countGrantedPermissions([])).toEqual({ granted: 0, total: SCOPE_GROUPS.length });
+  it('counts none for an empty grant, out of every Permission but Corporation', () => {
+    expect(countGrantedPermissions([])).toEqual({ granted: 0, total: COUNTED.length });
+  });
+
+  it('leaves Corporation out, granted or not', () => {
+    const all = COUNTED.flatMap((group) => [...scopesForGroup(group)]);
+    expect(countGrantedPermissions(all)).toEqual({
+      granted: COUNTED.length,
+      total: COUNTED.length,
+    });
+    expect(countGrantedPermissions([...scopesForGroup('corp')]).granted).toBe(0);
   });
 
   it('counts a Permission when all of its scopes are held', () => {
-    const [first] = SCOPE_GROUPS;
+    const [first] = COUNTED;
     expect(countGrantedPermissions([...scopesForGroup(first)]).granted).toBeGreaterThanOrEqual(1);
   });
 
   it('does not count a Permission with one of its scopes missing', () => {
-    const group = SCOPE_GROUPS.find((g) => scopesForGroup(g).length > 1);
+    const group = COUNTED.find((g) => scopesForGroup(g).length > 1);
     if (group === undefined) return;
     const partial = scopesForGroup(group).slice(1);
     expect(countGrantedPermissions(partial).granted).toBe(
-      SCOPE_GROUPS.filter((g) => scopesForGroup(g).every((s) => partial.includes(s))).length
+      COUNTED.filter((g) => scopesForGroup(g).every((s) => partial.includes(s))).length
     );
   });
 
   it('counts every Permission for a grant of every scope', () => {
     const all = SCOPE_GROUPS.flatMap((group) => [...scopesForGroup(group)]);
     expect(countGrantedPermissions(all)).toEqual({
-      granted: SCOPE_GROUPS.length,
-      total: SCOPE_GROUPS.length,
+      granted: COUNTED.length,
+      total: COUNTED.length,
     });
   });
 
