@@ -4,6 +4,7 @@ import { ProgressBar } from '@/components/ui';
 import { SkillLink } from '@/features/entities';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
+import { useTimeZone } from '@/lib/timeFormat';
 import type { SkillCatalog } from '../skillMap';
 import { heroProgress, heroSpPerHour, type QueueRowView } from './queueView';
 import { formatCount } from '@/lib/formatCount';
@@ -22,6 +23,7 @@ interface NowTrainingCardProps {
  */
 export function NowTrainingCard({ row, next, catalog, nowMs }: NowTrainingCardProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const { entry, secondsRemaining } = row;
   const skill = catalog.bySkillTypeID.get(entry.skill_id);
   const name = skill?.name ?? `#${entry.skill_id}`;
@@ -31,7 +33,9 @@ export function NowTrainingCard({ row, next, catalog, nowMs }: NowTrainingCardPr
   const spPerHour = heroSpPerHour(entry);
   const nextSkill = next ? catalog.bySkillTypeID.get(next.entry.skill_id) : undefined;
   const finish =
-    secondsRemaining === null ? null : formatLocalDate(new Date(nowMs + secondsRemaining * 1000));
+    secondsRemaining === null
+      ? null
+      : formatLocalDate(new Date(nowMs + secondsRemaining * 1000), timeZone);
 
   return (
     <section

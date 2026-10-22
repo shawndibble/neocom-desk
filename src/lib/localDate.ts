@@ -15,10 +15,11 @@ const OPTIONS: Intl.DateTimeFormatOptions = {
  * Renders an instant as the viewer's local calendar date (YYYY-MM-DD). Used
  * by every Skills Planner date surface (plan header, entries panel header,
  * step timeline, remap-cooldown) so two surfaces showing the same instant
- * can never disagree by a day — see #207.
+ * can never disagree by a day — see #207. `timeZone` (`'UTC'` for the EVE
+ * clock, from `useTimeZone()`) moves them all together; omitted, the host zone.
  */
-export function formatLocalDate(date: Date): string {
-  return date.toLocaleDateString('en-CA', OPTIONS);
+export function formatLocalDate(date: Date, timeZone?: 'UTC'): string {
+  return date.toLocaleDateString('en-CA', timeZone ? { ...OPTIONS, timeZone } : OPTIONS);
 }
 
 const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {

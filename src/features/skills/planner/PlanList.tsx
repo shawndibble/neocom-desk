@@ -20,6 +20,7 @@ import * as Icon from '@/components/ui/icons';
 import type { CharacterRecord, SkillPlanRecord } from '@/db';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 
 /** A plan's costed total and finish (`null` when there is nothing left to train). */
@@ -72,6 +73,7 @@ function PlanRow({
   onRequestDelete: (plan: SkillPlanRecord) => void;
 } & Pick<PlanListProps, 'planHref' | 'onDuplicate' | 'onRename'>) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const [renaming, setRenaming] = useState(autoRename);
   const [draftName, setDraftName] = useState(plan.name);
   const rowMenu = useOpenAfterMenu();
@@ -149,7 +151,7 @@ function PlanRow({
                     ? t('plans.listRowNothingToTrain')
                     : t('plans.listRowStats', {
                         duration: formatCountdown(stats.totalSeconds),
-                        date: formatLocalDate(stats.finish),
+                        date: formatLocalDate(stats.finish, timeZone),
                       })}
                 </span>
               )}

@@ -4,6 +4,7 @@ import { romanLevel } from '@/engine/projection';
 import { SkillLink } from '@/features/entities';
 import { formatCountdown } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
+import { useTimeZone } from '@/lib/timeFormat';
 import { skillGroupIcon } from '../skillGroupIcon';
 import type { SkillCatalog } from '../skillMap';
 import type { SkillQueueStatus } from '@/engine/skills/queueStatus';
@@ -30,6 +31,7 @@ interface RowProps {
 /** One queued level: its skill and group, how long it adds, and when it finishes. */
 function QueueRow({ row, catalog, nowMs }: RowProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const { entry, status, secondsRemaining, durationSeconds } = row;
   const skill = catalog.bySkillTypeID.get(entry.skill_id);
   const badgeKey = BADGE_KEY[status];
@@ -58,7 +60,7 @@ function QueueRow({ row, catalog, nowMs }: RowProps) {
         <div className="shrink-0 text-right tabular-nums">
           <div className="text-sm text-text">{formatCountdown(durationSeconds ?? 0)}</div>
           <div className="text-xs text-text-dim">
-            {formatLocalDate(new Date(nowMs + secondsRemaining * 1000))}
+            {formatLocalDate(new Date(nowMs + secondsRemaining * 1000), timeZone)}
           </div>
         </div>
       )}
@@ -66,11 +68,15 @@ function QueueRow({ row, catalog, nowMs }: RowProps) {
   );
 }
 
-function periodLabel(t: TFunction, group: Group, nowMs: number): string {
+function periodLabel(t: TFunction, group: Group, nowMs: number, timeZone?: 'UTC'): string {
   if (group.id === 'week') return t('plans.periodWeek');
   if (group.id === 'month' || !group.monthStart) return t('plans.periodMonth');
-  const sameYear = group.monthStart.getFullYear() === new Date(nowMs).getFullYear();
+  // `monthStart` is UTC midnight of the month's first, so name it in UTC; the
+  // current year is read on the chosen clock to match how the group was filed.
+  const currentYear = Number(formatLocalDate(new Date(nowMs), timeZone).slice(0, 4));
+  const sameYear = group.monthStart.getUTCFullYear() === currentYear;
   return group.monthStart.toLocaleDateString('en-US', {
+    timeZone: 'UTC',
     month: 'long',
     ...(sameYear ? {} : { year: 'numeric' }),
   });
@@ -85,11 +91,12 @@ interface QueuePeriodGroupProps {
 /** Levels finishing in one stretch of the queue, headed by how many and how long. */
 export function QueuePeriodGroup({ group, catalog, nowMs }: QueuePeriodGroupProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   return (
     <section>
       <div className="mb-1 flex items-baseline justify-between gap-3 px-1">
         <h3 className="text-xs font-semibold tracking-wide text-text-dim uppercase">
-          {periodLabel(t, group, nowMs)}
+          {periodLabel(t, group, nowMs, timeZone)}
         </h3>
         <span className="text-xs text-text-dim tabular-nums">
           {t('plans.periodSummary', {

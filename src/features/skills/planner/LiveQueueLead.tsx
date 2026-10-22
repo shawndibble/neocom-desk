@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, Disclosure } from '@/components/ui';
 import { SkillLink } from '@/features/entities';
 import { formatLocalDate } from '@/lib/localDate';
+import { useTimeZone } from '@/lib/timeFormat';
 import type { QueueEndProjection } from '@/engine/skills/queueStatus';
 
 interface LiveQueueLeadProps {
@@ -19,6 +20,7 @@ interface LiveQueueLeadProps {
  */
 export function LiveQueueLead({ projection, fetchedAt, nameFor }: LiveQueueLeadProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const [expanded, setExpanded] = useState(false);
   const { queuedLevels, paused, startMs } = projection;
 
@@ -32,7 +34,7 @@ export function LiveQueueLead({ projection, fetchedAt, nameFor }: LiveQueueLeadP
       onToggle={() => setExpanded((v) => !v)}
       label={t('plans.liveQueueLead', {
         count: queuedLevels.length,
-        date: formatLocalDate(new Date(startMs)),
+        date: formatLocalDate(new Date(startMs), timeZone),
       })}
       trailing={fetchedAt ? <DataAgeBadge date={fetchedAt} tooltip={false} /> : undefined}
     >
@@ -41,7 +43,9 @@ export function LiveQueueLead({ projection, fetchedAt, nameFor }: LiveQueueLeadP
           <SkillLink typeId={e.skill_id}>{nameFor(e.skill_id)}</SkillLink>{' '}
           {romanLevel(e.finished_level)}
           {e.finish_date && (
-            <span className="ml-2 tabular-nums">{formatLocalDate(new Date(e.finish_date))}</span>
+            <span className="ml-2 tabular-nums">
+              {formatLocalDate(new Date(e.finish_date), timeZone)}
+            </span>
           )}
         </div>
       ))}

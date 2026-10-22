@@ -40,3 +40,13 @@ describe('formatLocalDateTime', () => {
     expect(formatLocalDateTime(new Date('2026-09-01T00:00:00Z'))).toBe('2026-09-01, 00:00');
   });
 });
+
+describe('formatLocalDate with the EVE clock', () => {
+  it('renders the UTC date whatever the host zone, only when asked', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    const late = new Date('2026-09-01T02:00:00Z');
+    expect(formatLocalDate(late)).toBe('2026-08-31');
+    expect(formatLocalDate(late, 'UTC')).toBe('2026-09-01');
+    expect(formatLocalDate(late, undefined)).toBe('2026-08-31');
+  });
+});

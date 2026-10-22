@@ -5,6 +5,7 @@ import { cx } from '@/lib/cx';
 import * as Icon from '@/components/ui/icons';
 import type { MilestoneState, MilestoneStatus } from '@/engine/skills/skillPlanMilestones';
 import { formatLocalDate } from '@/lib/localDate';
+import { useTimeZone } from '@/lib/timeFormat';
 
 /** An inline row glyph: shared by entry and prereq rows. */
 function RowMark({ label, tone, path }: { label: string; tone: string; path: string }) {
@@ -57,11 +58,12 @@ function milestoneStateKey(state: MilestoneState): string {
  */
 export function MilestoneMark({ status }: { status: MilestoneStatus }) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const dateText =
     status.state === 'projected' && status.finish
       ? status.milestone.fittingId !== undefined
-        ? t('plans.fitGoal.flyable', { date: formatLocalDate(status.finish) })
-        : formatLocalDate(status.finish)
+        ? t('plans.fitGoal.flyable', { date: formatLocalDate(status.finish, timeZone) })
+        : formatLocalDate(status.finish, timeZone)
       : t(milestoneStateKey(status.state));
   return (
     <Tooltip content={status.milestone.name}>

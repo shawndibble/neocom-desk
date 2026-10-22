@@ -107,6 +107,7 @@ import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBa
 import { queueCsvColumns } from './queueCsv';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { formatLocalDate } from '@/lib/localDate';
+import { useTimeZone } from '@/lib/timeFormat';
 import { dedupeEntries } from './reorder';
 import { buildRows } from './markers';
 import {
@@ -252,6 +253,7 @@ export function PlanEditor({
   onUpdate,
 }: PlanEditorProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const navigate = useNavigate();
   // Which side the tools pane lands on — the same hook the rest of the app's two-column
   // layouts switch on, so this pane can never disagree with them.
@@ -1274,7 +1276,7 @@ export function PlanEditor({
                     ? t('plans.remapBudgetYearlyReady')
                     : t('plans.remapBudgetYearlyFrom', {
                         date: remapInfo.cooldownUntil
-                          ? formatLocalDate(remapInfo.cooldownUntil)
+                          ? formatLocalDate(remapInfo.cooldownUntil, timeZone)
                           : '',
                       })
                 }`
@@ -1313,7 +1315,7 @@ export function PlanEditor({
                   markersVerdict.kind === 'saves' ? 'text-xs text-success' : 'text-xs text-text-dim'
                 }
               >
-                {confirmRemapOutcome(t, markersVerdict)}
+                {confirmRemapOutcome(t, markersVerdict, undefined, timeZone)}
               </p>
             )}
           </div>

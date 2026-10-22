@@ -21,8 +21,8 @@ export function appendedCountMessage(
     : t('plans.importAddedNone');
 }
 
-export function yearlyRemapAfterNote(t: TFunction, date: Date): string {
-  return t('plans.optimizeConfirmYearlyAfter', { date: formatLocalDate(date) });
+export function yearlyRemapAfterNote(t: TFunction, date: Date, timeZone?: 'UTC'): string {
+  return t('plans.optimizeConfirmYearlyAfter', { date: formatLocalDate(date, timeZone) });
 }
 
 // Same beside-the-button confirmation for both Optimize Modes: the savings
@@ -33,14 +33,17 @@ export function yearlyRemapAfterNote(t: TFunction, date: Date): string {
 export function confirmRemapOutcome(
   t: TFunction,
   verdict: OptimizeVerdict,
-  yearlyRemapAfter?: Date
+  yearlyRemapAfter?: Date,
+  timeZone?: 'UTC'
 ): string {
   switch (verdict.kind) {
     case 'saves': {
       const saves = t('plans.optimizeConfirmSaves', {
         duration: formatCountdown(verdict.savingsSeconds),
       });
-      return yearlyRemapAfter ? `${saves}. ${yearlyRemapAfterNote(t, yearlyRemapAfter)}` : saves;
+      return yearlyRemapAfter
+        ? `${saves}. ${yearlyRemapAfterNote(t, yearlyRemapAfter, timeZone)}`
+        : saves;
     }
     case 'noRemapsAvailable':
       return t('plans.optimizeConfirmNoRemaps');
@@ -117,7 +120,8 @@ export function optimizeQueueMadeMessage(
   t: TFunction,
   name: string,
   made: { savingsSeconds: number; remapsPlaced: number; yearlyRemapAfter?: Date },
-  firstSkill: string
+  firstSkill: string,
+  timeZone?: 'UTC'
 ): string {
   const duration = formatCountdown(made.savingsSeconds);
   const what =
@@ -125,7 +129,7 @@ export function optimizeQueueMadeMessage(
       ? t('plans.optimizeQueueWhatMany', { count: made.remapsPlaced, duration })
       : t('plans.optimizeQueueWhatOne', { skill: firstSkill, duration });
   const wait = made.yearlyRemapAfter
-    ? t('plans.optimizeQueueYearlyWait', { date: formatLocalDate(made.yearlyRemapAfter) })
+    ? t('plans.optimizeQueueYearlyWait', { date: formatLocalDate(made.yearlyRemapAfter, timeZone) })
     : '';
   return t('plans.optimizeQueueMade', { name, what, wait });
 }

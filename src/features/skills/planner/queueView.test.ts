@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import type { WeekStart } from '@/lib/calendarGrid';
 import { classifySkillQueue } from '@/engine/skills/queueStatus';
@@ -142,4 +142,61 @@ describe('heroSpPerHour', () => {
     expect(heroSpPerHour(entry(0, 1, -1))).toBeNull();
     expect(heroSpPerHour({ ...entry(0, 1, 1), training_start_sp: 1, level_end_sp: 2 })).toBeNull();
   });
+});
+
+describe('buildQueueView on the EVE clock', () => {
+  // 2026-10-17T03:00Z is Fri the 16th in Los Angeles but Sat the 17th in UTC;
+  // "now" is Sun 2026-10-18T20:00Z (Sun the 18th UTC, Sun the 18th LA 13:00).
+  const run = (finishIso: string, nowIso: string, tz?: 'UTC', weekStart: WeekStart = 'monday') => {
+    const now = Date.parse(nowIso);
+    const e = {
+      skill_id: 3301,
+      queue_position: 1,
+      finished_level: 5,
+      start_date: new Date(now).toISOString(),
+      finish_date: finishIso,
+    } satisfies SkillQueueEntry;
+    const hero = {
+      ...e,
+      skill_id: 3300,
+      queue_position: 0,
+      finish_date: new Date(now + 1000).toISOString(),
+    };
+    return buildQueueView(classifySkillQueue([hero, e], now), now, weekStart, tz).groups.map(
+      (g) => g.id
+    );
+  };
+
+  it('files a level under the month its UTC date falls in, not the local one', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    // 2026-12-01T03:00Z is Nov 30 in LA (local: November) and Dec 1 in UTC.
+    const finish = '2026-12-01T03:00:00Z';
+    const now = '2026-10-14T12:00:00Z';
+    expect(run(finish, now)).toEqual(['2026-11']);
+    expect(run(finish, now, 'UTC')).toEqual(['2026-12']);
+  });
+
+  it('closes the week at the UTC week boundary on the EVE clock', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    // Now Wed 2026-10-14. Monday weeks end at 2026-10-19 00:00 on the chosen clock.
+    // 2026-10-19T03:00Z is still Sun the 18th in LA (this week) but Mon the 19th in UTC.
+    const finish = '2026-10-19T03:00:00Z';
+    const now = '2026-10-14T12:00:00Z';
+    expect(run(finish, now)).toEqual(['week']);
+    expect(run(finish, now, 'UTC')).toEqual(['month']);
+  });
+
+  it('reads "this month" on the chosen clock too', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    // Now 2026-11-01T03:00Z is Oct 31 in LA but Nov 1 in UTC; a Nov 20 finish is "this month" only on UTC.
+    const now = '2026-11-01T03:00:00Z';
+    const finish = '2026-11-20T12:00:00Z';
+    expect(run(finish, now)).toEqual(['2026-11']);
+    expect(run(finish, now, 'UTC')).toEqual(['month']);
+  });
+});
+
+const originalTz = process.env.TZ;
+afterAll(() => {
+  process.env.TZ = originalTz;
 });

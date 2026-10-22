@@ -13,6 +13,7 @@ import * as Icon from '@/components/ui/icons';
 import type { MilestoneStatus } from '@/engine/skills/skillPlanMilestones';
 import type { PlanPriority } from '@/engine/types';
 import { formatCountdown } from '@/lib/duration';
+import { useTimeZone } from '@/lib/timeFormat';
 import { SkillLink } from '@/features/entities';
 import { doneByText } from '../doneBy';
 import type { AttributePair } from '../attributePairBands';
@@ -91,6 +92,7 @@ export const EntryRow = memo(function EntryRow({
   onRemoveMilestone,
 }: EntryRowProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
   // The dialogs these items open wait for the menu to hand focus back to ⋮.
   const menu = useOpenAfterMenu();
@@ -224,7 +226,7 @@ export const EntryRow = memo(function EntryRow({
         {columns.cumulativeTime && (
           <MetaValue
             label={t('plans.columnDoneBy')}
-            value={doneByText(row.cumulativeSeconds, startDate)}
+            value={doneByText(row.cumulativeSeconds, startDate, timeZone)}
           />
         )}
         {milestoneStatus && <MilestoneMark status={milestoneStatus} />}
@@ -257,7 +259,7 @@ export const EntryRow = memo(function EntryRow({
               )}
               {columns.cumulativeTime && (
                 <TimeCell
-                  value={doneByText(row.cumulativeSeconds, startDate)}
+                  value={doneByText(row.cumulativeSeconds, startDate, timeZone)}
                   label={t('plans.columnDoneBy')}
                 />
               )}

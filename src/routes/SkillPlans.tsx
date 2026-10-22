@@ -11,6 +11,7 @@ import type { OptimizeQueueToastState, SkillPlanImportState } from '@/lib/shortc
 import { parseSkillQueue } from '@/engine/skills/queueImport';
 import { romanLevel } from '@/engine/projection';
 import { formatLocalDate } from '@/lib/localDate';
+import { useTimeZone } from '@/lib/timeFormat';
 import { loadCharacterSkillQueue } from '@/features/skills/data';
 import { optimizeQueueMadeMessage } from '@/features/skills/planner/optimizeHelpers';
 import { optimizeQueuePlan } from '@/features/skills/planner/optimizeQueuePlan';
@@ -83,11 +84,18 @@ export function SkillPlans() {
   const queueResult = useSkillQueue(activeCharacterId ?? 0);
   // Shared with every other 30 s clock on screen; paused while the tab is hidden.
   const nowMs = useTicker(TICK_MS);
+  const timeZone = useTimeZone();
   const weekStart = useCalendarWeekStart((state) => state.value);
   useHydratedStore(useCalendarWeekStart);
   const queueView = useMemo(
-    () => buildQueueView(classifySkillQueue(queueResult?.data ?? [], nowMs), nowMs, weekStart),
-    [queueResult, nowMs, weekStart]
+    () =>
+      buildQueueView(
+        classifySkillQueue(queueResult?.data ?? [], nowMs),
+        nowMs,
+        weekStart,
+        timeZone
+      ),
+    [queueResult, nowMs, weekStart, timeZone]
   );
 
   // The oldest of the sources that are actually the saved copy: a fresh queue
@@ -172,7 +180,7 @@ export function SkillPlans() {
         : '';
       void navigate(`/skills/plans/${outcome.plan.id}`, {
         state: {
-          optimizeQueueMessage: optimizeQueueMadeMessage(t, name, outcome, skill),
+          optimizeQueueMessage: optimizeQueueMadeMessage(t, name, outcome, skill, timeZone),
         } satisfies OptimizeQueueToastState,
       });
     } catch (err) {
@@ -182,7 +190,7 @@ export function SkillPlans() {
     } finally {
       optimizing.current = false;
     }
-  }, [activeCharacterId, scheduleInputs, cloneStates, remapInfo, navigate, t]);
+  }, [activeCharacterId, scheduleInputs, cloneStates, remapInfo, navigate, t, timeZone]);
 
   if (!hydrated) {
     return (
