@@ -17,8 +17,8 @@ const OPTIONS: Intl.DateTimeFormatOptions = {
  * step timeline, remap-cooldown) so two surfaces showing the same instant
  * can never disagree by a day — see #207.
  */
-export function formatLocalDate(date: Date): string {
-  return date.toLocaleDateString('en-CA', OPTIONS);
+export function formatLocalDate(date: Date, timeZone?: string): string {
+  return date.toLocaleDateString('en-CA', { ...OPTIONS, timeZone });
 }
 
 const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {

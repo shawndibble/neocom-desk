@@ -1,9 +1,11 @@
 import { render, renderHook, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { TFunction } from 'i18next';
 import type { RegionOrder } from '@/esi/endpoints';
 import { useMarketOrderColumns } from './useMarketOrderColumns';
 import { useVisibleMarketOrderColumns } from './marketOrderColumns';
+import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
+import { formatDateOnly } from '@/lib/timestamp';
 
 import type { OrderFeeContext } from '@/engine/market/orderFees';
 
@@ -118,5 +120,33 @@ describe('useMarketOrderColumns fee tooltips', () => {
     expect(tip(columns.buyColumns, 'fees')).toBe('market.feesTooltip.buy');
     expect(tip(columns.buyColumns, 'finalPrice')).toBe('market.finalPriceTooltip.buy');
     await useVisibleMarketOrderColumns.getState().setValue([]);
+  });
+});
+
+describe('useMarketOrderColumns expiry column', () => {
+  const zone = process.env.TZ;
+  afterEach(() => {
+    process.env.TZ = zone;
+    useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: true });
+  });
+
+  it.each(['local', 'eve'] as const)('shows the %s day', (format) => {
+    process.env.TZ = 'Pacific/Auckland';
+    useTimeFormat.setState({ value: format, hydrated: true });
+    const order = {
+      order_id: 1,
+      price: 1,
+      is_buy_order: false,
+      volume_remain: 1,
+      duration: 90,
+      issued: '2026-10-01T23:30:00Z',
+    } as RegionOrder;
+    const { orderColumnsById } = columnsFor(false);
+    render(<div>{orderColumnsById.expiry.render(order)}</div>);
+    const expires = new Date(Date.parse(order.issued) + 90 * 86_400_000);
+    expect(
+      screen.getByText(formatDateOnly(expires, format === 'eve' ? 'UTC' : undefined))
+    ).toBeInTheDocument();
+    expect(formatDateOnly(expires, 'UTC')).not.toBe(formatDateOnly(expires));
   });
 });

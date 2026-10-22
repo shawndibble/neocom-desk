@@ -20,6 +20,8 @@ import type { SaleLinking } from './useSaleLinking';
 import { SourcingInput } from './SourcingInput';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
+import { useTimeZone } from '@/lib/timeFormat';
+import { formatDateOnly } from '@/lib/timestamp';
 
 /**
  * The "Sold" split button — primary action Link Past Sale, plus an attached
@@ -60,6 +62,7 @@ export function SoldSplitButton({
   refreshing?: boolean;
 }) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   return (
     <div className="flex items-center gap-1.5 sm:justify-end">
       <div className="flex">
@@ -83,7 +86,7 @@ export function SoldSplitButton({
               const named = losses.length > 1;
               const detail = {
                 count: loss.quantity,
-                date: new Date(loss.lostAt).toLocaleDateString(),
+                date: formatDateOnly(new Date(loss.lostAt), timeZone),
               };
               return [
                 <DropdownMenuItem key={`${loss.id}:edit`} onSelect={() => onEditLoss?.(loss)}>
@@ -128,6 +131,7 @@ function SalePicker({
   onLink: (txn: WalletTransaction) => void;
 }) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   if (candidates.length === 0) {
     return <EmptyState title={t('industry.noPastSalesToLink')} className="py-4" />;
   }
@@ -146,7 +150,7 @@ function SalePicker({
             {' — '}
             {formatIsk(txn.quantity * txn.unit_price)}
             {' — '}
-            {new Date(txn.date).toLocaleDateString()}
+            {formatDateOnly(new Date(txn.date), timeZone)}
           </span>
           <Button size="sm" onClick={() => onLink(txn)}>
             {t('industry.link')}

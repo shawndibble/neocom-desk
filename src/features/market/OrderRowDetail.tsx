@@ -24,6 +24,8 @@ import { priceComparison, type DepthAt } from '@/engine/market/orderBookDepth';
 import { PlaceLink, SystemLink } from '@/features/entities';
 import type { RegionOrder } from '@/esi/endpoints';
 import { formatAge } from '@/lib/age';
+import { useTimeZone } from '@/lib/timeFormat';
+import { formatDateOnly } from '@/lib/timestamp';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatMarketIsk } from '@/lib/isk';
 import { feeColumnTooltip } from './feeColumnTooltip';
@@ -84,6 +86,7 @@ export function OrderRowDetail({
   now: nowProp,
 }: OrderRowDetailProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const [copied, setCopied] = useState(false);
   // Read once when the row opens: ages and days-left don't need to tick.
   const [openedAt] = useState(() => Date.now());
@@ -151,7 +154,7 @@ export function OrderRowDetail({
             : `${signedMarketIsk(versusBest.delta)} (${versusBest.ratio > 0 ? '+' : '−'}${fixed2(Math.abs(versusBest.ratio * 100))}%)`}
         </Fact>
         <Fact label={t('market.expiry')}>
-          {expiry.toLocaleDateString()}{' '}
+          {formatDateOnly(expiry, timeZone)}{' '}
           <span className="text-text-dim">
             · {t('market.orderDetail.daysLeft', { count: daysLeft })}
           </span>

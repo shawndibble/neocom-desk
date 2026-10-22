@@ -16,6 +16,7 @@ import { TextArea } from '@/components/ui/TextArea';
 import { Tooltip } from '@/components/ui/Tooltip';
 import * as Icon from '@/components/ui/icons';
 import { formatDateOnly } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
 import {
   SYSTEM_NOTE_MAX_LENGTH,
   noteFirstLine,
@@ -25,6 +26,7 @@ import {
 
 function NoteEditor({ systemId, name }: { systemId: number; name: string }) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const fieldId = useId();
   const note = useSystemNotes((s) => s.value[systemId]);
   const [draft, setDraft] = useState(note?.text ?? '');
@@ -60,7 +62,9 @@ function NoteEditor({ systemId, name }: { systemId: number; name: string }) {
       />
       <p className="flex justify-between gap-2 text-[0.75rem] text-text-dim tabular-nums">
         <span>
-          {note ? t('travel.note.updated', { date: formatDateOnly(new Date(note.updatedAt)) }) : ''}
+          {note
+            ? t('travel.note.updated', { date: formatDateOnly(new Date(note.updatedAt), timeZone) })
+            : ''}
         </span>
         <span>{t('travel.note.count', { length: draft.length, max: SYSTEM_NOTE_MAX_LENGTH })}</span>
       </p>
