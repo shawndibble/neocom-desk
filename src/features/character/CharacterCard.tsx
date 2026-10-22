@@ -104,8 +104,17 @@ export function CharacterCard({
   return (
     <li
       aria-current={isActive ? 'true' : undefined}
+      onClick={(event) => {
+        // Pointer convenience for the whole card; the name button stays the
+        // keyboard control. React events bubble out of portals (the group
+        // Select's menu), so only DOM descendants count, and never a control.
+        const target = event.target as HTMLElement;
+        if (!event.currentTarget.contains(target)) return;
+        if (target.closest('button, a, [role="combobox"]')) return;
+        onSelect(character.characterId);
+      }}
       className={cx(
-        'flex flex-col gap-2 rounded-xs border border-line p-3 backdrop-blur-sm hover:border-line-bright hover:bg-panel-2',
+        'cursor-pointer flex flex-col gap-2 rounded-xs border border-line p-3 backdrop-blur-sm hover:border-line-bright hover:bg-panel-2',
         interactiveClassName,
         isActive ? selectedRowClassName : 'bg-panel/85'
       )}
