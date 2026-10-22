@@ -27,5 +27,6 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [fittings-restock](fittings-restock/README.md) | Issue #4550 | Appraisal's card title becomes a source select (Paste / From my Fittings); Fittings with hull-count steppers; Send to Build Group… in the actions menu; Appraise and Clear inline on phone |
 | [queue-remap-advice](queue-remap-advice/README.md) | Issue #4701 | Optimize queue at the foot of the Attributes card (full width, under the remap budget): one press makes a plan from the queue with the optimizer's Remap Markers and opens it, Undo toast; empty queue aria-disabled, already optimal makes no plan |
 | [compare-trade-hubs](compare-trade-hubs/README.md) | Issue #4696 (build: #4697) | Desktop as proposed (items × hubs, best sell over best buy, LOWEST/HIGHEST words, jumps in headers); table at every width (phone scrolls sideways, item pinned, "Hubs" label); own hub highlighted |
+| [margin-reason](margin-reason/README.md) | Issue #4736 | Transactions: reason text in each dashed Margin cell (desktop), one "N sales uncosted · X ISK" line under the totals strip (desktop and phone) |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.
