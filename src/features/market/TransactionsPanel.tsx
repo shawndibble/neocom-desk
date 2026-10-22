@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { useCharacterCount } from '@/features/character/useCharacters';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   Button,
   DataAgeBadge,
@@ -35,7 +36,9 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { iskToneClass } from '@/features/character/format';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatMarketIsk } from '@/lib/isk';
-import { formatTimestamp } from '@/lib/timestamp';
+import { splitTimestamp } from '@/lib/timestamp';
+import { HintText } from '@/components/ui/HintText';
+import type { MarginGap } from '@/engine/market/realizedMargin';
 import { useTimeZone } from '@/lib/timeFormat';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -51,7 +54,7 @@ import { useResolvedCharacterFilter } from '@/features/character/characterFilter
 import { useRememberedUrlParams } from '@/lib/useUrlState';
 import {
   pooledTransactionMargins,
-  transactionMargins,
+  transactionMarginReport,
   type PooledTransaction,
 } from './transactionMargins';
 import { summarizeTrading } from './tradingSummary';
@@ -61,6 +64,29 @@ import type { PageHeaderSlots } from './pageHeaderSlots';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { highlightedTransactionId } from './transactionHighlight';
 import { formatCount } from '@/lib/formatCount';
+
+/** Static keys, so the i18n key scan sees every string. */
+function marginGapLabel(t: TFunction, gap: MarginGap): string {
+  switch (gap) {
+    case 'noBuy':
+      return t('wallet.marginGap.noBuy');
+    case 'noTax':
+      return t('wallet.marginGap.noTax');
+    case 'outside':
+      return t('wallet.marginGap.outside');
+  }
+}
+
+function marginGapHint(t: TFunction, gap: MarginGap): string {
+  switch (gap) {
+    case 'noBuy':
+      return t('wallet.marginGapHint.noBuy');
+    case 'noTax':
+      return t('wallet.marginGapHint.noTax');
+    case 'outside':
+      return t('wallet.marginGapHint.outside');
+  }
+}
 
 const HISTORY_CHARACTER_PARAMS = { 'txn.chars': characterFilterParam('current') };
 
@@ -173,11 +199,9 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     [allScope, allFills, data]
   );
   // Worked out over every fill, not the filtered rows — a filter must not change what a sale cost.
-  const margins = useMemo(
+  const { margins, gaps } = useMemo(
     () =>
-      allScope && pooled
-        ? pooled.margins
-        : transactionMargins(allScope ? [] : transactions, journal),
+      allScope && pooled ? pooled : transactionMarginReport(allScope ? [] : transactions, journal),
     [allScope, pooled, transactions, journal]
   );
   const archiveSince = allScope
@@ -199,8 +223,8 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     [transactions, rowsFilter, nameFor]
   );
   const trading = useMemo(
-    () => summarizeTrading(filteredTransactions, margins, journal, rowsFilter, archiveSince),
-    [filteredTransactions, margins, journal, rowsFilter, archiveSince]
+    () => summarizeTrading(filteredTransactions, margins, journal, rowsFilter, archiveSince, gaps),
+    [filteredTransactions, margins, gaps, journal, rowsFilter, archiveSince]
   );
   const csvColumns = useMemo(() => walletTransactionsCsvColumns(t, nameFor), [t, nameFor]);
   const transactionsExport = useTableExport({
@@ -225,8 +249,20 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       {
         id: 'date',
         header: t('wallet.date'),
-        className: 'whitespace-nowrap text-text-dim',
-        render: (txn) => formatTimestamp(new Date(txn.date), timeZone),
+        className: 'whitespace-nowrap text-text-dim max-sm:px-1',
+        headerClassName: 'max-sm:px-1',
+        // Date over time on a phone, freeing width for the other columns; one line from `sm` up.
+        render: (txn) => {
+          const { date, time } = splitTimestamp(new Date(txn.date), timeZone);
+          const body = date.trimEnd();
+          return (
+            <>
+              <span className="max-sm:block">{body}</span>
+              <span className="max-sm:hidden">{date.slice(body.length)}</span>
+              {time && <span className="max-sm:block">{time}</span>}
+            </>
+          );
+        },
         sortValue: (txn) => txn.date,
       },
       ...(allScope
@@ -299,7 +335,15 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         render: (txn) => {
           if (txn.is_buy) return null;
           const margin = margins.get(txn.transaction_id);
-          if (!margin) return '—';
+          if (!margin) {
+            const gap = gaps.get(txn.transaction_id);
+            if (!gap) return '—';
+            return (
+              <HintText content={marginGapHint(t, gap)}>
+                <span className="text-xs text-text-dim">{marginGapLabel(t, gap)}</span>
+              </HintText>
+            );
+          }
           return (
             <Tooltip
               content={t('wallet.marginWorking', {
@@ -314,7 +358,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         sortValue: (txn) => margins.get(txn.transaction_id)?.margin,
       },
     ],
-    [t, typeNames, timeZone, nameFor, margins, allScope]
+    [t, typeNames, timeZone, nameFor, margins, gaps, allScope]
   );
 
   const headerChrome = (

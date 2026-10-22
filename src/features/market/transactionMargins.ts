@@ -8,7 +8,12 @@
  */
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
-import { realizedMargins, type RealizedMargin } from '@/engine/market/realizedMargin';
+import {
+  realizedMarginReport,
+  type MarginGap,
+  type RealizedMargin,
+  type RealizedMarginReport,
+} from '@/engine/market/realizedMargin';
 import { toWalletTrade } from './orderCostBasis';
 
 /** Each sale's sales tax (positive ISK) from the journal's `transaction_tax` lines, keyed by transaction id. */
@@ -33,14 +38,21 @@ function salesTaxByTransaction(
   return salesTax;
 }
 
+export function transactionMarginReport(
+  transactions: readonly WalletTransaction[],
+  journal: readonly WalletJournalEntry[]
+): RealizedMarginReport {
+  return realizedMarginReport(
+    transactions.map(toWalletTrade),
+    salesTaxByTransaction(transactions, journal)
+  );
+}
+
 export function transactionMargins(
   transactions: readonly WalletTransaction[],
   journal: readonly WalletJournalEntry[]
 ): Map<number, RealizedMargin> {
-  return realizedMargins(
-    transactions.map(toWalletTrade),
-    salesTaxByTransaction(transactions, journal)
-  );
+  return transactionMarginReport(transactions, journal).margins;
 }
 
 export interface CharacterFills {
@@ -66,6 +78,7 @@ export type PooledTransaction = WalletTransaction & {
 export function pooledTransactionMargins(sources: readonly CharacterFills[]): {
   rows: PooledTransaction[];
   margins: Map<number, RealizedMargin>;
+  gaps: Map<number, MarginGap>;
 } {
   const rows: PooledTransaction[] = [];
   const salesTax = new Map<number, number>();
@@ -84,5 +97,6 @@ export function pooledTransactionMargins(sources: readonly CharacterFills[]): {
       });
     }
   }
-  return { rows, margins: realizedMargins(rows.map(toWalletTrade), salesTax) };
+  const { margins, gaps } = realizedMarginReport(rows.map(toWalletTrade), salesTax);
+  return { rows, margins, gaps };
 }
