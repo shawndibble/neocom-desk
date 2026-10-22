@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { cx } from '@/lib/cx';
 import { AlertsBell } from './AlertsBell';
+import { PageHeaderClusterContext } from './pageHeaderCluster';
 
 interface PageHeaderProps {
   /**
@@ -10,15 +11,42 @@ interface PageHeaderProps {
   /**
    * Sits immediately after the title, sharing its baseline: the view's
    * `DataAgeBadge`, a stat strip, a count. Reads as part of the title, not as
-   * a control — put anything clickable in `actions`. Exception: a
-   * `CharacterFilterControl` may sit here too, on the same "names whose data
-   * this is" rationale `Panel.meta` uses per
-   * `docs/context/decisions/20260908-192806-the-character-filter-rides-in-the-panel-header.md`,
-   * when the route has no titled inner `Panel` of its own to host it (see
-   * `Assets.tsx`, `OverviewTab.tsx`).
+   * a control — put anything clickable in `actions`, and the Character
+   * picker in `scope`. With `scope` set, meta stays on the title's line and
+   * clips rather than wrapping, so keep it short.
    */
   meta?: ReactNode;
-  /** @summary Right-aligned control cluster of `IconButton`s, in the order they're used. */
+  /**
+   * The page's one `CharacterFilterControl` (This character / All characters
+   * / Corporation), rendered first in the right-hand cluster, before
+   * `actions`. In this slot the control takes the header's touch tier
+   * (44px square below `md`, 36px tall from `md` up) on its own, through
+   * `PageHeaderClusterContext`, so it is always level with the `IconButton`s
+   * beside it.
+   *
+   * Passing it also locks the title row to one line at every width: the
+   * `<h1>` truncates (its full text in `title`), `meta` shrinks and clips,
+   * and the cluster never wraps or shrinks. A page with more actions than a
+   * phone row holds moves the rare ones into a `HeaderMoreMenu` below the
+   * breakpoint, deciding in JS rather than with CSS. See
+   * `docs/context/decisions/20261022-123837-the-character-picker-rides-first-in-the-page.md`.
+   *
+   * The lock keys on the prop, not on what renders: a picker that renders
+   * nothing (a one-Character account) still leaves the header single-line.
+   * That is intended — a page must fit its row through the ⋮ either way, so
+   * its layout does not change when a second Character is added.
+   *
+   * @summary The page's Character picker, first in the right-hand cluster; locks the header to one line.
+   */
+  scope?: ReactNode;
+  /**
+   * The page's controls, after `scope`, in this fixed order: text-labelled
+   * page actions (Compose, Payees, a labelled Export…), then icon-only ones
+   * (Refresh), then the `HeaderMoreMenu` ⋮ last. The `AlertsBell` follows on
+   * its own.
+   *
+   * @summary Right-aligned control cluster: text actions, icon actions (Refresh), then ⋮.
+   */
   actions?: ReactNode;
   /**
    * A route's sub-navigation, on the title's own line instead of below it.
@@ -58,13 +86,33 @@ interface PageHeaderProps {
  * and so no filter control, has nothing to name here either — the bottom
  * tab bar's More sheet is still a phone's route to Characters either way.
  *
+ * The right-hand cluster's order is fixed on every page: `scope` (the
+ * Character picker) → text-labelled page actions → icon-only actions
+ * (Refresh) → ⋮ More actions (`HeaderMoreMenu`) → `AlertsBell`: words on the
+ * left, icons on the right. With `scope` set the whole title row
+ * stays on one line (see that prop); without it the row wraps as it always
+ * has.
+ *
  * @summary A route's top line: the one `<h1>`, its data age beside it, and the page controls at the right.
  */
-export function PageHeader({ title, meta, actions, subNav, className = '' }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  meta,
+  scope,
+  actions,
+  subNav,
+  className = '',
+}: PageHeaderProps) {
+  // A scope picker locks the title row to one line (decision 20261022-123837): the
+  // title and meta give way, the control cluster never does.
+  const singleLine = scope !== undefined && scope !== null && scope !== false;
   return (
     <header
       className={cx(
         'flex min-h-11 flex-wrap gap-2 md:min-h-9',
+        // Below `md` the sub-nav still needs its own wrapped line; from `md` up
+        // everything shares one row and must not wrap.
+        singleLine && 'md:flex-nowrap',
         // With a sub-nav the header *is* the tab bar's baseline, so everything
         // in it aligns to that rule rather than to the row's centre. Without
         // one, nothing changes for the thirteen routes already using this.
@@ -72,23 +120,49 @@ export function PageHeader({ title, meta, actions, subNav, className = '' }: Pag
         className
       )}
     >
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 self-stretch md:contents">
+      <div
+        className={cx(
+          'flex min-w-0 flex-1 items-center gap-2 self-stretch md:contents',
+          singleLine ? 'flex-nowrap' : 'flex-wrap'
+        )}
+      >
         {/* `tabIndex={-1}`: route focus (`app/routeFocus.ts`) lands here after navigation. */}
         <h1
           tabIndex={-1}
-          className="max-w-full min-w-0 shrink-0 text-xl font-semibold tracking-widest break-words uppercase focus:outline-none"
+          title={singleLine ? title : undefined}
+          className={cx(
+            'max-w-full text-xl font-semibold tracking-widest uppercase focus:outline-none',
+            singleLine ? 'min-w-12 shrink truncate' : 'min-w-0 shrink-0 break-words'
+          )}
         >
           {title}
         </h1>
-        {meta}
+        {singleLine
+          ? meta && (
+              // Shrinks before the title does (the larger factor), and clips.
+              // `p-1 -m-1`: room inside the clip for a focusable item's focus
+              // ring (the `DataAgeBadge`'s `<time tabIndex=0>`); `min-w-10`
+              // keeps a tabbable item from collapsing to nothing.
+              <div className="-m-1 flex min-w-10 shrink-[4] items-center gap-2 overflow-hidden p-1 whitespace-nowrap">
+                {meta}
+              </div>
+            )
+          : meta}
         {/* `md:order-1`: after the sub-nav, which sits between meta and actions at `md`. The bell is always there (dim at zero), so the cluster never collapses. */}
         <div
           className={cx(
-            // `min-w-0 max-w-full`: a full-width nowrap action truncates instead of pushing the page sideways.
-            'ml-auto flex max-w-full min-w-0 flex-wrap items-center justify-end gap-1.5 md:order-1',
+            'ml-auto flex items-center justify-end gap-1.5 md:order-1',
+            singleLine
+              ? 'shrink-0 flex-nowrap'
+              : // `min-w-0 max-w-full`: a full-width nowrap action truncates instead of pushing the page sideways.
+                'max-w-full min-w-0 flex-wrap',
             subNav ? 'md:pb-1' : undefined
           )}
         >
+          {/* Only `scope`: the context would otherwise reach through portals into modals an action opens. */}
+          <PageHeaderClusterContext.Provider value={true}>
+            {scope}
+          </PageHeaderClusterContext.Provider>
           {actions}
           <AlertsBell />
         </div>

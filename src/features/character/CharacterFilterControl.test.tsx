@@ -1,8 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { IconButton } from '@/components/ui';
+import { db } from '@/db';
+import { seedCharacter } from '@/test/seed';
+import { IconButton, PageHeader } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { CharacterFilterControl, type CharacterScopeChoice } from './CharacterFilterControl';
 
 async function openMenu() {
@@ -112,11 +115,12 @@ describe('CharacterFilterControl', () => {
   });
 
   describe('the icon-only phone trigger', () => {
-    it('renders both an icon (hidden at md) and the text label (hidden below md)', () => {
+    it('renders the glyph at every width (leading the md+ pill) and the text label from md up', () => {
       render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
       const trigger = screen.getByRole('button', { name: 'This character' });
       const [iconSlot, textSlot] = trigger.children;
-      expect(iconSlot).toHaveClass('md:hidden');
+      expect(iconSlot).not.toHaveClass('md:hidden');
+      expect(iconSlot).toHaveClass('md:size-5');
       expect(textSlot).toHaveClass('hidden', 'md:inline');
     });
 
@@ -266,6 +270,171 @@ describe('CharacterFilterControl', () => {
         'This character',
         'Corporation',
       ]);
+    });
+  });
+
+  describe('partial coverage and loading, carried in the trigger', () => {
+    const partial = {
+      activeCharacterId: 1,
+      onChange: () => {},
+      characterCount: 4,
+      missingNames: ['Bob Vale', 'Cy Rho'],
+    } as const;
+
+    it('keeps the label as "All characters" and adds who is missing to the accessible name', () => {
+      render(<CharacterFilterControl {...partial} value="all" />);
+      const trigger = screen.getByRole('button', {
+        name: 'All characters · 4. Not included: Bob Vale and Cy Rho',
+      });
+      expect(trigger.children[1]).toHaveTextContent(/^All characters · 4$/);
+    });
+
+    it('draws a warning dot on the trigger itself, at every width', () => {
+      render(<CharacterFilterControl {...partial} value="all" />);
+      const dot = screen.getByRole('button').querySelector('[data-partial-dot]');
+      expect(dot).toBeInTheDocument();
+      expect(dot?.parentElement).toBe(screen.getByRole('button'));
+      expect(dot?.className).not.toMatch(/hidden/);
+    });
+
+    it('names who is missing in a non-interactive note in the open menu', async () => {
+      render(<CharacterFilterControl {...partial} value="all" />);
+      await openMenu();
+      const note = screen.getByText('Not included: Bob Vale and Cy Rho');
+      expect(note.closest('[role="menuitem"],[role="menuitemradio"]')).toBeNull();
+    });
+
+    it('keeps the plain label and no dot for "This character"', () => {
+      render(<CharacterFilterControl {...partial} value="current" />);
+      const trigger = screen.getByRole('button', { name: 'This character' });
+      expect(trigger.querySelector('[data-partial-dot]')).toBeNull();
+    });
+
+    it('full coverage (no missing names) reads the plain count', () => {
+      render(<CharacterFilterControl {...partial} missingNames={[]} value="all" />);
+      expect(screen.getByRole('button', { name: 'All characters · 4' })).toBeInTheDocument();
+      expect(screen.getByRole('button').querySelector('[data-partial-dot]')).toBeNull();
+    });
+
+    it('shows a hidden spinner inside the trigger while loading, the box unchanged', () => {
+      const props = {
+        activeCharacterId: 1,
+        value: 'current',
+        onChange: () => {},
+        size: 'md',
+      } as const;
+      const { rerender } = render(<CharacterFilterControl {...props} />);
+      const idle = screen.getByRole('button', { name: 'This character' }).className;
+      rerender(<CharacterFilterControl {...props} loading />);
+      const trigger = screen.getByRole('button', { name: 'This character' });
+      expect(trigger.className).toBe(idle);
+      expect(trigger).toHaveAttribute('aria-busy', 'true');
+      const spinner = trigger.querySelector('[role="status"]');
+      expect(spinner).toBeInTheDocument();
+      expect(spinner?.closest('[aria-hidden="true"]')).not.toBeNull();
+    });
+
+    it('draws no spinner when not loading', () => {
+      render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
+      expect(screen.getByRole('button').querySelector('[role="status"]')).toBeNull();
+      expect(screen.getByRole('button')).not.toHaveAttribute('aria-busy');
+    });
+  });
+
+  it("takes the PageHeader's tier in its scope slot: the same height as the IconButtons beside it", () => {
+    render(
+      <PageHeader
+        title="Wallet"
+        scope={
+          <CharacterFilterControl
+            activeCharacterId={1}
+            value="current"
+            onChange={() => {}}
+            size="sm"
+          />
+        }
+        actions={<IconButton icon={<Icon.Refresh />} label="Refresh" />}
+      />
+    );
+    const picker = screen.getByRole('button', { name: 'This character' });
+    const refresh = screen.getByRole('button', { name: 'Refresh' });
+    // 44px square below md, 36px tall from md up, 44px on a touch pointer.
+    expect(picker).toHaveClass('h-11', 'w-11', 'md:h-9', 'touch:h-11');
+    expect(refresh).toHaveClass('size-11', 'md:size-9', 'touch:size-11');
+    expect(picker).not.toHaveClass('h-9', 'md:h-7');
+  });
+
+  describe("the Corporation glyph is the active Character's corp logo", () => {
+    const LOGO = 'corporations/98000001/logo';
+    beforeEach(async () => {
+      await db.characters.clear();
+    });
+
+    function renderCorp(size: 'sm' | 'md' = 'md') {
+      return render(
+        <CharacterFilterControl<CharacterScopeChoice>
+          activeCharacterId={1}
+          value="corporation"
+          corporation
+          onChange={() => {}}
+          size={size}
+        />
+      );
+    }
+
+    it('shows the logo once it loads, in the same box sizes', async () => {
+      await seedCharacter(1, 'Aria', { corporationId: 98000001 });
+      renderCorp();
+      const trigger = screen.getByRole('button', { name: 'Corporation' });
+      const img = await waitFor(() => {
+        const found = trigger.querySelector(`img[src*="${LOGO}"]`);
+        expect(found).not.toBeNull();
+        return found as HTMLImageElement;
+      });
+      // The Buildings glyph holds the box until the logo has loaded.
+      expect(trigger.querySelector('svg[data-corp-fallback]')).toBeInTheDocument();
+      fireEvent.load(img);
+      expect(trigger.querySelector('svg[data-corp-fallback]')).toBeNull();
+      expect(trigger).toHaveClass('h-11', 'w-11', 'md:h-9');
+      expect(trigger.children[0]).toHaveClass('md:size-5');
+      expect(img.parentElement).toHaveClass('size-8', 'md:size-5');
+    });
+
+    it('keeps the phone box the portrait uses for the sm tier', async () => {
+      await seedCharacter(1, 'Aria', { corporationId: 98000001 });
+      renderCorp('sm');
+      const trigger = screen.getByRole('button', { name: 'Corporation' });
+      const img = await waitFor(() => {
+        const found = trigger.querySelector(`img[src*="${LOGO}"]`);
+        expect(found).not.toBeNull();
+        return found as HTMLImageElement;
+      });
+      expect(trigger).toHaveClass('h-9', 'w-9');
+      expect(img.parentElement).toHaveClass('size-7', 'md:size-5');
+    });
+
+    it('falls back to the Buildings glyph when the logo fails', async () => {
+      await seedCharacter(1, 'Aria', { corporationId: 98000001 });
+      renderCorp();
+      const trigger = screen.getByRole('button', { name: 'Corporation' });
+      const img = await waitFor(() => {
+        const found = trigger.querySelector(`img[src*="${LOGO}"]`);
+        expect(found).not.toBeNull();
+        return found as HTMLImageElement;
+      });
+      fireEvent.error(img);
+      expect(trigger.querySelector('img')).toBeNull();
+      expect(trigger.querySelector('svg[data-corp-fallback]')).toBeInTheDocument();
+    });
+
+    it('shows the Buildings glyph when no corporation is known', async () => {
+      await seedCharacter(1, 'Aria');
+      renderCorp();
+      const trigger = screen.getByRole('button', { name: 'Corporation' });
+      // Let the Dexie read settle; still no logo.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(trigger.querySelector('img')).toBeNull();
+      expect(trigger.querySelector('svg[data-corp-fallback]')).toBeInTheDocument();
     });
   });
 });

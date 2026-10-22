@@ -2,6 +2,11 @@
 
 _Recorded 2026-09-08._
 
+> **Superseded in part by
+> `20261022-123837-the-character-picker-rides-first-in-the-page.md`:** the
+> picker now rides first in the `PageHeader`'s control cluster (`scope`), one
+> per page, not in a panel's `meta`. The one-character rule below still holds.
+
 - **A Character filter belongs in its panel's `meta` slot, beside the title —
   not in a row of its own inside the body.** Issue #607 first put
   `CharacterFilterControl` in the body of Active Jobs and above the Wallet

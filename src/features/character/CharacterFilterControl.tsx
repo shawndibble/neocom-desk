@@ -24,10 +24,24 @@
  * `routeScopes.ts`), and reusing the word here would read as a third,
  * unrelated meaning.
  *
- * Where it goes: in the `meta` slot of the panel it filters, beside that
- * panel's title, and not at all for a caller with one Character to offer —
- * see
- * `docs/context/decisions/20260908-192806-the-character-filter-rides-in-the-panel-header.md`.
+ * Where it goes: one per page, in the `PageHeader`'s `scope` slot — the first
+ * item of the header's right-hand control cluster, before the page's actions
+ * (the AlertsBell stays last) — and not at all for a caller with one
+ * Character to offer. The slot sets the header's touch tier itself
+ * (`PageHeaderClusterContext`), so no `size` is needed there. A
+ * page's partial-coverage readout and its loading spinner ride in this
+ * trigger (`missingNames`, `loading`), not beside it. See
+ * `docs/context/decisions/20261022-123837-the-character-picker-rides-first-in-the-page.md`
+ * (which supersedes the placement half of the 2026-09-08 panel-header
+ * decision; its one-Character rule stands). The `variant="field"` form for
+ * Settings is a form field and is outside that rule.
+ *
+ * Partial coverage: with `missingNames` and the value "all", the label stays
+ * "All characters" (the trigger only ever reads This character / All
+ * characters / Corporation), a warning dot marks the trigger at every width,
+ * the accessible name adds "Not included: …", and the open menu names who is
+ * missing in a non-interactive note. `loading` swaps the glyph for a
+ * `Spinner` in the same box, so the trigger never changes size mid-load.
  *
  * Below `md` the trigger is icon-only, fixed to the same box a sibling
  * `IconButton` uses in whichever row it rides in — `size="sm"` (the panel
@@ -39,21 +53,28 @@
  * phone-only "whose data is this" avatar `PageHeader` used to float in its
  * own corner (#1764): with this trigger already carrying that cue whenever a
  * route offers the filter, a second, separate avatar had nothing left to
- * say. At `md` the trigger is the usual text button, at its tier's height;
- * there is room for the words there.
+ * say. From `md` up the trigger is a text pill at its tier's height that
+ * keeps the same glyph in front of the words — glyph, words, caret —
+ * with the header `IconButton`'s border, fill and hover, so it reads as one
+ * of the header's controls.
  *
  * `corporation` adds a third option, "Corporation", for a page that has a corp
  * view of the same data (Market orders, Contracts): that view is a choice on
  * this picker, not a separate switch. It emits `'corporation'`
  * (`CharacterScopeChoice`, which widens `CharacterFilterValue` without
- * changing it), and the phone trigger shows the `Corporation` glyph for it.
+ * changing it), and the trigger's glyph for it is the active Character's own
+ * corporation logo (`CorporationLogoGlyph`, from the Character's cached
+ * `corporationId`; the `Corporation` Buildings glyph while it loads, on error,
+ * or with no corp known), the way "This character" shows the portrait.
  * `hideAll` drops "All characters" for a page that cannot sum Characters.
  * The options follow from the Character count and those two props: one
  * Character with no Corporation renders nothing; one Character with it offers
  * This character / Corporation; several offer This / All (/ Corporation); a
  * `hideAll` page never offers All.
  */
+import { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PageHeaderClusterContext } from '@/components/ui/pageHeaderCluster';
 import * as Icon from '@/components/ui/icons';
 import { ICON_SIZE } from '@/components/ui/icons';
 import {
@@ -65,6 +86,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
+import { Spinner } from '@/components/ui/Spinner';
+import { CorporationLogoGlyph } from './CorporationLogoGlyph';
 import {
   fieldBaseClassName,
   controlHeightClassName,
@@ -96,7 +119,9 @@ export interface CharacterFilterControlProps<
    * (Active Jobs, Open Orders, Mining Tax) are themselves `size="sm"`.
    * `'md'` for a `PageHeader`'s `meta`, where that header's own `actions`
    * cluster sits at `IconButton`'s default (larger) tier instead (Assets,
-   * Mining Tax Overview) — see `PageHeader`'s own doc comment.
+   * Mining Tax Overview) — see `PageHeader`'s own doc comment. Inside a
+   * `PageHeader`'s `scope` slot this prop is ignored: the header's
+   * `'md'` tier always applies (`PageHeaderClusterContext`).
    */
   size?: 'sm' | 'md';
   /**
@@ -114,6 +139,15 @@ export interface CharacterFilterControlProps<
   characterCount?: number;
   /** Per-Character unread, listed under the options (Mail, issue #2867). Read-only: it informs the choice, it is not one. */
   unreadByCharacter?: readonly { characterId: number; name: string; unread: number }[];
+  /**
+   * Names of the Characters "All" leaves out (no grant, not yet synced). With
+   * the value "all" and a non-empty list the label does not change; a warning
+   * dot marks the trigger at every width, its accessible name adds "Not
+   * included: {names}", and the open menu shows that line as a note.
+   */
+  missingNames?: readonly string[];
+  /** The page's data for this scope is loading: a `Spinner` stands in the trigger, at the same box size. */
+  loading?: boolean;
 }
 
 /**
@@ -144,9 +178,8 @@ const TRIGGER_BOX: Record<'sm' | 'md', string> = {
 const triggerBaseClassName =
   `inline-flex shrink-0 items-center justify-center rounded-xs border border-line font-semibold ` +
   `tracking-widest uppercase ${interactiveClassName} ${focusRingClassName} ` +
-  `bg-panel-2 p-0 text-text-dim hover:border-line-bright ` +
-  `hover:bg-panel-2 hover:text-text md:w-auto md:gap-1.5 md:bg-transparent md:px-2.5 ` +
-  `md:text-[0.6875rem] md:text-text md:hover:bg-panel-2`;
+  `bg-panel-2 p-0 text-text-dim hover:border-line-bright hover:text-text active:bg-panel ` +
+  `md:w-auto md:gap-1.5 md:px-2.5 md:text-[0.6875rem]`;
 
 export function CharacterFilterControl<V extends CharacterScopeChoice = CharacterFilterValue>({
   activeCharacterId,
@@ -154,13 +187,18 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
   onChange,
   corporation = false,
   hideAll = false,
-  size = 'sm',
+  size: sizeProp = 'sm',
   variant = 'icon',
   triggerLabel,
   characterCount,
   unreadByCharacter,
+  missingNames,
+  loading = false,
 }: CharacterFilterControlProps<V>) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // In a `PageHeader` cluster the header's touch tier wins, so the trigger is
+  // always level with the `IconButton`s beside it.
+  const size = useContext(PageHeaderClusterContext) ? 'md' : sizeProp;
   const resolved = useResolvedCharacterFilter(
     value === 'corporation' ? 'current' : value,
     activeCharacterId
@@ -171,6 +209,12 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
     characterCount === undefined
       ? t('character.filter.allCharacters')
       : t('character.scope.all', { count: characterCount });
+  const missingNote =
+    missingNames && missingNames.length > 0
+      ? t('character.scope.missing', {
+          names: new Intl.ListFormat(i18n.language, { type: 'conjunction' }).format(missingNames),
+        })
+      : null;
   const corporationLabel = t('character.filter.corporation');
   const label = isCorporation
     ? corporationLabel
@@ -182,6 +226,7 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
   const soloCharacter = characterCount !== undefined && characterCount <= 1;
   const showAll = !hideAll && !(corporation && soloCharacter);
   const showCurrent = activeCharacterId !== null;
+  const isPartial = isAll && showAll && missingNote !== null;
   // One Character and no Corporation option: nothing to switch, so no picker.
   if (!corporation && soloCharacter && variant === 'icon') return null;
   const options = (
@@ -200,6 +245,12 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
           <DropdownMenuRadioItem value="corporation">{corporationLabel}</DropdownMenuRadioItem>
         )}
       </DropdownMenuRadioGroup>
+      {showAll && missingNote && (
+        <>
+          <DropdownMenuSeparator />
+          <p className="px-2 py-1.5 text-xs text-text-dim">{missingNote}</p>
+        </>
+      )}
       {unreadByCharacter && unreadByCharacter.length > 0 && (
         <>
           <DropdownMenuSeparator />
@@ -213,6 +264,13 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
         </>
       )}
     </DropdownMenuContent>
+  );
+
+  // Hidden from assistive tech: the trigger's `aria-busy` says it, without a live region inside a button.
+  const spinner = (
+    <span aria-hidden="true" className="flex">
+      <Spinner size="sm" label={t('common.loading')} />
+    </span>
   );
 
   if (variant === 'field') {
@@ -242,25 +300,47 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label={label}
-          className={`${TRIGGER_BOX[size]} ${triggerBaseClassName}`}
+          aria-label={
+            isPartial ? t('character.scope.triggerPartial', { label, missing: missingNote }) : label
+          }
+          aria-busy={loading || undefined}
+          className={`relative ${TRIGGER_BOX[size]} ${triggerBaseClassName}`}
         >
-          <span aria-hidden="true" className="flex shrink-0 items-center justify-center md:hidden">
-            {isCorporation ? (
-              <Icon.Corporation size={ICON_SIZE.md} />
-            ) : isAll || activeCharacterId === null ? (
-              <Icon.AllCharacters size={ICON_SIZE.md} />
+          {/* The glyph at every width: the whole trigger below `md`, the pill's leading icon from `md` up (a fixed 20px slot there, so a spinner swap never resizes the pill). */}
+          <span className="flex shrink-0 items-center justify-center md:size-5">
+            {loading ? (
+              spinner
             ) : (
-              <CharacterAvatar
-                characterId={activeCharacterId}
-                size={size === 'md' ? 'md' : 'sm'}
-                loading="lazy"
-                className="rounded-full"
-              />
+              <span aria-hidden="true" className="flex items-center justify-center">
+                {isCorporation ? (
+                  <CorporationLogoGlyph
+                    characterId={activeCharacterId}
+                    size={size === 'md' ? 'md' : 'sm'}
+                    className="md:size-5"
+                  />
+                ) : isAll || activeCharacterId === null ? (
+                  <Icon.AllCharacters size={ICON_SIZE.md} />
+                ) : (
+                  <CharacterAvatar
+                    characterId={activeCharacterId}
+                    size={size === 'md' ? 'md' : 'sm'}
+                    loading="lazy"
+                    className="rounded-full md:size-5"
+                  />
+                )}
+              </span>
             )}
           </span>
           <span className="hidden md:inline">{label}</span>
           <Icon.Expanded size={ICON_SIZE.sm} aria-hidden="true" className="hidden md:block" />
+          {isPartial && (
+            // Every width: the label never says "partial", so the dot is the visible cue.
+            <span
+              data-partial-dot
+              aria-hidden="true"
+              className="absolute -top-1 -right-1 size-2 rounded-full bg-warning ring-2 ring-bg"
+            />
+          )}
         </button>
       </DropdownMenuTrigger>
       {options}

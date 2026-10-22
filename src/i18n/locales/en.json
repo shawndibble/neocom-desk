@@ -3912,7 +3912,8 @@
       "allPartial": "All characters · {{covered}} of {{total}}",
       "one": "{{name}} only",
       "corp": "Corp · {{division}}",
-      "missing": "Not included: {{names}}"
+      "missing": "Not included: {{names}}",
+      "triggerPartial": "{{label}}. {{missing}}"
     },
     "crumb": {
       "wallet": "Wallet"
@@ -5699,6 +5700,7 @@
     "unknown": "—",
     "aboutLabel": "About {{label}}",
     "moreActionsLabel": "More actions for {{name}}",
+    "moreActions": "More actions",
     "tableExport": {
       "menuLabel": "{{name}} actions",
       "exportButtonLabel": "Export {{name}}",
@@ -6813,7 +6815,6 @@
     },
     "valueAffix": "value",
     "noPriceLabel": "No price",
-    "moreActions": "More actions",
     "sections": {
       "open": "Open · {{count}}",
       "openEmpty": "Nothing open — every entry is paid or dismissed.",

@@ -39,6 +39,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   EmptyState,
+  HeaderMoreMenu,
   IconButton,
   NeedsConnection,
   PageHeader,
@@ -1034,25 +1035,20 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                 {t('miningTax.managePayeesAction')}
               </Button>
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <IconButton icon={<Icon.More />} label={t('miningTax.moreActions')} />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => setOreTagsOpen(true)}>
-                  {t('miningTax.oreTagsAction')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
-                  {t('pageSettings.menuItem')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
             <IconButton
               icon={<Icon.Refresh />}
               label={t('miningTax.refresh')}
               onClick={refresh}
               disabled={loading}
             />
+            <HeaderMoreMenu>
+              <DropdownMenuItem onSelect={() => setOreTagsOpen(true)}>
+                {t('miningTax.oreTagsAction')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
+                {t('pageSettings.menuItem')}
+              </DropdownMenuItem>
+            </HeaderMoreMenu>
           </>
         }
       />
