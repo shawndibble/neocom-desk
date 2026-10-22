@@ -145,8 +145,6 @@ describe('heroSpPerHour', () => {
 });
 
 describe('buildQueueView on the EVE clock', () => {
-  // 2026-10-17T03:00Z is Fri the 16th in Los Angeles but Sat the 17th in UTC;
-  // "now" is Sun 2026-10-18T20:00Z (Sun the 18th UTC, Sun the 18th LA 13:00).
   const run = (finishIso: string, nowIso: string, tz?: 'UTC', weekStart: WeekStart = 'monday') => {
     const now = Date.parse(nowIso);
     const e = {
@@ -184,6 +182,14 @@ describe('buildQueueView on the EVE clock', () => {
     const now = '2026-10-14T12:00:00Z';
     expect(run(finish, now)).toEqual(['week']);
     expect(run(finish, now, 'UTC')).toEqual(['month']);
+  });
+
+  it('counts a Sunday-start week on UTC days', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    // Now Sun 2026-10-18T20:00Z: the week runs to Sat the 24th; Sun the 25th starts the next.
+    const now = '2026-10-18T20:00:00Z';
+    expect(run('2026-10-24T20:00:00Z', now, 'UTC', 'sunday')).toEqual(['week']);
+    expect(run('2026-10-25T01:00:00Z', now, 'UTC', 'sunday')).toEqual(['month']);
   });
 
   it('reads "this month" on the chosen clock too', () => {
