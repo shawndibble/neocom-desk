@@ -455,6 +455,10 @@ export function OpenOrdersPanel({
             value={corporation ? 'corporation' : characterFilterValue}
             // Under Corporation the entries are issuers, so All counts the device's Characters.
             characterCount={corporation ? deviceCharacterCount : entriesWithOrders.length}
+            // The faces are the same Characters the count is: those with orders.
+            allCharacterIds={
+              corporation ? undefined : entriesWithOrders.map((entry) => entry.characterId)
+            }
             corporation={onChooseCorporation !== undefined}
             // The body shows its spinner for the same first load (a switch to or from Corporation remounts).
             loading={loading && !data}

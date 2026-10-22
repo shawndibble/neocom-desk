@@ -200,7 +200,72 @@ describe('CharacterFilterControl', () => {
       }
     });
 
-    it('holds the AllCharacters glyph until the roster has loaded', () => {
+    it('holds the stack width with empty circles until the roster loads, then shows the faces', async () => {
+      render(
+        <CharacterFilterControl
+          activeCharacterId={1}
+          value="all"
+          characterCount={5}
+          onChange={() => {}}
+        />
+      );
+      const trigger = screen.getByRole('button');
+      expect(trigger.querySelectorAll('[data-stack-placeholder]')).toHaveLength(3);
+      expect(trigger.querySelector('[data-stack-extra]')).toHaveTextContent('+2');
+      for (let id = 1; id <= 5; id += 1) await seedCharacter(id, `Pilot ${id}`, { addedAt: id });
+      await waitFor(() => expect(faceIds(trigger)).toEqual(['1', '2', '3']));
+      expect(trigger.querySelector('[data-stack-placeholder]')).toBeNull();
+      expect(trigger.querySelector('[data-stack-extra]')).toHaveTextContent('+2');
+    });
+
+    it("builds the stack from the page's own Characters when it passes them", async () => {
+      for (let id = 1; id <= 5; id += 1) await seedCharacter(id, `Pilot ${id}`, { addedAt: id });
+      render(
+        <CharacterFilterControl
+          activeCharacterId={4}
+          value="all"
+          characterCount={2}
+          allCharacterIds={[2, 4]}
+          onChange={() => {}}
+        />
+      );
+      const trigger = screen.getByRole('button', { name: 'All characters · 2' });
+      await waitFor(() => expect(faceIds(trigger)).toEqual(['4', '2']));
+      expect(trigger.querySelector('[data-stack-extra]')).toBeNull();
+    });
+
+    it("falls back to the Character's initial when a stacked portrait fails", async () => {
+      await seedCharacter(1, 'Aria', { addedAt: 1 });
+      await seedCharacter(2, 'Bex', { addedAt: 2 });
+      render(
+        <CharacterFilterControl
+          activeCharacterId={1}
+          value="all"
+          characterCount={2}
+          onChange={() => {}}
+        />
+      );
+      const trigger = screen.getByRole('button');
+      await waitFor(() => expect(faceIds(trigger)).toEqual(['1', '2']));
+      fireEvent.error(trigger.querySelectorAll('img')[1]);
+      expect(faceIds(trigger)).toEqual(['1']);
+      expect(trigger).toHaveTextContent('B');
+    });
+
+    it("falls back to the AllCharacters glyph when 'This character's portrait fails", () => {
+      render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
+      const trigger = screen.getByRole('button');
+      fireEvent.error(trigger.querySelector('img')!);
+      expect(trigger.querySelector('img')).toBeNull();
+      expect(trigger.querySelector('[data-face-fallback]')).toBeInTheDocument();
+    });
+
+    it('loads its portraits eagerly, as header chrome', () => {
+      render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
+      expect(screen.getByRole('button').querySelector('img')).not.toHaveAttribute('loading');
+    });
+
+    it('shows the AllCharacters glyph with neither a roster nor a count to reserve', () => {
       render(<CharacterFilterControl activeCharacterId={1} value="all" onChange={() => {}} />);
       const trigger = screen.getByRole('button');
       expect(trigger.querySelector('img')).toBeNull();
@@ -351,7 +416,7 @@ describe('CharacterFilterControl', () => {
       const trigger = screen.getByRole('button', {
         name: 'All characters · 4. Not included: Bob Vale and Cy Rho',
       });
-      expect(trigger).toHaveTextContent(/^$/);
+      expect(trigger).not.toHaveTextContent(/All characters/);
     });
 
     it('draws a warning dot on the trigger itself, at every width', () => {

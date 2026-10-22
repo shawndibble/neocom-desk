@@ -184,7 +184,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 ## Mobile behaviour
 
 - Journal: `responsive="table"`, Balance off by default on phones (Columns menu shows them), filters collapse into a sheet; date range kept on one row inside the sheet (test `Wallet.test.tsx:522`).
-- Character filter trigger is icon-only below `md` (avatar or all-characters glyph).
+- Character filter trigger is an avatar stack with no words at every width (portrait, or up to 3 faces + "+N" for All, 2 below `md`); the words are in its tooltip and accessible name.
 - "Transactions" link has 44px min hit area below `md`.
 - LP table and balance table: `responsive="table"`.
 

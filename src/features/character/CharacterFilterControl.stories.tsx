@@ -17,6 +17,7 @@ const PILOT_IDS = [90000001, 2112625428, 91316135, 95465499, 96180548, 133805788
 /** Seeds `count` Characters into Dexie, the roster the "All" stack reads. */
 function seedRoster(count: number) {
   return async () => {
+    // corporationId: an NPC corporation (Caldari Navy), so the Corporation story has a real logo.
     await db.characters.clear();
     await db.characters.bulkPut(
       PILOT_IDS.slice(0, count).map((characterId, index) => ({
@@ -24,6 +25,7 @@ function seedRoster(count: number) {
         name: `Pilot ${index + 1}`,
         ownerHash: `story-${index}`,
         addedAt: index,
+        corporationId: 1000035,
       }))
     );
     return {};

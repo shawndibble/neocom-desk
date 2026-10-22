@@ -44,8 +44,12 @@
  * (two below `md`, chosen in JS with `useIsNarrow`)
  * of the Characters it covers (the active one first, then the roster in the
  * order it was added, read from Dexie: no ESI call; see `characterStack`),
- * with a "+N" chip for the rest; "Corporation" is the corp logo. Before the
- * roster has loaded, "All" shows the generic `AllCharacters` glyph. The
+ * with a "+N" chip for the rest; "Corporation" is the corp logo. A page whose
+ * "All" covers fewer than the roster passes `allCharacterIds`, so the faces
+ * and "+N" agree with its label's count. Before the roster loads, empty face
+ * circles (and the chip) hold the stack's width; a portrait that fails to load
+ * becomes the Character's initial in the stack, the `AllCharacters` glyph for
+ * "This character". The
  * accessible name keeps the full words ("All characters · 4"), and a
  * `Tooltip` shows the same words on hover and focus. The trigger also
  * absorbed the phone-only "whose data is this" avatar `PageHeader` used to
@@ -72,9 +76,15 @@
  * This character / Corporation; several offer This / All (/ Corporation); a
  * `hideAll` page never offers All.
  */
-import { forwardRef, useContext, type ButtonHTMLAttributes } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
+import {
+  forwardRef,
+  useContext,
+  useMemo,
+  useState,
+  type ButtonHTMLAttributes,
+  type ReactNode,
+} from 'react';
+import { useCharacters } from './useCharacters';
 import { useTranslation } from 'react-i18next';
 import { PageHeaderClusterContext } from '@/components/ui/pageHeaderCluster';
 import * as Icon from '@/components/ui/icons';
@@ -153,6 +163,14 @@ export interface CharacterFilterControlProps<
   missingNames?: readonly string[];
   /** The page's data for this scope is loading: a `Spinner` stands in the trigger, at the same box size. */
   loading?: boolean;
+  /**
+   * The Characters this page's "All" covers, when that is not the whole
+   * roster (Open orders: the Characters with orders). The face stack is drawn
+   * from these (still active first, roster order, minus `missingNames`) so
+   * its faces and "+N" agree with the `characterCount` in the label. Without
+   * it the stack is the device roster.
+   */
+  allCharacterIds?: readonly number[];
 }
 
 /**
@@ -192,6 +210,7 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
   unreadByCharacter,
   missingNames,
   loading = false,
+  allCharacterIds,
 }: CharacterFilterControlProps<V>) {
   const { t, i18n } = useTranslation();
   // In a `PageHeader` cluster the header's touch tier wins, so the trigger is
@@ -202,12 +221,13 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
     activeCharacterId
   );
   // The roster in the order it was added, for the "All" faces: Dexie only, no ESI call.
-  const roster = useLiveQuery(
-    async () =>
-      (await db.characters.toArray())
+  const characters = useCharacters();
+  const roster = useMemo(
+    () =>
+      [...characters]
         .sort((a, b) => a.addedAt - b.addedAt)
         .map((c) => ({ characterId: c.characterId, name: c.name })),
-    []
+    [characters]
   );
   const isNarrow = useIsNarrow();
   const isCorporation = corporation && value === 'corporation';
@@ -306,40 +326,57 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
     ? t('character.scope.triggerPartial', { label, missing: missingNote })
     : label;
   // Below `md` the stack draws one face fewer, so a phone header keeps its title.
+  const maxFaces = isNarrow ? STACK_MAX_FACES_NARROW : STACK_MAX_FACES;
   const stack = isAll
-    ? characterStack(
-        roster ?? [],
-        activeCharacterId,
-        missingNames,
-        isNarrow ? STACK_MAX_FACES_NARROW : STACK_MAX_FACES
-      )
+    ? characterStack(roster, activeCharacterId, missingNames, maxFaces, allCharacterIds)
     : null;
+  const nameOf = (id: number) => roster.find((c) => c.characterId === id)?.name;
+  // Before the roster loads, empty circles hold the stack's width, so the
+  // title's truncation point does not jump when the faces arrive.
+  const expectedCount = allCharacterIds?.length ?? characterCount ?? 0;
+  const placeholderCount = Math.min(expectedCount, maxFaces);
+  const extraChip = (extra: number) => (
+    <span
+      data-stack-extra
+      className={cx(
+        FACE_BOX,
+        FACE_RING,
+        FACE_OVERLAP,
+        'flex shrink-0 items-center justify-center bg-panel text-[0.625rem] font-semibold text-text tabular-nums'
+      )}
+    >
+      +{extra}
+    </span>
+  );
   const faces = isCorporation ? (
     <CorporationLogoGlyph characterId={activeCharacterId} size="sm" boxClassName={FACE_BOX} />
   ) : stack && stack.faces.length > 0 ? (
     <>
       {stack.faces.map((id, index) => (
-        <Face key={id} characterId={id} className={cx(index > 0 && FACE_OVERLAP)} />
+        <Face
+          key={id}
+          characterId={id}
+          className={cx(index > 0 && FACE_OVERLAP)}
+          fallback={<Initial name={nameOf(id)} className={cx(index > 0 && FACE_OVERLAP)} />}
+        />
       ))}
-      {stack.extra > 0 && (
-        <span
-          data-stack-extra
-          className={cx(
-            FACE_BOX,
-            FACE_RING,
-            FACE_OVERLAP,
-            'flex items-center justify-center bg-panel text-[0.625rem] font-semibold text-text tabular-nums'
-          )}
-        >
-          +{stack.extra}
-        </span>
-      )}
+      {stack.extra > 0 && extraChip(stack.extra)}
+    </>
+  ) : isAll && placeholderCount > 0 ? (
+    <>
+      {Array.from({ length: placeholderCount }, (_, index) => (
+        <Initial key={index} data-stack-placeholder className={cx(index > 0 && FACE_OVERLAP)} />
+      ))}
+      {expectedCount > maxFaces && extraChip(expectedCount - maxFaces)}
     </>
   ) : isAll || activeCharacterId === null ? (
-    // The roster has not loaded (or is empty): the generic glyph holds the place.
+    // No count to reserve and no roster: the generic glyph holds the place.
     <Icon.AllCharacters size={ICON_SIZE.md} />
   ) : (
-    <Face characterId={activeCharacterId} />
+    <Face
+      characterId={activeCharacterId}
+      fallback={<Icon.AllCharacters size={ICON_SIZE.md} data-face-fallback />}
+    />
   );
 
   return (
@@ -380,20 +417,57 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
 /**
  * One portrait in the trigger: `CharacterAvatar`'s image, at the trigger's own
  * face box (`CharacterAvatar` fixes its box per size, which this one steps
- * per breakpoint), with the ring that separates overlapping faces.
+ * per breakpoint), with the ring that separates overlapping faces. Eager,
+ * like a header portrait. If the image fails, `fallback` takes its place.
  */
-function Face({ characterId, className }: { characterId: number; className?: string }) {
+function Face({
+  characterId,
+  className,
+  fallback,
+}: {
+  characterId: number;
+  className?: string;
+  fallback: ReactNode;
+}) {
+  const src = characterPortraitUrl(characterId, 64);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  if (failedSrc === src) return fallback;
   return (
     <img
-      src={characterPortraitUrl(characterId, 64)}
+      src={src}
       crossOrigin="anonymous"
       alt=""
       width={24}
       height={24}
-      loading="lazy"
       decoding="async"
+      onError={() => setFailedSrc(src)}
       className={cx('shrink-0 border border-line bg-panel', FACE_BOX, FACE_RING, className)}
     />
+  );
+}
+
+/**
+ * A neutral face circle: the Character's initial when known (a portrait that
+ * failed), or empty (a placeholder holding a face's room before the roster
+ * loads).
+ */
+function Initial({
+  name,
+  className,
+  ...rest
+}: { name?: string; className?: string } & Record<`data-${string}`, boolean>) {
+  return (
+    <span
+      {...rest}
+      className={cx(
+        'flex shrink-0 items-center justify-center border border-line bg-panel text-[0.625rem] font-semibold text-text-dim uppercase',
+        FACE_BOX,
+        FACE_RING,
+        className
+      )}
+    >
+      {name?.charAt(0)}
+    </span>
   );
 }
 

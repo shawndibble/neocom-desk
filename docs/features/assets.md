@@ -181,7 +181,7 @@ Item name link: `ItemInfoLink` → opens Show info (`?info=type-<id>` modal, `fe
 - Rows wrap to a name + one metadata line; no fixed-width columns below md, no horizontal scroll; item figures become table cells only at md+.
 - Back button steps up a drill level; level header shows a Back `IconButton`.
 - Security/jumps in the drilled header hidden below `sm`; item count too (aggregate value stays).
-- Character filter trigger icon-only below md; page height accounts for the bottom nav.
+- Character filter trigger is an avatar stack with no words at every width (2 faces + "+N" below md); page height accounts for the bottom nav.
 - Touch: long-press opens row menu; More actions button always visible.
 
 ## Related

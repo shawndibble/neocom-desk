@@ -68,7 +68,7 @@ _Recorded 2026-10-22. Supersedes the placement half of
   shortcut, which is a recovery link inside an empty state rather than the
   page's picker.
 
-- **Words only from `lg` (amended 2026-10-22).** The pill first started at
+- **Words only from `lg` (amended 2026-10-22; superseded by the avatar stack below).** The pill first started at
   `md`. With the sidebar showing, a 768px row left about 190px for the title
   and data age beside the pill and three icons, so titles like CONTRACTS
   clipped. Between `md` and `lg` the trigger is now the 36px icon square, with

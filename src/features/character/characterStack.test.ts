@@ -37,6 +37,21 @@ describe('characterStack', () => {
     expect(characterStack(ROSTER.slice(0, 2), 1, [], 2)).toEqual({ faces: [1, 2], extra: 0 });
   });
 
+  it("draws only the page's own Characters when given, still active first in roster order", () => {
+    expect(characterStack(ROSTER, 4, [], 3, [6, 2, 4])).toEqual({ faces: [4, 2, 6], extra: 0 });
+    expect(characterStack(ROSTER, 1, ['Charlie'], 2, [1, 3, 5, 6])).toEqual({
+      faces: [1, 5],
+      extra: 1,
+    });
+  });
+
+  it("keeps a given id the roster doesn't know (yet), after the known ones", () => {
+    expect(characterStack(ROSTER.slice(0, 2), null, [], 3, [9, 2])).toEqual({
+      faces: [2, 9],
+      extra: 0,
+    });
+  });
+
   it('is empty for an empty roster', () => {
     expect(characterStack([], 1)).toEqual({ faces: [], extra: 0 });
   });
