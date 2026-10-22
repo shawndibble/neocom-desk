@@ -357,6 +357,12 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
             value={characterFilter}
             characterCount={characterCount}
             loading={allScope && allFills.status === 'loading'}
+            // Who "All" leaves out (no wallet grant): the trigger's dot and menu note.
+            missingNames={
+              allScope && allFills.status === 'ready'
+                ? allFills.data.skipped.map((c) => c.name)
+                : undefined
+            }
             onChange={(next) => setCharacterValues({ 'txn.chars': next })}
           />
         )

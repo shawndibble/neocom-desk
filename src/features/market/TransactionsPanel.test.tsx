@@ -10,6 +10,7 @@ import { WithPageHeaderSlots } from './__fixtures__/pageHeaderSlots';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import { loadWalletJournal, loadWalletTransactionsWithStatus } from '@/features/character/wallet';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { loadAllCharactersJournals } from '@/features/character/walletJournalAll';
 import * as download from '@/lib/download';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 
@@ -19,6 +20,7 @@ vi.mock('@/features/character/wallet', () => ({
 }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn() }));
+vi.mock('@/features/character/walletJournalAll', () => ({ loadAllCharactersJournals: vi.fn() }));
 
 const mockedLoadTransactions = vi.mocked(loadWalletTransactionsWithStatus);
 const mockedLoadJournal = vi.mocked(loadWalletJournal);
@@ -148,6 +150,29 @@ describe('TransactionsPanel — page header controls', () => {
       expect(picker).toHaveClass('h-11', 'md:h-9');
       expect(picker).not.toHaveClass('md:h-7');
       expect(screen.getAllByRole('button', { name: 'This character' })).toHaveLength(1);
+    });
+
+    it('names a Character "All" leaves out (no wallet grant) in the picker', async () => {
+      vi.mocked(loadAllCharactersJournals).mockResolvedValue({
+        loaded: [
+          {
+            characterId: 1,
+            name: 'Pilot One',
+            transactions: [transaction()],
+            journal: [],
+            fillsTruncated: false,
+          },
+        ],
+        skipped: [{ characterId: 2, name: 'Pilot Two' }],
+        typeNames: TYPE_NAMES,
+      } as never);
+      renderPanel('/market/history?txn.chars=all');
+
+      expect(
+        await within(screen.getByRole('banner')).findByRole('button', {
+          name: /^All characters · 2\. Not included: Pilot Two$/,
+        })
+      ).toBeInTheDocument();
     });
 
     it('keeps the picker in the header when the read fails, so the pilot can switch scope', async () => {
