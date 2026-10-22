@@ -40,7 +40,6 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { contractsCsvColumns } from '@/features/character/contractsCsv';
 import type { Contract } from '@/esi/endpoints';
-import { cx } from '@/lib/cx';
 import { useRememberedPageTab } from '@/lib/usePageTab';
 import { useContractSearchMode } from '@/features/contractSearch/contractSearchModePref';
 import { useRememberedUrlParams, useUrlParams, useUrlSort } from '@/lib/useUrlState';
@@ -343,6 +342,8 @@ export function Contracts() {
               value={pickerValue}
               // A source switch spins in the trigger while the body waits on it.
               loading={sourceHeld || (loading && !active.data)}
+              // Who "All" leaves out (never granted contracts): the trigger's dot and menu note.
+              missingNames={view.skipped.map((c) => c.name)}
               onChange={changeSource}
             />
           ) : undefined
@@ -413,15 +414,12 @@ export function Contracts() {
         ) : error || (source === 'corporation' && active.data && view.corporationId === null) ? (
           <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
         ) : !contractsResult || contracts.length === 0 ? (
-          <>
-            <SkippedNote skipped={view.skipped} />
-            <CachedEmptyState
-              result={contractsResult}
-              title={sourceLabel.emptyTitle}
-              hint={sourceLabel.emptyHint}
-              fetchedTitle={sourceLabel.fetchedTitle}
-            />
-          </>
+          <CachedEmptyState
+            result={contractsResult}
+            title={sourceLabel.emptyTitle}
+            hint={sourceLabel.emptyHint}
+            fetchedTitle={sourceLabel.fetchedTitle}
+          />
         ) : (
           <Panel padded={false}>
             <ContractsHistoryTable
@@ -441,7 +439,6 @@ export function Contracts() {
                   {contractsResult.fromCache && (
                     <CachedNotice className="px-3 pt-2" fetchedAt={contractsResult.fetchedAt} />
                   )}
-                  <SkippedNote skipped={view.skipped} className="px-3 pt-2" />
                   {contractsTruncated && (
                     <p className="flex flex-wrap items-center gap-2 px-3 pt-2 text-[0.6875rem] text-warning uppercase">
                       <span>{t('common.incompleteTitle')}</span>
@@ -480,22 +477,5 @@ export function Contracts() {
         />
       )}
     </div>
-  );
-}
-
-/** One line per Character that has not shared its contracts, as Open orders words it. */
-function SkippedNote({
-  skipped,
-  className,
-}: {
-  skipped: readonly { characterId: number; name: string }[];
-  className?: string;
-}) {
-  const { t } = useTranslation();
-  if (skipped.length === 0) return null;
-  return (
-    <p className={cx('text-xs text-text-dim', className)}>
-      {skipped.map((c) => t('contracts.notShared', { name: c.name })).join(' · ')}
-    </p>
   );
 }

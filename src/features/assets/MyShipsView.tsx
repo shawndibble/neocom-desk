@@ -1,12 +1,12 @@
 import { idSetKey } from '@/lib/idSetKey';
 import { useCallback, useMemo, useState } from 'react';
+import { useReportSkipped } from './useReportSkipped';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   EmptyState,
-  LiveStatus,
   MenuItem,
   RowActionsMenu,
   RowMoreActions,
@@ -164,6 +164,8 @@ interface MyShipsViewProps {
   /** Where a ship's location opens in the Assets browser. */
   hrefFor: (locationId: number) => string;
   route: JumpBasis;
+  /** Reports the Characters this tab's read skipped, for the header picker's `missingNames`. */
+  onSkippedChange?: (names: readonly string[] | undefined) => void;
 }
 
 /** Phone: a card (ship line, place line, then one meta line: character, Sec, Jumps). `sm` up: the table grid. The Character column only exists when more than one Character's ships are listed. */
@@ -341,6 +343,7 @@ export function MyShipsView({
   onShowAllCharacters,
   hrefFor,
   route,
+  onSkippedChange,
 }: MyShipsViewProps) {
   const { t } = useTranslation();
   const idsKey = idSetKey(characterIds);
@@ -361,10 +364,11 @@ export function MyShipsView({
 
   const allSkipped =
     state.status === 'ready' && state.data.skipped.length > 0 && state.data.loadedCount === 0;
-  const skippedMessage =
-    state.status === 'ready' && state.data.skipped.length > 0
-      ? t('assets.skippedCharacters', { names: state.data.skipped.map((c) => c.name).join(', ') })
-      : '';
+  // Who the read left out is the header picker's to say (its dot and "Not included" note).
+  useReportSkipped(
+    state.status === 'ready' ? state.data.skipped.map((c) => c.name) : undefined,
+    onSkippedChange
+  );
   const rows = useMemo(() => (state.status === 'ready' ? state.data.rows : []), [state]);
   const places = usePlaces(rows, activeCharacterId, route);
   const groupIds = useMemo(
@@ -483,12 +487,8 @@ export function MyShipsView({
             </div>
           }
         >
-          <LiveStatus>{!allSkipped ? skippedMessage : ''}</LiveStatus>
           {state.status === 'ready' && state.data.cachedAt !== null && (
             <CachedNotice fetchedAt={state.data.cachedAt} />
-          )}
-          {state.status === 'ready' && !allSkipped && state.data.skipped.length > 0 && (
-            <p className="text-[0.6875rem] text-warning uppercase">{skippedMessage}</p>
           )}
           {state.status === 'ready' && sorted.length === 0 && !allSkipped && (
             <EmptyState

@@ -481,11 +481,7 @@ export function OpenOrdersPanel({
       }
       actions={
         <>
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('market.orders.refreshOrders')}
-            onClick={refresh}
-          />
+          {/* Export before Refresh, as on every header (DESIGN.md §6c Header controls). */}
           {snapshot && (
             <TableActionsMenu
               name={t('market.orders.tableName')}
@@ -493,6 +489,11 @@ export function OpenOrdersPanel({
               size="md"
             />
           )}
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('market.orders.refreshOrders')}
+            onClick={refresh}
+          />
         </>
       }
     />

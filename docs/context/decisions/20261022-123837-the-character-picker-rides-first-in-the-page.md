@@ -28,7 +28,10 @@ _Recorded 2026-10-22. Supersedes the placement half of
   More actions (`HeaderMoreMenu`) or a settings gear → `AlertsBell`. Words on
   the left, icons on the right; the ⋮ or gear is always the last action, just
   before the bell, after Refresh (Mining Overview's view-settings gear,
-  Industry's per-tab settings gear).
+  Industry's per-tab settings gear). Export comes before Refresh, whether
+  it is the labelled Export or the bare download icon (amended 2026-10-22:
+  Market's Open orders and History put Refresh first while Contracts and
+  Contacts put Export first; one order now holds everywhere).
 
 - **Same height as the icons beside it, enforced.** Inside a `PageHeader`
   cluster the picker takes the header's touch tier on its own
@@ -73,7 +76,13 @@ _Recorded 2026-10-22. Supersedes the placement half of
   move into it: with `missingNames` and the value "all", a warning dot marks
   the trigger at every width, its accessible name adds "Not included: {names}",
   and the open menu shows that line as a non-interactive note. The label does
-  not change: no "3 of 4" on the trigger. `loading` swaps the glyph for a
+  not change: no "3 of 4" on the trigger. The dot and the menu note need the
+  value "all": "This character" never says who it leaves out. Because the dot
+  is visual only, the control also renders a polite `LiveStatus` beside (not
+  inside) the trigger that announces "Not included: {names}" once when that
+  list appears or changes, so the cue reaches a screen reader on every page
+  without each page keeping its own announcement (amended 2026-10-22).
+  `loading` swaps the glyph for a
   `Spinner` in the same box, so the trigger never resizes.
 
 - **Out of scope:** the Overview's per-widget scope readouts

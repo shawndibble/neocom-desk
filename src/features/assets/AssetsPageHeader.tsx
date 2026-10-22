@@ -20,10 +20,13 @@ export function AssetsPageHeader({
   tab,
   assetsData,
   assetsRows,
+  tabMissingNames,
 }: {
   tab: string;
   assetsData: AssetsData;
   assetsRows: AssetsRows;
+  /** Who the Ships or Move tab's own read left out (`useReportSkipped`); Items uses its search's. */
+  tabMissingNames?: readonly string[];
 }) {
   const {
     loading,
@@ -35,6 +38,7 @@ export function AssetsPageHeader({
     viewedCharacterId,
     activeCharacterId,
     crossCharacterFilter,
+    shipsFilterIsAll,
     crossCharacterCandidates,
     otherCharacterIds,
     activeCrossCharacterData,
@@ -54,7 +58,14 @@ export function AssetsPageHeader({
         value={crossCharacterFilter}
         onChange={(chars: CharacterFilterValue) => setView({ chars })}
         characterCount={crossCharacterCandidates.length}
-        missingNames={activeCrossCharacterData?.skipped.map((c) => c.name)}
+        missingNames={
+          tab === 'items'
+            ? activeCrossCharacterData?.skipped.map((c) => c.name)
+            : // Only "All" leaves anyone out; a This-character read that failed is the tab's own error.
+              shipsFilterIsAll
+              ? tabMissingNames
+              : undefined
+        }
         loading={otherCharacterIds.length > 0 && crossCharacterLoading}
       />
     ) : undefined;

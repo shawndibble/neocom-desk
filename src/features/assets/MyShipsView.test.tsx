@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -28,11 +28,15 @@ vi.mock('@/features/places', () => ({
 }));
 vi.mock('@/features/market/groupNames', () => ({ loadGroupNames: async () => new Map() }));
 
-function renderShips(characterIds: number[]) {
+function renderShips(
+  characterIds: number[],
+  onSkippedChange?: (names: readonly string[] | undefined) => void
+) {
   return render(
     <MemoryRouter>
       <MyShipsView
         characterIds={characterIds}
+        onSkippedChange={onSkippedChange}
         activeCharacterId={characterIds[0] ?? null}
         hrefFor={() => '/assets'}
         route={'shortest' as never}
@@ -55,13 +59,13 @@ describe('MyShipsView with unreadable assets', () => {
     expect(screen.queryByText(/missing here/)).not.toBeInTheDocument();
   });
 
-  it('names a skipped Character beside the ships that did load', async () => {
+  it('hands a skipped Character up to the header picker instead of naming it in the body', async () => {
     read.entries = [{ characterId: 1, name: 'Alice', assets: [] }];
     read.skipped = [{ characterId: 2, name: 'Bob' }];
-    renderShips([1, 2]);
-    expect(
-      await screen.findAllByText("Couldn't load assets for Bob — they are missing here.")
-    ).not.toHaveLength(0);
+    const onSkippedChange = vi.fn();
+    renderShips([1, 2], onSkippedChange);
+    await waitFor(() => expect(onSkippedChange).toHaveBeenLastCalledWith(['Bob']));
+    expect(screen.queryByText(/missing here/)).not.toBeInTheDocument();
   });
 
   it('shows "couldn\'t load" with Retry, not "No ships found", when every Character was skipped', async () => {

@@ -357,13 +357,19 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
             value={characterFilter}
             characterCount={characterCount}
             loading={allScope && allFills.status === 'loading'}
+            // Who "All" leaves out (no wallet grant): the trigger's dot and menu note.
+            missingNames={
+              allScope && allFills.status === 'ready'
+                ? allFills.data.skipped.map((c) => c.name)
+                : undefined
+            }
             onChange={(next) => setCharacterValues({ 'txn.chars': next })}
           />
         )
       }
       actions={
         <>
-          <IconButton icon={<Icon.Refresh />} label={t('wallet.refresh')} onClick={refresh} />
+          {/* Export before Refresh, as on every header (DESIGN.md §6c Header controls). */}
           {transactionsResult && (
             <TableActionsMenu
               name={t('market.sections.transactions')}
@@ -371,6 +377,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
               size="md"
             />
           )}
+          <IconButton icon={<Icon.Refresh />} label={t('wallet.refresh')} onClick={refresh} />
         </>
       }
     />

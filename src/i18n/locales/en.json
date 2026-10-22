@@ -6881,7 +6881,6 @@
       "ships": "Ships",
       "move": "Move"
     },
-    "skippedCharacters": "Couldn't load assets for {{names}} — they are missing here.",
     "skippedAllHint": "Their assets aren't saved on this device yet. They load once ESI answers.",
     "movePlan": {
       "title": "Plan a move",
@@ -8935,7 +8934,6 @@
     "corpEmptyFetchedTitle": "No corp contracts",
     "allEmptyHint": "Couldn't load your characters' contracts yet. Try again shortly.",
     "character": "Character",
-    "notShared": "{{name}} hasn't shared their contracts",
     "itemSearchTab": "Item search",
     "courierTab": "Courier",
     "refresh": "Refresh",

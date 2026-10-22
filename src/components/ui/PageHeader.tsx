@@ -43,10 +43,10 @@ interface PageHeaderProps {
   /**
    * The page's controls, after `scope`, in this fixed order: text-labelled
    * page actions (Compose, Payees, a labelled Export…), then icon-only ones
-   * (Refresh), then the `HeaderMoreMenu` ⋮ or a settings gear last. The
+   * (a bare Export icon, then Refresh), then the `HeaderMoreMenu` ⋮ or a settings gear last. The
    * `AlertsBell` follows on its own.
    *
-   * @summary Right-aligned control cluster: text actions, icon actions (Refresh), then ⋮ or gear.
+   * @summary Right-aligned control cluster: text actions, icon actions (Export, then Refresh), then ⋮ or gear.
    */
   actions?: ReactNode;
   /**
@@ -83,13 +83,13 @@ interface PageHeaderProps {
  * No phone-only "whose data is this" avatar lives here any more (#1764 added
  * one, since removed): a route that filters by Character already carries
  * that cue in its `CharacterFilterControl`, whose trigger shows the active
- * Character's own portrait below `md`. A route with one Character to offer,
+ * Character's own portrait (or the faces "All" covers) at every width. A route with one Character to offer,
  * and so no filter control, has nothing to name here either — the bottom
  * tab bar's More sheet is still a phone's route to Characters either way.
  *
  * The right-hand cluster's order is fixed on every page: `scope` (the
  * Character picker) → text-labelled page actions → icon-only actions
- * (Refresh) → ⋮ More actions (`HeaderMoreMenu`) or a settings gear →
+ * (Export → Refresh) → ⋮ More actions (`HeaderMoreMenu`) or a settings gear →
  * `AlertsBell`: words on the left, icons on the right. With `scope` set the whole title row
  * stays on one line (see that prop); without it the row wraps as it always
  * has.
