@@ -126,7 +126,7 @@ describe('StockTab', () => {
     expect(screen.getByRole('heading', { name: 'Efa Market' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /All markets/ })).not.toBeInTheDocument();
     const rows = within(table).getAllByRole('row').slice(1);
-    expect(rows.map((row) => within(row).getAllByRole('cell')[0].textContent)).toEqual([
+    expect(rows.map((row) => within(row).getAllByRole('cell')[1].textContent)).toEqual([
       'Catalyst',
       'Nanite Repair Paste',
       'Warrior II',
@@ -164,6 +164,39 @@ describe('StockTab', () => {
         useStockLists.getState().value[0].items.find((item) => item.typeId === CATALYST)?.target
       ).toBe(55)
     );
+  });
+
+  it('removes ticked rows at once and Undo restores them with their targets', async () => {
+    seed([efa]);
+    renderTab();
+    const table = await screen.findByRole('table', { name: 'Stock targets' });
+    expect(screen.queryByRole('button', { name: /Remove selected/ })).not.toBeInTheDocument();
+    await userEvent.click(within(table).getByRole('checkbox', { name: 'Select Catalyst' }));
+    await userEvent.click(within(table).getByRole('checkbox', { name: 'Select Warrior II' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove selected (2)' }));
+    await waitFor(() =>
+      expect(useStockLists.getState().value[0].items).toEqual([{ typeId: PASTE, target: 1500 }])
+    );
+    expect((await screen.findAllByText('Removed 2 items')).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(useStockLists.getState().value[0].items).toHaveLength(3));
+    const items = useStockLists.getState().value[0].items;
+    expect(items.find((i) => i.typeId === CATALYST)?.target).toBe(40);
+    expect(items.find((i) => i.typeId === WARRIOR)?.target).toBe(200);
+  });
+
+  it('selects all only among the visible rows, and a filter change drops the ticks', async () => {
+    seed([efa]);
+    renderTab();
+    const table = await screen.findByRole('table', { name: 'Stock targets' });
+    const chips = screen.getByRole('group', { name: 'Status' });
+    await userEvent.click(within(chips).getByRole('button', { name: /Low/ }));
+    await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(2));
+    await userEvent.click(screen.getByRole('button', { name: 'Select all' }));
+    expect(screen.getByRole('button', { name: 'Remove selected (1)' })).toBeInTheDocument();
+    await userEvent.click(within(chips).getByRole('button', { name: /^All/ }));
+    await waitFor(() => expect(within(table).getAllByRole('row')).toHaveLength(4));
+    expect(screen.queryByRole('button', { name: /Remove selected/ })).not.toBeInTheDocument();
   });
 
   it('opens Show Info from a row', async () => {
