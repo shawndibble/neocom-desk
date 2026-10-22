@@ -325,25 +325,25 @@ export function Contracts() {
       <PageHeader
         title={t('contracts.title')}
         meta={
-          <>
-            {tab === 'history' && (
-              <CharacterFilterControl<CharacterScopeChoice>
-                size="md"
-                corporation={corpAvailable}
-                characterCount={characterCount}
-                activeCharacterId={activeCharacterId}
-                value={pickerValue}
-                onChange={changeSource}
-              />
-            )}
-            {tab === 'history' ? (
-              contractsResult && !sourceHeld ? (
-                <DataAgeBadge date={contractsResult.fetchedAt} />
-              ) : undefined
-            ) : searchStatus?.lastSyncedAt != null ? (
-              <DataAgeBadge date={new Date(searchStatus.lastSyncedAt)} />
-            ) : undefined}
-          </>
+          tab === 'history' ? (
+            contractsResult && !sourceHeld ? (
+              <DataAgeBadge date={contractsResult.fetchedAt} />
+            ) : undefined
+          ) : searchStatus?.lastSyncedAt != null ? (
+            <DataAgeBadge date={new Date(searchStatus.lastSyncedAt)} />
+          ) : undefined
+        }
+        // History only: the Search tabs read a shared public snapshot, nobody's.
+        scope={
+          tab === 'history' ? (
+            <CharacterFilterControl<CharacterScopeChoice>
+              corporation={corpAvailable}
+              characterCount={characterCount}
+              activeCharacterId={activeCharacterId}
+              value={pickerValue}
+              onChange={changeSource}
+            />
+          ) : undefined
         }
         actions={
           tab === 'history' ? (

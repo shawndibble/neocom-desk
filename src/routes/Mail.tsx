@@ -28,7 +28,6 @@ import {
   NO_OWNERS,
 } from '@/features/character/mailSnapshot';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import type { CharacterFilterValue } from '@/features/character/characterFilterValue';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { NewMailComposer, type NewMailCloseReason } from '@/features/character/NewMailComposer';
@@ -59,8 +58,11 @@ const MAIL_FILTER_PARAMS = { search: SEARCH_PARAM, hideRead: HIDE_READ_PARAM };
 
 interface MailViewProps {
   scope: CharacterFilterValue;
-  /** The This/All picker (with per-Character unread), null when there is one Character to offer. */
-  scopeControl: ReactNode;
+  /**
+   * The This/All picker (with per-Character unread), given the names "All"
+   * leaves out (no mail grant, not synced); null when there is one Character to offer.
+   */
+  scopeControl: (missingNames: readonly string[] | undefined) => ReactNode;
 }
 
 /** Mail's two-pane client for one scope: list beside reading pane, the list scrolls on its own, the reading pane grows with the page (docs/context/decisions/20261012-161659-mail-reading-pane-scrolls-with-the-page-not.md). */
@@ -293,19 +295,8 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader
         title={t('mail.title')}
-        meta={
-          <>
-            {fetchedAt && <DataAgeBadge date={fetchedAt} />}
-            {scopeControl}
-            {isAll && data && data.skipped.length > 0 && (
-              <CharacterScopeReadout
-                scope="all"
-                total={owners.length + data.skipped.length}
-                missing={data.skipped.map((c) => c.name)}
-              />
-            )}
-          </>
-        }
+        meta={fetchedAt && <DataAgeBadge date={fetchedAt} />}
+        scope={scopeControl(isAll ? data?.skipped.map((c) => c.name) : undefined)}
         actions={
           <>
             {isDesktop && !newMailOpen && (
@@ -555,7 +546,7 @@ export function Mail() {
     <MailView
       key={scope}
       scope={scope}
-      scopeControl={
+      scopeControl={(missingNames) =>
         offered ? (
           <CharacterFilterControl
             activeCharacterId={activeCharacterId}
@@ -563,7 +554,7 @@ export function Mail() {
             onChange={changeScope}
             characterCount={characterCount}
             unreadByCharacter={unreadByCharacter}
-            size="md"
+            missingNames={missingNames}
           />
         ) : null
       }

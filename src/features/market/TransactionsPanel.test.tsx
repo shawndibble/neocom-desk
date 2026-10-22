@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { db } from '@/db';
 import { TransactionsPanel } from './TransactionsPanel';
 import { WithPageHeaderSlots } from './__fixtures__/pageHeaderSlots';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
@@ -118,6 +119,45 @@ describe('TransactionsPanel — page header controls', () => {
     // The table's card has no header strip left.
     const table = screen.getByRole('table', { name: 'Transactions' });
     expect(table.closest('.rounded-xs')?.querySelector('header')).toBeNull();
+  });
+
+  describe('with two Characters', () => {
+    beforeEach(async () => {
+      await db.characters.clear();
+      await db.characters.bulkPut([
+        { characterId: 1, name: 'Pilot One', ownerHash: 'oh1', addedAt: 1 },
+        { characterId: 2, name: 'Pilot Two', ownerHash: 'oh2', addedAt: 2 },
+      ]);
+    });
+    afterEach(async () => {
+      await db.characters.clear();
+    });
+
+    it('puts the Character picker in the page header, not the table toolbar', async () => {
+      mockTransactions({
+        data: [transaction()],
+        fetchedAt: new Date(),
+        fromCache: false,
+        truncated: false,
+      });
+      renderPanel();
+
+      const header = screen.getByRole('banner');
+      expect(
+        await within(header).findByRole('button', { name: 'This character' })
+      ).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'This character' })).toHaveLength(1);
+    });
+
+    it('keeps the picker in the header when the read fails, so the pilot can switch scope', async () => {
+      mockedLoadTransactions.mockRejectedValue(new Error('boom'));
+      renderPanel();
+
+      expect(await screen.findByText('Could not load')).toBeInTheDocument();
+      expect(
+        within(screen.getByRole('banner')).getByRole('button', { name: 'This character' })
+      ).toBeInTheDocument();
+    });
   });
 });
 

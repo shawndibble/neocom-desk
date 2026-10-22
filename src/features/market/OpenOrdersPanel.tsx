@@ -449,30 +449,31 @@ export function OpenOrdersPanel({
     <PageHeaderPortals
       slots={headerSlots}
       meta={oldestFetchedAt !== null && <DataAgeBadge date={new Date(oldestFetchedAt)} />}
+      scope={
+        (showCharacterStrip || onChooseCorporation) && (
+          <CharacterFilterControl<CharacterScopeChoice>
+            activeCharacterId={activeCharacterId}
+            value={corporation ? 'corporation' : characterFilterValue}
+            // Under Corporation the entries are issuers, so All counts the device's Characters.
+            characterCount={corporation ? deviceCharacterCount : entriesWithOrders.length}
+            corporation={onChooseCorporation !== undefined}
+            onChange={(next) => {
+              if (next === 'corporation') {
+                if (!corporation) onChooseCorporation?.();
+                return;
+              }
+              const resolved = resolveCharacterFilter(next, activeCharacterId);
+              setUrlFilter({
+                ...urlFilter,
+                characterIds: resolved === 'all' ? [] : [...resolved],
+              });
+              if (corporation) onLeaveCorporation?.();
+            }}
+          />
+        )
+      }
       actions={
         <>
-          {(showCharacterStrip || onChooseCorporation) && (
-            <CharacterFilterControl<CharacterScopeChoice>
-              size="md"
-              activeCharacterId={activeCharacterId}
-              value={corporation ? 'corporation' : characterFilterValue}
-              // Under Corporation the entries are issuers, so All counts the device's Characters.
-              characterCount={corporation ? deviceCharacterCount : entriesWithOrders.length}
-              corporation={onChooseCorporation !== undefined}
-              onChange={(next) => {
-                if (next === 'corporation') {
-                  if (!corporation) onChooseCorporation?.();
-                  return;
-                }
-                const resolved = resolveCharacterFilter(next, activeCharacterId);
-                setUrlFilter({
-                  ...urlFilter,
-                  characterIds: resolved === 'all' ? [] : [...resolved],
-                });
-                if (corporation) onLeaveCorporation?.();
-              }}
-            />
-          )}
           <IconButton
             icon={<Icon.Refresh />}
             label={t('market.orders.refreshOrders')}

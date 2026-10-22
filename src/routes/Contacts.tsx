@@ -271,21 +271,27 @@ export function Contacts() {
             ? standings.meta
             : contactsResult && <DataAgeBadge date={contactsResult.fetchedAt} />
         }
+        // Not on Standings: that tab reads the active Character's standings only.
+        scope={
+          tab === 'standings'
+            ? undefined
+            : // One character is the whole roster: nothing to compare it against,
+              // so there is no "All characters" to offer.
+              acrossLists.length > 1 && (
+                <CharacterFilterControl
+                  activeCharacterId={activeCharacterId}
+                  value={view === 'across' ? 'all' : 'current'}
+                  // One list per Character on the device, so this is the roster size.
+                  characterCount={acrossLists.length}
+                  onChange={(next) => setTab(next === 'all' ? 'across' : 'character')}
+                />
+              )
+        }
         actions={
           tab === 'standings' ? (
             standings.actions
           ) : (
             <>
-              {/* One character is the whole roster: nothing to compare it against,
-                so there is no "All characters" to offer. */}
-              {acrossLists.length > 1 && (
-                <CharacterFilterControl
-                  activeCharacterId={activeCharacterId}
-                  value={view === 'across' ? 'all' : 'current'}
-                  onChange={(next) => setTab(next === 'all' ? 'across' : 'character')}
-                  size="md"
-                />
-              )}
               {view === 'across' ? (
                 <TableActionsMenu
                   name={t('contacts.tabAcrossCharacters')}
