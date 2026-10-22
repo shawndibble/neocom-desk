@@ -79,7 +79,7 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
   }, [outcome]);
 
   const otherId =
-    lacksScope && holders !== undefined
+    lacksScope && holders !== undefined && characterId !== null && names.has(characterId)
       ? [...holders].find((id) => id !== characterId && names.has(id))
       : undefined;
   const switchTo = otherId === undefined ? null : { id: otherId, name: names.get(otherId) ?? '' };
