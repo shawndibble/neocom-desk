@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
@@ -15,6 +15,7 @@ import type { CorporationAsset, CorporationDivisions } from '@/esi/endpoints';
 import * as boardData from '@/features/corp/boardData';
 import * as corpAssets from '@/features/corp/assets';
 import * as corpWallet from '@/features/corp/wallet';
+import * as stockTargets from '@/features/corp/stockTargets';
 import { db } from '@/db';
 import { CorpAssets } from './CorpAssets';
 import { LocationProbe } from '@/test/LocationProbe';
@@ -49,6 +50,22 @@ vi.mock('@/sde/loadSde', async (importOriginal) => ({
 // Copy valuation reaches Firestore; these tests only need a copy's badge.
 vi.mock('@/features/assets/assetCopyValues', () => ({
   loadAssetCopyValues: vi.fn(async () => new Map()),
+}));
+// Stock targets live in a synced setting; the page only needs the hook's shape.
+vi.mock('@/features/corp/stockTargets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/corp/stockTargets')>()),
+  useCorpStockTargets: vi.fn(),
+}));
+// The market catalogue is a lazy download; the Group column only needs its answer.
+vi.mock('@/features/corp/assetCategories', () => ({
+  loadTypeCategories: vi.fn(async () => new Map()),
+}));
+// Names for a targeted type the corporation owns none of come from the SDE/ESI resolver.
+vi.mock('@/features/character/typeNames', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/character/typeNames')>()),
+  loadTypeNames: vi.fn(
+    async (ids: readonly number[]) => new Map(ids.map((id) => [id, `Name ${id}`]))
+  ),
 }));
 vi.mock('@/features/corp/wallet', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/corp/wallet')>()),
@@ -98,6 +115,82 @@ function asset(overrides: Partial<CorporationAsset> & { item_id: number }): Corp
   };
 }
 
+const OFFICE = 60003760;
+const EMPTY_OFFICE = 60008494;
+
+/** An office with stock in two divisions, a delivery, a copy, an impounded hull, and a second, empty office. */
+function ledgerFixture(): CorporationAsset[] {
+  return [
+    asset({
+      item_id: 100,
+      type_id: 27,
+      location_id: OFFICE,
+      location_type: 'station',
+      location_flag: 'OfficeFolder',
+    }),
+    asset({
+      item_id: 101,
+      type_id: 27,
+      location_id: EMPTY_OFFICE,
+      location_type: 'station',
+      location_flag: 'OfficeFolder',
+    }),
+    asset({
+      item_id: 1,
+      type_id: 34,
+      quantity: 5000,
+      location_id: 100,
+      location_type: 'item',
+      location_flag: 'CorpSAG1',
+    }),
+    asset({
+      item_id: 2,
+      type_id: 35,
+      quantity: 10,
+      location_id: 100,
+      location_type: 'item',
+      location_flag: 'CorpSAG3',
+    }),
+    asset({
+      item_id: 3,
+      type_id: 34,
+      quantity: 200,
+      location_id: 100,
+      location_type: 'item',
+      location_flag: 'CorpDeliveries',
+    }),
+    asset({
+      item_id: 4,
+      type_id: 587,
+      location_id: OFFICE,
+      location_type: 'station',
+      location_flag: 'Impounded',
+      is_singleton: true,
+    }),
+    asset({
+      item_id: 5,
+      type_id: 691,
+      location_id: 100,
+      location_type: 'item',
+      location_flag: 'CorpSAG1',
+      is_blueprint_copy: true,
+    }),
+  ];
+}
+
+const setTarget = vi.fn();
+const removeTarget = vi.fn();
+
+function useTargets(targets: [number, number][] = []) {
+  const map = new Map(targets);
+  vi.mocked(stockTargets.useCorpStockTargets).mockReturnValue({
+    hydrated: true,
+    targets: map,
+    setTarget,
+    removeTarget,
+  });
+}
+
 function renderAssets(initialEntry = '/corp/assets') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -114,32 +207,44 @@ function currentLocation(): string {
   return screen.getByTestId('location').textContent ?? '';
 }
 
-/**
- * Renders, then waits for the division list to have replaced the loading
- * spinner. A longer timeout than the global `asyncUtilTimeout` (5000ms,
- * `vitest.setup.dom.ts`): this chains two mocked loads
- * (`loadCorporationId` then `loadCorporationDivisions`) before anything
- * renders, and it was observed timing out at just over 5000ms on a loaded
- * CI runner — the same CPU contention `vite.config.ts`'s `testTimeout`
- * comment already gives headroom for — rather than the divisions never
- * loading at all.
- */
-async function divisionList(): Promise<HTMLElement> {
-  renderAssets();
-  return waitFor(() => screen.getByRole('link', { name: /Division 1/ }), { timeout: 10000 });
+/** Longer than the global async timeout: the page chains several mocked loads before it renders. */
+async function ledger(entry = '/corp/assets') {
+  renderAssets(entry);
+  return screen.findByRole('tablist', { name: 'Asset state' }, { timeout: 10000 });
+}
+
+/** The item names in table order (first cell of each body row). */
+function itemOrder(): string[] {
+  return screen
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => row.textContent ?? '')
+    .filter(Boolean);
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.setSystemTime(NOW);
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
+  useTargets();
 
   mocked.loadCorporationId.mockResolvedValue(CORPORATION_ID);
-  mocked.loadCorporationAssets.mockResolvedValue(cached([asset({ item_id: 1 })]));
-  mocked.loadCorporationDivisions.mockResolvedValue(cached<CorporationDivisions>({ hangar: [] }));
+  mocked.loadCorporationAssets.mockResolvedValue(cached(ledgerFixture()));
+  mocked.loadCorporationDivisions.mockResolvedValue(
+    cached<CorporationDivisions>({ hangar: [{ division: 1, name: 'Ships' }] })
+  );
   mocked.loadCorpAssetLabels.mockResolvedValue({
-    types: new Map([[34, 'Tritanium']]),
-    locations: new Map([[60003760, 'Jita IV - Moon 4']]),
+    types: new Map([
+      [34, 'Tritanium'],
+      [35, 'Pyerite'],
+      [587, 'Rifter'],
+      [691, 'Rifter Blueprint'],
+      [27, 'Office'],
+    ]),
+    locations: new Map([
+      [OFFICE, 'Jita IV - Moon 4'],
+      [EMPTY_OFFICE, 'Amarr VIII - Emperor Family Academy'],
+    ]),
   });
   mockedAccess.mockReturnValue(accessOf('ready', { canReadAssets: true }));
 });
@@ -148,31 +253,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('the cached data notice', () => {
-  it('says nothing while every read is fresh', async () => {
-    await divisionList();
-    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
-  });
-
-  it.each([
-    ['the assets read', 'assets'],
-    ['the divisions read', 'divisions'],
-  ] as const)('shows it, aged, when only %s is the saved copy', async (_name, which) => {
-    const saved = { fromCache: true, fetchedAt: new Date(NOW - 3 * 3_600_000) };
-    if (which === 'assets') {
-      mocked.loadCorporationAssets.mockResolvedValue(cached([asset({ item_id: 1 })], saved));
-    } else {
-      mocked.loadCorporationDivisions.mockResolvedValue(
-        cached<CorporationDivisions>({ hangar: [] }, saved)
-      );
-    }
-    await divisionList();
-    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
-    expect(screen.getByText('3h ago', { selector: 'p time' })).toBeInTheDocument();
-  });
-});
-
-describe('access (AC2)', () => {
+describe('access', () => {
   it('waits rather than deciding while corp access is still resolving', () => {
     mockedAccess.mockReturnValue(accessOf('unknown', {}));
     renderAssets();
@@ -184,7 +265,7 @@ describe('access (AC2)', () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadWallet: true }));
     renderAssets();
     expect(await screen.findByText('Corp assets need Director')).toBeInTheDocument();
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     expect(mocked.loadCorporationAssets).not.toHaveBeenCalled();
   });
 
@@ -202,255 +283,278 @@ describe('access (AC2)', () => {
   });
 });
 
-describe('division layout (AC1)', () => {
-  it('renders all seven hangar divisions, even the ones holding nothing', async () => {
-    await divisionList();
-    for (let division = 1; division <= 7; division += 1) {
-      expect(
-        screen.getByRole('link', { name: new RegExp(`Division ${division}`) })
-      ).toBeInTheDocument();
-    }
+describe('state tabs', () => {
+  it('counts stacks per tab and hides the tabs that hold nothing', async () => {
+    await ledger();
+    expect(screen.getByRole('tab', { name: 'All 5' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Offices 3' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Corp deliveries 1' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Impounded 1' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /^In space/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /^Asset safety/ })).not.toBeInTheDocument();
   });
 
-  it('names a division from the hangar read instead of a number once one is granted', async () => {
-    mocked.loadCorporationDivisions.mockResolvedValue(
-      cached<CorporationDivisions>({ hangar: [{ division: 1, name: 'SRP' }] })
-    );
-    renderAssets();
-    expect(await screen.findByRole('link', { name: /SRP/ })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Division 1/ })).not.toBeInTheDocument();
-  });
-
-  it('drills into a division and lists its resolved item name, quantity and location', async () => {
+  it('keeps All and Offices even when the corporation has no offices', async () => {
     mocked.loadCorporationAssets.mockResolvedValue(
-      cached([asset({ item_id: 1, quantity: 5000, location_flag: 'CorpSAG3' })])
+      cached([asset({ item_id: 4, type_id: 587, location_flag: 'Impounded' })])
     );
-    const user = userEvent.setup();
-    renderAssets();
-    await user.click(await screen.findByRole('link', { name: /Division 3/ }));
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByText('×5,000')).toBeInTheDocument();
+    await ledger();
+    expect(screen.getByRole('tab', { name: 'Offices 0' })).toBeInTheDocument();
   });
 
-  it('keeps a division’s items out of a different division’s listing', async () => {
-    mocked.loadCorporationAssets.mockResolvedValue(
-      cached([
-        asset({ item_id: 1, location_flag: 'CorpSAG1' }),
-        asset({ item_id: 2, location_flag: 'CorpSAG7', type_id: 35 }),
-      ])
-    );
-    mocked.loadCorpAssetLabels.mockResolvedValue({
-      types: new Map([
-        [34, 'Tritanium'],
-        [35, 'Pyerite'],
-      ]),
-      locations: new Map([[60003760, 'Jita IV - Moon 4']]),
-    });
+  it('puts the tab in the path and keeps the query when switching', async () => {
     const user = userEvent.setup();
-    renderAssets();
-    await user.click(await screen.findByRole('link', { name: /Division 1/ }));
+    await ledger('/corp/assets?q=r');
+    await user.click(screen.getByRole('tab', { name: 'Impounded 1' }));
+    expect(currentLocation()).toBe('/corp/assets/impounded?q=r');
+    expect(await screen.findByText('Rifter')).toBeInTheDocument();
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+  });
+
+  it('opens a tab straight from its path', async () => {
+    await ledger('/corp/assets/deliveries');
+    expect(
+      screen.getByRole('tab', { name: 'Corp deliveries 1', selected: true })
+    ).toBeInTheDocument();
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
+  });
 
-    await user.click(screen.getByRole('button', { name: 'Back one level' }));
-    await user.click(await screen.findByRole('link', { name: /Division 7/ }));
+  it('sends an old tree deep link to /corp/assets, keeping the query', async () => {
+    renderAssets('/corp/assets/1/i:999?q=tri');
+    await waitFor(() => expect(currentLocation()).toBe('/corp/assets?q=tri'));
+    expect(await screen.findByRole('tablist', { name: 'Asset state' })).toBeInTheDocument();
+  });
+});
+
+describe('group by item', () => {
+  it('lists one row per item type, with a blueprint copy as its own badged row', async () => {
+    await ledger();
+    // A plain name, not a Show info link: the row expands in place (DESIGN.md §6c).
+    expect(await screen.findByText('Tritanium')).not.toHaveAttribute('href');
+    expect(screen.getAllByText('Tritanium')).toHaveLength(1);
+    expect(screen.getByText('Blueprint copy').parentElement).toHaveTextContent('BPC');
+    expect(screen.getByText('5,200')).toBeInTheDocument();
+  });
+
+  it('names where an item sits, with the corp’s division names', async () => {
+    await ledger();
+    expect(await screen.findByText('Jita IV · Ships ×5,000')).toBeInTheDocument();
+    expect(screen.getByText('Jita IV · Corp deliveries ×200')).toBeInTheDocument();
+    expect(screen.getByText('Jita IV · Impounded ×1')).toBeInTheDocument();
+  });
+
+  it('sorts by any column from its header, writing the sort to the query', async () => {
+    const user = userEvent.setup();
+    await ledger();
+    await screen.findByText('Pyerite');
+    await user.click(screen.getByRole('button', { name: /^Qty/ }));
+    await waitFor(() => expect(currentLocation()).toContain('sort=quantity'));
+    const rows = itemOrder();
+    expect(rows.findIndex((r) => r.includes('Pyerite'))).toBeLessThan(
+      rows.findIndex((r) => r.includes('Tritanium'))
+    );
+  });
+
+  it('adds a column from the column picker', async () => {
+    const user = userEvent.setup();
+    await ledger();
+    await screen.findByText('Pyerite');
+    expect(screen.queryByRole('button', { name: /^Volume/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(await screen.findByRole('menuitemcheckbox', { name: 'Volume' }));
+    // The open menu hides the page from the accessibility tree.
+    await user.keyboard('{Escape}');
+    expect(await screen.findByRole('button', { name: /^Volume/ })).toBeInTheDocument();
+  });
+
+  it('opens a row to list its stacks with their full path', async () => {
+    const user = userEvent.setup();
+    await ledger();
+    await user.click(await screen.findByText('5,200'));
+    expect(await screen.findByText(/Jita IV - Moon 4 › Ships/)).toBeInTheDocument();
+    expect(screen.getByText(/Jita IV - Moon 4 › Corp deliveries/)).toBeInTheDocument();
+  });
+
+  it('searches by item name and keeps the search in the query', async () => {
+    const user = userEvent.setup();
+    await ledger();
+    await user.type(screen.getByPlaceholderText('Search items…'), 'pyer');
+    await waitFor(() => expect(currentLocation()).toBe('/corp/assets?q=pyer'));
+    await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+  });
+
+  it('applies ?q= on arrival', async () => {
+    await ledger('/corp/assets?q=tri');
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search items…')).toHaveValue('tri');
+  });
+
+  it('filters by location and division from the query', async () => {
+    await ledger('/corp/assets?loc=60003760&div=3');
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
   });
 
-  it('moves focus to the level heading on drill-in, and back to the root heading on Back (issue #1485)', async () => {
+  it('shows an empty state when the filters leave nothing', async () => {
+    await ledger('/corp/assets?q=zzz');
+    expect(await screen.findByText('Nothing matches')).toBeInTheDocument();
+  });
+});
+
+describe('stock targets', () => {
+  it('sets a target from the Target cell', async () => {
     const user = userEvent.setup();
-    renderAssets();
-    await user.click(await screen.findByRole('link', { name: /Division 3/ }));
-
-    const levelHeading = await screen.findByRole('heading', { name: /Division 3/ });
-    expect(levelHeading).toHaveFocus();
-
-    await user.click(screen.getByRole('button', { name: 'Back one level' }));
-
-    const rootHeading = await screen.findByRole('heading', { name: /group/i });
-    expect(rootHeading).toHaveFocus();
+    await ledger();
+    await user.click(await screen.findByRole('button', { name: 'Set a stock target for Pyerite' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Target for Pyerite' }), '50{Enter}');
+    expect(setTarget).toHaveBeenCalledWith(35, 50);
   });
 
-  it('falls back to the raw id when an item name will not resolve', async () => {
-    mocked.loadCorpAssetLabels.mockResolvedValue({ types: new Map(), locations: new Map() });
-    const user = userEvent.setup();
-    renderAssets();
-    await user.click(await screen.findByRole('link', { name: /Division 1/ }));
-    expect(await screen.findByText('Type #34')).toBeInTheDocument();
+  it('shows how far short a target is, and flags a type with none owned', async () => {
+    useTargets([
+      [35, 50],
+      [999, 5],
+    ]);
+    await ledger();
+    expect(await screen.findByText('40')).toBeInTheDocument();
+    expect(screen.getByText('none owned')).toBeInTheDocument();
   });
 
-  // Office pass-through end-to-end — see assetDivisions.test.ts for the bug itself.
-  it("places an office's contents in their real hangar division, named by the station the office sits at", async () => {
-    mocked.loadCorporationAssets.mockResolvedValue(
-      cached([
-        asset({ item_id: 50, type_id: 27, location_flag: 'OfficeFolder' }),
-        asset({
-          item_id: 1,
-          quantity: 5000,
-          location_flag: 'CorpSAG3',
-          location_type: 'item',
-          location_id: 50,
-        }),
-      ])
-    );
+  it('narrows to the types below target and sorts the biggest shortfall first', async () => {
     const user = userEvent.setup();
-    await divisionList();
-    expect(screen.queryByRole('link', { name: /Office/ })).not.toBeInTheDocument();
+    useTargets([[35, 50]]);
+    await ledger();
+    await screen.findByText('Tritanium');
+    await user.click(screen.getByRole('button', { name: /Below target/ }));
+    await waitFor(() => expect(currentLocation()).toBe('/corp/assets?below=1'));
+    await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
+    expect(screen.getByText('Pyerite')).toBeInTheDocument();
+  });
 
-    await user.click(screen.getByRole('link', { name: /Division 3/ }));
-    const locationLink = await screen.findByRole('link', { name: /Jita IV - Moon 4/ });
-    expect(locationLink).toBeInTheDocument();
+  it('names a targeted type the corporation owns none of, and finds it by search', async () => {
+    useTargets([[4242, 7]]);
+    await ledger('/corp/assets?q=name 4242');
+    expect(await screen.findByText('Name 4242')).toBeInTheDocument();
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+  });
 
-    await user.click(locationLink);
+  it('opens the Stock targets dialog', async () => {
+    const user = userEvent.setup();
+    await ledger();
+    await user.click(screen.getByRole('button', { name: 'Stock targets…' }));
+    expect(await screen.findByRole('dialog', { name: 'Stock targets' })).toBeInTheDocument();
+  });
+});
+
+describe('group by location', () => {
+  it('groups divisions under their office and flags an empty office', async () => {
+    const user = userEvent.setup();
+    await ledger();
+    await user.click(screen.getByRole('button', { name: 'Location' }));
+    await waitFor(() => expect(currentLocation()).toBe('/corp/assets?group=location'));
+    expect(await screen.findByText('Amarr VIII - Emperor Family Academy')).toBeInTheDocument();
+    expect(screen.getByText('Empty office')).toBeInTheDocument();
+    expect(screen.getByText('Jita IV - Moon 4')).toBeInTheDocument();
+    expect(screen.getAllByText('Ships').length).toBeGreaterThan(0);
+  });
+
+  it('opens the by-item view for a clicked division, dropping group', async () => {
+    const user = userEvent.setup();
+    await ledger('/corp/assets?group=location');
+    await user.click((await screen.findAllByText('Ships'))[0]);
+    await waitFor(() => expect(currentLocation()).toBe('/corp/assets?loc=60003760&div=1'));
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByText('×5,000')).toBeInTheDocument();
+    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
+  });
+
+  it('lists only the divisions in use, with a count, and folds an empty office', async () => {
+    await ledger('/corp/assets?group=location');
+    expect(await screen.findByText('Empty office')).toBeInTheDocument();
+    expect(screen.getAllByText('2 of 7 divisions in use').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Division 4')).not.toBeInTheDocument();
+    // The empty office is folded: its placeholder row is not mounted.
+    expect(screen.queryByText('Nothing stored here')).not.toBeInTheDocument();
+  });
+
+  it('keeps Corp deliveries after the divisions, however the table is sorted', async () => {
+    const user = userEvent.setup();
+    await ledger('/corp/assets?group=location&lsort=items:asc');
+    await screen.findByText('Empty office');
+    const order = () => itemOrder().filter((r) => /Ships|Division 3|Corp deliveries/.test(r));
+    expect(order().at(-1)).toContain('Corp deliveries');
+    await user.click(screen.getAllByRole('button', { name: /^Items/ })[0]);
+    expect(order().at(-1)).toContain('Corp deliveries');
+  });
+
+  it('hides every group with no match under a filter, empty offices included', async () => {
+    await ledger('/corp/assets?group=location&q=zzz');
+    expect(await screen.findByText('Nothing matches')).toBeInTheDocument();
+    // A filter hides every group with no matching row, empty offices included.
+    expect(screen.queryByText('Empty office')).not.toBeInTheDocument();
+    expect(screen.queryByText('Jita IV - Moon 4')).not.toBeInTheDocument();
+  });
+
+  it('lists non-office places as their own groups on All', async () => {
+    await ledger('/corp/assets?group=location');
+    expect(await screen.findByText('Jita IV · Impounded')).toBeInTheDocument();
   });
 });
 
-describe('special flag groups (AC3)', () => {
-  it('adds a flag group only when it holds something, with its fixed label', async () => {
-    mocked.loadCorporationAssets.mockResolvedValue(
-      cached([asset({ item_id: 1, location_flag: 'AssetSafety' })])
-    );
-    await divisionList();
-    expect(screen.getByRole('link', { name: /Asset Safety/ })).toBeInTheDocument();
-    // The root heading's count (issue #1485) must include this 8th group —
-    // seven hangar divisions plus Asset Safety — not just the seven
-    // divisions, which would undercount what's actually listed below it.
-    expect(screen.getByRole('heading', { name: '8 groups' })).toBeInTheDocument();
+describe('the cached data notice', () => {
+  it('says nothing while every read is fresh', async () => {
+    await ledger();
+    expect(screen.queryByText('Showing cached data')).not.toBeInTheDocument();
   });
 
-  it('shows none of the four flag groups when nothing sits in them', async () => {
-    await divisionList();
-    expect(screen.queryByRole('link', { name: /Office/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Deliveries/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Impounded/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Asset Safety/ })).not.toBeInTheDocument();
-  });
-
-  /**
-   * CCP can extend `location_flag` without notice; a row with a flag this
-   * app has never heard of must still be visible somewhere rather than
-   * silently vanishing from the one page whose job is "what does the
-   * corporation own" (GLOSSARY.md round 44).
-   */
-  it('buckets an unrecognised flag under Other rather than dropping the row', async () => {
+  it('shows it, aged, when the read is the saved copy', async () => {
     mocked.loadCorporationAssets.mockResolvedValue(
-      cached([asset({ item_id: 1, location_flag: 'SomeFutureFlag' })])
+      cached(ledgerFixture(), { fromCache: true, fetchedAt: new Date(NOW - 3 * 3_600_000) })
     );
-    await divisionList();
-    expect(screen.getByRole('link', { name: /Other/ })).toBeInTheDocument();
+    await ledger();
+    expect(await screen.findByText('Showing cached data')).toBeInTheDocument();
   });
 });
 
-describe('truncation (AC4)', () => {
-  it('shows nothing extra when the read was not truncated', async () => {
-    await divisionList();
-    expect(document.body.textContent).not.toContain('Incomplete data');
-  });
-
-  /**
-   * Matches `/assets`' own two-part treatment: the shared `common.incompleteTitle`
-   * plus a page-specific count, not the shared string alone. The two halves
-   * render as sibling text nodes in one paragraph, so this checks the
-   * rendered text rather than a single exact node.
-   */
-  it('surfaces truncation rather than dropping it silently, with the count fetched', async () => {
-    mocked.loadCorporationAssets.mockResolvedValue(
-      cached([asset({ item_id: 1 }), asset({ item_id: 2 })], { truncated: true })
-    );
-    await divisionList();
-    expect(document.body.textContent).toContain('Incomplete data — some pages could not be loaded');
-    expect(document.body.textContent).toContain(
-      'Only the first 2 assets were fetched — this corporation has more.'
-    );
-  });
-});
-
-describe('manual refresh keeps the division list visible (issue #418)', () => {
-  it('does not blank the division list while a refresh is in flight', async () => {
-    await divisionList();
-
-    let resolveSecondFetch!: (value: ReturnType<typeof cached<CorporationAsset[]>>) => void;
-    mocked.loadCorporationAssets.mockReturnValueOnce(
-      new Promise((resolve) => {
-        resolveSecondFetch = resolve;
-      })
-    );
-
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Refresh corp assets' }));
-    expect(screen.getByRole('link', { name: /Division 1/ })).toBeInTheDocument();
-
-    resolveSecondFetch(cached([asset({ item_id: 1 })]));
-    await waitFor(() => expect(mocked.loadCorporationAssets).toHaveBeenCalledTimes(2));
-    expect(screen.getByRole('link', { name: /Division 1/ })).toBeInTheDocument();
+describe('truncation', () => {
+  it('surfaces truncation with the count fetched', async () => {
+    mocked.loadCorporationAssets.mockResolvedValue(cached(ledgerFixture(), { truncated: true }));
+    await ledger();
+    expect(await screen.findByText(/Only the first 7 assets were fetched/)).toBeInTheDocument();
   });
 });
 
 describe('failed vs. genuinely empty reads', () => {
-  it('shows a load-failed state rather than an empty corporation when the assets read itself failed', async () => {
+  it('shows a load-failed state rather than an empty corporation when the read failed', async () => {
     mocked.loadCorporationAssets.mockResolvedValue(READ_FAILED);
     renderAssets();
     expect(await screen.findByText('Could not load corp assets')).toBeInTheDocument();
-    expect(screen.queryByText('No corporation assets')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Division 1/ })).not.toBeInTheDocument();
-  });
-
-  /** AC5: "no access", "read failed" and "empty" must not share one generic message. */
-  it('gives the load-failed state its own copy, distinct from "no access" and "empty"', async () => {
-    mocked.loadCorporationAssets.mockResolvedValue(READ_FAILED);
-    renderAssets();
-    const loadFailedText = await screen.findByText('Could not load corp assets');
-    expect(loadFailedText).toBeInTheDocument();
-    expect(screen.queryByText('Corp assets need Director')).not.toBeInTheDocument();
-    expect(screen.queryByText('No corporation assets')).not.toBeInTheDocument();
   });
 
   it('shows the empty state when the corporation genuinely owns nothing', async () => {
     mocked.loadCorporationAssets.mockResolvedValue(cached([]));
     renderAssets();
     expect(await screen.findByText('No corporation assets')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Division 1/ })).not.toBeInTheDocument();
   });
 });
 
-describe('row context menu (issue #420)', () => {
-  it('opens the same menu from a visible More actions button on the row (#1497)', async () => {
+describe('row actions', () => {
+  it('opens the item menu from a visible More actions button', async () => {
     const user = userEvent.setup();
-    renderAssets();
-    await user.click(await screen.findByRole('link', { name: /Division 1/ }));
-
-    await user.click(await screen.findByRole('button', { name: 'More actions for Tritanium' }));
-
-    expect(await screen.findByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-  });
-
-  it('offers View in Market and Copy name on an asset row, with no Build Plan lookup', async () => {
-    const user = userEvent.setup();
-    renderAssets();
-    await user.click(await screen.findByRole('link', { name: /Division 1/ }));
-    const item = await screen.findByText('Tritanium');
-    item.focus();
-    fireEvent.contextMenu(item);
-
-    expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-    // `blueprintTypeID` is `null`, not `undefined` — corp assets never loads
-    // the blueprint catalog, so this must resolve instantly rather than
-    // dangling in "checking…" forever.
+    await ledger();
+    await screen.findByText('Pyerite');
+    await user.click(screen.getByRole('button', { name: 'More actions for Pyerite' }));
+    expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'No blueprint options' })).toBeInTheDocument();
   });
-});
 
-describe('bulk Add to Quickbar', () => {
-  it('adds every selected item but a Mutated module, which has no market', async () => {
+  it('adds every selected item but a Mutated module to the Quickbar', async () => {
     await db.quickbars.clear();
     mocked.loadCorporationAssets.mockResolvedValue(
       cached([
-        asset({ item_id: 1 }),
+        asset({ item_id: 1, type_id: 34 }),
         asset({ item_id: 2, type_id: 35 }),
         asset({ item_id: 3, type_id: ABYSSAL_NEUT, is_singleton: true }),
       ])
@@ -461,13 +565,11 @@ describe('bulk Add to Quickbar', () => {
         [35, 'Pyerite'],
         [ABYSSAL_NEUT, 'Heavy Abyssal Energy Neutralizer'],
       ]),
-      locations: new Map([[60003760, 'Jita IV - Moon 4']]),
+      locations: new Map(),
     });
     const user = userEvent.setup();
-    renderAssets();
-    await user.click(await screen.findByRole('link', { name: /Division 1/ }));
+    await ledger();
     await screen.findByText('Heavy Abyssal Energy Neutralizer');
-
     await user.click(screen.getByRole('button', { name: 'Select' }));
     await user.click(screen.getByRole('checkbox', { name: 'Select Tritanium' }));
     await user.click(screen.getByRole('checkbox', { name: 'Select Pyerite' }));
@@ -483,197 +585,5 @@ describe('bulk Add to Quickbar', () => {
         { typeId: 35, name: 'Pyerite' },
       ]);
     });
-  });
-});
-
-describe('item name and blueprint badge', () => {
-  const RIFTER_BLUEPRINT = {
-    name: 'Rifter Blueprint',
-    time: 6000,
-    materials: [],
-    products: [{ typeID: 587, quantity: 1 }],
-    skills: [],
-    activity: 'manufacturing' as const,
-  };
-
-  beforeEach(async () => {
-    const { loadBlueprints } = await import('@/sde/loadSde');
-    vi.mocked(loadBlueprints).mockResolvedValue({ '691': RIFTER_BLUEPRINT });
-    mocked.loadCorporationAssets.mockResolvedValue(
-      cached([
-        asset({ item_id: 1, type_id: 34 }),
-        asset({ item_id: 2, type_id: 691 }),
-        asset({ item_id: 3, type_id: 691, is_blueprint_copy: true }),
-      ])
-    );
-    mocked.loadCorpAssetLabels.mockResolvedValue({
-      types: new Map([
-        [34, 'Tritanium'],
-        [691, 'Rifter Blueprint'],
-      ]),
-      locations: new Map([[60003760, 'Jita IV - Moon 4']]),
-    });
-  });
-
-  it('links the item name to its Show info', async () => {
-    const user = userEvent.setup();
-    renderAssets();
-    await user.click(await screen.findByRole('link', { name: /Division 1/ }));
-
-    const name = await screen.findByRole('link', { name: 'Tritanium' });
-    expect(name.getAttribute('href')).toMatch(/info=type-34$/);
-  });
-
-  it('badges a corp BPO and BPC, and leaves an ordinary item bare', async () => {
-    const user = userEvent.setup();
-    renderAssets();
-    await user.click(await screen.findByRole('link', { name: /Division 1/ }));
-
-    expect((await screen.findByText('Blueprint original')).parentElement).toHaveTextContent('BPO');
-    expect(screen.getByText('Blueprint copy').parentElement).toHaveTextContent('BPC');
-    expect(screen.getAllByText(/^Blueprint (original|copy)$/)).toHaveLength(2);
-  });
-
-  it('badges a blueprint search hit, whose row stays a link', async () => {
-    renderAssets('/corp/assets?q=Rifter');
-
-    expect((await screen.findByText('Blueprint original')).parentElement).toHaveTextContent('BPO');
-    expect(screen.getByText('Blueprint copy').parentElement).toHaveTextContent('BPC');
-    expect(screen.queryByRole('button', { name: 'Rifter Blueprint' })).not.toBeInTheDocument();
-  });
-});
-
-describe('search (issue #779)', () => {
-  beforeEach(() => {
-    mocked.loadCorporationAssets.mockResolvedValue(
-      cached([
-        asset({ item_id: 1, type_id: 34, location_flag: 'CorpSAG1' }),
-        asset({ item_id: 2, type_id: 35, location_flag: 'CorpSAG7' }),
-      ])
-    );
-    mocked.loadCorpAssetLabels.mockResolvedValue({
-      types: new Map([
-        [34, 'Tritanium'],
-        [35, 'Pyerite'],
-      ]),
-      locations: new Map([[60003760, 'Jita IV - Moon 4']]),
-    });
-  });
-
-  it('finds a match across every division from the root, with no division opened by hand', async () => {
-    renderAssets();
-    await screen.findByRole('link', { name: /Division 1/ });
-    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
-
-    await userEvent.setup().type(screen.getByPlaceholderText('Search items…'), 'tri');
-
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
-  });
-
-  it('announces the result count in a status region mounted before the search', async () => {
-    renderAssets();
-    await screen.findByRole('link', { name: /Division 1/ });
-    expect(document.querySelector('[role="status"].sr-only')).toBeInTheDocument();
-
-    await userEvent.setup().type(screen.getByPlaceholderText('Search items…'), 'tri');
-
-    expect(
-      await screen.findByText(/\d+ match/, { selector: '[role="status"].sr-only' })
-    ).toBeInTheDocument();
-  });
-
-  it('clearing the search returns to the division root', async () => {
-    const user = userEvent.setup();
-    renderAssets();
-    const search = await screen.findByPlaceholderText('Search items…');
-    await user.type(search, 'tri');
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-
-    await user.clear(search);
-
-    await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
-    expect(screen.getByRole('link', { name: /Division 1/ })).toBeInTheDocument();
-  });
-});
-
-describe('search in the URL (issue #1306)', () => {
-  beforeEach(() => {
-    mocked.loadCorporationAssets.mockResolvedValue(
-      cached([
-        asset({ item_id: 1, type_id: 34, location_flag: 'CorpSAG1' }),
-        asset({ item_id: 2, type_id: 35, location_flag: 'CorpSAG7' }),
-      ])
-    );
-    mocked.loadCorpAssetLabels.mockResolvedValue({
-      types: new Map([
-        [34, 'Tritanium'],
-        [35, 'Pyerite'],
-      ]),
-      locations: new Map([[60003760, 'Jita IV - Moon 4']]),
-    });
-  });
-
-  it('keeps an untouched view out of the URL', async () => {
-    await divisionList();
-    expect(currentLocation()).toBe('/corp/assets');
-  });
-
-  it('applies ?q= on arrival', async () => {
-    renderAssets('/corp/assets?q=tri');
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Search items…')).toHaveValue('tri');
-    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
-  });
-
-  it('composes with a drill-down path: the path stays, the search reports across divisions', async () => {
-    renderAssets('/corp/assets/7?q=tri');
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-    expect(currentLocation()).toBe('/corp/assets/7?q=tri');
-  });
-
-  it('keeps the query on drill-down links', async () => {
-    renderAssets('/corp/assets?q=tri');
-    expect(await screen.findByRole('link', { name: /Tritanium/ })).toHaveAttribute(
-      'href',
-      expect.stringMatching(/\?q=tri$/)
-    );
-  });
-
-  it('writes typed text to the query without touching the drill-down path', async () => {
-    renderAssets('/corp/assets/7');
-    const search = await screen.findByPlaceholderText('Search items…');
-    await userEvent.setup().type(search, 'tri');
-    await waitFor(() => expect(currentLocation()).toBe('/corp/assets/7?q=tri'));
-  });
-
-  it('removes ?q= when the search is cleared', async () => {
-    renderAssets('/corp/assets/7?q=tri');
-    await screen.findByText('Tritanium');
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Clear search' }));
-    await waitFor(() => expect(currentLocation()).toBe('/corp/assets/7'));
-    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
-  });
-
-  it('puts focus back on the search box when Clear search removes itself (WCAG 2.4.3)', async () => {
-    renderAssets('/corp/assets/7?q=tri');
-    await screen.findByText('Tritanium');
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Clear search' }));
-    await waitFor(() => expect(screen.getByRole('searchbox')).toHaveFocus());
-  });
-});
-
-describe('URL drill-down (issue #779)', () => {
-  it('lands directly on a division from its URL, without visiting the root first', async () => {
-    mocked.loadCorporationAssets.mockResolvedValue(
-      cached([asset({ item_id: 1, location_flag: 'CorpSAG3' })])
-    );
-    renderAssets('/corp/assets/3');
-    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
-  });
-
-  it('reports a stale/unknown segment instead of crashing or silently redirecting', async () => {
-    renderAssets('/corp/assets/1/i:999');
-    expect(await screen.findByText('This location is gone')).toBeInTheDocument();
   });
 });

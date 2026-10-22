@@ -3,12 +3,49 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
+import type { MiningTaxAssignmentRecord } from '@/db';
 import { createPayee } from '@/features/miningTax/payees';
+import { useSurveyConnections } from '@/features/miningTax/surveyConnections';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { MoonTaxReadout, MoonTaxRow } from './MoonTaxRow';
+import type { ConnectableSurvey } from './useSurveyConnection';
 
 const { setSurveyTax } = vi.hoisted(() => ({ setSurveyTax: vi.fn() }));
 vi.mock('./surveyStore', () => ({ setSurveyTax }));
+
+const { autoAssignFromSurveys } = vi.hoisted(() => ({ autoAssignFromSurveys: vi.fn() }));
+vi.mock('@/features/miningTax/surveyConnections', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/miningTax/surveyConnections')>()),
+  autoAssignFromSurveys,
+}));
+
+const BITUMENS = 45492;
+vi.mock('@/sde/loadSde', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/sde/loadSde')>()),
+  loadMoonOreTypeIds: () => Promise.resolve([BITUMENS, 45494]),
+  loadTypes: () =>
+    Promise.resolve({ [BITUMENS]: { name: 'Bitumens' }, 45494: { name: 'Cobaltite' } }),
+}));
+
+const SYSTEM = 30000142;
+vi.mock('@/features/route/placeSystem', () => ({
+  resolvePlaceSystemId: () => Promise.resolve(SYSTEM),
+}));
+
+const NOW = Date.now();
+const CONNECTABLE: ConnectableSurvey = {
+  id: 'abc123XYZ',
+  expiresAt: NOW + 7 * 24 * 60 * 60 * 1000,
+  locationId: 40000001,
+  summary: {
+    firstAt: NOW - 60 * 60 * 1000,
+    etaAt: NOW + 2 * 60 * 60 * 1000,
+    finished: false,
+    finishedAt: null,
+    lastAt: NOW,
+    oreNames: ['Bitumens', 'Veldspar'],
+  },
+};
 
 function Where() {
   const loc = useLocation();
@@ -17,7 +54,10 @@ function Where() {
 
 const SURVEY = { id: 'abc123XYZ', expiresAt: 5000, published: null };
 
-function renderRow(survey?: Parameters<typeof MoonTaxRow>[0]['survey']) {
+function renderRow(
+  survey?: Parameters<typeof MoonTaxRow>[0]['survey'],
+  connectable?: ConnectableSurvey
+) {
   return render(
     <MemoryRouter initialEntries={['/mining/survey']}>
       <Routes>
@@ -25,7 +65,7 @@ function renderRow(survey?: Parameters<typeof MoonTaxRow>[0]['survey']) {
           path="*"
           element={
             <>
-              <MoonTaxRow characterId={7} survey={survey} />
+              <MoonTaxRow characterId={7} survey={survey} connectable={connectable} />
               <Where />
             </>
           }
@@ -42,9 +82,12 @@ function type(label: string, value: string) {
 }
 
 beforeEach(async () => {
-  await db.payees.clear();
+  await Promise.all([db.payees.clear(), db.settings.clear()]);
+  useSurveyConnections.setState({ value: [], hydrated: false });
   setSurveyTax.mockReset();
   setSurveyTax.mockResolvedValue(undefined);
+  autoAssignFromSurveys.mockReset();
+  autoAssignFromSurveys.mockResolvedValue([]);
 });
 afterEach(cleanup);
 
@@ -111,6 +154,31 @@ describe('MoonTaxRow', () => {
     expect(setSurveyTax).not.toHaveBeenCalled();
   });
 
+  it('connects the moon in one click, staying on the survey and making the rate the Payee’s default', async () => {
+    const mine = await createPayee(7, { name: 'Moon Corp', defaultTaxPct: 5 });
+    renderRow({ ...SURVEY, published: { name: 'Moon Corp', pct: 8 } }, CONNECTABLE);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
+    expect(
+      await screen.findByText(/Your ore from this moon will be assigned to Moon Corp at 8%/)
+    ).toBeTruthy();
+    expect(screen.getByTestId('where').textContent).toBe('/mining/survey');
+    expect((await db.payees.get(mine.id))?.defaultTaxPct).toBe(8);
+    expect(useSurveyConnections.getState().value).toMatchObject([
+      { surveyId: 'abc123XYZ', characterId: 7, payeeId: mine.id, taxPct: 8 },
+    ]);
+  });
+
+  it('Undo puts back the default rate the owner’s click changed, and focus moves to Stop', async () => {
+    const mine = await createPayee(7, { name: 'Moon Corp', defaultTaxPct: 5 });
+    renderRow({ ...SURVEY, published: { name: 'Moon Corp', pct: 8 } }, CONNECTABLE);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
+    const stop = await screen.findByRole('button', { name: 'Stop' });
+    await waitFor(() => expect(document.activeElement).toBe(stop));
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(async () => expect((await db.payees.get(mine.id))?.defaultTaxPct).toBe(5));
+    expect(useSurveyConnections.getState().value).toEqual([]);
+  });
+
   it('starts blank on a survey with no stored tax, whatever was set on another', () => {
     const first = renderRow({ ...SURVEY, published: { name: 'Moon Corp', pct: 8 } });
     expect((screen.getByLabelText('Tax rate, percent') as HTMLInputElement).value).toBe('8');
@@ -122,7 +190,7 @@ describe('MoonTaxRow', () => {
 });
 
 describe('MoonTaxReadout', () => {
-  function renderReadout() {
+  function renderReadout(connectable: ConnectableSurvey | null = CONNECTABLE) {
     return render(
       <MemoryRouter initialEntries={['/s/abc123XYZ']}>
         <Routes>
@@ -130,7 +198,10 @@ describe('MoonTaxReadout', () => {
             path="*"
             element={
               <>
-                <MoonTaxReadout tax={{ name: 'Moon Corp', pct: 8 }} />
+                <MoonTaxReadout
+                  tax={{ name: 'Moon Corp', pct: 8 }}
+                  connectable={connectable ?? undefined}
+                />
                 <Where />
               </>
             }
@@ -152,65 +223,85 @@ describe('MoonTaxReadout', () => {
     expect(manage.getAttribute('aria-disabled')).toBe('true');
     expect(manage.getAttribute('aria-describedby')).toBe(screen.getByText('Log in to access').id);
     fireEvent.click(manage);
-    expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByTestId('where').textContent).toBe('/s/abc123XYZ');
+    expect(useSurveyConnections.getState().value).toEqual([]);
   });
 
-  it("opens the Tax tab on the viewer's own Payee by that name, keeping their rate", async () => {
+  it("connects the moon to the viewer's own Payee by that name in one click, keeping their rate", async () => {
     useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
     const mine = await createPayee(7, { name: 'moon corp', defaultTaxPct: 5 });
     renderReadout();
-    expect(screen.queryByText('Log in to access')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
-    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/mining/tax'));
+    expect(await screen.findByText(/Assigning to moon corp until/)).toBeTruthy();
     expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByTestId('where').textContent).toBe('/s/abc123XYZ');
     expect(await db.payees.toArray()).toEqual([mine]);
+    expect(useSurveyConnections.getState().value).toMatchObject([
+      {
+        surveyId: 'abc123XYZ',
+        characterId: 7,
+        payeeId: mine.id,
+        taxPct: 8,
+        systemId: SYSTEM,
+        typeIds: [BITUMENS],
+        untilMs: CONNECTABLE.summary.etaAt,
+      },
+    ]);
+    expect(autoAssignFromSurveys).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Manage Taxes' })).toBeNull();
   });
 
-  it('asks before adding a missing Payee, then adds it at the survey rate and opens the tab', async () => {
+  it('adds a missing Payee at the survey rate without asking, and Undo takes it all back', async () => {
     useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
     renderReadout();
     fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
-    await screen.findByText('Add Moon Corp as a Payee at 8%?');
-    expect(screen.getByTestId('where').textContent).toBe('/s/abc123XYZ');
-    fireEvent.click(screen.getByRole('button', { name: 'Add Payee' }));
-    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/mining/tax'));
+    expect(await screen.findByText(/Added Moon Corp as a Payee at 8%\./)).toBeTruthy();
     expect(await db.payees.toArray()).toMatchObject([
       { characterId: 7, name: 'Moon Corp', defaultTaxPct: 8 },
     ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(async () => expect(await db.payees.count()).toBe(0));
+    expect(useSurveyConnections.getState().value).toEqual([]);
+    expect(await screen.findByRole('button', { name: 'Manage Taxes' })).toBeTruthy();
   });
 
-  it('opens the tab without adding when the viewer declines', async () => {
+  it('says how much of the already-mined ore it assigned', async () => {
     useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+    await createPayee(7, { name: 'Moon Corp', defaultTaxPct: 8 });
+    autoAssignFromSurveys.mockResolvedValue([{ id: 'a1' } as MiningTaxAssignmentRecord]);
     renderReadout();
     fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Open without adding' }));
-    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/mining/tax'));
-    expect(await db.payees.count()).toBe(0);
+    expect(await screen.findByText('Assigned 1 mining entry to Moon Corp.')).toBeTruthy();
   });
 
-  it('stays on the survey when the dialog is closed', async () => {
+  it('Stop disconnects the moon', async () => {
     useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+    await createPayee(7, { name: 'Moon Corp', defaultTaxPct: 8 });
     renderReadout();
     fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
-    await screen.findByRole('dialog');
-    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(screen.getByTestId('where').textContent).toBe('/s/abc123XYZ');
-    expect(await db.payees.count()).toBe(0);
+    fireEvent.click(await screen.findByRole('button', { name: 'Stop' }));
+    const manage = await screen.findByRole('button', { name: 'Manage Taxes' });
+    await waitFor(() => expect(document.activeElement).toBe(manage));
+    expect(useSurveyConnections.getState().value).toEqual([]);
   });
 
   it('says so and stays when the Payee cannot be added', async () => {
     useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
     renderReadout();
-    fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
-    await screen.findByRole('dialog');
     const add = vi.spyOn(db.payees, 'put').mockRejectedValueOnce(new Error('quota'));
-    fireEvent.click(screen.getByRole('button', { name: 'Add Payee' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
     expect((await screen.findByRole('alert')).textContent).toBe(
-      "Couldn't save that Payee. Try again."
+      "Couldn't connect this moon to that Payee. Try again."
     );
-    expect(screen.getByTestId('where').textContent).toBe('/s/abc123XYZ');
+    expect(useSurveyConnections.getState().value).toEqual([]);
     add.mockRestore();
+  });
+
+  it('without a survey to connect, opens the Tax tab on their own Payee', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+    await createPayee(7, { name: 'Moon Corp', defaultTaxPct: 8 });
+    renderReadout(null);
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/mining/tax'));
   });
 });

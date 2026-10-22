@@ -1,10 +1,11 @@
 /**
- * The Corp overview's widget kinds: the feeds each reads and its builder.
+ * The Corp Board's widget kinds: the feeds each reads and its builder.
  * Same contract as `models.ts` (pure, derived at render time); joins its
  * `KINDS` table through `registerKindDefs` when the Corp route loads.
  * Structures and Moon extractions are the Overview's own kinds, reused as they are.
  */
 import type { KindDef } from './builderKit';
+import { corpAssets } from './corpAssetsModels';
 import { corpContracts } from './corpContractsModels';
 import { corpOrders } from './corpOrdersModels';
 import { corpDeadlines, corpJobs, corpServices } from './corpClockModels';
@@ -33,5 +34,6 @@ export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
   corpMining: { feeds: ['corpMining'], build: corpMining },
   corpOrders: { feeds: ['corpOrders'], build: corpOrders },
   corpContracts: { feeds: ['corpContracts'], build: corpContracts },
+  corpAssets: { feeds: ['corpAssets', 'corpStockTargets'], build: corpAssets },
   corpKills: { feeds: ['corpKills'], build: corpKills },
 };

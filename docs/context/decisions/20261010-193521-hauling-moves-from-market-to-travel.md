@@ -2,6 +2,8 @@
 
 _Recorded 2026-10-10 · issue #3526._
 
+_Superseded 2026-10-21 by `20261021-211648-hauling-moves-back-from-travel-to-market` (issue #4702)._
+
 - **Hauling Opportunities is a Travel tab, after Route Safety, Thera / Turnur
   and Pilot Lookup (`/travel/hauling`).** Hauling is a route problem (what to
   carry from one Trade Hub to another), not a market lookup, and Market had

@@ -7,8 +7,7 @@
  * the grant's token is that Character's, and reads their corporation and roles
  * with it). Revoking is the holder's own act, or the CEO's with a live token.
  */
-import { httpsCallable } from 'firebase/functions';
-import { getSyncFunctions } from './firebaseApp';
+import { callRouted } from './routedCallable';
 import { ensureSignedIn } from './syncAuth';
 
 export async function saveCorpSyncGrantRemote(
@@ -16,11 +15,10 @@ export async function saveCorpSyncGrantRemote(
   grant: { corporationId: number; accessToken: string; refreshToken: string }
 ): Promise<void> {
   await ensureSignedIn(characterId);
-  const call = httpsCallable<typeof grant, { characterId: number; enabledAt: number }>(
-    getSyncFunctions(),
-    'saveCorpTaxBookSyncGrantCallable'
+  await callRouted<typeof grant, { characterId: number; enabledAt: number }>(
+    'saveCorpTaxBookSyncGrantCallable',
+    grant
   );
-  await call(grant);
 }
 
 export async function revokeCorpSyncGrantRemote(
@@ -28,11 +26,10 @@ export async function revokeCorpSyncGrantRemote(
   call: { corporationId: number; accessToken?: string }
 ): Promise<void> {
   await ensureSignedIn(characterId);
-  const revoke = httpsCallable<typeof call, { deleted: boolean; revoked: boolean }>(
-    getSyncFunctions(),
-    'revokeCorpTaxBookSyncGrantCallable'
+  await callRouted<typeof call, { deleted: boolean; revoked: boolean }>(
+    'revokeCorpTaxBookSyncGrantCallable',
+    call
   );
-  await revoke(call);
 }
 
 export interface FeederGrantCall {
@@ -48,9 +45,8 @@ export async function saveFeederGrantRemote(
   grant: FeederGrantCall
 ): Promise<{ collectorCorporationId: number; feederCorporationId: number; rejoined: boolean }> {
   await ensureSignedIn(characterId);
-  const save = httpsCallable<
+  return callRouted<
     FeederGrantCall,
     { collectorCorporationId: number; feederCorporationId: number; rejoined: boolean }
-  >(getSyncFunctions(), 'saveCorpTaxBookFeederGrantCallable');
-  return (await save(grant)).data;
+  >('saveCorpTaxBookFeederGrantCallable', grant);
 }

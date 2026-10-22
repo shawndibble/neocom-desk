@@ -96,7 +96,7 @@ describe('firestore.indexes.json field overrides', () => {
   });
 
   it('re-enables firedAt on notificationFeed at collection-group scope', () => {
-    // `purgeNotificationFeed` (functions/src/index.ts) runs
+    // `dailyHousekeeping` (functions/src/index.ts, its feed purge) runs
     // `collectionGroup('notificationFeed').where('firedAt', '<', cutoff)`.
     // Without this entry the wildcard exemption leaves that query unindexed
     // and it fails FAILED_PRECONDITION on every tick.

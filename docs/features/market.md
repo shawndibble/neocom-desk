@@ -1,25 +1,25 @@
 # Market, Hauling, LP Store, Contract search: feature inventory
 
-Scope: `/market` (Browser, Open orders, Stock, History, Appraisal), Hauling (now the Travel tab `/travel/hauling`, `20261010-193521`, #3526), LP Store (now the Wallet tab `/wallet/lp-store`, `20261010-200446`, #3527), and the Item search + Courier tabs of `/contracts`. Source of truth is code; each section cites `path:line`. Glossary terms per `GLOSSARY.md`. Decisions: `docs/context/decisions/`. ADRs: 0002 (Fuzzwork prices), 0003 (Browser reads ESI order books), 0013 (public contract snapshot), 0015 (tab = path segment, URL holds view state), 0017 (DataTable stacks by class).
+Scope: `/market` (Browser, Open orders, Stock, History, Appraisal, Hauling; back from Travel by `20261021-211648-hauling-moves-back-from-travel-to-market`, #4702), LP Store (now the Wallet tab `/wallet/lp-store`, `20261010-200446`, #3527), and the Item search + Courier tabs of `/contracts`. Source of truth is code; each section cites `path:line`. Glossary terms per `GLOSSARY.md`. Decisions: `docs/context/decisions/`. ADRs: 0002 (Fuzzwork prices), 0003 (Browser reads ESI order books), 0013 (public contract snapshot), 0015 (tab = path segment, URL holds view state), 0017 (DataTable stacks by class).
 
 ## Summary table
 
-| Feature              | Where                                                                                | Notes                                                                                  |
-| -------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| Market page shell    | `/market`, `src/routes/Market.tsx`                                                   | `MARKET_TABS` (`src/app/pageTabs.ts:126`); page UNGATED, tabs gate themselves          |
-| Browser              | `/market/browser`                                                                    | Item finder + ESI order book; Location Mode hub/region/all regions; Jump Range filters |
-| Order book item tabs | Browser item panel                                                                   | Order book, Variations, Price history                                                  |
-| Quickbar             | Browser finder column                                                                | Per-character pinned items, drag reorder, price alerts                                 |
-| Compare drawer       | all Market tabs when set non-empty                                                   | Prices + Attributes views; scratch set                                                 |
-| Open orders          | `/market/orders` (`?char=<id>` narrows to one Character, with a "Name only" readout) | All-character worklist by problem; Order Detail modal                                  |
-| History              | `/market/history`                                                                    | Wallet fills with realized margin                                                      |
-| Appraisal            | `/market/appraisal`                                                                  | Paste list, price at hub, net/refine/LP, Compare Hubs, share link                      |
-| Stock                | `/market/stock[/<list id>]`                                                          | Stock Lists: per-market targets vs listed and in-hangar counts (section 4b)            |
-| Hauling              | `/travel/hauling` (Travel tab; `/market/hauling` redirects)                          | Hub price-gap scan, Trip Plan, Multibuy; moved to Travel (`20261010-193521`, #3526)    |
-| LP Store             | `/wallet/lp-store[/:corporationId]` (Wallet tab; `/market/lp-store` redirects)       | Own route that draws Wallet's tab bar; ISK/LP ranking (`20261010-200446`, #3527)       |
-| Contract Item search | `/contracts/search/items`                                                            | Public contract lines from the shared R2 snapshot                                      |
-| Courier search       | `/contracts/search/courier`                                                          | Public courier contracts ranked ISK/jump                                               |
-| Page paste           | `src/app/GlobalPasteRouter.tsx`                                                      | Ctrl/Cmd+V routes EFT fit to Fittings or item list to Appraisal                        |
+| Feature              | Where                                                                                | Notes                                                                                                                         |
+| -------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Market page shell    | `/market`, `src/routes/Market.tsx`                                                   | `MARKET_TABS` (`src/app/pageTabs.ts:126`); page UNGATED, tabs gate themselves                                                 |
+| Browser              | `/market/browser`                                                                    | Item finder + ESI order book; Location Mode hub/region/all regions; Jump Range filters                                        |
+| Order book item tabs | Browser item panel                                                                   | Order book, Variations, Price history                                                                                         |
+| Quickbar             | Browser finder column                                                                | Per-character pinned items, drag reorder, price alerts                                                                        |
+| Compare drawer       | all Market tabs when set non-empty                                                   | Prices + Attributes views; scratch set                                                                                        |
+| Open orders          | `/market/orders` (`?char=<id>` narrows to one Character, with a "Name only" readout) | All-character worklist by problem; Order Detail modal                                                                         |
+| History              | `/market/history`                                                                    | Wallet fills with realized margin                                                                                             |
+| Appraisal            | `/market/appraisal`                                                                  | Paste list, price at hub, net/refine/LP, Compare Hubs, share link                                                             |
+| Stock                | `/market/stock[/<list id>]`                                                          | Stock Lists: per-market targets vs listed and in-hangar counts (section 4b)                                                   |
+| Hauling              | `/market/hauling` (Market tab; `/travel/hauling` redirects)                          | Hub price-gap scan, Trip Plan, Multibuy; back from Travel (`20261021-211648-hauling-moves-back-from-travel-to-market`, #4702) |
+| LP Store             | `/wallet/lp-store[/:corporationId]` (Wallet tab; `/market/lp-store` redirects)       | Own route that draws Wallet's tab bar; ISK/LP ranking (`20261010-200446`, #3527)                                              |
+| Contract Item search | `/contracts/search/items`                                                            | Public contract lines from the shared R2 snapshot                                                                             |
+| Courier search       | `/contracts/search/courier`                                                          | Public courier contracts ranked ISK/jump                                                                                      |
+| Page paste           | `src/app/GlobalPasteRouter.tsx`                                                      | Ctrl/Cmd+V routes EFT fit to Fittings or item list to Appraisal                                                               |
 
 ## Purpose and user goal
 
@@ -28,7 +28,7 @@ Scope: `/market` (Browser, Open orders, Stock, History, Appraisal), Hauling (now
 - **Top jobs (ranked):** 1. "Where can I get item X within N jumps, even in another region?" (Browser: Jump Range from the Current System spans regions, `20260929-204125`; owner, 2026-10-11) 2. "Which of my orders have a problem, and how do I fix it?" (Open orders; owner, 2026-10-11) 3. "What is this pile worth?" (Appraisal).
 - **Device and cadence:** desktop primary, with the EVE client open beside it (owner, 2026-10-11): copy a new price, a sell list or a multibuy list into the client; paste an inventory list into Appraisal. Phone parity: Market is one of the four default phone tabs (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts:46`); Open orders has a compact phone list (`20260924-020211`, #1429). Pilots arrive from alerts: `marketOrderUndercut` → `/market/orders`, `stockBelowTarget` → `/market/stock`, `marketOrderFilled` → Transactions, `priceAlertTriggered` → Browser (`src/features/notifications/notificationOptions.ts`). Browser is laid out two-column at desk width (`max-w-[96rem]`).
 - **Above the fold:** Browser: item finder (Quickbar below it) beside the selected item's scope bar ("Within N jumps of X, N stations") and order book with a Jumps column. Open orders: problem groups worst first, healthy folded, one relist floor and Copy new price per row. Appraisal: paste box, then the total at the chosen hub.
-- **Not for:** spending LP (Wallet › LP Store, `20261010-200446`, #3527) or picking a haul (Travel › Hauling, `20261010-193521`, #3526); Hauling in section 4, and section 5 (LP Store), predate both moves. Public contracts are Contracts. Net worth is Wallet.
+- **Not for:** spending LP (Wallet › LP Store, `20261010-200446`, #3527) Section 5 (LP Store) predates that move. Public contracts are Contracts. Net worth is Wallet.
 - **Sources:** owner, 2026-10-11 (job ranking, desktop use); `20260906-155913`, `20260924-020211`, `20261010-182330`, `20260831-140406-market-browser-rebuild`, `20260929-204125`, `20260904-111509`, `20260908-164742`, `20261010-193521`, `20261010-200446`, ADR 0002, 0003; #1429, #3526, #3527.
 - **Unconfirmed:** that order upkeep is a daily or per-session habit; how often pilots far from a Trade Hub use Browser vs Appraisal.
 
@@ -47,9 +47,9 @@ Scope: `/market` (Browser, Open orders, Stock, History, Appraisal), Hauling (now
 
 ## 1. Route, nav, scopes
 
-- Nav: `/market` is an Economy destination, `gating: 'scope'`, `mobileTab: true` (`src/app/navDestinations.ts`). LP Store is no longer under Market: it is a Wallet tab, `/wallet/lp-store` (`WALLET_TABS`, `20261010-200446-lp-store-moves-from-market-to-wallet`, #3527), and Hauling is a Travel tab, `/travel/hauling` (`TRAVEL_TABS`, `20261010-193521-hauling-moves-from-market-to-travel`, #3526). `/contracts` is a separate Economy destination (`navDestinations.ts:207`).
+- Nav: `/market` is an Economy destination, `gating: 'scope'`, `mobileTab: true` (`src/app/navDestinations.ts`). LP Store is no longer under Market: it is a Wallet tab, `/wallet/lp-store` (`WALLET_TABS`, `20261010-200446-lp-store-moves-from-market-to-wallet`, #3527). Hauling is a Market tab again, `/market/hauling` (`MARKET_TABS`, `20261021-211648-hauling-moves-back-from-travel-to-market`, #4702). `/contracts` is a separate Economy destination (`navDestinations.ts:207`).
 - Tabs rendered in the tab bar: Browser, Open orders, Stock, History, Appraisal (`MARKET_TABS`, `src/app/pageTabs.ts`). History is the Transactions table; its old Ended orders view was dropped in #3692.
-- Legacy: `/wallet/transactions` and `/market/history/transactions` -> `/market/history` (query kept); `/wallet/loyalty[/:id]` -> `/wallet/lp-store[/:id]` (`src/app/legacyPaths.ts`); `/market/lp-store[/:id]` -> `/wallet/lp-store[/:id]` and `/market/hauling` -> `/travel/hauling` (`PAGE_LEGACY_LOCATIONS`, `src/app/pageTabs.ts`); `/orders` retired into Market (note in `routeScopes.ts:52`).
+- Legacy: `/wallet/transactions` and `/market/history/transactions` -> `/market/history` (query kept); `/wallet/loyalty[/:id]` -> `/wallet/lp-store[/:id]` (`src/app/legacyPaths.ts`); `/market/lp-store[/:id]` -> `/wallet/lp-store[/:id]` and `/travel/hauling` -> `/market/hauling` (`PAGE_LEGACY_LOCATIONS`, `src/app/pageTabs.ts`); `/orders` retired into Market (note in `routeScopes.ts:52`).
 - Scopes (`src/app/routeScopes.ts`): `/market` UNGATED (`:57`); Open orders needs `esi-markets.read_character_orders.v1`, History `esi-wallet.read_character_wallet.v1`, each as a panel-level `GrantBanner`; Browser and Appraisal need none (Hauling, now `/travel/hauling`, needs none either). LP Store's gate moved with it: `/wallet/lp-store` and `/wallet/lp-store/:corporationId` use `LP_STORE_REQUIREMENT` (`:245-246`). `/contracts` UNGATED (`:230`), History tab gates `getCharacterContracts` per tab; search tabs need no scope.
 - Page layout: `max-w-[96rem]` on Browser else `max-w-6xl` (`Market.tsx:759`). Header hub picker/refresh described in section 2.1.
 - Held at route level so they survive tab switches: `useAppraisal` (pasted list), `useOrderBookOrchestration` (CompareDrawer and Item Detail read it), Compare Set (`Market.tsx:473,493`).
@@ -255,7 +255,7 @@ What: character's buy/sell fills; corp fills live on `/corp/wallet`. `Transactio
 
 ## 4. Appraisal, Hauling, Compare, Variations, Price History, Quickbar (Market page)
 
-Note: Hauling (subsection 2) is now a Travel tab, `/travel/hauling` (`20261010-193521`, #3526); its spec below predates the move.
+Note: Hauling (subsection 2) is a Market tab again, `/market/hauling` (`20261021-211648-hauling-moves-back-from-travel-to-market`, #4702).
 
 Summary table
 
@@ -467,7 +467,7 @@ Observed gaps: alerts exist only for pinned items and require an active characte
 
 ### 7. Page-level paste router
 
-`src/app/GlobalPasteRouter.tsx`, mounted in Layout. Ctrl/Cmd+V anywhere not in a field and with no overlay open: `pasteDestination` (`engine/import/pasteDestination`) classifies the clipboard as an EFT fit (-> `FITTINGS_PATH` with `fittingLoadText`) or an item list (-> `/market/appraisal` with `appraiseText`); anything else is ignored. No confirm step; parsers and catalogue load lazily on first paste. Decisions: `20261001-211035-...`, `20261002-133425-...`.
+`src/app/GlobalPasteRouter.tsx`, mounted in Layout. Ctrl/Cmd+V anywhere not in a field (an open dialog or sidebar does not block it): `pasteDestination` (`engine/import/pasteDestination`) classifies the clipboard as an EFT fit (-> `FITTINGS_PATH` with `fittingLoadText`) or an item list (-> `/market/appraisal` with `appraiseText`); anything else is ignored. No confirm step; parsers and catalogue load lazily on first paste. Decisions: `20261001-211035-...`, `20261002-133425-...`.
 Observed gaps: no visible hint of the shortcut outside Help shortcuts; a failed classification gives no feedback.
 
 ## 4b. Stock (`/market/stock`, Stock Lists)

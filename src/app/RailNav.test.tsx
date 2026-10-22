@@ -62,6 +62,14 @@ function setPhone(phone: boolean) {
 }
 
 beforeEach(async () => {
+  vi.mocked(useCorpAccess).mockReturnValue({
+    state: 'none',
+    capabilities: NO_CORP_CAPABILITIES,
+    missingScopes: [],
+    roles: [],
+    readFailed: false,
+    retry: () => {},
+  });
   setPhone(false);
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: true });
@@ -72,6 +80,69 @@ beforeEach(async () => {
 });
 
 describe('the rail', () => {
+  it('draws a Corporation group of the permitted Corp pages, with Moons open on /corp/moons', async () => {
+    vi.mocked(useCorpAccess).mockReturnValue({
+      state: 'ready',
+      capabilities: { ...NO_CORP_CAPABILITIES, canReadWallet: true },
+      missingScopes: [],
+      roles: ['Junior_Accountant'],
+      readFailed: false,
+      retry: () => {},
+    });
+    await db.characters.put({
+      characterId: 42,
+      name: 'Pilot',
+      ownerHash: 'h',
+      addedAt: 0,
+      corporationId: 98000001,
+    });
+    useActiveCharacter.setState({ activeCharacterId: 42, hydrated: true });
+    renderAt('/corp/moons');
+
+    const group = await within(rail()).findByRole('group', { name: 'Corporation' });
+    const names = within(group)
+      .getAllByRole('link')
+      .map((link) => link.textContent);
+    expect(names).toEqual(expect.arrayContaining(['Corp Board', 'Corp Wallet', 'Moons']));
+    expect(names).not.toContain('Corp Assets');
+    expect(names).not.toContain('Members');
+    expect(within(group).getByRole('link', { name: 'Statements' })).toBeInTheDocument();
+  });
+
+  it('marks only Corp Wallet current on /corp/wallet, not Corp Board above it', async () => {
+    vi.mocked(useCorpAccess).mockReturnValue({
+      state: 'ready',
+      capabilities: { ...NO_CORP_CAPABILITIES, canReadWallet: true },
+      missingScopes: [],
+      roles: ['Junior_Accountant'],
+      readFailed: false,
+      retry: () => {},
+    });
+    await db.characters.put({
+      characterId: 42,
+      name: 'Pilot',
+      ownerHash: 'h',
+      addedAt: 0,
+      corporationId: 98000001,
+    });
+    useActiveCharacter.setState({ activeCharacterId: 42, hydrated: true });
+    renderAt('/corp/wallet');
+
+    const group = await within(rail()).findByRole('group', { name: 'Corporation' });
+    expect(within(group).getByRole('link', { name: 'Corp Wallet' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(within(group).getByRole('link', { name: 'Corp Board' })).not.toHaveAttribute(
+      'aria-current'
+    );
+  });
+
+  it('draws no Corporation group, heading included, without Corp Access', () => {
+    renderAt('/overview');
+    expect(screen.queryByText('Corporation')).not.toBeInTheDocument();
+  });
+
   it("lists LP Store among Wallet's views, current on a store's page (#3527)", () => {
     renderAt('/wallet/lp-store/1000125');
 
@@ -129,7 +200,7 @@ describe('the rail', () => {
   });
 
   it('leaves out what the pilot hid, unless it is where they are', () => {
-    useHiddenNav.setState({ value: ['/mining', '/planetary-industry', '/travel/hauling'] });
+    useHiddenNav.setState({ value: ['/mining', '/planetary-industry', '/market/hauling'] });
     renderAt('/planetary-industry');
 
     expect(within(rail()).queryByRole('link', { name: 'Mining' })).not.toBeInTheDocument();

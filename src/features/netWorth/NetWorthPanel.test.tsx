@@ -127,6 +127,18 @@ describe('NetWorthPanel, several Characters', () => {
     expect(await within(row).findByText(/^1,134/)).toBeInTheDocument();
   });
 
+  it('orders the table by net worth, highest first, with an unshared Character last', async () => {
+    await seed({ covered: [1, 2] });
+    renderPanel();
+    const table = await screen.findByRole('table', { name: 'Balance by character' });
+    await within(table).findByText(/^1,534/);
+    const names = within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => ['Ava', 'Bo', 'Cy'].find((name) => within(row).queryByText(name)));
+    expect(names).toEqual(['Bo', 'Ava', 'Cy']);
+  });
+
   it('switching a layer off changes the total and says what is excluded', async () => {
     const user = userEvent.setup();
     await seed({ covered: [1, 2, 3] });

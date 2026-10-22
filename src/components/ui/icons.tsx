@@ -35,6 +35,7 @@ import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/csr/ArrowCount
 import { ArrowDown } from '@phosphor-icons/react/dist/csr/ArrowDown';
 import { ArrowLineDown } from '@phosphor-icons/react/dist/csr/ArrowLineDown';
 import { ArrowLineUp } from '@phosphor-icons/react/dist/csr/ArrowLineUp';
+import { ArrowRight } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { DiscordLogo } from '@phosphor-icons/react/dist/csr/DiscordLogo';
 import { GithubLogo } from '@phosphor-icons/react/dist/csr/GithubLogo';
 import { ArrowSquareOut } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
@@ -126,10 +127,13 @@ import { Target } from '@phosphor-icons/react/dist/csr/Target';
 import { TextAa } from '@phosphor-icons/react/dist/csr/TextAa';
 import { Tray } from '@phosphor-icons/react/dist/csr/Tray';
 import { User } from '@phosphor-icons/react/dist/csr/User';
+import { UserList } from '@phosphor-icons/react/dist/csr/UserList';
 import { UserPlus } from '@phosphor-icons/react/dist/csr/UserPlus';
 import { UsersFour } from '@phosphor-icons/react/dist/csr/UsersFour';
 import { UsersThree } from '@phosphor-icons/react/dist/csr/UsersThree';
+import { Vault } from '@phosphor-icons/react/dist/csr/Vault';
 import { Wallet as WalletGlyph } from '@phosphor-icons/react/dist/csr/Wallet';
+import { Warehouse } from '@phosphor-icons/react/dist/csr/Warehouse';
 import { Warning } from '@phosphor-icons/react/dist/csr/Warning';
 import { WarningOctagon } from '@phosphor-icons/react/dist/csr/WarningOctagon';
 import { X } from '@phosphor-icons/react/dist/csr/X';
@@ -228,6 +232,12 @@ export const BuildGroup = withWeight(FolderSimple);
  * controls away on the same page.
  */
 export const Compare = withWeight(Scales);
+/**
+ * The arrow between a lane's two ends (Hauling's From → To), pressed to swap
+ * them. A plain right arrow, not `Route`'s pair: at rest it still has to say
+ * which end is the origin, since the hub pickers carry no caption.
+ */
+export const SwapEnds = withWeight(ArrowRight);
 /** Route preference (shortest vs safest). */
 export const Route = withWeight(ArrowsLeftRight);
 /** Bulk-writes a chosen hub/facility/security/build-system onto every plan in a Build Group (issue #632) — the same crosshair `PriceAlert` uses, for retargeting a group. */
@@ -444,6 +454,15 @@ export const ColumnsPicker = withWeight(ColumnsGlyph);
 export const NavOverview = withWeight(SquaresFour);
 export const NavAlerts = withWeight(Bell);
 export const NavCorp = withWeight(Buildings);
+/*
+ * The other Corp pages each look unlike the pilot page they share a word with:
+ * a roster (not Communities' crowd), a vault (not Wallet's billfold), a
+ * warehouse (not Assets' box), and the moon the Moon Mining Tax ledger uses.
+ */
+export const NavCorpMembers = withWeight(UserList);
+export const NavCorpWallet = withWeight(Vault);
+export const NavCorpAssets = withWeight(Warehouse);
+export const NavCorpMoons = withWeight(Moon);
 export const NavSkills = withWeight(GraduationCap);
 export const NavIndustry = withWeight(Factory);
 export const NavShips = withWeight(RocketLaunch);

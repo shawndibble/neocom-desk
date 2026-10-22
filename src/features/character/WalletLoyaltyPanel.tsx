@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CachedEmptyState, DataTable, Panel, type DataTableColumn } from '@/components/ui';
+import { CachedEmptyState, DataTable, Panel, Spinner, type DataTableColumn } from '@/components/ui';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import type { DataTableSort } from '@/components/ui';
@@ -9,10 +9,19 @@ import { LpStorePicker } from '@/features/loyalty/LpStorePicker';
 import type { CachedResult } from '@/esi/cache';
 import type { CharacterLoyaltyPoints } from '@/esi/endpoints';
 
+/** A Character whose grant lacks the loyalty scope; `name` titles its banner. */
+export interface LoyaltyReauthCharacter {
+  characterId: number;
+  name?: string;
+}
+
 interface WalletLoyaltyPanelProps {
-  activeCharacterId: number;
+  /** The picked Characters' lists, summed per corporation; null when none could be read. */
   loyaltyResult: CachedResult<CharacterLoyaltyPoints[]> | null;
-  loyaltyNeedsReauth: boolean;
+  /** Picked Characters left out of the sum until they grant the loyalty scope again. */
+  reauthCharacters: readonly LoyaltyReauthCharacter[];
+  /** The picked Characters' lists are still being read. */
+  loading: boolean;
   /** The rows to list: Ever Marks are counted on the balance panel instead. */
   otherLoyalty: CharacterLoyaltyPoints[];
   columns: DataTableColumn<CharacterLoyaltyPoints>[];
@@ -22,9 +31,9 @@ interface WalletLoyaltyPanelProps {
 
 /** The Balance tab's loyalty points list (or its one-line "none" stand-in). */
 export function WalletLoyaltyPanel({
-  activeCharacterId,
   loyaltyResult,
-  loyaltyNeedsReauth,
+  reauthCharacters,
+  loading,
   otherLoyalty,
   columns,
   sortProps,
@@ -32,7 +41,7 @@ export function WalletLoyaltyPanel({
 }: WalletLoyaltyPanelProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  if (loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length === 0) {
+  if (!loading && loyaltyResult && reauthCharacters.length === 0 && otherLoyalty.length === 0) {
     // Nothing to list: one muted line instead of an empty panel. The
     // picker stays as the way into any corp's store (issue #2321).
     return (
@@ -54,30 +63,42 @@ export function WalletLoyaltyPanel({
           {/* Always shown, LP or not (issue #2321): the way into any
           corp's store for a pilot who holds LP nowhere yet. */}
           <LpStorePicker corporationName={null} size="sm" className="w-44" />
-          {loyaltyResult && !loyaltyNeedsReauth && otherLoyalty.length > 0 && (
+          {!loading && loyaltyResult && otherLoyalty.length > 0 && (
             <TableActionsMenu name={t('loyalty.title')} tableExport={tableExport} />
           )}
         </span>
       }
     >
-      {loyaltyNeedsReauth ? (
-        <div className="p-3">
-          <GrantBanner
-            characterId={activeCharacterId}
-            endpoints={['getCharacterLoyaltyPoints']}
-            title={t('loyalty.reauthTitle')}
-            hint={t('loyalty.reauthHint')}
-            actionLabel={t('loyalty.reauthAction')}
-          />
+      {reauthCharacters.length > 0 && (
+        <div className="space-y-2 p-3">
+          {reauthCharacters.map((character) => (
+            <GrantBanner
+              key={character.characterId}
+              characterId={character.characterId}
+              characterName={character.name}
+              endpoints={['getCharacterLoyaltyPoints']}
+              title={t('loyalty.reauthTitle')}
+              hint={t('loyalty.reauthHint')}
+              actionLabel={t('loyalty.reauthAction')}
+            />
+          ))}
+        </div>
+      )}
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <Spinner label={t('common.loading')} />
         </div>
       ) : !loyaltyResult || otherLoyalty.length === 0 ? (
-        <CachedEmptyState
-          result={loyaltyResult}
-          title={t('loyalty.emptyTitle')}
-          hint={t('loyalty.emptyHint')}
-          fetchedTitle={t('loyalty.emptyTitle')}
-          className="py-8"
-        />
+        // A Character needing a new grant already has its banner above.
+        (loyaltyResult || reauthCharacters.length === 0) && (
+          <CachedEmptyState
+            result={loyaltyResult}
+            title={t('loyalty.emptyTitle')}
+            hint={t('loyalty.emptyHint')}
+            fetchedTitle={t('loyalty.emptyTitle')}
+            className="py-8"
+          />
+        )
       ) : (
         <DataTable
           {...tableExport.tableProps}

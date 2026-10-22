@@ -2,6 +2,11 @@ import { useState, useSyncExternalStore } from 'react';
 import type { DisplayRow, GroupMember } from '@/features/miningTax/groupRows';
 import type { SettleUpRow } from '@/features/miningTax/SettleUpDialog';
 
+export interface SettleUpStart {
+  payerId?: number;
+  focusIds?: ReadonlySet<string>;
+}
+
 /** Whose owed entries "Link a wallet payment" is choosing a payment for: a Payee's whole balance, or just the entries ticked or settling. */
 export interface LinkWalletTarget {
   payeeId: string;
@@ -21,6 +26,8 @@ export interface TaxDialogState {
   joinCandidateOverride: DisplayRow[] | null;
   /** What Settle up is settling: a balance card's whole balance, or the table's selection. */
   settleUpRows: SettleUpRow[] | null;
+  /** Who pays, and (from one entry) which entries start ticked — `SettleUpDialog`'s `payerId` / `focusIds`. */
+  settleUpStart: SettleUpStart;
   linkWalletTarget: LinkWalletTarget | null;
   corpPayTarget: number | null;
   bulkDismissOpen: boolean;
@@ -37,6 +44,7 @@ const CLOSED: TaxDialogState = {
   splitTarget: null,
   joinCandidateOverride: null,
   settleUpRows: null,
+  settleUpStart: {},
   linkWalletTarget: null,
   corpPayTarget: null,
   bulkDismissOpen: false,
@@ -79,7 +87,8 @@ function createActions(patch: (next: Patch) => void) {
     closeJoin: () => patch({ joinTarget: null, joinCandidateOverride: null }),
     openSplit: (dr: DisplayRow | null) => patch({ splitTarget: dr }),
     splitFromDetail: (dr: DisplayRow) => patch({ splitTarget: dr, detailTarget: null }),
-    openSettleUp: (rows: SettleUpRow[] | null) => patch({ settleUpRows: rows }),
+    openSettleUp: (rows: SettleUpRow[] | null, start: SettleUpStart = {}) =>
+      patch({ settleUpRows: rows, settleUpStart: start }),
     openLinkWallet: (target: LinkWalletTarget | null) => patch({ linkWalletTarget: target }),
     linkWalletFromDetail: (target: LinkWalletTarget) =>
       patch({ linkWalletTarget: target, detailTarget: null }),

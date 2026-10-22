@@ -108,7 +108,7 @@ export function loadCorporationMiningExtractions(
 }
 
 /**
- * The division whose journal the Corp overview's money widgets read: the master wallet.
+ * The division whose journal the Corp Board's money widgets read: the master wallet.
  *
  * ESI publishes no all-divisions journal and the seven are separately
  * role-gated, so net and runway can only ever describe one wallet.

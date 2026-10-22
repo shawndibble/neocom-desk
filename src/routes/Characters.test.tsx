@@ -487,6 +487,24 @@ describe('Characters', () => {
     expect(await screen.findByText('mail page')).toBeInTheDocument();
   });
 
+  it('picking from the rail portrait returns to the page the pilot was on (#4691)', async () => {
+    const user = userEvent.setup();
+    renderCharacters({ pathname: '/characters', state: { from: '/skills/trained?q=gunnery' } });
+    await user.click(await screen.findByRole('button', { name: 'Select Pilot One' }));
+
+    expect(await screen.findByText('skills page')).toBeInTheDocument();
+    expect(locationSearch()).toBe('?q=gunnery');
+  });
+
+  it('drops the previous viewed-Character id from the return path (#4691)', async () => {
+    const user = userEvent.setup();
+    renderCharacters({ pathname: '/characters', state: { from: '/mail?char=2112&q=hi' } });
+    await user.click(await screen.findByRole('button', { name: 'Select Pilot One' }));
+
+    expect(await screen.findByText('mail page')).toBeInTheDocument();
+    expect(locationSearch()).toBe('?q=hi');
+  });
+
   it('falls back to /overview when the origin is /characters itself (#1764)', async () => {
     const user = userEvent.setup();
     renderCharacters({ pathname: '/characters', state: { from: '/characters' } });

@@ -17,9 +17,12 @@ import { loadTypeInfo } from '@/sde/loadTypeInfo';
 import { piFixture } from '@/sde/__fixtures__/pi';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { seedGrant } from '@/test/seed';
 import { clearOrderBookCache } from './orderBook';
 import type { RegionOrder } from '@/esi/endpoints';
 import { LocationProbe } from '@/test/LocationProbe';
+
+const OPEN_WINDOW_CHARACTER = 4242;
 
 /** Jita/The Forge, the default Trade Hub the modal falls back to unhydrated. */
 const JITA_REGION_ID = 10000002;
@@ -79,6 +82,8 @@ afterEach(async () => {
 
 describe('ItemDetailModal', () => {
   it('offers View in Market only when asked, closing itself on the way', async () => {
+    await seedGrant(OPEN_WINDOW_CHARACTER, ['esi-ui.open_window.v1']);
+    useActiveCharacter.setState({ activeCharacterId: OPEN_WINDOW_CHARACTER, hydrated: true });
     // Fails fast: a request left hanging would hold an ESI slot the next tests need.
     server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => HttpResponse.error()));
     mockedLoadDictionary.mockReturnValue(new Promise(() => {}));
@@ -1167,6 +1172,8 @@ describe('ItemDetailModal header actions on a phone', () => {
   });
 
   it('keeps a single action as its plain button, with no ⋮', async () => {
+    await seedGrant(OPEN_WINDOW_CHARACTER, ['esi-ui.open_window.v1']);
+    useActiveCharacter.setState({ activeCharacterId: OPEN_WINDOW_CHARACTER, hydrated: true });
     goNarrow();
     server.use(http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () => HttpResponse.error()));
     mockedLoadDictionary.mockReturnValue(new Promise(() => {}));

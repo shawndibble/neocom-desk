@@ -137,6 +137,16 @@
 // its entry and the key is never deleted, so the tombstone-expiry edge does not
 // bite it. See features/character/cloneNicknames.ts.
 //
+// sync.miningTaxSurveyConnections (issue #4684): the moon Surveys the pilot
+// connected with "Manage Taxes", as {surveyId, characterId, payeeId,
+// payeeName, taxPct, systemId, typeIds, fromDate, untilMs, expiresAt,
+// connectedAt} entries, so a second device keeps assigning that moon's ore to
+// its Payee. Each lives only until its Survey's ETA (plus an hour), and every
+// write prunes the rest, so the list stays a few entries. See
+// features/miningTax/surveyConnections.ts, whose parse drops malformed
+// entries. Never deleted via deleteSyncedSetting: a pruned list is written
+// back. No `legacyKey`: new.
+//
 // sync.miningTaxManualMoonOreTypeIds / sync.miningTaxManualIgnoredTypeIds
 // (decision doc 20260923-112603-manual-ore-tags-sync-across-devices,
 // superseding 20260907-090317's device-local call): the Moon Mining Tax ledger's
@@ -229,13 +239,21 @@
 // Supersedes the two Overview keys above, which stay on the list to seed a
 // returning pilot's first layout. No `legacyKey`: new.
 //
-// sync.corpOverviewLayout: the Corp overview's widget grid, the same shape and
+// sync.corpOverviewLayout: the Corp Board's widget grid, the same shape and
 // parse as sync.overviewLayout (features/overview/widgets/layoutStore.ts), one
 // value for the whole account rather than per corporation or per Character.
 // Absent means "never edited": the page then draws the full default and does
 // not write it. A widget whose capability a Character lacks is kept and simply
 // not drawn, so one Character's edit never drops another's widgets. No
 // `legacyKey`: new.
+//
+// sync.corpStockTargets (issue #4671): the minimum quantity the pilot wants a
+// corporation to hold of each item type, as {corporationId: {typeId: quantity}}.
+// Account-wide, not per Character: the targets belong to the corporation, so
+// whichever Character reads its assets sees the same ones. Its parse drops
+// targets that are not whole numbers above zero and keeps corporation ids this
+// build knows nothing about. Never deleted via deleteSyncedSetting: removing the
+// last target writes {}. No `legacyKey`: new. See features/corp/stockTargets.ts.
 //
 // sync.avoidedSystems: the solar system ids the pilot keeps off their routes,
 // managed from Settings → Travel (features/route/avoidedSystems.ts). One list
@@ -327,6 +345,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.miningTaxCompressedOre',
   'sync.miningTaxManualMoonOreTypeIds',
   'sync.miningTaxOreValueMode',
+  'sync.miningTaxSurveyConnections',
   'sync.navHidden',
   'sync.navSetupAnswered',
   'sync.notificationFeedPrefs',
@@ -335,6 +354,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.overviewHiddenCards',
   'sync.overviewLayout',
   'sync.corpOverviewLayout',
+  'sync.corpStockTargets',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
   'sync.podKillThreshold',

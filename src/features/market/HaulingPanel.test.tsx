@@ -209,7 +209,7 @@ const linkParam = (key: string) =>
 function renderPanel(query = 'from=jita&to=amarr') {
   const actions = fakeItemActions();
   render(
-    <MemoryRouter initialEntries={[`/travel/hauling?${query}`]}>
+    <MemoryRouter initialEntries={[`/market/hauling?${query}`]}>
       <FakeItemActions actions={actions}>
         <HaulingPanel />
       </FakeItemActions>
@@ -271,9 +271,7 @@ describe('HaulingPanel rows select, the rail shows the detail', () => {
     renderPanel();
     await user.click(row());
     expect(row()).toHaveAttribute('aria-current', 'true');
-    expect(
-      screen.getByRole('link', { name: 'Price history and orders in Amarr' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Amarr market' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Trip' })).toBeInTheDocument();
 
     await user.click(row());
@@ -627,7 +625,7 @@ describe('HaulingPanel fill the free space', () => {
     fillState = fillDone([FILL_ROW]);
     let info: { refresh: () => void } | null = null;
     render(
-      <MemoryRouter initialEntries={['/travel/hauling?from=jita&to=amarr']}>
+      <MemoryRouter initialEntries={['/market/hauling?from=jita&to=amarr']}>
         <FakeItemActions actions={fakeItemActions()}>
           <HaulingPanel onRefreshInfoChange={(next) => (info = next)} />
         </FakeItemActions>
@@ -724,9 +722,7 @@ describe('HaulingPanel on a phone', () => {
     expect(
       within(sheet).getAllByRole('button', { name: 'More actions for Damage Control II' })
     ).toHaveLength(1);
-    expect(
-      within(sheet).getByRole('link', { name: 'Price history and orders in Amarr' })
-    ).toBeInTheDocument();
+    expect(within(sheet).getByRole('link', { name: 'Amarr market' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
 
@@ -785,6 +781,15 @@ describe('HaulingPanel, Any hub', () => {
     expect(scanCalls.at(-1)).toMatchObject({ from: 'any', to: AMARR });
   });
 
+  it('the arrow between the hubs swaps them, in the link and the scan', async () => {
+    const user = userEvent.setup();
+    renderPanel('from=jita&to=amarr');
+    await user.click(screen.getByRole('button', { name: 'Swap origin and destination' }));
+    expect(screen.getByRole('combobox', { name: 'From' })).toHaveTextContent('Amarr');
+    expect(screen.getByRole('combobox', { name: 'To' })).toHaveTextContent('Jita');
+    expect(scanCalls.at(-1)).toMatchObject({ from: AMARR, to: JITA });
+  });
+
   it('refuses Any at both ends with a message, and runs no scan', () => {
     scanCalls.length = 0;
     renderPanel('from=any&to=any');
@@ -822,7 +827,7 @@ describe('HaulingPanel data age (#3534)', () => {
   it('hands the ready scan’s fetchedAt up to the page header instead of badging its own filter bar', () => {
     const onRefreshInfoChange = vi.fn();
     const { container } = render(
-      <MemoryRouter initialEntries={['/travel/hauling?from=jita&to=amarr']}>
+      <MemoryRouter initialEntries={['/market/hauling?from=jita&to=amarr']}>
         <FakeItemActions actions={fakeItemActions()}>
           <HaulingPanel onRefreshInfoChange={onRefreshInfoChange} />
         </FakeItemActions>
@@ -838,7 +843,7 @@ describe('HaulingPanel data age (#3534)', () => {
   it('hands up no fetchedAt while no scan is ready', () => {
     const onRefreshInfoChange = vi.fn();
     render(
-      <MemoryRouter initialEntries={['/travel/hauling?from=jita&to=jita']}>
+      <MemoryRouter initialEntries={['/market/hauling?from=jita&to=jita']}>
         <FakeItemActions actions={fakeItemActions()}>
           <HaulingPanel onRefreshInfoChange={onRefreshInfoChange} />
         </FakeItemActions>

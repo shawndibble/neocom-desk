@@ -16,21 +16,32 @@ export function PayeeOpenInEveButton({
   name,
   entityId,
   payeeId,
+  fromCharacter,
 }: {
   name: string;
   /** The Payee's stored EVE entity id, when it has one. */
   entityId?: number;
   payeeId?: string;
+  /** The paying Character: the window opens in its client, and the label names it. */
+  fromCharacter?: { id: number; name: string };
 }) {
   const { t } = useTranslation();
+  const from =
+    fromCharacter === undefined
+      ? {}
+      : {
+          characterId: fromCharacter.id,
+          label: t('miningTax.settleUp.openInEveAs', { name: fromCharacter.name }),
+        };
   if (entityId !== undefined) {
-    return <OpenInEveButton kind="information" id={entityId} name={name} />;
+    return <OpenInEveButton kind="information" id={entityId} name={name} {...from} />;
   }
   return (
     <OpenInEveButton
       kind="information"
       id={0}
       name={name}
+      {...from}
       lookup={{
         unresolvedText: t('miningTax.payees.verify.openUnresolved', { name }),
         resolveId: async () => {

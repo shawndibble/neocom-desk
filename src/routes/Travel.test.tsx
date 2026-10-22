@@ -1471,68 +1471,27 @@ describe('Travel › Route Safety › Thera / Turnur modal', () => {
   });
 });
 
-describe('Travel › Hauling (moved from Market, #3526)', () => {
-  const HAULING_FAILED = "Couldn't scan the market";
-
-  function phoneScreen() {
-    return vi.spyOn(window, 'matchMedia').mockImplementation(
-      (media: string) =>
-        ({
-          media,
-          matches: media === PHONE_QUERY,
-          addEventListener: () => {},
-          removeEventListener: () => {},
-        }) as unknown as MediaQueryList
-    );
-  }
-
-  it('is Travel’s last tab, after Route Safety and Pilot Lookup', async () => {
+describe('Travel › Hauling (moved back to Market, #4702)', () => {
+  it('has only Route Safety and Pilot Lookup tabs', async () => {
     visit(`?from=${JITA}&to=${UEDAMA}`);
     const strip = await screen.findByRole('tablist', { name: 'Travel' });
     expect(
       within(strip)
         .getAllByRole('tab')
         .map((tab) => tab.textContent)
-    ).toEqual([en.travel.routeTab, en.nav.pilotLookup, en.travel.haulingTab]);
+    ).toEqual([en.travel.routeTab, en.nav.pilotLookup]);
   });
 
-  it('opens straight from its own URL', async () => {
-    window.history.pushState({}, '', '/travel/hauling?from=amarr&to=jita');
+  it('moves an old Travel Hauling link to Market, keeping its query and hash', async () => {
+    window.history.pushState({}, '', '/travel/hauling?from=amarr&to=jita#x');
     render(<App />);
-    expect(await screen.findByText(HAULING_FAILED)).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Hauling' })).toHaveAttribute('aria-selected', 'true');
-    expect(window.location.pathname).toBe('/travel/hauling');
-  });
-
-  it('moves an old Market Hauling link here, keeping its query and hash', async () => {
-    window.history.pushState({}, '', '/market/hauling?from=amarr&to=jita#x');
-    render(<App />);
-    expect(await screen.findByText(HAULING_FAILED)).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/travel/hauling');
+    expect(await screen.findByRole('tab', { name: 'Hauling' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(window.location.pathname).toBe('/market/hauling');
     expect(window.location.search).toBe('?from=amarr&to=jita');
     expect(window.location.hash).toBe('#x');
-  });
-
-  it('leaves Route Safety’s systems behind on the way in, since its From/To are hubs', async () => {
-    const user = userEvent.setup();
-    visit(`?from=${JITA}&to=${UEDAMA}`);
-    await user.click(await screen.findByRole('tab', { name: 'Hauling' }));
-    expect(await screen.findByText(HAULING_FAILED)).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/travel/hauling');
-    expect(window.location.search).toBe('');
-  });
-
-  it('keeps the tab strip on a phone', async () => {
-    const matchMedia = phoneScreen();
-    try {
-      window.history.pushState({}, '', '/travel/hauling');
-      render(<App />);
-      expect(await screen.findByText(HAULING_FAILED)).toBeInTheDocument();
-      expect(screen.getByRole('tablist', { name: 'Travel' })).toBeInTheDocument();
-      expect(screen.getByRole('tab', { name: 'Hauling' })).toHaveAttribute('aria-selected', 'true');
-    } finally {
-      matchMedia.mockRestore();
-    }
   });
 });
 

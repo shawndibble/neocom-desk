@@ -174,6 +174,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     splitTarget,
     joinCandidateOverride,
     settleUpRows,
+    settleUpStart,
     linkWalletTarget,
     corpPayTarget,
     bulkDismissOpen,
@@ -234,13 +235,19 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     );
   }
 
-  /** Settle up from a row: that row's whole Payee balance, since that's what one transfer pays. */
+  /**
+   * Settle up from a row: that entry, paid by the Character who mined it. The
+   * rest of its Payee balance comes along unticked, to add in if wanted.
+   */
   function settleUpPayeeOf(dr: DisplayRow) {
     const payeeId = dr.assignment?.payeeId;
     const balance = balances.find((b) => b.payee.id === payeeId);
     actions.openDetail(null);
     if (balance && balance.members.length > 0)
-      actions.openSettleUp(settleUpRowsFor(balance.members));
+      actions.openSettleUp(settleUpRowsFor(balance.members), {
+        payerId: dr.row.characterId,
+        focusIds: new Set(allMembers(dr).map((m) => m.assignment.id)),
+      });
   }
 
   /** "I don't pay tax on this entry" — dismisses the whole unassigned residual in one action, no Payee needed. */
@@ -729,6 +736,8 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             open
             onClose={() => actions.openSettleUp(null)}
             rows={liveSettleUpRows ?? settleUpRows}
+            payerId={settleUpStart.payerId}
+            focusIds={settleUpStart.focusIds}
             systemNames={systemNames}
             arrivalCheck={settleUpRecheck}
             onPaid={() => {
@@ -739,13 +748,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
               const payeeIds = [...new Set(settleUpRows.map((r) => r.assignment.payeeId))];
               const only = payeeIds.length === 1 ? payeeIds[0] : undefined;
               if (!only) return undefined;
-              // The entries being settled, not the Payee's whole balance.
-              const members = settleUpRows.flatMap((r) =>
-                allDisplayRows
+              return (tickedIds: ReadonlySet<string>) => {
+                // The entries ticked to settle, not the Payee's whole balance.
+                const members = allDisplayRows
                   .flatMap(allMembers)
-                  .filter((m) => m.assignment.id === r.assignment.id)
-              );
-              return () => {
+                  .filter((m) => tickedIds.has(m.assignment.id));
                 actions.openSettleUp(null);
                 actions.openLinkWallet({ payeeId: only, members });
               };

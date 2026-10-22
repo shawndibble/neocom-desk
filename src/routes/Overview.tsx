@@ -34,6 +34,7 @@ import { guarded } from '@/app/routeChunks';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { OverviewSubNav } from '@/features/character/OverviewSubNav';
 import { DangerBanner } from '@/features/notifications/DangerBanner';
+import { WarBanner } from '@/features/wars/WarBanner';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
@@ -118,6 +119,7 @@ function Board({ characterId, layout }: BoardProps) {
       />
       <OverviewSubNav trailing={<OverviewDataAge summary={summary} />} />
       <DangerBanner />
+      <WarBanner characterId={characterId} />
       <OverviewCachedNotice summary={summary} />
       {editing && (
         <Suspense fallback={null}>
@@ -224,6 +226,7 @@ export function Overview() {
         <CharacterHeader characterId={activeCharacterId} overview />
         <OverviewSubNav />
         <DangerBanner />
+        <WarBanner characterId={activeCharacterId} />
         <Suspense
           fallback={
             <Centered>

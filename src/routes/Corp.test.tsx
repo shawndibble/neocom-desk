@@ -419,12 +419,13 @@ describe('the layout', () => {
     );
   });
 
-  it('offers the section’s sub-nav', async () => {
+  it('draws no sub-nav of its own', async () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
     mocked.loadCorporationMemberTracking.mockResolvedValue(cached([]));
     mocked.loadCorporationMemberIds.mockResolvedValue(cached([]));
     renderCorp();
-    expect(await screen.findByRole('navigation', { name: 'Corporation' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Corp Board' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Corporation' })).not.toBeInTheDocument();
   });
 });
 

@@ -486,7 +486,7 @@ describe('AppraisalPanel', () => {
 
     async function compareCards() {
       const toggle = await screen.findByRole('button', { name: 'Compare hubs' });
-      if (toggle.getAttribute('aria-expanded') === 'false') {
+      if (toggle.getAttribute('aria-pressed') === 'false') {
         await userEvent.click(toggle);
       }
       return screen.findByRole('list', { name: 'Compare hubs' });
@@ -503,12 +503,12 @@ describe('AppraisalPanel', () => {
 
     it('is absent until something has been appraised', () => {
       renderPanel({ controller: controller({ result: null, compare: null }) });
-      expect(screen.queryByText('Compare hubs')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Compare hubs' })).not.toBeInTheDocument();
     });
 
     it('gives all 5 Trade Hubs a card, collapsed by default', async () => {
       renderPanel({ controller: controller({ result: outcome(), compare: COMPARE_ROWS }) });
-      expect(screen.getByText('Compare hubs')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Compare hubs' })).toBeInTheDocument();
       expect(screen.queryByRole('list', { name: 'Compare hubs' })).not.toBeInTheDocument();
 
       const list = await compareCards();
@@ -565,9 +565,73 @@ describe('AppraisalPanel', () => {
       renderPanel({ controller: controller({ result: outcome(), compare: COMPARE_ROWS }) });
       const list = await compareCards();
       // Jita's buy is null here, so only its sell total is a copy target.
-      expect(within(hubCard(list, TRADE_HUBS[0].systemName)).getAllByRole('button')).toHaveLength(
-        1
+      expect(
+        within(hubCard(list, TRADE_HUBS[0].systemName)).getAllByRole('button', { name: /^Copy / })
+      ).toHaveLength(1);
+    });
+
+    it('switches the appraisal to a hub when its card is clicked', async () => {
+      const onHubChange = vi.fn();
+      renderPanel({
+        controller: controller({ result: outcome(), compare: COMPARE_ROWS }),
+        onHubChange,
+      });
+      const list = await compareCards();
+      const amarr = hubCard(list, TRADE_HUBS[1].systemName);
+
+      // The title stretches over the whole card in CSS (`after:inset-0`),
+      // which jsdom can't lay out, so the title button stands in for the card.
+      await userEvent.click(
+        within(amarr).getByRole('button', { name: `Appraise at ${TRADE_HUBS[1].systemName}` })
       );
+      expect(onHubChange).toHaveBeenLastCalledWith(TRADE_HUBS[1].id);
+
+      await userEvent.click(
+        within(hubCard(list, TRADE_HUBS[2].systemName)).getByRole('button', {
+          name: `Appraise at ${TRADE_HUBS[2].systemName}`,
+        })
+      );
+      expect(onHubChange).toHaveBeenLastCalledWith(TRADE_HUBS[2].id);
+    });
+
+    it('copies a total without switching the hub', async () => {
+      configureClipboard(async () => {});
+      const onHubChange = vi.fn();
+      renderPanel({
+        controller: controller({ result: outcome(), compare: COMPARE_ROWS }),
+        onHubChange,
+      });
+      const list = await compareCards();
+      const amarr = hubCard(list, TRADE_HUBS[1].systemName);
+      await userEvent.click(within(amarr).getByRole('button', { name: 'Copy 4,000 ISK' }));
+      expect(onHubChange).not.toHaveBeenCalled();
+      configureClipboard(null);
+    });
+
+    it('marks the hub the appraisal is quoted at, and links no system', async () => {
+      renderPanel({
+        controller: controller({ result: outcome(), compare: COMPARE_ROWS }),
+        hub: TRADE_HUBS[1],
+      });
+      const list = await compareCards();
+      expect(hubCard(list, TRADE_HUBS[1].systemName)).toHaveAttribute('aria-current', 'true');
+      expect(hubCard(list, TRADE_HUBS[0].systemName)).not.toHaveAttribute('aria-current');
+      expect(within(list).queryAllByRole('link')).toHaveLength(0);
+    });
+
+    it('does nothing when the hub already quoted is clicked', async () => {
+      const onHubChange = vi.fn();
+      renderPanel({
+        controller: controller({ result: outcome(), compare: COMPARE_ROWS }),
+        onHubChange,
+      });
+      const list = await compareCards();
+      await userEvent.click(
+        within(hubCard(list, TRADE_HUBS[0].systemName)).getByRole('button', {
+          name: `Appraise at ${TRADE_HUBS[0].systemName}`,
+        })
+      );
+      expect(onHubChange).not.toHaveBeenCalled();
     });
   });
 

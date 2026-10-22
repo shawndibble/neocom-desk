@@ -535,20 +535,16 @@ describe('Message the requester', () => {
     expect(await screen.findByText('Opened in your EVE client.')).toBeInTheDocument();
   });
 
-  it('explains the missing Permission with the Grant link instead of failing', async () => {
+  it('hides Message without the Open in EVE Permission', async () => {
     const user = userEvent.setup();
     await grant();
     renderTab([request({ ownerUid: 'char:2119000001' })]);
     await user.click(screen.getByText('Tritanium'));
-    const button = await screen.findByRole('button', { name: 'Message Aria Voss…' });
-    await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'true'));
-    await user.click(button);
+    await screen.findByRole('dialog');
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Message Aria Voss…' })).not.toBeInTheDocument()
+    );
     expect(world.newMail).not.toHaveBeenCalled();
-    const panel = screen.getByRole('dialog');
-    expect(within(panel).getByText(/needs the Open in EVE Permission/)).toBeInTheDocument();
-    expect(
-      within(panel).getByRole('link', { name: 'Grant missing Permissions' })
-    ).toBeInTheDocument();
   });
 
   it('says so when the game refuses, and offers no Message on my own Request', async () => {

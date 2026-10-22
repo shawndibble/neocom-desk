@@ -12,8 +12,22 @@ vi.mock('./ledgerActions', () => ({
 }));
 
 vi.mock('@/features/openInEve/OpenInEveButton', () => ({
-  OpenInEveButton: ({ id, kind, lookup }: { id: number; kind: string; lookup?: unknown }) => (
-    <button type="button">{`Open ${kind} ${lookup ? 'by name' : String(id)}`}</button>
+  OpenInEveButton: ({
+    id,
+    kind,
+    lookup,
+    characterId,
+    label,
+  }: {
+    id: number;
+    kind: string;
+    lookup?: unknown;
+    characterId?: number;
+    label?: string;
+  }) => (
+    <button type="button" data-from={characterId} title={label}>
+      {`Open ${kind} ${lookup ? 'by name' : String(id)}`}
+    </button>
   ),
 }));
 
@@ -53,7 +67,12 @@ const THREE_ROWS = [
 
 function renderDialog(
   rows: readonly SettleUpRow[],
-  extra: { onPickFromWallet?: () => void; onPaid?: () => void } = {}
+  extra: {
+    onPickFromWallet?: (tickedIds: ReadonlySet<string>) => void;
+    onPaid?: () => void;
+    payerId?: number;
+    focusIds?: ReadonlySet<string>;
+  } = {}
 ) {
   return render(
     <SettleUpDialog
@@ -63,6 +82,8 @@ function renderDialog(
       systemNames={new Map([[30000142, 'Jita']])}
       onPaid={extra.onPaid ?? vi.fn()}
       onPickFromWallet={extra.onPickFromWallet}
+      payerId={extra.payerId}
+      focusIds={extra.focusIds}
     />
   );
 }
@@ -215,5 +236,94 @@ describe('SettleUpDialog', () => {
     renderDialog(THREE_ROWS, { onPickFromWallet });
     await userEvent.click(screen.getByRole('button', { name: 'Already in my wallet? Pick it…' }));
     expect(onPickFromWallet).toHaveBeenCalledOnce();
+    expect(onPickFromWallet).toHaveBeenCalledWith(new Set(['a-1', 'a-2', 'a-3']));
+  });
+});
+
+describe('SettleUpDialog paying from one Character', () => {
+  const ARCHANGEL = 1;
+  const OTICHODA = 2;
+  const by = (
+    characterId: number,
+    characterName: string,
+    id: string,
+    date: string,
+    taxOwed: number
+  ): SettleUpRow => ({
+    assignment: { ...assignment(id, date, taxOwed), characterId },
+    characterName,
+    payeeName: 'Corp Wallet',
+    payeeEntityId: 98_000_001,
+  });
+  const MIXED = [
+    by(ARCHANGEL, 'Ashken Archangel', 'arch-1', '2026-10-20', 18_000_000),
+    by(OTICHODA, 'Ashken Otichoda', 'oti-1', '2026-10-20', 1_300_000),
+    by(OTICHODA, 'Ashken Otichoda', 'oti-2', '2026-10-21', 8_300_000),
+  ];
+
+  beforeEach(() => {
+    settle.mockReset();
+    settle.mockResolvedValue({ ok: true, value: undefined });
+  });
+
+  it("asks who pays when the entries span Characters, ticking only the payer's", async () => {
+    renderDialog(MIXED, { payerId: OTICHODA });
+    const from = screen.getByRole('group', { name: 'Paying from' });
+    expect(from).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Ashken Otichoda · 9,600,000 ISK/ })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await userEvent.click(screen.getByRole('button', { name: RECORD }));
+    expect(paidIds()).toEqual(['oti-1', 'oti-2']);
+  });
+
+  it('opens the Payee in EVE from the paying Character, on its own row', () => {
+    renderDialog(MIXED, { payerId: OTICHODA });
+    const open = screen.getByRole('button', { name: 'Open information 98000001' });
+    expect(open).toHaveAttribute('data-from', String(OTICHODA));
+    expect(open).toHaveAttribute('title', 'Open in EVE · Ashken Otichoda');
+  });
+
+  it("switching the payer ticks exactly the new payer's entries and opens EVE from it", async () => {
+    renderDialog(MIXED, { payerId: OTICHODA });
+    await userEvent.click(screen.getByRole('button', { name: /Ashken Archangel · / }));
+    expect(screen.getByRole('button', { name: 'Open information 98000001' })).toHaveAttribute(
+      'data-from',
+      String(ARCHANGEL)
+    );
+    await userEvent.click(screen.getByRole('button', { name: RECORD }));
+    expect(paidIds()).toEqual(['arch-1']);
+  });
+
+  it("can tick in another Character's entries to pay on their behalf", async () => {
+    renderDialog(MIXED, { payerId: ARCHANGEL });
+    await userEvent.click(
+      screen.getByRole('button', { name: /Also pay for other characters · 2 entries/ })
+    );
+    await userEvent.click(screen.getAllByRole('checkbox', { name: 'Include 2026-10-21' })[0]);
+    await userEvent.click(screen.getByRole('button', { name: RECORD }));
+    expect(paidIds()).toEqual(['arch-1', 'oti-2']);
+  });
+
+  it("from one entry, ticks only it and offers the payer's other entries unticked", async () => {
+    renderDialog(MIXED, { payerId: OTICHODA, focusIds: new Set(['oti-1']) });
+    expect(screen.getByRole('button', { name: /1 entry · 2026-10-20/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Also pay 1 other entry/ }));
+    await userEvent.click(screen.getByRole('button', { name: RECORD }));
+    expect(paidIds()).toEqual(['oti-1']);
+  });
+
+  it('adds a held-back entry of the same payer when ticked in', async () => {
+    renderDialog(MIXED, { payerId: OTICHODA, focusIds: new Set(['oti-1']) });
+    await userEvent.click(screen.getByRole('button', { name: /Also pay 1 other entry/ }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include 2026-10-21' }));
+    await userEvent.click(screen.getByRole('button', { name: RECORD }));
+    expect(paidIds()).toEqual(['oti-1', 'oti-2']);
+  });
+
+  it('asks nothing when one Character owes it all', () => {
+    renderDialog(THREE_ROWS);
+    expect(screen.queryByRole('group', { name: 'Paying from' })).not.toBeInTheDocument();
   });
 });

@@ -45,6 +45,19 @@ export const WithCount: Story = {
   },
 };
 
+/** @summary A count can be toned when it is work waiting (`warning`) or something to recover (`danger`); the number always prints. */
+export const WithToneCount: Story = {
+  args: {
+    tabs: [
+      { id: 'all', label: 'All', count: 120 },
+      { id: 'deliveries', label: 'Corp deliveries', count: 4, countTone: 'warning' },
+      { id: 'impounded', label: 'Impounded', count: 2, countTone: 'danger' },
+    ],
+    value: 'all',
+    label: 'Corporation assets',
+  },
+};
+
 /** @summary More tabs than fit: the bar scrolls sideways instead of squeezing. Shown at 390 wide. */
 export const OverflowOnPhone: Story = {
   args: {

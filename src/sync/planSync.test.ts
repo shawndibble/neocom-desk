@@ -1,3 +1,4 @@
+import { failureAnnotation } from '@/observability/reportFailure';
 import { REMOTE_COLLECTIONS } from './syncedCollections';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore/lite';
@@ -2207,6 +2208,24 @@ describe('sync orchestration', () => {
     expect(error).toBeInstanceOf(AggregateError);
     expect((error as AggregateError).errors).toHaveLength(2);
     expect(getSyncStatus(1).error).toMatch(/offline \(and 1 more\)$/);
+  });
+
+  it('names the collections that failed, and their codes, for the report', async () => {
+    const denied = (message: string) =>
+      Object.assign(new Error(message), { code: 'permission-denied' });
+    vi.mocked(getDocs).mockImplementation((async (target: FakeQuery) => {
+      if (target.col.path === PLANS_PATH) throw denied('plans');
+      if (target.col.path === BUILD_PLANS_PATH) throw denied('build plans');
+      return fake.getDocsImpl(target);
+    }) as never);
+
+    const error = await triggerSync(1).catch((e: unknown) => e);
+
+    expect(failureAnnotation(error)).toEqual({
+      failed_collections: expect.stringMatching(/^(plans,buildPlans|buildPlans,plans)$/),
+      failed_count: '2',
+      error_codes: 'permission-denied',
+    });
   });
 
   it('debounces scheduleSync into a single run', async () => {

@@ -3,11 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { ColumnPickerMenu, IconButton, MenuItem } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { TableActionsMenu } from '@/components/ui/TableExport';
-import { Caret } from '@/components/ui/Disclosure';
-import { textActionClassName } from '@/components/ui/textActionClassName';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { MAX_SNAPSHOT_ITEMS } from '@/engine/market/appraisalSnapshot';
-import { useIsPhone } from '@/lib/useIsPhone';
 import type { AppraisalController } from './useAppraisal';
 import { useAppraisalColumns } from './useAppraisalColumns';
 import { useAppraisalCopyLists, COPY_LISTS } from './useAppraisalCopyLists';
@@ -42,30 +39,18 @@ export function AppraisalResultActions({
   rowCount,
 }: AppraisalResultActionsProps) {
   const { t } = useTranslation();
-  const isPhone = useIsPhone();
   return (
     <>
-      {compare !== null &&
-        (isPhone ? (
-          <IconButton
-            size="sm"
-            icon={<Icon.Compare />}
-            label={t('market.appraisal.compareHubsTitle')}
-            pressed={compareExpanded}
-            onClick={() => onToggleCompare()}
-          />
-        ) : (
-          <button
-            type="button"
-            aria-expanded={compareExpanded}
-            onClick={() => onToggleCompare()}
-            className={textActionClassName('gap-1 normal-case')}
-          >
-            {t('market.appraisal.compareHubsTitle')}
-            {/* The cards open above the table, so open points up. */}
-            <Caret expanded={compareExpanded} opensUp />
-          </button>
-        ))}
+      {/* An icon at every width, like the Columns, Share and export controls beside it. */}
+      {compare !== null && (
+        <IconButton
+          size="sm"
+          icon={<Icon.Compare />}
+          label={t('market.appraisal.compareHubsTitle')}
+          pressed={compareExpanded}
+          onClick={() => onToggleCompare()}
+        />
+      )}
       <ColumnPickerMenu
         available={availableColumns}
         visible={visibleColumns}

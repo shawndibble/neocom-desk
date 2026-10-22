@@ -87,20 +87,24 @@ function assertUnclaimed(
  * unpaid row instead of spawning a fresh one on every ledger refresh. Moving
  * the flag (not adding a second) keeps one collector per entry, which
  * `SplitDialog` and coalescing rely on; the paid record's status, ore and tax
- * stay as they are. Meant to run inside the write's transaction.
+ * stay as they are. `takesGrowth` moves the flag the same way whatever the
+ * collector's status (a Survey connection's ore). Meant to run inside the
+ * write's transaction.
  */
 async function claimNewOre(
   record: MiningTaxAssignmentRecord,
-  entryOreLines?: readonly MiningTaxOreLine[]
+  entryOreLines?: readonly MiningTaxOreLine[],
+  takesGrowth = false
 ): Promise<MiningTaxAssignmentRecord[]> {
   const covering = (
     await db.miningTaxAssignments.where('characterId').equals(record.characterId).toArray()
   ).filter((a) => a.date === record.date && a.solarSystemId === record.solarSystemId);
   assertUnclaimed(covering, record.oreLines, entryOreLines);
+  if (covering.length === 0) return [record];
   const collector = growthCollector(covering);
-  if (collector?.status !== 'paid') return [record];
+  if (!takesGrowth && collector?.status !== 'paid') return [record];
   record.collectsGrowth = true;
-  if (!collector.collectsGrowth) return [record];
+  if (!collector?.collectsGrowth) return [record];
   const handedOver: MiningTaxAssignmentRecord = { ...collector, updatedAt: record.updatedAt };
   delete handedOver.collectsGrowth;
   return [record, handedOver];
@@ -135,6 +139,12 @@ export interface AssignInput {
   markPaid: boolean;
   /** Optional "Moon / structure" note; metadata only. */
   label?: string;
+  /**
+   * Make this the entry's growth collector even over an unpaid one: a Survey
+   * connection's ore (issue #4684), so ore mined after it goes to the moon
+   * now being mined rather than growing into an earlier moon's Assignment.
+   */
+  takesGrowth?: boolean;
 }
 
 /** The `rawOrePriced` marker for a value snapshotted under the Ore Form setting as it stands now. */
@@ -164,7 +174,9 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
   // Check and write in one transaction so two tabs cannot both pass the check
   // (under a ledger action this joins the action's own transaction).
   await db.transaction('rw', db.miningTaxAssignments, async () => {
-    await db.miningTaxAssignments.bulkPut(await claimNewOre(record, input.entryOreLines));
+    await db.miningTaxAssignments.bulkPut(
+      await claimNewOre(record, input.entryOreLines, input.takesGrowth)
+    );
   });
   return record;
 }

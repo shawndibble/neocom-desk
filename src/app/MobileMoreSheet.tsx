@@ -9,22 +9,28 @@ import { cx } from '@/lib/cx';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
 import { useHiddenTabPaths } from './useHiddenTabPaths';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
+import { useCorpViewCapabilities } from '@/features/corp/useCorpViewCapabilities';
 import { useCommandPalette } from '@/features/commandPalette/store';
-import { listNavDestinations, railGroups, type NavPage } from './navDestinations';
+import {
+  isNavPageAvailable,
+  listNavDestinations,
+  railGroups,
+  type NavPage,
+} from './navDestinations';
 import { canHide, FOOTER_PAGES, recentNavFor, viewPathFor } from './navRail';
 import { useHiddenNav, useRecentNav } from './navPreferences';
 import { NavHideToggle, NavItem } from './NavItem';
-import type { AppRoutePath } from './routeScopes';
 
 export const MORE_SHEET_ID = 'mobile-more-sheet';
 
 const SHEET_GROUPS = railGroups();
-const NO_LOCKS: ReadonlySet<AppRoutePath> = new Set();
+const NO_LOCKS: ReadonlySet<string> = new Set();
 const ALL_CORP_VIEWS = {
   canReadMembers: true,
   canReadWallet: true,
   canReadAssets: true,
   canReadMiningLedger: true,
+  canReadRoleAudit: true,
 };
 
 const TILE_GRID = 'grid grid-cols-4 gap-1.5';
@@ -33,7 +39,7 @@ const HEADING = 'text-[0.625rem] font-semibold tracking-widest text-text-dim upp
 interface MobileMoreSheetProps {
   open: boolean;
   onClose: () => void;
-  locked: ReadonlySet<AppRoutePath>;
+  locked: ReadonlySet<string>;
   /**
    * The active Character's portrait link, which `Layout` owns, given the page
    * to return to once a Character is picked (#1764).
@@ -53,7 +59,7 @@ interface MobileMoreSheetProps {
  *
  * Pages the pilot hid fold into one row that opens in place, so the sheet
  * still reaches every page (“never in neither”). Corp
- * shows only while the Character has corp access; Settings, Help and the
+ * pages show only while the Character has corp access, each for its own capability; Settings, Help and the
  * Character link have permanent rows at the foot.
  *
  * A real modal: it covers the viewport, so the tab bar underneath must not stay
@@ -66,8 +72,9 @@ export function MobileMoreSheet({
   renderCharacterLink,
 }: MobileMoreSheetProps) {
   const { t } = useTranslation();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const corpVisible = useCorpNavVisible();
+  const corpCapabilities = useCorpViewCapabilities();
   const hiddenTabPaths = useHiddenTabPaths();
   const hidden = useHiddenNav((state) => state.value);
   const recent = useRecentNav((state) => state.value);
@@ -94,7 +101,9 @@ export function MobileMoreSheet({
   );
 
   const inSheet = (page: NavPage) =>
-    page.gating === 'corp' ? corpVisible : page.path !== '/characters';
+    page.gating === 'corp'
+      ? isNavPageAvailable(page, corpVisible, corpCapabilities)
+      : page.path !== '/characters';
   const hiddenSet = new Set(hidden);
   const groups = SHEET_GROUPS.map((group) => ({
     ...group,
@@ -285,7 +294,7 @@ export function MobileMoreSheet({
               />
             ))}
           </div>
-          {renderCharacterLink(pathname)}
+          {renderCharacterLink(pathname + search)}
         </div>
       </div>
     </Modal>

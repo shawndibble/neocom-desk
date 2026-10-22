@@ -784,6 +784,10 @@ export function systemZkillUrl(systemId: number): string {
   return `https://zkillboard.com/system/${systemId}/`;
 }
 
+export function warZkillUrl(warId: number): string {
+  return `https://zkillboard.com/war/${warId}/`;
+}
+
 export function characterZkillUrl(characterId: number): string {
   return `https://zkillboard.com/character/${characterId}/`;
 }

@@ -1,5 +1,5 @@
 /**
- * The Corp overview's own reads: their shapes, and thin loaders that pull the
+ * The Corp Board's own reads: their shapes, and thin loaders that pull the
  * real work in behind `import()` (`corpFeedLoaders.ts`), like the structure
  * and moon reads in `../../data/boardData.ts`. The corp reads, role checks and
  * engines are for the few pilots with corp roles; the Overview's first paint
@@ -23,6 +23,7 @@ import type { MemberActivity, RosterDiff } from '@/engine/corp/members';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { RoleAuditData } from '@/features/corp/roleAudit';
 import type { WalletDivision } from '@/features/corp/divisions';
+import type { CorpAssetsSummary } from './corpAssetsSummary';
 import type { PilotStats, ZkillFailureReason } from '@/lib/zkillboard';
 
 interface CorpFeedBase {
@@ -68,6 +69,15 @@ export interface CorpCustomsFeed extends CorpFeedBase {
   typeNames: ReadonlyMap<number, string>;
   /** Solar system names from the static data; a missing one degrades one cell. */
   systemNames: ReadonlyMap<number, string>;
+}
+
+export interface CorpAssetsFeed extends CorpFeedBase {
+  /** Null when unreadable. */
+  corporationId: number | null;
+  /** The ledger's counts and values; null when unreadable. */
+  summary: CorpAssetsSummary | null;
+  /** The read hit its page cap, so the counts are a floor. */
+  truncated: boolean;
 }
 
 export interface CorpRoleAuditFeed extends CorpFeedBase {
@@ -197,6 +207,11 @@ export async function loadCorpOrdersFeed(characterId: number): Promise<CorpOrder
 export async function loadCorpKillsFeed(characterId: number): Promise<CorpKillsFeed> {
   const { loadCorpKills } = await import('./corpFeedLoaders');
   return loadCorpKills(characterId);
+}
+
+export async function loadCorpAssetsFeed(characterId: number): Promise<CorpAssetsFeed> {
+  const { loadCorpAssets } = await import('./corpFeedLoaders');
+  return loadCorpAssets(characterId);
 }
 
 export async function loadCorpCustomsFeed(characterId: number): Promise<CorpCustomsFeed> {

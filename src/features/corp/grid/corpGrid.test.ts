@@ -27,7 +27,7 @@ const drawnFor = (caps: CorpCapabilities) => {
     .map((w) => w.kind);
 };
 
-describe('the Corp overview default layout', () => {
+describe('the Corp Board default layout', () => {
   it('opens with the clocks first, then money, then people, like the board it replaces', () => {
     expect(corpDefaultLayout().widgets.map((w) => w.kind)).toEqual([...CORP_DEFAULT_KINDS]);
     expect(CORP_DEFAULT_KINDS.slice(0, 2)).toEqual(['corpDeadlines', 'structures']);
@@ -71,7 +71,7 @@ describe('the Corp overview default layout', () => {
   });
 });
 
-describe('the Corp overview board', () => {
+describe('the Corp Board board', () => {
   it('offers only corp kinds, hides what the Character cannot read, and has no Character scope', () => {
     const board = corpWidgetBoard({ ...NO_CORP_CAPABILITIES, canReadWallet: true });
     expect(board.id).toBe('corp');

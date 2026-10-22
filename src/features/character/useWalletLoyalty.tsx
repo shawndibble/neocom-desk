@@ -1,12 +1,13 @@
 import { formatCount } from '@/lib/formatCount';
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { RowCaret, type DataTableColumn } from '@/components/ui';
+import { IconButton, RowCaret, type DataTableColumn } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { useUrlSort } from '@/lib/useUrlState';
 import { splitEverMarks } from '@/features/character/loyalty';
+import { usePublicInfoModal } from '@/stores/publicInfoModal';
 import { loyaltyPointsCsvColumns } from '@/features/character/loyaltyPointsCsv';
 import type { CachedResult } from '@/esi/cache';
 import type { CharacterLoyaltyPoints } from '@/esi/endpoints';
@@ -22,6 +23,7 @@ export function useWalletLoyalty(
   corporationNames: ReadonlyMap<number, string>
 ) {
   const { t } = useTranslation();
+  const { open: openInfo } = usePublicInfoModal();
   const { everMarks, otherLoyalty } = useMemo(
     () => splitEverMarks(loyaltyResult?.data ?? []),
     [loyaltyResult]
@@ -32,17 +34,27 @@ export function useWalletLoyalty(
       {
         id: 'corporation',
         header: t('loyalty.corporation'),
-        // The row navigates to the LP Store (§6c): the name is its accent
-        // link, the caret column closes the row. Show Info for the corporation
-        // is on the LP Store page header.
-        render: (entry) => (
-          <Link
-            to={`/wallet/lp-store/${entry.corporation_id}`}
-            className={entityLinkClassName('group')}
-          >
-            {corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
-          </Link>
-        ),
+        // The row navigates to the LP Store (§6c): the name is plain accent
+        // text, not a link that would steal the row's click, and the caret
+        // column closes the row. The ⓘ opens the corporation's Show Info
+        // without leaving the Wallet, though the LP Store header carries it
+        // too (docs/context/decisions/20261021-210214-wallet-lp-rows-carry-an-in-row-show.md).
+        // DataTable leaves a click on a button inside the row to that button.
+        render: (entry) => {
+          const name = corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`;
+          return (
+            <span className="flex items-center gap-1">
+              <span className={entityLinkClassName('min-w-0 truncate')}>{name}</span>
+              <IconButton
+                size="sm"
+                icon={<Icon.Info />}
+                label={t('loyalty.corporationInfo', { corporation: name })}
+                tooltip={t('loyalty.corporationInfoShort')}
+                onClick={() => openInfo('corporation', entry.corporation_id)}
+              />
+            </span>
+          );
+        },
         sortValue: (entry) =>
           corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
       },
@@ -61,7 +73,7 @@ export function useWalletLoyalty(
         render: () => <RowCaret />,
       },
     ],
-    [t, corporationNames]
+    [t, corporationNames, openInfo]
   );
   const sortProps = useUrlSort(
     'loyalty.sort',

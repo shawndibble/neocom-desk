@@ -312,6 +312,8 @@ export function AppraisalPanel({
             cargo={cargo}
             onCargoChange={(next) => void setCargo(next)}
             characterId={characterId}
+            hubId={hub.id}
+            onHubChange={onHubChange}
           />
         )}
 

@@ -5,8 +5,10 @@
  * field and a name field, always shown like the location and notes, since a rate
  * means little without its payee. Focus leaving the pair saves it, as for the
  * other two. The name completes from the pilot's Payees (and fills in that
- * Payee's rate), and the button opens the Tax tab, where the ledger shows what
- * is owed once the ore is in it.
+ * Payee's rate). Manage Taxes connects the Survey's moon to that Payee
+ * (`useSurveyConnection`, issue #4684): the Payee is added if need be, ore
+ * already mined there is assigned, and ore mined until the Survey's ETA is
+ * assigned as it reaches the ledger, so the pilot never assigns it by hand.
  *
  * The fields start blank for each survey (only what the survey itself stored
  * comes back), so a tax is shown only when the pilot sets it.
@@ -16,16 +18,20 @@
  * name and rate is also stored on the survey (`setSurveyTax`), so everyone with
  * the link sees it.
  */
-import { useEffect, useId, useRef, useState, type FocusEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useId, useRef, useState, type FocusEvent, type ReactNode } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, Modal, TextInput } from '@/components/ui';
+import { Button, TextInput, Toast } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import type { SurveyConnection } from '@/engine/miningTax/surveyConnection';
+import { eveWhen } from '@/lib/eveTime';
+import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { InfoRow } from './InfoRow';
 import { blockedButtonClassName, blockedReasonClassName } from './blockedActionStyles';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useSurveyPayeeId } from '@/features/miningTax/surveyPayeePref';
-import { createPayee, loadPayees } from '@/features/miningTax/payees';
+import { loadPayees } from '@/features/miningTax/payees';
 import {
   ensurePayee,
   findPayeeByName,
@@ -35,6 +41,11 @@ import {
   type TaxDraft,
 } from './moonTaxPayee';
 import { setSurveyTax, type SurveyTaxShare } from './surveyStore';
+import {
+  useSurveyConnection,
+  type ConnectableSurvey,
+  type ConnectionToast,
+} from './useSurveyConnection';
 
 /** The stored survey this row publishes its tax to, and what is already stored there. */
 export interface TaxSurvey {
@@ -43,17 +54,124 @@ export interface TaxSurvey {
   published: SurveyTaxShare | null;
 }
 
+/** "Assigning to … until …", with the Tax tab and Stop: what a connected Survey shows in place of Manage Taxes. */
+function ConnectedNote({
+  connection,
+  nowMs,
+  onStop,
+  stopId,
+}: {
+  connection: SurveyConnection;
+  nowMs: number;
+  onStop: () => void;
+  stopId: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 sm:ml-auto">
+      <span role="status" className="text-sm text-text-dim">
+        {connection.systemId === null
+          ? t('survey.moonTax.connectedNoLocation', { name: connection.payeeName })
+          : t('survey.moonTax.connected', {
+              name: connection.payeeName,
+              time: eveWhen(connection.untilMs, nowMs),
+            })}
+      </span>
+      <Link to={MINING_TAX_HREF} className={inlineLinkClassName}>
+        {t('survey.moonTax.openTax')}
+      </Link>
+      <Button id={stopId} size="sm" variant="ghost" className="touch:min-h-11" onClick={onStop}>
+        {t('survey.moonTax.stop')}
+      </Button>
+    </div>
+  );
+}
+
+function ConnectionToastView({
+  toast,
+  onClose,
+}: {
+  toast: ConnectionToast | null;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  if (toast === null) return null;
+  return (
+    <Toast
+      message={toast.message}
+      undo={{ label: t('survey.moonTax.undo'), onUndo: toast.onUndo }}
+      onClose={onClose}
+    />
+  );
+}
+
+/**
+ * The Survey connection behind Manage Taxes, with focus handed between Manage
+ * Taxes and Stop as they swap places (DESIGN §6c focus) and a failed Stop or
+ * Undo reported through `onFailed`.
+ */
+function useManageTaxes(
+  options: Omit<Parameters<typeof useSurveyConnection>[0], 'onFailed'>,
+  onFailed: () => void
+) {
+  const moon = useSurveyConnection({ ...options, onFailed });
+  const manageId = useId();
+  const stopId = useId();
+  const focusAfterCommit = useFocusAfterCommit();
+  const byId = (id: string) => () => document.getElementById(id);
+  return {
+    ...moon,
+    manageId,
+    stopId,
+    connect: async () => {
+      await moon.connect();
+      focusAfterCommit(byId(stopId));
+    },
+    stop: () => {
+      void moon.stop().then(() => focusAfterCommit(byId(manageId)), onFailed);
+    },
+  };
+}
+
+/** Manage Taxes (`children`) until the Survey is connected, then what it is doing, plus its Undo toast. */
+function MoonConnectionSlot({
+  moon,
+  children,
+}: {
+  moon: ReturnType<typeof useManageTaxes>;
+  children: ReactNode;
+}) {
+  return (
+    <>
+      {moon.connection ? (
+        <ConnectedNote
+          connection={moon.connection}
+          nowMs={moon.now}
+          stopId={moon.stopId}
+          onStop={moon.stop}
+        />
+      ) : (
+        children
+      )}
+      <ConnectionToastView toast={moon.toast} onClose={moon.closeToast} />
+    </>
+  );
+}
+
 /** Stable fallback while the live query loads, so `payees` keeps one identity. */
 const NO_PAYEES: Awaited<ReturnType<typeof loadPayees>> = [];
 
 export function MoonTaxRow({
   characterId,
   survey,
+  connectable,
   draft,
   onDraftChange,
 }: {
   characterId: number;
   survey?: TaxSurvey;
+  /** The Survey as connected by Manage Taxes; without it the button only opens the Tax tab. */
+  connectable?: ConnectableSurvey;
   /**
    * The draft, when the panel holds it, so a template can fill it. Without
    * these the row keeps its own.
@@ -79,6 +197,10 @@ export function MoonTaxRow({
   const pct = parseTaxPct(saved.pct);
   const name = saved.name.trim();
   const ready = name !== '' && pct !== null;
+  const moon = useManageTaxes(
+    { characterId, survey: connectable, tax: ready ? { name, pct } : null, updateRate: true },
+    () => setFailed(true)
+  );
 
   // Stored on the survey once focus leaves the pair. Best effort: a failed write
   // is not retried until the name or rate changes, and the local line is unaffected.
@@ -110,9 +232,13 @@ export function MoonTaxRow({
     setBusy(true);
     setFailed(false);
     try {
-      const payee = await ensurePayee(characterId, saved.name, pct);
-      await useSurveyPayeeId.getState().setValue(payee.id);
-      navigate(MINING_TAX_HREF);
+      if (connectable) {
+        await moon.connect();
+      } else {
+        const payee = await ensurePayee(characterId, saved.name, pct);
+        await useSurveyPayeeId.getState().setValue(payee.id);
+        navigate(MINING_TAX_HREF);
+      }
     } catch {
       setFailed(true);
     } finally {
@@ -165,15 +291,18 @@ export function MoonTaxRow({
             ))}
           </datalist>
         </div>
-        <Button
-          size="sm"
-          className="touch:min-h-11 sm:ml-auto"
-          disabled={!ready}
-          loading={busy}
-          onClick={() => void openTax()}
-        >
-          {t('survey.moonTax.open')}
-        </Button>
+        <MoonConnectionSlot moon={moon}>
+          <Button
+            id={moon.manageId}
+            size="sm"
+            className="touch:min-h-11 sm:ml-auto"
+            disabled={!ready}
+            loading={busy}
+            onClick={() => void openTax()}
+          >
+            {t('survey.moonTax.open')}
+          </Button>
+        </MoonConnectionSlot>
         {failed && (
           <span role="alert" className="w-full text-xs text-danger">
             {t('survey.moonTax.failed')}
@@ -186,66 +315,54 @@ export function MoonTaxRow({
 
 /**
  * The read-only line, for everyone but the owner (in the app or on the public
- * page): the rate and who gets it, as the owner set them, and Manage Taxes into
- * the Tax tab. Logged out it is disabled with "Log in to access" right under it, like
- * Set waypoint. Logged in, a Payee of the viewer's by that name (any case) is
- * handed to the tab as is, keeping the viewer's own rate; without one, the
- * viewer is asked whether to add it at the owner's rate first. Declining still
- * opens the tab; closing the dialog stays here.
+ * page): the rate and who gets it, as the owner set them, and Manage Taxes.
+ * Logged out it is disabled with "Log in to access" right under it, like Set
+ * waypoint. Logged in, one click connects the Survey's moon to that Payee
+ * (`useSurveyConnection`): a Payee of the viewer's by that name (any case) is
+ * used as is, keeping the viewer's own default rate; without one it is added
+ * at the owner's rate, with Undo. Without the Survey to connect it only opens
+ * the Tax tab.
  */
-export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
+export function MoonTaxReadout({
+  tax,
+  connectable,
+}: {
+  tax: SurveyTaxShare;
+  connectable?: ConnectableSurvey;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
-  const [addPayeeOpen, setAddPayeeOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const inFlight = useRef(false);
   const hintId = useId();
   const loggedOut = characterId === null;
+  const moon = useManageTaxes(
+    { characterId, survey: connectable, tax: { name: tax.name, pct: tax.pct }, updateRate: false },
+    () => setFailed(true)
+  );
 
-  /** One step at a time; a failure shows the alert. Resolves to the step's result, undefined when it didn't run or failed. */
-  async function run<T>(step: (id: number) => Promise<T>): Promise<T | undefined> {
-    if (characterId === null || inFlight.current) return undefined;
+  async function open() {
+    if (characterId === null || inFlight.current) return;
     inFlight.current = true;
     setBusy(true);
     setFailed(false);
     try {
-      return await step(characterId);
+      if (connectable) {
+        await moon.connect();
+      } else {
+        const known = findPayeeByName(await loadPayees(characterId), tax.name);
+        if (known) await useSurveyPayeeId.getState().setValue(known.id);
+        navigate(MINING_TAX_HREF);
+      }
     } catch {
       setFailed(true);
-      return undefined;
     } finally {
       inFlight.current = false;
       setBusy(false);
     }
   }
-
-  async function openTab(payeeId: string | null) {
-    if (payeeId !== null) await useSurveyPayeeId.getState().setValue(payeeId);
-    navigate(MINING_TAX_HREF);
-  }
-
-  async function open() {
-    const missing = await run(async (id) => {
-      const known = findPayeeByName(await loadPayees(id), tax.name);
-      if (known) await openTab(known.id);
-      return known === undefined;
-    });
-    // Opened once the lookup is done, so the dialog never starts out busy.
-    if (missing) setAddPayeeOpen(true);
-  }
-
-  const addPayee = () =>
-    run(async (id) => {
-      // Looked up again: the Payee may have been added elsewhere while the dialog was open.
-      const payee =
-        findPayeeByName(await loadPayees(id), tax.name) ??
-        (await createPayee(id, { name: tax.name.trim(), defaultTaxPct: tax.pct }));
-      await openTab(payee.id);
-    });
-
-  const skip = () => run(() => openTab(null));
 
   return (
     <InfoRow label={t('survey.moonTax.label')}>
@@ -255,65 +372,33 @@ export function MoonTaxReadout({ tax }: { tax: SurveyTaxShare }) {
           <span className="font-normal text-text-dim">{t('survey.moonTax.to')}</span>
           <span className="min-w-0 [overflow-wrap:anywhere]">{tax.name}</span>
         </p>
-        <div className={blockedButtonClassName}>
-          <Button
-            size="sm"
-            className="touch:min-h-11"
-            // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
-            aria-disabled={loggedOut || undefined}
-            aria-describedby={loggedOut ? hintId : undefined}
-            loading={busy && !addPayeeOpen}
-            onClick={() => void open()}
-          >
-            {t('survey.moonTax.manage')}
-          </Button>
-          {loggedOut && (
-            <span id={hintId} className={blockedReasonClassName}>
-              {t('survey.moonTax.needLogin')}
-            </span>
-          )}
-        </div>
-        {failed && !addPayeeOpen && (
+        <MoonConnectionSlot moon={moon}>
+          <div className={blockedButtonClassName}>
+            <Button
+              id={moon.manageId}
+              size="sm"
+              className="touch:min-h-11"
+              // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
+              aria-disabled={loggedOut || undefined}
+              aria-describedby={loggedOut ? hintId : undefined}
+              loading={busy}
+              onClick={() => void open()}
+            >
+              {t('survey.moonTax.manage')}
+            </Button>
+            {loggedOut && (
+              <span id={hintId} className={blockedReasonClassName}>
+                {t('survey.moonTax.needLogin')}
+              </span>
+            )}
+          </div>
+        </MoonConnectionSlot>
+        {failed && (
           <span role="alert" className="w-full text-xs text-danger">
             {t('survey.moonTax.failed')}
           </span>
         )}
       </div>
-      <Modal
-        open={addPayeeOpen}
-        onClose={() => {
-          setAddPayeeOpen(false);
-          setFailed(false);
-        }}
-        title={t('survey.moonTax.addPayee.title')}
-      >
-        <div className="flex flex-col gap-3">
-          <p className="font-semibold">
-            {t('survey.moonTax.addPayee.confirm', { name: tax.name, pct: tax.pct })}
-          </p>
-          <p className="text-sm text-text-dim">
-            {t('survey.moonTax.addPayee.body', { name: tax.name })}
-          </p>
-          {failed && (
-            <p role="alert" className="text-sm text-danger">
-              {t('survey.moonTax.failed')}
-            </p>
-          )}
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-disabled={busy || undefined}
-              onClick={() => void skip()}
-            >
-              {t('survey.moonTax.addPayee.skip')}
-            </Button>
-            <Button variant="primary" size="sm" loading={busy} onClick={() => void addPayee()}>
-              {t('survey.moonTax.addPayee.submit')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </InfoRow>
   );
 }

@@ -1,6 +1,6 @@
 # Travel (Route Safety, Thera / Turnur, Travel Settings)
 
-Progression group page `/travel` (last in the group). Three tabs (`TRAVEL_TABS`, `src/app/pageTabs.ts`): Route Safety (`/travel/route`, default for bare `/travel`), Pilot Lookup (`/travel/pilot`, see `docs/features/pilot-lookup.md`) and Hauling (`/travel/hauling`, spec in `docs/features/market.md` §4). Thera / Turnur is a modal on Route Safety (below), not a tab; an old `/travel/thera` link redirects to `/travel/route` (`legacyTravelLocation`, origin becomes `from`, `pref` kept). Settings > Travel edits the same stores as the Route rules panel.
+Progression group page `/travel` (last in the group). Two tabs (`TRAVEL_TABS`, `src/app/pageTabs.ts`): Route Safety (`/travel/route`, default for bare `/travel`), and Pilot Lookup (`/travel/pilot`, see `docs/features/pilot-lookup.md`); `/travel/hauling` redirects to Market's Hauling tab. Thera / Turnur is a modal on Route Safety (below), not a tab; an old `/travel/thera` link redirects to `/travel/route` (`legacyTravelLocation`, origin becomes `from`, `pref` kept). Settings > Travel edits the same stores as the Route rules panel.
 
 Glossary terms (GLOSSARY.md): Route Safety, Route strip, Quiet stretch, Stop, Leg, Hole jump, Ansiblex, Way to fly, Pinned way, Avoided Systems, Route Preference, Travel Settings, Jump Basis, Gank Chokepoint, Current System.
 
@@ -39,7 +39,7 @@ Principle in every Route Safety scope decision: conditions, never verdicts (`202
 
 "What is on my way, and how do I get there?" A pilot about to fly (a hauling or buying run, a trip through several Stops, a hop through Thera or Turnur) checks the last hour's kills and jumps along the route, chooses how to fly each Leg, then sends the Stops to the game's autopilot. Travel became in scope with #2328 (`20260929-234357`); Route Safety states conditions, never verdicts (`20260912-172628`). Pilot Lookup's Threat badge is a verdict (`20261008-181210`), but it has no green level and never calls a pilot safe, so nothing on Travel is called safe or unsafe.
 
-Hauling is also a Travel tab (`/travel/hauling`, moved from Market by `20261010-193521-hauling-moves-from-market-to-travel`, #3526); its spec still lives in `market.md` §4.
+Hauling is a Market tab again (`/market/hauling`, `20261021-211648-hauling-moves-back-from-travel-to-market`, #4702); `/travel/hauling` redirects there.
 
 - **Top jobs (ranked):** 1. "What happened along this route in the last hour?" (kills, jumps, Gank Chokepoints per system; #2328). 2. "What is the best order and way to fly my Stops, and does a Thera/Turnur hole or Ansiblex cut it short?" (#2475, `20261003-173108`, #2330). 3. "Put this route in my autopilot" (Set waypoints, `20261003-175151`).
 - **Device and cadence:** desktop primary, planned with the EVE client open beside it, then Set waypoints sends the route to the client (owner, 2026-10-11). The phone is for one-off route viewing (owner, 2026-10-11): phone-specific fixes #2519 and #2591 and dense phone route cards serve it, though Travel is not in the default phone tabs (`DEFAULT_MOBILE_TABS`, `src/lib/mobileTabs.ts`: Overview, Skills, Industry, Market). Used per trip, not daily (inferred).

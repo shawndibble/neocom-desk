@@ -6,6 +6,8 @@ import { setupServer } from 'msw/node';
 import '@/i18n';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { seedGrant } from '@/test/seed';
 import { ContractDetailModal, type ContractDetailModalProps } from './ContractDetailModal';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import type { Contract } from '@/esi/endpoints';
@@ -816,7 +818,9 @@ describe('ContractDetailModal', () => {
   });
 
   describe('Layout', () => {
-    it('shows the status as a pill beside the title, and the id with copy and Open in EVE under it', () => {
+    it('shows the status as a pill beside the title, and the id with copy and Open in EVE under it', async () => {
+      await seedGrant(CHAR_ID, ['esi-ui.open_window.v1']);
+      useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
       renderModal({
         characterId: CHAR_ID,
         contract: ITEM_EXCHANGE,
@@ -828,7 +832,7 @@ describe('ContractDetailModal', () => {
       expect(within(dialog).getByText('12345')).toBeInTheDocument();
       expect(within(dialog).getByRole('button', { name: 'Copy contract ID' })).toBeInTheDocument();
       expect(
-        within(dialog).getByRole('button', { name: /Open contract in EVE/ })
+        await within(dialog).findByRole('button', { name: /Open contract in EVE/ })
       ).toBeInTheDocument();
     });
 

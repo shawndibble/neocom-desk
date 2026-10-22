@@ -1,14 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { Button } from '@/components/ui';
 import { OUTCOME_VISIBLE_MS } from '@/features/openInEve/useOpenInEve';
 import { OPEN_NEW_MAIL_ENDPOINTS, openNewMail } from '@/features/openInEve/sendOpenNewMail';
-import { permissionsForEndpoints } from '@/esi/registry';
 import { useOnline } from '@/stores/network';
-
-const MISSING_GROUPS = permissionsForEndpoints(OPEN_NEW_MAIL_ENDPOINTS);
 
 type Outcome = { tone: 'status' | 'alert'; text: string } | null;
 
@@ -17,10 +13,8 @@ type Outcome = { tone: 'status' | 'alert'; text: string } | null;
  * window addressed to the requester, subject and body filled in (an ESI
  * open-window call; nothing is sent until the pilot presses Send in game, and
  * it counts against no mail cap). The call needs the Open in EVE Permission.
- * A Character without it is not shown an error: the button stays (it reads
- * `aria-disabled`, so it keeps its place in the tab order) and the line beside
- * it says why, with the same link to grant it that every missing Permission
- * uses. A refusal from ESI (the pilot is not in game) is said beside it too.
+ * A Character without it doesn't see the button at all. A refusal from ESI
+ * (the pilot is not in game) is said beside it.
  */
 export function MessageRequesterButton({
   characterId,
@@ -76,12 +70,14 @@ export function MessageRequesterButton({
         });
       }
       // needsPermission: the grant just turned out to lack the scope; the live
-      // check above now reads true and the line beside the button says so.
+      // check above now reads true and the button hides.
     } finally {
       inFlight.current = false;
       setSending(false);
     }
   };
+
+  if (lacksScope) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -94,12 +90,6 @@ export function MessageRequesterButton({
       >
         {t('communities.board.message', { name })}
       </Button>
-      {lacksScope && (
-        <span id={reasonId} className="text-xs text-text-dim">
-          {t('communities.board.messageNeedsPermission')}{' '}
-          <GrantMissingLink groups={MISSING_GROUPS} />
-        </span>
-      )}
       {offlineBlocked && (
         <span id={reasonId} className="text-xs text-text-dim">
           {t('common.needsConnection')}

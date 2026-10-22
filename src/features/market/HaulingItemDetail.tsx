@@ -534,13 +534,16 @@ function InstantBody({
   );
 }
 
-/** Show info, the destination's full book and price history, and Route Safety for the lane. */
+/** Each end hub's Market page for the item, Route Safety for the lane, and Show info. */
 function Links({ row }: { row: HaulingViewRow }) {
   const { t } = useTranslation();
   return (
     <p className="flex flex-wrap gap-2">
+      <MarketItemLink typeId={row.typeId} hubId={row.fromHub.id} className={LINK_BUTTON}>
+        {t('market.hauling.itemDetail.hubMarket', { hub: row.fromHub.systemName })}
+      </MarketItemLink>
       <MarketItemLink typeId={row.typeId} hubId={row.toHub.id} className={LINK_BUTTON}>
-        {t('market.hauling.itemDetail.priceHistory', { hub: row.toHub.systemName })}
+        {t('market.hauling.itemDetail.hubMarket', { hub: row.toHub.systemName })}
       </MarketItemLink>
       <Link to={routeToHref(row.toHub.systemId, row.fromHub.systemId)} className={LINK_BUTTON}>
         {t('market.hauling.itemDetail.routeSafety')}

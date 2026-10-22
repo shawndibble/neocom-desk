@@ -17,13 +17,22 @@ const ALL_CORP_VIEWS = {
   canReadWallet: true,
   canReadAssets: true,
   canReadMiningLedger: true,
+  canReadRoleAudit: true,
 };
 const NO_CORP_VIEWS = {
   canReadMembers: false,
   canReadWallet: false,
   canReadAssets: false,
   canReadMiningLedger: false,
+  canReadRoleAudit: false,
 };
+
+const MOONS_TAB_PATHS = [
+  '/corp/moons/extractions',
+  '/corp/moons/miners',
+  '/corp/moons/statements',
+  '/corp/moons/moon-owners',
+];
 
 describe('NAV_PAGES', () => {
   it('holds each path once', () => {
@@ -49,7 +58,11 @@ describe('railGroups', () => {
         paths: group.pages.map((page) => page.path),
       }))
     ).toEqual([
-      { labelKey: null, paths: ['/overview', '/corp'] },
+      { labelKey: null, paths: ['/overview'] },
+      {
+        labelKey: 'nav.groups.corp',
+        paths: ['/corp', '/corp/members', '/corp/wallet', '/corp/assets', '/corp/moons'],
+      },
       {
         labelKey: 'nav.groups.progression',
         paths: ['/skills', '/industry', '/ships', '/mining', '/planetary-industry', '/travel'],
@@ -102,6 +115,12 @@ describe('NAV_LOCK_PATHS', () => {
         '/skills/plans',
         '/skills/trained',
         '/skills/certificates',
+        // Tabs of an ungated page that are only a re-login banner without their scope.
+        '/market/orders',
+        '/market/history',
+        '/wallet/journal',
+        '/contracts/history',
+        '/contacts/standings',
       ].toSorted()
     );
   });
@@ -114,7 +133,8 @@ describe('NAV_LOCK_PATHS', () => {
 describe('navPageLabelKey', () => {
   it('reads a page label from the descriptor', () => {
     expect(navPageLabelKey('/mining')).toBe('nav.miningTax');
-    expect(navPageLabelKey('/corp')).toBe('nav.corp');
+    expect(navPageLabelKey('/corp')).toBe('nav.corpBoard');
+    expect(navPageLabelKey('/corp/wallet')).toBe('nav.corpWallet');
   });
 });
 
@@ -126,6 +146,19 @@ describe('listNavDestinations', () => {
     t,
   });
   const byPath = (path: string) => all.find((entry) => entry.path === path);
+
+  it('locks only the scope-bound tab, not its page or siblings', () => {
+    const locked = listNavDestinations({
+      locked: new Set(['/market/history']),
+      corpVisible: true,
+      corpCapabilities: ALL_CORP_VIEWS,
+      t,
+    });
+    const flag = (path: string) => locked.find((entry) => entry.path === path)?.locked;
+    expect(flag('/market/history')).toBe(true);
+    expect(flag('/market/orders')).toBe(false);
+    expect(flag('/market')).toBe(false);
+  });
 
   it('leaves out a tab whose path is in hiddenTabPaths', () => {
     const without = listNavDestinations({
@@ -209,7 +242,7 @@ describe('listNavDestinations', () => {
       corpCapabilities: NO_CORP_VIEWS,
       t,
     });
-    expect(hidden.some((entry) => entry.pagePath === '/corp')).toBe(false);
+    expect(hidden.some((entry) => entry.path.startsWith('/corp'))).toBe(false);
     expect(byPath('/corp')).toMatchObject({ locked: false });
   });
 
@@ -237,8 +270,10 @@ describe('listNavDestinations', () => {
       corpCapabilities: { ...NO_CORP_VIEWS, canReadWallet: true },
       t,
     });
-    const corp = accountant.filter((entry) => entry.pagePath === '/corp');
+    const corp = accountant.filter((entry) => entry.path.startsWith('/corp'));
     expect(corp.map((entry) => entry.path)).toEqual(['/corp', '/corp/wallet']);
+    expect(corp.map((entry) => entry.label)).toEqual(['nav.corpBoard', 'nav.corpWallet']);
+    expect(corp.every((entry) => entry.kind === 'page')).toBe(true);
     expect(corp.every((entry) => entry.gating === 'corp' && !entry.locked)).toBe(true);
   });
 
@@ -249,10 +284,27 @@ describe('listNavDestinations', () => {
       corpCapabilities: { ...NO_CORP_VIEWS, canReadMiningLedger: true },
       t,
     });
-    expect(accountant.filter((entry) => entry.pagePath === '/corp').map((e) => e.path)).toEqual([
-      '/corp',
-      '/corp/moons',
+    expect(accountant.filter((entry) => entry.path.startsWith('/corp')).map((e) => e.path)).toEqual(
+      ['/corp', '/corp/moons', ...MOONS_TAB_PATHS]
+    );
+  });
+
+  it("lists Members' Roles tab only with the role audit", () => {
+    const members = (canReadRoleAudit: boolean) =>
+      listNavDestinations({
+        locked: NO_LOCKS,
+        corpVisible: true,
+        corpCapabilities: { ...NO_CORP_VIEWS, canReadMembers: true, canReadRoleAudit },
+        t,
+      })
+        .filter((entry) => entry.pagePath === '/corp/members')
+        .map((entry) => entry.path);
+    expect(members(true)).toEqual([
+      '/corp/members',
+      '/corp/members/members',
+      '/corp/members/roles',
     ]);
+    expect(members(false)).toEqual(['/corp/members']);
   });
 
   it("hides Settings' Corporation section with the Corp entry", () => {

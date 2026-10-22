@@ -14,7 +14,7 @@
 import { tabBarTabs, tabPath } from '@/lib/pageTabs';
 import { PAGE_TABS } from './pageTabs';
 import type { CorpCapabilities } from '@/engine/corpRoles';
-import type { AppRoutePath } from './routeScopes';
+import { TAB_ENDPOINTS, type AppRoutePath } from './routeScopes';
 
 /**
  * - `scope`: an ordinary page; a missing grant marks it locked (never hidden,
@@ -27,10 +27,11 @@ import type { AppRoutePath } from './routeScopes';
 export type NavGating = 'scope' | 'corp' | 'ungated';
 
 /**
- * `primary` sits at the top of the rail with no heading; `footer` is pinned
+ * `primary` sits at the top of the rail with no heading; `corp` follows it,
+ * headed, and renders only while Corp Access is ready; `footer` is pinned
  * below the scrolling rail (Settings, then the Character link).
  */
-export type NavGroupId = 'primary' | 'progression' | 'economy' | 'social' | 'footer';
+export type NavGroupId = 'primary' | 'corp' | 'progression' | 'economy' | 'social' | 'footer';
 
 export interface NavGroup {
   readonly id: NavGroupId;
@@ -39,12 +40,13 @@ export interface NavGroup {
 }
 
 export const NAV_GROUPS = [
-  /*
-   * No heading: Corp sits in this group, and a heading over a
-   * conditionally-rendered item would strand itself for the ~95% of users who
-   * never see the item.
-   */
   { id: 'primary', labelKey: null },
+  /*
+   * The whole group, heading included, renders only while Corp Access is
+   * ready (`isNavPageAvailable`), so the heading never strands itself over
+   * nothing for the pilots who never see Corp.
+   */
+  { id: 'corp', labelKey: 'nav.groups.corp' },
   { id: 'progression', labelKey: 'nav.groups.progression' },
   { id: 'economy', labelKey: 'nav.groups.economy' },
   { id: 'social', labelKey: 'nav.groups.social' },
@@ -58,8 +60,8 @@ export interface NavPage {
   readonly group: NavGroupId;
   readonly gating: NavGating;
   /**
-   * Whether the phone's tab bar may hold it. `/corp` may not — it hides
-   * rather than locks, so a chosen `/corp` would leave a hole in the bar on
+   * Whether the phone's tab bar may hold it. A Corp page may not — it hides
+   * rather than locks, so a chosen one would leave a hole in the bar on
    * every Character without corp access — and `/settings` may not, because it
    * has a permanent row in the More sheet. Both keep their sheet rows.
    */
@@ -77,23 +79,25 @@ export interface NavPage {
   readonly tablessNav?: true;
   /** Tab ids shown only while the Corp entry is (`visibleSettingsGroups`' Corporation section). */
   readonly corpTabs?: readonly string[];
+  /** For a Corp page: the capability it is listed for. Hidden, never locked, without it. */
+  readonly corpCapability?: CorpViewCapability;
+  /** For a Corp page: tab ids listed only with the given capability (Members › Roles). */
+  readonly corpTabCapabilities?: Readonly<Record<string, CorpViewCapability>>;
   /**
    * Views that are routes of their own but live in this page's sub-nav rather
-   * than its `PAGE_TABS` (`OverviewSubNav`, `CorpSubNav`). Listed as the
+   * than its `PAGE_TABS` (`OverviewSubNav`). Listed as the
    * page's tabs; each carries its own route's lock.
    */
   readonly subViews?: readonly NavSubView[];
 }
 
-/** The Corp Capabilities a Corp sub-view is gated on — hidden, not locked, without one. */
+/** The Corp Capabilities a Corp page or tab is gated on — hidden, not locked, without one. */
 export type CorpViewCapability =
-  'canReadMembers' | 'canReadWallet' | 'canReadAssets' | 'canReadMiningLedger';
+  'canReadMembers' | 'canReadWallet' | 'canReadAssets' | 'canReadMiningLedger' | 'canReadRoleAudit';
 
 export interface NavSubView {
   readonly path: AppRoutePath;
   readonly labelKey: string;
-  /** For a Corp view: the capability `CorpSubNav` shows it for. */
-  readonly corpCapability?: CorpViewCapability;
   /** i18n keys of other names it goes by: the palette also matches these (Wallet › LP Store ← "loyalty points"). */
   readonly searchKeys?: readonly string[];
 }
@@ -128,22 +132,51 @@ export const NAV_PAGES = [
     inRail: false,
   },
   /*
-   * Beside Overview rather than inside a group: the two are the same kind of
-   * destination — "this pilot" and "this corporation" — and the Corp section
-   * has sub-navigation of its own for the views under it (`CorpSubNav`).
+   * The Corporation group: its own pages, each with a name that stands alone
+   * (scope decision `20261021-160721-corporation-becomes-a-rail-group-of-its-own`).
+   * Members' and Moons' tabs are their `PAGE_TABS`, listed under the open page.
+   * Moons' Extractions tab is listed always: whether it shows needs the Corp
+   * Tax Book, which only the page loads, and the page redirects away if not.
    */
   {
     path: '/corp',
-    labelKey: 'nav.corp',
-    group: 'primary',
+    labelKey: 'nav.corpBoard',
+    group: 'corp',
     gating: 'corp',
     mobileTab: false,
-    subViews: [
-      { path: '/corp/members', labelKey: 'corp.membersTab', corpCapability: 'canReadMembers' },
-      { path: '/corp/wallet', labelKey: 'corp.walletTab', corpCapability: 'canReadWallet' },
-      { path: '/corp/assets', labelKey: 'corp.assetsTab', corpCapability: 'canReadAssets' },
-      { path: '/corp/moons', labelKey: 'corp.moonsTab', corpCapability: 'canReadMiningLedger' },
-    ],
+  },
+  {
+    path: '/corp/members',
+    labelKey: 'nav.corpMembers',
+    group: 'corp',
+    gating: 'corp',
+    mobileTab: false,
+    corpCapability: 'canReadMembers',
+    corpTabCapabilities: { roles: 'canReadRoleAudit' },
+  },
+  {
+    path: '/corp/wallet',
+    labelKey: 'nav.corpWallet',
+    group: 'corp',
+    gating: 'corp',
+    mobileTab: false,
+    corpCapability: 'canReadWallet',
+  },
+  {
+    path: '/corp/assets',
+    labelKey: 'nav.corpAssets',
+    group: 'corp',
+    gating: 'corp',
+    mobileTab: false,
+    corpCapability: 'canReadAssets',
+  },
+  {
+    path: '/corp/moons',
+    labelKey: 'nav.corpMoons',
+    group: 'corp',
+    gating: 'corp',
+    mobileTab: false,
+    corpCapability: 'canReadMiningLedger',
   },
   {
     path: '/skills',
@@ -302,21 +335,49 @@ export function navTabs(page: NavPage): readonly NavTab[] {
 
 /**
  * Every scope-gated destination the shell asks `useLockedRoutes` about: the
- * scope-gated pages (the rail's amber lock dots) and their sub-views. Corp
+ * scope-gated pages (the rail's amber lock dots), their sub-views, and the
+ * `TAB_ENDPOINTS` tabs of ungated pages. Corp
  * paths are absent — corp hides rather than locks. Module-level, so the
  * hook's memo sees one array.
  */
-export const NAV_LOCK_PATHS: readonly AppRoutePath[] = (NAV_PAGES as readonly NavPage[])
-  .filter((page) => page.gating === 'scope')
-  .flatMap((page) => [page.path, ...(page.subViews ?? []).map((view) => view.path)]);
+export const NAV_LOCK_PATHS: readonly string[] = [
+  ...(NAV_PAGES as readonly NavPage[])
+    .filter((page) => page.gating === 'scope')
+    .flatMap((page) => [page.path, ...(page.subViews ?? []).map((view) => view.path)]),
+  ...Object.keys(TAB_ENDPOINTS),
+];
 
 const LABEL_KEY_BY_PATH = Object.fromEntries(
   NAV_PAGES.map((page) => [page.path, page.labelKey])
 ) as Record<NavPagePath, string>;
 
+/**
+ * Pages whose path is the parent of another page's (`/corp` over
+ * `/corp/wallet`). Their links match exactly, or Corp Board would read as
+ * current on every Corp page; every other page stays current on its own tabs.
+ */
+export const PARENT_PAGE_PATHS: ReadonlySet<string> = new Set(
+  NAV_PAGES.map((page) => page.path as string).filter((path) =>
+    NAV_PAGES.some((other) => other.path.startsWith(`${path}/`))
+  )
+);
+
 /** The `nav.*` key for a page in the descriptor. */
 export function navPageLabelKey(path: NavPagePath): string {
   return LABEL_KEY_BY_PATH[path];
+}
+
+/**
+ * Whether a page is listed at all right now: a Corp page needs Corp Access
+ * ready and its own Corp Capability; every other page always is.
+ */
+export function isNavPageAvailable(
+  page: NavPage,
+  corpVisible: boolean,
+  corpCapabilities: Partial<Record<CorpViewCapability, boolean>>
+): boolean {
+  if (page.gating !== 'corp') return true;
+  return corpVisible && (!page.corpCapability || corpCapabilities[page.corpCapability] === true);
 }
 
 export interface RailGroup {
@@ -357,10 +418,10 @@ export interface NavDestination {
 }
 
 export interface ListNavDestinationsOptions {
-  readonly locked: ReadonlySet<AppRoutePath>;
-  /** `useCorpNavVisible()` — `/corp` is left out entirely, never locked, when false. */
+  readonly locked: ReadonlySet<string>;
+  /** `useCorpNavVisible()` — every Corp page is left out entirely, never locked, when false. */
   readonly corpVisible: boolean;
-  /** `useCorpAccess().capabilities` — each Corp view shows only for its capability, as in `CorpSubNav`. */
+  /** `useCorpAccess().capabilities` — each Corp view shows only for its capability, as the Corp pages and Roles tab are gated. */
   readonly corpCapabilities: Pick<CorpCapabilities, CorpViewCapability>;
   readonly t: (key: string) => string;
   /** Tab paths left out for now (Industry › Logs until a Production Run is logged). */
@@ -384,7 +445,7 @@ export function listNavDestinations({
 }: ListNavDestinationsOptions): NavDestination[] {
   const out: NavDestination[] = [];
   for (const page of NAV_PAGES as readonly NavPage[]) {
-    if (page.gating === 'corp' && !corpVisible) continue;
+    if (!isNavPageAvailable(page, corpVisible, corpCapabilities)) continue;
     const pageLocked = page.gating === 'scope' && locked.has(page.path);
     const pageLabel = t(page.labelKey);
     out.push({
@@ -416,13 +477,20 @@ export function listNavDestinations({
         ...(searchKeys && { keywords: searchKeys.map(t) }),
       };
     };
-    for (const tab of navTabs(page)) {
+    // Members without the role audit has one tab and draws no tab bar: list none.
+    const allTabs = navTabs(page);
+    const shownTabs = page.corpTabCapabilities
+      ? allTabs.filter((tab) => {
+          const needed = page.corpTabCapabilities?.[tab.id];
+          return !needed || corpCapabilities[needed];
+        })
+      : allTabs;
+    for (const tab of page.corpTabCapabilities && shownTabs.length < 2 ? [] : shownTabs) {
       if (page.corpTabs?.includes(tab.id) && !corpVisible) continue;
       if (hiddenTabPaths?.has(tab.path)) continue;
-      out.push(tabEntry(tab.path, tab.labelKey, pageLocked));
+      out.push(tabEntry(tab.path, tab.labelKey, pageLocked || locked.has(tab.path)));
     }
     for (const view of page.subViews ?? []) {
-      if (view.corpCapability && !corpCapabilities[view.corpCapability]) continue;
       out.push(tabEntry(view.path, view.labelKey, locked.has(view.path), view.searchKeys));
     }
   }
