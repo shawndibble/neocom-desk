@@ -6,6 +6,7 @@ import {
   parseStockLists,
   removeStockList,
   removeStockTarget,
+  removeStockTargets,
   renameStockList,
   setStockListLocation,
   setStockTarget,
@@ -139,5 +140,40 @@ describe('addMissingStockTargets', () => {
       { typeId: 16242, target: 40 },
       { typeId: 34, target: 500 },
     ]);
+  });
+});
+
+describe('removeStockTargets', () => {
+  const list: StockList = {
+    ...efa,
+    items: [
+      { typeId: 1, target: 10 },
+      { typeId: 2, target: 20 },
+      { typeId: 3, target: 30 },
+    ],
+  };
+
+  it('removes every named Stock Target in one edit and leaves the rest', () => {
+    expect(removeStockTargets([list], 'a', [1, 3])[0].items).toEqual([{ typeId: 2, target: 20 }]);
+  });
+
+  it('leaves other lists alone and ignores ids the list does not have', () => {
+    const other = { ...efa, id: 'b', locationId: 9 };
+    const next = removeStockTargets([list, other], 'a', [99]);
+    expect(next).toEqual([list, other]);
+  });
+
+  it('is undone by adding the removed targets back with their own quantities', () => {
+    const removed = list.items.filter((item) => item.typeId !== 2);
+    const after = removeStockTargets([list], 'a', [1, 3]);
+    const restored = addMissingStockTargets(after, 'a', removed);
+    expect(restored[0].items).toEqual(
+      expect.arrayContaining([
+        { typeId: 1, target: 10 },
+        { typeId: 2, target: 20 },
+        { typeId: 3, target: 30 },
+      ])
+    );
+    expect(restored[0].items).toHaveLength(3);
   });
 });

@@ -175,3 +175,16 @@ export function removeStockTarget(
     items: list.items.filter((item) => item.typeId !== typeId),
   }));
 }
+
+/** Removes several Stock Targets in one edit (the Manager's bulk remove). */
+export function removeStockTargets(
+  lists: readonly StockList[],
+  listId: string,
+  typeIds: readonly number[]
+): StockList[] {
+  const drop = new Set(typeIds);
+  return updateList(lists, listId, (list) => ({
+    ...list,
+    items: list.items.filter((item) => !drop.has(item.typeId)),
+  }));
+}

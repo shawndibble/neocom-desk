@@ -14146,6 +14146,13 @@
       "noPrice": "No price",
       "status": "Status",
       "remove": "Remove from list",
+      "selectAria": "Select {{name}}",
+      "selectAll": "Select all",
+      "selectNone": "Select none",
+      "removeSelected": "Remove selected ({{count}})",
+      "undo": "Undo",
+      "removedMany_one": "Removed {{count}} item",
+      "removedMany_other": "Removed {{count}} items",
       "legendListed": "Listed (coloured by status)",
       "legendHangar": "In hangar, ready to list"
     },

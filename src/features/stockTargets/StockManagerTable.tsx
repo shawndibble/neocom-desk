@@ -6,6 +6,8 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Button,
+  Checkbox,
   DataTable,
   IskAmount,
   MenuItem,
@@ -13,13 +15,18 @@ import {
   TextInput,
   type DataTableColumn,
 } from '@/components/ui';
-import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
+import {
+  focusRingClassName,
+  interactiveClassName,
+  touchCheckboxLabelClassName,
+} from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { StockRow } from '@/engine/stockTargets/stockRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { useItemActions } from '@/features/market/itemActions';
 import { cx } from '@/lib/cx';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
+import { useRowSelection } from '@/lib/useRowSelection';
 import { StockFillBar, StockStatusPill } from './StockStatus';
 import { formatNumber } from '@/lib/numberLocale';
 
@@ -116,15 +123,20 @@ export function StockManagerTable({
   rows,
   nameOf,
   groupOf,
+  selectionKey,
   onSetTarget,
   onRemove,
+  onRemoveMany,
 }: {
   rows: readonly StockRow[];
   nameOf: (typeId: number) => string;
   /** The item's top-level Market Group, under its name on desktop. */
   groupOf: (typeId: number) => string | undefined;
+  /** Names what the ticks were made in (Character, list, filters): a change drops them. */
+  selectionKey: string;
   onSetTarget: (typeId: number, target: number) => void;
   onRemove: (typeId: number) => void;
+  onRemoveMany: (typeIds: number[]) => void;
 }) {
   const { t } = useTranslation();
   const { showInfo } = useItemActions();
@@ -148,7 +160,46 @@ export function StockManagerTable({
     );
   }
 
+  const selection = useRowSelection(
+    selectionKey,
+    rows.map((row) => row.typeId)
+  );
+
+  /** Bulk remove acts at once (the page offers Undo); focus lands on the row that took its place. */
+  function removeSelected() {
+    const chosen = rows.filter((row) => selection.selected.has(row.typeId));
+    if (chosen.length === 0) return;
+    const first = rows.findIndex((row) => selection.selected.has(row.typeId));
+    const remaining = rows.filter((row) => !selection.selected.has(row.typeId));
+    const next = rows.slice(first).find((row) => !selection.selected.has(row.typeId));
+    const prev = remaining.filter((row) => rows.indexOf(row) < first).at(-1);
+    selection.clear();
+    onRemoveMany(chosen.map((row) => row.typeId));
+    window.setTimeout(() =>
+      focusAfterCommit(editButton(next?.typeId), editButton(prev?.typeId), () =>
+        document.querySelector<HTMLElement>('[data-stock-market-title]')
+      )
+    );
+  }
+
+  const selectColumn: DataTableColumn<StockRow> = {
+    id: 'select',
+    header: '',
+    className: 'w-8',
+    cardCorner: 'start',
+    render: (row) => (
+      <label className={touchCheckboxLabelClassName} onClick={(e) => e.stopPropagation()}>
+        <Checkbox
+          checked={selection.selected.has(row.typeId)}
+          onChange={() => selection.toggle(row.typeId)}
+          aria-label={t('stockTargets.table.selectAria', { name: nameOf(row.typeId) })}
+        />
+      </label>
+    ),
+  };
+
   const columns: DataTableColumn<StockRow>[] = [
+    selectColumn,
     {
       id: 'item',
       header: t('stockTargets.table.item'),
@@ -276,34 +327,49 @@ export function StockManagerTable({
   ];
 
   return (
-    <DataTable
-      columns={columns}
-      rows={rows}
-      rowKey={(row) => row.typeId}
-      label={t('stockTargets.table.label')}
-      stackLayout="dense"
-      // The ⋮ pins to the card's edge on a phone, so line one stays text-tall (§4a).
-      className="dt-actions-pinned-only"
-      onRowClick={(row) => showInfo(row.typeId, nameOf(row.typeId))}
-      rowMoreActions
-      rowContextMenu={(row, tr) => (
-        <ItemContextMenu
-          typeId={row.typeId}
-          itemName={nameOf(row.typeId)}
-          // The pencil already edits the Stock Target here (§6c restraint).
-          hideStockTarget
-          extraItems={
-            <>
-              <MenuSeparator />
-              <MenuItem className="text-danger" onSelect={() => remove(row.typeId)}>
-                {t('stockTargets.table.remove')}
-              </MenuItem>
-            </>
-          }
-        >
-          {tr}
-        </ItemContextMenu>
-      )}
-    />
+    <>
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+        <Button size="sm" onClick={selection.selectAll}>
+          {t('stockTargets.table.selectAll')}
+        </Button>
+        <Button size="sm" aria-disabled={selection.selected.size === 0} onClick={selection.clear}>
+          {t('stockTargets.table.selectNone')}
+        </Button>
+        {selection.selected.size > 0 && (
+          <Button size="sm" onClick={removeSelected}>
+            {t('stockTargets.table.removeSelected', { count: selection.selected.size })}
+          </Button>
+        )}
+      </div>
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(row) => row.typeId}
+        label={t('stockTargets.table.label')}
+        stackLayout="dense"
+        // The ⋮ pins to the card's edge on a phone, so line one stays text-tall (§4a).
+        className="dt-actions-pinned-only"
+        onRowClick={(row) => showInfo(row.typeId, nameOf(row.typeId))}
+        rowMoreActions
+        rowContextMenu={(row, tr) => (
+          <ItemContextMenu
+            typeId={row.typeId}
+            itemName={nameOf(row.typeId)}
+            // The pencil already edits the Stock Target here (§6c restraint).
+            hideStockTarget
+            extraItems={
+              <>
+                <MenuSeparator />
+                <MenuItem className="text-danger" onSelect={() => remove(row.typeId)}>
+                  {t('stockTargets.table.remove')}
+                </MenuItem>
+              </>
+            }
+          >
+            {tr}
+          </ItemContextMenu>
+        )}
+      />
+    </>
   );
 }
