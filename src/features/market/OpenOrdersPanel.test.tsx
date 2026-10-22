@@ -787,6 +787,12 @@ describe('OpenOrdersPanel', () => {
     });
     expect(picker).toHaveClass('md:h-9');
     expect(screen.queryByText("Charlie hasn't shared their orders")).not.toBeInTheDocument();
+    // The faces are the two Characters with orders, the active one first (no "+N" from the roster).
+    const faces = Array.from(picker.querySelectorAll('img')).map(
+      (img) => /characters\/(\d+)\//.exec(img.getAttribute('src') ?? '')?.[1]
+    );
+    expect(faces).toEqual(['1', '2']);
+    expect(picker.querySelector('[data-stack-extra]')).toBeNull();
   });
 
   describe('funnel filter controls', () => {

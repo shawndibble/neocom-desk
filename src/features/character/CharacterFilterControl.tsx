@@ -37,27 +37,30 @@
  * decision; its one-Character rule stands). The `variant="field"` form for
  * Settings is a form field and is outside that rule.
  *
- * Partial coverage: with `missingNames` and the value "all", the label stays
- * "All characters" (the trigger only ever reads This character / All
- * characters / Corporation), a warning dot marks the trigger at every width,
- * the accessible name adds "Not included: …", and the open menu names who is
- * missing in a non-interactive note. `loading` swaps the glyph for a
- * `Spinner` in the same box, so the trigger never changes size mid-load.
+ * The trigger is the same at every width and carries no words: faces and a
+ * small caret, at the height of the `IconButton`s beside it (44px below `md`
+ * or on a touch pointer, 36px from `md`). "This character" is the active
+ * Character's portrait; "All characters" is up to three overlapping portraits
+ * (two below `md`, chosen in JS with `useIsNarrow`)
+ * of the Characters it covers (the active one first, then the roster in the
+ * order it was added, read from Dexie: no ESI call; see `characterStack`),
+ * with a "+N" chip for the rest; "Corporation" is the corp logo. A page whose
+ * "All" covers fewer than the roster passes `allCharacterIds`, so the faces
+ * and "+N" agree with its label's count. Before the roster loads, empty face
+ * circles (and the chip) hold the stack's width; a portrait that fails to load
+ * becomes the Character's initial in the stack, the `AllCharacters` glyph for
+ * "This character". The
+ * accessible name keeps the full words ("All characters · 4"), and a
+ * `Tooltip` shows the same words on hover and focus. The trigger also
+ * absorbed the phone-only "whose data is this" avatar `PageHeader` used to
+ * float in its own corner (#1764).
  *
- * Below `lg` the trigger is icon-only, fixed to the same box a sibling
- * `IconButton` uses in whichever row it rides in — `size="sm"` (the panel
- * `meta` hosts: Active Jobs, Open Orders, Mining Tax) by default, `size="md"`
- * where a `PageHeader`'s own `actions` cluster sits at its default (larger)
- * touch tier instead (Mining Tax Overview) — rather than a
- * full-width text pill. The active Character's own portrait for "current,"
- * the generic `AllCharacters` glyph for "all." That box also absorbed the
- * phone-only "whose data is this" avatar `PageHeader` used to float in its
- * own corner (#1764): with this trigger already carrying that cue whenever a
- * route offers the filter, a second, separate avatar had nothing left to
- * say. From `lg` up the trigger is a text pill at its tier's height that
- * keeps the same glyph in front of the words — glyph, words, caret —
- * with the header `IconButton`'s border, fill and hover, so it reads as one
- * of the header's controls.
+ * Partial coverage: with `missingNames` and the value "all", those
+ * Characters drop out of the stack, a warning dot marks the trigger, the
+ * accessible name and tooltip add "Not included: …", and the open menu names
+ * who is missing in a non-interactive note. `loading` puts a `Spinner` over
+ * the faces, which stay (invisible) underneath so the trigger never changes
+ * width mid-load.
  *
  * `corporation` adds a third option, "Corporation", for a page that has a corp
  * view of the same data (Market orders, Contracts): that view is a choice on
@@ -73,7 +76,15 @@
  * This character / Corporation; several offer This / All (/ Corporation); a
  * `hideAll` page never offers All.
  */
-import { useContext } from 'react';
+import {
+  forwardRef,
+  useContext,
+  useMemo,
+  useState,
+  type ButtonHTMLAttributes,
+  type ReactNode,
+} from 'react';
+import { useCharacters } from './useCharacters';
 import { useTranslation } from 'react-i18next';
 import { PageHeaderClusterContext } from '@/components/ui/pageHeaderCluster';
 import * as Icon from '@/components/ui/icons';
@@ -86,9 +97,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/DropdownMenu';
-import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
+import { characterPortraitUrl } from '@/lib/eveImages';
 import { Spinner } from '@/components/ui/Spinner';
+import { Tooltip } from '@/components/ui/Tooltip';
+import { cx } from '@/lib/cx';
 import { CorporationLogoGlyph } from './CorporationLogoGlyph';
+import { characterStack, STACK_MAX_FACES, STACK_MAX_FACES_NARROW } from './characterStack';
+import { useIsNarrow } from '@/lib/useIsNarrow';
 import {
   fieldBaseClassName,
   controlHeightClassName,
@@ -113,7 +128,7 @@ export interface CharacterFilterControlProps<
   /** Leaves out "All characters", for a page that cannot sum Characters. */
   hideAll?: boolean;
   /**
-   * The sibling touch tier this trigger's icon-only phone box must match,
+   * The sibling touch tier this trigger's height must match,
    * mirroring `IconButtonSize`'s two below-`md` values (`size-9`/`size-11`) —
    * not the full `IconButtonSize` (there is no `'row'` tier here). `'sm'`
    * (default) for a panel's own `meta` row, where the `IconButton`s beside it
@@ -126,12 +141,11 @@ export interface CharacterFilterControlProps<
    */
   size?: 'sm' | 'md';
   /**
-   * `'icon'` (default): the compact header trigger above. `'field'`: a form
-   * control for a settings row — field chrome (§6c "a box sized like a field")
-   * with the current value as text and a trailing `CaretDown` at every width.
-   * Below `lg` the icon-only trigger has no label or caret and, where the portrait does
-   * not load, reads as a blank square; it only suits a header row where the
-   * panel title says what it filters.
+   * `'icon'` (default): the compact header trigger above, faces and a caret
+   * with no words; it only suits a header row where the page title says what
+   * it filters. `'field'`: a form control for a settings row — field chrome
+   * (§6c "a box sized like a field") with the current value as text and a
+   * trailing `CaretDown` at every width.
    */
   variant?: 'icon' | 'field';
   /** `variant="field"` only: the setting's name. The button's accessible name becomes "<name>: <value>", since the value alone doesn't say what is being set. */
@@ -149,36 +163,39 @@ export interface CharacterFilterControlProps<
   missingNames?: readonly string[];
   /** The page's data for this scope is loading: a `Spinner` stands in the trigger, at the same box size. */
   loading?: boolean;
+  /**
+   * The Characters this page's "All" covers, when that is not the whole
+   * roster (Open orders: the Characters with orders). The face stack is drawn
+   * from these (still active first, roster order, minus `missingNames`) so
+   * its faces and "+N" agree with the `characterCount` in the label. Without
+   * it the stack is the device roster.
+   */
+  allCharacterIds?: readonly number[];
 }
 
 /**
- * The two box sizes this trigger can be fixed to, keyed the same way
- * `CharacterFilterControlProps.size` is. Only the height is set, from the
- * tier (`controlHeightClassName`, which already steps down at `md` and back
- * up for `touch:`); `aspect-square` makes the width follow it, so below `lg`
- * the trigger is exactly the square a sibling `IconButton` is at every width
- * and pointer. Not `IconButton`'s own `size-*`: from `lg` up the trigger is an
- * auto-width text pill (`lg:aspect-auto`), and a `size-*` would need its
- * width half overridden per breakpoint and per `touch:`, an ordering Tailwind
- * does not promise to resolve predictably.
+ * The face box inside the trigger, the same at both size tiers: 24px where
+ * the trigger is 44px (below `md`, or a touch pointer), 20px from `md` (an
+ * `IconButton` glyph's size). Each face after the first tucks half under the
+ * one before it (`FACE_OVERLAP`); the ring in the trigger's own fill
+ * separates them. Three faces, a "+N" and the caret stay about 72px wide at
+ * 36px tall.
  */
-const TRIGGER_BOX: Record<'sm' | 'md', string> = {
-  sm: `aspect-square lg:aspect-auto ${controlHeightClassName.sm}`,
-  md: `aspect-square lg:aspect-auto ${controlHeightClassName.md}`,
-};
+const FACE_BOX = 'size-6 md:size-5 touch:size-6';
+const FACE_OVERLAP = '-ml-3 md:-ml-2.5 touch:-ml-3';
+const FACE_RING = 'rounded-full ring-2 ring-panel-2';
 
 /**
- * The rest of the composite class list is one element rather than `Button`'s
- * or `IconButton`'s own `size`/`variant` props for the same width-coupling
- * reason `TRIGGER_BOX` is: the default-tone ghost colors below are
- * `iconButtonClassName`'s own cascade, copied rather than composed because
- * composing it would pull in its coupled `size-*` too.
+ * Height from the tier (`controlHeightClassName`, which steps down at `md`
+ * and back up for `touch:`), so the trigger is level with the `IconButton`s
+ * beside it; the width is the faces' own plus the caret. The default-tone
+ * ghost colours are `iconButtonClassName`'s cascade, copied rather than
+ * composed because composing it would pull in its coupled `size-*` too.
  */
 const triggerBaseClassName =
-  `inline-flex shrink-0 items-center justify-center rounded-xs border border-line font-semibold ` +
-  `tracking-widest uppercase ${interactiveClassName} ${focusRingClassName} ` +
-  `bg-panel-2 p-0 text-text-dim hover:border-line-bright hover:text-text active:bg-panel ` +
-  `lg:gap-1.5 lg:px-2.5 lg:text-[0.6875rem]`;
+  `relative inline-flex shrink-0 items-center rounded-xs border border-line px-1 ` +
+  `${interactiveClassName} ${focusRingClassName} ` +
+  `bg-panel-2 text-text-dim hover:border-line-bright hover:text-text active:bg-panel`;
 
 export function CharacterFilterControl<V extends CharacterScopeChoice = CharacterFilterValue>({
   activeCharacterId,
@@ -193,6 +210,7 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
   unreadByCharacter,
   missingNames,
   loading = false,
+  allCharacterIds,
 }: CharacterFilterControlProps<V>) {
   const { t, i18n } = useTranslation();
   // In a `PageHeader` cluster the header's touch tier wins, so the trigger is
@@ -202,6 +220,16 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
     value === 'corporation' ? 'current' : value,
     activeCharacterId
   );
+  // The roster in the order it was added, for the "All" faces: Dexie only, no ESI call.
+  const characters = useCharacters();
+  const roster = useMemo(
+    () =>
+      [...characters]
+        .sort((a, b) => a.addedAt - b.addedAt)
+        .map((c) => ({ characterId: c.characterId, name: c.name })),
+    [characters]
+  );
+  const isNarrow = useIsNarrow();
   const isCorporation = corporation && value === 'corporation';
   const isAll = !isCorporation && resolved === 'all';
   const allLabel =
@@ -294,55 +322,171 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
     );
   }
 
+  const accessibleName = isPartial
+    ? t('character.scope.triggerPartial', { label, missing: missingNote })
+    : label;
+  // Below `md` the stack draws one face fewer, so a phone header keeps its title.
+  const maxFaces = isNarrow ? STACK_MAX_FACES_NARROW : STACK_MAX_FACES;
+  const stack = isAll
+    ? characterStack(roster, activeCharacterId, missingNames, maxFaces, allCharacterIds)
+    : null;
+  const nameOf = (id: number) => roster.find((c) => c.characterId === id)?.name;
+  // Before the roster loads, empty circles hold the stack's width, so the
+  // title's truncation point does not jump when the faces arrive.
+  const expectedCount = allCharacterIds?.length ?? characterCount ?? 0;
+  const placeholderCount = Math.min(expectedCount, maxFaces);
+  const extraChip = (extra: number) => (
+    <span
+      data-stack-extra
+      className={cx(
+        FACE_BOX,
+        FACE_RING,
+        FACE_OVERLAP,
+        'flex shrink-0 items-center justify-center bg-panel text-[0.625rem] font-semibold text-text tabular-nums'
+      )}
+    >
+      +{extra}
+    </span>
+  );
+  const faces = isCorporation ? (
+    <CorporationLogoGlyph characterId={activeCharacterId} size="sm" boxClassName={FACE_BOX} />
+  ) : stack && stack.faces.length > 0 ? (
+    <>
+      {stack.faces.map((id, index) => (
+        <Face
+          key={id}
+          characterId={id}
+          className={cx(index > 0 && FACE_OVERLAP)}
+          fallback={<Initial name={nameOf(id)} className={cx(index > 0 && FACE_OVERLAP)} />}
+        />
+      ))}
+      {stack.extra > 0 && extraChip(stack.extra)}
+    </>
+  ) : isAll && placeholderCount > 0 ? (
+    <>
+      {Array.from({ length: placeholderCount }, (_, index) => (
+        <Initial key={index} data-stack-placeholder className={cx(index > 0 && FACE_OVERLAP)} />
+      ))}
+      {expectedCount > maxFaces && extraChip(expectedCount - maxFaces)}
+    </>
+  ) : isAll || activeCharacterId === null ? (
+    // No count to reserve and no roster: the generic glyph holds the place.
+    <Icon.AllCharacters size={ICON_SIZE.md} />
+  ) : (
+    <Face
+      characterId={activeCharacterId}
+      fallback={<Icon.AllCharacters size={ICON_SIZE.md} data-face-fallback />}
+    />
+  );
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={
-            isPartial ? t('character.scope.triggerPartial', { label, missing: missingNote }) : label
-          }
+        <StackTrigger
+          tooltip={accessibleName}
+          aria-label={accessibleName}
           aria-busy={loading || undefined}
-          className={`relative ${TRIGGER_BOX[size]} ${triggerBaseClassName}`}
+          className={`${controlHeightClassName[size]} ${triggerBaseClassName}`}
         >
-          {/* The glyph at every width: the whole trigger below `lg` (an `IconButton`-sized 20px glyph from `md`), the pill's leading icon from `lg` up (a fixed 20px slot, so a spinner swap never resizes the pill). */}
-          <span className="flex shrink-0 items-center justify-center md:size-5">
-            {loading ? (
-              spinner
-            ) : (
-              <span aria-hidden="true" className="flex items-center justify-center">
-                {isCorporation ? (
-                  <CorporationLogoGlyph
-                    characterId={activeCharacterId}
-                    size={size === 'md' ? 'md' : 'sm'}
-                    className="md:size-5"
-                  />
-                ) : isAll || activeCharacterId === null ? (
-                  <Icon.AllCharacters size={ICON_SIZE.md} />
-                ) : (
-                  <CharacterAvatar
-                    characterId={activeCharacterId}
-                    size={size === 'md' ? 'md' : 'sm'}
-                    loading="lazy"
-                    className="rounded-full md:size-5"
-                  />
-                )}
-              </span>
+          {/* The faces at every width. A spinner stands over them while loading,
+              the faces kept (invisible) so the trigger never changes width. */}
+          <span className="relative flex items-center">
+            <span aria-hidden="true" className={cx('flex items-center', loading && 'invisible')}>
+              {faces}
+            </span>
+            {loading && (
+              <span className="absolute inset-0 flex items-center justify-center">{spinner}</span>
             )}
           </span>
-          <span className="hidden lg:inline">{label}</span>
-          <Icon.Expanded size={ICON_SIZE.sm} aria-hidden="true" className="hidden lg:block" />
+          <Icon.Expanded size="0.75rem" aria-hidden="true" className="shrink-0" />
           {isPartial && (
-            // Every width: the label never says "partial", so the dot is the visible cue.
+            // The trigger has no words, so the dot is the visible cue.
             <span
               data-partial-dot
               aria-hidden="true"
               className="absolute -top-1 -right-1 size-2 rounded-full bg-warning ring-2 ring-bg"
             />
           )}
-        </button>
+        </StackTrigger>
       </DropdownMenuTrigger>
       {options}
     </DropdownMenu>
   );
 }
+
+/**
+ * One portrait in the trigger: `CharacterAvatar`'s image, at the trigger's own
+ * face box (`CharacterAvatar` fixes its box per size, which this one steps
+ * per breakpoint), with the ring that separates overlapping faces. Eager,
+ * like a header portrait. If the image fails, `fallback` takes its place.
+ */
+function Face({
+  characterId,
+  className,
+  fallback,
+}: {
+  characterId: number;
+  className?: string;
+  fallback: ReactNode;
+}) {
+  const src = characterPortraitUrl(characterId, 64);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  if (failedSrc === src) return fallback;
+  return (
+    <img
+      src={src}
+      crossOrigin="anonymous"
+      alt=""
+      width={24}
+      height={24}
+      decoding="async"
+      onError={() => setFailedSrc(src)}
+      className={cx('shrink-0 border border-line bg-panel', FACE_BOX, FACE_RING, className)}
+    />
+  );
+}
+
+/**
+ * A neutral face circle: the Character's initial when known (a portrait that
+ * failed), or empty (a placeholder holding a face's room before the roster
+ * loads).
+ */
+function Initial({
+  name,
+  className,
+  ...rest
+}: { name?: string; className?: string } & Record<`data-${string}`, boolean>) {
+  return (
+    <span
+      {...rest}
+      className={cx(
+        'flex shrink-0 items-center justify-center border border-line bg-panel text-[0.625rem] font-semibold text-text-dim uppercase',
+        FACE_BOX,
+        FACE_RING,
+        className
+      )}
+    >
+      {name?.charAt(0)}
+    </span>
+  );
+}
+
+/**
+ * The trigger button inside its `Tooltip`, which shows the same words as its
+ * accessible name on hover and focus: the faces carry no text. A forwardRef
+ * component so Radix's `DropdownMenuTrigger asChild` reaches the `<button>`
+ * through the tooltip, the way it does an `IconButton`.
+ */
+const StackTrigger = forwardRef<
+  HTMLButtonElement,
+  ButtonHTMLAttributes<HTMLButtonElement> & { tooltip: string }
+>(function StackTrigger({ tooltip, children, className, ...props }, ref) {
+  return (
+    <Tooltip content={tooltip}>
+      {/* `focusRingClassName` composed here too, so the focus ring belongs to this `<button>` itself rather than only to whichever caller passes the class. */}
+      <button ref={ref} type="button" className={cx(focusRingClassName, className)} {...props}>
+        {children}
+      </button>
+    </Tooltip>
+  );
+});
