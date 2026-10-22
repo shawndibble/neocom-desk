@@ -271,9 +271,7 @@ describe('HaulingPanel rows select, the rail shows the detail', () => {
     renderPanel();
     await user.click(row());
     expect(row()).toHaveAttribute('aria-current', 'true');
-    expect(
-      screen.getByRole('link', { name: 'Price history and orders in Amarr' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Amarr market' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Trip' })).toBeInTheDocument();
 
     await user.click(row());
@@ -724,9 +722,7 @@ describe('HaulingPanel on a phone', () => {
     expect(
       within(sheet).getAllByRole('button', { name: 'More actions for Damage Control II' })
     ).toHaveLength(1);
-    expect(
-      within(sheet).getByRole('link', { name: 'Price history and orders in Amarr' })
-    ).toBeInTheDocument();
+    expect(within(sheet).getByRole('link', { name: 'Amarr market' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
 
