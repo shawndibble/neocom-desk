@@ -12,10 +12,9 @@
  * plain objects out.
  */
 import { DEADLINE_SEVERITIES } from '../character/severity';
-import { localMidnight } from '../localDay';
+import { dayStart, nextDay, type DayZone } from '../localDay';
 import { CORP_BOARD_ITEM_KINDS, type CorpBoardItem, type CorpBoardItemKind } from './board';
 import type { CorpBoardSeverity } from './board';
-import { DAY_MS } from '@/lib/age';
 
 /** How far ahead the Deadline Strip looks on a full-width viewport. */
 export const DEADLINE_STRIP_DAYS = 14;
@@ -37,7 +36,7 @@ export const DUE_SOON_WINDOW_MS = 86_400_000;
 const SEVERITY_RANK: readonly CorpBoardSeverity[] = DEADLINE_SEVERITIES;
 
 export interface DeadlineDay {
-  /** Local midnight this day starts at — the bar's identity and its label's source. */
+  /** Midnight this day starts at on the Time format clock (local, or UTC for EVE time) — the bar's identity and its label's source. */
   startMs: number;
   /** How many board items fall due on this day. */
   count: number;
@@ -74,17 +73,21 @@ export interface DueSoonCount {
  *   in the past would be unreachable and would make the strip's own total
  *   disagree with what the cards show as still needing doing.
  */
-function dayIndexFor(item: CorpBoardItem, dayZeroStartMs: number, days: number): number | null {
+function dayIndexFor(
+  item: CorpBoardItem,
+  strip: readonly DeadlineDay[],
+  zone: DayZone
+): number | null {
   if (item.timing === 'untimed') return null;
   if (item.timing === 'passed') return 0;
   if (item.deadlineMs === null) return null;
 
-  // `round`, not `floor`: a DST boundary makes a local day 23 or 25 hours long,
-  // so the difference between two local midnights is not always a whole
-  // multiple of 24h. Rounding lands on the right day either way.
-  const index = Math.round((localMidnight(item.deadlineMs) - dayZeroStartMs) / DAY_MS);
-  if (index < 0) return 0;
-  return index < days ? index : null;
+  // Matched on the day's own midnight, not by dividing a difference by 24h: a
+  // local day is 23 or 25 hours long across a DST change.
+  const startMs = dayStart(item.deadlineMs, zone);
+  if (startMs < strip[0]!.startMs) return 0;
+  const index = strip.findIndex((day) => day.startMs === startMs);
+  return index === -1 ? null : index;
 }
 
 function worseOf(
@@ -96,7 +99,8 @@ function worseOf(
 }
 
 /**
- * One entry per day for `days` days starting today, however sparse.
+ * One entry per day for `days` days starting today, however sparse. Days are
+ * cut on `zone`'s clock: the machine's own when omitted, UTC for EVE time.
  *
  * Empty days are present and count zero, which is the point: the gaps are what
  * make a cluster legible, and a strip that only carried the days with work
@@ -105,21 +109,21 @@ function worseOf(
 export function deadlinesByDay(
   items: readonly CorpBoardItem[],
   nowMs: number,
-  days: number = DEADLINE_STRIP_DAYS
+  days: number = DEADLINE_STRIP_DAYS,
+  zone?: DayZone
 ): DeadlineDay[] {
-  const dayZeroStartMs = localMidnight(nowMs);
-  const strip: DeadlineDay[] = Array.from({ length: Math.max(0, days) }, (_, index) => ({
-    // Built from local calendar arithmetic rather than `dayZeroStartMs + index *
-    // DAY_MS`, so a DST change does not drift the later labels by an hour.
-    startMs: localMidnight(dayZeroStartMs + index * DAY_MS + DAY_MS / 2),
-    count: 0,
-    severity: null,
-  }));
+  const strip: DeadlineDay[] = [];
+  let startMs = dayStart(nowMs, zone);
+  for (let index = 0; index < Math.max(0, days); index += 1) {
+    strip.push({ startMs, count: 0, severity: null });
+    startMs = nextDay(startMs, zone);
+  }
+  if (strip.length === 0) return strip;
 
   for (const item of items) {
-    const index = dayIndexFor(item, dayZeroStartMs, strip.length);
+    const index = dayIndexFor(item, strip, zone);
     if (index === null) continue;
-    const day = strip[index];
+    const day = strip[index]!;
     day.count += 1;
     day.severity = worseOf(day.severity, item.severity);
   }

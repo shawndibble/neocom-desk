@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { DEADLINE_STRIP_DAYS, deadlinesByDay, dueSoon, groupBoardByKind } from './deadlines';
 import {
   CORP_BOARD_ITEM_KINDS,
@@ -294,5 +294,59 @@ describe('groupBoardByKind', () => {
     );
 
     expect([...grouped.keys()]).toEqual([...CORP_BOARD_ITEM_KINDS]);
+  });
+});
+
+describe('deadlinesByDay on the Time format clock', () => {
+  const originalTz = process.env.TZ;
+  afterEach(() => {
+    process.env.TZ = originalTz;
+  });
+
+  // 05:00 UTC on the 8th is 22:00 on the 7th in Los Angeles: two days on two clocks.
+  const nowMs = Date.UTC(2026, 8, 7, 12);
+  const lateEvening = item({ id: 'late', deadlineMs: Date.UTC(2026, 8, 8, 5) });
+
+  it('files an instant near midnight on the local day, or on the EVE day when asked', () => {
+    process.env.TZ = 'America/Los_Angeles';
+
+    expect(deadlinesByDay([lateEvening], nowMs, 3).map((d) => d.count)).toEqual([1, 0, 0]);
+    expect(deadlinesByDay([lateEvening], nowMs, 3, 'UTC').map((d) => d.count)).toEqual([0, 1, 0]);
+  });
+
+  it('starts each EVE day at UTC midnight', () => {
+    process.env.TZ = 'America/Los_Angeles';
+
+    const strip = deadlinesByDay([], nowMs, 3, 'UTC');
+
+    expect(strip.map((d) => d.startMs)).toEqual([
+      Date.UTC(2026, 8, 7),
+      Date.UTC(2026, 8, 8),
+      Date.UTC(2026, 8, 9),
+    ]);
+  });
+
+  it('keeps local days on local midnights across a 25-hour DST day', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    // Clocks go back on 2026-11-01 in Los Angeles.
+    const before = new Date(2026, 9, 31, 12).getTime();
+    const late = item({ id: 'x', deadlineMs: new Date(2026, 10, 2, 23, 30).getTime() });
+
+    const strip = deadlinesByDay([late], before, 4);
+
+    expect(strip.map((d) => d.startMs)).toEqual([
+      new Date(2026, 9, 31).getTime(),
+      new Date(2026, 10, 1).getTime(),
+      new Date(2026, 10, 2).getTime(),
+      new Date(2026, 10, 3).getTime(),
+    ]);
+    expect(strip.map((d) => d.count)).toEqual([0, 0, 1, 0]);
+  });
+
+  it('still lands an overdue or passed item on day 0 on either clock', () => {
+    const passed = item({ id: 'p', timing: 'passed' });
+    const overdue = item({ id: 'o', deadlineMs: nowMs - 3 * DAY });
+
+    expect(deadlinesByDay([passed, overdue], nowMs, 3, 'UTC')[0].count).toBe(2);
   });
 });
