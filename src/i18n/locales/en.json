@@ -6721,7 +6721,14 @@
       "notEnough": "Not enough for the oldest entry",
       "hint": "Record it now — the transfer links itself once it shows up in your wallet journal.",
       "recordAction": "I sent it · record payment",
-      "pickFromWallet": "Already in my wallet? Pick it…"
+      "pickFromWallet": "Already in my wallet? Pick it…",
+      "fromLabel": "Paying from",
+      "fromOption": "{{name}} · {{amount}} ISK",
+      "alsoPayRest_one": "Also pay {{count}} other entry",
+      "alsoPayRest_other": "Also pay {{count}} other entries",
+      "alsoPayOthers_one": "Also pay for other characters · {{count}} entry",
+      "alsoPayOthers_other": "Also pay for other characters · {{count}} entries",
+      "openInEveAs": "Open in EVE · {{name}}"
     },
     "linkWallet": {
       "title": "Link a wallet payment",
