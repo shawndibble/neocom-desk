@@ -192,7 +192,7 @@ Offered when a wholly unassigned entry has the same Character + system on the EV
 
 ### Ledger table, filters, selection
 
-- Order: Owed cards, Attention strip (collapsed, header counts), Continue cards, filter row (Character filter, Payee multi-select "All payees / N selected", phone sort picker, export), Open, History.
+- Order: Owed cards, Attention strip (collapsed, header counts), Continue cards, filter row (Payee multi-select "All payees / N selected", phone sort picker, export), Open, History.
 - Owed cards (`balances.ts:31`): per Payee sum of `taxOwed` of `outstanding` assignments (not total across statuses); sorted owed desc then name; settled Payees included at 0; a Payee unknown on this device is skipped (the table row says "Unknown Payee"). "Days waiting" = whole EVE days from the oldest owed entry to today (`OwedBalances.tsx:8`). Follows the Character filter, NOT the Payee filter. Side cards "Unassigned entries" (count; value of unassigned ore) and "Unlinked payments". Click a card filters the table to that Payee.
 - Payee filter (`TaxTab.tsx:535-557`): drops rows without a Payee (unassigned and dismissed vanish as soon as a Payee is selected); options list every Payee across all Characters, suffixed with the Character name when >1 Character; URL-held.
 - Open columns: select, Character (>1 only), Date (EVE date, tooltip), System, Ore (icons; hidden below 87.5rem, #2147), Payee, Estimated Value, Tax Owed, Status pill. Default sort Date desc (`tax.sort`).

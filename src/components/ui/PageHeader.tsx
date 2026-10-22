@@ -83,7 +83,7 @@ interface PageHeaderProps {
  * No phone-only "whose data is this" avatar lives here any more (#1764 added
  * one, since removed): a route that filters by Character already carries
  * that cue in its `CharacterFilterControl`, whose trigger shows the active
- * Character's own portrait below `md`. A route with one Character to offer,
+ * Character's own portrait (or the faces "All" covers) at every width. A route with one Character to offer,
  * and so no filter control, has nothing to name here either — the bottom
  * tab bar's More sheet is still a phone's route to Characters either way.
  *

@@ -143,6 +143,8 @@ export function Wallet() {
         onChange={setWalletCharacterFilter}
         characterCount={walletFilterCandidates.length}
         missingNames={netWorthMissingNames}
+        // The body shows its spinner for the same first load.
+        loading={loading && !data}
       />
     ) : undefined;
 

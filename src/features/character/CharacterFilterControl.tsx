@@ -131,13 +131,10 @@ export interface CharacterFilterControlProps<
    * The sibling touch tier this trigger's height must match,
    * mirroring `IconButtonSize`'s two below-`md` values (`size-9`/`size-11`) —
    * not the full `IconButtonSize` (there is no `'row'` tier here). `'sm'`
-   * (default) for a panel's own `meta` row, where the `IconButton`s beside it
-   * (Open Orders) are themselves `size="sm"`.
-   * `'md'` for a `PageHeader`'s `meta`, where that header's own `actions`
-   * cluster sits at `IconButton`'s default (larger) tier instead — see
-   * `PageHeader`'s own doc comment. Inside a
-   * `PageHeader`'s `scope` slot this prop is ignored: the header's
-   * `'md'` tier always applies (`PageHeaderClusterContext`).
+   * (default) beside `size="sm"` `IconButton`s, `'md'` beside default-tier
+   * ones. Every page picker now sits in a `PageHeader`'s `scope` slot, where
+   * this prop is ignored: the header's `'md'` tier always applies
+   * (`PageHeaderClusterContext`).
    */
   size?: 'sm' | 'md';
   /**

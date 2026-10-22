@@ -88,7 +88,7 @@ Corp assets (`/corp/assets`, `routes/CorpAssets.tsx`) are a separate inventory l
 
 `PageHeader` title "Assets":
 
-- Meta: `DataAgeBadge` (assets fetch), the Character filter control (`CharacterFilterControl`, size md; hidden for one-Character accounts), small spinner "Searching other characters…" while cross-character data loads.
+- Meta: `DataAgeBadge` (assets fetch); a `?char=` link's "Name only" readout. The Character filter (`CharacterFilterControl`; hidden for one-Character accounts and while a `?char=` link names the Character) rides first in the right-hand cluster (`PageHeader` `scope`), one picker for all three tabs; its trigger spins while cross-character data loads and carries the "Not included" dot for skipped Characters.
 - Actions (right): one labelled **Tools** menu (`TableActionsMenu` with `triggerText`: grid icon, the word, caret) holding All items, Select, **Refresh** (with the data's age) and Export table ▸ — Items tab only. **Plan a move** is the Move tab (`MovePlanTab`: tick items per Character and pickup, pick any system or one of your stations, get totals, a suggested hauler and a Route Safety link per pickup).
 - Below: `SearchInput` "Search items…" — only shown when assets are loaded and no re-login needed. Debounced 250 ms for matching; input stays instant.
 - Select-mode bar (when on) between search and list.
@@ -225,7 +225,7 @@ Item name link: `ItemInfoLink` → opens Show info (`?info=type-<id>` modal, `fe
 - Item columns at item rows only: `20260926-203503-assets-item-columns-ship-at-item-rows-only.md`.
 - BPC value from contract listings (0 without a listing): `20260930-120122-asset-value-prices-blueprint-copies-from-contract-listings.md`.
 - Corp assets reuse the engine: `20260903-162701-corp-assets-are-registered-and-assets-gets-no.md`, `20260910-152158` (both reversed by `20261021-163150-corp-assets-is-an-inventory-ledger-not-a`).
-- Character filter placement: `20260908-192806`.
+- Character filter placement: `20261022-123837-the-character-picker-rides-first-in-the-page.md` (supersedes the placement half of `20260908-192806`).
 - Use-assets in Build Plans (readers of the same assets): `20261003-203239-use-all-fills-every-row-its-use-assets.md`.
 - Drill-down in the URL so Back steps up: `src/engine/assetPath.ts:1-14`.
 

@@ -788,6 +788,23 @@ describe('Contracts All characters source', () => {
     expect(screen.getByRole('columnheader', { name: 'Character' })).toBeInTheDocument();
   });
 
+  it('names a Character who has not shared contracts in the picker, not in a body note', async () => {
+    await db.characters.put({
+      characterId: 93,
+      name: 'Pilot Three',
+      ownerHash: 'o3',
+      addedAt: 3,
+    });
+    // No token: never granted the contracts scope, so "All" leaves it out.
+    window.history.pushState({}, '', '/contracts/history?history.chars=all');
+    render(<App />);
+    expect(await screen.findByText('Alt trade')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^All characters.*Not included: Pilot Three$/ })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/hasn't shared their contracts/)).not.toBeInTheDocument();
+  });
+
   it('has no Character column for This character', async () => {
     window.history.pushState({}, '', '/contracts/history');
     render(<App />);

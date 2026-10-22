@@ -997,6 +997,20 @@ describe('Wallet', () => {
       expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
     });
 
+    it('spins in the picker while the page loads, as Mail and Contracts do', async () => {
+      await seedSecondCharacter();
+      server.use(
+        http.get(
+          `https://esi.evetech.net/characters/${CHAR_ID}/wallet`,
+          () => new Promise(() => {})
+        )
+      );
+      render(<App />);
+
+      const picker = await screen.findByRole('button', { name: 'This character' });
+      expect(picker).toHaveAttribute('aria-busy', 'true');
+    });
+
     it('only shows a "hasn\'t granted access" notice for a skipped character actually in the selected filter', async () => {
       const user = userEvent.setup();
       await seedSecondCharacter();
