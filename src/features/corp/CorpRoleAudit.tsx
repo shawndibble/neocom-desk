@@ -32,6 +32,8 @@ import { label } from '@/engine/corp/members';
 import { recentChanges, roleLabel, type RoleChange } from '@/engine/corp/roleAudit';
 import { formatAge } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
+
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { loadCorporationId } from './boardData';
 import { loadRoleAudit, type RoleAuditData } from './roleAudit';
@@ -79,6 +81,7 @@ const DASH = '—';
 
 function HistoryTable({ rows }: { rows: readonly HistoryRow[] }) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const columns = useMemo<DataTableColumn<HistoryRow>[]>(
     () => [
       {
@@ -87,7 +90,7 @@ function HistoryTable({ rows }: { rows: readonly HistoryRow[] }) {
         className: 'whitespace-nowrap tabular-nums text-text-dim',
         render: (row) => (
           <time dateTime={new Date(row.change.changedAtMs).toISOString()}>
-            {formatTimestamp(new Date(row.change.changedAtMs))}
+            {formatTimestamp(new Date(row.change.changedAtMs), timeZone)}
           </time>
         ),
         sortValue: (row) => row.change.changedAtMs,
@@ -131,7 +134,7 @@ function HistoryTable({ rows }: { rows: readonly HistoryRow[] }) {
         sortValue: (row) => row.issuer ?? undefined,
       },
     ],
-    [t]
+    [t, timeZone]
   );
   return (
     <DataTable

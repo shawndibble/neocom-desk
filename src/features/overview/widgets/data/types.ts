@@ -7,6 +7,7 @@
  * plain fixtures.
  */
 import type { DeadlineSeverity } from '@/engine/character/severity';
+import type { DayZone } from '@/engine/localDay';
 import type { EsiEndpointId } from '@/esi/registry';
 import type { StockBoardData } from '@/features/stockTargets/stockBoard';
 import type { ExtractionPrices } from '@/features/character/useExtractionPrices';
@@ -297,4 +298,6 @@ export interface BuildContext {
   plexPer30Days?: number;
   /** Which calendar events a Coming up widget lists; left out, accepted and tentative. */
   calendarEvents?: CalendarEventsChoice;
+  /** The Time format clock days are cut on (`useTimeZone`); left out, the machine's own. */
+  zone?: DayZone;
 }

@@ -56,6 +56,8 @@ import {
 import { iskToneClass } from '@/features/character/format';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
+import { useTimeZone } from '@/lib/timeFormat';
+
 import type { CachedResult } from '@/esi/cache';
 import type { CorporationWalletTransaction } from '@/esi/endpoints';
 import { useColumnVisibility } from '@/lib/columnVisibility';
@@ -171,6 +173,7 @@ export function CorpTransactionsPanel({
   refreshFailed,
 }: CorpTransactionsPanelProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
 
   // The same six columns Market's character panel draws, and in the same
   // order: the two tables answer the same question about different wallets,
@@ -182,7 +185,7 @@ export function CorpTransactionsPanel({
         id: 'date',
         header: t('wallet.date'),
         className: 'whitespace-nowrap text-text-dim',
-        render: (txn) => formatTimestamp(new Date(txn.date)),
+        render: (txn) => formatTimestamp(new Date(txn.date), timeZone),
         sortValue: (txn) => txn.date,
       },
       {
@@ -226,7 +229,7 @@ export function CorpTransactionsPanel({
         sortValue: (txn) => transactionTotal(txn),
       },
     ],
-    [t, nameFor]
+    [t, nameFor, timeZone]
   );
 
   const { visible, isVisible, toggle, reset } = useColumnVisibility(

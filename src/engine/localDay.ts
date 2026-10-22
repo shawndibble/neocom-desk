@@ -1,9 +1,10 @@
 /**
  * Local calendar days, shared by both deadline boards.
  *
- * Days are **local calendar days, not rolling 24-hour windows**: a pilot
- * reading "Tuesday" means their own Tuesday, so this reads the machine's zone
- * deliberately and takes no zone argument.
+ * Days are **calendar days, not rolling 24-hour windows**: a pilot reading
+ * "Tuesday" means their own Tuesday. `localMidnight` reads the machine's zone
+ * deliberately; `dayStart` and `nextDay` take the Time format clock (`DayZone`)
+ * for boards that follow it.
  *
  * Implemented by zeroing a `Date`'s clock fields rather than by subtracting a
  * modulus: a `ms % 86_400_000` is an hour wrong for half the year on either

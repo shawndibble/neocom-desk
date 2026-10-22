@@ -1,3 +1,4 @@
+import { formatTimestamp } from '@/lib/timestamp';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -80,7 +81,7 @@ describe('SharedLink', () => {
     expect(screen.getByText('5,400,000,000 ISK (5.4B)')).toBeInTheDocument();
     expect(screen.getByText('4,500,000,000 ISK (4.5B)')).toBeInTheDocument();
     expect(screen.queryByText(/Unverified/)).not.toBeInTheDocument();
-    expect(screen.getByText(new Date(expiresAt).toLocaleString())).toBeInTheDocument();
+    expect(screen.getByText(formatTimestamp(new Date(expiresAt)))).toBeInTheDocument();
   });
 
   it('still opens a link in the old /share/<id> spelling', async () => {

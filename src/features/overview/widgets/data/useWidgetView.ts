@@ -6,6 +6,7 @@ import {
   useNotificationPreferences,
 } from '@/features/notifications/preferences';
 import { useTicker } from '@/lib/ticker';
+import { useTimeZone } from '@/lib/timeFormat';
 import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
 import { DEFAULT_RANGE, type CalendarEventsChoice, type WidgetRange } from '../layout';
 import type { FeedStore } from './feedStore';
@@ -67,6 +68,7 @@ function cachedView(
     ctx.now,
     ctx.activeCharacterId,
     ctx.notTrainingAlert,
+    ctx.zone,
   ];
   const hit = cache.get(id);
   if (hit && sameItems(hit.deps, deps)) return hit.view;
@@ -87,6 +89,7 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
   const now = useTicker(OVERVIEW_TICK_MS);
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const zone = useTimeZone();
   const prefs = useNotificationPreferences((state) => state.value);
   const notTrainingAlert =
     activeCharacterId !== null && isNotTrainingAlertEnabledFor(prefs, activeCharacterId);
@@ -123,13 +126,14 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
           now,
           activeCharacterId,
           notTrainingAlert,
+          zone,
         })
       );
     }
     return views;
     // `slice` is the signal that an own feed changed; the store read inside is current.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stable, store, slice, now, t, activeCharacterId, notTrainingAlert]);
+  }, [stable, store, slice, now, t, activeCharacterId, notTrainingAlert, zone]);
 }
 
 /** The view for one widget. */
