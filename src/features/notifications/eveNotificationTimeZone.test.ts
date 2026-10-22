@@ -2,6 +2,8 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { eveNotificationText } from './eveNotificationText';
 import { renderEveNotification } from './eveNotificationRender';
 import i18n from '@/i18n';
+import { parseEveNotificationPayload, reinforcementExitMs } from '@/engine/eveNotificationPayload';
+import { formatLocalDateTime } from '@/lib/localDate';
 import type { EveNotificationFire } from '@/engine/notificationDiffs';
 
 /**
@@ -11,7 +13,8 @@ import type { EveNotificationFire } from '@/engine/notificationDiffs';
  */
 const originalTz = process.env.TZ;
 afterAll(() => {
-  process.env.TZ = originalTz;
+  if (originalTz === undefined) delete process.env.TZ;
+  else process.env.TZ = originalTz;
 });
 
 // 2026-06-14T23:30:00Z as EVE ticks.
@@ -87,6 +90,10 @@ describe('EVE Notification times follow the Time format', () => {
     const local = renderEveNotification(t, f, CHARACTER).body;
     const eve = renderEveNotification(t, f, CHARACTER, {}, 'UTC').body;
     expect(eve).not.toBe(local);
-    expect(eve).toMatch(/\d{4}-\d{2}-\d{2}, \d{2}:\d{2}/);
+    // The exact UTC rendering of the instant the engine computes, not just its shape.
+    const exitMs = reinforcementExitMs(f.timestamp, parseEveNotificationPayload(f.text));
+    expect(exitMs).toBeDefined();
+    expect(eve).toContain(formatLocalDateTime(new Date(exitMs!), 'UTC'));
+    expect(local).toContain(formatLocalDateTime(new Date(exitMs!)));
   });
 });

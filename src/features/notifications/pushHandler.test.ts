@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterAll } from 'vitest';
 import { handlePush, parsePushPayload, type PushEnv, type PushPayload } from './pushHandler';
 import { notificationTagFor } from './notificationOptions';
 import { occurrenceKey } from '@/engine/occurrenceKey';
@@ -30,6 +30,12 @@ const VALID_PAYLOAD: PushPayload = {
 function rawFcmPayload(payload: Partial<Record<keyof PushPayload, unknown>>): string {
   return JSON.stringify({ data: payload });
 }
+
+const originalTz = process.env.TZ;
+afterAll(() => {
+  if (originalTz === undefined) delete process.env.TZ;
+  else process.env.TZ = originalTz;
+});
 
 describe('parsePushPayload', () => {
   it('parses a well-formed payload nested under data, coercing characterId from a string', () => {
@@ -384,6 +390,21 @@ describe('server-polled EVE notifications (ADR 0020)', () => {
     );
     expect(vi.mocked(e.resolveNames)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toContain('Marmite Corp');
+  });
+
+  it('a rejecting zone reader still shows the rich body, in the host zone (#4731)', async () => {
+    const e = withName({ timeZone: () => Promise.reject(new Error('settings unavailable')) });
+    await handlePush(
+      e,
+      serverSingle({
+        eveType: 'OrbitalReinforced',
+        notificationText: 'planetID: 40121487\nreinforceExitTime: 134259534000000000\n',
+      }),
+      NOW
+    );
+    expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toMatch(
+      /Timer ends \d{4}-\d{2}-\d{2}, \d{2}:\d{2}/
+    );
   });
 
   it('renders times in the zone the Time format setting names (#4731)', async () => {

@@ -246,7 +246,8 @@ async function present(env: PushEnv, payload: PushPayload, now: number): Promise
       timestamp: raw.timestamp,
     };
     const names = (await env.resolveNames?.(fire)) ?? {};
-    const timeZone = await env.timeZone?.();
+    // A preference read must never hold back (or drop) the rich body.
+    const timeZone = await env.timeZone?.().catch(() => undefined);
     const { title, body } = renderEveNotification(
       (key, options) => i18n.t(key, options),
       fire,
