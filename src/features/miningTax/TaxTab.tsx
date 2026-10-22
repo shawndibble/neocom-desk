@@ -65,7 +65,8 @@ import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapsh
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { toggleFilterMember } from '@/lib/multiSelectFilter';
-import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { useRememberedUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
 import { type UrlParamCodec } from '@/lib/urlState';
 import type { TradeHub } from '@/market/hubs';
 import type { PayeeRecord } from '@/db';
@@ -99,6 +100,7 @@ import { useLinkSuggestions, useMadePayments } from '@/features/miningTax/useMad
 import { useContinuations } from '@/features/miningTax/useContinuations';
 import { dateLabel, dateRangeOf, taxOwedOf } from '@/features/miningTax/taxRowFormat';
 import type { SettleUpRow } from '@/features/miningTax/SettleUpDialog';
+import { defaultPayer } from '@/features/miningTax/settlePayer';
 import type { PayeeOwed } from '@/features/miningTax/PayeeManagerDialog';
 import { findPricingGaps, type PricingGap } from '@/features/miningTax/pricingGaps';
 import { taxCsvColumns } from '@/features/miningTax/taxCsv';
@@ -264,8 +266,14 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   );
   useRefreshOnOreFormChange(refresh);
 
+  // Remembered per device once changed; a first visit stays on All characters.
+  const rememberedCharacterFilter = useRememberedCharacterFilter<typeof TAX_URL_PARAMS>(
+    'miningTax',
+    'tax.character',
+    'all'
+  );
   const [{ 'tax.character': characterFilter, 'tax.payee': payeeFilter }, setTaxUrlParams] =
-    useUrlParams(TAX_URL_PARAMS);
+    useRememberedUrlParams(TAX_URL_PARAMS, rememberedCharacterFilter);
   const setCharacterFilter = useCallback(
     (next: CharacterFilterValue) => setTaxUrlParams({ 'tax.character': next }),
     [setTaxUrlParams]
@@ -629,9 +637,18 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     setPayeeFilter(isSolePayeeFilter(payeeId) ? 'all' : new Set([payeeId]));
   }
 
-  /** "Pay them in one lump sum": every Outstanding Assignment behind one balance, straight into Settle up. */
+  /**
+   * "Pay them in one lump sum": every Outstanding Assignment behind one
+   * balance, straight into Settle up — paid by the active Character when it
+   * owes some, so a balance spanning Characters isn't one blended figure.
+   */
   function settleUpBalance(members: readonly GroupMember[]) {
-    actions.openSettleUp(settleUpRowsFor(members));
+    openSettleUpFor(settleUpRowsFor(members));
+  }
+
+  function openSettleUpFor(rows: SettleUpRow[]) {
+    const payerId = defaultPayer(rows, activeCharacterId);
+    actions.openSettleUp(rows, payerId === null ? {} : { payerId });
   }
 
   /** The "Assign next" shortcut: the newest still-unassigned entry, opened straight into its Assign form. */
@@ -1277,7 +1294,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                       }
                       onClear={clearSelection}
                       settleUpCount={selectedSettleUpRows.length}
-                      onSettleUp={() => actions.openSettleUp(selectedSettleUpRows)}
+                      onSettleUp={() => openSettleUpFor(selectedSettleUpRows)}
                       combine={combine}
                       onCombine={handleCombineSelected}
                       dismissCount={dismissTargets.length}

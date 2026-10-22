@@ -10,8 +10,8 @@ import { useDefaultCharacterFilter } from './defaultCharacterFilter';
 
 const PARAMS = { chars: characterFilterParam('current') };
 
-function useFilter(page: 'assets' | 'wallet') {
-  const remembered = useRememberedCharacterFilter<typeof PARAMS>(page, 'chars');
+function useFilter(page: 'assets' | 'wallet' | 'miningTax', firstVisit?: 'current' | 'all') {
+  const remembered = useRememberedCharacterFilter<typeof PARAMS>(page, 'chars', firstVisit);
   const [values, setValues] = useRememberedUrlParams(PARAMS, remembered);
   return { value: values.chars, set: (chars: 'current' | 'all') => setValues({ chars }) };
 }
@@ -32,6 +32,18 @@ describe('remembered character filter precedence', () => {
     useDefaultCharacterFilter.setState({ value: 'all' });
     const { result } = renderHook(() => useFilter('assets'), { wrapper: wrapper('/') });
     await waitFor(() => expect(result.current.value).toBe('all'));
+  });
+
+  it("a page's own first-visit value beats the Settings default", async () => {
+    const { result } = renderHook(() => useFilter('miningTax', 'all'), { wrapper: wrapper('/') });
+    await waitFor(() => expect(useDefaultCharacterFilter.getState().hydrated).toBe(true));
+    expect(result.current.value).toBe('all');
+  });
+
+  it("a page's remembered pick beats its first-visit value", async () => {
+    await db.settings.put({ key: 'characterFilterPicks', value: { miningTax: 'current' } });
+    const { result } = renderHook(() => useFilter('miningTax', 'all'), { wrapper: wrapper('/') });
+    await waitFor(() => expect(result.current.value).toBe('current'));
   });
 
   it("a page's remembered pick beats the Settings default", async () => {

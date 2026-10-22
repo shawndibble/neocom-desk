@@ -18,6 +18,8 @@ export function OpenInEveButton({
   lookup,
   size = 'sm',
   inRow = false,
+  characterId,
+  label: labelOverride,
 }: OpenInEveTarget & {
   /** What is being opened, for the button's accessible name. */
   name?: string;
@@ -31,10 +33,18 @@ export function OpenInEveButton({
    * the button to a new line under the pointer.
    */
   inRow?: boolean;
+  /** Send from this Character, not the active one (see `OpenInEveOptions`). */
+  characterId?: number;
+  /** Replaces the kind's label, e.g. to name the Character it sends from. */
+  label?: string;
 }) {
   const { t } = useTranslation();
-  const { unavailable, blockedReason, sending, outcome, send } = useOpenInEve({ kind, id }, lookup);
-  const label = t(`openInEve.${kind}`);
+  const { unavailable, blockedReason, sending, outcome, send } = useOpenInEve(
+    { kind, id },
+    lookup,
+    characterId === undefined ? undefined : { characterId }
+  );
+  const label = labelOverride ?? t(`openInEve.${kind}`);
   const reasonId = useId();
 
   if (unavailable) return null;
