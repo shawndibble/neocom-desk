@@ -21,6 +21,14 @@ jobs:
   # PR's jobs queue for. The shard counts and job merges below are sized
   # against it.
   #
+  # Caches: a PR run can restore only caches its own PR saved or ones saved on
+  # its base branch or the default branch (`main`), and this workflow never
+  # runs on either. cache-warm.yml saves the dependency caches there, so a PR's
+  # first run hits them. It mirrors every actions/cache and setup-node cache
+  # below (path, key, runner image), so change one in both places. Jobs that
+  # restore node_modules don't also take setup-node's npm download cache: on a
+  # hit it is a wasted download, and on a miss each PR would save its own.
+  #
   # lint, format:check, typecheck and check:case used to be four jobs, each
   # paying its own checkout and `npm ci`. Run back to back they take about as
   # long as the slowest test shard, so one runner costs no wall time and
@@ -32,8 +40,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-      - run: npm ci
+      # Same node_modules cache as the test jobs (and warmed on `develop` by
+      # cache-warm.yml); a miss falls back to `npm ci`.
+      - uses: actions/cache@v4
+        id: node-modules
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
       - run: npm run check:case
       - run: npm run lint
       - run: npm run format:check
@@ -54,8 +69,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-      - run: npm ci
+      # Same node_modules cache as the test jobs (and warmed on `develop` by
+      # cache-warm.yml); a miss falls back to `npm ci`.
+      - uses: actions/cache@v4
+        id: node-modules
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
       - run: npm run build
         env:
           VITE_EVE_CLIENT_ID: e2e-fake-client
@@ -116,9 +138,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-      # setup-node caches the npm download, not node_modules; restoring the
-      # tree skips the install. A miss falls back to `npm ci`.
+      # Restoring node_modules skips the install (see "Caches" at the top);
+      # a miss falls back to `npm ci`.
       - uses: actions/cache@v4
         id: node-modules
         with:
@@ -147,8 +168,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          # Both trees are installed here, so a change to either lockfile
-          # refreshes the download cache.
+          # The npm download cache, for `npm ci --prefix functions` (and the
+          # root install on a node_modules miss). Keyed on both lockfiles, so
+          # a change to either refreshes it; cache-warm.yml saves the same key.
           cache-dependency-path: |
             package-lock.json
             functions/package-lock.json
@@ -156,8 +178,8 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      # setup-node caches the npm download, not node_modules; restoring the
-      # tree skips the install. A miss falls back to `npm ci`.
+      # Restoring node_modules skips the install (see "Caches" at the top);
+      # a miss falls back to `npm ci`.
       - uses: actions/cache@v4
         id: node-modules
         with:
@@ -252,14 +274,13 @@ jobs:
       - uses: actions/checkout@v4
       # The container runs as root over a checkout owned by the runner user, so
       # git refuses the repo ("dubious ownership") and `npm ci`'s husky
-      # postinstall check then reports no hook installed.
+      # `prepare` check then reports no hook installed.
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-      # setup-node caches the npm download, not node_modules; restoring the
-      # tree skips the install. A miss falls back to `npm ci`.
+      # Restoring node_modules skips the install (see "Caches" at the top);
+      # a miss falls back to `npm ci`.
       - uses: actions/cache@v4
         id: node-modules
         with:
@@ -269,12 +290,12 @@ jobs:
         run: npm ci
       - name: Check the image matches @playwright/test
         env:
-          # Keep in sync with `container.image` above.
+          # Keep in sync with `container.image` above (and cache-warm.yml's).
           IMAGE_VERSION: 1.62.1
         run: |
           installed="$(node -p "require('@playwright/test/package.json').version")"
           if [ "$installed" != "$IMAGE_VERSION" ]; then
-            echo "::error::@playwright/test is $installed but the e2e-shard container image is v$IMAGE_VERSION; bump the image tag and IMAGE_VERSION in ci.yml together"
+            echo "::error::@playwright/test is $installed but the e2e-shard container image is v$IMAGE_VERSION; bump the image tag and IMAGE_VERSION in ci.yml (and the image in cache-warm.yml) together"
             exit 1
           fi
       # The `built` Playwright project renders dist/ via `vite preview`; the
