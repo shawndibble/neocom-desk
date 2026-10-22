@@ -27,7 +27,14 @@ import { useCharacterPermissionCounts } from '@/features/permissions/useCharacte
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { grantMissingPath } from './grantMissingPath';
 
-export function CharacterSwitcher({ className }: { className?: string }) {
+export function CharacterSwitcher({
+  className,
+  onNavigate,
+}: {
+  className?: string;
+  /** Called when Fix… or Manage characters leaves the page, so a sheet the switcher sits in can close. */
+  onNavigate?: () => void;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -110,7 +117,12 @@ export function CharacterSwitcher({ className }: { className?: string }) {
                     size="sm"
                     variant="ghost"
                     aria-label={t('nav.fixPermissionsFor', { name: row.name })}
-                    onClick={() => pick(row.characterId, () => navigate(grantMissingPath([])))}
+                    onClick={() =>
+                      pick(row.characterId, () => {
+                        onNavigate?.();
+                        navigate(grantMissingPath([]));
+                      })
+                    }
                   >
                     {t('nav.fixPermissions')}
                   </Button>
@@ -120,7 +132,14 @@ export function CharacterSwitcher({ className }: { className?: string }) {
           })}
         </ul>
         <div className="border-t border-line px-3 py-2 text-xs">
-          <Link to="/characters" onClick={() => setOpen(false)} className="text-accent underline">
+          <Link
+            to="/characters"
+            onClick={() => {
+              setOpen(false);
+              onNavigate?.();
+            }}
+            className="text-accent underline"
+          >
             {t('nav.manageCharacters')}
           </Link>
         </div>

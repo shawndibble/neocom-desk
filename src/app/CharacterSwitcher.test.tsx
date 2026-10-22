@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -25,10 +25,10 @@ function Where() {
   return <output data-testid="where">{pathname}</output>;
 }
 
-function show() {
+function show(onNavigate?: () => void) {
   render(
     <MemoryRouter initialEntries={['/overview']}>
-      <CharacterSwitcher />
+      <CharacterSwitcher onNavigate={onNavigate} />
       <Where />
     </MemoryRouter>
   );
@@ -77,6 +77,19 @@ describe('CharacterSwitcher', () => {
     );
     await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(3));
     expect(screen.getByTestId('where')).toHaveTextContent('/settings/permissions');
+  });
+
+  it('tells a host sheet to close when Fix… or Manage characters leaves the page', async () => {
+    const onNavigate = vi.fn();
+    show(onNavigate);
+    await userEvent.click(await screen.findByRole('button', { name: 'Characters' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Fix permissions for Marsha' })
+    );
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledTimes(1));
+    await userEvent.click(await screen.findByRole('button', { name: 'Characters' }));
+    await userEvent.click(await screen.findByRole('link', { name: 'Manage characters' }));
+    expect(onNavigate).toHaveBeenCalledTimes(2);
   });
 
   it('links to the Characters page', async () => {

@@ -492,7 +492,7 @@ export const Layout = memo(function Layout() {
                       originPath={originPath}
                     />
                   </div>
-                  <CharacterSwitcher />
+                  <CharacterSwitcher onNavigate={() => setMoreOpen(false)} />
                 </div>
               )}
             />
