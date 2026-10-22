@@ -117,11 +117,9 @@ function TradeHubCell({ row, hub, loading }: { row: HubRow; hub: TradeHub; loadi
 export function TradeHubsTable({
   items,
   loadingHubs = [],
-  narrow = false,
 }: {
   items: readonly SampleCompareItem[];
   loadingHubs?: readonly HubId[];
-  narrow?: boolean;
 }) {
   const loading = new Set(loadingHubs);
   const rows: HubRow[] = items.map((item) => {
@@ -168,7 +166,9 @@ export function TradeHubsTable({
         rows={rows}
         rowKey={(row) => row.typeId}
         label="Compare at trade hubs"
-        responsive={narrow ? 'stack' : 'table'}
+        // A compare table at every width, as Prices: on a phone it scrolls
+        // sideways with the item column pinned.
+        responsive="table"
       />
     </NewComponent>
   );
@@ -215,7 +215,7 @@ export function ProposedCompareDrawer({
               label="Compare view"
               options={[
                 { value: 'prices', label: 'Prices' },
-                // Three options overflow a 390px header: the phone says "Hubs".
+                // "Trade hubs" pushes Attributes off a 390px header: the phone says "Hubs".
                 { value: 'hubs', label: fullScreen ? 'Hubs' : 'Trade hubs' },
                 { value: 'attributes', label: 'Attributes' },
               ]}
@@ -248,7 +248,7 @@ export function ProposedCompareDrawer({
             <p className="border-b border-line bg-panel-2 px-3 py-2 text-xs text-warning">{note}</p>
           )}
           <div className="overflow-x-auto p-1">
-            <TradeHubsTable items={items} loadingHubs={loadingHubs} narrow={fullScreen} />
+            <TradeHubsTable items={items} loadingHubs={loadingHubs} />
           </div>
         </div>
       </section>

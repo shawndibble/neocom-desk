@@ -88,7 +88,7 @@ export const Proposed: Story = {
   ),
 };
 
-/** @summary Proposed on a phone: one card per item, one labelled line per hub. */
+/** @summary Proposed on a phone: a table like Prices, scrolling sideways with the item column pinned. */
 export const ProposedPhone: Story = {
   globals: PHONE,
   parameters: { shell: shell(seedProposed) },
