@@ -65,4 +65,15 @@ describe('settleEsiCacheLoads', () => {
     await load;
     await settleEsiCacheLoads();
   });
+
+  it('ignores a pending load whose key the filter rejects', async () => {
+    const live = deferred<string>();
+    const load = loadWithCacheStatus(CHAR_ID, KEY, () => live.promise);
+
+    await expect(settleEsiCacheLoads(30, (key) => key.endsWith(':other'))).resolves.toBeUndefined();
+
+    live.resolve('payload');
+    await load;
+    await settleEsiCacheLoads();
+  });
 });

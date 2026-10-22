@@ -5,6 +5,8 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db, type SkillPlanRecord } from '@/db';
+import { settleEsiCacheLoads } from '@/esi/cache';
+import { KEYS } from '@/features/skills/data';
 import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
@@ -229,6 +231,11 @@ afterEach(() => {
   configureClipboard(null);
 });
 beforeEach(async () => {
+  // The previous test's skill-queue read can still be in flight when it ends;
+  // a read for the same character and key joins it, so "is inert with an empty
+  // queue" never gets its `server.use` answer and sees the default queue.
+  // Only that key: an unrelated read (the Clone state's) may never settle.
+  await settleEsiCacheLoads(3000, (key) => key.endsWith(`:${KEYS.skillqueue}`));
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();

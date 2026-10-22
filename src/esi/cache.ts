@@ -460,13 +460,17 @@ function trackLoad<R>(characterId: number, key: string, run: () => Promise<R>): 
  * cache. Throws, naming the keys still pending, rather than letting the next
  * test read a poisoned cache.
  */
-export async function settleEsiCacheLoads(timeoutMs = 3000): Promise<void> {
+export async function settleEsiCacheLoads(
+  timeoutMs = 3000,
+  /** Waits only on loads whose key (`characterId:key`) passes: for a test that cares about one read. */
+  only: (key: string) => boolean = () => true
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const pending = [
       ...pendingLoads,
       ...[...inFlightLoads].map(([key, entry]) => ({ key, promise: entry.promise })),
-    ];
+    ].filter((entry) => only(entry.key));
     if (pending.length === 0) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timedOut = new Promise<'timeout'>((resolve) => {
