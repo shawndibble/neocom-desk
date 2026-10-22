@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # `validate` below aggregates `static`, `build` and `functions` and keeps the
+  # `validate` below aggregates `static`, `build` and `rules` and keeps the
   # context name the `develop`/`main` ruleset requires.
   #
   # lint, format:check, typecheck and check:case used to be four jobs, each
@@ -68,28 +68,13 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  # functions/ is its own package, with its own lockfile, tsconfig and vitest
-  # run — neither the root typecheck nor the pre-commit hook's copy of it ever
-  # reads it, so without this job the Cloud Functions ship unchecked (issue
-  # #595). Needs only `functions/` installed, not the root.
-  functions:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: functions/package-lock.json
-      - run: npm ci --prefix functions
-      - run: npm run typecheck --prefix functions
-      - run: npm test --prefix functions
-
   # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
   # reasoning; this one aggregates the parallel jobs above instead of a matrix.
+  # `rules` also carries the functions/ typecheck and tests, which is why it
+  # is here.
   validate:
     if: ${{ !cancelled() }}
-    needs: [static, build, functions]
+    needs: [static, build, rules]
     runs-on: ubuntu-latest
     steps:
       - name: Fail unless every validate job passed
@@ -138,7 +123,16 @@ jobs:
 
   # Firestore rules tests (rules-tests/): run against the Firestore emulator,
   # which needs a JRE. Kept out of `test-shard` so `npm run test:run` never
-  # needs Java. Not yet a required context in the `develop`/`main` ruleset.
+  # needs Java. Gated through `validate`, not a required context of its own.
+  #
+  # Also the functions/ gate. functions/ is its own package, with its own
+  # lockfile, tsconfig and vitest run — neither the root typecheck nor the
+  # pre-commit hook's copy of it ever reads it, so without these steps the
+  # Cloud Functions ship unchecked (issue #595). They were a job of their own
+  # until it was folded in here: this job already installs functions/ for the
+  # emulator tests, and Actions runs at most 20 jobs at once across the
+  # account, so a runner that spends 30s on a second checkout and install is
+  # a slot another PR's jobs wait on.
   rules:
     runs-on: ubuntu-latest
     steps:
@@ -169,8 +163,11 @@ jobs:
             ~/.npm/_npx
             ~/.cache/firebase
           key: firebase-tools-14.27.0-${{ runner.os }}
-      # The Corp Tax Book callable tests (functions/) run in the same emulator session.
       - run: npm ci --prefix functions
+      # Before the emulator starts, so a type error fails in seconds.
+      - run: npm run typecheck --prefix functions
+      - run: npm test --prefix functions
+      # The Corp Tax Book callable tests (functions/) run in the same emulator session.
       - run: npm run test:rules
 
   # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
@@ -213,12 +210,19 @@ jobs:
     # Eight shards, files dealt out by measured run time (see the run step).
     # Playwright's own `--shard` cut the test list into contiguous runs, so a
     # ~100-test sweep landed whole in one shard: wall time per shard ranged
-    # 259s to 354s on the same suite. Eight is where the ~45s of fixed setup
-    # per shard starts to eat what the extra runner saves.
+    # 259s to 354s on the same suite.
+    #
+    # Six, down from eight. Actions runs at most 20 jobs at once across the
+    # account, and eight e2e shards plus `static` and the four `test-shard`s
+    # held 13 of them per PR, so two PRs in flight already queued. The e2e
+    # path isn't the critical one: shards start ~100s in (after `build`) and
+    # ran ~180–260s at eight, while `test-shard` runs ~370–410s from the
+    # start. Six shards run ~290s each and still finish inside that window,
+    # so a lone PR is no slower and two PRs nearly fit side by side.
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6]
     # Playwright's own image: Chromium and its apt libraries are baked in, so
     # there is no `playwright install --with-deps`, no apt index to go bad
     # (that failure mode cost a whole run before), and no browser cache to

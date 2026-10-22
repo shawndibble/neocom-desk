@@ -21,7 +21,7 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   the full suite (`npm run test:run`) or `npm run build` locally** — CI's
   `validate` job runs `lint`, `format:check`, `typecheck` and `build` on
   every PR (`ci.yml` is PR-only; `deploy.yml` handles pushes to `develop`/`main`), the `test` job runs `test:run` across four shards, and the
-  `e2e` job runs Playwright across eight (whole spec files dealt out by
+  `e2e` job runs Playwright across six (whole spec files dealt out by
   `e2e/shard-weights.json`; a new spec needs no entry, and
   `node scripts/e2e-shard.mjs --weights <ci-log>` refreshes the table) inside
   Playwright's container image, whose tag in `ci.yml` must match
