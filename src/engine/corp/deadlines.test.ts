@@ -348,5 +348,6 @@ describe('deadlinesByDay on the Time format clock', () => {
     const overdue = item({ id: 'o', deadlineMs: nowMs - 3 * DAY });
 
     expect(deadlinesByDay([passed, overdue], nowMs, 3, 'UTC')[0].count).toBe(2);
+    expect(deadlinesByDay([passed, overdue], nowMs, 3)[0].count).toBe(2);
   });
 });
