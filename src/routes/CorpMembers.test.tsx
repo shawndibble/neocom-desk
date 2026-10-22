@@ -671,7 +671,7 @@ describe('CSV export (issue #421, AC4)', () => {
   /** Title-bar export button → Download CSV, by keyboard (jsdom has no hover intent). */
   async function downloadCsvFromMenu() {
     const user = userEvent.setup();
-    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Corp members' }), {
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Export Members' }), {
       button: 0,
       pointerType: 'mouse',
     });
@@ -732,7 +732,7 @@ describe('CSV export (issue #421, AC4)', () => {
     );
     await rosterTable();
 
-    const exportButton = screen.getByRole('button', { name: 'Export Corp members' });
+    const exportButton = screen.getByRole('button', { name: 'Export Members' });
     const refreshButton = screen.getByRole('button', { name: 'Refresh member list' });
 
     expect(exportButton.parentElement).toBe(refreshButton.parentElement);

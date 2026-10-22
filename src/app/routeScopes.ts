@@ -12,6 +12,7 @@ import {
   ESI_REGISTRY,
   isScopeRequired,
   permissionsForEndpoints,
+  requiredScopesForEndpoints,
   type EsiEndpointId,
   type Scope,
   type ScopeGroup,
@@ -293,6 +294,28 @@ export function requiredScopesForRoute(path: AppRoutePath): readonly Scope[] {
     (endpoint) => ESI_REGISTRY[endpoint].scope
   );
   return [...new Set(declared)].filter(isScopeRequired);
+}
+
+/**
+ * Tabs of an ungated page that show nothing but a re-login banner without one
+ * scope (the page itself stays open for its scope-free tabs). The nav marks
+ * these like a gated page, so a dot always means "this will ask you to log in
+ * again". Tabs that mix scopes with useful scope-free content are not listed.
+ */
+export const TAB_ENDPOINTS: Readonly<Record<string, readonly EsiEndpointId[]>> = {
+  '/market/orders': ['getCharacterOrders'],
+  '/market/history': ['getCharacterWalletTransactions'],
+  '/wallet/journal': ['getCharacterWalletJournal'],
+  '/contracts/history': ['getCharacterContracts'],
+  '/contacts/standings': ['getCharacterStandings'],
+};
+
+/** `requiredScopesForRoute` for a route or a `TAB_ENDPOINTS` tab path. */
+export function requiredScopesForNavPath(path: string): readonly Scope[] {
+  const endpoints = TAB_ENDPOINTS[path];
+  return endpoints
+    ? requiredScopesForEndpoints(endpoints)
+    : requiredScopesForRoute(path as AppRoutePath);
 }
 
 /**

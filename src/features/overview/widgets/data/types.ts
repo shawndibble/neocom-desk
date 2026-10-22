@@ -25,6 +25,7 @@ import type {
 import type { IncursionsBoardData } from '../../data/incursionsBoard';
 import type { CorpContractsFeed, CorpOrdersFeed } from './corpFeeds';
 import type {
+  CorpAssetsFeed,
   CorpCustomsFeed,
   CorpRoleAuditFeed,
   CorpJobsFeed,
@@ -34,6 +35,7 @@ import type {
   CorpStarbasesFeed,
   CorpWalletFeed,
 } from './corpFeeds';
+import type { CorpStockTargets } from '@/features/corp/stockTargets';
 import type { BoardDeadline } from '../nextDeadline';
 import type { WidgetStateInput } from '../state';
 import type { CalendarEventsChoice, WidgetRange } from '../layout';
@@ -264,6 +266,9 @@ export interface FeedMap {
   corpWallet: CorpWalletFeed;
   corpJobs: CorpJobsFeed;
   corpCustoms: CorpCustomsFeed;
+  corpAssets: CorpAssetsFeed;
+  /** The synced stock targets for every corporation, read by a hook, not loaded. */
+  corpStockTargets: CorpStockTargets;
   corpRoleAudit: CorpRoleAuditFeed;
   corpMembers: CorpMembersFeed;
   corpMining: CorpMiningFeed;

@@ -9,7 +9,7 @@
  * active Character holds a blueprint, so an industry pilot sees what to build
  * and can hand the lot to a Build Group.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { SecurityStatus } from '@/components/SecurityStatus';
@@ -45,6 +45,7 @@ import {
   addMissingStockTargets,
   removeStockList,
   removeStockTarget,
+  removeStockTargets,
   renameStockList,
   setStockListLocation,
   setStockTarget,
@@ -109,6 +110,12 @@ export function StockMarketPage({
   const [dialog, setDialog] = useState<Dialog>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
+  const [undoToast, setUndoToast] = useState<{ message: string; onUndo: () => void } | null>(null);
+  // Undo runs after later edits: it must add to the lists as they are then, not as they were.
+  const latestLists = useRef(lists);
+  useEffect(() => {
+    latestLists.current = lists;
+  }, [lists]);
   // A menu item that opens a dialog hands focus back to the ⋮, not to an unmounted item (§6c).
   const menu = useOpenAfterMenu();
 
@@ -142,6 +149,21 @@ export function StockMarketPage({
     loading ? 'busy' : failed ? 'failed' : 'ok',
     list.id
   );
+
+  /** Bulk remove acts at once; the toast's Undo puts every removed row back with its own target. */
+  function removeMany(typeIds: number[]) {
+    const gone = new Set(typeIds);
+    const removed = list.items.filter((item) => gone.has(item.typeId));
+    onSave(removeStockTargets(lists, list.id, typeIds));
+    setToast(null);
+    setUndoToast({
+      message: t('stockTargets.table.removedMany', { count: removed.length }),
+      onUndo: () => {
+        onSave(addMissingStockTargets(latestLists.current, list.id, removed));
+        setUndoToast(null);
+      },
+    });
+  }
 
   async function addListed() {
     const listed = await loadListedAtMarket(list.locationId).catch(() => []);
@@ -497,6 +519,8 @@ export function StockMarketPage({
                     onSave(setStockTarget(lists, list.id, typeId, target))
                   }
                   onRemove={(typeId) => onSave(removeStockTarget(lists, list.id, typeId))}
+                  selectionKey={`${activeCharacterId}|${list.id}|${filter}|${activeGroup}`}
+                  onRemoveMany={removeMany}
                 />
               </Panel>
               <BarLegend />
@@ -512,7 +536,15 @@ export function StockMarketPage({
         )}
       </div>
       {dialogs}
-      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+      {undoToast ? (
+        <Toast
+          message={undoToast.message}
+          undo={{ label: t('stockTargets.table.undo'), onUndo: undoToast.onUndo }}
+          onClose={() => setUndoToast(null)}
+        />
+      ) : (
+        toast && <Toast message={toast} onClose={() => setToast(null)} />
+      )}
     </div>
   );
 }

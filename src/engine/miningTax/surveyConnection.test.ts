@@ -1,0 +1,256 @@
+import { describe, expect, it } from 'vitest';
+import {
+  LEDGER_GRACE_MS,
+  connectionWindow,
+  isConnectionLive,
+  parseSurveyConnections,
+  planSurveyAutoAssign,
+  upsertSurveyConnection,
+  type SurveyConnection,
+} from './surveyConnection';
+import type { MiningLedgerEntry } from './types';
+
+const HOUR = 60 * 60 * 1000;
+const NOON = Date.UTC(2026, 9, 21, 12);
+const SYSTEM = 30000142;
+const OTHER_SYSTEM = 30002187;
+const BITUMENS = 45492;
+const COBALTITE = 45494;
+const ZEOLITES = 45490;
+
+function connection(overrides: Partial<SurveyConnection> = {}): SurveyConnection {
+  return {
+    surveyId: 'abc123',
+    characterId: 1,
+    payeeId: 'p1',
+    payeeName: 'Moon Corp',
+    taxPct: 10,
+    systemId: SYSTEM,
+    typeIds: [BITUMENS, COBALTITE],
+    fromDate: '2026-10-21',
+    untilMs: NOON + 2 * HOUR,
+    expiresAt: NOON + 7 * 24 * HOUR,
+    connectedAt: NOON - HOUR,
+    ...overrides,
+  };
+}
+
+function entry(
+  oreLines: MiningLedgerEntry['oreLines'],
+  overrides: Partial<MiningLedgerEntry> = {}
+) {
+  return {
+    characterId: 1,
+    date: '2026-10-21',
+    solarSystemId: SYSTEM,
+    oreLines,
+    ...overrides,
+  };
+}
+
+function assignment(
+  oreLines: MiningLedgerEntry['oreLines'],
+  overrides: Partial<Parameters<typeof planSurveyAutoAssign>[1][number]> = {}
+) {
+  return {
+    id: 'a1',
+    characterId: 1,
+    date: '2026-10-21',
+    solarSystemId: SYSTEM,
+    oreLines,
+    payeeId: 'p1',
+    taxPct: 10,
+    status: 'outstanding',
+    ...overrides,
+  };
+}
+
+describe('connectionWindow', () => {
+  it('runs from the first scan’s UTC date until the ETA', () => {
+    expect(
+      connectionWindow({
+        firstAt: Date.UTC(2026, 9, 20, 23, 30),
+        etaAt: NOON,
+        finished: false,
+        finishedAt: null,
+        lastAt: NOON - HOUR,
+        expiresAt: NOON + 24 * HOUR,
+      })
+    ).toEqual({ fromDate: '2026-10-20', untilMs: NOON });
+  });
+
+  it('ends when the field was found empty', () => {
+    expect(
+      connectionWindow({
+        firstAt: NOON - 3 * HOUR,
+        etaAt: null,
+        finished: true,
+        finishedAt: NOON,
+        lastAt: NOON,
+        expiresAt: NOON + 24 * HOUR,
+      }).untilMs
+    ).toBe(NOON);
+  });
+
+  it('runs until the survey expires while there is no ETA yet', () => {
+    expect(
+      connectionWindow({
+        firstAt: NOON,
+        etaAt: null,
+        finished: false,
+        finishedAt: null,
+        lastAt: NOON,
+        expiresAt: NOON + 24 * HOUR,
+      }).untilMs
+    ).toBe(NOON + 24 * HOUR);
+  });
+
+  it('never runs past the survey’s expiry', () => {
+    expect(
+      connectionWindow({
+        firstAt: NOON,
+        etaAt: NOON + 48 * HOUR,
+        finished: false,
+        finishedAt: null,
+        lastAt: NOON,
+        expiresAt: NOON + 24 * HOUR,
+      }).untilMs
+    ).toBe(NOON + 24 * HOUR);
+  });
+});
+
+describe('isConnectionLive', () => {
+  it('stays live a grace period past the ETA, for the ledger’s lag', () => {
+    const c = connection({ untilMs: NOON });
+    expect(isConnectionLive(c, NOON + LEDGER_GRACE_MS)).toBe(true);
+    expect(isConnectionLive(c, NOON + LEDGER_GRACE_MS + 1)).toBe(false);
+  });
+});
+
+describe('upsertSurveyConnection', () => {
+  it('replaces the same survey for the same character and drops ones no longer live', () => {
+    const stale = connection({ surveyId: 'old', untilMs: NOON - 5 * HOUR });
+    const other = connection({ surveyId: 'other' });
+    const first = connection({ taxPct: 5 });
+    const next = connection({ taxPct: 10 });
+    expect(upsertSurveyConnection([stale, other, first], next, NOON)).toEqual([other, next]);
+  });
+});
+
+describe('parseSurveyConnections', () => {
+  it('keeps well-formed connections and drops the rest', () => {
+    const good = connection();
+    expect(parseSurveyConnections([good, { surveyId: 'x' }, null, 'junk'])).toEqual([good]);
+    expect(parseSurveyConnections('nope')).toBeNull();
+  });
+});
+
+describe('planSurveyAutoAssign', () => {
+  it('assigns already-mined, unassigned ore of the survey’s ore types', () => {
+    const e = entry([
+      { typeId: BITUMENS, quantity: 1000 },
+      { typeId: COBALTITE, quantity: 500 },
+    ]);
+    expect(planSurveyAutoAssign([e], [], [connection()], NOON)).toEqual([
+      {
+        connection: connection(),
+        characterId: 1,
+        date: '2026-10-21',
+        solarSystemId: SYSTEM,
+        oreLines: [
+          { typeId: BITUMENS, quantity: 1000 },
+          { typeId: COBALTITE, quantity: 500 },
+        ],
+        entryOreLines: e.oreLines,
+      },
+    ]);
+  });
+
+  it('assigns only the ore no Assignment holds yet', () => {
+    const e = entry([{ typeId: BITUMENS, quantity: 1500 }]);
+    const held = assignment([{ typeId: BITUMENS, quantity: 1000 }], {
+      payeeId: 'someone-else',
+    });
+    expect(planSurveyAutoAssign([e], [held], [connection()], NOON)[0]?.oreLines).toEqual([
+      { typeId: BITUMENS, quantity: 500 },
+    ]);
+  });
+
+  it('leaves growth to an unpaid Assignment already billing this Payee at this rate', () => {
+    const e = entry([{ typeId: BITUMENS, quantity: 1500 }]);
+    const held = assignment([{ typeId: BITUMENS, quantity: 1000 }]);
+    expect(planSurveyAutoAssign([e], [held], [connection()], NOON)).toEqual([]);
+  });
+
+  it('still assigns new ore when the one billing this Payee is paid', () => {
+    const e = entry([{ typeId: BITUMENS, quantity: 1500 }]);
+    const held = assignment([{ typeId: BITUMENS, quantity: 1000 }], { status: 'paid' });
+    expect(planSurveyAutoAssign([e], [held], [connection()], NOON)).toHaveLength(1);
+  });
+
+  it('respects an entry the pilot dismissed', () => {
+    const e = entry([{ typeId: BITUMENS, quantity: 1500 }]);
+    const held = assignment([{ typeId: BITUMENS, quantity: 1000 }], {
+      status: 'dismissed',
+      payeeId: undefined,
+      taxPct: 0,
+    });
+    expect(planSurveyAutoAssign([e], [held], [connection()], NOON)).toEqual([]);
+  });
+
+  it('skips other systems, characters, days before the survey and days after it', () => {
+    const lines = [{ typeId: BITUMENS, quantity: 1000 }];
+    const entries = [
+      entry(lines, { solarSystemId: OTHER_SYSTEM }),
+      entry(lines, { characterId: 2 }),
+      entry(lines, { date: '2026-10-20' }),
+      entry(lines, { date: '2026-10-22' }),
+    ];
+    expect(planSurveyAutoAssign(entries, [], [connection()], NOON)).toEqual([]);
+  });
+
+  it('does nothing once the connection is past its ETA and grace', () => {
+    const e = entry([{ typeId: BITUMENS, quantity: 1000 }]);
+    const c = connection({ untilMs: NOON - LEDGER_GRACE_MS - 1 });
+    expect(planSurveyAutoAssign([e], [], [c], NOON)).toEqual([]);
+  });
+
+  it('does nothing without a system to match', () => {
+    const e = entry([{ typeId: BITUMENS, quantity: 1000 }]);
+    expect(planSurveyAutoAssign([e], [], [connection({ systemId: null })], NOON)).toEqual([]);
+  });
+
+  it('never guesses: another moon’s ore no connection covers leaves the entry alone', () => {
+    const e = entry([
+      { typeId: BITUMENS, quantity: 1000 },
+      { typeId: ZEOLITES, quantity: 800 },
+    ]);
+    expect(planSurveyAutoAssign([e], [], [connection()], NOON)).toEqual([]);
+  });
+
+  it('splits one entry between two connected moons with different ores', () => {
+    const e = entry([
+      { typeId: BITUMENS, quantity: 1000 },
+      { typeId: ZEOLITES, quantity: 800 },
+    ]);
+    const moonB = connection({ surveyId: 'b', payeeId: 'p2', typeIds: [ZEOLITES] });
+    const plan = planSurveyAutoAssign([e], [], [connection(), moonB], NOON);
+    expect(plan.map((s) => [s.connection.payeeId, s.oreLines])).toEqual([
+      ['p1', [{ typeId: BITUMENS, quantity: 1000 }]],
+      ['p2', [{ typeId: ZEOLITES, quantity: 800 }]],
+    ]);
+  });
+
+  it('gives shared ore to the moon still being mined over one in its grace period', () => {
+    const e = entry([{ typeId: BITUMENS, quantity: 1000 }]);
+    const done = connection({ untilMs: NOON - HOUR / 2 });
+    const mining = connection({ surveyId: 'b', payeeId: 'p2', untilMs: NOON + HOUR });
+    expect(planSurveyAutoAssign([e], [], [done, mining], NOON)[0]?.connection.payeeId).toBe('p2');
+  });
+
+  it('never guesses between two moons both being mined with the same ore', () => {
+    const e = entry([{ typeId: BITUMENS, quantity: 1000 }]);
+    const b = connection({ surveyId: 'b', payeeId: 'p2' });
+    expect(planSurveyAutoAssign([e], [], [connection(), b], NOON)).toEqual([]);
+  });
+});

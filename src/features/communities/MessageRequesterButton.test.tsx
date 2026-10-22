@@ -54,6 +54,14 @@ describe('MessageRequesterButton', () => {
     expect(alert).not.toHaveTextContent('logged in to the game');
   });
 
+  it('renders nothing when the character lacks the permission', async () => {
+    await db.tokens.update(ONE, { scopes: [] });
+    show();
+    await vi.waitFor(() =>
+      expect(screen.queryByRole('button', { name: /Requester/ })).not.toBeInTheDocument()
+    );
+  });
+
   it('is aria-disabled with a visible reason while offline, and sends nothing', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
     show();

@@ -1,5 +1,5 @@
 /**
- * The Corp overview as a widget board: which kinds it offers, which the
+ * The Corp Board as a widget board: which kinds it offers, which the
  * Character may see, and the layout it opens with.
  *
  * Pure (no React, Dexie or fetch). The route hands `corpWidgetBoard` the
@@ -28,7 +28,7 @@ import {
 import { seqId } from '@/features/overview/widgets/roles';
 
 /**
- * The layout a Corp overview opens with, before the pilot changes anything:
+ * The layout a Corp Board opens with, before the pilot changes anything:
  * when, then money, then people, then the ledgers.
  *
  * Every kind, whatever this Character can read: the board's `canDraw` hides

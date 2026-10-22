@@ -1,5 +1,5 @@
 /**
- * The Corp overview's widget grid across widths.
+ * The Corp Board's widget grid across widths.
  *
  * `/corp` needs a signed-in character with corp roles and mocked corp ESI, so
  * this runs against the dev server like the other corp specs. A Director opens
@@ -170,7 +170,7 @@ async function overflow(page: Page) {
   });
 }
 
-test.describe('Corp overview widget grid', () => {
+test.describe('Corp Board widget grid', () => {
   test('draws the default widgets with no horizontal scroll from 320px to 1920px', async ({
     page,
   }) => {

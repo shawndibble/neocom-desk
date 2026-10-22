@@ -21,7 +21,7 @@ export function CustomizeBar({
   onRoles,
 }: {
   onAdd: () => void;
-  /** Start from a role; absent on a board with no roles (the Corp overview). */
+  /** Start from a role; absent on a board with no roles (the Corp Board). */
   onRoles?: () => void;
 }) {
   const { t } = useTranslation();

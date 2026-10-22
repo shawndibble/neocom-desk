@@ -285,7 +285,7 @@ describe('the real en.json against the real sources', () => {
     expect(shellBytes / JSON.stringify(en).length).toBeLessThan(0.3);
   });
 
-  it('keeps the Corp overview widget builders, and so their copy, out of the startup graph', () => {
+  it('keeps the Corp Board widget builders, and so their copy, out of the startup graph', () => {
     const corpBuilders = [...startup].filter((file) =>
       /\/widgets\/data\/corp[A-Z]\w*Models\.ts$/.test(file)
     );

@@ -890,7 +890,7 @@ describe('hauling', () => {
 
   it('reads from its own feed and links to the Hauling tab', () => {
     expect(KIND_FEEDS.hauling).toEqual(['hauling']);
-    expect(buildView('hauling', { hauling: ok(data()) }, ctx()).to).toBe('/travel/hauling');
+    expect(buildView('hauling', { hauling: ok(data()) }, ctx()).to).toBe('/market/hauling');
   });
 
   it('leads with the best profit and tables each route with jumps and ISK per jump', () => {

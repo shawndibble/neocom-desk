@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Spinner } from '@/components/ui';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
-import { countedScans } from '@/engine/survey/series';
+import { countedScans, type SurveySummary } from '@/engine/survey/series';
 import { classifyScan, lastSeenField, missingOres } from '@/engine/survey/scanUpdate';
 import { ShareShell } from '@/features/share/ShareShell';
 import { shareUrl } from '@/features/share/shareStore';
@@ -19,7 +19,7 @@ import { isTypingTarget } from '@/lib/shortcuts';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ScanFeedback } from './ScanFeedback';
 import { useScanFeedback } from './useScanFeedback';
-import { SurveyInfoReadout } from './SurveyInfoPanel';
+import { SurveyInfoReadout, type SurveyToConnect } from './SurveyInfoPanel';
 import { SurveyBoard } from './SurveyBoard';
 import { ExpandedCheck } from './ExpandedCheck';
 import { stashPendingScan } from './pendingScan';
@@ -110,7 +110,7 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
       if (event.defaultPrevented) return;
-      if (isTypingTarget(event.target) || isTypingTarget(document.activeElement)) return;
+      if (isTypingTarget(event.target)) return;
       const text = event.clipboardData?.getData('text/plain') ?? '';
       if (parseSurveyScan(text) !== null) void trackedAdd(text);
     }
@@ -167,7 +167,12 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
             location={state.info?.location?.name ?? null}
             expiresAt={state.expiresAt}
             afterPanel={(summary) => (
-              <SurveyInfoIfAny info={state.info} tax={state.tax} oreNames={summary.oreNames} />
+              <SurveyInfoIfAny
+                info={state.info}
+                tax={state.tax}
+                summary={summary}
+                connect={{ id: shareId, expiresAt: state.expiresAt, summary }}
+              />
             )}
             panelTitle={t('survey.sharePanelTitle')}
           />
@@ -181,12 +186,14 @@ export function SurveyShareScreen({ shareId }: { shareId: string }) {
 function SurveyInfoIfAny({
   info,
   tax,
-  oreNames,
+  summary,
+  connect,
 }: {
   info: SurveyInfoShare | null;
   tax: SurveyTaxShare | null;
-  oreNames: string[];
+  summary: SurveySummary;
+  connect: SurveyToConnect;
 }) {
-  const moon = useHasMoonOre(oreNames);
-  return <SurveyInfoReadout info={info} tax={moon ? tax : null} />;
+  const moon = useHasMoonOre(summary.oreNames);
+  return <SurveyInfoReadout info={info} tax={moon ? tax : null} connect={connect} />;
 }

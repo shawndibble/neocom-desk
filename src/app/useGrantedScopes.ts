@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { requiredScopesForEndpoints, type EsiEndpointId } from '@/esi/registry';
-import { requiredScopesForRoute, type AppRoutePath } from './routeScopes';
+import { requiredScopesForNavPath } from './routeScopes';
 
 /**
  * The active Character's granted OAuth scopes, live from Dexie; `undefined`
@@ -35,13 +35,13 @@ export function useGrantedScopes(): readonly string[] | undefined {
  * built once here and reused, rather than once per path inside
  * `missingScopesForRoute`. Keep the two "missing" definitions in step.
  */
-export function useLockedRoutes(paths: readonly AppRoutePath[]): ReadonlySet<AppRoutePath> {
+export function useLockedRoutes(paths: readonly string[]): ReadonlySet<string> {
   const granted = useGrantedScopes();
   return useMemo(() => {
-    if (granted === undefined) return new Set<AppRoutePath>();
+    if (granted === undefined) return new Set<string>();
     const held = new Set(granted);
     return new Set(
-      paths.filter((path) => requiredScopesForRoute(path).some((scope) => !held.has(scope)))
+      paths.filter((path) => requiredScopesForNavPath(path).some((scope) => !held.has(scope)))
     );
   }, [granted, paths]);
 }

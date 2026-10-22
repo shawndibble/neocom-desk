@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useMatch } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { IconButton, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -9,6 +9,7 @@ import { useGrantedScopes } from './useGrantedScopes';
 import { warmRoute } from './routeWarm';
 import { preloadRouteChunk } from './routeChunks';
 import { NAV_ICON_BY_PATH } from './navIcons';
+import { PARENT_PAGE_PATHS } from './navDestinations';
 import { toggleHiddenNav } from './navPreferences';
 import type { AppRoutePath } from './routeScopes';
 
@@ -105,7 +106,8 @@ export function NavItem({
   // Only `/characters` carries an origin — it is the one destination a
   // pilot needs to come back *from* (#1764); every other nav item is a
   // destination in its own right.
-  const originState = to === '/characters' ? { from: location.pathname } : undefined;
+  const originState =
+    to === '/characters' ? { from: location.pathname + location.search } : undefined;
   /*
    * Compose this route's snapshot while the pointer is still travelling to the
    * link (`routeWarm.ts`). `focus` covers the keyboard, where tabbing to a link
@@ -129,6 +131,11 @@ export function NavItem({
   const counted = badge !== undefined && badge > 0;
   const Glyph = NAV_ICON_BY_PATH[to];
   const linkClass = tab ? mobileNavClass : tile ? tileClass : bar ? barClass : navClass;
+  // A string, not NavLink's `className` callback: a locked link sits under
+  // `Tooltip`'s Radix `asChild`, which merges `className` as strings and would
+  // print the callback's source into the class list, dropping every style.
+  const end = PARENT_PAGE_PATHS.has(to);
+  const isActive = useMatch({ path: to, end }) !== null;
   // The lock marker rides on a `Tooltip` (and `data-locked`), and the count on
   // `aria-label`: a second string inside the link would rewrite its accessible
   // name from "Assets" to "Assets, needs a new login", which is not what the
@@ -136,12 +143,13 @@ export function NavItem({
   const link = (
     <NavLink
       to={to}
+      end={end}
       state={originState}
       onClick={onClick}
       onMouseEnter={warm}
       onFocus={warm}
       onPointerDown={warm}
-      className={(state) => cx(linkClass(state), className)}
+      className={cx(linkClass({ isActive }), className)}
       data-locked={locked ? 'true' : undefined}
       aria-label={counted ? t(badgeLabelKey ?? 'nav.alertsWithCount', { count: badge }) : undefined}
     >

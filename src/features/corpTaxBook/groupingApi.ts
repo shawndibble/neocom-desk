@@ -8,9 +8,8 @@
  * link) but has no way to confirm. Firebase: reach this only from the lazy
  * verify route and the Mining Tax tab (`app/bootImportGraph.test.ts`).
  */
-import { httpsCallable } from 'firebase/functions';
 import { underFirebaseSession } from '@/features/communities/pledgeWrites';
-import { getSyncFunctions } from '@/sync/firebaseApp';
+import { callRouted } from '@/sync/routedCallable';
 import { ensureSignedIn } from '@/sync/syncAuth';
 
 /** A grouping waiting for a character: which book, which Miner, and who the main is. */
@@ -20,8 +19,7 @@ export interface PendingGrouping {
   mainCharacterId: number;
 }
 
-const call = <In, Out>(name: string, data: In): Promise<Out> =>
-  httpsCallable<In, Out>(getSyncFunctions(), name)(data).then((r) => r.data);
+const call = <In, Out>(name: string, data: In): Promise<Out> => callRouted<In, Out>(name, data);
 
 /** The groupings waiting for `characterId`, read as that Character. */
 export function listPendingGroupings(characterId: number): Promise<PendingGrouping[]> {

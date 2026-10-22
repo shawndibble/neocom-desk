@@ -7,8 +7,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
-import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
-import { permissionsForEndpoints, type ScopeGroup } from '@/esi/registry';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { useCharacterIdsWithScopes, useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
+import { useCharacterNames } from '@/features/character/useCharacters';
+import {
+  permissionsForEndpoints,
+  requiredScopesForEndpoints,
+  type ScopeGroup,
+} from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
 import { openInEve, OPEN_IN_EVE_ENDPOINTS, type OpenInEveTarget } from './sendOpenInEve';
@@ -19,12 +25,23 @@ export const OUTCOME_VISIBLE_MS = 10_000;
 type Outcome = { tone: 'status' | 'alert'; text: ReactNode } | null;
 
 const MISSING_GROUPS: readonly ScopeGroup[] = permissionsForEndpoints(OPEN_IN_EVE_ENDPOINTS);
+const OPEN_IN_EVE_SCOPES = requiredScopesForEndpoints(OPEN_IN_EVE_ENDPOINTS);
 
 export interface OpenInEve {
   /** Why sending can't work yet — no Character, or no Open in EVE permission — or null when it can. */
   blockedReason: ReactNode;
   /** Sending is blocked only because the browser is offline: the item reads "Needs a connection". */
   offline: boolean;
+  /**
+   * No Character, or none of the tracked Characters holds the Open in EVE
+   * permission (or it isn't known yet): a button hides itself rather than
+   * show a reason it can't resolve.
+   */
+  unavailable: boolean;
+  /** The active Character lacks the permission but this other one has it: what "Switch to" offers. */
+  switchTo: { id: number; name: string } | null;
+  /** Makes `switchTo` the active Character. */
+  switchCharacter: () => void;
   /** The Permissions blocking it, for a menu that can't carry a link in its reason; empty otherwise. */
   missingGroups: readonly ScopeGroup[];
   sending: boolean;
@@ -43,11 +60,38 @@ export interface OpenInEveLookup {
   unresolvedText: string;
 }
 
-export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLookup): OpenInEve {
+export interface OpenInEveOptions {
+  /**
+   * Send from this Character instead of the active one (Settle up's payer).
+   * Without the permission it never falls back to another Character: the
+   * button stays, blocked, with a link to grant it — unless no Character
+   * holds the permission at all, when it hides as usual.
+   */
+  characterId?: number;
+}
+
+export function useOpenInEve(
+  { kind, id }: OpenInEveTarget,
+  lookup?: OpenInEveLookup,
+  options?: OpenInEveOptions
+): OpenInEve {
   const { t } = useTranslation();
-  const characterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
+  const activeCharacterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
+  const fixedCharacter = options?.characterId !== undefined;
+  const characterId = options?.characterId ?? activeCharacterId;
+  /** Permissions shows the active Character, so a fixed one's grant link switches to it first. */
+  const grantLink = (
+    <GrantMissingLink
+      groups={MISSING_GROUPS}
+      asCharacter={
+        fixedCharacter && characterId !== activeCharacterId ? (characterId ?? undefined) : undefined
+      }
+    />
+  );
   const lacksScope = useCharacterLacksEndpoints(characterId, OPEN_IN_EVE_ENDPOINTS);
   const online = useOnline();
+  const holders = useCharacterIdsWithScopes(OPEN_IN_EVE_SCOPES);
+  const names = useCharacterNames();
   const [sending, setSending] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(null);
   /** `sending` lags a render behind; two quick selects must not both send. */
@@ -59,11 +103,37 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
     return () => clearTimeout(timer);
   }, [outcome]);
 
+  const otherId =
+    !fixedCharacter &&
+    lacksScope &&
+    holders !== undefined &&
+    characterId !== null &&
+    names.has(characterId)
+      ? [...holders].find((id) => id !== characterId && names.has(id))
+      : undefined;
+  const switchTo = otherId === undefined ? null : { id: otherId, name: names.get(otherId) ?? '' };
+  const switchCharacter = () => {
+    if (switchTo !== null) void useActiveCharacter.getState().setActiveCharacter(switchTo.id);
+  };
+
   const blockedReason =
     characterId === null ? (
       t('openInEve.needCharacter')
     ) : lacksScope ? (
-      <GrantMissingLink groups={MISSING_GROUPS} />
+      switchTo ? (
+        <>
+          {t('openInEve.notGranted', { name: names.get(characterId) ?? '' })}{' '}
+          <button type="button" className={inlineLinkClassName} onClick={switchCharacter}>
+            {t('openInEve.switchTo', { name: switchTo.name })}
+          </button>
+        </>
+      ) : fixedCharacter ? (
+        <>
+          {t('openInEve.notGranted', { name: names.get(characterId) ?? '' })} {grantLink}
+        </>
+      ) : (
+        grantLink
+      )
     ) : !online ? (
       t('common.needsConnection')
     ) : null;
@@ -89,11 +159,9 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
       } else {
         setOutcome({
           tone: 'alert',
-          text: result.needsPermission ? (
-            <GrantMissingLink groups={MISSING_GROUPS} />
-          ) : (
-            t('openInEve.failed', { message: result.message ?? t('openInEve.unknownError') })
-          ),
+          text: result.needsPermission
+            ? grantLink
+            : t('openInEve.failed', { message: result.message ?? t('openInEve.unknownError') }),
         });
       }
     } catch {
@@ -110,6 +178,14 @@ export function useOpenInEve({ kind, id }: OpenInEveTarget, lookup?: OpenInEveLo
 
   return {
     blockedReason,
+    unavailable:
+      characterId === null ||
+      (lacksScope &&
+        (fixedCharacter
+          ? holders === undefined || ![...holders].some((holder) => names.has(holder))
+          : switchTo === null)),
+    switchTo,
+    switchCharacter,
     offline: characterId !== null && !lacksScope && !online,
     missingGroups: lacksScope && characterId !== null ? MISSING_GROUPS : [],
     sending,

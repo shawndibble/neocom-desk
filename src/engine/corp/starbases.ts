@@ -1,5 +1,5 @@
 /**
- * Starbase (POS) fuel arithmetic for the Corp overview's Starbases widget
+ * Starbase (POS) fuel arithmetic for the Corp Board's Starbases widget
  * (issue #4610). Pure: type ids and quantities in, hours out.
  *
  * ESI gives a tower's fuel *quantity* and never its burn rate, so the rate

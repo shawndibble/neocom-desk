@@ -22,7 +22,7 @@ describe('FeatureShowcase', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('tab', { name: 'Corporation' }));
     const panel = within(screen.getByRole('tabpanel'));
-    expect(panel.getByRole('img', { name: /corporation overview/i })).toHaveAttribute(
+    expect(panel.getByRole('img', { name: /Corp Board/i })).toHaveAttribute(
       'src',
       '/screenshots/desktop-corporation.webp'
     );

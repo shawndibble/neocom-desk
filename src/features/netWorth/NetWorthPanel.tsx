@@ -17,6 +17,7 @@ import {
   RowCaret,
   Spinner,
   type DataTableColumn,
+  type DataTableSort,
 } from '@/components/ui';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { MultiSelect } from '@/components/ui/MultiSelect';
@@ -84,6 +85,8 @@ export interface NetWorthPanelProps {
 
 const NO_SERIES: CharacterSeries = { points: [], firstSnapshotDay: null, gapDays: [] };
 const EMPTY_WALLET: ReadonlyMap<string, number> = new Map();
+/** Richest first; the headers stay sortable. */
+const BALANCE_SORT: DataTableSort = { columnId: 'total', direction: 'desc' };
 
 function useHidden() {
   const hiddenLayers = useNetWorthHiddenLayers((s) => s.value);
@@ -276,6 +279,7 @@ export function NetWorthPanel({
         header: t('wallet.balanceCharacterColumn'),
         stickyStart: true,
         stickyStartOnPanel: true,
+        sortValue: (row) => row.characterName,
         render: (row) => {
           const lineIndex =
             mode === 'multi' ? lines.findIndex((c) => c.characterId === row.characterId) : -1;
@@ -303,6 +307,8 @@ export function NetWorthPanel({
         header: t(LAYER_LABEL_KEYS[id]),
         align: 'right',
         className: cx('tabular-nums', hiddenLayers.includes(id) && 'text-text-dim'),
+        sortValue: (row) =>
+          row.layers && !(id === 'isk' && row.needsReauth) ? row.layers[id] : undefined,
         render: (row) => {
           if (id === 'isk' && row.needsReauth) {
             return <span className="text-warning">{t('wallet.reauthTitle')}</span>;
@@ -315,6 +321,8 @@ export function NetWorthPanel({
         header: t('wallet.netWorth.total'),
         align: 'right',
         className: 'tabular-nums font-semibold',
+        sortValue: (row) =>
+          row.layers && !row.needsReauth ? netWorthOf(row.layers, shown) : undefined,
         render: (row) =>
           row.layers && !row.needsReauth ? (
             <span className={iskToneClass(netWorthOf(row.layers, shown))}>
@@ -454,6 +462,7 @@ export function NetWorthPanel({
             columns={tableColumns}
             rows={tableRows}
             rowKey={(row) => row.characterId}
+            defaultSort={BALANCE_SORT}
             responsive="table"
             rowClassName={() => 'group'}
             onRowClick={(row) => onDrill(row.characterId)}

@@ -554,6 +554,14 @@ export const ESI_REGISTRY = {
     route: '/alliances/{alliance_id}/corporations',
     scope: PUBLIC,
   },
+  getWarIds: {
+    route: '/wars',
+    scope: PUBLIC,
+  },
+  getWar: {
+    route: '/wars/{war_id}',
+    scope: PUBLIC,
+  },
   getKillmail: {
     route: '/killmails/{killmail_id}/{killmail_hash}',
     scope: PUBLIC,

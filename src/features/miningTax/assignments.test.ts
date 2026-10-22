@@ -227,6 +227,22 @@ describe("assigning a paid day's late ore (paid stays paid, ADR 0024)", () => {
     expect(created.collectsGrowth).toBeUndefined();
   });
 
+  it('takesGrowth makes the new entry the collector over an unpaid one, moving the flag', async () => {
+    await db.miningTaxAssignments.put(
+      paidDay({ status: 'outstanding', paidAt: undefined, collectsGrowth: true })
+    );
+
+    const created = await createAssignment({ ...lateOre, payeeId: 'payee-2', takesGrowth: true });
+
+    expect(created.collectsGrowth).toBe(true);
+    expect((await db.miningTaxAssignments.get('paid'))?.collectsGrowth).toBeUndefined();
+  });
+
+  it('takesGrowth leaves the flag off on an entry nobody has assigned yet', async () => {
+    const created = await createAssignment({ ...lateOre, takesGrowth: true });
+    expect(created.collectsGrowth).toBeUndefined();
+  });
+
   it("makes a member a combine creates from a paid day's late ore the collector too", async () => {
     await db.miningTaxAssignments.put(paidDay());
 

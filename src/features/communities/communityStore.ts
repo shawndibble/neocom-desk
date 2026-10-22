@@ -7,10 +7,10 @@
  * here is the `lite` build (no listeners), so callers refetch after a change.
  */
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
-import { httpsCallable } from 'firebase/functions';
 import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
 import type { SharedBlueprint } from '@/engine/communities/sharedLibrary';
-import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
+import { getSyncFirestore } from '@/sync/firebaseApp';
+import { callRouted } from '@/sync/routedCallable';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
 import {
@@ -214,8 +214,8 @@ export async function callCommunity<In, Out>(
   const override = communityBackendOverride();
   if (override) return override.call(name, data) as Out;
   await ensureSignedIn(characterId);
-  const result = await httpsCallable<In, Out>(getSyncFunctions(), name)(data);
-  return result.data;
+  const result = await callRouted<In, Out>(name, data);
+  return result;
 }
 
 export interface InvitePreview {
@@ -226,11 +226,9 @@ export interface InvitePreview {
 
 /** The invite page's preview. Needs no session: a visitor has not signed in yet. */
 export async function previewInvite(inviteCode: string): Promise<InvitePreview> {
-  const result = await httpsCallable<{ inviteCode: string }, InvitePreview>(
-    getSyncFunctions(),
-    'previewCommunityCallable'
-  )({ inviteCode });
-  return result.data;
+  return callRouted<{ inviteCode: string }, InvitePreview>('previewCommunityCallable', {
+    inviteCode,
+  });
 }
 
 export function joinCommunity(characterId: number, inviteCode: string, characterName: string) {

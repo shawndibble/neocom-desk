@@ -1,5 +1,5 @@
 /**
- * `/corp` — the Corp overview: a grid of corp widgets the pilot chooses,
+ * `/corp` — the Corp Board: a grid of corp widgets the pilot chooses,
  * sizes, orders, renames and removes, like the Overview (`routes/Overview.tsx`).
  *
  * A corp manager does not browse, they triage, and the default layout says so:
@@ -29,7 +29,6 @@ import { guarded } from '@/app/routeChunks';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
 import { CorpDenied } from '@/features/corp/CorpDenied';
-import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { corpDefaultLayout, corpWidgetBoard } from '@/features/corp/grid/corpGrid';
 import {
   OverviewCachedNotice,
@@ -53,8 +52,10 @@ import { OverviewEditProvider } from '@/features/overview/widgets/OverviewEditPr
 import { distinctKinds, visibleWidgets } from '@/features/overview/widgets/visibility';
 import { WidgetGrid } from '@/features/overview/widgets/WidgetGrid';
 import type { CorpCapabilities } from '@/engine/corpRoles';
+import { WarBanner } from '@/features/wars/WarBanner';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 
 // The corp kinds' builders load with this route, not with the Overview's startup graph.
 registerKindDefs(CORP_DEFS);
@@ -83,6 +84,7 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
   const isPhone = useIsPhone();
   const [galleryOpen, setGalleryOpen] = useState(false);
   const summary = useOverviewSummary(layout.widgets);
+  const characterId = useActiveCharacter((state) => state.activeCharacterId);
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -92,11 +94,11 @@ function CorpGrid({ layout }: { layout: OverviewLayout }) {
         names the next clock.
       */}
       <PageHeader
-        title={t('corp.title')}
+        title={t('nav.corpBoard')}
         meta={<OverviewDataAge summary={summary} note={t('corp.dataAgeNote')} />}
-        subNav={<CorpSubNav flush />}
         actions={<OverviewCustomize />}
       />
+      {characterId !== null && <WarBanner characterId={characterId} />}
       <OverviewCachedNotice summary={summary} />
       {editing && (
         <Suspense fallback={null}>

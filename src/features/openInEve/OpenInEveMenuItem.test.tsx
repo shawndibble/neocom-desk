@@ -158,6 +158,21 @@ describe('OpenInEveMenuItem', () => {
     expect(infoMock).not.toHaveBeenCalled();
   });
 
+  it('offers Switch to a character that has the permission', async () => {
+    await seed(['esi-skills.read_skills.v1']);
+    await db.characters.put({ characterId: 92, name: 'Alt Pilot', ownerHash: 'o2', addedAt: 2 });
+    await db.tokens.put({
+      characterId: 92,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: [SCOPE],
+    });
+    openMenu('information', 1);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Switch to Alt Pilot' }));
+    await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(92));
+  });
+
   it('lists Grant missing Permissions, which opens Settings with the Permission flagged', async () => {
     await seed(['esi-skills.read_skills.v1']);
     openMenu('information', 1);

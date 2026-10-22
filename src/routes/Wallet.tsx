@@ -35,6 +35,7 @@ import { useWalletBalances } from '@/features/character/useWalletBalances';
 import { useWalletDrill } from '@/features/character/useWalletDrill';
 import { useWalletJournalView } from '@/features/character/useWalletJournalView';
 import { useWalletLoyalty } from '@/features/character/useWalletLoyalty';
+import { usePickedLoyalty } from '@/features/character/usePickedLoyalty';
 import { loadWalletSnapshot } from '@/features/character/walletSnapshot';
 
 const WALLET_CHARACTER_PARAMS = { char: characterFilterParam('current') };
@@ -139,9 +140,40 @@ export function Wallet() {
   const journalResult = data?.journalResult ?? null;
   const journalNeedsReauth = data?.journalNeedsReauth ?? false;
   const journalTruncated = data?.journalTruncated ?? false;
-  const loyaltyResult = data?.loyaltyResult ?? null;
-  const loyaltyNeedsReauth = data?.loyaltyNeedsReauth ?? false;
-  const corporationNames = data?.corporationNames ?? NO_NAMES;
+  /**
+   * Loyalty points follow the same picker as the balance (issue #4694),
+   * summed per corporation across the picked Characters. There is never a
+   * Corporation scope: ESI has no corporation LP endpoint. A list behind a
+   * revoked grant is dropped from the figures and gets a banner instead.
+   */
+  const pickedLoyalty = usePickedLoyalty(showingBeyondActive, multiCharacters);
+  const activeLoyaltyNeedsReauth = data?.loyaltyNeedsReauth ?? false;
+  const loyaltyResult = showingBeyondActive
+    ? (pickedLoyalty.snapshot?.loyaltyResult ?? null)
+    : activeLoyaltyNeedsReauth
+      ? null
+      : (data?.loyaltyResult ?? null);
+  const loyaltyReauthCharacters = useMemo(() => {
+    if (!showingBeyondActive) {
+      return activeLoyaltyNeedsReauth && activeCharacterId !== null
+        ? [{ characterId: activeCharacterId }]
+        : [];
+    }
+    return (pickedLoyalty.snapshot?.reauthCharacterIds ?? []).map((characterId) => ({
+      characterId,
+      name: multiCharacters.find((c) => c.characterId === characterId)?.name,
+    }));
+  }, [
+    showingBeyondActive,
+    activeLoyaltyNeedsReauth,
+    activeCharacterId,
+    pickedLoyalty.snapshot,
+    multiCharacters,
+  ]);
+  const loyaltyLoading = showingBeyondActive && pickedLoyalty.snapshot === null;
+  const corporationNames =
+    (showingBeyondActive ? pickedLoyalty.snapshot?.corporationNames : data?.corporationNames) ??
+    NO_NAMES;
 
   const journalView = useWalletJournalView({
     journalOpen: tab === 'journal',
@@ -159,16 +191,16 @@ export function Wallet() {
   const handlePersonalRefresh = () => {
     refresh();
     journalView.refresh();
+    pickedLoyalty.refresh();
   };
 
   // One age for the page: the stalest of the two feeds it shows.
   const oldestFetchedAt = useMemo(() => {
-    const dates = [
-      balanceResult?.fetchedAt,
-      loyaltyNeedsReauth ? undefined : loyaltyResult?.fetchedAt,
-    ].filter((d): d is Date => d != null);
+    const dates = [balanceResult?.fetchedAt, loyaltyResult?.fetchedAt].filter(
+      (d): d is Date => d != null
+    );
     return dates.length === 0 ? null : new Date(Math.min(...dates.map((d) => d.getTime())));
-  }, [balanceResult, loyaltyResult, loyaltyNeedsReauth]);
+  }, [balanceResult, loyaltyResult]);
 
   if (!hydrated) {
     return (
@@ -258,7 +290,8 @@ export function Wallet() {
             balanceResult={balanceResult}
             balanceNeedsReauth={balanceNeedsReauth}
             loyaltyResult={loyaltyResult}
-            loyaltyNeedsReauth={loyaltyNeedsReauth}
+            loyaltyReauthCharacters={loyaltyReauthCharacters}
+            loyaltyLoading={loyaltyLoading}
             journalNeedsReauth={journalNeedsReauth}
             journalTruncated={journalTruncated}
             oldestFetchedAt={oldestFetchedAt}

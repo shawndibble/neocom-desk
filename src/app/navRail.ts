@@ -71,14 +71,13 @@ export const FOOTER_PAGES: readonly NavPage[] = (NAV_PAGES as readonly NavPage[]
 
 /**
  * Pages that are the only way to something never hide, read off the
- * descriptor rather than listed: Corp (already hidden unless the Character
- * has corp access) and every footer page — Settings has no other route on a
+ * descriptor rather than listed: every footer page — Settings has no other route on a
  * phone, Characters is the only way to switch, and Help is where a lost pilot
  * goes.
  */
 const NEVER_HIDDEN: ReadonlySet<string> = new Set(
   (NAV_PAGES as readonly NavPage[])
-    .filter((page) => page.group === 'footer' || page.gating === 'corp')
+    .filter((page) => page.group === 'footer')
     .map((page) => page.path)
 );
 
@@ -115,6 +114,12 @@ export const DEFAULT_SHOWN_NAV: readonly string[] = [
   '/assets',
   '/wallet',
   '/travel',
+  // Corp pages render only behind Corp Access, so they are no clutter for anyone without it.
+  '/corp',
+  '/corp/members',
+  '/corp/wallet',
+  '/corp/assets',
+  '/corp/moons',
 ];
 
 /** The first-run question's answers, each with the pages it brings onto the rail. */

@@ -48,7 +48,6 @@ import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { CorpDenied } from '@/features/corp/CorpDenied';
-import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import {
   CorpRoleAudit,
   MembersTabPanel,
@@ -317,7 +316,6 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader
         title={t('corp.members.title')}
-        subNav={<CorpSubNav flush />}
         meta={
           data?.fetchedAt ? (
             <DataAgeBadge date={data.fetchedAt} note={t('corp.dataAgeNote')} />
@@ -495,7 +493,7 @@ function CorpMembersTabs({ canReadRoleAudit }: { canReadRoleAudit: boolean }) {
         value={tab}
         onChange={(id) => selectTab(id as typeof tab)}
         tabs={[
-          { id: 'members', label: t('corp.membersTab') },
+          { id: 'members', label: t('corp.members.rosterTab') },
           { id: 'roles', label: t('corp.roles.tab') },
         ]}
       />

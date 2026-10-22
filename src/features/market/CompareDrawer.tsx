@@ -51,6 +51,11 @@ import { RemovableTypeIcon } from './RemovableTypeIcon';
 import { useCompareSet } from './compareSet';
 import { useCompareRows, type CompareRow } from './useCompareRows';
 import { useCompareAttributes } from './useCompareAttributes';
+import { useCompareHubs } from './useCompareHubs';
+import { buildCompareHubRows } from './compareHubsRows';
+import { compareHubsCsvColumns } from './compareHubsCsv';
+import { TradeHubsTable } from './TradeHubsTable';
+import { useMarketHub } from './hub';
 import { CompareAttributesMatrix } from './CompareAttributesMatrix';
 import type { OrderBookLocation } from './orderBookView';
 import { compareCsvColumns } from './compareCsv';
@@ -60,7 +65,7 @@ import { useTableExport } from '@/components/ui/useTableExport';
 import { useCompareAttributesExport } from './useCompareAttributesExport';
 import { compareMargin, type AppraisalNetFees } from '@/engine/market/appraisal';
 import { ZERO_STANDINGS, type ResolvedStandings } from '@/engine/market/standings';
-import type { TradeHub } from '@/market/hubs';
+import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
@@ -88,7 +93,11 @@ function clampHeight(value: number): number {
   return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, value));
 }
 
-const VIEW_LABEL_KEYS = { prices: 'viewPrices', attributes: 'viewAttributes' } as const;
+const VIEW_LABEL_KEYS = {
+  prices: 'viewPrices',
+  hubs: 'viewHubs',
+  attributes: 'viewAttributes',
+} as const;
 
 export interface CompareDrawerProps {
   location: OrderBookLocation;
@@ -226,6 +235,16 @@ export function CompareDrawer({
     columns: pricesCsvColumns,
   });
   const attributesExport = useCompareAttributesExport(rows, attributes.data);
+  const ownHubId = useMarketHub((state) => state.value);
+  const ownHubName = TRADE_HUBS.find((candidate) => candidate.id === ownHubId)?.systemName ?? '';
+  const hubsData = useCompareHubs(items, mode !== 'closed' && view === 'hubs', refreshTick);
+  const hubRows = useMemo(() => buildCompareHubRows(items, hubsData), [items, hubsData]);
+  const hubsCsvColumns = useMemo(() => compareHubsCsvColumns(t), [t]);
+  const hubsExport = useTableExport({
+    surface: 'market-compare-hubs',
+    rows: hubRows,
+    columns: hubsCsvColumns,
+  });
 
   // One header row on a phone: Clear all joins the export's overflow menu
   // instead of a button of its own that would wrap the header.
@@ -453,7 +472,12 @@ export function CompareDrawer({
         inert={fullScreen}
         aria-expanded={mode !== 'closed'}
         aria-controls={DRAWER_ID}
-        onClick={() => setMode((m) => (m === 'closed' ? 'open' : 'closed'))}
+        onClick={() => {
+          // Prices for a lone item compares nothing, so opening lands on Trade hubs
+          // (a view the user picked on purpose stays).
+          if (mode === 'closed' && items.length === 1 && view === 'prices') setView('hubs');
+          setMode((m) => (m === 'closed' ? 'open' : 'closed'));
+        }}
         className={`flex ${controlHeightClassName.md} items-center justify-center gap-1.5 border border-line bg-panel px-4 text-[0.6875rem] font-semibold tracking-widest text-text uppercase ${rowInteractiveClassName} ${focusRingInsetClassName}`}
       >
         <Caret expanded={mode !== 'closed'} />
@@ -504,9 +528,12 @@ export function CompareDrawer({
                   right at every width, not just on a phone. */}
               <SegmentedControl
                 label={t('market.compare.viewLabel')}
-                options={(['prices', 'attributes'] as const).map((option) => ({
+                options={(['prices', 'hubs', 'attributes'] as const).map((option) => ({
                   value: option,
-                  label: t(`market.compare.${VIEW_LABEL_KEYS[option]}`),
+                  // "Trade hubs" would push Attributes off a phone header.
+                  label: t(
+                    `market.compare.${option === 'hubs' && narrow ? 'viewHubsShort' : VIEW_LABEL_KEYS[option]}`
+                  ),
                 }))}
                 value={view}
                 onChange={setView}
@@ -518,8 +545,17 @@ export function CompareDrawer({
               )}
             </div>
             <div className="flex items-center gap-2">
+              {view === 'hubs' && !narrow && (
+                <span className="text-[0.6875rem] text-text-dim">
+                  {t('market.compare.hubsSubtitle', { hub: ownHubName })}
+                </span>
+              )}
               {view === 'prices' ? (
                 <TableActionsMenu name={t('market.compare.viewPrices')} tableExport={pricesExport}>
+                  {clearAllMenuItem}
+                </TableActionsMenu>
+              ) : view === 'hubs' ? (
+                <TableActionsMenu name={t('market.compare.viewHubs')} tableExport={hubsExport}>
                   {clearAllMenuItem}
                 </TableActionsMenu>
               ) : (
@@ -579,6 +615,23 @@ export function CompareDrawer({
                   />
                 </div>
               )
+            ) : view === 'hubs' ? (
+              <>
+                {narrow && (
+                  <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                    {t('market.compare.hubsSubtitle', { hub: ownHubName })}
+                  </p>
+                )}
+                <div className="overflow-x-auto">
+                  <TradeHubsTable
+                    rows={hubRows}
+                    jumps={hubsData.jumps}
+                    ownHub={ownHubId}
+                    tableExport={hubsExport}
+                    onRemove={removeItem}
+                  />
+                </div>
+              </>
             ) : rows.length === 0 ? (
               <div className="flex justify-center py-8">
                 <Spinner label={t('common.loading')} />

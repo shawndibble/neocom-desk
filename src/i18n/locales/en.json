@@ -26,11 +26,17 @@
     "characters": "Characters",
     "overview": "Overview",
     "corp": "Corporation",
+    "corpBoard": "Corp Board",
+    "corpMembers": "Members",
+    "corpWallet": "Corp Wallet",
+    "corpAssets": "Corp Assets",
+    "corpMoons": "Moons",
     "skills": "Skills",
     "industry": "Industry",
     "ships": "Ships",
     "market": "Market",
     "groups": {
+      "corp": "Corporation",
       "progression": "Progression",
       "economy": "Economy",
       "social": "Social"
@@ -52,6 +58,11 @@
     "help": "Help & FAQ",
     "soon": "Soon",
     "switchCharacter": "Switch character",
+    "characterSwitcher": "Characters",
+    "characterActive": "Active",
+    "fixPermissions": "Fix…",
+    "fixPermissionsFor": "Fix permissions for {{name}}",
+    "manageCharacters": "Manage characters",
     "more": "More",
     "mobileLabel": "Mobile navigation",
     "alerts": "Alerts",
@@ -2130,6 +2141,16 @@
     "fromCertifiedItem": "From a Certified Plan…",
     "fromCommunityItem": "From a Community plan…",
     "newPlanName": "Untitled plan",
+    "optimizeQueue": "Optimize queue",
+    "optimizeQueueEmptyTip": "Your skill queue is empty: nothing to optimize.",
+    "optimizeQueueFailed": "Couldn't read your skill queue. Try again.",
+    "optimizeQueuePlanName": "Skill queue · {{date}}",
+    "optimizeQueueMade": "Made \"{{name}}\": {{what}}.{{wait}}",
+    "optimizeQueueWhatOne": "remap before {{skill}} saves {{duration}}",
+    "optimizeQueueWhatMany": "{{count}} remaps save {{duration}}",
+    "optimizeQueueYearlyWait": " It waits for your yearly remap on {{date}}.",
+    "optimizeQueueOptimal": "Your attributes already suit your skill queue: no remap makes it faster, so no plan was made.",
+    "optimizeQueueUndo": "Undo",
     "copySuffix": "{{name}} (copy)",
     "namePlaceholder": "Plan name",
     "duplicate": "Duplicate",
@@ -3679,7 +3700,7 @@
         "caption": "Alerts for everything that needs you"
       },
       "corporation": {
-        "alt": "The Corporation overview: standing and runway, deadlines per day for the next 14 days, and fuel and moon chunk lists that put what runs out soonest first.",
+        "alt": "The Corp Board: standing and runway, deadlines per day for the next 14 days, and fuel and moon chunk lists that put what runs out soonest first.",
         "caption": "One deadline-ranked board for the corp"
       },
       "industryJobs": {
@@ -3733,7 +3754,7 @@
       },
       "corp": {
         "tab": "Corporation",
-        "board": "The Corporation overview merges fuel, structure timers, moon extractions, finished jobs and offline services into one deadline-ranked board.",
+        "board": "The Corp Board merges fuel, structure timers, moon extractions, finished jobs and offline services into one deadline-ranked board.",
         "deadlines": "A strip shows the deadlines per day for the next 14 days, beside the fuel list, soonest first.",
         "tables": "Members, Wallet and Assets are the tables behind it.",
         "access": "It appears only when a character holds a Corp Role in game, and corporation data is a separate grant, requested only when you open those pages."
@@ -5230,6 +5251,36 @@
         "summary_one": "{{count}} outstanding corp contract, {{soon}} expiring within a day.",
         "summary_other": "{{count}} outstanding corp contracts, {{soon}} expiring within a day."
       },
+      "corpAssets": {
+        "title": "Corp Assets",
+        "description": "Asset safety, impounded and delivered items, and stock below target",
+        "empty": "The corporation holds no assets and has no stock targets.",
+        "allClear": "Nothing in asset safety, impounded or waiting, and every stock target is met.",
+        "unit_one": "thing to look at",
+        "unit_other": "things to look at",
+        "truncated": "The asset list was cut short, so counts may be incomplete.",
+        "line": {
+          "safety": "Asset safety",
+          "impounded": "Impounded",
+          "deliveries": "Corp deliveries waiting",
+          "belowTarget": "Below target"
+        },
+        "safetyCount_one": "{{count}} stack",
+        "safetyCount_other": "{{count}} stacks",
+        "impoundedCount_one": "{{count}} stack",
+        "impoundedCount_other": "{{count}} stacks",
+        "deliveriesCount_one": "{{count}} stack",
+        "deliveriesCount_other": "{{count}} stacks",
+        "belowTargetCount_one": "{{count}} type",
+        "belowTargetCount_other": "{{count}} types",
+        "col": {
+          "line": "Where",
+          "count": "Count",
+          "value": "Est. value"
+        },
+        "summary": "{{parts}}.",
+        "summaryClear": "Nothing in asset safety, impounded or waiting, and every stock target is met."
+      },
       "corpSrp": {
         "title": "Ship replacement",
         "description": "SRP claims waiting and paid",
@@ -5601,6 +5652,39 @@
       "notifyMe": "Manage Notification Settings",
       "pushOn": "Push on this device: On",
       "pushOff": "Push on this device: Off"
+    }
+  },
+  "wars": {
+    "banner": {
+      "label": "War",
+      "title": "At war with {{name}}",
+      "titleMore_one": "At war with {{name}} and {{count}} more",
+      "titleMore_other": "At war with {{name}} and {{count}} more",
+      "declared": "Declared {{age}}",
+      "startsIn": "Starts in {{time}}",
+      "notStarted": "Not started yet"
+    },
+    "modal": {
+      "title_one": "War declared",
+      "title_other": "{{count}} wars declared",
+      "active": "Active",
+      "startsIn": "Starts in {{time}}",
+      "pendingUnknown": "Not started",
+      "declaredOnYou": "Declared war on you",
+      "declaredOnAlly": "Declared war on your ally {{name}}",
+      "declared": "Declared",
+      "starts": "Starts",
+      "started": "Started",
+      "ends": "Ends",
+      "mutual": "Mutual",
+      "noEnd": "No end set",
+      "allies": "Allies",
+      "noAllies": "None",
+      "theyDestroyed": "They destroyed",
+      "ships_one": "{{count}} ship",
+      "ships_other": "{{count}} ships",
+      "zkill": "War on zKillboard",
+      "youDestroyed": "You destroyed"
     }
   },
   "common": {
@@ -6043,14 +6127,16 @@
       "open": "Manage Taxes",
       "manage": "Manage Taxes",
       "needLogin": "Log in to access",
-      "failed": "Couldn't save that Payee. Try again.",
-      "addPayee": {
-        "title": "Add Payee",
-        "confirm": "Add {{name}} as a Payee at {{pct}}%?",
-        "body": "{{name}} isn't one of your Payees yet. Add them so you can assign this ore's tax to them on the Tax tab.",
-        "submit": "Add Payee",
-        "skip": "Open without adding"
-      }
+      "failed": "Couldn't connect this moon to that Payee. Try again.",
+      "addedPayee": "Added {{name}} as a Payee at {{pct}}%.",
+      "assigned_one": "Assigned {{count}} mining entry to {{name}}.",
+      "assigned_other": "Assigned {{count}} mining entries to {{name}}.",
+      "willAssign": "Your ore from this moon will be assigned to {{name}} at {{pct}}% as it reaches your mining ledger.",
+      "connected": "Assigning to {{name}} until {{time}}",
+      "connectedNoLocation": "Assigning to {{name}} once the survey has a location",
+      "openTax": "Mining Tax",
+      "stop": "Stop",
+      "undo": "Undo"
     },
     "templates": {
       "menu": "Templates",
@@ -6645,7 +6731,14 @@
       "notEnough": "Not enough for the oldest entry",
       "hint": "Record it now — the transfer links itself once it shows up in your wallet journal.",
       "recordAction": "I sent it · record payment",
-      "pickFromWallet": "Already in my wallet? Pick it…"
+      "pickFromWallet": "Already in my wallet? Pick it…",
+      "fromLabel": "Paying from",
+      "fromOption": "{{name}} · {{amount}} ISK",
+      "alsoPayRest_one": "Also pay {{count}} other entry",
+      "alsoPayRest_other": "Also pay {{count}} other entries",
+      "alsoPayOthers_one": "Also pay for other characters · {{count}} entry",
+      "alsoPayOthers_other": "Also pay for other characters · {{count}} entries",
+      "openInEveAs": "Open in EVE · {{name}}"
     },
     "linkWallet": {
       "title": "Link a wallet payment",
@@ -9672,7 +9765,6 @@
         "none_other": "No Requests within {{count}} jumps"
       },
       "message": "Message {{name}}…",
-      "messageNeedsPermission": "Messaging opens a window in your EVE client, which needs the Open in EVE Permission.",
       "mail": {
         "subject": "Your Request: {{items}}",
         "body": "Hi {{name}}, about your Request in {{community}} for {{items}}: "
@@ -9790,9 +9882,11 @@
     "title": "Loyalty Points",
     "refresh": "Refresh",
     "emptyTitle": "No loyalty points cached",
-    "emptyHint": "Couldn't load this character's loyalty point balances yet. Try again shortly.",
+    "emptyHint": "Couldn't load loyalty point balances yet. Try again shortly.",
     "noneLine": "Loyalty Points: none ·",
     "corporation": "Corporation",
+    "corporationInfo": "Show info for {{corporation}}",
+    "corporationInfoShort": "Show info",
     "points": "Loyalty Points",
     "browseStores": "Browse LP Stores",
     "reauthTitle": "Log in again to see your loyalty points",
@@ -10408,13 +10502,15 @@
       "stock": "Stock",
       "history": "History",
       "transactions": "Transactions",
-      "appraisal": "Appraisal"
+      "appraisal": "Appraisal",
+      "hauling": "Hauling"
     },
     "hauling": {
       "dataAgeNote": "Prices come from ESI's regional market orders, which EVE refreshes about every 5 minutes.",
       "title": "Hauling",
       "from": "From",
       "to": "To",
+      "swapHubs": "Swap origin and destination",
       "anyHub": "Any hub",
       "category": "Category",
       "categoryAll": "Everything",
@@ -10564,7 +10660,7 @@
       },
       "detail": {
         "planNote": "{{volume}} · in your plan: {{note}}",
-        "regionNote": "Sales per day are for the whole {{hub}} region. The sell orders are the hub station's own.",
+        "regionNote": "Daily sales are region-wide; orders are the hub station's.",
         "buyIn": "Buy in {{hub}}",
         "sellIn": "Sell in {{hub}}",
         "tax": "Sales tax",
@@ -10572,10 +10668,10 @@
         "ordersTitle": "Sell orders in {{hub}}",
         "colPrice": "Price",
         "colUnits": "Units",
-        "instantNote": "Only buy orders at the {{hub}} hub station count. You sell into them on arrival, so there is no broker fee and no wait.",
+        "instantNote": "Only {{hub}} station buy orders count. No broker fee, no wait.",
         "sellInto": "Sell into buy orders in {{hub}}",
         "buyOrdersTitle": "Buy orders in {{hub}}",
-        "noneProfitable": "No buy order here pays enough to cover the purchase and sales tax."
+        "noneProfitable": "No buy order pays enough to cover cost and tax."
       },
       "itemDetail": {
         "lane": "{{from}} to {{to}}",
@@ -10593,15 +10689,15 @@
         "buyOrdersNote": "Dearest first. Shaded rows are the ones your load sells into.",
         "showMath": "Show the math",
         "profitEachLine": "Profit each",
-        "noneProfitable": "No unit on today's books sells here for more than it costs after fees.",
+        "noneProfitable": "Nothing sells here for more than it costs after fees.",
         "planUnits_one": "{{units}} unit",
         "planUnits_other": "{{units}} units",
-        "whyLead": "Why {{price}}:",
-        "whyTick": "the lower of what listings recently sold for ({{recent}}) and one tick under the cheapest listing ({{undercut}}).",
-        "whyTickRounded": "the lower of what listings recently sold for ({{recent}}) and one tick under the cheapest listing ({{undercut}}), rounded down to a valid price.",
-        "whyAsk": "the lower of what listings recently sold for ({{recent}}) and the cheapest listing ({{undercut}}).",
-        "whyAskRounded": "the lower of what listings recently sold for ({{recent}}) and the cheapest listing ({{undercut}}), rounded down to a valid price.",
-        "priceHistory": "Price history and orders in {{hub}}",
+        "whyLead": "Sell price {{price}}:",
+        "whyTick": "lower of recent sales ({{recent}}) and one tick under the cheapest listing ({{undercut}}).",
+        "whyTickRounded": "lower of recent sales ({{recent}}) and one tick under the cheapest listing ({{undercut}}), rounded down.",
+        "whyAsk": "lower of recent sales ({{recent}}) and the cheapest listing ({{undercut}}).",
+        "whyAskRounded": "lower of recent sales ({{recent}}) and the cheapest listing ({{undercut}}), rounded down.",
+        "hubMarket": "{{hub}} market",
         "routeSafety": "Route safety",
         "lastSalesSplit": "Last sales ({{date}}): {{high}} from a listing, {{low}} into a buy order."
       },
@@ -10782,6 +10878,7 @@
       "unpriced_one": "{{count}} item has no orders on one side at this hub, so it is left out of that total.",
       "unpriced_other": "{{count}} items have no orders on one side at this hub, so they are left out of that total.",
       "compareHubsTitle": "Compare hubs",
+      "appraiseAtHub": "Appraise at {{hub}}",
       "copyTotal": "Copy {{amount}}",
       "copyTotalCompact": "Copy {{short}} ISK ({{full}})",
       "copiedAmount": "Copied {{amount}}",
@@ -10874,6 +10971,21 @@
       "viewLabel": "Compare view",
       "viewPrices": "Prices",
       "viewAttributes": "Attributes",
+      "viewHubs": "Trade hubs",
+      "viewHubsShort": "Hubs",
+      "hubsSubtitle": "Best sell over best buy at each hub's station · your hub: {{hub}}",
+      "hubsTableLabel": "Compare at trade hubs",
+      "hubHeader": "{{hub}} · {{jumps}}j",
+      "hubJumpsFromYou_one": "{{count}} jump from you",
+      "hubJumpsFromYou_other": "{{count}} jumps from you",
+      "hubYourMarketHub": "your Market hub",
+      "hubCellLabel": "{{item}} at {{hub}}: best sell {{price}}",
+      "hubSellColumn": "{{hub}} best sell",
+      "hubBuyColumn": "{{hub}} best buy",
+      "noSellers": "No sellers",
+      "buyLine": "buy {{price}}",
+      "lowest": "Lowest",
+      "highest": "Highest",
       "attributeColumn": "Attribute",
       "itemsHeader": "Compared items",
       "worth": "Worth",
@@ -11762,8 +11874,8 @@
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, and the structure broker fees you typed.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
-            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, and how the Assign form edits ore values. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
-            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your corporation overview layout, hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
+            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, how the Assign form edits ore values, and the moon surveys you connected to a payee with Manage Taxes. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
+            "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your Corp Board layout, the stock targets you set on corporation assets, hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs. The notes you wrote on solar systems (up to 500 characters each, so don't put anything private in them)."
           }
         },
@@ -12176,6 +12288,16 @@
     "permissions": {
       "hint": "What this character lets Neocom Desk read from EVE. Grant adds permissions in one login; revoke on <ccp>EVE's own site</ccp>.",
       "selectCharacter": "Select a character to see its permissions.",
+      "character": {
+        "label": "Character",
+        "choose": "Choose a character",
+        "count": "{{granted}} of {{total}}",
+        "missing": "{{count}} missing",
+        "search": "Find a character",
+        "needs": "Needs permissions · {{count}}",
+        "complete": "All granted · {{count}}",
+        "noMatch": "No characters match."
+      },
       "checking": "Checking…",
       "granted": "Granted",
       "grantedGroup": "Granted ({{count}})",
@@ -12376,10 +12498,11 @@
     },
     "members": {
       "darkState": ", dark",
-      "title": "Corp members",
+      "title": "Members",
       "refresh": "Refresh member list",
       "tableLabel": "Corporation members",
       "columnMember": "Member",
+      "rosterTab": "Roster",
       "columnLastSeen": "Last seen",
       "columnShip": "Ship",
       "columnLocation": "Location",
@@ -12438,7 +12561,7 @@
       "needsGrantHint": "The corporation permission needs to be granted again from Settings before roles can load."
     },
     "wallet": {
-      "title": "Corp wallet",
+      "title": "Corp Wallet",
       "divisionsTitle": "Divisions",
       "divisionsShow": "Show all divisions",
       "divisionsHide": "Hide divisions",
@@ -12448,23 +12571,10 @@
       "noAccessHint": "EVE only opens the corporation wallet to a Director, Accountant or Junior Accountant. Roles can only be changed in game, and granting access here will not change that."
     },
     "assets": {
-      "title": "Corp assets",
+      "title": "Corp Assets",
       "refresh": "Refresh corp assets",
       "empty": "No corporation assets",
       "emptyHint": "EVE reported no assets for this corporation.",
-      "divisionEmpty": "Nothing in this division",
-      "treeLabel": "Corporation assets",
-      "tableLabel": "{{group}} assets",
-      "columnItem": "Item",
-      "columnQuantity": "Quantity",
-      "columnLocation": "Location",
-      "itemCount_one": "{{count, number}} item",
-      "itemCount_other": "{{count, number}} items",
-      "levelHeading": {
-        "itemsSuffix": ", {{items}}"
-      },
-      "groupCount_one": "{{count}} group",
-      "groupCount_other": "{{count}} groups",
       "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this corporation has more.",
       "noAccessTitle": "Corp assets need Director",
       "noAccessHint": "EVE only opens the corporation asset list to a Director. No other corporation role can see it, and granting access here will not change that.",
@@ -12472,13 +12582,80 @@
       "loadFailedHint": "The corporation asset read failed and nothing is cached yet. Try refreshing.",
       "searchPlaceholder": "Search items…",
       "unknownLocation": "Location #{{locationId}}",
-      "flag": {
-        "officeFolder": "Office",
-        "corpDeliveries": "Deliveries",
+      "unknownPlace": "Unknown location",
+      "tabsLabel": "Asset state",
+      "tab": {
+        "all": "All",
+        "offices": "Offices",
+        "deliveries": "Corp deliveries",
+        "inSpace": "In space",
         "impounded": "Impounded",
-        "assetSafety": "Asset Safety",
+        "assetSafety": "Asset safety",
+        "lockdown": "Lockdown",
+        "capsuleerDeliveries": "Capsuleer deliveries"
+      },
+      "state": {
+        "offices": "Office",
+        "deliveries": "Corp deliveries",
+        "inSpace": "In space",
+        "impounded": "Impounded",
+        "assetSafety": "Asset safety",
+        "lockdown": "Lockdown",
+        "capsuleerDeliveries": "Capsuleer deliveries",
         "other": "Other"
-      }
+      },
+      "column": {
+        "item": "Item",
+        "quantity": "Qty",
+        "target": "Target",
+        "shortBy": "Short by",
+        "where": "Where",
+        "value": "Est. value",
+        "volume": "Volume",
+        "group": "Group",
+        "place": "Office › division",
+        "items": "Items",
+        "largest": "Largest stacks"
+      },
+      "csv": {
+        "kind": "Blueprint",
+        "place": "Location"
+      },
+      "itemTableLabel": "Corporation assets by item",
+      "locationTableLabel": "Corporation assets by location",
+      "noneOwned": "none owned",
+      "morePlacements": "+{{count}} more",
+      "noStacks": "The corporation owns none of this item right now.",
+      "assembled": "Assembled",
+      "packaged": "Packaged",
+      "moreStacks_one": "and {{count}} more stack",
+      "moreStacks_other": "and {{count}} more stacks",
+      "groupTotals_one": "{{count, number}} item · {{value}} ISK",
+      "groupTotals_other": "{{count, number}} items · {{value}} ISK",
+      "emptyOffice": "Empty office",
+      "nothingStored": "Nothing stored here",
+      "divisionsInUse": "{{count}} of 7 divisions in use",
+      "noMatchesTitle": "Nothing matches",
+      "noMatchesHint": "Clear the search or a filter, or pick another tab.",
+      "filtersTitle": "Filters",
+      "filter": {
+        "location": "Location",
+        "division": "Division",
+        "category": "Category",
+        "anyLocation": "Any location",
+        "anyDivision": "Any division",
+        "anyCategory": "Any category"
+      },
+      "groupBy": {
+        "label": "Group by",
+        "item": "Item",
+        "location": "Location"
+      },
+      "belowTarget": "Below target",
+      "belowTargetCount_one": "{{count}} item type below target",
+      "belowTargetCount_other": "{{count}} item types below target",
+      "belowTargetNone": "Set a stock target first.",
+      "stockTargetsButton": "Stock targets…"
     },
     "grantPromptTitle": "Corporation access",
     "grantPromptBody": "You hold {{roles}} in {{corporation}}. Grant corp access so Neocom Desk can show your corporation's data?",
@@ -12537,23 +12714,46 @@
     },
     "grid": {
       "customize": {
-        "barLabel": "Customize the corporation overview",
-        "emptyTitle": "Your corporation overview is empty",
+        "barLabel": "Customize the Corp Board",
+        "emptyTitle": "Your Corp Board is empty",
         "emptyBody": "Add widgets to track what your corporation needs."
       },
       "gallery": {
-        "subtitle": "{{total}} widgets · {{onBoard}} on your corporation overview",
-        "onBoard": "On your corporation overview ×{{count}}"
+        "subtitle": "{{total}} widgets · {{onBoard}} on your Corp Board",
+        "onBoard": "On your Corp Board ×{{count}}"
       },
       "menu": {
-        "remove": "Remove from corporation overview"
+        "remove": "Remove from Corp Board"
       },
       "header": {
-        "breakdownCaption": "When each widget on the corporation overview last read its data"
+        "breakdownCaption": "When each widget on the Corp Board last read its data"
       },
       "widgets": {
-        "noWidgets": "There are no widgets to show on this corporation overview."
+        "noWidgets": "There are no widgets to show on this Corp Board."
       }
+    },
+    "stockTargets": {
+      "title": "Stock targets",
+      "intro": "The least your corporation should hold of each item. Owned counts Offices and Corp deliveries; Impounded, Asset safety and In space items don't count.",
+      "listLabel": "Stock targets",
+      "emptyTitle": "No stock targets yet",
+      "emptyHint": "Search for an item above and give it a quantity.",
+      "searchLabel": "Item",
+      "searchPlaceholder": "Search items…",
+      "searchUnavailable": "Item search needs a one-time download. Connect once to use it.",
+      "quantityLabel": "Target",
+      "pickItem": "Pick an item from the list.",
+      "quantityRequired": "Enter a whole number of at least 1.",
+      "add": "Add",
+      "added": "Added a stock target for {{name}}.",
+      "done": "Done",
+      "owned": "{{formatted}} owned",
+      "removeLabel": "Remove the stock target for {{name}}",
+      "cellLabel": "Target for {{name}}",
+      "cellSet": "Set a stock target for {{name}}",
+      "cellEdit": "Stock target for {{name}}: {{count}}. Edit",
+      "invalid": "Enter a whole number of at least 1, or leave it empty to remove the target.",
+      "typeFallback": "Type {{id}}"
     }
   },
   "publicInfo": {
@@ -12876,6 +13076,8 @@
     "sending": "Opening in EVE…",
     "opened": "Opened in your EVE client.",
     "needCharacter": "Log in a character to open this in its EVE client.",
+    "notGranted": "{{name}} hasn't granted Open in EVE.",
+    "switchTo": "Switch to {{name}}",
     "failed": "Couldn't open it in EVE: {{message}}",
     "unknownError": "Is your character logged in to the game?",
     "offline": "You're offline — reconnect to open this in EVE.",
@@ -12924,7 +13126,6 @@
     },
     "title": "Travel",
     "routeTab": "Route Safety",
-    "haulingTab": "Hauling",
     "pilotTab": "Pilot Lookup",
     "pilot": {
       "pickTitle": "Look up a pilot by name",
@@ -13972,6 +14173,13 @@
       "noPrice": "No price",
       "status": "Status",
       "remove": "Remove from list",
+      "selectAria": "Select {{name}}",
+      "selectAll": "Select all",
+      "selectNone": "Select none",
+      "removeSelected": "Remove selected ({{count}})",
+      "undo": "Undo",
+      "removedMany_one": "Removed {{count}} item",
+      "removedMany_other": "Removed {{count}} items",
       "legendListed": "Listed (coloured by status)",
       "legendHangar": "In hangar, ready to list"
     },

@@ -27,6 +27,7 @@ export const CHARACTER_FILTER_PAGES = [
   'orders',
   'contracts',
   'transactions',
+  'miningTax',
 ] as const;
 export type CharacterFilterPage = (typeof CHARACTER_FILTER_PAGES)[number];
 
@@ -64,8 +65,15 @@ export const useCharacterFilterPicks = createLocalSetting<CharacterFilterPicks>(
   parse: parseCharacterFilterPicks,
 });
 
-/** The value `page` opens on when the URL names none, and how to remember an edit. */
-export function useCharacterFilterPick(page: CharacterFilterPage): {
+/**
+ * The value `page` opens on when the URL names none, and how to remember an
+ * edit. `firstVisit` replaces the Settings default for a page that has always
+ * opened on its own value (Mining Tax on All) until the pilot picks.
+ */
+export function useCharacterFilterPick(
+  page: CharacterFilterPage,
+  firstVisit?: CharacterFilterValue
+): {
   pick: CharacterFilterValue;
   remember: (value: CharacterFilterValue) => Promise<void>;
 } {
@@ -73,7 +81,11 @@ export function useCharacterFilterPick(page: CharacterFilterPage): {
   const storedDefault = useDefaultCharacterFilter((state) => state.value);
   useHydratedStore(useCharacterFilterPicks, useDefaultCharacterFilter);
 
-  const pick = pickedCharacterFilter(picks, page, fromStoredCharacterFilterValue(storedDefault));
+  const pick = pickedCharacterFilter(
+    picks,
+    page,
+    firstVisit ?? fromStoredCharacterFilterValue(storedDefault)
+  );
   const remember = useCallback(
     async (value: CharacterFilterValue) => {
       // Hydrate first: writing before the stored row is read would replace
@@ -94,9 +106,10 @@ export function useCharacterFilterPick(page: CharacterFilterPage): {
  */
 export function useRememberedCharacterFilter<S extends UrlParamSchema>(
   page: CharacterFilterPage,
-  key: keyof S & string
+  key: keyof S & string,
+  firstVisit?: CharacterFilterValue
 ): RememberedDefaults<S> {
-  const { pick, remember } = useCharacterFilterPick(page);
+  const { pick, remember } = useCharacterFilterPick(page, firstVisit);
   return useMemo(
     () => ({
       values: { [key]: pick } as Partial<UrlParamValues<S>>,

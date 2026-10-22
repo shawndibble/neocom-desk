@@ -33,7 +33,6 @@ import { recentChanges, roleLabel, type RoleChange } from '@/engine/corp/roleAud
 import { formatAge } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { CorpSubNav } from './CorpSubNav';
 import { loadCorporationId } from './boardData';
 import { loadRoleAudit, type RoleAuditData } from './roleAudit';
 
@@ -269,7 +268,6 @@ export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader
         title={t('corp.members.title')}
-        subNav={<CorpSubNav flush />}
         meta={
           audit?.fetchedAt ? (
             <DataAgeBadge date={audit.fetchedAt} note={t('corp.dataAgeNote')} />

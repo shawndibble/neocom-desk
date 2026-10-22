@@ -246,18 +246,7 @@ describe('Corp Wallet: the gate', () => {
     await findDivisions();
   });
 
-  it('is an entry in the Corp section nav for a Character who can read the wallet', async () => {
-    render(<App />);
-    await findDivisions();
-
-    const nav = screen.getByRole('navigation', { name: 'Corporation' });
-    expect(within(nav).getByRole('link', { name: 'Wallet' })).toHaveAttribute(
-      'href',
-      '/corp/wallet'
-    );
-  });
-
-  /** One level of tabs: the Corp sub-nav. The page switches its table with a view control. */
+  /** A page of its own, not a tab: it switches its table with a view control. */
   it('has no tab bar of its own', async () => {
     render(<App />);
     await findDivisions();
@@ -543,7 +532,7 @@ describe('Wallet no longer carries the corporation', () => {
     expect(await screen.findByText('EverMarks')).toBeInTheDocument();
     // The switch used to appear only once corp access resolved to `ready`,
     // which is also what puts Corp in the sidebar.
-    expect(await screen.findByRole('link', { name: 'Corporation' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Corp Board' })).toBeInTheDocument();
 
     expect(screen.queryByRole('group', { name: 'Wallet owner' })).toBeNull();
     expect(screen.queryByLabelText('Wallet division')).toBeNull();

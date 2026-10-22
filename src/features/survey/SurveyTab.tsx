@@ -19,7 +19,7 @@ import { useCharacters } from '@/features/character/useCharacters';
 import { Button, EmptyState, PageHeader, TabPanel, textActionClassName } from '@/components/ui';
 import { isShareId } from '@/engine/share/shareId';
 import { ownsSurvey } from '@/engine/survey/owner';
-import { countedScans } from '@/engine/survey/series';
+import { countedScans, type SurveySummary } from '@/engine/survey/series';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import { classifyScan, lastSeenField, missingOres } from '@/engine/survey/scanUpdate';
 import { shareUrl } from '@/features/share/shareStore';
@@ -325,7 +325,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
                 characterId !== null && (
                   <SurveyInfoLine
                     characterId={characterId}
-                    oreNames={summary.oreNames}
+                    summary={summary}
                     owned={owned}
                     onStored={() => void refresh()}
                     tax={state.status === 'ready' ? state.tax : null}
@@ -394,7 +394,7 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
  */
 function SurveyInfoLine({
   characterId,
-  oreNames,
+  summary,
   owned,
   tax,
   info,
@@ -402,24 +402,26 @@ function SurveyInfoLine({
   onStored,
 }: {
   characterId: number;
-  oreNames: string[];
+  summary: SurveySummary;
   owned: boolean;
   tax: SurveyTaxShare | null;
   info: SurveyInfoShare | null;
   survey?: InfoSurvey;
   onStored: () => void;
 }) {
-  const moon = useHasMoonOre(oreNames);
+  const moon = useHasMoonOre(summary.oreNames);
+  const connect = survey && { id: survey.id, expiresAt: survey.expiresAt, summary };
   if (owned) {
     return (
       <SurveyInfoEditor
         key={survey?.id}
         characterId={characterId}
         survey={survey}
+        connect={connect}
         moon={moon}
         onStored={onStored}
       />
     );
   }
-  return <SurveyInfoReadout info={info} tax={moon ? tax : null} />;
+  return <SurveyInfoReadout info={info} tax={moon ? tax : null} connect={connect} />;
 }

@@ -6,7 +6,7 @@
 import { definePageTabs } from '@/lib/pageTabs';
 
 export const CORP_MEMBERS_TABS = definePageTabs('/corp/members', [
-  { id: 'members', labelKey: 'corp.membersTab' },
+  { id: 'members', labelKey: 'corp.members.rosterTab' },
   { id: 'roles', labelKey: 'corp.roles.tab' },
 ]);
 

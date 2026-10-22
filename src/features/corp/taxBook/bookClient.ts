@@ -18,7 +18,6 @@ import {
   orderBy,
   query,
 } from 'firebase/firestore/lite';
-import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
 import type { Miner } from '@/engine/corpTaxBook/charges';
@@ -44,7 +43,8 @@ import type { RemovalNoticeRecord } from '@/engine/corpTaxBook/mailQueue';
 import type { OwnerRateEntry } from '@/engine/corpTaxBook/ownerRate';
 import type { StoredRefineryLabel, StoredRefineryStructure } from '@/engine/corpTaxBook/refinery';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
-import { getSyncFirestore, getSyncFunctions } from '@/sync/firebaseApp';
+import { getSyncFirestore } from '@/sync/firebaseApp';
+import { callRouted } from '@/sync/routedCallable';
 import { ensureSignedIn } from '@/sync/syncAuth';
 
 /** `verifyCorpOfficerCallable`'s answer. */
@@ -99,8 +99,8 @@ export interface SyncReceipt {
 /** One Corp Tax Book callable, signed in as `characterId`; the other taxBook clients share it. */
 export async function call<In, Out>(characterId: number, name: string, data: In): Promise<Out> {
   await ensureSignedIn(characterId);
-  const result = await httpsCallable<In, Out>(getSyncFunctions(), name)(data);
-  return result.data;
+  const result = await callRouted<In, Out>(name, data);
+  return result;
 }
 
 /**

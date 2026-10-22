@@ -337,7 +337,7 @@ const survey: Builder = (feeds, { t, now }) => {
 
 // --- Hauling ------------------------------------------------------------------------
 
-const HAULING_PATH = '/travel/hauling';
+const HAULING_PATH = '/market/hauling';
 
 const hauling: Builder = (feeds, { t }) => {
   const feed = feeds.hauling;

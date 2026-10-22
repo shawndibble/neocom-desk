@@ -10,7 +10,8 @@ vi.mock('firebase/functions', () => ({
       failNext = false;
       throw new Error('offline');
     }
-    sent.push({ name, data });
+    const { action, data: inner } = data as { action: string; data: unknown };
+    sent.push({ name: `${name}:${action}`, data: inner });
     return { data: { ok: true } };
   },
 }));
@@ -65,7 +66,7 @@ describe('teachRefinerySystems (#4650)', () => {
     expect(signedIn).toEqual([90000002]);
     expect(sent).toEqual([
       {
-        name: 'learnCorpTaxBookRefinerySystemsCallable',
+        name: 'corpTaxBookCall:learnCorpTaxBookRefinerySystemsCallable',
         data: { corporationId: BOOK, systems: { [String(TATARA)]: 30002187 } },
       },
     ]);

@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { AttributesPane } from './AttributesPane';
 import type { RemapAvailability } from './remapAvailability';
@@ -75,5 +76,43 @@ describe('AttributesPane on a phone', () => {
     expect(region).toHaveTextContent('INT');
     expect(region).toHaveTextContent('31');
     expect(screen.queryByText(/remap/i)).toBeNull();
+  });
+});
+
+describe('AttributesPane Optimize queue', () => {
+  it('runs on press, on a phone too', async () => {
+    const onOptimizeQueue = vi.fn();
+    render(
+      <AttributesPane
+        result={null}
+        implantBonuses={{}}
+        remapInfo={null}
+        onOptimizeQueue={onOptimizeQueue}
+      />
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Optimize queue' }));
+    expect(onOptimizeQueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays focusable but does nothing when the queue is empty', async () => {
+    const onOptimizeQueue = vi.fn();
+    render(
+      <AttributesPane
+        result={null}
+        implantBonuses={{}}
+        remapInfo={null}
+        onOptimizeQueue={onOptimizeQueue}
+        queueEmpty
+      />
+    );
+    const button = screen.getByRole('button', { name: 'Optimize queue' });
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(button);
+    expect(onOptimizeQueue).not.toHaveBeenCalled();
+  });
+
+  it('has no button without a handler', () => {
+    render(<AttributesPane result={null} implantBonuses={{}} remapInfo={null} />);
+    expect(screen.queryByRole('button', { name: 'Optimize queue' })).toBeNull();
   });
 });

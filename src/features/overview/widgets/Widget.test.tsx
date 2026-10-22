@@ -223,7 +223,7 @@ describe('Widget states', () => {
     expect(within(region).getByText('No scan yet')).toBeInTheDocument();
     expect(within(region).getByRole('link', { name: 'Open Hauling' })).toHaveAttribute(
       'href',
-      '/travel/hauling'
+      '/market/hauling'
     );
   });
 

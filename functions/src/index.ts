@@ -3,7 +3,9 @@
 // the client sends only its short-lived access token, which is verified
 // against EVE's published JWKS before any Firebase credential is minted.
 
-import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onCall, HttpsError, type CallableOptions } from 'firebase-functions/v2/https';
+import { createActionGroup, type CallableHandler } from './callableRouter.js';
+import { runDailyHousekeeping } from './dailyHousekeeping.js';
 import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { error as logError, info as logInfo, warn as logWarn } from 'firebase-functions/logger';
@@ -15,6 +17,7 @@ import { runPurgeNotificationFeed, runPurgeStaleAccounts } from './purgeJobs.js'
 import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, r2ConfigOrThrow } from './r2Publish.js';
 import { openPricesR2Key } from './r2DailySnapshots.js';
 import { createR2Get } from './r2Publisher.js';
+import { runSyncActiveWars } from './activeWarsJob.js';
 import { runSyncLawlessSystems, runSyncMarketOpenPrices } from './marketHistoryJob.js';
 import {
   runSyncLpStoreOffers,
@@ -247,50 +250,61 @@ export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
 // (client-generated, device-local) id, never a token-keyed doc — that is what
 // makes re-registering after an FCM token rotation replace the entry instead
 // of accumulating one per token.
-export const registerDevice = onCall<unknown>({ maxInstances: 5 }, async (request) => {
-  let input;
-  try {
-    input = parseRegisterDeviceInput(request.data);
-  } catch (err) {
-    throw new HttpsError(
-      'invalid-argument',
-      err instanceof Error ? err.message : 'Invalid request body'
+const alertsActions = createActionGroup();
+const alertsCallable = (name: string, options: CallableOptions, handler: CallableHandler) =>
+  onCall<unknown>(options, alertsActions.register(name, handler));
+
+export const registerDevice = alertsCallable(
+  'registerDevice',
+  { maxInstances: 5 },
+  async (request) => {
+    let input;
+    try {
+      input = parseRegisterDeviceInput(request.data);
+    } catch (err) {
+      throw new HttpsError(
+        'invalid-argument',
+        err instanceof Error ? err.message : 'Invalid request body'
+      );
+    }
+
+    const { registration, rejected, projections, eveTypesByCharacter } =
+      await buildDeviceRegistration(input, verifyOptions, logError);
+
+    if (registration.characterIds.length === 0) {
+      throw new HttpsError('unauthenticated', 'No character access token could be verified');
+    }
+
+    await writeDeviceRegistration(firestore(), {
+      deviceId: input.deviceId,
+      fcmToken: registration.fcmToken,
+      characterIds: registration.characterIds,
+      projections,
+      eveTypesByCharacter,
+      quietHours: input.quietHours,
+    });
+
+    // The types the server has seen for each Character (alertGrants, ADR 0020),
+    // so the client can offer a toggle for them. Only `seenTypes` is read out.
+    const { store } = alertGrantDeps();
+    const seenTypes: Record<string, string[]> = {};
+    await Promise.all(
+      registration.characterIds.map(async (characterId) => {
+        try {
+          seenTypes[String(characterId)] = (await store.get(characterId))?.seenTypes ?? [];
+        } catch (err) {
+          // The registration already landed; a failed read only delays new toggles.
+          logError('Device registration: seenTypes read failed', {
+            characterId,
+            error: String(err),
+          });
+        }
+      })
     );
+
+    return { deviceId: input.deviceId, registered: registration.characterIds, rejected, seenTypes };
   }
-
-  const { registration, rejected, projections, eveTypesByCharacter } =
-    await buildDeviceRegistration(input, verifyOptions, logError);
-
-  if (registration.characterIds.length === 0) {
-    throw new HttpsError('unauthenticated', 'No character access token could be verified');
-  }
-
-  await writeDeviceRegistration(firestore(), {
-    deviceId: input.deviceId,
-    fcmToken: registration.fcmToken,
-    characterIds: registration.characterIds,
-    projections,
-    eveTypesByCharacter,
-    quietHours: input.quietHours,
-  });
-
-  // The types the server has seen for each Character (alertGrants, ADR 0020),
-  // so the client can offer a toggle for them. Only `seenTypes` is read out.
-  const { store } = alertGrantDeps();
-  const seenTypes: Record<string, string[]> = {};
-  await Promise.all(
-    registration.characterIds.map(async (characterId) => {
-      try {
-        seenTypes[String(characterId)] = (await store.get(characterId))?.seenTypes ?? [];
-      } catch (err) {
-        // The registration already landed; a failed read only delays new toggles.
-        logError('Device registration: seenTypes read failed', { characterId, error: String(err) });
-      }
-    })
-  );
-
-  return { deviceId: input.deviceId, registered: registration.characterIds, rejected, seenTypes };
-});
+);
 
 // Alerts Grant custody (issue #3753, ADR 0020). `ALERTS_TOKEN_KEY` is a Firebase
 // secret (base64, 32 bytes): `firebase functions:secrets:set ALERTS_TOKEN_KEY`.
@@ -318,7 +332,8 @@ function alertGrantHttpsError(err: unknown): never {
 
 // The device's full-scope session is not involved: the callable's proof is the
 // notifications-only access token itself, verified like registerDevice does.
-export const saveAlertGrant = onCall<unknown>(
+export const saveAlertGrant = alertsCallable(
+  'saveAlertGrant',
   { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
   async (request) => {
     try {
@@ -331,7 +346,8 @@ export const saveAlertGrant = onCall<unknown>(
 
 // Deleting needs the Character's own signed-in session, so one Character
 // cannot drop another's grant.
-export const deleteAlertGrant = onCall<unknown>(
+export const deleteAlertGrant = alertsCallable(
+  'deleteAlertGrant',
   { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
   async (request) => {
     const { uid } = callerOf(request);
@@ -343,11 +359,18 @@ export const deleteAlertGrant = onCall<unknown>(
   }
 );
 
+// The device and Alerts Grant router (see callableRouter.ts). Clients call this; the per-name exports
+// above go once none do. The secret is only used by the grant actions.
+export const alertsCall = onCall<unknown>(
+  { maxInstances: 10, secrets: [ALERTS_TOKEN_KEY] },
+  alertsActions.route
+);
+
 /**
  * dispatchProjections: fires whatever is due (issue #358, ADR 0010,
  * GLOSSARY.md round 45). Runs every 5 minutes, matching the Foreground
  * Poller's own cadence (`POLL_INTERVAL_MS`). One of this deployment's two
- * Cloud Scheduler jobs — `purgeNotificationFeed` below is the other.
+ * Cloud Scheduler jobs — `dailyHousekeeping` below is the other.
  *
  * Holds no EVE token and makes no ESI call: every row already carries
  * rendered title/body text, uploaded by a device that read the real data
@@ -395,43 +418,6 @@ export const pollEveNotifications = onSchedule(
   }
 );
 
-/**
- * purgeNotificationFeed: server-side expiry for the remote Notification Feed
- * (issue #595), on the same 30 days the client rule and the fired-projection
- * purge already use.
- *
- * #582 made `syncFeed` delete a remote row fired outside the window, which
- * bounds the collection for any account that still syncs. It cannot reach an
- * account whose devices were all uninstalled without the Characters being
- * removed: nothing signs in as that uid again, so nothing runs the rule. This
- * job does, and reaches pre-existing rows too — it is a *collection group*
- * query, so one pass covers every `characters/{uid}/notificationFeed` without
- * enumerating accounts.
- *
- * Daily rather than every 5 minutes: the retention is 30 days, so the tick
- * only has to be small against that. It needs the collection-group index on
- * `firedAt` in firestore.indexes.json — deploy indexes before this function,
- * or the query fails FAILED_PRECONDITION until the index finishes building.
- */
-export const purgeNotificationFeed = onSchedule('every 24 hours', runPurgeNotificationFeed);
-
-/**
- * purgeStaleAccounts: deletes the synced data of accounts with no successful
- * sync in 90 days (issue #2065). Retention is by inactivity, not by Character
- * removal, so it reaches accounts whose devices are all gone.
- *
- * Enumerates `characters/{uid}` with `listDocuments()` (which includes uids
- * that only have subcollections and no parent doc), then per uid: seeds the
- * heartbeat if absent, or, when stale, empties every subcollection in bounded
- * batches and finally deletes the parent doc. The run-wide pass cap leaves a
- * large backlog for the next tick; the parent doc survives until its
- * subcollections are empty, so a half-purged account stays stale.
- */
-export const purgeStaleAccounts = onSchedule(
-  { schedule: 'every 24 hours', secrets: [ALERTS_TOKEN_KEY] },
-  () => runPurgeStaleAccounts({ alertGrantDeps, corpSyncDeps })
-);
-
 // Communities (issue #3596, ADR 0018). Every write that enforces a cap or
 // deletes another doc goes through these callables (communitiesStore.ts); the
 // client only writes a Member's own library chunks, directly, under the rules.
@@ -450,21 +436,35 @@ function callerOf(request: {
 
 const COMMUNITY_CALLABLE_OPTIONS = { maxInstances: 5 };
 
-export const createCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
-  createCommunity(firestore(), callerOf(request), parseCreateInput(request.data))
+// One deployed function per group instead of one per callable (see callableRouter.ts). The
+// per-name exports below stay until every client calls `communityCall`.
+const communityActions = createActionGroup();
+const communityCallable = (name: string, options: CallableOptions, handler: CallableHandler) =>
+  onCall<unknown>(options, communityActions.register(name, handler));
+export const communityCall = onCall<unknown>({ maxInstances: 10 }, communityActions.route);
+
+export const createCommunityCallable = communityCallable(
+  'createCommunityCallable',
+  COMMUNITY_CALLABLE_OPTIONS,
+  (request) => createCommunity(firestore(), callerOf(request), parseCreateInput(request.data))
 );
 
 // Callable with no session on purpose: the invite page shows what the link is
 // for before a visitor signs in. Returns three public facts, see previewCommunity.
-export const previewCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
-  previewCommunity(firestore(), parsePreviewInput(request.data).inviteCode)
+export const previewCommunityCallable = communityCallable(
+  'previewCommunityCallable',
+  COMMUNITY_CALLABLE_OPTIONS,
+  (request) => previewCommunity(firestore(), parsePreviewInput(request.data).inviteCode)
 );
 
-export const joinCommunityCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
-  joinCommunity(firestore(), callerOf(request), parseJoinInput(request.data))
+export const joinCommunityCallable = communityCallable(
+  'joinCommunityCallable',
+  COMMUNITY_CALLABLE_OPTIONS,
+  (request) => joinCommunity(firestore(), callerOf(request), parseJoinInput(request.data))
 );
 
-export const setCommunityApprovalCallable = onCall<unknown>(
+export const setCommunityApprovalCallable = communityCallable(
+  'setCommunityApprovalCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, requireApproval } = parseRequireApprovalInput(request.data);
@@ -472,7 +472,8 @@ export const setCommunityApprovalCallable = onCall<unknown>(
   }
 );
 
-export const decideCommunityJoinRequestCallable = onCall<unknown>(
+export const decideCommunityJoinRequestCallable = communityCallable(
+  'decideCommunityJoinRequestCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, memberUid, accept } = parseJoinRequestDecisionInput(request.data);
@@ -480,7 +481,8 @@ export const decideCommunityJoinRequestCallable = onCall<unknown>(
   }
 );
 
-export const leaveCommunityCallable = onCall<unknown>(
+export const leaveCommunityCallable = communityCallable(
+  'leaveCommunityCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     await leaveCommunity(
@@ -491,7 +493,8 @@ export const leaveCommunityCallable = onCall<unknown>(
   }
 );
 
-export const removeCommunityMemberCallable = onCall<unknown>(
+export const removeCommunityMemberCallable = communityCallable(
+  'removeCommunityMemberCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, memberUid } = parseRemoveMemberInput(request.data);
@@ -499,7 +502,8 @@ export const removeCommunityMemberCallable = onCall<unknown>(
   }
 );
 
-export const transferCommunityAdminCallable = onCall<unknown>(
+export const transferCommunityAdminCallable = communityCallable(
+  'transferCommunityAdminCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, memberUid } = parseTransferAdminInput(request.data);
@@ -509,7 +513,8 @@ export const transferCommunityAdminCallable = onCall<unknown>(
 
 // Mail invites (issue #3604): the client sends the EVE mail with its own token,
 // so the cap, the one-per-target rule and the "Sent" stamp live in these three.
-export const reserveCommunityMailInviteCallable = onCall<unknown>(
+export const reserveCommunityMailInviteCallable = communityCallable(
+  'reserveCommunityMailInviteCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   (request) => {
     const { communityId, targetCharacterId, targetName } = parseMailInviteInput(request.data);
@@ -523,7 +528,8 @@ export const reserveCommunityMailInviteCallable = onCall<unknown>(
   }
 );
 
-export const confirmCommunityMailInviteCallable = onCall<unknown>(
+export const confirmCommunityMailInviteCallable = communityCallable(
+  'confirmCommunityMailInviteCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, targetCharacterId } = parseMailInviteInput(request.data);
@@ -531,7 +537,8 @@ export const confirmCommunityMailInviteCallable = onCall<unknown>(
   }
 );
 
-export const releaseCommunityMailInviteCallable = onCall<unknown>(
+export const releaseCommunityMailInviteCallable = communityCallable(
+  'releaseCommunityMailInviteCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, targetCharacterId } = parseMailInviteInput(request.data);
@@ -539,7 +546,8 @@ export const releaseCommunityMailInviteCallable = onCall<unknown>(
   }
 );
 
-export const revokeCommunityInviteCallable = onCall<unknown>(
+export const revokeCommunityInviteCallable = communityCallable(
+  'revokeCommunityInviteCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     await revokeInvite(
@@ -550,7 +558,8 @@ export const revokeCommunityInviteCallable = onCall<unknown>(
   }
 );
 
-export const regenerateCommunityInviteCallable = onCall<unknown>(
+export const regenerateCommunityInviteCallable = communityCallable(
+  'regenerateCommunityInviteCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   (request) =>
     regenerateInvite(
@@ -560,7 +569,8 @@ export const regenerateCommunityInviteCallable = onCall<unknown>(
     )
 );
 
-export const deleteCommunityCallable = onCall<unknown>(
+export const deleteCommunityCallable = communityCallable(
+  'deleteCommunityCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     await deleteCommunity(
@@ -573,15 +583,20 @@ export const deleteCommunityCallable = onCall<unknown>(
 
 // Community Requests (issue #3807, ADR 0021): posting counts the caller's open
 // Requests, so it is a callable; extend and close/reopen are the requester's own.
-export const postCommunityRequestCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
-  postRequest(firestore(), callerOf(request), parsePostRequestInput(request.data))
+export const postCommunityRequestCallable = communityCallable(
+  'postCommunityRequestCallable',
+  COMMUNITY_CALLABLE_OPTIONS,
+  (request) => postRequest(firestore(), callerOf(request), parsePostRequestInput(request.data))
 );
 
-export const editCommunityRequestCallable = onCall<unknown>(COMMUNITY_CALLABLE_OPTIONS, (request) =>
-  editRequest(firestore(), callerOf(request), parseEditRequestInput(request.data))
+export const editCommunityRequestCallable = communityCallable(
+  'editCommunityRequestCallable',
+  COMMUNITY_CALLABLE_OPTIONS,
+  (request) => editRequest(firestore(), callerOf(request), parseEditRequestInput(request.data))
 );
 
-export const extendCommunityRequestCallable = onCall<unknown>(
+export const extendCommunityRequestCallable = communityCallable(
+  'extendCommunityRequestCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   (request) => {
     const { communityId, requestId } = parseRequestIdInput(request.data);
@@ -589,7 +604,8 @@ export const extendCommunityRequestCallable = onCall<unknown>(
   }
 );
 
-export const setCommunityRequestClosedCallable = onCall<unknown>(
+export const setCommunityRequestClosedCallable = communityCallable(
+  'setCommunityRequestClosedCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, requestId, closed } = parseSetClosedInput(request.data);
@@ -600,7 +616,8 @@ export const setCommunityRequestClosedCallable = onCall<unknown>(
 // Pledge mail: the Pledger's client sends the EVE mail with its own token; the
 // 100-a-day cap and the once-per-Pledger-per-Request rule live in these three.
 // The recipient is the Request's owner, read server-side, never sent by a client.
-export const reserveCommunityPledgeMailCallable = onCall<unknown>(
+export const reserveCommunityPledgeMailCallable = communityCallable(
+  'reserveCommunityPledgeMailCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   (request) => {
     const { communityId, requestId } = parseRequestIdInput(request.data);
@@ -608,7 +625,8 @@ export const reserveCommunityPledgeMailCallable = onCall<unknown>(
   }
 );
 
-export const confirmCommunityPledgeMailCallable = onCall<unknown>(
+export const confirmCommunityPledgeMailCallable = communityCallable(
+  'confirmCommunityPledgeMailCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, requestId } = parseRequestIdInput(request.data);
@@ -616,7 +634,8 @@ export const confirmCommunityPledgeMailCallable = onCall<unknown>(
   }
 );
 
-export const releaseCommunityPledgeMailCallable = onCall<unknown>(
+export const releaseCommunityPledgeMailCallable = communityCallable(
+  'releaseCommunityPledgeMailCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, requestId } = parseRequestIdInput(request.data);
@@ -626,7 +645,8 @@ export const releaseCommunityPledgeMailCallable = onCall<unknown>(
 
 // The admin removes any Request or Pledge (issue #3812): no per-Community
 // switch, so the callables only check the caller is the Community's admin.
-export const removeCommunityRequestCallable = onCall<unknown>(
+export const removeCommunityRequestCallable = communityCallable(
+  'removeCommunityRequestCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, requestId } = parseRequestIdInput(request.data);
@@ -634,7 +654,8 @@ export const removeCommunityRequestCallable = onCall<unknown>(
   }
 );
 
-export const removeCommunityPledgeCallable = onCall<unknown>(
+export const removeCommunityPledgeCallable = communityCallable(
+  'removeCommunityPledgeCallable',
   COMMUNITY_CALLABLE_OPTIONS,
   async (request) => {
     const { communityId, requestId, pledgeUid } = parseRemovePledgeInput(request.data);
@@ -656,8 +677,13 @@ const corpTaxBookDeps = (): BookDeps => ({
 
 const CORP_TAX_BOOK_OPTIONS = { maxInstances: 5 };
 
+const corpTaxBookActions = createActionGroup();
+const corpTaxBookCallable = (name: string, options: CallableOptions, handler: CallableHandler) =>
+  onCall<unknown>(options, corpTaxBookActions.register(name, handler));
+
 // Collector books (issue #4507): invite links for a feeder corporation. Codes only; the UI maps them later.
-export const createCorpTaxBookFeederInviteCallable = onCall<unknown>(
+export const createCorpTaxBookFeederInviteCallable = corpTaxBookCallable(
+  'createCorpTaxBookFeederInviteCallable',
   CORP_TAX_BOOK_OPTIONS,
   (request) =>
     createFeederInvite(
@@ -667,7 +693,8 @@ export const createCorpTaxBookFeederInviteCallable = onCall<unknown>(
     )
 );
 
-export const revokeCorpTaxBookFeederInviteCallable = onCall<unknown>(
+export const revokeCorpTaxBookFeederInviteCallable = corpTaxBookCallable(
+  'revokeCorpTaxBookFeederInviteCallable',
   CORP_TAX_BOOK_OPTIONS,
   (request) =>
     revokeFeederInvite(
@@ -678,7 +705,8 @@ export const revokeCorpTaxBookFeederInviteCallable = onCall<unknown>(
 );
 
 // The consent screen's preview of a link: the accounting corporation and the offered rate.
-export const previewCorpTaxBookFeederInviteCallable = onCall<unknown>(
+export const previewCorpTaxBookFeederInviteCallable = corpTaxBookCallable(
+  'previewCorpTaxBookFeederInviteCallable',
   CORP_TAX_BOOK_OPTIONS,
   (request) =>
     previewFeederInvite(
@@ -688,7 +716,8 @@ export const previewCorpTaxBookFeederInviteCallable = onCall<unknown>(
     )
 );
 
-export const acceptCorpTaxBookFeederInviteCallable = onCall<unknown>(
+export const acceptCorpTaxBookFeederInviteCallable = corpTaxBookCallable(
+  'acceptCorpTaxBookFeederInviteCallable',
   CORP_TAX_BOOK_OPTIONS,
   (request) =>
     acceptFeederInvite(
@@ -727,7 +756,8 @@ const FEEDER_VIEW_SECRETS = [ALERTS_TOKEN_KEY, R2_ACCESS_KEY_ID, R2_SECRET_ACCES
 
 // Proven by the signed-in Character AND the grant's own access token, which must be
 // for that same Character; the corporation and its roles are read with the grant.
-export const saveCorpTaxBookSyncGrantCallable = onCall<unknown>(
+export const saveCorpTaxBookSyncGrantCallable = corpTaxBookCallable(
+  'saveCorpTaxBookSyncGrantCallable',
   { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
   (request) =>
     saveCorpSyncGrant(corpSyncDeps(), callerOf(request), parseSaveCorpSyncGrantInput(request.data))
@@ -735,7 +765,8 @@ export const saveCorpTaxBookSyncGrantCallable = onCall<unknown>(
 
 // Collector books (issue #4511): the moon owner's side. The grant is a separate SSO login by
 // the Accountant alt (mining scope only); the first ledger pull is the role check.
-export const saveCorpTaxBookFeederGrantCallable = onCall<unknown>(
+export const saveCorpTaxBookFeederGrantCallable = corpTaxBookCallable(
+  'saveCorpTaxBookFeederGrantCallable',
   { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
   (request) =>
     saveFeederGrant(
@@ -745,24 +776,28 @@ export const saveCorpTaxBookFeederGrantCallable = onCall<unknown>(
     )
 );
 
-export const leaveCorpTaxBookFeederCallable = onCall<unknown>(
+export const leaveCorpTaxBookFeederCallable = corpTaxBookCallable(
+  'leaveCorpTaxBookFeederCallable',
   { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
   (request) => leaveFeeder(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
 );
 
-export const getCorpTaxBookFeederStatusCallable = onCall<unknown>(
+export const getCorpTaxBookFeederStatusCallable = corpTaxBookCallable(
+  'getCorpTaxBookFeederStatusCallable',
   { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
   (request) => getFeederStatus(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
 );
 
 // The moon owner's view (issue #4512): its officers (CEO, Director, Accountant; live role check)
 // get a 24h access record the rules read, may ask for a rate, and dismiss the after-leaving view.
-export const getCorpTaxBookFeederViewAccessCallable = onCall<unknown>(
+export const getCorpTaxBookFeederViewAccessCallable = corpTaxBookCallable(
+  'getCorpTaxBookFeederViewAccessCallable',
   { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
   (request) => getFeederViewAccess(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
 );
 
-export const requestCorpTaxBookFeederRateCallable = onCall<unknown>(
+export const requestCorpTaxBookFeederRateCallable = corpTaxBookCallable(
+  'requestCorpTaxBookFeederRateCallable',
   { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
   (request) =>
     requestFeederRate(corpSyncDeps(), callerOf(request), parseRequestFeederRateInput(request.data))
@@ -770,7 +805,8 @@ export const requestCorpTaxBookFeederRateCallable = onCall<unknown>(
 
 // The moon owner names its payee: its own CEO, Directors and Accountants. The accounting
 // corporation's officers set it too (#4653), through `setCorpTaxBookFeederPayeeFromBookCallable`.
-export const setCorpTaxBookFeederPayeeCallable = onCall<unknown>(
+export const setCorpTaxBookFeederPayeeCallable = corpTaxBookCallable(
+  'setCorpTaxBookFeederPayeeCallable',
   { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
   (request) =>
     setFeederPayee(
@@ -781,7 +817,8 @@ export const setCorpTaxBookFeederPayeeCallable = onCall<unknown>(
     )
 );
 
-export const dismissCorpTaxBookFeederHistoryCallable = onCall<unknown>(
+export const dismissCorpTaxBookFeederHistoryCallable = corpTaxBookCallable(
+  'dismissCorpTaxBookFeederHistoryCallable',
   { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
   (request) =>
     dismissFeederHistory(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
@@ -792,23 +829,31 @@ export const dismissCorpTaxBookFeederHistoryCallable = onCall<unknown>(
 const feederOwnerDeps = (): BookDeps => ({ ...corpTaxBookDeps(), openPrices: r2OpenPrices });
 const FEEDER_OWNER_OPTIONS = { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS };
 
-export const setCorpTaxBookFeederRateCallable = onCall<unknown>(FEEDER_OWNER_OPTIONS, (request) =>
-  setFeederRate(feederOwnerDeps(), callerOf(request), parseSetFeederRateInput(request.data))
+export const setCorpTaxBookFeederRateCallable = corpTaxBookCallable(
+  'setCorpTaxBookFeederRateCallable',
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    setFeederRate(feederOwnerDeps(), callerOf(request), parseSetFeederRateInput(request.data))
 );
 
-export const setCorpTaxBookFeederModeCallable = onCall<unknown>(FEEDER_OWNER_OPTIONS, (request) =>
-  setFeederMode(feederOwnerDeps(), callerOf(request), parseSetFeederModeInput(request.data))
+export const setCorpTaxBookFeederModeCallable = corpTaxBookCallable(
+  'setCorpTaxBookFeederModeCallable',
+  FEEDER_OWNER_OPTIONS,
+  (request) =>
+    setFeederMode(feederOwnerDeps(), callerOf(request), parseSetFeederModeInput(request.data))
 );
 
 // Refinery labels (issue #4640): the accounting side passes `feederCorporationId`; the moon owner's
 // own officers do not.
-export const setCorpTaxBookRefineryLabelCallable = onCall<unknown>(
+export const setCorpTaxBookRefineryLabelCallable = corpTaxBookCallable(
+  'setCorpTaxBookRefineryLabelCallable',
   FEEDER_OWNER_OPTIONS,
   (request) =>
     setRefineryLabel(feederOwnerDeps(), callerOf(request), parseSetRefineryLabelInput(request.data))
 );
 
-export const setCorpTaxBookOwnRefineryLabelCallable = onCall<unknown>(
+export const setCorpTaxBookOwnRefineryLabelCallable = corpTaxBookCallable(
+  'setCorpTaxBookOwnRefineryLabelCallable',
   FEEDER_OWNER_OPTIONS,
   (request) =>
     setOwnRefineryLabel(
@@ -819,7 +864,8 @@ export const setCorpTaxBookOwnRefineryLabelCallable = onCall<unknown>(
 );
 
 // A refinery's system (issue #4650): a miner's client reports what its own ledger placed it in.
-export const learnCorpTaxBookRefinerySystemsCallable = onCall<unknown>(
+export const learnCorpTaxBookRefinerySystemsCallable = corpTaxBookCallable(
+  'learnCorpTaxBookRefinerySystemsCallable',
   CORP_TAX_BOOK_OPTIONS,
   (request) =>
     learnRefinerySystems(
@@ -837,7 +883,8 @@ const removalDeps = (): BookDeps => ({
 
 // Either side sets a moon owner's payee (#4653): this is the accounting corporation's officers'
 // side (Accountant or higher, live role check). The CEO lookup names whom the change is mailed to.
-export const setCorpTaxBookFeederPayeeFromBookCallable = onCall<unknown>(
+export const setCorpTaxBookFeederPayeeFromBookCallable = corpTaxBookCallable(
+  'setCorpTaxBookFeederPayeeFromBookCallable',
   FEEDER_OWNER_OPTIONS,
   (request) =>
     setBookFeederPayee(
@@ -848,27 +895,33 @@ export const setCorpTaxBookFeederPayeeFromBookCallable = onCall<unknown>(
     )
 );
 
-export const startCorpTaxBookFeederRemovalCallable = onCall<unknown>(
+export const startCorpTaxBookFeederRemovalCallable = corpTaxBookCallable(
+  'startCorpTaxBookFeederRemovalCallable',
   FEEDER_OWNER_OPTIONS,
   (request) => startFeederRemoval(removalDeps(), callerOf(request), parseRemovalCall(request.data))
 );
 
-export const recordCorpTaxBookFeederRemovalSentCallable = onCall<unknown>(
+export const recordCorpTaxBookFeederRemovalSentCallable = corpTaxBookCallable(
+  'recordCorpTaxBookFeederRemovalSentCallable',
   FEEDER_OWNER_OPTIONS,
   (request) =>
     recordRemovalSent(removalDeps(), callerOf(request), parseRemovalNoticeCall(request.data))
 );
 
-export const cancelCorpTaxBookFeederRemovalCallable = onCall<unknown>(
+export const cancelCorpTaxBookFeederRemovalCallable = corpTaxBookCallable(
+  'cancelCorpTaxBookFeederRemovalCallable',
   FEEDER_OWNER_OPTIONS,
   (request) => cancelFeederRemoval(removalDeps(), callerOf(request), parseRemovalCall(request.data))
 );
 
-export const getCorpTaxBookRemovalLinkCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
-  getRemovalLink(removalDeps(), callerOf(request), parseRemovalLinkCall(request.data))
+export const getCorpTaxBookRemovalLinkCallable = corpTaxBookCallable(
+  'getCorpTaxBookRemovalLinkCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => getRemovalLink(removalDeps(), callerOf(request), parseRemovalLinkCall(request.data))
 );
 
-export const forceCorpTaxBookRemovalCallable = onCall<unknown>(
+export const forceCorpTaxBookRemovalCallable = corpTaxBookCallable(
+  'forceCorpTaxBookRemovalCallable',
   { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
   (request) =>
     forceRemovalNow(
@@ -890,19 +943,22 @@ export const finalizeCorpTaxBookRemovals = onSchedule(
 
 // Paying a moon owner (issue #4514): record a payout, mark a journal row not a payout, and attach
 // the wallet journal's outgoing donations to the records. Each rebuilds the moon owner's view.
-export const recordCorpTaxBookFeederPayoutCallable = onCall<unknown>(
+export const recordCorpTaxBookFeederPayoutCallable = corpTaxBookCallable(
+  'recordCorpTaxBookFeederPayoutCallable',
   FEEDER_OWNER_OPTIONS,
   (request) =>
     recordFeederPayout(feederOwnerDeps(), callerOf(request), parseRecordPayoutInput(request.data))
 );
 
-export const markCorpTaxBookFeederPayoutCallable = onCall<unknown>(
+export const markCorpTaxBookFeederPayoutCallable = corpTaxBookCallable(
+  'markCorpTaxBookFeederPayoutCallable',
   FEEDER_OWNER_OPTIONS,
   (request) =>
     markFeederPayout(feederOwnerDeps(), callerOf(request), parseMarkPayoutInput(request.data))
 );
 
-export const reconcileCorpTaxBookFeederPayoutsCallable = onCall<unknown>(
+export const reconcileCorpTaxBookFeederPayoutsCallable = corpTaxBookCallable(
+  'reconcileCorpTaxBookFeederPayoutsCallable',
   FEEDER_OWNER_OPTIONS,
   (request) =>
     reconcileFeederPayoutsCall(
@@ -912,13 +968,15 @@ export const reconcileCorpTaxBookFeederPayoutsCallable = onCall<unknown>(
     )
 );
 
-export const listCorpTaxBookFeederInvitesCallable = onCall<unknown>(
+export const listCorpTaxBookFeederInvitesCallable = corpTaxBookCallable(
+  'listCorpTaxBookFeederInvitesCallable',
   CORP_TAX_BOOK_OPTIONS,
   (request) => listFeederInvites(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 // The holder revokes their own; the CEO revokes anyone's (live role check, so it carries an access token).
-export const revokeCorpTaxBookSyncGrantCallable = onCall<unknown>(
+export const revokeCorpTaxBookSyncGrantCallable = corpTaxBookCallable(
+  'revokeCorpTaxBookSyncGrantCallable',
   { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
   (request) => revokeCorpSyncGrant(corpSyncDeps(), callerOf(request), parseBookCall(request.data))
 );
@@ -942,16 +1000,21 @@ export const syncCorpTaxBooks = onSchedule(
   }
 );
 
-export const verifyCorpOfficerCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
-  verifyOfficer(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+export const verifyCorpOfficerCallable = corpTaxBookCallable(
+  'verifyCorpOfficerCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => verifyOfficer(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
 );
 
-export const turnOnCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
-  turnOnBook(corpTaxBookDeps(), callerOf(request), parseTurnOnInput(request.data))
+export const turnOnCorpTaxBookCallable = corpTaxBookCallable(
+  'turnOnCorpTaxBookCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => turnOnBook(corpTaxBookDeps(), callerOf(request), parseTurnOnInput(request.data))
 );
 
 // Whoever turned the book on (or the CEO) deletes it; the scheduled-sync grant is revoked with it.
-export const deleteCorpTaxBookCallable = onCall<unknown>(
+export const deleteCorpTaxBookCallable = corpTaxBookCallable(
+  'deleteCorpTaxBookCallable',
   { ...CORP_TAX_BOOK_OPTIONS, secrets: [ALERTS_TOKEN_KEY] },
   (request) =>
     deleteBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data), (corporationId) =>
@@ -959,33 +1022,44 @@ export const deleteCorpTaxBookCallable = onCall<unknown>(
     )
 );
 
-export const reclaimCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
-  reclaimBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+export const reclaimCorpTaxBookCallable = corpTaxBookCallable(
+  'reclaimCorpTaxBookCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => reclaimBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 // A sync is many small transactions (up to 2000 observer rows), so give it room.
-export const syncCorpTaxBookCallable = onCall<unknown>(
+export const syncCorpTaxBookCallable = corpTaxBookCallable(
+  'syncCorpTaxBookCallable',
   { ...CORP_TAX_BOOK_OPTIONS, timeoutSeconds: 120 },
   (request) =>
     syncBook(corpTaxBookDeps(), callerOf(request), parseSyncInput(request.data, Date.now()))
 );
 
-export const editCorpTaxBookCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
-  editBook(
-    corpTaxBookDeps(),
-    callerOf(request),
-    parseBookCall(request.data),
-    parseEditAction(request.data)
-  )
+export const editCorpTaxBookCallable = corpTaxBookCallable(
+  'editCorpTaxBookCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    editBook(
+      corpTaxBookDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseEditAction(request.data)
+    )
 );
 
 // A player claims their own Unmatched donation (D5): uid-authorised, no officer role.
-export const claimCorpTaxBookPaymentCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) => {
-  const { corporationId, paymentId } = parseClaimPaymentInput(request.data);
-  return claimPayment(corpTaxBookDeps(), callerOf(request), corporationId, paymentId);
-});
+export const claimCorpTaxBookPaymentCallable = corpTaxBookCallable(
+  'claimCorpTaxBookPaymentCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => {
+    const { corporationId, paymentId } = parseClaimPaymentInput(request.data);
+    return claimPayment(corpTaxBookDeps(), callerOf(request), corporationId, paymentId);
+  }
+);
 
-export const confirmCorpTaxBookGroupingCallable = onCall<unknown>(
+export const confirmCorpTaxBookGroupingCallable = corpTaxBookCallable(
+  'confirmCorpTaxBookGroupingCallable',
   CORP_TAX_BOOK_OPTIONS,
   (request) => {
     const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
@@ -993,7 +1067,8 @@ export const confirmCorpTaxBookGroupingCallable = onCall<unknown>(
   }
 );
 
-export const declineCorpTaxBookGroupingCallable = onCall<unknown>(
+export const declineCorpTaxBookGroupingCallable = corpTaxBookCallable(
+  'declineCorpTaxBookGroupingCallable',
   CORP_TAX_BOOK_OPTIONS,
   (request) => {
     const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
@@ -1001,19 +1076,23 @@ export const declineCorpTaxBookGroupingCallable = onCall<unknown>(
   }
 );
 
-export const listPendingCorpTaxBookGroupingsCallable = onCall<unknown>(
+export const listPendingCorpTaxBookGroupingsCallable = corpTaxBookCallable(
+  'listPendingCorpTaxBookGroupingsCallable',
   CORP_TAX_BOOK_OPTIONS,
   (request) => listPendingGroupings(corpTaxBookDeps(), callerOf(request))
 );
 
 // No session on purpose: the verify link is the credential (D27), so a miner
 // without an EVE login can read their Statement and stop reminders.
-export const readCorpTaxBookStatementCallable = onCall<unknown>(CORP_TAX_BOOK_OPTIONS, (request) =>
-  readStatementByToken(corpTaxBookDeps(), parseToken(request.data))
+export const readCorpTaxBookStatementCallable = corpTaxBookCallable(
+  'readCorpTaxBookStatementCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => readStatementByToken(corpTaxBookDeps(), parseToken(request.data))
 );
 
 // A decline needs only the link; a confirm never does (it needs the character's own sign-in).
-export const declineCorpTaxBookGroupingByTokenCallable = onCall<unknown>(
+export const declineCorpTaxBookGroupingByTokenCallable = corpTaxBookCallable(
+  'declineCorpTaxBookGroupingByTokenCallable',
   CORP_TAX_BOOK_OPTIONS,
   (request) => {
     const { token, characterId } = parseDeclineByTokenInput(request.data);
@@ -1021,7 +1100,8 @@ export const declineCorpTaxBookGroupingByTokenCallable = onCall<unknown>(
   }
 );
 
-export const stopCorpTaxBookRemindersCallable = onCall<unknown>(
+export const stopCorpTaxBookRemindersCallable = corpTaxBookCallable(
+  'stopCorpTaxBookRemindersCallable',
   CORP_TAX_BOOK_OPTIONS,
   (request) => {
     const { token, stopped } = parseStopReminders(request.data);
@@ -1029,27 +1109,54 @@ export const stopCorpTaxBookRemindersCallable = onCall<unknown>(
   }
 );
 
+// The Corp Tax Book router: the union of its callables' secrets and the longest timeout (a sync is many
+// small transactions). Clients call this; the per-name exports above go once none do.
+export const corpTaxBookCall = onCall<unknown>(
+  { maxInstances: 10, secrets: FEEDER_VIEW_SECRETS, timeoutSeconds: 120 },
+  corpTaxBookActions.route
+);
+
 /**
- * sweepCommunityRequests (issue #3812, ADR 0021): deletes Requests expired a
- * week ago and Requests closed a week ago, with their Pledges. Bounded to 500
- * deletes a run; a backlog continues on the next tick. Up to 500 sequential
- * read and recursive deletes, so it takes the 9-minute maximum timeout.
+ * dailyHousekeeping (was three scheduled functions, to stay under the deploy quota and the
+ * Cloud Scheduler free tier):
+ * - the Notification Feed purge (`runPurgeNotificationFeed`, issue #595): daily rather than every
+ *   5 minutes since the retention is 30 days. It needs the collection-group index on `firedAt` in
+ *   firestore.indexes.json: deploy indexes before this function.
+ * - purgeStaleAccounts (issue #2065): deletes the synced data of accounts with no successful sync
+ *   in 90 days. Retention is by inactivity, not by Character removal, so it reaches accounts whose
+ *   devices are all gone. The run-wide pass cap leaves a large backlog for the next tick.
+ * - sweepCommunityRequests (issue #3812, ADR 0021): deletes Requests expired a week ago and
+ *   Requests closed a week ago, with their Pledges. Bounded to 500 deletes a run; up to 500
+ *   sequential reads and recursive deletes, so the function takes the 9-minute maximum timeout.
  */
-export const sweepCommunityRequests = onSchedule(
-  { schedule: 'every 24 hours', timeoutSeconds: 540 },
-  async () => {
-    const result = await sweepRequests(firestore(), Date.now());
-    const { deleted, failed, truncated } = result;
-    if (failed > 0 || truncated) {
-      logWarn('Community Request sweep incomplete, continues next run', {
-        deleted,
-        failed,
-        truncated,
-      });
-    } else {
-      logInfo('Community Request sweep done', { deleted, failed, truncated });
-    }
-  }
+export const dailyHousekeeping = onSchedule(
+  { schedule: 'every 24 hours', secrets: [ALERTS_TOKEN_KEY], timeoutSeconds: 540 },
+  () =>
+    runDailyHousekeeping(
+      [
+        { name: 'purgeNotificationFeed', run: runPurgeNotificationFeed },
+        {
+          name: 'purgeStaleAccounts',
+          run: () => runPurgeStaleAccounts({ alertGrantDeps, corpSyncDeps }),
+        },
+        {
+          name: 'sweepCommunityRequests',
+          run: async () => {
+            const { deleted, failed, truncated } = await sweepRequests(firestore(), Date.now());
+            if (failed > 0 || truncated) {
+              logWarn('Community Request sweep incomplete, continues next run', {
+                deleted,
+                failed,
+                truncated,
+              });
+            } else {
+              logInfo('Community Request sweep done', { deleted, failed, truncated });
+            }
+          },
+        },
+      ],
+      logError
+    )
 );
 
 /**
@@ -1066,6 +1173,27 @@ export const sweepCommunityRequests = onSchedule(
 export const syncLawlessSystems = onSchedule(
   { schedule: 'every 15 minutes' },
   runSyncLawlessSystems
+);
+
+/**
+ * syncActiveWars: the War banner's data (`systemConditions/activeWars`). ESI
+ * cannot list one corporation's wars, so this keeps every war that is still
+ * running and the app picks its own out of the list. Twice a day: a new
+ * declaration also reaches a pilot sooner through their Alerts, and a war has
+ * a 24-hour wait before it starts, so 12 hours is a fine cadence for the
+ * pilot who had no alerts on.
+ *
+ * Each run reads new war ids, re-reads the wars it holds, and spends the rest
+ * of its allowance seeding backward from the newest id (`activeWars.ts`), so the
+ * first runs fill in about a year of history. ESI gives `/wars/{id}` 3,600
+ * tokens per 15 minutes; a run stops short of emptying that window. It can be
+ * run again by hand from Cloud Scheduler to seed faster.
+ *
+ * Another Cloud Scheduler job past the free three, like the jobs above.
+ */
+export const syncActiveWars = onSchedule(
+  { schedule: 'every 12 hours', timeoutSeconds: 540, maxInstances: 1 },
+  runSyncActiveWars
 );
 
 /**
@@ -1114,7 +1242,7 @@ export const syncLawlessSystems = onSchedule(
  * rather than a config bump. `rowCount` is the early warning for that too.
  *
  * It is the third of the deployment's Cloud Scheduler jobs, alongside
- * `dispatchProjections` and `purgeNotificationFeed` — back inside the 3 free
+ * `dispatchProjections` and `dailyHousekeeping` — back inside the 3 free
  * per billing account ADR 0013 budgeted against, now that the blueprint-only
  * sync it briefly ran beside is gone.
  */

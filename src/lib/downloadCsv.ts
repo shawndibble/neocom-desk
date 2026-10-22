@@ -39,6 +39,7 @@ export type CsvSurface =
   | 'market-compare'
   | 'market-appraisal'
   | 'market-compare-attributes'
+  | 'market-compare-hubs'
   | 'market-price-history'
   | 'market-scope-orders'
   | 'appraisal-shared'
