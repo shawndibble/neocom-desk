@@ -76,7 +76,10 @@ describe('CharacterSwitcher', () => {
       await screen.findByRole('button', { name: 'Fix permissions for Marsha' })
     );
     await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(3));
-    expect(screen.getByTestId('where')).toHaveTextContent('/settings/permissions');
+    // The navigation follows the switch by a tick.
+    await waitFor(() =>
+      expect(screen.getByTestId('where')).toHaveTextContent('/settings/permissions')
+    );
   });
 
   it('tells a host sheet to close when Fix… or Manage characters leaves the page', async () => {
