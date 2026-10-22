@@ -21,7 +21,7 @@ import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { Pill } from '@/components/ui/Pill';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { rowInteractiveClassName } from '@/components/ui/controlStyles';
+import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { pickerTone } from '@/features/permissions/permissionCounts';
 import { useCharacterPermissionCounts } from '@/features/permissions/useCharacterPermissionCounts';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -87,6 +87,7 @@ export function CharacterSwitcher({
                   className={cx(
                     'flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left md:min-h-9 touch:min-h-11',
                     rowInteractiveClassName,
+                    focusRingInsetClassName,
                     active && 'bg-panel-2'
                   )}
                 >
