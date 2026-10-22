@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { db } from '@/db';
+import { seedCharacter } from '@/test/seed';
 import { IconButton, PageHeader } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { CharacterFilterControl, type CharacterScopeChoice } from './CharacterFilterControl';
@@ -356,5 +358,79 @@ describe('CharacterFilterControl', () => {
     expect(picker).toHaveClass('h-11', 'w-11', 'md:h-9', 'touch:h-11');
     expect(refresh).toHaveClass('size-11', 'md:size-9', 'touch:size-11');
     expect(picker).not.toHaveClass('h-9', 'md:h-7');
+  });
+
+  describe("the Corporation glyph is the active Character's corp logo", () => {
+    const LOGO = 'corporations/98000001/logo';
+    beforeEach(async () => {
+      await db.characters.clear();
+    });
+
+    function renderCorp(size: 'sm' | 'md' = 'md') {
+      return render(
+        <CharacterFilterControl<CharacterScopeChoice>
+          activeCharacterId={1}
+          value="corporation"
+          corporation
+          onChange={() => {}}
+          size={size}
+        />
+      );
+    }
+
+    it('shows the logo once it loads, in the same box sizes', async () => {
+      await seedCharacter(1, 'Aria', { corporationId: 98000001 });
+      renderCorp();
+      const trigger = screen.getByRole('button', { name: 'Corporation' });
+      const img = await waitFor(() => {
+        const found = trigger.querySelector(`img[src*="${LOGO}"]`);
+        expect(found).not.toBeNull();
+        return found as HTMLImageElement;
+      });
+      // The Buildings glyph holds the box until the logo has loaded.
+      expect(trigger.querySelector('svg[data-corp-fallback]')).toBeInTheDocument();
+      fireEvent.load(img);
+      expect(trigger.querySelector('svg[data-corp-fallback]')).toBeNull();
+      expect(trigger).toHaveClass('h-11', 'w-11', 'md:h-9');
+      expect(trigger.children[0]).toHaveClass('md:size-5');
+      expect(img.parentElement).toHaveClass('size-8', 'md:size-5');
+    });
+
+    it('keeps the phone box the portrait uses for the sm tier', async () => {
+      await seedCharacter(1, 'Aria', { corporationId: 98000001 });
+      renderCorp('sm');
+      const trigger = screen.getByRole('button', { name: 'Corporation' });
+      const img = await waitFor(() => {
+        const found = trigger.querySelector(`img[src*="${LOGO}"]`);
+        expect(found).not.toBeNull();
+        return found as HTMLImageElement;
+      });
+      expect(trigger).toHaveClass('h-9', 'w-9');
+      expect(img.parentElement).toHaveClass('size-7', 'md:size-5');
+    });
+
+    it('falls back to the Buildings glyph when the logo fails', async () => {
+      await seedCharacter(1, 'Aria', { corporationId: 98000001 });
+      renderCorp();
+      const trigger = screen.getByRole('button', { name: 'Corporation' });
+      const img = await waitFor(() => {
+        const found = trigger.querySelector(`img[src*="${LOGO}"]`);
+        expect(found).not.toBeNull();
+        return found as HTMLImageElement;
+      });
+      fireEvent.error(img);
+      expect(trigger.querySelector('img')).toBeNull();
+      expect(trigger.querySelector('svg[data-corp-fallback]')).toBeInTheDocument();
+    });
+
+    it('shows the Buildings glyph when no corporation is known', async () => {
+      await seedCharacter(1, 'Aria');
+      renderCorp();
+      const trigger = screen.getByRole('button', { name: 'Corporation' });
+      // Let the Dexie read settle; still no logo.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(trigger.querySelector('img')).toBeNull();
+      expect(trigger.querySelector('svg[data-corp-fallback]')).toBeInTheDocument();
+    });
   });
 });

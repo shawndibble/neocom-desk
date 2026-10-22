@@ -33,8 +33,12 @@ _Recorded 2026-10-22. Supersedes the placement half of
   always draws at that tier.
 
 - **The trigger's look.** Below `md` it stays the 44px icon-only box (the
-  active Character's portrait, the `AllCharacters` glyph or the `Corporation`
-  glyph). From `md` up it is a text pill with the same glyph leading the
+  active Character's portrait, the `AllCharacters` glyph, or for Corporation
+  the active Character's own corporation logo). The logo comes from the
+  Character's cached `corporationId` (no new ESI call), with the `Corporation`
+  Buildings glyph while it loads, on error, or when no corp is known; the
+  glyph box stays the portrait's size either way. The menu items carry no
+  glyphs. From `md` up it is a text pill with the same glyph leading the
   words and a trailing caret, with the header `IconButton`'s border, fill and
   hover. The label only ever reads This character, All characters (with its
   count where the page passes one) or Corporation.

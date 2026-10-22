@@ -61,7 +61,10 @@
  * view of the same data (Market orders, Contracts): that view is a choice on
  * this picker, not a separate switch. It emits `'corporation'`
  * (`CharacterScopeChoice`, which widens `CharacterFilterValue` without
- * changing it), and the phone trigger shows the `Corporation` glyph for it.
+ * changing it), and the trigger's glyph for it is the active Character's own
+ * corporation logo (`CorporationLogoGlyph`, from the Character's cached
+ * `corporationId`; the `Corporation` Buildings glyph while it loads, on error,
+ * or with no corp known), the way "This character" shows the portrait.
  * `hideAll` drops "All characters" for a page that cannot sum Characters.
  * The options follow from the Character count and those two props: one
  * Character with no Corporation renders nothing; one Character with it offers
@@ -83,6 +86,7 @@ import {
 } from '@/components/ui/DropdownMenu';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { Spinner } from '@/components/ui/Spinner';
+import { CorporationLogoGlyph } from './CorporationLogoGlyph';
 import {
   fieldBaseClassName,
   controlHeightClassName,
@@ -298,7 +302,11 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
             ) : (
               <span aria-hidden="true" className="flex items-center justify-center">
                 {isCorporation ? (
-                  <Icon.Corporation size={ICON_SIZE.md} />
+                  <CorporationLogoGlyph
+                    characterId={activeCharacterId}
+                    size={size === 'md' ? 'md' : 'sm'}
+                    className="md:size-5"
+                  />
                 ) : isAll || activeCharacterId === null ? (
                   <Icon.AllCharacters size={ICON_SIZE.md} />
                 ) : (
