@@ -15,7 +15,16 @@ import { useOpenInEve } from './useOpenInEve';
 
 export function OpenInEveMenuItem({ kind, id }: OpenInEveTarget) {
   const { t } = useTranslation();
-  const { blockedReason, offline, missingGroups, sending, outcome, send } = useOpenInEve({
+  const {
+    blockedReason,
+    offline,
+    missingGroups,
+    switchTo,
+    switchCharacter,
+    sending,
+    outcome,
+    send,
+  } = useOpenInEve({
     kind,
     id,
   });
@@ -36,6 +45,11 @@ export function OpenInEveMenuItem({ kind, id }: OpenInEveTarget) {
       <>
         <DisabledMenuItem reason={t('permissions.grantMissing')}>{label}</DisabledMenuItem>
         <GrantMissingMenuItem groups={missingGroups} />
+        {switchTo && (
+          <MenuItem onSelect={switchCharacter}>
+            {t('openInEve.switchTo', { name: switchTo.name })}
+          </MenuItem>
+        )}
       </>
     ) : (
       <DisabledMenuItem
