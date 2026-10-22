@@ -427,6 +427,15 @@ describe('CharacterFilterControl', () => {
       expect(dot?.className).not.toMatch(/hidden/);
     });
 
+    it('keeps the dot inside the trigger box, so it never spills past the header edge', () => {
+      render(<CharacterFilterControl {...partial} value="all" />);
+      const dot = screen.getByRole('button').querySelector('[data-partial-dot]');
+      // A negative inset (`-top-1`, `-right-1`) pushed it 4px outside the trigger;
+      // as the last control on a phone header that ran into the page gutter.
+      expect(dot?.className).toMatch(/\babsolute\b/);
+      expect(dot?.className).not.toMatch(/(^|\s)-(top|right|bottom|left|inset)-/);
+    });
+
     it('names who is missing in a non-interactive note in the open menu', async () => {
       render(<CharacterFilterControl {...partial} value="all" />);
       await openMenu();

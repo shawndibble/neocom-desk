@@ -397,11 +397,12 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
           </span>
           <Icon.Expanded size="0.75rem" aria-hidden="true" className="shrink-0" />
           {isPartial && (
-            // The trigger has no words, so the dot is the visible cue.
+            // The trigger has no words, so the dot is the visible cue. Inset inside the
+            // trigger box: as the last control on a phone header it must not spill past the edge.
             <span
               data-partial-dot
               aria-hidden="true"
-              className="absolute -top-1 -right-1 size-2 rounded-full bg-warning ring-2 ring-bg"
+              className="absolute top-0.5 right-0.5 size-2 rounded-full bg-warning ring-2 ring-panel-2"
             />
           )}
         </StackTrigger>
