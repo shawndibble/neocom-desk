@@ -145,8 +145,9 @@ export function PageHeader({
               // ring (the `DataAgeBadge`'s `<time tabIndex=0>`); `min-w-10`
               // keeps a tabbable item from collapsing to nothing. An empty wrapper,
               // or one whose only child is an empty portal target (Market's
-              // tab-filled meta slot), is hidden so it holds no room or gap.
-              <div className="-m-1 flex min-w-10 shrink-[4] items-center gap-2 overflow-hidden p-1 whitespace-nowrap empty:hidden has-[>:only-child:empty]:hidden">
+              // tab-filled meta slot), is hidden so it holds no room or gap; so is
+              // one whose one child is itself hidden below `md` (a `DataAgeBadge`).
+              <div className="-m-1 flex min-w-10 shrink-[4] items-center gap-2 overflow-hidden p-1 whitespace-nowrap empty:hidden has-[>:only-child:empty]:hidden max-md:has-[>.hidden:only-child]:hidden">
                 {meta}
               </div>
             )
