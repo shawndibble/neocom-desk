@@ -363,7 +363,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       }
       actions={
         <>
-          <IconButton icon={<Icon.Refresh />} label={t('wallet.refresh')} onClick={refresh} />
+          {/* Export before Refresh, as on every header (DESIGN.md §6c Header controls). */}
           {transactionsResult && (
             <TableActionsMenu
               name={t('market.sections.transactions')}
@@ -371,6 +371,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
               size="md"
             />
           )}
+          <IconButton icon={<Icon.Refresh />} label={t('wallet.refresh')} onClick={refresh} />
         </>
       }
     />

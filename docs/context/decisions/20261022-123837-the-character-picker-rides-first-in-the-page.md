@@ -28,7 +28,10 @@ _Recorded 2026-10-22. Supersedes the placement half of
   More actions (`HeaderMoreMenu`) or a settings gear → `AlertsBell`. Words on
   the left, icons on the right; the ⋮ or gear is always the last action, just
   before the bell, after Refresh (Mining Overview's view-settings gear,
-  Industry's per-tab settings gear).
+  Industry's per-tab settings gear). Export comes before Refresh, whether
+  it is the labelled Export or the bare download icon (amended 2026-10-22:
+  Market's Open orders and History put Refresh first while Contracts and
+  Contacts put Export first; one order now holds everywhere).
 
 - **Same height as the icons beside it, enforced.** Inside a `PageHeader`
   cluster the picker takes the header's touch tier on its own
