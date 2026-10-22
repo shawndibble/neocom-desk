@@ -785,6 +785,15 @@ describe('HaulingPanel, Any hub', () => {
     expect(scanCalls.at(-1)).toMatchObject({ from: 'any', to: AMARR });
   });
 
+  it('the arrow between the hubs swaps them, in the link and the scan', async () => {
+    const user = userEvent.setup();
+    renderPanel('from=jita&to=amarr');
+    await user.click(screen.getByRole('button', { name: 'Swap origin and destination' }));
+    expect(screen.getByRole('combobox', { name: 'From' })).toHaveTextContent('Amarr');
+    expect(screen.getByRole('combobox', { name: 'To' })).toHaveTextContent('Jita');
+    expect(scanCalls.at(-1)).toMatchObject({ from: AMARR, to: JITA });
+  });
+
   it('refuses Any at both ends with a message, and runs no scan', () => {
     scanCalls.length = 0;
     renderPanel('from=any&to=any');
