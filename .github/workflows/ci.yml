@@ -78,7 +78,9 @@ jobs:
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
       - if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
-      - run: npm run build
+      # `static` already typechecks the whole tree (tsconfig.build.json is a
+      # subset of it), so skip the duplicate tsc that `npm run build` runs.
+      - run: npm run build:bundle
         env:
           VITE_EVE_CLIENT_ID: e2e-fake-client
           VITE_FIREBASE_API_KEY: ''
