@@ -480,10 +480,11 @@ function Initial({
 const StackTrigger = forwardRef<
   HTMLButtonElement,
   ButtonHTMLAttributes<HTMLButtonElement> & { tooltip: string }
->(function StackTrigger({ tooltip, children, ...props }, ref) {
+>(function StackTrigger({ tooltip, children, className, ...props }, ref) {
   return (
     <Tooltip content={tooltip}>
-      <button ref={ref} type="button" {...props}>
+      {/* `focusRingClassName` composed here too, so the focus ring belongs to this `<button>` itself rather than only to whichever caller passes the class. */}
+      <button ref={ref} type="button" className={cx(focusRingClassName, className)} {...props}>
         {children}
       </button>
     </Tooltip>
