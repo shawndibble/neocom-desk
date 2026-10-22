@@ -13022,6 +13022,8 @@
     "sending": "Opening in EVE…",
     "opened": "Opened in your EVE client.",
     "needCharacter": "Log in a character to open this in its EVE client.",
+    "notGranted": "{{name}} hasn't granted Open in EVE.",
+    "switchTo": "Switch to {{name}}",
     "failed": "Couldn't open it in EVE: {{message}}",
     "unknownError": "Is your character logged in to the game?",
     "offline": "You're offline — reconnect to open this in EVE.",
