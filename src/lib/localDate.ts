@@ -35,7 +35,16 @@ const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
  * minute — a date alone would leave a director guessing which fifteen-minute
  * window to be in space for — but every other constraint from `formatLocalDate`
  * still applies, so this shares its numeric-only, per-call-formatter shape.
+ * `timeZone` (`'UTC'` for the EVE clock) moves the date and the time together.
  */
-export function formatLocalDateTime(date: Date): string {
-  return date.toLocaleString('en-CA', DATE_TIME_OPTIONS);
+export function formatLocalDateTime(date: Date, timeZone?: string): string {
+  if (timeZone === undefined) return date.toLocaleString('en-CA', DATE_TIME_OPTIONS);
+  // `h23` rather than `hour12: false`, which can print "24:05" just after
+  // midnight; the EVE clock is 24-hour (`timestamp.ts`'s `clockFor`).
+  return date.toLocaleString('en-CA', {
+    ...DATE_TIME_OPTIONS,
+    hour12: undefined,
+    hourCycle: 'h23',
+    timeZone,
+  });
 }

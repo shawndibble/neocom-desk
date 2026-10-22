@@ -386,6 +386,25 @@ describe('server-polled EVE notifications (ADR 0020)', () => {
     expect(vi.mocked(e.showNotification).mock.calls[0][1].body).toContain('Marmite Corp');
   });
 
+  it('renders times in the zone the Time format setting names (#4731)', async () => {
+    process.env.TZ = 'Pacific/Auckland';
+    const text = 'planetID: 40121487\nreinforceExitTime: 134259534000000000\n';
+    const run = async (timeZone?: PushEnv['timeZone']) => {
+      const e = withName(timeZone ? { timeZone } : {});
+      await handlePush(
+        e,
+        serverSingle({ eveType: 'OrbitalReinforced', notificationText: text }),
+        NOW
+      );
+      return vi.mocked(e.showNotification).mock.calls[0][1].body;
+    };
+    const eve = await run(async () => 'UTC');
+    expect(eve).toContain('2026-06-14, 23:30');
+    expect(await run(async () => undefined)).not.toContain('2026-06-14, 23:30');
+    // No reader at all (older env): the host's own zone, as before.
+    expect(await run()).toMatch(/Timer ends \d{4}-\d{2}-\d{2}, \d{2}:\d{2}/);
+  });
+
   it('falls back to the generic body when the payload text has nothing to render', async () => {
     const e = withName();
     await handlePush(e, serverSingle({ notificationText: '' }), NOW);

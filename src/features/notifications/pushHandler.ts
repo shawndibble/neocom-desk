@@ -73,6 +73,8 @@ export interface PushEnv {
   characterName?: (characterId: number) => Promise<string | undefined>;
   /** Names for a raw EVE notification, already within the resolution budget; never rejects. */
   resolveNames?: (fire: EveNotificationFire) => Promise<EveNotificationNames>;
+  /** The Time format zone (`'UTC'` for EVE time) the body's times render in; absent means the host's own. Never rejects. */
+  timeZone?: () => Promise<string | undefined>;
 }
 
 /** The raw notification a server-polled push carries (issue #3756). */
@@ -244,11 +246,13 @@ async function present(env: PushEnv, payload: PushPayload, now: number): Promise
       timestamp: raw.timestamp,
     };
     const names = (await env.resolveNames?.(fire)) ?? {};
+    const timeZone = await env.timeZone?.();
     const { title, body } = renderEveNotification(
       (key, options) => i18n.t(key, options),
       fire,
       { name: name ?? i18n.t('notifications.fired.pushFallback.character') },
-      names
+      names,
+      timeZone
     );
     return { title, body, feedKey: occurrenceKey(fire, now) };
   } catch {
