@@ -312,9 +312,13 @@ describe('SkillPlans Optimize queue', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const button = await screen.findByRole('button', { name: 'Optimize queue' });
-    await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'true'));
-    await user.click(button);
+    // Re-queried on every poll, never held: the page can swap the button's DOM
+    // node (a remount while its inputs settle) after the first find, and a held
+    // reference then goes stale and never shows aria-disabled.
+    const optimizeQueue = () => screen.getByRole('button', { name: 'Optimize queue' });
+    await screen.findByRole('button', { name: 'Optimize queue' });
+    await waitFor(() => expect(optimizeQueue()).toHaveAttribute('aria-disabled', 'true'));
+    await user.click(optimizeQueue());
     expect(await db.skillPlans.where('characterId').equals(CHAR_ID).count()).toBe(0);
   });
 });
