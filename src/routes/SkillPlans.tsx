@@ -220,7 +220,7 @@ export function SkillPlans() {
             implantBonuses={implants}
             attributeBaseline={attributeBaseline}
             remapInfo={remapInfo}
-            onOptimizeQueue={scheduleInputs ? () => void optimizeQueue() : undefined}
+            onOptimizeQueue={scheduleInputs && remapInfo ? () => void optimizeQueue() : undefined}
             queueEmpty={queueResult != null && queueResult.data.length === 0}
           />
         </aside>

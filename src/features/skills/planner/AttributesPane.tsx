@@ -63,9 +63,9 @@ export function AttributesPane({
       <Button
         size="sm"
         align="start"
-        className={queueEmpty ? 'w-full cursor-not-allowed opacity-40' : 'w-full'}
+        className="w-full"
         aria-disabled={queueEmpty || undefined}
-        onClick={queueEmpty ? undefined : onOptimizeQueue}
+        onClick={onOptimizeQueue}
       >
         <span aria-hidden="true" className="shrink-0 text-text-dim">
           <Icon.OptimizeRemaps size={Icon.ICON_SIZE.sm} />

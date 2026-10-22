@@ -267,6 +267,58 @@ async function openAllPlans(user: ReturnType<typeof userEvent.setup>) {
   return screen.findByRole('dialog', { name: 'All plans' });
 }
 
+describe('SkillPlans Optimize queue', () => {
+  const longQueue = [
+    { skill_id: 1, queue_position: 0, finished_level: 5 },
+    { skill_id: 3, queue_position: 1, finished_level: 5 },
+  ];
+
+  it('makes a remapped plan from the queue, opens it, and Undo takes it back', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({ ...attributesPayload, bonus_remaps: 2 })
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json(longQueue)
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: 'Optimize queue' }));
+
+    const stored = await waitFor(async () => {
+      const all = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
+      expect(all).toHaveLength(1);
+      return all;
+    });
+    expect(stored[0]!.name).toMatch(/^Skill queue · \d{4}-\d{2}-\d{2}$/);
+    expect(stored[0]!.entries).toHaveLength(2);
+    expect(stored[0]!.markers?.length).toBeGreaterThan(0);
+    await waitFor(() => expect(window.location.pathname).toBe(`/skills/plans/${stored[0]!.id}`));
+    expect(await screen.findByText(/^Made "Skill queue · /)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/skills/plans'));
+    expect(await db.skillPlans.where('characterId').equals(CHAR_ID).count()).toBe(0);
+  });
+
+  it('is inert with an empty queue', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([])
+      )
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    const button = await screen.findByRole('button', { name: 'Optimize queue' });
+    await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'true'));
+    await user.click(button);
+    expect(await db.skillPlans.where('characterId').equals(CHAR_ID).count()).toBe(0);
+  });
+});
+
 describe('SkillPlans CRUD', () => {
   it('creates a plan and navigates straight to its editor, scheduling a sync', async () => {
     const user = userEvent.setup();
