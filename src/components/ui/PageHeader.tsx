@@ -20,7 +20,8 @@ interface PageHeaderProps {
    * The page's one `CharacterFilterControl` (This character / All characters
    * / Corporation), rendered first in the right-hand cluster, before
    * `actions`. In this slot the control takes the header's touch tier
-   * (44px square below `md`, 36px tall from `md` up) on its own, through
+   * (44px square below `md`, 36px from `md` up: an icon square until `lg`,
+   * then its text pill) on its own, through
    * `PageHeaderClusterContext`, so it is always level with the `IconButton`s
    * beside it.
    *

@@ -38,6 +38,12 @@ const preview: Preview = {
           styles: { width: '390px', height: '844px' },
           type: 'mobile',
         },
+        // Between `md` and `lg`: where the Character picker is still an icon square.
+        tablet768: {
+          name: 'Tablet (768)',
+          styles: { width: '768px', height: '1024px' },
+          type: 'tablet',
+        },
       },
     },
     controls: { matchers: { date: /Date$/i } },

@@ -43,7 +43,7 @@
  * missing in a non-interactive note. `loading` swaps the glyph for a
  * `Spinner` in the same box, so the trigger never changes size mid-load.
  *
- * Below `md` the trigger is icon-only, fixed to the same box a sibling
+ * Below `lg` the trigger is icon-only, fixed to the same box a sibling
  * `IconButton` uses in whichever row it rides in — `size="sm"` (the panel
  * `meta` hosts: Active Jobs, Open Orders, Mining Tax) by default, `size="md"`
  * where a `PageHeader`'s own `actions` cluster sits at its default (larger)
@@ -53,7 +53,7 @@
  * phone-only "whose data is this" avatar `PageHeader` used to float in its
  * own corner (#1764): with this trigger already carrying that cue whenever a
  * route offers the filter, a second, separate avatar had nothing left to
- * say. From `md` up the trigger is a text pill at its tier's height that
+ * say. From `lg` up the trigger is a text pill at its tier's height that
  * keeps the same glyph in front of the words — glyph, words, caret —
  * with the header `IconButton`'s border, fill and hover, so it reads as one
  * of the header's controls.
@@ -128,7 +128,7 @@ export interface CharacterFilterControlProps<
    * `'icon'` (default): the compact header trigger above. `'field'`: a form
    * control for a settings row — field chrome (§6c "a box sized like a field")
    * with the current value as text and a trailing `CaretDown` at every width.
-   * Below `md` the icon-only trigger has no label or caret and, where the portrait does
+   * Below `lg` the icon-only trigger has no label or caret and, where the portrait does
    * not load, reads as a blank square; it only suits a header row where the
    * panel title says what it filters.
    */
@@ -151,21 +151,19 @@ export interface CharacterFilterControlProps<
 }
 
 /**
- * The two below-`md` box sizes this trigger can be fixed to, keyed the same
- * way `CharacterFilterControlProps.size` is. Plain `h-*`/`w-*` rather than
- * `IconButton`'s own `size-*` (which bakes width and height into one
- * utility): this trigger also needs an auto-width text pill at `md` and up,
- * and overriding just the `md:` width half of a `size-*` utility would mean
- * two `md:`-prefixed utilities fighting over the same breakpoint — the one
- * ordering Tailwind does not promise to resolve predictably, the same reason
- * two unprefixed utilities for one property are avoided elsewhere in this
- * file. At `md` and up the trigger is a text pill whose height is still the
- * tier's (`controlHeightClassName`), so it sits level with the `PageHeader`
- * actions or panel `IconButton`s it shares a line with.
+ * The two box sizes this trigger can be fixed to, keyed the same way
+ * `CharacterFilterControlProps.size` is. Only the height is set, from the
+ * tier (`controlHeightClassName`, which already steps down at `md` and back
+ * up for `touch:`); `aspect-square` makes the width follow it, so below `lg`
+ * the trigger is exactly the square a sibling `IconButton` is at every width
+ * and pointer. Not `IconButton`'s own `size-*`: from `lg` up the trigger is an
+ * auto-width text pill (`lg:aspect-auto`), and a `size-*` would need its
+ * width half overridden per breakpoint and per `touch:`, an ordering Tailwind
+ * does not promise to resolve predictably.
  */
 const TRIGGER_BOX: Record<'sm' | 'md', string> = {
-  sm: `w-9 ${controlHeightClassName.sm}`,
-  md: `w-11 ${controlHeightClassName.md}`,
+  sm: `aspect-square lg:aspect-auto ${controlHeightClassName.sm}`,
+  md: `aspect-square lg:aspect-auto ${controlHeightClassName.md}`,
 };
 
 /**
@@ -179,7 +177,7 @@ const triggerBaseClassName =
   `inline-flex shrink-0 items-center justify-center rounded-xs border border-line font-semibold ` +
   `tracking-widest uppercase ${interactiveClassName} ${focusRingClassName} ` +
   `bg-panel-2 p-0 text-text-dim hover:border-line-bright hover:text-text active:bg-panel ` +
-  `md:w-auto md:gap-1.5 md:px-2.5 md:text-[0.6875rem]`;
+  `lg:gap-1.5 lg:px-2.5 lg:text-[0.6875rem]`;
 
 export function CharacterFilterControl<V extends CharacterScopeChoice = CharacterFilterValue>({
   activeCharacterId,
@@ -306,7 +304,7 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
           aria-busy={loading || undefined}
           className={`relative ${TRIGGER_BOX[size]} ${triggerBaseClassName}`}
         >
-          {/* The glyph at every width: the whole trigger below `md`, the pill's leading icon from `md` up (a fixed 20px slot there, so a spinner swap never resizes the pill). */}
+          {/* The glyph at every width: the whole trigger below `lg` (an `IconButton`-sized 20px glyph from `md`), the pill's leading icon from `lg` up (a fixed 20px slot, so a spinner swap never resizes the pill). */}
           <span className="flex shrink-0 items-center justify-center md:size-5">
             {loading ? (
               spinner
@@ -331,8 +329,8 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
               </span>
             )}
           </span>
-          <span className="hidden md:inline">{label}</span>
-          <Icon.Expanded size={ICON_SIZE.sm} aria-hidden="true" className="hidden md:block" />
+          <span className="hidden lg:inline">{label}</span>
+          <Icon.Expanded size={ICON_SIZE.sm} aria-hidden="true" className="hidden lg:block" />
           {isPartial && (
             // Every width: the label never says "partial", so the dot is the visible cue.
             <span

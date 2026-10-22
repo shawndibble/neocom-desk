@@ -114,21 +114,31 @@ describe('CharacterFilterControl', () => {
     expect(screen.getByRole('menuitemradio', { name: 'All characters' })).toBeInTheDocument();
   });
 
-  describe('the icon-only phone trigger', () => {
-    it('renders the glyph at every width (leading the md+ pill) and the text label from md up', () => {
+  describe('the icon-only trigger below lg', () => {
+    it('renders the glyph at every width (leading the lg+ pill) and the text label and caret only from lg up', () => {
       render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
       const trigger = screen.getByRole('button', { name: 'This character' });
       const [iconSlot, textSlot] = trigger.children;
       expect(iconSlot).not.toHaveClass('md:hidden');
       expect(iconSlot).toHaveClass('md:size-5');
-      expect(textSlot).toHaveClass('hidden', 'md:inline');
+      expect(textSlot).toHaveClass('hidden', 'lg:inline');
+      expect(textSlot).not.toHaveClass('md:inline');
+      expect(trigger.querySelector(':scope > svg')).toHaveClass('hidden', 'lg:block');
+    });
+
+    it('stays a square box, the width following the height, until the lg pill', () => {
+      render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
+      const trigger = screen.getByRole('button');
+      expect(trigger).toHaveClass('aspect-square', 'lg:aspect-auto', 'lg:px-2.5');
+      expect(trigger).not.toHaveClass('md:px-2.5');
+      expect(trigger).not.toHaveClass('md:w-auto');
     });
 
     it("shows the AllCharacters glyph for 'all' and the active Character's own portrait for 'current'", () => {
       const { rerender } = render(
         <CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />
       );
-      // The phone icon slot only: the md+ text pill carries its own CaretDown.
+      // The icon slot only: the lg+ text pill carries its own CaretDown.
       const slot = () => screen.getByRole('button').children[0];
       expect(slot().querySelector('img')).toBeInTheDocument();
       expect(slot().querySelector('svg')).not.toBeInTheDocument();
@@ -140,7 +150,7 @@ describe('CharacterFilterControl', () => {
 
     it("defaults to the sm touch tier (a panel meta row's own IconButton size)", () => {
       render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
-      expect(screen.getByRole('button')).toHaveClass('h-9', 'w-9');
+      expect(screen.getByRole('button')).toHaveClass('h-9', 'aspect-square');
     });
 
     it("matches the larger md tier when a PageHeader's own actions cluster needs it", () => {
@@ -152,12 +162,12 @@ describe('CharacterFilterControl', () => {
           size="md"
         />
       );
-      expect(screen.getByRole('button')).toHaveClass('h-11', 'w-11');
+      expect(screen.getByRole('button')).toHaveClass('h-11', 'aspect-square');
     });
 
-    // The text pill at `md` and up keeps its tier's height too, so it sits
-    // level with the PageHeader actions it shares a line with (Mining Overview).
-    it('keeps the tier height for the text pill at md and up', () => {
+    // The md–lg square and the lg+ text pill keep the tier's height too, so they
+    // sit level with the PageHeader actions they share a line with.
+    it('keeps the tier height at md and up', () => {
       const { rerender } = render(
         <CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />
       );
@@ -358,8 +368,8 @@ describe('CharacterFilterControl', () => {
     );
     const picker = screen.getByRole('button', { name: 'This character' });
     const refresh = screen.getByRole('button', { name: 'Refresh' });
-    // 44px square below md, 36px tall from md up, 44px on a touch pointer.
-    expect(picker).toHaveClass('h-11', 'w-11', 'md:h-9', 'touch:h-11');
+    // 44px square below md, a 36px square from md, 36px tall pill from lg, 44px on a touch pointer.
+    expect(picker).toHaveClass('h-11', 'aspect-square', 'md:h-9', 'touch:h-11');
     expect(refresh).toHaveClass('size-11', 'md:size-9', 'touch:size-11');
     expect(picker).not.toHaveClass('h-9', 'md:h-7');
   });
@@ -395,7 +405,7 @@ describe('CharacterFilterControl', () => {
       expect(trigger.querySelector('svg[data-corp-fallback]')).toBeInTheDocument();
       fireEvent.load(img);
       expect(trigger.querySelector('svg[data-corp-fallback]')).toBeNull();
-      expect(trigger).toHaveClass('h-11', 'w-11', 'md:h-9');
+      expect(trigger).toHaveClass('h-11', 'aspect-square', 'md:h-9');
       expect(trigger.children[0]).toHaveClass('md:size-5');
       expect(img.parentElement).toHaveClass('size-8', 'md:size-5');
     });
@@ -409,7 +419,7 @@ describe('CharacterFilterControl', () => {
         expect(found).not.toBeNull();
         return found as HTMLImageElement;
       });
-      expect(trigger).toHaveClass('h-9', 'w-9');
+      expect(trigger).toHaveClass('h-9', 'aspect-square');
       expect(img.parentElement).toHaveClass('size-7', 'md:size-5');
     });
 
