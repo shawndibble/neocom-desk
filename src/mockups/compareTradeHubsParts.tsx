@@ -14,7 +14,12 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { controlHeightClassName, inlineLinkClassName } from '@/components/ui/controlStyles';
+import {
+  controlHeightClassName,
+  focusRingInsetClassName,
+  inlineLinkClassName,
+  rowInteractiveClassName,
+} from '@/components/ui/controlStyles';
 import { Caret } from '@/components/ui/Disclosure';
 import { RemovableTypeIcon } from '@/features/market/RemovableTypeIcon';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
@@ -197,7 +202,7 @@ export function ProposedCompareDrawer({
     >
       <button
         type="button"
-        className={`flex ${controlHeightClassName.md} items-center justify-center gap-1.5 border border-line bg-panel px-4 text-[0.6875rem] font-semibold tracking-widest text-text uppercase`}
+        className={`flex ${controlHeightClassName.md} items-center justify-center gap-1.5 border border-line bg-panel px-4 text-[0.6875rem] font-semibold tracking-widest text-text uppercase ${rowInteractiveClassName} ${focusRingInsetClassName}`}
       >
         <Caret expanded />
         {count}
