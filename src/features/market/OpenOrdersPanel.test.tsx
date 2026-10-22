@@ -769,6 +769,26 @@ describe('OpenOrdersPanel', () => {
     expect(cached.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("names a Character left out of All on the picker, not in the list's foot", async () => {
+    mockedLoadAll.mockResolvedValue(
+      snapshot(
+        [
+          entry([EXPIRING_ORDER]),
+          entry([{ ...EXPIRING_ORDER, order_id: 202 }], { characterId: 2, characterName: 'Bravo' }),
+        ],
+        [{ characterId: 3, name: 'Charlie' }]
+      )
+    );
+
+    renderPanel();
+
+    const picker = await within(screen.getByRole('banner')).findByRole('button', {
+      name: 'All characters · 2. Not included: Charlie',
+    });
+    expect(picker).toHaveClass('md:h-9');
+    expect(screen.queryByText("Charlie hasn't shared their orders")).not.toBeInTheDocument();
+  });
+
   describe('funnel filter controls', () => {
     /**
      * The controls live behind the funnel at every width on this page (the

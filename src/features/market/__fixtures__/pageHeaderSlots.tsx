@@ -7,11 +7,12 @@ export function WithPageHeaderSlots({
 }: {
   children: (slots: PageHeaderSlots) => ReactNode;
 }) {
-  const { slots, metaSlot, actionsSlot } = usePageHeaderSlots();
+  const { slots, metaSlot, scopeSlot, actionsSlot } = usePageHeaderSlots();
   return (
     <>
       <header>
         {metaSlot}
+        {scopeSlot}
         {actionsSlot}
       </header>
       {children(slots)}

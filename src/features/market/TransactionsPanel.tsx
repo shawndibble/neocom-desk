@@ -344,10 +344,23 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     [t, typeNames, timeZone, nameFor, margins, gaps, allScope]
   );
 
+  // The picker rides in the page header in every state (loading, error, empty),
+  // so a pilot can always switch scope out of a dead end.
   const headerChrome = (
     <PageHeaderPortals
       slots={headerSlots}
       meta={transactionsResult && <DataAgeBadge date={transactionsResult.fetchedAt} />}
+      scope={
+        showCharacterFilter && (
+          <CharacterFilterControl
+            activeCharacterId={activeCharacterId}
+            value={characterFilter}
+            characterCount={characterCount}
+            loading={allScope && allFills.status === 'loading'}
+            onChange={(next) => setCharacterValues({ 'txn.chars': next })}
+          />
+        )
+      }
       actions={
         <>
           <IconButton icon={<Icon.Refresh />} label={t('wallet.refresh')} onClick={refresh} />
@@ -405,15 +418,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
   }
 
   const hasRows = (allScope || !transactionsNeedsReauth) && transactions.length > 0;
-  const characterControl = showCharacterFilter ? (
-    <CharacterFilterControl
-      size="md"
-      activeCharacterId={activeCharacterId}
-      value={characterFilter}
-      characterCount={characterCount}
-      onChange={(next) => setCharacterValues({ 'txn.chars': next })}
-    />
-  ) : undefined;
 
   return (
     <div className="space-y-4">
@@ -454,11 +458,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
                 {t('common.incompleteTitle')} — {t('wallet.transactionsTruncatedHint')}
               </p>
             )}
-            <TransactionsFilterBar
-              filter={filter}
-              onChange={setFilter}
-              actions={characterControl}
-            />
+            <TransactionsFilterBar filter={filter} onChange={setFilter} />
             {filteredTransactions.length === 0 ? (
               <EmptyState
                 title={t('wallet.transactionsNoFilterMatches')}

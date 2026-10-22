@@ -1393,7 +1393,7 @@ describe('Mail', () => {
       await waitFor(() => expect(posts).toHaveLength(1));
     });
 
-    it('names a Character left out in an "N of M" readout', async () => {
+    it('names a Character left out on the picker, not in an "N of M" readout', async () => {
       await addSecondCharacter();
       serveSecondCharacter();
       await db.characters.put({
@@ -1413,8 +1413,9 @@ describe('Mail', () => {
       render(<App />);
       await screen.findByText('Second pilot mail');
       expect(
-        screen.getByRole('group', { name: /All characters · 2 of 3\. Not included: Pilot Three/ })
+        screen.getByRole('button', { name: 'All characters · 3. Not included: Pilot Three' })
       ).toBeInTheDocument();
+      expect(screen.queryByText(/2 of 3/)).not.toBeInTheDocument();
     });
 
     it('is unchanged with one Character: no scope control, no owner chips', async () => {

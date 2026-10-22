@@ -72,7 +72,7 @@ const affiliationPayload = [
 async function showAllCharacters() {
   const user = userEvent.setup();
   await user.click(screen.getByRole('button', { name: 'This character' }));
-  await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+  await user.click(await screen.findByRole('menuitemradio', { name: /^All characters · 2$/ }));
 }
 
 /** Every filter now sits behind the funnel (FilterBar, issue #1282). */
@@ -356,7 +356,7 @@ describe('Contacts', () => {
       render(<App />);
 
       const table = within(await screen.findByRole('table', { name: /across/i }));
-      expect(screen.getByRole('button', { name: 'All characters' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^All characters · 2$/ })).toBeInTheDocument();
       expect(table.queryByText('2 of 2')).not.toBeInTheDocument();
       expect(table.getAllByText('1 of 2').length).toBe(4);
     });

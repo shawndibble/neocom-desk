@@ -71,6 +71,48 @@ describe('PageHeader', () => {
       );
     });
 
+    // Market's meta is a portal target, always rendered and empty until a tab
+    // fills it: an empty slot must not hold the clip's 40px minimum open.
+    it('takes no room for a meta slot that has nothing in it (yet)', () => {
+      const { rerender } = render(
+        <PageHeader
+          title="Market"
+          meta={<span data-testid="slot" className="contents" />}
+          scope={<button type="button">All characters</button>}
+        />
+      );
+      const wrapper = screen.getByTestId('slot').parentElement!;
+      expect(wrapper).toHaveClass('empty:hidden', 'has-[>:only-child:empty]:hidden');
+      expect(wrapper.matches(':has(>:only-child:empty)')).toBe(true);
+      rerender(
+        <PageHeader
+          title="Market"
+          meta={
+            <span data-testid="slot" className="contents">
+              <time>12m ago</time>
+            </span>
+          }
+          scope={<button type="button">All characters</button>}
+        />
+      );
+      expect(wrapper.matches(':has(>:only-child:empty)')).toBe(false);
+    });
+
+    // A `DataAgeBadge` is `hidden md:inline-flex`: on a phone the clip around it
+    // would otherwise hold 40px (plus its gap) of nothing beside the title.
+    it('hides the meta wrapper below md when its one child is itself hidden there', () => {
+      render(
+        <PageHeader
+          title="Contracts"
+          meta={<time className="hidden md:inline-flex">12m ago</time>}
+          scope={<button type="button">All characters</button>}
+        />
+      );
+      const wrapper = screen.getByText('12m ago').parentElement!;
+      expect(wrapper).toHaveClass('max-md:has-[>.hidden:only-child]:hidden');
+      expect(wrapper.matches(':has(>.hidden:only-child)')).toBe(true);
+    });
+
     it('without scope keeps the wrapping header as before', () => {
       render(<PageHeader title="Assets" actions={<button type="button">Refresh</button>} />);
       const h1 = screen.getByRole('heading', { level: 1 });
