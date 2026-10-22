@@ -50,17 +50,18 @@ export const Phone: Story = {
 
 /**
  * A stand-in for the page's Character picker, at the header tier the `scope`
- * slot gives the real one (44px square below `md`, 36px tall from `md` up).
+ * slot gives the real one (44px square below `md`, a 36px square from `md`,
+ * a 36px-tall text pill from `lg`).
  * `ui` stories don't import `@/features`; the real picker in this slot is
  * `character/CharacterFilterControl`'s InPageHeader stories.
  */
 const scopeStandIn = (
   <button
     type="button"
-    className="inline-flex h-11 w-11 shrink-0 items-center justify-center gap-1.5 rounded-xs border border-line bg-panel-2 text-text-dim md:h-9 md:w-auto md:px-2.5 md:text-[0.6875rem] md:font-semibold md:tracking-widest md:uppercase"
+    className="inline-flex aspect-square h-11 shrink-0 items-center justify-center gap-1.5 rounded-xs border border-line bg-panel-2 text-text-dim md:h-9 lg:aspect-auto lg:px-2.5 lg:text-[0.6875rem] lg:font-semibold lg:tracking-widest lg:uppercase"
   >
     <Icon.AllCharacters aria-hidden="true" />
-    <span className="hidden md:inline">All characters</span>
+    <span className="hidden lg:inline">All characters</span>
   </button>
 );
 

@@ -59,5 +59,11 @@ export const InPageHeaderPhone: Story = {
   globals: { viewport: { value: 'phone390', isRotated: false } },
 };
 
+/** @summary The same header at 768 wide: between `md` and `lg` the picker is a 36px icon square, level with Refresh; its words start at `lg`. */
+export const InPageHeaderTablet: Story = {
+  ...InPageHeader,
+  globals: { viewport: { value: 'tablet768', isRotated: false } },
+};
+
 /** @summary `loading`: a spinner in the glyph box, the trigger's size unchanged. */
 export const Loading: Story = { args: { loading: true } };

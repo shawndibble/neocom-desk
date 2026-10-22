@@ -28,17 +28,18 @@ _Recorded 2026-10-22. Supersedes the placement half of
 
 - **Same height as the icons beside it, enforced.** Inside a `PageHeader`
   cluster the picker takes the header's touch tier on its own
-  (`PageHeaderClusterContext`): a 44px square below `md`, 36px tall from `md`
-  up, whatever `size` the page passes. `HeaderMoreMenu` has no size prop and
+  (`PageHeaderClusterContext`): a 44px square below `md`, a 36px square from
+  `md`, 36px tall from `lg` up, whatever `size` the page passes. `HeaderMoreMenu` has no size prop and
   always draws at that tier.
 
-- **The trigger's look.** Below `md` it stays the 44px icon-only box (the
+- **The trigger's look.** Below `lg` it stays the icon-only box, the same
+  square as the `IconButton`s beside it (44px below `md`, 36px from `md`) (the
   active Character's portrait, the `AllCharacters` glyph, or for Corporation
   the active Character's own corporation logo). The logo comes from the
   Character's cached `corporationId` (no new ESI call), with the `Corporation`
   Buildings glyph while it loads, on error, or when no corp is known; the
   glyph box stays the portrait's size either way. The menu items carry no
-  glyphs. From `md` up it is a text pill with the same glyph leading the
+  glyphs. From `lg` up it is a text pill with the same glyph leading the
   words and a trailing caret, with the header `IconButton`'s border, fill and
   hover. The label only ever reads This character, All characters (with its
   count where the page passes one) or Corporation.
@@ -66,3 +67,10 @@ _Recorded 2026-10-22. Supersedes the placement half of
   a page filter), and the Assets/Ships empty-state "Show all characters"
   shortcut, which is a recovery link inside an empty state rather than the
   page's picker.
+
+- **Words only from `lg` (amended 2026-10-22).** The pill first started at
+  `md`. With the sidebar showing, a 768px row left about 190px for the title
+  and data age beside the pill and three icons, so titles like CONTRACTS
+  clipped. Between `md` and `lg` the trigger is now the 36px icon square, with
+  the same glyph, warning dot and spinner. The words show from `lg`, where the
+  row has room for them.
