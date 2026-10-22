@@ -3,6 +3,10 @@ import { PageHeader } from './PageHeader';
 import { IconButton } from './IconButton';
 import { DataAgeBadge } from './DataAgeBadge';
 import * as Icon from './icons';
+import { Button } from './Button';
+import { HeaderMoreMenu } from './HeaderMoreMenu';
+import { DropdownMenuItem } from './DropdownMenu';
+import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 
 const meta = {
   title: 'ui/PageHeader',
@@ -42,5 +46,63 @@ export const WithDataAge: Story = {
 /** @summary The same header at 390 wide: actions keep a 44px touch target. */
 export const Phone: Story = {
   ...WithMetaAndActions,
+  globals: { viewport: { value: 'phone390', isRotated: false } },
+};
+
+const picker = (
+  <CharacterFilterControl
+    activeCharacterId={null}
+    value="all"
+    onChange={() => {}}
+    characterCount={4}
+    missingNames={['Bob Vale']}
+  />
+);
+
+/**
+ * The cluster's fixed order: picker → text buttons → icon buttons (Refresh)
+ * → ⋮ → bell. The picker takes the header's tier on its own, so it is the
+ * same height as the `IconButton`s beside it: 36px here, 44px on a phone.
+ *
+ * @summary `scope` slot: the Character picker first in the cluster, level with the icon buttons, one line.
+ */
+export const WithScope: Story = {
+  args: {
+    title: 'Market orders',
+    meta: <DataAgeBadge date={new Date(Date.now() - 12 * 60_000)} />,
+    scope: picker,
+    actions: (
+      <>
+        <Button variant="ghost">Export</Button>
+        <IconButton label="Refresh" icon={<Icon.Refresh />} />
+        <HeaderMoreMenu>
+          <DropdownMenuItem>Page settings…</DropdownMenuItem>
+          <DropdownMenuItem>Column presets…</DropdownMenuItem>
+        </HeaderMoreMenu>
+      </>
+    ),
+  },
+};
+
+/**
+ * A page decides in JS which actions fit: at phone width the text action
+ * moves into the ⋮ and the row stays on one line; the long title truncates.
+ *
+ * @summary `scope` at 390 wide: picker, Refresh, ⋮ and bell on one line; the title truncates.
+ */
+export const WithScopePhone: Story = {
+  args: {
+    title: 'Market orders and history',
+    scope: picker,
+    actions: (
+      <>
+        <IconButton label="Refresh" icon={<Icon.Refresh />} />
+        <HeaderMoreMenu>
+          <DropdownMenuItem>Export…</DropdownMenuItem>
+          <DropdownMenuItem>Page settings…</DropdownMenuItem>
+        </HeaderMoreMenu>
+      </>
+    ),
+  },
   globals: { viewport: { value: 'phone390', isRotated: false } },
 };

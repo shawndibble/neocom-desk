@@ -5699,6 +5699,7 @@
     "unknown": "—",
     "aboutLabel": "About {{label}}",
     "moreActionsLabel": "More actions for {{name}}",
+    "moreActions": "More actions",
     "tableExport": {
       "menuLabel": "{{name}} actions",
       "exportButtonLabel": "Export {{name}}",
@@ -6813,7 +6814,6 @@
     },
     "valueAffix": "value",
     "noPriceLabel": "No price",
-    "moreActions": "More actions",
     "sections": {
       "open": "Open · {{count}}",
       "openEmpty": "Nothing open — every entry is paid or dismissed.",

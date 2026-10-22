@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { IconButton } from '@/components/ui';
+import { IconButton, PageHeader } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { CharacterFilterControl, type CharacterScopeChoice } from './CharacterFilterControl';
 
 async function openMenu() {
@@ -112,11 +113,12 @@ describe('CharacterFilterControl', () => {
   });
 
   describe('the icon-only phone trigger', () => {
-    it('renders both an icon (hidden at md) and the text label (hidden below md)', () => {
+    it('renders the glyph at every width (leading the md+ pill) and the text label from md up', () => {
       render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
       const trigger = screen.getByRole('button', { name: 'This character' });
       const [iconSlot, textSlot] = trigger.children;
-      expect(iconSlot).toHaveClass('md:hidden');
+      expect(iconSlot).not.toHaveClass('md:hidden');
+      expect(iconSlot).toHaveClass('md:size-5');
       expect(textSlot).toHaveClass('hidden', 'md:inline');
     });
 
@@ -267,5 +269,92 @@ describe('CharacterFilterControl', () => {
         'Corporation',
       ]);
     });
+  });
+
+  describe('partial coverage and loading, carried in the trigger', () => {
+    const partial = {
+      activeCharacterId: 1,
+      onChange: () => {},
+      characterCount: 4,
+      missingNames: ['Bob Vale'],
+    } as const;
+
+    it('keeps the label as "All characters" and adds who is missing to the accessible name', () => {
+      render(<CharacterFilterControl {...partial} value="all" />);
+      const trigger = screen.getByRole('button', {
+        name: 'All characters · 4. Not included: Bob Vale',
+      });
+      expect(trigger.children[1]).toHaveTextContent(/^All characters · 4$/);
+    });
+
+    it('draws a warning dot on the trigger itself, at every width', () => {
+      render(<CharacterFilterControl {...partial} value="all" />);
+      const dot = screen.getByRole('button').querySelector('[data-partial-dot]');
+      expect(dot).toBeInTheDocument();
+      expect(dot?.parentElement).toBe(screen.getByRole('button'));
+      expect(dot?.className).not.toMatch(/hidden/);
+    });
+
+    it('names who is missing in a non-interactive note in the open menu', async () => {
+      render(<CharacterFilterControl {...partial} value="all" />);
+      await openMenu();
+      const note = screen.getByText('Not included: Bob Vale');
+      expect(note.closest('[role="menuitem"],[role="menuitemradio"]')).toBeNull();
+    });
+
+    it('keeps the plain label and no dot for "This character"', () => {
+      render(<CharacterFilterControl {...partial} value="current" />);
+      const trigger = screen.getByRole('button', { name: 'This character' });
+      expect(trigger.querySelector('[data-partial-dot]')).toBeNull();
+    });
+
+    it('full coverage (no missing names) reads the plain count', () => {
+      render(<CharacterFilterControl {...partial} missingNames={[]} value="all" />);
+      expect(screen.getByRole('button', { name: 'All characters · 4' })).toBeInTheDocument();
+      expect(screen.getByRole('button').querySelector('[data-partial-dot]')).toBeNull();
+    });
+
+    it('shows a spinner inside the trigger while loading, keeping the box size', () => {
+      render(
+        <CharacterFilterControl
+          activeCharacterId={1}
+          value="current"
+          onChange={() => {}}
+          size="md"
+          loading
+        />
+      );
+      const trigger = screen.getByRole('button', { name: 'This character' });
+      expect(trigger).toHaveClass('h-11', 'w-11');
+      expect(trigger.querySelector('[role="status"]')).toBeInTheDocument();
+    });
+
+    it('draws no spinner when not loading', () => {
+      render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
+      expect(screen.getByRole('button').querySelector('[role="status"]')).toBeNull();
+    });
+  });
+
+  it("takes the PageHeader's tier in its scope slot: the same height as the IconButtons beside it", () => {
+    render(
+      <PageHeader
+        title="Wallet"
+        scope={
+          <CharacterFilterControl
+            activeCharacterId={1}
+            value="current"
+            onChange={() => {}}
+            size="sm"
+          />
+        }
+        actions={<IconButton icon={<Icon.Refresh />} label="Refresh" />}
+      />
+    );
+    const picker = screen.getByRole('button', { name: 'This character' });
+    const refresh = screen.getByRole('button', { name: 'Refresh' });
+    // 44px square below md, 36px tall from md up, 44px on a touch pointer.
+    expect(picker).toHaveClass('h-11', 'w-11', 'md:h-9', 'touch:h-11');
+    expect(refresh).toHaveClass('size-11', 'md:size-9', 'touch:size-11');
+    expect(picker).not.toHaveClass('h-9', 'md:h-7');
   });
 });
