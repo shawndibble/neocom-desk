@@ -13,10 +13,12 @@ name: Cache warm
 # any difference is a silent miss. Change a key in ci.yml, change it here.
 #
 # Runs on `develop` only when a key can change (a lockfile, or ci.yml itself).
-# The weekly and by-hand runs use the default branch (`main`), whose caches
-# every branch can read as well. A hit saves nothing, so a run with nothing new
-# costs seconds. PR restores count as use, so a busy cache is never evicted
-# for age.
+# The weekly run (and a by-hand run, unless pointed at `--ref develop`) runs on
+# `main`, whose caches every PR can read as well; every run checks out
+# `develop`, so those keys follow `develop`'s lockfiles, and a `develop` entry
+# evicted under the 10GB quota comes back within a week. A hit saves nothing,
+# so a run with nothing new costs seconds. Schedule and by-hand runs need this
+# file on `main`, so they start after the next promotion.
 on:
   push:
     branches: [develop]
@@ -33,7 +35,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: cache-warm
+  group: cache-warm-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -42,9 +44,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: develop
+      # `rules`' setup-node npm cache: same two-lockfile key. Filled by the
+      # functions install below, which `rules` repeats on every run.
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
       - uses: actions/cache@v4
         id: node-modules
         with:
@@ -52,6 +62,7 @@ jobs:
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
       - if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
+      - run: npm ci --prefix functions
       # `rules`: firebase-tools (npx's download) and the Firestore emulator
       # jar. The version is the one pinned in the `test:rules` script.
       - uses: actions/cache@v4
@@ -74,6 +85,8 @@ jobs:
       options: --init --ipc=host
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: develop
       # Root over a runner-owned checkout; see ci.yml's `e2e-shard`.
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-node@v4

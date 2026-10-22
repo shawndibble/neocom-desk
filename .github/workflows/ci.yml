@@ -22,9 +22,12 @@ jobs:
   # against it.
   #
   # Caches: a PR run can restore only caches its own PR saved or ones saved on
-  # `develop`, and this workflow never runs on `develop`. cache-warm.yml saves
-  # the dependency caches there, so a PR's first run hits them; it mirrors
-  # every cache key below, so change a key in both places.
+  # its base branch or the default branch (`main`), and this workflow never
+  # runs on either. cache-warm.yml saves the dependency caches there, so a PR's
+  # first run hits them. It mirrors every actions/cache and setup-node cache
+  # below (path, key, runner image), so change one in both places. Jobs that
+  # restore node_modules don't also take setup-node's npm download cache: on a
+  # hit it is a wasted download, and on a miss each PR would save its own.
   #
   # lint, format:check, typecheck and check:case used to be four jobs, each
   # paying its own checkout and `npm ci`. Run back to back they take about as
@@ -37,7 +40,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
       # Same node_modules cache as the test jobs (and warmed on `develop` by
       # cache-warm.yml); a miss falls back to `npm ci`.
       - uses: actions/cache@v4
@@ -67,7 +69,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
       # Same node_modules cache as the test jobs (and warmed on `develop` by
       # cache-warm.yml); a miss falls back to `npm ci`.
       - uses: actions/cache@v4
@@ -137,9 +138,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-      # setup-node caches the npm download, not node_modules; restoring the
-      # tree skips the install. A miss falls back to `npm ci`.
+      # Restoring node_modules skips the install (see "Caches" at the top);
+      # a miss falls back to `npm ci`.
       - uses: actions/cache@v4
         id: node-modules
         with:
@@ -168,8 +168,9 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          # Both trees are installed here, so a change to either lockfile
-          # refreshes the download cache.
+          # The npm download cache, for `npm ci --prefix functions` (and the
+          # root install on a node_modules miss). Keyed on both lockfiles, so
+          # a change to either refreshes it; cache-warm.yml saves the same key.
           cache-dependency-path: |
             package-lock.json
             functions/package-lock.json
@@ -177,8 +178,8 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      # setup-node caches the npm download, not node_modules; restoring the
-      # tree skips the install. A miss falls back to `npm ci`.
+      # Restoring node_modules skips the install (see "Caches" at the top);
+      # a miss falls back to `npm ci`.
       - uses: actions/cache@v4
         id: node-modules
         with:
@@ -273,14 +274,13 @@ jobs:
       - uses: actions/checkout@v4
       # The container runs as root over a checkout owned by the runner user, so
       # git refuses the repo ("dubious ownership") and `npm ci`'s husky
-      # postinstall check then reports no hook installed.
+      # `prepare` check then reports no hook installed.
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-      # setup-node caches the npm download, not node_modules; restoring the
-      # tree skips the install. A miss falls back to `npm ci`.
+      # Restoring node_modules skips the install (see "Caches" at the top);
+      # a miss falls back to `npm ci`.
       - uses: actions/cache@v4
         id: node-modules
         with:
