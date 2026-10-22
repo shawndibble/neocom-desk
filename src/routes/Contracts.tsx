@@ -62,6 +62,7 @@ import {
   currentContractsView,
 } from '@/features/contracts/contractsHistoryView';
 import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
+import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 
@@ -161,6 +162,7 @@ export function Contracts() {
   const scopeParam = sourceParams.scope;
   const charactersValue = sourceParams['history.chars'];
   const characterCount = useCharacterCountOrLoading();
+  const isDesktop = useIsDesktop();
   const corpAvailable = granted?.includes(CORP_CONTRACTS_SCOPE) ?? false;
   const tab: 'search' | 'history' = tabId === 'history' ? 'history' : 'search';
   const mode: ContractMode = tabId === 'search/courier' ? 'courier' : 'items';
@@ -327,7 +329,8 @@ export function Contracts() {
         meta={
           tab === 'history' ? (
             contractsResult && !sourceHeld ? (
-              <DataAgeBadge date={contractsResult.fetchedAt} />
+              // Dot only between md and lg, where the picker's pill leaves the title little room.
+              <DataAgeBadge date={contractsResult.fetchedAt} dotOnly={!isDesktop} />
             ) : undefined
           ) : searchStatus?.lastSyncedAt != null ? (
             <DataAgeBadge date={new Date(searchStatus.lastSyncedAt)} />
@@ -352,7 +355,9 @@ export function Contracts() {
                 name={t('contracts.title')}
                 tableExport={historyExport}
                 size="md"
-                showLabel
+                // Between md and lg the sidebar leaves the row too little room for the
+                // title beside the picker's pill, so Export drops its word there.
+                showLabel={isDesktop}
               />
               <IconButton
                 icon={<Icon.Refresh />}
