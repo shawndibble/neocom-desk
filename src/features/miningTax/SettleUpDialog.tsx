@@ -110,16 +110,14 @@ export function SettleUpDialog({
   // Rows can refresh while open (`liveSettleUpRows`) but never change who's in them.
   const payers = useMemo(() => payerOptions(rows), [rows]);
   const [payer, setPayer] = useState<number | null>(
-    () =>
-      (payers.some((p) => p.characterId === payerId) ? payerId : payers[0]?.characterId) ?? null
+    () => (payers.some((p) => p.characterId === payerId) ? payerId : payers[0]?.characterId) ?? null
   );
   const [focus, setFocus] = useState<ReadonlySet<string> | null>(focusIds ?? null);
   const startsTicked = (r: SettleUpRow, who: number | null, only: ReadonlySet<string> | null) =>
     (who === null || r.assignment.characterId === who) &&
     (only === null || only.has(r.assignment.id));
   const [excluded, setExcluded] = useState<ReadonlySet<string>>(
-    () =>
-      new Set(rows.filter((r) => !startsTicked(r, payer, focus)).map((r) => r.assignment.id))
+    () => new Set(rows.filter((r) => !startsTicked(r, payer, focus)).map((r) => r.assignment.id))
   );
   const primaryRows = rows.filter((r) => startsTicked(r, payer, focus));
   const sameCharacterRest =

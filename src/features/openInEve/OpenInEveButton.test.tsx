@@ -128,7 +128,12 @@ describe('OpenInEveButton from a fixed Character', () => {
   it('sends from that Character, not the active one, under its own label', async () => {
     render(
       <MemoryRouter>
-        <OpenInEveButton kind="information" id={7} characterId={PAYER} label="Open in EVE as Payer" />
+        <OpenInEveButton
+          kind="information"
+          id={7}
+          characterId={PAYER}
+          label="Open in EVE as Payer"
+        />
       </MemoryRouter>
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Open in EVE as Payer' }));

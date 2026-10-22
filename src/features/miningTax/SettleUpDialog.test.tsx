@@ -265,7 +265,7 @@ describe('SettleUpDialog paying from one Character', () => {
     settle.mockResolvedValue({ ok: true, value: undefined });
   });
 
-  it('asks who pays when the entries span Characters, ticking only the payer\'s', async () => {
+  it("asks who pays when the entries span Characters, ticking only the payer's", async () => {
     renderDialog(MIXED, { payerId: OTICHODA });
     const from = screen.getByRole('group', { name: 'Paying from' });
     expect(from).toBeInTheDocument();
@@ -284,7 +284,7 @@ describe('SettleUpDialog paying from one Character', () => {
     expect(open).toHaveAttribute('title', 'Open in EVE · Ashken Otichoda');
   });
 
-  it('switching the payer ticks exactly the new payer\'s entries and opens EVE from it', async () => {
+  it("switching the payer ticks exactly the new payer's entries and opens EVE from it", async () => {
     renderDialog(MIXED, { payerId: OTICHODA });
     await userEvent.click(screen.getByRole('button', { name: /Ashken Archangel · / }));
     expect(screen.getByRole('button', { name: 'Open information 98000001' })).toHaveAttribute(
@@ -305,7 +305,7 @@ describe('SettleUpDialog paying from one Character', () => {
     expect(paidIds()).toEqual(['arch-1', 'oti-2']);
   });
 
-  it('from one entry, ticks only it and offers the payer\'s other entries unticked', async () => {
+  it("from one entry, ticks only it and offers the payer's other entries unticked", async () => {
     renderDialog(MIXED, { payerId: OTICHODA, focusIds: new Set(['oti-1']) });
     expect(screen.getByRole('button', { name: /1 entry · 2026-10-20/ })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Also pay 1 other entry/ }));

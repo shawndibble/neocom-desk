@@ -76,9 +76,7 @@ export function useOpenInEve(
   options?: OpenInEveOptions
 ): OpenInEve {
   const { t } = useTranslation();
-  const activeCharacterId = useActiveCharacter((s) =>
-    s.hydrated ? s.activeCharacterId : null
-  );
+  const activeCharacterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
   const fixedCharacter = options?.characterId !== undefined;
   const characterId = fixedCharacter ? (options.characterId ?? null) : activeCharacterId;
   const lacksScope = useCharacterLacksEndpoints(characterId, OPEN_IN_EVE_ENDPOINTS);
