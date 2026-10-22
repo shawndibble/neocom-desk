@@ -12,7 +12,7 @@ import {
   HAULING_SCOPES,
   MASTODON_CARGO,
 } from '@/storybook/haulingFixtures';
-import { Travel } from './Travel';
+import { Market } from './Market';
 
 /**
  * A Mastodon as the Cargo Space and the intro read. Prices, books and scans
@@ -35,8 +35,8 @@ async function seedHauling() {
 }
 
 const meta = {
-  title: 'pages/Travel Hauling',
-  component: Travel,
+  title: 'pages/Market Hauling',
+  component: Market,
   parameters: {
     layout: 'fullscreen',
     shell: {
@@ -48,15 +48,15 @@ const meta = {
   },
   render: () => (
     <Routes>
-      <Route path="travel/*" element={<Travel />} />
+      <Route path="market/*" element={<Market />} />
     </Routes>
   ),
-} satisfies Meta<typeof Travel>;
+} satisfies Meta<typeof Market>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** @summary Travel › Hauling: an Amarr → Jita ammo scan planned into a Mastodon's hold. */
+/** @summary Market › Hauling: an Amarr → Jita ammo scan planned into a Mastodon's hold. */
 export const Hauling: Story = {};
 
 /** @summary The same Amarr → Jita scan in the phone shell. */

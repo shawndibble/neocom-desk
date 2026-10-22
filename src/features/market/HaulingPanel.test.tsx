@@ -209,7 +209,7 @@ const linkParam = (key: string) =>
 function renderPanel(query = 'from=jita&to=amarr') {
   const actions = fakeItemActions();
   render(
-    <MemoryRouter initialEntries={[`/travel/hauling?${query}`]}>
+    <MemoryRouter initialEntries={[`/market/hauling?${query}`]}>
       <FakeItemActions actions={actions}>
         <HaulingPanel />
       </FakeItemActions>
@@ -627,7 +627,7 @@ describe('HaulingPanel fill the free space', () => {
     fillState = fillDone([FILL_ROW]);
     let info: { refresh: () => void } | null = null;
     render(
-      <MemoryRouter initialEntries={['/travel/hauling?from=jita&to=amarr']}>
+      <MemoryRouter initialEntries={['/market/hauling?from=jita&to=amarr']}>
         <FakeItemActions actions={fakeItemActions()}>
           <HaulingPanel onRefreshInfoChange={(next) => (info = next)} />
         </FakeItemActions>
@@ -831,7 +831,7 @@ describe('HaulingPanel data age (#3534)', () => {
   it('hands the ready scan’s fetchedAt up to the page header instead of badging its own filter bar', () => {
     const onRefreshInfoChange = vi.fn();
     const { container } = render(
-      <MemoryRouter initialEntries={['/travel/hauling?from=jita&to=amarr']}>
+      <MemoryRouter initialEntries={['/market/hauling?from=jita&to=amarr']}>
         <FakeItemActions actions={fakeItemActions()}>
           <HaulingPanel onRefreshInfoChange={onRefreshInfoChange} />
         </FakeItemActions>
@@ -847,7 +847,7 @@ describe('HaulingPanel data age (#3534)', () => {
   it('hands up no fetchedAt while no scan is ready', () => {
     const onRefreshInfoChange = vi.fn();
     render(
-      <MemoryRouter initialEntries={['/travel/hauling?from=jita&to=jita']}>
+      <MemoryRouter initialEntries={['/market/hauling?from=jita&to=jita']}>
         <FakeItemActions actions={fakeItemActions()}>
           <HaulingPanel onRefreshInfoChange={onRefreshInfoChange} />
         </FakeItemActions>

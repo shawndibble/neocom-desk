@@ -200,26 +200,35 @@ describe('LP Store, a Wallet tab (issue #3527)', () => {
   });
 });
 
-describe('Hauling, a Travel tab (issue #3526)', () => {
-  it('sits last on Travel and is gone from Market', () => {
-    expect(TRAVEL_TABS.tabs.map((tab) => tab.id)).toEqual(['route', 'pilot', 'hauling']);
-    expect(MARKET_TABS.tabs.map((tab) => tab.id)).not.toContain('hauling');
+describe('Hauling, a Market tab again (issue #4702)', () => {
+  it('sits after Appraisal on Market and is gone from Travel', () => {
+    expect(MARKET_TABS.tabs.map((tab) => tab.id)).toEqual([
+      'browser',
+      'orders',
+      'stock',
+      'history',
+      'appraisal',
+      'hauling',
+    ]);
+    expect(TRAVEL_TABS.tabs.map((tab) => tab.id)).toEqual(['route', 'pilot']);
   });
 
-  it('moves an old Market Hauling link to Travel with its query intact', () => {
-    const moved = PAGE_LEGACY_LOCATIONS['/market'];
-    expect(moved?.('/market/hauling', '?from=amarr&to=jita')).toEqual({
-      pathname: '/travel/hauling',
+  it('moves an old Travel Hauling link to Market with its query intact', () => {
+    const moved = PAGE_LEGACY_LOCATIONS['/travel'];
+    expect(moved?.('/travel/hauling', '?from=amarr&to=jita')).toEqual({
+      pathname: '/market/hauling',
       search: '?from=amarr&to=jita',
     });
-    expect(moved?.('/market/browser', '')).toBeNull();
-    expect(moved?.('/market/haulingx', '')).toBeNull();
+    expect(moved?.('/travel/hauling/', '')).toEqual({ pathname: '/market/hauling', search: '' });
+    expect(moved?.('/travel/route', '')).toBeNull();
+    expect(moved?.('/travel/haulingx', '')).toBeNull();
   });
 
-  it('reports the old path as a redirect and the new one as a Travel tab', () => {
-    expect(isTabRedirectPath('/market/hauling')).toBe(true);
-    expect(pageKeyFor('/travel/hauling')).toBe('/travel');
-    expect(tabbedPagePathFor('/travel/hauling')).toBe('/travel/hauling');
+  it('reports the old path as a redirect and the new one as a Market tab', () => {
+    expect(isTabRedirectPath('/travel/hauling')).toBe(true);
+    expect(pageKeyFor('/market/hauling')).toBe('/market');
+    expect(tabbedPagePathFor('/market/hauling')).toBe('/market/hauling');
+    expect(PAGE_LEGACY_LOCATIONS['/market']?.('/market/hauling', '')).toBeNull();
   });
 });
 
@@ -231,6 +240,7 @@ describe('History is Transactions only (issue #3692)', () => {
       'stock',
       'history',
       'appraisal',
+      'hauling',
     ]);
   });
 
@@ -262,7 +272,6 @@ describe('Thera / Turnur is a modal on Route Safety, not a Travel tab', () => {
     });
     expect(moved?.('/travel/thera/', '')).toEqual({ pathname: '/travel/route', search: '' });
     expect(moved?.('/travel/therax', '')).toBeNull();
-    expect(moved?.('/travel/hauling', '')).toBeNull();
     expect(isTabRedirectPath('/travel/thera')).toBe(true);
   });
 });
