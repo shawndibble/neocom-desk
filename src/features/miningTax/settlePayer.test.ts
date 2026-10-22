@@ -10,15 +10,15 @@ const ARCHANGEL = 1;
 const OTICHODA = 2;
 
 describe('payerOptions', () => {
-  it('gives one option per character, with its subtotal and entry count, most owed first', () => {
+  it('gives one option per character, with its subtotal, most owed first', () => {
     const rows = [
       row(ARCHANGEL, 'Ashken Archangel', 100),
       row(OTICHODA, 'Ashken Otichoda', 300),
       row(ARCHANGEL, 'Ashken Archangel', 50),
     ];
     expect(payerOptions(rows)).toEqual([
-      { characterId: OTICHODA, characterName: 'Ashken Otichoda', subtotal: 300, count: 1 },
-      { characterId: ARCHANGEL, characterName: 'Ashken Archangel', subtotal: 150, count: 2 },
+      { characterId: OTICHODA, characterName: 'Ashken Otichoda', subtotal: 300 },
+      { characterId: ARCHANGEL, characterName: 'Ashken Archangel', subtotal: 150 },
     ]);
   });
 

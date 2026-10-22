@@ -68,7 +68,7 @@ const THREE_ROWS = [
 function renderDialog(
   rows: readonly SettleUpRow[],
   extra: {
-    onPickFromWallet?: () => void;
+    onPickFromWallet?: (tickedIds: ReadonlySet<string>) => void;
     onPaid?: () => void;
     payerId?: number;
     focusIds?: ReadonlySet<string>;
@@ -236,6 +236,7 @@ describe('SettleUpDialog', () => {
     renderDialog(THREE_ROWS, { onPickFromWallet });
     await userEvent.click(screen.getByRole('button', { name: 'Already in my wallet? Pick it…' }));
     expect(onPickFromWallet).toHaveBeenCalledOnce();
+    expect(onPickFromWallet).toHaveBeenCalledWith(new Set(['a-1', 'a-2', 'a-3']));
   });
 });
 

@@ -78,7 +78,16 @@ export function useOpenInEve(
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((s) => (s.hydrated ? s.activeCharacterId : null));
   const fixedCharacter = options?.characterId !== undefined;
-  const characterId = fixedCharacter ? (options.characterId ?? null) : activeCharacterId;
+  const characterId = options?.characterId ?? activeCharacterId;
+  /** Permissions shows the active Character, so a fixed one's grant link switches to it first. */
+  const grantLink = (
+    <GrantMissingLink
+      groups={MISSING_GROUPS}
+      asCharacter={
+        fixedCharacter && characterId !== activeCharacterId ? (characterId ?? undefined) : undefined
+      }
+    />
+  );
   const lacksScope = useCharacterLacksEndpoints(characterId, OPEN_IN_EVE_ENDPOINTS);
   const online = useOnline();
   const holders = useCharacterIdsWithScopes(OPEN_IN_EVE_SCOPES);
@@ -120,11 +129,10 @@ export function useOpenInEve(
         </>
       ) : fixedCharacter ? (
         <>
-          {t('openInEve.notGranted', { name: names.get(characterId) ?? '' })}{' '}
-          <GrantMissingLink groups={MISSING_GROUPS} />
+          {t('openInEve.notGranted', { name: names.get(characterId) ?? '' })} {grantLink}
         </>
       ) : (
-        <GrantMissingLink groups={MISSING_GROUPS} />
+        grantLink
       )
     ) : !online ? (
       t('common.needsConnection')
@@ -151,11 +159,9 @@ export function useOpenInEve(
       } else {
         setOutcome({
           tone: 'alert',
-          text: result.needsPermission ? (
-            <GrantMissingLink groups={MISSING_GROUPS} />
-          ) : (
-            t('openInEve.failed', { message: result.message ?? t('openInEve.unknownError') })
-          ),
+          text: result.needsPermission
+            ? grantLink
+            : t('openInEve.failed', { message: result.message ?? t('openInEve.unknownError') }),
         });
       }
     } catch {

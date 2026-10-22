@@ -748,13 +748,11 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
               const payeeIds = [...new Set(settleUpRows.map((r) => r.assignment.payeeId))];
               const only = payeeIds.length === 1 ? payeeIds[0] : undefined;
               if (!only) return undefined;
-              // The entries being settled, not the Payee's whole balance.
-              const members = settleUpRows.flatMap((r) =>
-                allDisplayRows
+              return (tickedIds: ReadonlySet<string>) => {
+                // The entries ticked to settle, not the Payee's whole balance.
+                const members = allDisplayRows
                   .flatMap(allMembers)
-                  .filter((m) => m.assignment.id === r.assignment.id)
-              );
-              return () => {
+                  .filter((m) => tickedIds.has(m.assignment.id));
                 actions.openSettleUp(null);
                 actions.openLinkWallet({ payeeId: only, members });
               };

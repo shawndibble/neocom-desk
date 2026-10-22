@@ -155,7 +155,7 @@ describe('OpenInEveButton from a fixed Character', () => {
     expect(info).not.toHaveBeenCalled();
   });
 
-  it('renders nothing when no Character holds the permission', async () => {
+  it('renders nothing until some Character holds the permission', async () => {
     await db.tokens.update(PAYER, { scopes: [] });
     await db.tokens.update(ONE, { scopes: [] });
     render(
@@ -163,8 +163,24 @@ describe('OpenInEveButton from a fixed Character', () => {
         <OpenInEveButton kind="information" id={7} characterId={PAYER} />
       </MemoryRouter>
     );
-    await vi.waitFor(() =>
-      expect(screen.queryByRole('button', { name: 'Open in EVE' })).not.toBeInTheDocument()
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole('button', { name: 'Open in EVE' })).not.toBeInTheDocument();
+    // The same render shows it, still blocked for the payer, once another Character grants it.
+    await db.tokens.update(ONE, { scopes: ['esi-ui.open_window.v1'] });
+    expect(await screen.findByRole('button', { name: 'Open in EVE' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
     );
+  });
+
+  it("the payer's grant link switches to the payer before opening Permissions", async () => {
+    await db.tokens.update(PAYER, { scopes: [] });
+    render(
+      <MemoryRouter>
+        <OpenInEveButton kind="information" id={7} characterId={PAYER} />
+      </MemoryRouter>
+    );
+    await userEvent.click(await screen.findByRole('link', { name: /Grant/ }));
+    await vi.waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(PAYER));
   });
 });

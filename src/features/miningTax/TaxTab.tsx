@@ -266,11 +266,14 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   );
   useRefreshOnOreFormChange(refresh);
 
+  // Remembered per device once changed; a first visit stays on All characters.
+  const rememberedCharacterFilter = useRememberedCharacterFilter<typeof TAX_URL_PARAMS>(
+    'miningTax',
+    'tax.character',
+    'all'
+  );
   const [{ 'tax.character': characterFilter, 'tax.payee': payeeFilter }, setTaxUrlParams] =
-    useRememberedUrlParams(
-      TAX_URL_PARAMS,
-      useRememberedCharacterFilter<typeof TAX_URL_PARAMS>('miningTax', 'tax.character', 'all')
-    );
+    useRememberedUrlParams(TAX_URL_PARAMS, rememberedCharacterFilter);
   const setCharacterFilter = useCallback(
     (next: CharacterFilterValue) => setTaxUrlParams({ 'tax.character': next }),
     [setTaxUrlParams]

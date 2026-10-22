@@ -16,7 +16,6 @@ export interface PayerOption {
   characterName: string;
   /** Sum of `taxOwed` over this Character's rows. */
   subtotal: number;
-  count: number;
 }
 
 /** One option per Character among `rows`, most owed first (ties by name). */
@@ -28,10 +27,8 @@ export function payerOptions(rows: readonly PayableRow[]): PayerOption[] {
       characterId: id,
       characterName: r.characterName,
       subtotal: 0,
-      count: 0,
     };
     option.subtotal += r.assignment.taxOwed;
-    option.count += 1;
     byCharacter.set(id, option);
   }
   return [...byCharacter.values()].sort(
@@ -51,8 +48,7 @@ export function defaultPayer(
 ): number | null {
   const options = payerOptions(rows);
   if (options.length === 0) return null;
-  if (options.some((o) => o.characterId === activeCharacterId) && options.length > 1) {
-    return activeCharacterId;
-  }
-  return options[0].characterId;
+  return (
+    options.find((o) => o.characterId === activeCharacterId)?.characterId ?? options[0].characterId
+  );
 }

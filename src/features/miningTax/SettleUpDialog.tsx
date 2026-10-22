@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -57,7 +57,7 @@ interface SettleUpDialogProps {
    * for when the transfer already shows in the journal. The button shows only
    * when this is given.
    */
-  onPickFromWallet?: () => void;
+  onPickFromWallet?: (tickedIds: ReadonlySet<string>) => void;
   /** The fresh ledger pull behind the "Ore still arriving" line; absent, the line judges what is already loaded. */
   arrivalCheck?: SettleUpRecheck;
   /**
@@ -112,7 +112,14 @@ export function SettleUpDialog({
   const [payer, setPayer] = useState<number | null>(
     () => (payers.some((p) => p.characterId === payerId) ? payerId : payers[0]?.characterId) ?? null
   );
-  const [focus, setFocus] = useState<ReadonlySet<string> | null>(focusIds ?? null);
+  // A focus naming none of the payer's offered entries would open with nothing ticked: drop it.
+  const [focus, setFocus] = useState<ReadonlySet<string> | null>(() =>
+    focusIds !== undefined &&
+    rows.some((r) => r.assignment.characterId === payer && focusIds.has(r.assignment.id))
+      ? focusIds
+      : null
+  );
+  const fromId = useId();
   const startsTicked = (r: SettleUpRow, who: number | null, only: ReadonlySet<string> | null) =>
     (who === null || r.assignment.characterId === who) &&
     (only === null || only.has(r.assignment.id));
@@ -314,6 +321,31 @@ export function SettleUpDialog({
 
   const sumOwed = (list: readonly SettleUpRow[]) =>
     list.reduce((sum, r) => sum + r.assignment.taxOwed, 0);
+  const primaryTicked = primaryRows.filter((r) => !excluded.has(r.assignment.id));
+
+  /** One collapsible list of tickable entries: the payer's, or an "Also pay" group. */
+  const entryGroup = (
+    label: string,
+    trailingIsk: number,
+    list: readonly SettleUpRow[],
+    [expanded, setExpanded]: [boolean, (update: (open: boolean) => boolean) => void],
+    showCharacter: boolean,
+    footer?: ReactNode
+  ) => (
+    <Disclosure
+      key={label}
+      className="overflow-hidden rounded-xs border border-line"
+      label={label}
+      trailing={`${formatIsk(trailingIsk)} ISK`}
+      expanded={expanded}
+      onToggle={() => setExpanded((v) => !v)}
+    >
+      <ul className="divide-y divide-line">
+        {list.map((r) => entryRow(r, showCharacter))}
+        {footer}
+      </ul>
+    </Disclosure>
+  );
 
   // What the "Sent a different amount?" figure does to the ticked entries.
   let allocationSummary: { text: string; warn: boolean } | null = null;
@@ -351,7 +383,7 @@ export function SettleUpDialog({
         />
         {payers.length > 1 && payer !== null && (
           <div className="space-y-1">
-            <p id="settle-up-from" className={SETTLE_FIELD_LABEL}>
+            <p id={fromId} className={SETTLE_FIELD_LABEL}>
               {t('miningTax.settleUp.fromLabel')}
             </p>
             {payers.length <= MAX_SEGMENTED_PAYERS ? (
@@ -371,7 +403,7 @@ export function SettleUpDialog({
               />
             ) : (
               <Select value={String(payer)} onValueChange={(value) => changePayer(Number(value))}>
-                <SelectTrigger aria-labelledby="settle-up-from">
+                <SelectTrigger aria-labelledby={fromId}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -388,49 +420,36 @@ export function SettleUpDialog({
             )}
           </div>
         )}
-        <Disclosure
-          className="overflow-hidden rounded-xs border border-line"
-          label={t('miningTax.settleUp.entriesSummary', {
-            count: included.length,
-            range: shortEveRange(sortedDates),
-          })}
-          trailing={`${formatIsk(total)} ISK`}
-          expanded={entriesOpen}
-          onToggle={() => setEntriesOpen((v) => !v)}
-        >
-          <ul className="divide-y divide-line">
-            {primaryRows.map((r) => entryRow(r, payers.length === 1))}
-            <li className="px-2 py-1.5 text-[0.6875rem] text-text-dim">
-              {t('miningTax.settleUpUntickHint')}
-            </li>
-          </ul>
-        </Disclosure>
-        {sameCharacterRest.length > 0 && (
-          <Disclosure
-            className="overflow-hidden rounded-xs border border-line"
-            label={t('miningTax.settleUp.alsoPayRest', { count: sameCharacterRest.length })}
-            trailing={`${formatIsk(sumOwed(sameCharacterRest))} ISK`}
-            expanded={restOpen}
-            onToggle={() => setRestOpen((v) => !v)}
-          >
-            <ul className="divide-y divide-line">
-              {sameCharacterRest.map((r) => entryRow(r, false))}
-            </ul>
-          </Disclosure>
+        {entryGroup(
+          t('miningTax.settleUp.entriesSummary', {
+            count: primaryTicked.length,
+            range: shortEveRange(primaryTicked.map((r) => r.assignment.date).sort()),
+          }),
+          sumOwed(primaryTicked),
+          primaryRows,
+          [entriesOpen, setEntriesOpen],
+          // With no picker, the row itself names who mined it; with one, the picker does.
+          payers.length === 1,
+          <li className="px-2 py-1.5 text-[0.6875rem] text-text-dim">
+            {t('miningTax.settleUpUntickHint')}
+          </li>
         )}
-        {otherCharacterRows.length > 0 && (
-          <Disclosure
-            className="overflow-hidden rounded-xs border border-line"
-            label={t('miningTax.settleUp.alsoPayOthers', { count: otherCharacterRows.length })}
-            trailing={`${formatIsk(sumOwed(otherCharacterRows))} ISK`}
-            expanded={othersOpen}
-            onToggle={() => setOthersOpen((v) => !v)}
-          >
-            <ul className="divide-y divide-line">
-              {otherCharacterRows.map((r) => entryRow(r, true))}
-            </ul>
-          </Disclosure>
-        )}
+        {sameCharacterRest.length > 0 &&
+          entryGroup(
+            t('miningTax.settleUp.alsoPayRest', { count: sameCharacterRest.length }),
+            sumOwed(sameCharacterRest),
+            sameCharacterRest,
+            [restOpen, setRestOpen],
+            false
+          )}
+        {otherCharacterRows.length > 0 &&
+          entryGroup(
+            t('miningTax.settleUp.alsoPayOthers', { count: otherCharacterRows.length }),
+            sumOwed(otherCharacterRows),
+            otherCharacterRows,
+            [othersOpen, setOthersOpen],
+            true
+          )}
 
         <div className="divide-y divide-line rounded-xs border border-line bg-panel-2">
           {perPayee.length <= 1 ? (
@@ -525,7 +544,11 @@ export function SettleUpDialog({
           {onPickFromWallet && (
             <>
               {' '}
-              <button type="button" className={inlineLinkClassName} onClick={onPickFromWallet}>
+              <button
+                type="button"
+                className={inlineLinkClassName}
+                onClick={() => onPickFromWallet(new Set(included.map((r) => r.assignment.id)))}
+              >
                 {t('miningTax.settleUp.pickFromWallet')}
               </button>
             </>
