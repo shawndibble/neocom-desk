@@ -1413,7 +1413,7 @@ describe('Mail', () => {
       render(<App />);
       await screen.findByText('Second pilot mail');
       expect(
-        screen.getByRole('button', { name: /^All characters · \d\. Not included: Pilot Three$/ })
+        screen.getByRole('button', { name: 'All characters · 3. Not included: Pilot Three' })
       ).toBeInTheDocument();
       expect(screen.queryByText(/2 of 3/)).not.toBeInTheDocument();
     });

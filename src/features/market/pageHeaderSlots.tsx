@@ -3,9 +3,10 @@ import { useMemo, useState } from 'react';
 /**
  * Live nodes inside Market's `PageHeader`. A character tab (Open orders,
  * History) portals its Character picker into `scope`, its Refresh / export
- * into `actions` and its data age into `meta`, so they sit in the page's one header, beside the bell, rather than
- * in a title bar of the tab's own. Its data lives in the panel, which is why
- * the panel renders them and the route only owns where they land.
+ * into `actions` and its data age into `meta`, so they sit in the page's one
+ * header, beside the bell, rather than in a title bar of the tab's own. Its
+ * data lives in the panel, which is why the panel renders them and the route
+ * only owns where they land.
  */
 export interface PageHeaderSlots {
   meta: HTMLElement | null;

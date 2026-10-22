@@ -71,6 +71,33 @@ describe('PageHeader', () => {
       );
     });
 
+    // Market's meta is a portal target, always rendered and empty until a tab
+    // fills it: an empty slot must not hold the clip's 40px minimum open.
+    it('takes no room for a meta slot that has nothing in it (yet)', () => {
+      const { rerender } = render(
+        <PageHeader
+          title="Market"
+          meta={<span data-testid="slot" className="contents" />}
+          scope={<button type="button">All characters</button>}
+        />
+      );
+      const wrapper = screen.getByTestId('slot').parentElement!;
+      expect(wrapper).toHaveClass('empty:hidden', 'has-[>:only-child:empty]:hidden');
+      expect(wrapper.matches(':has(>:only-child:empty)')).toBe(true);
+      rerender(
+        <PageHeader
+          title="Market"
+          meta={
+            <span data-testid="slot" className="contents">
+              <time>12m ago</time>
+            </span>
+          }
+          scope={<button type="button">All characters</button>}
+        />
+      );
+      expect(wrapper.matches(':has(>:only-child:empty)')).toBe(false);
+    });
+
     it('without scope keeps the wrapping header as before', () => {
       render(<PageHeader title="Assets" actions={<button type="button">Refresh</button>} />);
       const h1 = screen.getByRole('heading', { level: 1 });

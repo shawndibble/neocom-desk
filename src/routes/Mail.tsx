@@ -60,9 +60,10 @@ interface MailViewProps {
   scope: CharacterFilterValue;
   /**
    * The This/All picker (with per-Character unread), given the names "All"
-   * leaves out (no mail grant, not synced); null when there is one Character to offer.
+   * leaves out (no mail grant, not synced) and whether the scope's mail is
+   * still loading. It hides itself when there is one Character to offer.
    */
-  scopeControl: (missingNames: readonly string[] | undefined) => ReactNode;
+  scopeControl: (state: { missingNames?: readonly string[]; loading: boolean }) => ReactNode;
 }
 
 /** Mail's two-pane client for one scope: list beside reading pane, the list scrolls on its own, the reading pane grows with the page (docs/context/decisions/20261012-161659-mail-reading-pane-scrolls-with-the-page-not.md). */
@@ -296,7 +297,10 @@ function MailView({ scope, scopeControl }: MailViewProps) {
       <PageHeader
         title={t('mail.title')}
         meta={fetchedAt && <DataAgeBadge date={fetchedAt} />}
-        scope={scopeControl(isAll ? data?.skipped.map((c) => c.name) : undefined)}
+        scope={scopeControl({
+          missingNames: isAll ? data?.skipped.map((c) => c.name) : undefined,
+          loading: loading && !data,
+        })}
         actions={
           <>
             {isDesktop && !newMailOpen && (
@@ -532,7 +536,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
 export function Mail() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const { scope, scopeHydrated, offered, characterCount, unreadByCharacter, changeScope } =
+  const { scope, scopeHydrated, characterCount, unreadByCharacter, changeScope } =
     useMailScopeSwitch();
 
   if (!scopeHydrated) {
@@ -546,18 +550,19 @@ export function Mail() {
     <MailView
       key={scope}
       scope={scope}
-      scopeControl={(missingNames) =>
-        offered ? (
-          <CharacterFilterControl
-            activeCharacterId={activeCharacterId}
-            value={scope}
-            onChange={changeScope}
-            characterCount={characterCount}
-            unreadByCharacter={unreadByCharacter}
-            missingNames={missingNames}
-          />
-        ) : null
-      }
+      // Always the control, so the header's one-line lock never flips; with one
+      // Character (`characterCount` 1) it renders nothing.
+      scopeControl={({ missingNames, loading }) => (
+        <CharacterFilterControl
+          activeCharacterId={activeCharacterId}
+          value={scope}
+          onChange={changeScope}
+          characterCount={characterCount}
+          unreadByCharacter={unreadByCharacter}
+          missingNames={missingNames}
+          loading={loading}
+        />
+      )}
     />
   );
 }

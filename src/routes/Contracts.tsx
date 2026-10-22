@@ -341,6 +341,8 @@ export function Contracts() {
               characterCount={characterCount}
               activeCharacterId={activeCharacterId}
               value={pickerValue}
+              // A source switch spins in the trigger while the body waits on it.
+              loading={sourceHeld || (loading && !active.data)}
               onChange={changeSource}
             />
           ) : undefined
