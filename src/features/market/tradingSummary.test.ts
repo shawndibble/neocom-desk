@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { MarginGap } from '@/engine/market/realizedMargin';
 import type { WalletTransaction } from '@/esi/endpoints';
 import { summarizeTrading, tradingWindow } from './tradingSummary';
 
@@ -64,7 +65,7 @@ describe('summarizeTrading', () => {
 
   it('counts the sales shown that have a gap, and their revenue', () => {
     const three = [...fills, { ...sale(3, '2026-01-07T10:00:00Z'), quantity: 5, unit_price: 20 }];
-    const gaps = new Map<number, 'noBuy' | 'outside' | 'noTax'>([
+    const gaps = new Map<number, MarginGap>([
       [2, 'noBuy'],
       [3, 'noTax'],
     ]);

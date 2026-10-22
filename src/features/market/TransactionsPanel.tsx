@@ -2,7 +2,6 @@ import { useCallback, useMemo } from 'react';
 import { useCharacterCount } from '@/features/character/useCharacters';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { TFunction } from 'i18next';
 import {
   Button,
   DataAgeBadge,
@@ -66,27 +65,11 @@ import { highlightedTransactionId } from './transactionHighlight';
 import { formatCount } from '@/lib/formatCount';
 
 /** Static keys, so the i18n key scan sees every string. */
-function marginGapLabel(t: TFunction, gap: MarginGap): string {
-  switch (gap) {
-    case 'noBuy':
-      return t('wallet.marginGap.noBuy');
-    case 'noTax':
-      return t('wallet.marginGap.noTax');
-    case 'outside':
-      return t('wallet.marginGap.outside');
-  }
-}
-
-function marginGapHint(t: TFunction, gap: MarginGap): string {
-  switch (gap) {
-    case 'noBuy':
-      return t('wallet.marginGapHint.noBuy');
-    case 'noTax':
-      return t('wallet.marginGapHint.noTax');
-    case 'outside':
-      return t('wallet.marginGapHint.outside');
-  }
-}
+const MARGIN_GAP_COPY: Record<MarginGap, { label: string; hint: string }> = {
+  noBuy: { label: 'wallet.marginGap.noBuy', hint: 'wallet.marginGapHint.noBuy' },
+  noTax: { label: 'wallet.marginGap.noTax', hint: 'wallet.marginGapHint.noTax' },
+  outside: { label: 'wallet.marginGap.outside', hint: 'wallet.marginGapHint.outside' },
+};
 
 const HISTORY_CHARACTER_PARAMS = { 'txn.chars': characterFilterParam('current') };
 
@@ -339,8 +322,8 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
             const gap = gaps.get(txn.transaction_id);
             if (!gap) return '—';
             return (
-              <HintText content={marginGapHint(t, gap)}>
-                <span className="text-xs text-text-dim">{marginGapLabel(t, gap)}</span>
+              <HintText content={t(MARGIN_GAP_COPY[gap].hint)}>
+                <span className="text-xs text-text-dim">{t(MARGIN_GAP_COPY[gap].label)}</span>
               </HintText>
             );
           }
