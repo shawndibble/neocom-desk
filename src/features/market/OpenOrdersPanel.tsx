@@ -29,7 +29,6 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useCharacterCount } from '@/features/character/useCharacters';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
-import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   CharacterFilterControl,
@@ -584,7 +583,6 @@ export function OpenOrdersPanel({
         <div className="min-w-0 space-y-3">
           {viewedCharacterId !== undefined && (
             <div className="flex items-center gap-3">
-              <WalletOriginCrumb />
               {viewedCharacter && (
                 <CharacterScopeReadout
                   scope="one"

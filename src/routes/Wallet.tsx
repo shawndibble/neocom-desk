@@ -86,7 +86,6 @@ export function Wallet() {
     rememberedCharacterFilter
   );
   const walletCharacterFilter = walletParams.char;
-  const setWalletCharacterFilter = (char: CharacterFilterValue) => setWalletParams({ char });
 
   // A Character named in the URL is the one page subject: the balance panel
   // follows it rather than a stored "all" default.
@@ -100,6 +99,12 @@ export function Wallet() {
     !resolvedWalletFilter.has(activeCharacterId ?? -1);
 
   const drill = useWalletDrill();
+  // A new pick from the header picker ends a drill: the drilled panel would
+  // otherwise keep showing one Character the picker no longer describes.
+  const setWalletCharacterFilter = (char: CharacterFilterValue) => {
+    setWalletParams({ char });
+    if (drill.drilledId !== 0) drill.clearDrill();
+  };
 
   const allCharacters = useCharacters();
   const activeCharacter = allCharacters.find((c) => c.characterId === activeCharacterId);

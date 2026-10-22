@@ -39,5 +39,7 @@ export function useWalletDrill() {
       () => (backButtonRef.current?.isConnected ? null : panelHeadingRef.current)
     );
   }, [setDrilledId, focusAfterCommit, drilledId, t]);
-  return { drilledId, drillInto, leaveDrill, backButtonRef, panelHeadingRef };
+  /** Ends a drill in place (no history entry, no focus move), for a scope change. */
+  const clearDrill = useCallback(() => setDrilledId(0), [setDrilledId]);
+  return { drilledId, drillInto, leaveDrill, clearDrill, backButtonRef, panelHeadingRef };
 }

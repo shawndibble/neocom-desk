@@ -928,6 +928,41 @@ describe('Wallet', () => {
       await waitFor(() => expect(window.location.search).not.toContain('drill='));
     });
 
+    it('ends a drill when the header picker changes', async () => {
+      const user = userEvent.setup();
+      await seedSecondCharacter();
+      await grantSnapshotScopes(CHAR_ID, 92);
+      await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
+      render(<App />);
+
+      const table = await screen.findByRole('table', { name: 'Balance by character' });
+      await user.click(await within(table).findByText('Pilot Two'));
+      await waitFor(() => expect(window.location.search).toContain('drill=92'));
+
+      const pageHeader = screen.getByRole('heading', { level: 1 }).closest('header')!;
+      await user.click(within(pageHeader).getByRole('button', { name: /^All characters/ }));
+      await user.click(await screen.findByRole('menuitemradio', { name: 'This character' }));
+
+      await waitFor(() => expect(window.location.search).not.toContain('drill='));
+      expect(window.location.search).not.toContain('char=all');
+      expect(
+        within(pageHeader).getByRole('button', { name: 'This character' })
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Pilot Two only')).not.toBeInTheDocument();
+    });
+
+    it('offers no Character picker on the LP Store tab', async () => {
+      await seedSecondCharacter();
+      await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
+      window.history.pushState({}, '', '/wallet/lp-store');
+      render(<App />);
+
+      const title = await screen.findByRole('heading', { level: 1, name: 'LP Store' });
+      expect(
+        within(title.closest('header')!).queryByRole('button', { name: /characters?/i })
+      ).toBeNull();
+    });
+
     it('moves focus to the drilled back button, then the Character row, never the body', async () => {
       const user = userEvent.setup();
       await seedSecondCharacter();

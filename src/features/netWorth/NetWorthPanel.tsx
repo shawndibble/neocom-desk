@@ -24,6 +24,7 @@ import { MultiSelect } from '@/components/ui/MultiSelect';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { inlineLinkClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { walletBalancesCsvColumns } from '@/features/character/walletBalancesCsv';
 import { iskToneClass } from '@/features/character/format';
 import { lineRows, stackRows } from '@/engine/netWorth/chartRows';
@@ -39,7 +40,6 @@ import {
   type LayerValues,
 } from '@/engine/netWorth/series';
 import { cx } from '@/lib/cx';
-import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import { formatIsk } from '@/lib/isk';
 import { formatDateOnly } from '@/lib/timestamp';
 import { CharacterSwatch } from './CharacterSwatch';
@@ -372,8 +372,8 @@ export function NetWorthPanel({
     <Panel
       title={title ?? t('wallet.netWorth.title')}
       headingRef={headingRef}
-      // A drill shows one of the picked Characters while the page header's
-      // picker still reads "All characters": the title bar names whose it is.
+      // A drill shows one Character while the page header's picker keeps the
+      // wider pick it was reached from: the title bar names whose it is.
       meta={
         drilled && single ? (
           <CharacterScopeReadout

@@ -3915,9 +3915,6 @@
       "missing": "Not included: {{names}}",
       "triggerPartial": "{{label}}. {{missing}}"
     },
-    "crumb": {
-      "wallet": "Wallet"
-    },
     "filter": {
       "thisCharacter": "This character",
       "allCharacters": "All characters",

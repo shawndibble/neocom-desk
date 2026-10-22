@@ -1,7 +1,8 @@
 /**
- * The "This Character / All Characters" toggle shared by the cross-character
- * Wallet and Assets pages (in their `PageHeader` `scope`), the Industry Active Jobs view, by Open Orders' character
- * strip, and by the synced default in Settings (issue #607).
+ * The "This Character / All Characters" toggle shared by every page that can
+ * show more than one Character's data (Wallet, Assets, Market, Contracts,
+ * Industry…, each in its `PageHeader`'s `scope`) and by the synced default in
+ * Settings (issue #607).
  *
  * Used to also offer a hand-picked subset of specific characters (a
  * checkbox-per-character list with a search box, the `MoonMiningTax.tsx`

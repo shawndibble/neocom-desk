@@ -875,33 +875,6 @@ describe('OpenOrdersPanel', () => {
         expect(useActiveCharacter.getState().activeCharacterId).toBe(1);
       });
 
-      it('shows the crumb only when route state names the Wallet', async () => {
-        const plain = renderPanel('/market/orders?char=2');
-        await screen.findByText('Bravo only');
-        expect(screen.queryByRole('link', { name: /Wallet/ })).not.toBeInTheDocument();
-        plain.unmount();
-        render(
-          <MemoryRouter
-            initialEntries={[
-              { pathname: '/market/orders', search: '?char=2', state: { origin: 'wallet' } },
-            ]}
-          >
-            <FakeItemActions actions={actions}>
-              {withOrderDetailLoaders(
-                <WithPageHeaderSlots>
-                  {(slots) => <OpenOrdersPanel headerSlots={slots} />}
-                </WithPageHeaderSlots>,
-                loaders
-              )}
-            </FakeItemActions>
-          </MemoryRouter>
-        );
-        expect(await screen.findByRole('link', { name: /Wallet/ })).toHaveAttribute(
-          'href',
-          '/wallet'
-        );
-      });
-
       it('shows the grant note for a Character without the orders scope', async () => {
         mockedLoadAll.mockResolvedValue(snapshot([], [{ characterId: 2, name: 'Bravo' }]));
         renderPanel('/market/orders?char=2');

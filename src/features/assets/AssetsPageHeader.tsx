@@ -12,6 +12,7 @@ import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadou
 import { formatAge } from '@/lib/age';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTranslation } from 'react-i18next';
+import { useIsNarrow } from '@/lib/useIsNarrow';
 import type { AssetsData } from './useAssetsData';
 import type { AssetsRows } from './useAssetsRows';
 
@@ -42,6 +43,7 @@ export function AssetsPageHeader({
   } = assetsData;
   const { selectMode, toggleSelectMode } = assetsRows;
   const { t } = useTranslation();
+  const isNarrow = useIsNarrow();
   // One picker for all three tabs. Absent while a `?char=<id>` link names the
   // page's Character (a fixed subject, named in `meta` instead) and for a
   // one-Character account, where both options resolve to the same pilot.
@@ -79,7 +81,9 @@ export function AssetsPageHeader({
               <TableActionsMenu
                 name={t('assets.title')}
                 label={t('assets.tools.label')}
-                triggerText={t('assets.tools.label')}
+                // Below `md` the word wrapped the title row (a `?char=` link's
+                // "<name> only" readout beside it): the menu takes its icon-only ⋮ form.
+                triggerText={isNarrow ? undefined : t('assets.tools.label')}
                 tableExport={assetsExport}
                 size="md"
               >
