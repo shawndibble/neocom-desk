@@ -24,6 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  HeaderMoreMenu,
   IconButton,
   InfoTooltip,
   Modal,
@@ -51,6 +52,7 @@ import { StatusPill } from '@/features/miningTax/StatusPill';
 import type { PayeeBalance } from '@/features/miningTax/balances';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { useMediaQuery } from '@/lib/useMediaQuery';
 import { SAMPLE_ACTIVE_CHARACTER } from '@/storybook/sampleData';
 import { NewComponent } from './NewComponent';
 import {
@@ -352,6 +354,7 @@ const HISTORY_NEWEST = HISTORY_ROWS.map((r) => r.date.slice(0, 7))
 export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }) {
   const tabsId = useTabsId();
   const phone = useIsPhone();
+  const payeesFit = useMediaQuery('(min-width: 64rem)');
   const [sort, setSort] = useState<DataTableSort>(DEFAULT_SORT);
   const [historySort, setHistorySort] = useState<DataTableSort>(DEFAULT_SORT);
   const openColumns = usePersonalColumns(true);
@@ -389,11 +392,24 @@ export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }
       <PageHeader
         title="Mining"
         meta={<DataAgeBadge date={LOADED_AT} />}
+        scope={
+          <CharacterFilterControl
+            activeCharacterId={ME}
+            value="all"
+            onChange={() => {}}
+            characterCount={2}
+          />
+        }
         actions={
           <>
-            <Button variant="ghost">Payees</Button>
-            <IconButton icon={<Icon.More />} label="More actions" />
+            {/* As `TaxTab`: Payees folds into the ⋮ below `lg`. */}
+            {payeesFit && <Button variant="ghost">Payees</Button>}
             <IconButton icon={<Icon.Refresh />} label="Refresh" />
+            <HeaderMoreMenu>
+              {!payeesFit && <DropdownMenuItem>Payees</DropdownMenuItem>}
+              <DropdownMenuItem>Ore tags</DropdownMenuItem>
+              <DropdownMenuItem>Settings</DropdownMenuItem>
+            </HeaderMoreMenu>
           </>
         }
       />
@@ -438,12 +454,6 @@ export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }
       <CorpBookSyncNote />
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <CharacterFilterControl
-            activeCharacterId={ME}
-            value="all"
-            onChange={() => {}}
-            characterCount={2}
-          />
           <Button size="sm">All payees</Button>
           {phone && (
             <DataTableSortPicker

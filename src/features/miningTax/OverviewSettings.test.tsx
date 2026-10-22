@@ -2,10 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { MINING_YIELD_RANGES } from '@/engine/miningTax/yieldRange';
 import {
   BuybackRateInput,
-  MobileSettings,
+  SettingsSheet,
   PriceBasisOptions,
   ShowRefiningToggle,
   ValueMenu,
@@ -91,12 +90,12 @@ describe('Value menu triggers (issue #3816)', () => {
     expect(heightTokens(screen.getByRole('button')).sort()).toEqual(mdTier);
   });
 
-  it('MobileSettings trigger sizes from the md control tier, not a bare height', () => {
+  it('SettingsSheet is an icon-only gear, named for the sheet', () => {
     render(
-      <MobileSettings range={MINING_YIELD_RANGES[0]} basis="now-sell" buybackRate={100}>
+      <SettingsSheet>
         <div />
-      </MobileSettings>
+      </SettingsSheet>
     );
-    expect(heightTokens(screen.getByRole('button')).sort()).toEqual(mdTier);
+    expect(screen.getByRole('button', { name: 'Page settings' })).toBeInTheDocument();
   });
 });

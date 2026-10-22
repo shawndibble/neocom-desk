@@ -13,8 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui';
-import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import type { CharacterFilterValue } from '@/features/character/characterFilterValue';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { MOSTLY_COVERED_PCT } from './opportunityMetrics';
 
@@ -109,35 +107,23 @@ function StockFilterControl({
   );
 }
 
-/** The panel's `meta` slot: view toggle (desktop), Character filter, stock filter. */
+/**
+ * The panel's `meta` slot: view toggle (desktop) and stock filter. The
+ * Character filter is the Industry page's own, in its `PageHeader`.
+ */
 export function OpportunitiesFilterBar({
   view,
   onViewChange,
-  showCharacterFilter,
-  activeCharacterId,
-  characterFilter,
-  onCharacterFilterChange,
   stockFilter,
   onStockFilterChange,
 }: {
   view: OpportunitiesView;
   onViewChange: (next: OpportunitiesView) => void;
-  showCharacterFilter: boolean;
-  activeCharacterId: number;
-  characterFilter: CharacterFilterValue;
-  onCharacterFilterChange: (next: CharacterFilterValue) => void;
   stockFilter: OpportunitiesStockFilter;
   onStockFilterChange: (next: OpportunitiesStockFilter) => void;
 }) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
-  const characterFilterControl = showCharacterFilter && (
-    <CharacterFilterControl
-      activeCharacterId={activeCharacterId}
-      value={characterFilter}
-      onChange={onCharacterFilterChange}
-    />
-  );
   const stockFilterControl = view === 'ranked' && (
     <StockFilterControl value={stockFilter} onChange={onStockFilterChange} />
   );
@@ -153,15 +139,14 @@ export function OpportunitiesFilterBar({
           { value: 'owned', label: t('industry.opportunitiesViewOwned') },
         ]}
       />
-      {characterFilterControl}
       {stockFilterControl}
     </span>
   ) : (
     // A second header row on a phone, so the stock select gets the full width
-    // instead of colliding with the view picker and Refresh.
-    <span className="flex items-center gap-2 max-md:basis-full">
-      {characterFilterControl}
-      {stockFilterControl}
-    </span>
+    // instead of colliding with the view picker and Refresh. None at all on
+    // All owned, which has no stock filter.
+    stockFilterControl && (
+      <span className="flex items-center gap-2 max-md:basis-full">{stockFilterControl}</span>
+    )
   );
 }

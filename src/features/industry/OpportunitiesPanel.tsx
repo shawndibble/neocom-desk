@@ -6,9 +6,9 @@
  * plans with, just run over every owned blueprint instead of a hand-picked
  * set. Selected rows seed real Build Plans into Compare via `onAddToCompare`.
  *
- * Reuses `CharacterFilterControl` (`ActiveJobsPanel.tsx`'s exact shape) for
- * "this character / all characters / pick some" — this ticket adds no new
- * account-level alt-linking, just this feature's own scoped selector.
+ * Whose blueprints it ranks is Industry's one Character filter
+ * (`useIndustryCharacterFilter`), the same value Active Jobs reads; its
+ * picker rides in the Industry `PageHeader`.
  */
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useMemo, useState, type ReactElement } from 'react';
@@ -47,7 +47,6 @@ import type { PiData } from '@/sde/types';
 import { useRowStartPlan } from './rowStartPlan';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
-import { type CharacterFilterValue } from '@/features/character/characterFilterValue';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
@@ -74,10 +73,9 @@ import { StartPlanButton } from './StartPlanButton';
 import { opportunitiesCsvColumns } from './opportunitiesCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
-import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
-import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
+import { useIndustryCharacterFilter } from './industryCharacterFilter';
 import { useColumnVisibility } from '@/lib/columnVisibility';
-import { useRememberedUrlParams, useUrlParam, useUrlSort } from '@/lib/useUrlState';
+import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { enumParam } from '@/lib/urlState';
 import { OwnedBlueprintsPanel } from './OwnedBlueprintsPanel';
 import {
@@ -110,8 +108,6 @@ interface OpportunitiesPanelProps {
    */
   onDataAgeChange?: (date: Date | null) => void;
 }
-
-const OPPORTUNITIES_CHARACTER_PARAMS = { 'opps.chars': characterFilterParam('current') };
 
 /**
  * The columns' sort keys, at module scope: the columns themselves close over
@@ -165,17 +161,8 @@ export function OpportunitiesPanel({
 
   const [view, setView] = useUrlParam('opps.view', VIEW_PARAM);
   const [stockFilter, setStockFilter] = useUrlParam('opps.stock', STOCK_PARAM);
-  // Absent from the URL: this page's remembered pick, then the synced Settings default.
-  const rememberedCharacterFilter = useRememberedCharacterFilter<
-    typeof OPPORTUNITIES_CHARACTER_PARAMS
-  >('opportunities', 'opps.chars');
-  const [characterParams, setCharacterParams] = useRememberedUrlParams(
-    OPPORTUNITIES_CHARACTER_PARAMS,
-    rememberedCharacterFilter
-  );
-  const characterFilter = characterParams['opps.chars'];
-  const setCharacterFilter = (next: CharacterFilterValue) =>
-    setCharacterParams({ 'opps.chars': next });
+  // Industry's one page-wide filter; its picker rides in the Industry `PageHeader`.
+  const [characterFilter] = useIndustryCharacterFilter();
   const {
     characterIds,
     characterIdsKey,
@@ -344,7 +331,6 @@ export function OpportunitiesPanel({
     );
   }
 
-  const showCharacterFilter = characterCandidates.length > 1;
   const showCharacterColumn = new Set(rows.map((r) => r.candidate.characterId)).size > 1;
 
   const csvColumns = useMemo(() => opportunitiesCsvColumns(t), [t]);
@@ -567,10 +553,6 @@ export function OpportunitiesPanel({
     <OpportunitiesFilterBar
       view={view}
       onViewChange={setView}
-      showCharacterFilter={showCharacterFilter}
-      activeCharacterId={activeCharacterId}
-      characterFilter={characterFilter}
-      onCharacterFilterChange={setCharacterFilter}
       stockFilter={stockFilter}
       onStockFilterChange={setStockFilter}
     />

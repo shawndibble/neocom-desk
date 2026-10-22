@@ -17,9 +17,11 @@ _Recorded 2026-10-22. Supersedes the placement half of
   still describes the control; it just loses to a position that never moves.
 
 - **One picker per page.** A page whose panels each had their own picker gets
-  one page-level picker that drives them all. Industry merges its two
-  (`jobs.chars` on Active Jobs and `opps.chars` on Opportunities) into one in
-  a later PR.
+  one page-level picker that drives them all. Industry merged its two
+  (`jobs.chars` on Active Jobs and `opps.chars` on Opportunities) into one,
+  `industry.chars`, in the Industry header on every Industry page; the old
+  params still open a link, and the old per-panel remembered picks seed the
+  merged one (`industryCharacterFilter.ts`).
 
 - **The cluster's order is fixed:** picker → text-labelled page actions
   (Compose, Payees, a labelled Export…) → icon-only actions (Refresh) → ⋮
