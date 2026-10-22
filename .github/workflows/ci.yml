@@ -12,8 +12,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # `validate` below aggregates `static`, `build` and `functions` and keeps the
+  # `validate` below aggregates `static`, `build` and `rules` and keeps the
   # context name the `develop`/`main` ruleset requires.
+  #
+  # Runner budget: GitHub Actions runs at most 20 jobs at once across the
+  # whole account (Free plan), and every job here counts against it. Parallel
+  # PRs share that pool, so a job that saves no wall time is a slot another
+  # PR's jobs queue for. The shard counts and job merges below are sized
+  # against it.
   #
   # lint, format:check, typecheck and check:case used to be four jobs, each
   # paying its own checkout and `npm ci`. Run back to back they take about as
@@ -68,28 +74,14 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  # functions/ is its own package, with its own lockfile, tsconfig and vitest
-  # run — neither the root typecheck nor the pre-commit hook's copy of it ever
-  # reads it, so without this job the Cloud Functions ship unchecked (issue
-  # #595). Needs only `functions/` installed, not the root.
-  functions:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: functions/package-lock.json
-      - run: npm ci --prefix functions
-      - run: npm run typecheck --prefix functions
-      - run: npm test --prefix functions
-
   # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
-  # reasoning; this one aggregates the parallel jobs above instead of a matrix.
+  # reasoning; this one aggregates `static` and `build` above and `rules`
+  # below instead of a matrix. `rules` is here for the functions/ typecheck
+  # and tests it carries, and that also makes the Firestore rules tests
+  # merge-blocking.
   validate:
     if: ${{ !cancelled() }}
-    needs: [static, build, functions]
+    needs: [static, build, rules]
     runs-on: ubuntu-latest
     steps:
       - name: Fail unless every validate job passed
@@ -138,7 +130,15 @@ jobs:
 
   # Firestore rules tests (rules-tests/): run against the Firestore emulator,
   # which needs a JRE. Kept out of `test-shard` so `npm run test:run` never
-  # needs Java. Not yet a required context in the `develop`/`main` ruleset.
+  # needs Java. Not a required context of its own, but merge-blocking through
+  # `validate` since it took over the functions/ gate.
+  #
+  # The functions/ gate: functions/ is its own package, with its own
+  # lockfile, tsconfig and vitest run — neither the root typecheck nor the
+  # pre-commit hook's copy of it ever reads it, so without these steps the
+  # Cloud Functions ship unchecked (issue #595). They were a job of their own;
+  # this job already installs functions/ for the emulator tests, so a second
+  # checkout and install cost a runner (see "Runner budget" at the top).
   rules:
     runs-on: ubuntu-latest
     steps:
@@ -147,6 +147,11 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          # Both trees are installed here, so a change to either lockfile
+          # refreshes the download cache.
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -169,9 +174,17 @@ jobs:
             ~/.npm/_npx
             ~/.cache/firebase
           key: firebase-tools-14.27.0-${{ runner.os }}
-      # The Corp Tax Book callable tests (functions/) run in the same emulator session.
       - run: npm ci --prefix functions
-      - run: npm run test:rules
+      # The functions/ checks and the emulator tests are independent; each
+      # runs even when the one before it failed, so one red result never
+      # hides the others. Still `!cancelled()`, so a superseded run stops.
+      - if: ${{ !cancelled() }}
+        run: npm run typecheck --prefix functions
+      - if: ${{ !cancelled() }}
+        run: npm test --prefix functions
+      # The Corp Tax Book callable tests (functions/) run in the same emulator session.
+      - if: ${{ !cancelled() }}
+        run: npm run test:rules
 
   # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
   # reasoning — a matrix reports as `test-shard (1)`…`(4)`, none of which is
@@ -197,7 +210,7 @@ jobs:
     # fresh browser context. A shard gets its own runner, and therefore its
     # own dev server and its own pair of Playwright workers, so the work
     # divides on the resource that was actually saturated. Public repo, so
-    # the extra runners are free.
+    # the extra runners cost no minutes, only slots (see "Runner budget").
     #
     # Worker count is left at Playwright's default (half the cores, so 2
     # here) on purpose. Raising it to 4 was tried and does not work: four
@@ -210,15 +223,22 @@ jobs:
     # `fail-fast: false` so one shard's failure still lets the others report
     # theirs — otherwise a flake in shard 1 hides real breakage in shard 3.
     #
-    # Eight shards, files dealt out by measured run time (see the run step).
+    # Files are dealt out by measured run time (see the run step).
     # Playwright's own `--shard` cut the test list into contiguous runs, so a
     # ~100-test sweep landed whole in one shard: wall time per shard ranged
-    # 259s to 354s on the same suite. Eight is where the ~45s of fixed setup
-    # per shard starts to eat what the extra runner saves.
+    # 259s to 354s on the same suite.
+    #
+    # Six shards, down from eight, for the runner budget (top of file): eight
+    # plus `static`, `rules` and the four `test-shard`s held up to 14 runners
+    # per PR at the peak, so two PRs in flight queued. The e2e path isn't the
+    # critical one: shards start ~100s in (after `build`) and ran ~160–300s
+    # at eight, while `test-shard` runs ~370–410s from the start. Six run
+    # ~270–330s each, which keeps them at or near that window; fewer would
+    # make e2e the long pole of every PR.
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6]
     # Playwright's own image: Chromium and its apt libraries are baked in, so
     # there is no `playwright install --with-deps`, no apt index to go bad
     # (that failure mode cost a whole run before), and no browser cache to
