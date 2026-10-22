@@ -154,17 +154,66 @@ describe('Wallet', () => {
     expect(screen.queryByText('#1000419')).not.toBeInTheDocument();
   });
 
-  it("links each loyalty row's corporation name to the LP Store, with a trailing caret and no store column", async () => {
+  it('opens the LP Store from a loyalty row, with the corporation name as plain text and an ⓘ for Show Info (issue #4694)', async () => {
     render(<App />);
     expect(await screen.findByText('EverMarks')).toBeInTheDocument();
-    // A real link, not just a row click: a keyboard or screen-reader user
-    // reaches the LP Store without the row. Not a Show Info link any more.
-    expect(screen.getByRole('link', { name: 'Caldari Navy' })).toHaveAttribute(
-      'href',
-      '/wallet/lp-store/1000167'
-    );
+    // The row's click is the store (DESIGN §6c): the name inside it is no link.
+    expect(screen.queryByRole('link', { name: 'Caldari Navy' })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'LP Store' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Open LP Store/ })).not.toBeInTheDocument();
+
+    // The ⓘ opens Show Info over the Wallet, without the row's navigation.
+    fireEvent.click(screen.getByRole('button', { name: 'Show info for Caldari Navy' }));
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).get('info')).toBe('corporation-1000167')
+    );
+    expect(window.location.pathname).not.toMatch(/lp-store/);
+
+    fireEvent.click(screen.getByText('Caldari Navy').closest('tr') as HTMLElement);
+    await waitFor(() => expect(window.location.pathname).toBe('/wallet/lp-store/1000167'));
+  });
+
+  describe('loyalty points across the picked Characters (issue #4694)', () => {
+    async function seedSecond(loyalty: () => Response) {
+      await db.characters.put({ characterId: 92, name: 'Bex Roan', ownerHash: 'oh2', addedAt: 2 });
+      await db.tokens.put({
+        characterId: 92,
+        accessToken: 'access-2',
+        refreshToken: 'refresh-2',
+        expiresAt: Date.now() + 3_600_000,
+        scopes: ['esi-wallet.read_character_wallet.v1', 'esi-characters.read_loyalty.v1'],
+      });
+      server.use(
+        http.get('https://esi.evetech.net/characters/92/wallet', () => HttpResponse.json(777)),
+        http.get('https://esi.evetech.net/characters/92/loyalty/points', loyalty)
+      );
+    }
+
+    it("sums each corporation's points, and EverMarks, over every picked Character", async () => {
+      await seedSecond(() =>
+        HttpResponse.json([
+          { corporation_id: 1000167, loyalty_points: 1500 },
+          { corporation_id: 1000419, loyalty_points: 50 },
+        ])
+      );
+      window.history.pushState({}, '', '/wallet?char=all');
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'Loyalty Points' });
+      expect(await within(table).findByText('6,500')).toBeInTheDocument();
+      expect(within(table).getAllByRole('row')).toHaveLength(2);
+      const everMarks = screen.getByText('EverMarks').closest('div') as HTMLElement;
+      expect(within(everMarks).getByText('300')).toBeInTheDocument();
+    });
+
+    it('names a picked Character whose grant lacks the loyalty scope, and sums the rest', async () => {
+      await seedSecond(() => new HttpResponse(null, { status: 403 }));
+      window.history.pushState({}, '', '/wallet?char=all');
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'Loyalty Points' });
+      expect(await within(table).findByText('5,000')).toBeInTheDocument();
+      expect(
+        screen.getByText(/Bex Roan.*Log in again to see your loyalty points/)
+      ).toBeInTheDocument();
+    });
   });
 
   it('offers the LP Store picker even when the Character holds no LP anywhere (issue #2321)', async () => {
