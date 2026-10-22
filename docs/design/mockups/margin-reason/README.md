@@ -20,3 +20,5 @@ Sample sales and the reason each gets (same rules as the realized-margin engine)
 - Hobgoblin II (covered, tax line missing): "No sales tax line found".
 
 Phone: the Margin column is desktop-only today (`phoneHidden`), so the phone shows no reasons. Only the "5 sales uncosted · 64,509,000 ISK" line is new there. Say so in review if you want reasons on the phone too.
+
+Phone date: the Date cell stacks date over time below `sm`, one line from `sm` up, with tighter column padding, so the table fits 390px. This is the Wallet journal's existing pattern (`splitTimestamp`), no new component. Today's table lets the date push the other columns off screen; the ticket should apply this to the real table too.

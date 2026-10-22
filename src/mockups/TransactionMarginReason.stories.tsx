@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Route, Routes } from 'react-router-dom';
 import { DataTable, PageHeader, Panel, Tabs, type DataTableColumn } from '@/components/ui';
 import { ItemInfoLink } from '@/features/entities';
-import { formatTimestamp } from '@/lib/timestamp';
+import { splitTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { HintText } from '@/components/ui/HintText';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
@@ -173,8 +173,20 @@ function ProposedTable() {
     {
       id: 'date',
       header: 'Date',
-      className: 'whitespace-nowrap text-text-dim',
-      render: (t) => formatTimestamp(new Date(t.date), timeZone),
+      className: 'whitespace-nowrap text-text-dim max-sm:px-1',
+      headerClassName: 'max-sm:px-1',
+      // Date over time on a phone, as the Wallet journal does; one line from `sm` up.
+      render: (t) => {
+        const { date, time } = splitTimestamp(new Date(t.date), timeZone);
+        const body = date.trimEnd();
+        return (
+          <>
+            <span className="max-sm:block">{body}</span>
+            <span className="max-sm:hidden">{date.slice(body.length)}</span>
+            {time && <span className="max-sm:block">{time}</span>}
+          </>
+        );
+      },
     },
     {
       id: 'item',
@@ -190,23 +202,26 @@ function ProposedTable() {
     },
     {
       id: 'qty',
-      header: 'Quantity',
+      header: 'Qty',
       align: 'right',
-      className: 'tabular-nums',
+      className: 'tabular-nums max-sm:px-1',
+      headerClassName: 'max-sm:px-1',
       render: (t) => t.quantity,
     },
     {
       id: 'unit',
       header: 'Unit price',
       align: 'right',
-      className: 'tabular-nums',
+      className: 'tabular-nums max-sm:px-1',
+      headerClassName: 'max-sm:px-1',
       render: (t) => formatMarketIsk(t.unit_price),
     },
     {
       id: 'total',
       header: 'Total',
       align: 'right',
-      className: 'tabular-nums',
+      className: 'tabular-nums max-sm:px-1',
+      headerClassName: 'max-sm:px-1',
       cellClassName: (t) => (t.is_buy ? 'text-isk-neg' : 'text-isk-pos'),
       render: (t) => formatMarketIsk((t.is_buy ? -1 : 1) * t.quantity * t.unit_price),
     },
