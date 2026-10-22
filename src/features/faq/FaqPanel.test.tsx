@@ -68,6 +68,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.surveyInfoTemplates': /info templates/i,
   'sync.stockLists': /markets you stock/i,
   'sync.miningTaxOreValueMode': /Assign form edits ore values/i,
+  'sync.miningTaxSurveyConnections': /moon surveys you connected/i,
   'sync.courierHighCollateralRatio': /courier collateral warning/i,
   'sync.bpcHideAuctions': /hide auctions/i,
   'sync.bpcHidePlex': /hide PLEX/i,

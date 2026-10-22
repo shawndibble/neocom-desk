@@ -137,6 +137,16 @@
 // its entry and the key is never deleted, so the tombstone-expiry edge does not
 // bite it. See features/character/cloneNicknames.ts.
 //
+// sync.miningTaxSurveyConnections (issue #4684): the moon Surveys the pilot
+// connected with "Manage Taxes", as {surveyId, characterId, payeeId,
+// payeeName, taxPct, systemId, typeIds, fromDate, untilMs, expiresAt,
+// connectedAt} entries, so a second device keeps assigning that moon's ore to
+// its Payee. Each lives only until its Survey's ETA (plus an hour), and every
+// write prunes the rest, so the list stays a few entries. See
+// features/miningTax/surveyConnections.ts, whose parse drops malformed
+// entries. Never deleted via deleteSyncedSetting: a pruned list is written
+// back. No `legacyKey`: new.
+//
 // sync.miningTaxManualMoonOreTypeIds / sync.miningTaxManualIgnoredTypeIds
 // (decision doc 20260923-112603-manual-ore-tags-sync-across-devices,
 // superseding 20260907-090317's device-local call): the Moon Mining Tax ledger's
@@ -335,6 +345,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.miningTaxCompressedOre',
   'sync.miningTaxManualMoonOreTypeIds',
   'sync.miningTaxOreValueMode',
+  'sync.miningTaxSurveyConnections',
   'sync.navHidden',
   'sync.navSetupAnswered',
   'sync.notificationFeedPrefs',

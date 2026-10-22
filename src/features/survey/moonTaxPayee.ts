@@ -12,8 +12,12 @@ export function findPayeeByName(
   payees: readonly PayeeRecord[],
   name: string
 ): PayeeRecord | undefined {
-  const wanted = name.trim().toLowerCase();
-  return payees.find((p) => p.name.trim().toLowerCase() === wanted);
+  return payees.find((p) => samePayeeName(p.name, name));
+}
+
+/** Payee names match ignoring case and surrounding spaces. */
+export function samePayeeName(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
 /** The name and rate as typed in the Survey's moon tax row, before they are checked. */

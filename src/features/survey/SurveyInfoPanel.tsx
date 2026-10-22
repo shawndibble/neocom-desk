@@ -27,6 +27,7 @@ import {
   type InfoTemplate,
 } from '@/engine/survey/infoTemplate';
 import { MoonTaxReadout, MoonTaxRow, type TaxSurvey } from './MoonTaxRow';
+import type { ConnectableSurvey } from './useSurveyConnection';
 import { initialTaxDraft, parseTaxPct } from './moonTaxPayee';
 import { ManageTemplatesDialog, SaveTemplateDialog } from './SurveyTemplateDialogs';
 import { SurveyTemplateMenu } from './SurveyTemplateMenu';
@@ -48,14 +49,19 @@ export interface InfoSurvey extends TaxSurvey {
   info: SurveyInfoShare | null;
 }
 
+/** What Manage Taxes connects, less the location (each panel knows its own). */
+export type SurveyToConnect = Omit<ConnectableSurvey, 'locationId'>;
+
 export function SurveyInfoEditor({
   characterId,
   survey,
+  connect,
   moon,
   onStored,
 }: {
   characterId: number;
   survey?: InfoSurvey;
+  connect?: SurveyToConnect;
   /** The scans show a moon ore, so the moon tax row applies. */
   moon: boolean;
   /** A store landed: the page re-reads the survey so what it passes on (the chat message's location) is current. */
@@ -172,6 +178,7 @@ export function SurveyInfoEditor({
           <MoonTaxRow
             characterId={characterId}
             survey={survey}
+            connectable={connect && { ...connect, locationId: location?.id ?? null }}
             draft={tax}
             onDraftChange={setTax}
           />
@@ -212,10 +219,12 @@ export function SurveyInfoEditor({
 export function SurveyInfoReadout({
   info,
   tax,
+  connect,
 }: {
   info: SurveyInfoShare | null;
   /** Already empty when the scans show no moon ore. */
   tax: SurveyTaxShare | null;
+  connect?: SurveyToConnect;
 }) {
   const { t } = useTranslation();
   const location = info?.location ?? null;
@@ -236,7 +245,12 @@ export function SurveyInfoReadout({
             </div>
           </InfoRow>
         )}
-        {tax !== null && <MoonTaxReadout tax={tax} />}
+        {tax !== null && (
+          <MoonTaxReadout
+            tax={tax}
+            connectable={connect && { ...connect, locationId: location?.id ?? null }}
+          />
+        )}
         {notes !== '' && (
           <InfoRow label={t('survey.info.notes')}>
             <SurveyNotes notes={notes} />
