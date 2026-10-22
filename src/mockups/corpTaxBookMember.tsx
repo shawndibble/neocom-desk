@@ -53,7 +53,7 @@ import type { PayeeBalance } from '@/features/miningTax/balances';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useIsNarrow } from '@/lib/useIsNarrow';
-import { SAMPLE_ACTIVE_CHARACTER } from '@/storybook/sampleData';
+import { SAMPLE_ACTIVE_CHARACTER, SAMPLE_CHARACTERS } from '@/storybook/sampleData';
 import { NewComponent } from './NewComponent';
 import {
   BOOK,
@@ -72,6 +72,8 @@ import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { formatNumber } from '@/lib/numberLocale';
 
 const ME = SAMPLE_ACTIVE_CHARACTER.characterId;
+/** As `TaxTab`: the ledger's Characters, which the picker's faces follow. */
+const LEDGER_CHARACTER_IDS = SAMPLE_CHARACTERS.slice(0, 2).map((c) => c.characterId);
 const ME_NAME = SAMPLE_ACTIVE_CHARACTER.name;
 /** The page just read, as today's header says ("just now"). */
 const LOADED_AT = new Date();
@@ -397,7 +399,8 @@ export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }
             activeCharacterId={ME}
             value="all"
             onChange={() => {}}
-            characterCount={2}
+            characterCount={LEDGER_CHARACTER_IDS.length}
+            allCharacterIds={LEDGER_CHARACTER_IDS}
           />
         }
         actions={

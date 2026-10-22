@@ -192,6 +192,9 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
   const today = eveToday(new Date(nowMs));
 
   const characters = data?.characters ?? [];
+  // The Characters the ledger tracks, which can be fewer than the roster: the
+  // picker's faces and "+N" follow them, matching its "· N".
+  const characterIds = useMemo(() => (data?.characters ?? []).map((c) => c.characterId), [data]);
   const isWide = useMediaQuery(WIDE_HEADER_QUERY);
   const isMid = useMediaQuery(MID_HEADER_QUERY);
   const headerLayout: 'narrow' | 'mid' | 'wide' = isWide ? 'wide' : isMid ? 'mid' : 'narrow';
@@ -508,6 +511,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
               value={characterFilter}
               onChange={setCharacterFilter}
               characterCount={characters.length}
+              allCharacterIds={characterIds}
             />
           )
         }

@@ -314,6 +314,9 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // obligation) — a character with nothing mined yet still needs to appear
   // in the Characters filter and in Manage Payees.
   const characters = useMemo(() => data?.characters ?? [], [data]);
+  // The Characters the ledger tracks, which can be fewer than the roster: the
+  // picker's faces and "+N" follow them, matching its "· N".
+  const characterIds = useMemo(() => characters.map((c) => c.characterId), [characters]);
 
   const { madePayments, paymentSources } = useMadePayments(
     characters.map((c) => c.characterId).join(',')
@@ -1043,6 +1046,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
               value={characterFilter}
               onChange={setCharacterFilter}
               characterCount={characters.length}
+              allCharacterIds={characterIds}
             />
           )
         }
