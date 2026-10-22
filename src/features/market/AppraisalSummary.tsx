@@ -10,6 +10,7 @@ import { AppraisalHeaderStats } from './AppraisalHeaderStats';
 import { AppraisalHoldBar } from './AppraisalHoldBar';
 import { HubCompareCards } from './HubCompareCards';
 import type { AppraisalController } from './useAppraisal';
+import type { TradeHub } from '@/market/hubs';
 
 interface AppraisalSummaryProps {
   result: NonNullable<AppraisalController['result']>;
@@ -25,6 +26,10 @@ interface AppraisalSummaryProps {
   cargo: Parameters<typeof AppraisalHoldBar>[0]['cargo'] | null;
   onCargoChange: Parameters<typeof AppraisalHoldBar>[0]['onCargoChange'];
   characterId: number | null;
+  /** The hub the appraisal is quoted at; its Compare Hubs card reads as selected. */
+  hubId: TradeHub['id'];
+  /** A Compare Hubs card's click re-quotes the appraisal at that hub. */
+  onHubChange: (id: TradeHub['id']) => void;
 }
 
 export function AppraisalSummary({
@@ -40,6 +45,8 @@ export function AppraisalSummary({
   cargo,
   onCargoChange,
   characterId,
+  hubId,
+  onHubChange,
 }: AppraisalSummaryProps) {
   const { t } = useTranslation();
   const totals = result.appraisal.totals;
@@ -93,7 +100,9 @@ export function AppraisalSummary({
           {t('market.appraisal.refineUnpriced', { count: totals.refineUnpricedRows })}
         </p>
       )}
-      {compare !== null && compareExpanded && <HubCompareCards rows={compare} />}
+      {compare !== null && compareExpanded && (
+        <HubCompareCards rows={compare} selectedHubId={hubId} onSelectHub={onHubChange} />
+      )}
     </div>
   );
 }
