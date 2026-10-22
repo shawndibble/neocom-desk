@@ -52,6 +52,11 @@ vi.mock('@/sde/loadMarketSde', () => ({
 
 const CHAR_ID = 91;
 
+// Relative to now, not fixed dates: a fixed `issued` expires on a real calendar
+// day, and inside its last week the order turns "expiring" and leaves the Fine fold.
+const TEN_DAYS_AGO = Date.now() - 10 * 86_400_000;
+const daysAgoIso = (offsetMs = 0) => new Date(TEN_DAYS_AGO + offsetMs).toISOString();
+
 const openOrder = {
   order_id: 1,
   type_id: 34,
@@ -62,7 +67,7 @@ const openOrder = {
   price: 5.5,
   volume_remain: 100,
   volume_total: 200,
-  issued: '2026-08-01T00:00:00Z',
+  issued: daysAgoIso(),
   duration: 90,
   range: 'region',
 };
@@ -70,7 +75,7 @@ const openOrder = {
 const transactions = [
   {
     transaction_id: 1,
-    date: '2026-08-01T00:00:00Z',
+    date: daysAgoIso(),
     location_id: 60003760,
     type_id: 34,
     unit_price: 5,
@@ -82,7 +87,7 @@ const transactions = [
   },
   {
     transaction_id: 2,
-    date: '2026-08-01T00:00:01Z',
+    date: daysAgoIso(1000),
     location_id: 60003760,
     type_id: 35,
     unit_price: 12,
