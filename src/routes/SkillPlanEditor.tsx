@@ -1,12 +1,13 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, Navigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { Button, buttonClassName, EmptyState, Spinner } from '@/components/ui';
+import { Button, buttonClassName, EmptyState, Spinner, Toast } from '@/components/ui';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { scheduleSync } from '@/sync';
+import { markPlanDeleted, scheduleSync } from '@/sync';
+import type { OptimizeQueueToastState } from '@/lib/shortcuts';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { SkillsPageHeader } from '@/features/skills/SkillsPageHeader';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
@@ -53,6 +54,16 @@ export function SkillPlanEditor() {
     activeCharacterId
   );
   const isDesktop = useIsDesktop();
+  // "Optimize queue" opens a fresh plan with the toast it owes: held in state
+  // so the location can be spent at once, a reload or Back must not raise it again.
+  const navigate = useNavigate();
+  const location = useLocation();
+  const stateMessage = (location.state as Partial<OptimizeQueueToastState> | null)
+    ?.optimizeQueueMessage;
+  const [madeToast, setMadeToast] = useState<string | null>(stateMessage ?? null);
+  useEffect(() => {
+    if (stateMessage) navigate(location.pathname, { replace: true, state: null });
+  }, [stateMessage, location.pathname, navigate]);
   // Memoised: the list pane's per-plan costing re-runs when this changes.
   const scheduleInputs = useMemo(
     () =>
@@ -212,6 +223,21 @@ export function SkillPlanEditor() {
           }
           headerActionsContainer={headerActionsEl}
           onUpdate={handleUpdate}
+        />
+      )}
+      {madeToast && (
+        <Toast
+          message={madeToast}
+          undo={{
+            label: t('plans.optimizeQueueUndo'),
+            onUndo: () => {
+              setMadeToast(null);
+              void markPlanDeleted(plan.characterId, plan.id).then(() =>
+                navigate('/skills/plans', { replace: true })
+              );
+            },
+          }}
+          onClose={() => setMadeToast(null)}
         />
       )}
     </div>

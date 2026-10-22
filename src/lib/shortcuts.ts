@@ -32,6 +32,15 @@ export interface SkillPlanImportState {
 }
 
 /**
+ * Router `location.state` shape "Optimize queue" (`routes/SkillPlans.tsx`)
+ * navigates a new plan's editor with: the toast to raise there. A toast
+ * closes on a route change, so it can only be raised after the navigation.
+ */
+export interface OptimizeQueueToastState {
+  readonly optimizeQueueMessage: string;
+}
+
+/**
  * Router `location.state` shape the app-wide paste router navigates
  * `/mining/survey` with: a pasted Survey Scan, added to the current Survey on
  * arrival.
