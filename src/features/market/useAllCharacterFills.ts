@@ -15,6 +15,8 @@ export interface AllCharacterFills {
   truncated: boolean;
   /** The latest archive start among the pooled Characters; the shortest archive limits the pool. */
   archiveSince: number | null;
+  /** Characters left out of the pool: no wallet grant, or nothing to read. The header picker names them. */
+  skipped: { characterId: number; name: string }[];
 }
 
 export type AllCharacterFillsState =
@@ -53,6 +55,7 @@ export function useAllCharacterFills(
           typeNames: snapshot.typeNames,
           truncated: snapshot.loaded.some((c) => c.fillsTruncated),
           archiveSince: latestArchiveSince(infos.map((i) => i.since)),
+          skipped: snapshot.skipped.map((c) => ({ characterId: c.characterId, name: c.name })),
         },
       });
     })().catch(() => {

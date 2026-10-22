@@ -1,5 +1,5 @@
 import { formatCount } from '@/lib/formatCount';
-import { useMemo, type ReactNode } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CachedNotice, IconButton, InfoTooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -28,8 +28,6 @@ interface WalletBalanceTabProps {
   balances: ReturnType<typeof useWalletBalances>;
   drill: ReturnType<typeof useWalletDrill>;
   loyalty: ReturnType<typeof useWalletLoyalty>;
-  /** The Character picker, riding in each panel's title bar. */
-  filterMeta: ReactNode;
   balanceResult: CachedResult<number> | null;
   balanceNeedsReauth: boolean;
   /** The picked Characters' loyalty points, summed per corporation. */
@@ -55,7 +53,6 @@ export function WalletBalanceTab({
   balances,
   drill,
   loyalty,
-  filterMeta,
   balanceResult,
   balanceNeedsReauth,
   loyaltyResult,
@@ -119,12 +116,9 @@ export function WalletBalanceTab({
   return (
     <div className="space-y-4">
       {/*
-        The picker stays visible in both branches, even while pinned to
-        "This character" — otherwise there is no way to discover the
-        cross-character view at all (issue #607) — but it rides in each
-        panel's own header rather than a row above them. The panel content
-        swaps beneath it: unchanged for "This character", a per-character
-        table + total for anything wider.
+        The page header's Character picker drives which panel this is:
+        unchanged for "This character", a per-character table + total for
+        anything wider, or the one Character drilled into from that table.
       */}
       {drilledCharacter ? (
         <NetWorthPanel
@@ -133,7 +127,6 @@ export function WalletBalanceTab({
           backRef={backButtonRef}
           characters={drilledCharacters}
           liveWallet={liveWallet}
-          filterMeta={filterMeta}
           onDrill={drillInto}
           onBack={leaveDrill}
           headingRef={panelHeadingRef}
@@ -153,7 +146,6 @@ export function WalletBalanceTab({
               />
             )
           }
-          filterMeta={filterMeta}
           onDrill={drillInto}
           onBack={leaveDrill}
           headingRef={panelHeadingRef}
@@ -172,7 +164,6 @@ export function WalletBalanceTab({
           mode="single"
           characters={activeCharacters}
           liveWallet={liveWallet}
-          filterMeta={filterMeta}
           onDrill={drillInto}
           onBack={leaveDrill}
           headingRef={panelHeadingRef}

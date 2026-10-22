@@ -1,5 +1,6 @@
 import { loadCharacterSkillQueueWithStatus } from '@/features/skills/data';
 import { projectSkillQueue } from '@/engine/projection';
+import { loadSkills } from '@/sde/loadSde';
 import type { SkillQueueEntry } from '@/esi/endpoints';
 import type {
   NotificationFire,
@@ -10,13 +11,7 @@ import type { SkillNames } from '../domainCopy';
 import { NOTIFICATION_EVENT_ENTRIES, SNAPSHOT_SOURCES } from '../eventEntries';
 import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
-import {
-  HOUR_MS,
-  currentThresholds,
-  resolveProjectionNames,
-  typeNameOrAbsent,
-  universeTypeName,
-} from './shared';
+import { HOUR_MS, currentThresholds, resolveProjectionNames, universeTypeName } from './shared';
 
 /* Skill queue ---------------------------------------------------------------- */
 
@@ -47,6 +42,16 @@ function toSkillQueueEntrySnapshot(
   };
 }
 
+/**
+ * A skill's name from the bundled SDE first — no network, so a transient ESI
+ * failure at fire time can't bake a bare `#3405` into the alert — then ESI for
+ * a skill newer than the pinned SDE.
+ */
+async function skillName(skillId: number): Promise<string | null> {
+  const skills = await loadSkills().catch(() => []);
+  return skills.find((skill) => skill.typeID === skillId)?.name ?? universeTypeName(skillId);
+}
+
 export const skillQueueDomain = defineDomain<
   SkillQueueEntrySnapshot,
   SkillQueueSnapshot,
@@ -74,7 +79,7 @@ export const skillQueueDomain = defineDomain<
     const entries = snapshot.entries.map((entry) => ({ ...entry, endingLeadMs }));
     const skillNames = await resolveProjectionNames(
       entries.map((entry) => entry.skillId),
-      universeTypeName
+      skillName
     );
     return projectSkillQueue(
       characterId,
@@ -87,6 +92,6 @@ export const skillQueueDomain = defineDomain<
     );
   },
   names: async (fire) => ({
-    skill: fire.skillId === null ? undefined : await typeNameOrAbsent(fire.skillId),
+    skill: fire.skillId === null ? undefined : ((await skillName(fire.skillId)) ?? undefined),
   }),
 });

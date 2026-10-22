@@ -28,7 +28,6 @@ import {
   NO_OWNERS,
 } from '@/features/character/mailSnapshot';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import type { CharacterFilterValue } from '@/features/character/characterFilterValue';
 import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { NewMailComposer, type NewMailCloseReason } from '@/features/character/NewMailComposer';
@@ -59,8 +58,12 @@ const MAIL_FILTER_PARAMS = { search: SEARCH_PARAM, hideRead: HIDE_READ_PARAM };
 
 interface MailViewProps {
   scope: CharacterFilterValue;
-  /** The This/All picker (with per-Character unread), null when there is one Character to offer. */
-  scopeControl: ReactNode;
+  /**
+   * The This/All picker (with per-Character unread), given the names "All"
+   * leaves out (no mail grant, not synced) and whether the scope's mail is
+   * still loading. It hides itself when there is one Character to offer.
+   */
+  scopeControl: (state: { missingNames?: readonly string[]; loading: boolean }) => ReactNode;
 }
 
 /** Mail's two-pane client for one scope: list beside reading pane, the list scrolls on its own, the reading pane grows with the page (docs/context/decisions/20261012-161659-mail-reading-pane-scrolls-with-the-page-not.md). */
@@ -293,19 +296,11 @@ function MailView({ scope, scopeControl }: MailViewProps) {
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader
         title={t('mail.title')}
-        meta={
-          <>
-            {fetchedAt && <DataAgeBadge date={fetchedAt} />}
-            {scopeControl}
-            {isAll && data && data.skipped.length > 0 && (
-              <CharacterScopeReadout
-                scope="all"
-                total={owners.length + data.skipped.length}
-                missing={data.skipped.map((c) => c.name)}
-              />
-            )}
-          </>
-        }
+        meta={fetchedAt && <DataAgeBadge date={fetchedAt} />}
+        scope={scopeControl({
+          missingNames: isAll ? data?.skipped.map((c) => c.name) : undefined,
+          loading: loading && !data,
+        })}
         actions={
           <>
             {isDesktop && !newMailOpen && (
@@ -541,7 +536,7 @@ function MailView({ scope, scopeControl }: MailViewProps) {
 export function Mail() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const { scope, scopeHydrated, offered, characterCount, unreadByCharacter, changeScope } =
+  const { scope, scopeHydrated, characterCount, unreadByCharacter, changeScope } =
     useMailScopeSwitch();
 
   if (!scopeHydrated) {
@@ -555,18 +550,19 @@ export function Mail() {
     <MailView
       key={scope}
       scope={scope}
-      scopeControl={
-        offered ? (
-          <CharacterFilterControl
-            activeCharacterId={activeCharacterId}
-            value={scope}
-            onChange={changeScope}
-            characterCount={characterCount}
-            unreadByCharacter={unreadByCharacter}
-            size="md"
-          />
-        ) : null
-      }
+      // Always the control, so the header's one-line lock never flips; with one
+      // Character (`characterCount` 1) it renders nothing.
+      scopeControl={({ missingNames, loading }) => (
+        <CharacterFilterControl
+          activeCharacterId={activeCharacterId}
+          value={scope}
+          onChange={changeScope}
+          characterCount={characterCount}
+          unreadByCharacter={unreadByCharacter}
+          missingNames={missingNames}
+          loading={loading}
+        />
+      )}
     />
   );
 }

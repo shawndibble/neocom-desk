@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
+import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
+import { formatDateOnly } from '@/lib/timestamp';
 import { configureClipboard } from '@/lib/clipboard';
 import type { RegionOrder } from '@/esi/endpoints';
 import { OrderRowDetail } from './OrderRowDetail';
@@ -146,5 +148,27 @@ describe('OrderRowDetail', () => {
     });
     expect(screen.getByRole('button', { name: /Tax & fees/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Final price/ })).toBeInTheDocument();
+  });
+
+  describe('expiry date follows the Time format setting', () => {
+    const zone = process.env.TZ;
+    afterEach(() => {
+      process.env.TZ = zone;
+      useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: true });
+    });
+
+    it.each(['local', 'eve'] as const)('shows the %s day', (format) => {
+      process.env.TZ = 'Pacific/Auckland';
+      useTimeFormat.setState({ value: format, hydrated: true });
+      // Expires 2026-12-30T23:30Z: Dec 30 in UTC, Dec 31 in Auckland.
+      const order = { ...ORDER, issued: '2026-10-01T23:30:00Z' };
+      renderDetail({ order });
+      const expires = new Date(Date.parse(order.issued) + 90 * 86_400_000);
+      const expected = formatDateOnly(expires, format === 'eve' ? 'UTC' : undefined);
+      expect(
+        screen.getByText(new RegExp(`^${expected.replace(/\//g, '\\/')}`))
+      ).toBeInTheDocument();
+      expect(formatDateOnly(expires, 'UTC')).not.toBe(formatDateOnly(expires));
+    });
   });
 });

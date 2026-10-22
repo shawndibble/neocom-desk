@@ -11,14 +11,10 @@
  * Default `'local'`, which is what every `formatTimestamp` surface already
  * did, so nothing moves until the pilot asks it to.
  *
- * Three deliberate exclusions, recorded as a scope decision
- * (`docs/context/decisions/`):
+ * Two deliberate exclusions, recorded as a scope decision
+ * (`docs/context/decisions/`). The Calendar was a third until its day
+ * bucketing moved with the clock (`engine/localDay.ts`'s `dayStart`).
  *
- * - **The Calendar grids.** `lib/calendarGrid.ts` buckets events into
- *   *local-day* cells. Switching only the rendered string would put a
- *   23:00-local event in today's cell labelled with tomorrow's UTC hour.
- *   Converting those needs the bucketing to move too — a follow-up, not a
- *   silent half-conversion.
  * - **Industry's Active Jobs "Ends" column.** It stays on `formatEveDateTime`
  *   unconditionally. That column's whole purpose is reading back to the game
  *   client, and making it follow a preference defaulting to `'local'` would
@@ -26,6 +22,7 @@
  * - **The phone Wallet Journal's day groups.** Days are EVE (UTC) days, so the
  *   times under a day header are UTC and the header says "EVE time".
  */
+import { db } from '@/db';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const TIME_FORMAT_SETTING_KEY = 'timeFormat';
@@ -56,6 +53,20 @@ export const useTimeFormat = createLocalSetting<TimeFormat>({
  */
 export function timeZoneFor(format: TimeFormat): 'UTC' | undefined {
   return format === 'eve' ? 'UTC' : undefined;
+}
+
+/**
+ * The zone straight from the Dexie row, for code with no store to subscribe to
+ * and no guarantee it was hydrated: the service worker composing a push (#4731).
+ * Never rejects; an unreadable or absent row is the default, the host's own zone.
+ */
+export async function readTimeZone(): Promise<'UTC' | undefined> {
+  try {
+    const row = await db.settings.get(TIME_FORMAT_SETTING_KEY);
+    return timeZoneFor(isTimeFormat(row?.value) ? row.value : DEFAULT_TIME_FORMAT);
+  } catch {
+    return undefined;
+  }
 }
 
 /** Subscribes to the preference and yields the zone `timestamp.ts` takes. */

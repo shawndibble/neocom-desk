@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -14,7 +14,6 @@ import { TableActionsMenu } from '@/components/ui/TableExport';
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import { cx } from '@/lib/cx';
 import { GrantBanner } from '@/app/GrantNote';
-import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
 import { JournalTable } from '@/features/character/WalletJournalTable';
 import { WalletHistoryNote } from '@/features/character/WalletHistoryNote';
 import type { WalletArchiveInfo } from '@/features/character/walletArchive';
@@ -28,7 +27,6 @@ interface WalletJournalPanelProps {
   /** The Journal tab covers more than the active Character. */
   showingBeyondActive: boolean;
   iskPanelOpen: boolean;
-  filterMeta: ReactNode;
   refreshCount: number;
   archive: WalletArchiveInfo | undefined;
   journalResult: CachedResult<WalletJournalEntry[]> | null;
@@ -56,7 +54,6 @@ export function WalletJournalPanel({
   activeCharacterId,
   showingBeyondActive,
   iskPanelOpen,
-  filterMeta,
   refreshCount,
   archive,
   journalResult,
@@ -80,21 +77,6 @@ export function WalletJournalPanel({
     <Panel
       padded={false}
       title={t('wallet.journalTab')}
-      wrapMeta
-      // Beside the open panel the page is narrow at any viewport, so the
-      // Character filter drops under the title instead of crowding the actions.
-      className={iskPanelOpen ? '[&>header>div:first-child]:flex-wrap' : undefined}
-      meta={
-        <span
-          className={cx(
-            'flex flex-wrap items-center gap-2 max-md:basis-full',
-            iskPanelOpen && 'md:basis-full'
-          )}
-        >
-          <WalletOriginCrumb />
-          {filterMeta}
-        </span>
-      }
       actions={
         <span className="flex items-center gap-2">
           <Link

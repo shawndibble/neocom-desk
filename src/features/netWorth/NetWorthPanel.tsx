@@ -63,8 +63,6 @@ export interface NetWorthPanelProps {
   characters: readonly NetWorthCharacter[];
   /** Live wallet balance per Character, where the page has fetched it. */
   liveWallet: ReadonlyMap<number, { balance: number | null; needsReauth: boolean }>;
-  /** The Character filter, shown in the panel title bar. */
-  filterMeta?: ReactNode;
   /** The panel is a drill into one Character from the all-Characters view. */
   drilled?: boolean;
   onDrill: (characterId: number) => void;
@@ -139,7 +137,6 @@ export function NetWorthPanel({
   mode,
   characters,
   liveWallet,
-  filterMeta,
   drilled = false,
   onDrill,
   onBack,
@@ -199,9 +196,6 @@ export function NetWorthPanel({
   );
 
   const coveredIds = useMemo(() => ids.filter((id) => data.covered.has(id)), [ids, data.covered]);
-  const missingNames = characters
-    .filter((c) => !data.covered.has(c.characterId))
-    .map((c) => c.name);
   // Hidden ids are device-wide, so a filter can leave none visible; show them all then.
   const unhidden = coveredIds.filter((id) => !hiddenCharacters.includes(id));
   const included = mode === 'multi' && unhidden.length > 0 ? unhidden : coveredIds;
@@ -240,12 +234,6 @@ export function NetWorthPanel({
   const total =
     mode === 'single' ? (singleLatest ? netWorthOf(singleLatest, shown) : 0) : totals.total;
   const excluded = listed.filter((id) => !shown.includes(id)).map((id) => t(LAYER_LABEL_KEYS[id]));
-
-  // One Character's panel says nothing about scope: the page header already names them.
-  const readout =
-    mode === 'single' ? null : (
-      <CharacterScopeReadout scope="all" total={characters.length} missing={missingNames} />
-    );
 
   const toggleCharacter = (id: number) =>
     void setHiddenCharacters([...toggleHidden(hiddenCharacters, id, coveredIds)]);
@@ -384,11 +372,16 @@ export function NetWorthPanel({
     <Panel
       title={title ?? t('wallet.netWorth.title')}
       headingRef={headingRef}
+      // A drill shows one Character while the page header's picker keeps the
+      // wider pick it was reached from: the title bar names whose it is.
       meta={
-        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          {filterMeta}
-          {readout}
-        </span>
+        drilled && single ? (
+          <CharacterScopeReadout
+            scope="one"
+            characterId={single.characterId}
+            characterName={single.name}
+          />
+        ) : undefined
       }
       actions={
         <span className="flex items-center gap-2">
@@ -456,17 +449,20 @@ export function NetWorthPanel({
         {tableRows.length === 0 ? (
           <EmptyState title={t('wallet.balanceEmpty')} className="py-8" />
         ) : (
-          <DataTable
-            {...tableExport.tableProps}
-            label={t('wallet.balanceByCharacter')}
-            columns={tableColumns}
-            rows={tableRows}
-            rowKey={(row) => row.characterId}
-            defaultSort={BALANCE_SORT}
-            responsive="table"
-            rowClassName={() => 'group'}
-            onRowClick={(row) => onDrill(row.characterId)}
-          />
+          // Scrolls sideways under the pinned Character column instead of widening the page.
+          <div className="overflow-x-auto">
+            <DataTable
+              {...tableExport.tableProps}
+              label={t('wallet.balanceByCharacter')}
+              columns={tableColumns}
+              rows={tableRows}
+              rowKey={(row) => row.characterId}
+              defaultSort={BALANCE_SORT}
+              responsive="table"
+              rowClassName={() => 'group'}
+              onRowClick={(row) => onDrill(row.characterId)}
+            />
+          </div>
         )}
       </Panel>
     </div>

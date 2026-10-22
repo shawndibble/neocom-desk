@@ -149,8 +149,8 @@ test('a long plan scrolls the page, with the summary strip pinned above it', asy
         'Gunnery III',
       ].join('\n')
     );
-  await dialog.getByRole('button', { name: 'Parse' }).click();
-  await expect(dialog.getByText('Detected: skill plan')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Import' }).click();
+  // The e2e catalog doesn't know two of those names, so the preview comes up first.
   await dialog.getByRole('button', { name: 'Apply' }).click();
   await expect(dialog).toBeHidden();
 

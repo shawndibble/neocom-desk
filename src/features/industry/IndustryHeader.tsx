@@ -7,6 +7,7 @@ import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
 import { IndustrySettingsForm } from '@/features/settings/IndustrySettingsForm';
 import { BpcSourcingSettingsForm } from '@/features/settings/BpcSourcingSettingsForm';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
+import { IndustryCharacterPicker } from './IndustryCharacterPicker';
 import { useHasProductionLogs } from './useHasProductionLogs';
 import { INDUSTRY_TABS_ID, industryTabs, type IndustryTab } from './industryTabs';
 
@@ -85,6 +86,7 @@ export function IndustryHeader({
       <PageHeader
         title={t('nav.industry')}
         meta={meta}
+        scope={<IndustryCharacterPicker activeCharacterId={activeCharacterId} />}
         actions={
           actions ? (
             <>

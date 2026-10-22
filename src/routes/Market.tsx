@@ -327,10 +327,10 @@ export function Market() {
     setExpandCompareOnAppraisal(expandCompare);
   }
   const isPhone = useIsPhone();
-  // Open orders and History hang Refresh, export and data age on the page
-  // header rather than on a title bar of their own.
+  // Open orders and History hang their Character picker, Refresh, export and
+  // data age on the page header rather than on a title bar of their own.
   const tabOwnsHeader = tab === 'orders' || tab === 'history';
-  const { slots: headerSlots, metaSlot, actionsSlot } = usePageHeaderSlots();
+  const { slots: headerSlots, metaSlot, scopeSlot, actionsSlot } = usePageHeaderSlots();
   const viewsTabsId = useTabsId();
   const itemTabsId = useTabsId();
   const marketTabs = MARKET_TABS.tabs.map((item) => ({ id: item.id, label: t(item.labelKey) }));
@@ -849,6 +849,8 @@ export function Market() {
               />
             ) : undefined
           }
+          // Only the Character tabs have a picker; the others must not lock the row.
+          scope={tabOwnsHeader ? scopeSlot : undefined}
           actions={
             usesHubPicker(tab) ? (
               <>

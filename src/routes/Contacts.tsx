@@ -43,6 +43,7 @@ import {
   type ContactsFilter,
 } from '@/features/character/contactsFilter';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import { useCharacterCount } from '@/features/character/useCharacters';
 import { usePublicInfoModal } from '@/stores/publicInfoModal';
 import { type AcrossCharactersRow } from '@/features/character/contactsAcrossCharacters';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
@@ -78,6 +79,7 @@ const FILTER_PARAMS = {
 
 /** Contacts: standings, blocked/watched state, searchable and filterable by type and standing. */
 export function Contacts() {
+  const characterCount = useCharacterCount();
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadContactsSnapshot,
@@ -271,21 +273,24 @@ export function Contacts() {
             ? standings.meta
             : contactsResult && <DataAgeBadge date={contactsResult.fetchedAt} />
         }
+        // Not on Standings: that tab reads the active Character's standings only.
+        // Always the control otherwise, so the header's one-line lock never flips:
+        // with one Character it hides itself (nothing to compare the roster with).
+        scope={
+          tab === 'standings' ? undefined : (
+            <CharacterFilterControl
+              activeCharacterId={activeCharacterId}
+              value={view === 'across' ? 'all' : 'current'}
+              characterCount={characterCount}
+              onChange={(next) => setTab(next === 'all' ? 'across' : 'character')}
+            />
+          )
+        }
         actions={
           tab === 'standings' ? (
             standings.actions
           ) : (
             <>
-              {/* One character is the whole roster: nothing to compare it against,
-                so there is no "All characters" to offer. */}
-              {acrossLists.length > 1 && (
-                <CharacterFilterControl
-                  activeCharacterId={activeCharacterId}
-                  value={view === 'across' ? 'all' : 'current'}
-                  onChange={(next) => setTab(next === 'all' ? 'across' : 'character')}
-                  size="md"
-                />
-              )}
               {view === 'across' ? (
                 <TableActionsMenu
                   name={t('contacts.tabAcrossCharacters')}

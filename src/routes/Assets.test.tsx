@@ -15,6 +15,7 @@ import { useDefaultCharacterFilter } from '@/features/character/defaultCharacter
 import { useCharacterFilterPicks } from '@/features/character/characterFilterPicks';
 import { configureClipboard } from '@/lib/clipboard';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
+import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { App } from '@/app/App';
 import * as routeChunks from '@/app/routeChunks';
 import { exportRows } from '@/lib/downloadCsv';
@@ -287,6 +288,26 @@ describe('Assets', () => {
     // My ships and Plan a move are the Ships and Move tabs now, not menu items.
     expect(screen.queryByRole('menuitem', { name: /^My ships/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: /^Plan a move/ })).not.toBeInTheDocument();
+  });
+
+  it('shows Tools as its icon-only ⋮ below md', async () => {
+    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation(
+      (media: string) =>
+        ({
+          media,
+          matches: media === NARROW_QUERY,
+          onchange: null,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          addListener: () => {},
+          removeListener: () => {},
+          dispatchEvent: () => false,
+        }) as unknown as MediaQueryList
+    );
+    render(<App />);
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tools' })).not.toHaveTextContent('Tools');
+    matchMedia.mockRestore();
   });
 
   it('has Items, Ships and Move tabs, opening on Items', async () => {
@@ -1503,6 +1524,72 @@ describe('cross-character search (issue #85)', () => {
     expect(screen.getByText('Pilot Two')).toBeInTheDocument();
   });
 
+  function pageHeader() {
+    return screen.getByRole('heading', { level: 1 }).closest('header')!;
+  }
+
+  it('puts the one Character picker in the page header', async () => {
+    render(<App />);
+    await screen.findByText(JITA);
+    expect(
+      within(pageHeader()).getByRole('button', { name: 'This character' })
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'This character' })).toHaveLength(1);
+  });
+
+  it('marks the picker when "All characters" leaves someone out, naming them', async () => {
+    await db.characters.put({ characterId: 93, name: 'Pilot Three', ownerHash: 'oh3', addedAt: 3 });
+    // No assets permission: the fan-out skips this Character.
+    await db.tokens.put({
+      characterId: 93,
+      accessToken: 'access-token-3',
+      refreshToken: 'refresh-3',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: [],
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText(JITA);
+    await user.click(within(pageHeader()).getByRole('button', { name: 'This character' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
+    await user.type(screen.getByPlaceholderText(/search items/i), 'pyerite');
+
+    const picker = await within(pageHeader()).findByRole('button', {
+      name: /^All characters · 3\. Not included: Pilot Three$/,
+    });
+    expect(picker.querySelector('[data-partial-dot]')).not.toBeNull();
+    expect(screen.queryByText(/2 of 3/)).not.toBeInTheDocument();
+  });
+
+  it('shows the other Characters loading in the picker itself', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/assets`, async () => {
+        await gate;
+        return HttpResponse.json([], { headers: { 'X-Pages': '1' } });
+      })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText(JITA);
+    await user.click(within(pageHeader()).getByRole('button', { name: 'This character' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
+
+    await waitFor(() =>
+      expect(within(pageHeader()).getByRole('button', { name: /^All characters/ })).toHaveAttribute(
+        'aria-busy',
+        'true'
+      )
+    );
+    release();
+    await waitFor(() =>
+      expect(
+        within(pageHeader()).getByRole('button', { name: /^All characters/ })
+      ).not.toHaveAttribute('aria-busy')
+    );
+  });
+
   describe('My ships', () => {
     const ship = (itemId: number, locationId: number) => ({
       item_id: itemId,
@@ -1561,6 +1648,55 @@ describe('cross-character search (issue #85)', () => {
       );
       expect(within(panel).getByText('Pilot Two')).toBeInTheDocument();
       expect(within(panel).getByRole('columnheader', { name: /character/i })).toBeVisible();
+    });
+
+    it('names no one as missing on Ships while the picker reads This character', async () => {
+      // The active Character's own read is skipped: that is the body's "couldn't load", not a
+      // "Not included" on a filter that never asked for anyone else.
+      server.use(
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, () =>
+          HttpResponse.json({ error: 'not found' }, { status: 404 })
+        )
+      );
+      const user = userEvent.setup();
+      window.history.replaceState({}, '', '/assets/ships');
+      render(<App />);
+      await screen.findAllByText("Couldn't load");
+      const picker = within(pageHeader()).getByRole('button', { name: 'This character' });
+      await user.click(picker);
+      await screen.findByRole('menuitemradio', { name: 'This character' });
+      expect(screen.queryByText(/Not included/)).not.toBeInTheDocument();
+    });
+
+    it('marks the header picker, not the body, when All leaves someone out on Ships and Move', async () => {
+      await db.characters.put({
+        characterId: 93,
+        name: 'Pilot Three',
+        ownerHash: 'oh3',
+        addedAt: 3,
+      });
+      await db.tokens.put({
+        characterId: 93,
+        accessToken: 'access-token-3',
+        refreshToken: 'refresh-3',
+        expiresAt: Date.now() + 3_600_000,
+        scopes: [],
+      });
+      const user = userEvent.setup();
+      render(<App />);
+      const panel = await openMyShips(user);
+      await within(panel).findByText('Rifter');
+      await user.click(within(pageHeader()).getByRole('button', { name: 'This character' }));
+      await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
+
+      const partial = /^All characters · 3\. Not included: Pilot Three$/;
+      expect(await within(pageHeader()).findByRole('button', { name: partial })).toBeVisible();
+      expect(screen.queryByText(/missing here/)).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('tab', { name: 'Move' }));
+      await screen.findByRole('region', { name: 'Plan a move' });
+      expect(await within(pageHeader()).findByRole('button', { name: partial })).toBeVisible();
+      expect(screen.queryByText(/missing here/)).not.toBeInTheDocument();
     });
 
     it('shows the ship class under the name, with sortable columns and a search', async () => {

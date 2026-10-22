@@ -24,6 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  HeaderMoreMenu,
   IconButton,
   InfoTooltip,
   Modal,
@@ -51,7 +52,8 @@ import { StatusPill } from '@/features/miningTax/StatusPill';
 import type { PayeeBalance } from '@/features/miningTax/balances';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { SAMPLE_ACTIVE_CHARACTER } from '@/storybook/sampleData';
+import { useIsNarrow } from '@/lib/useIsNarrow';
+import { SAMPLE_ACTIVE_CHARACTER, SAMPLE_CHARACTERS } from '@/storybook/sampleData';
 import { NewComponent } from './NewComponent';
 import {
   BOOK,
@@ -70,6 +72,8 @@ import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { formatNumber } from '@/lib/numberLocale';
 
 const ME = SAMPLE_ACTIVE_CHARACTER.characterId;
+/** As `TaxTab`: the ledger's Characters, which the picker's faces follow. */
+const LEDGER_CHARACTER_IDS = SAMPLE_CHARACTERS.slice(0, 2).map((c) => c.characterId);
 const ME_NAME = SAMPLE_ACTIVE_CHARACTER.name;
 /** The page just read, as today's header says ("just now"). */
 const LOADED_AT = new Date();
@@ -352,6 +356,7 @@ const HISTORY_NEWEST = HISTORY_ROWS.map((r) => r.date.slice(0, 7))
 export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }) {
   const tabsId = useTabsId();
   const phone = useIsPhone();
+  const payeesFit = !useIsNarrow();
   const [sort, setSort] = useState<DataTableSort>(DEFAULT_SORT);
   const [historySort, setHistorySort] = useState<DataTableSort>(DEFAULT_SORT);
   const openColumns = usePersonalColumns(true);
@@ -389,11 +394,25 @@ export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }
       <PageHeader
         title="Mining"
         meta={<DataAgeBadge date={LOADED_AT} />}
+        scope={
+          <CharacterFilterControl
+            activeCharacterId={ME}
+            value="all"
+            onChange={() => {}}
+            characterCount={LEDGER_CHARACTER_IDS.length}
+            allCharacterIds={LEDGER_CHARACTER_IDS}
+          />
+        }
         actions={
           <>
-            <Button variant="ghost">Payees</Button>
-            <IconButton icon={<Icon.More />} label="More actions" />
+            {/* As `TaxTab`: Payees folds into the ⋮ below `md`. */}
+            {payeesFit && <Button variant="ghost">Payees</Button>}
             <IconButton icon={<Icon.Refresh />} label="Refresh" />
+            <HeaderMoreMenu>
+              {!payeesFit && <DropdownMenuItem>Payees</DropdownMenuItem>}
+              <DropdownMenuItem>Ore tags</DropdownMenuItem>
+              <DropdownMenuItem>Settings</DropdownMenuItem>
+            </HeaderMoreMenu>
           </>
         }
       />
@@ -438,12 +457,6 @@ export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }
       <CorpBookSyncNote />
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <CharacterFilterControl
-            activeCharacterId={ME}
-            value="all"
-            onChange={() => {}}
-            characterCount={2}
-          />
           <Button size="sm">All payees</Button>
           {phone && (
             <DataTableSortPicker

@@ -79,7 +79,7 @@ Modal copy states local deletion and that the synced copy stays. `removeCharacte
 
 ## Shared pieces
 
-`CharacterHeader`: `<h1>` name, corp/alliance entity links, total + unallocated SP chips only when SP is passed (Clones; the Overview and Employment omit them), plus optional `aside` beside the name and `actions` ahead of the bell (Overview, Employment). `CharacterFilterControl`: This / All Characters toggle emitting `'current'`/`'all'` (URL codec `characterFilterUrlParam.ts`, comma ids still parse; synced default `defaultCharacterFilter.ts`); used by Wallet, Assets, Contacts, Industry Active Jobs/Opportunities, Open Orders, Mining Tax tabs, Settings; hidden for one Character; icon-only on phone; decisions `20260908-192806`, `20260927-072408`.
+`CharacterHeader`: `<h1>` name, corp/alliance entity links, total + unallocated SP chips only when SP is passed (Clones; the Overview and Employment omit them), plus optional `aside` beside the name and `actions` ahead of the bell (Overview, Employment). `CharacterFilterControl`: This / All Characters toggle emitting `'current'`/`'all'` (URL codec `characterFilterUrlParam.ts`, comma ids still parse; synced default `defaultCharacterFilter.ts`); used by Wallet, Assets, Contacts, Industry Active Jobs/Opportunities, Open Orders, Mining Tax tabs, Settings; hidden for one Character; one per page in `PageHeader`'s `scope` slot; its trigger is an avatar stack with no words at every width (active portrait; up to 3 faces, 2 below md, + "+N" for All, from `allCharacterIds` when the page passes its own set; corp logo), the words in its accessible name and tooltip; decisions `20260908-192806`, `20260927-072408`, `20261022-123837`.
 
 ## Tests (what they assert)
 

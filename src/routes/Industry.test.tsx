@@ -829,17 +829,18 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
     render(<App />);
     const user = userEvent.setup();
 
-    // The panel defaults to "This character" (91, no blueprints); switch to
+    // The page defaults to "This character" (91, no blueprints); switch to
     // "All characters" to see the alt's two Rifter/Mechanical Parts BPOs.
-    // Scoped to this panel's own section: Active Jobs renders its own
-    // (unrelated) character filter with the same trigger label.
-    const oppSection = (
-      await screen.findByRole('heading', { name: 'Build Opportunities' })
-    ).closest('section')!;
-    await user.click(await within(oppSection).findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
+    // Industry's one picker, in the page header, drives Opportunities and
+    // Active Jobs alike.
+    await screen.findByRole('heading', { name: 'Build Opportunities' });
+    const pageHeader = screen
+      .getByRole('heading', { level: 1, name: 'Industry' })
+      .closest('header')!;
+    await user.click(await within(pageHeader).findByRole('button', { name: 'This character' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
     // The filter lives in the URL, so a reload keeps it.
-    expect(new URLSearchParams(window.location.search).get('opps.chars')).toBe('all');
+    expect(new URLSearchParams(window.location.search).get('industry.chars')).toBe('all');
 
     await user.click(
       await screen.findByRole('checkbox', { name: 'Select Rifter to compare plans' })

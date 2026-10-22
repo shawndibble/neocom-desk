@@ -30,6 +30,22 @@ const AUG_10 = new Date(2026, 7, 10, 12, 0, 0).getTime();
 const AUG_20 = new Date(2026, 7, 20, 12, 0, 0).getTime();
 const AUG_30 = new Date(2026, 7, 30, 12, 0, 0).getTime();
 
+describe('filterProductionRunsByDate on the EVE clock', () => {
+  it('buckets a run by its UTC day when given the UTC zone', () => {
+    // 23:30 UTC on Mar 10 is already Mar 11 in Auckland (UTC+13).
+    const late = run(Date.UTC(2026, 2, 10, 23, 30));
+    const onlyMar10 = { startDate: '2026-03-10', endDate: '2026-03-10' };
+    const zone = process.env.TZ;
+    process.env.TZ = 'Pacific/Auckland';
+    try {
+      expect(filterProductionRunsByDate([late], onlyMar10)).toHaveLength(0);
+      expect(filterProductionRunsByDate([late], onlyMar10, 'UTC')).toHaveLength(1);
+    } finally {
+      process.env.TZ = zone;
+    }
+  });
+});
+
 describe('filterProductionRunsByDate', () => {
   it('passes every run through the empty filter', () => {
     const runs = [run(AUG_10), run(AUG_20), run(AUG_30)];

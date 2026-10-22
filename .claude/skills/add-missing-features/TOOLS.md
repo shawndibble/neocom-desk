@@ -288,6 +288,8 @@ Numbering is stable — later runs cite these by number. Append, never renumber.
 
 #4550 NARROW — Fittings: several Fittings x hull counts into one netted shortfall (fit set; not named "Doctrine").
 
+#4736 NARROW — Transactions: per-row reason for a missing margin (engine-decided causes only) plus an uncosted-revenue total (EVE Market Tool).
+
 **Verdict is the hostile review's, not the ticket's fate.** `SHIP` means the
 reviewer cleared it, never that Shawn accepted it — #858 carries `SHIP` and was
 closed "the quickbar already has enough". Check `gh issue view <n> --comments`.
@@ -511,3 +513,5 @@ invention-planning.md`, #2848 not planned — only the Market-Wide label
   Detection also needs competitor prices, which the page's eager/on-demand split
   exists to avoid. Only revival shape: `belowFloor` alone,
   Production-Run-linked, station scope, feed-only — after the cost-basis work.
+
+- **EVE Market Tool** (evemarkettool.com, live, paid tiers — gating is not copied): profit ledger by source (trade/build/contract/gathered), FIFO warehouse, pending-cost bucket, plus PI throughput and calendar, margin and industry calculators. Mostly covered (Market History FIFO, Open Orders, PI Advisor, Calendar). Killed: **Gathered Items "mined vs sold"** — "unsold" is mined-minus-sold over fungible ore (reprocessed, taxed, compressed, 30-day ledger vs sale-day axis) and a sold-ore total is a Transactions type filter; **hand-entered cost on pending sales** — settled killed (hand-entered cost basis); **extractor-end ICS subscription feed** — needs a server holding colony data, app is local-first and already pushes extractor ends; **HyperNet calculator** and **abyssal roll scanner** — EQM HyperNet is a standing kill, abyssal crafters are a niche (abyssal pricing already ships).

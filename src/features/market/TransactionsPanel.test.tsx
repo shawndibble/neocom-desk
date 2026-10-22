@@ -4,11 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { db } from '@/db';
 import { TransactionsPanel } from './TransactionsPanel';
 import { WithPageHeaderSlots } from './__fixtures__/pageHeaderSlots';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import { loadWalletJournal, loadWalletTransactionsWithStatus } from '@/features/character/wallet';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { loadAllCharactersJournals } from '@/features/character/walletJournalAll';
 import * as download from '@/lib/download';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 
@@ -18,6 +20,7 @@ vi.mock('@/features/character/wallet', () => ({
 }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn() }));
+vi.mock('@/features/character/walletJournalAll', () => ({ loadAllCharactersJournals: vi.fn() }));
 
 const mockedLoadTransactions = vi.mocked(loadWalletTransactionsWithStatus);
 const mockedLoadJournal = vi.mocked(loadWalletJournal);
@@ -118,6 +121,69 @@ describe('TransactionsPanel — page header controls', () => {
     // The table's card has no header strip left.
     const table = screen.getByRole('table', { name: 'Transactions' });
     expect(table.closest('.rounded-xs')?.querySelector('header')).toBeNull();
+  });
+
+  describe('with two Characters', () => {
+    beforeEach(async () => {
+      await db.characters.clear();
+      await db.characters.bulkPut([
+        { characterId: 1, name: 'Pilot One', ownerHash: 'oh1', addedAt: 1 },
+        { characterId: 2, name: 'Pilot Two', ownerHash: 'oh2', addedAt: 2 },
+      ]);
+    });
+    afterEach(async () => {
+      await db.characters.clear();
+    });
+
+    it('puts the Character picker in the page header, not the table toolbar', async () => {
+      mockTransactions({
+        data: [transaction()],
+        fetchedAt: new Date(),
+        fromCache: false,
+        truncated: false,
+      });
+      renderPanel();
+
+      const header = screen.getByRole('banner');
+      const picker = await within(header).findByRole('button', { name: 'This character' });
+      // The header's touch tier reaches through the portal (re-provided context), not the panel's sm.
+      expect(picker).toHaveClass('h-11', 'md:h-9');
+      expect(picker).not.toHaveClass('md:h-7');
+      expect(screen.getAllByRole('button', { name: 'This character' })).toHaveLength(1);
+    });
+
+    it('names a Character "All" leaves out (no wallet grant) in the picker', async () => {
+      vi.mocked(loadAllCharactersJournals).mockResolvedValue({
+        loaded: [
+          {
+            characterId: 1,
+            name: 'Pilot One',
+            transactions: [transaction()],
+            journal: [],
+            fillsTruncated: false,
+          },
+        ],
+        skipped: [{ characterId: 2, name: 'Pilot Two' }],
+        typeNames: TYPE_NAMES,
+      } as never);
+      renderPanel('/market/history?txn.chars=all');
+
+      expect(
+        await within(screen.getByRole('banner')).findByRole('button', {
+          name: /^All characters · 2\. Not included: Pilot Two$/,
+        })
+      ).toBeInTheDocument();
+    });
+
+    it('keeps the picker in the header when the read fails, so the pilot can switch scope', async () => {
+      mockedLoadTransactions.mockRejectedValue(new Error('boom'));
+      renderPanel();
+
+      expect(await screen.findByText('Could not load')).toBeInTheDocument();
+      expect(
+        within(screen.getByRole('banner')).getByRole('button', { name: 'This character' })
+      ).toBeInTheDocument();
+    });
   });
 });
 
@@ -289,18 +355,44 @@ describe('TransactionsPanel — margin', () => {
     expect(marginCell(row)).toHaveTextContent('132,634');
   });
 
-  it('shows a dash, never a zero-cost margin, for a sale no wallet buy covers', async () => {
+  it('says no wallet buy covers a sale, never showing a zero-cost margin', async () => {
     load([taxFor(2, -49_766.4), taxFor(3, -100)]);
     renderPanel();
     const row = await screen.findByRole('row', { name: /Tritanium/ });
-    expect(marginCell(row)).toHaveTextContent('—');
+    expect(marginCell(row)).toHaveTextContent('No wallet buy covers it');
   });
 
-  it('shows a dash when the journal did not load, rather than a tax-free margin', async () => {
+  it('says no sales tax line was found when the journal did not load, rather than a tax-free margin', async () => {
     load(null);
     renderPanel();
     const row = await screen.findByRole('row', { name: /Damage Control II.*Sell/ });
-    expect(marginCell(row)).toHaveTextContent('—');
+    expect(marginCell(row)).toHaveTextContent('No sales tax line found');
+  });
+
+  it('totals the sales without a margin under the figures', async () => {
+    load([taxFor(2, -49_766.4), taxFor(3, -100)]);
+    renderPanel();
+    const strip = await screen.findByRole('region', { name: /Totals/ });
+    // Only the built Tritanium sale has no margin.
+    expect(strip).toHaveTextContent('1 sale uncosted ·');
+  });
+
+  it('omits the uncosted line when every sale has a margin', async () => {
+    mockTransactions({
+      data: [BUY, SALE],
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+    });
+    mockedLoadJournal.mockResolvedValue({
+      data: [taxFor(2, -49_766.4)],
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+    });
+    renderPanel();
+    const strip = await screen.findByRole('region', { name: /Totals/ });
+    expect(strip).not.toHaveTextContent('uncosted');
   });
 
   it('leaves Margin out of the totals when no sale has one', async () => {
@@ -381,6 +473,8 @@ describe('TransactionsPanel — phone', () => {
     const row = screen.getAllByRole('row')[1];
     expect(row.querySelector('td[data-label="Side"]')).toHaveClass('max-sm:hidden');
     expect(row.querySelector('td[data-label="Date"]')).not.toHaveClass('max-sm:hidden');
+    // Date over time: the date and the time are separate block spans below `sm`.
+    expect(row.querySelectorAll('td[data-label="Date"] span.max-sm\\:block')).toHaveLength(2);
     expect(row.querySelector('td[data-label="Margin"]')).toHaveClass('max-sm:hidden');
     expect(row.querySelector('td[data-label="Total"]')).not.toHaveClass('max-sm:hidden');
     const summary = screen.getByRole('region', { name: 'Totals for the transactions shown' });

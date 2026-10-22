@@ -69,19 +69,15 @@ import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { jobSlotSkillsFromCharacterSkills } from '@/features/character/jobSlotSkills';
 import { JOB_SLOT_CATEGORIES, type JobSlotSkills } from '@/engine/industry/jobSlots';
-import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
-import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
-import { useRememberedUrlParams, useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { enumParam, enumSetParam, idListParam } from '@/lib/urlState';
-import { useRememberedCharacterFilter } from '@/features/character/characterFilterPicks';
+import { useIndustryCharacterFilter } from './industryCharacterFilter';
 import { activeJobColumns, historyColumns, toneClass, type JobRow } from './activeJobColumns';
 import { useJobSlotSummary, useJobsFanOut } from './useJobsFanOut';
 
 /** The two derived job states this panel's Status filter offers — not ESI's raw `status` enum, just what the list already highlights. */
 type JobStatusFilter = 'completingSoon' | 'done';
-
-const JOBS_CHARACTER_PARAMS = { 'jobs.chars': characterFilterParam('current') };
 
 /**
  * The Activity and Status filters in the URL (ADR 0015). Both start empty —
@@ -236,25 +232,14 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   );
 
   /**
-   * The character-filter picker (issue #607): `'current'` by default —
-   * today's exact behavior, no extra fan-out, and it keeps following the
-   * active Character across a switch with no resync logic of its own
-   * (`useResolvedCharacterFilter` re-resolves it whenever the active
-   * Character changes) — or `'all'` once the pilot asks.
-   *
-   * Kept in the URL (`jobs.chars`); absent, it is this page's remembered
-   * pick, then the synced Settings default. A link's value is never
-   * remembered; only a change to the control is.
+   * The character filter (issue #607): `'current'` by default — no extra
+   * fan-out, and it keeps following the active Character across a switch
+   * (`useResolvedCharacterFilter` re-resolves it) — or `'all'` once the pilot
+   * asks. Industry's one page-wide filter: its picker rides in the Industry
+   * `PageHeader` (`IndustryCharacterPicker`), and Opportunities reads the
+   * same value.
    */
-  const rememberedCharacterFilter = useRememberedCharacterFilter<typeof JOBS_CHARACTER_PARAMS>(
-    'jobs',
-    'jobs.chars'
-  );
-  const [jobsCharacterValues, setJobsCharacterValues] = useRememberedUrlParams(
-    JOBS_CHARACTER_PARAMS,
-    rememberedCharacterFilter
-  );
-  const jobsCharacterFilter = jobsCharacterValues['jobs.chars'];
+  const [jobsCharacterFilter] = useIndustryCharacterFilter();
 
   const resolvedJobsFilter = useResolvedCharacterFilter(jobsCharacterFilter, characterId);
   // Set once the filter names anyone but the current Character: gates the
@@ -444,13 +429,6 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   // panel only genuinely one line, when these are absent too.
   const hasFanOutNotices =
     needsJobSlotFanOut && (jobsFanOutReauth.length > 0 || jobsFanOutSkipped.length > 0);
-  /**
-   * Hidden outright for a one-Character account: "This character" and "All
-   * characters" then resolve to the same pilot, so the picker is a control
-   * that cannot change anything (`OpenOrdersPanel`'s `showCharacterStrip`
-   * precedent).
-   */
-  const showCharacterFilter = jobsFilterCandidates.length > 1;
 
   const presentActivityIds = useMemo(
     () => [...new Set(jobs.map((job) => job.activity_id))].sort((a, b) => a - b),
@@ -692,26 +670,13 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   );
 
   /**
-   * The header's one-line read: who this panel is showing, then what it holds.
-   *
-   * The character filter sits here beside the title rather than in a row of
-   * its own inside the body, where issue #607 first put it. Three states
-   * forced the move: folded, the body is hidden but a body row was not, so the
-   * "collapsed" panel stayed two rows tall with a stray control under the
-   * summary; idle, the body is empty, so the picker sat alone in a padded box;
-   * and the summary it stands beside — "3 running · 1 done" — has no subject
-   * without it. `Panel`'s left-hand group deliberately doesn't wrap (it holds
-   * every panel's title), so the wrapper here carries its own.
+   * The header's one-line read: what this panel holds. Whose jobs it shows
+   * is the Industry page's own Character picker, in the `PageHeader` above
+   * (decision 20261022-123837). `Panel`'s left-hand group deliberately doesn't
+   * wrap (it holds every panel's title), so the wrapper here carries its own.
    */
   const jobsMeta = (
     <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-      {showCharacterFilter && (
-        <CharacterFilterControl
-          activeCharacterId={characterId}
-          value={jobsCharacterFilter}
-          onChange={(next) => setJobsCharacterValues({ 'jobs.chars': next })}
-        />
-      )}
       {showHistorySegment && (
         <SegmentedControl
           label={t('industry.jobsViewLabel')}

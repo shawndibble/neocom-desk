@@ -10,6 +10,7 @@ import { Button, Modal } from '@/components/ui';
 import { focusRingClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatLocalDate } from '@/lib/localDate';
+import { useTimeZone } from '@/lib/timeFormat';
 import { isFitGoalPickable, type FitGoalOption } from './fitGoalOptions';
 
 interface FitGoalModalProps {
@@ -20,7 +21,7 @@ interface FitGoalModalProps {
   onPick: (option: FitGoalOption) => void;
 }
 
-function stateText(option: FitGoalOption, t: TFunction): string {
+function stateText(option: FitGoalOption, t: TFunction, timeZone?: 'UTC'): string {
   switch (option.state) {
     case 'loading':
       return t('plans.fitGoal.loading');
@@ -29,7 +30,7 @@ function stateText(option: FitGoalOption, t: TFunction): string {
     case 'flyable-now':
       return t('plans.fitGoal.flyableNow');
     case 'on-date':
-      return t('plans.fitGoal.flyableOn', { date: formatLocalDate(option.date) });
+      return t('plans.fitGoal.flyableOn', { date: formatLocalDate(option.date, timeZone) });
     case 'missing':
       return t('plans.fitGoal.notByEnd', { count: option.missingLevels });
   }
@@ -37,6 +38,7 @@ function stateText(option: FitGoalOption, t: TFunction): string {
 
 export function FitGoalModal({ open, options, onClose, onPick }: FitGoalModalProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const [confirming, setConfirming] = useState<FitGoalOption | null>(null);
   const [wasOpen, setWasOpen] = useState(open);
   if (open !== wasOpen) {
@@ -74,7 +76,7 @@ export function FitGoalModal({ open, options, onClose, onPick }: FitGoalModalPro
                 >
                   <span className="truncate">{option.name}</span>
                   <span className="shrink-0 tabular-nums text-text-dim">
-                    {stateText(option, t)}
+                    {stateText(option, t, timeZone)}
                   </span>
                 </button>
               </li>

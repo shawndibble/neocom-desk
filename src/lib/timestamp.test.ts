@@ -4,6 +4,7 @@ import {
   formatDateOnly,
   formatTimeOfDay,
   formatTimestamp,
+  splitTimestamp,
 } from './timestamp';
 
 /**
@@ -82,5 +83,40 @@ describe('formatDateOnly', () => {
     // 2026-09-06T23:30Z is already the 7th in Tokyo and still the 6th in UTC.
     const lateUtc = new Date('2026-09-06T23:30:00.000Z');
     expect(formatDateOnly(lateUtc, 'UTC')).not.toBe(formatDateOnly(lateUtc, 'Asia/Tokyo'));
+  });
+});
+
+describe('EVE time is a 24-hour clock', () => {
+  const afternoon = new Date('2026-09-06T13:28:00.000Z');
+  const justAfterMidnight = new Date('2026-09-07T00:05:00.000Z');
+  const NOT_12_HOUR = /\b(AM|PM)\b/i;
+
+  it('renders UTC times as 13:28, never 01:28 PM, on every formatter', () => {
+    expect(formatTimestamp(afternoon, 'UTC')).toMatch(/\b13:28\b/);
+    expect(formatCalendarTimestamp(afternoon, 'UTC')).toMatch(/\b13:28\b/);
+    expect(formatTimeOfDay(afternoon, 'UTC')).toBe('13:28');
+    expect(splitTimestamp(afternoon, 'UTC').time).toBe('13:28');
+    for (const text of [
+      formatTimestamp(afternoon, 'UTC'),
+      formatCalendarTimestamp(afternoon, 'UTC'),
+      formatTimeOfDay(afternoon, 'UTC'),
+    ]) {
+      expect(text).not.toMatch(NOT_12_HOUR);
+    }
+  });
+
+  it('reads the first minutes after midnight as 00:05, not 24:05', () => {
+    expect(formatTimeOfDay(justAfterMidnight, 'UTC')).toBe('00:05');
+    expect(formatTimestamp(justAfterMidnight, 'UTC')).not.toMatch(/\b24:/);
+    // The split must still land on the clock, or it falls back to unsplit.
+    const split = splitTimestamp(justAfterMidnight, 'UTC');
+    expect(split.time).toMatch(/^0?0:05$/);
+    expect(split.date + split.time).toBe(formatTimestamp(justAfterMidnight, 'UTC'));
+  });
+
+  it('leaves the viewer-locale clock alone when no zone is given', () => {
+    expect(formatTimeOfDay(afternoon)).toBe(
+      afternoon.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+    );
   });
 });

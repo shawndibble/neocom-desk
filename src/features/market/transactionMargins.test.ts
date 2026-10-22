@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
-import { pooledTransactionMargins, transactionMargins } from './transactionMargins';
+import {
+  pooledTransactionMargins,
+  transactionMarginReport,
+  transactionMargins,
+} from './transactionMargins';
 
 function fill(over: Partial<WalletTransaction>): WalletTransaction {
   return {
@@ -55,6 +59,19 @@ describe('transactionMargins', () => {
   });
 });
 
+describe('transactionMarginReport', () => {
+  it('says a covered sale with no tax line in the journal has no sales tax line found', () => {
+    const { margins, gaps } = transactionMarginReport([BUY, SALE], []);
+    expect(margins.has(2)).toBe(false);
+    expect(gaps.get(2)).toBe('noTax');
+  });
+
+  it('says a sale with no wallet buy behind it is not covered by one', () => {
+    const { gaps } = transactionMarginReport([SALE], [taxLine({ context_id: 2 })]);
+    expect(gaps.get(2)).toBe('noBuy');
+  });
+});
+
 describe('pooledTransactionMargins', () => {
   it("prices a main's sale against an alt's buy, keeping each journal to its own Character", () => {
     // Same ids on both wallets: renumbering keeps them apart.
@@ -78,5 +95,15 @@ describe('pooledTransactionMargins', () => {
   it('leaves the same sale without a margin in its own single view', () => {
     const mainSale = fill({ ...SALE, transaction_id: 1 });
     expect(transactionMargins([mainSale], [taxLine({ context_id: 1 })]).size).toBe(0);
+  });
+});
+
+describe('pooledTransactionMargins gaps', () => {
+  it("keys a pooled sale's gap by its renumbered id", () => {
+    const mainSale = fill({ ...SALE, transaction_id: 1, journal_ref_id: 12 });
+    const { rows, gaps } = pooledTransactionMargins([
+      { characterId: 20, name: 'Main', transactions: [mainSale], journal: [] },
+    ]);
+    expect(gaps.get(rows[0].transaction_id)).toBe('noBuy');
   });
 });

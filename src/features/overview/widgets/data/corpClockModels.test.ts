@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { BoardExtractionSource, BoardStructureSource } from '@/engine/corp/board';
 import type { CorporationIndustryJob } from '@/esi/endpoints';
+import { formatDateOnly } from '@/lib/timestamp';
 import type { MoonChunksBoardData, StructuresBoardData } from '../../data/boardData';
 import type { CorpJobsFeed, CorpStarbasesFeed } from './corpFeeds';
 import { corpDeadlines, corpJobs, corpServices } from './corpClockModels';
@@ -251,6 +252,37 @@ describe('corpDeadlines', () => {
     expect(chart.values).toHaveLength(14);
     expect(chart.values[0]).toBe(1);
     expect(chart.summary).toContain('corp.standing.strip.describe');
+  });
+
+  describe('on the Time format clock', () => {
+    const originalTz = process.env.TZ;
+    afterEach(() => {
+      process.env.TZ = originalTz;
+    });
+
+    // 05:00 UTC the next day is 22:00 tonight in Los Angeles: two days on two clocks.
+    const feeds = (): Feeds => ({
+      structures: structuresFeed([structure({ fuelExpiresMs: NOW + 17 * HOUR })]),
+      moonChunks: moonFeed([]),
+      corpJobs: jobsFeed([]),
+    });
+    const bars = (zone: 'UTC' | undefined) => {
+      const chart = corpDeadlines(feeds(), { ...ctx, zone }).chart;
+      if (chart?.kind !== 'bars') throw new Error('expected a bars chart');
+      return chart;
+    };
+
+    it('buckets the day bars on the pilot local days by default', () => {
+      process.env.TZ = 'America/Los_Angeles';
+      expect(bars(undefined).values.slice(0, 3)).toEqual([1, 0, 0]);
+    });
+
+    it('buckets and labels the day bars on EVE days when the setting is eve', () => {
+      process.env.TZ = 'America/Los_Angeles';
+      const chart = bars('UTC');
+      expect(chart.values.slice(0, 3)).toEqual([0, 1, 0]);
+      expect(chart.tips?.[1]?.title).toBe(formatDateOnly(new Date(Date.UTC(2026, 9, 12)), 'UTC'));
+    });
   });
 
   it('draws what it could read when one feed is unreadable', () => {

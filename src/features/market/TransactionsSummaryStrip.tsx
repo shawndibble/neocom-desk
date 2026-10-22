@@ -8,6 +8,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { iskToneClass } from '@/features/character/format';
 import type { WalletTransaction } from '@/esi/endpoints';
 import { signedIsk } from '@/lib/signedIsk';
+import { formatMarketIsk } from '@/lib/isk';
 import { summarizeTransactions } from './transactionDays';
 import type { TradingSummary } from './tradingSummary';
 
@@ -76,6 +77,14 @@ export function TransactionsSummaryStrip({
           />
         )}
       </dl>
+      {trading && trading.uncosted.sales > 0 && (
+        <p className="text-xs text-text-dim">
+          {t('wallet.tradingUncosted', {
+            count: trading.uncosted.sales,
+            isk: formatMarketIsk(trading.uncosted.revenue),
+          })}
+        </p>
+      )}
       {trading?.archiveSince != null && (
         <p className="text-xs text-text-dim">
           {t('wallet.archiveSince', {

@@ -1,6 +1,7 @@
 export { Panel } from './Panel';
 export { CollapsiblePanel } from './CollapsiblePanel';
 export { PageHeader } from './PageHeader';
+export { HeaderMoreMenu } from './HeaderMoreMenu';
 export { AlertsBell } from './AlertsBell';
 export { Button } from './Button';
 export type { ButtonVariant, ButtonSize } from './Button';

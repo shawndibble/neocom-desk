@@ -60,9 +60,9 @@ Code: `src/routes/Mail.tsx`, `src/features/character/{mail,mailAll,mailScopePref
 
 ## All characters
 
-- Scope picker = the shared `CharacterFilterControl` (#2846), only offered with 2+ Characters. Label "All characters · N"; menu lists each Character's unread (sum of its four System Labels' `unread_count`, custom labels excluded).
+- Scope picker = the shared `CharacterFilterControl` (#2846), only offered with 2+ Characters, first in the page header's cluster (`PageHeader` `scope`). Trigger is an avatar stack (words "All characters · N" in its tooltip, accessible name and menu); menu lists each Character's unread (sum of its four System Labels' `unread_count`, custom labels excluded).
 - Choice persists device-wide in Dexie setting `mailScope` (`mailScopePref.ts`); URL `scope` (`current|all`) overrides it for one view and is never written back. `MailView` is keyed on the scope, so each scope loads its own snapshot (route cache key `mail` / `mail-all`).
-- Load: `loadMailForCharacters` (`mailAll.ts`) fans out the per-Character loaders under `ESI_FANOUT_CONCURRENCY`. A Character without `esi-mail.read_mail.v1`, or with nothing cached and no fetch, is skipped and named in the readout: "All characters · 3 of 4", warning icon, tooltip "Not included: …". A skipped Character lacking the grant also gets its own `GrantNote`.
+- Load: `loadMailForCharacters` (`mailAll.ts`) fans out the per-Character loaders under `ESI_FANOUT_CONCURRENCY`. A Character without `esi-mail.read_mail.v1`, or with nothing cached and no fetch, is skipped and named by the picker: a warning dot on the trigger, "Not included: …" in its accessible name and as a note in its menu. A skipped Character lacking the grant also gets its own `GrantNote`.
 - Throttle: each Character goes live at most once per `MAIL_REFRESH_MIN_GAP_MS` (60 s). A Refresh inside the window reads Dexie for that Character instead.
 - List: same rows, merged newest first by timestamp (`mergeOwnedMail`), each with an owner chip (avatar + name). `mail_id` is per-Character, so row identity is `mailKey(ownerId, mailId)`. Folder of a row comes from its own owner's labels. Chip counts = each System Label's own `unread_count` summed across Characters (`sumUnreadByTab`).
 - Load more pages every Character that has more (`last_mail_id` per mailbox). Display cap (200) applies to the merged list.

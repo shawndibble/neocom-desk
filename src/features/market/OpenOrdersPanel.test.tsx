@@ -769,6 +769,32 @@ describe('OpenOrdersPanel', () => {
     expect(cached.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("names a Character left out of All on the picker, not in the list's foot", async () => {
+    mockedLoadAll.mockResolvedValue(
+      snapshot(
+        [
+          entry([EXPIRING_ORDER]),
+          entry([{ ...EXPIRING_ORDER, order_id: 202 }], { characterId: 2, characterName: 'Bravo' }),
+        ],
+        [{ characterId: 3, name: 'Charlie' }]
+      )
+    );
+
+    renderPanel();
+
+    const picker = await within(screen.getByRole('banner')).findByRole('button', {
+      name: 'All characters · 2. Not included: Charlie',
+    });
+    expect(picker).toHaveClass('md:h-9');
+    expect(screen.queryByText("Charlie hasn't shared their orders")).not.toBeInTheDocument();
+    // The faces are the two Characters with orders, the active one first (no "+N" from the roster).
+    const faces = Array.from(picker.querySelectorAll('img')).map(
+      (img) => /characters\/(\d+)\//.exec(img.getAttribute('src') ?? '')?.[1]
+    );
+    expect(faces).toEqual(['1', '2']);
+    expect(picker.querySelector('[data-stack-extra]')).toBeNull();
+  });
+
   describe('funnel filter controls', () => {
     /**
      * The controls live behind the funnel at every width on this page (the
@@ -853,33 +879,6 @@ describe('OpenOrdersPanel', () => {
         expect(await screen.findByRole('row', { name: /Mexallon/ })).toBeInTheDocument();
         expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
         expect(useActiveCharacter.getState().activeCharacterId).toBe(1);
-      });
-
-      it('shows the crumb only when route state names the Wallet', async () => {
-        const plain = renderPanel('/market/orders?char=2');
-        await screen.findByText('Bravo only');
-        expect(screen.queryByRole('link', { name: /Wallet/ })).not.toBeInTheDocument();
-        plain.unmount();
-        render(
-          <MemoryRouter
-            initialEntries={[
-              { pathname: '/market/orders', search: '?char=2', state: { origin: 'wallet' } },
-            ]}
-          >
-            <FakeItemActions actions={actions}>
-              {withOrderDetailLoaders(
-                <WithPageHeaderSlots>
-                  {(slots) => <OpenOrdersPanel headerSlots={slots} />}
-                </WithPageHeaderSlots>,
-                loaders
-              )}
-            </FakeItemActions>
-          </MemoryRouter>
-        );
-        expect(await screen.findByRole('link', { name: /Wallet/ })).toHaveAttribute(
-          'href',
-          '/wallet'
-        );
       });
 
       it('shows the grant note for a Character without the orders scope', async () => {

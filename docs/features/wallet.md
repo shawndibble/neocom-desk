@@ -84,13 +84,13 @@ Route `/wallet` (`src/routes/Wallet.tsx`). Economy nav group, mobile tab. Tabbed
 
 ## Balance tab
 
-Character filter (`CharacterFilterControl`) rides in the Worth panel's meta. Absent when the account has one Character (`Wallet.tsx:237-244`). State in `?char=` (codec `characterFilterParam`, default = synced Settings "default character filter" `useDefaultCharacterFilter`; URL value never written back to the setting). Options: This character / All characters.
+Character filter (`CharacterFilterControl`) rides first in the page header's right-hand cluster (`PageHeader` `scope`) on Balance and Journal; LP Store has none. Absent when the account has one Character (`walletScopePicker` in `Wallet.tsx`). State in `?char=` (codec `characterFilterParam`, default = synced Settings "default character filter" `useDefaultCharacterFilter`; URL value never written back to the setting). Options: This character / All characters.
 
 ### Single-Character panel ("Worth", issue #3004)
 
 One panel, the `NetWorthPanel` in `single` mode with the page's `stats` and `notices`; there is no separate Balance panel.
 
-- Title bar: "Worth", the Character filter (when the account has several), and a **Layers** `MultiSelect` (button "Layers: N of 4", options ISK / Assets / Order escrow / Sell orders, each with its colour swatch). Same default, same device-local persistence as the old checkboxes; the last series cannot be switched off.
+- Title bar: "Worth" (a drill names its Character here) and a **Layers** `MultiSelect` (button "Layers: N of 4", options ISK / Assets / Order escrow / Sell orders, each with its colour swatch). Same default, same device-local persistence as the old checkboxes; the last series cannot be switched off.
 - Stat row: **Net worth** (small-caps label, large figure toned by sign, whole ISK, no decimals; "—" when the Character lacks the wallet, assets or orders permission) and **EverMarks** to its right (Paragon corp 1000419 split out of the LP list, `splitEverMarks`, `loyalty.ts`) with an `InfoTooltip`. EverMarks shows "unknown" when loyalty is missing or needs re-auth.
 - No character portrait or "<name> only" readout: the page header already names the Character.
 - The exact wallet balance is no longer a figure of its own (user decision). It can still be read in the layer table under the chart (ISK row, whole ISK, the live balance); cents are not shown anywhere on this tab.
@@ -113,7 +113,7 @@ Replaces the old journal balance-history chart. Maths in `src/engine/netWorth/` 
 - **Layers** (the title-bar Layers dropdown; the last one cannot be switched off): ISK (wallet), Assets (hub-priced, PLEX stacks removed), Order escrow (buy orders), Sell orders (`volume_remain x price`, Character's own orders only). PLEX is not a layer: the PLEX Vault is not in ESI, so only hangar PLEX could show, which would mislead.
 - **One Character:** layers stacked, plus a layer table (Layer, Value, Share, Opens). Opens links: ISK to `/wallet/journal`, Assets to `/assets`, Order escrow and Sell orders to `/market/orders`, each carrying `state.from = 'wallet'` so the landing page shows a "‹ Wallet" crumb (`FromWalletCrumb`).
 - **Several Characters** (the existing `?char=` filter): one line per Character; "Balance by character" gains a leading Show checkbox column (the last Character cannot be unchecked), one column per layer and a net worth column. A row or a chart line drills into that Character's own layered view as route state `?drill=<id>` (pushed, so Back undoes it); a "‹ All characters" crumb returns. Not `?character=`: that is the alert deep link `AlertCharacterSwitch` strips.
-- **Permissions:** a Character without the wallet, assets and orders scopes is left out of totals; the scope readout reads "All characters · N of M" with a tooltip naming who is missing.
+- **Permissions:** a Character without the wallet, assets and orders scopes is left out of totals; the header picker's trigger carries a warning dot, and its accessible name, tooltip and open menu add "Not included: {names}".
 - **History:** ISK is backfilled from the cached wallet journal (last balance per UTC day; ESI keeps about 30 days). The other layers start on the first snapshot day: before it the chart shows a dashed "Wallet only before <date>" divider. Days with no snapshot after that are hatched, the wallet continues and nothing is interpolated.
 - **Device-local toggles:** hidden layers and hidden Characters persist per device (`netWorthHiddenLayers`, `netWorthHiddenCharacters`, stored as what is hidden so a new Character shows by default).
 - **Export:** surface `wallet-balances`; columns Character, one per layer, Net worth of the shown layers; blank (not 0) for an excluded Character.
@@ -184,7 +184,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 ## Mobile behaviour
 
 - Journal: `responsive="table"`, Balance off by default on phones (Columns menu shows them), filters collapse into a sheet; date range kept on one row inside the sheet (test `Wallet.test.tsx:522`).
-- Character filter trigger is icon-only below `md` (avatar or all-characters glyph).
+- Character filter trigger is an avatar stack with no words at every width (portrait, or up to 3 faces + "+N" for All, 2 below `md`); the words are in its tooltip and accessible name.
 - "Transactions" link has 44px min hit area below `md`.
 - LP table and balance table: `responsive="table"`.
 
@@ -228,7 +228,7 @@ Table (`features/character/WalletJournalTable.tsx`, shared with `/corp/wallet`):
 - Corp wallet left Wallet for the Corp section: `20260929-131220-corp-wallet-moves-to-the-corp-section.md`.
 - Personal fills moved to Market › History: `20261001-113143-date-market-order-fills-from-wallet-transactions.md` (reads transactions) and `routes/Wallet.tsx` comments.
 - LP Store is a Wallet tab beside the balances it spends: `20261010-200446-lp-store-moves-from-market-to-wallet.md` (it replaced the Market placement of `20261002-145653-lp-store-under-market-pilot-lookup-its-own.md`); picker shape `20260930-144709-select-box-lp-store-picker.md` (still applies to this card; the Market page dropped its picker in `20261009-163837-lp-store-switches-stores-through-its-search-not.md`); loyalty scope gate `20260929-224008-lp-store-browsing-keeps-the-loyalty-scope-gate.md`.
-- Character filter sits in the panel header and shrinks to This/All: `20260908-192806-the-character-filter-rides-in-the-panel-header.md`.
+- Character filter shrinks to This/All: `20260908-192806-the-character-filter-rides-in-the-panel-header.md`; it rides first in the page header's cluster: `20261022-123837-the-character-picker-rides-first-in-the-page.md`.
 - Route ungated, panel-gated: `src/app/routeScopes.ts:120-123`.
 
 ## Formulas and edge cases

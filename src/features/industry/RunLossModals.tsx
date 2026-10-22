@@ -11,6 +11,8 @@ import {
 } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
+import { useTimeZone } from '@/lib/timeFormat';
+import { formatDateOnly } from '@/lib/timestamp';
 import { SourcingInput } from './SourcingInput';
 import type { LossInsuranceMode, RunLoss } from './useRunLoss';
 
@@ -28,6 +30,7 @@ function todayInput(): string {
  */
 export function RunLossModals({ loss }: { loss: RunLoss }) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const quantityErrorId = useId();
   const dialog = loss.dialog;
   const preview = loss.preview;
@@ -122,7 +125,7 @@ export function RunLossModals({ loss }: { loss: RunLoss }) {
                           <span>
                             {formatIsk(entry.amount ?? 0)}
                             {' — '}
-                            {new Date(entry.date).toLocaleDateString()}
+                            {formatDateOnly(new Date(entry.date), timeZone)}
                           </span>
                         </label>
                       </li>

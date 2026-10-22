@@ -15,10 +15,11 @@ const OPTIONS: Intl.DateTimeFormatOptions = {
  * Renders an instant as the viewer's local calendar date (YYYY-MM-DD). Used
  * by every Skills Planner date surface (plan header, entries panel header,
  * step timeline, remap-cooldown) so two surfaces showing the same instant
- * can never disagree by a day — see #207.
+ * can never disagree by a day — see #207. `timeZone` (`'UTC'` for the EVE
+ * clock, from `useTimeZone()`) moves them all together; omitted, the host zone.
  */
-export function formatLocalDate(date: Date): string {
-  return date.toLocaleDateString('en-CA', OPTIONS);
+export function formatLocalDate(date: Date, timeZone?: string): string {
+  return date.toLocaleDateString('en-CA', timeZone ? { ...OPTIONS, timeZone } : OPTIONS);
 }
 
 const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
@@ -34,7 +35,16 @@ const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
  * minute — a date alone would leave a director guessing which fifteen-minute
  * window to be in space for — but every other constraint from `formatLocalDate`
  * still applies, so this shares its numeric-only, per-call-formatter shape.
+ * `timeZone` (`'UTC'` for the EVE clock) moves the date and the time together.
  */
-export function formatLocalDateTime(date: Date): string {
-  return date.toLocaleString('en-CA', DATE_TIME_OPTIONS);
+export function formatLocalDateTime(date: Date, timeZone?: string): string {
+  if (timeZone === undefined) return date.toLocaleString('en-CA', DATE_TIME_OPTIONS);
+  // `h23` rather than `hour12: false`, which can print "24:05" just after
+  // midnight; the EVE clock is 24-hour (`timestamp.ts`'s `clockFor`).
+  return date.toLocaleString('en-CA', {
+    ...DATE_TIME_OPTIONS,
+    hour12: undefined,
+    hourCycle: 'h23',
+    timeZone,
+  });
 }

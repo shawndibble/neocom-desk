@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Prints the e2e spec files one CI shard should run, one per line:
- *   node scripts/e2e-shard.mjs --shard 3/8
+ *   node scripts/e2e-shard.mjs --shard 3/6
  *
  * Weights live in e2e/shard-weights.json (seconds of worker time per file).
  * Refresh them from a CI log with `node scripts/e2e-shard.mjs --weights <log>`;

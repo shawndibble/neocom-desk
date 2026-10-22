@@ -6,7 +6,7 @@
  * Pure: the caller loads the journal and the archive coverage.
  */
 import { sumBrokerFees, sumMargins, type MarginTotal } from '@/engine/market/tradingProfit';
-import type { RealizedMargin } from '@/engine/market/realizedMargin';
+import type { MarginGap, RealizedMargin } from '@/engine/market/realizedMargin';
 import type { WalletTransaction } from '@/esi/endpoints';
 import type { WalletTransactionFilter } from '@/features/character/walletTransactionFilter';
 
@@ -14,6 +14,8 @@ export interface TradingSummary extends MarginTotal {
   brokerFees: number;
   /** The archive starts after the range does: the figures cover only this far back. Epoch ms. */
   archiveSince: number | null;
+  /** The sales shown that have no margin (a gap), and the ISK they brought in. */
+  uncosted: { sales: number; revenue: number };
 }
 
 interface FeeLine {
@@ -42,6 +44,8 @@ export function tradingWindow(
   return { fromMs, toMs };
 }
 
+const NO_GAPS: ReadonlyMap<number, MarginGap> = new Map();
+
 /**
  * `archiveSinceMs` is where the local wallet archive starts (null when it has
  * no history); it is reported only when it falls inside the range.
@@ -51,7 +55,8 @@ export function summarizeTrading(
   margins: ReadonlyMap<number, RealizedMargin>,
   journal: readonly FeeLine[],
   filter: Pick<WalletTransactionFilter, 'startDate' | 'endDate'>,
-  archiveSinceMs: number | null
+  archiveSinceMs: number | null,
+  gaps: ReadonlyMap<number, MarginGap> = NO_GAPS
 ): TradingSummary {
   const fills = shown.map((t) => ({
     transactionId: t.transaction_id,
@@ -61,8 +66,15 @@ export function summarizeTrading(
   }));
   const { fromMs, toMs } = tradingWindow(filter, shown);
   const total = sumMargins(fills, margins);
+  const uncosted = { sales: 0, revenue: 0 };
+  for (const t of shown) {
+    if (t.is_buy || !gaps.has(t.transaction_id)) continue;
+    uncosted.sales += 1;
+    uncosted.revenue += t.quantity * t.unit_price;
+  }
   return {
     ...total,
+    uncosted,
     brokerFees: fromMs === null ? 0 : sumBrokerFees(journal, fromMs, toMs),
     archiveSince:
       archiveSinceMs !== null && fromMs !== null && archiveSinceMs > fromMs ? archiveSinceMs : null,

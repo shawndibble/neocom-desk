@@ -60,8 +60,8 @@
     "switchCharacter": "Switch character",
     "characterSwitcher": "Characters",
     "characterActive": "Active",
-    "fixPermissions": "Fix…",
-    "fixPermissionsFor": "Fix permissions for {{name}}",
+    "permissionsCount": "{{granted}} of {{total}} Permissions",
+    "permissionsFor": "{{granted}} of {{total}} Permissions for {{name}}",
     "manageCharacters": "Manage characters",
     "more": "More",
     "mobileLabel": "Mobile navigation",
@@ -2307,18 +2307,12 @@
     "boosterQuickPicks": "Quick picks for the time left",
     "boosterQuickPickHours": "+{{hours}}h",
     "boosterQuickPickDays": "+{{days}}d",
+    "importAction": "Import",
+    "importFileChoose": "Or choose a .emp or .xml file",
     "importDialogTitle": "Import plan",
     "importPaste": "Paste an EFT fit or a skill plan (one \"Skill Name Level\" per line)",
-    "importParse": "Parse",
     "importApply": "Apply",
     "importCancel": "Cancel",
-    "importModeEft": "Detected: EFT fit",
-    "importModeSkillPlan": "Detected: skill plan",
-    "importModePlanXml": "Detected: plan file",
-    "importPasteTab": "Paste",
-    "importFileTab": "File",
-    "importFileDrop": "Drop a .emp or .xml file here, or",
-    "importFileBrowse": "Choose file",
     "importFileTooLarge": "That file is too large to import.",
     "importFileReadFailed": "Couldn't read that file — try picking it again.",
     "importFileDecompressFailed": "Couldn't decompress that file — it may be corrupt.",
@@ -2332,7 +2326,7 @@
     "searchResultCount_other": "{{count}} skills match",
     "importWarnings": "Warnings",
     "importErrors": "Errors",
-    "importEmpty": "Nothing to import — paste some text and click Parse.",
+    "importEmpty": "Nothing to import — no skills were found.",
     "importLine": "Line {{line}}: {{text}} — {{reason}}",
     "alreadyTrained": "Already trained",
     "alreadyInPlan": "Already in plan",
@@ -2371,8 +2365,6 @@
     "removeMarker": "Remove remap marker {{position}}",
     "reorderMarker": "Reorder remap marker {{position}} — press Space then arrow keys to move it",
     "noSkillsMatch": "No skills match \"{{query}}\"",
-    "pasteFromClipboard": "Paste from clipboard",
-    "pasteFromClipboardFailed": "Couldn't read the clipboard — paste manually instead.",
     "markerAttributesModalTitle": "Remap marker attributes",
     "markerAttributesModalHint": "Set the attributes this remap should target, before implants. Every point spent on one attribute comes off another — a legal remap always totals {{total}}, {{min}}–{{max}} per attribute. The marker row in your plan shows these numbers with your implants added, the way EVE's remap screen does.",
     "markerAttributesRemaining_one": "{{count}} point left to allocate",
@@ -3920,10 +3912,8 @@
       "allPartial": "All characters · {{covered}} of {{total}}",
       "one": "{{name}} only",
       "corp": "Corp · {{division}}",
-      "missing": "Not included: {{names}}"
-    },
-    "crumb": {
-      "wallet": "Wallet"
+      "missing": "Not included: {{names}}",
+      "triggerPartial": "{{label}}. {{missing}}"
     },
     "filter": {
       "thisCharacter": "This character",
@@ -5601,8 +5591,6 @@
     "newest": "newest {{age}}",
     "searchLabel": "Search alerts",
     "searchPlaceholder": "Search alerts…",
-    "characterLabel": "Character",
-    "allCharacters": "All characters",
     "empty": "No alerts yet",
     "emptyHint": "Events you have enabled appear here while the app is open.",
     "noMatches": "No alerts match these filters",
@@ -5707,6 +5695,7 @@
     "unknown": "—",
     "aboutLabel": "About {{label}}",
     "moreActionsLabel": "More actions for {{name}}",
+    "moreActions": "More actions",
     "tableExport": {
       "menuLabel": "{{name}} actions",
       "exportButtonLabel": "Export {{name}}",
@@ -5825,12 +5814,24 @@
     "net": "Net",
     "transactionsSummaryLabel": "Totals for the transactions shown",
     "margin": "Margin",
-    "marginTooltip": "Sale total less the wallet buys it used up (oldest first) and its sales tax. Broker fees aren't taken off. A dash means no wallet buy covers it — stock you built, say — its tax isn't in your journal, or some of that item's stock came from outside this history.",
+    "marginTooltip": "Sale total less the wallet buys it used up (oldest first) and its sales tax. Broker fees aren't taken off. A sale without a margin says why in its own cell.",
+    "marginGap": {
+      "noBuy": "No wallet buy covers it",
+      "noTax": "No sales tax line found",
+      "outside": "Stock came from outside this history"
+    },
+    "marginGapHint": {
+      "noBuy": "No earlier wallet buy covers all of these units, so there is no cost to take off.",
+      "noTax": "This sale's tax isn't in your journal, so a margin would overstate it.",
+      "outside": "Another sale of this item used more units than your wallet buys, so we can't tell which stock this one used."
+    },
     "marginWorking": "Cost {{unitCost}} each from your wallet buys\nSales tax {{salesTax}}",
     "transactionsRange": "{{from}} – {{to}}",
     "tradingMargin": "Margin",
     "tradingMatched_one": "{{matched}} of {{count}} sale matched",
     "tradingMatched_other": "{{matched}} of {{count}} sales matched",
+    "tradingUncosted_one": "{{count}} sale uncosted · {{isk}} ISK",
+    "tradingUncosted_other": "{{count}} sales uncosted · {{isk}} ISK",
     "brokerFees": "Broker fees",
     "brokerFeesTooltip": "Broker fees paid over the same dates, from your journal. They aren't taken off the margin — a fee can't be tied to a sale.",
     "archiveSince": "Since {{date}} — your wallet archive starts there.",
@@ -6577,7 +6578,8 @@
       "dateRangeStat": "Date range",
       "daysMinedStat": "Days mined",
       "valueMenu": "Value",
-      "settingsTitle": "Page settings",
+      "settingsTitle": "View settings",
+      "rangeSummary": "{{range}} · {{summary}}",
       "buybackRateLabel": "Buyback rate",
       "buybackRateHint": "% of market price a buyback pays",
       "showRefiningLabel": "Show refining",
@@ -6821,7 +6823,6 @@
     },
     "valueAffix": "value",
     "noPriceLabel": "No price",
-    "moreActions": "More actions",
     "sections": {
       "open": "Open · {{count}}",
       "openEmpty": "Nothing open — every entry is paid or dismissed.",
@@ -6880,7 +6881,6 @@
       "ships": "Ships",
       "move": "Move"
     },
-    "skippedCharacters": "Couldn't load assets for {{names}} — they are missing here.",
     "skippedAllHint": "Their assets aren't saved on this device yet. They load once ESI answers.",
     "movePlan": {
       "title": "Plan a move",
@@ -7008,7 +7008,6 @@
     "security": {
       "ariaLabel": "Security status: {{value}}"
     },
-    "crossCharacterLoading": "Searching other characters…",
     "crossCharacterBadge": "From {{character}}",
     "crossCharacterCsvNote": "CSV export only includes this character's own items.",
     "blueprintBadge": {
@@ -7435,7 +7434,6 @@
     },
     "filter": {
       "title": "Event types",
-      "visibleLabel": "Filter",
       "open": "Filter event types",
       "openWithCount": "Filter event types ({{count}} hidden)",
       "notGranted": "Not granted",
@@ -8936,7 +8934,6 @@
     "corpEmptyFetchedTitle": "No corp contracts",
     "allEmptyHint": "Couldn't load your characters' contracts yet. Try again shortly.",
     "character": "Character",
-    "notShared": "{{name}} hasn't shared their contracts",
     "itemSearchTab": "Item search",
     "courierTab": "Courier",
     "refresh": "Refresh",
@@ -11213,7 +11210,6 @@
       "fillsInHelp": "Units left to buy divided by the item's average daily volume in the region, shared by your place in the queue.",
       "sellsOutPastExpiry": "Runs past the day this order expires",
       "details": "Details",
-      "allCharacters": "All characters",
       "onlySeller": "You are the only seller here",
       "scopeTheirPrice": "Their price",
       "scopeOverBy": "I am over by",
@@ -12220,7 +12216,7 @@
       "deviceField": "This device only."
     },
     "timeFormatLabel": "Time format",
-    "timeFormatHint": "EVE runs on UTC, the clock other players quote timers in. Calendar keeps your local days.",
+    "timeFormatHint": "EVE runs on UTC, the clock other players quote timers in.",
     "timeFormat": {
       "local": "My local time",
       "eve": "EVE time (UTC)"
@@ -14315,6 +14311,7 @@
     },
     "mailQueue": {
       "title": "Statement mail",
+      "sentAt": "{{time}} EVE",
       "minutes_one": "{{count}} minute",
       "minutes_other": "{{count}} minutes",
       "chip": {

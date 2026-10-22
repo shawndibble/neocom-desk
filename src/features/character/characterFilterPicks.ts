@@ -22,6 +22,10 @@ export const CHARACTER_FILTER_PICKS_SETTING_KEY = 'characterFilterPicks';
 export const CHARACTER_FILTER_PAGES = [
   'assets',
   'wallet',
+  // Industry's one page-wide picker. `jobs` and `opportunities` were its two
+  // per-panel pickers before they merged; kept so their stored picks still
+  // parse and seed `industry` (`industryCharacterPick`), never written again.
+  'industry',
   'jobs',
   'opportunities',
   'orders',

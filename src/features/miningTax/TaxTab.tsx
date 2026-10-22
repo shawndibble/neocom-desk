@@ -39,6 +39,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   EmptyState,
+  HeaderMoreMenu,
   IconButton,
   NeedsConnection,
   PageHeader,
@@ -105,6 +106,7 @@ import type { PayeeOwed } from '@/features/miningTax/PayeeManagerDialog';
 import { findPricingGaps, type PricingGap } from '@/features/miningTax/pricingGaps';
 import { taxCsvColumns } from '@/features/miningTax/taxCsv';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { AttentionStrip, type AttentionItem } from '@/features/miningTax/AttentionStrip';
 import { OwedBalances } from '@/features/miningTax/OwedBalances';
@@ -250,6 +252,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
   const isPhone = useIsPhone();
+  const payeesFit = !useIsNarrow();
   const selectionToolbarRef = useRef<HTMLDivElement>(null);
   // The Ore column only where the table has room for it beside a full Payee
   // name: the Payee is what a row is read by, the ore is one click away in
@@ -311,6 +314,9 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // obligation) — a character with nothing mined yet still needs to appear
   // in the Characters filter and in Manage Payees.
   const characters = useMemo(() => data?.characters ?? [], [data]);
+  // The Characters the ledger tracks, which can be fewer than the roster: the
+  // picker's faces and "+N" follow them, matching its "· N".
+  const characterIds = useMemo(() => characters.map((c) => c.characterId), [characters]);
 
   const { madePayments, paymentSources } = useMadePayments(
     characters.map((c) => c.characterId).join(',')
@@ -1012,6 +1018,12 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       expandedCombined.has(dr.key) && 'sm:[&>td]:align-top'
     );
 
+  // The header row never wraps (it has a picker): below `md` Payees moves
+  // into the ⋮, except as the accent first-run call to action, which is the
+  // one control an empty tab is waiting on and so stays in sight.
+  const canManagePayees = payeeManagerDefaultCharacterId !== null;
+  const payeesInline = canManagePayees && (payeesFit || needsFirstPayee);
+
   return (
     <div className="space-y-4">
       {/*
@@ -1024,9 +1036,23 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
       <PageHeader
         title={t('miningTax.title')}
         meta={data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
+        // None while the tab waits on its first Payee: the body is then only
+        // that call to action, with no list for the picker to filter, and the
+        // accent Payees button keeps the phone row's room for the title.
+        scope={
+          !needsFirstPayee && (
+            <CharacterFilterControl
+              activeCharacterId={activeCharacterId}
+              value={characterFilter}
+              onChange={setCharacterFilter}
+              characterCount={characters.length}
+              allCharacterIds={characterIds}
+            />
+          )
+        }
         actions={
           <>
-            {payeeManagerDefaultCharacterId !== null && (
+            {payeesInline && (
               <Button
                 variant={needsFirstPayee ? 'accent' : 'ghost'}
                 onClick={() => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)}
@@ -1034,25 +1060,27 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                 {t('miningTax.managePayeesAction')}
               </Button>
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <IconButton icon={<Icon.More />} label={t('miningTax.moreActions')} />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => setOreTagsOpen(true)}>
-                  {t('miningTax.oreTagsAction')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
-                  {t('pageSettings.menuItem')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
             <IconButton
               icon={<Icon.Refresh />}
               label={t('miningTax.refresh')}
               onClick={refresh}
               disabled={loading}
             />
+            <HeaderMoreMenu>
+              {canManagePayees && !payeesInline && (
+                <DropdownMenuItem
+                  onSelect={() => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)}
+                >
+                  {t('miningTax.managePayeesAction')}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onSelect={() => setOreTagsOpen(true)}>
+                {t('miningTax.oreTagsAction')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
+                {t('pageSettings.menuItem')}
+              </DropdownMenuItem>
+            </HeaderMoreMenu>
           </>
         }
       />
@@ -1141,12 +1169,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                   it already carries its status. */}
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <CharacterFilterControl
-                      activeCharacterId={activeCharacterId}
-                      value={characterFilter}
-                      onChange={setCharacterFilter}
-                    />
-
                     {ledgerPayees.length > 0 && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

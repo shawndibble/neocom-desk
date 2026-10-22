@@ -3,6 +3,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { formatCountdown } from '@/lib/duration';
+import { useTimeZone } from '@/lib/timeFormat';
 import { SkillLink } from '@/features/entities';
 import { doneByText } from '../doneBy';
 import type { AttributePair } from '../attributePairBands';
@@ -50,6 +51,7 @@ export const PrereqRow = memo(function PrereqRow({
   onStageSkillDetail,
 }: PrereqRowProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
   const label = formatLevelLabel(name, row.step.level);
 
@@ -113,7 +115,7 @@ export const PrereqRow = memo(function PrereqRow({
         {columns.cumulativeTime && (
           <MetaValue
             label={t('plans.columnDoneBy')}
-            value={doneByText(row.step.cumulativeSeconds, startDate)}
+            value={doneByText(row.step.cumulativeSeconds, startDate, timeZone)}
           />
         )}
       </div>
@@ -137,7 +139,7 @@ export const PrereqRow = memo(function PrereqRow({
           )}
           {columns.cumulativeTime && (
             <TimeCell
-              value={doneByText(row.step.cumulativeSeconds, startDate)}
+              value={doneByText(row.step.cumulativeSeconds, startDate, timeZone)}
               label={t('plans.columnDoneBy')}
             />
           )}

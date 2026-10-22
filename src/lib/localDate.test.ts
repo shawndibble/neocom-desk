@@ -40,3 +40,28 @@ describe('formatLocalDateTime', () => {
     expect(formatLocalDateTime(new Date('2026-09-01T00:00:00Z'))).toBe('2026-09-01, 00:00');
   });
 });
+
+describe('formatLocalDate with the EVE clock', () => {
+  it('renders the UTC date whatever the host zone, only when asked', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    const late = new Date('2026-09-01T02:00:00Z');
+    expect(formatLocalDate(late)).toBe('2026-08-31');
+    expect(formatLocalDate(late, 'UTC')).toBe('2026-09-01');
+    expect(formatLocalDate(late, undefined)).toBe('2026-08-31');
+  });
+});
+
+describe('formatLocalDateTime with the EVE clock', () => {
+  it('renders UTC date and time whatever the host zone, only when asked', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    const late = new Date('2026-09-01T02:30:00Z');
+    expect(formatLocalDateTime(late)).toBe('2026-08-31, 19:30');
+    expect(formatLocalDateTime(late, 'UTC')).toBe('2026-09-01, 02:30');
+    expect(formatLocalDateTime(late, undefined)).toBe('2026-08-31, 19:30');
+  });
+
+  it('renders the first minutes after UTC midnight as 00:05, never 24:05', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    expect(formatLocalDateTime(new Date('2026-09-01T00:05:00Z'), 'UTC')).toBe('2026-09-01, 00:05');
+  });
+});

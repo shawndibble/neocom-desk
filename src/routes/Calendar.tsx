@@ -33,12 +33,7 @@ import {
   toggleHiddenKind,
 } from '@/features/character/calendarKindFilter';
 import { buildCharacterBoard, type CharacterBoardItemKind } from '@/engine/character/board';
-import {
-  countsByDay,
-  countsByKind,
-  filterByKinds,
-  localMidnight,
-} from '@/engine/character/deadlines';
+import { countsByDay, countsByKind, filterByKinds } from '@/engine/character/deadlines';
 import {
   addDays,
   addMonths,
@@ -50,10 +45,14 @@ import {
   formatFortnightLabel,
   formatMonthLabel,
 } from '@/lib/calendarGrid';
+import { cellOf, dayStart, type DayZone } from '@/engine/localDay';
+import { useTimeZone } from '@/lib/timeFormat';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useUrlParam } from '@/lib/useUrlState';
 import type { UrlParamCodec } from '@/lib/urlState';
+import { PageSettingsButton } from '@/features/settings/PageSettingsModal';
+import { CalendarSettingsForm } from '@/features/settings/CalendarSettingsForm';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { calendarCsvColumns, calendarExportEvents } from '@/features/character/calendarCsv';
@@ -126,6 +125,8 @@ export function Calendar() {
     { cacheKey: 'calendar' }
   );
   const isNarrow = useIsNarrow();
+  // Days are cut on the Time format's clock: the pilot's own, or EVE's (UTC).
+  const zone = useTimeZone();
 
   const density = useCalendarDensity((state) => state.value);
   const setDensity = useCalendarDensity((state) => state.setValue);
@@ -150,7 +151,7 @@ export function Calendar() {
   }
 
   // "Today" at mount, stable for this visit's codec identity (see `anchorParam`).
-  const [defaultAnchorKey] = useState(() => dayKey(new Date()));
+  const [defaultAnchorKey] = useState(() => dayKey(cellOf(Date.now(), zone)));
   const anchorCodec = useMemo(() => anchorParam(defaultAnchorKey), [defaultAnchorKey]);
   const [anchorKey, setAnchorKey] = useUrlParam('anchor', anchorCodec);
   const anchor = useMemo(() => parseAnchorKey(anchorKey), [anchorKey]);
@@ -168,7 +169,11 @@ export function Calendar() {
     anchorKeyRef.current = key;
     setAnchorKey(key);
   }
-  const [selectedDayMs, setSelectedDayMs] = useState<number | null>(null);
+  // A selected day is a midnight on one clock; it names no day on the other,
+  // so a pick made before the Time format changed reads as no pick.
+  const [selectedDay, setSelectedDay] = useState<{ zone: DayZone; ms: number } | null>(null);
+  const selectedDayMs = selectedDay !== null && selectedDay.zone === zone ? selectedDay.ms : null;
+  const setSelectedDayMs = (ms: number | null) => setSelectedDay(ms === null ? null : { zone, ms });
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
   /**
@@ -263,7 +268,7 @@ export function Calendar() {
 
   const selected = useMemo(() => shownKinds(hiddenKinds), [hiddenKinds]);
   const visible = useMemo(() => filterByKinds(board, selected), [board, selected]);
-  const loads = useMemo(() => countsByDay(visible), [visible]);
+  const loads = useMemo(() => countsByDay(visible, zone), [visible, zone]);
   // Counted off the unfiltered board: a kind's own count must not drop to zero
   // just because the pilot has it switched off in the menu showing that count.
   const counts = useMemo(() => countsByKind(board), [board]);
@@ -272,8 +277,8 @@ export function Calendar() {
     () =>
       selectedDayMs === null
         ? visible
-        : visible.filter((item) => localMidnight(item.deadlineMs) === selectedDayMs),
-    [visible, selectedDayMs]
+        : visible.filter((item) => dayStart(item.deadlineMs, zone) === selectedDayMs),
+    [visible, selectedDayMs, zone]
   );
 
   /**
@@ -288,18 +293,18 @@ export function Calendar() {
     // `nowMs`, not the builders' `new Date()` default: `isToday` and the
     // `isPast` the cells derive from `nowMs` must answer to one clock, or a
     // render straddling midnight can ring one day and hatch it at once.
-    const today = new Date(nowMs);
+    const today = cellOf(nowMs, zone);
     if (isNarrow) return buildDaysFrom(anchor, TICKER_DAYS, today);
     return density === 'month'
       ? buildMonthGrid(anchor, today, weekStart)
       : buildFortnightDays(anchor, today, weekStart);
-  }, [anchor, density, isNarrow, nowMs, weekStart]);
+  }, [anchor, density, isNarrow, nowMs, weekStart, zone]);
 
   const events = useMemo(() => eventsWithOverrides ?? [], [eventsWithOverrides]);
   const selectedEvent = events.find((event) => event.event_id === selectedEventId) ?? null;
 
   function goToday() {
-    setAnchor(new Date());
+    setAnchor(cellOf(Date.now(), zone));
     setSelectedDayMs(null);
   }
 
@@ -316,8 +321,8 @@ export function Calendar() {
   // them), so the export reads `events` in ESI's order, narrowed to what the
   // rail shows: kind filter and selected day.
   const exportEvents = useMemo(
-    () => calendarExportEvents(events, hiddenKinds, selectedDayMs),
-    [events, hiddenKinds, selectedDayMs]
+    () => calendarExportEvents(events, hiddenKinds, selectedDayMs, zone),
+    [events, hiddenKinds, selectedDayMs, zone]
   );
   const csvColumns = useMemo(() => calendarCsvColumns(t), [t]);
   const eventsExport = useTableExport({
@@ -396,18 +401,16 @@ export function Calendar() {
               skillPlanError={data?.skillPlanError ?? null}
               onChooseSkillPlan={(planId) => void chooseSkillPlan(planId)}
             />
-            <TableActionsMenu
-              name={t('calendar.title')}
-              tableExport={eventsExport}
-              size="md"
-              showLabel
-            />
+            <TableActionsMenu name={t('calendar.title')} tableExport={eventsExport} size="md" />
             <IconButton
               icon={<Icon.Refresh />}
               label={t('calendar.refresh')}
               onClick={refresh}
               busy={loading}
             />
+            <PageSettingsButton pageName={t('calendar.title')} section="display">
+              <CalendarSettingsForm />
+            </PageSettingsButton>
           </>
         }
       />

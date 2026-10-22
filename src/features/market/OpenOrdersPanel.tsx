@@ -29,7 +29,6 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useCharacterCount } from '@/features/character/useCharacters';
 import { useViewedCharacterId } from '@/features/character/viewedCharacter';
-import { WalletOriginCrumb } from '@/features/character/WalletOriginCrumb';
 import { CharacterScopeReadout } from '@/features/character/CharacterScopeReadout';
 import {
   CharacterFilterControl,
@@ -449,35 +448,40 @@ export function OpenOrdersPanel({
     <PageHeaderPortals
       slots={headerSlots}
       meta={oldestFetchedAt !== null && <DataAgeBadge date={new Date(oldestFetchedAt)} />}
+      scope={
+        (showCharacterStrip || onChooseCorporation) && (
+          <CharacterFilterControl<CharacterScopeChoice>
+            activeCharacterId={activeCharacterId}
+            value={corporation ? 'corporation' : characterFilterValue}
+            // Under Corporation the entries are issuers, so All counts the device's Characters.
+            characterCount={corporation ? deviceCharacterCount : entriesWithOrders.length}
+            // The faces are the same Characters the count is: those with orders.
+            allCharacterIds={
+              corporation ? undefined : entriesWithOrders.map((entry) => entry.characterId)
+            }
+            corporation={onChooseCorporation !== undefined}
+            // The body shows its spinner for the same first load (a switch to or from Corporation remounts).
+            loading={loading && !data}
+            // Who "All" leaves out (never granted orders): the trigger's dot and menu note.
+            missingNames={snapshot?.openOrders.skipped.map((c) => c.name)}
+            onChange={(next) => {
+              if (next === 'corporation') {
+                if (!corporation) onChooseCorporation?.();
+                return;
+              }
+              const resolved = resolveCharacterFilter(next, activeCharacterId);
+              setUrlFilter({
+                ...urlFilter,
+                characterIds: resolved === 'all' ? [] : [...resolved],
+              });
+              if (corporation) onLeaveCorporation?.();
+            }}
+          />
+        )
+      }
       actions={
         <>
-          {(showCharacterStrip || onChooseCorporation) && (
-            <CharacterFilterControl<CharacterScopeChoice>
-              size="md"
-              activeCharacterId={activeCharacterId}
-              value={corporation ? 'corporation' : characterFilterValue}
-              // Under Corporation the entries are issuers, so All counts the device's Characters.
-              characterCount={corporation ? deviceCharacterCount : entriesWithOrders.length}
-              corporation={onChooseCorporation !== undefined}
-              onChange={(next) => {
-                if (next === 'corporation') {
-                  if (!corporation) onChooseCorporation?.();
-                  return;
-                }
-                const resolved = resolveCharacterFilter(next, activeCharacterId);
-                setUrlFilter({
-                  ...urlFilter,
-                  characterIds: resolved === 'all' ? [] : [...resolved],
-                });
-                if (corporation) onLeaveCorporation?.();
-              }}
-            />
-          )}
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('market.orders.refreshOrders')}
-            onClick={refresh}
-          />
+          {/* Export before Refresh, as on every header (DESIGN.md §6c Header controls). */}
           {snapshot && (
             <TableActionsMenu
               name={t('market.orders.tableName')}
@@ -485,6 +489,11 @@ export function OpenOrdersPanel({
               size="md"
             />
           )}
+          <IconButton
+            icon={<Icon.Refresh />}
+            label={t('market.orders.refreshOrders')}
+            onClick={refresh}
+          />
         </>
       }
     />
@@ -528,6 +537,7 @@ export function OpenOrdersPanel({
   }));
 
   const notShared = snapshot.openOrders.skipped;
+  const pickerNamesMissing = showCharacterStrip && !corporation && characterFilterValue === 'all';
   const corpReauth = corporation && snapshot.corporation?.needsReauth === true;
 
   // The modal loads what the order needs as it opens (`useOpenOrderDetail`).
@@ -578,7 +588,6 @@ export function OpenOrdersPanel({
         <div className="min-w-0 space-y-3">
           {viewedCharacterId !== undefined && (
             <div className="flex items-center gap-3">
-              <WalletOriginCrumb />
               {viewedCharacter && (
                 <CharacterScopeReadout
                   scope="one"
@@ -799,7 +808,12 @@ export function OpenOrdersPanel({
             </>
           )}
 
-          <ListNotes floorCharacters={floorCharacters} notShared={notShared} />
+          {/* With the picker on All, it names who is left out itself (`missingNames`);
+              otherwise (no picker, or one Character's view) the foot still says so. */}
+          <ListNotes
+            floorCharacters={floorCharacters}
+            notShared={pickerNamesMissing ? [] : notShared}
+          />
 
           {detailRow && (
             <OrderDetailModal

@@ -10,7 +10,6 @@ import { clearStationPin, setAccountStationPin, setCharacterStationPin } from '@
 import { db, type BuildPlanRecord } from '@/db';
 import { useCharacters } from '@/features/character/useCharacters';
 import { nextPinState, pinStateForStation, type PinState } from '@/features/assets/stationPins';
-import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
   useResolvedCharacterFilter,
   type CharacterFilterValue,
@@ -119,27 +118,12 @@ export function useAssetsData() {
       })),
     [allCharactersQuery]
   );
-  // Absent for a one-Character account: "This character" and "All characters"
-  // then resolve to the same pilot, leaving a control that cannot change
-  // anything (`OpenOrdersPanel`'s precedent).
+  // The Character a `?char=<id>` link names: the page's fixed subject, so the
+  // header names them instead of offering the Character picker.
   const viewedCharacter =
     viewedCharacterId === undefined
       ? undefined
       : allCharactersQuery.find((c) => c.characterId === viewedCharacterId);
-  const crossCharacterFilterMeta =
-    crossCharacterCandidates.length > 1 && viewedCharacterId === undefined ? (
-      <CharacterFilterControl
-        activeCharacterId={activeCharacterId}
-        value={crossCharacterFilter}
-        onChange={(chars: CharacterFilterValue) => setView({ chars })}
-        characterCount={crossCharacterCandidates.length}
-        // Rides in this route's own `PageHeader` meta (no titled inner
-        // `Panel`), whose `actions` cluster sits at `IconButton`'s default
-        // (larger) touch tier — match it, not the panel-`meta` default.
-        size="md"
-      />
-    ) : undefined;
-
   // The active Character's own assets already come from `assetsResult` —
   // this is only ever the *other* Characters the resolved filter names.
   const otherCharacterIds = useMemo(() => {
@@ -436,7 +420,6 @@ export function useAssetsData() {
     allCharactersQuery,
     crossCharacterCandidates,
     viewedCharacter,
-    crossCharacterFilterMeta,
     otherCharacterIds,
     shipCharacterIds,
     shipsFilterIsAll,

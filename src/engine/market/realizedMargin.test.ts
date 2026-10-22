@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WalletTrade } from './walletCostBasis';
-import { realizedMargins } from './realizedMargin';
+import { realizedMarginReport, realizedMargins } from './realizedMargin';
 
 let nextId = 1;
 function trade(over: Partial<WalletTrade> = {}): WalletTrade {
@@ -143,5 +143,77 @@ describe('realizedMargins malformed dates', () => {
     const bad = trade({ date: 'garbage', isBuy: false, quantity: 4, unitPrice: 150 });
     const margins = realizedMargins([buy, bad], new Map());
     expect(margins.has(bad.transactionId)).toBe(false);
+  });
+});
+
+describe('realizedMarginReport', () => {
+  const sell = (over: Partial<WalletTrade>) =>
+    trade({ date: '2026-01-02T00:00:00Z', isBuy: false, ...over });
+
+  it('gives a margin and no gap to a covered, taxed sale', () => {
+    const buy = trade({ quantity: 10 });
+    const sale = sell({ quantity: 4 });
+    const { margins, gaps } = realizedMarginReport([buy, sale], new Map([[sale.transactionId, 0]]));
+    expect(margins.has(sale.transactionId)).toBe(true);
+    expect(gaps.size).toBe(0);
+  });
+
+  it('says no wallet buy covers a sale that used up more than the buys held', () => {
+    const buy = trade({ typeId: 587, quantity: 1 });
+    const built = sell({ typeId: 999, quantity: 3 });
+    const outran = sell({ typeId: 587, quantity: 4 });
+    const tax = new Map([
+      [built.transactionId, 1],
+      [outran.transactionId, 1],
+    ]);
+    const { margins, gaps } = realizedMarginReport([buy, built, outran], tax);
+    expect(margins.size).toBe(0);
+    expect(gaps.get(built.transactionId)).toBe('noBuy');
+    expect(gaps.get(outran.transactionId)).toBe('noBuy');
+  });
+
+  it('says the stock came from outside for a covered sale whose type another sale outran', () => {
+    const buy = trade({ quantity: 2 });
+    const covered = sell({ quantity: 1, date: '2026-01-02T00:00:00Z' });
+    const outran = sell({ quantity: 4, date: '2026-01-03T00:00:00Z' });
+    const tax = new Map([
+      [covered.transactionId, 1],
+      [outran.transactionId, 1],
+    ]);
+    const { gaps } = realizedMarginReport([buy, covered, outran], tax);
+    expect(gaps.get(covered.transactionId)).toBe('outside');
+    expect(gaps.get(outran.transactionId)).toBe('noBuy');
+  });
+
+  it('says no sales tax line was found for a covered sale missing its tax', () => {
+    const buy = trade({ quantity: 10 });
+    const sale = sell({ quantity: 4 });
+    const { margins, gaps } = realizedMarginReport([buy, sale], new Map());
+    expect(margins.has(sale.transactionId)).toBe(false);
+    expect(gaps.get(sale.transactionId)).toBe('noTax');
+  });
+
+  it('prefers outside over no tax when the type outran its buys anyway', () => {
+    const buy = trade({ quantity: 2 });
+    const untaxed = sell({ quantity: 1, date: '2026-01-02T00:00:00Z' });
+    const outran = sell({ quantity: 4, date: '2026-01-03T00:00:00Z' });
+    const { gaps } = realizedMarginReport([buy, untaxed, outran], new Map());
+    expect(gaps.get(untaxed.transactionId)).toBe('outside');
+  });
+
+  it('leaves buys and sales not on the character’s own behalf out of the gaps', () => {
+    const corpSale = sell({ isPersonal: false });
+    const buy = trade({ typeId: 5 });
+    const { gaps } = realizedMarginReport([buy, corpSale], new Map());
+    expect(gaps.size).toBe(0);
+  });
+
+  it('reports the same margins as realizedMargins', () => {
+    const buy = trade({ quantity: 10, unitPrice: 100 });
+    const sale = sell({ quantity: 4, unitPrice: 150 });
+    const tax = new Map([[sale.transactionId, 30]]);
+    expect(realizedMarginReport([buy, sale], tax).margins).toEqual(
+      realizedMargins([buy, sale], tax)
+    );
   });
 });

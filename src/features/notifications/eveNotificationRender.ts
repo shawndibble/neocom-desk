@@ -68,6 +68,8 @@ interface RenderContext {
   fire: EveNotificationFire;
   payload: EveNotificationPayload;
   names: EveNotificationNames;
+  /** `'UTC'` for the EVE clock; `undefined` for the host's own (`lib/timeFormat.ts`). */
+  timeZone: string | undefined;
 }
 
 /** A chosen body sub-key plus its interpolation values, or `null` to fall back to the generic body. */
@@ -115,9 +117,9 @@ function entityLabel(t: EveNotificationTranslate, id: number, names: EveNotifica
 }
 
 /** When the reinforcement timer runs out (round 36's rule, `eveNotificationPayload.ts`). */
-function timerEnd({ fire, payload }: RenderContext): string | null {
+function timerEnd({ fire, payload, timeZone }: RenderContext): string | null {
   const exitMs = reinforcementExitMs(fire.timestamp, payload);
-  return exitMs === undefined ? null : formatLocalDateTime(new Date(exitMs));
+  return exitMs === undefined ? null : formatLocalDateTime(new Date(exitMs), timeZone);
 }
 
 /** `planet #<id>`, or `null` when the payload carries no `planetID` at all. */
@@ -137,9 +139,12 @@ export function orbitalAggressorId(payload: EveNotificationPayload): number | un
 }
 
 /** `OrbitalReinforced`'s exit time is an absolute instant already, unlike `timeLeft`'s duration. */
-function reinforceExitEnd(payload: EveNotificationPayload): string | null {
+function reinforceExitEnd(
+  payload: EveNotificationPayload,
+  timeZone: string | undefined
+): string | null {
   if (payload.reinforceExitMs === undefined) return null;
-  return formatLocalDateTime(new Date(payload.reinforceExitMs));
+  return formatLocalDateTime(new Date(payload.reinforceExitMs), timeZone);
 }
 
 /** Body for a type whose whole payload contribution is "which structure". */
@@ -231,26 +236,31 @@ const TYPE_RENDERERS: Readonly<Record<string, (ctx: RenderContext) => BodyChoice
     const ready = ctx.payload.readyTimeMs;
     return ready === undefined
       ? { key: 'body', vars: { structure } }
-      : { key: 'bodyWithReady', vars: { structure, ready: formatLocalDateTime(new Date(ready)) } };
+      : {
+          key: 'bodyWithReady',
+          vars: { structure, ready: formatLocalDateTime(new Date(ready), ctx.timeZone) },
+        };
   },
   MoonminingExtractionFinished: structureOnly,
   MoonminingLaserFired: structureOnly,
   MoonminingAutomaticFracture: structureOnly,
   MoonminingExtractionCancelled: structureOnly,
-  CorpAllBillMsg: ({ payload }) => {
+  CorpAllBillMsg: ({ payload, timeZone }) => {
     const amount = payload.amount === undefined ? undefined : formatIsk(payload.amount);
     const due =
-      payload.dueDateMs === undefined ? undefined : formatLocalDate(new Date(payload.dueDateMs));
+      payload.dueDateMs === undefined
+        ? undefined
+        : formatLocalDate(new Date(payload.dueDateMs), timeZone);
     if (amount !== undefined && due !== undefined) return { key: 'body', vars: { amount, due } };
     if (due !== undefined) return { key: 'bodyWithoutAmount', vars: { due } };
     if (amount !== undefined) return { key: 'bodyWithoutDue', vars: { amount } };
     return null;
   },
-  BillOutOfMoneyMsg: ({ payload }) => {
+  BillOutOfMoneyMsg: ({ payload, timeZone }) => {
     // The real payload is `billTypeID` + `dueDate` and carries no amount, so
     // the due date is the one field worth requiring here.
     if (payload.dueDateMs === undefined) return null;
-    return { key: 'body', vars: { due: formatLocalDate(new Date(payload.dueDateMs)) } };
+    return { key: 'body', vars: { due: formatLocalDate(new Date(payload.dueDateMs), timeZone) } };
   },
   // CCP publishes no payload schema for this type and it appears in no public
   // sample, so this reads `dueDate` opportunistically — the key every other
@@ -258,10 +268,13 @@ const TYPE_RENDERERS: Readonly<Record<string, (ctx: RenderContext) => BodyChoice
   // does *not* do is guess at key names it has no evidence for: a wrong expiry
   // date would cost an office, which is exactly what the notification exists
   // to prevent.
-  CorpOfficeExpirationMsg: ({ payload }) =>
+  CorpOfficeExpirationMsg: ({ payload, timeZone }) =>
     payload.dueDateMs === undefined
       ? { key: 'body', vars: {} }
-      : { key: 'bodyWithDue', vars: { due: formatLocalDate(new Date(payload.dueDateMs)) } },
+      : {
+          key: 'bodyWithDue',
+          vars: { due: formatLocalDate(new Date(payload.dueDateMs), timeZone) },
+        },
   WarDeclared: warDeclared(true),
   AllWarDeclaredMsg: warDeclared(false),
   // Genuinely an empty payload (`{}`): there is no aggressor yet, only the
@@ -287,10 +300,10 @@ const TYPE_RENDERERS: Readonly<Record<string, (ctx: RenderContext) => BodyChoice
       : { key: 'bodyWithAggressor', vars: { planet, aggressor } };
   },
   OrbitalReinforced: (ctx) => {
-    const { t, payload } = ctx;
+    const { t, payload, timeZone } = ctx;
     const planet = planetLabel(t, payload);
     if (planet === null) return null;
-    const timer = reinforceExitEnd(payload);
+    const timer = reinforceExitEnd(payload, timeZone);
     return timer === null
       ? { key: 'body', vars: { planet } }
       : { key: 'bodyWithTimer', vars: { planet, timer } };
@@ -299,9 +312,9 @@ const TYPE_RENDERERS: Readonly<Record<string, (ctx: RenderContext) => BodyChoice
     if (payload.corpId === undefined) return null;
     return { key: 'body', vars: { corp: entityLabel(t, payload.corpId, names) } };
   },
-  InfrastructureHubBillAboutToExpire: ({ payload }) => {
+  InfrastructureHubBillAboutToExpire: ({ payload, timeZone }) => {
     if (payload.dueDateMs === undefined) return null;
-    return { key: 'body', vars: { due: formatLocalDate(new Date(payload.dueDateMs)) } };
+    return { key: 'body', vars: { due: formatLocalDate(new Date(payload.dueDateMs), timeZone) } };
   },
 };
 
@@ -312,14 +325,21 @@ export function renderEveNotification(
   t: EveNotificationTranslate,
   fire: EveNotificationFire,
   character: EveNotificationTextCharacter,
-  names: EveNotificationNames = {}
+  names: EveNotificationNames = {},
+  timeZone?: string
 ): { title: string; body: string } {
   // A `type` with no entry here folds into the same `choice === null` path as
   // a known type whose payload didn't parse, rather than a separate early
   // return — one fallback path, not two.
   const render = TYPE_RENDERERS[fire.type] ?? (() => null);
   try {
-    const choice = render({ t, fire, payload: parseEveNotificationPayload(fire.text), names });
+    const choice = render({
+      t,
+      fire,
+      payload: parseEveNotificationPayload(fire.text),
+      names,
+      timeZone,
+    });
     if (choice === null) return genericText(t, fire, character);
     const titleKey = `${BASE}.types.${fire.type}.title`;
     const bodyKey = `${BASE}.types.${fire.type}.${choice.key}`;

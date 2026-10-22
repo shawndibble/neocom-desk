@@ -342,7 +342,7 @@ here — they go one per file in `docs/context/decisions/`.
   row of day columns, each with its weekday, date, a count and a bar segmented
   by **Clock Kind**, in place of a grid that would take the width the **Coming
   Up Rail** needs.
-- **Deadline Strip**: The bar per local calendar day in the **Corp Board**'s
+- **Deadline Strip**: The bar per calendar day (on the Time format clock: local, or UTC under EVE time) in the **Corp Board**'s
   Due soon **Widget**'s Chart **View**, each counting the Corp Board Items
   falling due on it and coloured by the worst Board Severity landing there.
   Exists so that several calm-looking lists cannot hide one bad day. It was a

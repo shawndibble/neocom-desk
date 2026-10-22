@@ -861,23 +861,23 @@ describe('Wallet', () => {
       expect(screen.queryByRole('button', { name: 'This character' })).toBeNull();
     });
 
-    it('puts the character filter in the Worth panel header, and keeps it there across the panel swap', async () => {
+    it('puts the character filter in the page header, and keeps it there across the panel swap', async () => {
       const user = userEvent.setup();
       await seedSecondCharacter();
       render(<App />);
 
-      // In the panel's own title bar, not a bare row floating above it.
+      // In the PageHeader's scope slot, not the Worth panel's title bar.
       await screen.findByText('EverMarks');
-      const balanceHeader = screen.getByRole('heading', { name: 'Worth' }).closest('header');
-      expect(balanceHeader).not.toBeNull();
-      await user.click(within(balanceHeader!).getByRole('button', { name: 'This character' }));
+      const pageHeader = () => screen.getByRole('heading', { level: 1 }).closest('header')!;
+      const panelHeader = screen.getByRole('heading', { name: 'Worth' }).closest('header')!;
+      expect(within(panelHeader).queryByRole('button', { name: 'This character' })).toBeNull();
+      await user.click(within(pageHeader()).getByRole('button', { name: 'This character' }));
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
-      // The panel below swaps to the per-character table; the picker rides
-      // along into that panel's header rather than being left behind.
-      const wideHeader = (await screen.findByRole('heading', { name: 'Worth' })).closest('header');
+      // The panel below swaps to the per-character table; the picker stays put.
+      await screen.findByRole('table', { name: 'Balance by character' });
       expect(
-        within(wideHeader!).getByRole('button', { name: /^All characters/ })
+        within(pageHeader()).getByRole('button', { name: /^All characters/ })
       ).toBeInTheDocument();
     });
 
@@ -928,6 +928,41 @@ describe('Wallet', () => {
       await waitFor(() => expect(window.location.search).not.toContain('drill='));
     });
 
+    it('ends a drill when the header picker changes', async () => {
+      const user = userEvent.setup();
+      await seedSecondCharacter();
+      await grantSnapshotScopes(CHAR_ID, 92);
+      await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
+      render(<App />);
+
+      const table = await screen.findByRole('table', { name: 'Balance by character' });
+      await user.click(await within(table).findByText('Pilot Two'));
+      await waitFor(() => expect(window.location.search).toContain('drill=92'));
+
+      const pageHeader = screen.getByRole('heading', { level: 1 }).closest('header')!;
+      await user.click(within(pageHeader).getByRole('button', { name: /^All characters/ }));
+      await user.click(await screen.findByRole('menuitemradio', { name: 'This character' }));
+
+      await waitFor(() => expect(window.location.search).not.toContain('drill='));
+      expect(window.location.search).not.toContain('char=all');
+      expect(
+        within(pageHeader).getByRole('button', { name: 'This character' })
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Pilot Two only')).not.toBeInTheDocument();
+    });
+
+    it('offers no Character picker on the LP Store tab', async () => {
+      await seedSecondCharacter();
+      await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
+      window.history.pushState({}, '', '/wallet/lp-store');
+      render(<App />);
+
+      const title = await screen.findByRole('heading', { level: 1, name: 'LP Store' });
+      expect(
+        within(title.closest('header')!).queryByRole('button', { name: /characters?/i })
+      ).toBeNull();
+    });
+
     it('moves focus to the drilled back button, then the Character row, never the body', async () => {
       const user = userEvent.setup();
       await seedSecondCharacter();
@@ -962,6 +997,20 @@ describe('Wallet', () => {
       expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
     });
 
+    it('spins in the picker while the page loads, as Mail and Contracts do', async () => {
+      await seedSecondCharacter();
+      server.use(
+        http.get(
+          `https://esi.evetech.net/characters/${CHAR_ID}/wallet`,
+          () => new Promise(() => {})
+        )
+      );
+      render(<App />);
+
+      const picker = await screen.findByRole('button', { name: 'This character' });
+      expect(picker).toHaveAttribute('aria-busy', 'true');
+    });
+
     it('only shows a "hasn\'t granted access" notice for a skipped character actually in the selected filter', async () => {
       const user = userEvent.setup();
       await seedSecondCharacter();
@@ -980,9 +1029,11 @@ describe('Wallet', () => {
       await user.click(screen.getByRole('button', { name: 'This character' }));
       await user.click(await screen.findByRole('menuitemradio', { name: /^All characters/ }));
 
-      // All three selected: Pilot Three is left out, named by the scope readout
-      // and flagged on its own row.
-      expect(await screen.findByLabelText(/All characters · 2 of 3/)).toBeInTheDocument();
+      // All three selected: Pilot Three is left out, named by the picker's
+      // accessible name (and its menu note) and flagged on its own row.
+      expect(
+        await screen.findByRole('button', { name: /^All characters.*Not included: Pilot Three$/ })
+      ).toBeInTheDocument();
       expect(
         await screen.findByRole('link', { name: 'Grant missing Permissions' })
       ).toBeInTheDocument();
@@ -1044,9 +1095,12 @@ describe('Wallet', () => {
         { characterId: 91, name: 'Pilot One' },
         { characterId: 92, name: 'Pilot Two' },
       ]);
-      // In the panel's title bar beside the name, with the age of the data.
+      // The picker in the page header; the panel's title bar keeps the age of the data.
+      const pageHeader = screen.getByRole('heading', { level: 1 }).closest('header');
+      expect(
+        within(pageHeader!).getByRole('button', { name: /^All characters/ })
+      ).toBeInTheDocument();
       const header = screen.getByRole('heading', { name: 'Journal' }).closest('header');
-      expect(within(header!).getByRole('button', { name: /^All characters/ })).toBeInTheDocument();
       expect(header!.textContent).toMatch(/ago|just now|now/i);
     });
 

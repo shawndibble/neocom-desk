@@ -35,7 +35,9 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { iskToneClass } from '@/features/character/format';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatMarketIsk } from '@/lib/isk';
-import { formatTimestamp } from '@/lib/timestamp';
+import { splitTimestamp } from '@/lib/timestamp';
+import { HintText } from '@/components/ui/HintText';
+import type { MarginGap } from '@/engine/market/realizedMargin';
 import { useTimeZone } from '@/lib/timeFormat';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -51,7 +53,7 @@ import { useResolvedCharacterFilter } from '@/features/character/characterFilter
 import { useRememberedUrlParams } from '@/lib/useUrlState';
 import {
   pooledTransactionMargins,
-  transactionMargins,
+  transactionMarginReport,
   type PooledTransaction,
 } from './transactionMargins';
 import { summarizeTrading } from './tradingSummary';
@@ -61,6 +63,13 @@ import type { PageHeaderSlots } from './pageHeaderSlots';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { highlightedTransactionId } from './transactionHighlight';
 import { formatCount } from '@/lib/formatCount';
+
+/** Static keys, so the i18n key scan sees every string. */
+const MARGIN_GAP_COPY: Record<MarginGap, { label: string; hint: string }> = {
+  noBuy: { label: 'wallet.marginGap.noBuy', hint: 'wallet.marginGapHint.noBuy' },
+  noTax: { label: 'wallet.marginGap.noTax', hint: 'wallet.marginGapHint.noTax' },
+  outside: { label: 'wallet.marginGap.outside', hint: 'wallet.marginGapHint.outside' },
+};
 
 const HISTORY_CHARACTER_PARAMS = { 'txn.chars': characterFilterParam('current') };
 
@@ -173,11 +182,9 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     [allScope, allFills, data]
   );
   // Worked out over every fill, not the filtered rows — a filter must not change what a sale cost.
-  const margins = useMemo(
+  const { margins, gaps } = useMemo(
     () =>
-      allScope && pooled
-        ? pooled.margins
-        : transactionMargins(allScope ? [] : transactions, journal),
+      allScope && pooled ? pooled : transactionMarginReport(allScope ? [] : transactions, journal),
     [allScope, pooled, transactions, journal]
   );
   const archiveSince = allScope
@@ -199,8 +206,8 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     [transactions, rowsFilter, nameFor]
   );
   const trading = useMemo(
-    () => summarizeTrading(filteredTransactions, margins, journal, rowsFilter, archiveSince),
-    [filteredTransactions, margins, journal, rowsFilter, archiveSince]
+    () => summarizeTrading(filteredTransactions, margins, journal, rowsFilter, archiveSince, gaps),
+    [filteredTransactions, margins, gaps, journal, rowsFilter, archiveSince]
   );
   const csvColumns = useMemo(() => walletTransactionsCsvColumns(t, nameFor), [t, nameFor]);
   const transactionsExport = useTableExport({
@@ -225,8 +232,20 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       {
         id: 'date',
         header: t('wallet.date'),
-        className: 'whitespace-nowrap text-text-dim',
-        render: (txn) => formatTimestamp(new Date(txn.date), timeZone),
+        className: 'whitespace-nowrap text-text-dim max-sm:px-1',
+        headerClassName: 'max-sm:px-1',
+        // Date over time on a phone, freeing width for the other columns; one line from `sm` up.
+        render: (txn) => {
+          const { date, time } = splitTimestamp(new Date(txn.date), timeZone);
+          const body = date.trimEnd();
+          return (
+            <>
+              <span className="max-sm:block">{body}</span>
+              <span className="max-sm:hidden">{date.slice(body.length)}</span>
+              {time && <span className="max-sm:block">{time}</span>}
+            </>
+          );
+        },
         sortValue: (txn) => txn.date,
       },
       ...(allScope
@@ -299,7 +318,15 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         render: (txn) => {
           if (txn.is_buy) return null;
           const margin = margins.get(txn.transaction_id);
-          if (!margin) return '—';
+          if (!margin) {
+            const gap = gaps.get(txn.transaction_id);
+            if (!gap) return '—';
+            return (
+              <HintText content={t(MARGIN_GAP_COPY[gap].hint)}>
+                <span className="text-xs text-text-dim">{t(MARGIN_GAP_COPY[gap].label)}</span>
+              </HintText>
+            );
+          }
           return (
             <Tooltip
               content={t('wallet.marginWorking', {
@@ -314,16 +341,35 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         sortValue: (txn) => margins.get(txn.transaction_id)?.margin,
       },
     ],
-    [t, typeNames, timeZone, nameFor, margins, allScope]
+    [t, typeNames, timeZone, nameFor, margins, gaps, allScope]
   );
 
+  // The picker rides in the page header in every state (loading, error, empty),
+  // so a pilot can always switch scope out of a dead end.
   const headerChrome = (
     <PageHeaderPortals
       slots={headerSlots}
       meta={transactionsResult && <DataAgeBadge date={transactionsResult.fetchedAt} />}
+      scope={
+        showCharacterFilter && (
+          <CharacterFilterControl
+            activeCharacterId={activeCharacterId}
+            value={characterFilter}
+            characterCount={characterCount}
+            loading={allScope && allFills.status === 'loading'}
+            // Who "All" leaves out (no wallet grant): the trigger's dot and menu note.
+            missingNames={
+              allScope && allFills.status === 'ready'
+                ? allFills.data.skipped.map((c) => c.name)
+                : undefined
+            }
+            onChange={(next) => setCharacterValues({ 'txn.chars': next })}
+          />
+        )
+      }
       actions={
         <>
-          <IconButton icon={<Icon.Refresh />} label={t('wallet.refresh')} onClick={refresh} />
+          {/* Export before Refresh, as on every header (DESIGN.md §6c Header controls). */}
           {transactionsResult && (
             <TableActionsMenu
               name={t('market.sections.transactions')}
@@ -331,6 +377,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
               size="md"
             />
           )}
+          <IconButton icon={<Icon.Refresh />} label={t('wallet.refresh')} onClick={refresh} />
         </>
       }
     />
@@ -378,15 +425,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
   }
 
   const hasRows = (allScope || !transactionsNeedsReauth) && transactions.length > 0;
-  const characterControl = showCharacterFilter ? (
-    <CharacterFilterControl
-      size="md"
-      activeCharacterId={activeCharacterId}
-      value={characterFilter}
-      characterCount={characterCount}
-      onChange={(next) => setCharacterValues({ 'txn.chars': next })}
-    />
-  ) : undefined;
 
   return (
     <div className="space-y-4">
@@ -427,11 +465,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
                 {t('common.incompleteTitle')} — {t('wallet.transactionsTruncatedHint')}
               </p>
             )}
-            <TransactionsFilterBar
-              filter={filter}
-              onChange={setFilter}
-              actions={characterControl}
-            />
+            <TransactionsFilterBar filter={filter} onChange={setFilter} />
             {filteredTransactions.length === 0 ? (
               <EmptyState
                 title={t('wallet.transactionsNoFilterMatches')}

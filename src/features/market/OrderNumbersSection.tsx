@@ -5,6 +5,8 @@ import type { OpenOrderRow } from './openOrdersModel';
 import { computeSellThrough, stationRank } from './orderScopeState';
 import { IskDelta } from '@/components/ui/IskDelta';
 import { formatCount } from '@/lib/formatCount';
+import { useTimeZone } from '@/lib/timeFormat';
+import { formatDateOnly } from '@/lib/timestamp';
 
 /** "The numbers": rank, sell-through, volume, expiry and the net if it sells as listed. */
 export function OrderNumbersSection({
@@ -21,6 +23,7 @@ export function OrderNumbersSection({
   onToggle: () => void;
 }) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const sellValue =
     sell.kind === 'known'
       ? `${sell.daysToClear}d`
@@ -122,8 +125,8 @@ export function OrderNumbersSection({
                   <span className="text-text-dim">
                     {' · '}
                     {t('market.orders.statExpiresCaption', {
-                      date: new Date(row.expiry.expiresAt).toLocaleDateString(),
-                      listed: new Date(row.issued).toLocaleDateString(),
+                      date: formatDateOnly(new Date(row.expiry.expiresAt), timeZone),
+                      listed: formatDateOnly(new Date(row.issued), timeZone),
                     })}
                   </span>
                 </span>
