@@ -31,6 +31,7 @@ import {
 import { cx } from '@/lib/cx';
 import { MD_UP_QUERY, useMediaQuery, usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import { AlertCharacterSwitch } from './AlertCharacterSwitch';
+import { CharacterSwitcher } from './CharacterSwitcher';
 import { AuthFailureNotice } from './AuthFailureNotice';
 import { StandingsScopeNotice } from './StandingsScopeNotice';
 import { useLockedRoutes } from './useGrantedScopes';
@@ -407,7 +408,12 @@ export const Layout = memo(function Layout() {
                 <NavItem key={page.path} to={page.path} label={t(page.labelKey)} locked={false} />
               ))}
             </div>
-            <RailCharacterFooterLink activeCharacter={activeCharacter} />
+            <div className="flex shrink-0 items-center pr-2">
+              <div className="min-w-0 flex-1">
+                <RailCharacterFooterLink activeCharacter={activeCharacter} />
+              </div>
+              <CharacterSwitcher />
+            </div>
           </aside>
 
           <main className="min-w-0 flex-1 px-2 py-4 pb-[max(calc(5rem_+_env(safe-area-inset-bottom)),var(--compare-drawer-space,0px),calc(var(--sticky-clearance)_+_var(--bottom-nav-clearance)_+_1rem))] md:px-4 md:pb-[max(1rem,var(--compare-drawer-space,0px),calc(var(--sticky-clearance)_+_1rem))]">
@@ -476,13 +482,18 @@ export const Layout = memo(function Layout() {
               onClose={() => setMoreOpen(false)}
               locked={locked}
               renderCharacterLink={(originPath) => (
-                <CharacterFooterLink
-                  activeCharacter={activeCharacter}
-                  size="sm"
-                  className="min-h-11 rounded-xs"
-                  onClick={() => setMoreOpen(false)}
-                  originPath={originPath}
-                />
+                <div className="flex items-center">
+                  <div className="min-w-0 flex-1">
+                    <CharacterFooterLink
+                      activeCharacter={activeCharacter}
+                      size="sm"
+                      className="min-h-11 rounded-xs"
+                      onClick={() => setMoreOpen(false)}
+                      originPath={originPath}
+                    />
+                  </div>
+                  <CharacterSwitcher />
+                </div>
               )}
             />
           )}
