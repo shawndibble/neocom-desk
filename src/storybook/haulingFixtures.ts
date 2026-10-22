@@ -1,5 +1,5 @@
 /**
- * Travel › Hauling fixtures: the Amarr → Jita "Ammunition & Charges" scan the
+ * Market › Hauling fixtures: the Amarr → Jita "Ammunition & Charges" scan the
  * trip-rail mockups were drawn from, served as the Fuzzwork, ESI market and
  * pilot answers the real page asks for, so the page story renders the live
  * panel against known books.
@@ -27,7 +27,7 @@ const AMARR = hub('amarr');
 const JITA = hub('jita');
 
 /** The scan's route, as the page's own query string. */
-export const HAULING_PATH = '/travel/hauling?from=amarr&to=jita&cat=11';
+export const HAULING_PATH = '/market/hauling?from=amarr&to=jita&cat=11';
 
 /** A Mastodon's general hold, as the Cargo Space control saves a hull. */
 export const MASTODON_CARGO: HaulingCargo = {
@@ -374,6 +374,11 @@ export function haulingFixtureRoutes(): FixtureRoute[] {
   const regionOf = (url: URL) => Number(url.pathname.split('/')[2]);
   return [
     ...walletFixtureRoutes(),
+    // Market reads the pilot's location for its header; docked at Amarr.
+    {
+      path: at('/location'),
+      respond: () => ({ body: { solar_system_id: 30002187, station_id: 60008494 } }),
+    },
     { path: at('/standings/'), respond: () => ({ body: STANDINGS }) },
     {
       path: at('/skills'),

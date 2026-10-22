@@ -10492,7 +10492,8 @@
       "stock": "Stock",
       "history": "History",
       "transactions": "Transactions",
-      "appraisal": "Appraisal"
+      "appraisal": "Appraisal",
+      "hauling": "Hauling"
     },
     "hauling": {
       "dataAgeNote": "Prices come from ESI's regional market orders, which EVE refreshes about every 5 minutes.",
@@ -13115,7 +13116,6 @@
     },
     "title": "Travel",
     "routeTab": "Route Safety",
-    "haulingTab": "Hauling",
     "pilotTab": "Pilot Lookup",
     "pilot": {
       "pickTitle": "Look up a pilot by name",

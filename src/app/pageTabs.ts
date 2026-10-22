@@ -30,16 +30,14 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
 ]);
 
 /**
- * Travel (issue #2328). Pilot Lookup (#2331) is its tab again, and Hauling moved
- * here from Market (#3526): a route problem, not a market lookup.
- * `/market/hauling` redirects via `PAGE_LEGACY_LOCATIONS`. Thera / Turnur
+ * Travel (issue #2328). Pilot Lookup (#2331) is its tab again. Thera / Turnur
  * (#2330) was a tab until it became a modal on Route Safety; `/travel/thera`
- * redirects there.
+ * redirects there. Hauling was a tab here (#3526) and is Market's again
+ * (#4702); `/travel/hauling` redirects via `PAGE_LEGACY_LOCATIONS`.
  */
 export const TRAVEL_TABS = definePageTabs('/travel', [
   { id: 'route', labelKey: 'travel.routeTab' },
   { id: 'pilot', labelKey: 'nav.pilotLookup' },
-  { id: 'hauling', labelKey: 'travel.haulingTab' },
 ]);
 
 /**
@@ -136,6 +134,7 @@ export const MARKET_TABS = definePageTabs('/market', [
   { id: 'stock', labelKey: 'market.sections.stock', deep: true },
   { id: 'history', labelKey: 'market.sections.history' },
   { id: 'appraisal', labelKey: 'market.sections.appraisal' },
+  { id: 'hauling', labelKey: 'market.sections.hauling' },
 ]);
 
 /**
@@ -185,6 +184,9 @@ export const PAGE_LEGACY_LOCATIONS: Partial<
 };
 
 /**
+ * Hauling was a Travel tab (#3526) until it moved back to Market (#4702); its
+ * link keeps its query.
+ *
  * Thera / Turnur was a Travel tab until it became a modal on Route Safety: an
  * old link lands there, its origin as From and its Route Preference kept. The
  * hub, exit and fit filters were the modal's now, local to it.
@@ -193,6 +195,9 @@ function legacyTravelLocation(
   pathname: string,
   search: string
 ): { pathname: string; search: string } | null {
+  if (pathname === '/travel/hauling' || pathname.startsWith('/travel/hauling/')) {
+    return { pathname: tabPath(MARKET_TABS, 'hauling'), search };
+  }
   if (pathname.replace(/\/$/, '') !== '/travel/thera') return null;
   const old = new URLSearchParams(search);
   const next = new URLSearchParams();
@@ -215,17 +220,14 @@ function legacyIndustryLocation(
 }
 
 /**
- * Hauling was a Market tab until #3526; it is a Travel tab now. LP Store was
- * one until #3527; it is a Wallet tab now, and a store's corporation id rides along.
+ * LP Store was a Market tab until #3527; it is a Wallet tab now, and a store's
+ * corporation id rides along.
  * `/market/history/transactions`, History's old Transactions view, is History now.
  */
 function legacyMarketLocation(
   pathname: string,
   search: string
 ): { pathname: string; search: string } | null {
-  if (pathname === '/market/hauling' || pathname.startsWith('/market/hauling/')) {
-    return { pathname: tabPath(TRAVEL_TABS, 'hauling'), search };
-  }
   if (pathname === '/market/lp-store' || pathname.startsWith('/market/lp-store/')) {
     return { pathname: `/wallet${pathname.slice('/market'.length)}`, search };
   }

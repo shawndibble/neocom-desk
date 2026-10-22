@@ -1,9 +1,9 @@
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { formatCount } from '@/lib/formatCount';
 /**
- * The Travel page's Hauling tab: what is worth
- * buying at one Trade Hub to sell at another, priced at what a hauler can expect to actually get rather than
- * at today's cheapest listing, and sized to a hold.
+ * The Market page's Hauling tab (back from Travel, #4702): what is worth buying
+ * at one Trade Hub to sell at another, priced at what a hauler can expect to
+ * actually get rather than at today's cheapest listing, and sized to a hold.
  *
  * The first view needs nothing from the user: a route and a category are
  * preset and the list works with no ship chosen. Choosing Cargo Space (and,

@@ -152,8 +152,20 @@ describe('Market top-level tabs', () => {
       'true'
     );
     expect(screen.queryByRole('link', { name: 'Orders' })).not.toBeInTheDocument();
-    // Hauling is a Travel tab now (#3526).
-    expect(screen.queryByRole('tab', { name: 'Hauling' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Hauling' })).toBeInTheDocument();
+  });
+
+  it('opens Hauling from its URL and leaves its query behind on the way out', async () => {
+    window.history.pushState({}, '', '/market/hauling?from=amarr&to=jita');
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByRole('tab', { name: 'Hauling' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    await user.click(screen.getByRole('tab', { name: 'Market' }));
+    expect(window.location.pathname).toBe('/market/browser');
+    expect(window.location.search).toBe('');
   });
 
   it('switches to Open Orders and History via the tab bar', async () => {

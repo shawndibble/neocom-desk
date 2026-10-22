@@ -668,7 +668,7 @@ here — they go one per file in `docs/context/decisions/`.
   the pilot builds. Distinct from the **Corp Board** (`/corp`), which
   answers the same question for a corporation.
 - **Trade Hub**: A market station/region the user picks for price lookups in a Build Plan.
-- **Hauling Opportunities**: The Travel page's Hauling tab: items worth buying at one **Trade Hub** to sell at another, scanned per market category, priced at an **Expected Sell Price** and sized to a **Trip Plan**. Not a price-gap list.
+- **Hauling Opportunities**: The Market page's Hauling tab: items worth buying at one **Trade Hub** to sell at another, scanned per market category, priced at an **Expected Sell Price** and sized to a **Trip Plan**. Not a price-gap list.
 - **Selling into buy orders**: (`instant` mode in code.) The **Hauling Opportunities** mode that sells the cargo instantly into the destination hub station's standing buy orders instead of listing it: priced at what those orders actually pay, after sales tax only, with no **Days to Sell** or demand.
 - **Expected Sell Price**: What a hauler should expect per unit at the destination hub if they list to sell: the lower of one tick under the cheapest listing and the volume-weighted median price the item sold at recently. Never above today's cheapest listing.
 - **Days to Sell**: How long the units listed within 1% of the **Expected Sell Price** (they will relist below the hauler), plus about one day's worth of the hauler's own, take to sell at the region's recent sales rate. Not **Traded Volume** (units sold), and not a promise for the whole load.
