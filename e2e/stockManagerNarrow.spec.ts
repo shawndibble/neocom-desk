@@ -48,7 +48,7 @@ test('the Stock Manager fits its panel at 1024px without the fill bar', async ({
     .locator(`${TABLE} tbody tr`)
     .first()
     .getByRole('cell')
-    .first()
+    .nth(1) // after the selection checkbox
     .boundingBox();
   // Two lines of name plus the group line at most: ~44px a line at 1440.
   expect(item!.height).toBeLessThanOrEqual(110);
