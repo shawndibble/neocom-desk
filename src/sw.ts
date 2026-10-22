@@ -35,6 +35,7 @@ import { handlePush, type PushEnv } from '@/features/notifications/pushHandler';
 import { recordFeedEntry } from '@/features/notifications/feed';
 import { resolvePushNames } from '@/features/notifications/pushNames';
 import { db } from '@/db';
+import { readTimeZone } from '@/lib/timeFormat';
 import {
   isContractSnapshotObject,
   isEvePortraitImage,
@@ -180,6 +181,7 @@ function pushEnv(): PushEnv {
     recordFeedEntry,
     characterName: async (characterId) => (await db.characters.get(characterId))?.name,
     resolveNames: (fire) => resolvePushNames(fire),
+    timeZone: readTimeZone,
   };
 }
 

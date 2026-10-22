@@ -22,6 +22,7 @@
  * - **The phone Wallet Journal's day groups.** Days are EVE (UTC) days, so the
  *   times under a day header are UTC and the header says "EVE time".
  */
+import { db } from '@/db';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const TIME_FORMAT_SETTING_KEY = 'timeFormat';
@@ -52,6 +53,20 @@ export const useTimeFormat = createLocalSetting<TimeFormat>({
  */
 export function timeZoneFor(format: TimeFormat): 'UTC' | undefined {
   return format === 'eve' ? 'UTC' : undefined;
+}
+
+/**
+ * The zone straight from the Dexie row, for code with no store to subscribe to
+ * and no guarantee it was hydrated: the service worker composing a push (#4731).
+ * Never rejects; an unreadable or absent row is the default, the host's own zone.
+ */
+export async function readTimeZone(): Promise<'UTC' | undefined> {
+  try {
+    const row = await db.settings.get(TIME_FORMAT_SETTING_KEY);
+    return timeZoneFor(isTimeFormat(row?.value) ? row.value : DEFAULT_TIME_FORMAT);
+  } catch {
+    return undefined;
+  }
 }
 
 /** Subscribes to the preference and yields the zone `timestamp.ts` takes. */
