@@ -10650,7 +10650,7 @@
       },
       "detail": {
         "planNote": "{{volume}} · in your plan: {{note}}",
-        "regionNote": "Daily sales cover the whole {{hub}} region.",
+        "regionNote": "Daily sales are region-wide; orders are the hub station's.",
         "buyIn": "Buy in {{hub}}",
         "sellIn": "Sell in {{hub}}",
         "tax": "Sales tax",

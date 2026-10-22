@@ -208,11 +208,11 @@ describe('HaulingItemDetail — listing', () => {
     renderDetail(listRow());
     expect(screen.getByRole('link', { name: 'Jita market' })).toHaveAttribute(
       'href',
-      expect.stringContaining('/market/browser?')
+      expect.stringContaining('hub=jita')
     );
     expect(screen.getByRole('link', { name: 'Amarr market' })).toHaveAttribute(
       'href',
-      expect.stringContaining('/market/browser?')
+      expect.stringContaining('hub=amarr')
     );
     const route = screen.getByRole('link', { name: 'Route safety' }).getAttribute('href')!;
     expect(route).toContain(`from=${AMARR.systemId}`);
