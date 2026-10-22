@@ -210,7 +210,7 @@ export function ValueMenu({
  * The settings sheet: the Overview's view settings that don't fit the header
  * row, behind one icon-only gear. Its header shares a line with the
  * Character picker and never wraps, and a text trigger ("30d · Jita buy")
- * did not fit beside it below `lg` (measured at 768 and 1024). These are
+ * beside the range truncated the title at 1024. These are
  * view settings, not actions, so they live here, not in a ⋮.
  */
 export function SettingsSheet({ children }: { children: ReactNode }) {

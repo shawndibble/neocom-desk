@@ -102,12 +102,11 @@ const EMPTY_NAMES: ReadonlyMap<number, string> = new Map();
 const OVERVIEW_CHARACTER_FILTER_PARAM = characterFilterParam('all');
 /**
  * From `xl` the header row holds the range, chart metric and Value menu
- * inline beside the picker; from `lg` the range alone (the rest truncated
- * the title at 1024); below `lg` none of them (the range alone overflowed
- * at 768, beside the nav rail).
+ * inline beside the picker; from `md` the range alone (the rest truncated
+ * the title at 1024); below `md` none of them.
  */
 const WIDE_HEADER_QUERY = '(min-width: 80rem)';
-const MID_HEADER_QUERY = '(min-width: 64rem)';
+const MID_HEADER_QUERY = '(min-width: 48rem)';
 const OVERVIEW_DEFAULT_SORT = { columnId: 'date', direction: 'desc' as const };
 
 /** A row's mined m³ — units times the type's own unit volume for each ore line. */
@@ -516,7 +515,7 @@ export function OverviewTab({ tabBar, tabsId }: OverviewTabProps) {
             {/* The header row never wraps (it has a picker), so what fits
                 decides what is inline (measured at 390/768/1024/1280):
                 everything from `xl`; the range alone, with the other view
-                settings behind the gear, from `lg`; below that the range
+                settings behind the gear, from `md`; on a phone the range
                 joins them. */}
             {headerLayout === 'wide' ? (
               <>

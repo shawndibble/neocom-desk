@@ -52,7 +52,7 @@ import { StatusPill } from '@/features/miningTax/StatusPill';
 import type { PayeeBalance } from '@/features/miningTax/balances';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { useMediaQuery } from '@/lib/useMediaQuery';
+import { useIsNarrow } from '@/lib/useIsNarrow';
 import { SAMPLE_ACTIVE_CHARACTER } from '@/storybook/sampleData';
 import { NewComponent } from './NewComponent';
 import {
@@ -354,7 +354,7 @@ const HISTORY_NEWEST = HISTORY_ROWS.map((r) => r.date.slice(0, 7))
 export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }) {
   const tabsId = useTabsId();
   const phone = useIsPhone();
-  const payeesFit = useMediaQuery('(min-width: 64rem)');
+  const payeesFit = !useIsNarrow();
   const [sort, setSort] = useState<DataTableSort>(DEFAULT_SORT);
   const [historySort, setHistorySort] = useState<DataTableSort>(DEFAULT_SORT);
   const openColumns = usePersonalColumns(true);
@@ -402,7 +402,7 @@ export function PersonalF({ detail, diff }: { detail?: boolean; diff?: boolean }
         }
         actions={
           <>
-            {/* As `TaxTab`: Payees folds into the ⋮ below `lg`. */}
+            {/* As `TaxTab`: Payees folds into the ⋮ below `md`. */}
             {payeesFit && <Button variant="ghost">Payees</Button>}
             <IconButton icon={<Icon.Refresh />} label="Refresh" />
             <HeaderMoreMenu>
