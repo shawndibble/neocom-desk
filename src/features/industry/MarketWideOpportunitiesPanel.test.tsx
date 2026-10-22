@@ -655,7 +655,10 @@ describe('MarketWideOpportunitiesPanel offline', () => {
     await user.click(scan);
     expect(hookState.run).not.toHaveBeenCalled();
     await user.hover(scan);
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Needs a connection');
+    // No open delay (`delayDuration={0}`), but a loaded CI runner can take over the default 1 s.
+    expect(await screen.findByRole('tooltip', {}, { timeout: 3000 })).toHaveTextContent(
+      'Needs a connection'
+    );
   });
 
   it('scans as usual while online', async () => {
