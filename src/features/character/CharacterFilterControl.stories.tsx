@@ -108,6 +108,12 @@ export const SixCharacters: Story = {
   loaders: [seedRoster(6)],
 };
 
+/** @summary Six Characters at 390 wide: two faces and a "+4" chip, so the phone title keeps its room. */
+export const SixCharactersPhone: Story = {
+  ...SixCharacters,
+  globals: { viewport: { value: 'phone390', isRotated: false } },
+};
+
 /** @summary Corporation: the active Character's corp logo (the Buildings glyph until it loads). */
 export const Corporation: Story = {
   render: (args) => (

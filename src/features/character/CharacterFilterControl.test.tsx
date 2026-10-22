@@ -170,6 +170,36 @@ describe('CharacterFilterControl', () => {
       expect(trigger.querySelector('[data-stack-extra]')).toHaveTextContent('+2');
     });
 
+    it('draws two faces and a larger "+N" below md', async () => {
+      const original = window.matchMedia;
+      window.matchMedia = ((media: string) => ({
+        media,
+        matches: media.includes('max-width: 47.999rem'),
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      })) as unknown as typeof window.matchMedia;
+      try {
+        for (let id = 1; id <= 5; id += 1) await seedCharacter(id, `Pilot ${id}`, { addedAt: id });
+        render(
+          <CharacterFilterControl
+            activeCharacterId={4}
+            value="all"
+            characterCount={5}
+            onChange={() => {}}
+          />
+        );
+        const trigger = screen.getByRole('button');
+        await waitFor(() => expect(faceIds(trigger)).toEqual(['4', '1']));
+        expect(trigger.querySelector('[data-stack-extra]')).toHaveTextContent('+3');
+      } finally {
+        window.matchMedia = original;
+      }
+    });
+
     it('holds the AllCharacters glyph until the roster has loaded', () => {
       render(<CharacterFilterControl activeCharacterId={1} value="all" onChange={() => {}} />);
       const trigger = screen.getByRole('button');

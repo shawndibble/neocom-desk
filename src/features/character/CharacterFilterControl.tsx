@@ -41,6 +41,7 @@
  * small caret, at the height of the `IconButton`s beside it (44px below `md`
  * or on a touch pointer, 36px from `md`). "This character" is the active
  * Character's portrait; "All characters" is up to three overlapping portraits
+ * (two below `md`, chosen in JS with `useIsNarrow`)
  * of the Characters it covers (the active one first, then the roster in the
  * order it was added, read from Dexie: no ESI call; see `characterStack`),
  * with a "+N" chip for the rest; "Corporation" is the corp logo. Before the
@@ -91,7 +92,8 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cx } from '@/lib/cx';
 import { CorporationLogoGlyph } from './CorporationLogoGlyph';
-import { characterStack } from './characterStack';
+import { characterStack, STACK_MAX_FACES, STACK_MAX_FACES_NARROW } from './characterStack';
+import { useIsNarrow } from '@/lib/useIsNarrow';
 import {
   fieldBaseClassName,
   controlHeightClassName,
@@ -207,6 +209,7 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
         .map((c) => ({ characterId: c.characterId, name: c.name })),
     []
   );
+  const isNarrow = useIsNarrow();
   const isCorporation = corporation && value === 'corporation';
   const isAll = !isCorporation && resolved === 'all';
   const allLabel =
@@ -302,7 +305,15 @@ export function CharacterFilterControl<V extends CharacterScopeChoice = Characte
   const accessibleName = isPartial
     ? t('character.scope.triggerPartial', { label, missing: missingNote })
     : label;
-  const stack = isAll ? characterStack(roster ?? [], activeCharacterId, missingNames) : null;
+  // Below `md` the stack draws one face fewer, so a phone header keeps its title.
+  const stack = isAll
+    ? characterStack(
+        roster ?? [],
+        activeCharacterId,
+        missingNames,
+        isNarrow ? STACK_MAX_FACES_NARROW : STACK_MAX_FACES
+      )
+    : null;
   const faces = isCorporation ? (
     <CorporationLogoGlyph characterId={activeCharacterId} size="sm" boxClassName={FACE_BOX} />
   ) : stack && stack.faces.length > 0 ? (

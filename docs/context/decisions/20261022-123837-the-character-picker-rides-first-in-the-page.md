@@ -82,6 +82,8 @@ _Recorded 2026-10-22. Supersedes the placement half of
   - All characters: up to three overlapping portraits of the Characters it
     covers, the active one first, then roster order, with a "+N" chip for
     the rest. Characters in `missingNames` are left out of the stack.
+    Below `md` the stack draws two faces, with "+N" counting the rest. With
+    three faces, five Characters clipped CONTRACTS on a 390px phone.
   - Corporation: the corp logo.
 
   The full words stay in the accessible name and in a hover/focus tooltip,

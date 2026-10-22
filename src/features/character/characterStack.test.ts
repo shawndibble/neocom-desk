@@ -31,6 +31,12 @@ describe('characterStack', () => {
     expect(characterStack(ROSTER.slice(0, 2), null)).toEqual({ faces: [1, 2], extra: 0 });
   });
 
+  it('takes a smaller cap (the phone trigger), counting the rest as +N', () => {
+    expect(characterStack(ROSTER, 1, [], 2)).toEqual({ faces: [1, 2], extra: 4 });
+    expect(characterStack(ROSTER.slice(0, 3), 3, [], 2)).toEqual({ faces: [3, 1], extra: 1 });
+    expect(characterStack(ROSTER.slice(0, 2), 1, [], 2)).toEqual({ faces: [1, 2], extra: 0 });
+  });
+
   it('is empty for an empty roster', () => {
     expect(characterStack([], 1)).toEqual({ faces: [], extra: 0 });
   });
