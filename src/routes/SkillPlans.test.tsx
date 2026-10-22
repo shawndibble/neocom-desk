@@ -1857,7 +1857,6 @@ describe('SkillPlans editor: import from clipboard', () => {
     // Every item resolved, so it applies with no preview.
     expect(await screen.findByText('Added 1 skill(s)')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(await screen.findByText('Added 1 skill(s)')).toBeInTheDocument();
 
     // "Gunnery III" is applied as one entry and split into its per-level rows
     // by a second write, so wait for the settled list rather than whichever

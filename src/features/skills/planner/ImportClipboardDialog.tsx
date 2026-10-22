@@ -100,31 +100,48 @@ export function ImportClipboardDialog({
           <Button size="sm" onClick={onClose}>
             {t('plans.importCancel')}
           </Button>
-          {/* Import is the pilot's own step; with a preview up, Apply below is the commit. */}
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={handleImport}
-            disabled={text.trim() === '' || needsReview}
-            loading={importing}
-          >
-            {t('plans.importAction')}
-          </Button>
+          {/* One primary: Import until something needs a look, then Apply commits what was read. */}
+          {needsReview ? (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={() => onApply(preview.entries)}
+              disabled={preview.entries.length === 0}
+            >
+              {t('plans.importApply')}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={handleImport}
+              disabled={text.trim() === ''}
+              loading={importing}
+            >
+              {t('plans.importAction')}
+            </Button>
+          )}
         </div>
       }
     >
       <div
         className={`space-y-3 ${dragOver ? 'outline-1 outline-dashed outline-accent' : ''}`}
         onDragOver={(e) => {
+          // Only a file is ours to take; dragged text still drops into the textarea.
+          if (!e.dataTransfer.types.includes('Files')) return;
           e.preventDefault();
           setDragOver(true);
         }}
-        onDragLeave={() => setDragOver(false)}
+        onDragLeave={(e) => {
+          // Crossing onto a child fires a leave too; only leaving the body counts.
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false);
+        }}
         onDrop={(e) => {
-          e.preventDefault();
           setDragOver(false);
           const file = e.dataTransfer.files?.[0];
-          if (file) handleFile(file);
+          if (!file) return;
+          e.preventDefault();
+          handleFile(file);
         }}
       >
         <label className="block text-xs text-text-dim" htmlFor="clipboard-import-text">
@@ -138,7 +155,9 @@ export function ImportClipboardDialog({
             setText(e.target.value);
             setPreview(null);
           }}
-          onSubmitChord={handleImport}
+          onSubmitChord={() => {
+            if (!needsReview) handleImport();
+          }}
           rows={8}
           className="text-xs"
           aria-describedby={empty ? 'clipboard-import-empty' : undefined}
@@ -157,7 +176,6 @@ export function ImportClipboardDialog({
           }}
         />
         <p className="text-xs text-text-dim">
-          {t('plans.importFileOr')}{' '}
           <button
             type="button"
             className={inlineLinkClassName}
@@ -246,15 +264,6 @@ export function ImportClipboardDialog({
                     </ul>
                   </div>
                 )}
-
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => onApply(preview.entries)}
-                  disabled={preview.entries.length === 0}
-                >
-                  {t('plans.importApply')}
-                </Button>
               </>
             )}
           </div>

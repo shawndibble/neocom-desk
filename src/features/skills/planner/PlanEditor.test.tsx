@@ -618,6 +618,7 @@ describe('PlanEditor tools pane', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
+    expect(onUpdate).toHaveBeenCalledTimes(1);
     const [patch] = onUpdate.mock.calls[0];
     // The reorder half, same result "Suggest reorder" alone produces.
     expect(patch.entries).toEqual([
@@ -1065,6 +1066,7 @@ describe('"Optimize for me" never previews or writes a redundant remap (real rep
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
+    expect(onUpdate).toHaveBeenCalledTimes(1);
     const [patch] = onUpdate.mock.calls[0];
     // Exactly what the preview showed — one marker, not two.
     expect(patch.markers).toHaveLength(1);
@@ -1867,6 +1869,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
 
     // One write, carrying the new instant. The emptied box on the way there
     // must not land on the plan.
+    expect(onUpdate).toHaveBeenCalledTimes(1);
     const [update] = onUpdate.mock.calls[0] as [{ boosters: PlanBooster[] }];
     expect(update.boosters[0].expiresAt).toBeGreaterThan(Date.now() + 4 * DAY - 10_000);
     expect(update.boosters[0].expiresAt).toBeLessThan(Date.now() + 4 * DAY + 10_000);

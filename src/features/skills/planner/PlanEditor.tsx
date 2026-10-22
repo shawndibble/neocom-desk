@@ -975,14 +975,28 @@ export function PlanEditor({
     setImportPreview(undefined);
   }
 
+  const applyTextImportRef = useRef(applyTextImport);
+  useEffect(() => {
+    applyTextImportRef.current = applyTextImport;
+  });
+
   /**
    * A pasted skill plan or a dropped plan file: applied without a dialog when
    * every line parsed, otherwise the dialog opens on what was and wasn't read.
    */
   async function importWithoutDialog(previewing: Promise<ClipboardImportPreview>, openOn?: string) {
-    const result = await previewing;
+    let result: ClipboardImportPreview;
+    try {
+      result = await previewing;
+    } catch {
+      // The catalogs would not load: open the dialog on the text so Import can retry.
+      setImportSeed(openOn ?? null);
+      setImportOpen(true);
+      return;
+    }
     if (importOutcome(result) === 'apply') {
-      applyTextImport(result.entries);
+      // The plan may have changed while the catalogs loaded: apply through the latest render.
+      applyTextImportRef.current(result.entries);
       return;
     }
     setImportSeed(openOn ?? null);
@@ -997,7 +1011,6 @@ export function PlanEditor({
     if (importSeed === null || seedRef.current === importSeed) return;
     seedRef.current = importSeed;
     void importWithoutDialog(previewImportText(importSeed), importSeed);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires per seed; the handler closes over the latest plan when the preview lands
   }, [importSeed]);
 
   /** A plan file dropped on the editor goes through the same import as the dialog's. */
