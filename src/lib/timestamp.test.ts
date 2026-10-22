@@ -108,6 +108,10 @@ describe('EVE time is a 24-hour clock', () => {
   it('reads the first minutes after midnight as 00:05, not 24:05', () => {
     expect(formatTimeOfDay(justAfterMidnight, 'UTC')).toBe('00:05');
     expect(formatTimestamp(justAfterMidnight, 'UTC')).not.toMatch(/\b24:/);
+    // The split must still land on the clock, or it falls back to unsplit.
+    const split = splitTimestamp(justAfterMidnight, 'UTC');
+    expect(split.time).toMatch(/^0?0:05$/);
+    expect(split.date + split.time).toBe(formatTimestamp(justAfterMidnight, 'UTC'));
   });
 
   it('leaves the viewer-locale clock alone when no zone is given', () => {
