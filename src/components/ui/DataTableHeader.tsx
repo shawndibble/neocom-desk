@@ -5,6 +5,11 @@ import { focusRingInsetClassName, interactiveClassName } from './controlStyles';
 import * as Icon from './icons';
 import { InfoTooltip } from './Tooltip';
 import { stickyStartClass } from './dataTableSticky';
+import {
+  columnCellWidth,
+  TRAILING_COL_ACTIONS_REM,
+  TRAILING_COL_EXPAND_REM,
+} from './dataTableWidths';
 import type { DataTableColumn, DataTableSort } from './DataTable';
 
 interface Props<T> {
@@ -13,6 +18,8 @@ interface Props<T> {
   sort: DataTableSort | null;
   density: 'default' | 'compact';
   isStacked: boolean;
+  /** `table-layout: fixed`: the header cells carry the column widths. */
+  fixedLayout: boolean;
   expandable: boolean;
   rowMoreActions: boolean;
   onToggleSort: (column: DataTableColumn<T>) => void;
@@ -25,6 +32,7 @@ export function DataTableHeader<T>({
   sort,
   density,
   isStacked,
+  fixedLayout,
   expandable,
   rowMoreActions,
   onToggleSort,
@@ -58,6 +66,11 @@ export function DataTableHeader<T>({
               key={column.id}
               role="columnheader"
               scope="col"
+              style={
+                fixedLayout && column.width
+                  ? { width: columnCellWidth(column.width, density) }
+                  : undefined
+              }
               className={cx(
                 sortable ? 'p-0' : headerTextClass[i],
                 column.stickyStart && stickyStartClass(column),
@@ -111,7 +124,13 @@ export function DataTableHeader<T>({
           );
         })}
         {expandable && (
-          <th role="columnheader" scope="col" aria-hidden="true" className="w-0 p-0" />
+          <th
+            role="columnheader"
+            scope="col"
+            aria-hidden="true"
+            style={fixedLayout ? { width: `${TRAILING_COL_EXPAND_REM}rem` } : undefined}
+            className={cx('p-0', !fixedLayout && 'w-0')}
+          />
         )}
         {rowMoreActions && (
           // `relative`: the `sr-only` label below has no explicit
@@ -124,7 +143,12 @@ export function DataTableHeader<T>({
           // wrapper visually clips everything else. This `<th>` being
           // positioned gives the label a containing block that's already
           // inside the clip.
-          <th role="columnheader" scope="col" className="relative w-0 p-0">
+          <th
+            role="columnheader"
+            scope="col"
+            style={fixedLayout ? { width: `${TRAILING_COL_ACTIONS_REM}rem` } : undefined}
+            className={cx('relative p-0', !fixedLayout && 'w-0')}
+          >
             <span className="sr-only">{t('common.dataTable.actionsHeader')}</span>
           </th>
         )}

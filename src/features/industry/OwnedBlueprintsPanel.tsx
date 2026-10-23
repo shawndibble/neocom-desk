@@ -6,6 +6,7 @@
  * the blueprint load, the Character filter and the ranked rows this view
  * borrows ISK/hour from.
  */
+import { COL_QUANTITY, COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -254,6 +255,7 @@ export function OwnedBlueprintsPanel({
     {
       id: 'kind',
       header: t('industry.ownedBlueprintsKind'),
+      width: '10ch',
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.kind,
       render: (row) => (
         <span className={row.kind === 'bpo' ? 'font-medium' : undefined}>
@@ -265,7 +267,8 @@ export function OwnedBlueprintsPanel({
       id: 'me',
       header: t('industry.ownedBlueprintsMe'),
       align: 'right',
-      className: 'tabular-nums',
+      width: COL_SMALL_NUMBER,
+      className: 'tabular-nums whitespace-nowrap',
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.me,
       render: (row) => row.blueprint.material_efficiency,
     },
@@ -273,7 +276,8 @@ export function OwnedBlueprintsPanel({
       id: 'te',
       header: t('industry.ownedBlueprintsTe'),
       align: 'right',
-      className: 'tabular-nums',
+      width: COL_SMALL_NUMBER,
+      className: 'tabular-nums whitespace-nowrap',
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.te,
       render: (row) => row.blueprint.time_efficiency,
     },
@@ -281,7 +285,8 @@ export function OwnedBlueprintsPanel({
       id: 'runs',
       header: t('industry.runs'),
       align: 'right',
-      className: 'tabular-nums',
+      width: COL_QUANTITY,
+      className: 'tabular-nums whitespace-nowrap',
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.runs,
       render: (row) =>
         row.kind === 'bpo' ? t('industry.ownedBlueprintsUnlimitedRuns') : row.blueprint.runs,
@@ -290,28 +295,39 @@ export function OwnedBlueprintsPanel({
       id: 'quantity',
       header: t('industry.quantity'),
       align: 'right',
-      className: 'tabular-nums',
+      width: COL_QUANTITY,
+      className: 'tabular-nums whitespace-nowrap',
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.quantity,
       render: (row) => ownedBlueprintQuantity(row.blueprint),
     },
     {
       id: 'location',
       header: t('industry.ownedBlueprintsLocation'),
+      className: 'truncate',
       sortValue: locationSortValue,
       render: (row) => locationLabel(row) ?? t('industry.ownedBlueprintsResolvingLocation'),
     },
     {
       id: 'owner',
       header: t('industry.ownedBlueprintsOwner'),
+      width: '22ch',
+      className: 'truncate',
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.owner,
-      render: (row) =>
-        row.owner.kind === 'character' ? row.owner.name : t('industry.ownedBlueprintsCorporation'),
+      render: (row) => {
+        const owner =
+          row.owner.kind === 'character'
+            ? row.owner.name
+            : t('industry.ownedBlueprintsCorporation');
+        return owner;
+      },
     },
     {
       id: 'iskPerHour',
       header: t('industry.iskPerHour'),
       align: 'right',
-      className: 'tabular-nums',
+      // `IskAmount` compact figure ("999.99B"); the exact one rides its tooltip.
+      width: '12ch',
+      className: 'tabular-nums whitespace-nowrap',
       sortValue: OWNED_BLUEPRINT_SORT_VALUE.iskPerHour,
       cellClassName: (row) => (row.iskPerHour !== null ? iskToneClass(row.iskPerHour) : undefined),
       render: (row) =>
@@ -320,6 +336,8 @@ export function OwnedBlueprintsPanel({
     {
       id: 'action',
       header: '',
+      // The Start plan button, "Starting plan…" while busy.
+      width: '18ch',
       render: (row) => {
         const entry = row.catalogEntry;
         return entry ? (

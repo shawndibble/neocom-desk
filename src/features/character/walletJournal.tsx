@@ -6,6 +6,7 @@
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DataTableColumn } from '@/components/ui';
+import { COL_DATETIME, COL_ISK } from '@/components/ui/dataTableWidths';
 import type { WalletTransactionCommon } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
 import { journalRefKey, type JournalLine, type JournalRow } from '@/engine/journalNetting';
@@ -113,7 +114,8 @@ export function useJournalColumnsBuilder(): (
             {
               id: 'character',
               header: t('wallet.balanceCharacterColumn'),
-              className: 'max-sm:px-1 sm:whitespace-nowrap',
+              width: '22ch',
+              className: 'max-sm:px-1 sm:truncate',
               headerClassName: 'max-sm:px-1',
               render: nameOf,
               sortValue: nameOf,
@@ -125,7 +127,8 @@ export function useJournalColumnsBuilder(): (
             {
               id: 'player',
               header: t('wallet.playerColumn'),
-              className: 'max-sm:px-1 sm:whitespace-nowrap',
+              width: '22ch',
+              className: 'max-sm:px-1 sm:truncate',
               headerClassName: 'max-sm:px-1',
               render: playerNameFor,
               sortValue: playerNameFor,
@@ -136,6 +139,7 @@ export function useJournalColumnsBuilder(): (
         {
           id: 'date',
           header: t('wallet.date'),
+          width: COL_DATETIME,
           className: 'whitespace-nowrap text-text-dim max-sm:px-1',
           headerClassName: 'max-sm:px-1',
           // Date over time on a phone, freeing width for Description; one line from `sm` up.
@@ -157,7 +161,8 @@ export function useJournalColumnsBuilder(): (
           id: 'refType',
           header: t('wallet.refType'),
           // Wraps onto two lines on a phone so Amount stays on screen; one line from `sm` up.
-          className: 'max-sm:px-1 sm:whitespace-nowrap',
+          width: '24ch',
+          className: 'max-sm:px-1 sm:truncate',
           headerClassName: 'max-sm:px-1',
           render: (entry) => journalRefLabel(journalRefKey(entry), t),
           sortValue: (entry) => journalRefLabel(journalRefKey(entry), t),
@@ -194,6 +199,7 @@ export function useJournalColumnsBuilder(): (
         {
           id: 'amount',
           header: t('wallet.amount'),
+          width: COL_ISK,
           align: 'right',
           className: 'tabular-nums max-sm:px-1',
           headerClassName: 'max-sm:px-1',
@@ -210,6 +216,7 @@ export function useJournalColumnsBuilder(): (
         {
           id: 'balance',
           header: t('wallet.balanceCol'),
+          width: COL_ISK,
           align: 'right',
           className: 'tabular-nums text-text-dim',
           render: (entry) =>

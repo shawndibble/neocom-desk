@@ -2,6 +2,7 @@ import { fixed1 } from '@/lib/fixedFormat';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, type DataTableColumn } from '@/components/ui';
+import { COL_ISK } from '@/components/ui/dataTableWidths';
 import { iskPerConcordLp, type ConcordRate } from '@/engine/loyalty/concordExchange';
 import {
   LOYALTY_STORE_OFFERS_COLUMN_IDS,
@@ -49,6 +50,7 @@ export function useLoyaltyOfferColumns({
         id: 'profit',
         header: t('loyaltyStore.colProfit'),
         align: 'right',
+        width: COL_ISK,
         sortValue: (row) => row.profit.profit ?? undefined,
         cellClassName: (row) => iskPerLpTone(row.profit.profit),
         render: (row) =>
@@ -60,6 +62,7 @@ export function useLoyaltyOfferColumns({
           lpBasis === 'concord' ? 'loyaltyStore.colIskPerConcordLp' : 'loyaltyStore.colIskPerLp'
         ),
         align: 'right',
+        width: '14ch',
         headerClassName: 'whitespace-nowrap',
         sortValue: (row) => shownIskPerLp(row) ?? undefined,
         cellClassName: (row) => `font-semibold tabular-nums ${iskPerLpTone(shownIskPerLp(row))}`,

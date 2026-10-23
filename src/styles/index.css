@@ -364,6 +364,12 @@
     overflow-wrap: anywhere;
   }
 
+  /* A fixed-width column's `truncate` is for the table; a card has room. */
+  .dt-stacked td.truncate {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
   .dt-stacked td::before {
     content: attr(data-label);
     position: absolute;

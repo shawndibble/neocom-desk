@@ -96,7 +96,9 @@ export function useContractsHistoryColumns({
       status: {
         id: 'status',
         header: t('contracts.status'),
-        className: 'font-semibold',
+        // "Finished (Contractor)" plus the lapsed-offer glyph.
+        width: '24ch',
+        className: 'font-semibold whitespace-nowrap',
         cellClassName: (contract) => STATUS_TONE[contract.status],
         sortValue: (contract) => t(CONTRACT_STATUS_KEY[contract.status]),
         render: (contract) => <ContractStatusCell contract={contract} />,
@@ -104,6 +106,8 @@ export function useContractsHistoryColumns({
       issuer: {
         id: 'issuer',
         header: t('contracts.issuer'),
+        width: '24ch',
+        className: 'truncate',
         sortValue: (contract) => {
           const { id } = contractIssuer(contract);
           return issuerNames.get(id) ?? `#${id}`;
@@ -132,6 +136,8 @@ export function useContractsHistoryColumns({
       receiver: {
         id: 'receiver',
         header: t('contracts.receiver'),
+        width: '24ch',
+        className: 'truncate',
         sortValue: (contract) => {
           const receiver = receiverFor(contract);
           return receiver ? (issuerNames.get(receiver.id) ?? `#${receiver.id}`) : '';
@@ -159,7 +165,9 @@ export function useContractsHistoryColumns({
         id: 'price',
         header: t('contracts.price'),
         align: 'right',
-        className: 'tabular-nums',
+        // `IskAmount` renders the compact figure ("999.99B"); the exact one rides its tooltip.
+        width: '12ch',
+        className: 'tabular-nums whitespace-nowrap',
         // The dense phone card's headline figure, beside the title.
         cardCorner: true,
         sortValue: (contract) => contractAmount(contract),
@@ -171,6 +179,8 @@ export function useContractsHistoryColumns({
       issued: {
         id: 'issued',
         header: t('contracts.issued'),
+        // Date only ("10/23/2026"); the time rides a tooltip.
+        width: '12ch',
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (contract) => new Date(contract.date_issued).getTime(),
         // Off the phone card: its day section header already says it.
@@ -183,6 +193,8 @@ export function useContractsHistoryColumns({
       expires: {
         id: 'expires',
         header: t('contracts.expires'),
+        // A courier's "Due 10/23/2026 · in 123d 23h" is the longest text.
+        width: '30ch',
         className: 'whitespace-nowrap text-text-dim',
         // An accepted courier's clock is delivery, not the accept-by expiry.
         sortValue: (contract) =>
@@ -208,6 +220,7 @@ export function useContractsHistoryColumns({
       {
         id: 'type',
         header: t('contracts.type'),
+        className: 'truncate',
         sortValue: (contract) => contract.title || t(CONTRACT_TYPE_KEY[contract.type]),
         render: (contract) => {
           const opener = (
@@ -244,7 +257,8 @@ export function useContractsHistoryColumns({
             {
               id: 'character',
               header: t('contracts.character'),
-              className: 'whitespace-nowrap',
+              width: '20ch',
+              className: 'truncate',
               sortValue: characterNameOf,
               render: (contract: Contract) => characterNameOf(contract),
             } satisfies DataTableColumn<Contract>,

@@ -32,6 +32,7 @@ import {
   type DataTableColumn,
   type DataTableGroupBy,
 } from '@/components/ui';
+import { COL_DATETIME_STACKED, COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
 import {
   COURIER_COLUMN_IDS,
   useVisibleCourierColumns,
@@ -691,6 +692,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       reward: {
         id: 'reward',
         header: t('contractSearch.rewardColumn'),
+        width: '12ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortValue: (row) => row.reward,
@@ -701,6 +703,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       collateral: {
         id: 'collateral',
         header: t('contractSearch.collateralColumn'),
+        width: '12ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortValue: (row) => courierCollateral(row),
@@ -716,6 +719,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       jumps: {
         id: 'jumps',
         header: t('contractSearch.jumpsColumn'),
+        width: COL_SMALL_NUMBER,
         align: 'right',
         className: 'tabular-nums',
         // `undefined`, never a stand-in figure: `DataTable` sinks a valueless
@@ -753,6 +757,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       iskPerJump: {
         id: 'iskPerJump',
         header: t('contractSearch.iskPerJumpColumn'),
+        width: '16ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         // The phone card's headline figure, top right beside the route: the
@@ -826,6 +831,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       iskPerVolume: {
         id: 'iskPerVolume',
         header: t('contractSearch.iskPerVolumeColumn'),
+        width: '14ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortValue: (row) => iskPerVolume(row.reward, row.volume) ?? undefined,
@@ -843,6 +849,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       expires: {
         id: 'expires',
         header: t('contractSearch.expiresColumn'),
+        width: COL_DATETIME_STACKED,
         // `sm:px-2` (a variant, so it sorts after the base `px-3`) claws back the last few px a 1024px panel is short once the cell stacks.
         className: 'whitespace-nowrap text-text-dim sm:px-2',
         headerClassName: 'sm:px-2',
@@ -879,7 +886,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           `${endpointSystemName(row.origin)} ${endpointSystemName(row.destination)}`,
         render: (row) => (
           <div className="flex flex-col gap-0.5">
-            <span>
+            <span className="truncate">
               <EndpointSystem endpoint={row.origin} />
               <EndpointSecurity security={row.origin.security} />
               {originRegion(row) && (
@@ -887,7 +894,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
               )}
               <EndpointRiskMarkers endpoint={row.origin} end="origin" />
             </span>
-            <span className="text-text-dim">
+            <span className="truncate text-text-dim">
               {'→ '}
               <EndpointSystem endpoint={row.destination} />
               <EndpointSecurity security={row.destination.security} />

@@ -5,6 +5,7 @@
  */
 import { useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { COL_ICON, COL_ISK, COL_QUANTITY } from '@/components/ui/dataTableWidths';
 import { Checkbox, ColumnPickerMenu, DataTable, type DataTableColumn } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -153,7 +154,8 @@ export function CorpAssetItemTable({
       id: 'quantity',
       header: t('corp.assets.column.quantity'),
       align: 'right',
-      className: 'tabular-nums',
+      width: COL_QUANTITY,
+      className: 'tabular-nums whitespace-nowrap',
       sortValue: (r) => r.ledger.quantity,
       render: (r) => formatCount(r.ledger.quantity),
     },
@@ -161,6 +163,7 @@ export function CorpAssetItemTable({
       id: 'target',
       header: t('corp.assets.column.target'),
       align: 'right',
+      width: '12ch',
       sortValue: (r) => r.ledger.stock?.target,
       render: (r) =>
         // A copy never counts toward its type's target, so it has no cell to set one in.
@@ -179,7 +182,8 @@ export function CorpAssetItemTable({
       id: 'shortBy',
       header: t('corp.assets.column.shortBy'),
       align: 'right',
-      className: 'tabular-nums',
+      width: '22ch',
+      className: 'tabular-nums whitespace-nowrap',
       sortValue: (r) => r.ledger.stock?.shortBy,
       render: (r) => {
         const stock = r.ledger.stock;
@@ -222,7 +226,8 @@ export function CorpAssetItemTable({
       id: 'value',
       header: t('corp.assets.column.value'),
       align: 'right',
-      className: 'tabular-nums',
+      width: COL_ISK,
+      className: 'tabular-nums whitespace-nowrap',
       sortValue: (r) => r.ledger.estimatedValue,
       render: (r) => (r.ledger.estimatedValue === 0 ? '—' : formatIsk(r.ledger.estimatedValue)),
     },
@@ -230,13 +235,16 @@ export function CorpAssetItemTable({
       id: 'volume',
       header: t('corp.assets.column.volume'),
       align: 'right',
-      className: 'tabular-nums',
+      width: '14ch',
+      className: 'tabular-nums whitespace-nowrap',
       sortValue: (r) => r.ledger.volume ?? undefined,
       render: (r) => (r.ledger.volume === null ? '—' : formatCubicMetres(r.ledger.volume)),
     },
     group: {
       id: 'group',
       header: t('corp.assets.column.group'),
+      width: '20ch',
+      className: 'truncate',
       sortValue: (r) => r.categoryName?.toLowerCase(),
       render: (r) => r.categoryName ?? '—',
     },
@@ -245,6 +253,7 @@ export function CorpAssetItemTable({
   const selectColumn: DataTableColumn<ItemTableRow> = {
     id: 'select',
     header: '',
+    width: COL_ICON,
     className: 'w-8',
     cardCorner: 'start',
     render: (r) => (
