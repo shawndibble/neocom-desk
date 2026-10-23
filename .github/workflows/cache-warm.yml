@@ -39,7 +39,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # `static`, `build`, `test-shard` and `rules` in ci.yml.
+  # `static` (which carries the Firestore rules tests), `build` and `test-shard` in ci.yml.
   node-modules:
     runs-on: ubuntu-latest
     steps:
