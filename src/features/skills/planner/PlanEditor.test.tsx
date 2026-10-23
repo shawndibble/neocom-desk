@@ -611,10 +611,15 @@ describe('PlanEditor tools pane', () => {
     const dialog = screen.getByRole('dialog', { name: 'Optimize for me' });
     // The new order, same as "Suggest reorder"'s own preview: high-priority
     // Skill B first.
-    expect(within(dialog).getByText('Skill B I')).toBeInTheDocument();
-    expect(within(dialog).getByText('Skill A I')).toBeInTheDocument();
+    // Each skill shows once in Current and once in Optimized.
+    expect(within(dialog).getAllByText('Skill B I')).toHaveLength(2);
+    expect(within(dialog).getAllByText('Skill A I')).toHaveLength(2);
     expect(within(dialog).getByText(/^Total /)).toBeInTheDocument();
-    expect(within(dialog).getByText('Segment 1')).toBeInTheDocument();
+    expect(within(dialog).getByText(/^Current · /)).toBeInTheDocument();
+    expect(within(dialog).getByText(/^Optimized · /)).toBeInTheDocument();
+    // Skill B jumps ahead of Skill A: Current says where it goes, Optimized says it moved up.
+    expect(within(dialog).getByText('moves to 1')).toBeInTheDocument();
+    expect(within(dialog).getByText('Moved up 1 place')).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
@@ -1059,10 +1064,9 @@ describe('"Optimize for me" never previews or writes a redundant remap (real rep
     await clickOptimizeMode(user, 'Optimize for me…');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize for me' });
-    expect(within(dialog).getByText('Segment 1')).toBeInTheDocument();
     // The whole point of the fix: a second segment that would just repeat
     // the first's spread never gets previewed as a real second remap.
-    expect(within(dialog).queryByText('Segment 2')).toBeNull();
+    expect(within(dialog).getAllByText('New remap marker.')).toHaveLength(1);
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
