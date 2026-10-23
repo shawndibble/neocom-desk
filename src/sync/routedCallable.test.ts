@@ -20,6 +20,7 @@ describe('routerFor', () => {
     ['turnOffSrpCallable', 'corpTaxBookCall'],
     ['saveSrpSettingsCallable', 'corpTaxBookCall'],
     ['reclaimSrpCallable', 'corpTaxBookCall'],
+    ['fileSrpClaimCallable', 'corpTaxBookCall'],
     ['registerDevice', 'alertsCall'],
     ['saveAlertGrant', 'alertsCall'],
     ['deleteAlertGrant', 'alertsCall'],

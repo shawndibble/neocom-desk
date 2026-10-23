@@ -5,7 +5,13 @@
  */
 import { getValidAccessToken } from '@/auth/session';
 import { call } from './taxBook/bookClient';
-import type { SrpOfficerVerdict, SrpSettingsPatch, SrpStatus } from './srpTypes';
+import type {
+  FileSrpClaimInput,
+  FiledSrpClaim,
+  SrpOfficerVerdict,
+  SrpSettingsPatch,
+  SrpStatus,
+} from './srpTypes';
 
 /** Checks the Character's roles with ESI and records officer access for 24 hours. */
 export async function verifySrpOfficer(
@@ -51,4 +57,19 @@ export async function reclaimSrp(
 ): Promise<{ officersRevoked: number }> {
   const accessToken = await getValidAccessToken(characterId);
   return call(characterId, 'reclaimSrpCallable', { corporationId, accessToken });
+}
+
+/**
+ * Any member files an SRP Claim for their own loss. Sends a pasted zKillboard or ESI link; the
+ * server fetches the killmail, checks it and prices the claim. The server fails with a
+ * `details.reason` (not-your-loss, loss-in-other-corp, outside-window, already-claimed,
+ * not-covered, fleet-or-fc-required, note-required, hash-unavailable, srp-off, ...).
+ */
+export async function fileSrpClaim(
+  characterId: number,
+  corporationId: number,
+  claim: FileSrpClaimInput
+): Promise<FiledSrpClaim> {
+  const accessToken = await getValidAccessToken(characterId);
+  return call(characterId, 'fileSrpClaimCallable', { corporationId, accessToken, ...claim });
 }
