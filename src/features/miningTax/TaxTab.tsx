@@ -2,7 +2,8 @@ import { NO_NAMES } from '@/lib/emptyCollections';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { TaxDialogsHost } from '@/features/miningTax/TaxDialogsHost';
-import { isSelectableRow, useTaxColumns } from '@/features/miningTax/useTaxColumns';
+import { isSelectableRow, statusLabel, useTaxColumns } from '@/features/miningTax/useTaxColumns';
+import { statusColumnWidthClass } from '@/features/miningTax/statusColumnWidth';
 import { useTaxDialogs, useTaxDialogSelector } from '@/features/miningTax/useTaxDialogs';
 import { typeLabels } from './typeLabels';
 import { UnpricedOreDetail } from './UnpricedOreDetail';
@@ -782,6 +783,19 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const selectableVisible = openRows.filter(isSelectableRow);
   const showSelectColumn = selectableVisible.length > 0;
 
+  // Sized to the longest status on screen, over both tables so Open's and
+  // History's columns still line up.
+  const statusWidthClass = useMemo(() => {
+    const marked: string[] = [];
+    const labels = visibleRows.map((dr) => {
+      if (!dr.corp) return statusLabel(t, dr.status);
+      const label = corpStateLabel(dr.corp);
+      if (dr.corp.kind === 'row' && dr.corp.view.overlap) marked.push(label);
+      return label;
+    });
+    return statusColumnWidthClass(labels, { markedLabels: marked });
+  }, [visibleRows, corpStateLabel, t]);
+
   const { baseColumns, openColumns, historyColumns } = useTaxColumns({
     isPhone,
     showOreColumn,
@@ -798,6 +812,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     systemName,
     payeeDisplayName,
     corpStateLabel,
+    statusWidthClass,
   });
 
   const taxSort = useUrlSort(

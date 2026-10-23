@@ -38,7 +38,7 @@ import { formatCount } from '@/lib/formatCount';
 const SELECT_COLUMN_CLASS = 'w-9 pl-2 pr-0';
 
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
-function statusLabel(t: (key: string) => string, status: MiningTaxRowStatus): string {
+export function statusLabel(t: (key: string) => string, status: MiningTaxRowStatus): string {
   return t(`miningTax.status.${STATUS_LABEL_KEY[status]}`);
 }
 
@@ -68,6 +68,8 @@ interface UseTaxColumnsInput {
   systemName: (dr: DisplayRow) => string;
   payeeDisplayName: (dr: DisplayRow) => string;
   corpStateLabel: (corp: CorpRowInfo) => string;
+  /** `statusColumnWidthClass` for the rows on screen, both tables' together so their columns line up. */
+  statusWidthClass: string;
 }
 
 /**
@@ -92,6 +94,7 @@ export function useTaxColumns({
   systemName,
   payeeDisplayName,
   corpStateLabel,
+  statusWidthClass,
 }: UseTaxColumnsInput) {
   const { t } = useTranslation();
   return useMemo(() => {
@@ -328,7 +331,10 @@ export function useTaxColumns({
       },
       {
         id: 'status',
-        headerCellClassName: 'sm:w-32',
+        headerCellClassName: statusWidthClass,
+        // Centred on a table, where the pill would otherwise sit at the left of
+        // a column wider than it; the phone card places it on its own line.
+        align: isPhone ? undefined : 'center',
         header: t('miningTax.statusColumn'),
         // Closes the phone card's second line at its right edge, so every
         // status sits in one column under the tax figure above it.
@@ -415,5 +421,6 @@ export function useTaxColumns({
     systemName,
     payeeDisplayName,
     corpStateLabel,
+    statusWidthClass,
   ]);
 }
