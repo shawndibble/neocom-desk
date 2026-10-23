@@ -8,27 +8,18 @@
  * both are being mined is left unassigned (`planSurveyAutoAssign`), and the
  * row says so rather than leaving a pilot to wonder where it went.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
-import { isConnectionLive, type SurveyConnection } from '@/engine/miningTax/surveyConnection';
+import {
+  findOreClash,
+  isConnectionLive,
+  type SurveyConnection,
+} from '@/engine/miningTax/surveyConnection';
 import { eveWhen } from '@/lib/eveTime';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { systemLabel } from './names';
 import { removeSurveyConnection, useSurveyConnections } from './surveyConnections';
-
-/** Another connection of the same pilot, in the same system, mining the same ore type, to a different Payee. */
-function overlaps(a: SurveyConnection, b: SurveyConnection, nowMs: number): boolean {
-  return (
-    a !== b &&
-    a.characterId === b.characterId &&
-    a.systemId === b.systemId &&
-    a.payeeId !== b.payeeId &&
-    nowMs <= a.untilMs &&
-    nowMs <= b.untilMs &&
-    a.typeIds.some((id) => b.typeIds.includes(id))
-  );
-}
 
 export function SurveyConnectionsPanel({
   characterIds,
@@ -43,12 +34,16 @@ export function SurveyConnectionsPanel({
   characterNames: ReadonlyMap<number, string>;
   systemNames: ReadonlyMap<number, string>;
   typeNames: ReadonlyMap<number, string>;
-  /** For tests; otherwise the time the panel mounted. */
+  /** For tests; otherwise the clock, read each minute. */
   nowMs?: number;
 }) {
   const { t } = useTranslation();
-  const [mountedAt] = useState(() => Date.now());
-  const nowMs = nowOverride ?? mountedAt;
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setClock(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const nowMs = nowOverride ?? clock;
   useHydratedStore(useSurveyConnections);
   const all = useSurveyConnections((s) => s.value);
   const [failed, setFailed] = useState(false);
@@ -66,7 +61,7 @@ export function SurveyConnectionsPanel({
     <Panel title={t('miningTax.surveyConnections.title')}>
       <ul className="divide-y divide-line text-sm">
         {live.map((c) => {
-          const clash = live.find((other) => overlaps(c, other, nowMs));
+          const clash = findOreClash(c, live, nowMs);
           const ore = c.typeIds.map((id) => typeNames.get(id) ?? `#${id}`).join(', ');
           return (
             <li

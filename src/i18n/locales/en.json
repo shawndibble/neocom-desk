@@ -6442,6 +6442,7 @@
     "reauthTitle": "Some characters need to log in again",
     "reauthHint": "Log in again to fetch this character's personal mining ledger.",
     "reauthAction": "Log in again with EVE Online",
+    "reauthCharacterHint": "{{character}} needs to log in again to see their mining ledger.",
     "surveyConnections": {
       "title": "Auto-assigning moon tax",
       "line": "{{name}} at {{pct}}%",
@@ -6450,7 +6451,6 @@
       "overlap": "Shares ore with the survey for {{name}}. Ore both claim stays unassigned for you to assign.",
       "stopFailed": "Couldn't stop that. Try again."
     },
-    "reauthCharacterHint": "{{character}} needs to log in again to see their mining ledger.",
     "emptyTitle": "No mining ledger entries match this filter",
     "emptyHint": "Mine a moon and check back — ESI's personal mining ledger updates daily.",
     "managePayeesAction": "Payees",
