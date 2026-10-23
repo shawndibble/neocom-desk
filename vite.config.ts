@@ -94,6 +94,36 @@ const { app: appStrings } = JSON.parse(
  * `src/testEnvironmentSplit.test.ts` now guards that case.
  */
 const DOM_TS_TESTS = 'src/**/*.dom.test.ts';
+// Files that break without per-file module isolation (#4750): they `vi.mock` a
+// module other files import for real, or read module-level state another file
+// leaves behind. They run in the isolated `unit-isolated` project below.
+const NEEDS_ISOLATION = [
+  'src/db/upgradeFromHistory.test.ts',
+  'src/esi/cachePurgeLookupFailure.test.ts',
+  'src/esi/cacheSettle.test.ts',
+  'src/features/assets/assetSortPreference.test.ts',
+  'src/features/bpcContracts/publicContractItems.test.ts',
+  'src/features/character/calendarRsvp.test.ts',
+  'src/features/character/clones.test.ts',
+  'src/features/character/stations.test.ts',
+  'src/features/communities/communityCache.test.ts',
+  'src/features/contractSearch/courierEndpoints.test.ts',
+  'src/features/contractSearch/publicContractOffers.test.ts',
+  'src/features/corp/taxBook/feederClient.test.ts',
+  'src/features/fittings/saveToEve.test.ts',
+  'src/features/fittings/skillRequirements.test.ts',
+  'src/features/fittings/useCompareCanFly.test.ts',
+  'src/features/market/haulingData.test.ts',
+  'src/features/market/locationMode.test.ts',
+  'src/features/miningTax/continueSessionPref.test.ts',
+  'src/features/miningTax/oreForm.test.ts',
+  'src/features/miningTax/oreFormReprice.test.ts',
+  'src/features/miningTax/snapshot.test.ts',
+  'src/features/miningTax/typeOverrides.test.ts',
+  'src/features/notifications/pollDomains/skillQueueNames.test.ts',
+  'src/features/overview/widgets/data/corpContractsLoader.test.ts',
+  'src/market/priceFallback.test.ts',
+];
 
 /**
  * Source-map upload is opt-in on the token, which only the deploy job holds:
@@ -464,7 +494,15 @@ export default defineConfig({
           // rest of that directory's one-off tooling stays untested by
           // design, same as before.
           include: ['src/**/*.{test,spec}.ts', 'scripts/lib/**/*.test.mjs'],
-          exclude: [...configDefaults.exclude, DOM_TS_TESTS],
+          exclude: [...configDefaults.exclude, DOM_TS_TESTS, ...NEEDS_ISOLATION],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'unit-isolated',
+          environment: 'node',
+          include: NEEDS_ISOLATION,
         },
       },
       {
