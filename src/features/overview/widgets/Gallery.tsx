@@ -240,6 +240,7 @@ function GalleryBody({
   const [unusedOnly, setUnusedOnly] = useState(true);
   const [density, setDensity] = useState<Density>('grid');
   const [justAdded, setJustAdded] = useState<string | null>(null);
+  const [addedHere, setAddedHere] = useState<ReadonlySet<string>>(new Set());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -255,7 +256,7 @@ function GalleryBody({
   const matching = matchKinds(offered, query, (kind) => `${t(kind.titleKey)} ${t(kind.descKey)}`);
   // "Not on your board" only narrows the wide layout: the drawer keeps listing everything.
   const hidingUsed = browse && unusedOnly;
-  const shown = hidingUsed ? notOnBoard(matching, counts) : matching;
+  const shown = hidingUsed ? notOnBoard(matching, counts, addedHere) : matching;
   const catCounts = categoryCounts(shown, board);
   const items = shown.filter((kind) => category === 'all' || categoryOn(board, kind) === category);
 
@@ -272,6 +273,7 @@ function GalleryBody({
     edit.add(id);
     onAdded();
     if (isPhone) return;
+    setAddedHere((prev) => new Set(prev).add(id));
     setJustAdded(id);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setJustAdded(null), ADDED_MS);
@@ -293,7 +295,7 @@ function GalleryBody({
   );
   const listClass =
     browse && density === 'grid'
-      ? 'grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-2'
+      ? 'grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-2'
       : 'grid gap-2';
 
   // Featured leads the wide layout's All view; its kinds are not repeated below it.

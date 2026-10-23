@@ -27,12 +27,17 @@ export function kindInstanceCounts(widgets: readonly { kind: string }[]): Map<st
   return map;
 }
 
-/** The kinds with no widget on the board yet. */
+/**
+ * The kinds with no widget on the board yet. `keep` holds the kinds added during
+ * this visit: they stay listed, so a card does not vanish (and its "Added"
+ * confirmation with it) the moment it is added.
+ */
 export function notOnBoard(
   kinds: readonly WidgetKindDef[],
-  counts: ReadonlyMap<string, number>
+  counts: ReadonlyMap<string, number>,
+  keep: ReadonlySet<string> = new Set()
 ): WidgetKindDef[] {
-  return kinds.filter((kind) => !counts.get(kind.id));
+  return kinds.filter((kind) => !counts.get(kind.id) || keep.has(kind.id));
 }
 
 /** Kinds per category on `board`, plus `all`. */
@@ -43,7 +48,7 @@ export function categoryCounts(
   const counts = { all: kinds.length } as Record<CategoryFilter, number>;
   for (const id of board.categories) counts[id] = 0;
   for (const kind of kinds) {
-    const id = categoryOn(board as WidgetBoard, kind);
+    const id = categoryOn(board, kind);
     counts[id] = (counts[id] ?? 0) + 1;
   }
   return counts;
@@ -57,7 +62,7 @@ export function groupByCategory(
   return board.categories
     .map((category) => ({
       category,
-      kinds: kinds.filter((kind) => categoryOn(board as WidgetBoard, kind) === category),
+      kinds: kinds.filter((kind) => categoryOn(board, kind) === category),
     }))
     .filter((group) => group.kinds.length > 0);
 }

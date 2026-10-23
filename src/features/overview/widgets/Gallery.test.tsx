@@ -273,6 +273,13 @@ describe('Gallery Browse all', () => {
     expect(screen.queryByRole('dialog', { name: 'Add a widget' })).toBeNull();
   });
 
+  it('keeps a card in place after Add, so its Added confirmation shows', async () => {
+    const { user, dialog } = await browse({ initial: { version: 1, widgets: [] } });
+    await user.click(within(dialog).getByRole('button', { name: 'Add Wallet' }));
+    expect(within(itemOf(dialog, 'Wallet')).getByRole('status')).toHaveTextContent('Added');
+    expect(within(dialog).getByRole('button', { name: 'Add another Wallet' })).toBeInTheDocument();
+  });
+
   it('drops the previews in the list layout', async () => {
     const { user, dialog } = await browse({ initial: { version: 1, widgets: [] } });
     expect(within(dialog).getAllByTestId('gallery-preview').length).toBeGreaterThan(0);

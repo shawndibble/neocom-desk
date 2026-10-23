@@ -36,6 +36,16 @@ describe('notOnBoard', () => {
     const counts = new Map([['wallet', 1]]);
     expect(notOnBoard(kinds, counts).map((k) => k.id)).toEqual(['training', 'mail']);
   });
+  it('keeps a kind named in `keep` even once it is on the board', () => {
+    const counts = new Map([
+      ['wallet', 1],
+      ['mail', 1],
+    ]);
+    expect(notOnBoard(kinds, counts, new Set(['wallet'])).map((k) => k.id)).toEqual([
+      'wallet',
+      'training',
+    ]);
+  });
 });
 
 describe('categoryCounts / groupByCategory', () => {
