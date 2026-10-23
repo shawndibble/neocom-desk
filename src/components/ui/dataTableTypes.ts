@@ -30,6 +30,16 @@ export interface DataTableColumn<T> {
    */
   headerCellClassName?: string;
   /**
+   * Fixed column width, a CSS length — use `ch` (`'18ch'`) so it follows the
+   * font; the `COL_*` constants in `dataTableWidths.ts` cover the common
+   * kinds. A windowed table (`virtualize`) that sets a width on any column
+   * switches to `table-layout: fixed`: columns without one share what is left
+   * and their text truncates (`truncate` on the cell), so scrolling cannot
+   * resize columns as rows mount and unmount. Ignored while the table is not
+   * windowed and in the stacked card layout.
+   */
+  width?: string;
+  /**
    * Pins the column at the left edge while the rest scroll sideways under it
    * (a table that overflows its wrapper, e.g. `responsive="table"` on a
    * phone), so row labels stay on screen. Below `md` it also gets a right

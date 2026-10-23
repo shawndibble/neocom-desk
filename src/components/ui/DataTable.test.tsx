@@ -1430,6 +1430,60 @@ describe('DataTable virtualize', () => {
     expect(mountedIds()).not.toContain('1');
   });
 
+  describe('column widths', () => {
+    const sized: DataTableColumn<Row>[] = [
+      { id: 'item', header: 'Item', render: (row) => row.item },
+      { id: 'amount', header: 'Amount', width: '12ch', render: (row) => row.amount },
+    ];
+    const renderSized = (props: { virtualize?: boolean; cols?: DataTableColumn<Row>[] }) =>
+      render(
+        <DataTable
+          label="Offers"
+          columns={props.cols ?? sized}
+          rows={many}
+          rowKey={(row) => row.id}
+          virtualize={props.virtualize}
+        />
+      );
+
+    it('fixes the layout and sizes the header cells when windowed', () => {
+      renderSized({ virtualize: true });
+      expect(screen.getByRole('table')).toHaveClass('table-fixed');
+      // jsdom resolves `ch` to px on read; the written value is what ships.
+      expect(screen.getByRole('columnheader', { name: 'Amount' }).getAttribute('style')).toContain(
+        '12ch'
+      );
+    });
+
+    it('keeps the auto layout when not windowed', () => {
+      renderSized({});
+      expect(screen.getByRole('table')).not.toHaveClass('table-fixed');
+    });
+
+    it('keeps the auto layout when no column sets a width', () => {
+      renderSized({ virtualize: true, cols: sortableColumns });
+      expect(screen.getByRole('table')).not.toHaveClass('table-fixed');
+    });
+
+    it('keeps the card layout free of fixed widths on a phone', () => {
+      const real = window.matchMedia;
+      window.matchMedia = ((media: string) =>
+        ({
+          media,
+          matches: media === PHONE_QUERY,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList) as typeof window.matchMedia;
+      try {
+        renderSized({ virtualize: true });
+        expect(screen.getByRole('table')).toHaveClass('dt-stacked');
+        expect(screen.getByRole('table')).not.toHaveClass('table-fixed');
+      } finally {
+        window.matchMedia = real;
+      }
+    });
+  });
+
   it('renders every row when not asked to virtualize', () => {
     render(
       <DataTable label="Offers" columns={sortableColumns} rows={many} rowKey={(row) => row.id} />

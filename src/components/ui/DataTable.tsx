@@ -60,6 +60,16 @@ export function DataTableDenseCell({ children }: { children: ReactNode }) {
  */
 export const VIRTUALIZE_THRESHOLD = 150;
 
+/** Least a width-less column of a fixed-layout table may squeeze to. */
+const GROW_COLUMN_MIN = 16;
+
+/** Table `min-width`: below it the wrapper scrolls sideways instead of squeezing columns. */
+function fixedLayoutMinWidth<T>(columns: readonly DataTableColumn<T>[]): string {
+  const sized = columns.flatMap((column) => (column.width ? [column.width] : []));
+  const grow = columns.length - sized.length;
+  return `calc(${[...sized, `${grow * GROW_COLUMN_MIN}ch`].join(' + ')})`;
+}
+
 /**
  * Dense table. Headers and cell content arrive already translated — no i18n
  * here. No empty branch — callers show `EmptyState` instead (docs/DESIGN.md
@@ -241,6 +251,10 @@ export function DataTable<T>({
     !grouping &&
     (virtualize === true || (virtualize === 'auto' && sortedRows.length > VIRTUALIZE_THRESHOLD));
   const expandable = expandableRow !== undefined;
+  // Fixed layout only where rows mount and unmount under the header (a
+  // windowed table) and only for a table that opted in with a width; a
+  // stacked card has no columns to fix.
+  const fixedLayout = windowed && !isStacked && columns.some((column) => column.width);
   // Rough per-layout heights; each mounted row is then measured, so these
   // only have to be close enough to size the rows not yet seen.
   const estimatedRowHeight =
@@ -404,8 +418,10 @@ export function DataTable<T>({
       // With most rows unmounted, AT would otherwise count only the window.
       // An open row's detail is a row too.
       aria-rowcount={windowed ? sortedRows.length + 1 + (expandedIndex >= 0 ? 1 : 0) : undefined}
+      style={fixedLayout ? { minWidth: fixedLayoutMinWidth(columns) } : undefined}
       className={cx(
         'w-full text-xs',
+        fixedLayout && 'table-fixed',
         responsive === 'stack' && 'dt-stack',
         isStacked && 'dt-stacked',
         responsive === 'stack' && !dense && stackColumns === 2 && 'dt-stack-2col',
@@ -419,6 +435,7 @@ export function DataTable<T>({
         sort={sort}
         density={density}
         isStacked={isStacked}
+        fixedLayout={fixedLayout}
         expandable={expandable}
         rowMoreActions={rowMoreActions}
         onToggleSort={toggleSort}
