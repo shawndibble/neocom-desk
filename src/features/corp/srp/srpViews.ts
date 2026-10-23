@@ -1,11 +1,10 @@
 import type { ComponentType } from 'react';
-import { MemberSrpView } from './MemberSrpView';
 import { SrpOfficerView } from './SrpOfficerView';
 import { SrpSettingsView } from './SrpSettingsView';
 import type { SrpTabId } from './srpTabs';
 
 /**
- * The views of `/corp/srp`, in tab order (issues #4851-#4853; epic #4608). One page, role-aware:
+ * The officer views of `/corp/srp`, in tab order (issues #4851-#4853; epic #4608).
  * `SrpPage` shows one visible view bare and several behind a tab bar. A view is a tab in
  * `srpTabs.ts` plus an entry here with its own `visible` rule. Hidden, never locked: a view that
  * is not `visible` is not listed.
@@ -28,13 +27,6 @@ export const SRP_VIEWS: readonly SrpView[] = [
     // Director or Accountant (the page's own gate) in an SRP corp; the server re-checks the roles
     // on every action. Where SRP is off, an officer goes straight to Settings to turn it on.
     visible: ({ canManageSrp, srpOn }) => canManageSrp && srpOn,
-  },
-  {
-    id: 'claims',
-    component: MemberSrpView,
-    // Anyone in an SRP corp, no Corp Access needed. Where SRP is off, an officer goes straight to
-    // Settings to turn it on; anyone else keeps this view, which says SRP is not set up.
-    visible: ({ canManageSrp, srpOn }) => srpOn || !canManageSrp,
   },
   {
     id: 'settings',

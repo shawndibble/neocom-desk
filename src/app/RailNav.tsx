@@ -263,7 +263,7 @@ const RailNavBody = memo(function RailNavBody({
   // level, not a second tree). The page you are on stays in its own group.
   const morePages = RAIL_GROUPS.flatMap((group) => group.pages).filter(
     (page) =>
-      isNavPageAvailable(page, corpVisible, capabilities, srpVisible) &&
+      isNavPageAvailable(page, corpVisible, capabilities) &&
       hidden.has(page.path) &&
       page.path !== current
   );
@@ -298,7 +298,7 @@ const RailNavBody = memo(function RailNavBody({
         {RAIL_GROUPS.map((group) => {
           const pages = group.pages.filter(
             (page) =>
-              isNavPageAvailable(page, corpVisible, capabilities, srpVisible) &&
+              isNavPageAvailable(page, corpVisible, capabilities) &&
               (editing || !hidden.has(page.path) || page.path === current)
           );
           // A heading over nothing would strand itself.

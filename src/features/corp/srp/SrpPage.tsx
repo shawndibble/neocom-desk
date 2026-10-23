@@ -6,10 +6,10 @@ import { SRP_TABS } from './srpTabs';
 import { SRP_VIEWS } from './srpViews';
 
 /**
- * `/corp/srp`'s body (issues #4851-#4853): the page header and the views `srpViews.ts` lists
- * for this pilot. One view renders bare; two or more get a tab bar (`SRP_TABS`, a path segment).
- * A tab the pilot has no view for (a stale link, or the bare path for a member) falls back to
- * the first they have.
+ * `/corp/srp`'s body (issues #4851-#4853): the page header and the officer views `srpViews.ts`
+ * lists for this pilot. One view renders bare; two or more get a tab bar (`SRP_TABS`, a path
+ * segment). A tab the pilot has no view for (a stale link, or Queue where SRP is off) falls back
+ * to the first they have.
  */
 export function SrpPage({ canManageSrp, srpOn }: { canManageSrp: boolean; srpOn: boolean }) {
   const { t } = useTranslation();

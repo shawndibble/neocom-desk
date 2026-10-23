@@ -121,6 +121,7 @@ const CorpMembers = lazy(routeChunks.loadCorpMembers);
 const CorpAssets = lazy(routeChunks.loadCorpAssets);
 const CorpMoons = lazy(routeChunks.loadCorpMoons);
 const CorpSrp = lazy(routeChunks.loadCorpSrp);
+const Srp = lazy(routeChunks.loadSrp);
 const CorpWallet = lazy(routeChunks.loadCorpWallet);
 const Market = lazy(routeChunks.loadMarket);
 const Wallet = lazy(routeChunks.loadWallet);
@@ -237,6 +238,7 @@ const ROUTE_ELEMENTS = {
   '/corp/assets': <CorpAssets />,
   '/corp/moons': <CorpMoons />,
   '/corp/srp': <CorpSrp />,
+  '/srp': <Srp />,
   '/corp/assets/*': <CorpAssets />,
   '/assets': <Assets />,
   '/mail': <Mail />,

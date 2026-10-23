@@ -120,7 +120,7 @@ export const DEFAULT_SHOWN_NAV: readonly string[] = [
   '/corp/wallet',
   '/corp/assets',
   '/corp/moons',
-  // Behind the pilot's corporation having SRP on, so no clutter for anyone else.
+  // Officer SRP: behind `canManageSrp`, so no clutter for anyone else.
   '/corp/srp',
 ];
 

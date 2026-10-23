@@ -93,10 +93,11 @@ export function MobileMoreSheet({
         locked: NO_LOCKS,
         corpVisible: true,
         corpCapabilities: ALL_CORP_VIEWS,
+        srpVisible,
         t,
         hiddenTabPaths,
       }),
-    [t, hiddenTabPaths]
+    [srpVisible, t, hiddenTabPaths]
   );
   const byPath = useMemo(
     () => new Map(destinations.map((destination) => [destination.path, destination])),
@@ -104,8 +105,8 @@ export function MobileMoreSheet({
   );
 
   const inSheet = (page: NavPage) =>
-    page.gating === 'corp' || page.gating === 'srp'
-      ? isNavPageAvailable(page, corpVisible, corpCapabilities, srpVisible)
+    page.gating === 'corp'
+      ? isNavPageAvailable(page, corpVisible, corpCapabilities)
       : page.path !== '/characters';
   const hiddenSet = new Set(hidden);
   const groups = SHEET_GROUPS.map((group) => ({

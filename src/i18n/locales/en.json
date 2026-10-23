@@ -47,6 +47,7 @@
     "clones": "Clones",
     "pi": "PI",
     "employmentHistory": "Employment",
+    "srp": "SRP",
     "assets": "Assets",
     "mail": "Mail",
     "calendar": "Calendar",
@@ -16249,7 +16250,6 @@
     "title": "SRP",
     "tabs": {
       "queue": "Queue",
-      "claims": "My claims",
       "settings": "Settings"
     },
     "officer": {

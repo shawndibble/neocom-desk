@@ -1,4 +1,4 @@
-/** Member view (`/corp/srp`'s "My claims" tab, headed by `SrpPage`): file by pasted link or by picking a lost ship, follow My claims. No Corp Access needed. */
+/** Member view (`/srp`, a sub-view of the Overview): file by pasted link or by picking a lost ship, follow My claims. No Corp Access needed. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Disclosure, EmptyState, LoadFailedState, Panel, Spinner, Toast } from '@/components/ui';

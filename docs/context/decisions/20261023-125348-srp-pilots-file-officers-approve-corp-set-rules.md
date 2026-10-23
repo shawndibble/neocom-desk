@@ -3,7 +3,7 @@
 _Recorded 2026-10-23 · issue #4608._
 
 - **Any pilot in the corp files; only the Character that died.** The filer must have been in the corporation when the ship died, and files within 30 days (corp-adjustable). One **SRP Claim** per killmail. A rejected claim may be re-filed once, with a note. Rules out filing for an alt or for another pilot's loss.
-- **Members need no corp grant.** A pilot signs in with EVE SSO and the app reads their corporation from public affiliation. The SRP nav item shows only when their corp has SRP on. Hidden, never locked.
+- **Members need no corp grant.** A pilot signs in with EVE SSO and the app reads their corporation from public affiliation. Their SRP is the SRP sub-view of the personal Overview (`/srp`, beside Clones and Employment), shown only when their corp has SRP on. Hidden, never locked. Officers work at `/corp/srp` (Queue, Settings).
 - **Filing is a pasted killmail link, or a pick from the pilot's lost ships.** The lost-ships list needs `esi-killmails.read_killmails.v1`, an opt-in grant the SRP page prompts for. Paste works without it. This is a deliberate exception to the standing preference against new opt-in scope groups, because the page asks at the point of need.
 - **The server verifies the killmail.** It fetches it from ESI, checks the victim and the corporation at the time, fills in hull, system and time, and rejects duplicates.
 - **Amount is worked out by a chain.** A fixed price for the hull (**Hull Rule**), else killmail value (zKillboard) × the corp's killmail percent, else Jita **Appraisal** × the corp's Appraisal percent, else the officer types it. Each hull or class is **Pay**, **Not covered** or **Officer decides**. The officer may override the amount on any claim, with a reason.

@@ -1,15 +1,37 @@
 /**
- * `/corp/srp` (issues #4851, #4852, epic #4608, ADR 0026): one role-aware page. No Corp Access
- * gate: a member of an SRP corporation files with no corp scope. Officer views (Settings, later
- * the queue) are listed by `features/corp/srp/srpViews.ts` for a pilot with `canManageSrp` and
- * check the server's verdict themselves.
+ * `/corp/srp` (issues #4851, #4853, epic #4608, ADR 0026): the officer's SRP, Queue and Settings,
+ * for a pilot with `canManageSrp` (`features/corp/srp/srpViews.ts`). A pilot's own claims are the
+ * Overview's SRP sub-view at `/srp` (`routes/Srp.tsx`); a pilot who is no officer and opens this
+ * path is sent there.
  */
+import { Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { PageHeader } from '@/components/ui';
+import { CorpDenied } from '@/features/corp/CorpDenied';
+import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
+import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { SrpPage } from '@/features/corp/srp/SrpPage';
 import { useSrpNavVisible } from '@/features/corp/srp/useSrpNavVisible';
-import { useCorpAccess } from '@/features/corp/useCorpAccess';
 
 export function CorpSrp() {
-  const { state, capabilities } = useCorpAccess();
+  const { t } = useTranslation();
+  const gate = useCorpRouteGate((capabilities) => capabilities.canManageSrp);
   const srpOn = useSrpNavVisible();
-  return <SrpPage canManageSrp={state === 'ready' && capabilities.canManageSrp} srpOn={srpOn} />;
+  if (gate.status === 'denied' && (gate.reason === 'none' || gate.reason === 'capability')) {
+    return <Navigate to="/srp" replace />;
+  }
+  const content =
+    gate.status === 'denied' ? (
+      <div className="mx-auto max-w-5xl space-y-4 px-4 py-4">
+        <PageHeader title={t('srp.title')} />
+        <CorpDenied
+          reason={gate.reason}
+          title={t('srp.officer.deniedTitle')}
+          hint={t('srp.officer.deniedHint')}
+        />
+      </div>
+    ) : gate.status === 'ready' ? (
+      <SrpPage canManageSrp srpOn={srpOn} />
+    ) : null;
+  return <CorpRolesGate gate={gate}>{content}</CorpRolesGate>;
 }

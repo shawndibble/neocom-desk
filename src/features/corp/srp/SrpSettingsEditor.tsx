@@ -104,7 +104,7 @@ export function SrpSettingsEditor({
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
   const reclaimRef = useRef<HTMLButtonElement>(null);
 
-  const link = `${window.location.origin}/corp/srp`;
+  const link = `${window.location.origin}/srp`;
   const problems = formProblems(form);
   const dirty = formIsDirty(form, settings);
   const patch = (p: Partial<SrpSettingsForm>) => setForm({ ...form, ...p });
