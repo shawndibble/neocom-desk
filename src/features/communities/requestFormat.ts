@@ -1,5 +1,5 @@
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
-import type { StandingRequest } from '@/engine/communities/buyback';
+import type { BuybackLine, StandingRequest } from '@/engine/communities/buyback';
 import type { CommunityRequest, RequestStatus } from '@/engine/communities/requests';
 import { TRADE_HUBS } from '@/market/hubs';
 
@@ -56,12 +56,14 @@ export const STATUS_TONE: Record<RequestStatus, string> = {
   expired: 'text-text-dim',
 };
 
+/** One buy line as a person reads it: an item's name, or a group's label ("All ore"). */
+export const buyLineLabel = (line: BuybackLine, t: Translate): string =>
+  line.kind === 'type' ? line.name : t(`communities.board.buyback.group.${line.group}`);
+
 /** What a Request asks for, as one headline: its first line, or for a buyback its first group or item. */
 export function requestHeadline(request: CommunityRequest, t: Translate): string {
   const names = request.standing
-    ? request.standing.buyLines.map((line) =>
-        line.kind === 'type' ? line.name : t(`communities.board.buyback.group.${line.group}`)
-      )
+    ? request.standing.buyLines.map((line) => buyLineLabel(line, t))
     : request.lines.map((line) => line.name);
   const more =
     names.length > 1 ? ` ${t('communities.board.more', { count: names.length - 1 })}` : '';

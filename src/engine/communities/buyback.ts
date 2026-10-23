@@ -13,11 +13,15 @@ export const MAX_RATE = 200;
 export const QUOTE_HOLD_MS = 14 * 24 * 60 * 60 * 1000;
 /** Priced lines one quote carries. */
 export const MAX_QUOTE_LINES = 50;
+/** Buy lines one standing Request holds: the callable's cap. */
+export const MAX_BUY_LINES = 50;
 
-export type RateBasis = 'buy' | 'sell';
+export const RATE_BASES = ['buy', 'sell'] as const;
+export type RateBasis = (typeof RATE_BASES)[number];
 
 /** The Trade Hubs a buyback may name: the ids of `src/market/hubs.ts`, which a parity test pins. */
-export type BuybackHubId = 'jita' | 'amarr' | 'dodixie' | 'rens' | 'hek';
+export const BUYBACK_HUB_IDS = ['jita', 'amarr', 'dodixie', 'rens', 'hek'] as const;
+export type BuybackHubId = (typeof BUYBACK_HUB_IDS)[number];
 
 /** A Rate is a percent in tenths, so 92.5 is allowed and 92.55 is not. */
 export function isValidRate(value: unknown): value is number {
@@ -28,6 +32,18 @@ export function isValidRate(value: unknown): value is number {
     value <= MAX_RATE &&
     Math.abs(value * 10 - Math.round(value * 10)) < 1e-9
   );
+}
+
+/**
+ * A rate as typed: "90", "92,5" or "92.5 %". Only digits, one optional decimal
+ * place and a percent sign; "1,000" or "9e1" is not a rate, so a typo never
+ * becomes a valid one.
+ */
+export function parseRate(text: string): number | null {
+  const match = /^(\d{1,3}(?:[.,]\d)?)\s*%?$/.exec(text.trim());
+  if (!match) return null;
+  const rate = Number(match[1].replace(',', '.'));
+  return isValidRate(rate) ? rate : null;
 }
 
 /** An item as a group sees it; null where the SDE group (or its category) is unknown. */
@@ -141,7 +157,8 @@ export function priceQuote(items: readonly QuoteInput[], ratePct: number): Price
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       // Rate is in tenths: work in whole numbers so 92.5% does not drift.
-      total: Math.floor((item.quantity * item.unitPrice * Math.round(ratePct * 10)) / 1000),
+      // The small epsilon keeps float error (100 * 4.35 = 434.99999999999994) from costing an ISK.
+      total: Math.floor((item.quantity * item.unitPrice * Math.round(ratePct * 10)) / 1000 + 1e-6),
     });
   }
   return { lines, total: lines.reduce((sum, line) => sum + line.total, 0), unpriced };

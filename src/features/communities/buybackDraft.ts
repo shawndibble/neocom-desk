@@ -4,8 +4,8 @@
  */
 import {
   BUYBACK_GROUP_KEYS,
-  MAX_QUOTE_LINES,
-  isValidRate,
+  MAX_BUY_LINES,
+  parseRate,
   type BuybackGroup,
   type BuybackHubId,
   type BuybackLine,
@@ -33,13 +33,10 @@ export const emptyBuybackDraft = (): BuybackDraft => ({
   types: [],
 });
 
-/** The most buy lines a draft may hold: the callable's cap. */
-export const MAX_BUY_LINES = MAX_QUOTE_LINES;
-
 /** The standing Request a draft describes, or null while the rate or the buy list is not valid. */
 export function draftToStanding(draft: BuybackDraft): StandingRequest | null {
-  const rate = Number(draft.rate.replace('%', '').replace(',', '.').trim());
-  if (draft.rate.trim() === '' || !isValidRate(rate)) return null;
+  const rate = parseRate(draft.rate);
+  if (rate === null) return null;
   const buyLines: BuybackLine[] = [
     // Group order follows the table, so the same ticks always make the same Request.
     ...BUYBACK_GROUP_KEYS.filter((g) => draft.groups.includes(g)).map((group): BuybackLine => ({

@@ -12,11 +12,11 @@ import { isRecord } from '../guards';
 import { parseLocalizedNumber } from '../numbers/parseLocalizedNumber';
 import { DAY_MS } from '@/lib/age';
 import {
+  BUYBACK_HUB_IDS,
+  RATE_BASES,
   isBuybackGroup,
   isValidRate,
-  type BuybackHubId,
   type BuybackLine,
-  type RateBasis,
   type StandingRequest,
 } from './buyback';
 
@@ -60,9 +60,6 @@ export interface CommunityRequest {
   standing?: StandingRequest;
 }
 
-const RATE_BASES: readonly RateBasis[] = ['buy', 'sell'];
-const HUB_IDS: readonly BuybackHubId[] = ['jita', 'amarr', 'dodixie', 'rens', 'hek'];
-
 function readBuyLine(raw: unknown): BuybackLine | null {
   if (!isRecord(raw)) return null;
   if (raw.kind === 'group')
@@ -77,7 +74,7 @@ function readBuyLine(raw: unknown): BuybackLine | null {
 export function readStanding(d: Record<string, unknown>): StandingRequest | undefined {
   if (d.standing !== true) return undefined;
   const basis = RATE_BASES.find((b) => b === d.rateBasis);
-  const hub = HUB_IDS.find((h) => h === d.hubId);
+  const hub = BUYBACK_HUB_IDS.find((h) => h === d.hubId);
   if (!isValidRate(d.rate) || !basis || !hub) return undefined;
   const buyLines = (Array.isArray(d.buyLines) ? d.buyLines : [])
     .map(readBuyLine)

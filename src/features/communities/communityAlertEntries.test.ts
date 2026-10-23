@@ -194,6 +194,26 @@ describe('loadCommunityAlertEntries: Pledges on my Requests', () => {
     expect(loadCommunityPledges).not.toHaveBeenCalled();
   });
 
+  it('raises no Pledge alert for a standing buyback: it takes quotes, not Pledges', async () => {
+    await rememberCommunityWatch(CHARACTER, [member()]);
+    vi.mocked(loadMyCommunities).mockResolvedValue([member()]);
+    vi.mocked(loadMyRequests).mockResolvedValue([
+      request({
+        lines: [],
+        expiresAt: 0,
+        standing: {
+          rate: 90,
+          rateBasis: 'buy',
+          hubId: 'jita',
+          buyerCharacterId: null,
+          buyLines: [{ kind: 'group', group: 'ore' }],
+        },
+      }),
+    ]);
+    expect(await loadCommunityAlertEntries(CHARACTER)).toEqual([]);
+    expect(loadCommunityPledges).not.toHaveBeenCalled();
+  });
+
   it('reads the roster once for names it has not seen, and falls back to no name when that fails', async () => {
     await rememberCommunityWatch(CHARACTER, [member()]);
     vi.mocked(loadMyCommunities).mockResolvedValue([member({ id: 'c9' })]);

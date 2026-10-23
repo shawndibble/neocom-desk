@@ -36,7 +36,8 @@ import { MAX_REQUEST_MAILS_PER_DAY } from '@/engine/communities/requests';
 import { notePledgeEdit } from './pledgeWrites';
 import { DELIVERY_ENDPOINTS, slotKey } from './requestDelivery';
 import { useDeliverySync } from './useDeliverySync';
-import { describeExpiry, requestHeadline, standingRateLine } from './requestFormat';
+import { buybackLineKey } from '@/engine/communities/buyback';
+import { buyLineLabel, describeExpiry, requestHeadline, standingRateLine } from './requestFormat';
 import {
   extendRequest,
   removePledge,
@@ -270,52 +271,50 @@ export function RequestPanel({
             </p>
             <ul aria-label={t('communities.board.buyback.buysLabel')} className="text-xs">
               {request.standing.buyLines.map((line) => (
-                <li key={line.kind === 'type' ? `t${line.typeId}` : `g${line.group}`}>
-                  {line.kind === 'type'
-                    ? line.name
-                    : t(`communities.board.buyback.group.${line.group}`)}
-                </li>
+                <li key={buybackLineKey(line)}>{buyLineLabel(line, t)}</li>
               ))}
             </ul>
           </section>
         )}
-        <ul className="divide-y divide-line" aria-label={t('communities.board.linesLabel')}>
-          {request.lines.map((line, index) => {
-            const own = myPledge?.lines[index];
-            const key = lineKey(line);
-            return (
-              <PledgeRow
-                key={key}
-                line={line}
-                spec={lineSpec(line, t)}
-                progress={lineProgress(index, line, pledges)}
-                own={own}
-                stale={own !== undefined && isStalePledge(own, myPledge?.updatedAt ?? 0, now)}
-                canPledge={mayPledge}
-                busy={pledgeBusy === key}
-                onPledge={(quantity) =>
-                  void changePledge(key, (lines) => withPledgeLine(lines, index, quantity), {
-                    mail: true,
-                  })
-                }
-                onWithdraw={() =>
-                  void changePledge(key, (lines) => withdrawPledgeLine(lines, index))
-                }
-                flags={delivery?.flags.get(slotKey(request.id, index))}
-                manualEntry={mayPledge}
-                onSaveDelivered={(amount) =>
-                  // A cleared amount falls back to contracts: run the sync again after saving.
-                  void changePledge(key, (lines) => {
-                    const stored = lines[index];
-                    return stored
-                      ? { ...lines, [index]: pledgeEntryAfterManual(stored, amount) }
-                      : lines;
-                  }).then(() => setSyncTick((n) => n + 1))
-                }
-              />
-            );
-          })}
-        </ul>
+        {request.lines.length > 0 && (
+          <ul className="divide-y divide-line" aria-label={t('communities.board.linesLabel')}>
+            {request.lines.map((line, index) => {
+              const own = myPledge?.lines[index];
+              const key = lineKey(line);
+              return (
+                <PledgeRow
+                  key={key}
+                  line={line}
+                  spec={lineSpec(line, t)}
+                  progress={lineProgress(index, line, pledges)}
+                  own={own}
+                  stale={own !== undefined && isStalePledge(own, myPledge?.updatedAt ?? 0, now)}
+                  canPledge={mayPledge}
+                  busy={pledgeBusy === key}
+                  onPledge={(quantity) =>
+                    void changePledge(key, (lines) => withPledgeLine(lines, index, quantity), {
+                      mail: true,
+                    })
+                  }
+                  onWithdraw={() =>
+                    void changePledge(key, (lines) => withdrawPledgeLine(lines, index))
+                  }
+                  flags={delivery?.flags.get(slotKey(request.id, index))}
+                  manualEntry={mayPledge}
+                  onSaveDelivered={(amount) =>
+                    // A cleared amount falls back to contracts: run the sync again after saving.
+                    void changePledge(key, (lines) => {
+                      const stored = lines[index];
+                      return stored
+                        ? { ...lines, [index]: pledgeEntryAfterManual(stored, amount) }
+                        : lines;
+                    }).then(() => setSyncTick((n) => n + 1))
+                  }
+                />
+              );
+            })}
+          </ul>
+        )}
         {mayPledge && (
           <p className="text-xs text-text-dim">
             {t('communities.board.deliveryNote', { name: request.ownerName })}

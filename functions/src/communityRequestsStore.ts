@@ -377,6 +377,7 @@ export async function reservePledgeMail(
         {
           closed: request.get('closed') === true,
           expiresAt: Number(request.get('expiresAt') ?? 0),
+          standing: request.get('standing') === true,
         },
         now
       ),

@@ -9,3 +9,4 @@ _Recorded 2026-10-23 · issue #4780._
 - **A second paste replaces the held quote.** One quote per Member per Request: no stale quote, nothing to choose between.
 - **A quote is held 14 days.** Buyers sit on a contract for days, so the 30-day Request clock and the 14-day Pledge-stale rule are both the wrong length. 14 days is the stored `expiresAt - quotedAt`.
 - **Rate is a percent in tenths, 1 to 200.** 92.5 is allowed, 92.55 is not. Over 100 covers a buyer who pays above hub.
+- **A named buyer is checked for membership, not ownership.** The server cannot tell which Characters one person owns, so it only requires the buyer to be a Member. A Member can name another Member as buyer; sellers see "Contracts to <name>" and that Member can ignore the contracts. Accepted for v1: the picker offers only the poster's own Characters.

@@ -10079,7 +10079,6 @@
         "needsPermission": "{{name}} asked for a mail when you Pledge. Sending it needs the Send mail Permission."
       },
       "buyback": {
-        "new": "New buyback…",
         "title": "New buyback",
         "editTitle": "Edit buyback",
         "toggle": "Standing buyback",

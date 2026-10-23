@@ -3,7 +3,11 @@ import {
   BUYBACK_GROUPS,
   QUOTE_HOLD_MS,
   buybackLineCovers,
+  MAX_BUY_LINES,
   isValidRate,
+  parseRate,
+  RATE_BASES,
+  BUYBACK_HUB_IDS,
   priceQuote,
   quoteExpiry,
   quoteIsHeld,
@@ -101,5 +105,34 @@ describe('the 14-day hold', () => {
     const quote = { quotedAt: 0, expiresAt: QUOTE_HOLD_MS };
     expect(quoteIsHeld(quote, QUOTE_HOLD_MS - 1)).toBe(true);
     expect(quoteIsHeld(quote, QUOTE_HOLD_MS)).toBe(false);
+  });
+});
+
+describe('parseRate', () => {
+  it('reads a plain, decimal-comma or percent-signed rate', () => {
+    expect(parseRate('90')).toBe(90);
+    expect(parseRate('92,5')).toBe(92.5);
+    expect(parseRate(' 92.5 % ')).toBe(92.5);
+  });
+  it('refuses what is not a plain rate: thousands separators, exponents, hex, hundredths', () => {
+    for (const text of ['', '1,000', '9e1', '0x5A', '90.55', '0', '201', 'abc', '-5']) {
+      expect(parseRate(text)).toBeNull();
+    }
+  });
+});
+
+describe('priceQuote float safety', () => {
+  it('does not lose an ISK to float error', () => {
+    // 100 * 4.35 is 434.99999999999994 in floating point.
+    const quote = priceQuote([{ typeId: 1, name: 'A', quantity: 100, unitPrice: 4.35 }], 100);
+    expect(quote.total).toBe(435);
+  });
+});
+
+describe('shared lists', () => {
+  it('names the two bases, five hubs and the 50-line cap the callable mirrors', () => {
+    expect([...RATE_BASES]).toEqual(['buy', 'sell']);
+    expect([...BUYBACK_HUB_IDS]).toEqual(['jita', 'amarr', 'dodixie', 'rens', 'hek']);
+    expect(MAX_BUY_LINES).toBe(50);
   });
 });

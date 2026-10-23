@@ -10,7 +10,7 @@ import {
 } from '@/components/ui';
 import {
   BUYBACK_GROUP_KEYS,
-  isValidRate,
+  parseRate,
   type BuybackHubId,
   type RateBasis,
 } from '@/engine/communities/buyback';
@@ -50,8 +50,7 @@ export function BuybackFields({
   const { t } = useTranslation();
   const rateErrorId = useId();
   const [search, setSearch] = useState('');
-  const rateText = draft.rate.replace('%', '').replace(',', '.').trim();
-  const rateValid = rateText !== '' && isValidRate(Number(rateText));
+  const rateValid = parseRate(draft.rate) !== null;
 
   const results = useMemo(() => {
     const needle = needleOf(search);

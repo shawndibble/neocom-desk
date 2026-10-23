@@ -543,7 +543,8 @@ export function ComposeRequestDialog({
             )}
           </>
         )}
-        <RequestNotifyChoice value={notify} onChange={setNotify} />
+        {/* A standing Request takes quotes, not Pledges, so there is nothing to be told about. */}
+        {!standingMode && <RequestNotifyChoice value={notify} onChange={setNotify} />}
         {error && (
           <p role="alert" className="text-xs text-danger">
             {error}
