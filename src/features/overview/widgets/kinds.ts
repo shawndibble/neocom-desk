@@ -501,7 +501,15 @@ const SPECS: Record<string, Spec> = {
     size: 'M',
     endpoints: ['getCorporationAssets'],
   },
-  corpSrp: { corp: 'corpOps', views: NT, view: 'table', size: 'M', soon: true, endpoints: [] },
+  // Firestore under the officer rules, not ESI: gated on the SRP officer capability, hidden without it.
+  corpSrp: {
+    corp: 'corpOps',
+    capabilities: ['canManageSrp'],
+    views: NT,
+    view: 'table',
+    size: 'M',
+    endpoints: [],
+  },
 };
 
 export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(SPECS).map(([id, s]) => ({
