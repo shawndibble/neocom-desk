@@ -83,6 +83,21 @@ function codeTag(error: object): Record<string, string> | undefined {
 }
 
 /**
+ * `beforeSend`'s other half: an error that reaches Sentry by the global handlers
+ * (an unhandled rejection, an error boundary) rather than `reportFailure` still
+ * carries the tags its thrower put on it. The event's own tags win.
+ */
+export function tagAnnotatedEvent<E extends { tags?: Record<string, unknown> }>(
+  event: E,
+  original: unknown
+): E {
+  const annotated =
+    typeof original === 'object' && original !== null ? annotations.get(original) : undefined;
+  if (!annotated) return event;
+  return { ...event, tags: { ...annotated, ...event.tags } };
+}
+
+/**
  * Report an unexpected sync/esi/auth/backup failure to Sentry. Skips network
  * failures, dead SSO grants and repeats of a message already sent this window.
  * The message and stack go through `scrubEvent` (`beforeSend`); only the subsystem is tagged —

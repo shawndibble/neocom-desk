@@ -71,8 +71,9 @@ const reportError = reactErrorHandler();
 function releaseAndReport(...args: Parameters<typeof reportError>) {
   releaseLandingShell();
   if (!isRouteChunkFailure(args[0])) return reportError(...args);
-  // A lone failed chunk is usually the visitor's network or a blocker; a burst
-  // after a deploy is a broken release, which a Sentry alert on this tag counts.
+  // A failed chunk is usually the visitor's network or a blocker, so it is a
+  // warning; a burst after a deploy is a broken release, which a Sentry alert
+  // on this tag counts. `reportError` captures synchronously, inside the scope.
   withScope((scope) => {
     scope.setLevel('warning');
     scope.setTag('chunk_load', 'failed');
