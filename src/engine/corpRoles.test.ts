@@ -39,7 +39,12 @@ describe('corpCapabilities', () => {
   // GET /corporations/{id}/wallets (+ journal, transactions) declares
   // x-required-roles ["Accountant", "Junior_Accountant"] — either one alone.
   it('grants wallet and mining-ledger access to an Accountant', () => {
-    expect(held(['Accountant'])).toEqual(['canReadWallet', 'canReadMiningLedger', 'canReadOrders']);
+    expect(held(['Accountant'])).toEqual([
+      'canReadWallet',
+      'canReadMiningLedger',
+      'canReadOrders',
+      'canManageSrp',
+    ]);
   });
 
   // GET /corporations/{id}/orders declares x-required-roles ["Accountant", "Trader"].
@@ -130,6 +135,13 @@ describe('corpCapabilities', () => {
     expect(corpCapabilities(['Director']).canReadRoleAudit).toBe(true);
   });
 
+  it('opens SRP management to an Accountant or a Director, not a Junior_Accountant (#4848)', () => {
+    expect(corpCapabilities(['Accountant']).canManageSrp).toBe(true);
+    expect(corpCapabilities(['Director']).canManageSrp).toBe(true);
+    expect(corpCapabilities(['Junior_Accountant']).canManageSrp).toBe(false);
+    expect(corpCapabilities(['Station_Manager']).canManageSrp).toBe(false);
+  });
+
   it('opens the starbase reads to a Director alone', () => {
     expect(corpCapabilities(['Station_Manager']).canReadStarbases).toBe(false);
     expect(corpCapabilities(['Director']).canReadStarbases).toBe(true);
@@ -161,6 +173,7 @@ describe('corpCapabilities', () => {
       'canReadMiningLedger',
       'canReadIndustry',
       'canReadOrders',
+      'canManageSrp',
     ]);
   });
 

@@ -152,6 +152,16 @@ import {
   verifyOfficer,
   type BookDeps,
 } from './corpTaxBookStore.js';
+import { parseSrpSettingsPatch } from './srp.js';
+import {
+  getSrpStatus,
+  reclaimSrp,
+  saveSrpSettings,
+  turnOffSrp,
+  turnOnSrp,
+  verifySrpOfficer,
+  type SrpDeps,
+} from './srpStore.js';
 import {
   parseCommunityIdInput,
   parseCreateInput,
@@ -1085,6 +1095,56 @@ export const editCorpTaxBookCallable = corpTaxBookCallable(
       parseBookCall(request.data),
       parseEditAction(request.data)
     )
+);
+
+// SRP (issue #4848, ADR 0026): data under corps/{id}, written only by these callables. Served by
+// the Corp Tax Book router (one more deployed function would add a quota hit for nothing).
+const srpDeps = (): SrpDeps => ({
+  ...corpTaxBookDeps(),
+  lookupCorporation: esiCorporationLookup(),
+});
+
+export const verifySrpOfficerCallable = corpTaxBookCallable(
+  'verifySrpOfficerCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => verifySrpOfficer(srpDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+// A member (no corp role, no corp scope): is SRP on for my corporation, and what are its rules.
+export const getSrpStatusCallable = corpTaxBookCallable(
+  'getSrpStatusCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => getSrpStatus(srpDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+export const turnOnSrpCallable = corpTaxBookCallable(
+  'turnOnSrpCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => turnOnSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+export const turnOffSrpCallable = corpTaxBookCallable(
+  'turnOffSrpCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => turnOffSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+export const saveSrpSettingsCallable = corpTaxBookCallable(
+  'saveSrpSettingsCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    saveSrpSettings(
+      srpDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseSrpSettingsPatch((request.data as { settings?: unknown } | null)?.settings)
+    )
+);
+
+export const reclaimSrpCallable = corpTaxBookCallable(
+  'reclaimSrpCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => reclaimSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 // A player claims their own Unmatched donation (D5): uid-authorised, no officer role.

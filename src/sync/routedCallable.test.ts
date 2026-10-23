@@ -14,6 +14,8 @@ describe('routerFor', () => {
     ['reclaimCorpTaxBookCallable', 'corpTaxBookCall'],
     ['setCorpTaxBookFeederRateCallable', 'corpTaxBookCall'],
     ['verifyCorpOfficerCallable', 'corpTaxBookCall'],
+    ['turnOnSrpCallable', 'corpTaxBookCall'],
+    ['getSrpStatusCallable', 'corpTaxBookCall'],
     ['registerDevice', 'alertsCall'],
     ['saveAlertGrant', 'alertsCall'],
     ['deleteAlertGrant', 'alertsCall'],
