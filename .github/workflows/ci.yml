@@ -317,6 +317,9 @@ jobs:
         run: |
           mapfile -t specs < <(node scripts/e2e-shard.mjs --shard ${{ matrix.shard }}/${{ strategy.job-total }})
           if [ "${#specs[@]}" -eq 0 ]; then echo "no specs in this shard"; exit 0; fi
+          # The Vite dev server only serves the `*.dev.spec.ts` files; skip
+          # booting it on a shard that has none (see playwright.config.ts).
+          if printf '%s\n' "${specs[@]}" | grep -q '\.dev\.spec\.ts$'; then export E2E_NEEDS_DEV=1; fi
           npx playwright test "${specs[@]}"
         env:
           VITE_EVE_CLIENT_ID: e2e-fake-client
