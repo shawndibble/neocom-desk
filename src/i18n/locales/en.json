@@ -5501,6 +5501,17 @@
       "added": "Added",
       "noMatchHint": "Try another word, or clear the search to see every widget.",
       "clearSearch": "Clear search",
+      "browseAll": "Browse all",
+      "quickAdd": "Quick add",
+      "done": "Done",
+      "featured": "Featured",
+      "notOnBoard": "Not on your board",
+      "density": "Layout",
+      "densityGrid": "Grid",
+      "densityList": "List",
+      "allOnBoard": "Every widget here is already on your board",
+      "allOnBoardHint": "Show all widgets to add another of any of them.",
+      "showAll": "Show all widgets",
       "samples": {
         "training": {
           "note": "Advanced Industry V · 4 skills queued",
