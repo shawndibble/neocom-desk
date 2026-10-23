@@ -1369,6 +1369,11 @@ export function PlanEditor({
               label: t('plans.addMarker'),
               onClick: handleAddMarker,
             })}
+            {toolAction({
+              icon: <Icon.Ships size={Icon.ICON_SIZE.sm} />,
+              label: t('plans.fitGoal.add'),
+              onClick: () => setFitGoalOpen(true),
+            })}
             {markerConfirm && confirmation(t('plans.markerAdded'))}
             {/* Standing, not a post-click toast: the moment the plan carries
                 a Remap Marker, what it saves is a fact about the plan, and
@@ -1434,12 +1439,8 @@ export function PlanEditor({
             implantBonuses={implants}
             boosterBonus={acceleratorBonusOf(attributeBaseline)}
             dense
+            short
           />
-          {/* Says which half of this section is fact. An earlier draft read
-              "every estimate on this page is costed against these", which is
-              false the moment the lens leaves "current" — the estimates are
-              costed against the lens, not against the chips. */}
-          <p className="text-[0.6875rem] text-text-dim">{t('plans.attributesCurrentNote')}</p>
           {/* An impossible sheet is reported, never quietly approximated: the
               scheduler below is running on the placeholder spread, and a
               number presented without that caveat is the bug this fixes. */}
@@ -1696,11 +1697,6 @@ export function PlanEditor({
           {/* Plan Milestones (GLOSSARY.md) whose entry was removed from the plan
             entirely — no row exists to flag any more, so they surface here
             instead of vanishing silently. */}
-          <div>
-            <Button size="sm" onClick={() => setFitGoalOpen(true)}>
-              {t('plans.fitGoal.add')}
-            </Button>
-          </div>
           {orphanedMilestones.length > 0 && (
             <div className="flex flex-wrap gap-2 text-xs">
               {orphanedMilestones.map((status) => (

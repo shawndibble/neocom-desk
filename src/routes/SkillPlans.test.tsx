@@ -734,7 +734,7 @@ describe('SkillPlans editor: the same attributes, on the route they are costed o
 
     const section = toolsSection('Attributes');
     expect(await within(section).findByText('24')).toBeInTheDocument();
-    expect(within(section).getByText('Intelligence')).toBeInTheDocument();
+    expect(within(section).getByText('INT')).toBeInTheDocument();
     expect(within(section).getByText('25')).toBeInTheDocument();
     expect(section.querySelector('time')).not.toBeNull();
     // The what-if lens is not in this section: it sits in the closed Assumptions row.

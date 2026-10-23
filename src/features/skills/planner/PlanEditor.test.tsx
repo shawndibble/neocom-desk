@@ -324,7 +324,7 @@ describe('PlanEditor tools pane', () => {
 
     // Attributes: the sheet every estimate is costed against, then the two
     // what-if lenses over it — which change the numbers, not the plan.
-    expect(within(attributesSection).getByText('Intelligence')).toBeInTheDocument();
+    expect(within(attributesSection).getByText('INT')).toBeInTheDocument();
     // The lenses live one level in, under the closed-by-default Assumptions
     // row, not in the Attributes section.
     expect(within(attributesSection).queryByLabelText('What-if implants')).toBeNull();
@@ -1263,17 +1263,13 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
     await openTools(user);
 
     const section = sectionFor('Attributes');
-    expect(within(section).getByText('Intelligence')).toBeInTheDocument();
+    expect(within(section).getByText('INT')).toBeInTheDocument();
     expect(within(section).getByText('24')).toBeInTheDocument();
     expect(within(section).getByText('25')).toBeInTheDocument();
     // `attributes` (what computeSchedule runs on) is all 20s here, and falls
     // back to placeholder numbers when ESI can't be read — presenting it as
     // the character's own sheet is exactly the mistake to avoid.
     expect(within(section).queryByText('20')).toBeNull();
-    // The caption naming which half of the section is fact. Asserted on the
-    // rendered text, not the key: a mistyped key renders as its own name and
-    // nothing else in the gate — `tsc` included — can see that.
-    expect(within(section).getByText(/current sheet/i)).toBeInTheDocument();
   });
 
   it('dates the attributes, as every ESI-derived view must', async () => {
@@ -1316,7 +1312,7 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
 
     const section = sectionFor('Attributes');
     expect(within(section).getByText('—')).toBeInTheDocument();
-    expect(within(section).queryByText('Intelligence')).toBeNull();
+    expect(within(section).queryByText('INT')).toBeNull();
     expect(section.querySelector('time')).toBeNull();
   });
 
@@ -1340,7 +1336,7 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
     // No second always-open block above the entry list — the plan still leads
     // the page, and the attributes cost the same one tap as every other tool.
     expect(screen.queryByRole('heading', { name: 'Attributes' })).toBeNull();
-    expect(screen.queryByText('Intelligence')).toBeNull();
+    expect(screen.queryByText('INT')).toBeNull();
   });
 
   it('shows them in the sidebar with no interaction at `lg`+, beside the lens that reinterprets them', () => {
