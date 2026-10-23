@@ -86,7 +86,7 @@ const START = day(40);
 const STATEMENT_DAYS = [12, 11, 10, 9, 8]; // billed on the issued Statement
 const OPEN_DAYS = [7, 6, 5, 4, 3, 2, 1]; // still Billable
 
-const book = db.collection('corpTaxBooks').doc(String(CORP));
+const book = db.collection('corps').doc(String(CORP));
 const sub = (name) => book.collection(name);
 const writes = []; // [ref, data]
 const put = (ref, data) => writes.push([ref, data]);

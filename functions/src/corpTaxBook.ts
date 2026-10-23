@@ -4,7 +4,7 @@
 // and the wiring is in index.ts.
 //
 // Firestore layout (rules in firestore.rules; every write is a callable):
-//   corpTaxBooks/{corporationId}                settings: start date, hub, Ore Form, rates, grace,
+//   corps/{corporationId}                settings: start date, hub, Ore Form, rates, grace,
 //                                               minimum Statement, divisions, lastSync
 //     officers/{uid}                            officer access record (24h) written by verifyOfficer
 //     observed/{char_type_date_structure}       Observed Mining Entry rows, upserted monotonically
@@ -21,7 +21,8 @@ import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, docId, record } from './communities.js';
 import { BOOK_DEFAULTS, type ForfeitBasis } from './corpTaxBookEngine.js';
 
-export const BOOKS_COLLECTION = 'corpTaxBooks';
+/** The Tax Book lives under the `corps/{id}` umbrella (issue #4858, ADR 0026). */
+export const BOOKS_COLLECTION = 'corps';
 export const TOKENS_COLLECTION = 'corpTaxBookTokens';
 
 /**
@@ -46,7 +47,7 @@ export const MINERS = 'miners';
 export const META = 'meta';
 export const PAID_DOC = 'paid';
 export const AUDIT = 'audit';
-/** `corpTaxBooks/{collector}/feeders/{feederCorp}`: a feeder's record (issue #4507). */
+/** `corps/{collector}/feeders/{feederCorp}`: a feeder's record (issue #4507). */
 export const FEEDERS = 'feeders';
 /** `corpTaxBookFeederInvites/{sha256(code)}`: invite links, function-only. */
 export const FEEDER_INVITES_COLLECTION = 'corpTaxBookFeederInvites';
@@ -66,7 +67,7 @@ export const FEEDER_PREVIOUS_COLLECTION = 'corpTaxBookFeederPrevious';
  * hash is stored. Function-only: a client never reads it.
  */
 export const REMOVAL_LINKS_COLLECTION = 'corpTaxBookRemovalLinks';
-/** `corpTaxBooks/{collector}/feederViews/{feederCorp}`: the moon owner's read model (issue #4512). */
+/** `corps/{collector}/feederViews/{feederCorp}`: the moon owner's read model (issue #4512). */
 export const FEEDER_VIEWS = 'feederViews';
 /**
  * `corpTaxBookBilledBy/{char:id}`: which books bill a Character, `books[collectorCorp]`
@@ -109,7 +110,7 @@ export function decideRoles(roles: readonly string[], isCeo: boolean): OfficerRo
   };
 }
 
-/** `corpTaxBooks/{corp}/officers/{uid}`. */
+/** `corps/{corp}/officers/{uid}`. */
 export interface OfficerAccess extends OfficerRoles {
   characterId: number;
   characterName: string;

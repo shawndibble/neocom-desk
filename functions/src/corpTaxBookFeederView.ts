@@ -1,5 +1,5 @@
 // The feeder view (issue #4512, spec #4504): the read model a moon owner sees, written by the
-// server only. Layout, all under `corpTaxBooks/{collector}/feederViews/{feederCorp}`:
+// server only. Layout, all under `corps/{collector}/feederViews/{feederCorp}`:
 //
 //   (doc)              FeederViewSummary
 //   days/{date}        FeederViewDay: one covered UTC day
@@ -40,7 +40,7 @@ import { bookRef, feederRef, type BookDeps, type OpenPricesReader } from './corp
 // --- Stored shapes -----------------------------------------------------------
 
 /**
- * `corpTaxBooks/{collector}/feederCoverage/{feederCorp}` (issue #4622): what a miner's personal
+ * `corps/{collector}/feederCoverage/{feederCorp}` (issue #4622): what a miner's personal
  * tab needs of a moon owner, readable by the miners the book bills. Coverage periods and the
  * read clock only: never the payee, rates, notes or the moon owner's name.
  */

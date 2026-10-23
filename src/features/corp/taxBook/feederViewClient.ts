@@ -1,6 +1,6 @@
 /**
  * The moon owner's read model, client side (#4512, spec #4504). The server
- * writes `corpTaxBooks/{collector}/feederViews/{feeder}/…`; the client reads it
+ * writes `corps/{collector}/feederViews/{feeder}/…`; the client reads it
  * under the viewer access record (`getFeederViewAccess`) and changes nothing
  * but through the callables. It holds no miner debts, statements, miner rate or
  * margin. Player-facing text never says feeder or Collector.
@@ -217,7 +217,7 @@ export async function readFeederView(
 ): Promise<FeederView | null> {
   const base = [
     getSyncFirestore(),
-    'corpTaxBooks',
+    'corps',
     String(collectorCorporationId),
     'feederViews',
   ] as const;

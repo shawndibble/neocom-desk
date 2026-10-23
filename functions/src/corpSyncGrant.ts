@@ -4,7 +4,7 @@
 // One holder per corporation, so the grant doc is keyed by corporation id:
 //
 //   corpTaxBookSyncGrants/{corporationId}        function-only (firestore.rules): the encrypted token
-//   corpTaxBooks/{corp}/meta/scheduledSync       what officers may see: holder, status, why it
+//   corps/{corp}/meta/scheduledSync       what officers may see: holder, status, why it
 //                                                stopped, the last run. No token, ever.
 //
 // A grant exists only while the schedule is active. When it stops (role lost,
@@ -86,7 +86,7 @@ export interface CorpSyncGrantDoc {
   readsStructures?: boolean;
 }
 
-/** `corpTaxBooks/{corp}/meta/scheduledSync`: officers read this, nobody writes it but the functions. */
+/** `corps/{corp}/meta/scheduledSync`: officers read this, nobody writes it but the functions. */
 export interface ScheduledSyncStatus {
   status: 'active' | 'stopped';
   characterId: number;

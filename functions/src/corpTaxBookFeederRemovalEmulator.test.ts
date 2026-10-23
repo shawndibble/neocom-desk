@@ -127,7 +127,7 @@ const who = (id: number): Caller => ({ uid: `char:${id}`, ownerHash: `h${id}` })
 const tok = (id: number) => `tok-${id}`;
 const call = (id: number) => ({ corporationId: COLLECTOR, accessToken: tok(id) });
 const target = (id: number) => ({ ...call(id), feederCorporationId: FEEDER });
-const collectorBook = () => db.collection('corpTaxBooks').doc(String(COLLECTOR));
+const collectorBook = () => db.collection('corps').doc(String(COLLECTOR));
 const record = async () =>
   (await collectorBook().collection('feeders').doc(String(FEEDER)).get()).data() as
     FeederRecord | undefined;

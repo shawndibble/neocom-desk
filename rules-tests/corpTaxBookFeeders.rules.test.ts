@@ -11,7 +11,7 @@ import { characterAuth, createRulesEnv } from './testEnv';
 // or a feeder pointer. An officer may read the feeder records; nobody reads the other two.
 let env: RulesTestEnvironment;
 const OFFICER = 1;
-const RECORD = 'corpTaxBooks/98000001/feeders/98000002';
+const RECORD = 'corps/98000001/feeders/98000002';
 const PAYOUT = `${RECORD}/payouts/p1`;
 const INVITE = 'corpTaxBookFeederInvites/abc';
 const POINTER = 'corpTaxBookFeederOf/98000002';
@@ -32,7 +32,7 @@ beforeEach(async () => {
     await setDoc(doc(db, INVITE), { collectorCorporationId: 98000001 });
     await setDoc(doc(db, POINTER), { collectorCorporationId: 98000001 });
     await setDoc(doc(db, REMOVAL_LINK), { collectorCorporationId: 98000001 });
-    await setDoc(doc(db, `corpTaxBooks/98000001/officers/char:${OFFICER}`), {
+    await setDoc(doc(db, `corps/98000001/officers/char:${OFFICER}`), {
       ownerHash: 'h',
       corporationId: 98000001,
       canView: true,
@@ -101,8 +101,8 @@ describe('moon owner view', () => {
   const MOON_OWNER = 5;
   const FEEDER = 98000002;
   const OTHER_FEEDER = 98000003;
-  const VIEW = `corpTaxBooks/98000001/feederViews/${FEEDER}`;
-  const OTHER_VIEW = `corpTaxBooks/98000001/feederViews/${OTHER_FEEDER}`;
+  const VIEW = `corps/98000001/feederViews/${FEEDER}`;
+  const OTHER_VIEW = `corps/98000001/feederViews/${OTHER_FEEDER}`;
   const viewer = (over: Record<string, unknown> = {}) => ({
     uid: `char:${MOON_OWNER}`,
     characterId: MOON_OWNER,
@@ -127,11 +127,11 @@ describe('moon owner view', () => {
       await setDoc(doc(db, 'corpTaxBookFeederPrevious/98000002'), {
         collectorCorporationId: 98000001,
       });
-      await setDoc(doc(db, 'corpTaxBooks/98000001/observed/row'), { uid: 'char:900' });
-      await setDoc(doc(db, 'corpTaxBooks/98000001/miners/900'), { uids: ['char:900'] });
-      await setDoc(doc(db, 'corpTaxBooks/98000001/statements/s1'), { uids: ['char:900'] });
-      await setDoc(doc(db, 'corpTaxBooks/98000001/audit/a1'), { action: 'x' });
-      await setDoc(doc(db, 'corpTaxBooks/98000001/meta/rates'), { x: 1 });
+      await setDoc(doc(db, 'corps/98000001/observed/row'), { uid: 'char:900' });
+      await setDoc(doc(db, 'corps/98000001/miners/900'), { uids: ['char:900'] });
+      await setDoc(doc(db, 'corps/98000001/statements/s1'), { uids: ['char:900'] });
+      await setDoc(doc(db, 'corps/98000001/audit/a1'), { action: 'x' });
+      await setDoc(doc(db, 'corps/98000001/meta/rates'), { x: 1 });
       if (access) await setDoc(doc(db, `${VIEW}/viewers/char:${MOON_OWNER}`), access);
     });
   }
@@ -151,21 +151,21 @@ describe('moon owner view', () => {
     await seed();
     const db = owner();
     for (const path of [
-      'corpTaxBooks/98000001/observed/row',
-      'corpTaxBooks/98000001/miners/900',
-      'corpTaxBooks/98000001/statements/s1',
-      'corpTaxBooks/98000001/audit/a1',
-      'corpTaxBooks/98000001/meta/rates',
+      'corps/98000001/observed/row',
+      'corps/98000001/miners/900',
+      'corps/98000001/statements/s1',
+      'corps/98000001/audit/a1',
+      'corps/98000001/meta/rates',
       RECORD,
       PAYOUT,
-      'corpTaxBooks/98000001/officers/char:5',
+      'corps/98000001/officers/char:5',
       'corpTaxBookFeederPrevious/98000002',
       POINTER,
     ]) {
       await assertFails(getDoc(doc(db, path)));
     }
-    await assertFails(getDocs(collection(db, 'corpTaxBooks/98000001/observed')));
-    await assertFails(getDocs(collection(db, 'corpTaxBooks/98000001/feeders')));
+    await assertFails(getDocs(collection(db, 'corps/98000001/observed')));
+    await assertFails(getDocs(collection(db, 'corps/98000001/feeders')));
   });
 
   it('denies another moon owner view', async () => {
@@ -205,7 +205,7 @@ describe('moon owner view', () => {
       )
     );
     await assertFails(getDocs(collection(owner(), `${VIEW}/viewers`)));
-    await assertFails(getDocs(collection(owner(), `corpTaxBooks/98000001/feederViews`)));
+    await assertFails(getDocs(collection(owner(), `corps/98000001/feederViews`)));
   });
 
   it('denies every client write under the view, the moon owner included', async () => {

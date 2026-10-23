@@ -144,7 +144,7 @@ export function mergeGaps(prior: readonly SyncGap[], fresh: readonly SyncGap[]):
 
 // --- Last synced ----------------------------------------------------------
 
-/** `corpTaxBooks/{corp}.lastSync`. */
+/** `corps/{corp}.lastSync`. */
 export interface LastSync {
   /** Epoch ms, server time. */
   at: number;

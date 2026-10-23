@@ -103,7 +103,7 @@ type Data = Record<string, unknown>;
 
 export const bookRef = (db: Firestore, corporationId: number) =>
   db.collection(BOOKS_COLLECTION).doc(String(corporationId));
-/** `corpTaxBooks/{collector}/feeders/{feeder}`: one moon owner's record. */
+/** `corps/{collector}/feeders/{feeder}`: one moon owner's record. */
 export const feederRef = (db: Firestore, collector: number, feeder: number) =>
   bookRef(db, collector).collection(FEEDERS).doc(String(feeder));
 const sub = (db: Firestore, corporationId: number, name: string) =>

@@ -21,7 +21,7 @@ import { characterAuth, createRulesEnv } from './testEnv';
 // Adjustments and write-offs. Nothing here is client-writable.
 let env: RulesTestEnvironment;
 
-const BOOK = 'corpTaxBooks/98000001';
+const BOOK = 'corps/98000001';
 const COVERAGE = `${BOOK}/feederCoverage/98000002`;
 const RECORD = `${BOOK}/feeders/98000002`;
 const MINER = 3; // billed by the book

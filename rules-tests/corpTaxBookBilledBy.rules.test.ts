@@ -25,7 +25,7 @@ beforeEach(async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     await setDoc(doc(db, POINTER), { books: { '98000001': 1 } });
-    await setDoc(doc(db, `corpTaxBooks/98000001/officers/char:${OFFICER}`), {
+    await setDoc(doc(db, `corps/98000001/officers/char:${OFFICER}`), {
       ownerHash: 'h',
       corporationId: 98000001,
       canView: true,
