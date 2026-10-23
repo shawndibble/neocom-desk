@@ -10,9 +10,11 @@
  * Not covered -> refused. Officer decides -> never a computed amount, but the
  * percent-chain value (steps 2-3) comes back as `suggested`.
  *
- * Percents are corp-set, valid 0-100 inclusive; anything else (null, blank,
- * NaN, out of range) is unset and skips its step. 0 is a set percent and pays 0.
- * Values / fixed ISK that are null, NaN, infinite or negative count as missing.
+ * Percents are corp-set, valid 1-100 inclusive; anything else (null, blank,
+ * NaN, 0, out of range) is unset and skips its step. 0 counts as unset: a
+ * silent 0 ISK Reimbursement is worse than falling through.
+ * Values / fixed ISK under 1 or null, NaN, infinite count as missing (a 0 value is
+ * a lookup gap, not a free ship; a 0 fixed price is a blank field).
  * Amounts are whole ISK, rounded down.
  */
 
@@ -55,10 +57,10 @@ export type SrpPricingResult =
   | { kind: 'refused'; reason: 'not-covered' };
 
 const validPercent = (p: number | null | undefined): p is number =>
-  typeof p === 'number' && Number.isFinite(p) && p >= 0 && p <= 100;
+  typeof p === 'number' && Number.isFinite(p) && p >= 1 && p <= 100;
 
 const validAmount = (n: number | null | undefined): n is number =>
-  typeof n === 'number' && Number.isFinite(n) && n >= 0;
+  typeof n === 'number' && Number.isFinite(n) && n >= 1;
 
 function percentChain(input: SrpPricingInput): SrpSuggestion | null {
   const { killmailValue, killmailPercent, appraisalValue, appraisalPercent } = input;

@@ -97,14 +97,13 @@ describe('percent chain with no Hull Rule', () => {
       reason: 'no-amount',
     });
   });
-  it('a 0 percent is a set percent and pays 0', () => {
-    expect(price({ killmailValue: 1000, killmailPercent: 0 })).toMatchObject({
-      kind: 'amount',
-      isk: 0,
-    });
+  it('treats 0 percent as unset and falls through', () => {
+    expect(
+      price({ killmailValue: 1000, killmailPercent: 0, appraisalValue: 400, appraisalPercent: 50 })
+    ).toMatchObject({ isk: 200, basis: { step: 'appraisal-percent' } });
   });
   it('treats out-of-range percents as unset', () => {
-    for (const p of [-1, 100.5, 150, NaN, Infinity]) {
+    for (const p of [-1, 0.5, 100.5, 150, NaN, Infinity]) {
       expect(price({ killmailValue: 1000, killmailPercent: p })).toEqual({
         kind: 'officer',
         reason: 'no-amount',
@@ -112,7 +111,7 @@ describe('percent chain with no Hull Rule', () => {
     }
   });
   it('treats negative or NaN values as missing', () => {
-    for (const v of [-5, NaN, Infinity]) {
+    for (const v of [-5, 0, NaN, Infinity]) {
       expect(
         price({ killmailValue: v, killmailPercent: 50, appraisalValue: 100, appraisalPercent: 50 })
       ).toMatchObject({ isk: 50, basis: { step: 'appraisal-percent' } });
@@ -138,7 +137,7 @@ describe('Officer decides', () => {
 
 describe('invalid fixed ISK', () => {
   it('falls back to the percent chain', () => {
-    for (const f of [-1, NaN, Infinity]) {
+    for (const f of [-1, 0, 0.5, NaN, Infinity]) {
       expect(
         price({
           hullRules: { 100: { mode: 'pay', fixedIsk: f } },
