@@ -21,7 +21,7 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   the full suite (`npm run test:run`) or `npm run build` locally** — CI's
   `validate` job runs `check:case`, `lint`, `format:check`, `typecheck`,
   `build`, the Firestore rules tests and the `functions/`
-  typecheck and tests (all but `build` in the one `static` job) on every PR (`ci.yml` is PR-only; `deploy.yml` handles pushes to `develop`/`main`, and `cache-warm.yml` saves CI's dependency caches on `develop` so a PR's first run hits them), the `test` job runs `test:run` across four shards, and the
+  typecheck and tests (all but `build` in the one `static` job) on every PR (`ci.yml` is PR-only; `deploy.yml` handles pushes to `develop`/`main`, and `cache-warm.yml` saves CI's dependency caches on `develop` so a PR's first run hits them), the `test` job runs `test:run` across four shards (`--shard=N/4`, dealt out by measured file cost from `src/test/shard-weights.json`; a new test needs no entry, and `node scripts/unit-shard-weights.mjs <vitest-json-report>...` refreshes the table), and the
   `e2e` job runs Playwright across six (whole spec files dealt out by
   `e2e/shard-weights.json`; a new spec needs no entry, and
   `node scripts/e2e-shard.mjs --weights <ci-log>` refreshes the table) inside

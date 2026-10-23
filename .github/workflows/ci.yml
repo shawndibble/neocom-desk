@@ -167,10 +167,15 @@ jobs:
     # `cores - 1` = 3 workers on a 4-vCPU runner at 93% utilisation, so there
     # is nothing left to reclaim on one machine.
     #
-    # Four, not more: vitest shards by a stable hash of the file path, and
-    # replaying that split over measured per-file costs puts the worst shard
-    # at 27.7% against an ideal 25%. Six splits worse (20.9% worst) for four
-    # more runners. The four heavy route tests land in different shards.
+    # Four, not more. `--shard=N/4` is vitest's flag, but the split is ours:
+    # vitest's own cuts a path-hash ordering into equal-COUNT slices, which
+    # measured 231s / 515s / 347s / 600s of file time per shard (ideal 423s),
+    # so the job waited on a shard carrying 35% of the work. The sequencer in
+    # vite.config.ts (src/test/weightedShardSequencer.ts) deals whole files out
+    # by the measured weights in src/test/shard-weights.json instead; a file
+    # missing from the table counts as the median. Refresh the table with
+    # `node scripts/unit-shard-weights.mjs <report>...` from per-shard
+    # `--reporter=json --outputFile.json=...` reports.
     #
     # Unlike the e2e worker experiment, this adds no concurrency per machine:
     # each shard still runs vitest's default 3 workers on its own runner.
@@ -192,13 +197,7 @@ jobs:
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
       - if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
-      - run: npm run test:run -- --shard=${{ matrix.shard }}/4 --reporter=agent --reporter=json --outputFile.json=vitest-report.json
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: vitest-report-${{ matrix.shard }}
-          path: vitest-report.json
-          retention-days: 3
+      - run: npm run test:run -- --shard=${{ matrix.shard }}/4
 
   # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
   # reasoning — a matrix reports as `test-shard (1)`…`(4)`, none of which is

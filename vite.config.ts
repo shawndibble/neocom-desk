@@ -232,6 +232,15 @@ function spaFallbackHtml() {
   };
 }
 
+/**
+ * Deals `--shard` out by measured file cost instead of Vitest's path hash (see
+ * the sequencer). Only Vitest needs it, and `vitest/node` is heavy, so
+ * `vite dev` and `vite build` never load it.
+ */
+const shardSequencer = process.env.VITEST
+  ? (await import('./src/test/weightedShardSequencer.ts')).default
+  : undefined;
+
 export default defineConfig({
   base: '/',
   build: {
@@ -393,6 +402,7 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    ...(shardSequencer ? { sequence: { sequencer: shardSequencer } } : {}),
     // Undo `vi.stubGlobal` and restore `vi.spyOn` spies after every test, so a
     // file that forgets to clean up cannot leak into the next test (#4117).
     unstubGlobals: true,
