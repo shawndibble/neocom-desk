@@ -16,6 +16,52 @@ import {
 } from '@/engine/market/realizedMargin';
 import { toWalletTrade } from './orderCostBasis';
 
+/**
+ * ESI's real `transaction_tax` lines carry no context, and a fill's
+ * `journal_ref_id` names neither its `market_transaction` line nor its tax
+ * line, so the exact keys above rarely hit. What the journal does keep is
+ * order: a sale's proceeds line (`market_transaction`, the sale's total, the
+ * fill's timestamp) is followed by its tax line. A sale the keys left alone is
+ * paired that way — the next unclaimed tax line after an unclaimed proceeds
+ * line of the same time and amount. Same-priced sales at one timestamp are
+ * interchangeable, so claiming them in order is exact.
+ */
+function pairByProceeds(
+  transactions: readonly WalletTransaction[],
+  journal: readonly WalletJournalEntry[],
+  salesTax: Map<number, number>,
+  claimed: Set<number>
+): void {
+  const ordered = [...journal].sort((a, b) => a.id - b.id);
+  const sales = transactions
+    .filter((txn) => !txn.is_buy && !salesTax.has(txn.transaction_id))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.transaction_id - b.transaction_id);
+  for (const sale of sales) {
+    const total = sale.quantity * sale.unit_price;
+    const proceeds = ordered.find(
+      (entry) =>
+        entry.ref_type === 'market_transaction' &&
+        !claimed.has(entry.id) &&
+        entry.date === sale.date &&
+        entry.amount !== undefined &&
+        Math.abs(entry.amount - total) < 0.01
+    );
+    if (!proceeds) continue;
+    const tax = ordered.find(
+      (entry) =>
+        entry.ref_type === 'transaction_tax' &&
+        !claimed.has(entry.id) &&
+        entry.id > proceeds.id &&
+        entry.date === sale.date &&
+        entry.amount !== undefined
+    );
+    if (!tax) continue;
+    claimed.add(proceeds.id);
+    claimed.add(tax.id);
+    salesTax.set(sale.transaction_id, Math.abs(tax.amount!));
+  }
+}
+
 /** Each sale's sales tax (positive ISK) from the journal's `transaction_tax` lines, keyed by transaction id. */
 function salesTaxByTransaction(
   transactions: readonly WalletTransaction[],
@@ -24,17 +70,20 @@ function salesTaxByTransaction(
   const linkFor = journalTransactionLinks(transactions);
   const salesTax = new Map<number, number>();
   const seen = new Set<number>();
+  const linked = new Set<number>();
   for (const entry of journal) {
     if (entry.ref_type !== 'transaction_tax' || entry.amount === undefined) continue;
     if (seen.has(entry.id)) continue;
     seen.add(entry.id);
     const txn = linkFor(entry);
     if (!txn || txn.is_buy) continue;
+    linked.add(entry.id);
     salesTax.set(
       txn.transaction_id,
       (salesTax.get(txn.transaction_id) ?? 0) + Math.abs(entry.amount)
     );
   }
+  pairByProceeds(transactions, journal, salesTax, linked);
   return salesTax;
 }
 
