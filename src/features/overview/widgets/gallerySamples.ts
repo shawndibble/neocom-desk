@@ -832,6 +832,16 @@ function buildSamples(t: TFunction): Record<string, Sample> {
       note: t('overview.widgets.corpKills.secondary', { losses: '312', efficiency: '81%' }),
       rows: [],
     },
+    corpSrp: {
+      value: '7',
+      unit: t('overview.widgets.corpSrp.unit', { count: 7 }),
+      note: t('overview.widgets.corpSrp.owed', { amount: '1,482,300,000 ISK' }),
+      rows: [
+        ['Tamsin Varro', 'Drake, Tama', '38.4M'],
+        ['Dax Orlen', 'Megathron, Jita', '212M'],
+        ['Mira Venn', 'Rifter, Old Man Star', '1.9M'],
+      ],
+    },
     incursions: {
       value: '6',
       unit: t('overview.gallery.samples.incursions.unit'),

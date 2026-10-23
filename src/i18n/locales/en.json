@@ -5471,8 +5471,32 @@
       },
       "corpSrp": {
         "title": "Ship replacement",
-        "description": "SRP claims waiting and paid",
-        "empty": "This widget is coming soon."
+        "description": "Open SRP claims and the ISK owed",
+        "unit_one": "open claim",
+        "unit_other": "open claims",
+        "owed": "{{amount}} owed",
+        "owedNote": "Approved, not yet Paid",
+        "review": "Review claims",
+        "footer": "{{amount}} owed, Approved and not yet Paid",
+        "col": {
+          "pilot": "Pilot",
+          "killmail": "Killmail",
+          "amount": "Amount",
+          "status": "Status"
+        },
+        "status": {
+          "pending": "Pending",
+          "approved": "Approved"
+        },
+        "empty": "No open claims",
+        "emptyHint": "Pilots file claims on the SRP page. New ones show here while Pending.",
+        "open": "Open SRP",
+        "off": "SRP is not turned on",
+        "offHintDirector": "A Director turns it on and sets the rules in SRP settings.",
+        "offHintOfficer": "A Director turns it on and sets the rules.",
+        "setUp": "Set up SRP",
+        "summary_one": "{{count}} open SRP claim, {{owed}} owed.",
+        "summary_other": "{{count}} open SRP claims, {{owed}} owed."
       }
     },
     "header": {

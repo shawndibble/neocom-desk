@@ -24,7 +24,7 @@ import type {
   StructuresBoardData,
 } from '../../data/boardData';
 import type { IncursionsBoardData } from '../../data/incursionsBoard';
-import type { CorpContractsFeed, CorpOrdersFeed } from './corpFeeds';
+import type { CorpContractsFeed, CorpOrdersFeed, CorpSrpFeed } from './corpFeeds';
 import type {
   CorpAssetsFeed,
   CorpCustomsFeed,
@@ -323,6 +323,7 @@ export interface FeedMap {
   corpContracts: CorpContractsFeed;
   corpOrders: CorpOrdersFeed;
   corpKills: CorpKillsFeed;
+  corpSrp: CorpSrpFeed;
 }
 
 export type FeedId = keyof FeedMap;
