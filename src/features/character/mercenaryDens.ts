@@ -22,6 +22,7 @@ import { ESI_REGISTRY } from '@/esi/registry';
 import { parseInstant } from '@/engine/esiInstant';
 import { denState, levelNumber, operationState, type Den } from '@/engine/character/mercenaryDens';
 import { fanOutAllCharacters } from '@/features/character/allCharactersFanOut';
+import { resolveNames } from '@/features/character/names';
 import { loadPlanetInfoRow } from '@/features/pi/names';
 import { jumpsFromCurrent } from '@/features/route/jumpsFromCurrent';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -40,6 +41,11 @@ export interface MercenaryDenRow extends Den {
   /** Null when the den's detail could not be read. */
   infomorphs: number | null;
   developmentLevel: number | null;
+  /** 0–100 within the level; null when the detail could not be read. */
+  developmentAmount: number | null;
+  anarchyAmount: number | null;
+  /** The corporation owning the skyhook the den sits on. */
+  skyhookOwnerId: number | null;
   /** False when the operations scope or any operation read is missing: unknown, not "none". */
   operationsRead: boolean;
 }
@@ -52,6 +58,9 @@ export interface MercenaryDensWidgetData {
   failed: number[];
   /** Jumps from the header Character's Current System, by system id. */
   jumps: Map<number, number>;
+  systemNames: Map<number, string>;
+  /** Skyhook owner corporation names, by id; an unresolved id is absent. */
+  ownerNames: Map<number, string>;
   fetchedAt: Date | null;
 }
 
@@ -195,6 +204,9 @@ function toRow(
     reinforcedUntilMs,
     anarchyLevel: detail ? levelNumber(detail.evolution.anarchy.level) : null,
     developmentLevel: detail ? levelNumber(detail.evolution.development.level) : null,
+    developmentAmount: detail?.evolution.development.amount ?? null,
+    anarchyAmount: detail?.evolution.anarchy.amount ?? null,
+    skyhookOwnerId: detail?.skyhook.corporation_id ?? null,
     infomorphs: detail?.infomorphs.amount ?? null,
     operations: (entry.operations ?? [])
       .filter((op) => op.mercenary_den_id === den.id)
@@ -238,11 +250,27 @@ export async function loadMercenaryDensWidget(
     ...new Set(rows.flatMap((row) => (row.systemId === null ? [] : [row.systemId]))),
   ];
   const stamps = read.flatMap((entry) => entry.reads.map((r) => r.fetchedAt.getTime()));
+  const ownerIds = [
+    ...new Set(rows.flatMap((row) => (row.skyhookOwnerId === null ? [] : [row.skyhookOwnerId]))),
+  ];
+  const [jumps, systems, ownerNames] = await Promise.all([
+    jumpsFromCurrent(characterId, systemIds),
+    import('@/sde/solarSystems').then((m) => m.loadSolarSystemsById()).catch(() => null),
+    // A name is a nicety in the modal; a failed lookup leaves the id unnamed.
+    resolveNames(ownerIds).catch(() => new Map<number, string>()),
+  ]);
+  const systemNames = new Map<number, string>();
+  for (const systemId of systemIds) {
+    const name = systems?.get(systemId)?.name;
+    if (name !== undefined) systemNames.set(systemId, name);
+  }
   return {
     rows,
     granted: entries.filter((entry) => entry.status !== 'reauth').map((e) => e.characterId),
     failed,
-    jumps: await jumpsFromCurrent(characterId, systemIds),
+    jumps,
+    systemNames,
+    ownerNames,
     fetchedAt: stamps.length === 0 ? null : new Date(Math.min(...stamps)),
   };
 }

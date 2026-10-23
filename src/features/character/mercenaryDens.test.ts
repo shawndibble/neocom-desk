@@ -44,6 +44,12 @@ vi.mock('@/esi/cache', () => ({
   loadStaticEntity: (_prefix: string, planetId: number) =>
     Promise.resolve({ data: { name: `Planet ${planetId}`, system_id: 30000142 } }),
 }));
+vi.mock('@/features/character/names', () => ({
+  resolveNames: () => Promise.resolve(new Map([[98000001, 'Ashfall Holdings']])),
+}));
+vi.mock('@/sde/solarSystems', () => ({
+  loadSolarSystemsById: () => Promise.resolve(new Map([[30000142, { name: 'Jita' }]])),
+}));
 vi.mock('@/features/route/jumpsFromCurrent', () => ({
   jumpsFromCurrent: () => Promise.resolve(new Map([[30000142, 4]])),
 }));
@@ -101,6 +107,13 @@ describe('loadMercenaryDensWidget', () => {
       operations: [{ state: 'available', expiresMs: Date.parse('2026-10-24T00:00:00Z') }],
     });
     expect(data.jumps.get(30000142)).toBe(4);
+    expect(data.systemNames.get(30000142)).toBe('Jita');
+    expect(data.ownerNames.get(98000001)).toBe('Ashfall Holdings');
+    expect(data.rows[0]).toMatchObject({
+      developmentAmount: 74,
+      anarchyAmount: 62,
+      skyhookOwnerId: 98000001,
+    });
   });
 
   it('marks operations unread for a Character without the operations scope', async () => {
