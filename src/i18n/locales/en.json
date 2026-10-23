@@ -4970,6 +4970,36 @@
         "summary_one": "{{count}} structure service is offline.",
         "summary_other": "{{count}} structure services are offline across {{structures}} structures."
       },
+      "corpSovereignty": {
+        "title": "Sovereignty",
+        "description": "Skyhook and sov hub raid windows",
+        "empty": "The corporation has no skyhooks or sov hubs.",
+        "unit_one": "skyhook raidable",
+        "unit_other": "skyhooks raidable",
+        "opensIn": "next in {{duration}}",
+        "openNow": "one is open now",
+        "windowIn": "in {{duration}}",
+        "windowOpen": "Open, {{duration}} left",
+        "windowClosed": "Closed",
+        "windowOvertime": "Overtime",
+        "hubHours_one": "{{count}} hour left",
+        "hubHours_other": "{{count}} hours left",
+        "deadline": "Raid window opens at {{subject}}",
+        "kind": {
+          "skyhook": "Skyhook",
+          "hub": "Sov hub"
+        },
+        "col": {
+          "system": "System",
+          "kind": "Structure",
+          "window": "Next raid window",
+          "reagents": "Reagents",
+          "adm": "ADM (Mil / Ind / Strat)",
+          "jumps": "Jumps"
+        },
+        "summary_one": "{{count}} skyhook is raidable, across {{total}} structures.",
+        "summary_other": "{{count}} skyhooks are raidable, across {{total}} structures."
+      },
       "corpStarbases": {
         "title": "Starbases",
         "description": "Starbase fuel, strontium and state",
@@ -12481,7 +12511,18 @@
         "moonArrival": "Moon chunk ready to fracture",
         "moonDecay": "Moon chunk breaks up on its own",
         "jobReady": "Job finished, waiting on delivery",
-        "serviceOffline": "{{service}} is offline"
+        "serviceOffline": "{{service}} is offline",
+        "sovRaid": {
+          "skyhook": {
+            "upcoming": "Skyhook raid window opens",
+            "open": "Skyhook raid window closes"
+          },
+          "hub": {
+            "upcoming": "Sov hub becomes vulnerable",
+            "open": "Sov hub vulnerability ends",
+            "overtime": "Sov hub is in overtime"
+          }
+        }
       },
       "severity": {
         "critical": "Critical",

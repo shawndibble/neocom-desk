@@ -126,6 +126,9 @@ async function openCorpOverview(page: Page): Promise<void> {
       ]);
     }
     if (path === `${corp}/starbases`) return json([]);
+    if (path === `${corp}/structures/skyhooks`) return json({ skyhooks: [] });
+    if (path === `${corp}/structures/sovereignty-hubs`) return json({ sovereignty_hubs: [] });
+    if (path === '/sovereignty/systems') return json({ solar_systems: [] });
     if (path === `${corp}/members`) return json([CHARACTER_ID, 90000002, 90000003]);
     if (path === `${corp}/membertracking`) {
       return json([

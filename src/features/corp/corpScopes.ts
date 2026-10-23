@@ -114,6 +114,11 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
    * `canReadAssets` already claim this scope, so no Director loses a surface.
    */
   canReadDivisions: ['esi-corporations.read_divisions.v1'],
+  /**
+   * Station_Manager (issue #4775). Additive (below): the scope is new, so a
+   * Station_Manager's older corp grant keeps every surface it had.
+   */
+  canReadSkyhooks: ['esi-structures.read_corporation.v1'],
 };
 
 /**
@@ -140,6 +145,7 @@ const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set([
   'canReadContracts',
   'canReadOrders',
   'canReadDivisions',
+  'canReadSkyhooks',
 ]);
 
 /**

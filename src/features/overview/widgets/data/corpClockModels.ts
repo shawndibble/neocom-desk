@@ -23,6 +23,7 @@ import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from '.
 import { fractionBar } from './cellKit';
 import { hbarsFromRows } from './chartBuilders';
 import type { CorpJobsFeed } from './corpFeeds';
+import { toBoardSovereignty } from './corpSovereigntyModels';
 import { toBoardStarbases } from './corpStarbaseModels';
 import { elapsedShare } from './industryModels';
 import { shortStructureName } from './structureModels';
@@ -50,6 +51,8 @@ function whatOf(item: CorpBoardItem, t: Translate): string {
       return t('corp.board.detail.jobReady');
     case 'serviceOffline':
       return t('corp.board.detail.serviceOffline', { service: item.detail });
+    case 'sovRaid':
+      return t(`corp.board.detail.sovRaid.${item.detail}`);
   }
 }
 
@@ -112,8 +115,12 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
   // Towers only add clocks: a Character may not read them, so they wait for an answer but never block one.
   const towers = feeds.corpStarbases;
   const towersPending = towers && !towers.data && towers.loading ? towers : undefined;
-  if (list.some((feed) => !feed) || pending !== undefined || towersPending !== undefined) {
-    return blank(null, statusOf(pending ?? towersPending));
+  // Raid windows are the same kind of extra: waited for, never blocking.
+  const raids = feeds.corpSovereignty;
+  const raidsPending = raids && !raids.data && raids.loading ? raids : undefined;
+  const extraPending = towersPending ?? raidsPending;
+  if (list.some((feed) => !feed) || pending !== undefined || extraPending !== undefined) {
+    return blank(null, statusOf(pending ?? extraPending));
   }
 
   // A source this Character cannot read contributes undefined, never [].
@@ -123,14 +130,16 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
   const extractions = chunks ? (feeds.moonChunks?.data?.extractions ?? []) : undefined;
   const jobsData = feeds.corpJobs?.data?.readable ? feeds.corpJobs.data : undefined;
   const towersData = towers?.data?.readable ? towers.data : undefined;
+  const raidsData = raids?.data?.readable ? raids.data : undefined;
 
   if (
     structures === undefined &&
     chunks === undefined &&
     jobsData === undefined &&
-    towersData === undefined
+    towersData === undefined &&
+    raidsData === undefined
   ) {
-    const failed = [...list, towers].find((feed) => feed && !feed.data && feed.error);
+    const failed = [...list, towers, raids].find((feed) => feed && !feed.data && feed.error);
     if (failed) return blank(null, statusOf(failed));
     const needsReauth =
       Boolean(feeds.structures?.data?.needsReauth) ||
@@ -146,6 +155,7 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
     extractions,
     jobs: jobsData ? toBoardJobs(jobsData.jobs, jobsData.typeNames) : undefined,
     starbases: towersData ? toBoardStarbases(towersData, now) : undefined,
+    sovereignty: raidsData ? toBoardSovereignty(raidsData) : undefined,
   });
   // The board is already soonest-first; an offline service has no clock, so it is no deadline.
   const timed = items.filter((item) => item.timing !== 'untimed');
@@ -191,17 +201,18 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
     chunks ? feeds.moonChunks?.data?.fetchedAt : null,
     jobsData?.fetchedAt,
     towersData?.fetchedAt,
+    raidsData?.fetchedAt,
   ].filter((at): at is Date => at instanceof Date);
 
   return {
     ...blank(null, {
       ...statusOf(undefined, {
-        loading: [...list, towers].some((feed) => feed?.loading),
+        loading: [...list, towers, raids].some((feed) => feed?.loading),
         hasData: true,
         isEmpty: timed.length === 0,
       }),
       // Any failed read still draws what the other feeds gave, flagged as failed.
-      error: [...list, towers].some((feed) => Boolean(feed && !feed.data && feed.error)),
+      error: [...list, towers, raids].some((feed) => Boolean(feed && !feed.data && feed.error)),
     }),
     fetchedAt:
       fetched.length > 0 ? fetched.reduce((oldest, at) => (at < oldest ? at : oldest)) : null,

@@ -77,7 +77,11 @@ describe('corpCapabilities', () => {
    * `Structure_manager`. That spelling appears nowhere in ESI's spec.
    */
   it('grants structure and moon-extraction access to a Station_Manager', () => {
-    expect(held(['Station_Manager'])).toEqual(['canReadStructures', 'canReadMoonExtractions']);
+    expect(held(['Station_Manager'])).toEqual([
+      'canReadStructures',
+      'canReadMoonExtractions',
+      'canReadSkyhooks',
+    ]);
   });
 
   // GET /corporations/{id}/membertracking declares ["Director"].
@@ -131,6 +135,12 @@ describe('corpCapabilities', () => {
     expect(corpCapabilities(['Director']).canReadStarbases).toBe(true);
   });
 
+  it('opens the skyhook and sov hub reads to a Station_Manager or a Director (#4775)', () => {
+    expect(corpCapabilities(['Accountant']).canReadSkyhooks).toBe(false);
+    expect(corpCapabilities(['Station_Manager']).canReadSkyhooks).toBe(true);
+    expect(corpCapabilities(['Director']).canReadSkyhooks).toBe(true);
+  });
+
   /**
    * The case a naive `roles.includes('Accountant')` gets wrong for the most
    * important user. In EVE a Director implicitly holds every other role, and
@@ -163,6 +173,7 @@ describe('corpCapabilities', () => {
     expect(held(['Chief_Vibes_Officer', 'Station_Manager'])).toEqual([
       'canReadStructures',
       'canReadMoonExtractions',
+      'canReadSkyhooks',
     ]);
   });
 

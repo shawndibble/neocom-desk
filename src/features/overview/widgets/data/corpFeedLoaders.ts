@@ -8,6 +8,19 @@
  * corp-scoped keys and the 403 handling are theirs, not a second copy.
  */
 import { diffRoster } from '@/engine/corp/members';
+import { getSovereigntySystems, getUniversePlanet } from '@/esi/endpoints';
+import {
+  conditionalFetch,
+  GLOBAL_CACHE_CHARACTER_ID,
+  loadStaticEntity,
+  loadWithCache,
+  type CachedResult,
+  type StatusResult,
+} from '@/esi/cache';
+import { CORP_CACHE_WINDOW_MS } from '../../data/corpCards';
+import { loadCurrentSystemId } from '@/features/route/currentSystem';
+import { jumpsBetween, loadJumpBasis } from '@/features/route/jumpBasis';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { summariseBay } from '@/engine/corp/starbases';
 import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -35,6 +48,12 @@ import {
   loadCorporationMemberTracking,
   toMemberActivity,
 } from '@/features/corp/members';
+import {
+  loadCorporationSkyhooks,
+  loadCorporationSovereigntyHubs,
+  loadHubDetails,
+  loadSkyhookDetails,
+} from '@/features/corp/sovereignty';
 import { loadCorporationStarbases, loadStarbaseDetails } from '@/features/corp/starbases';
 import { readPreviousRoster } from '@/features/corp/rosterState';
 import { loadObserverFeed } from '@/features/corp/taxBook/esiFeed';
@@ -47,7 +66,6 @@ import { isNpcCorporationId } from '@/esi/entityIds';
 import { DAY_MS } from '@/lib/age';
 import { fetchCorporationStatsRead } from '@/lib/zkillboard';
 import { parseInstant } from '@/engine/esiInstant';
-import type { CachedResult, StatusResult } from '@/esi/cache';
 import type {
   CorpAssetsFeed,
   CorpCustomsFeed,
@@ -58,6 +76,8 @@ import type {
   CorpKillsFeed,
   CorpMembersFeed,
   CorpMiningFeed,
+  CorpSovereigntyFeed,
+  CorpSovereigntyRow,
   CorpStarbaseRow,
   CorpStarbasesFeed,
   CorpOrdersFeed,
@@ -475,5 +495,189 @@ export async function loadCorpKills(characterId: number): Promise<CorpKillsFeed>
     corporationId,
     stats: result.kind === 'stats' ? result.stats : null,
     failed: null,
+  };
+}
+
+function finiteOrNull(value: number): number | null {
+  return Number.isFinite(value) ? value : null;
+}
+
+/** Planet -> system for each skyhook; a planet that cannot be read is left out, not guessed. */
+async function planetSystems(planetIds: readonly number[]): Promise<Map<number, number>> {
+  const systems = new Map<number, number>();
+  await mapWithConcurrencyLimit(planetIds, ESI_FANOUT_CONCURRENCY, async (planetId) => {
+    try {
+      const systemId = (await loadStaticEntity('planet-info', planetId, getUniversePlanet))?.data
+        .system_id;
+      if (systemId !== undefined) systems.set(planetId, systemId);
+    } catch {
+      // The row keeps its raid window and loses only its system.
+    }
+  });
+  return systems;
+}
+
+/** Development of every claimed system; empty when the public read fails. */
+async function sovereigntyDevelopment(): Promise<CorpSovereigntyFeed['development']> {
+  const development = new Map<
+    number,
+    { military: number; industrial: number; strategic: number }
+  >();
+  try {
+    // The whole public list, so one hour-long copy beats a download per widget load.
+    const { fetchLive, conditional } = conditionalFetch((options) =>
+      getSovereigntySystems(options)
+    );
+    const list = await loadWithCache(GLOBAL_CACHE_CHARACTER_ID, 'sovereigntySystems', fetchLive, {
+      staleAfterMs: CORP_CACHE_WINDOW_MS,
+      conditional,
+    });
+    for (const system of list?.data.solar_systems ?? []) {
+      const level = system.claim?.alliance?.development;
+      if (level === undefined) continue;
+      development.set(system.solar_system_id, {
+        military: level.military_level,
+        industrial: level.industrial_level,
+        strategic: level.strategic_level,
+      });
+    }
+  } catch {
+    // ADM is a column, not the widget.
+  }
+  return development;
+}
+
+/** Jumps from the Current System, under the Route Safety basis; empty when the origin is unknown. */
+async function jumpsFromCurrent(
+  characterId: number,
+  systemIds: readonly number[]
+): Promise<Map<number, number>> {
+  const jumps = new Map<number, number>();
+  try {
+    const origin = await loadCurrentSystemId(characterId);
+    if (origin === null || systemIds.length === 0) return jumps;
+    const basis = await loadJumpBasis();
+    await Promise.all(
+      systemIds.map(async (systemId) => {
+        const result = await jumpsBetween(origin, systemId, basis);
+        if (result.kind === 'known') jumps.set(systemId, result.jumps);
+      })
+    );
+  } catch {
+    // No distance column rather than a failed widget.
+  }
+  return jumps;
+}
+
+export async function loadCorpSovereignty(characterId: number): Promise<CorpSovereigntyFeed> {
+  const empty: CorpSovereigntyFeed = {
+    ...UNREADABLE,
+    rows: [],
+    systemNames: new Map(),
+    development: new Map(),
+    jumps: new Map(),
+  };
+  const access = await gate(characterId, 'canReadSkyhooks');
+  if (access === null) return empty;
+  const { corporationId } = access;
+  const [skyhooks, hubs] = await Promise.all([
+    loadCorporationSkyhooks(characterId, corporationId),
+    loadCorporationSovereigntyHubs(characterId, corporationId),
+  ]);
+  if (skyhooks.cached === null && hubs.cached === null) {
+    if (skyhooks.needsReauth || hubs.needsReauth) return { ...empty, needsReauth: true };
+    throw new CorpReadFailed('sovereignty');
+  }
+  const skyhookList = skyhooks.cached?.data.skyhooks ?? [];
+  const hubList = hubs.cached?.data.sovereignty_hubs ?? [];
+  const [skyhookDetails, hubDetails, planets, development] = await Promise.all([
+    loadSkyhookDetails(
+      characterId,
+      corporationId,
+      skyhookList.map((s) => s.id)
+    ),
+    loadHubDetails(
+      characterId,
+      corporationId,
+      hubList.map((h) => h.id)
+    ),
+    planetSystems([...new Set(skyhookList.map((s) => s.planet_id))]),
+    sovereigntyDevelopment(),
+  ]);
+
+  // Every detail read failing says the reads are down, not that nothing is raidable.
+  const details = [...skyhookDetails.values(), ...hubDetails.values()];
+  if (details.length > 0 && details.every((result) => result.cached === null)) {
+    if (details.some((result) => result.needsReauth)) return { ...empty, needsReauth: true };
+    throw new CorpReadFailed('sovereignty');
+  }
+
+  const rows: CorpSovereigntyRow[] = [
+    ...skyhookList.map((skyhook): CorpSovereigntyRow => {
+      const detail = skyhookDetails.get(skyhook.id)?.cached?.data;
+      const window = detail?.theft_vulnerability;
+      return {
+        key: `skyhook:${skyhook.id}`,
+        kind: 'skyhook',
+        structureId: skyhook.id,
+        systemId: planets.get(skyhook.planet_id) ?? null,
+        windowStartMs: parseInstant(window?.start),
+        windowEndMs: parseInstant(window?.end),
+        stock:
+          detail?.reagents === undefined
+            ? null
+            : finiteOrNull(
+                detail.reagents.reduce((sum, r) => sum + r.secured_stock + r.unsecured_stock, 0)
+              ),
+        hubBay: null,
+      };
+    }),
+    ...hubList.map((hub): CorpSovereigntyRow => {
+      const detail = hubDetails.get(hub.id)?.cached?.data;
+      const window = detail?.vulnerability_window;
+      const reagents = detail?.reagent_bay.reagents ?? [];
+      const updatedMs = parseInstant(detail?.reagent_bay.last_updated);
+      const amount = reagents.reduce((sum, r) => sum + r.amount, 0);
+      const burningPerHour = reagents.reduce((sum, r) => sum + r.burning_per_hour, 0);
+      return {
+        key: `hub:${hub.id}`,
+        kind: 'hub',
+        structureId: hub.id,
+        systemId: hub.solar_system_id,
+        windowStartMs: parseInstant(window?.start),
+        windowEndMs: parseInstant(window?.end),
+        stock: null,
+        // An unreadable timestamp or a non-number is unknown, never "0 hours left".
+        hubBay:
+          detail === undefined ||
+          reagents.length === 0 ||
+          updatedMs === null ||
+          !Number.isFinite(amount + burningPerHour)
+            ? null
+            : { amount, burningPerHour, updatedMs },
+      };
+    }),
+  ];
+
+  const systemIds = [
+    ...new Set(rows.flatMap((row) => (row.systemId === null ? [] : [row.systemId]))),
+  ];
+  const [systems, jumps] = await Promise.all([
+    import('@/sde/solarSystems').then((m) => m.loadSolarSystemsById()).catch(() => null),
+    jumpsFromCurrent(characterId, systemIds),
+  ]);
+  const systemNames = new Map<number, string>();
+  for (const systemId of systemIds) {
+    const name = systems?.get(systemId)?.name;
+    if (name !== undefined) systemNames.set(systemId, name);
+  }
+  return {
+    readable: true,
+    needsReauth: false,
+    ...readAge([skyhooks, hubs, ...skyhookDetails.values(), ...hubDetails.values()]),
+    rows,
+    systemNames,
+    development,
+    jumps,
   };
 }

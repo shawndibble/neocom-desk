@@ -81,6 +81,7 @@ describe('the required scope set', () => {
     expect(requiredFor(['Station_Manager'])).toEqual([
       'esi-corporations.read_structures.v1',
       'esi-industry.read_corporation_mining.v1',
+      'esi-structures.read_corporation.v1',
     ]);
   });
 
@@ -275,6 +276,19 @@ describe('corpGrantCoverage', () => {
     expect(coverage.missingScopes).toEqual([CUSTOMS]);
     expect(coverage.capabilities.canReadCustomsOffices).toBe(false);
     expect(coverage.capabilities.canReadWallet).toBe(true);
+  });
+
+  it('keeps a Station_Manager’s older grant ready when only the skyhook scope is missing (#4775)', () => {
+    const SKYHOOKS = 'esi-structures.read_corporation.v1';
+    expect(CORP_SCOPES_FOR_CAPABILITY.canReadSkyhooks).toEqual([SKYHOOKS]);
+    const coverage = corpGrantCoverage(
+      corpCapabilities(['Station_Manager']),
+      scopesForGroup('corp').filter((scope) => scope !== SKYHOOKS)
+    );
+    expect(coverage.blocking).toBe(false);
+    expect(coverage.missingScopes).toEqual([SKYHOOKS]);
+    expect(coverage.capabilities.canReadSkyhooks).toBe(false);
+    expect(coverage.capabilities.canReadStructures).toBe(true);
   });
 
   it('keeps a Director’s older grant ready when only the titles scope is missing (#4613)', () => {

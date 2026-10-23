@@ -46,7 +46,7 @@ describe('route templates', () => {
   it('are absolute paths whose only variables are {snake_case} placeholders', () => {
     for (const [id, spec] of entries) {
       // No digits: an interpolated id would show up here instead of a placeholder.
-      expect(spec.route, id).toMatch(/^\/[a-z/{}_]*$/);
+      expect(spec.route, id).toMatch(/^\/[a-z/{}_-]*$/);
       for (const placeholder of spec.route.match(/\{[^}]*\}/g) ?? []) {
         expect(placeholder, id).toMatch(/^\{[a-z]+(_[a-z]+)*\}$/);
       }
