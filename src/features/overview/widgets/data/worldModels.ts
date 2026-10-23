@@ -6,7 +6,8 @@
  * and a chart that names what it draws.
  */
 import { DAY_MS } from '@/lib/age';
-import { eveClock, eveDateLabel } from '@/engine/eveTime';
+import { eveClock } from '@/lib/eveTime';
+import { utcDay } from '@/engine/localDay';
 import type { DeadlineSeverity } from '@/engine/character/severity';
 import { filterYieldRange, eveToday, rangeDates, daysCovered } from '@/engine/miningTax/yieldRange';
 import type { MiningYieldRange } from '@/engine/miningTax/yieldRange';
@@ -424,7 +425,7 @@ export const eveTime: Builder = (_feeds, { t, now }) => ({
   number: {
     value: eveClock(now),
     unit: t('overview.widgets.eveTime.unit'),
-    secondary: { text: eveDateLabel(now) },
+    secondary: { text: utcDay(now) },
     tone: 'clear',
   },
   summary: t('overview.widgets.eveTime.summary', { time: eveClock(now) }),

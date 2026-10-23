@@ -12,8 +12,8 @@ describe('CalendarClocks', () => {
 
   it('shows EVE time as UTC HH:MM', async () => {
     render(<CalendarClocks />);
-    expect(await screen.findByText('EVE')).toBeInTheDocument();
-    expect(screen.getByText('14:32')).toBeInTheDocument();
+    const label = await screen.findByText('EVE');
+    expect(label.nextElementSibling).toHaveTextContent('Fri 14:32');
   });
 
   it('also labels the local clock', async () => {
