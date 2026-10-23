@@ -208,8 +208,9 @@ async function loadAssetsSnapshot(
   const assets = assetsResult.cached?.data ?? null;
   const inputs = assets === null ? null : toCorpAssetInputs(assets);
   const typeIds = inputs === null ? [] : [...new Set(inputs.map((i) => i.typeId))];
+  const placeIds = assets === null ? [] : assetPlaceIds(assets);
   const [labels, volumeByTypeId, categoryByTypeId, copyValueByItemId] = await Promise.all([
-    assets === null ? EMPTY_CORP_ASSET_LABELS : loadCorpAssetLabels(assets),
+    assets === null ? EMPTY_CORP_ASSET_LABELS : loadCorpAssetLabels(assets, placeIds),
     loadTypeVolumes(typeIds),
     loadTypeCategories(typeIds),
     // Director-only endpoint: without the role a copy still prices, at ME0/TE0.
@@ -236,7 +237,7 @@ async function loadAssetsSnapshot(
     inputs,
     divisionNames,
     labels,
-    placeIds: assets === null ? [] : assetPlaceIds(assets),
+    placeIds,
     priceByTypeId,
     copyValueByItemId,
     volumeByTypeId,
@@ -310,16 +311,14 @@ function CorpAssetsView({
     () => (data ? data.placeIds.filter((id) => !data.labels.locations.has(id)) : []),
     [data]
   );
+  const activeCharacterId = snapshot.activeCharacterId;
   const loadMissingPlaces = useCallback(
-    () =>
-      resolveMissingLocationNames(snapshot.activeCharacterId ?? 0, missingPlaceIds).catch(
-        () => new Map<number, string>()
-      ),
-    [snapshot.activeCharacterId, missingPlaceIds]
+    () => resolveMissingLocationNames(activeCharacterId as number, missingPlaceIds),
+    [activeCharacterId, missingPlaceIds]
   );
   const missingPlaces = useKeyedLoad(
-    missingPlaceIds.length > 0 && snapshot.activeCharacterId !== null
-      ? `${snapshot.activeCharacterId}:${data?.corporationId}`
+    missingPlaceIds.length > 0 && activeCharacterId !== null
+      ? `${activeCharacterId}:${data?.corporationId}`
       : null,
     loadMissingPlaces
   );

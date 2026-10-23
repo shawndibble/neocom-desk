@@ -298,7 +298,7 @@ export async function readCachedStructureNames(
  * another. For a fan-out over every place a corporation holds assets, where
  * the sweep multiplies one refusal into a request per roster member.
  */
-export async function loadStructureNameOwnOnly(
+export async function loadStructureNameNoRoster(
   characterId: number,
   structureId: number
 ): Promise<string | null> {

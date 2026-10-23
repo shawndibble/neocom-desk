@@ -22,7 +22,7 @@ import { getCorporationAssets, type CorporationAsset } from '@/esi/endpoints';
 import type { StatusResult } from '@/esi/cache';
 import { readCachedNames, resolveNames } from '@/features/character/names';
 import {
-  loadStructureNameOwnOnly,
+  loadStructureNameNoRoster,
   readCachedStructureNames,
 } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -85,22 +85,27 @@ export function toCorpAssetInputs(assets: readonly CorporationAsset[]): CorpAsse
 }
 
 /**
- * The distinct places a corporation's assets sit: stations and Upwell
- * structures. A `location_id` that is another asset's `item_id` is a container
- * or ship holding the row, and a solar-system id is open space; neither has a
- * name to look up. Without this filter every container became a
- * `/universe/structures/{id}` call (item ids sit above
- * `UPWELL_STRUCTURE_ID_FLOOR` too), each refused and then swept across the
- * roster.
+ * The distinct places a corporation's assets sit: stations, Upwell structures
+ * and solar systems. A `location_id` that is another asset's `item_id` is a
+ * container or ship, not a place; item ids sit above `UPWELL_STRUCTURE_ID_FLOOR`
+ * too, so looking them up as structures costs a refused request each.
  */
 export function assetPlaceIds(assets: readonly CorporationAsset[]): number[] {
   const itemIds = new Set(assets.map((asset) => asset.item_id));
   const places = new Set<number>();
   for (const asset of assets) {
-    if (asset.location_type === 'solar_system' || asset.location_type === 'item') continue;
-    if (!itemIds.has(asset.location_id)) places.add(asset.location_id);
+    if (asset.location_type === 'item' || itemIds.has(asset.location_id)) continue;
+    places.add(asset.location_id);
   }
   return [...places];
+}
+
+/** Upwell structures have no bulk name endpoint; everything below the floor does. */
+function splitPlaceIds(ids: readonly number[]): { structureIds: number[]; bulkIds: number[] } {
+  return {
+    structureIds: ids.filter((id) => id >= UPWELL_STRUCTURE_ID_FLOOR),
+    bulkIds: ids.filter((id) => id < UPWELL_STRUCTURE_ID_FLOOR),
+  };
 }
 
 /**
@@ -110,8 +115,7 @@ export function assetPlaceIds(assets: readonly CorporationAsset[]): number[] {
 async function cachedAssetLocationNames(
   locationIds: readonly number[]
 ): Promise<Map<number, string>> {
-  const structureIds = locationIds.filter((id) => id >= UPWELL_STRUCTURE_ID_FLOOR);
-  const bulkIds = locationIds.filter((id) => id < UPWELL_STRUCTURE_ID_FLOOR);
+  const { structureIds, bulkIds } = splitPlaceIds(locationIds);
   const [bulk, structures] = await Promise.all([
     readCachedNames(bulkIds),
     readCachedStructureNames(structureIds),
@@ -130,7 +134,7 @@ async function cachedAssetLocationNames(
  * mixed into the batch. A structure the reading Character is not on the ACL
  * for stays unresolved and the view falls back to the raw id, exactly as
  * `members.ts` and the personal Assets page do; unlike them it does not ask the
- * rest of the roster (`loadStructureNameOwnOnly`).
+ * rest of the roster (`loadStructureNameNoRoster`).
  *
  * The structure resolves are capped at `ESI_FANOUT_CONCURRENCY` (issue #420):
  * each is its own call against a rate-limited endpoint.
@@ -141,12 +145,11 @@ export async function resolveMissingLocationNames(
   known: ReadonlyMap<number, string> = new Map()
 ): Promise<Map<number, string>> {
   const missing = [...new Set(locationIds)].filter((id) => !known.has(id));
-  const structureIds = missing.filter((id) => id >= UPWELL_STRUCTURE_ID_FLOOR);
-  const bulkIds = missing.filter((id) => id < UPWELL_STRUCTURE_ID_FLOOR);
+  const { structureIds, bulkIds } = splitPlaceIds(missing);
 
   const names = await resolveNames(bulkIds);
   await mapWithConcurrencyLimit(structureIds, ESI_FANOUT_CONCURRENCY, async (id) => {
-    const name = await loadStructureNameOwnOnly(characterId, id);
+    const name = await loadStructureNameNoRoster(characterId, id);
     if (name !== null) names.set(id, name);
   });
   return names;
@@ -173,11 +176,12 @@ export const EMPTY_CORP_ASSET_LABELS: CorpAssetLabels = {
  * which the view runs after the ledger is already on screen.
  */
 export async function loadCorpAssetLabels(
-  assets: readonly CorporationAsset[]
+  assets: readonly CorporationAsset[],
+  placeIds: readonly number[] = assetPlaceIds(assets)
 ): Promise<CorpAssetLabels> {
   const [types, locations] = await Promise.all([
     loadTypeNames(assets.map((asset) => asset.type_id)),
-    cachedAssetLocationNames(assetPlaceIds(assets)),
+    cachedAssetLocationNames(placeIds),
   ]);
   return { types, locations };
 }

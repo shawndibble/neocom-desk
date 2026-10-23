@@ -7,7 +7,7 @@ import { db } from '@/db';
 import { STALE_AFTER, resetRevalidationState } from '@/esi/cache';
 import {
   loadStructureName,
-  loadStructureNameOwnOnly,
+  loadStructureNameNoRoster,
   readCachedStructureNames,
 } from './structures';
 import { seedCharacter as seedCharacterRow } from '@/test/seed';
@@ -303,7 +303,7 @@ describe('readCachedStructureNames', () => {
   });
 });
 
-describe('loadStructureNameOwnOnly', () => {
+describe('loadStructureNameNoRoster', () => {
   it('does not sweep the roster when the character is refused', async () => {
     await seedCharacter(CHARACTER_ID);
     await seedCharacter(OTHER_CHARACTER_ID);
@@ -316,7 +316,7 @@ describe('loadStructureNameOwnOnly', () => {
       })
     );
 
-    expect(await loadStructureNameOwnOnly(CHARACTER_ID, 1000000000001)).toBeNull();
+    expect(await loadStructureNameNoRoster(CHARACTER_ID, 1000000000001)).toBeNull();
     expect(calls).toBe(1);
   });
 
@@ -326,7 +326,7 @@ describe('loadStructureNameOwnOnly', () => {
         HttpResponse.json({ name: 'Own Citadel', owner_id: 1, solar_system_id: 1 })
       )
     );
-    expect(await loadStructureNameOwnOnly(CHARACTER_ID, 1000000000001)).toBe('Own Citadel');
+    expect(await loadStructureNameNoRoster(CHARACTER_ID, 1000000000001)).toBe('Own Citadel');
     expect((await readCachedStructureNames([1000000000001])).get(1000000000001)).toBe(
       'Own Citadel'
     );

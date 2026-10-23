@@ -310,14 +310,14 @@ describe('corp asset labels', () => {
     expect(labels.locations.get(60003760)).toBe('Jita IV');
   });
 
-  it('never looks up a container or ship holding other assets as a structure', async () => {
+  it('never looks up a container or ship holding other assets, but keeps solar systems', async () => {
     const FLOOR = 1_000_000_000_000;
     const assets: CorporationAsset[] = [
       { ...ASSETS[0], item_id: FLOOR + 5, location_id: 60003760 },
       { ...ASSETS[1], item_id: 9001, location_id: FLOOR + 5, location_type: 'item' },
       { ...ASSETS[1], item_id: 9002, location_id: 30000142, location_type: 'solar_system' },
     ];
-    expect(assetPlaceIds(assets)).toEqual([60003760]);
+    expect(assetPlaceIds(assets)).toEqual([60003760, 30000142]);
   });
 
   it('does not ask the other characters in the roster about a structure it cannot see', async () => {
