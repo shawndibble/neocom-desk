@@ -3,6 +3,8 @@
 // transaction that applies a decision is in srpOfficerStore.ts.
 //
 // State machine (anything else is refused): pending -> approved | rejected, approved -> paid.
+// An amount may also be changed while a claim is pending or approved (never once paid or rejected).
+// An officer never decides their own claim: another officer must.
 // `closedAt` is set when a claim becomes paid or rejected (the retention sweep, #4856, keys on it).
 // The app never moves ISK: an officer pays in game, then marks the claim paid.
 
@@ -21,11 +23,20 @@ const killmailId = (value: unknown) => int(value, 'killmailId', 1, KILLMAIL_ID_M
 const amountField = (value: unknown) => int(value, 'amount', 1, MAX_SRP_AMOUNT);
 const reasonField = (value: unknown) => boundedString(value, 'reason', MAX_SRP_REASON);
 
+/**
+ * The amount the officer saw, whole ISK, or null when the claim showed none. Omitted means no
+ * check. A claim whose stored amount differs is refused (`amount-changed`).
+ */
+function expectedAmountField(value: unknown): number | null {
+  return value === null ? null : amountField(value);
+}
+
 export interface ApproveItem {
   killmailId: number;
   /** An officer-typed or overriding amount, whole ISK. */
   amount?: number;
   reason?: string;
+  expectedAmount?: number | null;
 }
 
 export function parseApproveItem(data: unknown): ApproveItem {
@@ -35,6 +46,7 @@ export function parseApproveItem(data: unknown): ApproveItem {
   if (d.reason !== undefined && d.reason !== null && d.reason !== '') {
     item.reason = reasonField(d.reason);
   }
+  if (d.expectedAmount !== undefined) item.expectedAmount = expectedAmountField(d.expectedAmount);
   return item;
 }
 
@@ -56,14 +68,27 @@ export function parseApproveBatch(data: unknown): ApproveItem[] {
   return distinct(list(record(data).claims, 'claims').map(parseApproveItem));
 }
 
-export function parseKillmailId(data: unknown): number {
-  return killmailId(record(data).killmailId);
+export interface MarkPaidItem {
+  killmailId: number;
+  expectedAmount?: number | null;
 }
 
-export function parseKillmailIds(data: unknown): number[] {
-  return distinct(
-    list(record(data).killmailIds, 'killmailIds').map((id) => ({ killmailId: killmailId(id) }))
-  ).map((i) => i.killmailId);
+export function parseMarkPaidItem(data: unknown): MarkPaidItem {
+  const d = record(data);
+  const item: MarkPaidItem = { killmailId: killmailId(d.killmailId) };
+  if (d.expectedAmount !== undefined) item.expectedAmount = expectedAmountField(d.expectedAmount);
+  return item;
+}
+
+/** `claims: [{ killmailId, expectedAmount? }]`; the older `killmailIds: number[]` still works. */
+export function parseMarkPaidBatch(data: unknown): MarkPaidItem[] {
+  const d = record(data);
+  if (d.claims === undefined && d.killmailIds !== undefined) {
+    return distinct(
+      list(d.killmailIds, 'killmailIds').map((id) => ({ killmailId: killmailId(id) }))
+    );
+  }
+  return distinct(list(d.claims, 'claims').map(parseMarkPaidItem));
 }
 
 export interface RejectItem {
@@ -139,16 +164,35 @@ function outcomeOf(
   };
 }
 
-function requireState(claim: ClaimData, from: 'pending' | 'approved'): Record<string, unknown> {
+/** The claim, once it exists, is in one of `from`, and is not the deciding officer's own. */
+function requireState(
+  claim: ClaimData,
+  from: SrpClaimOutcome['state'] | SrpClaimOutcome['state'][],
+  officer: Officer
+): Record<string, unknown> {
   if (!claim) fail('not-found', 'No such SRP claim', 'claim-not-found');
-  if (claim.state !== from) {
+  if (claim.characterId === officer.characterId) {
+    fail('permission-denied', 'Another officer must decide your own claim', 'own-claim');
+  }
+  const allowed = Array.isArray(from) ? from : [from];
+  if (!allowed.includes(claim.state as SrpClaimOutcome['state'])) {
     fail(
       'failed-precondition',
-      `That claim is ${String(claim.state)}, not ${from}`,
+      `That claim is ${String(claim.state)}, not ${allowed.join(' or ')}`,
       'illegal-transition'
     );
   }
   return claim;
+}
+
+/** Refuses a decision on an amount the officer did not see. */
+function requireExpectedAmount(
+  claim: Record<string, unknown>,
+  expected: number | null | undefined
+): void {
+  if (expected !== undefined && expected !== amountOf(claim)) {
+    fail('failed-precondition', 'The amount changed: review the claim again', 'amount-changed');
+  }
 }
 
 /** The fields that record an amount an officer set, keeping what the server worked out. */
@@ -179,7 +223,8 @@ export function decideApprove(
   officer: Officer,
   now: number
 ): Decision {
-  const claim = requireState(claimData, 'pending');
+  const claim = requireState(claimData, 'pending', officer);
+  requireExpectedAmount(claim, item.expectedAmount);
   const held = amountOf(claim);
   let amount = held;
   let override: Record<string, unknown> = {};
@@ -221,7 +266,7 @@ export function decideReject(
   officer: Officer,
   now: number
 ): Decision {
-  const claim = requireState(claimData, 'pending');
+  const claim = requireState(claimData, 'pending', officer);
   return {
     patch: {
       state: 'rejected',
@@ -241,14 +286,14 @@ export function decideReject(
   };
 }
 
-/** A pending claim keeps its state; its amount changes, with a reason. */
+/** A pending or approved claim keeps its state (and has no closedAt); its amount changes, with a reason. */
 export function decideChangeAmount(
   claimData: ClaimData,
   item: ChangeAmountItem,
   officer: Officer,
   now: number
 ): Decision {
-  const claim = requireState(claimData, 'pending');
+  const claim = requireState(claimData, ['pending', 'approved'], officer);
   const held = amountOf(claim);
   if (item.amount === held)
     fail('invalid-argument', 'That is already the amount', 'amount-unchanged');
@@ -261,18 +306,26 @@ export function decideChangeAmount(
       amount: item.amount,
       reason: item.reason,
     },
-    outcome: outcomeOf(claim, item.killmailId, 'pending', item.amount, item.reason),
+    outcome: outcomeOf(
+      claim,
+      item.killmailId,
+      claim.state as SrpClaimOutcome['state'],
+      item.amount,
+      item.reason
+    ),
   };
 }
 
 /** Approved -> paid: the officer paid in game; the app records it. */
 export function decideMarkPaid(
   claimData: ClaimData,
-  id: number,
+  item: MarkPaidItem,
   officer: Officer,
   now: number
 ): Decision {
-  const claim = requireState(claimData, 'approved');
+  const id = item.killmailId;
+  const claim = requireState(claimData, 'approved', officer);
+  requireExpectedAmount(claim, item.expectedAmount);
   const amount = amountOf(claim);
   return {
     patch: {

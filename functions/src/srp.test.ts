@@ -22,7 +22,7 @@ describe('parseSrpSettingsPatch', () => {
         requireFleetOrFc: true,
         hullRules: [
           { scope: 'hull', id: 587, kind: 'pay-fixed', iskAmount: 5_000_000 },
-          { scope: 'class', id: 25, kind: 'pay-percent', pct: 50 },
+          { scope: 'class', id: 25, kind: 'pay-percent' },
           { scope: 'hull', id: 11, kind: 'not-covered' },
           { scope: 'class', id: 27, kind: 'officer-decides' },
         ],
@@ -34,7 +34,7 @@ describe('parseSrpSettingsPatch', () => {
       requireFleetOrFc: true,
       hullRules: [
         { scope: 'hull', id: 587, kind: 'pay-fixed', iskAmount: 5_000_000 },
-        { scope: 'class', id: 25, kind: 'pay-percent', pct: 50 },
+        { scope: 'class', id: 25, kind: 'pay-percent' },
         { scope: 'hull', id: 11, kind: 'not-covered' },
         { scope: 'class', id: 27, kind: 'officer-decides' },
       ],
@@ -50,6 +50,12 @@ describe('parseSrpSettingsPatch', () => {
   it('bounds percents and the window', () => {
     expect(fails({ killmailPct: 101 })).toMatch(/killmailPct/);
     expect(fails({ appraisalPct: -1 })).toMatch(/appraisalPct/);
+    expect(fails({ killmailPct: 0 })).toMatch(/killmailPct/);
+    expect(fails({ appraisalPct: 0.5 })).toMatch(/appraisalPct/);
+    expect(parseSrpSettingsPatch({ killmailPct: 1, appraisalPct: 100 })).toEqual({
+      killmailPct: 1,
+      appraisalPct: 100,
+    });
     expect(fails({ killmailPct: 'x' })).toMatch(/killmailPct/);
     expect(fails({ windowDays: 0 })).toMatch(/windowDays/);
     expect(fails({ windowDays: 366 })).toMatch(/windowDays/);
@@ -67,9 +73,15 @@ describe('parseSrpSettingsPatch', () => {
     expect(
       fails({ hullRules: [{ scope: 'hull', id: 1, kind: 'pay-fixed', iskAmount: 0 }] })
     ).toMatch(/iskAmount/);
-    expect(fails({ hullRules: [{ scope: 'hull', id: 1, kind: 'pay-percent', pct: 120 }] })).toMatch(
-      /pct/
-    );
+    expect(
+      fails({ hullRules: [{ scope: 'hull', id: 1, kind: 'pay-fixed', iskAmount: 0.5 }] })
+    ).toMatch(/iskAmount/);
+    // A legacy stored pct is ignored, not refused.
+    expect(
+      parseSrpSettingsPatch({
+        hullRules: [{ scope: 'hull', id: 1, kind: 'pay-percent', pct: 120 }],
+      }).hullRules
+    ).toEqual([{ scope: 'hull', id: 1, kind: 'pay-percent' }]);
     expect(
       parseSrpSettingsPatch({
         hullRules: [{ scope: 'hull', id: 1, kind: 'not-covered', iskAmount: 9, pct: 9, x: 1 }],

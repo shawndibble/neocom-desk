@@ -4,7 +4,7 @@
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import { record } from './communities.js';
-import { int, pctField } from './corpTaxBook.js';
+import { int } from './corpTaxBook.js';
 import {
   HULL_RULE_KINDS,
   MAX_CLAIM_WINDOW_DAYS,
@@ -31,12 +31,13 @@ function parseHullRule(raw: unknown): HullRule {
     if (typeof d.iskAmount !== 'number' || !Number.isFinite(d.iskAmount)) {
       throw new HttpsError('invalid-argument', 'iskAmount must be a number');
     }
-    if (d.iskAmount <= 0 || d.iskAmount > 1e13) {
-      throw new HttpsError('invalid-argument', 'iskAmount must be above 0 and at most 1e13');
+    // The engine treats under 1 ISK as unset, so a smaller amount would silently never pay.
+    if (d.iskAmount < 1 || d.iskAmount > 1e13) {
+      throw new HttpsError('invalid-argument', 'iskAmount must be 1 to 1e13');
     }
     return { scope, id, kind, iskAmount: d.iskAmount };
   }
-  if (kind === 'pay-percent') return { scope, id, kind, pct: pctField(d.pct, 'pct') };
+  // Pay: corp percent follows the corp's own chain; a stored legacy `pct` is ignored.
   return { scope, id, kind };
 }
 
@@ -57,6 +58,14 @@ function parseHullRules(raw: unknown): HullRule[] {
     seen.add(key);
   }
   return rules;
+}
+
+/** 1-100, the range the engine and the settings form use (under 1 reads as unset). */
+function pctField(value: unknown, name: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 1 || value > 100) {
+    throw new HttpsError('invalid-argument', `${name} must be 1-100`);
+  }
+  return value;
 }
 
 /** A percent, or null for "this step is not used". */

@@ -17,7 +17,7 @@ const saved: SrpSettings = {
   hullRules: [
     { scope: 'class', id: 27, kind: 'pay-fixed', iskAmount: 180_000_000 },
     { scope: 'hull', id: 641, kind: 'not-covered' },
-    { scope: 'class', id: 26, kind: 'pay-percent', pct: 70 },
+    { scope: 'class', id: 26, kind: 'pay-percent' },
   ],
   windowDays: 30,
   requireFleetOrFc: false,
@@ -55,21 +55,30 @@ describe('srpSettingsForm', () => {
     const form = setRule(formFromSettings(saved), 'hull', 641, { kind: 'none', isk: '' });
     const patch = formToPatch(form, saved);
     expect(patch.hullRules).toEqual([
-      { scope: 'class', id: 26, kind: 'pay-percent', pct: 70 },
+      { scope: 'class', id: 26, kind: 'pay-percent' },
       { scope: 'class', id: 27, kind: 'pay-fixed', iskAmount: 180_000_000 },
     ]);
   });
 
-  it('pay-percent rules carry the corp percent, killmail first then Appraisal', () => {
+  it('pay-percent rules carry no figure of their own, whatever the corp percents', () => {
     const base = formFromSettings(saved);
     const form = setRule({ ...base, killmailPct: '', appraisalPct: '55' }, 'hull', 5, {
       kind: 'pay-percent',
       isk: '',
     });
     const rules = formToPatch(form, saved).hullRules ?? [];
-    expect(
-      rules.filter((r) => r.kind === 'pay-percent').map((r) => (r as { pct: number }).pct)
-    ).toEqual([55, 55]);
+    expect(rules.filter((r) => r.kind === 'pay-percent')).toEqual([
+      { scope: 'class', id: 26, kind: 'pay-percent' },
+      { scope: 'hull', id: 5, kind: 'pay-percent' },
+    ]);
+  });
+
+  it('a stored legacy pct never reads as an edit', () => {
+    const legacy = {
+      ...saved,
+      hullRules: [{ scope: 'class', id: 26, kind: 'pay-percent', pct: 70 }],
+    } as unknown as SrpSettings;
+    expect(formToPatch(formFromSettings(legacy), legacy)).toEqual({});
   });
 
   it('reports bad percents, a blank fixed price, a bad window and a percent rule with no percent', () => {

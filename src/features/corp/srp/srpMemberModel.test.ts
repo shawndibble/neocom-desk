@@ -61,7 +61,7 @@ describe('lostRowKind', () => {
   });
   it('is notCovered by a hull rule, and the hull rule beats the class rule', () => {
     const classBlock: HullRule = { scope: 'class', id: 10, kind: 'not-covered' };
-    const hullPay: HullRule = { scope: 'hull', id: 100, kind: 'pay-percent', pct: 50 };
+    const hullPay: HullRule = { scope: 'hull', id: 100, kind: 'pay-percent' };
     expect(lostRowKind(loss(), ctx({ hullRules: [classBlock] }))).toBe('notCovered');
     expect(lostRowKind(loss(), ctx({ hullRules: [classBlock, hullPay] }))).toBe('open');
   });

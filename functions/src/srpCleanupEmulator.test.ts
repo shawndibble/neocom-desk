@@ -51,7 +51,7 @@ suite('SRP retention sweep (emulator)', () => {
   afterAll(clearEmulator);
   beforeEach(clearEmulator);
 
-  it('deletes Paid and Rejected claims at one year, keeps the rest, audits each', async () => {
+  it('deletes Paid and Rejected claims at one year, keeps the rest, one audit entry per corp', async () => {
     await put(CORP_A, 1, 'paid', OLD);
     await put(CORP_A, 2, 'rejected', OLD);
     await put(CORP_A, 3, 'paid', OLD + 1); // 1 ms short
@@ -66,16 +66,15 @@ suite('SRP retention sweep (emulator)', () => {
     expect(await claimIds(CORP_A)).toEqual(['3', '4', '5', '6']);
     expect(await claimIds(CORP_B)).toEqual([]);
     const entries = await audit(CORP_A);
-    expect(entries).toHaveLength(2);
-    const byClaim = Object.fromEntries(entries.map((e) => [e.detail.claimId, e.detail]));
-    expect(byClaim['1']).toEqual({
-      claimId: '1',
-      state: 'paid',
-      characterId: 1,
-      closedAt: OLD,
-      deletedAt: NOW,
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toEqual({
+      at: NOW,
+      by: null,
+      byName: 'retention sweep',
+      action: 'retentionDelete',
+      detail: { count: 2, claimIds: ['1', '2'] },
     });
-    expect(byClaim['2'].state).toBe('rejected');
+    expect(JSON.stringify(entries)).not.toMatch(/char:|characterId|Must Not Leak/);
     expect(JSON.stringify(await audit(CORP_B))).not.toContain('Must Not Leak');
     expect(await audit(CORP_B)).toHaveLength(1);
   });
@@ -93,10 +92,25 @@ suite('SRP retention sweep (emulator)', () => {
 
     const first = await sweepSrpClaims(db, NOW, { maxDeletes: 6, pageSize: 2 });
     expect(first).toEqual({ deleted: 6, failed: 0, truncated: true });
-    const second = await sweepSrpClaims(db, NOW, { maxDeletes: 6, pageSize: 2 });
+    const second = await sweepSrpClaims(db, NOW + 1000, { maxDeletes: 6, pageSize: 2 });
     expect(second).toEqual({ deleted: 2, failed: 0, truncated: false });
     expect(await claimIds(CORP_A)).toEqual([]);
     expect(await claimIds(CORP_B)).toEqual([]);
-    expect((await audit(CORP_A)).length + (await audit(CORP_B)).length).toBe(8);
+    // CORP_A: one entry (run 1). CORP_B: one entry per run.
+    expect((await audit(CORP_A)).length + (await audit(CORP_B)).length).toBe(3);
+  });
+
+  it('splits a corp with more than 200 deleted claims into several entries, ids only', async () => {
+    const writes = [];
+    for (let id = 1; id <= 450; id += 1) writes.push(put(CORP_A, id, 'paid', OLD - id));
+    await Promise.all(writes);
+    expect(await sweepSrpClaims(db, NOW, { maxDeletes: 500 })).toEqual({
+      deleted: 450,
+      failed: 0,
+      truncated: false,
+    });
+    const entries = await audit(CORP_A);
+    expect(entries.map((e) => e.detail.count).sort((a, b) => a - b)).toEqual([50, 200, 200]);
+    expect(entries.flatMap((e) => e.detail.claimIds)).toHaveLength(450);
   });
 });

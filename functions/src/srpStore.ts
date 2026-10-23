@@ -14,7 +14,6 @@ import { randomBytes } from 'node:crypto';
 import { type Firestore, type Transaction } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
-  ACCESS_TTL_MS,
   decideRoles,
   isCacheFresh,
   satisfies,
@@ -48,6 +47,13 @@ import {
   type SrpSettingsPatch,
 } from './srpTypes.js';
 import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
+
+/**
+ * How long an officer record lets rules show the queue, claims, audit and settings. Short on
+ * purpose: rules read only this record, so a demoted or removed officer keeps read access until
+ * it expires. (ADR 0023 accepted 24h for the Tax Book; SRP holds every pilot's claims.)
+ */
+export const SRP_OFFICER_TTL_MS = 3_600_000;
 
 export interface SrpDeps extends Pick<BookDeps, 'db' | 'now' | 'verifyToken' | 'readIdentity'> {
   /** A Character's corporation from public ESI: no token, no scope. */
@@ -120,7 +126,7 @@ export async function authorizeMember(
 /**
  * Establishes what the caller may do as an SRP officer. Officer calls re-check
  * live (`live: true`, the default): ESI roles are read on every call. The
- * 24-hour `srpOfficers/{uid}` record that lets rules show the officer the
+ * 1-hour `srpOfficers/{uid}` record that lets rules show the officer the
  * queue is (re)written whenever SRP has been turned on and the caller holds
  * Director or Accountant, and deleted when a renewal finds them demoted or gone.
  */
@@ -170,7 +176,7 @@ export async function authorizeSrpOfficer(
       corporationId: call.corporationId,
       roles: identity.roles,
       checkedAt: now,
-      expiresAt: now + ACCESS_TTL_MS,
+      expiresAt: now + SRP_OFFICER_TTL_MS,
     };
     if ((await srpSettingsRef(deps.db, call.corporationId).get()).exists) {
       await officerRef.set(access);
@@ -215,7 +221,7 @@ export interface VerifySrpOfficerResult {
   expiresAt: number;
 }
 
-/** Checks roles with ESI and records officer access for 24 hours, so rules show the queue. */
+/** Checks roles with ESI and records officer access for an hour, so rules show the queue. */
 export async function verifySrpOfficer(
   deps: SrpDeps,
   caller: Caller,
@@ -428,12 +434,6 @@ export async function fileSrpClaim(
   }
   const { killmailId } = input.ref;
   const ref = claimRef(deps.db, corporationId, killmailId);
-  // Cheap early refusal; the transaction below re-checks against a racing second filing.
-  const early = refileDecision((await ref.get()).data());
-  if (early === 'refile' && input.note === null) {
-    fail('invalid-argument', 'A re-filed claim needs a note', 'note-required');
-  }
-
   const zkill = await softZkill(deps.killmails, killmailId);
   const hash = input.ref.hash ?? zkill.hash;
   if (!hash) {
@@ -453,6 +453,12 @@ export async function fileSrpClaim(
       'You were not in this corporation for that loss',
       'loss-in-other-corp'
     );
+  }
+  // Only after the victim checks: before them, `already-claimed` would tell any member whether
+  // another pilot's killmail has a claim. The transaction below re-checks against a racing filing.
+  const early = refileDecision((await ref.get()).data());
+  if (early === 'refile' && input.note === null) {
+    fail('invalid-argument', 'A re-filed claim needs a note', 'note-required');
   }
   const now = deps.now();
   if (!withinWindow(km.killedAt, now, settings.windowDays)) {

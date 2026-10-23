@@ -15,6 +15,7 @@ import {
   type ApproveItem,
   type ChangeAmountItem,
   type Decision,
+  type MarkPaidItem,
   type Officer,
   type RejectItem,
   type SrpClaimOutcome,
@@ -131,11 +132,11 @@ export async function markSrpClaimPaid(
   deps: SrpDeps,
   caller: Caller,
   call: BookCall,
-  killmailId: number
+  item: MarkPaidItem
 ): Promise<SrpClaimOutcome> {
   const officer = officerOf(await authorizeSrpOfficer(deps, caller, call, 'edit'));
-  return apply(deps, call, officer, killmailId, 'markClaimPaid', (claim, now) =>
-    decideMarkPaid(claim, killmailId, officer, now)
+  return apply(deps, call, officer, item.killmailId, 'markClaimPaid', (claim, now) =>
+    decideMarkPaid(claim, item, officer, now)
   );
 }
 
@@ -143,15 +144,15 @@ export async function markSrpClaimsPaid(
   deps: SrpDeps,
   caller: Caller,
   call: BookCall,
-  killmailIds: number[]
+  items: MarkPaidItem[]
 ): Promise<SrpBatchOutcome> {
   const officer = officerOf(await authorizeSrpOfficer(deps, caller, call, 'edit'));
   const results: SrpBatchResult[] = [];
-  for (const id of killmailIds) {
+  for (const item of items) {
     results.push(
-      await settle(id, () =>
-        apply(deps, call, officer, id, 'markClaimPaid', (claim, now) =>
-          decideMarkPaid(claim, id, officer, now)
+      await settle(item.killmailId, () =>
+        apply(deps, call, officer, item.killmailId, 'markClaimPaid', (claim, now) =>
+          decideMarkPaid(claim, item, officer, now)
         )
       )
     );

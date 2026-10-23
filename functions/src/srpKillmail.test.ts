@@ -107,7 +107,7 @@ describe('pricingInput', () => {
     appraisalPct: 60,
     hullRules: [
       { scope: 'hull' as const, id: 587, kind: 'pay-fixed' as const, iskAmount: 5_000_000 },
-      { scope: 'class' as const, id: 25, kind: 'pay-percent' as const, pct: 50 },
+      { scope: 'class' as const, id: 25, kind: 'pay-percent' as const },
       { scope: 'class' as const, id: 27, kind: 'not-covered' as const },
     ],
   };
@@ -117,12 +117,23 @@ describe('pricingInput', () => {
     const input = pricingInput(settings, 587, 25, values);
     expect(priceSrpClaim(input)).toMatchObject({ kind: 'amount', isk: 5_000_000 });
   });
-  it('a pay-percent rule replaces the corp percents', () => {
+  it('a pay-percent rule follows the corp chain, killmail percent first', () => {
     const input = pricingInput(settings, 588, 25, values);
     expect(priceSrpClaim(input)).toMatchObject({
       kind: 'amount',
-      isk: 5_000_000,
-      basis: { step: 'killmail-percent', percent: 50 },
+      isk: 8_000_000,
+      basis: { step: 'killmail-percent', percent: 80 },
+    });
+  });
+  it('a pay-percent rule falls to the Appraisal percent when the killmail has no value', () => {
+    const input = pricingInput(settings, 588, 25, {
+      killmailValue: null,
+      appraisalValue: 10_000_000,
+    });
+    expect(priceSrpClaim(input)).toMatchObject({
+      kind: 'amount',
+      isk: 6_000_000,
+      basis: { step: 'appraisal-percent', percent: 60 },
     });
   });
   it('a not-covered class refuses', () => {

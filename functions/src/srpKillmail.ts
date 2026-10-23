@@ -161,8 +161,8 @@ function engineRule(rule: HullRule): SrpHullRule {
 }
 
 /**
- * The engine's input. A Pay rule with its own percent replaces the corp's percents for this
- * claim, whichever of killmail value or Appraisal the chain ends up using.
+ * The engine's input. A Pay: corp percent rule follows the corp's chain: its killmail percent,
+ * then its Appraisal percent, each as the corp set it.
  */
 export function pricingInput(
   settings: Pick<SrpSettings, 'killmailPct' | 'appraisalPct' | 'hullRules'>,
@@ -175,8 +175,6 @@ export function pricingInput(
   for (const rule of settings.hullRules) {
     (rule.scope === 'hull' ? hullRules : classRules)[rule.id] = engineRule(rule);
   }
-  const own = matchedHullRule(settings.hullRules, hullTypeId, classId);
-  const ownPct = own?.kind === 'pay-percent' ? own.pct : null;
   return {
     hullTypeId,
     classId,
@@ -184,7 +182,7 @@ export function pricingInput(
     classRules,
     killmailValue: values.killmailValue,
     appraisalValue: values.appraisalValue,
-    killmailPercent: ownPct ?? settings.killmailPct,
-    appraisalPercent: ownPct ?? settings.appraisalPct,
+    killmailPercent: settings.killmailPct,
+    appraisalPercent: settings.appraisalPct,
   };
 }

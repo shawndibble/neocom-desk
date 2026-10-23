@@ -190,19 +190,131 @@ suite('SRP officer actions (emulator)', () => {
         )
       )
     ).toBe('illegal-transition');
-    expect(await reason(markSrpClaimPaid(deps(), who(DIRECTOR), call(DIRECTOR), 2))).toBe(
-      'claim-not-found'
-    );
+    expect(
+      await reason(markSrpClaimPaid(deps(), who(DIRECTOR), call(DIRECTOR), { killmailId: 2 }))
+    ).toBe('claim-not-found');
     await seed(3);
-    expect(await reason(markSrpClaimPaid(deps(), who(DIRECTOR), call(DIRECTOR), 3))).toBe(
-      'illegal-transition'
-    );
-    await markSrpClaimPaid(deps(), who(DIRECTOR), call(DIRECTOR), 1);
-    expect(await reason(markSrpClaimPaid(deps(), who(DIRECTOR), call(DIRECTOR), 1))).toBe(
-      'illegal-transition'
-    );
+    expect(
+      await reason(markSrpClaimPaid(deps(), who(DIRECTOR), call(DIRECTOR), { killmailId: 3 }))
+    ).toBe('illegal-transition');
+    await markSrpClaimPaid(deps(), who(DIRECTOR), call(DIRECTOR), { killmailId: 1 });
+    expect(
+      await reason(markSrpClaimPaid(deps(), who(DIRECTOR), call(DIRECTOR), { killmailId: 1 }))
+    ).toBe('illegal-transition');
     expect(await reason(approve(1))).toBe('illegal-transition');
     expect(await audit()).toHaveLength(2);
+  });
+
+  it('blocks an officer deciding their own claim, even as a batch; another officer may', async () => {
+    await seed(1, { characterId: DIRECTOR, uid: `char:${DIRECTOR}` });
+    expect(await reason(approve(1, DIRECTOR))).toBe('own-claim');
+    expect(
+      await reason(
+        rejectSrpClaim(
+          deps(),
+          who(DIRECTOR),
+          call(DIRECTOR),
+          parseReject({ killmailId: 1, reason: 'x' })
+        )
+      )
+    ).toBe('own-claim');
+    expect(
+      await reason(
+        changeSrpClaimAmount(
+          deps(),
+          who(DIRECTOR),
+          call(DIRECTOR),
+          parseChangeAmount({ killmailId: 1, amount: 5, reason: 'x' })
+        )
+      )
+    ).toBe('own-claim');
+    const batch = await approveSrpClaims(
+      deps(),
+      who(DIRECTOR),
+      call(DIRECTOR),
+      parseApproveBatch({ claims: [{ killmailId: 1 }] })
+    );
+    expect(batch.results[0]).toMatchObject({ ok: false, reason: 'own-claim' });
+    expect(await claimDoc(1)).toMatchObject({ state: 'pending', amount: 1_000_000 });
+    expect(await audit()).toHaveLength(0);
+    await approve(1, ACCOUNTANT);
+    expect(
+      await reason(markSrpClaimPaid(deps(), who(DIRECTOR), call(DIRECTOR), { killmailId: 1 }))
+    ).toBe('own-claim');
+    expect(await claimDoc(1)).toMatchObject({ state: 'approved' });
+  });
+
+  it('refuses an approval or payment when the amount changed under the officer', async () => {
+    await seed(1);
+    await changeSrpClaimAmount(
+      deps(),
+      who(ACCOUNTANT),
+      call(ACCOUNTANT),
+      parseChangeAmount({ killmailId: 1, amount: 900_000, reason: 'fit' })
+    );
+    expect(await reason(approve(1, DIRECTOR, { expectedAmount: 1_000_000 }))).toBe(
+      'amount-changed'
+    );
+    const batch = await approveSrpClaims(
+      deps(),
+      who(DIRECTOR),
+      call(DIRECTOR),
+      parseApproveBatch({ claims: [{ killmailId: 1, expectedAmount: 1_000_000 }] })
+    );
+    expect(batch.results[0]).toMatchObject({ ok: false, reason: 'amount-changed' });
+    expect(await claimDoc(1)).toMatchObject({ state: 'pending' });
+    await approve(1, DIRECTOR, { expectedAmount: 900_000 });
+    // Approved amount is then changed under a second officer about to pay.
+    await changeSrpClaimAmount(
+      deps(),
+      who(ACCOUNTANT),
+      call(ACCOUNTANT),
+      parseChangeAmount({ killmailId: 1, amount: 800_000, reason: 'again' })
+    );
+    expect(
+      await reason(
+        markSrpClaimPaid(deps(), who(DIRECTOR), call(DIRECTOR), {
+          killmailId: 1,
+          expectedAmount: 900_000,
+        })
+      )
+    ).toBe('amount-changed');
+    const paid = await markSrpClaimsPaid(deps(), who(DIRECTOR), call(DIRECTOR), [
+      { killmailId: 1, expectedAmount: 800_000 },
+    ]);
+    expect(paid.results[0]).toMatchObject({ ok: true, state: 'paid', amount: 800_000 });
+  });
+
+  it('changes the amount of an approved claim without a new state or closedAt; not a paid one', async () => {
+    await seed(1);
+    await approve(1);
+    now = T0 + 7;
+    const out = await changeSrpClaimAmount(
+      deps(),
+      who(ACCOUNTANT),
+      call(ACCOUNTANT),
+      parseChangeAmount({ killmailId: 1, amount: 700_000, reason: 'bad fit' })
+    );
+    expect(out).toMatchObject({ state: 'approved', amount: 700_000 });
+    const doc = await claimDoc(1);
+    expect(doc).toMatchObject({ state: 'approved', amount: 700_000, computedAmount: 1_000_000 });
+    expect(doc).not.toHaveProperty('closedAt');
+    const last = (await audit()).at(-1);
+    expect(last).toMatchObject({
+      action: 'changeClaimAmount',
+      detail: { from: 1_000_000, amount: 700_000, reason: 'bad fit' },
+    });
+    await markSrpClaimPaid(deps(), who(DIRECTOR), call(DIRECTOR), { killmailId: 1 });
+    expect(
+      await reason(
+        changeSrpClaimAmount(
+          deps(),
+          who(ACCOUNTANT),
+          call(ACCOUNTANT),
+          parseChangeAmount({ killmailId: 1, amount: 1, reason: 'x' })
+        )
+      )
+    ).toBe('illegal-transition');
   });
 
   it('two racing approvals: exactly one wins', async () => {
@@ -239,7 +351,9 @@ suite('SRP officer actions (emulator)', () => {
     await seed(1);
     await approve(1);
     now = T0 + 9000;
-    const out = await markSrpClaimPaid(deps(), who(ACCOUNTANT), call(ACCOUNTANT), 1);
+    const out = await markSrpClaimPaid(deps(), who(ACCOUNTANT), call(ACCOUNTANT), {
+      killmailId: 1,
+    });
     expect(out).toMatchObject({ state: 'paid', amount: 1_000_000, characterId: 50 });
     expect(await claimDoc(1)).toMatchObject({
       state: 'paid',
@@ -316,7 +430,10 @@ suite('SRP officer actions (emulator)', () => {
       'illegal-transition',
       'claim-not-found',
     ]);
-    const paid = await markSrpClaimsPaid(deps(), who(DIRECTOR), call(DIRECTOR), [1, 2]);
+    const paid = await markSrpClaimsPaid(deps(), who(DIRECTOR), call(DIRECTOR), [
+      { killmailId: 1 },
+      { killmailId: 2 },
+    ]);
     expect(paid.results.map((r) => (r.ok ? r.state : r.reason))).toEqual([
       'paid',
       'illegal-transition',

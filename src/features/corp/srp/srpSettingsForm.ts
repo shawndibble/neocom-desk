@@ -4,9 +4,8 @@
  * `saveSrpSettingsCallable` takes. Pure: no fetch, DOM or Dexie.
  *
  * Percents are valid 1-100 or blank (blank = that step of the pricing chain is off, the
- * same rule as `engine/srpPricing.ts`). A `pay-percent` Hull Rule means "the corp's percent
- * of value", which the server's rule shape stores as a `pct`: it is filled from the corp's
- * killmail percent, else its Appraisal percent, on every save, so it never goes stale.
+ * same rule as `engine/srpPricing.ts`). A `pay-percent` Hull Rule means "follow the corp's
+ * percent chain" (killmail percent, then Appraisal percent) and carries no figure of its own.
  */
 import {
   MAX_CLAIM_WINDOW_DAYS,
@@ -126,9 +125,6 @@ export function formProblems(form: SrpSettingsForm): FormProblems {
 }
 
 function rulesOf(form: SrpSettingsForm): HullRule[] {
-  const km = parsePct(form.killmailPct);
-  const ap = parsePct(form.appraisalPct);
-  const corpPct = typeof km === 'number' ? km : typeof ap === 'number' ? ap : 0;
   const out: HullRule[] = [];
   for (const [key, draft] of Object.entries(form.rules)) {
     if (draft.kind === 'none') continue;
@@ -137,7 +133,7 @@ function rulesOf(form: SrpSettingsForm): HullRule[] {
     if (draft.kind === 'pay-fixed') {
       out.push({ ...base, kind: 'pay-fixed', iskAmount: parseFixed(draft.isk) ?? 0 });
     } else if (draft.kind === 'pay-percent') {
-      out.push({ ...base, kind: 'pay-percent', pct: corpPct });
+      out.push({ ...base, kind: 'pay-percent' });
     } else {
       out.push({ ...base, kind: draft.kind });
     }
@@ -159,8 +155,8 @@ export function formToPatch(form: SrpSettingsForm, saved: SrpSettings): SrpSetti
   if (days !== null && days !== saved.windowDays) patch.windowDays = days;
   if (form.requireFleetOrFc !== saved.requireFleetOrFc)
     patch.requireFleetOrFc = form.requireFleetOrFc;
-  // Compared as the saved form would send them (pay-percent pcts re-derived from each form's
-  // percents), so stale pcts and list order never read as edits.
+  // Compared as the saved form would send them, so stale legacy pcts and list order never read
+  // as edits.
   const rules = rulesOf(form);
   if (!sameRules(rules, rulesOf(formFromSettings(saved)))) patch.hullRules = rules;
   return patch;

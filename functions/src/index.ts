@@ -227,8 +227,8 @@ import {
   parseApproveBatch,
   parseApproveItem,
   parseChangeAmount,
-  parseKillmailId,
-  parseKillmailIds,
+  parseMarkPaidBatch,
+  parseMarkPaidItem,
   parseReject,
 } from './srpOfficer.js';
 import {
@@ -1234,7 +1234,7 @@ export const markSrpClaimPaidCallable = corpTaxBookCallable(
       srpDeps(),
       callerOf(request),
       parseBookCall(request.data),
-      parseKillmailId(request.data)
+      parseMarkPaidItem(request.data)
     )
 );
 
@@ -1246,7 +1246,7 @@ export const markSrpClaimsPaidCallable = corpTaxBookCallable(
       srpDeps(),
       callerOf(request),
       parseBookCall(request.data),
-      parseKillmailIds(request.data)
+      parseMarkPaidBatch(request.data)
     )
 );
 
