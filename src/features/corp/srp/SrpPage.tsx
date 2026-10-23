@@ -1,13 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import { PageHeader, Tabs, useTabsId } from '@/components/ui';
+import { cx } from '@/lib/cx';
 import { usePageTab } from '@/lib/usePageTab';
 import { SRP_TABS } from './srpTabs';
 import { SRP_VIEWS } from './srpViews';
 
 /**
- * `/corp/srp`'s body (issues #4851, #4852): the page header and the views `srpViews.ts` lists
+ * `/corp/srp`'s body (issues #4851-#4853): the page header and the views `srpViews.ts` lists
  * for this pilot. One view renders bare; two or more get a tab bar (`SRP_TABS`, a path segment).
- * A tab the pilot has no view for (a stale link) falls back to the first they have.
+ * A tab the pilot has no view for (a stale link, or the bare path for a member) falls back to
+ * the first they have.
  */
 export function SrpPage({ canManageSrp, srpOn }: { canManageSrp: boolean; srpOn: boolean }) {
   const { t } = useTranslation();
@@ -18,7 +20,7 @@ export function SrpPage({ canManageSrp, srpOn }: { canManageSrp: boolean; srpOn:
   if (!view) return null;
   const View = view.component;
   return (
-    <div className="mx-auto grid max-w-5xl gap-4 px-4 py-4">
+    <div className={cx('mx-auto grid gap-4 px-4 py-4', view.wide ? 'max-w-6xl' : 'max-w-5xl')}>
       <PageHeader title={t('srp.title')} />
       {views.length > 1 && (
         <Tabs

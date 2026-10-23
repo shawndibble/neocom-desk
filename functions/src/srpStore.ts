@@ -60,7 +60,7 @@ export const srpSettingsRef = (db: Firestore, corporationId: number) =>
   corpRef(db, corporationId).collection(SRP_SETTINGS_COLLECTION).doc(SRP_SETTINGS_DOC);
 const officersOf = (db: Firestore, corporationId: number) =>
   corpRef(db, corporationId).collection(SRP_OFFICERS);
-const claimRef = (db: Firestore, corporationId: number, killmailId: number) =>
+export const claimRef = (db: Firestore, corporationId: number, killmailId: number) =>
   corpRef(db, corporationId).collection(SRP_CLAIMS).doc(String(killmailId));
 
 const rand = () => randomBytes(6).toString('base64url');
@@ -187,7 +187,7 @@ export async function authorizeSrpOfficer(
 
 // --- Audit -----------------------------------------------------------------
 
-function appendSrpAudit(
+export function appendSrpAudit(
   tx: Transaction,
   deps: SrpDeps,
   corporationId: number,

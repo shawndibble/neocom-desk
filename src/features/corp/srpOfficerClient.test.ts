@@ -1,0 +1,60 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const fns = vi.hoisted(() => ({ callable: vi.fn(), httpsCallable: vi.fn() }));
+vi.mock('firebase/functions', () => ({ httpsCallable: fns.httpsCallable }));
+vi.mock('@/sync/firebaseApp', () => ({
+  getSyncFirestore: vi.fn(),
+  getSyncFunctions: () => 'functions',
+}));
+vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn().mockResolvedValue(undefined) }));
+const token = vi.hoisted(() => vi.fn());
+vi.mock('@/auth/session', () => ({ getValidAccessToken: token }));
+vi.mock('firebase/firestore/lite', () => ({
+  collection: vi.fn(),
+  getDocs: vi.fn(),
+  limit: vi.fn(),
+  orderBy: vi.fn(),
+  query: vi.fn(),
+  where: vi.fn(),
+}));
+
+import {
+  approveSrpClaim,
+  approveSrpClaims,
+  changeSrpClaimAmount,
+  markSrpClaimPaid,
+  markSrpClaimsPaid,
+  rejectSrpClaim,
+} from './srpOfficerClient';
+
+const CORP = 98000001;
+const sent = (action: string, data: Record<string, unknown>) => {
+  expect(fns.httpsCallable).toHaveBeenCalledWith('functions', 'corpTaxBookCall');
+  expect(fns.callable).toHaveBeenLastCalledWith({ action, data });
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  token.mockResolvedValue('access-token');
+  fns.httpsCallable.mockReturnValue(fns.callable);
+  fns.callable.mockResolvedValue({ data: { ok: true } });
+});
+
+describe('SRP officer client', () => {
+  it('sends each action with the access token and the claim', async () => {
+    const auth = { corporationId: CORP, accessToken: 'access-token' };
+    await approveSrpClaim(7, CORP, { killmailId: 5, amount: 9, reason: 'r' });
+    sent('approveSrpClaimCallable', { ...auth, killmailId: 5, amount: 9, reason: 'r' });
+    await approveSrpClaims(7, CORP, [{ killmailId: 5 }, { killmailId: 6 }]);
+    sent('approveSrpClaimsCallable', { ...auth, claims: [{ killmailId: 5 }, { killmailId: 6 }] });
+    await rejectSrpClaim(7, CORP, 5, 'solo');
+    sent('rejectSrpClaimCallable', { ...auth, killmailId: 5, reason: 'solo' });
+    await changeSrpClaimAmount(7, CORP, 5, 100, 'why');
+    sent('changeSrpClaimAmountCallable', { ...auth, killmailId: 5, amount: 100, reason: 'why' });
+    await markSrpClaimPaid(7, CORP, 5);
+    sent('markSrpClaimPaidCallable', { ...auth, killmailId: 5 });
+    await markSrpClaimsPaid(7, CORP, [5, 6]);
+    sent('markSrpClaimsPaidCallable', { ...auth, killmailIds: [5, 6] });
+    expect(token).toHaveBeenCalledWith(7);
+  });
+});

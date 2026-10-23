@@ -224,6 +224,22 @@ import {
 import { sweepFleetPayouts } from './communityFleetPayoutsCleanup.js';
 import { sweepSrpClaims } from './srpCleanup.js';
 import {
+  parseApproveBatch,
+  parseApproveItem,
+  parseChangeAmount,
+  parseKillmailId,
+  parseKillmailIds,
+  parseReject,
+} from './srpOfficer.js';
+import {
+  approveSrpClaim,
+  approveSrpClaims,
+  changeSrpClaimAmount,
+  markSrpClaimPaid,
+  markSrpClaimsPaid,
+  rejectSrpClaim,
+} from './srpOfficerStore.js';
+import {
   MutamarketBusyError,
   MutamarketInputError,
   MutamarketProxy,
@@ -1158,6 +1174,79 @@ export const saveSrpSettingsCallable = corpTaxBookCallable(
       callerOf(request),
       parseBookCall(request.data),
       parseSrpSettingsPatch((request.data as { settings?: unknown } | null)?.settings)
+    )
+);
+
+// Officer queue (#4853): each re-checks Director/Accountant live and guards the state change in a transaction.
+export const approveSrpClaimCallable = corpTaxBookCallable(
+  'approveSrpClaimCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    approveSrpClaim(
+      srpDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseApproveItem(request.data)
+    )
+);
+
+export const approveSrpClaimsCallable = corpTaxBookCallable(
+  'approveSrpClaimsCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    approveSrpClaims(
+      srpDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseApproveBatch(request.data)
+    )
+);
+
+export const rejectSrpClaimCallable = corpTaxBookCallable(
+  'rejectSrpClaimCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    rejectSrpClaim(
+      srpDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseReject(request.data)
+    )
+);
+
+export const changeSrpClaimAmountCallable = corpTaxBookCallable(
+  'changeSrpClaimAmountCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    changeSrpClaimAmount(
+      srpDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseChangeAmount(request.data)
+    )
+);
+
+export const markSrpClaimPaidCallable = corpTaxBookCallable(
+  'markSrpClaimPaidCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    markSrpClaimPaid(
+      srpDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseKillmailId(request.data)
+    )
+);
+
+export const markSrpClaimsPaidCallable = corpTaxBookCallable(
+  'markSrpClaimsPaidCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    markSrpClaimsPaid(
+      srpDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseKillmailIds(request.data)
     )
 );
 
