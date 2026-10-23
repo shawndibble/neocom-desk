@@ -69,5 +69,17 @@ export const OverflowOnPhone: Story = {
   globals: { viewport: { value: 'phone390', isRotated: false } },
 };
 
+/** @summary The same overflow in a narrow desktop frame: a pointer gets edge chevrons and wheel travel instead of a swipe. */
+export const OverflowWithPointer: Story = {
+  args: OverflowOnPhone.args,
+  decorators: [
+    (Story) => (
+      <div className="w-[26rem]">
+        <Story />
+      </div>
+    ),
+  ],
+};
+
 /** @summary Manual activation: arrows move focus only, Enter or Space selects. Use when `onChange` navigates. */
 export const ManualActivation: Story = { args: { activation: 'manual' } };
