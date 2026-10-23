@@ -1,4 +1,4 @@
-// SRP Doctrine Fit input (#4857, ADR 0026): parsing the Director's save and delete, no Firestore.
+// SRP Doctrine Fit input: parsing the Director's save and delete, no Firestore.
 // The client sends an already-built snapshot (pasted EFT or a picked Fitting, resolved to type
 // ids); the server only checks its shape and bounds, and sorts the lists.
 

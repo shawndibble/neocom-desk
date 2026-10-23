@@ -1,5 +1,5 @@
 /**
- * Doctrine Fit sources (#4857): an EFT paste or a saved Fitting becomes the corp's
+ * Doctrine Fit sources: an EFT paste or a saved Fitting becomes the corp's
  * snapshot. Client only (reuses the Fittings loaders); the match itself is srpDoctrine.ts.
  */
 import {

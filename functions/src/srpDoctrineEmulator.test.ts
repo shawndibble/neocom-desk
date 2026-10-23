@@ -278,6 +278,15 @@ suite('SRP doctrine-fit (emulator)', () => {
       expect(await reason(setRules(rule([id])))).toBe('doctrine-hull-mismatch');
       expect((await settings())?.hullRules).toEqual([]);
     });
+
+    it('refuses moving a listed fit to another hull, but allows it once unlisted', async () => {
+      const { id } = await save(fit());
+      await setRules(rule([id]));
+      expect(await reason(save({ ...fit({}, 999), id }))).toBe('doctrine-hull-listed');
+      await setRules({ hullRules: [{ scope: 'hull', id: HULL, kind: 'pay-percent' }] });
+      await save({ ...fit({}, 999), id });
+      expect((await doctrines())[0].snapshot.hullTypeId).toBe(999);
+    });
   });
 
   describe('filing', () => {

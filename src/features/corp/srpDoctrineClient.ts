@@ -1,5 +1,5 @@
 /**
- * Doctrine Fits as the client sees them (ADR 0026, #4857). A Director's reads go to Firestore
+ * Doctrine Fits as the client sees them (ADR 0026). A Director's reads go to Firestore
  * under the rules (`verifySrpOfficer` first); every change and the pilot's pre-filing check are
  * callables. Only a short-lived access token is sent; the refresh token never leaves Dexie.
  */
@@ -68,7 +68,7 @@ export function deleteSrpDoctrine(
 }
 
 /**
- * Any member (the member page's backend stand-in covers Storybook): the check a filing of this killmail would store, with nothing written. A hull the
+ * Any member: the check a filing of this killmail would store, with nothing written. A hull the
  * corp does not check answers `not-checked`.
  */
 export async function previewSrpDoctrineCheck(

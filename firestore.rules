@@ -607,7 +607,7 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // Doctrine Fits (issue #4857): officers read them; a pilot gets the pre-filing result
+      // Doctrine Fits: officers read them; a pilot gets the pre-filing result
       // through a callable, never the list. Written only by the doctrine callables.
       match /srpDoctrines/{doctrineId} {
         allow get, list: if isSrpOfficer();

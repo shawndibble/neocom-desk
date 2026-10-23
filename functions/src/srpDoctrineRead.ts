@@ -1,4 +1,4 @@
-// SRP Doctrine Fits (#4857, ADR 0026): reading them. Kept apart from srpStore.ts so the settings
+// SRP Doctrine Fits: reading them. Kept apart from srpStore.ts so the settings
 // save and the file-claim callable can read fits without a cycle with the doctrine callables.
 
 import type { Firestore, Transaction } from 'firebase-admin/firestore';

@@ -1,4 +1,4 @@
-// SRP doctrine-fit (#4857, ADR 0026): runs the pure match engine on a server-fetched killmail.
+// SRP doctrine-fit: runs the pure match engine on a server-fetched killmail.
 // No Firestore, no fetch. A Hull Rule's `doctrineIds` are hull-scope only: a doctrine is for one
 // hull, and a class rule has no single hull to compare against.
 

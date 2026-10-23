@@ -1,6 +1,6 @@
 // Mirror of src/engine/srpDoctrine.ts; srpDoctrine.test.ts checks they match.
 /**
- * SRP doctrine-fit match (#4857, ADR 0026). Pure, self-contained (no imports) so
+ * SRP doctrine-fit match. Pure, self-contained (no imports) so
  * functions/src/srpDoctrine.ts can mirror it byte for byte.
  *
  * Compares what a killmail's ship was fitted with to a hull's Doctrine Fits:

@@ -1,4 +1,4 @@
-// SRP Doctrine Fits (#4857, ADR 0026): the admin-SDK half. A Director saves or deletes a corp's
+// SRP Doctrine Fits: the admin-SDK half. A Director saves or deletes a corp's
 // Doctrine Fit snapshot (re-checked live, CEO included, like Hull Rules); each change appends to
 // the immutable audit log in the same transaction. Any member may preview the fit check of their
 // own loss; that writes nothing. Parsing: srpDoctrineInput.ts; the match: srpDoctrineCheck.ts.
@@ -42,6 +42,18 @@ export async function saveSrpDoctrine(
     const existing = (await tx.get(ref)).data() as DoctrineFit | undefined;
     if (input.id !== undefined && !existing) {
       fail('not-found', 'No such Doctrine Fit', 'doctrine-not-found');
+    }
+    if (existing && existing.snapshot.hullTypeId !== input.snapshot.hullTypeId) {
+      // a rule lists only fits of its own hull; moving one would silently un-check that hull
+      const settings = (await tx.get(srpSettingsRef(deps.db, call.corporationId))).data() as
+        SrpSettings | undefined;
+      if (settings?.hullRules.some((r) => r.doctrineIds?.includes(id))) {
+        fail(
+          'failed-precondition',
+          'A Hull Rule lists this Doctrine Fit; remove it there first',
+          'doctrine-hull-listed'
+        );
+      }
     }
     if (!existing) {
       // ids only: the cap needs a count, not the fits

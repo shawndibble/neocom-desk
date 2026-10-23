@@ -1,5 +1,5 @@
 /**
- * Where a Director's Doctrine Fit comes from (#4857): one of their saved Fittings, or pasted
+ * Where a Director's Doctrine Fit comes from: one of their saved Fittings, or pasted
  * EFT. Both become the engine's snapshot (`engine/srpDoctrineFit.ts`); the catalogs load on use.
  */
 import type { FittingRecord } from '@/db';
