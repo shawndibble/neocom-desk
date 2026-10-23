@@ -8,6 +8,7 @@ import {
   SlideOver,
   Spinner,
 } from '@/components/ui';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { Pill } from '@/components/ui/Pill';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
@@ -196,14 +197,16 @@ export function FleetPayoutDetail({
               >
                 {shares.map((share) => (
                   <li key={share.id} className="flex items-center gap-3 px-3 py-1.5">
-                    <Checkbox
-                      aria-label={t('communities.payouts.detail.paidToggle', {
-                        name: share.pilotName,
-                      })}
-                      checked={share.paid}
-                      disabled={busyId !== null}
-                      onChange={(e) => void toggle(share, e.target.checked)}
-                    />
+                    <label className={touchCheckboxLabelClassName}>
+                      <Checkbox
+                        aria-label={t('communities.payouts.detail.paidToggle', {
+                          name: share.pilotName,
+                        })}
+                        checked={share.paid}
+                        disabled={busyId !== null}
+                        onChange={(e) => void toggle(share, e.target.checked)}
+                      />
+                    </label>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{share.pilotName}</span>
                       <span className="flex flex-wrap items-center gap-1 text-xs text-text-dim">

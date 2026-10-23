@@ -12179,6 +12179,7 @@
           "fittings": "Fittings you share: name, hull and share code. Never notes or your skills.",
           "plans": "Skill Plans you share, one at a time: name and ordered skill targets. Never milestones, implants or your trained skills.",
           "requests": "Requests you post: the items and quantities, a location, a one-line note, whether you want to hear about Pledges in the app or by mail, and your Character's name.",
+          "payouts": "Fleet Payouts you open as the boss: the name, the loot value, the split, and each pilot's name and ISK with whether you marked it paid. Pilots who are not in the Community are stored by the name you typed. A Member can read only their own line; you read all of them. Deleted 30 days after posting.",
           "pledges": "Pledges you make: quantities, what you marked delivered, and the IDs of the contracts behind it. The contract IDs and delivered amounts come from your finished contracts, read on this device and uploaded while the app is open. Nothing else about the contracts is.",
           "mail": "Mail about invites and Pledges is sent from your own Character, so its text goes to EVE and not to us. Our server records only who was mailed and when, to enforce a daily limit."
         },

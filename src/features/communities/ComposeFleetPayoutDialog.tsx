@@ -11,6 +11,7 @@ import {
   TextArea,
   TextInput,
 } from '@/components/ui';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { Pill } from '@/components/ui/Pill';
 import {
   DEFAULT_HOLD_BACK_PCT,
@@ -423,13 +424,15 @@ export function ComposeFleetPayoutDialog({
                 const weightText = weights[pilot.key] ?? '1';
                 return (
                   <li key={pilot.key} className="flex items-center gap-3 px-3 py-1.5">
-                    <Checkbox
-                      aria-label={t('communities.payouts.compose.include', {
-                        name: pilot.pilotName,
-                      })}
-                      checked={on}
-                      onChange={(e) => toggleTick(pilot.key, e.target.checked)}
-                    />
+                    <label className={touchCheckboxLabelClassName}>
+                      <Checkbox
+                        aria-label={t('communities.payouts.compose.include', {
+                          name: pilot.pilotName,
+                        })}
+                        checked={on}
+                        onChange={(e) => toggleTick(pilot.key, e.target.checked)}
+                      />
+                    </label>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{pilot.pilotName}</span>
                       <span className="flex flex-wrap items-center gap-1 text-xs text-text-dim">
