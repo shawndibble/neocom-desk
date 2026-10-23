@@ -19,6 +19,9 @@ vi.mock('./useSrpResultMail', () => ({ useSrpResultMail: () => mailResult }));
 import { OfficerQueue } from './OfficerQueue';
 import type { SrpHistoryState, SrpQueueData } from './useSrpQueue';
 
+/** A Toast renders its line twice on purpose (visible, aria-hidden + sr-only live region); take the first. */
+const findLine = async (text: string | RegExp) => (await screen.findAllByText(text))[0]!;
+
 const claim = (killmailId: number, over: Partial<SrpClaim> = {}): SrpClaim => ({
   killmailId,
   corporationId: 98,
@@ -93,7 +96,7 @@ describe('OfficerQueue pending', () => {
     const data = setup(pendingSet());
     await userEvent.click(screen.getAllByRole('button', { name: 'Approve' })[0]!);
     expect(data.approve).toHaveBeenCalledWith({ killmailId: 1, expectedAmount: 1_000_000 });
-    expect(await screen.findByText(/Approved Pilot1/)).toBeInTheDocument();
+    expect(await findLine(/Approved Pilot1/)).toBeInTheDocument();
   });
 
   it('keeps Approve inert for a claim with no amount until one is typed', async () => {
@@ -120,7 +123,7 @@ describe('OfficerQueue pending', () => {
       { killmailId: 1, expectedAmount: 1_000_000 },
       { killmailId: 2, expectedAmount: 1_000_000 },
     ]);
-    expect(await screen.findByText('Approved 2 of 2')).toBeInTheDocument();
+    expect(await findLine('Approved 2 of 2')).toBeInTheDocument();
   });
 
   it('reports the result mail after a batch approve, and a failed one keeps the status', async () => {
@@ -129,7 +132,7 @@ describe('OfficerQueue pending', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
     await userEvent.click(screen.getByRole('button', { name: 'Approve (2)' }));
     expect(
-      await screen.findByText(
+      await findLine(
         'Approved 2 of 2. Mail sent to 1 pilot. Mail failed for Pilot2, status still saved.'
       )
     ).toBeInTheDocument();
@@ -148,7 +151,7 @@ describe('OfficerQueue pending', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Approve' })[0]!);
     expect(data.approve).toHaveBeenCalled();
     expect(
-      await screen.findByText(/Approved Pilot1.*No mail sent: mail permission missing\./)
+      await findLine(/Approved Pilot1.*No mail sent: mail permission missing\./)
     ).toBeInTheDocument();
   });
 
@@ -162,9 +165,7 @@ describe('OfficerQueue pending', () => {
     } as never);
     await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
     await userEvent.click(screen.getByRole('button', { name: 'Approve (2)' }));
-    expect(
-      await screen.findByText(/Approved 1 of 2\. 1 not changed: Another officer/)
-    ).toBeInTheDocument();
+    expect(await findLine(/Approved 1 of 2\. 1 not changed: Another officer/)).toBeInTheDocument();
   });
 
   it('words an amount that changed under the officer, plainly', async () => {
@@ -173,9 +174,7 @@ describe('OfficerQueue pending', () => {
       Object.assign(new Error('x'), { details: { reason: 'amount-changed' } })
     );
     await userEvent.click(screen.getAllByRole('button', { name: 'Approve' })[0]!);
-    expect(
-      await screen.findByText('The amount changed. Review it and try again.')
-    ).toBeInTheDocument();
+    expect(await findLine('The amount changed. Review it and try again.')).toBeInTheDocument();
   });
 
   it('keeps the grant-mail note when a run had no pilots to mail', async () => {
@@ -189,7 +188,7 @@ describe('OfficerQueue pending', () => {
     } as never);
     await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
     await userEvent.click(screen.getByRole('button', { name: 'Approve (2)' }));
-    await screen.findByText(/Approved 0 of 1/);
+    await findLine(/Approved 0 of 1/);
     expect(screen.getByText("Can't mail the pilot")).toBeInTheDocument();
   });
 
@@ -199,9 +198,7 @@ describe('OfficerQueue pending', () => {
       Object.assign(new Error('x'), { details: { reason: 'illegal-transition' } })
     );
     await userEvent.click(screen.getAllByRole('button', { name: 'Approve' })[0]!);
-    expect(
-      await screen.findByText('Another officer already decided that claim.')
-    ).toBeInTheDocument();
+    expect(await findLine('Another officer already decided that claim.')).toBeInTheDocument();
   });
 });
 
@@ -226,7 +223,7 @@ describe('OfficerQueue reject', () => {
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByRole('textbox'), 'Solo roam');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Reject claim' }));
-    expect(await screen.findByText(/Rejected Pilot1.*Mail sent to 1 pilot\./)).toBeInTheDocument();
+    expect(await findLine(/Rejected Pilot1.*Mail sent to 1 pilot\./)).toBeInTheDocument();
     expect(mailResult).toHaveBeenCalledWith('rejected', [
       expect.objectContaining({ claim: expect.objectContaining({ reason: 'Solo roam' }) }),
     ]);
