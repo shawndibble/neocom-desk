@@ -251,6 +251,14 @@ interface TaxTabProps {
   tabsId: string;
 }
 
+/**
+ * `table-fixed` from `sm`, with the trailing ⋮ column given the width the
+ * header's own `w-0` would otherwise zero: a fixed layout honours that 0, and
+ * the 28px button then overflows past the table's right edge, off screen
+ * behind the scroll container.
+ */
+const FIXED_WITH_ACTIONS = 'sm:table-fixed sm:[&_th:last-child]:w-11 sm:[&_td.dt-actions]:w-11';
+
 export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
@@ -1262,7 +1270,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                               {...taxExport.tableProps}
                               columns={openColumns}
                               rows={openRows}
-                              className="dt-dense-lead sm:table-fixed"
+                              className={`dt-dense-lead ${FIXED_WITH_ACTIONS}`}
                               rowKey={(dr) => dr.key}
                               label={t('miningTax.sections.openLabel')}
                               {...taxSort}
@@ -1291,7 +1299,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                           rows={historyRows}
                           // Months are sections here, not folded duplicates:
                           // their entries line up with Open's, unindented.
-                          className="dt-flat-groups sm:table-fixed"
+                          className={`dt-flat-groups ${FIXED_WITH_ACTIONS}`}
                           rowKey={(dr) => dr.key}
                           label={t('miningTax.sections.history')}
                           {...historySort}
