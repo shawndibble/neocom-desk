@@ -86,6 +86,20 @@ export function defaultSrpSettings(): Pick<
   };
 }
 
+/** An SRP Claim's state (scope decision: Pending -> Approved -> Paid, plus Rejected). */
+export type SrpClaimState = 'pending' | 'approved' | 'paid' | 'rejected';
+
+/**
+ * Written by the callables that close a claim (#4851 reject, #4852 mark paid) and by
+ * re-filing (which sets state back to 'pending' and removes `closedAt`). The retention sweep
+ * (#4856) reads `state` and `closedAt` only. `closedAt` is the epoch ms the claim became
+ * Paid or Rejected; absent while Pending or Approved. A claim without it is never swept.
+ */
+export interface SrpClaimClosure {
+  state: SrpClaimState;
+  closedAt?: number;
+}
+
 /**
  * The fields of an SRP Claim doc that rules and the officer gate rely on. The
  * file-claim callable (#4850) writes the rest. `uid` and `ownerHash` are the filer's

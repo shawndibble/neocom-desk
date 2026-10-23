@@ -218,6 +218,7 @@ import {
   setFleetShareDone,
 } from './communityFleetPayoutsStore.js';
 import { sweepFleetPayouts } from './communityFleetPayoutsCleanup.js';
+import { sweepSrpClaims } from './srpCleanup.js';
 import {
   MutamarketBusyError,
   MutamarketInputError,
@@ -1229,6 +1230,8 @@ export const corpTaxBookCall = onCall<unknown>(
  *   sequential reads and recursive deletes, so the function takes the 9-minute maximum timeout.
  * - sweepCommunityFleetPayouts (issue #4779): deletes Fleet Payouts expired a week ago, with
  *   their Shares. Bounded to 500 deletes a run.
+ * - sweepSrpClaims (issue #4856, ADR 0026): deletes Paid and Rejected SRP Claims a year after
+ *   they close, leaving an srpAudit line. Bounded to 500 deletes a run.
  */
 export const dailyHousekeeping = onSchedule(
   { schedule: 'every 24 hours', secrets: [ALERTS_TOKEN_KEY], timeoutSeconds: 540 },
@@ -1267,6 +1270,21 @@ export const dailyHousekeeping = onSchedule(
               });
             } else {
               logInfo('Community Fleet Payout sweep done', { deleted, failed, truncated });
+            }
+          },
+        },
+        {
+          name: 'sweepSrpClaims',
+          run: async () => {
+            const { deleted, failed, truncated } = await sweepSrpClaims(firestore(), Date.now());
+            if (failed > 0 || truncated) {
+              logWarn('SRP claim sweep incomplete, continues next run', {
+                deleted,
+                failed,
+                truncated,
+              });
+            } else {
+              logInfo('SRP claim sweep done', { deleted, failed, truncated });
             }
           },
         },
