@@ -5,14 +5,18 @@ import '@/i18n';
 import { CHARACTER_BOARD_ITEM_KINDS, type CharacterBoardItemKind } from '@/engine/character/board';
 import { CalendarKindFilterMenu } from './CalendarKindFilterMenu';
 
-async function openMenu(hidden: CharacterBoardItemKind[], onShowAll = vi.fn()) {
+async function openMenu(
+  hidden: CharacterBoardItemKind[],
+  onShowAll = vi.fn(),
+  counts = new Map<CharacterBoardItemKind, number>()
+) {
   const user = userEvent.setup();
   render(
     <CalendarKindFilterMenu
       hidden={hidden}
       onToggle={() => {}}
       onShowAll={onShowAll}
-      counts={new Map()}
+      counts={counts}
       readableKinds={[...CHARACTER_BOARD_ITEM_KINDS]}
       reauthKinds={[]}
       skillPlanChoices={[]}
@@ -53,5 +57,21 @@ describe('CalendarKindFilterMenu keyboard access', () => {
       'aria-disabled',
       'true'
     );
+  });
+});
+
+describe('CalendarKindFilterMenu empty kinds', () => {
+  it('drops a readable kind with nothing due', async () => {
+    const [first, second] = CHARACTER_BOARD_ITEM_KINDS;
+    await openMenu([], vi.fn(), new Map([[first, 2]]));
+    const rows = screen.getAllByRole('menuitemcheckbox');
+    expect(rows).toHaveLength(1);
+    expect(second).toBeDefined();
+  });
+
+  it('keeps a hidden kind so it can be turned back on', async () => {
+    const [first, second] = CHARACTER_BOARD_ITEM_KINDS;
+    await openMenu([second], vi.fn(), new Map([[first, 2]]));
+    expect(screen.getAllByRole('menuitemcheckbox')).toHaveLength(2);
   });
 });
