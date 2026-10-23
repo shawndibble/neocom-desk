@@ -135,25 +135,27 @@ describe('BuyerQuotes', () => {
     await vi.waitFor(() => expect(mocks.loadContracts).toHaveBeenCalled());
     expect(screen.queryByText('Finished')).not.toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
-    expect(mocks.remember).toHaveBeenLastCalledWith(200, new Map());
+    await vi.waitFor(() => expect(mocks.remember).toHaveBeenLastCalledWith(200, new Map()));
   });
 
   it('says a link is only the Member’s word when the buyer cannot confirm it', async () => {
     mocks.loadContracts.mockResolvedValue({ needsReauth: true, cached: null });
     show([pledge('char:100', { links: [{ contractId: 11, status: 'finished' }] })]);
     expect(await screen.findByText('Not confirmed in your contracts')).toBeInTheDocument();
-    expect(mocks.remember).toHaveBeenLastCalledWith(200, new Map());
+    await vi.waitFor(() => expect(mocks.remember).toHaveBeenLastCalledWith(200, new Map()));
   });
 
   it('remembers the linked contracts so the Contracts page can mark them', async () => {
     mocks.loadContracts.mockResolvedValue({ cached: { data: [contract()], truncated: false } });
     show([pledge('char:100', { links: [{ contractId: 11, status: 'outstanding' }] })]);
     await screen.findByRole('button');
-    expect(mocks.remember).toHaveBeenCalledWith(
-      200,
-      new Map([
-        [11, expect.objectContaining({ requestId: 'r1', communityId: 'c1', quotedTotal: 9000 })],
-      ])
+    await vi.waitFor(() =>
+      expect(mocks.remember).toHaveBeenCalledWith(
+        200,
+        new Map([
+          [11, expect.objectContaining({ requestId: 'r1', communityId: 'c1', quotedTotal: 9000 })],
+        ])
+      )
     );
   });
 });

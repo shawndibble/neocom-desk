@@ -74,19 +74,12 @@
     "goTo": "Go to…",
     "pageViews": "{{page}} views",
     "editRail": "Hide pages you don't use",
-    "editHint": "Hide pages and views you never use. They stay in Go to and in More, and a page's own tabs never change.",
+    "editHint": "Hide pages and views you never use. They stay in Go to, and a page's own tabs never change.",
     "editDone": "Done",
     "showInNav": "Show {{page}} in navigation",
     "searchPlaceholder": "Search pages, items, pilots…",
     "recent": "Recent",
-    "hiddenPages_one": "{{count}} hidden: {{pages}}",
-    "hiddenPages_other": "{{count}} hidden: {{pages}}",
-    "hiddenExpand": "Show",
-    "hiddenCollapse": "Hide",
-    "morePages_one": "{{count}} more page",
-    "morePages_other": "{{count}} more pages",
     "customize": "Customize",
-    "showPermanently": "Always show {{page}}",
     "communitiesNewRequests_one": "Communities, {{count}} new Request",
     "communitiesNewRequests_other": "Communities, {{count}} new Requests"
   },
@@ -4916,6 +4909,12 @@
           "event": "Event"
         }
       },
+      "eveTime": {
+        "title": "EVE time",
+        "description": "The game clock, UTC, with today's date",
+        "unit": "EVE time",
+        "summary": "EVE time {{time}}"
+      },
       "incursions": {
         "title": "Incursions",
         "description": "The nearest Incursions to your current system",
@@ -5573,12 +5572,15 @@
       "categories": {
         "all": "All",
         "character": "Character",
-        "money": "Money and market",
+        "money": "Money",
+        "trade": "Market and hauling",
         "industry": "Industry and mining",
         "planets": "Planets and structures",
-        "space": "Space and travel",
+        "travel": "Travel",
+        "conflict": "Combat and raids",
         "messages": "Messages and schedule",
-        "corpClocks": "Structures and timers",
+        "corpClocks": "Timers",
+        "corpStructures": "Structures",
         "corpMoney": "Money",
         "corpPeople": "Members",
         "corpIndustry": "Industry and mining",
@@ -7067,6 +7069,10 @@
       "done": "{{date}} added to your {{payee}} session",
       "undo": "Undo"
     },
+    "rowMenu": {
+      "view": "View details",
+      "name": "{{date}} in {{system}}"
+    },
     "combined": {
       "showDays": "Show each day of {{date}}",
       "days_one": "{{count}} day",
@@ -7123,6 +7129,7 @@
         "edited": "Edited by hand",
         "copy": "Copy pricing as text",
         "copied": "Copied",
+        "copyFailed": "Couldn't copy to the clipboard.",
         "caveat": "Hub, ore form and unit prices are your current settings, re-read for the day mined. The bill itself is frozen.",
         "drift": "Unit prices are re-read for the day mined and now differ from the figures this bill was frozen at ({{value}} ISK). Hub and ore form are your current settings.",
         "driftText": "Note: unit prices were re-read when copied and may not multiply out to the frozen total above.",
@@ -12764,11 +12771,10 @@
       "eve": "EVE time (UTC)"
     },
     "numberFormatLabel": "Number format",
-    "numberFormatHint": "How numbers are written. Pasted numbers read in either format.",
+    "numberFormatHint": "How numbers are written. Starts on your browser's format. Pasted numbers read in either format.",
     "numberFormat": {
-      "auto": "Match my browser ({{example}})",
-      "period": "Period decimal ({{example}})",
-      "comma": "Comma decimal ({{example}})"
+      "period": "English ({{example}})",
+      "comma": "European ({{example}})"
     },
     "weekStartLabel": "Week starts on",
     "weekStartHint": "First day of the week in the Calendar's Month and Fortnight grids.",
@@ -15692,7 +15698,18 @@
           "confirmTitle": "Delete the book?",
           "body": "Every mining entry, payment, Statement and the activity log is erased, the automatic sync stops, and Statement verify links stop working. Members' Mining Tax pages stop showing this corporation's book. This can't be undone.",
           "confirm": "Delete the book"
-        }
+        },
+        "tabs": {
+          "rates": "Rates",
+          "billing": "Billing",
+          "extractions": "Extractions",
+          "access": "Access"
+        },
+        "scheduled": "Scheduled",
+        "addRateTitle": "Add a rate",
+        "ratesLive": "A rate saves as soon as you add it. The other tabs save with Save.",
+        "statements": "Statements",
+        "sections": "Settings sections"
       },
       "grouping": {
         "title": "Characters",

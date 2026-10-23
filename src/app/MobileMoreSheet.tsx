@@ -3,7 +3,6 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
-import { Caret } from '@/components/ui/Disclosure';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { focusRingClassName, interactiveClassName } from '@/components/ui/controlStyles';
@@ -81,7 +80,6 @@ export function MobileMoreSheet({
   const hiddenTabPaths = useHiddenTabPaths();
   const hidden = useHiddenNav((state) => state.value);
   const recent = useRecentNav((state) => state.value);
-  const [showHidden, setShowHidden] = useState(false);
   // The phone's own hide editor: the rail's lives on desktop only.
   const [editing, setEditing] = useState(false);
 
@@ -113,9 +111,6 @@ export function MobileMoreSheet({
     ...group,
     pages: group.pages.filter((page) => inSheet(page) && (editing || !hiddenSet.has(page.path))),
   })).filter((group) => group.pages.length > 0);
-  const hiddenPages = SHEET_GROUPS.flatMap((group) =>
-    group.pages.filter((page) => inSheet(page) && hiddenSet.has(page.path))
-  );
   const recentViews = recentNavFor(recent, viewPathFor(pathname)).flatMap((path) => {
     const destination = byPath.get(path);
     return destination ? [destination] : [];
@@ -151,16 +146,6 @@ export function MobileMoreSheet({
     return (
       <div key={page.path} className="relative">
         {link}
-        {pageHidden && (
-          <Icon.NavHidden
-            aria-hidden="true"
-            size={Icon.ICON_SIZE.sm}
-            className={cx(
-              'pointer-events-none absolute text-text-dim',
-              bar ? 'top-1/2 right-11 -translate-y-1/2' : 'top-1.5 left-1.5'
-            )}
-          />
-        )}
         <NavHideToggle
           path={page.path}
           label={t(page.labelKey)}
@@ -243,35 +228,6 @@ export function MobileMoreSheet({
             )}
           </section>
         ))}
-
-        {!editing && hiddenPages.length > 0 && (
-          <div className="space-y-1.5 border-t border-line pt-2">
-            <button
-              type="button"
-              aria-expanded={showHidden}
-              onClick={() => setShowHidden((shown) => !shown)}
-              className={cx(
-                'flex min-h-11 w-full items-center gap-2 rounded-xs text-left text-xs text-text-dim',
-                interactiveClassName,
-                focusRingClassName
-              )}
-            >
-              <Icon.NavHidden aria-hidden="true" size={Icon.ICON_SIZE.sm} />
-              <span className="min-w-0 flex-1 truncate">
-                {t('nav.hiddenPages', {
-                  count: hiddenPages.length,
-                  pages: hiddenPages.map((page) => t(page.labelKey)).join(', '),
-                })}
-              </span>
-              {/* Visual only: `aria-expanded` already says open or closed. */}
-              <span aria-hidden="true" className="text-accent">
-                {t(showHidden ? 'nav.hiddenCollapse' : 'nav.hiddenExpand')}
-              </span>
-              <Caret expanded={showHidden} />
-            </button>
-            {showHidden && <div className={TILE_GRID}>{hiddenPages.map((page) => tile(page))}</div>}
-          </div>
-        )}
 
         <div className="mt-auto flex flex-col gap-3">
           <button

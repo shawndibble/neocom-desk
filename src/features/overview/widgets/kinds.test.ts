@@ -42,6 +42,7 @@ const ALL_IDS = [
   'kills',
   'omega',
   'tradingProfit',
+  'eveTime',
   'comingUp',
   'contracts',
   'mail',
@@ -152,8 +153,8 @@ describe('widget kind catalogue', () => {
     for (const k of WIDGET_KINDS) expect(k.views, k.id).toContain('number');
   });
 
-  it('uses every one of the six categories', () => {
-    expect(KIND_CATEGORIES).toHaveLength(6);
+  it('uses every one of the eight categories', () => {
+    expect(KIND_CATEGORIES).toHaveLength(8);
     for (const c of KIND_CATEGORIES) {
       expect(
         overviewKinds().some((k) => k.boards.overview === c),

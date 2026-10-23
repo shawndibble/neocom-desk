@@ -842,6 +842,12 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ['Mira Venn', 'Rifter, Old Man Star', '1.9M'],
       ],
     },
+    eveTime: {
+      value: 'Fri 14:32',
+      unit: t('overview.widgets.eveTime.unit'),
+      note: '2026-10-23',
+      rows: [],
+    },
     incursions: {
       value: '6',
       unit: t('overview.gallery.samples.incursions.unit'),
