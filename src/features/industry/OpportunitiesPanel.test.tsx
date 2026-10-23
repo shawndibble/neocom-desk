@@ -449,11 +449,11 @@ describe('OpportunitiesPanel', () => {
     });
   });
   describe('Corp projects view (issue #4786)', () => {
-    const renderAt = (url: string) =>
+    const renderAt = (url: string, catalog: BlueprintCatalog = CATALOG) =>
       render(
         withItemActions(
           <OpportunitiesPanel
-            catalog={CATALOG}
+            catalog={catalog}
             pi={null}
             facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
             activeCharacterId={CHARACTER_ID}
@@ -469,6 +469,26 @@ describe('OpportunitiesPanel', () => {
           wrapper: ({ children }) => <MemoryRouter initialEntries={[url]}>{children}</MemoryRouter>,
         }
       );
+    const hurricane = {
+      blueprintTypeID: 100,
+      blueprint: {
+        name: 'Hurricane Blueprint',
+        time: 600,
+        materials: [],
+        products: [{ typeID: 24702, quantity: 1 }],
+        skills: [],
+        activity: 'manufacturing',
+      },
+      productTypeID: 24702,
+      productName: 'Hurricane',
+      productNameLower: 'hurricane',
+    };
+    const BUILDS_HURRICANE: BlueprintCatalog = {
+      entries: [hurricane],
+      byBlueprintTypeID: new Map([[100, hurricane]]),
+      byProductTypeID: new Map([[24702, hurricane]]),
+      typesById: {} as unknown as BlueprintCatalog['typesById'],
+    } as unknown as BlueprintCatalog;
     const project = {
       id: 'p1',
       name: 'Hulls',
@@ -496,14 +516,29 @@ describe('OpportunitiesPanel', () => {
       expect(screen.queryByRole('button', { name: 'Corp projects' })).toBeNull();
     });
 
+    it('does not offer Corp projects when no listed project can be built or contributed to', async () => {
+      // The sample catalog builds nothing, and a capped project has nothing left to give.
+      corp.entries = [
+        {
+          characterId: CHARACTER_ID,
+          corporationId: 500,
+          projects: [project, { ...project, id: 'capped', contributed: 5 }],
+        },
+      ];
+      renderAt('/');
+      expect(await screen.findByText('Build')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Corp projects' })).toBeNull();
+    });
+
     it('adds Corp projects after All owned and switches to it', async () => {
       corp.entries = [{ characterId: CHARACTER_ID, corporationId: 500, projects: [project] }];
-      renderAt('/');
+      renderAt('/', BUILDS_HURRICANE);
       const button = await screen.findByRole('button', { name: 'Corp projects' });
       expect(button).toHaveAttribute('aria-pressed', 'false');
       fireEvent.click(button);
-      // The sample catalog builds nothing, so the view says so rather than showing a bare table.
-      expect(await screen.findByText('No open manufacture projects')).toBeInTheDocument();
+      expect(
+        await screen.findByRole('table', { name: 'Open manufacture corporation projects' })
+      ).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Corp projects' })).toHaveAttribute(
         'aria-pressed',
         'true'

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ProjectDetailInput } from '@/engine/corpProjects/corpProjects';
+import { EsiError } from '@/esi/errors';
 import { fetchManufactureProjects, type ProjectReads } from './corpProjectsData';
 
 const summary = (id: string) => ({
@@ -86,6 +87,30 @@ describe('fetchManufactureProjects', () => {
     });
     const projects = await fetchManufactureProjects(reads({ listPage, detail, contribution }));
     expect(projects?.map((p) => p.id)).toEqual(['c']);
+  });
+
+  it('answers null, so nothing short is cached, when a read fails for a passing reason', async () => {
+    const listPage = vi.fn().mockResolvedValue({ projects: [summary('a'), summary('b')] });
+    const detail = vi.fn(async (id: string) => {
+      if (id === 'a') throw new EsiError(503, 'status 503');
+      return manufacture(id);
+    });
+    expect(await fetchManufactureProjects(reads({ listPage, detail }))).toBeNull();
+    detail.mockImplementation(async (id: string) => {
+      if (id === 'a') throw new EsiError(429, 'status 429');
+      return manufacture(id);
+    });
+    expect(await fetchManufactureProjects(reads({ listPage, detail }))).toBeNull();
+  });
+
+  it('leaves out a project that is gone for good (404) and keeps the rest', async () => {
+    const listPage = vi.fn().mockResolvedValue({ projects: [summary('a'), summary('b')] });
+    const detail = vi.fn(async (id: string) => {
+      if (id === 'a') throw new EsiError(404, 'status 404');
+      return manufacture(id);
+    });
+    const projects = await fetchManufactureProjects(reads({ listPage, detail }));
+    expect(projects?.map((p) => p.id)).toEqual(['b']);
   });
 
   it('lets a failed first page through so the cache can fall back or ask to re-login', async () => {

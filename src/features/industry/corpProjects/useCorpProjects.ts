@@ -55,13 +55,23 @@ export function useCorpProjects(characterIds: readonly number[]): CorpProjectsSt
     null
   );
   useEffect(() => {
-    if (eligible === undefined || eligibleKey === undefined) return;
+    if (eligibleKey === undefined) return;
     let cancelled = false;
+    // The key is the eligible list by value, so the effect parses it back rather than depend on a rebuilt array.
+    const pairs =
+      eligibleKey === '' ? [] : eligibleKey.split(',').map((pair) => pair.split(':').map(Number));
     void Promise.all(
-      eligible.map(async ({ characterId, corporationId }) => {
-        const { cached } = await loadCorpManufactureProjects(characterId, corporationId);
-        const projects = cached?.data ?? [];
-        return projects.length > 0 ? [{ characterId, corporationId, projects }] : [];
+      pairs.map(async ([characterId, corporationId]) => {
+        try {
+          const { cached } = await loadCorpManufactureProjects(characterId!, corporationId!);
+          const projects = cached?.data ?? [];
+          return projects.length > 0
+            ? [{ characterId: characterId!, corporationId: corporationId!, projects }]
+            : [];
+        } catch {
+          // A Character whose read fails drops out, as one with no projects does: the view hides, never hangs.
+          return [];
+        }
       })
     ).then((groups) => {
       if (!cancelled) setState({ key: eligibleKey, entries: groups.flat() });
@@ -69,8 +79,6 @@ export function useCorpProjects(characterIds: readonly number[]): CorpProjectsSt
     return () => {
       cancelled = true;
     };
-    // `eligibleKey` is `eligible` by value; the array itself is rebuilt every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eligibleKey]);
 
   const loading = eligibleKey === undefined || state?.key !== eligibleKey;

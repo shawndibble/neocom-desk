@@ -158,6 +158,19 @@ describe('buildCorpProjectRow', () => {
     expect(row.profit).toBe((41_800_000 - 36_400_000) * 7 - 4_200_000);
   });
 
+  it('spreads a whole run’s cost over the units that earn the reward when a run makes more', () => {
+    // 10 units left, 100 per run: one run builds 100, and all of it is paid for.
+    const row = buildCorpProjectRow({
+      ...base,
+      project: { ...project, cap: 13, contributed: 3, rewardEach: 1_000_000 },
+      entry: entry(100),
+      compared: { loading: false, result: result(5_000_000), error: null },
+    });
+    expect(row.remaining).toBe(10);
+    expect(row.unitCost).toBe(500_000);
+    expect(row.profit).toBe(10 * 1_000_000 - 5_000_000);
+  });
+
   it('has no figures while the plan is still pricing, or when it could not be priced', () => {
     const loading = buildCorpProjectRow({
       ...base,

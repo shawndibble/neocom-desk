@@ -8,7 +8,12 @@ import { useTranslation } from 'react-i18next';
 import { Checkbox } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
 import { formatIskCompact } from '@/lib/isk';
-import { BlueprintSourceCell, ProfitCell, ProjectWorking } from './CorpProjectCells';
+import {
+  BlueprintSourceCell,
+  ENDING_SOON_HOURS,
+  ProfitCell,
+  ProjectWorking,
+} from './CorpProjectCells';
 import type { CorpProjectRow } from './corpProjectRows';
 
 interface CorpProjectCardsProps {
@@ -63,7 +68,7 @@ export function CorpProjectCards({
                         {' · '}
                         <span
                           className={
-                            row.hoursLeft !== null && row.hoursLeft < 48
+                            row.hoursLeft !== null && row.hoursLeft < ENDING_SOON_HOURS
                               ? 'text-warning'
                               : undefined
                           }

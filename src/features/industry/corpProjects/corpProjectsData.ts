@@ -4,7 +4,7 @@
  * open project costs a detail read, and each manufacture one a contribution
  * read. That is one cache row per Character and corporation, read when
  * Opportunities opens and never polled: `corp-project` is a 600-token window
- * per 15 minutes, shared by all four of its routes.
+ * per 15 minutes, shared by all its routes.
  */
 import type { StatusResult } from '@/esi/cache';
 import {
@@ -17,6 +17,7 @@ import {
   type CorpManufactureProject,
   type ProjectDetailInput,
 } from '@/engine/corpProjects/corpProjects';
+import { EsiError } from '@/esi/errors';
 import { loadCorpWithCacheStatus } from '@/features/corp/corpRead';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 
@@ -37,7 +38,8 @@ const MAX_PAGES = 10;
 /**
  * Every open manufacture project, in list order. A failed first page throws,
  * so the cache falls back to its stored row or reports a re-login; a project
- * whose own reads fail is left out rather than guessed at.
+ * whose own reads fail for good is left out rather than guessed at, and one that
+ * fails for a passing reason makes the whole answer null, so it is never cached short.
  */
 export async function fetchManufactureProjects(
   reads: ProjectReads
@@ -64,6 +66,10 @@ export async function fetchManufactureProjects(
   }
 
   const found = new Map<string, CorpManufactureProject>();
+  // A read that failed for a reason that will pass (offline, rate limited, 5xx) must not
+  // leave a shortened list in the cache for its whole window; one that never will (the
+  // project is gone, or is not readable) just leaves that project out.
+  let transient = false;
   await mapWithConcurrencyLimit(ids, ESI_FANOUT_CONCURRENCY, async (id) => {
     try {
       const detail = await reads.detail(id);
@@ -74,10 +80,17 @@ export async function fetchManufactureProjects(
       if (!contribution) return;
       const project = toManufactureProject(detail, contribution.contributed);
       if (project) found.set(id, project);
-    } catch {
+    } catch (error) {
       // One unreadable project must not hide the rest of the list.
+      if (
+        error instanceof EsiError &&
+        (error.status === 0 || error.status === 429 || error.status >= 500)
+      ) {
+        transient = true;
+      }
     }
   });
+  if (transient) return null;
   return ids.flatMap((id) => {
     const project = found.get(id);
     return project ? [project] : [];

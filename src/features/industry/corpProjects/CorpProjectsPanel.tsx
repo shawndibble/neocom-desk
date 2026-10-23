@@ -17,6 +17,7 @@ import {
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import { remainingUnits } from '@/engine/corpProjects/corpProjects';
@@ -39,6 +40,8 @@ import { BlueprintSourceCell, EndsIn, ProfitCell, ProjectWorking } from './CorpP
 import { CorpProjectCards } from './CorpProjectCards';
 import {
   buildCorpProjectRow,
+  buildableEntry,
+  corpProjectPlanId,
   corpProjectRowId,
   ownedBlueprintFor,
   planForCorpProject,
@@ -141,10 +144,9 @@ export function CorpProjectsPanel({
     () =>
       entries.flatMap(({ characterId, projects }) =>
         projects.flatMap((project) => {
-          const entry = catalog.byProductTypeID.get(project.typeId);
-          if (!entry || entry.blueprint.activity === 'reaction') return [];
+          const entry = buildableEntry(project, catalog);
+          if (!entry) return [];
           const units = remainingUnits(project);
-          if (units === 0) return [];
           const owned = ownedBlueprintFor(
             ownedByCharacter.get(characterId) ?? NO_BLUEPRINTS,
             entry.blueprintTypeID
@@ -160,7 +162,7 @@ export function CorpProjectsPanel({
               stock,
               units,
             }),
-            id: `corp-project:${corpProjectRowId(characterId, project.id)}:${units}`,
+            id: corpProjectPlanId(characterId, project.id, units),
             updatedAt: 0,
           };
           return [{ characterId, project, entry, owned, plan }];
@@ -230,13 +232,14 @@ export function CorpProjectsPanel({
       header: t('industry.corpProjects.select'),
       phoneHidden: true,
       render: (row) => (
-        <span onClick={(event) => event.stopPropagation()}>
+        // The label is the 44px touch target on a coarse pointer, and keeps the click off the row's disclosure.
+        <label className={touchCheckboxLabelClassName} onClick={(event) => event.stopPropagation()}>
           <Checkbox
             checked={selectedIds.has(row.id)}
             onChange={() => toggleSelected(row.id)}
             aria-label={t('industry.opportunitiesSelectFor', { name: row.itemName })}
           />
-        </span>
+        </label>
       ),
     },
     {

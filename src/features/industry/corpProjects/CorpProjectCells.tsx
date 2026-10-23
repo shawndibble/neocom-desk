@@ -7,7 +7,7 @@ import { formatIskCompact } from '@/lib/isk';
 import type { CorpProjectRow } from './corpProjectRows';
 
 /** Under two days left a project is about to close, so its time turns amber. */
-const ENDING_SOON_HOURS = 48;
+export const ENDING_SOON_HOURS = 48;
 
 export function EndsIn({ hours }: { hours: number | null }) {
   const { t } = useTranslation();

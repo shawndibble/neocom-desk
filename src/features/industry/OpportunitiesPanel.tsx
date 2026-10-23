@@ -79,6 +79,7 @@ import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { enumParam } from '@/lib/urlState';
 import { OwnedBlueprintsPanel } from './OwnedBlueprintsPanel';
 import { CorpProjectsPanel } from './corpProjects/CorpProjectsPanel';
+import { buildableEntry } from './corpProjects/corpProjectRows';
 import { useCorpProjects } from './corpProjects/useCorpProjects';
 import type { BuildPlanPricingInputs } from './buildPlanPricingInputs';
 import {
@@ -195,9 +196,19 @@ export function OpportunitiesPanel({
   // some: no permission, no corporation or no open manufacture project leaves
   // it out, and a stale `?opps.view=corp` then reads as Ranked.
   const corpProjects = useCorpProjects(characterIds);
-  const showCorpProjects = corpProjects.entries.length > 0;
+  const corpEntries = useMemo(
+    () =>
+      corpProjects.entries.flatMap((entry) => {
+        const projects = entry.projects.filter((p) => buildableEntry(p, catalog) !== null);
+        return projects.length > 0 ? [{ ...entry, projects }] : [];
+      }),
+    [corpProjects.entries, catalog]
+  );
+  const showCorpProjects = corpEntries.length > 0;
   const view =
     urlView === 'corp' && !showCorpProjects && !corpProjects.loading ? 'ranked' : urlView;
+  // The option stays listed while the corp view is open, even as the reads refresh.
+  const corpOptionShown = showCorpProjects || view === 'corp';
 
   // Every candidate's own Build Plan, for `hubForCharacter` below (issue
   // #2055): the same Trade Hub a fresh plan for that Character would default
@@ -567,14 +578,14 @@ export function OpportunitiesPanel({
     <OpportunitiesViewPicker
       view={view}
       onViewChange={setView}
-      showCorpProjects={showCorpProjects || view === 'corp'}
+      showCorpProjects={corpOptionShown}
     />
   );
   const meta = (
     <OpportunitiesFilterBar
       view={view}
       onViewChange={setView}
-      showCorpProjects={showCorpProjects || view === 'corp'}
+      showCorpProjects={corpOptionShown}
       stockFilter={stockFilter}
       onStockFilterChange={setStockFilter}
     />
@@ -608,7 +619,7 @@ export function OpportunitiesPanel({
         title={title}
         leading={viewPicker}
         meta={meta}
-        entries={corpProjects.entries}
+        entries={corpEntries}
         loading={corpProjects.loading}
         catalog={catalog}
         pi={pi}

@@ -18,7 +18,7 @@ import type { DetectedOwnedStockMap } from '@/engine/industry/ownedStock';
 import type { BuildResult } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { TradeHub } from '@/market/hubs';
-import type { BlueprintCatalogEntry } from '../blueprintCatalog';
+import type { BlueprintCatalog, BlueprintCatalogEntry } from '../blueprintCatalog';
 import type { ActivityFacilityDefaults } from '../facilityDefaults';
 import { newBuildPlan } from '../newBuildPlan';
 import { ownedMaterialSourcing } from '../opportunities';
@@ -26,6 +26,21 @@ import { ownedMaterialSourcing } from '../opportunities';
 /** Units one run of the blueprint makes: 1 for a ship, many for ammunition. */
 const unitsPerRun = (entry: BlueprintCatalogEntry): number =>
   entry.blueprint.products[0]?.quantity ?? 1;
+
+/**
+ * The catalog entry a project is built from, or null when the row would never be
+ * listed: the item has no manufacturing blueprint here (or only a reaction), or
+ * the Character can contribute nothing more. The hide rule and the table share it,
+ * so the view is never offered only to open empty.
+ */
+export function buildableEntry(
+  project: CorpManufactureProject,
+  catalog: BlueprintCatalog
+): BlueprintCatalogEntry | null {
+  const entry = catalog.byProductTypeID.get(project.typeId);
+  if (!entry || entry.blueprint.activity === 'reaction') return null;
+  return remainingUnits(project) > 0 ? entry : null;
+}
 
 /** Whole runs that make `units` of the product; at least one. */
 export function runsForUnits(units: number, entry: BlueprintCatalogEntry): number {
@@ -125,6 +140,14 @@ export function corpProjectRowId(characterId: number, projectId: string): string
   return `${characterId}:${projectId}`;
 }
 
+/**
+ * The id of the unsaved plan that prices a row. Stable across renders, and it
+ * carries the units so a change in what can still be contributed reprices it.
+ */
+export function corpProjectPlanId(characterId: number, projectId: string, units: number): string {
+  return `corp-project:${corpProjectRowId(characterId, projectId)}:${units}`;
+}
+
 export function buildCorpProjectRow(args: {
   project: CorpManufactureProject;
   characterId: number;
@@ -170,8 +193,10 @@ export function buildCorpProjectRow(args: {
         : undefined,
   });
   const copyPrice = source.kind === 'copy' ? source.price : 0;
-  const runs = runsForUnits(remaining, entry);
-  const unitCost = (result.totalCost - copyPrice) / (runs * unitsPerRun(entry));
+  // A run can make more units than the Character may still contribute (100 rounds
+  // for 10 paid ones); the whole run is built and paid for, so its cost is spread
+  // over the units that earn the reward, not over the units it makes.
+  const unitCost = remaining > 0 ? (result.totalCost - copyPrice) / remaining : 0;
   return {
     ...base,
     unitCost,
