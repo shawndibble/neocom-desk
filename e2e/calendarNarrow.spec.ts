@@ -147,6 +147,9 @@ test('a Station Manager sees a moon chunk on the phone rail, without overflow', 
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     if (path === `/characters/${CHARACTER_ID}/roles`) return json({ roles: ['Station_Manager'] });
     if (path === `/corporations/${CORPORATION_ID}/structures`) return json([]);
+    if (path === `/corporations/${CORPORATION_ID}/structures/skyhooks`) {
+      return json({ skyhooks: [] });
+    }
     if (path === `/corporation/${CORPORATION_ID}/mining/extractions`) {
       return json([
         {
