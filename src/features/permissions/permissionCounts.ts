@@ -21,12 +21,13 @@ export interface CharacterPermissionCount extends PermissionCount {
   name: string;
 }
 
-const COUNTED_GROUPS = SCOPE_GROUPS.filter((group) => group !== 'corp');
+/** The Permissions the count covers: every one but Corporation. */
+export const COUNTED_PERMISSIONS = SCOPE_GROUPS.filter((group) => group !== 'corp');
 
 export function countGrantedPermissions(scopes: readonly string[]): PermissionCount {
   return {
-    granted: COUNTED_GROUPS.filter((group) => isPermissionGranted(group, scopes)).length,
-    total: COUNTED_GROUPS.length,
+    granted: COUNTED_PERMISSIONS.filter((group) => isPermissionGranted(group, scopes)).length,
+    total: COUNTED_PERMISSIONS.length,
   };
 }
 
