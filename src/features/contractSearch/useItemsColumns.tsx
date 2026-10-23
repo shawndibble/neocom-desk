@@ -7,6 +7,7 @@ import { formatCount } from '@/lib/formatCount';
 import { useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, type DataTableColumn } from '@/components/ui';
+import { COL_DATETIME, COL_QUANTITY, COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
@@ -104,6 +105,7 @@ export function useItemsColumns({
       qty: {
         id: 'qty',
         header: t('contractSearch.qtyColumn'),
+        width: COL_QUANTITY,
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => row.quantity,
@@ -115,6 +117,7 @@ export function useItemsColumns({
       price: {
         id: 'price',
         header: t('contractSearch.priceColumn'),
+        width: '18ch',
         align: 'right',
         // The headline figure of the dense phone card, on the title line.
         cardCorner: true,
@@ -169,6 +172,7 @@ export function useItemsColumns({
         // meta line reads "Qty · System · Region · Exp", narrowest place last.
         id: 'system',
         header: t('contractSearch.systemColumn'),
+        width: '16ch',
         className: 'whitespace-nowrap',
         // Unplaced or still resolving sinks in either direction, rather than
         // sorting as a name — the Price column's "unknowable sorts last" rule.
@@ -197,6 +201,7 @@ export function useItemsColumns({
       jumps: {
         id: 'jumps',
         header: t('contractSearch.itemsJumpsColumn'),
+        width: COL_SMALL_NUMBER,
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => {
@@ -215,12 +220,15 @@ export function useItemsColumns({
       region: {
         id: 'region',
         header: t('contractSearch.regionColumn'),
+        width: '18ch',
+        className: 'truncate',
         sortValue: (row) => regionNames.get(row.regionId) ?? `#${row.regionId}`,
         render: (row) => regionNames.get(row.regionId) ?? `#${row.regionId}`,
       },
       expires: {
         id: 'expires',
         header: t('contractSearch.expiresColumn'),
+        width: COL_DATETIME,
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (row) => row.dateExpired,
         render: (row) => formatTimestamp(new Date(row.dateExpired), timeZone),
@@ -236,6 +244,7 @@ export function useItemsColumns({
         id: 'item',
         header: t('contractSearch.itemColumn'),
         primary: true,
+        className: 'truncate',
         sortValue: (row) => typeNames.get(row.typeId) ?? `#${row.typeId}`,
         render: (row) => (
           // Plain: the row opens the contract modal, whose item lines link to Market.

@@ -24,6 +24,15 @@ export function walletFixtureRoutes(): FixtureRoute[] {
     },
     { path: at('/wallet/transactions'), respond: () => ({ body: [] }) },
     { path: at('/loyalty/points'), respond: () => ({ body: SAMPLE_LOYALTY_POINTS }) },
+    // Public corporation info: the LP-store prefetch and corp-name lookups ask for any corporation,
+    // and a late one from an earlier story must not land as an unfixtured request.
+    {
+      path: /^\/corporations\/\d+$/,
+      respond: ({ url }) => {
+        const id = Number(url.pathname.split('/').pop());
+        return { body: { name: SAMPLE_CORPORATION_NAMES[id] ?? `Unknown ${id}`, member_count: 1 } };
+      },
+    },
     {
       method: 'POST',
       path: '/universe/names',

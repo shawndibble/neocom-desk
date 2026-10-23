@@ -16,7 +16,7 @@ import {
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { MOSTLY_COVERED_PCT } from './opportunityMetrics';
 
-export type OpportunitiesView = 'ranked' | 'owned';
+export type OpportunitiesView = 'ranked' | 'owned' | 'corp';
 export type OpportunitiesStockFilter = 'any' | 'mostly' | 'full';
 
 /**
@@ -28,14 +28,17 @@ export type OpportunitiesStockFilter = 'any' | 'mostly' | 'full';
 export function OpportunitiesViewPicker({
   view,
   onViewChange,
+  showCorpProjects,
 }: {
   view: OpportunitiesView;
   onViewChange: (next: OpportunitiesView) => void;
+  /** The Corp projects view exists for this Character (the hide rule); it is absent otherwise. */
+  showCorpProjects: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <span className="flex min-w-0 items-center pl-2">
-      <h2 className="sr-only">{t('industry.opportunitiesTitle')}</h2>
+      <h2 className="sr-only">{t('industry.opportunitiesTableLabel')}</h2>
       <Select value={view} onValueChange={(next) => onViewChange(next as OpportunitiesView)}>
         <SelectTrigger
           size="sm"
@@ -47,6 +50,9 @@ export function OpportunitiesViewPicker({
         <SelectContent>
           <SelectItem value="ranked">{t('industry.opportunitiesViewRankedTitle')}</SelectItem>
           <SelectItem value="owned">{t('industry.opportunitiesViewOwnedTitle')}</SelectItem>
+          {showCorpProjects && (
+            <SelectItem value="corp">{t('industry.opportunitiesViewCorpTitle')}</SelectItem>
+          )}
         </SelectContent>
       </Select>
     </span>
@@ -116,11 +122,14 @@ export function OpportunitiesFilterBar({
   onViewChange,
   stockFilter,
   onStockFilterChange,
+  showCorpProjects,
 }: {
   view: OpportunitiesView;
   onViewChange: (next: OpportunitiesView) => void;
   stockFilter: OpportunitiesStockFilter;
   onStockFilterChange: (next: OpportunitiesStockFilter) => void;
+  /** The Corp projects view exists for this Character (the hide rule); it is absent otherwise. */
+  showCorpProjects: boolean;
 }) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
@@ -137,6 +146,9 @@ export function OpportunitiesFilterBar({
         options={[
           { value: 'ranked', label: t('industry.opportunitiesViewRanked') },
           { value: 'owned', label: t('industry.opportunitiesViewOwned') },
+          ...(showCorpProjects
+            ? [{ value: 'corp' as const, label: t('industry.opportunitiesViewCorp') }]
+            : []),
         ]}
       />
       {stockFilterControl}

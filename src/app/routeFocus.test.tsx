@@ -27,6 +27,7 @@ describe('focusKeyFor', () => {
     expect(focusKeyFor('/skills/trained')).toBe(focusKeyFor('/skills/plans'));
     expect(focusKeyFor('/corp/members/roles')).toBe(focusKeyFor('/corp/members'));
     expect(focusKeyFor('/clones')).toBe(focusKeyFor('/overview'));
+    expect(focusKeyFor('/srp')).toBe(focusKeyFor('/overview'));
     expect(focusKeyFor('/overview')).not.toBe(focusKeyFor('/mail'));
   });
 

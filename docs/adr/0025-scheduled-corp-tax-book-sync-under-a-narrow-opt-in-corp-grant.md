@@ -55,7 +55,7 @@ that syncs and settles each opted-in corporation's book every 6 hours.
   not decrypt. No new secret. Every refresh writes the rotated token back in a
   transaction guarded on the blob it read. No access token is persisted; nothing
   is logged or sent to a client.
-- **What officers may see** is `corpTaxBooks/{corp}/meta/scheduledSync`
+- **What officers may see** is `corps/{corp}/meta/scheduledSync`
   (officer-readable, function-written): the holder, `active` or `stopped`, why,
   and the last run. No token, ever.
 - **What a run does.** It refreshes and rotates the token, re-reads the holder's

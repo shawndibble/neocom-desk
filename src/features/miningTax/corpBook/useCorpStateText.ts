@@ -31,6 +31,21 @@ export function useCorpStateLabel() {
   );
 }
 
+/** What the pill prints: the label, but a sent-waiting row's short form so it fits the column. */
+export function useCorpPillText() {
+  const { t } = useTranslation();
+  const label = useCorpStateLabel();
+  return useCallback(
+    (corp: CorpRowInfo): string => {
+      const state = corp.kind === 'label' ? corp.state : corp.view.state;
+      return state === 'sent-waiting'
+        ? t('miningTax.corpBook.state.sentWaitingShort')
+        : label(corp);
+    },
+    [t, label]
+  );
+}
+
 /** Why the row reads as it does — a tooltip, never the only place it is said (§6c). */
 export function useCorpStateHint() {
   const { t } = useTranslation();

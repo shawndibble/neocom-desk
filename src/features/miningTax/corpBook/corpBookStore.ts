@@ -236,7 +236,7 @@ export function readMiner(id: string, d: Data): Miner | null {
   return { id, characterIds, mainCharacterId: num(d.mainCharacterId) ?? characterIds[0] };
 }
 
-/** `corpTaxBooks/{book}/feederCoverage/{corp}`, written by the server (#4622). */
+/** `corps/{book}/feederCoverage/{corp}`, written by the server (#4622). */
 export function readFeederCoverage(id: string, d: Data): MemberFeederCoverage | null {
   const corporationId = Number(id);
   if (!Number.isSafeInteger(corporationId) || corporationId <= 0) return null;
@@ -427,11 +427,11 @@ async function readOneBook(
   characterIds: readonly number[]
 ): Promise<LoadedCorpBook | null> {
   const fs = getSyncFirestore();
-  const root = `corpTaxBooks/${corporationId}`;
+  const root = `corps/${corporationId}`;
   await ensureSignedIn(characterIds[0]);
   const settings = readBookSettings(
     corporationId,
-    (await getDoc(doc(fs, 'corpTaxBooks', String(corporationId)))).data()
+    (await getDoc(doc(fs, 'corps', String(corporationId)))).data()
   );
   if (!settings) return null;
 

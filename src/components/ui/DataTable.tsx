@@ -19,6 +19,11 @@ import { DataTableHeader } from './DataTableHeader';
 import { DataTableGroupHeader } from './DataTableGroupHeader';
 import { DataTableSortBar } from './DataTableSortBar';
 import { stickyStartClass } from './dataTableSticky';
+import {
+  columnCellWidth,
+  TRAILING_COL_ACTIONS_REM,
+  TRAILING_COL_EXPAND_REM,
+} from './dataTableWidths';
 import { useDataTableVirtualizer } from './useDataTableVirtualizer';
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from './ContextMenu';
 import { ExportTableItems, TableExportProvider } from './TableExport';
@@ -59,6 +64,27 @@ export function DataTableDenseCell({ children }: { children: ReactNode }) {
  * rows of several cells each).
  */
 export const VIRTUALIZE_THRESHOLD = 150;
+
+/** Least a width-less column of a fixed-layout table may squeeze to. */
+const GROW_COLUMN_MIN = 16;
+
+/**
+ * Table `min-width`: below it the wrapper scrolls sideways instead of
+ * squeezing columns. Columns a phone hides take no room there.
+ */
+function fixedLayoutMinWidth<T>(
+  columns: readonly DataTableColumn<T>[],
+  density: 'default' | 'compact',
+  isPhone: boolean,
+  trailingRem: number
+): string {
+  const shown = columns.filter((column) => !(isPhone && column.phoneHidden));
+  const sized = shown.flatMap((column) =>
+    column.width ? [columnCellWidth(column.width, density)] : []
+  );
+  const grow = shown.length - sized.length;
+  return `calc(${[...sized, `${grow * GROW_COLUMN_MIN}ch`, `${trailingRem}rem`].join(' + ')})`;
+}
 
 /**
  * Dense table. Headers and cell content arrive already translated — no i18n
@@ -241,6 +267,10 @@ export function DataTable<T>({
     !grouping &&
     (virtualize === true || (virtualize === 'auto' && sortedRows.length > VIRTUALIZE_THRESHOLD));
   const expandable = expandableRow !== undefined;
+  // Fixed layout only where rows mount and unmount under the header (a
+  // windowed table) and only for a table that opted in with a width; a
+  // stacked card has no columns to fix.
+  const fixedLayout = windowed && !isStacked && columns.some((column) => column.width);
   // Rough per-layout heights; each mounted row is then measured, so these
   // only have to be close enough to size the rows not yet seen.
   const estimatedRowHeight =
@@ -274,6 +304,8 @@ export function DataTable<T>({
   // Cells after the caller's columns: the disclosure chevron and the More
   // actions button. Full-width rows span them too.
   const trailingColumns = (expandableRow ? 1 : 0) + (rowMoreActions ? 1 : 0);
+  const trailingRem =
+    (expandableRow ? TRAILING_COL_EXPAND_REM : 0) + (rowMoreActions ? TRAILING_COL_ACTIONS_REM : 0);
   const rowIsClickable = (row: T) =>
     expandable || (Boolean(onRowClick) && (rowClickable ? rowClickable(row) : true));
 
@@ -404,8 +436,14 @@ export function DataTable<T>({
       // With most rows unmounted, AT would otherwise count only the window.
       // An open row's detail is a row too.
       aria-rowcount={windowed ? sortedRows.length + 1 + (expandedIndex >= 0 ? 1 : 0) : undefined}
+      style={
+        fixedLayout
+          ? { minWidth: fixedLayoutMinWidth(columns, density, isPhone, trailingRem) }
+          : undefined
+      }
       className={cx(
         'w-full text-xs',
+        fixedLayout && 'table-fixed',
         responsive === 'stack' && 'dt-stack',
         isStacked && 'dt-stacked',
         responsive === 'stack' && !dense && stackColumns === 2 && 'dt-stack-2col',
@@ -419,6 +457,7 @@ export function DataTable<T>({
         sort={sort}
         density={density}
         isStacked={isStacked}
+        fixedLayout={fixedLayout}
         expandable={expandable}
         rowMoreActions={rowMoreActions}
         onToggleSort={toggleSort}

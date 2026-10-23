@@ -36,7 +36,14 @@ describe('canHide', () => {
   });
 
   it('lets a pilot hide each Corp page on its own', () => {
-    for (const path of ['/corp', '/corp/members', '/corp/wallet', '/corp/assets', '/corp/moons']) {
+    for (const path of [
+      '/corp',
+      '/corp/members',
+      '/corp/wallet',
+      '/corp/assets',
+      '/corp/moons',
+      '/corp/srp',
+    ]) {
       expect(canHide(path)).toBe(true);
     }
   });

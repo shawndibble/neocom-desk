@@ -69,6 +69,8 @@ export const SCOPE_GROUPS = [
   'corp',
   'structureMarkets',
   'jumpFatigue',
+  'corpProjects',
+  'killmails',
 ] as const;
 export type ScopeGroup = (typeof SCOPE_GROUPS)[number];
 
@@ -176,6 +178,16 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
   jumpFatigue: {
     labelKey: 'permissions.jumpFatigue.label',
     captionKey: 'permissions.jumpFatigue.caption',
+    defaultOn: false,
+  },
+  corpProjects: {
+    labelKey: 'permissions.corpProjects.label',
+    captionKey: 'permissions.corpProjects.caption',
+    defaultOn: false,
+  },
+  killmails: {
+    labelKey: 'permissions.killmails.label',
+    captionKey: 'permissions.killmails.caption',
     defaultOn: false,
   },
 };
@@ -590,6 +602,16 @@ export const ESI_REGISTRY = {
     route: '/killmails/{killmail_id}/{killmail_hash}',
     scope: PUBLIC,
   },
+  /**
+   * The SRP page's lost-ships list. Opt-in and a Permission of its own: only a
+   * pilot filing a claim by pick needs it, and pasting a link works without it
+   * (docs/context/decisions/20261023-125348-srp-pilots-file-officers-approve-corp-set-rules.md).
+   */
+  getCharacterKillmailsRecent: {
+    route: '/characters/{character_id}/killmails/recent',
+    scope: 'esi-killmails.read_killmails.v1',
+    group: 'killmails',
+  },
   getUniverseType: {
     route: '/universe/types/{type_id}',
     scope: PUBLIC,
@@ -885,6 +907,27 @@ export const ESI_REGISTRY = {
     scope: 'esi-structures.read_corporation.v1',
     group: 'corp',
   },
+  /**
+   * Corporation Projects (issue #4786). Opt-in, and a Permission of their own
+   * rather than part of `corp`: the reads need no corp role, and widening `corp`
+   * would move every already-granted corp Character to `roles-without-grant`
+   * (docs/features/corp.md). All three share the `corp-project` rate group.
+   */
+  getCorporationProjects: {
+    route: '/corporations/{corporation_id}/projects',
+    scope: 'esi-corporations.read_projects.v1',
+    group: 'corpProjects',
+  },
+  getCorporationProject: {
+    route: '/corporations/{corporation_id}/projects/{project_id}',
+    scope: 'esi-corporations.read_projects.v1',
+    group: 'corpProjects',
+  },
+  getCorporationProjectContribution: {
+    route: '/corporations/{corporation_id}/projects/{project_id}/contribution/{character_id}',
+    scope: 'esi-corporations.read_projects.v1',
+    group: 'corpProjects',
+  },
   getSovereigntySystems: {
     route: '/sovereignty/systems',
     scope: PUBLIC,
@@ -900,6 +943,11 @@ export type Scope = Exclude<(typeof ESI_REGISTRY)[EsiEndpointId]['scope'], Publi
 export function isScopeRequired(requirement: ScopeRequirement): requirement is Scope {
   return requirement !== PUBLIC;
 }
+
+/** The endpoints a panel needs to send a mail from the active Character. */
+export const SEND_MAIL_ENDPOINTS = [
+  'postCharacterMail',
+] as const satisfies readonly EsiEndpointId[];
 
 /**
  * Distinct Permissions the given endpoints belong to, in declaration order.

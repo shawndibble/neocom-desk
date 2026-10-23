@@ -16,6 +16,7 @@ import {
   type DataTableColumn,
   CachedNotice,
 } from '@/components/ui';
+import { COL_DATETIME, COL_ISK, COL_QUANTITY } from '@/components/ui/dataTableWidths';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { loadWalletJournal, loadWalletTransactionsWithStatus } from '@/features/character/wallet';
@@ -289,6 +290,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       {
         id: 'date',
         header: t('wallet.date'),
+        width: COL_DATETIME,
         className: 'whitespace-nowrap text-text-dim max-sm:px-1',
         headerClassName: 'max-sm:px-1',
         // Date over time on a phone, freeing width for the other columns; one line from `sm` up.
@@ -311,7 +313,8 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
               id: 'character',
               header: t('wallet.character'),
               phoneHidden: true,
-              className: 'whitespace-nowrap',
+              width: '22ch',
+              className: 'truncate',
               render: (txn: WalletTransaction) => (txn as PooledTransaction).characterName,
               sortValue: (txn: WalletTransaction) => (txn as PooledTransaction).characterName,
             } satisfies DataTableColumn<WalletTransaction>,
@@ -321,6 +324,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         id: 'item',
         header: t('wallet.item'),
         stickyStart: true,
+        className: 'truncate',
         render: (txn) => (
           <ItemInfoLink typeId={txn.type_id}>
             {typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`}
@@ -331,6 +335,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       {
         id: 'side',
         header: t('wallet.side'),
+        width: '7ch',
         // The Total's sign and tone already say buy or sell (off by default on a phone).
         render: (txn) => (txn.is_buy ? t('wallet.buy') : t('wallet.sell')),
         sortValue: (txn) => (txn.is_buy ? 0 : 1),
@@ -338,6 +343,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       {
         id: 'quantity',
         header: t('wallet.quantity'),
+        width: COL_QUANTITY,
         align: 'right',
         className: 'tabular-nums',
         render: (txn) => formatCount(txn.quantity),
@@ -346,6 +352,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       {
         id: 'unitPrice',
         header: t('wallet.unitPrice'),
+        width: '16ch',
         align: 'right',
         className: 'tabular-nums',
         render: (txn) => formatMarketIsk(txn.unit_price),
@@ -354,6 +361,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       {
         id: 'total',
         header: t('wallet.total'),
+        width: COL_ISK,
         align: 'right',
         className: 'tabular-nums',
         cellClassName: (txn) => iskToneClass(transactionTotal(txn)),
@@ -364,6 +372,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         id: 'margin',
         header: t('wallet.margin'),
         headerTooltip: t('wallet.marginTooltip'),
+        width: COL_ISK,
         align: 'right',
         className: 'tabular-nums',
         cellClassName: (txn) => {
@@ -399,6 +408,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         id: 'marginPercent',
         header: t('wallet.marginPercent'),
         headerTooltip: t('wallet.marginPercentTooltip'),
+        width: '11ch',
         align: 'right',
         className: 'tabular-nums',
         cellClassName: (txn) => {
@@ -416,6 +426,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         id: 'unitCost',
         header: t('wallet.unitCost'),
         headerTooltip: t('wallet.unitCostTooltip'),
+        width: '16ch',
         align: 'right',
         className: 'tabular-nums',
         render: (txn) => {
@@ -428,7 +439,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       {
         id: 'location',
         header: t('wallet.location'),
-        className: 'whitespace-nowrap',
+        className: 'truncate',
         render: (txn) => <PlaceLink id={txn.location_id}>{placeNameFor(txn)}</PlaceLink>,
         sortValue: (txn) => placeNameFor(txn),
       },

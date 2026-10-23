@@ -93,10 +93,12 @@ describe('Gallery', () => {
       .map((h) => h.textContent);
     expect(headings).toEqual([
       'Character',
-      'Money and market',
+      'Money',
+      'Market and hauling',
       'Industry and mining',
       'Planets and structures',
-      'Space and travel',
+      'Travel',
+      'Combat and raids',
       'Messages and schedule',
     ]);
     // A category on its own is one flat list: no headings.
@@ -109,7 +111,7 @@ describe('Gallery', () => {
   it('puts the categories in one row, with counts', async () => {
     const { dialog } = await openGallery();
     const row = within(dialog).getByRole('group', { name: 'Categories' });
-    expect(within(row).getAllByRole('button')).toHaveLength(7);
+    expect(within(row).getAllByRole('button')).toHaveLength(9);
     expect(within(row).getByRole('button', { name: /^All/ })).toHaveTextContent(
       String(OVERVIEW_KINDS.length)
     );
@@ -324,7 +326,7 @@ describe('Gallery Browse all', () => {
       .getAllByRole('heading', { level: 3 })
       .map((h) => h.textContent);
     expect(headings[0]).toBe('Featured');
-    expect(headings).toContain('Structures and timers');
+    expect(headings).toContain('Timers');
     expect(within(dialog).queryByText('Wallet', { selector: 'div' })).toBeNull();
   });
 });

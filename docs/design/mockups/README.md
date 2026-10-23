@@ -23,9 +23,9 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [wallet-balance-trend](wallet-balance-trend/README.md) | worked example | story `mockups-wallet--proposed`, today vs proposed |
 | [corp-tax-book](corp-tax-book/README.md) | Issue #4056 (UI: #4063, #4064, #4065, #4066) | Final: A's drill-down pages, C's timeline + Needs you + Statement run, B's mail preview (dialog) and guest page, queue chip with % badge on phone, personal tab = today's Tax tab + corp states |
 | [collector-books](collector-books/README.md) | Spec #4504 (UI: #4512, #4513, #4514, #4520) | List A (sortable Moon owners table) for the accounting corporation, Page B (plain statement first) for the moon owner |
-| [corp-projects](corp-projects/README.md) | Issue #4530 | Industry › Projects as the fifth tab; summary strip, chips, read-only table; grant and empty states |
 | [fittings-restock](fittings-restock/README.md) | Issue #4550 | Appraisal's card title becomes a source select (Paste / From my Fittings); Fittings with hull-count steppers; Send to Build Group… in the actions menu; Appraise and Clear inline on phone |
 | [queue-remap-advice](queue-remap-advice/README.md) | Issue #4701 | Optimize queue at the foot of the Attributes card (full width, under the remap budget): one press makes a plan from the queue with the optimizer's Remap Markers and opens it, Undo toast; empty queue aria-disabled, already optimal makes no plan |
 | [compare-trade-hubs](compare-trade-hubs/README.md) | Issue #4696 (build: #4697) | Desktop as proposed (items × hubs, best sell over best buy, LOWEST/HIGHEST words, jumps in headers); table at every width (phone scrolls sideways, item pinned, "Hubs" label); own hub highlighted |
+| [srp](srp/README.md) | Epic #4608 (mockups #4847; build #4848-#4856) | Member filing with lost-ships list, officer queue (approve, reject with reason, override, Mark paid), Director settings with Hull Rules, `corpSrp` widget; phone uses dense cards |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.

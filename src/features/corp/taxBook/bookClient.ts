@@ -115,7 +115,7 @@ export async function readFeederRemovalState(
   await ensureSignedIn(characterId);
   const ref = doc(
     getSyncFirestore(),
-    'corpTaxBooks',
+    'corps',
     String(corporationId),
     'feeders',
     String(feederCorporationId)
@@ -194,7 +194,7 @@ export async function readBookSummary(
   corporationId: number
 ): Promise<BookSummary | null> {
   await ensureSignedIn(characterId);
-  const snap = await getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId)));
+  const snap = await getDoc(doc(getSyncFirestore(), 'corps', String(corporationId)));
   if (!snap.exists()) return null;
   const d = snap.data();
   return {
@@ -213,7 +213,7 @@ export async function readDeclinedAutoGroup(
 ): Promise<Set<number>> {
   await ensureSignedIn(characterId);
   const snap = await getDoc(
-    doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'declinedAutoGroup')
+    doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'declinedAutoGroup')
   );
   const ids = snap.data()?.ids;
   return new Set(Array.isArray(ids) ? (ids as number[]) : []);
@@ -227,7 +227,7 @@ export async function readBookState(
   const book = await readBookSummary(characterId, corporationId);
   if (!book) return null;
   const root = (name: string) =>
-    collection(getSyncFirestore(), 'corpTaxBooks', String(corporationId), name);
+    collection(getSyncFirestore(), 'corps', String(corporationId), name);
   const list = async <T>(name: string): Promise<T[]> =>
     (await getDocs(root(name))).docs.map((d) => d.data() as T);
   const [miners, statements, payments, dismissals, extractions, paid, writeOffs] =
@@ -237,7 +237,7 @@ export async function readBookState(
       list<SettlePayment>('payments'),
       list<Dismissal>('dismissals'),
       list<SyncExtraction>('extractions'),
-      getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'paid')),
+      getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'paid')),
       list<RecordedWriteOff>('writeOffs'),
     ]);
   return {
@@ -279,7 +279,7 @@ export async function readBookSettings(
   corporationId: number
 ): Promise<BookSettings | null> {
   await ensureSignedIn(characterId);
-  const snap = await getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId)));
+  const snap = await getDoc(doc(getSyncFirestore(), 'corps', String(corporationId)));
   return snap.exists() ? settingsFrom(snap.data()) : null;
 }
 
@@ -342,7 +342,7 @@ export function groupingAnswersFrom(d: Record<string, unknown> | undefined): Gro
 export type FeederPayoutRow = FeederPayout & { id: string };
 
 /**
- * One feeder's record as the officers read it (`corpTaxBooks/{book}/feeders/{corp}`), with its
+ * One feeder's record as the officers read it (`corps/{book}/feeders/{corp}`), with its
  * `payouts`. `lastReadWellAt` is an ISO string, as `FeederReadClock` carries it.
  */
 export interface BookFeeder extends FeederReadClock {
@@ -414,14 +414,7 @@ export interface BookData {
 }
 
 const feederPayouts = (book: number, feeder: number) =>
-  collection(
-    getSyncFirestore(),
-    'corpTaxBooks',
-    String(book),
-    'feeders',
-    String(feeder),
-    'payouts'
-  );
+  collection(getSyncFirestore(), 'corps', String(book), 'feeders', String(feeder), 'payouts');
 
 export async function readBookData(
   characterId: number,
@@ -430,7 +423,7 @@ export async function readBookData(
   const settings = await readBookSettings(characterId, corporationId);
   if (!settings) return null;
   const root = (name: string) =>
-    collection(getSyncFirestore(), 'corpTaxBooks', String(corporationId), name);
+    collection(getSyncFirestore(), 'corps', String(corporationId), name);
   const list = async <T>(name: string): Promise<T[]> =>
     (await getDocs(root(name))).docs.map((d) => d.data() as T);
   const [
@@ -453,14 +446,12 @@ export async function readBookData(
     list<SettlePayment>('payments'),
     list<Dismissal>('dismissals'),
     list<SyncExtraction>('extractions'),
-    getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'paid')),
+    getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'paid')),
     list<ObservedRow>('observed'),
     list<Declaration>('declarations'),
     list<Adjustment>('adjustments'),
-    getDoc(
-      doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'groupingAnswers')
-    ),
-    getDoc(doc(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'meta', 'scheduledSync')),
+    getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'groupingAnswers')),
+    getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'scheduledSync')),
     list<FeederDoc>('feeders'),
     list<RecordedWriteOff>('writeOffs'),
   ]);
@@ -515,7 +506,7 @@ export async function readAudit(
   await ensureSignedIn(characterId);
   const snap = await getDocs(
     query(
-      collection(getSyncFirestore(), 'corpTaxBooks', String(corporationId), 'audit'),
+      collection(getSyncFirestore(), 'corps', String(corporationId), 'audit'),
       orderBy('at', 'desc'),
       limitTo(count)
     )
@@ -572,9 +563,7 @@ export async function readVerifyTokens(
   const tokens = new Map<string, string>();
   await Promise.all(
     statementIds.map(async (id) => {
-      const snap = await getDoc(
-        doc(db, 'corpTaxBooks', String(corporationId), 'statementLinks', id)
-      );
+      const snap = await getDoc(doc(db, 'corps', String(corporationId), 'statementLinks', id));
       const token = snap.get('verifyToken');
       if (typeof token === 'string' && token !== '') tokens.set(id, token);
     })

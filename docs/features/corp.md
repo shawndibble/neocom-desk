@@ -308,6 +308,21 @@ All pure, `nowMs` is a parameter (never `Date.now()` inside `src/engine`).
 - Active-Character-only access state; the Notifications panel resolves capabilities per stored Character separately (`NotificationsPanel.tsx`), so the two can briefly disagree.
 - Decision text in `20260903-121925` still says the roles scope is in the Base Grant; superseded by `20260910-123303` (stale doc, not marked superseded in the file).
 
+## SRP, the player view (`/srp`, issue #4852)
+
+- Route `routes/Srp.tsx` (`MemberSrpView` under the Overview's `CharacterHeader` and `OverviewSubNav`). UNGATED: no Corp Access and no corp scope. Corporation from public affiliation (`useActiveCorporationIdState`).
+- Nav: the third sub-view of Overview (`subViews` in `navDestinations.ts`, `visible: 'srp'`, label `nav.srp`), listed only while `useSrpNavVisible()` (the corp has SRP on, from `getSrpStatus`, cached per Character and corporation for 1 hour in localStorage, unknown reads as hidden, NPC corps skipped). Hidden, never locked or dimmed, in `OverviewSubNav`, the rail, the More sheet's Recent row and Ctrl K. Typing `/srp` with SRP off shows the not-set-up state. Officers who lose ships use it like any pilot.
+- Officer SRP is `/corp/srp` (Corp group, `gating: 'corp'`, `canManageSrp`): tabs Queue and Settings only (`srpViews.ts`; Queue needs SRP on, so an officer of a corp with SRP off lands on Settings with no tab bar). The rail lists only the tabs that pilot can see (`conditionalTabs` and `corpTabCapabilities`). A pilot with no `canManageSrp` who opens `/corp/srp` is redirected to `/srp`.
+- Data: `srpMemberBackend.ts` (status callable, own claims read from `corps/{id}/srpClaims` with `uid` and `ownerHash` filters, `fileSrpClaim`, lost ships); a stand-in (`setSrpMemberBackendOverride`) serves Storybook and tests.
+- Lost ships: opt-in `killmails` Permission (`esi-killmails.read_killmails.v1`), asked on the page with a Grant banner. `getCharacterKillmailsRecent` (3 pages, newest first) then the public `getKillmail` per entry; kept only when the Character died in the current corporation. Rows: open (File), Claimed, Too old (past the corp window), Not covered (Hull Rule).
+- File: pasted link (zKillboard or ESI) plus Fleet or FC (required when the corp says so; File on a lost ship then fills the form in rather than filing without it). Refusals map from `details.reason` to a message beside the field that can fix it.
+- My claims: dense table, Rejected carries its reason and one Re-file with a required note; a row opens the detail dialog (sheet on a phone).
+
+## SRP, the officer view (`/corp/srp`, issues #4853, #4851)
+
+- Queue (Accountant or Director): Pending / Owed / History tables, per-row and bulk Approve, Reject (reason required, mailed to the pilot), Change amount (with reason), Mark paid; activity feed from `corps/{id}/srpAudit`. Reads: open claims (`state in [pending, approved]`) with the queue; History loads when its tab opens (newest 100 by `closedAt`, "Load older"). Actions are callables; each sends `expectedAmount` (the amount shown) and the server refuses with `amount-changed` if it moved. Bulk calls go in chunks of 50 (server cap).
+- Settings (Director or CEO): turn SRP on or off, Hull Rules, caps, claim window, retention. Saving records the on/off answer in the nav probe so the Queue tab and `/srp` sub-view update at once. A failed probe backs off 5 minutes.
+
 ## Improvement ideas
 
 - Add `/corp/structures` (sortable table: fuel days, state, services, location, moon extraction) and link the Structures widget's rows to it.

@@ -12,6 +12,7 @@ import { DEFAULT_MOBILE_TABS, useMobileTabs } from '@/lib/mobileTabs';
 import { useHiddenNav, useRecentNav } from './navPreferences';
 import { defaultHiddenNav } from './navRail';
 import { Layout } from './Layout';
+import { useSrpNavVisible } from '@/features/corp/srp/useSrpNavVisible';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
 vi.mocked(useCorpAccess).mockReturnValue({
@@ -22,6 +23,8 @@ vi.mocked(useCorpAccess).mockReturnValue({
   readFailed: false,
   retry: () => {},
 });
+
+vi.mock('@/features/corp/srp/useSrpNavVisible', () => ({ useSrpNavVisible: vi.fn() }));
 
 import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 vi.mock('@/sync', () => ({
@@ -70,6 +73,7 @@ beforeEach(async () => {
     readFailed: false,
     retry: () => {},
   });
+  vi.mocked(useSrpNavVisible).mockReturnValue(false);
   setPhone(false);
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: true });
@@ -170,6 +174,50 @@ describe('the rail', () => {
     );
   });
 
+  it('lists SRP under Overview for a pilot whose corp has SRP on, and not in the Corporation group', async () => {
+    vi.mocked(useSrpNavVisible).mockReturnValue(true);
+    renderAt('/srp');
+    const views = within(rail()).getByRole('list', { name: 'Overview' });
+    expect(within(views).getByRole('link', { name: 'SRP' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(within(rail()).queryByRole('group', { name: 'Corporation' })).not.toBeInTheDocument();
+  });
+
+  it('leaves SRP off the Overview views, hidden rather than dimmed, while the corp has SRP off', () => {
+    renderAt('/clones');
+    const views = within(rail()).getByRole('list', { name: 'Overview' });
+    expect(within(views).queryByRole('link', { name: 'SRP' })).not.toBeInTheDocument();
+  });
+
+  it('lists only the SRP tabs an officer can see under Corp SRP', async () => {
+    vi.mocked(useCorpAccess).mockReturnValue({
+      state: 'ready',
+      capabilities: { ...NO_CORP_CAPABILITIES, canManageSrp: true },
+      missingScopes: [],
+      roles: ['Director'],
+      readFailed: false,
+      retry: () => {},
+    });
+    await db.characters.put({
+      characterId: 42,
+      name: 'Pilot',
+      ownerHash: 'h',
+      addedAt: 0,
+      corporationId: 98000001,
+    });
+    useActiveCharacter.setState({ activeCharacterId: 42, hydrated: true });
+    vi.mocked(useSrpNavVisible).mockReturnValue(true);
+    renderAt('/corp/srp/queue');
+    const views = await within(rail()).findByRole('list', { name: 'SRP' });
+    expect(
+      within(views)
+        .getAllByRole('link')
+        .map((link) => link.textContent)
+    ).toEqual(['Queue', 'Settings']);
+  });
+
   it('opens a sub-view’s page even where its path does not nest under it', () => {
     renderAt('/clones');
     expect(within(rail()).getByRole('list', { name: 'Overview' })).toBeInTheDocument();
@@ -205,8 +253,7 @@ describe('the rail', () => {
 
     expect(within(rail()).queryByRole('link', { name: 'Mining' })).not.toBeInTheDocument();
     expect(within(rail()).getByRole('link', { name: 'PI' })).toBeInTheDocument();
-    // Pages only: a hidden view is not a page.
-    expect(within(rail()).getByRole('button', { name: /more page/ })).toBeInTheDocument();
+    expect(within(rail()).queryByRole('button', { name: /more page/ })).not.toBeInTheDocument();
   });
 
   it('groups the rail’s pages under their labels', () => {
@@ -216,8 +263,7 @@ describe('the rail', () => {
     expect(within(economy).getByRole('link', { name: 'Market' })).toBeInTheDocument();
   });
 
-  it('starts a new pilot on the eight-page default, the rest behind "N more pages"', async () => {
-    const user = userEvent.setup();
+  it('starts a new pilot on the eight-page default, the rest hidden with no "more pages" row', () => {
     useHiddenNav.setState({ value: defaultHiddenNav() });
     renderAt('/overview');
 
@@ -225,14 +271,7 @@ describe('the rail', () => {
     for (const name of ['Skills', 'Industry', 'Ships', 'Market', 'Assets', 'Wallet', 'Travel']) {
       expect(within(rail()).getByRole('link', { name })).toBeInTheDocument();
     }
-    const more = within(rail()).getByRole('button', { name: /more pages/ });
-    expect(more).toHaveAttribute('aria-expanded', 'false');
-    await user.click(more);
-    expect(more).toHaveAttribute('aria-expanded', 'true');
-    expect(within(rail()).getByRole('link', { name: 'Mining' })).toBeInTheDocument();
-
-    await user.click(within(rail()).getByRole('button', { name: 'Always show Mining' }));
-    await waitFor(() => expect(useHiddenNav.getState().value).not.toContain('/mining'));
+    expect(within(rail()).queryByRole('button', { name: /more pages/ })).not.toBeInTheDocument();
   });
 
   it('hides and shows pages from the rail editor, and never offers to hide Corporation or Settings', async () => {
@@ -297,17 +336,14 @@ describe('the More sheet', () => {
     expect(within(sheet).queryByRole('link', { name: 'Appraisal' })).not.toBeInTheDocument();
   });
 
-  it('folds hidden pages into one row that opens in place, so every page stays reachable', async () => {
+  it('leaves hidden pages out of the sheet, with no fold row', async () => {
     setPhone(true);
     useHiddenNav.setState({ value: ['/mining', '/calendar'] });
     renderAt('/overview');
-    const { user, sheet } = await openSheet();
+    const { sheet } = await openSheet();
 
     expect(within(sheet).queryByRole('link', { name: 'Mining' })).not.toBeInTheDocument();
-    const row = within(sheet).getByRole('button', { name: /2 hidden: Mining, Calendar/ });
-    await user.click(row);
-    expect(row).toHaveAttribute('aria-expanded', 'true');
-    expect(within(sheet).getByRole('link', { name: 'Mining' })).toBeInTheDocument();
+    expect(within(sheet).queryByRole('button', { name: /hidden:/ })).not.toBeInTheDocument();
   });
 
   it('shows recent views other than the current one', async () => {
@@ -367,9 +403,9 @@ describe('the More sheet editor', () => {
     await user.click(within(sheet).getByRole('button', { name: /hide pages you don't use/i }));
     await user.click(within(sheet).getByRole('button', { name: 'Show Mining in navigation' }));
     await waitFor(() => expect(useHiddenNav.getState().value).toEqual(['/mining']));
-    // No fade; an eye-slash glyph marks the hidden tile instead.
+    // No fade, and no second eye glyph: the toggle button alone marks it.
     const tile = within(sheet).getByRole('link', { name: /mining/i }).parentElement!;
     expect(tile.className).not.toMatch(/opacity-/);
-    expect(tile.querySelector(':scope > svg[aria-hidden="true"]')).not.toBeNull();
+    expect(tile.querySelector(':scope > svg')).toBeNull();
   });
 });

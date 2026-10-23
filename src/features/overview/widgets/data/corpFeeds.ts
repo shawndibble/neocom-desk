@@ -26,6 +26,13 @@ import type { RoleAuditData } from '@/features/corp/roleAudit';
 import type { WalletDivision } from '@/features/corp/divisions';
 import type { CorpAssetsSummary } from './corpAssetsSummary';
 import type { PilotStats, ZkillFailureReason } from '@/lib/zkillboard';
+import type { SrpClaim } from '@/features/corp/srpClaimTypes';
+
+/** The fields of a claim the Corp SRP widget reads. */
+export type SrpClaimRow = Pick<
+  SrpClaim,
+  'killmailId' | 'state' | 'amount' | 'characterName' | 'hullTypeId' | 'solarSystemId' | 'filedAt'
+>;
 
 interface CorpFeedBase {
   readable: boolean;
@@ -170,6 +177,22 @@ export interface CorpKillsFeed extends CorpFeedBase {
   failed: ZkillFailureReason | null;
 }
 
+/**
+ * The corporation's open SRP Claims (Pending and Approved), read from Firestore by an officer.
+ * `readable: false` means this Character is no SRP officer (hidden in practice).
+ */
+export interface CorpSrpFeed extends CorpFeedBase {
+  /** SRP is on for the corporation; off, `claims` is empty by definition. */
+  enabled: boolean;
+  /** A Director (or the CEO) may turn it on: the tile offers Set up SRP. */
+  canSetUp: boolean;
+  claims: SrpClaimRow[];
+  /** Hull names by type id; a missing one degrades one cell to the killmail id. */
+  typeNames: ReadonlyMap<number, string>;
+  /** System names from the static data. */
+  systemNames: ReadonlyMap<number, string>;
+}
+
 /** One reagent in a skyhook's silo at its last cycle. Only `unsecured` can be stolen. */
 export interface SkyhookReagent {
   typeId: number;
@@ -249,6 +272,11 @@ export async function loadCorpOrdersFeed(characterId: number): Promise<CorpOrder
 export async function loadCorpKillsFeed(characterId: number): Promise<CorpKillsFeed> {
   const { loadCorpKills } = await import('./corpFeedLoaders');
   return loadCorpKills(characterId);
+}
+
+export async function loadCorpSrpFeed(characterId: number): Promise<CorpSrpFeed> {
+  const { loadCorpSrp } = await import('./corpFeedLoaders');
+  return loadCorpSrp(characterId);
 }
 
 export async function loadCorpAssetsFeed(characterId: number): Promise<CorpAssetsFeed> {

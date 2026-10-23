@@ -68,7 +68,7 @@ const deps = (): BookDeps => ({
 });
 const who = (id: number): Caller => ({ uid: `char:${id}`, ownerHash: `h${id}` });
 const tok = (id: number) => `tok-${id}`;
-const collectorBook = () => db.collection('corpTaxBooks').doc(String(COLLECTOR));
+const collectorBook = () => db.collection('corps').doc(String(COLLECTOR));
 const feederRecord = async () =>
   (await collectorBook().collection('feeders').doc(String(FEEDER)).get()).data() as
     FeederRecord | undefined;
@@ -646,7 +646,7 @@ suite('feeder invites', () => {
       );
     expect(await reason(turnOn('2026-10-14'))).toBe('start-before-leave');
     await turnOn('2026-10-15');
-    expect((await db.collection('corpTaxBooks').doc(String(FEEDER)).get()).get('startDate')).toBe(
+    expect((await db.collection('corps').doc(String(FEEDER)).get()).get('startDate')).toBe(
       '2026-10-15'
     );
   });

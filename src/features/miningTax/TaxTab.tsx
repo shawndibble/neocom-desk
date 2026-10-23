@@ -2,7 +2,8 @@ import { NO_NAMES } from '@/lib/emptyCollections';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { TaxDialogsHost } from '@/features/miningTax/TaxDialogsHost';
-import { isSelectableRow, useTaxColumns } from '@/features/miningTax/useTaxColumns';
+import { isSelectableRow, statusLabel, useTaxColumns } from '@/features/miningTax/useTaxColumns';
+import { statusColumnWidthClass } from '@/features/miningTax/statusColumnWidth';
 import { useTaxDialogs, useTaxDialogSelector } from '@/features/miningTax/useTaxDialogs';
 import { typeLabels } from './typeLabels';
 import { UnpricedOreDetail } from './UnpricedOreDetail';
@@ -16,6 +17,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactElement,
   type ReactNode,
 } from 'react';
 import { guarded } from '@/app/routeChunks';
@@ -97,6 +99,7 @@ import {
   settleUpMembers,
 } from '@/features/miningTax/selection';
 import { SelectionToolbar } from '@/features/miningTax/SelectionToolbar';
+import { TaxRowMenu } from '@/features/miningTax/TaxRowMenu';
 import { useLinkSuggestions, useMadePayments } from '@/features/miningTax/useMadePayments';
 import { useContinuations } from '@/features/miningTax/useContinuations';
 import { dateLabel, dateRangeOf, taxOwedOf } from '@/features/miningTax/taxRowFormat';
@@ -119,6 +122,7 @@ import { CorpBookSyncNote } from '@/features/miningTax/corpBook/CorpBookSyncNote
 import { PendingGroupingNotice } from '@/features/miningTax/corpBook/PendingGroupingNotice';
 import {
   useCorpStateHint,
+  useCorpPillText,
   useCorpStateLabel,
 } from '@/features/miningTax/corpBook/useCorpStateText';
 import {
@@ -342,6 +346,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     security: data?.systemSecurity ?? NO_SECURITY,
   });
   const corpStateLabel = useCorpStateLabel();
+  const corpPillText = useCorpPillText();
   const corpStateHint = useCorpStateHint();
   const allDisplayRows = useMemo(
     () =>
@@ -462,6 +467,16 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     (dr: DisplayRow): string =>
       dr.row.entry.solarSystemId === 0 ? '—' : systemLabel(systemNames, dr.row.entry.solarSystemId),
     [systemNames]
+  );
+
+  // Stable, so a row only re-renders when its own data changes (DataTable's note on `rowContextMenu`).
+  const rowContextMenu = useCallback(
+    (dr: DisplayRow, tr: ReactElement) => (
+      <TaxRowMenu dr={dr} systemName={systemName(dr)} onAction={actions.runRowMenuAction}>
+        {tr}
+      </TaxRowMenu>
+    ),
+    [systemName, actions]
   );
 
   const payeeName = useCallback(
@@ -770,6 +785,19 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   const selectableVisible = openRows.filter(isSelectableRow);
   const showSelectColumn = selectableVisible.length > 0;
 
+  // Sized to the longest status on screen, over both tables so Open's and
+  // History's columns still line up.
+  const statusWidthClass = useMemo(
+    () =>
+      statusColumnWidthClass(
+        visibleRows.map((dr) => ({
+          text: dr.corp ? corpPillText(dr.corp) : statusLabel(t, dr.status),
+          marked: dr.corp?.kind === 'row' && Boolean(dr.corp.view.overlap),
+        }))
+      ),
+    [visibleRows, corpPillText, t]
+  );
+
   const { baseColumns, openColumns, historyColumns } = useTaxColumns({
     isPhone,
     showOreColumn,
@@ -786,6 +814,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     systemName,
     payeeDisplayName,
     corpStateLabel,
+    statusWidthClass,
   });
 
   const taxSort = useUrlSort(
@@ -1250,13 +1279,15 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                               {...taxExport.tableProps}
                               columns={openColumns}
                               rows={openRows}
-                              className="dt-dense-lead sm:table-fixed"
+                              className="dt-dense-lead dt-actions-pinned-only sm:table-fixed"
                               rowKey={(dr) => dr.key}
                               label={t('miningTax.sections.openLabel')}
                               {...taxSort}
                               stackLayout="dense"
                               rowClassName={rowClassName}
                               onRowClick={actions.openDetail}
+                              rowContextMenu={rowContextMenu}
+                              rowMoreActions
                             />
                           </div>
                         </Panel>
@@ -1277,13 +1308,15 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                           rows={historyRows}
                           // Months are sections here, not folded duplicates:
                           // their entries line up with Open's, unindented.
-                          className="dt-flat-groups sm:table-fixed"
+                          className="dt-flat-groups dt-actions-pinned-only sm:table-fixed"
                           rowKey={(dr) => dr.key}
                           label={t('miningTax.sections.history')}
                           {...historySort}
                           stackLayout="dense"
                           rowClassName={rowClassName}
                           onRowClick={actions.openDetail}
+                          rowContextMenu={rowContextMenu}
+                          rowMoreActions
                           groupBy={{
                             key: (dr) => (dateRangeOf(dr).at(-1) ?? dr.row.entry.date).slice(0, 7),
                             allWidths: true,
@@ -1430,6 +1463,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           priceSourcesFor={priceSourcesFor}
           onClearSelection={clearSelection}
           onAddPayee={onAddPayee}
+          onToast={(message) => setToast({ message })}
         />
       </TabPanel>
     </div>

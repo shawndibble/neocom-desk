@@ -960,3 +960,33 @@ test.describe('Split dialog collector radios — touch target (#3674)', () => {
     }
   });
 });
+
+test.describe('Mining Tax table — the ⋮ column stays inside the table', () => {
+  // The column kept the header's `w-0` under `table-fixed`, so the 28px button
+  // overflowed the table's right edge and made it scroll sideways.
+  for (const width of [1440, 1024]) {
+    test(`at ${width}px the ⋮ is inside the table and nothing scrolls sideways`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await signInAndGoto(page);
+      await seedPayeeBalance(page);
+      await page.goto('./mining/tax');
+
+      const more = page.locator('tr button[aria-haspopup]').first();
+      await expect(more).toBeVisible();
+      const { buttonRight, wrapRight, scrollWidth, clientWidth } = await page.evaluate(() => {
+        const button = document.querySelector('tr button[aria-haspopup]')!;
+        const wrap = document.querySelector('table')!.parentElement!;
+        return {
+          buttonRight: button.getBoundingClientRect().right,
+          wrapRight: wrap.getBoundingClientRect().right,
+          scrollWidth: wrap.scrollWidth,
+          clientWidth: wrap.clientWidth,
+        };
+      });
+      expect(buttonRight).toBeLessThanOrEqual(wrapRight);
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    });
+  }
+});

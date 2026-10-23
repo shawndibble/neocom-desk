@@ -30,7 +30,8 @@ const renderDialog = () =>
 describe('BookSettingsDialog per-refinery rate (#4621)', () => {
   it('lists a refinery rate by the refinery name', () => {
     renderDialog();
-    expect(screen.getByText(/Refinery · Efa - Ashfall Tatara/)).toBeInTheDocument();
+    const row = screen.getByText('Efa - Ashfall Tatara').closest('li')!;
+    expect(within(row).getByText('Refinery')).toBeInTheDocument();
   });
 
   it('adds a rate for a moon owner refinery, which has no moon', async () => {
@@ -55,7 +56,8 @@ describe('BookSettingsDialog per-refinery rate (#4621)', () => {
 describe('BookSettingsDialog per-moon-owner rate', () => {
   it('lists a moon owner rate by the corporation name', () => {
     renderDialog();
-    expect(screen.getByText(`Moon owner · Corp ${OWNER}`)).toBeInTheDocument();
+    const row = screen.getByText(`Corp ${OWNER}`).closest('li')!;
+    expect(within(row).getByText('Moon owner')).toBeInTheDocument();
   });
 
   it('adds a rate for every refinery of a moon owner still in the book', async () => {
@@ -73,5 +75,42 @@ describe('BookSettingsDialog per-moon-owner rate', () => {
       action: 'addRate',
       rate: expect.objectContaining({ scope: 'feeder', feederId: OWNER, pct: 9 }),
     });
+  });
+});
+
+describe('BookSettingsDialog tabs', () => {
+  it('opens on Rates and shows one tab of settings at a time', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    expect(screen.getByRole('tab', { name: /Rates/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByText('Trade hub')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Billing' }));
+    expect(screen.getByText('Trade hub')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add rate' })).not.toBeInTheDocument();
+  });
+
+  it('keeps an edit made on one tab when another tab is opened', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('tab', { name: 'Billing' }));
+    const grace = screen.getByRole('textbox', { name: 'Grace after day end (hours)' });
+    await user.clear(grace);
+    await user.type(grace, '12');
+    await user.click(screen.getByRole('tab', { name: 'Extractions' }));
+    await user.click(screen.getByRole('tab', { name: 'Billing' }));
+    expect(screen.getByRole('textbox', { name: 'Grace after day end (hours)' })).toHaveValue('12');
+  });
+
+  it('opens on Access and sync when it reopens after the EVE opt-in', () => {
+    render(
+      <MemoryRouter
+        initialEntries={[{ pathname: '/', state: { corpSyncGrant: { status: 'on' } } }]}
+      >
+        <BookProvider value={bookSettingsValue()}>
+          <BookSettingsDialog open onClose={() => {}} />
+        </BookProvider>
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('tab', { name: 'Access' })).toHaveAttribute('aria-selected', 'true');
   });
 });

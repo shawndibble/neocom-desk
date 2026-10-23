@@ -119,6 +119,12 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
    * Station_Manager's older corp grant keeps every surface it had.
    */
   canReadSkyhooks: ['esi-structures.read_corporation.v1'],
+  /**
+   * Officer gate for SRP Claims (Director or Accountant), like canEdit in functions/src/corpTaxBook.ts.
+   * Not an ESI read; the callables re-check live. Settings need a Director.
+   * Additive (below): the roles scope is already in the corp group.
+   */
+  canManageSrp: ['esi-characters.read_corporation_roles.v1'],
 };
 
 /**
@@ -146,6 +152,7 @@ const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set([
   'canReadOrders',
   'canReadDivisions',
   'canReadSkyhooks',
+  'canManageSrp',
 ]);
 
 /**

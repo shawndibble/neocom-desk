@@ -96,6 +96,7 @@ function MinerLines() {
     systemName: () => 'Efa',
     payeeDisplayName: () => t('miningTax.corpBook.payeeName', { corp: CORP_NAME }),
     corpStateLabel,
+    statusWidthClass: 'sm:w-32',
   });
   return (
     <Panel padded={false}>

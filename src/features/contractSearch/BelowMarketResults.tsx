@@ -15,6 +15,7 @@ import {
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
+import { COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import type { BelowMarketContract } from '@/engine/contracts/belowMarket';
@@ -63,6 +64,7 @@ export function BelowMarketResults({
         id: 'item',
         header: t('contractSearch.itemColumn'),
         primary: true,
+        className: 'truncate',
         sortValue: (row) => belowMarketItemLabel(row.lead, typeNames, t),
         render: (row) => (
           // Span, not a Link: the row opens the contract modal, whose lines link to Market.
@@ -82,6 +84,7 @@ export function BelowMarketResults({
       {
         id: 'value',
         header: t('contractSearch.belowMarket.valueColumn'),
+        width: '14ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortValue: (row) => row.value,
@@ -100,6 +103,7 @@ export function BelowMarketResults({
       {
         id: 'asking',
         header: t('contractSearch.belowMarket.askingColumn'),
+        width: '12ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         sortValue: (row) => row.asking,
@@ -109,6 +113,7 @@ export function BelowMarketResults({
       {
         id: 'profit',
         header: t('contractSearch.belowMarket.profitColumn'),
+        width: '12ch',
         align: 'right',
         cardCorner: true,
         className: 'tabular-nums whitespace-nowrap text-isk-pos',
@@ -122,6 +127,7 @@ export function BelowMarketResults({
       {
         id: 'system',
         header: t('contractSearch.systemColumn'),
+        width: '16ch',
         className: 'whitespace-nowrap',
         sortValue: (row) => offerLocations.get(row.lead.locationId)?.systemName ?? undefined,
         render: (row) => {
@@ -144,6 +150,7 @@ export function BelowMarketResults({
       {
         id: 'jumps',
         header: t('contractSearch.itemsJumpsColumn'),
+        width: COL_SMALL_NUMBER,
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => {

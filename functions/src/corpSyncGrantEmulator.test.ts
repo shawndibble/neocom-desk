@@ -131,7 +131,7 @@ const bookDeps = (): BookDeps => {
 };
 
 const who = (id: number): Caller => ({ uid: `char:${id}`, ownerHash: `h${id}` });
-const book = () => db.collection('corpTaxBooks').doc(String(CORP));
+const book = () => db.collection('corps').doc(String(CORP));
 const grantDoc = (): Promise<CorpSyncGrantDoc | undefined> =>
   db
     .collection(CORP_SYNC_GRANTS_COLLECTION)

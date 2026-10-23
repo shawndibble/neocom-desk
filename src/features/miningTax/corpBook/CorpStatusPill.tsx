@@ -1,9 +1,13 @@
-import { useTranslation } from 'react-i18next';
 import { HintText } from '@/components/ui/HintText';
 import { cx } from '@/lib/cx';
 import { StatusPill } from '../StatusPill';
 import type { CorpRowInfo } from './corpRows';
-import { useCorpStateHint, useCorpStateLabel, type PillState } from './useCorpStateText';
+import {
+  useCorpPillText,
+  useCorpStateHint,
+  useCorpStateLabel,
+  type PillState,
+} from './useCorpStateText';
 
 /** The tab's own pill look, with the Corp Tax Book values added (mockup F16). */
 const PILL_TONE: Record<PillState, string> = {
@@ -18,8 +22,8 @@ const PILL_TONE: Record<PillState, string> = {
 
 export function CorpStatusPill({ corp }: { corp: CorpRowInfo }) {
   const label = useCorpStateLabel();
+  const pillText = useCorpPillText();
   const hint = useCorpStateHint();
-  const { t } = useTranslation();
   if (corp.kind === 'row' && corp.view.state === 'paid') {
     return <StatusPill status="paid" label={label(corp)} hint={hint(corp)} />;
   }
@@ -32,7 +36,7 @@ export function CorpStatusPill({ corp }: { corp: CorpRowInfo }) {
           PILL_TONE[state]
         )}
       >
-        {state === 'sent-waiting' ? t('miningTax.corpBook.state.sentWaitingShort') : label(corp)}
+        {pillText(corp)}
       </span>
     </HintText>
   );

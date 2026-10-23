@@ -18,6 +18,7 @@ import { EmptyState, LiveStatus, Panel, textActionClassName } from '@/components
 import type { CharacterBoardItem } from '@/engine/character/board';
 import { useTimeZone } from '@/lib/timeFormat';
 import { groupByDay, relativeDayFor } from '@/engine/character/deadlines';
+import { CalendarClocks } from './CalendarClocks';
 import { CharacterBoardRow } from './CharacterBoardRow';
 
 export interface ComingUpRailProps {
@@ -118,13 +119,6 @@ export function ComingUpRail({
   return (
     <Panel
       padded={false}
-      title={t('calendar.rail.title')}
-      meta={
-        <span className="text-[0.6875rem] text-text-dim tabular-nums">
-          {t('calendar.rail.count', { count: items.length })}
-          <LiveStatus announceKey={selectedDayMs ?? 'all'}>{status}</LiveStatus>
-        </span>
-      }
       actions={
         selectedDayMs !== null && (
           <button type="button" onClick={onClearDay} className={textActionClassName()}>
@@ -134,6 +128,10 @@ export function ComingUpRail({
       }
       className="min-w-0 flex-1 md:max-w-lg md:min-w-72"
     >
+      <div className="border-b border-line px-3 py-2">
+        <CalendarClocks />
+        <LiveStatus announceKey={selectedDayMs ?? 'all'}>{status}</LiveStatus>
+      </div>
       {content}
     </Panel>
   );

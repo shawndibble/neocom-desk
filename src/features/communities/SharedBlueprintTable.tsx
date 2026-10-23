@@ -10,6 +10,7 @@ import {
   RowActionsMenu,
   type DataTableColumn,
 } from '@/components/ui';
+import { COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
 import { Pill } from '@/components/ui/Pill';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { ItemInfoLink } from '@/features/entities/EntityLink';
@@ -134,6 +135,7 @@ export function SharedBlueprintTable({
       id: 'name',
       header: t('communities.library.columns.blueprint'),
       primary: true,
+      className: 'truncate',
       render: (row) => (
         <ItemInfoLink typeId={row.typeId} itemName={row.name}>
           {row.name}
@@ -144,22 +146,25 @@ export function SharedBlueprintTable({
     {
       id: 'member',
       header: t('communities.library.columns.member'),
+      width: '26ch',
+      // The name truncates, the stale badge does not.
       render: (row) => (
-        <>
-          {row.memberName}
-          {row.stale && <Pill className="ml-1">{t('communities.staleBadge')}</Pill>}
-        </>
+        <span className="flex min-w-0 items-center">
+          <span className="truncate">{row.memberName}</span>
+          {row.stale && <Pill className="ml-1 shrink-0">{t('communities.staleBadge')}</Pill>}
+        </span>
       ),
       sortValue: (row) => row.memberName,
     },
     {
       id: 'location',
       header: t('communities.library.columns.location'),
+      className: 'truncate',
       render: (row) => (
         <>
           {row.locationName}
           {!placeNamesSystem(row.locationName, row.systemName) && (
-            <span className="block text-text-dim">{row.systemName}</span>
+            <span className="block truncate text-text-dim">{row.systemName}</span>
           )}
         </>
       ),
@@ -169,6 +174,7 @@ export function SharedBlueprintTable({
       id: 'jumps',
       header: t('communities.library.columns.jumps'),
       align: 'right',
+      width: COL_SMALL_NUMBER,
       className: 'tabular-nums',
       sortValue: (row) => jumpsCellSortValue(rowJumps(row)),
       render: (row) =>
@@ -179,6 +185,8 @@ export function SharedBlueprintTable({
       header: t('communities.library.columns.meTe'),
       align: 'right',
       headerClassName: 'whitespace-nowrap',
+      width: '10ch',
+      className: 'whitespace-nowrap',
       render: (row) => `${row.me} / ${row.te}`,
       sortValue: (row) => row.me * 100 + row.te,
     },
@@ -186,6 +194,8 @@ export function SharedBlueprintTable({
       id: 'runs',
       header: t('communities.library.columns.runs'),
       align: 'right',
+      width: '12ch',
+      className: 'whitespace-nowrap',
       render: (row) =>
         row.runs < 0
           ? t('communities.library.bpo')

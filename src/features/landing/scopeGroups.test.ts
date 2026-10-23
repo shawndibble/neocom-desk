@@ -29,7 +29,9 @@ describe('LANDING_SCOPE_GROUPS', () => {
   it('only tags as opt-in what the registry marks opt-in', () => {
     expect(PLACED_GROUPS.filter((g) => !PERMISSIONS[g].defaultOn).sort()).toEqual([
       'corp',
+      'corpProjects',
       'jumpFatigue',
+      'killmails',
       'structureMarkets',
     ]);
   });

@@ -1,7 +1,7 @@
 // Collector books (issue #4507, spec #4504): the feeder record, its invite links
 // and the callables behind them. No sync and no UI yet. Layout:
 //
-//   corpTaxBooks/{collector}/feeders/{feederCorp}  the feeder record (officer-readable, function-written)
+//   corps/{collector}/feeders/{feederCorp}  the feeder record (officer-readable, function-written)
 //   corpTaxBookFeederInvites/{sha256(code)}        an invite link; only the hash is stored (function-only)
 //   corpTaxBookFeederOf/{feederCorp}               feeder → Collector pointer (function-only)
 //   corpTaxBookFeederPrevious/{feederCorp}         set when a feeder leaves, so its after-leaving view still resolves (function-only)
@@ -46,7 +46,7 @@ import { characterIdForUid } from './verifyEveToken.js';
 
 export type FeederStatus = 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
 
-/** `corpTaxBooks/{collector}/feeders/{feederCorp}`. */
+/** `corps/{collector}/feeders/{feederCorp}`. */
 export interface FeederRecord {
   corporationId: number;
   status: FeederStatus;

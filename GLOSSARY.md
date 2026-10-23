@@ -151,7 +151,18 @@ here — they go one per file in `docs/context/decisions/`.
   hand-made Build Plan gets, run over every owned blueprint. Reaction
   blueprints are excluded. Selecting rows seeds them into **Build Plan
   Compare** as ordinary Build Plans. Sits beside **Market-Wide Build
-  Opportunities**, the tab's ownership-independent sibling panel.
+  Opportunities**, the tab's ownership-independent sibling panel. Its panel
+  is titled "Build" and has three views: Ranked, All owned and **Corp
+  projects**.
+- **Corporation Project**: A job the game's corporation project board offers
+  members: a fixed ISK reward per contributed unit, paid from a pool, with a
+  per-Character cap and an end date. Only the manufacture kind is read (mining,
+  delivery, combat, loyalty and unknown kinds are left to the game client). In
+  **Build Opportunities** it is a buyer: the **Corp projects** view lists each
+  open one the chosen Characters can still contribute to, with the reward,
+  the build cost, where the blueprint comes from and the profit at the cap.
+  Read with the opt-in **Permission** "Corporation projects"; the view is
+  absent without it.
 - **Build Plan**: An industry plan for one blueprint or reaction formula:
   materials needed, costs, fees/taxes, time, and two independent verdicts — an
   **Acquisition Verdict** and a **Sale Profitability** read. Covers
@@ -290,6 +301,21 @@ here — they go one per file in `docs/context/decisions/`.
 - **Corp Capability**: What a Character can actually _see_ — wallet,
   structures, members, industry — derived from their Corp Roles. The unit
   every consumer branches on; none compares role strings itself.
+- **SRP Claim**: A pilot's request, filed against one of their own killmails,
+  that their corporation's ship replacement program (SRP) repay the loss. One
+  per killmail, filed within 30 days of the loss by the Character that died,
+  who must have been in the corporation at the time. States: Pending,
+  Approved, Paid, Rejected. Distinct from a **Pledge**, which holds nothing,
+  and from a **Group Stock Claim**, which is a hold on stock.
+- **Reimbursement**: The ISK a corporation repays on an approved **SRP Claim**,
+  worked out from the corp's **Hull Rule** and **Price Percent**s, which an
+  officer may override with a reason. The corporation sends it in game. Distinct
+  from a **Payout**, which is mining-tax ISK a **Collector** sent a **Feeder**.
+- **Hull Rule**: A corporation's setting for one hull or hull class under SRP:
+  **Pay** (a fixed ISK amount, or the corp's percent of value), **Not covered**
+  (a pilot cannot file it), or **Officer decides**. A hull with no Hull Rule
+  follows the corp's percent chain when one is set up; with none set up it has
+  no computed amount and the officer types it.
 - **Corp Board**: `/corp`, a **Widget board** of corp **Widgets** the pilot
   chooses, sizes, orders, renames and removes, on the same engine as the
   Overview. Replaces the fixed Corp Ops Board (Standing, Deadline Strip, Kind

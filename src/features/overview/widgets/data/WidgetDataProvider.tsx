@@ -72,6 +72,7 @@ import {
   loadCorpSovereigntyFeed,
   loadCorpStarbasesFeed,
   loadCorpContractsFeed,
+  loadCorpSrpFeed,
   loadCorpOrdersFeed,
   loadCorpWalletFeed,
 } from './corpFeeds';
@@ -365,6 +366,8 @@ function Source({ feed }: { feed: FeedId }) {
       return <SnapshotSource feed="corpOrders" load={loadCorpOrdersFeed} cacheKey="corp:orders" />;
     case 'corpKills':
       return <SnapshotSource feed="corpKills" load={loadCorpKillsFeed} cacheKey="corp:kills" />;
+    case 'corpSrp':
+      return <SnapshotSource feed="corpSrp" load={loadCorpSrpFeed} cacheKey="corp:srp" />;
     case 'incursions':
       return <IncursionsSource />;
     case 'sovRaids':

@@ -120,6 +120,8 @@ export const DEFAULT_SHOWN_NAV: readonly string[] = [
   '/corp/wallet',
   '/corp/assets',
   '/corp/moons',
+  // Officer SRP: behind `canManageSrp`, so no clutter for anyone else.
+  '/corp/srp',
 ];
 
 /** The first-run question's answers, each with the pages it brings onto the rail. */

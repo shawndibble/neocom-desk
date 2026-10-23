@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { SlideOver, NeedsConnection, Button } from '@/components/ui';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { permissionsForEndpoints, SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import { pledgeEntryAfterManual } from '@/engine/communities/delivery';
 import {
   canPledge,
@@ -51,8 +51,7 @@ import {
 } from './requestStore';
 
 const DELIVERY_GROUPS = permissionsForEndpoints(DELIVERY_ENDPOINTS);
-const SEND_MAIL = ['postCharacterMail'] as const;
-const SEND_MAIL_GROUPS = permissionsForEndpoints(SEND_MAIL);
+const SEND_MAIL_GROUPS = permissionsForEndpoints(SEND_MAIL_ENDPOINTS);
 
 /** "BPC, runs 10, ME 10": what the requester asked of a blueprint line, empty for a plain item. */
 function lineSpec(line: RequestLine, t: (key: string, opts?: Record<string, unknown>) => string) {
@@ -142,7 +141,7 @@ export function RequestPanel({
   // A buyback is sold to, not pledged on: Sell to arrives with the quote.
   const mayPledge = !request.standing && canPledge(request, myUid, now);
   const lacksContracts = useCharacterLacksEndpoints(characterId, DELIVERY_ENDPOINTS);
-  const lacksSendMail = useCharacterLacksEndpoints(characterId, SEND_MAIL);
+  const lacksSendMail = useCharacterLacksEndpoints(characterId, SEND_MAIL_ENDPOINTS);
   const wantsMail = mayPledge && request.notify.mail;
   const delivery = useDeliverySync({
     characterId,

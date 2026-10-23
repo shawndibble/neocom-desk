@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
+import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
+import * as Icon from './icons';
 import { panelDomId, tabDomId, useTabPanelProps } from './tabPanel';
+import { pageScrollDelta, scrollEdges, wheelScrollDelta, type ScrollEdges } from './tabScroll';
 import {
   tabItemActiveClassName,
   tabItemClassName,
   tabItemIdleClassName,
+  tabChevronClassName,
   tabListClassName,
   tabScrollerClassName,
 } from './tabStyles';
@@ -72,7 +76,9 @@ interface TabsProps {
  *
  * The bar scrolls sideways rather than squeezing when it outgrows its frame —
  * see `tabScrollerClassName` for why the scroller is the wrapper and not the
- * tablist itself.
+ * tablist itself. With a pointer, a vertical wheel over the bar travels it and
+ * a chevron appears at whichever end still has tabs beyond it (§6c); on touch
+ * the swipe and the edge fade are the cue, so the chevrons are not drawn.
  *
  * @summary Horizontal tab bar for peer views inside one page (Open / History); not for navigation.
  */
@@ -92,6 +98,54 @@ export function Tabs({
   // anything until Enter/Space says so.
   const [manualFocusId, setManualFocusId] = useState(value);
   const focusedId = activation === 'manual' ? manualFocusId : value;
+  const reducedMotion = usePrefersReducedMotion();
+  const [edges, setEdges] = useState<ScrollEdges>({ before: false, after: false });
+
+  // Chevrons and wheel travel both need to know which ends still have tabs
+  // beyond them. Recomputed on scroll and on any resize of the frame or the
+  // bar (a tab added, a count badge growing, a window resize), so it needs no
+  // dependency on `tabs`, which callers often pass as a fresh array.
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const update = () => {
+      const next = scrollEdges(scroller);
+      setEdges((prev) => (prev.before === next.before && prev.after === next.after ? prev : next));
+    };
+    update();
+    scroller.addEventListener('scroll', update, { passive: true });
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+    observer?.observe(scroller);
+    if (listRef.current) observer?.observe(listRef.current);
+    return () => {
+      scroller.removeEventListener('scroll', update);
+      observer?.disconnect();
+    };
+  }, []);
+
+  // Native listener, not `onWheel`: React registers wheel passively, and
+  // taking the event over means calling `preventDefault`.
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const onWheel = (event: WheelEvent) => {
+      const delta = wheelScrollDelta(event, scrollEdges(scroller));
+      if (delta === null) return;
+      event.preventDefault();
+      scroller.scrollLeft += delta;
+    };
+    scroller.addEventListener('wheel', onWheel, { passive: false });
+    return () => scroller.removeEventListener('wheel', onWheel);
+  }, []);
+
+  function pageScroll(direction: 'before' | 'after') {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    scroller.scrollBy({
+      left: pageScrollDelta(direction, scroller.clientWidth),
+      behavior: reducedMotion ? 'auto' : 'smooth',
+    });
+  }
 
   /**
    * Keeps the selected (or, in manual mode, focused) tab on screen when it
@@ -136,58 +190,77 @@ export function Tabs({
   }
 
   return (
-    // `className` lands on the scroller, not the tablist: callers pass spacing
+    // `className` lands on this frame, not the tablist: callers pass spacing
     // (`mt-3`), and margin on the inner bar would be measured inside the
-    // scrollport.
-    <div ref={scrollerRef} className={cx(tabScrollerClassName, className)}>
-      <div
-        ref={listRef}
-        role="tablist"
-        aria-label={label}
-        onKeyDown={onKeyDown}
-        className={tabListClassName}
-      >
-        {tabs.map((tab) => {
-          const active = tab.id === value;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              id={tabDomId(tabsId, tab.id)}
-              data-tab-id={tab.id}
-              aria-selected={active}
-              // Only the selected tab has a rendered panel; elsewhere the id would dangle.
-              aria-controls={active ? panelDomId(tabsId, tab.id) : undefined}
-              tabIndex={tab.id === focusedId ? 0 : -1}
-              onClick={() => {
-                if (activation === 'manual') setManualFocusId(tab.id);
-                onChange(tab.id);
-              }}
-              className={cx(
-                tabItemClassName,
-                active ? tabItemActiveClassName : tabItemIdleClassName
-              )}
-            >
-              {tab.label}
-              {/* The space keeps the name "Members 12"; a flex item, it draws nothing. */}
-              {tab.count !== undefined && ' '}
-              {tab.count !== undefined && (
-                <span
-                  className={cx(
-                    'ml-1.5 inline-grid h-4.5 min-w-4.5 place-items-center rounded-full border px-1 text-[0.625rem] tracking-normal tabular-nums',
-                    tab.countTone === 'danger' && 'border-danger text-danger',
-                    tab.countTone === 'warning' && 'border-warning text-warning',
-                    tab.countTone === undefined &&
-                      (active ? 'border-accent-dim text-text' : 'border-line-bright')
-                  )}
-                >
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          );
-        })}
+    // scrollport. The chevrons sit here too, outside the scroller, because the
+    // scroller's edge-fade mask would fade them out with the tabs.
+    <div className={cx('relative', className)}>
+      {(['before', 'after'] as const).map((side) =>
+        edges[side] ? (
+          // Pointer-only and out of the tab order: arrow keys already travel
+          // the bar, and a screen reader reads every tab in the tablist.
+          <button
+            key={side}
+            type="button"
+            tabIndex={-1}
+            aria-hidden="true"
+            onClick={() => pageScroll(side)}
+            className={cx(tabChevronClassName, side === 'before' ? 'left-0.5' : 'right-0.5')}
+          >
+            {side === 'before' ? <Icon.Back size={14} /> : <Icon.Descend size={14} />}
+          </button>
+        ) : null
+      )}
+      <div ref={scrollerRef} className={tabScrollerClassName}>
+        <div
+          ref={listRef}
+          role="tablist"
+          aria-label={label}
+          onKeyDown={onKeyDown}
+          className={tabListClassName}
+        >
+          {tabs.map((tab) => {
+            const active = tab.id === value;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                id={tabDomId(tabsId, tab.id)}
+                data-tab-id={tab.id}
+                aria-selected={active}
+                // Only the selected tab has a rendered panel; elsewhere the id would dangle.
+                aria-controls={active ? panelDomId(tabsId, tab.id) : undefined}
+                tabIndex={tab.id === focusedId ? 0 : -1}
+                onClick={() => {
+                  if (activation === 'manual') setManualFocusId(tab.id);
+                  onChange(tab.id);
+                }}
+                className={cx(
+                  tabItemClassName,
+                  active ? tabItemActiveClassName : tabItemIdleClassName
+                )}
+              >
+                {tab.label}
+                {/* The space keeps the name "Members 12"; a flex item, it draws nothing. */}
+                {tab.count !== undefined && ' '}
+                {tab.count !== undefined && (
+                  <span
+                    className={cx(
+                      'ml-1.5 inline-grid h-4.5 min-w-4.5 place-items-center rounded-full border px-1 text-[0.625rem] tracking-normal tabular-nums',
+                      tab.countTone === 'danger' && 'border-danger text-danger',
+                      tab.countTone === 'warning' && 'border-warning text-warning',
+                      tab.countTone === undefined &&
+                        (active ? 'border-accent-dim text-text' : 'border-line-bright')
+                    )}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

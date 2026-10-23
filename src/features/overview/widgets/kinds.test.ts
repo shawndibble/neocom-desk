@@ -42,6 +42,7 @@ const ALL_IDS = [
   'kills',
   'omega',
   'tradingProfit',
+  'eveTime',
   'comingUp',
   'contracts',
   'mail',
@@ -70,7 +71,7 @@ const CORP_IDS = [
   'corpSrp',
 ];
 
-const CORP_SOON = ['corpSrp'];
+const CORP_SOON: string[] = [];
 
 const overviewKinds = () => boardKinds('overview');
 
@@ -121,6 +122,14 @@ describe('widget kind catalogue', () => {
     expect(kindOpenTo(getKind('wallet')!, null)).toBe(true);
   });
 
+  it('gates the SRP widget on the SRP officer capability alone', () => {
+    const srp = getKind('corpSrp')!;
+    expect(srp.availability).toBe('available');
+    expect(kindOpenTo(srp, NO_CORP_CAPABILITIES)).toBe(false);
+    expect(kindOpenTo(srp, { ...NO_CORP_CAPABILITIES, canManageSrp: true })).toBe(true);
+    expect(kindOpenTo(srp, { ...NO_CORP_CAPABILITIES, canReadContracts: true })).toBe(false);
+  });
+
   it('marks the corp kinds with no data source yet as coming soon', () => {
     const soon = boardKinds('corp')
       .filter((k) => k.availability === 'comingSoon')
@@ -144,8 +153,8 @@ describe('widget kind catalogue', () => {
     for (const k of WIDGET_KINDS) expect(k.views, k.id).toContain('number');
   });
 
-  it('uses every one of the six categories', () => {
-    expect(KIND_CATEGORIES).toHaveLength(6);
+  it('uses every one of the eight categories', () => {
+    expect(KIND_CATEGORIES).toHaveLength(8);
     for (const c of KIND_CATEGORIES) {
       expect(
         overviewKinds().some((k) => k.boards.overview === c),

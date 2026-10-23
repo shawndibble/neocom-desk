@@ -6,6 +6,8 @@
  * and a chart that names what it draws.
  */
 import { DAY_MS } from '@/lib/age';
+import { eveClock } from '@/lib/eveTime';
+import { utcDay } from '@/engine/localDay';
 import type { DeadlineSeverity } from '@/engine/character/severity';
 import { filterYieldRange, eveToday, rangeDates, daysCovered } from '@/engine/miningTax/yieldRange';
 import type { MiningYieldRange } from '@/engine/miningTax/yieldRange';
@@ -410,8 +412,28 @@ const sovRaidsPending: Builder = (feeds) =>
     statusOf(feeds.sovRaids, { loading: !feeds.sovRaids?.error, hasData: false })
   );
 
+/** The game clock: UTC, read from the ticking `now`, so no feed and nothing to wait for. */
+export const eveTime: Builder = (_feeds, { t, now }) => ({
+  ...blank(null, {
+    hasStaleData: false,
+    loading: false,
+    needsPermission: false,
+    error: false,
+    hasData: true,
+    isEmpty: false,
+  }),
+  number: {
+    value: eveClock(now),
+    unit: t('overview.widgets.eveTime.unit'),
+    secondary: { text: utcDay(now) },
+    tone: 'clear',
+  },
+  summary: t('overview.widgets.eveTime.summary', { time: eveClock(now) }),
+});
+
 /** The kinds built in this file and its siblings, each with the feeds it reads. */
 export const WORLD_DEFS: Readonly<Record<string, KindDef>> = {
+  eveTime: { feeds: [], build: eveTime },
   industry: { feeds: ['industry'], build: industry },
   planetary: { feeds: ['planetary'], build: planetary },
   mercenaryDens: { feeds: ['mercenaryDens'], build: mercenaryDens },

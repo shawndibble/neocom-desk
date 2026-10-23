@@ -152,6 +152,20 @@ import {
   verifyOfficer,
   type BookDeps,
 } from './corpTaxBookStore.js';
+import { parseSrpSettingsPatch } from './srp.js';
+import { parseFileClaimInput } from './srpKillmail.js';
+import { srpKillmailSource } from './srpKillmailEsi.js';
+import {
+  fileSrpClaim,
+  getSrpStatus,
+  reclaimSrp,
+  saveSrpSettings,
+  turnOffSrp,
+  turnOnSrp,
+  verifySrpOfficer,
+  type SrpDeps,
+  type SrpFileDeps,
+} from './srpStore.js';
 import {
   parseCommunityIdInput,
   parseCreateInput,
@@ -208,6 +222,23 @@ import {
   setFleetShareDone,
 } from './communityFleetPayoutsStore.js';
 import { sweepFleetPayouts } from './communityFleetPayoutsCleanup.js';
+import { sweepSrpClaims } from './srpCleanup.js';
+import {
+  parseApproveBatch,
+  parseApproveItem,
+  parseChangeAmount,
+  parseMarkPaidBatch,
+  parseMarkPaidItem,
+  parseReject,
+} from './srpOfficer.js';
+import {
+  approveSrpClaim,
+  approveSrpClaims,
+  changeSrpClaimAmount,
+  markSrpClaimPaid,
+  markSrpClaimsPaid,
+  rejectSrpClaim,
+} from './srpOfficerStore.js';
 import {
   MutamarketBusyError,
   MutamarketInputError,
@@ -1087,6 +1118,144 @@ export const editCorpTaxBookCallable = corpTaxBookCallable(
     )
 );
 
+// SRP (ADR 0026): data under corps/{id}, written only by these callables. Served by
+// the Corp Tax Book router (one more deployed function would add a quota hit for nothing).
+const srpDeps = (): SrpDeps => ({
+  ...corpTaxBookDeps(),
+  lookupCorporation: esiCorporationLookup(),
+});
+
+const srpFileDeps = (): SrpFileDeps => ({ ...srpDeps(), killmails: srpKillmailSource() });
+
+export const verifySrpOfficerCallable = corpTaxBookCallable(
+  'verifySrpOfficerCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => verifySrpOfficer(srpDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+// A member (no corp role, no corp scope): is SRP on for my corporation, and what are its rules.
+export const getSrpStatusCallable = corpTaxBookCallable(
+  'getSrpStatusCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => getSrpStatus(srpDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+// A member files an SRP Claim against their own killmail: the server verifies the loss and prices it.
+export const fileSrpClaimCallable = corpTaxBookCallable(
+  'fileSrpClaimCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    fileSrpClaim(
+      srpFileDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseFileClaimInput(request.data)
+    )
+);
+
+export const turnOnSrpCallable = corpTaxBookCallable(
+  'turnOnSrpCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => turnOnSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+export const turnOffSrpCallable = corpTaxBookCallable(
+  'turnOffSrpCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => turnOffSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+export const saveSrpSettingsCallable = corpTaxBookCallable(
+  'saveSrpSettingsCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    saveSrpSettings(
+      srpDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseSrpSettingsPatch((request.data as { settings?: unknown } | null)?.settings)
+    )
+);
+
+// Officer queue: each re-checks Director/Accountant live and guards the state change in a transaction.
+export const approveSrpClaimCallable = corpTaxBookCallable(
+  'approveSrpClaimCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    approveSrpClaim(
+      srpDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseApproveItem(request.data)
+    )
+);
+
+export const approveSrpClaimsCallable = corpTaxBookCallable(
+  'approveSrpClaimsCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    approveSrpClaims(
+      srpDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseApproveBatch(request.data)
+    )
+);
+
+export const rejectSrpClaimCallable = corpTaxBookCallable(
+  'rejectSrpClaimCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    rejectSrpClaim(
+      srpDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseReject(request.data)
+    )
+);
+
+export const changeSrpClaimAmountCallable = corpTaxBookCallable(
+  'changeSrpClaimAmountCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    changeSrpClaimAmount(
+      srpDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseChangeAmount(request.data)
+    )
+);
+
+export const markSrpClaimPaidCallable = corpTaxBookCallable(
+  'markSrpClaimPaidCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    markSrpClaimPaid(
+      srpDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseMarkPaidItem(request.data)
+    )
+);
+
+export const markSrpClaimsPaidCallable = corpTaxBookCallable(
+  'markSrpClaimsPaidCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    markSrpClaimsPaid(
+      srpDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseMarkPaidBatch(request.data)
+    )
+);
+
+export const reclaimSrpCallable = corpTaxBookCallable(
+  'reclaimSrpCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) => reclaimSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
+);
+
 // A player claims their own Unmatched donation (D5): uid-authorised, no officer role.
 export const claimCorpTaxBookPaymentCallable = corpTaxBookCallable(
   'claimCorpTaxBookPaymentCallable',
@@ -1169,6 +1338,8 @@ export const corpTaxBookCall = onCall<unknown>(
  *   sequential reads and recursive deletes, so the function takes the 9-minute maximum timeout.
  * - sweepCommunityFleetPayouts (issue #4779): deletes Fleet Payouts expired a week ago, with
  *   their Shares. Bounded to 500 deletes a run.
+ * - sweepSrpClaims (ADR 0026): deletes Paid and Rejected SRP Claims a year after
+ *   they close, leaving an srpAudit line. Bounded to 500 deletes a run.
  */
 export const dailyHousekeeping = onSchedule(
   { schedule: 'every 24 hours', secrets: [ALERTS_TOKEN_KEY], timeoutSeconds: 540 },
@@ -1207,6 +1378,21 @@ export const dailyHousekeeping = onSchedule(
               });
             } else {
               logInfo('Community Fleet Payout sweep done', { deleted, failed, truncated });
+            }
+          },
+        },
+        {
+          name: 'sweepSrpClaims',
+          run: async () => {
+            const { deleted, failed, truncated } = await sweepSrpClaims(firestore(), Date.now());
+            if (failed > 0 || truncated) {
+              logWarn('SRP claim sweep incomplete, continues next run', {
+                deleted,
+                failed,
+                truncated,
+              });
+            } else {
+              logInfo('SRP claim sweep done', { deleted, failed, truncated });
             }
           },
         },

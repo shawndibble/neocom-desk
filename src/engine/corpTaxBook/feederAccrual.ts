@@ -21,7 +21,7 @@ export interface FeederModeChange {
 export type PayoutStatus = 'recorded' | 'waiting-for-journal' | 'matched';
 
 /**
- * `corpTaxBooks/{collector}/feeders/{feederCorp}/payouts/{id}`, written only by
+ * `corps/{collector}/feeders/{feederCorp}/payouts/{id}`, written only by
  * callables. A journal match only attaches to a payout that already counts.
  */
 export interface FeederPayout {

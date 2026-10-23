@@ -364,6 +364,12 @@
     overflow-wrap: anywhere;
   }
 
+  /* A fixed-width column's `truncate` is for the table; a card has room. */
+  .dt-stacked td.truncate {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
   .dt-stacked td::before {
     content: attr(data-label);
     position: absolute;
@@ -649,6 +655,14 @@
     align-self: center;
   }
 
+  /* The ⋮ is a 44px thumb target, taller than the title: it stretches line one
+     to its own height, and the title and figure (baseline-aligned like the
+     rest of the row) would ride at the top of it while the ⋮ and a leading
+     tick box centre. Centre them too, so line one reads as one line. */
+  .dt-stacked.dt-stack-dense tr:has(> td.dt-actions) :is(td.dt-primary, td.dt-corner) {
+    align-self: center;
+  }
+
   /* The leading expand caret (`expandableRow.leadingIcon`) is a desktop cue:
      a card is itself the tap target. */
   .dt-stacked .dt-lead-caret {
@@ -855,6 +869,23 @@
     /* A tighter gap than the base rule's, so a 360px phone still fits the
        meta line and the box on one line. */
     padding-left: 0.25rem;
+  }
+
+  /* A row with the in-flow ⋮ (Mining Tax) has a 44px line one, and the box and
+     the button centre in it. The title and the headline figure stay on the
+     baseline, which pins them to the top of that line, a box-height above
+     the box beside them; centre them with it. */
+  .dt-stacked.dt-stack-dense.dt-dense-lead tr:has(> td.dt-actions) td.dt-primary,
+  .dt-stacked.dt-stack-dense.dt-dense-lead tr:has(> td.dt-actions) td.dt-corner {
+    align-self: center;
+  }
+
+  /* The ⋮'s 44px touch box holds a 16px glyph, so beside the card's padding
+     it left the dots a thumb-width in from the edge the status and the
+     figures end at. Let the box overhang into the padding: the touch target
+     is the same, the dots sit near the card's right edge. */
+  .dt-stacked.dt-stack-dense.dt-dense-lead tr:has(> td.dt-actions) td.dt-actions {
+    margin-right: -0.75rem;
   }
 
   /* Opt-in (`dt-dense-lead` on the table, Mining Tax): the tick box joins
@@ -1374,7 +1405,8 @@
   :root {
     --sticky-clearance: calc(
       var(--onboarding-banner-clearance, 0px) + var(--selection-toolbar-clearance, 0px) +
-        var(--compare-drawer-clearance, 0px) + var(--hauling-trip-bar-clearance, 0px)
+        var(--compare-drawer-clearance, 0px) + var(--hauling-trip-bar-clearance, 0px) +
+        var(--unsaved-bar-clearance, 0px)
     );
   }
   /* From md up the page reserves nothing by default (computed `auto`), so
@@ -1385,13 +1417,16 @@
       scroll-padding-bottom: var(--sticky-clearance);
     }
   }
-  /* Hauling's trip bar sits on top of the tab bar, so its term already
-     covers the tab bar: take that back out rather than count it twice. */
+  /* Hauling's trip bar and the unsaved-changes bar sit on top of the tab bar, so their term
+     already covers the tab bar: take that back out rather than count it twice. */
   @media (width < 48rem) {
     :root {
       scroll-padding-bottom: calc(
         var(--sticky-clearance) + var(--bottom-nav-clearance) -
-          min(var(--hauling-trip-bar-clearance, 0px), var(--bottom-nav-clearance))
+          min(
+            var(--hauling-trip-bar-clearance, 0px) + var(--unsaved-bar-clearance, 0px),
+            var(--bottom-nav-clearance)
+          )
       );
     }
   }

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TabPanel, Tabs } from './Tabs';
@@ -188,6 +188,75 @@ describe('Tabs', () => {
       );
       expect(screen.getByRole('tab', { name: 'Open' })).toHaveAttribute('aria-controls');
       expect(screen.getByRole('tab', { name: 'History' })).not.toHaveAttribute('aria-controls');
+    });
+  });
+
+  /**
+   * A pointer user has no swipe: a vertical wheel travels the bar and a
+   * chevron appears at whichever end still has tabs beyond it. jsdom does no
+   * layout, so the bar's widths are stubbed on the prototype.
+   */
+  describe('travelling an overflowing bar with a pointer', () => {
+    afterEach(() => {
+      delete (HTMLElement.prototype as { clientWidth?: number }).clientWidth;
+      delete (HTMLElement.prototype as { scrollWidth?: number }).scrollWidth;
+    });
+
+    function renderOverflowing() {
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+        configurable: true,
+        value: 400,
+      });
+      Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+        configurable: true,
+        value: 700,
+      });
+      render(
+        <Tabs tabsId="t" label="Orders" tabs={tabs} value="open" onChange={() => undefined} />
+      );
+      return screen.getByRole('tablist').parentElement!;
+    }
+
+    // The chevrons are aria-hidden and out of the tab order, so they are found by their glyph's button.
+    const chevrons = () => document.querySelectorAll<HTMLButtonElement>('button[aria-hidden]');
+
+    it('draws no chevron for a bar that fits', () => {
+      render(
+        <Tabs tabsId="t" label="Orders" tabs={tabs} value="open" onChange={() => undefined} />
+      );
+      expect(chevrons()).toHaveLength(0);
+    });
+
+    it('draws only the forward chevron at rest, and both once scrolled', () => {
+      const scroller = renderOverflowing();
+      expect(chevrons()).toHaveLength(1);
+      scroller.scrollLeft = 100;
+      act(() => {
+        fireEvent.scroll(scroller);
+      });
+      expect(chevrons()).toHaveLength(2);
+    });
+
+    it('pages the bar when a chevron is clicked', () => {
+      const scroller = renderOverflowing();
+      const scrollBy = vi.fn();
+      scroller.scrollBy = scrollBy;
+      fireEvent.click(chevrons()[0]);
+      expect(scrollBy).toHaveBeenCalledWith(expect.objectContaining({ left: 300 }));
+    });
+
+    it('turns a vertical wheel into sideways travel and keeps the page still', () => {
+      const scroller = renderOverflowing();
+      const notPrevented = fireEvent.wheel(scroller, { deltaY: 120 });
+      expect(notPrevented).toBe(false);
+      expect(scroller.scrollLeft).toBe(120);
+    });
+
+    it('hands the wheel back to the page at the start of the bar', () => {
+      const scroller = renderOverflowing();
+      const notPrevented = fireEvent.wheel(scroller, { deltaY: -120 });
+      expect(notPrevented).toBe(true);
+      expect(scroller.scrollLeft).toBe(0);
     });
   });
 });

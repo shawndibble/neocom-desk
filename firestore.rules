@@ -418,8 +418,11 @@ service cloud.firestore {
     }
 
     // Corp Tax Book (issue #4061, ADR 0023): a corporation's shared record of
-    // moon mining tax, keyed by corporation id. Nothing here is writable by a
-    // client: every write is a callable (functions/src/corpTaxBookStore.ts)
+    // moon mining tax, keyed by corporation id, under the `corps/{id}` umbrella
+    // (issue #4858, ADR 0026). SRP's collections (`srp`, `srpClaims`, `srpAudit`,
+    // `srpOfficers`) sit beside it under the next `corps/{id}` block; none of
+    // their names is in the officer-only list below. Nothing here is writable
+    // by a client: every write is a callable (functions/src/corpTaxBookStore.ts)
     // that appends to the immutable audit log.
     //
     // Reads:
@@ -432,12 +435,12 @@ service cloud.firestore {
     //  - any signed-in Character may `get` the book's settings doc (terms
     //    are printed on every mail), but never list books.
     // The verify-link tokens (`corpTaxBookTokens`) have no client access.
-    match /corpTaxBooks/{corporationId} {
+    match /corps/{corporationId} {
       function isCharacter() {
         return request.auth != null && request.auth.uid.matches('char:[0-9]+');
       }
       function officerPath() {
-        return /databases/$(database)/documents/corpTaxBooks/$(corporationId)/officers/$(request.auth.uid);
+        return /databases/$(database)/documents/corps/$(corporationId)/officers/$(request.auth.uid);
       }
       function isOfficer() {
         return isCharacter()
@@ -507,7 +510,7 @@ service cloud.firestore {
       // Written out because the officer-only wildcard below is two segments deep and so does
       // not cover `feederViews/{x}/days/{d}`.
       function viewerPath(feederCorp) {
-        return /databases/$(database)/documents/corpTaxBooks/$(corporationId)/feederViews/$(feederCorp)/viewers/$(request.auth.uid);
+        return /databases/$(database)/documents/corps/$(corporationId)/feederViews/$(feederCorp)/viewers/$(request.auth.uid);
       }
       function isMoonOwnerOf(feederCorp) {
         return isCharacter()
@@ -566,6 +569,55 @@ service cloud.firestore {
       }
     }
 
+    // SRP (issue #4848, ADR 0026): corp-shared data under the `corps/{id}` umbrella, written
+    // only by the SRP callables (functions/src/srpStore.ts). No client write, anywhere.
+    //  - srp/settings, srpAudit: officers only (the settings reach members through a callable).
+    //  - srpClaims: officers read all; a pilot reads only claims filed under their own
+    //    verified Character uid and owner hash (a sold Character does not inherit them; queries
+    //    must filter `uid == auth.uid` and `ownerHash == auth.token.ownerHash`).
+    //  - srpOfficers/{uid}: the 1h access record verifySrpOfficer writes; a Character may
+    //    read only their own. Officer access needs canEdit (Director, Accountant or CEO) and
+    //    the same ownerHash, so a demoted officer or a sold Character loses it.
+    // The Corp Tax Book also lives under `corps/{id}` (block above); anything neither covers is closed.
+    match /corps/{corporationId} {
+      function isSrpCharacter() {
+        return request.auth != null && request.auth.uid.matches('char:[0-9]+');
+      }
+      function srpOfficerPath() {
+        return /databases/$(database)/documents/corps/$(corporationId)/srpOfficers/$(request.auth.uid);
+      }
+      function isSrpOfficer() {
+        return isSrpCharacter()
+          && exists(srpOfficerPath())
+          && get(srpOfficerPath()).data.canEdit == true
+          && get(srpOfficerPath()).data.ownerHash == request.auth.token.ownerHash
+          && get(srpOfficerPath()).data.expiresAt > request.time.toMillis();
+      }
+
+      match /srp/{docId} {
+        allow get, list: if isSrpOfficer();
+        allow write: if false;
+      }
+
+      match /srpClaims/{killmailId} {
+        allow get, list: if isSrpOfficer()
+          || (isSrpCharacter() && resource.data.uid == request.auth.uid
+            && resource.data.ownerHash == request.auth.token.ownerHash);
+        allow write: if false;
+      }
+
+      match /srpAudit/{entryId} {
+        allow get, list: if isSrpOfficer();
+        allow write: if false;
+      }
+
+      match /srpOfficers/{officerUid} {
+        allow get: if isSrpCharacter() && request.auth.uid == officerUid
+          && resource.data.ownerHash == request.auth.token.ownerHash;
+        allow list, write: if false;
+      }
+    }
+
     match /corpTaxBookTokens/{token} {
       allow read, write: if false;
     }
@@ -599,7 +651,7 @@ service cloud.firestore {
     // to the scheduled sync. Written and read only by the save/revoke callables and
     // the scheduled function (admin). No client path, not even the holder's: the
     // token must never reach a device. What officers may see (holder, status, why
-    // it stopped) is `corpTaxBooks/{corp}/meta/scheduledSync`, covered above.
+    // it stopped) is `corps/{corp}/meta/scheduledSync`, covered above.
     match /corpTaxBookSyncGrants/{corporationId} {
       allow read, write: if false;
     }

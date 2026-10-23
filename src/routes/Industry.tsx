@@ -3,7 +3,7 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
 import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
+import { db, type BuildPlanRecord } from '@/db';
 import { DataGate } from '@/components/DataGate';
 import { useRetryableLoad } from '@/lib/useRetryableLoad';
 import {
@@ -650,24 +650,47 @@ export function Industry() {
     navigate(`/industry/groups/${result.groupId}`);
   }
 
-  async function handleAddOpportunitiesToCompare(rows: readonly OpportunityRow[]) {
-    if (activeCharacterId === null || rows.length === 0) return;
-    // Off disk for the same reason as `createPlan`.
-    const currentFacilityDefaults = await loadActivityFacilityDefaults();
-    const newPlans = rows.map((row) =>
-      planForOpportunityCandidate(
-        row.candidate,
-        currentFacilityDefaults,
-        row.materialSourcing,
-        row.buildHere,
-        activeCharacterId,
-        row.hub
-      )
-    );
+  /** Saves the plans, selects them and opens Compare on the Build Plans tab. */
+  async function seedCompare(newPlans: readonly BuildPlanRecord[]) {
     await createBuildPlans(newPlans);
     setCompareSelectedIds(new Set(newPlans.map((p) => p.id)));
     setComparing(true);
     setTab('plans');
+  }
+
+  async function handleAddOpportunitiesToCompare(rows: readonly OpportunityRow[]) {
+    if (activeCharacterId === null || rows.length === 0) return;
+    // Off disk for the same reason as `createPlan`.
+    const currentFacilityDefaults = await loadActivityFacilityDefaults();
+    await seedCompare(
+      rows.map((row) =>
+        planForOpportunityCandidate(
+          row.candidate,
+          currentFacilityDefaults,
+          row.materialSourcing,
+          row.buildHere,
+          activeCharacterId,
+          row.hub
+        )
+      )
+    );
+  }
+
+  /**
+   * Corp projects rows arrive as the plans that priced them (runs = the units
+   * still to contribute). A plan belongs to whoever builds it, so each is
+   * re-owned by the active Character and given its own id and timestamp.
+   */
+  async function handleAddProjectsToCompare(plans: readonly BuildPlanRecord[]) {
+    if (activeCharacterId === null || plans.length === 0) return;
+    await seedCompare(
+      plans.map((plan) => ({
+        ...plan,
+        id: crypto.randomUUID(),
+        characterId: activeCharacterId,
+        updatedAt: Date.now(),
+      }))
+    );
   }
 
   async function handleStartPlan(entry: BlueprintCatalogEntry): Promise<boolean> {
@@ -733,7 +756,9 @@ export function Industry() {
       activeCharacterId={activeCharacterId}
       ownedStockSnapshot={workspace.ownedStockSnapshot}
       assumedMe={assumedMe}
+      pricingInputs={pricingInputs}
       onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
+      onAddProjectsToCompare={(plans) => void handleAddProjectsToCompare(plans)}
       onStartPlan={handleStartPlan}
       onDataAgeChange={setOpportunitiesDataAge}
     />

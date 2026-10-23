@@ -164,6 +164,14 @@ describe('GroupSummaryModal as one entry', () => {
     expect(onUncombine).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the More menu beside Edit, not in the title, even when every day is paid', () => {
+    renderGroup();
+    const edit = screen.getByRole('button', { name: 'Edit…' });
+    const more = screen.getByRole('button', { name: 'More actions for this combined entry' });
+    expect(more.parentElement).toBe(edit.parentElement);
+    expect(more.closest('header')).toBeNull();
+  });
+
   it('settles up while a day is still owed, and closes with Close', () => {
     const onSettleUp = vi.fn();
     const onClose = vi.fn();
