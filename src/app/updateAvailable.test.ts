@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { checkForUpdate, useUpdateStatus, watchRegistration } from './updateAvailable';
+import {
+  checkForUpdate,
+  pollForUpdate,
+  useUpdateStatus,
+  watchRegistration,
+} from './updateAvailable';
 
 const fetchLatestRelease = vi.fn();
 vi.mock('./latestRelease', async (importOriginal) => ({
@@ -111,6 +116,40 @@ describe('checkForUpdate against the published release', () => {
     fetchLatestRelease.mockResolvedValue('neocom-desk@9+newer');
     await checkForUpdate();
     expect(status()).toBe('available');
+  });
+});
+
+describe('pollForUpdate', () => {
+  it('leaves the worker alone when the published release is the running one', async () => {
+    const registration = fakeRegistration();
+    fetchLatestRelease.mockResolvedValue(__APP_RELEASE__);
+    await pollForUpdate(registration as never);
+    expect(registration.update).not.toHaveBeenCalled();
+    expect(status()).toBe('unknown');
+  });
+
+  it('marks a different release available and starts the worker download', async () => {
+    const registration = fakeRegistration();
+    registration.update.mockResolvedValue(undefined);
+    fetchLatestRelease.mockResolvedValue('neocom-desk@9+newer');
+    await pollForUpdate(registration as never);
+    expect(status()).toBe('available');
+    expect(registration.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not wait on the download it started', async () => {
+    const registration = fakeRegistration();
+    registration.update.mockReturnValue(new Promise(() => undefined));
+    fetchLatestRelease.mockResolvedValue('neocom-desk@9+newer');
+    await pollForUpdate(registration as never);
+    expect(status()).toBe('available');
+  });
+
+  it('asks the worker when the published release cannot be read', async () => {
+    const registration = fakeRegistration();
+    await pollForUpdate(registration as never);
+    expect(registration.update).toHaveBeenCalledTimes(1);
+    expect(status()).toBe('unknown');
   });
 });
 

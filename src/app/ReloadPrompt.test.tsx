@@ -9,7 +9,15 @@ import { ReloadPrompt } from './ReloadPrompt';
 const { existingWorker } = vi.hoisted(() => ({
   existingWorker: { current: undefined as unknown },
 }));
-vi.mock('./updateAvailable', () => ({ watchRegistration: vi.fn() }));
+vi.mock('./updateAvailable', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./updateAvailable')>()),
+  watchRegistration: vi.fn(),
+}));
+const fetchLatestRelease = vi.fn();
+vi.mock('./latestRelease', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./latestRelease')>()),
+  fetchLatestRelease: () => fetchLatestRelease(),
+}));
 vi.mock('@/lib/serviceWorker', () => ({
   getServiceWorkerRegistration: () => Promise.resolve(existingWorker.current),
 }));
@@ -69,6 +77,8 @@ const HIDDEN_FOR_MS = 10 * 60 * 1000;
 
 beforeEach(() => {
   updateServiceWorker.mockClear();
+  // Default: the published release is unreadable, so the worker is asked.
+  fetchLatestRelease.mockReset().mockResolvedValue(null);
   navigateRef.current = null;
   existingWorker.current = undefined;
   registerSWOptions.current = undefined;
@@ -208,6 +218,37 @@ describe('ReloadPrompt', () => {
       setHidden(false);
       await vi.advanceTimersByTimeAsync(0);
       expect(update).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves the worker alone while the published release is the running one', async () => {
+      fetchLatestRelease.mockResolvedValue(__APP_RELEASE__);
+      const { update } = setup();
+
+      await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('starts the worker download as soon as the published release differs', async () => {
+      fetchLatestRelease.mockResolvedValue('neocom-desk@9+newer');
+      const { update } = setup();
+
+      await vi.advanceTimersByTimeAsync(CHECK_INTERVAL_MS);
+      expect(update).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads the published release when the tab comes back, at most once a minute', async () => {
+      fetchLatestRelease.mockResolvedValue(__APP_RELEASE__);
+      setup();
+      setHidden(true);
+      await vi.advanceTimersByTimeAsync(61 * 1000);
+      setHidden(false);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fetchLatestRelease).toHaveBeenCalledTimes(1);
+
+      setHidden(true);
+      setHidden(false);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fetchLatestRelease).toHaveBeenCalledTimes(1);
     });
 
     it('skips the check while offline', async () => {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { getServiceWorkerRegistration } from '@/lib/serviceWorker';
-import { watchRegistration } from './updateAvailable';
+import { pollForUpdate, watchRegistration } from './updateAvailable';
 import { isPublicRoute } from './routerPath';
 
 // Checking is cheap, so check often: a build found here is applied by the next
@@ -21,14 +21,14 @@ const pollingRegistrations = new WeakSet<ServiceWorkerRegistration>();
 async function checkForUpdate(registration: ServiceWorkerRegistration) {
   try {
     if (registration.installing || !navigator.onLine) return;
-    // No `fetch(swUrl, { cache: 'no-store' })` first, as vite-plugin-pwa's
-    // docs sample does: `update()` already fetches sw.js past the HTTP cache
-    // (the registration's default `updateViaCache: 'imports'` only lets
-    // imported scripts use it, and nothing here overrides that), so the
-    // pre-fetch only downloaded sw.js twice per check. Its other job — not
-    // calling `update()` offline — is `navigator.onLine` above plus this
-    // try/catch, which swallows the rejection `update()` gives offline.
-    await registration.update();
+    // `pollForUpdate` reads the tiny `version.json` first and only touches the
+    // worker when it differs (or cannot be read). No `fetch(swUrl, { cache:
+    // 'no-store' })` of our own, as vite-plugin-pwa's docs sample does:
+    // `update()` already fetches sw.js past the HTTP cache, so that pre-fetch
+    // only downloaded it twice. Not calling `update()` offline is
+    // `navigator.onLine` above plus this try/catch, which swallows the
+    // rejection `update()` gives offline.
+    await pollForUpdate(registration);
   } catch {
     // Offline/flaky network mid-check — next interval tick retries.
   }
