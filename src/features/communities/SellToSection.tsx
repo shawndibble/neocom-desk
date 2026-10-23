@@ -1,13 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { GrantMissingLink } from '@/app/GrantMissingLink';
 import { Button, NeedsConnection, TextArea } from '@/components/ui';
-import { quoteIsCurrent, quoteIsHeld } from '@/engine/communities/buyback';
+import { permissionsForEndpoints } from '@/esi/registry';
+import { quoteIsCurrent, quoteIsHeld, type StandingRequest } from '@/engine/communities/buyback';
 import type { CommunityRequest, RequestPledge } from '@/engine/communities/requests';
 import { CopyablePrice } from '@/features/market/CopyablePrice';
 import { formatIsk } from '@/lib/isk';
 import { formatNumber } from '@/lib/numberLocale';
 import { formatDateOnly } from '@/lib/timestamp';
+import { rememberBuybackLinks } from './buybackLinks';
+import { QuoteContractList, type LinkedContractRow } from './QuoteContractList';
+import { requestHeadline } from './requestFormat';
+import { DELIVERY_ENDPOINTS } from './requestDelivery';
 import { saveMyQuote } from './requestStore';
+import { syncQuoteLinks, type QuoteLinksResult } from './quoteLinks';
 import { quotePile, type PileQuote } from './sellTo';
 
 /**
@@ -16,18 +23,25 @@ import { quotePile, type PileQuote } from './sellTo';
  * Member's own Pledge document the moment it is priced, and a second paste
  * replaces it. The contract itself is made in game, to the buyer named.
  */
+const CONTRACT_GROUPS = permissionsForEndpoints(DELIVERY_ENDPOINTS);
+
 export function SellToSection({
   request,
+  standing,
   characterId,
   communityId,
+  communityName,
   myPledge,
   buyerName,
   now,
   refreshPledges,
 }: {
   request: CommunityRequest;
+  /** The Request's terms: it is a standing Request, or there is nothing to sell to. */
+  standing: StandingRequest;
   characterId: number;
   communityId: string;
+  communityName: string;
   myPledge: RequestPledge | undefined;
   buyerName: string;
   now: number;
@@ -38,13 +52,54 @@ export function SellToSection({
   const [busy, setBusy] = useState<'quote' | 'clear' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState<PileQuote | null>(null);
-  const { standing } = request;
-  if (!standing) return null;
-
+  // Tagged with the quote it was read for: a replaced quote's rows are not the new one's.
+  const [read, setRead] = useState<{ quotedAt: number; result: QuoteLinksResult } | null>(null);
   const held = myPledge?.quote;
   const stillHeld = held !== undefined && quoteIsHeld(held, now);
   const current = held === undefined || quoteIsCurrent(held, standing);
+  // What this side can say about the linked contracts: the read just made, else the stored ids and statuses.
+  const linkState = read && read.quotedAt === held?.quotedAt ? read.result : null;
+  const linkRows: LinkedContractRow[] =
+    linkState?.status === 'ok'
+      ? linkState.links.map((link) => ({
+          ...link,
+          contract: linkState.contracts.get(link.contractId),
+        }))
+      : (held?.links ?? []).map((link) => ({ ...link, priceDiffers: false }));
   const heldDate = held ? formatDateOnly(new Date(held.expiresAt)) : '';
+
+  // Which of the seller's contracts are this quote's: read when a held quote shows, not on a timer.
+  useEffect(() => {
+    if (!held || !quoteIsHeld(held, Date.now())) return;
+    let cancelled = false;
+    syncQuoteLinks({ characterId, communityId, request, quote: held, now: Date.now() }).then(
+      (result) => {
+        if (cancelled) return;
+        setRead({ quotedAt: held.quotedAt, result });
+        void rememberBuybackLinks(
+          characterId,
+          new Map(
+            result.links.map((link) => [
+              link.contractId,
+              {
+                requestId: request.id,
+                communityId,
+                communityName,
+                requestTitle: requestHeadline(request, t),
+                quotedTotal: held.total,
+              },
+            ])
+          )
+        ).catch(() => undefined);
+      },
+      () => undefined
+    );
+    return () => {
+      cancelled = true;
+    };
+    // The quote's date identifies it: a re-read of the same quote is not a reason to read contracts again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [held?.quotedAt, characterId, communityId, request.id]);
 
   const getQuote = async () => {
     setBusy('quote');
@@ -132,6 +187,26 @@ export function SellToSection({
               ))}
             </tbody>
           </table>
+          {stillHeld && (
+            <QuoteContractList
+              label={t('communities.board.buyback.contractsLabel')}
+              rows={linkRows}
+              quotedTotal={held.total}
+              viewerCharacterId={characterId}
+              now={now}
+            />
+          )}
+          {linkState?.status === 'needs-scope' && (
+            <p className="text-xs text-text-dim">
+              {t('communities.board.buyback.contractNeedsPermission')}{' '}
+              <GrantMissingLink groups={CONTRACT_GROUPS} />
+            </p>
+          )}
+          {linkState?.status === 'read-failed' && (
+            <p role="status" className="text-xs text-text-dim">
+              {t('communities.board.buyback.contractReadFailed')}
+            </p>
+          )}
         </div>
       )}
       <label className="block space-y-1">

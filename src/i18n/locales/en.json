@@ -9218,7 +9218,11 @@
     "detailAbyssalEstimateNote": "MutaMarket's model estimate for each module's exact rolls, not a sale price.",
     "detailAbyssalWhy": "An abyssal module is worth its own rolls, so it has no market price; MutaMarket can only estimate one it can identify.",
     "statusFilterLabel": "Status",
-    "typeFilterLabel": "Contract type"
+    "typeFilterLabel": "Contract type",
+    "buyback": {
+      "cue": "Buyback: {{title}} in {{community}}",
+      "cueLabel": "Buyback contract"
+    }
   },
   "contractDetail": {
     "regionLabel": "Region",
@@ -9300,7 +9304,9 @@
     "timelineRejected": "Rejected",
     "timelineFailed": "Failed",
     "timelineReversed": "Reversed",
-    "timelineExpired": "Expired"
+    "timelineExpired": "Expired",
+    "buyback": "Buyback · {{title}} in {{community}}",
+    "buybackDiffers": "Price differs from quote · {{quoted}} ISK quoted"
   },
   "bpcContracts": {
     "title": "BPC Sourcing",
@@ -10114,7 +10120,25 @@
         "termsLabel": "Buyback terms",
         "noExpiry": "Open until closed",
         "buysLabel": "Buys",
-        "buyerUnknown": "Character {{id}}"
+        "buyerUnknown": "Character {{id}}",
+        "contractStatus": {
+          "outstanding": "Outstanding",
+          "inProgress": "In progress",
+          "finished": "Finished",
+          "expired": "Expired",
+          "rejected": "Rejected"
+        },
+        "priceDiffers": "Price differs from quote · {{quoted}} ISK quoted",
+        "contractsLabel": "Your contracts for this quote",
+        "quotesLabel": "Quotes",
+        "quotesTitle": "Quotes from Members",
+        "noQuotes": "No quotes held yet.",
+        "contractNeedsPermission": "Reading contracts needs a Permission you have not granted, so this quote shows no contract status.",
+        "contractReadFailed": "Contracts could not be read, so the status shown may be old.",
+        "contractIssued": "Issued {{age}}",
+        "noContracts": "No contract to {{name}} for these items yet.",
+        "linked": "Contract {{id}}",
+        "unverified": "Not confirmed in your contracts"
       },
       "sellTo": {
         "label": "Sell to this buyback",

@@ -67,7 +67,12 @@ import { ContractReceiverLink } from './ContractReceiverLink';
 import { contractIssuer, type ContractReceiver } from './contractCounterparty';
 import type { EffectiveStanding } from './contactStandings';
 import { useOwnContractPriceCheck } from './useOwnContractPriceCheck';
-import { formatContractIsk } from '@/lib/isk';
+import { formatContractIsk, formatIsk } from '@/lib/isk';
+import { Link } from 'react-router-dom';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { priceDiffers } from '@/engine/communities/buybackContracts';
+import { useBuybackLinks } from '@/features/communities/buybackLinks';
+import { communityRequestPath } from '@/features/communities/communityStore';
 import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useNow } from '@/lib/useNow';
@@ -148,6 +153,7 @@ export function ContractDetailModal({
 }: ContractDetailModalProps) {
   const { t } = useTranslation();
   const issuer = contractIssuer(contract);
+  const buyback = useBuybackLinks(characterId).get(contract.contract_id);
   const timeZone = useTimeZone();
   const now = useNow();
   const deliverByMs = courierDeliveryDeadlineMs(contract);
@@ -323,6 +329,24 @@ export function ContractDetailModal({
       }
     >
       <div className="space-y-5 text-xs">
+        {buyback && (
+          <p className="space-y-1">
+            <Link
+              to={communityRequestPath(buyback.communityId, buyback.requestId)}
+              className={`${inlineLinkClassName} inline-flex min-h-11 items-center md:min-h-0`}
+            >
+              {t('contractDetail.buyback', {
+                title: buyback.requestTitle,
+                community: buyback.communityName,
+              })}
+            </Link>
+            {contract.price !== undefined && priceDiffers(contract.price, buyback.quotedTotal) && (
+              <span className="block text-warning">
+                {t('contractDetail.buybackDiffers', { quoted: formatIsk(buyback.quotedTotal) })}
+              </span>
+            )}
+          </p>
+        )}
         <StatChips>
           {iskFigures.map((figure, index) => (
             <StatChip

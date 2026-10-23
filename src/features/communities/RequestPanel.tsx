@@ -26,8 +26,10 @@ import { communityRequestsUrl } from './communityStore';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { MessageRequesterButton } from './MessageRequesterButton';
 import { PledgeRow } from './PledgeRow';
+import { BuyerQuotes } from './BuyerQuotes';
 import { SellToSection } from './SellToSection';
 import { callableErrorReason } from './callableError';
+import { buyerOf } from './quoteLinks';
 import {
   buildPledgeMail,
   pledgeMailDeps,
@@ -228,6 +230,9 @@ export function RequestPanel({
         (count) => t('communities.board.more', { count })
       );
   const buyerId = request.standing?.buyerCharacterId ?? null;
+  // The Character the contracts go to, and so who reads the Quotes' contracts.
+  const contractBuyerId = buyerOf(request);
+  const isBuyerView = request.standing !== undefined && (mine || contractBuyerId === characterId);
   // A buyer is a Member, so the roster names them; never fall back to the requester, who is not who the contract goes to.
   const buyerName =
     buyerId === null
@@ -282,9 +287,22 @@ export function RequestPanel({
             </ul>
           </section>
         )}
-        {request.standing && !mine && !request.closed && (
+        {request.standing && isBuyerView && contractBuyerId !== null && (
+          <BuyerQuotes
+            request={request}
+            pledges={pledges}
+            memberNames={memberNames}
+            communityId={communityId}
+            communityName={communityName}
+            buyerCharacterId={contractBuyerId}
+            now={now}
+          />
+        )}
+        {request.standing && !isBuyerView && !request.closed && (
           <SellToSection
             request={request}
+            standing={request.standing}
+            communityName={communityName}
             characterId={characterId}
             communityId={communityId}
             myPledge={myPledge}

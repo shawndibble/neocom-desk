@@ -12,6 +12,11 @@ import type { Contract } from '@/esi/endpoints';
 /** Open or being worked, as opposed to the character's mostly-historical contract list. */
 const ACTIVE_STATUSES = new Set<Contract['status']>(['outstanding', 'in_progress']);
 
+/** Finished, whichever side's view of it ESI reports. */
+export function isFinishedContractStatus(status: string): boolean {
+  return status === 'finished' || status === 'finished_issuer' || status === 'finished_contractor';
+}
+
 export function isActiveContractStatus(status: Contract['status']): boolean {
   return ACTIVE_STATUSES.has(status);
 }

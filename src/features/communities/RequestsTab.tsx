@@ -81,6 +81,7 @@ const STATUS_ORDER: Record<RequestStatus, number> = {
  * free text, a place off the stargate map) are left out and counted.
  */
 export function RequestsTab({
+  initialRequestId,
   characterId,
   communityId,
   communityName,
@@ -95,6 +96,8 @@ export function RequestsTab({
   onReload,
   refreshPledges,
 }: {
+  /** A Request to open the panel on at first: the link a buyback contract carries. */
+  initialRequestId?: string;
   characterId: number;
   communityId: string;
   communityName: string;
@@ -119,7 +122,13 @@ export function RequestsTab({
   const distanceNoteId = useId();
   const [filter, setFilter] = useState<RequestFilter>('open');
   const [query, setQuery] = useState('');
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(initialRequestId ?? null);
+  // A link to a Request (`?request=`) opens its panel, also when the board is already showing.
+  const [seenRequestId, setSeenRequestId] = useState(initialRequestId);
+  if (initialRequestId !== seenRequestId) {
+    setSeenRequestId(initialRequestId);
+    if (initialRequestId) setOpenId(initialRequestId);
+  }
   const [composing, setComposing] = useState(false);
   const [pledgesOpen, setPledgesOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);

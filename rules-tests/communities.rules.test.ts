@@ -661,7 +661,7 @@ describe('Requests', () => {
           ...over,
         };
       };
-      const quoteDoc = (over: Record<string, unknown> = {}, q = quote()) =>
+      const quoteDoc = (over: Record<string, unknown> = {}, q: Record<string, unknown> = quote()) =>
         pledgeDoc({}, { quote: q, ...over });
 
       beforeEach(async () => {
@@ -706,6 +706,51 @@ describe('Requests', () => {
           setDoc(
             doc(db, QUOTE),
             quoteDoc({}, quote({ quotedAt: at - 3 * DAY, expiresAt: at + 11 * DAY }))
+          )
+        );
+      });
+
+      it('lets the Member add contract links to a held Quote days later, but not move its date', async () => {
+        const db = characterAuth(env, 2, 'hash-2').firestore();
+        const old = Date.now() - 6 * DAY;
+        const held = quote({ quotedAt: old, expiresAt: old + 14 * DAY });
+        await env.withSecurityRulesDisabled(async (ctx) => {
+          await setDoc(doc(ctx.firestore(), QUOTE), {
+            ...quoteDoc({}, held),
+            updatedAt: new Date(),
+          });
+        });
+        const links = [{ contractId: 9, status: 'outstanding' }];
+        await assertSucceeds(setDoc(doc(db, QUOTE), quoteDoc({}, { ...held, links })));
+        // A different old date is a new quote, and must be about now.
+        const other = Date.now() - 5 * DAY;
+        await assertFails(
+          setDoc(
+            doc(db, QUOTE),
+            quoteDoc({}, quote({ quotedAt: other, expiresAt: other + 14 * DAY }))
+          )
+        );
+        await assertFails(
+          setDoc(
+            doc(db, QUOTE),
+            quoteDoc(
+              {},
+              {
+                ...held,
+                links: Array.from({ length: 6 }, () => ({ contractId: 1, status: 'finished' })),
+              }
+            )
+          )
+        );
+        // The old date keeps only its own content: a new total under it is a different quote.
+        await assertFails(setDoc(doc(db, QUOTE), quoteDoc({}, { ...held, total: 1, links })));
+        await assertFails(
+          setDoc(doc(db, QUOTE), quoteDoc({}, { ...held, links: [{ contractId: 9 }] }))
+        );
+        await assertFails(
+          setDoc(
+            doc(db, QUOTE),
+            quoteDoc({}, { ...held, links: [{ contractId: 9, status: 'weird' }] })
           )
         );
       });

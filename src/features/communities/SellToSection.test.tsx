@@ -5,7 +5,13 @@ import '@/i18n';
 import type { CommunityRequest, RequestPledge } from '@/engine/communities/requests';
 import { SellToSection } from './SellToSection';
 
-const mocks = vi.hoisted(() => ({ quotePile: vi.fn(), saveMyQuote: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  quotePile: vi.fn(),
+  saveMyQuote: vi.fn(),
+  syncQuoteLinks: vi.fn(),
+}));
+vi.mock('./quoteLinks', () => ({ syncQuoteLinks: mocks.syncQuoteLinks }));
+vi.mock('./buybackLinks', () => ({ rememberBuybackLinks: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('./sellTo', () => ({ quotePile: mocks.quotePile }));
 vi.mock('./requestStore', () => ({ saveMyQuote: mocks.saveMyQuote }));
 vi.mock('@/components/ui/NeedsConnection', () => ({
@@ -54,7 +60,9 @@ function setup(myPledge?: RequestPledge) {
     <SellToSection
       request={request}
       characterId={1}
+      standing={request.standing!}
       communityId="c1"
+      communityName="Efa Miners"
       myPledge={myPledge}
       buyerName="Mara Quill"
       now={NOW}
@@ -65,6 +73,7 @@ function setup(myPledge?: RequestPledge) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.syncQuoteLinks.mockResolvedValue({ status: 'ok', links: [], contracts: new Map() });
   refreshPledges.mockResolvedValue([]);
 });
 

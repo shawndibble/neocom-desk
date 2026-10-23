@@ -765,11 +765,38 @@ service cloud.firestore {
           // the lines are display-only (the 1000-expression budget has no room to
           // walk them), and no price, issuer or item ever reaches the buyer except
           // what the Member typed into their own document.
+          function pledgeLinkOk(e) {
+            return e is map && e.keys().hasOnly(['contractId', 'status'])
+              && e.contractId is int && e.contractId > 0
+              && e.status in ['outstanding', 'inProgress', 'finished', 'expired', 'rejected'];
+          }
+          // Rules cannot loop: the five links the quote may hold, unrolled.
+          function pledgeLinksOk(links) {
+            return (links.size() <= 0 || pledgeLinkOk(links[0]))
+              && (links.size() <= 1 || pledgeLinkOk(links[1]))
+              && (links.size() <= 2 || pledgeLinkOk(links[2]))
+              && (links.size() <= 3 || pledgeLinkOk(links[3]))
+              && (links.size() <= 4 || pledgeLinkOk(links[4]));
+          }
           function pledgeQuoteOk() {
             let q = request.resource.data.quote;
             let now = request.time.toMillis();
+            // The seller's client rewrites its own quote to add contract links days later:
+            // an unchanged `quotedAt` keeps its place, a new one must be about now.
+            let before = resource == null ? null : resource.data.get('quote', null);
+            // Only the links may change under an old date: new lines, a new total or a new rate
+            // under a date from days ago would read as held while it is not.
+            let keepsDate = before != null
+              && before.get('quotedAt', null) == q.quotedAt
+              && before.get('expiresAt', null) == q.expiresAt
+              && before.get('total', null) == q.total
+              && before.get('lines', null) == q.lines
+              && before.get('rate', null) == q.get('rate', null)
+              && before.get('rateBasis', null) == q.get('rateBasis', null)
+              && before.get('hubId', null) == q.get('hubId', null);
             return q is map
-              && q.keys().hasOnly(['lines', 'total', 'quotedAt', 'expiresAt', 'rate', 'rateBasis', 'hubId'])
+              && q.keys().hasOnly(['lines', 'total', 'quotedAt', 'expiresAt', 'rate', 'rateBasis', 'hubId', 'links'])
+              && (!('links' in q) || (q.links is list && q.links.size() <= 5 && pledgeLinksOk(q.links)))
               && (!('rate' in q) || (q.rate is number && q.rate >= 1 && q.rate <= 200))
               && (!('rateBasis' in q) || q.rateBasis in ['buy', 'sell'])
               && (!('hubId' in q) || q.hubId in ['jita', 'amarr', 'dodixie', 'rens', 'hek'])
@@ -777,7 +804,7 @@ service cloud.firestore {
               && q.total is int && q.total >= 0 && q.total <= 1000000000000000
               && q.quotedAt is int && q.expiresAt is int
               && q.expiresAt == q.quotedAt + 1209600000
-              && q.quotedAt >= now - 86400000 && q.quotedAt <= now + 86400000;
+              && (keepsDate || (q.quotedAt >= now - 86400000 && q.quotedAt <= now + 86400000));
           }
           function pledgeWritable() {
             let r = pledgeRequest();
