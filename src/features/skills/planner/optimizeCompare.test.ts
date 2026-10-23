@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RemapSegment } from '@/engine/optimizer';
 import type { PlanStep } from '@/engine/types';
-import { compareOrders } from './optimizeCompare';
+import { compareOrders, optimizeForMeHasGain } from './optimizeCompare';
 
 const step = (skillTypeID: number, level = 5): PlanStep => ({ skillTypeID, level });
 const attributes = { intelligence: 27, memory: 21, perception: 17, willpower: 17, charisma: 17 };
@@ -47,5 +47,26 @@ describe('compareOrders', () => {
   it('treats a step missing from the current plan as not moved', () => {
     const { proposed } = compareOrders([step(1)], [step(1), step(9)], []);
     expect(proposed[1]).toMatchObject({ kind: 'step', from: null });
+  });
+});
+
+describe('optimizeForMeHasGain', () => {
+  const none = { savedSeconds: 0, markers: 0, prioritized: false };
+
+  it('has no gain when no time is saved and no marker is added', () => {
+    expect(optimizeForMeHasGain(none)).toBe(false);
+    expect(optimizeForMeHasGain({ ...none, savedSeconds: 59 })).toBe(false);
+  });
+
+  it('has gain from a meaningful saving', () => {
+    expect(optimizeForMeHasGain({ ...none, savedSeconds: 60 })).toBe(true);
+  });
+
+  it('has gain from a placed remap marker', () => {
+    expect(optimizeForMeHasGain({ ...none, markers: 1 })).toBe(true);
+  });
+
+  it('keeps the preview when the pilot set priorities: the reorder is the point', () => {
+    expect(optimizeForMeHasGain({ ...none, prioritized: true })).toBe(true);
   });
 });
