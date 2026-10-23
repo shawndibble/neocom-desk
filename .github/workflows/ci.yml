@@ -109,8 +109,18 @@ jobs:
   # answers "does the app build" for `validate`.
   build:
     runs-on: ubuntu-latest
+    # Also decides whether the e2e shards run at all (see the `e2e` job): this
+    # job is already first on every PR, so it costs no extra runner.
+    outputs:
+      run_e2e: ${{ steps.e2e-needed.outputs.run_e2e }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The PR's merge commit plus its first parent, so scripts/needs-e2e.mjs
+          # can diff what the merge changes.
+          fetch-depth: 2
+      - id: e2e-needed
+        run: node scripts/needs-e2e.mjs
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -135,6 +145,7 @@ jobs:
           VITE_FIREBASE_PROJECT_ID: neocom-e2e
           VITE_FIREBASE_APP_ID: ''
       - uses: actions/upload-artifact@v4
+        if: steps.e2e-needed.outputs.run_e2e == 'true'
         with:
           name: dist
           path: dist
@@ -210,6 +221,9 @@ jobs:
 
   e2e-shard:
     needs: [build]
+    # Docs-, backend- and test-only PRs skip the six shards (see
+    # scripts/lib/e2eRelevance.mjs); the `e2e` job below still reports.
+    if: needs.build.outputs.run_e2e == 'true'
     runs-on: ubuntu-latest
     # Sharded because one runner could not get under the time budget. The
     # suite is ~91 specs at ~15s each — that is 21 minutes of test time, and
@@ -337,14 +351,16 @@ jobs:
   # PR waits forever.
   e2e:
     if: ${{ !cancelled() }}
-    needs: [e2e-shard]
+    needs: [build, e2e-shard]
     runs-on: ubuntu-latest
     steps:
       # A matrix `needs` result is `success` only when every shard succeeded,
       # so this one comparison covers failure, cancellation and a shard that
-      # never started.
+      # never started. The one accepted `skipped` is `build` having decided
+      # nothing in the PR can affect e2e; a skip for any other reason (build
+      # failed, so no output) still fails here.
       - name: Fail unless every shard passed
-        if: needs.e2e-shard.result != 'success'
+        if: needs.e2e-shard.result != 'success' && !(needs.e2e-shard.result == 'skipped' && needs.build.result == 'success' && needs.build.outputs.run_e2e == 'false')
         run: |
           echo "::error::e2e shards did not all pass (result: ${{ needs.e2e-shard.result }})"
           exit 1
