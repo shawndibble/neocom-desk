@@ -38,7 +38,6 @@ function subjectOf(item: CorpBoardItem): string {
 function whatOf(item: CorpBoardItem, t: Translate): string {
   switch (item.kind) {
     case 'structureFuel':
-      if (item.detail === 'hubReagents') return t('corp.board.detail.hubReagents');
       return t(item.timing === 'passed' ? 'corp.board.detail.fuelDry' : 'corp.board.detail.fuel');
     case 'structureTimer':
       return item.detail === 'unanchoring'
@@ -54,6 +53,8 @@ function whatOf(item: CorpBoardItem, t: Translate): string {
       return t('corp.board.detail.serviceOffline', { service: item.detail });
     case 'sovRaid':
       return t(`corp.board.detail.sovRaid.${item.detail}`);
+    case 'sovHubFuel':
+      return t('corp.board.detail.hubReagents');
   }
 }
 

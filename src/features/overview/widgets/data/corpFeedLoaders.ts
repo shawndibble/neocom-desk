@@ -8,16 +8,8 @@
  * corp-scoped keys and the 403 handling are theirs, not a second copy.
  */
 import { diffRoster } from '@/engine/corp/members';
-import { getSovereigntySystems, getUniversePlanet } from '@/esi/endpoints';
-import {
-  conditionalFetch,
-  GLOBAL_CACHE_CHARACTER_ID,
-  loadStaticEntity,
-  loadWithCache,
-  type CachedResult,
-  type StatusResult,
-} from '@/esi/cache';
-import { CORP_CACHE_WINDOW_MS } from '../../data/corpCards';
+import { getUniversePlanet } from '@/esi/endpoints';
+import { loadStaticEntity, type CachedResult, type StatusResult } from '@/esi/cache';
 import { loadCurrentSystemId } from '@/features/route/currentSystem';
 import { jumpsBetween, loadJumpBasis } from '@/features/route/jumpBasis';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -516,36 +508,6 @@ async function planetInfo(
   return planets;
 }
 
-/** Development of every claimed system; empty when the public read fails. */
-async function sovereigntyDevelopment(): Promise<CorpSovereigntyFeed['development']> {
-  const development = new Map<
-    number,
-    { military: number; industrial: number; strategic: number }
-  >();
-  try {
-    // The whole public list, so one hour-long copy beats a download per widget load.
-    const { fetchLive, conditional } = conditionalFetch((options) =>
-      getSovereigntySystems(options)
-    );
-    const list = await loadWithCache(GLOBAL_CACHE_CHARACTER_ID, 'sovereigntySystems', fetchLive, {
-      staleAfterMs: CORP_CACHE_WINDOW_MS,
-      conditional,
-    });
-    for (const system of list?.data.solar_systems ?? []) {
-      const level = system.claim?.alliance?.development;
-      if (level === undefined) continue;
-      development.set(system.solar_system_id, {
-        military: level.military_level,
-        industrial: level.industrial_level,
-        strategic: level.strategic_level,
-      });
-    }
-  } catch {
-    // ADM is a column, not the widget.
-  }
-  return development;
-}
-
 /** Jumps from the Current System, under the Route Safety basis; empty when the origin is unknown. */
 async function jumpsFromCurrent(
   characterId: number,
@@ -575,7 +537,6 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
     systemNames: new Map(),
     typeNames: new Map(),
     prices: new Map(),
-    development: new Map(),
     jumps: new Map(),
   };
   const access = await gate(characterId, 'canReadSkyhooks');
@@ -591,7 +552,7 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
   }
   const skyhookList = skyhooks.cached?.data.skyhooks ?? [];
   const hubList = hubs.cached?.data.sovereignty_hubs ?? [];
-  const [skyhookDetails, hubDetails, planets, development] = await Promise.all([
+  const [skyhookDetails, hubDetails, planets] = await Promise.all([
     loadSkyhookDetails(
       characterId,
       corporationId,
@@ -603,7 +564,6 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
       hubList.map((h) => h.id)
     ),
     planetInfo([...new Set(skyhookList.map((s) => s.planet_id))]),
-    sovereigntyDevelopment(),
   ]);
 
   // Every detail read failing says the reads are down, not that nothing is raidable.
@@ -618,7 +578,6 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
       const detail = skyhookDetails.get(skyhook.id)?.cached?.data;
       const window = detail?.theft_vulnerability;
       const planet = planets.get(skyhook.planet_id);
-      // A non-number is unknown, never "0 at risk".
       const reagents = detail?.reagents?.map((r) => ({
         typeId: r.type_id,
         secured: r.secured_stock,
@@ -632,6 +591,7 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
         planetName: planet?.name ?? null,
         windowStartMs: parseInstant(window?.start),
         windowEndMs: parseInstant(window?.end),
+        // A non-number is unknown, never "0 at risk".
         reagents:
           reagents === undefined ||
           reagents.some((r) => !Number.isFinite(r.secured) || !Number.isFinite(r.unsecured))
@@ -699,7 +659,6 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
     systemNames,
     typeNames,
     prices,
-    development,
     jumps,
   };
 }

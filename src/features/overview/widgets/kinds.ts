@@ -343,6 +343,8 @@ const SPECS: Record<string, Spec> = {
       'getCorporationStructures',
       'getCorporationMiningExtractions',
       'getCorporationIndustryJobs',
+      'getCorporationSkyhooks',
+      'getCorporationSovereigntyHubs',
     ],
   },
   corpServices: {
@@ -372,7 +374,6 @@ const SPECS: Record<string, Spec> = {
       'getCorporationSkyhook',
       'getCorporationSovereigntyHubs',
       'getCorporationSovereigntyHub',
-      'getSovereigntySystems',
       'getUniversePlanet',
     ],
   },

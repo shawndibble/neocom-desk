@@ -24,31 +24,22 @@ export function raidState(
 }
 
 /**
- * "N raidable in X": windows not yet closed, and the wait for the soonest to
- * open (0 when one is open now). `untilMs` is null when none is left.
+ * "N raidable within the horizon": windows open now or opening within
+ * `horizonMs`, and the wait for the soonest live one to open (0 when one is
+ * open now), even past the horizon. `untilMs` is null when none is left.
  */
 export function raidHeadline(
   windows: readonly RaidWindow[],
-  nowMs: number
+  nowMs: number,
+  horizonMs = Infinity
 ): { count: number; untilMs: number | null } {
   const live = windows.filter((window) => raidState(window, nowMs) !== 'closed');
   if (live.length === 0) return { count: 0, untilMs: null };
   const soonest = Math.min(...live.map((window) => window.startMs));
-  return { count: live.length, untilMs: Math.max(0, soonest - nowMs) };
-}
-
-/**
- * Whole hours a hub's reagent bay lasts from `nowMs`. ESI gives the amount at
- * `last_updated` and a burn rate, so the bay is run down from there. Null when
- * nothing burns.
- */
-export function hubReagentHoursLeft(
-  bay: { amount: number; burningPerHour: number; updatedMs: number },
-  nowMs: number
-): number | null {
-  if (bay.burningPerHour <= 0) return null;
-  const elapsedHours = Math.max(0, (nowMs - bay.updatedMs) / 3_600_000);
-  return Math.max(0, Math.floor(bay.amount / bay.burningPerHour - elapsedHours));
+  return {
+    count: live.filter((window) => window.startMs <= nowMs + horizonMs).length,
+    untilMs: Math.max(0, soonest - nowMs),
+  };
 }
 
 /**

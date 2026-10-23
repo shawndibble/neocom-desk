@@ -4996,8 +4996,8 @@
         "title": "Sovereignty",
         "description": "Skyhook theft windows and what each puts at risk",
         "empty": "The corporation has no skyhooks.",
-        "unit_one": "skyhook raidable",
-        "unit_other": "skyhooks raidable",
+        "unit_one": "skyhook raidable in 6h",
+        "unit_other": "skyhooks raidable in 6h",
         "nextOpensIn": "{{subject}} opens in {{duration}}",
         "nextOpenNow": "{{subject}} is open now",
         "atRisk": "{{isk}} ISK unsecured",
@@ -5017,11 +5017,10 @@
         },
         "fact": {
           "window": "Theft window",
-          "windowValue": "{{state}} · closes in {{closes}}",
+          "windowUpcoming": "opens in {{opens}} · closes in {{closes}}",
           "state": "State",
           "unsecured": "Unsecured",
-          "secured": "Secured",
-          "development": "Development (Mil / Ind / Strat)"
+          "secured": "Secured"
         },
         "state": {
           "Unspecified": "Unknown",

@@ -509,6 +509,7 @@ describe('CORP_BOARD_ITEM_KINDS', () => {
       sovereignty: [
         { id: 'skyhook:1', name: 'Skyhook', kind: 'skyhook', startMs: at(DAY), endMs: at(2 * DAY) },
       ],
+      hubFuel: [{ id: 'hub:9', name: 'Efa', runsOutMs: at(DAY) }],
     });
     const produced = new Set(items.map((item) => item.kind));
     expect([...produced].sort()).toEqual([...CORP_BOARD_ITEM_KINDS].sort());
@@ -620,9 +621,8 @@ describe('sov hub reagents', () => {
     const [item] = hubBoard([{ id: 'hub:9', name: 'Efa', runsOutMs: at(26 * HOUR) }]);
     expect(item).toMatchObject({
       id: 'fuel:hub:9',
-      kind: 'structureFuel',
+      kind: 'sovHubFuel',
       subject: 'Efa',
-      detail: 'hubReagents',
       deadlineMs: at(26 * HOUR),
       timing: 'timed',
     });

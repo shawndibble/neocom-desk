@@ -31,6 +31,7 @@ export const CORP_BOARD_ITEM_KINDS = [
   'structureTimer',
   'sovRaid',
   'structureFuel',
+  'sovHubFuel',
   'moonExtraction',
   'jobDelivery',
   'serviceOffline',
@@ -480,9 +481,9 @@ export function buildCorpBoard(sources: CorpBoardSources): CorpBoardItem[] {
       timedItem(
         {
           id: `fuel:${hub.id}`,
-          kind: 'structureFuel',
+          kind: 'sovHubFuel',
           subject: hub.name,
-          detail: 'hubReagents',
+          detail: '',
           typeId: null,
         },
         hub.runsOutMs,

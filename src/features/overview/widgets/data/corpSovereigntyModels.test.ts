@@ -57,7 +57,6 @@ function feedData(over: Partial<CorpSovereigntyFeed> = {}): CorpSovereigntyFeed 
     ]),
     typeNames: new Map([[GAS, 'Magmatic Gas']]),
     prices: new Map([[GAS, 100_000]]),
-    development: new Map([[30000142, { military: 3, industrial: 0, strategic: 5 }]]),
     jumps: new Map([[30000142, 4]]),
     ...over,
   };
@@ -68,12 +67,13 @@ const feeds = (over: Partial<CorpSovereigntyFeed> = {}): Feeds => ({
 });
 
 describe('corpSovereignty', () => {
-  it('counts raidable skyhooks and names the soonest, with what it puts at risk', () => {
+  it('counts skyhooks raidable within 6h and names the soonest, with what it puts at risk', () => {
     const view = corpSovereignty(
       feeds({
         rows: [
           row(),
           row({ key: 'skyhook:2', windowStartMs: NOW + 9 * HOUR, windowEndMs: NOW + 11 * HOUR }),
+          row({ key: 'skyhook:4', windowStartMs: NOW + 3 * HOUR, windowEndMs: NOW + 5 * HOUR }),
           row({ key: 'skyhook:3', windowStartMs: NOW - 5 * HOUR, windowEndMs: NOW - HOUR }),
           hub(),
         ],
@@ -83,7 +83,7 @@ describe('corpSovereignty', () => {
     expect(view.number.value).toBe('2');
     expect(view.number.unit).toBe('overview.widgets.corpSovereignty.unit{"count":2}');
     expect(view.number.secondary?.text).toBe(
-      'overview.widgets.corpSovereignty.nextOpensIn{"subject":"Jita IV","duration":"6h 0m"}, ' +
+      'overview.widgets.corpSovereignty.nextOpensIn{"subject":"Jita IV","duration":"3h 0m"}, ' +
         'overview.widgets.corpSovereignty.atRisk{"isk":"40M"}'
     );
   });
@@ -113,14 +113,35 @@ describe('corpSovereignty', () => {
       'overview.widgets.corpSovereignty.fact.state',
       'overview.widgets.corpSovereignty.fact.unsecured',
       'overview.widgets.corpSovereignty.fact.secured',
-      'overview.widgets.corpSovereignty.fact.development',
     ]);
+    expect(first!.detail!.facts[0]!.value).toBe(
+      'overview.widgets.corpSovereignty.fact.windowUpcoming{"opens":"6h 0m","closes":"8h 0m"}'
+    );
     expect(first!.detail!.facts[2]!.value).toBe('400 Magmatic Gas · 40,000,000 ISK');
   });
 
-  it('shows units, never 0 ISK, when a reagent has no price', () => {
-    const [first] = corpSovereignty(feeds({ prices: new Map() }), ctx).table!.rows;
-    expect(first!.cells[2]).toBe('overview.widgets.corpSovereignty.units{"count":400}');
+  it('states an open or closed window once, and an unknown structure state as unknown', () => {
+    const open = corpSovereignty(
+      feeds({
+        rows: [row({ windowStartMs: NOW - HOUR, windowEndMs: NOW + 3 * HOUR, state: 'Odd' })],
+      }),
+      ctx
+    ).table!.rows[0]!.detail!.facts;
+    expect(open[0]!.value).toBe('overview.widgets.corpSovereignty.windowOpen{"duration":"3h 0m"}');
+    expect(open[1]!.value).toBe('—');
+    const closed = corpSovereignty(
+      feeds({ rows: [row({ windowStartMs: NOW - 3 * HOUR, windowEndMs: NOW - HOUR })] }),
+      ctx
+    ).table!.rows[0]!.detail!.facts;
+    expect(closed[0]!.value).toBe('overview.widgets.corpSovereignty.windowClosed');
+  });
+
+  it('shows units, never 0 ISK, when a reagent has no price or a zero one', () => {
+    for (const prices of [new Map(), new Map([[GAS, 0]])]) {
+      const [first] = corpSovereignty(feeds({ prices }), ctx).table!.rows;
+      expect(first!.cells[2]).toBe('overview.widgets.corpSovereignty.units{"count":400}');
+      expect(first!.detail!.facts[2]!.value).toBe('400 Magmatic Gas');
+    }
   });
 
   it('says nothing is at risk when the silo holds no unsecured stock', () => {

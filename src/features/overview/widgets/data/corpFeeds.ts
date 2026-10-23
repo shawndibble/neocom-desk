@@ -204,12 +204,9 @@ export interface CorpSovereigntyRow {
 export interface CorpSovereigntyFeed extends CorpFeedBase {
   rows: CorpSovereigntyRow[];
   systemNames: ReadonlyMap<number, string>;
-  /** Reagent names by type id. */
   typeNames: ReadonlyMap<number, string>;
   /** Average price by type id; empty when the price read failed (units only, never 0 ISK). */
   prices: ReadonlyMap<number, number>;
-  /** Development levels (0-5) by system; absent for a system with no alliance claim. */
-  development: ReadonlyMap<number, { military: number; industrial: number; strategic: number }>;
   /** Stargate jumps from the Current System; absent when it or the route is unknown. */
   jumps: ReadonlyMap<number, number>;
 }
