@@ -1950,6 +1950,8 @@ export function BuildPlanDetail({
               productUnitPrice={productUnitPrice}
               productQuantity={productQuantity}
               costIndexSystemName={buildSystem?.name ?? hub.systemName}
+              costIndexSystemId={buildSystem?.id}
+              activity={activity}
               ownedSale={ownedSale}
               nameFor={(typeID) => nameForType(catalog, typeID)}
               totalVolume={materialVolume}

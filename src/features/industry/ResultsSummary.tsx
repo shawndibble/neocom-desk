@@ -14,7 +14,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { DataTableColumn } from '@/components/ui';
-import type { BuildResult } from '@/engine/industry/types';
+import type { BuildResult, IndustryActivity } from '@/engine/industry/types';
 import type { MaterialVolumeTotals } from '@/engine/industry/materialVolume';
 import {
   compareUseOrSell,
@@ -26,6 +26,7 @@ import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
+import { CostIndexTrend } from './CostIndexTrend';
 import { formatCostIndex, formatPercent, formatVolume } from './format';
 import { ownedSaleCsvColumns } from './ownedSaleCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
@@ -126,6 +127,9 @@ interface ResultsSummaryProps {
   productQuantity: number | null;
   /** Short solar-system name the build's cost index applies to (UX-REVIEW #6/#8: makes the trade-hub <-> build-system coupling explicit in the label). */
   costIndexSystemName: string;
+  /** The build system's ID and the plan's activity, for the cost index trend popover; no id, no popover. */
+  costIndexSystemId?: number;
+  activity?: IndustryActivity;
   /** Opens the Calculation Breakdown the hero owns — the break-even and owned-sale "?"s are doors into it. */
   onOpenBreakdown: () => void;
   /**
@@ -178,6 +182,8 @@ export function ResultsSummary({
   productUnitPrice,
   productQuantity,
   costIndexSystemName,
+  costIndexSystemId,
+  activity = 'manufacturing',
   onOpenBreakdown,
   ownedSale,
   nameFor,
@@ -373,7 +379,14 @@ export function ResultsSummary({
         {systemCostIndex !== null && (
           <CostRow
             label={t('industry.costIndexWithSystem', { system: costIndexSystemName })}
-            value={formatCostIndex(systemCostIndex)}
+            value={
+              <CostIndexTrend
+                value={formatCostIndex(systemCostIndex)}
+                systemId={costIndexSystemId}
+                systemName={costIndexSystemName}
+                activity={activity}
+              />
+            }
             tooltip={<Trans i18nKey="industry.costIndexTooltip" components={{ b: <strong /> }} />}
           />
         )}

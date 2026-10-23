@@ -2874,6 +2874,11 @@
     "time": "Time",
     "jobTime": "Main job time",
     "costIndexWithSystem": "Cost index ({{system}})",
+    "costIndexTrend": {
+      "open": "Cost index trend for {{system}} (now {{value}})",
+      "title": "{{system}} cost index, last {{days}} days",
+      "summary": "7d ago {{weekAgo}} · today {{today}}"
+    },
     "costIndexTooltip": "<b>Can be slightly off:</b> ESI rounds it to 4 decimals. The build system's manufacturing activity level, which drives the job's cost-index fee. Read live from ESI for the build system named above — the trade hub sets material and product prices, never this.",
     "revenue": "Revenue",
     "salesTax": "Sales tax",
@@ -15429,6 +15434,7 @@
       "externalLink": "Trailing external icon: leaves Neocom Desk",
       "hintText": "Dotted underline: has a tooltip (HintText)",
       "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
+      "figureHistory": "Small dim glyph after a figure: click or tap for its history in a popover",
       "infoTooltip": "? circle: explains a term (InfoTooltip)",
       "chartPoint": "Highlighted column or dot on a chart: hover or tap reads that point (ChartHover)",
       "addPreview": "Readout under the Add panel list: hover or keyboard-focus a module row to see what adding it changes (never on touch)",
@@ -15493,6 +15499,7 @@
       "addToCalendar": "Add to Google Calendar",
       "hintText": "Truncated name",
       "hintContent": "The full name, in a tooltip.",
+      "figureHistory": "4.4%",
       "communityMark": "Shared in a Community",
       "communityMarkContent": "Shared by Bob in Pals. Last updated 1 Oct 2026.",
       "chartLast": "This week",

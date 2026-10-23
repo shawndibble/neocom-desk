@@ -25,6 +25,11 @@ import {
   type PublicCourierContractRow,
 } from './publicContracts.js';
 import { publishLpStoreOffersToR2 } from './r2DailySnapshots.js';
+import {
+  INDUSTRY_SYSTEMS_URL,
+  parseCostIndices,
+  writeCostIndicesToR2,
+} from './costIndicesSnapshot.js';
 import { runWorkbenchSync } from './workbenchFits.js';
 import { r2WorkbenchHulls, workbenchFitsStore } from './workbenchFitsStore.js';
 import { PUBLIC_HOST_USER_AGENT } from './marketHistoryJob.js';
@@ -211,4 +216,32 @@ export async function runSyncLpStoreOffers(): Promise<void> {
   }
   await publishLpStoreOffersToR2(rows, Date.now(), createR2Put(r2));
   logInfo('LP store offers published to R2', { corporations: rows.length });
+}
+
+/** Body of the cost index half of syncLpStoreOffers (see its doc in index.ts). */
+export async function runSyncCostIndices(): Promise<void> {
+  const r2 = r2ConfigOrThrow();
+  const response = await fetch(INDUSTRY_SYSTEMS_URL, {
+    headers: {
+      'User-Agent': PUBLIC_HOST_USER_AGENT,
+      'X-User-Agent': PUBLIC_HOST_USER_AGENT,
+      'X-Compatibility-Date': '2026-08-01',
+      Accept: 'application/json',
+    },
+  });
+  if (!response.ok) throw new Error(`industry systems: HTTP ${response.status}`);
+  const indices = parseCostIndices(await response.json());
+  const systems = Object.keys(indices).length;
+  // An empty list would stamp nothing useful; fail loudly and try again tomorrow.
+  if (systems === 0) throw new Error('industry systems: no systems parsed');
+  const date = new Date().toISOString().slice(0, 10);
+  const result = await writeCostIndicesToR2(
+    [{ date, indices }],
+    { get: createR2Get(r2), put: createR2Put(r2) },
+    Date.now()
+  );
+  logInfo('cost indices published to R2', { systems, ...result });
+  // The merge is idempotent, so a failed system is fixed by the next run; fail it so the log shows.
+  if (result.failed > 0)
+    throw new Error(`cost indices: ${result.failed} failed: ${result.firstError}`);
 }
