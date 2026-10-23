@@ -100,13 +100,24 @@ function recordedPayment(): Record<string, unknown> | undefined {
 const RECORD = 'I sent it · record payment';
 
 describe('SettleUpDialog', () => {
-  it('offers Open in EVE beside To: by id for a verified Payee, by name lookup otherwise', () => {
+  it('offers Open in EVE above To: by id for a verified Payee, by name lookup otherwise', () => {
     const { unmount } = renderDialog([{ ...ONE_ROW[0], payeeEntityId: 98_000_001 }]);
     expect(screen.getByRole('button', { name: 'Open information 98000001' })).toBeInTheDocument();
     unmount();
 
     renderDialog(ONE_ROW);
     expect(screen.getByRole('button', { name: 'Open information by name' })).toBeInTheDocument();
+  });
+
+  it('puts Open in EVE first, then the To and Amount copy rows below it', () => {
+    renderDialog([{ ...ONE_ROW[0], payeeEntityId: 98_000_001 }]);
+    const open = screen.getByRole('button', { name: 'Open information 98000001' });
+    const copyTo = screen.getByRole('button', { name: 'Copy To' });
+    const copyAmount = screen.getByRole('button', { name: 'Copy Amount' });
+    expect(open.compareDocumentPosition(copyTo) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      copyTo.compareDocumentPosition(copyAmount) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   beforeEach(() => {
