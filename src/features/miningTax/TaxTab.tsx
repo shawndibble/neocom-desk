@@ -1262,7 +1262,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                               {...taxExport.tableProps}
                               columns={openColumns}
                               rows={openRows}
-                              className="dt-dense-lead sm:table-fixed"
+                              className="dt-dense-lead dt-actions-pinned-only sm:table-fixed"
                               rowKey={(dr) => dr.key}
                               label={t('miningTax.sections.openLabel')}
                               {...taxSort}
@@ -1291,7 +1291,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                           rows={historyRows}
                           // Months are sections here, not folded duplicates:
                           // their entries line up with Open's, unindented.
-                          className="dt-flat-groups sm:table-fixed"
+                          className="dt-flat-groups dt-actions-pinned-only sm:table-fixed"
                           rowKey={(dr) => dr.key}
                           label={t('miningTax.sections.history')}
                           {...historySort}
