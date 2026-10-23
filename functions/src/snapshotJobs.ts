@@ -15,6 +15,7 @@ import { SYSTEM_CONDITIONS_COLLECTION } from './lawlessSystems.js';
 import {
   accumulateRequestedSide,
   applyRequestedSide,
+  applyLineCounts,
   emptyRequestedSide,
   compactContractOfferRow,
   courierContractFrom,
@@ -103,6 +104,7 @@ export async function runSyncPublicContractOffers(): Promise<void> {
   });
 
   applyRequestedSide(rows, requestedSide);
+  applyLineCounts(rows);
 
   // `outstandingCourierContracts` against `courierRowCount` is the only
   // thing that tells an empty courier snapshot apart from one whose rows were

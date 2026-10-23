@@ -10,6 +10,7 @@
  */
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { BundleSplit } from '@/engine/contracts/contractFlags';
 import {
   iskPriceCheck,
   itemSwapPriceCheck,
@@ -32,6 +33,11 @@ export interface ContractPriceCheckView {
   flip: PriceCheckFlip;
   message?: string;
   busy: boolean;
+  /**
+   * The searched lines' value against the rest at the side on screen, when a
+   * search is active: what the padded-bundle sentence (#4773) is worded from.
+   */
+  split?: BundleSplit & { restLines: number; side: PriceSide };
 }
 
 export interface ContractPriceCheckArgs {
@@ -140,6 +146,7 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
   const pick = (diff: number, words: { below: string; above: string; level: string }) =>
     words[percentDirection(diff)];
   const rows: PriceCheckRowModel[] = [];
+  let splitView: ContractPriceCheckView['split'];
   if ('included' in check) {
     rows.push(
       { label: t('contractDetail.priceCheckIncluded'), value: formatContractIsk(check.included) },
@@ -165,8 +172,15 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
       { label: sideWord, value: formatContractIsk(check.value), note: unpricedNote }
     );
     const split = splitBySearch(included, searchedTypeIds, unitPricesOn(prices, side));
-    if (split && split.rest.pricedLines + split.rest.unpricedLines > 0) {
-      const restLines = split.rest.pricedLines + split.rest.unpricedLines;
+    const restLines = split ? split.rest.pricedLines + split.rest.unpricedLines : 0;
+    if (split && restLines > 0) {
+      splitView = {
+        mine: split.mine.total,
+        rest: split.rest.total,
+        unpricedLines: split.mine.unpricedLines + split.rest.unpricedLines,
+        restLines,
+        side,
+      };
       rows.push(
         {
           label: t('contractDetail.priceCheckYourSearch'),
@@ -194,5 +208,5 @@ export function useContractPriceCheck(args: ContractPriceCheckArgs): ContractPri
       });
     }
   }
-  return { ...view, rows, busy: false };
+  return { ...view, rows, busy: false, ...(splitView ? { split: splitView } : {}) };
 }

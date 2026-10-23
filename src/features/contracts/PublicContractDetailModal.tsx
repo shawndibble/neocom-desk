@@ -56,6 +56,13 @@ import { PlaceLink, SystemLink } from '@/features/entities';
 import { ItemInfoLink } from '@/features/entities';
 import { usePlexPrice } from '@/features/market/plexPrice';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
+import {
+  BUNDLE_MINORITY_SHARE,
+  bundleShareOfValue,
+  type ContractFlag,
+} from '@/engine/contracts/contractFlags';
+import { flagDetail } from '@/features/contractSearch/contractFlagText';
+import * as Icon from '@/components/ui/icons';
 import { SIMILAR_COPY_WINDOW, type BpcPerRunCheck } from '@/engine/contracts/bpcPerRunCheck';
 import { useMarketHub } from '@/features/market/hub';
 import { useMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
@@ -115,6 +122,10 @@ export interface PublicContractDetailModalProps {
    * this is not a blueprint listing.
    */
   bpcCheck?: BpcPerRunCheck | null;
+  /** The Items board's flag on this row (#4773), worded here beside the price check. */
+  flag?: ContractFlag | null;
+  /** The pilot's flag multiple, named in the overpriced sentence so the setting is findable. */
+  flagMultiple?: number;
   onClose: () => void;
 }
 
@@ -138,6 +149,8 @@ export function PublicContractDetailModal({
   askingIsk = null,
   searchedTypeIds = null,
   bpcCheck,
+  flag = null,
+  flagMultiple,
   onClose,
 }: PublicContractDetailModalProps) {
   const { t } = useTranslation();
@@ -243,6 +256,41 @@ export function PublicContractDetailModal({
     sellOverrides,
     searchedTypeIds: anySearched ? searchedTypeIds : null,
   });
+
+  // Flag sentences (#4773): the row's flag, and the padded-bundle share, which
+  // only this panel can say because it holds every line and its price. A flag
+  // states the condition and what it would cost instead, never a verdict.
+  const flagNotes = useMemo(() => {
+    const notes: string[] = [];
+    if (flag) notes.push(flagDetail(flag, hub, t));
+    if (flag?.kind === 'overpriced' && flagMultiple !== undefined) {
+      notes.push(t('contractDetail.flagThreshold', { times: flagMultiple }));
+    }
+    const split = priceCheck?.split;
+    const share = split ? bundleShareOfValue(split) : null;
+    if (split && share === null && split.unpricedLines > 0 && split.restLines > 0) {
+      notes.push(
+        t('contractDetail.flagBundleUnpriced', { hub: hub.systemName, count: split.restLines })
+      );
+    }
+    if (split && share !== null && share < BUNDLE_MINORITY_SHARE) {
+      const percent = Math.round(share * 100);
+      notes.push(
+        t(
+          percent < 1 ? 'contractDetail.flagBundleShareUnderOne' : 'contractDetail.flagBundleShare',
+          {
+            share: `${percent}%`,
+            hub: hub.systemName,
+            side: t(
+              split.side === 'buy' ? 'contractDetail.flagSideBuy' : 'contractDetail.flagSideSell'
+            ),
+            count: split.restLines,
+          }
+        )
+      );
+    }
+    return notes;
+  }, [flag, flagMultiple, priceCheck, hub, t]);
 
   // Each abyssal module is valued at its own MutaMarket estimate, apart from the
   // hub figure (it has no market price).
@@ -350,6 +398,21 @@ export function PublicContractDetailModal({
 
         {bpcCheck !== undefined && <BpcPriceCheck check={bpcCheck} />}
         {priceCheck && <ContractPriceCheck {...priceCheck} />}
+        {flagNotes.length > 0 && (
+          <p className="flex items-start gap-2 text-sm">
+            <span className="mt-0.5 shrink-0 text-warning">
+              <Icon.Warn aria-hidden size={Icon.ICON_SIZE.sm} />
+            </span>
+            <span>
+              {flagNotes[0]}
+              {flagNotes.slice(1).map((note) => (
+                <span key={note} className="block text-text-dim">
+                  {note}
+                </span>
+              ))}
+            </span>
+          </p>
+        )}
         {abyssalValue && checkLines.abyssal.length > 0 && (
           <ContractAbyssalValue value={abyssalValue} />
         )}

@@ -33,6 +33,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.industryBuildGroups',
   'sync.industryFacilityDefaults',
   'sync.industryReactionFacilityDefaults',
+  'sync.itemContractFlagMultiple',
   'sync.loyaltyLpValue',
   'sync.marketHub',
   'sync.marketPricePercent',

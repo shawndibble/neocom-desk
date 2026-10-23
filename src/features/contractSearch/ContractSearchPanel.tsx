@@ -68,6 +68,7 @@ import {
   type PublicContractOfferRow,
 } from '@/engine/contracts/contractOffers';
 import { bpcPerRunCheck } from '@/engine/contracts/bpcPerRunCheck';
+import { contractFlagFor, splitFlagged, type ContractFlag } from '@/engine/contracts/contractFlags';
 import {
   resolveCourierRoutes,
   type PublicCourierContractRow,
@@ -85,6 +86,9 @@ import {
 import { loadPublicCourierContracts } from '@/features/contractSearch/publicCourierContracts';
 import { useContractSearchRows } from '@/features/contractSearch/useContractSearchRows';
 import { useItemsColumns } from '@/features/contractSearch/useItemsColumns';
+import { ContractFlagMark } from '@/features/contractSearch/ContractFlagMark';
+import { useItemFlagMultiple } from '@/features/contractSearch/contractFlagThreshold';
+import { useContractFlagPrices } from '@/features/contractSearch/useContractFlagPrices';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import { useOfferLocations } from '@/features/contractSearch/offerLocations';
 import { usePlexPrice } from '@/features/market/plexPrice';
@@ -159,6 +163,11 @@ interface UiFilter {
   hideAuctions: boolean;
   /** Hides a contract asking for PLEX in return (`requestedPlex`). */
   hidePlex: boolean;
+  /**
+   * Hides the contracts the board flags as priced far above the hub (#4773).
+   * Judged on the rows after the engine's filter, since it needs hub prices.
+   */
+  hideOverpriced: boolean;
   /** Distance from the Current System (`engine/route/jumpRange.ts`); `'any'` is no restriction. */
   jumps: JumpRange;
 }
@@ -172,6 +181,7 @@ const ITEMS_FILTER_PARAMS = {
   'items.kind': optionalEnumParam(SALE_KINDS),
   'items.hideAuctions': boolParam(),
   'items.hidePlex': boolParam(),
+  'items.hideOverpriced': boolParam(),
   'items.jumps': enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE),
   'items.type': optionalIdParam(),
   /** Below market (#3989): one row per contract, valued at the hub. */
@@ -190,6 +200,8 @@ interface ContractSearchFilterBarProps {
   regionOptions: RegionOption[];
   /** The Jump Range filter's origin — computed above this bar since `FilterBar` unmounts its children. */
   currentSystem: CurrentSystemState;
+  /** The pilot's flag multiple, named in the Hide overpriced tooltip. */
+  itemFlagMultiple: number;
   /** The table's column picker, drawn beside the filter trigger. */
   actions?: ReactNode;
 }
@@ -199,6 +211,7 @@ function ContractSearchFilterBar({
   onChange,
   regionOptions,
   currentSystem,
+  itemFlagMultiple,
   actions,
 }: ContractSearchFilterBarProps) {
   const { t } = useTranslation();
@@ -213,6 +226,7 @@ function ContractSearchFilterBar({
     filter.saleKind !== null,
     filter.hideAuctions,
     filter.hidePlex,
+    filter.hideOverpriced,
     filter.jumps !== DEFAULT_JUMP_RANGE,
   ]);
 
@@ -310,6 +324,15 @@ function ContractSearchFilterBar({
               }
             />
           </FilterField>
+          {/* A filter, not a view control: it sits in the funnel as Market Browser's Hide bait sells does. */}
+          <FilterChip
+            label={t('contractSearch.filterHideOverpriced')}
+            tooltip={t('contractSearch.filterHideOverpricedHint', {
+              times: itemFlagMultiple,
+            })}
+            selected={draft.hideOverpriced}
+            onToggle={() => setDraft({ ...draft, hideOverpriced: !draft.hideOverpriced })}
+          />
           <FilterField label={t('jumpRange.label')}>
             <JumpRangeSelect
               value={draft.jumps}
@@ -405,6 +428,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
       saleKind: itemsParams['items.kind'],
       hideAuctions: itemsParams['items.hideAuctions'],
       hidePlex: itemsParams['items.hidePlex'],
+      hideOverpriced: itemsParams['items.hideOverpriced'],
       jumps: itemsParams['items.jumps'],
     }),
     [itemsParams]
@@ -610,6 +634,26 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     belowMarket,
   });
 
+  // Row flags (#4773): hub prices for what is on screen, judged by the pure
+  // engine. Silent until a type is priced, so a slow price read never flags
+  // wrongly, and off while Below market replaces the table.
+  const itemFlagMultiple = useItemFlagMultiple((state) => state.value);
+  useHydratedStore(useItemFlagMultiple);
+  const flagPrices = useContractFlagPrices(
+    displayRows,
+    mode === 'items' && searchActive && !belowMarket
+  );
+  const flagFor = useCallback(
+    (row: PublicContractOfferRow): ContractFlag | null =>
+      contractFlagFor(row, { hubSell: flagPrices.sellFor(row), threshold: itemFlagMultiple }),
+    [flagPrices, itemFlagMultiple]
+  );
+  const { shownRows, hiddenOverpriced } = useMemo(() => {
+    if (!uiFilter.hideOverpriced) return { shownRows: displayRows, hiddenOverpriced: 0 };
+    const { kept, hidden } = splitFlagged(displayRows, flagFor);
+    return { shownRows: kept, hiddenOverpriced: hidden.length };
+  }, [uiFilter.hideOverpriced, displayRows, flagFor]);
+
   const suggestions = useMemo<Suggestion[]>(() => {
     if (selectedTypeId !== null || uiFilter.typeQuery.trim() === '') return [];
     const ranked = rankedSearch(typeOptions, uiFilter.typeQuery, {
@@ -627,8 +671,8 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
   }, [selectedTypeId, uiFilter.typeQuery, typeOptions, statsByType]);
 
   const summary = useMemo(
-    () => (selectedTypeId === null ? null : contractOfferPriceSummary(displayRows, plexPrice)),
-    [selectedTypeId, displayRows, plexPrice]
+    () => (selectedTypeId === null ? null : contractOfferPriceSummary(shownRows, plexPrice)),
+    [selectedTypeId, shownRows, plexPrice]
   );
 
   const belowMarketState = useBelowMarket(
@@ -681,6 +725,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
       'items.kind': next.saleKind,
       'items.hideAuctions': next.hideAuctions,
       'items.hidePlex': next.hidePlex,
+      'items.hideOverpriced': next.hideOverpriced,
       'items.jumps': next.jumps,
       'items.type': unpin ? null : selectedTypeId,
     });
@@ -706,9 +751,19 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
       saleKind: null,
       hideAuctions: false,
       hidePlex: false,
+      hideOverpriced: false,
       jumps: DEFAULT_JUMP_RANGE,
     });
   }
+
+  // Stable, so the column set is not rebuilt on every panel render.
+  const priceFlag = useCallback(
+    (row: PublicContractOfferRow) => {
+      const flag = flagFor(row);
+      return flag && <ContractFlagMark flag={flag} hub={flagPrices.hub} t={t} />;
+    },
+    [flagFor, flagPrices.hub, t]
+  );
 
   const { columns, itemsColumnsById, itemsCsvColumns, offerJumps, plexAskLabel } = useItemsColumns({
     typeNames,
@@ -717,6 +772,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     jumpRangeFilter,
     plexPrice,
     visibleItemsColumns,
+    priceFlag,
   });
 
   const itemsSortProps = useUrlSort(
@@ -727,7 +783,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
 
   const itemsExport = useTableExport({
     surface: 'contract-search',
-    rows: displayRows,
+    rows: shownRows,
     columns: itemsCsvColumns,
   });
 
@@ -871,6 +927,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                 onChange={changeFilter}
                 regionOptions={regionOptions}
                 currentSystem={currentSystem}
+                itemFlagMultiple={itemFlagMultiple}
                 actions={
                   <>
                     {/* A view control, not a filter: it changes the rows and columns at once (§4b). */}
@@ -913,6 +970,13 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
               <div className="px-3 pt-2 text-[0.6875rem] text-text-dim empty:hidden">
                 <JumpRangeNote status={jumpRangeFilter.status} />
               </div>
+
+              {hiddenOverpriced > 0 && (
+                // Said, not silent: Hide overpriced never makes the board's rows quietly shorter (§6c).
+                <p role="status" className="px-3 pt-2 text-[0.6875rem] text-text-dim">
+                  {t('contractSearch.overpricedHidden', { count: hiddenOverpriced })}
+                </p>
+              )}
 
               <LiveStatus>
                 {suggestions.length > 0 &&
@@ -1007,7 +1071,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                   onOpen={setSelectedRow}
                   onResetFilters={resetFilters}
                 />
-              ) : displayRows.length === 0 ? (
+              ) : shownRows.length === 0 ? (
                 namingTypes && uiFilter.typeQuery.trim() !== '' ? (
                   // Every type still reads `#34` until the market catalogue
                   // lands, so a typed query matches nothing yet. "No matches"
@@ -1034,7 +1098,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                     {...itemsExport.tableProps}
                     label={t('contractSearch.title')}
                     columns={columns}
-                    rows={displayRows}
+                    rows={shownRows}
                     // Index included deliberately: one contract lists the same
                     // item once per stack, so contractId+typeId is not unique —
                     // the duplicate React keys left stale rows in the table.
@@ -1045,7 +1109,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
                     stackLayout="dense"
                     mobileSort
                     stackSummary={t('contractSearch.mobile.offerCount', {
-                      count: displayRows.length,
+                      count: shownRows.length,
                     })}
                     onRowClick={setSelectedRow}
                     rowMoreActions
@@ -1096,6 +1160,8 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
           }
           searchedTypeIds={typeIds}
           bpcCheck={selectedBpcCheck}
+          flag={flagFor(selectedRow)}
+          flagMultiple={itemFlagMultiple}
           onClose={() => setSelectedRow(null)}
         />
       )}
