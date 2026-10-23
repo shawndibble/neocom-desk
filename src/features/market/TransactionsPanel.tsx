@@ -7,6 +7,7 @@ import {
   DataAgeBadge,
   DataTable,
   CachedEmptyState,
+  ColumnPickerMenu,
   EmptyState,
   IconButton,
   Panel,
@@ -29,7 +30,9 @@ import {
   type WalletTransactionFilter,
 } from '@/features/character/walletTransactionFilter';
 import { useUrlFilter } from '@/lib/useUrlState';
-import { ItemInfoLink } from '@/features/entities';
+import { ItemInfoLink, PlaceLink } from '@/features/entities';
+import { placeKey, usePlaceDetails, type PlaceRef } from '@/features/places';
+import { formatPercent } from '@/features/industry/format';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { iskToneClass } from '@/features/character/format';
@@ -37,10 +40,18 @@ import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapsh
 import { formatMarketIsk } from '@/lib/isk';
 import { splitTimestamp } from '@/lib/timestamp';
 import { HintText } from '@/components/ui/HintText';
-import type { MarginGap } from '@/engine/market/realizedMargin';
+import type { MarginGap, RealizedMargin } from '@/engine/market/realizedMargin';
 import { useTimeZone } from '@/lib/timeFormat';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
+import { useColumnVisibility } from '@/lib/columnVisibility';
+import {
+  DEFAULT_VISIBLE_TRANSACTIONS_COLUMNS,
+  TRANSACTIONS_COLUMN_IDS,
+  TRANSACTIONS_PHONE_OFF_BY_DEFAULT,
+  useVisibleTransactionsColumns,
+  type TransactionsColumnId,
+} from './transactionsColumns';
 import {
   transactionTotal,
   walletTransactionsCsvColumns,
@@ -72,6 +83,16 @@ const MARGIN_GAP_COPY: Record<MarginGap, { label: string; hint: string }> = {
 };
 
 const HISTORY_CHARACTER_PARAMS = { 'txn.chars': characterFilterParam('current') };
+
+/** Margin over what the sold units cost, as a percent; null when the sale has no margin. */
+function marginPercentOf(
+  txn: WalletTransaction,
+  margin: RealizedMargin | undefined
+): number | null {
+  if (!margin) return null;
+  const cost = margin.unitCost * txn.quantity;
+  return cost > 0 ? (margin.margin / cost) * 100 : null;
+}
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
@@ -227,6 +248,42 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     [transactions, highlightTypeId]
   );
 
+  const { visible, isVisible, toggle, reset } = useColumnVisibility(
+    useVisibleTransactionsColumns,
+    DEFAULT_VISIBLE_TRANSACTIONS_COLUMNS,
+    TRANSACTIONS_PHONE_OFF_BY_DEFAULT
+  );
+  // Names only while Location is ticked: a structure's name is a lookup each.
+  const locationOn = isVisible('location');
+  // Under All a fill's place is asked as the Character that made it, since a
+  // structure's name is ACL-checked per Character.
+  const placeOwnerOf = useCallback(
+    (txn: WalletTransaction) =>
+      allScope ? (txn as PooledTransaction).characterId : activeCharacterId,
+    [allScope, activeCharacterId]
+  );
+  const placeRefs = useMemo<PlaceRef[]>(() => {
+    if (!locationOn) return [];
+    const byKey = new Map<string, PlaceRef>();
+    for (const txn of filteredTransactions) {
+      const ref = { locationId: txn.location_id, characterId: placeOwnerOf(txn) };
+      byKey.set(placeKey(ref), ref);
+    }
+    return [...byKey.values()];
+  }, [locationOn, filteredTransactions, placeOwnerOf]);
+  const placeDetails = usePlaceDetails(placeRefs, {
+    scopeId: activeCharacterId,
+    enabled: locationOn,
+    origin: null,
+    basis: null,
+  });
+  const placeNameFor = useCallback(
+    (txn: WalletTransaction) =>
+      placeDetails.get(placeKey({ locationId: txn.location_id, characterId: placeOwnerOf(txn) }))
+        ?.name ?? t('wallet.locationFallback', { id: txn.location_id }),
+    [placeDetails, placeOwnerOf, t]
+  );
+
   const columns = useMemo<DataTableColumn<WalletTransaction>[]>(
     () => [
       {
@@ -274,8 +331,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       {
         id: 'side',
         header: t('wallet.side'),
-        // The Total's sign and tone already say buy or sell.
-        phoneHidden: true,
+        // The Total's sign and tone already say buy or sell (off by default on a phone).
         render: (txn) => (txn.is_buy ? t('wallet.buy') : t('wallet.sell')),
         sortValue: (txn) => (txn.is_buy ? 0 : 1),
       },
@@ -307,7 +363,6 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
       {
         id: 'margin',
         header: t('wallet.margin'),
-        phoneHidden: true,
         headerTooltip: t('wallet.marginTooltip'),
         align: 'right',
         className: 'tabular-nums',
@@ -340,8 +395,65 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         },
         sortValue: (txn) => margins.get(txn.transaction_id)?.margin,
       },
+      {
+        id: 'marginPercent',
+        header: t('wallet.marginPercent'),
+        headerTooltip: t('wallet.marginPercentTooltip'),
+        align: 'right',
+        className: 'tabular-nums',
+        cellClassName: (txn) => {
+          const margin = margins.get(txn.transaction_id);
+          return margin ? iskToneClass(margin.margin) : 'text-text-dim';
+        },
+        render: (txn) => {
+          if (txn.is_buy) return null;
+          const percent = marginPercentOf(txn, margins.get(txn.transaction_id));
+          return percent === null ? '—' : formatPercent(percent);
+        },
+        sortValue: (txn) => marginPercentOf(txn, margins.get(txn.transaction_id)) ?? undefined,
+      },
+      {
+        id: 'unitCost',
+        header: t('wallet.unitCost'),
+        headerTooltip: t('wallet.unitCostTooltip'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (txn) => {
+          if (txn.is_buy) return null;
+          const margin = margins.get(txn.transaction_id);
+          return margin ? formatMarketIsk(margin.unitCost) : '—';
+        },
+        sortValue: (txn) => margins.get(txn.transaction_id)?.unitCost,
+      },
+      {
+        id: 'location',
+        header: t('wallet.location'),
+        className: 'whitespace-nowrap',
+        render: (txn) => <PlaceLink id={txn.location_id}>{placeNameFor(txn)}</PlaceLink>,
+        sortValue: (txn) => placeNameFor(txn),
+      },
     ],
-    [t, typeNames, timeZone, nameFor, margins, gaps, allScope]
+    [t, typeNames, timeZone, nameFor, margins, gaps, allScope, placeNameFor]
+  );
+
+  const columnsById = useMemo(
+    () =>
+      Object.fromEntries(columns.map((column) => [column.id, column])) as Record<
+        TransactionsColumnId,
+        DataTableColumn<WalletTransaction>
+      >,
+    [columns]
+  );
+  // Filtered only at the table's input, so a sort on a hidden column survives
+  // until it returns.
+  const shownColumns = useMemo(
+    () =>
+      columns.filter(
+        (column) =>
+          !(TRANSACTIONS_COLUMN_IDS as readonly string[]).includes(column.id) ||
+          isVisible(column.id as TransactionsColumnId)
+      ),
+    [columns, isVisible]
   );
 
   // The picker rides in the page header in every state (loading, error, empty),
@@ -465,7 +577,22 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
                 {t('common.incompleteTitle')} — {t('wallet.transactionsTruncatedHint')}
               </p>
             )}
-            <TransactionsFilterBar filter={filter} onChange={setFilter} />
+            <TransactionsFilterBar
+              filter={filter}
+              onChange={setFilter}
+              actions={
+                <ColumnPickerMenu
+                  available={TRANSACTIONS_COLUMN_IDS}
+                  visible={visible}
+                  columnsById={columnsById}
+                  onToggle={toggle}
+                  onReset={reset}
+                  buttonLabel={t('common.columnsButton')}
+                  menuTitle={t('common.columnsMenuTitle')}
+                  resetLabel={t('common.resetColumns')}
+                />
+              }
+            />
             {filteredTransactions.length === 0 ? (
               <EmptyState
                 title={t('wallet.transactionsNoFilterMatches')}
@@ -482,7 +609,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
                 <DataTable
                   {...transactionsExport.tableProps}
                   label={t('wallet.transactionsTab')}
-                  columns={columns}
+                  columns={shownColumns}
                   rows={filteredTransactions}
                   rowKey={transactionRowKey}
                   highlightRowKey={highlightId}
