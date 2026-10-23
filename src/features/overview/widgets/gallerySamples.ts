@@ -585,11 +585,38 @@ function buildSamples(t: TFunction): Record<string, Sample> {
     corpSovereignty: {
       value: '2',
       unit: t('overview.widgets.corpSovereignty.unit', { count: 2 }),
-      note: t('overview.widgets.corpSovereignty.opensIn', { duration: '6h' }),
+      note: t('overview.widgets.corpSovereignty.nextOpensIn', {
+        subject: 'X-7OMU IV',
+        duration: '2h',
+      }),
       rows: [
-        ['X-7OMU', t('overview.widgets.corpSovereignty.windowIn', { duration: '6h' }), '2 / 1 / 3'],
-        ['Efa', t('overview.widgets.corpSovereignty.windowIn', { duration: '1d 4h' }), '4 / 0 / 2'],
+        ['X-7OMU IV', t('overview.widgets.corpSovereignty.windowIn', { duration: '2h' }), '412M'],
+        ['Efa II', t('overview.widgets.corpSovereignty.windowIn', { duration: '5h' }), '96.5M'],
       ],
+      chart: ((): ChartModel => {
+        const first = t('overview.widgets.corpSovereignty.windowIn', { duration: '2h' });
+        const second = t('overview.widgets.corpSovereignty.windowIn', { duration: '5h' });
+        const note = t('overview.widgets.corpSovereignty.chartNote');
+        return {
+          kind: 'gantt',
+          rows: [
+            { key: 'a', label: 'X-7OMU IV', startMs: 2, endMs: 6, text: first, color: 'warning' },
+            { key: 'b', label: 'Efa II', startMs: 5, endMs: 9, text: second, color: 'warning' },
+          ],
+          axis: { from: 0, to: 48, now: 0 },
+          labels: {
+            from: '',
+            now: t('overview.widgets.corpSovereignty.chartNow'),
+            to: t('overview.widgets.corpSovereignty.chartTo', { duration: '48h' }),
+          },
+          note,
+          summary: note,
+          fallback: hbars([
+            ['X-7OMU IV', 0.96, first],
+            ['Efa II', 0.9, second],
+          ]) as Extract<ChartModel, { kind: 'hbars' }>,
+        };
+      })(),
     },
     corpJobs: {
       value: '3',

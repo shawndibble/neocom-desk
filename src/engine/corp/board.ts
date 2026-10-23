@@ -31,6 +31,7 @@ export const CORP_BOARD_ITEM_KINDS = [
   'structureTimer',
   'sovRaid',
   'structureFuel',
+  'sovHubFuel',
   'moonExtraction',
   'jobDelivery',
   'serviceOffline',
@@ -170,6 +171,14 @@ export interface BoardSovereigntySource {
   endMs: number;
 }
 
+/** When a sov hub's reagent bay empties: a fuel clock like a structure's. */
+export interface BoardHubFuelSource {
+  /** The hub's key, e.g. `hub:9`. */
+  id: string;
+  name: string;
+  runsOutMs: number;
+}
+
 export interface BoardExtractionSource {
   structureId: number;
   /** The refinery the drill is on, already named. */
@@ -207,6 +216,7 @@ export interface CorpBoardSources {
   structures?: readonly BoardStructureSource[];
   starbases?: readonly BoardStarbaseSource[];
   sovereignty?: readonly BoardSovereigntySource[];
+  hubFuel?: readonly BoardHubFuelSource[];
   extractions?: readonly BoardExtractionSource[];
   jobs?: readonly BoardJobSource[];
 }
@@ -466,6 +476,21 @@ export function buildCorpBoard(sources: CorpBoardSources): CorpBoardItem[] {
   for (const structure of sources.structures ?? []) items.push(...structureItems(structure, clock));
   for (const starbase of sources.starbases ?? []) items.push(...starbaseItems(starbase, clock));
   for (const raid of sources.sovereignty ?? []) items.push(...sovereigntyItems(raid, clock));
+  for (const hub of sources.hubFuel ?? []) {
+    items.push(
+      timedItem(
+        {
+          id: `fuel:${hub.id}`,
+          kind: 'sovHubFuel',
+          subject: hub.name,
+          detail: '',
+          typeId: null,
+        },
+        hub.runsOutMs,
+        clock
+      )
+    );
+  }
   for (const extraction of sources.extractions ?? []) items.push(extractionItem(extraction, clock));
   for (const job of sources.jobs ?? []) {
     // ESI often leaves a finished job's status at `active` past its end

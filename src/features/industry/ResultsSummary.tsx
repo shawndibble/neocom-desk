@@ -385,6 +385,7 @@ export function ResultsSummary({
                 systemId={costIndexSystemId}
                 systemName={costIndexSystemName}
                 activity={activity}
+                index={systemCostIndex}
               />
             }
             tooltip={<Trans i18nKey="industry.costIndexTooltip" components={{ b: <strong /> }} />}

@@ -173,6 +173,20 @@ export interface TableRowModel {
   tone?: DeadlineSeverity;
   /** Set only when the row leads somewhere narrower than the widget's own title link. */
   to?: string;
+  /**
+   * The row opens a modal with these facts instead of linking away (DESIGN §6c
+   * "Widget rows"). A row has `to` or `detail`, never both.
+   */
+  detail?: RowDetailModel;
+}
+
+/** What a widget row's modal shows: plain data, drawn by the widget shell. */
+export interface RowDetailModel {
+  title: string;
+  /** Labelled facts, in reading order; each value is already formatted. */
+  facts: { label: string; value: string }[];
+  /** Where it is: Set destination, and the jump count as a link to Route Safety. */
+  place?: { systemId: number; name: string; jumps?: number };
 }
 
 export interface TableModel {

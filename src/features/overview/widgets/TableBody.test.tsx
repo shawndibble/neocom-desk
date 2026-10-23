@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { TableModel } from './data/types';
@@ -125,6 +126,43 @@ describe('TableBody grow column', () => {
       </MemoryRouter>
     );
     expect(screen.getByRole('cell', { name: 'Bob' })).toHaveClass('w-full');
+  });
+});
+
+describe('TableBody row detail', () => {
+  const model: TableModel = {
+    columns: [
+      { key: 'hook', label: 'Skyhook', priority: 0 },
+      { key: 'opens', label: 'Window opens', align: 'end', priority: 1 },
+    ],
+    rows: [
+      {
+        key: 'a',
+        cells: ['X-7OMU IV', 'in 2h'],
+        detail: {
+          title: 'X-7OMU IV',
+          facts: [{ label: 'Theft window', value: 'in 2h · closes in 6h' }],
+          place: { systemId: 30000142, name: 'X-7OMU', jumps: 7 },
+        },
+      },
+    ],
+  };
+
+  it('opens the row facts in a modal, with the jumps linking to Route Safety', async () => {
+    renderTable(model);
+    const opener = screen.getByRole('button', { name: 'X-7OMU IV' });
+    expect(opener).toHaveAttribute('aria-haspopup', 'dialog');
+    await userEvent.click(opener);
+    const dialog = screen.getByRole('dialog', { name: 'X-7OMU IV' });
+    expect(dialog).toHaveTextContent('in 2h · closes in 6h');
+    expect(screen.getByRole('link', { name: /route safety to X-7OMU/i })).toHaveTextContent(
+      '7 jumps away'
+    );
+  });
+
+  it('draws no navigation caret for a row that opens a modal', () => {
+    const { container } = renderTable(model);
+    expect(container.querySelector('thead th[aria-hidden="true"]')).toBeNull();
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hubReagentHoursLeft, raidHeadline, raidState } from './sovereignty';
+import { hubReagentsRunOutMs, raidHeadline, raidState } from './sovereignty';
 
 const HOUR = 3_600_000;
 const NOW = 1_000 * HOUR;
@@ -45,20 +45,31 @@ describe('raidHeadline', () => {
   it('is empty when nothing is left to raid', () => {
     expect(raidHeadline([], NOW)).toEqual({ count: 0, untilMs: null });
   });
+  it('counts only windows open or opening within the horizon, still timing the soonest', () => {
+    expect(
+      raidHeadline(
+        [
+          { startMs: at(-HOUR), endMs: at(HOUR) },
+          { startMs: at(5 * HOUR), endMs: at(7 * HOUR) },
+          { startMs: at(30 * HOUR), endMs: at(32 * HOUR) },
+        ],
+        NOW,
+        6 * HOUR
+      )
+    ).toEqual({ count: 2, untilMs: 0 });
+    expect(raidHeadline([{ startMs: at(30 * HOUR), endMs: at(32 * HOUR) }], NOW, 6 * HOUR)).toEqual(
+      { count: 0, untilMs: 30 * HOUR }
+    );
+  });
 });
 
-describe('hubReagentHoursLeft', () => {
-  it('burns the bay down from when it was last updated', () => {
-    expect(
-      hubReagentHoursLeft({ amount: 100, burningPerHour: 10, updatedMs: at(-2 * HOUR) }, NOW)
-    ).toBe(8);
-  });
-  it('is 0 once the bay is spent', () => {
-    expect(
-      hubReagentHoursLeft({ amount: 10, burningPerHour: 10, updatedMs: at(-5 * HOUR) }, NOW)
-    ).toBe(0);
+describe('hubReagentsRunOutMs', () => {
+  it('is when the bay empties at its burn rate, from its last update', () => {
+    expect(hubReagentsRunOutMs({ amount: 100, burningPerHour: 10, updatedMs: at(-2 * HOUR) })).toBe(
+      at(8 * HOUR)
+    );
   });
   it('is unknown when nothing burns', () => {
-    expect(hubReagentHoursLeft({ amount: 10, burningPerHour: 0, updatedMs: NOW }, NOW)).toBeNull();
+    expect(hubReagentsRunOutMs({ amount: 10, burningPerHour: 0, updatedMs: NOW })).toBeNull();
   });
 });

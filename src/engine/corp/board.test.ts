@@ -5,6 +5,7 @@ import {
   severityForRemaining,
   type BoardExtractionSource,
   type BoardJobSource,
+  type BoardHubFuelSource,
   type BoardSovereigntySource,
   type BoardStarbaseSource,
   type BoardStructureSource,
@@ -508,6 +509,7 @@ describe('CORP_BOARD_ITEM_KINDS', () => {
       sovereignty: [
         { id: 'skyhook:1', name: 'Skyhook', kind: 'skyhook', startMs: at(DAY), endMs: at(2 * DAY) },
       ],
+      hubFuel: [{ id: 'hub:9', name: 'Efa', runsOutMs: at(DAY) }],
     });
     const produced = new Set(items.map((item) => item.kind));
     expect([...produced].sort()).toEqual([...CORP_BOARD_ITEM_KINDS].sort());
@@ -608,5 +610,26 @@ describe('sovereignty raid windows', () => {
   it('names a hub window as a hub', () => {
     const [item] = sovBoard([raid({ id: 'hub:9', kind: 'hub' })]);
     expect(item!.detail).toBe('hub.upcoming');
+  });
+});
+
+describe('sov hub reagents', () => {
+  const hubBoard = (hubFuel: BoardHubFuelSource[]) =>
+    board({ nowMs: NOW, staleWindowMs: STALE_WINDOW, hubFuel });
+
+  it('is a fuel clock that runs out when the bay empties', () => {
+    const [item] = hubBoard([{ id: 'hub:9', name: 'Efa', runsOutMs: at(26 * HOUR) }]);
+    expect(item).toMatchObject({
+      id: 'fuel:hub:9',
+      kind: 'sovHubFuel',
+      subject: 'Efa',
+      deadlineMs: at(26 * HOUR),
+      timing: 'timed',
+    });
+  });
+
+  it('stays on the board once the bay is empty, overdue', () => {
+    const [item] = hubBoard([{ id: 'hub:9', name: 'Efa', runsOutMs: at(-HOUR) }]);
+    expect(item!.severity).toBe('critical');
   });
 });
