@@ -10,14 +10,15 @@ describe('CalendarClocks', () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it('shows EVE time as UTC HH:MM', async () => {
+  it('shows EVE time as 24-hour UTC with an EVE suffix', async () => {
     render(<CalendarClocks />);
-    const label = await screen.findByText('EVE');
-    expect(label.nextElementSibling).toHaveTextContent('Fri 14:32');
+    expect(await screen.findByText('14:32 EVE')).toBeInTheDocument();
   });
 
-  it('also labels the local clock', async () => {
+  it('shows the local time with its zone, no label or weekday', async () => {
     render(<CalendarClocks />);
-    expect(await screen.findByText('Local')).toBeInTheDocument();
+    await screen.findByText('14:32 EVE');
+    expect(screen.queryByText('Local')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Fri/)).not.toBeInTheDocument();
   });
 });
