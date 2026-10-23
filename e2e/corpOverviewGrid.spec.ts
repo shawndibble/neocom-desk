@@ -46,6 +46,8 @@ test.describe('Corp Board widget grid', () => {
     await page.locator('#route-outlet').getByRole('button', { name: 'Customize' }).click();
     await page.getByRole('button', { name: 'Add widget' }).click();
     const gallery = page.getByRole('dialog', { name: 'Add a widget' });
+    // It opens in Browse all, which hides what is already on the board.
+    await gallery.getByRole('button', { name: 'Not on your board' }).click();
     await expect(gallery.getByText('Moon mining ledger')).toBeVisible();
     await expect(gallery.getByText('Training', { exact: true })).toHaveCount(0);
   });

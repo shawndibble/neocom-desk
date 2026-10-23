@@ -88,7 +88,7 @@ test('Customize adds a widget from the Gallery', async ({ page }) => {
   await expect(cards).toHaveCount(4);
 });
 
-test('the Gallery list scrolls only up and down; the category row is the one that scrolls sideways', async ({
+test('the Gallery list scrolls only up and down; in the drawer the category row scrolls sideways', async ({
   page,
 }) => {
   await signInAndGoto(page, './overview', SCOPES, THREE);
@@ -97,24 +97,28 @@ test('the Gallery list scrolls only up and down; the category row is the one tha
   await page.getByRole('button', { name: /^Add widget$/ }).click();
   const gallery = page.getByRole('dialog', { name: 'Add a widget' });
   await expect(gallery).toBeVisible();
-  const sideways = await gallery.evaluate((root) =>
-    [root, ...root.querySelectorAll('*')]
-      // Only a scroller can scroll sideways. An `overflow: visible` box that
-      // spills shows up at the scroller it spills into; counting it too made
-      // this flaky: a Recharts preview's inner box spills while its
-      // ResponsiveContainer is still 0px wide, before its first resize.
-      .filter((el) => {
-        const { overflowX } = getComputedStyle(el);
-        return (
-          el.scrollWidth > el.clientWidth + 1 && (overflowX === 'auto' || overflowX === 'scroll')
-        );
-      })
-      // sr-only helpers clip themselves
-      .filter((el) => !el.classList.contains('sr-only'))
-      .map((el) => el.getAttribute('role') ?? el.className.toString())
-  );
+  // A desktop opens in Browse all, whose rail is a column; the drawer keeps the sideways row.
+  const sidewaysIn = () =>
+    gallery.evaluate((root) =>
+      [root, ...root.querySelectorAll('*')]
+        // Only a scroller can scroll sideways. An `overflow: visible` box that
+        // spills shows up at the scroller it spills into; counting it too made
+        // this flaky: a Recharts preview's inner box spills while its
+        // ResponsiveContainer is still 0px wide, before its first resize.
+        .filter((el) => {
+          const { overflowX } = getComputedStyle(el);
+          return (
+            el.scrollWidth > el.clientWidth + 1 && (overflowX === 'auto' || overflowX === 'scroll')
+          );
+        })
+        // sr-only helpers clip themselves
+        .filter((el) => !el.classList.contains('sr-only'))
+        .map((el) => el.getAttribute('role') ?? el.className.toString())
+    );
+  expect(await sidewaysIn()).toEqual([]);
+  await gallery.getByRole('button', { name: 'Quick add' }).click();
   // Exactly one thing may scroll sideways: the category chips (role=group).
-  expect(sideways).toEqual(['group']);
+  expect(await sidewaysIn()).toEqual(['group']);
 });
 
 test("a widget's menu offers its settings and closes on Escape", async ({ page }) => {
