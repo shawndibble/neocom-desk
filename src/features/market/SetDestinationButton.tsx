@@ -12,7 +12,7 @@
  * A Character without the waypoint scope, or no Character at all, sees the
  * button disabled with the reason beside it rather than a click that fails.
  */
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
 import { useSetDestination } from '@/features/travel/useSetDestination';
@@ -21,11 +21,14 @@ import { ViewRouteButton } from '@/features/travel/ViewRouteButton';
 export function SetDestinationButton({
   locationId,
   placeName,
+  routeLink,
 }: {
-  /** The order's `location_id`: an NPC station or a player structure. */
+  /** The order's `location_id`: an NPC station, a player structure or a solar system. */
   locationId: number;
   /** Named in the button's accessible name and the confirmation. */
   placeName: string;
+  /** Replaces "View route" when the caller has a better way into Route Safety (a jump count). */
+  routeLink?: ReactNode;
 }) {
   const { t } = useTranslation();
   const { blockedReason, sending, outcome, send } = useSetDestination(locationId, placeName);
@@ -44,7 +47,7 @@ export function SetDestinationButton({
       >
         {t('market.orderDetail.setDestination')}
       </Button>
-      <ViewRouteButton locationId={locationId} placeName={placeName} />
+      {routeLink ?? <ViewRouteButton locationId={locationId} placeName={placeName} />}
       {blockedReason !== null && (
         <span id={reasonId} className="text-[0.6875rem] text-text-dim">
           {blockedReason}

@@ -23,7 +23,7 @@ import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from '.
 import { fractionBar } from './cellKit';
 import { hbarsFromRows } from './chartBuilders';
 import type { CorpJobsFeed } from './corpFeeds';
-import { toBoardSovereignty } from './corpSovereigntyModels';
+import { toBoardHubFuel, toBoardSovereignty } from './corpSovereigntyModels';
 import { toBoardStarbases } from './corpStarbaseModels';
 import { elapsedShare } from './industryModels';
 import { shortStructureName } from './structureModels';
@@ -53,6 +53,8 @@ function whatOf(item: CorpBoardItem, t: Translate): string {
       return t('corp.board.detail.serviceOffline', { service: item.detail });
     case 'sovRaid':
       return t(`corp.board.detail.sovRaid.${item.detail}`);
+    case 'sovHubFuel':
+      return t('corp.board.detail.hubReagents');
   }
 }
 
@@ -156,6 +158,7 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
     jobs: jobsData ? toBoardJobs(jobsData.jobs, jobsData.typeNames) : undefined,
     starbases: towersData ? toBoardStarbases(towersData, now) : undefined,
     sovereignty: raidsData ? toBoardSovereignty(raidsData) : undefined,
+    hubFuel: raidsData ? toBoardHubFuel(raidsData) : undefined,
   });
   // The board is already soonest-first; an offline service has no clock, so it is no deadline.
   const timed = items.filter((item) => item.timing !== 'untimed');
