@@ -28,6 +28,7 @@ import type { QueueInfo } from '@/features/character/rosterView';
 import type { CharacterGroup, CharacterSortStats } from '@/features/character/groups';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatDuration } from '@/lib/duration';
+import { CharacterAchievementLine } from '@/features/character/AchievementLine';
 import {
   UNGROUPED_VALUE,
   characterLastSynced,
@@ -180,6 +181,7 @@ export function CharacterCard({
               <span className="block truncate text-xs text-text-dim">
                 <AffiliationName name={info?.allianceName} />
               </span>
+              <CharacterAchievementLine characterId={character.characterId} />
             </span>
           </div>
           {/* Group and remove: the card's own controls, not part of the

@@ -13,6 +13,9 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const CHARACTER_COLUMN_IDS = [
   'name',
+  // Achievement score and title (issue #4777): off by default, so not in
+  // DEFAULT_VISIBLE_CHARACTER_COLUMNS, and a stored list predating it stays as is.
+  'achievement',
   'corp',
   'group',
   'spTotal',

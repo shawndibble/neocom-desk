@@ -7,6 +7,7 @@ import { cx } from '@/lib/cx';
 import { AlertsBell, CharacterAvatar, StatChip, StatChips } from '@/components/ui';
 import { AllianceLink, CorporationLink } from '@/features/entities';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { CharacterAchievementLine } from './AchievementLine';
 
 interface CharacterHeaderProps {
   characterId: number;
@@ -125,6 +126,7 @@ export function CharacterHeader({
             </>
           )}
         </p>
+        <CharacterAchievementLine characterId={characterId} />
       </div>
       {/* Controls sit in this flex row, then the bell: the Overview's Next and Customize, Employment History's Refresh and export. */}
       {actions}

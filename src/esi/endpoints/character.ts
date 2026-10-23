@@ -91,7 +91,12 @@ export interface CharacterPublicInfo {
   faction_id?: number;
   security_status?: number;
   description?: string;
-  title?: string;
+  /** The Character's title in their corporation (was `title` before compat date 2026-06-09). */
+  corporation_title?: string;
+  /** Total achievement score (compat date 2026-06-09). */
+  achievement_score?: number;
+  /** The cosmetic title shown, a `characterTitles` UUID; absent when none (compat date 2026-06-09). */
+  character_title_id?: string;
 }
 
 export function getCharacterPublicInfo(

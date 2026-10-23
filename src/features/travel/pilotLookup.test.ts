@@ -118,9 +118,46 @@ describe('loadPilotProfile', () => {
       allianceId: 300,
       allianceName: 'Some Alliance',
       securityStatus: -2.345,
+      achievement: { score: 0, titleId: null },
       fetchedAt: INFO_AT,
     });
     expect(mocks.resolveNames).toHaveBeenCalledWith([200, 300]);
+  });
+
+  it('carries the achievement score and title from the cached public record', async () => {
+    mocks.loadPublicCharacterInfo.mockResolvedValue({
+      info: {
+        character_id: 42,
+        name: 'Some Pilot',
+        birthday: '2010-01-01T00:00:00Z',
+        corporation_id: 100,
+        achievement_score: 1240,
+        character_title_id: 'title-uuid',
+      },
+      fetchedAt: INFO_AT,
+    });
+    mocks.resolveAffiliations.mockResolvedValue(new Map());
+    mocks.resolveNames.mockResolvedValue(new Map());
+    expect(await loadPilotProfile(42)).toMatchObject({
+      achievement: { score: 1240, titleId: 'title-uuid' },
+    });
+  });
+
+  it('carries them from the direct read when the cached loader came back empty', async () => {
+    mocks.loadPublicCharacterInfo.mockResolvedValue(null);
+    mocks.resolveAffiliations.mockResolvedValue(new Map());
+    mocks.getCharacterPublicInfo.mockResolvedValue({
+      data: {
+        name: 'Some Pilot',
+        birthday: '2010-01-01T00:00:00Z',
+        corporation_id: 100,
+        achievement_score: 85,
+      },
+    });
+    mocks.resolveNames.mockResolvedValue(new Map());
+    expect(await loadPilotProfile(42)).toMatchObject({
+      achievement: { score: 85, titleId: null },
+    });
   });
 
   it('leaves security status null when ESI omits it', async () => {

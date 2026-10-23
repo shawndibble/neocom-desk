@@ -4038,7 +4038,8 @@
       "pi": "PI",
       "spReady": "SP ready",
       "alerts": "Alerts",
-      "starred": "Starred"
+      "starred": "Starred",
+      "achievement": "Title / Score"
     },
     "jobSlotCategory": {
       "manufacturing": "Mfg",
@@ -4048,7 +4049,12 @@
     "openJobsTooltip": "{{used}}/{{max}} slots used",
     "spReadyYes": "Ready",
     "extractionTotal": "Ready extractions net {{isk}} ISK across characters, {{each}} each ({{hub}}: sell injector − buy extractor, before fees)",
-    "extractionUnpriced": "Extraction net unavailable: no sell orders at {{hub}}"
+    "extractionUnpriced": "Extraction net unavailable: no sell orders at {{hub}}",
+    "achievement": {
+      "points_one": "{{points}} point",
+      "points_other": "{{points}} points",
+      "line": "{{title}} · {{points}}"
+    }
   },
   "overview": {
     "title": "Overview",

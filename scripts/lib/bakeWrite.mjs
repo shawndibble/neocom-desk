@@ -33,6 +33,7 @@ export async function writeOutputs({
   mutaplasmids,
   wormholeMass,
   shipMass,
+  characterTitles,
   marketGroups,
   marketTypes,
   solarSystems,
@@ -104,6 +105,7 @@ export async function writeOutputs({
     ['mutaplasmids.json', mutaplasmids],
     ['wormholeMass.json', wormholeMass],
     ['shipMass.json', shipMass],
+    ['characterTitles.json', characterTitles],
   ];
   console.log('Writing outputs...');
   for (const [name, data] of outputs) {

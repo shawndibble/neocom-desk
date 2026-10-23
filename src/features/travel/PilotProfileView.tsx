@@ -34,6 +34,7 @@ import { killerRatio } from './zkillFigures';
 import { PilotKillmailsSection } from './PilotKillmailsSection';
 import { ZkillRatioMeters, ZkillStatsSection } from './ZkillStatsSection';
 import { pilotAge, type PilotProfile } from './pilotLookup';
+import { AchievementLine } from '@/features/character/AchievementLine';
 
 export interface PilotProfileViewProps {
   profile: PilotProfile;
@@ -199,6 +200,7 @@ function PilotIdentity({
             <AllianceLink id={allianceId}>{allianceLabel(allianceId)}</AllianceLink>
           )}
         </p>
+        <AchievementLine achievement={profile.achievement} />
         <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-text-dim">
           <span>
             {t('travel.pilot.securityStatus')}{' '}
