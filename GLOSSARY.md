@@ -316,6 +316,12 @@ here — they go one per file in `docs/context/decisions/`.
   (a pilot cannot file it), or **Officer decides**. A hull with no Hull Rule
   follows the corp's percent chain when one is set up; with none set up it has
   no computed amount and the officer types it.
+- **Doctrine Fit**: A corporation's saved fit that SRP checks a claim's lost
+  ship against, kept as the corp's own copy. A **Hull Rule** may list several;
+  a claim must match one. Distinct from a **Fitting**, which is a pilot's own
+  and private.
+- **Off doctrine**: The flag on an **SRP Claim** whose lost ship matches none
+  of its hull's **Doctrine Fit**s. The officer still decides the claim.
 - **Corp Board**: `/corp`, a **Widget board** of corp **Widgets** the pilot
   chooses, sizes, orders, renames and removes, on the same engine as the
   Overview. Replaces the fixed Corp Ops Board (Standing, Deadline Strip, Kind
