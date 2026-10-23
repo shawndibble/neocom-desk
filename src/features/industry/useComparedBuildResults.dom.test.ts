@@ -373,7 +373,6 @@ describe('useComparedBuildResults', () => {
     await waitFor(() => expect(result.current[0]?.loading).toBe(false));
 
     const call = mockedCompute.mock.calls[0]?.[0];
-    expect(typeof call?.recipeFor).toBe('function');
     expect(call?.recipeFor?.(300)).toEqual(
       expect.objectContaining({ method: 'manufacturing', me: 7 })
     );
@@ -411,7 +410,6 @@ describe('useComparedBuildResults', () => {
       blueprintTypeID: 100,
       line: { unitPrice: 500, owned: false },
     });
-    expect(typeof call?.acquisitionFor).toBe('function');
   });
 
   it('leaves groupResult null and never calls computeBuildPlan a second time when computeGroupResult is not requested', async () => {

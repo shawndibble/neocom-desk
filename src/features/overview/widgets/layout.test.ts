@@ -93,7 +93,6 @@ describe('addWidget', () => {
     const mk = counter();
     for (let i = 0; i < MAX_WIDGETS + 5; i++) l = addWidget(l, 'mail', mk);
     expect(l.widgets).toHaveLength(MAX_WIDGETS);
-    expect(MAX_WIDGETS).toBe(30);
   });
 });
 

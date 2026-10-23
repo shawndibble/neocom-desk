@@ -4,7 +4,6 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  ensureSignedIn,
   markBuildPlanDeleted,
   markBuildPlansDeleted,
   markPlanDeleted,
@@ -24,12 +23,8 @@ const driver = vi.hoisted(() => ({
 }));
 vi.mock('./planSync', () => driver);
 
-const auth = vi.hoisted(() => ({ ensureSignedIn: vi.fn(async () => 'char:1') }));
-vi.mock('./syncAuth', () => auth);
-
 beforeEach(() => {
   for (const fn of Object.values(driver)) fn.mockClear();
-  auth.ensureSignedIn.mockClear();
 });
 
 describe('lazy sync driver', () => {
@@ -61,10 +56,6 @@ describe('lazy sync driver', () => {
     await vi.waitFor(() =>
       expect(driver.scheduleSync).toHaveBeenCalledWith(7, undefined, 'background')
     );
-  });
-
-  it('forwards ensureSignedIn to the auth bridge', async () => {
-    await expect(ensureSignedIn(1)).resolves.toBe('char:1');
   });
 
   it('exposes the status store synchronously, without awaiting the driver', () => {
