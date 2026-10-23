@@ -49,4 +49,10 @@ describe('needsE2e', () => {
     expect(needsE2e(['src/features/README.md'])).toBe(true);
     expect(needsE2e(['src/docs/Guide.tsx'])).toBe(true);
   });
+
+  it('counts a file moved out of app code as app code once the diff lists the source path', () => {
+    // scripts/needs-e2e.mjs diffs with --no-renames, so a move shows as a
+    // delete of the old path plus an add of the new one.
+    expect(needsE2e(['src/features/x/Foo.tsx', 'docs/Foo.md'])).toBe(true);
+  });
 });

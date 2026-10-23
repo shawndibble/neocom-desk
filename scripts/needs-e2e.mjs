@@ -5,7 +5,9 @@
  *
  * On a `pull_request` run actions/checkout leaves HEAD at GitHub's merge commit
  * (parent 1 = the base branch tip, parent 2 = the PR head), so
- * `HEAD^1..HEAD` is exactly what merging would change. Anything that does not
+ * `HEAD^1..HEAD` is exactly what merging would change. `--no-renames` lists a
+ * moved file as a delete plus an add, so moving app code into docs/ still
+ * names the app path. Anything that does not
  * look like that (shallow history, no second parent, git failing) answers
  * `true`: a wasted e2e run is cheap, a skipped one that mattered is not.
  */
@@ -18,7 +20,7 @@ const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
 function changedFiles() {
   try {
     git('rev-parse', '--verify', '--quiet', 'HEAD^2');
-    return git('diff', '--name-only', 'HEAD^1', 'HEAD').split('\n').filter(Boolean);
+    return git('diff', '--name-only', '--no-renames', 'HEAD^1', 'HEAD').split('\n').filter(Boolean);
   } catch (error) {
     console.error(`needs-e2e: could not diff against the base (${error.message.split('\n')[0]})`);
     return [];

@@ -119,11 +119,11 @@ jobs:
           # The PR's merge commit plus its first parent, so scripts/needs-e2e.mjs
           # can diff what the merge changes.
           fetch-depth: 2
-      - id: e2e-needed
-        run: node scripts/needs-e2e.mjs
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - id: e2e-needed
+        run: node scripts/needs-e2e.mjs
       # Same node_modules cache as the test jobs (and warmed on `develop` by
       # cache-warm.yml); a miss falls back to `npm ci`.
       - uses: actions/cache@v4
@@ -144,6 +144,7 @@ jobs:
           # project id to build its (mocked) request — see E2E_ENV.
           VITE_FIREBASE_PROJECT_ID: neocom-e2e
           VITE_FIREBASE_APP_ID: ''
+      # No shards, no consumer of `dist`.
       - uses: actions/upload-artifact@v4
         if: steps.e2e-needed.outputs.run_e2e == 'true'
         with:
@@ -362,5 +363,5 @@ jobs:
       - name: Fail unless every shard passed
         if: needs.e2e-shard.result != 'success' && !(needs.e2e-shard.result == 'skipped' && needs.build.result == 'success' && needs.build.outputs.run_e2e == 'false')
         run: |
-          echo "::error::e2e shards did not all pass (result: ${{ needs.e2e-shard.result }})"
+          echo "::error::e2e shards did not all pass (shards: ${{ needs.e2e-shard.result }}, build: ${{ needs.build.result }})"
           exit 1
