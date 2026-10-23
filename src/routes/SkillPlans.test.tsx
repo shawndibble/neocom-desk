@@ -9,6 +9,7 @@ import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import type { SkillType } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -222,13 +223,7 @@ function toolsSection(title: string): HTMLElement {
 
 let clipboardWriteText: ReturnType<typeof vi.fn<ClipboardWriter>>;
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
-afterEach(() => {
-  server.resetHandlers();
-  configureClipboard(null);
-});
-beforeEach(async () => {
+async function resetSession() {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -259,7 +254,26 @@ beforeEach(async () => {
   });
 
   window.history.pushState({}, '', '/skills/plans');
+}
+
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render of the plans page, so no test pays for the first one:
+  // a worker's first `App` render (lazy route chunks, jsdom, React warm-up) is
+  // seconds, and it landed on whichever test ran first, past its 1s findBy.
+  await Promise.all([routeChunks.loadSkillPlans(), routeChunks.loadSkillPlanEditor()]);
+  await resetSession();
+  const { unmount } = render(<App />);
+  await screen.findByRole('button', { name: 'New plan' }, { timeout: 25_000 });
+  unmount();
+  server.resetHandlers();
+}, 30_000);
+afterAll(() => server.close());
+afterEach(() => {
+  server.resetHandlers();
+  configureClipboard(null);
 });
+beforeEach(resetSession);
 
 /** Opens the "All plans…" popover from the plan card. */
 async function openAllPlans(user: ReturnType<typeof userEvent.setup>) {
