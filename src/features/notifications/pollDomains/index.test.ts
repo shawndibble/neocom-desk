@@ -208,7 +208,7 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       priceAlert: ['priceAlertTriggered'],
       stockTargets: ['stockBelowTarget'],
       incursions: ['incursionNearby'],
-      skyhooks: ['skyhookRaidableNearby'],
+      skyhooksNearby: ['skyhookRaidableNearby'],
       kills: ['shipLost'],
       mercenaryDens: ['mercenaryDenReinforced', 'mercenaryDenAnarchy'],
       communities: ['communityJoinRequest', 'communityMemberJoined', 'communityRequestPledged'],

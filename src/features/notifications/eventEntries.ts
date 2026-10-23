@@ -249,7 +249,7 @@ export const SNAPSHOT_SOURCES = {
   stockTargets: source<StockAlertSnapshot>('stockTargets'),
   kills: source<ShipLossSnapshot, ShipLostNames>('kills'),
   incursions: source<IncursionAlertSnapshot, IncursionNames>('incursions'),
-  skyhooks: source<SkyhookAlertSnapshot, SkyhookNames>('skyhooks'),
+  skyhooksNearby: source<SkyhookAlertSnapshot, SkyhookNames>('skyhooksNearby'),
   communities: source<CommunityAlertSnapshot>('communities'),
 } as const;
 
@@ -636,7 +636,7 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     rowHintKey: null,
   }),
   skyhookRaidableNearby: defineEvent({
-    source: SNAPSHOT_SOURCES.skyhooks,
+    source: SNAPSHOT_SOURCES.skyhooksNearby,
     diff: diffSkyhookRaidableNearby,
     copy: skyhookRaidableNearbyCopy,
     projection: null,

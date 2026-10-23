@@ -36,14 +36,14 @@ const isSkyhookAlertEntry = shapeGuard<SkyhookAlertEntry>({
  * "once per". An input it cannot read skips the poll (`null`) rather than
  * writing a baseline that would fire a burst on the next good poll.
  */
-export const skyhookDomain = defineDomain<
+export const skyhookNearbyDomain = defineDomain<
   SkyhookAlertEntry,
   SkyhookAlertSnapshot,
   SkyhookRaidableNearbyFire,
   SkyhookNames
 >({
-  source: SNAPSHOT_SOURCES.skyhooks,
-  stateKey: 'notifications.pollerState.skyhooks',
+  source: SNAPSHOT_SOURCES.skyhooksNearby,
+  stateKey: 'notifications.pollerState.skyhooksNearby',
   entriesKey: 'entries',
   isEntry: isSkyhookAlertEntry,
   load: async (characterId) => {

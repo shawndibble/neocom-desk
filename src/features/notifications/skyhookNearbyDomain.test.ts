@@ -5,7 +5,7 @@ import { loadCurrentSystemId } from '@/features/route/currentSystem';
 import { loadJumpBasis } from '@/features/route/jumpBasis';
 import { localJumpDistances } from '@/features/route/localRoute';
 import { notificationUrlForSubject } from './notificationOptions';
-import { skyhookDomain } from './pollDomains/skyhooks';
+import { skyhookNearbyDomain } from './pollDomains/skyhooksNearby';
 import { DEFAULT_NOTIFICATION_PREFERENCES, useNotificationPreferences } from './preferences';
 
 vi.mock('@/features/route/currentSystem', () => ({ loadCurrentSystemId: vi.fn() }));
@@ -41,9 +41,9 @@ beforeEach(() => {
   useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: true });
 });
 
-describe('skyhookDomain.load (issue #4784)', () => {
+describe('skyhookNearbyDomain.load (issue #4784)', () => {
   it('counts each readable window from the Current System, dropping listings with none', async () => {
-    expect(await skyhookDomain.load(CHARACTER)).toEqual([
+    expect(await skyhookNearbyDomain.load(CHARACTER)).toEqual([
       {
         systemId: 30000144,
         planetId: 40000001,
@@ -60,16 +60,16 @@ describe('skyhookDomain.load (issue #4784)', () => {
 
   it('skips the poll when the list or the location cannot be read', async () => {
     vi.mocked(loadRaidableList).mockResolvedValue(null);
-    expect(await skyhookDomain.load(CHARACTER)).toBeNull();
+    expect(await skyhookNearbyDomain.load(CHARACTER)).toBeNull();
     vi.mocked(loadRaidableList).mockRejectedValue(new Error('down'));
-    expect(await skyhookDomain.load(CHARACTER)).toBeNull();
+    expect(await skyhookNearbyDomain.load(CHARACTER)).toBeNull();
     vi.mocked(loadCurrentSystemId).mockResolvedValue(null);
-    expect(await skyhookDomain.load(CHARACTER)).toBeNull();
+    expect(await skyhookNearbyDomain.load(CHARACTER)).toBeNull();
   });
 
   it('skips the poll when no route can be counted', async () => {
     vi.mocked(localJumpDistances).mockResolvedValue({ kind: 'unknown' } as never);
-    expect(await skyhookDomain.load(CHARACTER)).toBeNull();
+    expect(await skyhookNearbyDomain.load(CHARACTER)).toBeNull();
   });
 });
 
