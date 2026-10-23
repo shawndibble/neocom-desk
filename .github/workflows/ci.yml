@@ -192,7 +192,13 @@ jobs:
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
       - if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
-      - run: npm run test:run -- --shard=${{ matrix.shard }}/4
+      - run: npm run test:run -- --shard=${{ matrix.shard }}/4 --reporter=agent --reporter=json --outputFile.json=vitest-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vitest-report-${{ matrix.shard }}
+          path: vitest-report.json
+          retention-days: 3
 
   # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
   # reasoning — a matrix reports as `test-shard (1)`…`(4)`, none of which is
