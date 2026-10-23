@@ -104,6 +104,21 @@ describe('parseLayout', () => {
     );
   });
 
+  it('keeps the Skyhook raids Where and radius, drops bad ones and other kinds', () => {
+    const raids = (over: Record<string, unknown>) =>
+      parseLayout(wrap(good({ kind: 'sovRaids', ...over })))!.widgets[0];
+    const kept = raids({ raidsWhere: 'near', raidsRadius: 15 });
+    expect(kept.raidsWhere).toBe('near');
+    expect(kept.raidsRadius).toBe(15);
+    expect('raidsWhere' in raids({ raidsWhere: 'everywhere' })).toBe(false);
+    expect('raidsRadius' in raids({ raidsRadius: 7 })).toBe(false);
+    expect('raidsRadius' in raids({ raidsRadius: 8 })).toBe(false);
+    // An old layout with neither field loads unchanged.
+    const old = raids({});
+    expect('raidsWhere' in old || 'raidsRadius' in old).toBe(false);
+    expect('raidsWhere' in parseLayout(wrap(good({ raidsWhere: 'near' })))!.widgets[0]).toBe(false);
+  });
+
   it('keeps a valid rowsPerPage and drops one that is not offered', () => {
     expect(parseLayout(wrap(good({ rowsPerPage: 25 })))!.widgets[0].rowsPerPage).toBe(25);
     expect('rowsPerPage' in parseLayout(wrap(good({ rowsPerPage: 7 })))!.widgets[0]).toBe(false);

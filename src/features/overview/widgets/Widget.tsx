@@ -262,7 +262,9 @@ function LiveWidget(props: WidgetProps) {
     scope.scopeAll,
     kind?.hasRange ? (widget.range ?? DEFAULT_RANGE) : undefined,
     kind?.hasPlexPlan ? widget.plexPer30Days : undefined,
-    kind?.hasCalendarEvents ? widget.calendarEvents : undefined
+    kind?.hasCalendarEvents ? widget.calendarEvents : undefined,
+    kind?.hasRaidsWhere ? widget.raidsWhere : undefined,
+    kind?.hasRaidsWhere ? widget.raidsRadius : undefined
   );
   return <WidgetFrame {...props} view={view} />;
 }

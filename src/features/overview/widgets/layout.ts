@@ -18,6 +18,15 @@ export type WidgetScope = 'header' | 'all';
 export type CalendarEventsChoice = 'committed' | 'all';
 export const CALENDAR_EVENTS_CHOICES: readonly CalendarEventsChoice[] = ['committed', 'all'];
 
+/** Skyhook raids: whose space it lists. Alliance is the default and is never stored. */
+export type RaidsWhere = 'alliance' | 'near';
+export const RAIDS_WHERES: readonly RaidsWhere[] = ['alliance', 'near'];
+/** Jumps from the Current System under Near me; not a WidgetRange, which counts days. */
+export const RAIDS_RADII: readonly number[] = [5, 8, 10, 15];
+export const DEFAULT_RAIDS_RADIUS = 8;
+export const isRaidsRadius = (value: unknown): value is number =>
+  typeof value === 'number' && RAIDS_RADII.includes(value);
+
 export type WidgetRange = 7 | 30 | 90;
 export const WIDGET_RANGES: readonly WidgetRange[] = [7, 30, 90];
 export const DEFAULT_RANGE: WidgetRange = 30;
@@ -45,6 +54,10 @@ export interface Widget {
   plexPer30Days?: number;
   /** Coming up only: which events it lists. Absent means accepted and tentative; stored only for 'all'. */
   calendarEvents?: CalendarEventsChoice;
+  /** Skyhook raids only: 'near' lists any holder's space near the pilot. Absent means My alliance; stored only for 'near'. */
+  raidsWhere?: 'near';
+  /** Skyhook raids only: jumps for Near me. Absent means the default (8). */
+  raidsRadius?: number;
   showOnPhone: boolean;
 }
 
@@ -223,6 +236,39 @@ export function setCalendarEvents(
       return rest;
     }
     return { ...w, calendarEvents: choice };
+  });
+}
+
+/** Stored only when it differs from the default, so a widget nobody touched stays as small as before. */
+export function setRaidsWhere(
+  layout: OverviewLayout,
+  id: string,
+  where: RaidsWhere
+): OverviewLayout {
+  return update(layout, id, (w) => {
+    if (!getKind(w.kind)?.hasRaidsWhere || where === (w.raidsWhere ?? 'alliance')) return null;
+    if (where === 'alliance') {
+      const { raidsWhere: _dropped, ...rest } = w;
+      void _dropped;
+      return rest;
+    }
+    return { ...w, raidsWhere: 'near' };
+  });
+}
+
+/** Stored only when it differs from the default. */
+export function setRaidsRadius(layout: OverviewLayout, id: string, radius: number): OverviewLayout {
+  if (!isRaidsRadius(radius)) return layout;
+  return update(layout, id, (w) => {
+    if (!getKind(w.kind)?.hasRaidsWhere || radius === (w.raidsRadius ?? DEFAULT_RAIDS_RADIUS)) {
+      return null;
+    }
+    if (radius === DEFAULT_RAIDS_RADIUS) {
+      const { raidsRadius: _dropped, ...rest } = w;
+      void _dropped;
+      return rest;
+    }
+    return { ...w, raidsRadius: radius };
   });
 }
 

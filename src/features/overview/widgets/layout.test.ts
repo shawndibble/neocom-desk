@@ -17,6 +17,8 @@ import {
   restoreLayout,
   setRange,
   setCalendarEvents,
+  setRaidsRadius,
+  setRaidsWhere,
   setPlexPer30Days,
   setRowsPerPage,
   newWidget,
@@ -211,6 +213,31 @@ describe('setPlexPer30Days', () => {
     expect(setPlexPer30Days(l, 'a', 1.5)).toBe(l);
     expect(setPlexPer30Days(l, 'a', 99999)).toBe(l);
     expect(setPlexPer30Days(l, 'b', 700)).toBe(l);
+  });
+});
+
+describe('setRaidsWhere and setRaidsRadius', () => {
+  it('stores Near me and drops the field when it goes back to My alliance', () => {
+    const l = layoutOf(w('a', 'sovRaids'));
+    const near = setRaidsWhere(l, 'a', 'near');
+    expect(near.widgets[0].raidsWhere).toBe('near');
+    expect('raidsWhere' in setRaidsWhere(near, 'a', 'alliance').widgets[0]).toBe(false);
+  });
+
+  it('stores a radius other than 8 and drops it when it goes back to 8', () => {
+    const l = layoutOf(w('a', 'sovRaids'));
+    const wide = setRaidsRadius(l, 'a', 15);
+    expect(wide.widgets[0].raidsRadius).toBe(15);
+    expect('raidsRadius' in setRaidsRadius(wide, 'a', 8).widgets[0]).toBe(false);
+  });
+
+  it('changes nothing for the default, an unoffered radius or another kind', () => {
+    const l = layoutOf(w('a', 'sovRaids'), w('b', 'orders'));
+    expect(setRaidsWhere(l, 'a', 'alliance')).toBe(l);
+    expect(setRaidsWhere(l, 'b', 'near')).toBe(l);
+    expect(setRaidsRadius(l, 'a', 8)).toBe(l);
+    expect(setRaidsRadius(l, 'a', 7)).toBe(l);
+    expect(setRaidsRadius(l, 'b', 5)).toBe(l);
   });
 });
 
