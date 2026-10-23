@@ -3886,7 +3886,7 @@
     "trust": {
       "readOnly": {
         "name": "Six writes, and nothing else",
-        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, a reply or forward you write, or a Community invite you send by mail, goes out through your account, saving a Fitting to EVE recreates it on the game's side, setting a route's waypoints replaces your autopilot waypoints in the client, and Open in EVE opens a window in the client. Nothing else in the app writes to EVE."
+        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, a reply or forward you write, a Community invite you send by mail, or the result of an SRP claim you approve or reject, goes out through your account, saving a Fitting to EVE recreates it on the game's side, setting a route's waypoints replaces your autopilot waypoints in the client, and Open in EVE opens a window in the client. Nothing else in the app writes to EVE."
       },
       "token": {
         "name": "Your login stays on this device",
@@ -3928,7 +3928,7 @@
       "readMore": "Read more in the privacy policy",
       "writes": {
         "q": "Can it move ISK or change anything in EVE?",
-        "a": "It cannot move ISK. It writes to EVE only when you act: opening a mail marks it read, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written."
+        "a": "It cannot move ISK. It writes to EVE only when you act: opening a mail marks it read, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send, and the result mail an SRP officer's Approve or Reject sends the pilot), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written."
       },
       "free": {
         "q": "Is it free?",
@@ -12419,7 +12419,7 @@
           "crashes": "Crash reports: the error, the page it happened on and the addresses of recent requests, which can include EVE character or item IDs. The app doesn't attach your IP address; request and response bodies are never captured; EVE tokens are stripped first. Usage statistics: each page you open is counted in Google Analytics by the page's name only, never an ID or a search, and not tied to your character. Turn this off in Settings › App & backup › Analytics.",
           "shareLinks": "Share Links: the appraisal, Fitting, D-Scan or Survey you shared (items, scan text, a Survey's location and notes, and the Character names of whoever started it or pasted a scan), under a random link ID with no account or Character ID. Anyone with the link can read it, and anyone with a Survey link can add scans. It stops working after 7 days and is then deleted automatically, up to a day later. It can't be deleted sooner.",
           "removal": "Removing a character clears it from this device only; adding it back restores its synced copy. That copy is deleted after 90 days with no device syncing it, or right away from Settings › Log out & delete › Delete all data.",
-          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written.",
+          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send, and the result mail an SRP officer's Approve or Reject sends the pilot), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written.",
           "export": "Backups (Settings › App & backup) are password-encrypted files, login tokens included. One is written only when you press the button, and saved only where you put it. We never see it."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
@@ -16406,6 +16406,31 @@
         "paidMany": "Marked {{ok}} of {{total}} paid",
         "someFailed": "{{count}} not changed: {{reasons}}",
         "copyFailed": "Couldn't copy the amount"
+      },
+      "mail": {
+        "approvedSubject_one": "SRP approved: {{hull}}",
+        "approvedSubject_other": "SRP approved: {{count}} claims",
+        "rejectedSubject_one": "SRP rejected: {{hull}}",
+        "rejectedSubject_other": "SRP rejected: {{count}} claims",
+        "greeting": "Hi {{pilot}},",
+        "approvedIntro_one": "Your SRP claim was approved.",
+        "approvedIntro_other": "Your SRP claims were approved.",
+        "rejectedIntro_one": "Your SRP claim was rejected.",
+        "rejectedIntro_other": "Your SRP claims were rejected.",
+        "approvedLine": "{{hull}} (killmail {{id}}): {{isk}} ISK",
+        "rejectedLine": "{{hull}} (killmail {{id}}). Reason: {{reason}}",
+        "approvedOutro": "It will be paid in game by an officer of {{corp}}. You will get a separate payment.",
+        "rejectedOutro_one": "You can re-file it once from the SRP page.",
+        "rejectedOutro_other": "You can re-file each once from the SRP page.",
+        "sentTo_one": "Mail sent to {{count}} pilot.",
+        "sentTo_other": "Mail sent to {{count}} pilots.",
+        "failedFor": "Mail failed for {{names}}, status still saved.",
+        "noScope": "No mail sent: mail permission missing.",
+        "corpFallback": "your corporation",
+        "hullFallback": "your ship",
+        "grantTitle": "Can't mail the pilot",
+        "grantHint": "SRP result mails go out from your Character. Grant the mail permission to send them.",
+        "grantAction": "Grant mail permission"
       },
       "failed": {
         "generic": "Couldn't save that. Try again.",

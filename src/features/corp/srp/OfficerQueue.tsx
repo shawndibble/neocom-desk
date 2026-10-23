@@ -5,6 +5,7 @@
  */
 import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { GrantNote } from '@/app/GrantNote';
 import {
   Button,
   DataTable,
@@ -34,6 +35,7 @@ import { ChangeAmountDialog, RejectClaimDialog } from './OfficerDialogs';
 import { SrpActivityFeed } from './SrpActivityFeed';
 import { SrpBulkBar } from './SrpBulkBar';
 import { SrpClaimDetail } from './SrpClaimDetail';
+import { SEND_MAIL_ENDPOINTS, withMailSummary, type SrpMailClaim } from './srpResultMail';
 import { failureText } from './srpClaimText';
 import {
   approveAmount,
@@ -44,6 +46,7 @@ import {
   type QueueTab,
 } from './srpQueue';
 import { useSrpClaimNames } from './useSrpClaimNames';
+import { useSrpResultMail, type DecidedClaim } from './useSrpResultMail';
 import type { SrpQueueData, SrpQueueState } from './useSrpQueue';
 
 type Ready = Extract<SrpQueueState, { status: 'ready' }>;
@@ -66,6 +69,8 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
   const [openId, setOpenId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [mailMissing, setMailMissing] = useState(false);
+  const mailResult = useSrpResultMail();
 
   const split = useMemo(() => splitClaims(ready.claims), [ready.claims]);
   const rows = tab === 'pending' ? split.pending : tab === 'owed' ? split.owed : split.history;
@@ -116,6 +121,31 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     isk: formatIsk(o.amount ?? 0),
   });
 
+  /** Mails the pilots the result, best effort, and returns the result line with what happened to the mail. */
+  const withMail = async (
+    head: string,
+    kind: 'approved' | 'rejected',
+    decided: DecidedClaim[]
+  ): Promise<string> => {
+    const mail = await mailResult(kind, decided);
+    setMailMissing(mail.missingScope);
+    return withMailSummary(t, head, mail);
+  };
+
+  const decidedFrom = (o: SrpClaimOutcome, extra: Partial<SrpMailClaim> = {}): DecidedClaim => {
+    const claim = ready.claims.find((c) => c.killmailId === o.killmailId);
+    return {
+      characterId: o.characterId,
+      characterName: o.characterName,
+      claim: {
+        killmailId: o.killmailId,
+        hull: claim ? names.hull(claim.hullTypeId) : t('srp.officer.mail.hullFallback'),
+        amount: o.amount ?? claim?.amount ?? 0,
+        ...extra,
+      },
+    };
+  };
+
   const approve = (claim: SrpClaim) => {
     const amount = approveAmount(claim, typed[claim.killmailId]);
     if (amount === null) return;
@@ -125,7 +155,9 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
         ...(claim.amount === null ? { amount } : {}),
       });
       setOpenId(null);
-      return t('srp.officer.results.approved', pilotIsk(out));
+      return withMail(t('srp.officer.results.approved', pilotIsk(out)), 'approved', [
+        decidedFrom(out),
+      ]);
     });
   };
 
@@ -173,7 +205,8 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
       if (tab === 'pending') {
         const out = await data.approveMany(chosen.map((c) => ({ killmailId: c.killmailId })));
         setSelection([]);
-        return batchLine('approvedMany', out);
+        const decided = out.results.flatMap((r) => (r.ok ? [decidedFrom(r)] : []));
+        return withMail(batchLine('approvedMany', out), 'approved', decided);
       }
       const out = await data.markPaidMany(chosen.map((c) => c.killmailId));
       setSelection([]);
@@ -191,6 +224,14 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
 
   return (
     <div className="grid gap-4">
+      {mailMissing && (
+        <GrantNote
+          endpoints={SEND_MAIL_ENDPOINTS}
+          title={t('srp.officer.mail.grantTitle')}
+          hint={t('srp.officer.mail.grantHint')}
+          actionLabel={t('srp.officer.mail.grantAction')}
+        />
+      )}
       <p className="text-sm tabular-nums" aria-live="polite">
         <span className="font-semibold">
           {t('srp.officer.summary.pending', { count: counts.pending })}
@@ -303,8 +344,14 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           onClose={() => setRejecting(null)}
           onReject={async (reason) => {
             const out = await data.reject(rejecting.killmailId, reason);
-            setToast(t('srp.officer.results.rejected', { pilot: out.characterName ?? '' }));
             setOpenId(null);
+            setToast(
+              await withMail(
+                t('srp.officer.results.rejected', { pilot: out.characterName ?? '' }),
+                'rejected',
+                [decidedFrom(out, { reason: out.reason ?? reason })]
+              )
+            );
           }}
         />
       )}

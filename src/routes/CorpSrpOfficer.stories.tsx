@@ -22,6 +22,16 @@ const routes = (): FixtureRoute[] => [
   { path: /^\/characters\/\d+\/roles$/, respond: () => ({ body: { roles: ROLES[role] } }) },
 ];
 
+/** Adds what the result mail needs: the corporation's name and a mail send that answers a mail id. */
+const mailRoutes = (): FixtureRoute[] => [
+  ...routes(),
+  {
+    path: /^\/corporations\/\d+\/$/,
+    respond: () => ({ body: { name: 'Sample Corp', ceo_id: 1, member_count: 40, tax_rate: 0.1 } }),
+  },
+  { method: 'POST', path: /^\/characters\/\d+\/mail\/$/, respond: () => ({ body: 4711 }) },
+];
+
 async function seedCorp() {
   await Promise.all(
     SAMPLE_CHARACTERS.map((c) =>
@@ -31,6 +41,7 @@ async function seedCorp() {
 }
 
 const SCOPES = [...new Set(Object.values(CORP_SCOPES_FOR_CAPABILITY).flat())];
+const MAIL_SCOPES = [...SCOPES, 'esi-mail.send_mail.v1'];
 
 function SampleQueue({
   children,
@@ -177,3 +188,38 @@ export const ChangeAmountDialogPhone: Story = { ...ChangeAmountDialog, globals: 
 
 /** @summary An Accountant opens SRP: the queue is theirs, Settings is not listed. */
 export const AccountantQueue: Story = { decorators: [withQueue('accountant', 'queue')] };
+
+const approveFirst = async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+  const body = within(canvasElement);
+  await userEvent.click((await body.findAllByRole('button', { name: 'Approve' }))[0]!);
+};
+
+const approveTwo = async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+  const body = within(canvasElement);
+  const boxes = await body.findAllByRole('checkbox');
+  await userEvent.click(boxes[0]!);
+  await userEvent.click(boxes[1]!);
+  await userEvent.click(await body.findByRole('button', { name: /^approve \(2\)/i }));
+};
+
+/** @summary Approve with the mail permission: the result line says the pilot was mailed. */
+export const ApprovedMailed: Story = {
+  ...Queue,
+  parameters: {
+    ...meta.parameters,
+    shell: { ...meta.parameters.shell, routes: mailRoutes, scopes: MAIL_SCOPES },
+  },
+  play: approveFirst,
+};
+
+/** @summary Mailed approve on a phone. */
+export const ApprovedMailedPhone: Story = { ...ApprovedMailed, globals: phone };
+
+/** @summary Bulk approve with the mail permission: one mail per pilot, summarised in one line. */
+export const BulkApprovedMailed: Story = { ...ApprovedMailed, play: approveTwo };
+
+/** @summary Approve without the mail permission: saved, "No mail sent", and a Grant note. */
+export const ApprovedNoMailPermission: Story = { ...Queue, play: approveFirst };
+
+/** @summary No-permission approve on a phone. */
+export const ApprovedNoMailPermissionPhone: Story = { ...ApprovedNoMailPermission, globals: phone };
