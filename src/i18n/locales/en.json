@@ -12133,7 +12133,8 @@
         "itemInfo": "Item info",
         "market": "Market data",
         "planetary": "Planetary Industry data",
-        "reference": "Reference data"
+        "reference": "Reference data",
+        "appPages": "App pages"
       },
       "packLine_one": "{{name}} ({{count}} file): {{cached}} of {{total}} downloaded",
       "packLine_other": "{{name}} ({{count}} files): {{cached}} of {{total}} downloaded",

@@ -16,6 +16,13 @@ import { phosphorWeightsPlugin } from './src/components/ui/phosphorWeightsPlugin
 import { localeSplitPlugin } from './src/i18n/localeSplitPlugin.ts';
 import { deferEntryHtml } from './src/app/deferredEntry.ts';
 import { lazySdeGlobIgnores } from './src/sde/lazySdeFiles.ts';
+import {
+  bootClosure,
+  dropLazyFromManifest,
+  lazyChunkFiles,
+  lazyChunksJson,
+  type BundleLike,
+} from './src/app/lazyChunks.ts';
 
 const { version, dependencies } = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf-8')
@@ -239,6 +246,40 @@ function spaFallbackHtml() {
  * worker's precache. Kept out of the precache (`globIgnores`) so it is always
  * read from the network.
  */
+/**
+ * The chunks the install does not precache (`src/app/lazyChunks.ts`), filled by
+ * `lazyChunksPlugin` while the bundle is generated and read by
+ * `injectManifest.manifestTransforms`, which vite-plugin-pwa runs afterwards in
+ * its own `closeBundle`. Module scope, because the two live in separate options.
+ */
+const lazyChunkState = { files: new Set<string>() };
+
+/**
+ * Splits the bundle into the boot graph (precached) and every other chunk (left
+ * to the idle warm and `sw.ts`'s cache-first route), and emits
+ * `lazy-chunks.json` naming the second set for the warm, the Offline data panel
+ * and the worker's cleanup. Kept out of the precache (`globIgnores`).
+ */
+function lazyChunksPlugin() {
+  return {
+    name: 'neocom-lazy-chunks',
+    apply: 'build' as const,
+    generateBundle(
+      this: { emitFile: (file: object) => void },
+      _options: unknown,
+      bundle: BundleLike
+    ) {
+      const files = lazyChunkFiles(bundle, bootClosure(bundle));
+      lazyChunkState.files = new Set(files);
+      this.emitFile({
+        type: 'asset',
+        fileName: 'lazy-chunks.json',
+        source: lazyChunksJson(files, release),
+      });
+    },
+  };
+}
+
 function releaseFilePlugin() {
   return {
     name: 'neocom-release-file',
@@ -393,6 +434,12 @@ export default defineConfig({
           '**/icons/icon-512*.png',
           '**/brand/**',
           '**/version.json',
+          '**/lazy-chunks.json',
+        ],
+        // Everything but the boot graph is warmed at idle instead (`lazyChunksPlugin`).
+        // Read at call time: the list is only known once the bundle exists.
+        manifestTransforms: [
+          async (entries) => dropLazyFromManifest(lazyChunkState.files)(entries),
         ],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
@@ -410,6 +457,7 @@ export default defineConfig({
       : []),
     spaFallbackHtml(),
     releaseFilePlugin(),
+    lazyChunksPlugin(),
   ],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },

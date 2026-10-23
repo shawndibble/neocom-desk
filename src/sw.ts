@@ -40,8 +40,10 @@ import {
   isContractSnapshotObject,
   isEvePortraitImage,
   isEveTypeImage,
+  isLazyChunk,
   isVersionedSdeData,
 } from '@/lib/swRoutes';
+import { chunkKey, chunksToDelete } from '@/app/lazyChunks';
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -102,6 +104,46 @@ registerRoute(
     ],
   })
 );
+
+// Build chunks outside the boot graph (vite.config.ts `lazyChunksPlugin`, what
+// `lazy-chunks.json` lists) are not precached: the install stays small, and the
+// idle warm (src/sde/warmLazySde.ts) fetches them where the connection allows.
+// Cache-first under their content-hashed URL, so a changed chunk is a new
+// entry. The entry cap is a backstop; `dropStaleChunks` is the real cleanup.
+const LAZY_CHUNK_CACHE = 'lazy-chunks';
+registerRoute(
+  ({ url, request }) => isLazyChunk(url, request.mode, self.location.origin, scopePath),
+  new CacheFirst({
+    cacheName: LAZY_CHUNK_CACHE,
+    plugins: [cacheOnly200, new ExpirationPlugin({ maxEntries: 1500, purgeOnQuotaError: true })],
+  })
+);
+
+// A deploy renames hundreds of chunks, so the previous build's would pile up.
+// When a build's worker takes over, drop the cached ones its list no longer
+// names. An unreadable list deletes nothing (`chunksToDelete`).
+async function dropStaleChunks(): Promise<void> {
+  try {
+    const response = await fetch(`${scopePath}lazy-chunks.json`, { cache: 'no-store' });
+    if (!response.ok) return;
+    const { files } = (await response.json()) as { files?: unknown };
+    if (!Array.isArray(files)) return;
+    const cache = await caches.open(LAZY_CHUNK_CACHE);
+    const keys = await cache.keys();
+    const doomed = new Set(
+      chunksToDelete(
+        keys.map((key) => chunkKey(key.url, scopePath)),
+        files.filter((file): file is string => typeof file === 'string')
+      )
+    );
+    await Promise.all(
+      keys.filter((key) => doomed.has(chunkKey(key.url, scopePath))).map((key) => cache.delete(key))
+    );
+  } catch {
+    // Offline mid-activation: the next build's worker cleans up.
+  }
+}
+self.addEventListener('activate', (event) => event.waitUntil(dropStaleChunks()));
 
 // EVE image server: every icon/render/bp is `max-age=3600`, so without this
 // each one revalidated hourly. Type art only changes with a game expansion.
