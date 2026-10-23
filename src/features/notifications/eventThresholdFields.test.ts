@@ -69,7 +69,7 @@ describe('defaultedThresholds', () => {
       mercenaryDenReinforcedLeadHours: 1,
       mercenaryDenAnarchyPercent: 50,
       skyhookRaidableLeadHours: 2,
-      skyhookRaidableMinUnits: 0,
+      skyhookRaidableMinUnits: 1,
     });
   });
 

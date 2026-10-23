@@ -12521,7 +12521,7 @@
       "skyhookRaidableMinUnitsLabel": "Danger alert when open with unsecured stock of at least:",
       "skyhookRaidableMinUnitsOption_one": "{{count}} unit",
       "skyhookRaidableMinUnitsOption_other": "{{count}} units",
-      "skyhookRaidableMinUnitsHint": "A window that opens with less than this sends a plain alert instead. EVE sends no silo size, so this counts the unsecured units a raid would take; 0 makes every open window a danger alert.",
+      "skyhookRaidableMinUnitsHint": "A window that opens with less than this sends a plain alert instead, and an empty silo always does. EVE sends no silo size, so this counts the unsecured units a raid would take; 1 means any stock at risk is a danger alert. The larger steps are guesses, not game values.",
       "mercenaryDenAnarchyForegroundOnlyHint": "Fires only while the app is open: ESI offers no way to be told when anarchy rises.",
       "mercenaryDenReinforcedLeadTimeLabel": "Warn this far before a den leaves reinforcement:",
       "mercenaryDenReinforcedLeadTimeOption_one": "{{count}} hour",
