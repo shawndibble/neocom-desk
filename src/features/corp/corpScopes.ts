@@ -109,6 +109,11 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
   canReadContracts: ['esi-contracts.read_corporation_contracts.v1'],
   /** Accountant or Trader; additive (below), so a corp grant made before it stays `ready`. */
   canReadOrders: ['esi-markets.read_corporation_orders.v1'],
+  /**
+   * Director-only (issue #4756). Additive (below): `canReadWallet` and
+   * `canReadAssets` already claim this scope, so no Director loses a surface.
+   */
+  canReadDivisions: ['esi-corporations.read_divisions.v1'],
 };
 
 /**
@@ -134,6 +139,7 @@ const ADDITIVE_CORP_CAPABILITIES: ReadonlySet<CorpCapability> = new Set([
   'canReadRoleAudit',
   'canReadContracts',
   'canReadOrders',
+  'canReadDivisions',
 ]);
 
 /**

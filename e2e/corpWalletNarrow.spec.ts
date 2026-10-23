@@ -6,7 +6,7 @@
  *
  * `/corp/wallet` needs a wallet-reading role (`canReadWallet` in
  * `engine/corpRoles.ts`), so the shared mock's default `{}` roles response is
- * overridden to `['Accountant']`, and the JWT carries the `corp` scope group
+ * overridden to `['Director']`, and the JWT carries the `corp` scope group
  * on top of the base fixture grant.
  */
 import { test, expect } from './support/testBase';
@@ -75,7 +75,7 @@ test.describe('Corp Wallet narrow tables', () => {
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
       const corp = `/corporations/${CORPORATION_ID}`;
 
-      if (path === `/characters/${CHARACTER_ID}/roles`) return json({ roles: ['Accountant'] });
+      if (path === `/characters/${CHARACTER_ID}/roles`) return json({ roles: ['Director'] });
       if (path === `${corp}/wallets`) return json([{ division: 1, balance: 123456789013245 }]);
       if (path === `${corp}/divisions`) {
         return json({ wallet: [{ division: 1, name: 'Master Wallet' }] });
@@ -180,7 +180,7 @@ test.describe('Corp Wallet divisions panel (issue #2593)', () => {
       const json = (body: unknown) =>
         route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 
-      if (path === `/characters/${CHARACTER_ID}/roles`) return json({ roles: ['Accountant'] });
+      if (path === `/characters/${CHARACTER_ID}/roles`) return json({ roles: ['Director'] });
       if (path === `/corporations/${CORPORATION_ID}/wallets`) return json(WALLETS);
       if (path === `/corporations/${CORPORATION_ID}/divisions`) {
         return json({ wallet: NAMES, hangar: [] });

@@ -94,12 +94,13 @@ export async function loadCorpWallet(characterId: number): Promise<CorpWalletFee
     journalDivision: MASTER_WALLET_DIVISION,
     journal: null,
   };
-  const access = await gate(characterId, 'canReadWallet');
-  if (access === null) return empty;
-  const { corporationId } = access;
+  // Not `gate()`: this loader also needs `canReadDivisions` from the same access.
+  const resolved = await resolveCorpReadAccess(characterId);
+  if (resolved === null || !resolved.can('canReadWallet')) return empty;
+  const { corporationId } = resolved;
   const [wallets, divisions, journal] = await Promise.all([
     loadCorporationWallets(characterId, corporationId),
-    loadCorporationDivisions(characterId, corporationId),
+    loadCorporationDivisions(characterId, corporationId, resolved.can('canReadDivisions')),
     loadCorporationWalletJournal(characterId, corporationId, MASTER_WALLET_DIVISION),
   ]);
   if (wallets.cached === null) {
