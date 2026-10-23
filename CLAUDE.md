@@ -41,6 +41,13 @@ dev`) — Shawn frequently has another agent working there at the same
   ids).** Never re-implement a primitive that exists. A new
   `src/components/ui` primitive ships with a `<Component>.stories.tsx`. Mockups
   are stories, not hand-written HTML: `docs/design/mockups/README.md`.
+- **A new Cloud Function is never a new `export const` in `functions/src/index.ts`.**
+  A deploy has a per-minute mutation quota, so callables are _actions_ of a group's
+  router (`functions/src/callableRouter.ts`: `corpTaxBookAction(name, handler)`, or the
+  community / alerts group), called from the client with `callRouted`
+  (`src/sync/routedCallable.ts`). Only a scheduled job, a Firestore or HTTP trigger, or a
+  new router is a new export, and it goes in the allowlist in
+  `functions/src/deployedFunctions.test.ts` with the reason in the PR.
 - TDD for all calculation/logic modules (`src/engine`, `src/auth`, industry
   math): failing test first, then code.
 - Pure engines stay pure: no fetch/DOM/Dexie imports in `src/engine`.

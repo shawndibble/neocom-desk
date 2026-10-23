@@ -4,6 +4,10 @@
 
 Accepted (2026-10-23). Builds on ADR 0023. Issue #4608.
 
+Amended (2026-10-24): SRP's callables are router actions only. They are registered
+with `corpTaxBookAction` and served by `corpTaxBookCall`, with no deployed function of
+their own; `functions/src/deployedFunctions.test.ts` fails a new per-action export.
+
 Amended (2026-10-23, issue #4858): the Corp Tax Book now lives at `corps/{id}`
 too, with its subcollection names unchanged (`officers`, `observed`, `miners`,
 `feeders`, `meta`, `audit` and the rest) beside SRP's (`srp`, `srpClaims`,

@@ -495,7 +495,7 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   any signed-in Character read **their own lines** (`uid`/`uids` equals the
   verified `char:{id}` uid) in any corp's book, including after leaving it; the
   settings doc is `get`-able by any signed-in Character (the terms are on every
-  mail). Callables: `verifyCorpOfficerCallable`, `turnOnCorpTaxBookCallable`
+  mail). Callables (actions of the `corpTaxBookCall` router, `callableRouter.ts`; not deployed functions of their own, see SYNC-SETUP "Functions are routers"): `verifyCorpOfficerCallable`, `turnOnCorpTaxBookCallable`
   (Director), `deleteCorpTaxBookCallable` (the opener or the CEO; wipes the book), `reclaimCorpTaxBookCallable` (the CEO; revokes other officers'
   access), `syncCorpTaxBookCallable` (monotonic observer upsert, Extractions,
   donations; Accountant+), `editCorpTaxBookCallable` (rates, settings, payments,

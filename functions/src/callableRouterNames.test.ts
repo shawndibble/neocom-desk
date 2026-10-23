@@ -6,9 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 const index = readFileSync(join(__dirname, 'index.ts'), 'utf8');
 const registrations = [
-  ...index.matchAll(
-    /export const (\w+) = (communityCallable|corpTaxBookCallable|alertsCallable)\(\s*'(\w+)'/g
-  ),
+  ...index.matchAll(/^(communityAction|corpTaxBookAction|alertsAction)\(\s*'(\w+)'/gm),
 ];
 
 function clientSources(dir: string): string[] {
@@ -20,26 +18,26 @@ function clientSources(dir: string): string[] {
 }
 
 describe('callable router names', () => {
-  it('registers every callable under its own export name', () => {
-    expect(registrations.length).toBeGreaterThan(60);
-    expect(registrations.map((m) => m[3])).toEqual(
+  it('registers every action once, including the device and grant ones', () => {
+    const names = registrations.map((m) => m[2]);
+    expect(names.length).toBeGreaterThan(60);
+    expect(names).toEqual(
       expect.arrayContaining(['registerDevice', 'saveAlertGrant', 'deleteAlertGrant'])
     );
-    for (const [, exported, , action] of registrations) expect(action).toBe(exported);
+    expect(new Set(names).size).toBe(names.length);
   });
 
-  it('serves every community and Corp Tax Book callable through a router', () => {
-    const routed = new Set(registrations.map((m) => m[1]));
+  it('deploys no per-name community, Corp Tax Book, SRP or alerts callable', () => {
     const loose = [
       ...index.matchAll(
-        /export const (\w+(?:Communit|CorpTaxBook|CorpOfficer|Srp)\w*Callable) = onCall/g
+        /^export const (\w*(?:Communit|CorpTaxBook|CorpOfficer|Srp)\w*Callable|registerDevice|saveAlertGrant|deleteAlertGrant) =/gm
       ),
     ];
-    expect(loose.map((m) => m[1]).filter((n) => !routed.has(n))).toEqual([]);
+    expect(loose.map((m) => m[1])).toEqual([]);
   });
 
   it('is called by the client only with registered action names', () => {
-    const registered = new Set(registrations.map((m) => m[3]));
+    const registered = new Set(registrations.map((m) => m[2]));
     const used = new Set<string>();
     for (const file of clientSources(join(__dirname, '../../src'))) {
       const text = readFileSync(file, 'utf8');
