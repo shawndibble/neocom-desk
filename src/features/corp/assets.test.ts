@@ -10,7 +10,9 @@ import type { CorporationAsset } from '@/esi/endpoints';
 import {
   CORP_ASSETS_KEY,
   loadCorporationAssets,
+  assetPlaceIds,
   loadCorpAssetLabels,
+  resolveMissingLocationNames,
   toCorpAssetInputs,
 } from './assets';
 
@@ -177,9 +179,9 @@ describe('toCorpAssetInputs', () => {
   });
 });
 
-describe('loadCorpAssetLabels', () => {
+describe('corp asset labels', () => {
   it('resolves type names through loadTypeNames', async () => {
-    const labels = await loadCorpAssetLabels(CHAR_ID, ASSETS);
+    const labels = await loadCorpAssetLabels(ASSETS);
     expect(labels.types.get(34)).toBe('Type 34');
     expect(labels.types.get(35)).toBe('Type 35');
   });
@@ -197,12 +199,12 @@ describe('loadCorpAssetLabels', () => {
       })
     );
 
-    const labels = await loadCorpAssetLabels(CHAR_ID, ASSETS);
+    const locations = await resolveMissingLocationNames(CHAR_ID, assetPlaceIds(ASSETS));
 
     // Both rows share location_id 60003760 — one distinct location, one call.
     expect(nameCalls).toBe(1);
     expect(batched).toEqual([60003760]);
-    expect(labels.locations.get(60003760)).toBe('Location 60003760');
+    expect(locations.get(60003760)).toBe('Location 60003760');
   });
 
   /**
@@ -232,10 +234,10 @@ describe('loadCorpAssetLabels', () => {
     );
 
     const assets = ASSETS.map((asset) => ({ ...asset, location_id: STRUCTURE_ID }));
-    const labels = await loadCorpAssetLabels(CHAR_ID, assets);
+    const locations = await resolveMissingLocationNames(CHAR_ID, assetPlaceIds(assets));
 
     expect(structureCalls).toBe(1);
-    expect(labels.locations.get(STRUCTURE_ID)).toBe('X-7OMU - Home Office');
+    expect(locations.get(STRUCTURE_ID)).toBe('X-7OMU - Home Office');
   });
 
   /** A structure the reading Character is not on the ACL for is simply absent, same as Assets. */
@@ -248,9 +250,9 @@ describe('loadCorpAssetLabels', () => {
     );
 
     const assets = ASSETS.map((asset) => ({ ...asset, location_id: STRUCTURE_ID }));
-    const labels = await loadCorpAssetLabels(CHAR_ID, assets);
+    const locations = await resolveMissingLocationNames(CHAR_ID, assetPlaceIds(assets));
 
-    expect(labels.locations.has(STRUCTURE_ID)).toBe(false);
+    expect(locations.has(STRUCTURE_ID)).toBe(false);
   });
 
   /**
@@ -292,10 +294,88 @@ describe('loadCorpAssetLabels', () => {
       )
     );
 
-    const labels = await loadCorpAssetLabels(CHAR_ID, assets);
+    const locations = await resolveMissingLocationNames(CHAR_ID, assetPlaceIds(assets));
 
-    expect(labels.locations.size).toBe(structureIds.length);
+    expect(locations.size).toBe(structureIds.length);
     expect(peak).toBeLessThanOrEqual(ESI_FANOUT_CONCURRENCY);
     expect(peak).toBeGreaterThan(1);
+  });
+
+  it('names places from the device cache without a request', async () => {
+    await db.esiCache.bulkPut([
+      { characterId: 0, key: 'name:60003760', value: 'Jita IV', fetchedAt: Date.now() },
+    ] as never);
+    // `onUnhandledRequest: 'error'` fails the test on any request.
+    const labels = await loadCorpAssetLabels(ASSETS);
+    expect(labels.locations.get(60003760)).toBe('Jita IV');
+  });
+
+  it('never looks up a container or ship holding other assets as a structure', async () => {
+    const FLOOR = 1_000_000_000_000;
+    const assets: CorporationAsset[] = [
+      { ...ASSETS[0], item_id: FLOOR + 5, location_id: 60003760 },
+      { ...ASSETS[1], item_id: 9001, location_id: FLOOR + 5, location_type: 'item' },
+      { ...ASSETS[1], item_id: 9002, location_id: 30000142, location_type: 'solar_system' },
+    ];
+    expect(assetPlaceIds(assets)).toEqual([60003760]);
+  });
+
+  it('does not ask the other characters in the roster about a structure it cannot see', async () => {
+    const STRUCTURE_ID = 1035466617946;
+    await db.characters.bulkPut([
+      { characterId: CHAR_ID },
+      { characterId: 92 },
+      { characterId: 93 },
+    ] as never);
+    let calls = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/structures/${STRUCTURE_ID}`, () => {
+        calls += 1;
+        return HttpResponse.json({ error: 'Forbidden' }, { status: 403 });
+      })
+    );
+    await resolveMissingLocationNames(CHAR_ID, [STRUCTURE_ID]);
+    expect(calls).toBe(1);
+  });
+
+  it('skips places the caller already has a name for', async () => {
+    const names = await resolveMissingLocationNames(
+      CHAR_ID,
+      [60003760],
+      new Map([[60003760, 'Jita IV']])
+    );
+    expect(names.size).toBe(0);
+  });
+
+  it('looks up only the real structures however many containers hold assets', async () => {
+    const FLOOR = 1_000_000_000_000;
+    const STRUCTURES = [FLOOR + 900, FLOOR + 901];
+    const assets: CorporationAsset[] = [];
+    let itemId = FLOOR + 10_000;
+    for (const structureId of STRUCTURES) {
+      for (let box = 0; box < 100; box += 1) {
+        const container = itemId++;
+        assets.push({ ...ASSETS[0], item_id: container, location_id: structureId });
+        for (let n = 0; n < 5; n += 1) {
+          assets.push({
+            ...ASSETS[0],
+            item_id: itemId++,
+            location_id: container,
+            location_type: 'item',
+          });
+        }
+      }
+    }
+    expect(assetPlaceIds(assets)).toEqual(STRUCTURES);
+    expect(assets).toHaveLength(1200);
+  });
+
+  it('finds every station in a 200-station, 100k-asset corporation', () => {
+    const assets: CorporationAsset[] = Array.from({ length: 100_000 }, (_, i) => ({
+      ...ASSETS[0],
+      item_id: 5_000_000 + i,
+      location_id: 60_000_000 + (i % 200),
+    }));
+    expect(assetPlaceIds(assets)).toHaveLength(200);
   });
 });

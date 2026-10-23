@@ -20,8 +20,11 @@
 import { conditionalPagedFetch } from '@/esi/cache';
 import { getCorporationAssets, type CorporationAsset } from '@/esi/endpoints';
 import type { StatusResult } from '@/esi/cache';
-import { resolveNames } from '@/features/character/names';
-import { loadStructureName } from '@/features/character/structures';
+import { readCachedNames, resolveNames } from '@/features/character/names';
+import {
+  loadStructureNameOwnOnly,
+  readCachedStructureNames,
+} from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { CorpAssetInput } from '@/engine/corp/assetDivisions';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -82,37 +85,68 @@ export function toCorpAssetInputs(assets: readonly CorporationAsset[]): CorpAsse
 }
 
 /**
- * Location names for the distinct places this corporation's assets sit.
- *
- * Same split as `features/corp/members.ts`'s `resolveLocationNames`:
- * `/universe/names` 404s the *whole* batch if one id in it is unresolvable,
- * and an Upwell structure has no bulk name endpoint at all, so anything at or
- * above `UPWELL_STRUCTURE_ID_FLOOR` is resolved one at a time via
- * `loadStructureName` instead of being mixed into the batch. Unlike the
- * roster's version, there is no 1000-id chunking here: a corporation's
- * distinct asset locations are the offices and structures it holds, not one
- * per member, so a single `/universe/names` call is always enough.
- *
- * A structure the reading Character is not on the ACL for resolves to
- * nothing and the view falls back to the raw id, exactly as `members.ts` and
- * the personal Assets page both do.
- *
- * The structure resolves are capped at `ESI_FANOUT_CONCURRENCY` (issue #420):
- * a large corp's distinct Upwell structures can number well past ten, and
- * each is its own `/universe/structures/{id}` call against a rate-limited
- * endpoint, so a bare `Promise.all` over all of them risks 429s.
+ * The distinct places a corporation's assets sit: stations and Upwell
+ * structures. A `location_id` that is another asset's `item_id` is a container
+ * or ship holding the row, and a solar-system id is open space; neither has a
+ * name to look up. Without this filter every container became a
+ * `/universe/structures/{id}` call (item ids sit above
+ * `UPWELL_STRUCTURE_ID_FLOOR` too), each refused and then swept across the
+ * roster.
  */
-async function resolveAssetLocationNames(
-  characterId: number,
+export function assetPlaceIds(assets: readonly CorporationAsset[]): number[] {
+  const itemIds = new Set(assets.map((asset) => asset.item_id));
+  const places = new Set<number>();
+  for (const asset of assets) {
+    if (asset.location_type === 'solar_system' || asset.location_type === 'item') continue;
+    if (!itemIds.has(asset.location_id)) places.add(asset.location_id);
+  }
+  return [...places];
+}
+
+/**
+ * Names for `locationIds` that are already on this device — no request. This
+ * is what lets the ledger render before any name lookup finishes.
+ */
+async function cachedAssetLocationNames(
   locationIds: readonly number[]
 ): Promise<Map<number, string>> {
-  const unique = [...new Set(locationIds)];
-  const structureIds = unique.filter((id) => id >= UPWELL_STRUCTURE_ID_FLOOR);
-  const bulkIds = unique.filter((id) => id < UPWELL_STRUCTURE_ID_FLOOR);
+  const structureIds = locationIds.filter((id) => id >= UPWELL_STRUCTURE_ID_FLOOR);
+  const bulkIds = locationIds.filter((id) => id < UPWELL_STRUCTURE_ID_FLOOR);
+  const [bulk, structures] = await Promise.all([
+    readCachedNames(bulkIds),
+    readCachedStructureNames(structureIds),
+  ]);
+  return new Map([...bulk, ...structures]);
+}
+
+/**
+ * Looks up the places in `locationIds` the device does not already have a name
+ * for, and returns only what it found.
+ *
+ * Same split as `features/corp/members.ts`'s `resolveLocationNames`:
+ * `/universe/names` 404s the *whole* batch if one id in it is unresolvable, and
+ * an Upwell structure has no bulk name endpoint at all, so anything at or
+ * above `UPWELL_STRUCTURE_ID_FLOOR` is resolved one at a time instead of being
+ * mixed into the batch. A structure the reading Character is not on the ACL
+ * for stays unresolved and the view falls back to the raw id, exactly as
+ * `members.ts` and the personal Assets page do; unlike them it does not ask the
+ * rest of the roster (`loadStructureNameOwnOnly`).
+ *
+ * The structure resolves are capped at `ESI_FANOUT_CONCURRENCY` (issue #420):
+ * each is its own call against a rate-limited endpoint.
+ */
+export async function resolveMissingLocationNames(
+  characterId: number,
+  locationIds: readonly number[],
+  known: ReadonlyMap<number, string> = new Map()
+): Promise<Map<number, string>> {
+  const missing = [...new Set(locationIds)].filter((id) => !known.has(id));
+  const structureIds = missing.filter((id) => id >= UPWELL_STRUCTURE_ID_FLOOR);
+  const bulkIds = missing.filter((id) => id < UPWELL_STRUCTURE_ID_FLOOR);
 
   const names = await resolveNames(bulkIds);
   await mapWithConcurrencyLimit(structureIds, ESI_FANOUT_CONCURRENCY, async (id) => {
-    const name = await loadStructureName(characterId, id);
+    const name = await loadStructureNameOwnOnly(characterId, id);
     if (name !== null) names.set(id, name);
   });
   return names;
@@ -130,20 +164,20 @@ export const EMPTY_CORP_ASSET_LABELS: CorpAssetLabels = {
 };
 
 /**
- * Type and location names for a page of corp assets. Type names go through
- * `loadTypeNames` (SDE snapshot first, ESI only for what it misses) — the
- * same resolver the personal Assets page and the roster's ship column use —
+ * Type names, and the location names the device already has. Type names go
+ * through `loadTypeNames` (SDE snapshot first, ESI only for what it misses) —
+ * the same resolver the personal Assets page and the roster's ship column use —
  * never `resolveNames` directly, which knows nothing about the SDE.
+ *
+ * Location names that need a request are left to `resolveMissingLocationNames`,
+ * which the view runs after the ledger is already on screen.
  */
 export async function loadCorpAssetLabels(
-  characterId: number,
   assets: readonly CorporationAsset[]
 ): Promise<CorpAssetLabels> {
-  const typeIds = assets.map((asset) => asset.type_id);
-  const locationIds = assets.map((asset) => asset.location_id);
   const [types, locations] = await Promise.all([
-    loadTypeNames(typeIds),
-    resolveAssetLocationNames(characterId, locationIds),
+    loadTypeNames(assets.map((asset) => asset.type_id)),
+    cachedAssetLocationNames(assetPlaceIds(assets)),
   ]);
   return { types, locations };
 }

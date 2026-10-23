@@ -58,8 +58,10 @@ import { CorpDenied } from '@/features/corp/CorpDenied';
 import { loadCorporationId } from '@/features/corp/boardData';
 import {
   EMPTY_CORP_ASSET_LABELS,
+  assetPlaceIds,
   loadCorporationAssets,
   loadCorpAssetLabels,
+  resolveMissingLocationNames,
   toCorpAssetInputs,
   type CorpAssetLabels,
 } from '@/features/corp/assets';
@@ -107,6 +109,7 @@ import { getAveragePriceByType } from '@/market/prices';
 import { loadCorporationBlueprints } from '@/features/corp/blueprints';
 import { loadAssetCopyValues } from '@/features/assets/assetCopyValues';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useDebouncedValue } from '@/lib/useDebouncedValue';
 import { useUrlParams } from '@/lib/useUrlState';
 import { boolParam, enumParam, optionalIntParam, textParam } from '@/lib/urlState';
@@ -147,7 +150,10 @@ interface AssetsSnapshot {
   inputs: CorpAssetInput[] | null;
   /** Division number -> the corp's own name for it, or null if unnamed/unresolved. */
   divisionNames: ReadonlyMap<number, string | null>;
+  /** Type names, and the location names already on the device. The rest arrive after first paint (`resolveMissingLocationNames`). */
   labels: CorpAssetLabels;
+  /** Every station/structure the assets sit in, named or not. */
+  placeIds: readonly number[];
   /** Global average market price per type, best-effort — an outage degrades ISK figures to 0 rather than the whole page. */
   priceByTypeId: ReadonlyMap<number, number>;
   /** Each blueprint copy's own value by item id (`engine/blueprintCopyValue.ts`) — a copy never takes its type's average price. */
@@ -170,6 +176,7 @@ const EMPTY_SNAPSHOT: AssetsSnapshot = {
   inputs: null,
   divisionNames: new Map(),
   labels: EMPTY_CORP_ASSET_LABELS,
+  placeIds: [],
   priceByTypeId: new Map(),
   copyValueByItemId: new Map(),
   volumeByTypeId: new Map(),
@@ -202,7 +209,7 @@ async function loadAssetsSnapshot(
   const inputs = assets === null ? null : toCorpAssetInputs(assets);
   const typeIds = inputs === null ? [] : [...new Set(inputs.map((i) => i.typeId))];
   const [labels, volumeByTypeId, categoryByTypeId, copyValueByItemId] = await Promise.all([
-    assets === null ? EMPTY_CORP_ASSET_LABELS : loadCorpAssetLabels(characterId, assets),
+    assets === null ? EMPTY_CORP_ASSET_LABELS : loadCorpAssetLabels(assets),
     loadTypeVolumes(typeIds),
     loadTypeCategories(typeIds),
     // Director-only endpoint: without the role a copy still prices, at ME0/TE0.
@@ -229,6 +236,7 @@ async function loadAssetsSnapshot(
     inputs,
     divisionNames,
     labels,
+    placeIds: assets === null ? [] : assetPlaceIds(assets),
     priceByTypeId,
     copyValueByItemId,
     volumeByTypeId,
@@ -296,7 +304,32 @@ function CorpAssetsView({
         : new Map([...targetInfo.names, ...(data?.labels.types ?? [])]),
     [data?.labels.types, targetInfo.names]
   );
-  const locationNames = data?.labels.locations ?? EMPTY_CORP_ASSET_LABELS.locations;
+  // The ledger paints with the names the device already has; the rest are
+  // looked up here, after first paint, and fill in as they land.
+  const missingPlaceIds = useMemo(
+    () => (data ? data.placeIds.filter((id) => !data.labels.locations.has(id)) : []),
+    [data]
+  );
+  const loadMissingPlaces = useCallback(
+    () =>
+      resolveMissingLocationNames(snapshot.activeCharacterId ?? 0, missingPlaceIds).catch(
+        () => new Map<number, string>()
+      ),
+    [snapshot.activeCharacterId, missingPlaceIds]
+  );
+  const missingPlaces = useKeyedLoad(
+    missingPlaceIds.length > 0 && snapshot.activeCharacterId !== null
+      ? `${snapshot.activeCharacterId}:${data?.corporationId}`
+      : null,
+    loadMissingPlaces
+  );
+  const locationNames = useMemo(
+    () =>
+      missingPlaces.data && missingPlaces.data.size > 0
+        ? new Map([...(data?.labels.locations ?? []), ...missingPlaces.data])
+        : (data?.labels.locations ?? EMPTY_CORP_ASSET_LABELS.locations),
+    [data?.labels.locations, missingPlaces.data]
+  );
   const divisionNames = data?.divisionNames ?? EMPTY_DIVISION_NAMES;
   const categoryByTypeId = useMemo(
     () =>
