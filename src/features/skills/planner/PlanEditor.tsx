@@ -735,6 +735,8 @@ export function PlanEditor({
     implants: effectiveImplants,
     cloneState,
     onUpdate,
+    pricing,
+    loadedAtMs,
   });
 
   // #112: merge "Your entries" and the computed queue into one row list —
@@ -1286,7 +1288,6 @@ export function PlanEditor({
       hint: t('plans.optimizeForMeHint'),
       disabled: scheduled.length === 0,
       onSelect: handleOptimizeForMe,
-      emphasize: true,
     },
     {
       key: 'reorder',
@@ -1975,34 +1976,30 @@ export function PlanEditor({
         </div>
       </Modal>
 
-      <Modal
-        open={reorderPreview !== null}
-        onClose={() => setReorderPreview(null)}
-        title={t(
-          reorderPreview?.kind === 'shortest'
-            ? 'plans.sortShortestPreviewTitle'
-            : 'plans.reorderPreviewTitle'
-        )}
-      >
-        <ul className="max-h-56 overflow-y-auto text-xs">
-          {reorderPreview?.steps.map((step, i) => (
-            <li
-              key={`${step.skillTypeID}-${step.level}-${i}`}
-              className="border-b border-line py-1 last:border-b-0"
-            >
-              {nameFor(step.skillTypeID)} {romanLevel(step.level)}
-            </li>
-          ))}
-        </ul>
-        <div className="mt-2 flex gap-2">
-          <Button variant="primary" size="sm" onClick={acceptReorder}>
-            {t('plans.reorderAccept')}
-          </Button>
-          <Button size="sm" onClick={() => setReorderPreview(null)}>
-            {t('plans.reorderReject')}
-          </Button>
-        </div>
-      </Modal>
+      <OptimizeForMeModal
+        kind={reorderPreview?.kind}
+        preview={
+          reorderPreview
+            ? {
+                order: reorderPreview.order,
+                remaps: {
+                  segments: [],
+                  totalSeconds: reorderPreview.totalSeconds,
+                  currentSeconds: reorderPreview.totalSeconds,
+                  savingsSeconds: 0,
+                },
+              }
+            : null
+        }
+        currentOrder={scheduled}
+        totalSeconds={totalSeconds}
+        prioritized={[...priorityMap.values()].some((priority) => priority !== 'normal')}
+        nameFor={nameFor}
+        stepLabel={stepLabel}
+        implants={effectiveImplants}
+        onAccept={acceptReorder}
+        onReject={() => setReorderPreview(null)}
+      />
 
       <OptimizeForMeModal
         preview={optimizeForMePreview}

@@ -312,11 +312,11 @@ describe('PlanEditor tools pane', () => {
 
     await user.click(within(actions).getByRole('button', { name: 'Optimize' }));
     for (const name of [
-      'Optimize for me…',
-      'Reorder only…',
-      'Shortest first…',
-      'Place remaps only…',
-      'Use my remap markers…',
+      'Optimize for me',
+      'Reorder only',
+      'Shortest first',
+      'Place remaps only',
+      'Use my remap markers',
     ]) {
       expect(screen.getByRole('menuitem', { name })).toBeInTheDocument();
     }
@@ -464,11 +464,11 @@ describe('PlanEditor tools pane', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    await clickOptimizeMode(user, 'Reorder only…');
+    await clickOptimizeMode(user, 'Reorder only');
 
     const dialog = screen.getByRole('dialog', { name: 'Suggested reorder' });
-    expect(within(dialog).getByText('Skill B I')).toBeInTheDocument();
-    expect(within(dialog).getByText('Skill A I')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('Skill B I').length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByText('Skill A I').length).toBeGreaterThan(0);
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
@@ -486,7 +486,7 @@ describe('PlanEditor tools pane', () => {
     const { onUpdate } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Reorder only…');
+    await clickOptimizeMode(user, 'Reorder only');
     const dialog = screen.getByRole('dialog', { name: 'Suggested reorder' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
@@ -502,11 +502,11 @@ describe('PlanEditor tools pane', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    await clickOptimizeMode(user, 'Shortest first…');
+    await clickOptimizeMode(user, 'Shortest first');
 
     const dialog = screen.getByRole('dialog', { name: 'Suggested shortest-first sort' });
-    expect(within(dialog).getByText('Skill B I')).toBeInTheDocument();
-    expect(within(dialog).getByText('Skill A I')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('Skill B I').length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByText('Skill A I').length).toBeGreaterThan(0);
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
@@ -524,7 +524,7 @@ describe('PlanEditor tools pane', () => {
     const { onUpdate } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Shortest first…');
+    await clickOptimizeMode(user, 'Shortest first');
     const dialog = screen.getByRole('dialog', { name: 'Suggested shortest-first sort' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
@@ -540,7 +540,7 @@ describe('PlanEditor tools pane', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
     expect(within(dialog).getByText(/^Remapping saves/)).toBeInTheDocument();
@@ -563,7 +563,7 @@ describe('PlanEditor tools pane', () => {
     const { onUpdate } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
     const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
@@ -577,7 +577,7 @@ describe('PlanEditor tools pane', () => {
     const { replacePlan } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
     expect(screen.getByRole('dialog', { name: 'Optimize remaps' })).toBeInTheDocument();
 
     replacePlan((current) => ({ ...current, entries: [...current.entries].reverse() }));
@@ -591,7 +591,7 @@ describe('PlanEditor tools pane', () => {
     const { replacePlan } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Reorder only…');
+    await clickOptimizeMode(user, 'Reorder only');
     expect(screen.getByRole('dialog', { name: 'Suggested reorder' })).toBeInTheDocument();
 
     replacePlan((current) => ({ ...current, id: 'plan-2' }));
@@ -606,7 +606,7 @@ describe('PlanEditor tools pane', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    await clickOptimizeMode(user, 'Optimize for me…');
+    await clickOptimizeMode(user, 'Optimize for me');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize for me' });
     // The new order, same as "Suggest reorder"'s own preview: high-priority
@@ -651,7 +651,7 @@ describe('PlanEditor tools pane', () => {
     const { onUpdate } = renderEditor(vi.fn(), { plan, attributes });
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Optimize for me…');
+    await clickOptimizeMode(user, 'Optimize for me');
     const dialog = screen.getByRole('dialog', { name: 'Optimize for me' });
 
     expect(within(dialog).getByText(/^Nothing to gain/)).toBeInTheDocument();
@@ -665,7 +665,7 @@ describe('PlanEditor tools pane', () => {
     const { onUpdate } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Optimize for me…');
+    await clickOptimizeMode(user, 'Optimize for me');
     const dialog = screen.getByRole('dialog', { name: 'Optimize for me' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
@@ -680,7 +680,7 @@ describe('PlanEditor tools pane', () => {
     await openTools(user);
 
     await user.click(screen.getByRole('button', { name: 'Optimize' }));
-    const item = screen.getByRole('menuitem', { name: 'Use my remap markers…' });
+    const item = screen.getByRole('menuitem', { name: 'Use my remap markers' });
     expect(item).toHaveAttribute('aria-disabled', 'true');
     expect(within(item).getByText('Add a remap marker first')).toBeInTheDocument();
   });
@@ -690,7 +690,7 @@ describe('PlanEditor tools pane', () => {
     const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, remapCount: 0 } });
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
     expect(
@@ -709,7 +709,7 @@ describe('PlanEditor tools pane', () => {
     renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
     const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
@@ -780,7 +780,7 @@ describe('PlanEditor tools pane', () => {
     // is accepted, not where the figure is first disclosed.
     expect(within(sectionFor('Actions')).getByText(/^Saves/)).toBeInTheDocument();
 
-    await clickOptimizeMode(user, 'Use my remap markers…');
+    await clickOptimizeMode(user, 'Use my remap markers');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize at my markers' });
     expect(within(dialog).getByText(/^Remapping saves/)).toBeInTheDocument();
@@ -799,7 +799,7 @@ describe('PlanEditor tools pane', () => {
     const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, markers: [1] } });
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Use my remap markers…');
+    await clickOptimizeMode(user, 'Use my remap markers');
     const dialog = screen.getByRole('dialog', { name: 'Optimize at my markers' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
@@ -816,7 +816,7 @@ describe('PlanEditor tools pane', () => {
     });
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Use my remap markers…');
+    await clickOptimizeMode(user, 'Use my remap markers');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize at my markers' });
     expect(
@@ -988,7 +988,7 @@ describe('PlanEditor tools pane', () => {
     renderEditor(vi.fn(), { plan: localPlan, catalog: localCatalog, trainedSkills: trained });
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Use my remap markers…');
+    await clickOptimizeMode(user, 'Use my remap markers');
 
     // remapInstruction's own format: five "XXX N" terms joined by " / ",
     // which only a marker row's attribute spread (never an attribute-pair
@@ -1084,7 +1084,7 @@ describe('"Optimize for me" never previews or writes a redundant remap (real rep
     const { onUpdate } = renderEditor(vi.fn(), { plan: PW_PLAN, catalog: PW_CATALOG });
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Optimize for me…');
+    await clickOptimizeMode(user, 'Optimize for me');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize for me' });
     // The whole point of the fix: a second segment that would just repeat

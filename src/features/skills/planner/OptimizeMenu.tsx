@@ -65,6 +65,7 @@ export function OptimizeMenu({ items, disabled }: OptimizeMenuProps) {
                 item.onSelect();
               }}
               disabled={item.disabled}
+              className="flex-col items-start"
             >
               <span className={item.emphasize ? 'block font-semibold' : 'block'}>{item.label}</span>
               <span id={`${hintId}-${item.key}`} className="block text-[0.6875rem] text-text-dim">
