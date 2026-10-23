@@ -981,3 +981,89 @@ describe('Requests', () => {
     }
   });
 });
+
+describe('Fleet Payouts', () => {
+  const PAYOUT = `${C}/fleetPayouts/p1`;
+  const payout = {
+    ownerUid: 'char:1',
+    ownerName: 'One',
+    name: 'Roam',
+    totalIsk: 100,
+    holdBackPct: 10,
+    rule: 'equal',
+    memberUids: ['char:2'],
+    shareCount: 2,
+    paidCount: 0,
+    createdAt: 1,
+    expiresAt: Date.now() + 86_400_000,
+  };
+  const share = (memberUid: string | null) => ({
+    pilotName: 'Pilot',
+    characterId: 5,
+    memberUid,
+    weight: 1,
+    isk: 45,
+    paid: false,
+    paidAt: 0,
+  });
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, PAYOUT), payout);
+      await setDoc(doc(db, `${PAYOUT}/shares/0`), share('char:2'));
+      await setDoc(doc(db, `${PAYOUT}/shares/1`), share(null));
+    });
+  });
+
+  it('lets a Member read and list Payouts, and no outsider', async () => {
+    const two = characterAuth(env, 2, 'hash-2').firestore();
+    await assertSucceeds(getDoc(doc(two, PAYOUT)));
+    await assertSucceeds(getDocs(collection(two, `${C}/fleetPayouts`)));
+    const outsider = characterAuth(env, 9, 'hash-9').firestore();
+    await assertFails(getDoc(doc(outsider, PAYOUT)));
+    await assertFails(getDocs(collection(outsider, `${C}/fleetPayouts`)));
+    await assertFails(getDoc(doc(characterAuth(env, 2, 'wrong-hash').firestore(), PAYOUT)));
+  });
+
+  it('lets the boss list every Share', async () => {
+    const one = characterAuth(env, 1, 'hash-1').firestore();
+    const snap = await assertSucceeds(getDocs(collection(one, `${PAYOUT}/shares`)));
+    expect(snap.size).toBe(2);
+    await assertSucceeds(getDoc(doc(one, `${PAYOUT}/shares/1`)));
+  });
+
+  it('lets another Member read only their own Share', async () => {
+    const two = characterAuth(env, 2, 'hash-2').firestore();
+    await assertSucceeds(getDoc(doc(two, `${PAYOUT}/shares/0`)));
+    await assertFails(getDoc(doc(two, `${PAYOUT}/shares/1`)));
+    await assertFails(getDocs(collection(two, `${PAYOUT}/shares`)));
+    const mine = await assertSucceeds(
+      getDocs(query(collection(two, `${PAYOUT}/shares`), where('memberUid', '==', 'char:2')))
+    );
+    expect(mine.size).toBe(1);
+    await assertFails(
+      getDocs(query(collection(two, `${PAYOUT}/shares`), where('memberUid', '==', 'char:1')))
+    );
+  });
+
+  it('keeps Shares from outsiders', async () => {
+    const outsider = characterAuth(env, 9, 'hash-9').firestore();
+    await assertFails(getDoc(doc(outsider, `${PAYOUT}/shares/0`)));
+    await assertFails(
+      getDocs(query(collection(outsider, `${PAYOUT}/shares`), where('memberUid', '==', 'char:9')))
+    );
+  });
+
+  it('denies every client write, the boss included', async () => {
+    for (const n of [1, 2]) {
+      const db = characterAuth(env, n, `hash-${n}`).firestore();
+      await assertFails(setDoc(doc(db, `${C}/fleetPayouts/new`), payout));
+      await assertFails(updateDoc(doc(db, PAYOUT), { paidCount: 1 }));
+      await assertFails(deleteDoc(doc(db, PAYOUT)));
+      await assertFails(setDoc(doc(db, `${PAYOUT}/shares/9`), share(null)));
+      await assertFails(updateDoc(doc(db, `${PAYOUT}/shares/0`), { paid: true }));
+      await assertFails(deleteDoc(doc(db, `${PAYOUT}/shares/0`)));
+    }
+  });
+});

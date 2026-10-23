@@ -330,6 +330,7 @@ describe('Communities page', () => {
         c.tabs.fittings,
         c.tabs.plans,
         c.tabs.requests,
+        c.tabs.payouts,
         `${c.members} 2`,
       ]);
       expect(await screen.findByText(c.sharing.blueprintsNone)).toBeInTheDocument();

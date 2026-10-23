@@ -9,6 +9,7 @@
  * (`sharedFittings.ts`, `sharedPlans.ts`) reading "no stand-in".
  */
 import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
+import type { FleetPayout, FleetShare } from '@/engine/communities/fleetPayouts';
 import type { CommunityRequest, RequestPledge } from '@/engine/communities/requests';
 import type { SharedFitting } from '@/engine/communities/sharedFittings';
 import type { SharedPlan } from '@/engine/communities/sharedPlans';
@@ -39,6 +40,10 @@ export interface CommunityBackendOverride {
   ) => void;
   /** What marking deliveries from contracts found, for the panel's flags and notes. */
   syncDeliveries?: (communityId: string) => DeliverySyncResult;
+  /** Every Fleet Payout in the Community, any status. */
+  loadFleetPayouts?: (communityId: string) => FleetPayout[];
+  /** Every Fleet Share of one Fleet Payout. */
+  loadFleetShares?: (communityId: string, payoutId: string) => FleetShare[];
   /** Every Skill Plan shared into the Community, by anyone. */
   loadPlans?: (communityId: string) => SharedPlan[];
 }

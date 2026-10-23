@@ -37,6 +37,8 @@ import {
   REQUESTS_COLLECTION as ITEM_REQUESTS_COLLECTION,
 } from './communityRequests.js';
 
+import { FLEET_PAYOUTS_COLLECTION } from './communityFleetPayouts.js';
+
 const LIBRARY_COLLECTION = 'library';
 const REQUESTS_COLLECTION = 'requests';
 const FITTINGS_COLLECTION = 'fittings';
@@ -392,7 +394,7 @@ export async function queuePledgeDeletes(
 /**
  * Everything one Member shared into a Community: their blueprint library
  * chunks, their shared Fittings (issue #3605), their shared Skill Plans and
- * their Requests with the Pledges under them. Every delete-on-leave path goes
+ * their Requests with the Pledges under them, and their Fleet Payouts with Shares. Every delete-on-leave path goes
  * through this so a new kind of shared data can't be missed in one.
  */
 export async function deleteMemberShares(
@@ -415,6 +417,12 @@ export async function deleteMemberShares(
     .where('ownerUid', '==', uid)
     .get();
   for (const request of posted.docs) await db.recursiveDelete(request.ref);
+  // Fleet Payouts (#4779): a Member's own, with their Shares. Other bosses' Payouts keep a left Member's Share.
+  const payouts = await communityRef(db, communityId)
+    .collection(FLEET_PAYOUTS_COLLECTION)
+    .where('ownerUid', '==', uid)
+    .get();
+  for (const payout of payouts.docs) await db.recursiveDelete(payout.ref);
   // Their Pledges on other Members' Requests (the doc id is the Pledger's uid).
   const writer = db.bulkWriter();
   const pledgeDeletes = await queuePledgeDeletes(db, writer, communityId, uid);

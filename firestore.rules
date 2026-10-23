@@ -789,6 +789,25 @@ service cloud.firestore {
         }
       }
 
+      // Fleet Payouts (issue #4779): a Member's loot split, read by the whole
+      // Community (the boss's Payouts list finds "mine" through `memberUids`).
+      // Written only by the callables (open cap, Member linking), never by a
+      // client. Its Shares are private: the boss lists them all; any other
+      // Member reads only the Share carrying their own uid, so their query
+      // must filter `memberUid == uid`.
+      match /fleetPayouts/{payoutId} {
+        allow get, list: if isMember();
+        allow write: if false;
+
+        match /shares/{shareId} {
+          allow get, list: if isMember()
+            && (get(/databases/$(database)/documents/communities/$(communityId)/fleetPayouts/$(payoutId)).data.ownerUid
+                == request.auth.uid
+              || resource.data.memberUid == request.auth.uid);
+          allow write: if false;
+        }
+      }
+
       // Shared Fittings (issue #3605): one flat collection per Community, so a
       // list is one query however many Members there are. The doc id is
       // `<uid>~saved-<fitting id>` or `<uid>~game-<ESI fitting id>`; binding

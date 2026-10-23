@@ -1,10 +1,10 @@
-export type CommunityTab = 'blueprints' | 'fittings' | 'plans' | 'requests' | 'members';
+export type CommunityTab = 'blueprints' | 'fittings' | 'plans' | 'requests' | 'payouts' | 'members';
 
 /** The Community tabs that hold shared content, each with its own My sharing. */
-export type ContentTab = Exclude<CommunityTab, 'requests' | 'members'>;
+export type ContentTab = Exclude<CommunityTab, 'requests' | 'payouts' | 'members'>;
 
 export const isContentTab = (tab: CommunityTab): tab is ContentTab =>
-  tab !== 'requests' && tab !== 'members';
+  tab !== 'requests' && tab !== 'payouts' && tab !== 'members';
 
 /** The tabs a `?tab=` link may open on, in the order the bar shows them. */
 export const COMMUNITY_TABS: readonly CommunityTab[] = [
@@ -12,6 +12,7 @@ export const COMMUNITY_TABS: readonly CommunityTab[] = [
   'fittings',
   'plans',
   'requests',
+  'payouts',
   'members',
 ];
 
