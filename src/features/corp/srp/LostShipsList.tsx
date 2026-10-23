@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, DataTable, type DataTableColumn } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
+import { ItemInfoLink, SystemLink } from '@/features/entities';
 import { useTimeZone } from '@/lib/timeFormat';
 import { formatDateOnly } from '@/lib/timestamp';
 import type { LostRow } from './useMemberSrp';
@@ -27,9 +28,17 @@ export function LostShipsList({ rows, onFile, busyKillmailId = null }: LostShips
         id: 'hull',
         header: t('srpMember.lost.ship'),
         primary: true,
-        render: (r) => <span className="font-medium">{r.hullName}</span>,
+        render: (r) => (
+          <ItemInfoLink typeId={r.hullTypeId} itemName={r.hullName} className="font-medium">
+            {r.hullName}
+          </ItemInfoLink>
+        ),
       },
-      { id: 'system', header: t('srpMember.lost.system'), render: (r) => r.systemName },
+      {
+        id: 'system',
+        header: t('srpMember.lost.system'),
+        render: (r) => <SystemLink systemId={r.solarSystemId}>{r.systemName}</SystemLink>,
+      },
       {
         id: 'lost',
         header: t('srpMember.lost.lost'),

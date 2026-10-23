@@ -11,6 +11,7 @@ import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { CharacterLink } from '@/features/entities';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import type { SrpAuditEntry, SrpClaim } from '../srpClaimTypes';
 import type { ClaimColumnsContext } from './claimColumnsContext';
@@ -86,7 +87,7 @@ export function SrpClaimDetail({
             </Row>
             <Row label={t('srp.officer.detail.pilot')}>
               <span className="flex flex-wrap items-center gap-x-3">
-                {claim.characterName}
+                <CharacterLink id={claim.characterId}>{claim.characterName}</CharacterLink>
                 <OpenInEveButton
                   kind="information"
                   id={claim.characterId}
