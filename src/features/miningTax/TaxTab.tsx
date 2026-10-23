@@ -16,6 +16,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactElement,
   type ReactNode,
 } from 'react';
 import { guarded } from '@/app/routeChunks';
@@ -97,6 +98,7 @@ import {
   settleUpMembers,
 } from '@/features/miningTax/selection';
 import { SelectionToolbar } from '@/features/miningTax/SelectionToolbar';
+import { TaxRowMenu } from '@/features/miningTax/TaxRowMenu';
 import { useLinkSuggestions, useMadePayments } from '@/features/miningTax/useMadePayments';
 import { useContinuations } from '@/features/miningTax/useContinuations';
 import { dateLabel, dateRangeOf, taxOwedOf } from '@/features/miningTax/taxRowFormat';
@@ -462,6 +464,16 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     (dr: DisplayRow): string =>
       dr.row.entry.solarSystemId === 0 ? '—' : systemLabel(systemNames, dr.row.entry.solarSystemId),
     [systemNames]
+  );
+
+  // Stable, so a row only re-renders when its own data changes (DataTable's note on `rowContextMenu`).
+  const rowContextMenu = useCallback(
+    (dr: DisplayRow, tr: ReactElement) => (
+      <TaxRowMenu dr={dr} systemName={systemName(dr)} onAction={actions.runRowMenuAction}>
+        {tr}
+      </TaxRowMenu>
+    ),
+    [systemName, actions]
   );
 
   const payeeName = useCallback(
@@ -1257,6 +1269,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                               stackLayout="dense"
                               rowClassName={rowClassName}
                               onRowClick={actions.openDetail}
+                              rowContextMenu={rowContextMenu}
+                              rowMoreActions
                             />
                           </div>
                         </Panel>
@@ -1284,6 +1298,8 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
                           stackLayout="dense"
                           rowClassName={rowClassName}
                           onRowClick={actions.openDetail}
+                          rowContextMenu={rowContextMenu}
+                          rowMoreActions
                           groupBy={{
                             key: (dr) => (dateRangeOf(dr).at(-1) ?? dr.row.entry.date).slice(0, 7),
                             allWidths: true,
@@ -1430,6 +1446,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
           priceSourcesFor={priceSourcesFor}
           onClearSelection={clearSelection}
           onAddPayee={onAddPayee}
+          onToast={(message) => setToast({ message })}
         />
       </TabPanel>
     </div>
