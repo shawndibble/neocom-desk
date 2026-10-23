@@ -16,6 +16,7 @@ import {
 } from '@/features/contractSearch/contractSearchModePref';
 import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 
 const openContractMock = vi.hoisted(() => vi.fn());
@@ -139,7 +140,14 @@ const server = setupServer(
   http.post('https://esi.evetech.net/characters/affiliation', () => HttpResponse.json([]))
 );
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // Compile the lazy Layout and Contracts chunks here, under the hook's own
+  // budget: a worker's first `App` render pays for them, took seconds under
+  // parallel load on CI, and landed on the file's first test, past its findBy
+  // timeout (Wallet.test.tsx does the same).
+  await Promise.all([routeChunks.loadLayout(), routeChunks.loadContracts()]);
+});
 afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
 beforeEach(async () => {
