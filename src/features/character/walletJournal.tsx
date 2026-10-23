@@ -89,7 +89,9 @@ export function useJournalColumnsBuilder(): (
   /** Set in the multi-Character view: adds a Character column. */
   characterNameFor?: (characterId: number) => string,
   /** Set on the corp journal: adds a Player column, who did it. */
-  playerNameFor?: (entry: JournalRow) => string
+  playerNameFor?: (entry: JournalRow) => string,
+  /** Set on the personal journal: lets an insurance payout line open the loss it paid for. */
+  lossCharacterFor?: (entry: JournalRow) => number | undefined
 ) => DataTableColumn<JournalRow>[] {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -99,7 +101,8 @@ export function useJournalColumnsBuilder(): (
       nameFor: (typeId: number) => string,
       miningTaxHrefFor?: (entry: JournalLine) => string | undefined,
       characterNameFor?: (characterId: number) => string,
-      playerNameFor?: (entry: JournalRow) => string
+      playerNameFor?: (entry: JournalRow) => string,
+      lossCharacterFor?: (entry: JournalRow) => number | undefined
     ): DataTableColumn<JournalRow>[] => {
       const nameOf = (entry: JournalRow) =>
         characterNameFor && entry.characterId !== undefined
@@ -176,6 +179,7 @@ export function useJournalColumnsBuilder(): (
                   transaction={transaction}
                   itemName={transaction ? nameFor(transaction.type_id) : ''}
                   miningTaxHref={miningTaxHrefFor?.(entry)}
+                  lossCharacterId={lossCharacterFor?.(entry)}
                 />
                 {entry.internal && (
                   <span className="block text-xs text-text-dim">

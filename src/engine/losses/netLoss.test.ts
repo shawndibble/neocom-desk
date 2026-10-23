@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { computeNetLoss, matchInsurance, type InsuranceJournalRow } from './netLoss';
+import {
+  computeNetLoss,
+  matchInsurance,
+  matchLossToPayout,
+  type InsuranceJournalRow,
+} from './netLoss';
 
 const HULL = 100;
 const victim = {
@@ -111,5 +116,30 @@ describe('matchInsurance', () => {
   it('labels an ambiguous match an estimate and picks the closest in time', () => {
     const rows = [row(1, '2026-10-01T12:00:30Z', 900), row(2, '2026-10-01T12:03:00Z', 300)];
     expect(matchInsurance(rows, killTime)).toEqual({ amount: 900, estimate: true });
+  });
+});
+
+describe('matchLossToPayout', () => {
+  const at = (iso: string) => Date.parse(iso);
+  const losses = [
+    { id: 1, timeMs: at('2026-10-01T10:00:00Z') },
+    { id: 2, timeMs: at('2026-10-01T10:30:00Z') },
+    { id: 3, timeMs: at('2026-10-01T14:00:00Z') },
+  ];
+
+  it('picks the latest loss at or before the payout', () => {
+    expect(matchLossToPayout(losses, at('2026-10-01T10:31:00Z'))?.id).toBe(2);
+  });
+
+  it('allows a few minutes of clock skew before the kill time', () => {
+    expect(matchLossToPayout(losses, at('2026-10-01T13:57:00Z'))?.id).toBe(3);
+  });
+
+  it('is null when the nearest loss is over an hour before the payout', () => {
+    expect(matchLossToPayout(losses, at('2026-10-01T12:00:00Z'))).toBeNull();
+  });
+
+  it('is null with no losses', () => {
+    expect(matchLossToPayout([], at('2026-10-01T10:31:00Z'))).toBeNull();
   });
 });

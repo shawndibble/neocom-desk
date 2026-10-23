@@ -13,7 +13,7 @@
  * (see `Tooltip`).
  */
 import { formatCount } from '@/lib/formatCount';
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HintText } from '@/components/ui/HintText';
@@ -34,15 +34,25 @@ interface JournalDescriptionCellProps {
   itemName: string;
   /** Where the Moon Mining Tax row this line paid is, when a pilot linked it there. Built by the route, so this feature never imports `miningTax`. */
   miningTaxHref?: string;
+  /** The Character whose losses an insurance payout line can be matched against; absent where the line can't be (the corp journal). Opens the loss in a modal. */
+  lossCharacterId?: number;
 }
+
+const LazyInsuranceLossModal = lazy(() =>
+  import('./InsuranceLossModal').then((m) => ({ default: m.InsuranceLossModal }))
+);
 
 export function JournalDescriptionCell({
   entry,
   transaction,
   itemName,
   miningTaxHref,
+  lossCharacterId,
 }: JournalDescriptionCellProps) {
   const { t } = useTranslation();
+  const [lossOpen, setLossOpen] = useState(false);
+  const canViewLoss =
+    lossCharacterId !== undefined && entry.ref_type === 'insurance' && (entry.amount ?? 0) > 0;
   const contractId = entry.context_id_type === 'contract_id' ? entry.context_id : undefined;
   // A bounty line's reason is its kill list as raw `typeID: count` pairs.
   const kills = useMemo(() => bountyKillsOf(entry), [entry]);
@@ -57,7 +67,7 @@ export function JournalDescriptionCell({
       </HintText>
     );
   }
-  if (!transaction && !entry.reason && contractId === undefined && !miningTaxHref) {
+  if (!transaction && !entry.reason && contractId === undefined && !miningTaxHref && !canViewLoss) {
     return <>{entry.description}</>;
   }
   // The memo ("Moon tax 10-05 Ainsan") is the link when there is one; a line with no memo gets a labelled link instead.
@@ -100,6 +110,24 @@ export function JournalDescriptionCell({
         <Link to={miningTaxHref} className={inlineLinkClassName}>
           {t('wallet.journalMiningTaxLink')}
         </Link>
+      )}
+      {canViewLoss && (
+        <button
+          type="button"
+          className={`${inlineLinkClassName} w-fit text-left`}
+          onClick={() => setLossOpen(true)}
+        >
+          {t('wallet.journalInsuranceLossLink')}
+        </button>
+      )}
+      {lossOpen && lossCharacterId !== undefined && (
+        <Suspense fallback={null}>
+          <LazyInsuranceLossModal
+            payoutDate={entry.date}
+            characterId={lossCharacterId}
+            onClose={() => setLossOpen(false)}
+          />
+        </Suspense>
       )}
       {transaction && fill && (
         <Tooltip content={fill}>
