@@ -84,7 +84,8 @@ test('"Optimize for me" reorders and places remaps in one preview; Accept applie
 
   const dialog = page.getByRole('dialog', { name: 'Optimize for me' });
   await expect(dialog.getByText(/^Total (?:\d+[dhm]\s*)+→ (?:\d+[dhm]\s*)+/)).toBeVisible();
-  await expect(dialog.getByText('Segment 1')).toBeVisible();
+  await expect(dialog.getByText(/^Current · /)).toBeVisible();
+  await expect(dialog.getByText(/^Optimized · /)).toBeVisible();
 
   await dialog.getByRole('button', { name: 'Accept' }).click();
   await expect(dialog).not.toBeVisible();
