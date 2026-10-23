@@ -19,6 +19,8 @@ import { lazySdeGlobIgnores } from './src/sde/lazySdeFiles.ts';
 import {
   bootClosure,
   dropLazyFromManifest,
+  entryFile,
+  missingShellChunks,
   lazyChunkFiles,
   lazyChunksJson,
   type BundleLike,
@@ -240,13 +242,6 @@ function spaFallbackHtml() {
 }
 
 /**
- * Emits `version.json` (`{ release }`) beside `index.html`: the running app
- * compares it with its own `__APP_RELEASE__` to learn of a new build in one
- * small request (src/app/latestRelease.ts), instead of waiting on the service
- * worker's precache. Kept out of the precache (`globIgnores`) so it is always
- * read from the network.
- */
-/**
  * The chunks the install does not precache (`src/app/lazyChunks.ts`), filled by
  * `lazyChunksPlugin` while the bundle is generated and read by
  * `injectManifest.manifestTransforms`, which vite-plugin-pwa runs afterwards in
@@ -269,17 +264,30 @@ function lazyChunksPlugin() {
       _options: unknown,
       bundle: BundleLike
     ) {
+      const missing = missingShellChunks(bundle);
+      if (missing.length > 0) {
+        throw new Error(
+          `lazyChunksPlugin: no chunk named ${missing.join(', ')}; the boot graph would lose it (src/app/lazyChunks.ts SHELL_CHUNK_NAMES)`
+        );
+      }
       const files = lazyChunkFiles(bundle, bootClosure(bundle));
       lazyChunkState.files = new Set(files);
       this.emitFile({
         type: 'asset',
         fileName: 'lazy-chunks.json',
-        source: lazyChunksJson(files, release),
+        source: lazyChunksJson(files, release, entryFile(bundle)),
       });
     },
   };
 }
 
+/**
+ * Emits `version.json` (`{ release }`) beside `index.html`: the running app
+ * compares it with its own `__APP_RELEASE__` to learn of a new build in one
+ * small request (src/app/latestRelease.ts), instead of waiting on the service
+ * worker's precache. Kept out of the precache (`globIgnores`) so it is always
+ * read from the network.
+ */
 function releaseFilePlugin() {
   return {
     name: 'neocom-release-file',
@@ -406,7 +414,7 @@ export default defineConfig({
       // equivalent SPA-fallback routing is hand-written in src/sw.ts.
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,json,webp}'],
-        // Offline-first: the install precaches what a core feature needs to
+        // Offline-first for data: the install precaches what a core feature needs to
         // open with no network — the Industry blueprint catalogue, the Ship
         // Tree, and the small market lookups that route planning and the
         // system/region/group/attribute pickers read (`blueprints.json`,
@@ -436,7 +444,9 @@ export default defineConfig({
           '**/version.json',
           '**/lazy-chunks.json',
         ],
-        // Everything but the boot graph is warmed at idle instead (`lazyChunksPlugin`).
+        // Route code is the exception: only the boot graph is precached, the rest of
+        // the chunks are warmed at idle (`lazyChunksPlugin`, docs/context/decisions/
+        // *-only-the-boot-graph-is-precached-route-chunks-are-warmed-at-idle*).
         // Read at call time: the list is only known once the bundle exists.
         manifestTransforms: [
           async (entries) => dropLazyFromManifest(lazyChunkState.files)(entries),

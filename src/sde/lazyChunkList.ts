@@ -6,6 +6,8 @@
  * stores when the page requests it (`sw.ts`).
  */
 
+import { parseLazyChunksJson } from '@/app/lazyChunks';
+
 /** The URL a chunk file is requested (and cached) under. */
 export function lazyChunkUrl(file: string): string {
   return `${import.meta.env.BASE_URL}${file}`;
@@ -22,10 +24,7 @@ export async function fetchLazyChunkList(): Promise<string[]> {
       cache: 'no-store',
     });
     if (!response.ok) return [];
-    const { files } = (await response.json()) as { files?: unknown };
-    return Array.isArray(files)
-      ? files.filter((file): file is string => typeof file === 'string')
-      : [];
+    return parseLazyChunksJson(await response.json());
   } catch {
     return [];
   }

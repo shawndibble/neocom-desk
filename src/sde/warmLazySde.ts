@@ -9,6 +9,13 @@
  * The list is `lazySdeFiles.ts`, shared with `vite.config.ts`'s precache
  * ignores. Entry budget in `sde-data` (maxEntries 150 in `sw.ts`): ~2x its
  * length (73).
+ *
+ * The same pass then warms the build's route chunks (`lazy-chunks.json`, see
+ * `lazyChunkList.ts`): only the boot graph is precached, so a page the pilot
+ * has not opened is not offline until this has run. They are many small
+ * requests, so they go a few at a time (`CHUNK_WARM_CONCURRENCY`), last, and
+ * only where the gate says `all` (or the pilot forced it); `sw.ts`'s
+ * `lazy-chunks` route stores them.
  */
 import { sdeDataUrl } from './sdeDataUrl';
 import { currentWarmLevel } from '@/lib/lazyAssetWarmGate';

@@ -10,6 +10,8 @@ _Recorded 2026-10-23._
 
 - **Trade-off, accepted: a tab left open across deploys can 404 a chunk it has not cached.** The old build's precache used to keep every old chunk. Now an old tab opening a route it never visited, before the warm cached it, gets a 404; `staleBuildRecovery` purges and reloads it. Deploys land every ~15 minutes, so this is the common stale-tab case, not a rare one, which is why the warm runs soon after boot.
 
-- **Cleanup.** When a build's worker activates it deletes cached chunks `lazy-chunks.json` no longer lists (an unreadable list deletes nothing); the route's entry cap (1500) is the backstop. This deletes what a still-open old tab may want, same trade-off as above.
+- **Cleanup.** When a build's worker activates it deletes cached chunks `lazy-chunks.json` no longer lists. The list is read live, so it only prunes when the list's `entry` is one this worker precached (a worker for build N activating after N+1 deployed leaves the cache alone), and an unreadable list deletes nothing; the route's entry cap (1500) is the backstop. A fresh worker still deletes what a still-open old tab may want, same trade-off as above.
+
+- **First visit: nothing is offline beyond what was opened until the next boot.** The warm starts about 90 s after boot and needs a controlling worker; on a first visit that has not claimed the page yet it does nothing until the next load. The boot graph and the SDE precache still work offline from the install.
 
 - **Unchanged:** `version.json` and `lazy-chunks.json` are not precached; the SDE precache split (`lazySdeFiles.ts`); boot's swap and the update checks.

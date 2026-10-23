@@ -31,6 +31,23 @@ export type BundleLike = Record<string, BundleItemLike>;
  */
 const SHELL_CHUNK_NAMES = new Set(['Layout', 'Overview']);
 
+/** The entry chunk's file name: what identifies a build (its hash changes with every deploy). */
+export function entryFile(bundle: BundleLike): string {
+  const entry = Object.values(bundle).find((item) => item.type === 'chunk' && item.isEntry);
+  if (!entry) throw new Error('entryFile: the bundle has no entry chunk');
+  return entry.fileName;
+}
+
+/**
+ * The shell chunks the bundle no longer has under their expected `name`
+ * (a rename, or a name collision like `Overview2`, would quietly drop them from
+ * the boot graph). The build fails on a non-empty result.
+ */
+export function missingShellChunks(bundle: BundleLike): string[] {
+  const names = new Set(Object.values(bundle).map((item) => item.name));
+  return [...SHELL_CHUNK_NAMES].filter((name) => !names.has(name));
+}
+
 /** Every file the app needs to boot: static imports (and their css) of the entry and the shell chunks. */
 export function bootClosure(bundle: BundleLike): Set<string> {
   const items = Object.values(bundle);
@@ -79,9 +96,20 @@ export function dropLazyFromManifest(lazy: ReadonlySet<string>) {
   });
 }
 
-/** `lazy-chunks.json`: what the warm, the Offline panel and the worker's cleanup read. */
-export function lazyChunksJson(files: readonly string[], release: string): string {
-  return JSON.stringify({ release, files });
+/** `lazy-chunks.json`: what the warm, the Offline panel and the worker's cleanup read. `entry` names the build it belongs to. */
+export function lazyChunksJson(files: readonly string[], release: string, entry: string): string {
+  return JSON.stringify({ release, entry, files });
+}
+
+/**
+ * Whether a `lazy-chunks.json` body belongs to the build this worker precached
+ * (its entry file is in the worker's precache manifest). The file is read live,
+ * so a worker for build N activating after N+1 deployed would otherwise prune
+ * the chunks the page, still on N, is about to ask for.
+ */
+export function listMatchesBuild(body: unknown, precachedUrls: readonly string[]): boolean {
+  const entry = (body as { entry?: unknown } | null)?.entry;
+  return typeof entry === 'string' && precachedUrls.includes(entry);
 }
 
 /** A request URL as the list names it: its path under the site base, query dropped. */
@@ -97,4 +125,12 @@ export function chunksToDelete(cached: readonly string[], current: readonly stri
   if (current.length === 0) return [];
   const keep = new Set(current);
   return cached.filter((key) => !keep.has(key));
+}
+
+/** The file names in a `lazy-chunks.json` body, or `[]` when it is not one (an HTML fallback page, a bad shape). */
+export function parseLazyChunksJson(body: unknown): string[] {
+  const files = (body as { files?: unknown } | null)?.files;
+  return Array.isArray(files)
+    ? files.filter((file): file is string => typeof file === 'string')
+    : [];
 }

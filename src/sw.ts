@@ -43,7 +43,7 @@ import {
   isLazyChunk,
   isVersionedSdeData,
 } from '@/lib/swRoutes';
-import { chunkKey, chunksToDelete } from '@/app/lazyChunks';
+import { chunkKey, chunksToDelete, listMatchesBuild, parseLazyChunksJson } from '@/app/lazyChunks';
 
 declare let self: ServiceWorkerGlobalScope;
 
@@ -61,7 +61,8 @@ cleanupOutdatedCaches();
 // replaces): SDE loaders request `/data/<file>?v=<content hash>`
 // (src/sde/sdeDataUrl.ts), and a precached file must still be served from
 // the precache — its own revision already tracks the same bytes.
-precacheAndRoute(self.__WB_MANIFEST, {
+const precacheManifest = self.__WB_MANIFEST;
+precacheAndRoute(precacheManifest, {
   ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^v$/],
 });
 
@@ -126,14 +127,20 @@ async function dropStaleChunks(): Promise<void> {
   try {
     const response = await fetch(`${scopePath}lazy-chunks.json`, { cache: 'no-store' });
     if (!response.ok) return;
-    const { files } = (await response.json()) as { files?: unknown };
-    if (!Array.isArray(files)) return;
+    const body: unknown = await response.json();
+    // The list is the server's current build. Another build than this worker's
+    // (a deploy since it installed) must not prune what its page still needs.
+    const precached = precacheManifest.map((entry) =>
+      typeof entry === 'string' ? entry : entry.url
+    );
+    if (!listMatchesBuild(body, precached)) return;
+    const files = parseLazyChunksJson(body);
     const cache = await caches.open(LAZY_CHUNK_CACHE);
     const keys = await cache.keys();
     const doomed = new Set(
       chunksToDelete(
         keys.map((key) => chunkKey(key.url, scopePath)),
-        files.filter((file): file is string => typeof file === 'string')
+        files
       )
     );
     await Promise.all(

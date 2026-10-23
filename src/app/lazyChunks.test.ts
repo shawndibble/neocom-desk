@@ -6,6 +6,10 @@ import {
   dropLazyFromManifest,
   lazyChunkFiles,
   lazyChunksJson,
+  entryFile,
+  listMatchesBuild,
+  missingShellChunks,
+  parseLazyChunksJson,
   type BundleLike,
 } from './lazyChunks';
 
@@ -132,10 +136,9 @@ describe('dropLazyFromManifest', () => {
 
 describe('lazyChunksJson', () => {
   it('carries the release and the files', () => {
-    expect(JSON.parse(lazyChunksJson(['assets/a.js'], 'neocom-desk@1+abc'))).toEqual({
-      release: 'neocom-desk@1+abc',
-      files: ['assets/a.js'],
-    });
+    expect(
+      JSON.parse(lazyChunksJson(['assets/a.js'], 'neocom-desk@1+abc', 'assets/index-1.js'))
+    ).toEqual({ release: 'neocom-desk@1+abc', entry: 'assets/index-1.js', files: ['assets/a.js'] });
   });
 });
 
@@ -155,5 +158,61 @@ describe('chunksToDelete', () => {
 
   it('deletes nothing when the current list is empty, so a bad read never wipes the cache', () => {
     expect(chunksToDelete(['assets/a.js'], [])).toEqual([]);
+  });
+});
+
+describe('parseLazyChunksJson', () => {
+  it('reads what lazyChunksJson wrote', () => {
+    expect(
+      parseLazyChunksJson(JSON.parse(lazyChunksJson(['assets/a.js'], 'r', 'assets/index-1.js')))
+    ).toEqual(['assets/a.js']);
+  });
+
+  it.each([null, undefined, 'x', {}, { files: 'assets/a.js' }])('is empty for %j', (body) => {
+    expect(parseLazyChunksJson(body)).toEqual([]);
+  });
+
+  it('drops entries that are not strings', () => {
+    expect(parseLazyChunksJson({ files: ['assets/a.js', 3, null] })).toEqual(['assets/a.js']);
+  });
+});
+
+describe('entryFile', () => {
+  it('is the entry chunk', () => {
+    expect(
+      entryFile(bundleOf(chunk('assets/a.js'), chunk('assets/index-1.js', [], { isEntry: true })))
+    ).toBe('assets/index-1.js');
+  });
+});
+
+describe('missingShellChunks', () => {
+  it('names a shell chunk the bundle no longer has under its expected name', () => {
+    const bundle = bundleOf(chunk('assets/Layout-1.js', [], { name: 'Layout' }));
+    expect(missingShellChunks(bundle)).toEqual(['Overview']);
+  });
+
+  it('is empty when both are there', () => {
+    const bundle = bundleOf(
+      chunk('assets/Layout-1.js', [], { name: 'Layout' }),
+      chunk('assets/Overview-1.js', [], { name: 'Overview' })
+    );
+    expect(missingShellChunks(bundle)).toEqual([]);
+  });
+});
+
+describe('listMatchesBuild', () => {
+  const precached = ['index.html', 'assets/index-NEW.js'];
+
+  it("is true when the list's entry is one this worker precached", () => {
+    expect(listMatchesBuild({ entry: 'assets/index-NEW.js' }, precached)).toBe(true);
+  });
+
+  it('is false for another build, so a worker never prunes a build it is not running', () => {
+    expect(listMatchesBuild({ entry: 'assets/index-NEWER.js' }, precached)).toBe(false);
+  });
+
+  it('is false when the list names no entry', () => {
+    expect(listMatchesBuild({}, precached)).toBe(false);
+    expect(listMatchesBuild(null, precached)).toBe(false);
   });
 });
