@@ -21,6 +21,8 @@ describe('NOTIFICATION_EVENTS', () => {
       'newMail',
       'planetaryExtractionDone',
       'planetaryExtractorExpiring',
+      'mercenaryDenReinforced',
+      'mercenaryDenAnarchy',
       'marketOrderFilled',
       'marketOrderUndercut',
       'newCalendarEvent',

@@ -47,6 +47,8 @@ import type {
   OrdersLapsingFire,
   EveNotificationFire,
   StructureFuelLowFire,
+  MercenaryDenReinforcedFire,
+  MercenaryDenAnarchyFire,
   CorpIndustryJobNotificationFire,
   CorpMemberJoinedFire,
   CorpMemberLeftFire,
@@ -89,6 +91,8 @@ export type OccurrenceFire =
   | OrdersLapsingFire
   | EveNotificationFire
   | StructureFuelLowFire
+  | MercenaryDenReinforcedFire
+  | MercenaryDenAnarchyFire
   | CorpIndustryJobNotificationFire
   | CorpMemberJoinedFire
   | CorpMemberLeftFire
@@ -183,6 +187,13 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
       return [characterId, fire.eventId, fire.notificationId].join(':');
     case 'structureFuelLow':
       return [characterId, fire.eventId, fire.structureId, fire.fuelExpiresMs].join(':');
+    // A reinforcement is identified by its exit instant, so a fresh one is a new countdown; the
+    // lead warning and the "out now" fire of one exit are different occurrences.
+    case 'mercenaryDenReinforced':
+      return [characterId, fire.eventId, fire.denId, fire.reinforcedUntilMs, fire.phase].join(':');
+    // An edge with no natural id (foreground-only, never projected): the poll that saw the crossing is the occurrence, so a re-cross is new.
+    case 'mercenaryDenAnarchy':
+      return [characterId, fire.eventId, fire.denId, fire.thresholdPct, nowMs].join(':');
     case 'corpMemberJoined':
     case 'corpMemberLeft':
       return [characterId, fire.eventId, fire.memberCharacterId].join(':');
@@ -314,6 +325,8 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     case 'marketOrderFilled':
     case 'structureReinforcementExit':
     case 'structureFuelLow':
+    case 'mercenaryDenReinforced':
+    case 'mercenaryDenAnarchy':
     case 'corpMemberJoined':
     case 'corpMemberLeft':
     case 'corpWalletThreshold':

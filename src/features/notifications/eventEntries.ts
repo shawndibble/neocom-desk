@@ -94,6 +94,11 @@ import {
   type OrdersLapsingFire,
   type EveNotificationFire,
   type StructureFuelLowFire,
+  type MercenaryDenReinforcedFire,
+  type MercenaryDenAnarchyFire,
+  type DenSnapshot,
+  diffMercenaryDenReinforced,
+  diffMercenaryDenAnarchy,
   type CorpIndustryJobNotificationFire,
   type CorpMemberJoinedFire,
   type CorpMemberLeftFire,
@@ -135,6 +140,8 @@ import {
   ordersLapsingCopy,
   eveNotificationCopy,
   structureFuelCopy,
+  mercenaryDenReinforcedCopy,
+  mercenaryDenAnarchyCopy,
   corpIndustryJobCopy,
   corpRosterCopy,
   corpWalletCopy,
@@ -177,6 +184,8 @@ export type AnyNotificationFire =
   | OrdersLapsingFire
   | EveNotificationFire
   | StructureFuelLowFire
+  | MercenaryDenReinforcedFire
+  | MercenaryDenAnarchyFire
   | CorpIndustryJobNotificationFire
   | CorpMemberJoinedFire
   | CorpMemberLeftFire
@@ -224,6 +233,7 @@ export const SNAPSHOT_SOURCES = {
   orderExpiry: source<OrderExpirySnapshot>('orderExpiry'),
   eveNotification: source<EveNotificationSnapshot, EveNotificationNames>('eveNotification'),
   structureFuel: source<StructureFuelSnapshot>('structureFuel'),
+  mercenaryDens: source<DenSnapshot, PlanetNames>('mercenaryDens'),
   corpIndustryJobs: source<CorpIndustryJobSnapshot, ItemNames>('corpIndustryJobs'),
   corpRoster: source<CorpRosterSnapshot, MemberNames>('corpRoster'),
   corpWallet: source<CorpWalletSnapshot>('corpWallet'),
@@ -410,6 +420,24 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     // Projection Horizon, not the Character's grants, so it shows even
     // before authorization.
     rowHintKey: 'settings.notifications.extractorExpiringHint',
+  }),
+  // Per Character (issue #4782): ESI has no corporation den route.
+  mercenaryDenReinforced: defineEvent({
+    source: SNAPSHOT_SOURCES.mercenaryDens,
+    diff: diffMercenaryDenReinforced,
+    copy: mercenaryDenReinforcedCopy,
+    projection: { push: mercenaryDenReinforcedCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.mercenaryDenReinforcedLeadHours], hintKey: null },
+    rowHintKey: 'settings.notifications.mercenaryDenReinforcedHint',
+  }),
+  // Diff-based, so foreground-only: the server holds no den-scope token (ADR 0010).
+  mercenaryDenAnarchy: defineEvent({
+    source: SNAPSHOT_SOURCES.mercenaryDens,
+    diff: diffMercenaryDenAnarchy,
+    copy: mercenaryDenAnarchyCopy,
+    projection: null,
+    thresholds: { fields: [THRESHOLD_FIELDS.mercenaryDenAnarchyPercent], hintKey: null },
+    rowHintKey: 'settings.notifications.mercenaryDenAnarchyForegroundOnlyHint',
   }),
   marketOrderFilled: defineEvent({
     source: SNAPSHOT_SOURCES.marketOrders,

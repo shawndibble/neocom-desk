@@ -32,6 +32,9 @@ describe('isDangerEntry', () => {
     expect(isDangerEntry(attack('a', 1))).toBe(true);
     expect(isDangerEntry(mail('m', 1))).toBe(false);
     expect(isDangerEntry(entry('f', 'structureFuelLow', 1))).toBe(false);
+    // A reinforced den is the one critical personal event (issue #4782); its anarchy is a warning.
+    expect(isDangerEntry(entry('d', 'mercenaryDenReinforced', 1))).toBe(true);
+    expect(isDangerEntry(entry('a', 'mercenaryDenAnarchy', 1))).toBe(false);
   });
 });
 

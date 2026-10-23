@@ -31,6 +31,8 @@ import {
   DEFAULT_WALLET_FOLD_INTO_CONTRACT,
   DEFAULT_INCURSION_NEARBY_JUMPS,
   DEFAULT_SHIP_LOST_MINIMUM_ISK,
+  DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+  DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
   updateNotificationPrefs,
   toggleEventChannelPref,
   toggleEveTypeChannelPref,
@@ -267,6 +269,8 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
       shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
+      mercenaryDenReinforcedLeadHours: DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+      mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
     });
   });
 
@@ -290,6 +294,8 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
       shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
+      mercenaryDenReinforcedLeadHours: DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+      mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
     });
   });
 
@@ -314,6 +320,8 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
       shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
+      mercenaryDenReinforcedLeadHours: DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+      mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
     });
   });
 
@@ -347,6 +355,8 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
       shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
+      mercenaryDenReinforcedLeadHours: DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+      mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
     });
   });
 

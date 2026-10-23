@@ -47,6 +47,9 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   cloneJumpReady: '/clones',
   planetaryExtractionDone: '/planetary-industry',
   planetaryExtractorExpiring: '/planetary-industry',
+  // The Mercenary Dens widget (issue #4791) is the only den surface.
+  mercenaryDenReinforced: '/overview',
+  mercenaryDenAnarchy: '/overview',
   newMail: '/mail',
   newCalendarEvent: '/calendar',
   calendarEventStarting: '/calendar',

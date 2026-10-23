@@ -10427,6 +10427,17 @@
         "title": "Contract expiring",
         "body": "{{character}}'s issued contract expires in under {{hours}} hours."
       },
+      "mercenaryDenReinforced": {
+        "soonTitle": "Den leaving reinforcement soon",
+        "soonBody_one": "{{character}}'s Mercenary Den on {{planet}} comes out of reinforcement in about {{count}} hour.",
+        "soonBody_other": "{{character}}'s Mercenary Den on {{planet}} comes out of reinforcement in about {{count}} hours.",
+        "outTitle": "Den out of reinforcement",
+        "outBody": "{{character}}'s Mercenary Den on {{planet}} is out of reinforcement."
+      },
+      "mercenaryDenAnarchy": {
+        "title": "Den anarchy rising",
+        "body": "{{character}}'s Mercenary Den on {{planet}} has reached {{amount}}% anarchy."
+      },
       "ordersLapsing": {
         "title": "Market orders lapsing",
         "body_one": "{{character}} has {{count}} market order that lapses in under {{hours}} hours.",
@@ -12346,6 +12357,8 @@
         "newMail": "New mail",
         "planetaryExtractionDone": "Planetary extraction done",
         "planetaryExtractorExpiring": "Planetary extractor expiring",
+        "mercenaryDenReinforced": "Mercenary Den reinforced",
+        "mercenaryDenAnarchy": "Mercenary Den anarchy",
         "marketOrderFilled": "Sell order filled",
         "marketOrderUndercut": "Market order undercut",
         "newCalendarEvent": "New calendar event",
@@ -12372,6 +12385,14 @@
         "shipLost": "Ship lost"
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Planetary Industry always shows the real expiry.",
+      "mercenaryDenReinforcedHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. A den that leaves reinforcement early can still send it.",
+      "mercenaryDenAnarchyForegroundOnlyHint": "Fires only while the app is open: ESI offers no way to be told when anarchy rises.",
+      "mercenaryDenReinforcedLeadTimeLabel": "Warn this far before a den leaves reinforcement:",
+      "mercenaryDenReinforcedLeadTimeOption_one": "{{count}} hour",
+      "mercenaryDenReinforcedLeadTimeOption_other": "{{count}} hours",
+      "mercenaryDenAnarchyPercentLabel": "Alert when anarchy reaches:",
+      "mercenaryDenAnarchyPercentOption_one": "{{count}}%",
+      "mercenaryDenAnarchyPercentOption_other": "{{count}}%",
       "marketOrderUndercutStationOnlyHint": "Checks your order's own station only, and only while the app is open.",
       "corpGroup": "Corp notifications",
       "corpEventBestEffortHint": "Best effort: fires only while the app is open. Not a substitute for in-game alerts.",

@@ -8,6 +8,7 @@ import {
   projectColonies,
   projectCalendar,
   projectStructureFuel,
+  projectMercenaryDens,
   projectEveNotificationReinforcementExit,
   reinforcementExitStructureIds,
 } from './projection';
@@ -20,6 +21,7 @@ import {
   corpIndustryJobCopy,
   eveNotificationCopy,
   industryJobCopy,
+  mercenaryDenReinforcedCopy,
   skillQueueCopy,
   structureFuelCopy,
 } from '@/features/notifications/domainCopy';
@@ -35,6 +37,7 @@ describe('projectionWording', () => {
     'planetaryExtractionDone',
     'planetaryExtractorExpiring',
     'skillQueueEnding',
+    'mercenaryDenReinforced',
   ] as const)(
     'hedges %s, which an ordinary in-game action can falsify before it fires',
     (eventId) => {
@@ -503,6 +506,57 @@ describe('projectCalendar', () => {
       { calendarEventId: 99, startMs: T0 + 5 * HOUR_MS, response: 'accepted' as const },
     ];
     expect(projectCalendar(7, 'Kestrel', entries, calendarCopy.push, T0)).toHaveLength(1);
+  });
+});
+
+describe('projectMercenaryDens', () => {
+  const den = (reinforcedUntilMs: number | null) => ({
+    denId: 5,
+    planetId: 40_000_001,
+    reinforcedUntilMs,
+    anarchyAmount: 10,
+    anarchyLevel: 1,
+    leadMs: HOUR_MS,
+    anarchyPct: 50,
+  });
+  const names = new Map([[40_000_001, 'Efa III']]);
+  const project = (entries: ReturnType<typeof den>[], nowMs = T0) =>
+    projectMercenaryDens(7, 'Kestrel', entries, names, mercenaryDenReinforcedCopy.push, nowMs);
+
+  it('projects a hedged warning one lead time before the exit and a push at the exit', () => {
+    const rows = project([den(T0 + 10 * HOUR_MS)]);
+    expect(rows.map((r) => r.fireAt)).toEqual([T0 + 9 * HOUR_MS, T0 + 10 * HOUR_MS]);
+    expect(new Set(rows.map((r) => r.occurrenceKey)).size).toBe(2);
+    expect(rows[1].body).toContain('was due to come out of reinforcement');
+    expect(rows[1].body).toContain('Efa III');
+  });
+
+  it('projects only the exit when the warning time has already passed', () => {
+    const rows = project([den(T0 + 30 * 60_000)]);
+    expect(rows.map((r) => r.fireAt)).toEqual([T0 + 30 * 60_000]);
+  });
+
+  it('projects nothing for an unreinforced den or an exit beyond the horizon', () => {
+    expect(project([den(null)])).toEqual([]);
+    expect(project([den(T0 + PROJECTION_HORIZON_MS + 2 * HOUR_MS)])).toEqual([]);
+  });
+
+  it('keys a row like the live poll fire for the same exit', () => {
+    const [soon] = project([den(T0 + 10 * HOUR_MS)]);
+    expect(soon.occurrenceKey).toEqual(
+      occurrenceKey(
+        {
+          eventId: 'mercenaryDenReinforced',
+          characterId: 7,
+          denId: 5,
+          planetId: 40_000_001,
+          reinforcedUntilMs: T0 + 10 * HOUR_MS,
+          thresholdMs: HOUR_MS,
+          phase: 'soon',
+        },
+        T0 + 9 * HOUR_MS
+      )
+    );
   });
 });
 

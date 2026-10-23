@@ -42,3 +42,4 @@ export * from './pollDomains/copy/communities';
 export * from './pollDomains/copy/incursions';
 export * from './pollDomains/copy/priceAlerts';
 export * from './pollDomains/copy/kills';
+export * from './pollDomains/copy/dens';

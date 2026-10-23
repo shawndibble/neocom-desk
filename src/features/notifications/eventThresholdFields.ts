@@ -38,6 +38,10 @@ export interface CharacterEventThresholds {
   incursionNearbyJumps?: number;
   /** Least zKillboard total value, in ISK, a loss must carry to fire `shipLost` (issue #4772); 0 fires for every loss. */
   shipLostMinimumIsk?: number;
+  /** Hours before a Mercenary Den's reinforcement exit that trigger `mercenaryDenReinforced` (issue #4782) — one of `MERCENARY_DEN_REINFORCED_LEAD_HOUR_OPTIONS`. */
+  mercenaryDenReinforcedLeadHours?: number;
+  /** Anarchy % (within the den's level) at which `mercenaryDenAnarchy` fires (issue #4782) — one of `MERCENARY_DEN_ANARCHY_PERCENT_OPTIONS`. */
+  mercenaryDenAnarchyPercent?: number;
 }
 
 export type ThresholdKey = keyof CharacterEventThresholds;
@@ -64,6 +68,12 @@ export const CONTRACT_EXPIRING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 1
 /** The lead times `ordersLapsing`'s inline control offers (issue #3797), all within the 72-hour Projection Horizon. */
 export const ORDERS_LAPSING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 12, 6];
 
+/** The lead times `mercenaryDenReinforced`'s inline control offers (issue #4782), all within the 72-hour Projection Horizon. */
+export const MERCENARY_DEN_REINFORCED_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 6, 1];
+
+/** The anarchy percentages `mercenaryDenAnarchy`'s inline control offers (issue #4782). */
+export const MERCENARY_DEN_ANARCHY_PERCENT_OPTIONS: readonly number[] = [25, 50, 75, 90];
+
 /** How near an Incursion must be for `incursionNearby` (issue #3542): a short hop up to a long trip. */
 export const INCURSION_NEARBY_JUMP_OPTIONS: readonly number[] = [3, 5, 10, 15, 20];
 
@@ -81,6 +91,8 @@ export const DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK = 100_000_000;
 export const DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK = 1_000_000;
 export const DEFAULT_WALLET_FOLD_INTO_CONTRACT = 1;
 export const DEFAULT_SHIP_LOST_MINIMUM_ISK = 0;
+export const DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS = 1;
+export const DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT = 50;
 /** Close enough to fly to on a whim, without an alert for every Incursion in the region. */
 export const DEFAULT_INCURSION_NEARBY_JUMPS = 5;
 /**
@@ -246,6 +258,26 @@ export const THRESHOLD_FIELDS: { readonly [K in ThresholdKey]: ThresholdField<K>
       kind: 'iskAmount',
       labelKey: 'settings.notifications.shipLostMinimumIskLabel',
       inputIdPrefix: 'ship-lost-minimum',
+    },
+  },
+  mercenaryDenReinforcedLeadHours: {
+    key: 'mercenaryDenReinforcedLeadHours',
+    defaultValue: DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.mercenaryDenReinforcedLeadTimeLabel',
+      options: MERCENARY_DEN_REINFORCED_LEAD_HOUR_OPTIONS,
+      optionKey: 'settings.notifications.mercenaryDenReinforcedLeadTimeOption',
+    },
+  },
+  mercenaryDenAnarchyPercent: {
+    key: 'mercenaryDenAnarchyPercent',
+    defaultValue: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.mercenaryDenAnarchyPercentLabel',
+      options: MERCENARY_DEN_ANARCHY_PERCENT_OPTIONS,
+      optionKey: 'settings.notifications.mercenaryDenAnarchyPercentOption',
     },
   },
 };

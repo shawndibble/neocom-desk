@@ -80,6 +80,8 @@ const EVENT_CHIP: Readonly<Record<string, TopicChip>> = {
   corpIndustryJobReady: 'industry',
   planetaryExtractionDone: 'industry',
   planetaryExtractorExpiring: 'industry',
+  mercenaryDenReinforced: 'industry',
+  mercenaryDenAnarchy: 'industry',
   newMail: 'mail',
   newCalendarEvent: 'mail',
   calendarEventStarting: 'mail',

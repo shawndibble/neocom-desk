@@ -52,6 +52,8 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
       walletFoldIntoContract: ['walletBalanceChanged'],
       incursionNearbyJumps: ['incursionNearby'],
       shipLostMinimumIsk: ['shipLost'],
+      mercenaryDenReinforcedLeadHours: ['mercenaryDenReinforced'],
+      mercenaryDenAnarchyPercent: ['mercenaryDenAnarchy'],
       structureFuelLowDays: ['structureFuelLow'],
       corpWalletBalanceFloorIsk: ['corpWalletThreshold'],
       corpWalletTransactionCeilingIsk: ['corpWalletThreshold'],
@@ -61,7 +63,12 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
 
   it('carries a row hint only where Settings shows one regardless of grants', () => {
     const hinted = NOTIFICATION_EVENT_IDS.filter((id) => eventEntry(id).rowHintKey !== null);
-    expect(hinted).toEqual(['planetaryExtractorExpiring', 'marketOrderUndercut']);
+    expect(hinted).toEqual([
+      'planetaryExtractorExpiring',
+      'mercenaryDenReinforced',
+      'mercenaryDenAnarchy',
+      'marketOrderUndercut',
+    ]);
   });
 });
 
@@ -171,6 +178,54 @@ describe('one event through its entry', () => {
       'Kestrel: Keepstar was due to run out of fuel.'
     );
     expect(entry.thresholds.fields.map((field) => field.key)).toEqual(['structureFuelLowDays']);
+  });
+
+  it('mercenaryDenReinforced: warns inside the lead window, pushes hedged, owns the lead-hours threshold', () => {
+    const entry = NOTIFICATION_EVENT_ENTRIES.mercenaryDenReinforced;
+    const den = {
+      denId: 5,
+      planetId: 40_000_001,
+      anarchyAmount: null,
+      anarchyLevel: null,
+      leadMs: 3_600_000,
+      anarchyPct: 50,
+    };
+    const end = T0 + 3_600_000 * 3;
+    const fires = entry.diff(
+      C,
+      { entries: [{ ...den, reinforcedUntilMs: end }], nowMs: T0 },
+      { entries: [{ ...den, reinforcedUntilMs: end }], nowMs: end - 1_800_000 }
+    );
+    expect(fires).toHaveLength(1);
+    expect(entry.copy.poll(fires[0], PILOT, { planet: 'Efa III' }).body).toBe(
+      "Kestrel's Mercenary Den on Efa III comes out of reinforcement in about 1 hour."
+    );
+    expect(entry.projection.push(fires[0], PILOT, { planet: 'Efa III' }).body).toMatch(/was due/);
+    expect(entry.thresholds.fields.map((field) => field.key)).toEqual([
+      'mercenaryDenReinforcedLeadHours',
+    ]);
+  });
+
+  it('mercenaryDenAnarchy: fires on crossing, is foreground-only and owns the percent threshold', () => {
+    const entry = NOTIFICATION_EVENT_ENTRIES.mercenaryDenAnarchy;
+    const den = {
+      denId: 5,
+      planetId: 40_000_001,
+      reinforcedUntilMs: null,
+      anarchyLevel: 1,
+      leadMs: 3_600_000,
+      anarchyPct: 50,
+    };
+    const fires = entry.diff(
+      C,
+      { entries: [{ ...den, anarchyAmount: 40 }], nowMs: T0 },
+      { entries: [{ ...den, anarchyAmount: 60 }], nowMs: T0 + 1000 }
+    );
+    expect(fires).toHaveLength(1);
+    expect(entry.projection).toBeNull();
+    expect(entry.thresholds.fields.map((field) => field.key)).toEqual([
+      'mercenaryDenAnarchyPercent',
+    ]);
   });
 
   it('courierDeliveryDue: fires as the deadline crosses its lead time, pushes hedged, owns its own lead-hours threshold', () => {

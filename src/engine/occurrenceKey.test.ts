@@ -15,6 +15,7 @@ import type {
   MarketOrderUndercutFire,
   EveNotificationFire,
   StructureFuelLowFire,
+  MercenaryDenReinforcedFire,
   CorpIndustryJobNotificationFire,
   CorpMemberJoinedFire,
   CorpMemberLeftFire,
@@ -306,6 +307,23 @@ describe('occurrenceKey', () => {
       notificationId,
     };
     expect(occurrenceKey(projectedExit, T0)).not.toEqual(occurrenceKey(live, T0));
+  });
+
+  it('keys mercenaryDenReinforced on the exit instant, apart for the warning and the exit', () => {
+    const soon: MercenaryDenReinforcedFire = {
+      eventId: 'mercenaryDenReinforced',
+      characterId: 7,
+      denId: 5,
+      planetId: 40_000_001,
+      reinforcedUntilMs: T0 + 3_600_000,
+      thresholdMs: 3_600_000,
+      phase: 'soon',
+    };
+    expect(occurrenceKey(soon, T0)).toEqual(occurrenceKey({ ...soon }, T0 + 1000));
+    expect(occurrenceKey(soon, T0)).not.toEqual(occurrenceKey({ ...soon, phase: 'out' }, T0));
+    expect(occurrenceKey(soon, T0)).not.toEqual(
+      occurrenceKey({ ...soon, reinforcedUntilMs: T0 + 90_000_000 }, T0)
+    );
   });
 
   it('keys structureFuelLow on structureId and the fuel countdown it belongs to', () => {
