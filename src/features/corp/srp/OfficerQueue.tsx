@@ -238,8 +238,8 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           ]}
         />
       )}
-      <Panel title={t(`srp.officer.title.${tab}`)}>
-        <div className="grid gap-3 p-3">
+      <Panel title={t(`srp.officer.title.${tab}`)} padded={false}>
+        <div className="grid gap-3">
           {tab !== 'history' && (
             <SrpBulkBar
               selected={ticked.length}

@@ -33,8 +33,8 @@ export function SrpBulkBar({
   if (selectable === 0) return null;
   if (phone) {
     return (
-      <div className="grid gap-2">
-        <div className="flex justify-end">
+      <div className="grid gap-2 pt-3">
+        <div className="flex justify-end px-3">
           <button type="button" className={textActionClassName()} onClick={onSelectAll}>
             {t('srp.officer.bulk.selectAll', { count: selectable })}
           </button>
@@ -42,7 +42,7 @@ export function SrpBulkBar({
         {selected > 0 && (
           <div
             className={cx(
-              'sticky bottom-[var(--bottom-nav-clearance)] z-30 flex items-center gap-3 rounded-xs border border-line-bright bg-panel p-2 shadow-lg'
+              'sticky bottom-[var(--bottom-nav-clearance)] z-30 mx-3 flex items-center gap-3 rounded-xs border border-line-bright bg-panel p-2 shadow-lg'
             )}
           >
             <div className="min-w-0 flex-1 text-sm tabular-nums" role="status">
@@ -61,7 +61,7 @@ export function SrpBulkBar({
     );
   }
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 pt-3">
       <button type="button" className={textActionClassName()} onClick={onSelectAll}>
         {t('srp.officer.bulk.selectAll', { count: selectable })}
       </button>

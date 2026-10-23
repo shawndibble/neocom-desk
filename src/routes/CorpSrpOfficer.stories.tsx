@@ -80,9 +80,10 @@ const openTab =
   (name: RegExp) =>
   async ({ canvasElement }: { canvasElement: HTMLElement }) => {
     const body = within(canvasElement);
-    // The tab bar is Tabs on a desktop and a SegmentedControl (radios) on a phone.
+    // The tab bar is Tabs on a desktop and a SegmentedControl (pressed buttons) on a phone.
     await body.findAllByRole('checkbox');
-    const control = body.queryByRole('tab', { name }) ?? (await body.findByRole('radio', { name }));
+    const control =
+      body.queryByRole('tab', { name }) ?? (await body.findByRole('button', { name }));
     await userEvent.click(control);
   };
 

@@ -13,6 +13,8 @@ export interface SrpView {
   /** i18n key of the tab label. */
   labelKey: string;
   component: ComponentType;
+  /** A table-wide view takes the wide page column; a form keeps the narrow one. */
+  wide?: boolean;
   /** Who sees it, from what the page knows of the pilot's corp capabilities. */
   visible: (who: { canManageSrp: boolean }) => boolean;
 }
@@ -22,6 +24,7 @@ export const SRP_VIEWS: readonly SrpView[] = [
     id: 'queue',
     labelKey: 'srp.tabs.queue',
     component: SrpOfficerView,
+    wide: true,
     // Director or Accountant (the page's own gate); the server re-checks the roles on every action.
     visible: ({ canManageSrp }) => canManageSrp,
   },
