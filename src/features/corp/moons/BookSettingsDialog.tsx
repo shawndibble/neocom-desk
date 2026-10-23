@@ -1,10 +1,13 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import { chunkRateFor } from '@/engine/corpTaxBook/extraction';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   Checkbox,
+  Field,
+  Fields,
   IskInput,
   Modal,
   SegmentedControl,
@@ -13,14 +16,20 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  TabPanel,
+  Tabs,
   TextInput,
+  useTabsId,
+  type TabItem,
 } from '@/components/ui';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
+import { Pill } from '@/components/ui/Pill';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { TRADE_HUBS } from '@/market/hubs';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';
+import { Label } from './BookDialogs';
 import { isk } from './moonsFormat';
 import { AutomaticSyncSection } from './AutomaticSyncSection';
 import { DeleteBookSection } from './DeleteBookSection';
@@ -35,15 +44,6 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <h3 className={eyebrowClassName}>{title}</h3>
       {children}
     </section>
-  );
-}
-
-function Label({ text, children }: { text: string; children: ReactNode }) {
-  return (
-    <label className="block space-y-1">
-      <span className="block text-xs text-text-dim">{text}</span>
-      {children}
-    </label>
   );
 }
 
@@ -218,6 +218,22 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
       (a, b) => a.scope.localeCompare(b.scope) || b.effectiveFrom.localeCompare(a.effectiveFrom)
     );
 
+  const tabsId = useTabsId();
+  const fieldId = useId();
+  // Back from EVE's page after the Automatic sync opt-in: open where its notice is shown.
+  const { state: routerState } = useLocation();
+  const [tab, setTab] = useState<'rates' | 'billing' | 'extractions' | 'access'>(() =>
+    (routerState as { corpSyncGrant?: unknown } | null)?.corpSyncGrant !== undefined
+      ? 'access'
+      : 'rates'
+  );
+  const tabs: TabItem[] = [
+    { id: 'rates', label: t('corpTaxBook.moons.settings.tabs.rates'), count: rates.length },
+    { id: 'billing', label: t('corpTaxBook.moons.settings.tabs.billing') },
+    { id: 'extractions', label: t('corpTaxBook.moons.settings.tabs.extractions') },
+    { id: 'access', label: t('corpTaxBook.moons.settings.tabs.access') },
+  ];
+
   return (
     <Modal
       open={open}
@@ -244,335 +260,393 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
         </div>
       }
     >
-      <div className="space-y-5 text-sm">
-        <Section title={t('corpTaxBook.moons.settings.rates')}>
-          <p className="text-xs text-text-dim">{t('corpTaxBook.moons.settings.ratesHint')}</p>
-          <ul className="divide-y divide-line">
-            {rates.map((r) => (
-              <li
-                key={`${r.scope}-${'minerId' in r ? r.minerId : ''}-${'moonId' in r ? r.moonId : ''}-${'structureId' in r ? r.structureId : ''}-${'feederId' in r ? r.feederId : ''}-${r.effectiveFrom}`}
-                className="flex flex-wrap justify-between gap-2 py-1.5"
-              >
-                <span>
-                  {t(`corpTaxBook.moons.settings.rateScope.${r.scope}`)}
-                  {rateLabel(r, minerName, names.refinery, names.corporation) &&
-                    ` · ${rateLabel(r, minerName, names.refinery, names.corporation)}`}
-                </span>
-                <span className="tabular-nums text-text-dim">
-                  {r.pct}% ·{' '}
-                  {t('corpTaxBook.moons.settings.from', { date: displayDate(r.effectiveFrom) })}
-                </span>
-              </li>
-            ))}
-          </ul>
-          {canEdit && (
-            <div className="grid gap-2 sm:grid-cols-4">
-              <Label text={t('corpTaxBook.moons.settings.rateFor')}>
-                <Select
-                  value={rateScope}
-                  onValueChange={(v) => setRateScope(v as typeof rateScope)}
-                >
-                  <SelectTrigger
-                    aria-label={t('corpTaxBook.moons.settings.rateFor')}
-                    className="w-full"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {RATE_SCOPES.filter((s) => s !== 'feeder' || owners.length > 0).map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {t(`corpTaxBook.moons.settings.rateScope.${s}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Label>
-              {rateScope === 'miner' && (
-                <Label text={t('corpTaxBook.moons.cols.miner')}>
-                  <Select value={rateMiner} onValueChange={setRateMiner}>
-                    <SelectTrigger
-                      aria-label={t('corpTaxBook.moons.cols.miner')}
-                      className="w-full"
+      <div className="space-y-4 text-sm">
+        <Tabs
+          tabsId={tabsId}
+          tabs={tabs}
+          value={tab}
+          onChange={(id) => setTab(id as typeof tab)}
+          label={t('corpTaxBook.moons.settings.sections')}
+        />
+        <TabPanel tabsId={tabsId} tabId={tab} className="space-y-5">
+          {tab === 'rates' && (
+            <>
+              <p className="max-w-2xl text-xs text-text-dim">
+                {t('corpTaxBook.moons.settings.ratesHint')}
+              </p>
+              <ul className="divide-y divide-line rounded-xs border border-line">
+                {rates.map((r) => {
+                  const target = rateLabel(r, minerName, names.refinery, names.corporation);
+                  const scheduled = r.effectiveFrom > today;
+                  return (
+                    <li
+                      key={`${r.scope}-${'minerId' in r ? r.minerId : ''}-${'moonId' in r ? r.moonId : ''}-${'structureId' in r ? r.structureId : ''}-${'feederId' in r ? r.feederId : ''}-${r.effectiveFrom}`}
+                      className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2"
                     >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {view.miners.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {names.character(m.mainCharacterId)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Label>
-              )}
-              {rateScope === 'moon' && (
-                <Label text={t('corpTaxBook.moons.settings.moon')}>
-                  <Select value={rateMoon} onValueChange={setRateMoon}>
-                    <SelectTrigger
-                      aria-label={t('corpTaxBook.moons.settings.moon')}
-                      className="w-full"
+                      <Pill>{t(`corpTaxBook.moons.settings.rateScope.${r.scope}`)}</Pill>
+                      {target && (
+                        <span className="min-w-0 flex-1 basis-44 break-words">{target}</span>
+                      )}
+                      <span className="ml-auto flex items-center gap-3">
+                        <span className="text-xs text-text-dim tabular-nums">
+                          {t('corpTaxBook.moons.settings.from', {
+                            date: displayDate(r.effectiveFrom),
+                          })}
+                        </span>
+                        {scheduled && (
+                          <Pill tone="warning">{t('corpTaxBook.moons.settings.scheduled')}</Pill>
+                        )}
+                        <span className="w-14 text-right font-semibold tabular-nums">{r.pct}%</span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              {canEdit && (
+                <div className="space-y-3 rounded-xs bg-panel-2 p-3">
+                  <h3 className={eyebrowClassName}>
+                    {t('corpTaxBook.moons.settings.addRateTitle')}
+                  </h3>
+                  <div className="grid items-end gap-3 sm:grid-cols-4">
+                    <Label text={t('corpTaxBook.moons.settings.rateFor')}>
+                      <Select
+                        value={rateScope}
+                        onValueChange={(v) => setRateScope(v as typeof rateScope)}
+                      >
+                        <SelectTrigger
+                          aria-label={t('corpTaxBook.moons.settings.rateFor')}
+                          className="w-full"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {RATE_SCOPES.filter((s) => s !== 'feeder' || owners.length > 0).map(
+                            (s) => (
+                              <SelectItem key={s} value={s}>
+                                {t(`corpTaxBook.moons.settings.rateScope.${s}`)}
+                              </SelectItem>
+                            )
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </Label>
+                    {rateScope === 'miner' && (
+                      <Label text={t('corpTaxBook.moons.cols.miner')}>
+                        <Select value={rateMiner} onValueChange={setRateMiner}>
+                          <SelectTrigger
+                            aria-label={t('corpTaxBook.moons.cols.miner')}
+                            className="w-full"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {view.miners.map((m) => (
+                              <SelectItem key={m.id} value={m.id}>
+                                {names.character(m.mainCharacterId)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Label>
+                    )}
+                    {rateScope === 'moon' && (
+                      <Label text={t('corpTaxBook.moons.settings.moon')}>
+                        <Select value={rateMoon} onValueChange={setRateMoon}>
+                          <SelectTrigger
+                            aria-label={t('corpTaxBook.moons.settings.moon')}
+                            className="w-full"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {moons.map((m) => (
+                              <SelectItem key={m} value={String(m)}>
+                                {names.moon(m)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Label>
+                    )}
+                    {rateScope === 'structure' && (
+                      <Label text={t('corpTaxBook.moons.settings.rateScope.structure')}>
+                        <Select value={rateRefinery} onValueChange={setRateRefinery}>
+                          <SelectTrigger
+                            aria-label={t('corpTaxBook.moons.settings.rateScope.structure')}
+                            className="w-full"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {refineries.map((id) => (
+                              <SelectItem key={id} value={String(id)}>
+                                {names.refinery(id)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Label>
+                    )}
+                    {rateScope === 'feeder' && (
+                      <Label text={t('corpTaxBook.moons.settings.rateScope.feeder')}>
+                        <Select value={rateOwner} onValueChange={setRateOwner}>
+                          <SelectTrigger
+                            aria-label={t('corpTaxBook.moons.settings.rateScope.feeder')}
+                            className="w-full"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {owners.map((id) => (
+                              <SelectItem key={id} value={String(id)}>
+                                {names.corporation(id)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Label>
+                    )}
+                    <Label text={t('corpTaxBook.moons.settings.pct')}>
+                      <TextInput
+                        className="w-full"
+                        inputMode="decimal"
+                        value={ratePct}
+                        onChange={(e) => setRatePct(e.target.value)}
+                      />
+                    </Label>
+                    <Label text={t('corpTaxBook.moons.settings.effectiveFrom')}>
+                      <TextInput
+                        className="w-full"
+                        type="date"
+                        min={today}
+                        value={rateFrom}
+                        onChange={(e) => setRateFrom(e.target.value)}
+                      />
+                    </Label>
+                    <Button
+                      variant="primary"
+                      onClick={() => void addRate()}
+                      disabled={!rateReady || busy}
                     >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {moons.map((m) => (
-                        <SelectItem key={m} value={String(m)}>
-                          {names.moon(m)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Label>
+                      {t('corpTaxBook.moons.settings.addRate')}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-text-dim">
+                    {t('corpTaxBook.moons.settings.ratesLive')}
+                  </p>
+                </div>
               )}
-              {rateScope === 'structure' && (
-                <Label text={t('corpTaxBook.moons.settings.rateScope.structure')}>
-                  <Select value={rateRefinery} onValueChange={setRateRefinery}>
-                    <SelectTrigger
-                      aria-label={t('corpTaxBook.moons.settings.rateScope.structure')}
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {refineries.map((id) => (
-                        <SelectItem key={id} value={String(id)}>
-                          {names.refinery(id)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Label>
-              )}
-              {rateScope === 'feeder' && (
-                <Label text={t('corpTaxBook.moons.settings.rateScope.feeder')}>
-                  <Select value={rateOwner} onValueChange={setRateOwner}>
-                    <SelectTrigger
-                      aria-label={t('corpTaxBook.moons.settings.rateScope.feeder')}
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {owners.map((id) => (
-                        <SelectItem key={id} value={String(id)}>
-                          {names.corporation(id)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Label>
-              )}
-              <Label text={t('corpTaxBook.moons.settings.pct')}>
-                <TextInput
-                  className="w-full"
-                  inputMode="decimal"
-                  value={ratePct}
-                  onChange={(e) => setRatePct(e.target.value)}
-                />
-              </Label>
-              <Label text={t('corpTaxBook.moons.settings.effectiveFrom')}>
-                <TextInput
-                  className="w-full"
-                  type="date"
-                  min={today}
-                  value={rateFrom}
-                  onChange={(e) => setRateFrom(e.target.value)}
-                />
-              </Label>
-              <div className="flex items-end">
-                <Button onClick={() => void addRate()} disabled={!rateReady || busy}>
-                  {t('corpTaxBook.moons.settings.addRate')}
-                </Button>
-              </div>
-            </div>
+            </>
           )}
-        </Section>
 
-        <Section title={t('corpTaxBook.moons.settings.pricing')}>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Label text={t('corpTaxBook.moons.settings.hub')}>
-              <Select value={hubId} onValueChange={setHubId}>
-                <SelectTrigger aria-label={t('corpTaxBook.moons.settings.hub')} className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TRADE_HUBS.map((h) => (
-                    <SelectItem key={h.id} value={h.id}>
-                      {h.systemName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Label>
-            <Label text={t('corpTaxBook.moons.settings.oreForm')}>
-              <SegmentedControl
-                label={t('corpTaxBook.moons.settings.oreForm')}
-                value={oreForm}
-                onChange={setOreForm}
-                options={[
-                  { value: 'compressed', label: t('corpTaxBook.moons.settings.form.compressed') },
-                  { value: 'raw', label: t('corpTaxBook.moons.settings.form.raw') },
-                ]}
-                uppercase={false}
-              />
-            </Label>
-          </div>
-        </Section>
+          {tab === 'billing' && (
+            <>
+              <Section title={t('corpTaxBook.moons.settings.pricing')}>
+                <Fields variant="form">
+                  <Field label={t('corpTaxBook.moons.settings.hub')}>
+                    <Select value={hubId} onValueChange={setHubId}>
+                      <SelectTrigger aria-label={t('corpTaxBook.moons.settings.hub')}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TRADE_HUBS.map((h) => (
+                          <SelectItem key={h.id} value={h.id}>
+                            {h.systemName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field label={t('corpTaxBook.moons.settings.oreForm')}>
+                    <SegmentedControl
+                      label={t('corpTaxBook.moons.settings.oreForm')}
+                      value={oreForm}
+                      onChange={setOreForm}
+                      options={[
+                        {
+                          value: 'compressed',
+                          label: t('corpTaxBook.moons.settings.form.compressed'),
+                        },
+                        { value: 'raw', label: t('corpTaxBook.moons.settings.form.raw') },
+                      ]}
+                      uppercase={false}
+                    />
+                  </Field>
+                </Fields>
+              </Section>
 
-        <Section title={t('corpTaxBook.moons.settings.billing')}>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="space-y-1">
-              <span className="block text-xs text-text-dim">
-                {t('corpTaxBook.moons.settings.startDate')}
-              </span>
-              {/* Chosen once when the Director turns the book on (D10); the server never changes it. */}
-              <p className="py-1.5 tabular-nums">{displayDate(settings.startDate)}</p>
-            </div>
-            <Label text={t('corpTaxBook.moons.settings.grace')}>
-              <TextInput
-                className="w-full"
-                inputMode="numeric"
-                value={grace}
-                onChange={(e) => setGrace(e.target.value)}
-              />
-            </Label>
-            <Label text={t('corpTaxBook.moons.settings.overdue')}>
-              <TextInput
-                className="w-full"
-                inputMode="numeric"
-                value={overdue}
-                onChange={(e) => setOverdue(e.target.value)}
-              />
-            </Label>
-            <Label text={t('corpTaxBook.moons.settings.minimum')}>
-              <IskInput
-                value={minimum}
-                onChange={setMinimum}
-                aria-label={t('corpTaxBook.moons.settings.minimum')}
-              />
-            </Label>
-            <Label text={t('corpTaxBook.moons.settings.cadenceLabel')}>
-              <SegmentedControl
-                label={t('corpTaxBook.moons.settings.cadenceLabel')}
-                value={cadence}
-                onChange={setCadence}
-                options={[
-                  { value: 'monthly', label: t('corpTaxBook.moons.settings.cadence.monthly') },
-                  { value: 'days', label: t('corpTaxBook.moons.settings.cadence.days') },
-                ]}
-                uppercase={false}
-              />
-            </Label>
-            {cadence === 'days' && (
-              <Label text={t('corpTaxBook.moons.settings.cadenceDays')}>
-                <TextInput
-                  className="w-full"
-                  inputMode="numeric"
-                  value={cadenceDays}
-                  onChange={(e) => setCadenceDays(e.target.value)}
-                />
-              </Label>
-            )}
-          </div>
-          <fieldset className="space-y-1">
-            <legend className="text-xs text-text-dim">
-              {t('corpTaxBook.moons.settings.divisions')}
-            </legend>
-            <div className="flex flex-wrap gap-3">
-              {DIVISIONS.map((d) => (
-                <label key={d} className={cx(touchCheckboxLabelClassName, 'gap-1.5')}>
-                  <Checkbox
-                    checked={divisions.includes(d)}
-                    onChange={() =>
-                      setDivisions((prev) =>
-                        prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
-                      )
-                    }
-                    aria-label={t('corpTaxBook.moons.settings.division', { n: d })}
+              <Section title={t('corpTaxBook.moons.settings.statements')}>
+                <Fields variant="form">
+                  {/* Chosen once when the Director turns the book on (D10); the server never changes it. */}
+                  <Field label={t('corpTaxBook.moons.settings.startDate')}>
+                    <span className="tabular-nums">{displayDate(settings.startDate)}</span>
+                  </Field>
+                  <Field label={t('corpTaxBook.moons.settings.cadenceLabel')}>
+                    <SegmentedControl
+                      label={t('corpTaxBook.moons.settings.cadenceLabel')}
+                      value={cadence}
+                      onChange={setCadence}
+                      options={[
+                        {
+                          value: 'monthly',
+                          label: t('corpTaxBook.moons.settings.cadence.monthly'),
+                        },
+                        { value: 'days', label: t('corpTaxBook.moons.settings.cadence.days') },
+                      ]}
+                      uppercase={false}
+                    />
+                    {cadence === 'days' && (
+                      <TextInput
+                        className="w-20"
+                        inputMode="numeric"
+                        aria-label={t('corpTaxBook.moons.settings.cadenceDays')}
+                        value={cadenceDays}
+                        onChange={(e) => setCadenceDays(e.target.value)}
+                      />
+                    )}
+                  </Field>
+                  <Field label={t('corpTaxBook.moons.settings.minimum')}>
+                    <IskInput
+                      value={minimum}
+                      onChange={setMinimum}
+                      aria-label={t('corpTaxBook.moons.settings.minimum')}
+                    />
+                  </Field>
+                  <Field label={t('corpTaxBook.moons.settings.grace')} htmlFor={`${fieldId}-grace`}>
+                    <TextInput
+                      className="w-20"
+                      inputMode="numeric"
+                      id={`${fieldId}-grace`}
+                      value={grace}
+                      onChange={(e) => setGrace(e.target.value)}
+                    />
+                  </Field>
+                  <Field
+                    label={t('corpTaxBook.moons.settings.overdue')}
+                    htmlFor={`${fieldId}-overdue`}
+                  >
+                    <TextInput
+                      className="w-20"
+                      inputMode="numeric"
+                      id={`${fieldId}-overdue`}
+                      value={overdue}
+                      onChange={(e) => setOverdue(e.target.value)}
+                    />
+                  </Field>
+                  <Field label={t('corpTaxBook.moons.settings.divisions')}>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      {DIVISIONS.map((d) => (
+                        <label key={d} className={cx(touchCheckboxLabelClassName, 'gap-1.5')}>
+                          <Checkbox
+                            checked={divisions.includes(d)}
+                            onChange={() =>
+                              setDivisions((prev) =>
+                                prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
+                              )
+                            }
+                            aria-label={t('corpTaxBook.moons.settings.division', { n: d })}
+                          />
+                          {d}
+                        </label>
+                      ))}
+                    </div>
+                  </Field>
+                </Fields>
+              </Section>
+            </>
+          )}
+
+          {tab === 'extractions' && (
+            <Section title={t('corpTaxBook.moons.settings.extractions')}>
+              <Fields variant="form">
+                <Field
+                  label={t('corpTaxBook.moons.settings.chunk')}
+                  htmlFor={`${fieldId}-chunk`}
+                  note={t('corpTaxBook.moons.settings.chunkHint')}
+                >
+                  <TextInput
+                    className="w-28"
+                    inputMode="numeric"
+                    id={`${fieldId}-chunk`}
+                    value={chunk}
+                    onChange={(e) => setChunk(e.target.value)}
+                    placeholder="30000"
                   />
-                  {d}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        </Section>
+                </Field>
+                {structures.map((id) => {
+                  const learned = view.chunkRates.get(id);
+                  return (
+                    <Field
+                      key={id}
+                      label={t('corpTaxBook.moons.settings.expiry', { name: names.refinery(id) })}
+                      htmlFor={`${fieldId}-expiry-${id}`}
+                      note={
+                        learned
+                          ? t('corpTaxBook.moons.settings.measured', {
+                              name: names.refinery(id),
+                              rate: formatDecimal(learned.m3PerHour),
+                              count: learned.cycles,
+                            })
+                          : t('corpTaxBook.moons.settings.notMeasured', {
+                              name: names.refinery(id),
+                              rate: formatDecimal(
+                                chunkRateFor(undefined, settings.chunkM3PerHour ?? undefined)
+                                  .m3PerHour
+                              ),
+                            })
+                      }
+                    >
+                      <TextInput
+                        className="w-20"
+                        inputMode="numeric"
+                        id={`${fieldId}-expiry-${id}`}
+                        value={expiry[String(id)] ?? ''}
+                        placeholder="48"
+                        onChange={(e) =>
+                          setExpiry((prev) => ({ ...prev, [String(id)]: e.target.value }))
+                        }
+                      />
+                    </Field>
+                  );
+                })}
+              </Fields>
+            </Section>
+          )}
 
-        <Section title={t('corpTaxBook.moons.settings.extractions')}>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Label text={t('corpTaxBook.moons.settings.chunk')}>
-              <TextInput
-                className="w-full"
-                inputMode="numeric"
-                value={chunk}
-                onChange={(e) => setChunk(e.target.value)}
-                placeholder="30000"
-              />
-            </Label>
-            <ul className="space-y-0.5 text-xs text-text-dim sm:col-span-2">
-              <li>{t('corpTaxBook.moons.settings.chunkHint')}</li>
-              {structures.map((id) => {
-                const learned = view.chunkRates.get(id);
-                return (
-                  <li key={id}>
-                    {learned
-                      ? t('corpTaxBook.moons.settings.measured', {
-                          name: names.refinery(id),
-                          rate: formatDecimal(learned.m3PerHour),
-                          count: learned.cycles,
-                        })
-                      : t('corpTaxBook.moons.settings.notMeasured', {
-                          name: names.refinery(id),
-                          rate: formatDecimal(
-                            chunkRateFor(undefined, settings.chunkM3PerHour ?? undefined).m3PerHour
-                          ),
-                        })}
-                  </li>
-                );
-              })}
-            </ul>
-            {structures.map((id) => (
-              <Label
-                key={id}
-                text={t('corpTaxBook.moons.settings.expiry', { name: names.refinery(id) })}
-              >
-                <TextInput
-                  className="w-full"
-                  inputMode="numeric"
-                  value={expiry[String(id)] ?? ''}
-                  placeholder="48"
-                  onChange={(e) => setExpiry((prev) => ({ ...prev, [String(id)]: e.target.value }))}
-                />
-              </Label>
-            ))}
-          </div>
-        </Section>
+          {tab === 'access' && (
+            <>
+              <Section title={t('corpTaxBook.moons.settings.approvals')}>
+                <Fields variant="form">
+                  <Field
+                    label={t('corpTaxBook.moons.settings.approvalLimit')}
+                    note={
+                      verdict.isDirector
+                        ? settings.dismissApprovalAboveIsk === null
+                          ? t('corpTaxBook.moons.settings.approvalHintNone')
+                          : t('corpTaxBook.moons.settings.approvalHint', {
+                              limit: isk(settings.dismissApprovalAboveIsk),
+                            })
+                        : t('corpTaxBook.moons.settings.approvalDirector')
+                    }
+                  >
+                    <IskInput
+                      value={approval}
+                      onChange={setApproval}
+                      disabled={!verdict.isDirector}
+                      aria-label={t('corpTaxBook.moons.settings.approvalLimit')}
+                    />
+                  </Field>
+                </Fields>
+              </Section>
 
-        <Section title={t('corpTaxBook.moons.settings.approvals')}>
-          <Label text={t('corpTaxBook.moons.settings.approvalLimit')}>
-            <IskInput
-              value={approval}
-              onChange={setApproval}
-              disabled={!verdict.isDirector}
-              aria-label={t('corpTaxBook.moons.settings.approvalLimit')}
-            />
-          </Label>
-          <p className="text-xs text-text-dim">
-            {verdict.isDirector
-              ? settings.dismissApprovalAboveIsk === null
-                ? t('corpTaxBook.moons.settings.approvalHintNone')
-                : t('corpTaxBook.moons.settings.approvalHint', {
-                    limit: isk(settings.dismissApprovalAboveIsk),
-                  })
-              : t('corpTaxBook.moons.settings.approvalDirector')}
-          </p>
-        </Section>
+              <AutomaticSyncSection />
 
-        <AutomaticSyncSection />
+              <ReclaimBookSection />
 
-        <ReclaimBookSection />
-
-        <DeleteBookSection />
+              <DeleteBookSection />
+            </>
+          )}
+        </TabPanel>
       </div>
     </Modal>
   );

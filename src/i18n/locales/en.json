@@ -15665,7 +15665,18 @@
           "confirmTitle": "Delete the book?",
           "body": "Every mining entry, payment, Statement and the activity log is erased, the automatic sync stops, and Statement verify links stop working. Members' Mining Tax pages stop showing this corporation's book. This can't be undone.",
           "confirm": "Delete the book"
-        }
+        },
+        "tabs": {
+          "rates": "Rates",
+          "billing": "Pricing & billing",
+          "extractions": "Extractions",
+          "access": "Access & sync"
+        },
+        "scheduled": "Scheduled",
+        "addRateTitle": "Add a rate",
+        "ratesLive": "A rate saves as soon as you add it. The other tabs save with Save.",
+        "statements": "Statements",
+        "sections": "Settings sections"
       },
       "grouping": {
         "title": "Characters",
