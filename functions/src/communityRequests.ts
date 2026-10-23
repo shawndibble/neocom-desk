@@ -8,6 +8,18 @@
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
+  BUYBACK_GROUP_KEYS,
+  BUYBACK_HUB_IDS,
+  MAX_BUY_LINES,
+  MAX_RATE,
+  MIN_RATE,
+  RATE_BASES,
+  isValidRate,
+  type BuybackGroup,
+  type BuybackHubId,
+  type RateBasis,
+} from './buybackTerms.js';
+import {
   MAIL_MAX_ATTEMPTS_PER_TARGET,
   MAIL_RESERVATION_STALE_MS,
   boundedString,
@@ -42,21 +54,18 @@ export const EXPIRED_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 /** Far above any real stack; keeps a typo from becoming an unbounded number. */
 export const MAX_LINE_QUANTITY = 1_000_000_000_000;
 
-/**
- * Standing buyback Requests (issue #4780). Mirrors `src/engine/communities/buyback.ts`
- * (a parity test pins them): a rate in tenths of a percent, a basis, a Trade
- * Hub id, and buy lines that are an item type or one of a short list of groups.
- */
-export const MIN_RATE = 1;
-export const MAX_RATE = 200;
-export const MAX_BUY_LINES = 50;
-export const RATE_BASES = ['buy', 'sell'] as const;
-export const BUYBACK_GROUP_KEYS = ['ore', 'ice', 'minerals', 'gas', 'pi', 'salvage'] as const;
-export const BUYBACK_HUB_IDS = ['jita', 'amarr', 'dodixie', 'rens', 'hek'] as const;
+export {
+  BUYBACK_GROUP_KEYS,
+  BUYBACK_HUB_IDS,
+  MAX_BUY_LINES,
+  MAX_RATE,
+  MIN_RATE,
+  RATE_BASES,
+  type BuybackGroup,
+  type BuybackHubId,
+  type RateBasis,
+} from './buybackTerms.js';
 
-export type RateBasis = (typeof RATE_BASES)[number];
-export type BuybackGroup = (typeof BUYBACK_GROUP_KEYS)[number];
-export type BuybackHubId = (typeof BUYBACK_HUB_IDS)[number];
 export type BuyLine =
   { kind: 'type'; typeId: number; name: string } | { kind: 'group'; group: BuybackGroup };
 
@@ -217,13 +226,7 @@ const buyLineKey = (line: BuyLine) =>
 
 function parseStanding(d: Record<string, unknown>): StandingTerms {
   const { rate } = d;
-  if (
-    typeof rate !== 'number' ||
-    !Number.isFinite(rate) ||
-    rate < MIN_RATE ||
-    rate > MAX_RATE ||
-    Math.abs(rate * 10 - Math.round(rate * 10)) > 1e-9
-  ) {
+  if (!isValidRate(rate)) {
     throw new HttpsError(
       'invalid-argument',
       `rate must be a percent from ${MIN_RATE} to ${MAX_RATE} in tenths`

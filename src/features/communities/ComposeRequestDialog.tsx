@@ -32,6 +32,8 @@ import {
   emptyBuybackDraft,
   type BuybackDraft,
 } from './buybackDraft';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { LocationPicker } from './LocationPicker';
 import { callableErrorReason } from './callableError';
 import { RequestNotifyChoice } from './RequestNotifyChoice';
@@ -357,7 +359,7 @@ export function ComposeRequestDialog({
           </label>
         </div>
         {!editing && (
-          <label className="flex items-start gap-2">
+          <label className={cx('flex items-start gap-2', tappableRowClassName)}>
             <Checkbox
               className="mt-0.5"
               checked={standingMode}

@@ -39,8 +39,8 @@ import {
   MAX_RATE as FUNCTIONS_MAX_RATE,
   MIN_RATE as FUNCTIONS_MIN_RATE,
   RATE_BASES as FUNCTIONS_RATE_BASES,
-  parsePostRequestInput,
-} from '../functions/src/communityRequests';
+  isValidRate as functionsIsValidRate,
+} from '../functions/src/buybackTerms';
 
 describe('trade hubs', () => {
   it('SNAPSHOT_HUBS matches TRADE_HUBS ids, stations and regions, in order', () => {
@@ -121,18 +121,8 @@ describe('standing buyback Requests', () => {
   });
 
   it('the callable and the engine agree on which rates are valid', () => {
-    for (const rate of [0, 0.9, 1, 92.5, 92.55, 100, 200, 200.1]) {
-      const accepted = () =>
-        parsePostRequestInput({
-          communityId: 'c1',
-          standing: true,
-          rate,
-          rateBasis: 'buy',
-          hubId: 'jita',
-          buyLines: [{ kind: 'group', group: 'ore' }],
-        });
-      if (isValidRate(rate)) expect(accepted).not.toThrow();
-      else expect(accepted).toThrow();
+    for (const rate of [0, 0.9, 1, 92.5, 92.55, 100, 200, 200.1, Number.NaN, '90']) {
+      expect(functionsIsValidRate(rate)).toBe(isValidRate(rate));
     }
   });
 });

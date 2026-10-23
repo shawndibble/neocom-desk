@@ -15,6 +15,8 @@ import {
   type RateBasis,
 } from '@/engine/communities/buyback';
 import type { AppraisalCatalogue } from '@/engine/market/appraisalMatch';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { TRADE_HUBS } from '@/market/hubs';
 import { addType, removeType, toggleGroup, type BuybackDraft } from './buybackDraft';
 import { namedLike, needleOf } from './shareLists';
@@ -131,7 +133,7 @@ export function BuybackFields({
         <legend className="text-xs text-text-dim">{t('communities.board.buyback.buys')}</legend>
         <div className="flex flex-wrap gap-x-4 gap-y-2">
           {BUYBACK_GROUP_KEYS.map((group) => (
-            <label key={group} className="flex items-center gap-2">
+            <label key={group} className={cx('flex items-center gap-2', tappableRowClassName)}>
               <Checkbox
                 checked={draft.groups.includes(group)}
                 onChange={() => onChange(toggleGroup(draft, group))}
