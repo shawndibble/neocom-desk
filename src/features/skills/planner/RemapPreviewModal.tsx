@@ -12,7 +12,12 @@ import { formatCountdown } from '@/lib/duration';
 import { useTimeZone } from '@/lib/timeFormat';
 import { yearlyRemapAfterNote } from './optimizeHelpers';
 import type { OptimizeVerdict } from './optimizeVerdict';
-import { compareOrders, type CurrentCompareRow, type ProposedCompareRow } from './optimizeCompare';
+import {
+  compareOrders,
+  optimizeForMeHasGain,
+  type CurrentCompareRow,
+  type ProposedCompareRow,
+} from './optimizeCompare';
 import { remapInstruction } from './remapInstruction';
 
 interface RemapSegmentListProps {
@@ -160,6 +165,8 @@ interface OptimizeForMeModalProps {
   currentOrder: readonly PlanStep[];
   /** The plan's current total, shown as the "before" of the before/after line. */
   totalSeconds: number;
+  /** True when the pilot ranked any skill above or below normal: a reorder alone is then worth previewing. */
+  prioritized: boolean;
   nameFor: (skillTypeID: number) => string;
   stepLabel: (step: PlanStep) => string;
   implants: Implants;
@@ -284,6 +291,7 @@ export function OptimizeForMeModal({
   preview,
   currentOrder,
   totalSeconds,
+  prioritized,
   nameFor,
   stepLabel,
   implants,
@@ -298,14 +306,20 @@ export function OptimizeForMeModal({
   const saved = preview ? totalSeconds - preview.remaps.totalSeconds : 0;
   const moved = rows ? rows.current.filter((r) => r.movesTo !== null).length : 0;
   const markers = rows ? rows.proposed.filter((r) => r.kind === 'remap').length : 0;
+  const gain = optimizeForMeHasGain({ savedSeconds: saved, markers, prioritized });
   return (
     <Modal
       open={preview !== null}
       onClose={onReject}
       title={t('plans.optimizeForMeTitle')}
-      placement="wide"
+      placement={gain ? 'wide' : 'center'}
       footer={
-        preview && (
+        preview &&
+        (!gain ? (
+          <Button size="sm" onClick={onReject}>
+            {t('plans.remapDismiss')}
+          </Button>
+        ) : (
           <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <p className="text-xs">
               <span className="font-semibold text-success">
@@ -326,10 +340,13 @@ export function OptimizeForMeModal({
               </Button>
             </div>
           </div>
-        )
+        ))
       }
     >
-      {rows && (
+      {rows && !gain && (
+        <p className="text-xs text-text-dim">{t('plans.optimizeForMeNoGain', { total: before })}</p>
+      )}
+      {rows && gain && (
         <div className="space-y-2">
           <div className="md:hidden">
             <SegmentedControl

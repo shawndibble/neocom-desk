@@ -1,5 +1,6 @@
 import type { RemapSegment } from '@/engine/optimizer';
 import type { PlanStep } from '@/engine/types';
+import { MIN_MEANINGFUL_SAVINGS_SECONDS } from './planHeaderStats';
 
 export interface CurrentCompareRow {
   step: PlanStep;
@@ -55,4 +56,21 @@ export function compareOrders(
     });
   });
   return { current: currentRows, proposed: proposedRows };
+}
+
+/**
+ * Whether "Optimize for me" found anything worth previewing. A new order that
+ * saves no time and adds no Remap Marker is only a reshuffle, unless the pilot
+ * ranked skills by priority: then putting the urgent ones first is the point.
+ */
+export function optimizeForMeHasGain({
+  savedSeconds,
+  markers,
+  prioritized,
+}: {
+  savedSeconds: number;
+  markers: number;
+  prioritized: boolean;
+}): boolean {
+  return prioritized || markers > 0 || savedSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS;
 }
