@@ -1,16 +1,13 @@
-// SRP (issue #4848, epic #4608, ADR 0026): the shapes and layout the SRP
+// SRP (ADR 0026): the shapes and layout the SRP
 // callables, rules and later tickets share. No Firestore, no ESI.
 //
 // Firestore layout (rules in firestore.rules; every write is a callable):
 //   corps/{corporationId}/srp/settings          the corp's SRP settings (SrpSettings)
 //   corps/{corporationId}/srpClaims/{killmailId} one SRP Claim per killmail; the id IS the killmail
 //                                               id, so a second claim is a create conflict. Written by
-//                                               the file-claim callable (#4850); carries `uid`.
+//                                               the file-claim callable; carries `uid`.
 //   corps/{corporationId}/srpAudit/{at~rand}    immutable audit log
 //   corps/{corporationId}/srpOfficers/{uid}     officer access record (1h) written by verifySrpOfficer
-//
-// `srp` is the collection that holds the settings doc; claims, audit and officers are
-// sibling collections under the same `corps/{id}` umbrella.
 
 export const CORPS_COLLECTION = 'corps';
 export const SRP_SETTINGS_COLLECTION = 'srp';
@@ -89,26 +86,6 @@ export function defaultSrpSettings(): Pick<
 /** An SRP Claim's state (scope decision: Pending -> Approved -> Paid, plus Rejected). */
 export type SrpClaimState = 'pending' | 'approved' | 'paid' | 'rejected';
 
-/**
- * Written by the callables that close a claim (#4851 reject, #4852 mark paid) and by
- * re-filing (which sets state back to 'pending' and removes `closedAt`). The retention sweep
- * (#4856) reads `state` and `closedAt` only. `closedAt` is the epoch ms the claim became
- * Paid or Rejected; absent while Pending or Approved. A claim without it is never swept.
- */
-export interface SrpClaimClosure {
-  state: SrpClaimState;
-  closedAt?: number;
-}
-
-/**
- * The fields of an SRP Claim doc that rules and the officer gate rely on. The
- * file-claim callable (#4850) writes the rest. `uid` and `ownerHash` are the filer's
- * verified identity, which is what lets a pilot read only their own claims.
- */
-export interface SrpClaimKey {
-  uid: string;
-  /** The filer's ownerHash at filing; rules require it to match the reader's token. */
-  ownerHash: string;
-  corporationId: number;
-  killmailId: number;
-}
+// Retention sweep contract: it reads a claim's `state` and `closedAt` only. `closedAt` is the epoch
+// ms the claim became Paid or Rejected, set by the callables that close it; re-filing sets state
+// back to 'pending' and removes it. Absent while Pending or Approved; such a claim is never swept.

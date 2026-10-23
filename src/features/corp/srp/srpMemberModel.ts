@@ -45,7 +45,7 @@ export interface LostRowContext {
 }
 
 /** The hull's own rule beats its class's, as the server's pricing does. */
-export function isHullNotCovered(
+function isHullNotCovered(
   rules: readonly HullRule[],
   hullTypeId: number,
   classId: number

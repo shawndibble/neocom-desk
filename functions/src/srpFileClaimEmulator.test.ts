@@ -199,7 +199,8 @@ suite('fileSrpClaim (emulator)', () => {
   });
 
   it('refuses when SRP is off or was never turned on', async () => {
-    db.collection('corps')
+    await db
+      .collection('corps')
       .doc(String(CORP))
       .collection('srp')
       .doc('settings')

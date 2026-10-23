@@ -39,12 +39,10 @@ describe('parsing', () => {
     expect(() => parseApproveBatch({ claims: [] })).toThrow();
     expect(() => parseApproveBatch({ claims: [{ killmailId: 1 }, { killmailId: 1 }] })).toThrow();
     expect(() =>
-      parseMarkPaidBatch({ killmailIds: Array.from({ length: 51 }, (_, i) => i + 1) })
+      parseMarkPaidBatch({
+        claims: Array.from({ length: 51 }, (_, i) => ({ killmailId: i + 1 })),
+      })
     ).toThrow();
-    expect(parseMarkPaidBatch({ killmailIds: [1, 2] })).toEqual([
-      { killmailId: 1 },
-      { killmailId: 2 },
-    ]);
     expect(parseMarkPaidBatch({ claims: [{ killmailId: 1, expectedAmount: 5 }] })).toEqual([
       { killmailId: 1, expectedAmount: 5 },
     ]);

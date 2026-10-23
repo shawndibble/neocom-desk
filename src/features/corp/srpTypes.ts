@@ -1,9 +1,5 @@
-// Client mirror of `functions/src/srpTypes.ts` (issue #4848, epic #4608, ADR 0026): the shapes
-// the SRP callables take and return. Kept as its own copy, not an import, because the Cloud
-// Functions package is built separately; the two are kept in step by hand.
-//
-// Data lives under `corps/{corporationId}` and is written only through callables:
-//   srp/settings, srpClaims/{killmailId}, srpAudit/{id}, srpOfficers/{uid}.
+// Client mirror of `functions/src/srpTypes.ts` (ADR 0026; layout and field docs live there).
+// A copy, not an import: Functions builds separately; kept in step by hand.
 
 /** A claim's window, in days from the loss: corp default and the range a Director may set. */
 export const DEFAULT_CLAIM_WINDOW_DAYS = 30;
@@ -55,19 +51,6 @@ export interface SrpSettingsPatch {
   hullRules?: HullRule[];
   windowDays?: number;
   requireFleetOrFc?: boolean;
-}
-
-/**
- * The fields of an SRP Claim doc that rules and the officer gate rely on. The
- * file-claim callable (#4850) writes the rest. `uid` and `ownerHash` are the filer's
- * verified identity, which is what lets a pilot read only their own claims.
- */
-export interface SrpClaimKey {
-  uid: string;
-  /** The filer's ownerHash at filing; rules require it to match the reader's token. */
-  ownerHash: string;
-  corporationId: number;
-  killmailId: number;
 }
 
 /** `verifySrpOfficerCallable`'s answer. */

@@ -1,4 +1,4 @@
-// SRP (issue #4848, ADR 0026): the admin-SDK half of the callables. Parsing is
+// SRP (ADR 0026): the admin-SDK half of the callables. Parsing is
 // in srp.ts, the layout and shapes in srpTypes.ts. Every write to a
 // corporation's SRP data goes through here and appends to the immutable audit
 // log in the same transaction; clients have no write path (firestore.rules).
@@ -106,7 +106,7 @@ export interface SrpMember {
 /**
  * Whether the caller is in the corporation right now, from public affiliation.
  * Needs no corp scope and no role, so any pilot passes. The file-claim callable
- * (#4850) also checks the corporation at the time of the loss.
+ * also checks the corporation at the time of the loss.
  */
 export async function authorizeMember(
   deps: SrpDeps,
@@ -124,11 +124,8 @@ export async function authorizeMember(
 // --- Officer check ---------------------------------------------------------
 
 /**
- * Establishes what the caller may do as an SRP officer. Officer calls re-check
- * live (`live: true`, the default): ESI roles are read on every call. The
- * 1-hour `srpOfficers/{uid}` record that lets rules show the officer the
- * queue is (re)written whenever SRP has been turned on and the caller holds
- * Director or Accountant, and deleted when a renewal finds them demoted or gone.
+ * What the caller may do as an SRP officer; ESI roles re-read per call (`live`). Keeps the 1h
+ * `srpOfficers/{uid}` record in step: written when SRP is on and they hold the role, deleted on demotion.
  */
 export async function authorizeSrpOfficer(
   deps: SrpDeps,
@@ -365,7 +362,7 @@ export async function reclaimSrp(deps: SrpDeps, caller: Caller, call: BookCall) 
   return { officersRevoked: revoked };
 }
 
-// --- Filing a claim (#4850) --------------------------------------------------
+// --- Filing a claim -----------------------------------------------------------
 
 export interface SrpFileDeps extends SrpDeps {
   /** ESI, zKillboard and the Jita price source; faked in tests. */
@@ -471,20 +468,21 @@ export async function fileSrpClaim(
 
   const hullTypeId = km.victim.shipTypeId;
   const classId = await deps.killmails.shipGroupId(hullTypeId);
-  const none: ClaimValues = { killmailValue: null, appraisalValue: null };
-  if (priceSrpClaim(pricingInput(settings, hullTypeId, classId, none)).kind === 'refused') {
+  const priced = pricingInput(settings, hullTypeId, classId, {
+    killmailValue: null,
+    appraisalValue: null,
+  });
+  if (priceSrpClaim(priced).kind === 'refused') {
     fail('failed-precondition', 'This corporation does not cover that hull', 'not-covered');
   }
 
   const values: ClaimValues = { killmailValue: zkill.totalValue, appraisalValue: null };
-  let result = priceSrpClaim(pricingInput(settings, hullTypeId, classId, values));
+  const price = () => priceSrpClaim({ ...priced, ...values });
+  let result = price();
   const settled = result.kind === 'amount' || (result.kind === 'officer' && result.suggested);
-  if (
-    !settled &&
-    (pricingInput(settings, hullTypeId, classId, values).appraisalPercent ?? 0) >= 1
-  ) {
+  if (!settled && (priced.appraisalPercent ?? 0) >= 1) {
     values.appraisalValue = await softJita(deps.killmails, appraisalItems(km.victim));
-    result = priceSrpClaim(pricingInput(settings, hullTypeId, classId, values));
+    result = price();
   }
   if (result.kind === 'refused') {
     fail('failed-precondition', 'This corporation does not cover that hull', 'not-covered');

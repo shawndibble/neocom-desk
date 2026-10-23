@@ -1,8 +1,8 @@
-// SRP officer actions (issue #4853, epic #4608, ADR 0026): the admin-SDK half. Each action re-checks the
+// SRP officer actions (ADR 0026): the admin-SDK half. Each action re-checks the
 // caller's roles live (Director, Accountant or CEO), then moves a claim in a transaction that
 // re-reads it, so a double click or a racing second officer meets the state guard, and appends the
-// audit entry in the same transaction. Rules and shapes: srpOfficer.ts. The result mail is #4854: these
-// return what it needs (pilot, amount, reason) and send nothing.
+// audit entry in the same transaction. Rules and shapes: srpOfficer.ts.
+// Returns what the result mail needs (pilot, amount, reason); sends nothing.
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import type { BookCall } from './corpTaxBook.js';
@@ -49,11 +49,6 @@ async function apply(
   });
 }
 
-const officerOf = (access: Officer): Officer => ({
-  characterId: access.characterId,
-  characterName: access.characterName,
-});
-
 /** A refusal in a batch is a result, not a failure of the whole call. */
 async function settle(
   killmailId: number,
@@ -71,91 +66,80 @@ async function settle(
   }
 }
 
-export async function approveSrpClaim(
+type Decide<I> = (
+  claim: Record<string, unknown> | undefined,
+  item: I,
+  officer: Officer,
+  now: number
+) => Decision;
+
+async function decideOne<I extends { killmailId: number }>(
   deps: SrpDeps,
   caller: Caller,
   call: BookCall,
-  item: ApproveItem
+  item: I,
+  action: string,
+  decide: Decide<I>
 ): Promise<SrpClaimOutcome> {
-  const officer = officerOf(await authorizeSrpOfficer(deps, caller, call, 'edit'));
-  return apply(deps, call, officer, item.killmailId, 'approveClaim', (claim, now) =>
-    decideApprove(claim, item, officer, now)
+  const officer = await authorizeSrpOfficer(deps, caller, call, 'edit');
+  return apply(deps, call, officer, item.killmailId, action, (claim, now) =>
+    decide(claim, item, officer, now)
   );
 }
 
+async function decideMany<I extends { killmailId: number }>(
+  deps: SrpDeps,
+  caller: Caller,
+  call: BookCall,
+  items: I[],
+  action: string,
+  decide: Decide<I>
+): Promise<SrpBatchOutcome> {
+  const officer = await authorizeSrpOfficer(deps, caller, call, 'edit');
+  const results: SrpBatchResult[] = [];
+  for (const item of items) {
+    results.push(
+      await settle(item.killmailId, () =>
+        apply(deps, call, officer, item.killmailId, action, (claim, now) =>
+          decide(claim, item, officer, now)
+        )
+      )
+    );
+  }
+  return { results };
+}
+
+export const approveSrpClaim = (deps: SrpDeps, caller: Caller, call: BookCall, item: ApproveItem) =>
+  decideOne(deps, caller, call, item, 'approveClaim', decideApprove);
+
 /** Approve many at once (no overrides: a claim that needs a typed amount is refused on its own). */
-export async function approveSrpClaims(
+export const approveSrpClaims = (
   deps: SrpDeps,
   caller: Caller,
   call: BookCall,
   items: ApproveItem[]
-): Promise<SrpBatchOutcome> {
-  const officer = officerOf(await authorizeSrpOfficer(deps, caller, call, 'edit'));
-  const results: SrpBatchResult[] = [];
-  for (const item of items) {
-    results.push(
-      await settle(item.killmailId, () =>
-        apply(deps, call, officer, item.killmailId, 'approveClaim', (claim, now) =>
-          decideApprove(claim, item, officer, now)
-        )
-      )
-    );
-  }
-  return { results };
-}
+) => decideMany(deps, caller, call, items, 'approveClaim', decideApprove);
 
-export async function rejectSrpClaim(
-  deps: SrpDeps,
-  caller: Caller,
-  call: BookCall,
-  item: RejectItem
-): Promise<SrpClaimOutcome> {
-  const officer = officerOf(await authorizeSrpOfficer(deps, caller, call, 'edit'));
-  return apply(deps, call, officer, item.killmailId, 'rejectClaim', (claim, now) =>
-    decideReject(claim, item, officer, now)
-  );
-}
+export const rejectSrpClaim = (deps: SrpDeps, caller: Caller, call: BookCall, item: RejectItem) =>
+  decideOne(deps, caller, call, item, 'rejectClaim', decideReject);
 
-export async function changeSrpClaimAmount(
+export const changeSrpClaimAmount = (
   deps: SrpDeps,
   caller: Caller,
   call: BookCall,
   item: ChangeAmountItem
-): Promise<SrpClaimOutcome> {
-  const officer = officerOf(await authorizeSrpOfficer(deps, caller, call, 'edit'));
-  return apply(deps, call, officer, item.killmailId, 'changeClaimAmount', (claim, now) =>
-    decideChangeAmount(claim, item, officer, now)
-  );
-}
+) => decideOne(deps, caller, call, item, 'changeClaimAmount', decideChangeAmount);
 
-export async function markSrpClaimPaid(
+export const markSrpClaimPaid = (
   deps: SrpDeps,
   caller: Caller,
   call: BookCall,
   item: MarkPaidItem
-): Promise<SrpClaimOutcome> {
-  const officer = officerOf(await authorizeSrpOfficer(deps, caller, call, 'edit'));
-  return apply(deps, call, officer, item.killmailId, 'markClaimPaid', (claim, now) =>
-    decideMarkPaid(claim, item, officer, now)
-  );
-}
+) => decideOne(deps, caller, call, item, 'markClaimPaid', decideMarkPaid);
 
-export async function markSrpClaimsPaid(
+export const markSrpClaimsPaid = (
   deps: SrpDeps,
   caller: Caller,
   call: BookCall,
   items: MarkPaidItem[]
-): Promise<SrpBatchOutcome> {
-  const officer = officerOf(await authorizeSrpOfficer(deps, caller, call, 'edit'));
-  const results: SrpBatchResult[] = [];
-  for (const item of items) {
-    results.push(
-      await settle(item.killmailId, () =>
-        apply(deps, call, officer, item.killmailId, 'markClaimPaid', (claim, now) =>
-          decideMarkPaid(claim, item, officer, now)
-        )
-      )
-    );
-  }
-  return { results };
-}
+) => decideMany(deps, caller, call, items, 'markClaimPaid', decideMarkPaid);

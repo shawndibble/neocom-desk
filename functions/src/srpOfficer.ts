@@ -1,17 +1,18 @@
-// SRP officer decisions (issue #4853, epic #4608, ADR 0026): the pure half. Input parsing and the
+// SRP officer decisions (ADR 0026): the pure half. Input parsing and the
 // state-transition rules for approve, reject, change amount and mark paid, with no Firestore. The
 // transaction that applies a decision is in srpOfficerStore.ts.
 //
 // State machine (anything else is refused): pending -> approved | rejected, approved -> paid.
 // An amount may also be changed while a claim is pending or approved (never once paid or rejected).
 // An officer never decides their own claim: another officer must.
-// `closedAt` is set when a claim becomes paid or rejected (the retention sweep, #4856, keys on it).
+// `closedAt` is set when a claim becomes paid or rejected (the retention sweep keys on it).
 // The app never moves ISK: an officer pays in game, then marks the claim paid.
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
 import { int } from './corpTaxBook.js';
 import { fail } from './corpTaxBookStore.js';
+import type { SrpClaimState } from './srpTypes.js';
 
 /** The most claims one batch call touches. */
 export const MAX_SRP_BATCH = 50;
@@ -80,14 +81,9 @@ export function parseMarkPaidItem(data: unknown): MarkPaidItem {
   return item;
 }
 
-/** `claims: [{ killmailId, expectedAmount? }]`; the older `killmailIds: number[]` still works. */
+/** `claims: [{ killmailId, expectedAmount? }]`. */
 export function parseMarkPaidBatch(data: unknown): MarkPaidItem[] {
   const d = record(data);
-  if (d.claims === undefined && d.killmailIds !== undefined) {
-    return distinct(
-      list(d.killmailIds, 'killmailIds').map((id) => ({ killmailId: killmailId(id) }))
-    );
-  }
   return distinct(list(d.claims, 'claims').map(parseMarkPaidItem));
 }
 
@@ -123,10 +119,10 @@ export interface Officer {
   characterName: string;
 }
 
-/** What the result mail (#4854) needs, plus the new state. */
+/** What the result mail needs, plus the new state. */
 export interface SrpClaimOutcome {
   killmailId: number;
-  state: 'pending' | 'approved' | 'paid' | 'rejected';
+  state: SrpClaimState;
   /** The pilot the claim belongs to. */
   characterId: number | null;
   characterName: string | null;
@@ -150,7 +146,7 @@ const amountOf = (claim: Record<string, unknown>): number | null =>
 function outcomeOf(
   claim: Record<string, unknown>,
   id: number,
-  state: SrpClaimOutcome['state'],
+  state: SrpClaimState,
   amount: number | null,
   reason?: string
 ): SrpClaimOutcome {
@@ -167,7 +163,7 @@ function outcomeOf(
 /** The claim, once it exists, is in one of `from`, and is not the deciding officer's own. */
 function requireState(
   claim: ClaimData,
-  from: SrpClaimOutcome['state'] | SrpClaimOutcome['state'][],
+  from: SrpClaimState | SrpClaimState[],
   officer: Officer
 ): Record<string, unknown> {
   if (!claim) fail('not-found', 'No such SRP claim', 'claim-not-found');
@@ -175,7 +171,7 @@ function requireState(
     fail('permission-denied', 'Another officer must decide your own claim', 'own-claim');
   }
   const allowed = Array.isArray(from) ? from : [from];
-  if (!allowed.includes(claim.state as SrpClaimOutcome['state'])) {
+  if (!allowed.includes(claim.state as SrpClaimState)) {
     fail(
       'failed-precondition',
       `That claim is ${String(claim.state)}, not ${allowed.join(' or ')}`,
@@ -309,7 +305,7 @@ export function decideChangeAmount(
     outcome: outcomeOf(
       claim,
       item.killmailId,
-      claim.state as SrpClaimOutcome['state'],
+      claim.state as SrpClaimState,
       item.amount,
       item.reason
     ),
