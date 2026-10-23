@@ -7734,10 +7734,6 @@
       "today": "Today · {{date}}",
       "tomorrow": "Tomorrow · {{date}}"
     },
-    "clocks": {
-      "local": "Local",
-      "eve": "EVE"
-    },
     "rail": {
       "title": "Coming up",
       "count_one": "{{count}} ahead",

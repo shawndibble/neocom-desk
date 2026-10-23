@@ -24,6 +24,18 @@ export function eveClock(ms: number): string {
   return EVE_CLOCK.format(new Date(ms)).replace(',', '');
 }
 
+const EVE_TIME_OF_DAY = new Intl.DateTimeFormat('en-GB', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+  timeZone: 'UTC',
+});
+
+/** "14:02": EVE time as a 24-hour time of day, no weekday. */
+export function eveTimeOfDay(ms: number): string {
+  return EVE_TIME_OF_DAY.format(new Date(ms));
+}
+
 const WEEK_MS = 7 * 86_400_000;
 
 /** `eveClock` while the weekday is unambiguous (under a week out), else `formatEveDateTime`'s "10-23 14:20". */
