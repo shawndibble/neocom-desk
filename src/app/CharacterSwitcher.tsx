@@ -37,9 +37,6 @@ export function CharacterSwitcher({
   const rows = useCharacterPermissionCounts();
   const activeId = useActiveCharacter((state) => state.activeCharacterId);
   if (rows === undefined || rows.length < 2) return null;
-  const needsAttention = rows.some(
-    (row) => row.characterId === activeId && row.granted < row.total
-  );
 
   const pick = (characterId: number, then?: () => void) => {
     void useActiveCharacter
@@ -55,18 +52,8 @@ export function CharacterSwitcher({
         <IconButton
           label={t('nav.characterSwitcher')}
           variant="plain"
-          className={cx('relative shrink-0', className)}
-          icon={
-            <>
-              <Icon.AllCharacters />
-              {needsAttention && (
-                <span
-                  aria-hidden="true"
-                  className="absolute top-1 right-1 size-2 rounded-full bg-warning"
-                />
-              )}
-            </>
-          }
+          className={cx('shrink-0', className)}
+          icon={<Icon.AllCharacters />}
         />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-max min-w-56 max-w-[90vw] p-0">
