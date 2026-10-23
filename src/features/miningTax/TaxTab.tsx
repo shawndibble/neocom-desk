@@ -122,6 +122,7 @@ import { CorpBookSyncNote } from '@/features/miningTax/corpBook/CorpBookSyncNote
 import { PendingGroupingNotice } from '@/features/miningTax/corpBook/PendingGroupingNotice';
 import {
   useCorpStateHint,
+  useCorpPillText,
   useCorpStateLabel,
 } from '@/features/miningTax/corpBook/useCorpStateText';
 import {
@@ -345,6 +346,7 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
     security: data?.systemSecurity ?? NO_SECURITY,
   });
   const corpStateLabel = useCorpStateLabel();
+  const corpPillText = useCorpPillText();
   const corpStateHint = useCorpStateHint();
   const allDisplayRows = useMemo(
     () =>
@@ -785,16 +787,16 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
 
   // Sized to the longest status on screen, over both tables so Open's and
   // History's columns still line up.
-  const statusWidthClass = useMemo(() => {
-    const marked: string[] = [];
-    const labels = visibleRows.map((dr) => {
-      if (!dr.corp) return statusLabel(t, dr.status);
-      const label = corpStateLabel(dr.corp);
-      if (dr.corp.kind === 'row' && dr.corp.view.overlap) marked.push(label);
-      return label;
-    });
-    return statusColumnWidthClass(labels, { markedLabels: marked });
-  }, [visibleRows, corpStateLabel, t]);
+  const statusWidthClass = useMemo(
+    () =>
+      statusColumnWidthClass(
+        visibleRows.map((dr) => ({
+          text: dr.corp ? corpPillText(dr.corp) : statusLabel(t, dr.status),
+          marked: dr.corp?.kind === 'row' && Boolean(dr.corp.view.overlap),
+        }))
+      ),
+    [visibleRows, corpPillText, t]
+  );
 
   const { baseColumns, openColumns, historyColumns } = useTaxColumns({
     isPhone,

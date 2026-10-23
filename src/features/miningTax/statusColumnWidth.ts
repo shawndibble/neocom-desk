@@ -1,20 +1,36 @@
+/** A status pill's printed text, and whether an overlap mark sits beside it. */
+export interface StatusPillText {
+  text: string;
+  marked?: boolean;
+}
+
+/** The overlap mark beside a corp pill takes about two characters of room. */
+const OVERLAP_MARK_CHARS = 2;
+
 /**
- * The Status column's width for the labels on screen, as one of four literal
- * Tailwind classes (a class built at run time would never be generated). A
- * pill prints its label in small caps, about half a rem a character, inside
- * the cell's own padding; the floor is the header, "Status" and its sort
- * arrow. Open and History share their columns so they line up, so the caller
- * passes the labels of both tables.
+ * [longest text in characters, width class]: a pill prints small caps at about
+ * half a rem a character, inside 0.75rem of its own padding and the cell's
+ * 1.5rem, so a class is the first whose width clears its row's text. The first
+ * row's floor is the header, "Status" and its sort arrow (checked at 6rem).
+ * Literal classes, because one built at run time would never be generated.
  */
-export function statusColumnWidthClass(
-  labels: readonly string[],
-  { markedLabels = [] }: { markedLabels?: readonly string[] } = {}
-): string {
-  const marked = new Set(markedLabels);
-  // The overlap mark beside a corp pill takes about two characters of room.
-  const longest = Math.max(0, ...labels.map((l) => l.length + (marked.has(l) ? 2 : 0)));
-  if (longest <= 6) return 'sm:w-24';
-  if (longest <= 9) return 'sm:w-28';
-  if (longest <= 11) return 'sm:w-32';
-  return 'sm:w-36';
+const TIERS: readonly (readonly [number, string])[] = [
+  [6, 'sm:w-24'],
+  [9, 'sm:w-28'],
+  [11, 'sm:w-32'],
+  [13, 'sm:w-36'],
+  [17, 'sm:w-44'],
+];
+const WIDEST = 'sm:w-48';
+
+/**
+ * The Status column's width for the pills on screen. Open and History share
+ * their columns so they line up, so the caller passes both tables' pills.
+ */
+export function statusColumnWidthClass(pills: readonly StatusPillText[]): string {
+  const longest = Math.max(
+    0,
+    ...pills.map((p) => p.text.length + (p.marked ? OVERLAP_MARK_CHARS : 0))
+  );
+  return TIERS.find(([max]) => longest <= max)?.[1] ?? WIDEST;
 }
