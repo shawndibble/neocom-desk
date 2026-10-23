@@ -153,7 +153,10 @@ import {
   type BookDeps,
 } from './corpTaxBookStore.js';
 import { parseSrpSettingsPatch } from './srp.js';
+import { parseFileClaimInput } from './srpKillmail.js';
+import { srpKillmailSource } from './srpKillmailEsi.js';
 import {
+  fileSrpClaim,
   getSrpStatus,
   reclaimSrp,
   saveSrpSettings,
@@ -161,6 +164,7 @@ import {
   turnOnSrp,
   verifySrpOfficer,
   type SrpDeps,
+  type SrpFileDeps,
 } from './srpStore.js';
 import {
   parseCommunityIdInput,
@@ -1104,6 +1108,8 @@ const srpDeps = (): SrpDeps => ({
   lookupCorporation: esiCorporationLookup(),
 });
 
+const srpFileDeps = (): SrpFileDeps => ({ ...srpDeps(), killmails: srpKillmailSource() });
+
 export const verifySrpOfficerCallable = corpTaxBookCallable(
   'verifySrpOfficerCallable',
   CORP_TAX_BOOK_OPTIONS,
@@ -1115,6 +1121,19 @@ export const getSrpStatusCallable = corpTaxBookCallable(
   'getSrpStatusCallable',
   CORP_TAX_BOOK_OPTIONS,
   (request) => getSrpStatus(srpDeps(), callerOf(request), parseBookCall(request.data))
+);
+
+// A member files an SRP Claim against their own killmail (#4850): the server verifies the loss and prices it.
+export const fileSrpClaimCallable = corpTaxBookCallable(
+  'fileSrpClaimCallable',
+  CORP_TAX_BOOK_OPTIONS,
+  (request) =>
+    fileSrpClaim(
+      srpFileDeps(),
+      callerOf(request),
+      parseBookCall(request.data),
+      parseFileClaimInput(request.data)
+    )
 );
 
 export const turnOnSrpCallable = corpTaxBookCallable(

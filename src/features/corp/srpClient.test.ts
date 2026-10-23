@@ -11,6 +11,7 @@ const token = vi.hoisted(() => vi.fn());
 vi.mock('@/auth/session', () => ({ getValidAccessToken: token }));
 
 import {
+  fileSrpClaim,
   getSrpStatus,
   reclaimSrp,
   saveSrpSettings,
@@ -54,6 +55,12 @@ describe('SRP client', () => {
     };
     await saveSrpSettings(7, CORP, settings);
     sent('saveSrpSettingsCallable', { corporationId: CORP, accessToken: 'access-token', settings });
+  });
+
+  it('files a claim with the link and notes, never hull or amount', async () => {
+    const claim = { killmail: 'https://zkillboard.com/kill/9/', fleetOrFc: 'Alpha' };
+    await fileSrpClaim(7, CORP, claim);
+    sent('fileSrpClaimCallable', { corporationId: CORP, accessToken: 'access-token', ...claim });
   });
 
   it('returns the callable’s answer', async () => {

@@ -92,3 +92,32 @@ export interface SrpStatus {
     'killmailPct' | 'appraisalPct' | 'hullRules' | 'windowDays' | 'requireFleetOrFc'
   >;
 }
+
+/** A claim's `state`. `closedAt` (epoch ms) is set when it becomes paid or rejected. */
+export type SrpClaimState = 'pending' | 'approved' | 'paid' | 'rejected';
+
+/** `fileSrpClaimCallable`'s input beside the corporation and token. */
+export interface FileSrpClaimInput {
+  /** A pasted zKillboard (`/kill/<id>/`) or ESI (`/killmails/<id>/<hash>/`) link. */
+  killmail: string;
+  /** Which Fleet or FC the loss was under; required when the corp says so. */
+  fleetOrFc?: string;
+  /** Required when re-filing after a rejection. */
+  note?: string;
+}
+
+/** How a claim's amount was reached (mirror of the pricing engine's basis). */
+export type SrpClaimBasis =
+  | { step: 'hull-fixed' }
+  | { step: 'class-fixed' }
+  | { step: 'killmail-percent'; percent: number }
+  | { step: 'appraisal-percent'; percent: number };
+
+/** `fileSrpClaimCallable`'s answer. */
+export interface FiledSrpClaim {
+  killmailId: number;
+  state: 'pending';
+  /** Whole ISK; null when an officer types the amount. */
+  amount: number | null;
+  basis: SrpClaimBasis | null;
+}

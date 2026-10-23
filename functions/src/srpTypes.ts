@@ -98,3 +98,14 @@ export interface SrpClaimKey {
   corporationId: number;
   killmailId: number;
 }
+
+/** A claim's `state`; lowercase. */
+export type SrpClaimState = 'pending' | 'approved' | 'paid' | 'rejected';
+
+/**
+ * `closedAt` (epoch ms) is set when a claim becomes paid or rejected. A re-file of a rejected
+ * claim sets `state` back to 'pending' and removes `closedAt`; filing writes no `closedAt`.
+ */
+export interface SrpClaimClosure {
+  closedAt?: number;
+}
