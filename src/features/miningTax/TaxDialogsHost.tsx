@@ -1,4 +1,5 @@
 import { lazy, memo, Suspense, useEffect, useMemo, useState } from 'react';
+import { writeToClipboard } from '@/lib/clipboard';
 import { guarded } from '@/app/routeChunks';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { TaxPriceSource } from '@/engine/miningTax/priceBasis';
@@ -26,6 +27,9 @@ import {
   unsettle,
   type LedgerActionResult,
 } from '@/features/miningTax/ledgerActions';
+import { buildPriceBreakdown } from '@/features/miningTax/usePriceBreakdown';
+import { useMiningTaxCompressedOre } from '@/features/miningTax/oreForm';
+import type { RowMenuAction } from '@/features/miningTax/rowMenu';
 import { LinkTransactionDialog } from '@/features/miningTax/LinkTransactionDialog';
 import { paidOnFromIso } from '@/features/miningTax/madePayments';
 import type { LinkedTransaction } from '@/features/miningTax/PaymentLinksCard';
@@ -121,6 +125,8 @@ export interface TaxDialogsHostProps {
   onClearSelection: () => void;
   /** The Add-payee shortcut in the row detail; absent when there is no character to add one for. */
   onAddPayee: (() => void) | undefined;
+  /** A short confirmation for a row-menu action that has no dialog to show it in ("Copied"). */
+  onToast: (message: string) => void;
 }
 
 /**
@@ -164,10 +170,12 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     priceSourcesFor,
     onClearSelection,
     onAddPayee,
+    onToast,
   } = props;
   const { t } = useTranslation();
   const {
     detailTarget,
+    detailConfirmUnassign,
     editTarget,
     linkTransactionTarget,
     joinTarget,
@@ -198,12 +206,15 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
   // Reset whenever the target changes, not keyed on it: after a failure
   // nothing reloads, so reopening the same row hands back the very same object.
   const [errorTargets, setErrorTargets] = useState({ detailTarget, linkTransactionTarget });
+  // A row-menu action that failed opens its row's detail to say so; that open
+  // is a target change too, and must not wipe the message it opened for.
+  const [failedMenuRow, setFailedMenuRow] = useState<DisplayRow | null>(null);
   if (
     errorTargets.detailTarget !== detailTarget ||
     errorTargets.linkTransactionTarget !== linkTransactionTarget
   ) {
     setErrorTargets({ detailTarget, linkTransactionTarget });
-    setActionError(null);
+    if (detailTarget !== failedMenuRow) setActionError(null);
   }
 
   // Settle up's rows, re-read from every load by Assignment id: a recheck
@@ -310,22 +321,31 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
 
   /**
    * Every row action ends the same way: busy while it writes, then close and
-   * reload — or, when it wrote nothing, stay open and say so.
+   * reload — or, when it wrote nothing, stay open and say so. Run from the row
+   * menu (`menuRow`) no detail is open to close or to say so in, so a failure
+   * opens that row's detail to carry the message.
    */
-  async function runAndClose(action: () => Promise<LedgerActionResult<unknown>>) {
-    await runRowAction(action, () => {
-      actions.openDetail(null);
+  async function runAndClose(
+    action: () => Promise<LedgerActionResult<unknown>>,
+    menuRow?: DisplayRow
+  ) {
+    const result = await runRowAction(action, () => {
+      if (!menuRow) actions.openDetail(null);
       refresh();
     });
+    if (menuRow && !result.ok && result.reason !== 'already-assigned') {
+      setFailedMenuRow(menuRow);
+      actions.openDetail(menuRow);
+    }
   }
 
-  function handleMarkGroupPaidFromDetail() {
-    if (!detailTarget) return;
-    const outstanding = allMembers(detailTarget)
+  // Each takes the row and whether the row menu (not the detail) is asking.
+  function markGroupPaid(dr: DisplayRow, fromMenu = false) {
+    const outstanding = allMembers(dr)
       .filter((m) => m.assignment.status === 'outstanding')
       .map((m) => m.assignment);
     if (outstanding.length === 0) return;
-    void runAndClose(() => settle(outstanding));
+    void runAndClose(() => settle(outstanding), fromMenu ? dr : undefined);
   }
 
   /** The Assign form's submit, from inside RowDetailModal — same refresh-and-close every other row action takes. */
@@ -334,10 +354,8 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     refresh();
   }
 
-  function handleDismissFromDetail() {
-    if (!detailTarget) return;
-    const { row } = detailTarget;
-    void runAndClose(() => dismissRow(row));
+  function dismissEntry(dr: DisplayRow, fromMenu = false) {
+    void runAndClose(() => dismissRow(dr.row), fromMenu ? dr : undefined);
   }
 
   const detailLinkedTransactions: LinkedTransaction[] | undefined = useMemo(() => {
@@ -408,54 +426,133 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     );
   }
 
-  function handleMarkPaidFromDetail() {
-    const assignment = detailTarget?.assignment;
+  function markPaid(dr: DisplayRow, fromMenu = false) {
+    const assignment = dr.assignment;
     if (!assignment) return;
-    void runAndClose(() => settle([assignment]));
+    void runAndClose(() => settle([assignment]), fromMenu ? dr : undefined);
   }
 
-  function handleUnmarkPaidFromDetail() {
-    const assignment = detailTarget?.assignment;
+  function unmarkPaid(dr: DisplayRow, fromMenu = false) {
+    const assignment = dr.assignment;
     if (!assignment) return;
-    void runAndClose(() => unsettle([assignment]));
+    void runAndClose(() => unsettle([assignment]), fromMenu ? dr : undefined);
   }
 
-  function handleResolveFromDetail() {
-    const target = detailTarget;
-    if (!target?.assignment) return;
-    const assignment = target.assignment;
-    void runAndClose(() => acceptNewTotal([{ assignment, row: target.row }]));
+  function resolveEntry(dr: DisplayRow, fromMenu = false) {
+    const assignment = dr.assignment;
+    if (!assignment) return;
+    void runAndClose(
+      () => acceptNewTotal([{ assignment, row: dr.row }]),
+      fromMenu ? dr : undefined
+    );
   }
 
-  function handleUndoFromDetail() {
-    const assignment = detailTarget?.assignment;
+  /** "Undo" on a Dismissed row, "Unassign" on any other assigned one. */
+  function unassignEntry(dr: DisplayRow, fromMenu = false) {
+    const assignment = dr.assignment;
     if (!assignment) return;
-    void runAndClose(() => unassign([assignment]));
+    void runAndClose(() => unassign([assignment]), fromMenu ? dr : undefined);
   }
 
   /** Taking one day out of a combined entry keeps its Assignment; only the combination goes. */
-  function handleTakeOut(member: GroupMember) {
-    void runAndClose(() => uncombine([member.assignment]));
+  function takeOut(member: GroupMember, menuRow?: DisplayRow) {
+    void runAndClose(() => uncombine([member.assignment]), menuRow);
   }
 
   /** "Accept new total" on a combined entry: every day that grew since it was paid. */
-  function handleResolveGroup() {
-    if (!detailTarget) return;
-    const grown = allMembers(detailTarget).filter((m) => m.assignment.status === 'needs-review');
-    void runAndClose(() => acceptNewTotal(grown));
+  function resolveGroup(dr: DisplayRow, fromMenu = false) {
+    const grown = allMembers(dr).filter((m) => m.assignment.status === 'needs-review');
+    void runAndClose(() => acceptNewTotal(grown), fromMenu ? dr : undefined);
   }
 
-  function handleUnassignGroup() {
-    if (!detailTarget) return;
-    const members = allMembers(detailTarget).map((m) => m.assignment);
-    void runAndClose(() => unassign(members));
+  function unassignGroup(dr: DisplayRow, fromMenu = false) {
+    const members = allMembers(dr).map((m) => m.assignment);
+    void runAndClose(() => unassign(members), fromMenu ? dr : undefined);
   }
 
-  function handleUncombineAll() {
-    if (!detailTarget) return;
-    const members = allMembers(detailTarget).map((m) => m.assignment);
-    void runAndClose(() => uncombine(members));
+  function uncombineAll(dr: DisplayRow, fromMenu = false) {
+    const members = allMembers(dr).map((m) => m.assignment);
+    void runAndClose(() => uncombine(members), fromMenu ? dr : undefined);
   }
+
+  /** "Link a wallet payment" for a row: a combined entry's owed days, or its Payee's balance. */
+  function linkWalletFor(dr: DisplayRow) {
+    const payeeId = dr.assignment?.payeeId;
+    if (!payeeId) return;
+    actions.linkWalletFromDetail(
+      dr.groupMembers
+        ? {
+            payeeId,
+            members: allMembers(dr).filter((m) => m.assignment.status === 'outstanding'),
+          }
+        : { payeeId }
+    );
+  }
+
+  function copyBreakdown(dr: DisplayRow) {
+    const assignment = dr.assignment;
+    if (!assignment) return;
+    const { text } = buildPriceBreakdown(
+      {
+        assignment,
+        payee: payeeById.get(assignment.payeeId ?? ''),
+        systemName: systemName(dr),
+        typeNames,
+        pricesFor,
+        priceSourcesFor,
+      },
+      t,
+      useMiningTaxCompressedOre.getState().value
+    );
+    void writeToClipboard(text);
+    onToast(t('miningTax.detail.breakdown.copied'));
+  }
+
+  /** The row menu's actions: View details opens the modal, the rest do what its buttons do. */
+  function runMenuAction(action: RowMenuAction, dr: DisplayRow) {
+    const grouped = dr.groupMembers !== undefined;
+    switch (action.id) {
+      case 'view':
+        return actions.openDetail(dr);
+      case 'edit':
+        return actions.editFromDetail(dr);
+      case 'settleUp':
+        return settleUpPayeeOf(dr);
+      case 'resolve':
+        return grouped ? resolveGroup(dr, true) : resolveEntry(dr, true);
+      case 'reviewSplit':
+      case 'split':
+        return actions.splitFromDetail(dr);
+      case 'markPaid':
+        return markPaid(dr, true);
+      case 'markGroupPaid':
+        return markGroupPaid(dr, true);
+      case 'unmarkPaid':
+        return unmarkPaid(dr, true);
+      case 'linkWallet':
+        return linkWalletFor(dr);
+      case 'linkTransaction':
+        return actions.openLinkTransaction(dr);
+      case 'join':
+        return actions.joinFromDetail(dr);
+      case 'copyBreakdown':
+        return copyBreakdown(dr);
+      case 'dismiss':
+        return dismissEntry(dr, true);
+      case 'undismiss':
+        return unassignEntry(dr, true);
+      case 'takeOut':
+        return takeOut(action.member, dr);
+      case 'uncombine':
+        return uncombineAll(dr, true);
+      case 'unassign':
+        return actions.confirmUnassignFor(dr);
+      case 'corpPay':
+        if (dr.corp?.kind === 'row') actions.corpPayFromDetail(dr.corp.view.corporationId);
+        return;
+    }
+  }
+  useEffect(() => actions.registerRowMenuRunner(runMenuAction));
 
   const linkWalletPayee = payeeById.get(linkWalletTarget?.payeeId ?? '') ?? null;
   const linkWalletOwed = useMemo(
@@ -495,21 +592,13 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
           onSettleUp={
             detailTarget.status === 'outstanding' ? () => settleUpPayeeOf(detailTarget) : undefined
           }
-          onMarkAllPaid={handleMarkGroupPaidFromDetail}
-          onTakeOut={handleTakeOut}
-          onUncombine={handleUncombineAll}
-          onResolve={handleResolveGroup}
-          onUnassignAll={handleUnassignGroup}
-          onLinkWalletPayment={() => {
-            const payeeId = detailTarget.assignment?.payeeId;
-            if (!payeeId) return;
-            actions.linkWalletFromDetail({
-              payeeId,
-              members: allMembers(detailTarget).filter(
-                (m) => m.assignment.status === 'outstanding'
-              ),
-            });
-          }}
+          startWithUnassignConfirm={detailConfirmUnassign}
+          onMarkAllPaid={() => markGroupPaid(detailTarget)}
+          onTakeOut={(member) => takeOut(member)}
+          onUncombine={() => uncombineAll(detailTarget)}
+          onResolve={() => resolveGroup(detailTarget)}
+          onUnassignAll={() => unassignGroup(detailTarget)}
+          onLinkWalletPayment={() => linkWalletFor(detailTarget)}
           linkedTransactions={groupLinkedTransactions}
           onLinkTransaction={
             allMembers(detailTarget).every((m) => m.assignment.status === 'paid')
@@ -621,12 +710,13 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             busy={busy}
             // A failed link shows in its own dialog, open on top of this one.
             saveError={linkTransactionTarget ? null : actionError}
+            startWithUnassignConfirm={detailConfirmUnassign}
             onAssigned={handleAssignedFromDetail}
-            onDismiss={handleDismissFromDetail}
-            onMarkPaid={handleMarkPaidFromDetail}
-            onUnmarkPaid={handleUnmarkPaidFromDetail}
-            onResolve={handleResolveFromDetail}
-            onUndo={handleUndoFromDetail}
+            onDismiss={() => dismissEntry(detailTarget)}
+            onMarkPaid={() => markPaid(detailTarget)}
+            onUnmarkPaid={() => unmarkPaid(detailTarget)}
+            onResolve={() => resolveEntry(detailTarget)}
+            onUndo={() => unassignEntry(detailTarget)}
             onEdit={() => actions.editFromDetail(detailTarget)}
             onSettleUp={
               detailTarget.status === 'outstanding'
@@ -635,11 +725,7 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
             }
             onLinkWalletPayment={
               detailTarget.status === 'outstanding' && detailTarget.assignment?.payeeId
-                ? () => {
-                    const payeeId = detailTarget.assignment?.payeeId;
-                    if (payeeId) actions.linkWalletFromDetail({ payeeId });
-                    else actions.openDetail(null);
-                  }
+                ? () => linkWalletFor(detailTarget)
                 : undefined
             }
             onAddPayee={onAddPayee}

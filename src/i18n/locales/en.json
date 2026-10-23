@@ -7040,6 +7040,10 @@
       "done": "{{date}} added to your {{payee}} session",
       "undo": "Undo"
     },
+    "rowMenu": {
+      "view": "View details",
+      "name": "{{date}} in {{system}}"
+    },
     "combined": {
       "showDays": "Show each day of {{date}}",
       "days_one": "{{count}} day",

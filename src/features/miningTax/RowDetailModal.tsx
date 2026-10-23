@@ -101,6 +101,8 @@ interface RowDetailModalProps {
   onLinkWalletPayment?: () => void;
   /** What a Corp Tax Book says about this entry (pending record, unattributed), shown under the status line (#4065). */
   corpNote?: ReactNode;
+  /** Opens with the "unassign this entry?" question showing — the row menu's Unassign. */
+  startWithUnassignConfirm?: boolean;
 }
 
 /** Stand-in so the breakdown hook can run for a row with no assignment (its text is never used). */
@@ -161,10 +163,11 @@ export function RowDetailModal({
   onSettleUp,
   onLinkWalletPayment,
   corpNote,
+  startWithUnassignConfirm = false,
 }: RowDetailModalProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
-  const [confirmUnassign, setConfirmUnassign] = useState(false);
+  const [confirmUnassign, setConfirmUnassign] = useState(startWithUnassignConfirm);
   const [copied, setCopied] = useState<{ at: number } | null>(null);
   useTimedToast(copied, () => setCopied(null), NOTICE_MS);
   const oreLines = assignment ? assignment.oreLines : row.unassignedOreLines;

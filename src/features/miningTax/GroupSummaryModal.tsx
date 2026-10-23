@@ -68,6 +68,8 @@ interface GroupSummaryModalProps {
   /** Opens the manual "Link transaction" picker, scoped to every member of this group at once — offered whenever the whole group is Paid. */
   onLinkTransaction?: () => void;
   onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
+  /** Opens with the "unassign all days?" question showing — the row menu's Unassign. */
+  startWithUnassignConfirm?: boolean;
 }
 
 /**
@@ -76,7 +78,8 @@ interface GroupSummaryModalProps {
  * line — because a session that ran past midnight UTC is one bill but two
  * ledger days. One Edit for the whole entry (the per-day Edit buttons made
  * a pilot correct the same session twice); the rarer moves — take a day out,
- * uncombine — sit in the More menu.
+ * uncombine — sit in the chevron attached to the Edit button (a split button, the
+ * same as a single entry's detail).
  */
 export function GroupSummaryModal({
   open,
@@ -99,10 +102,11 @@ export function GroupSummaryModal({
   linkedTransactions,
   onLinkTransaction,
   onUnlinkTransaction,
+  startWithUnassignConfirm = false,
 }: GroupSummaryModalProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
-  const [confirmUnassign, setConfirmUnassign] = useState(false);
+  const [confirmUnassign, setConfirmUnassign] = useState(startWithUnassignConfirm);
   const sorted = [...members].sort((a, b) => a.row.entry.date.localeCompare(b.row.entry.date));
   const dates = sorted.map((m) => m.row.entry.date);
   const totalTaxOwed = members.reduce((sum, m) => sum + m.assignment.taxOwed, 0);
@@ -112,6 +116,42 @@ export function GroupSummaryModal({
   const allPaid = members.every((m) => m.assignment.status === 'paid');
   const taxPct = members[0]?.assignment.taxPct;
   const payment = members.find((m) => m.assignment.payment)?.assignment.payment;
+
+  const moreMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <IconButton
+          icon={<Icon.Expanded />}
+          label={t('miningTax.combined.moreLabel')}
+          disabled={busy}
+          className="-ml-px rounded-l-none"
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {anyOutstanding && onLinkWalletPayment && (
+          <>
+            <DropdownMenuItem onSelect={onLinkWalletPayment}>
+              {t('miningTax.detail.linkWalletPayment')}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        {sorted.map((member) => (
+          <DropdownMenuItem key={member.assignment.id} onSelect={() => onTakeOut(member)}>
+            {t('miningTax.combined.takeOut', { date: member.row.entry.date })}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onUncombine}>
+          {t('miningTax.combined.uncombineAll')}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => setConfirmUnassign(true)} className="text-danger">
+          {t('miningTax.combined.unassignAll')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
     <Modal
@@ -127,41 +167,6 @@ export function GroupSummaryModal({
             content={t('miningTax.dateEveHint')}
           />
         </span>
-      }
-      titleActions={
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <IconButton
-              variant="plain"
-              icon={<Icon.More />}
-              label={t('miningTax.combined.moreLabel')}
-              disabled={busy}
-            />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {anyOutstanding && onLinkWalletPayment && (
-              <>
-                <DropdownMenuItem onSelect={onLinkWalletPayment}>
-                  {t('miningTax.detail.linkWalletPayment')}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
-            )}
-            {sorted.map((member) => (
-              <DropdownMenuItem key={member.assignment.id} onSelect={() => onTakeOut(member)}>
-                {t('miningTax.combined.takeOut', { date: member.row.entry.date })}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onUncombine}>
-              {t('miningTax.combined.uncombineAll')}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => setConfirmUnassign(true)} className="text-danger">
-              {t('miningTax.combined.unassignAll')}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       }
     >
       <div className="space-y-3 text-sm">
@@ -265,9 +270,12 @@ export function GroupSummaryModal({
               {t('miningTax.markGroupPaidAction')}
             </Button>
           )}
-          <Button disabled={busy} onClick={onEdit}>
-            {t('miningTax.combined.edit')}
-          </Button>
+          <div className="flex">
+            <Button disabled={busy} onClick={onEdit} className="rounded-r-none">
+              {t('miningTax.combined.edit')}
+            </Button>
+            {moreMenu}
+          </div>
           <Button className="ml-auto" onClick={onClose}>
             {t('common.close')}
           </Button>
