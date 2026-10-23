@@ -233,7 +233,7 @@ export function MobileOpportunityList({
         className="-mt-1 pb-1"
       />
 
-      <ul className="-mx-3 flex flex-col" aria-label={t('industry.opportunitiesTitle')}>
+      <ul className="-mx-3 flex flex-col" aria-label={t('industry.opportunitiesTableLabel')}>
         {groups.map(({ first: row, members }) => {
           const hero = fields[activeFieldId].hero(row);
           const productTypeID = row.candidate.catalogEntry.productTypeID;

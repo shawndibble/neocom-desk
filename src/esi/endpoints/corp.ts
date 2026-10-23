@@ -436,6 +436,99 @@ export interface SovereigntyWindow {
   end: string;
 }
 
+// --- GET /corporations/{corporation_id}/projects (esi-corporations.read_projects.v1) ---
+
+/** One row of the project list. It carries no type: the detail read says what a project asks for. */
+export interface CorporationProjectSummary {
+  id: string;
+  name: string;
+  /** 'Active' while open; the list is asked for Active only. */
+  state: string;
+  last_modified: string;
+  progress: { current: number; desired: number };
+  reward?: { initial: number; remaining: number };
+}
+
+export interface CorporationProjectsPage {
+  /** `after` continues towards older rows; absent on the last page. */
+  cursor?: { after?: string; before?: string };
+  projects: CorporationProjectSummary[];
+}
+
+/** No role needed. One cursor page: `after` '0' (or omitted) starts the walk. */
+export function getCorporationProjects(
+  characterId: number,
+  corporationId: number,
+  query: { after?: string; limit?: number } = {},
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationProjectsPage>> {
+  return esiFetch(`/corporations/${corporationId}/projects`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationProjects',
+    query: { state: 'Active', limit: query.limit ?? 100, after: query.after },
+  });
+}
+
+/** A manufacture project's item filter: type ids and/or whole market groups. */
+export interface CorporationProjectManufactureItem {
+  owner: string;
+  items?: ({ type_id: number } | { group_id: number })[];
+}
+
+export interface CorporationProjectDetail extends CorporationProjectSummary {
+  details: {
+    description: string;
+    career: string;
+    created: string;
+    expires?: string;
+    finished?: string;
+  };
+  contribution?: {
+    /** The most units one Character may contribute. */
+    participation_limit: number;
+    reward_per_contribution: number;
+    submission_limit: number;
+    submission_multiplier: number;
+  };
+  /** One key per project type; only `manufacture_item` is read. Anything else is another kind. */
+  configuration: { manufacture_item?: CorporationProjectManufactureItem } & Record<string, unknown>;
+}
+
+// --- GET /corporations/{corporation_id}/projects/{project_id} (esi-corporations.read_projects.v1) ---
+
+export function getCorporationProject(
+  characterId: number,
+  corporationId: number,
+  projectId: string,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationProjectDetail>> {
+  return esiFetch(`/corporations/${corporationId}/projects/${projectId}`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationProject',
+  });
+}
+
+// --- GET /corporations/{corporation_id}/projects/{project_id}/contribution/{character_id} (esi-corporations.read_projects.v1) ---
+
+/** What one Character has already contributed to a project. */
+export function getCorporationProjectContribution(
+  characterId: number,
+  corporationId: number,
+  projectId: string,
+  options: EndpointOptions = {}
+): Promise<EsiResult<{ contributed: number; last_modified?: string }>> {
+  return esiFetch(
+    `/corporations/${corporationId}/projects/${projectId}/contribution/${characterId}`,
+    {
+      ...options,
+      characterId,
+      endpointId: 'getCorporationProjectContribution',
+    }
+  );
+}
+
 // --- GET /corporations/{corporation_id}/structures/skyhooks (esi-structures.read_corporation.v1) ---
 
 /** Station_Manager (`canReadSkyhooks`). The list names each skyhook's planet, not its system. */

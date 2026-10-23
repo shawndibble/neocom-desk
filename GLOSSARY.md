@@ -151,7 +151,18 @@ here — they go one per file in `docs/context/decisions/`.
   hand-made Build Plan gets, run over every owned blueprint. Reaction
   blueprints are excluded. Selecting rows seeds them into **Build Plan
   Compare** as ordinary Build Plans. Sits beside **Market-Wide Build
-  Opportunities**, the tab's ownership-independent sibling panel.
+  Opportunities**, the tab's ownership-independent sibling panel. Its panel
+  is titled "Build" and has three views: Ranked, All owned and **Corp
+  projects**.
+- **Corporation Project**: A job the game's corporation project board offers
+  members: a fixed ISK reward per contributed unit, paid from a pool, with a
+  per-Character cap and an end date. Only the manufacture kind is read (mining,
+  delivery, combat, loyalty and unknown kinds are left to the game client). In
+  **Build Opportunities** it is a buyer: the **Corp projects** view lists each
+  open one the chosen Characters can still contribute to, with the reward,
+  the build cost, where the blueprint comes from and the profit at the cap.
+  Read with the opt-in **Permission** "Corporation projects"; the view is
+  absent without it.
 - **Build Plan**: An industry plan for one blueprint or reaction formula:
   materials needed, costs, fees/taxes, time, and two independent verdicts — an
   **Acquisition Verdict** and a **Sale Profitability** read. Covers

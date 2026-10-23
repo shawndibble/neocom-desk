@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -11,6 +11,10 @@ import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBui
 import type { BuildPlanRecord } from '@/db';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import type { BuildResult } from '@/engine/industry/types';
+
+// jsdom matches no media query, so without this every case would draw the phone layout.
+const viewport = vi.hoisted(() => ({ desktop: true }));
+vi.mock('@/lib/useIsDesktop', () => ({ useIsDesktop: () => viewport.desktop }));
 
 vi.mock('@/market/fuzzwork', () => ({
   fetchOrderCounts: vi.fn(
@@ -127,6 +131,7 @@ function renderCompare(rows: ComparedBuildRow[], onDone = vi.fn(), onOpenPlan = 
 
 describe('BuildPlanCompare', () => {
   afterEach(async () => {
+    viewport.desktop = true;
     await useCompareHub.getState().setValue('plan');
   });
 
@@ -273,6 +278,48 @@ describe('BuildPlanCompare', () => {
     await waitFor(() => {
       const last = mockedUseComparedBuildResults.mock.calls.at(-1)?.[0];
       expect(last?.plans.map((p) => p.hubId)).toEqual(['amarr']);
+    });
+  });
+  describe('on a phone (issue #4786)', () => {
+    it('lays the plans out as columns and each shown metric as a row, not as a scrolling table', () => {
+      viewport.desktop = false;
+      renderCompare([
+        row({ planId: 'a', planName: 'Raven fit', productName: 'Raven', runs: 5, result: RESULT }),
+        row({
+          planId: 'b',
+          planName: 'Rifter fit',
+          productName: 'Rifter',
+          runs: 2,
+          result: { ...RESULT, totalCost: 900, profit: -50 },
+        }),
+      ]);
+
+      const table = screen.getByRole('table', { name: 'Build Plan comparison' });
+      expect(
+        within(table)
+          .getAllByRole('columnheader')
+          .map((h) => h.textContent)
+      ).toEqual(['Raven fit', 'Rifter fit']);
+
+      const cells = (name: RegExp) =>
+        within(within(table).getByRole('row', { name }))
+          .getAllByRole('cell')
+          .map((c) => c.textContent ?? '');
+      const [first, second] = cells(/Total cost/);
+      expect(first).toContain('565');
+      expect(second).toContain('900');
+      const [firstProfit, secondProfit] = cells(/^Profit/);
+      expect(firstProfit).toContain('435');
+      expect(secondProfit).toContain('-50');
+    });
+
+    it('still opens a plan from its column heading', async () => {
+      viewport.desktop = false;
+      const { onOpenPlan } = renderCompare([
+        row({ planId: 'a', planName: 'Raven fit', productName: 'Raven', result: RESULT }),
+      ]);
+      await userEvent.click(screen.getByRole('link', { name: 'Raven fit' }));
+      expect(onOpenPlan).toHaveBeenCalledWith('a');
     });
   });
 });

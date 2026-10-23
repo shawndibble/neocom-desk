@@ -78,6 +78,10 @@ import { useColumnVisibility } from '@/lib/columnVisibility';
 import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { enumParam } from '@/lib/urlState';
 import { OwnedBlueprintsPanel } from './OwnedBlueprintsPanel';
+import { CorpProjectsPanel } from './corpProjects/CorpProjectsPanel';
+import { buildableEntry } from './corpProjects/corpProjectRows';
+import { useCorpProjects } from './corpProjects/useCorpProjects';
+import type { BuildPlanPricingInputs } from './buildPlanPricingInputs';
 import {
   OPPORTUNITIES_COLUMN_IDS,
   OPPORTUNITIES_DEFAULT_COLUMNS,
@@ -98,7 +102,11 @@ interface OpportunitiesPanelProps {
    * so this is always the pilot's own setting, never the default (#2054).
    */
   assumedMe: number;
+  /** What a Build Plan page prices against; the Corp projects view resolves its rows through it. */
+  pricingInputs: BuildPlanPricingInputs;
   onAddToCompare: (rows: readonly OpportunityRow[]) => void;
+  /** Saves the Corp projects rows' plans and opens Compare with them. */
+  onAddProjectsToCompare: (plans: readonly BuildPlanRecord[]) => void;
   /** Resolves true once it has opened the new plan (see `StartPlanButton`). */
   onStartPlan: (entry: BlueprintCatalogEntry) => Promise<boolean>;
   /**
@@ -135,7 +143,7 @@ const SORT_VALUE = {
  * Ranked (the default) or "All owned" (issue #2335): the same owned
  * blueprints and Character filter, either priced and ranked or listed whole.
  */
-const VIEW_PARAM = enumParam(['ranked', 'owned'] as const, 'ranked');
+const VIEW_PARAM = enumParam(['ranked', 'owned', 'corp'] as const, 'ranked');
 /** "Use my stock" (issue #2847): narrow Ranked to builds owned stock covers. */
 const STOCK_PARAM = enumParam(['any', 'mostly', 'full'] as const, 'any');
 
@@ -149,7 +157,9 @@ export function OpportunitiesPanel({
   activeCharacterId,
   ownedStockSnapshot,
   assumedMe,
+  pricingInputs,
   onAddToCompare,
+  onAddProjectsToCompare,
   onStartPlan,
   onDataAgeChange,
 }: OpportunitiesPanelProps) {
@@ -159,7 +169,7 @@ export function OpportunitiesPanel({
 
   const { candidates: characterCandidates, namesById: characterNames } = useAccountCharacters();
 
-  const [view, setView] = useUrlParam('opps.view', VIEW_PARAM);
+  const [urlView, setView] = useUrlParam('opps.view', VIEW_PARAM);
   const [stockFilter, setStockFilter] = useUrlParam('opps.stock', STOCK_PARAM);
   // Industry's one page-wide filter; its picker rides in the Industry `PageHeader`.
   const [characterFilter] = useIndustryCharacterFilter();
@@ -181,6 +191,24 @@ export function OpportunitiesPanel({
     characterNames,
     onDataAgeChange,
   });
+
+  // Corp projects (issue #4786) is a view only for a Character that can see
+  // some: no permission, no corporation or no open manufacture project leaves
+  // it out, and a stale `?opps.view=corp` then reads as Ranked.
+  const corpProjects = useCorpProjects(characterIds);
+  const corpEntries = useMemo(
+    () =>
+      corpProjects.entries.flatMap((entry) => {
+        const projects = entry.projects.filter((p) => buildableEntry(p, catalog) !== null);
+        return projects.length > 0 ? [{ ...entry, projects }] : [];
+      }),
+    [corpProjects.entries, catalog]
+  );
+  const showCorpProjects = corpEntries.length > 0;
+  const view =
+    urlView === 'corp' && !showCorpProjects && !corpProjects.loading ? 'ranked' : urlView;
+  // The option stays listed while the corp view is open, even as the reads refresh.
+  const corpOptionShown = showCorpProjects || view === 'corp';
 
   // Every candidate's own Build Plan, for `hubForCharacter` below (issue
   // #2055): the same Trade Hub a fresh plan for that Character would default
@@ -238,7 +266,7 @@ export function OpportunitiesPanel({
   // never for All owned, which has no such column.
   const vs90dTargets = useMemo(
     () =>
-      view === 'owned' || loading
+      view !== 'ranked' || loading
         ? []
         : allRows.flatMap((row) => {
             const typeId = row.candidate.catalogEntry.productTypeID;
@@ -547,12 +575,17 @@ export function OpportunitiesPanel({
 
   // `undefined` on desktop, not an empty element: `Panel` pads its header by `leading`'s truthiness.
   const viewPicker = isDesktop ? undefined : (
-    <OpportunitiesViewPicker view={view} onViewChange={setView} />
+    <OpportunitiesViewPicker
+      view={view}
+      onViewChange={setView}
+      showCorpProjects={corpOptionShown}
+    />
   );
   const meta = (
     <OpportunitiesFilterBar
       view={view}
       onViewChange={setView}
+      showCorpProjects={corpOptionShown}
       stockFilter={stockFilter}
       onStockFilterChange={setStockFilter}
     />
@@ -579,6 +612,29 @@ export function OpportunitiesPanel({
       )}
     </>
   );
+
+  if (view === 'corp') {
+    return (
+      <CorpProjectsPanel
+        title={title}
+        leading={viewPicker}
+        meta={meta}
+        entries={corpEntries}
+        loading={corpProjects.loading}
+        catalog={catalog}
+        pi={pi}
+        pricingInputs={pricingInputs}
+        facilityDefaults={facilityDefaults}
+        assumedMe={assumedMe}
+        ownedStockSnapshot={ownedStockSnapshot}
+        ownedByCharacter={ownedByCharacter}
+        characterNames={characterNames}
+        hubFor={resolveHubForCharacter}
+        modifiersByCharacter={modifiersByCharacter}
+        onAddToCompare={onAddProjectsToCompare}
+      />
+    );
+  }
 
   if (view === 'owned') {
     return (
@@ -627,7 +683,7 @@ export function OpportunitiesPanel({
           )}
           {rows.length > 0 && (
             <TableActionsMenu
-              name={t('industry.opportunitiesTitle')}
+              name={t('industry.opportunitiesTableLabel')}
               tableExport={opportunitiesExport}
             />
           )}
@@ -696,7 +752,7 @@ export function OpportunitiesPanel({
               rows={rows}
               rowKey={opportunityRowKey}
               virtualize="auto"
-              label={t('industry.opportunitiesTitle')}
+              label={t('industry.opportunitiesTableLabel')}
               onRowClick={(row) => startPlanFromRow(row.candidate.catalogEntry)}
               rowContextMenu={rowContextMenu}
               rowMoreActions

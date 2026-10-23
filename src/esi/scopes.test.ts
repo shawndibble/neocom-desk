@@ -133,6 +133,11 @@ describe('scopesForGroup', () => {
     expect(SCOPES).not.toContain('esi-characters.read_fatigue.v1');
   });
 
+  it("lists exactly the corpProjects group's scopes (issue #4786)", () => {
+    expect([...scopesForGroup('corpProjects')]).toEqual(['esi-corporations.read_projects.v1']);
+    expect(SCOPES).not.toContain('esi-corporations.read_projects.v1');
+  });
+
   /**
    * Issue #327's first acceptance criterion, stated as its own case rather than
    * left implicit in the hand-written `SCOPES` list above: registering the corp
@@ -262,9 +267,11 @@ describe('PERMISSIONS', () => {
   // Hand-written, not derived from DEFAULT_ON_GROUPS/OPT_IN_GROUPS above: those
   // are filtered by `defaultOn` itself, so a derived expectation here would
   // pass no matter which way a group's flag flipped.
-  it('marks corp, structureMarkets and jumpFatigue opt-in and every other group default-on', () => {
+  it('marks corp, structureMarkets, jumpFatigue and corpProjects opt-in and every other group default-on', () => {
     const optIn = SCOPE_GROUPS.filter((group) => !PERMISSIONS[group].defaultOn);
-    expect([...optIn].sort()).toEqual(['corp', 'structureMarkets', 'jumpFatigue'].sort());
+    expect([...optIn].sort()).toEqual(
+      ['corp', 'structureMarkets', 'jumpFatigue', 'corpProjects'].sort()
+    );
   });
 });
 
