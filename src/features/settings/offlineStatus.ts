@@ -10,6 +10,7 @@ import {
   warmLazySde,
   type WarmSignal,
 } from '@/sde/warmLazySde';
+import { cachedLazyChunks, fetchLazyChunkList } from '@/sde/lazyChunkList';
 import { dogmaEngineAssetsCached } from '@/features/fittings/dogmaEngineAssets';
 import { summarizePacks, type PackSummary } from './offlinePacks';
 
@@ -17,21 +18,26 @@ export interface OfflineStatus {
   packs: PackSummary[];
   /** The fitting engine's WASM and SDE snapshot are both stored. */
   engine: boolean;
-  /** Everything downloadable: the lazy SDE files plus the engine (one item). */
+  /** Everything downloadable: the lazy SDE files, the build's route chunks, and the engine (one item). */
   total: number;
   totalCached: number;
 }
 
 export async function readOfflineStatus(): Promise<OfflineStatus> {
-  const [cachedFiles, engine] = await Promise.all([
+  const [cachedFiles, engine, chunks] = await Promise.all([
     cachedLazySdeFiles(),
     dogmaEngineAssetsCached(),
+    fetchLazyChunkList(),
   ]);
+  const cachedChunks = await cachedLazyChunks(chunks);
   return {
-    packs: summarizePacks(LAZY_SDE_FILES, cachedFiles),
+    packs: summarizePacks(
+      [...LAZY_SDE_FILES, ...chunks],
+      new Set([...cachedFiles, ...cachedChunks])
+    ),
     engine,
-    total: LAZY_ASSET_TOTAL,
-    totalCached: cachedFiles.size + (engine ? 1 : 0),
+    total: LAZY_ASSET_TOTAL + chunks.length,
+    totalCached: cachedFiles.size + cachedChunks.size + (engine ? 1 : 0),
   };
 }
 

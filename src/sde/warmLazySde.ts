@@ -9,11 +9,20 @@
  * The list is `lazySdeFiles.ts`, shared with `vite.config.ts`'s precache
  * ignores. Entry budget in `sde-data` (maxEntries 150 in `sw.ts`): ~2x its
  * length (73).
+ *
+ * The same pass then warms the build's route chunks (`lazy-chunks.json`, see
+ * `lazyChunkList.ts`): only the boot graph is precached, so a page the pilot
+ * has not opened is not offline until this has run. They are many small
+ * requests, so they go a few at a time (`CHUNK_WARM_CONCURRENCY`), last, and
+ * only where the gate says `all` (or the pilot forced it); `sw.ts`'s
+ * `lazy-chunks` route stores them.
  */
 import { sdeDataUrl } from './sdeDataUrl';
 import { currentWarmLevel } from '@/lib/lazyAssetWarmGate';
 import { fetchWithIdleTimeout } from '@/lib/idleTimeout';
 import { LAZY_SDE_FILES, LAZY_SDE_PRIORITY_COUNT } from './lazySdeFiles';
+import { runPool } from '@/lib/asyncPool';
+import { fetchLazyChunkList, lazyChunkUrl } from './lazyChunkList';
 
 export { LAZY_SDE_FILES };
 
@@ -49,7 +58,10 @@ export async function cachedLazySdeFiles(): Promise<Set<string>> {
 /** What `warmLazySde` reports in its failed list when the fitting engine could not be warmed (it is not a file). */
 export const ENGINE_ITEM = 'engine';
 
-/** Every downloadable item: the lazy SDE files plus the fitting engine (one item). */
+/** Chunk fetches in flight at once: the site is HTTP/2, so a few at a time is quick without crowding the page's own requests. */
+const CHUNK_WARM_CONCURRENCY = 6;
+
+/** Every downloadable item but the build chunks: the lazy SDE files plus the fitting engine (one item). */
 export const LAZY_ASSET_TOTAL = LAZY_SDE_FILES.length + 1;
 
 /**
@@ -73,6 +85,21 @@ function warmFile(file: string): Promise<boolean> {
     return ok;
   })().finally(() => inFlight.delete(file));
   inFlight.set(file, started);
+  return started;
+}
+
+/** A build chunk, through the same dedupe as `warmFile`; the service worker's chunk route stores it. */
+function warmChunk(file: string): Promise<boolean> {
+  const key = `chunk:${file}`;
+  const running = inFlight.get(key);
+  if (running) return running;
+  const started = (async () => {
+    const url = lazyChunkUrl(file);
+    if (await caches.match(url)) return true;
+    const { ok } = await fetchWithIdleTimeout(url, { drain: true });
+    return ok;
+  })().finally(() => inFlight.delete(key));
+  inFlight.set(key, started);
   return started;
 }
 
@@ -130,10 +157,16 @@ export async function warmLazySde(
 ): Promise<string[]> {
   const failed: string[] = [];
   let done = 0;
+  let total = LAZY_ASSET_TOTAL;
   const level = () => (force ? (navigator.onLine ? 'all' : 'none') : currentWarmLevel());
   try {
     const controlled = hasControllingServiceWorker();
     if (!controlled && !force) return failed;
+    // The build's route chunks are the bulk of the bytes: not on cellular or
+    // Save-Data (`small`) unless the pilot forced it, and only where the worker's
+    // chunk route can store them. Known up front so progress has its true total.
+    const chunks = controlled && level() === 'all' ? await fetchLazyChunkList() : [];
+    total += chunks.length;
     const warmFiles = async (files: readonly string[]): Promise<boolean> => {
       for (const file of files) {
         if (signal.cancelled || level() === 'none') return false;
@@ -142,7 +175,7 @@ export async function warmLazySde(
         } catch {
           failed.push(file);
         }
-        onProgress?.(++done, LAZY_ASSET_TOTAL);
+        onProgress?.(++done, total);
       }
       return true;
     };
@@ -158,8 +191,24 @@ export async function warmLazySde(
         failed.push(ENGINE_ITEM);
       }
     }
-    onProgress?.(controlled ? ++done : LAZY_ASSET_TOTAL, LAZY_ASSET_TOTAL);
-    if (controlled) await warmFiles(LAZY_SDE_FILES.slice(LAZY_SDE_PRIORITY_COUNT));
+    onProgress?.(controlled ? ++done : total, total);
+    if (controlled && !(await warmFiles(LAZY_SDE_FILES.slice(LAZY_SDE_PRIORITY_COUNT)))) {
+      return failed;
+    }
+    // Last, and a few at a time: the SDE files above are what a page needs first.
+    await runPool(
+      chunks,
+      CHUNK_WARM_CONCURRENCY,
+      async (file) => {
+        try {
+          if (!(await warmChunk(file))) failed.push(file);
+        } catch {
+          failed.push(file);
+        }
+        onProgress?.(++done, total);
+      },
+      () => signal.cancelled || level() === 'none'
+    );
   } catch {
     // The engine import or warm failed: lose it, never retry-loop.
   }

@@ -16,6 +16,18 @@ const fetchMock = vi.fn<(url: string) => Promise<Response>>(
   async () => new Response('{}', { status: 200 })
 );
 
+// What `lazy-chunks.json` names. Empty by default, so the SDE tests count only SDE fetches.
+const chunkList = { files: [] as string[] };
+const chunkFetch = vi.fn<(url: string) => Promise<Response>>();
+function routedFetch(url: string, init?: RequestInit) {
+  if (String(url).endsWith('lazy-chunks.json')) {
+    expect(init?.cache).toBe('no-store');
+    return Promise.resolve(Response.json({ release: 'r', files: chunkList.files }));
+  }
+  if (String(url).includes('/assets/')) return chunkFetch(String(url));
+  return fetchMock(String(url));
+}
+
 function env(opts: { controller?: boolean; online?: boolean; connection?: object }) {
   vi.stubGlobal('navigator', {
     onLine: opts.online ?? true,
@@ -26,7 +38,9 @@ function env(opts: { controller?: boolean; online?: boolean; connection?: object
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubGlobal('fetch', fetchMock);
+  chunkList.files = [];
+  chunkFetch.mockReset().mockImplementation(async () => new Response('x', { status: 200 }));
+  vi.stubGlobal('fetch', routedFetch);
   vi.stubGlobal('caches', { match: vi.fn(async () => undefined) });
   vi.stubGlobal('__SDE_DATA_VERSIONS__', {});
 });
@@ -143,6 +157,109 @@ describe('warmLazySde force', () => {
     expect(onProgress).toHaveBeenCalledTimes(total);
     expect(onProgress).toHaveBeenNthCalledWith(1, 1, total);
     expect(onProgress).toHaveBeenLastCalledWith(total, total);
+  });
+});
+
+describe('warming the build chunks', () => {
+  const FILES = Array.from({ length: 20 }, (_, i) => `assets/Route${i}-hash.js`);
+  const fetchedChunks = () => chunkFetch.mock.calls.map(([url]) => String(url));
+
+  beforeEach(() => {
+    chunkList.files = FILES;
+  });
+
+  it('fetches every listed chunk, after the SDE files and the engine', async () => {
+    env({});
+    const order: string[] = [];
+    fetchMock.mockImplementation(async () => (order.push('sde'), new Response('{}')));
+    chunkFetch.mockImplementation(async () => (order.push('chunk'), new Response('x')));
+    await warmLazySde({ cancelled: false });
+    expect(fetchedChunks()).toEqual(FILES.map((file) => `/${file}`));
+    expect(order.indexOf('chunk')).toBeGreaterThan(order.lastIndexOf('sde'));
+  });
+
+  it('keeps a handful in flight, never one by one and never all at once', async () => {
+    env({});
+    let inFlight = 0;
+    let peak = 0;
+    chunkFetch.mockImplementation(async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      inFlight -= 1;
+      return new Response('x');
+    });
+    await warmLazySde({ cancelled: false });
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(8);
+  });
+
+  it('leaves them alone on cellular or Save-Data, where the SDE files still warm', async () => {
+    env({ connection: { saveData: true } });
+    await warmLazySde({ cancelled: false });
+    expect(chunkFetch).not.toHaveBeenCalled();
+    env({ connection: { effectiveType: '4g', type: 'cellular' } });
+    await warmLazySde({ cancelled: false });
+    expect(chunkFetch).not.toHaveBeenCalled();
+  });
+
+  it('fetches them when the pilot forces the download, past that gate', async () => {
+    env({ connection: { saveData: true } });
+    await warmLazySde({ cancelled: false }, { force: true });
+    expect(chunkFetch).toHaveBeenCalledTimes(FILES.length);
+  });
+
+  it('needs a controlling service worker: without one nothing would store them', async () => {
+    env({ controller: false });
+    await warmLazySde({ cancelled: false }, { force: true });
+    expect(chunkFetch).not.toHaveBeenCalled();
+  });
+
+  it('skips chunks already in Cache Storage', async () => {
+    env({});
+    vi.stubGlobal('caches', {
+      match: vi.fn(async (url: string) => (url === `/${FILES[0]}` ? new Response('x') : undefined)),
+    });
+    await warmLazySde({ cancelled: false });
+    expect(fetchedChunks()).not.toContain(`/${FILES[0]}`);
+    expect(chunkFetch).toHaveBeenCalledTimes(FILES.length - 1);
+  });
+
+  it('reports the chunks that failed and keeps going', async () => {
+    env({});
+    chunkFetch.mockImplementation(async (url) =>
+      url.endsWith(FILES[3]) ? new Response('no', { status: 404 }) : new Response('x')
+    );
+    const failed = await warmLazySde({ cancelled: false });
+    expect(failed).toEqual([FILES[3]]);
+    expect(chunkFetch).toHaveBeenCalledTimes(FILES.length);
+  });
+
+  it('counts them in the progress total, ending at the whole', async () => {
+    env({});
+    const onProgress = vi.fn();
+    await warmLazySde({ cancelled: false }, { force: true, onProgress });
+    const total = LAZY_ASSET_TOTAL + FILES.length;
+    expect(onProgress).toHaveBeenCalledTimes(total);
+    expect(onProgress).toHaveBeenLastCalledWith(total, total);
+  });
+
+  it('stops taking chunks when cancelled', async () => {
+    env({});
+    const signal = { cancelled: false };
+    chunkFetch.mockImplementation(async () => {
+      signal.cancelled = true;
+      return new Response('x');
+    });
+    await warmLazySde(signal, { force: true });
+    expect(chunkFetch.mock.calls.length).toBeLessThan(FILES.length);
+  });
+
+  it('warms nothing extra when the list cannot be read', async () => {
+    env({});
+    chunkList.files = [];
+    await warmLazySde({ cancelled: false });
+    expect(chunkFetch).not.toHaveBeenCalled();
   });
 });
 

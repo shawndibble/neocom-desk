@@ -4,6 +4,13 @@ import { TYPE_INFO_SHARD_COUNT } from '@/sde/typeInfoShard';
 import { setDecimalMark } from '@/lib/numberLocale';
 import { OFFLINE_PACK_IDS, formatBytes, packFor, summarizePacks } from './offlinePacks';
 
+describe('packFor app pages', () => {
+  it('puts build chunks in their own pack', () => {
+    expect(packFor('assets/Market-AbC123.js')).toBe('appPages');
+    expect(packFor('assets/Market-AbC123.css')).toBe('appPages');
+  });
+});
+
 describe('packFor', () => {
   it('files the type-info shards under one pack', () => {
     expect(packFor('typeInfo/0.json')).toBe('itemInfo');

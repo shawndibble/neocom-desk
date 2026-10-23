@@ -26,6 +26,25 @@ export function isVersionedSdeData(
   );
 }
 
+/**
+ * A hashed script or stylesheet under `<base>assets/`: a build chunk. The name
+ * carries a content hash, so cache-first is always right. The boot chunks are
+ * precached and answered before this route is reached.
+ */
+export function isLazyChunk(
+  url: URL,
+  requestMode: RequestMode,
+  selfOrigin: string,
+  baseUrl: string
+): boolean {
+  return (
+    requestMode !== 'navigate' &&
+    url.origin === selfOrigin &&
+    url.pathname.startsWith(`${baseUrl}assets/`) &&
+    /\.(js|css)$/.test(url.pathname)
+  );
+}
+
 /** A type's icon, render or blueprint art on the EVE image server. */
 export function isEveTypeImage(url: URL): boolean {
   return url.origin === EVE_IMAGE_ORIGIN && url.pathname.startsWith('/types/');

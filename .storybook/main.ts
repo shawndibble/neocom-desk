@@ -12,7 +12,8 @@ const config: StorybookConfig = {
   // app does. The PWA, Sentry, Pages-fallback and landing-shell plugins are build-pipeline
   // concerns of the app, not of a catalogue.
   viteFinal: (viteConfig) => {
-    const appOnly = /^(vite-plugin-pwa|neocom-spa-fallback|neocom-landing-shell|sentry-)/;
+    const appOnly =
+      /^(vite-plugin-pwa|neocom-spa-fallback|neocom-landing-shell|neocom-lazy-chunks|neocom-release-file|sentry-)/;
     const strip = (plugins: unknown): unknown =>
       Array.isArray(plugins)
         ? plugins

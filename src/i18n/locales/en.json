@@ -12134,13 +12134,14 @@
     "analyticsLabel": "Send page views",
     "analyticsHint": "Sends only the page name to Google Analytics. Never character, corporation or other IDs.",
     "offline": {
-      "hint": "Large reference files download when a page first needs them. Download all to work offline.",
+      "hint": "Large reference files and app pages download when first needed, or in the background on Wi-Fi. Download everything to work offline.",
       "packsLabel": "Downloaded on this device",
       "packs": {
         "itemInfo": "Item info",
         "market": "Market data",
         "planetary": "Planetary Industry data",
-        "reference": "Reference data"
+        "reference": "Reference data",
+        "appPages": "App pages"
       },
       "packLine_one": "{{name}} ({{count}} file): {{cached}} of {{total}} downloaded",
       "packLine_other": "{{name}} ({{count}} files): {{cached}} of {{total}} downloaded",
