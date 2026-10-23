@@ -12,10 +12,11 @@ vi.mock('./useHullCatalog', () => ({
         '627': { name: 'Thorax', groupID: 26, volume: 1 },
         '626': { name: 'Vexor', groupID: 26, volume: 1 },
         '587': { name: 'Rifter', groupID: 25, volume: 1 },
+        '641': { name: 'Megathron', groupID: 27, volume: 1 },
       },
-      { '25': 6, '26': 6 }
+      { '25': 6, '26': 6, '27': 6 }
     ),
-    className: (id: number) => (id === 26 ? 'Cruiser' : 'Frigate'),
+    className: (id: number) => (id === 26 ? 'Cruiser' : id === 27 ? 'Battleship' : 'Frigate'),
   }),
 }));
 
@@ -105,22 +106,42 @@ describe('SrpSettingsEditor', () => {
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
   });
 
-  it('keeps classes collapsed, opens one to its hull rules, and adds a hull from the search', async () => {
+  it('lists only classes with a rule, collapsed, and adds a hull from the search', async () => {
     setup();
+    expect(screen.getByLabelText('Rule for Frigate')).toBeInTheDocument();
+    expect(screen.getByLabelText('Rule for Cruiser')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Rule for Battleship')).toBeNull();
     expect(screen.queryByText('Thorax')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: /Cruiser/ }));
-    expect(screen.getByText('Thorax')).toBeInTheDocument();
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Add a hull' }), 'vex');
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Add a hull or class' }), 'vex');
     await userEvent.click(screen.getByRole('button', { name: 'Add Vexor' }));
     expect(screen.getByLabelText('Rule for Vexor')).toHaveValue('none');
+  });
+
+  it('adds a class from the search with Pay: corp percent and focuses its rule', async () => {
+    const { onSave } = setup();
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Add a hull or class' }), 'battle');
+    await userEvent.click(screen.getByRole('button', { name: 'Add Battleship' }));
+    const rule = screen.getByLabelText('Rule for Battleship');
+    expect(rule).toHaveValue('pay-percent');
+    expect(rule).toHaveFocus();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSave).toHaveBeenCalled();
+  });
+
+  it('keeps a class set back to No rule on screen until the form remounts', async () => {
+    setup();
+    await userEvent.selectOptions(screen.getByLabelText('Rule for Frigate'), 'none');
+    expect(screen.getByLabelText('Rule for Frigate')).toHaveValue('none');
   });
 
   it('asks for an ISK amount only for Pay: fixed ISK, and blocks Save while it is blank', async () => {
     const { onSave } = setup();
     expect(screen.getByLabelText('Fixed price for Frigate')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Fixed price for Cruiser')).toBeNull();
-    await userEvent.selectOptions(screen.getByLabelText('Rule for Cruiser'), 'pay-fixed');
-    expect(screen.getByLabelText('Fixed price for Cruiser')).toBeInTheDocument();
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Add a hull or class' }), 'battle');
+    await userEvent.click(screen.getByRole('button', { name: 'Add Battleship' }));
+    expect(screen.queryByLabelText('Fixed price for Battleship')).toBeNull();
+    await userEvent.selectOptions(screen.getByLabelText('Rule for Battleship'), 'pay-fixed');
+    expect(screen.getByLabelText('Fixed price for Battleship')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(onSave).not.toHaveBeenCalled();
   });

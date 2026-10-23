@@ -50,3 +50,17 @@ export function searchHulls(catalog: HullCatalog, query: string): Hull[] {
   if (q === '') return [];
   return catalog.hulls.filter((h) => h.name.toLowerCase().includes(q));
 }
+
+/** Every ship class whose name contains the query; blank gives none. */
+export function searchClasses(
+  catalog: HullCatalog,
+  className: (classId: number) => string,
+  query: string
+): { id: number; name: string }[] {
+  const q = query.trim().toLowerCase();
+  if (q === '') return [];
+  return catalog.classIds
+    .map((id) => ({ id, name: className(id) }))
+    .filter((c) => c.name.toLowerCase().includes(q))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}

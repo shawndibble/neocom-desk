@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TypeMap } from '@/sde/types';
-import { buildHullCatalog, searchHulls } from './hullCatalog';
+import { buildHullCatalog, searchClasses, searchHulls } from './hullCatalog';
 
 const types: TypeMap = {
   '626': { name: 'Vexor', groupID: 26, volume: 1 },
@@ -25,5 +25,12 @@ describe('hullCatalog', () => {
     expect(searchHulls(c, ' ')).toEqual([]);
     expect(searchHulls(c, 'THOR').map((h) => h.id)).toEqual([627]);
     expect(searchHulls(c, 'o').map((h) => h.name)).toEqual(['Megathron', 'Thorax', 'Vexor']);
+  });
+
+  it('searches classes by name, nothing for a blank query', () => {
+    const c = buildHullCatalog(types, categories);
+    const name = (id: number) => ({ 25: 'Frigate', 26: 'Cruiser', 27: 'Battleship' })[id] ?? '';
+    expect(searchClasses(c, name, ' ')).toEqual([]);
+    expect(searchClasses(c, name, 'RUI')).toEqual([{ id: 26, name: 'Cruiser' }]);
   });
 });

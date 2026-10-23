@@ -167,21 +167,27 @@ export const FirstTime: Story = { parameters: settingsParams('director', 'never-
 /** @summary The first-time state in the phone shell. */
 export const FirstTimePhone: Story = { ...FirstTime, globals: phone };
 
-/** @summary A Director's settings: percents, Hull Rules by class, claim window, Fleet or FC. */
+/** @summary A Director's settings: percents, Hull Rules (only classes with a rule), claim window, Fleet or FC. */
 export const Configured: Story = { parameters: settingsParams('director', 'configured') };
 
 /** @summary The same settings in the phone shell: classes collapsed, one line per rule. */
 export const ConfiguredPhone: Story = { ...Configured, globals: phone };
 
-/** @summary Classes expanded and a hull searched: Cruiser and Battleship open, "mega" typed in the add-hull search. */
+/** @summary Adding a class: Cruiser opened, then "destroyer" searched and the class added, which lists its row with Pay: corp percent. */
 export const ExpandedWithSearch: Story = {
   ...Configured,
   play: async ({ canvasElement }) => {
     const body = within(canvasElement);
-    for (const name of [/Cruiser/, /Battleship/]) {
-      await userEvent.click(await body.findByRole('button', { name }));
-    }
-    await userEvent.type(await body.findByRole('searchbox', { name: 'Add a hull' }), 'mega');
+    await userEvent.click(await body.findByRole('button', { name: /Cruiser/ }));
+    await userEvent.type(
+      await body.findByRole('searchbox', { name: 'Add a hull or class' }),
+      'destroyer'
+    );
+    await userEvent.click(await body.findByRole('button', { name: 'Add Destroyer' }));
+    await userEvent.type(
+      await body.findByRole('searchbox', { name: 'Add a hull or class' }),
+      'mega'
+    );
   },
 };
 

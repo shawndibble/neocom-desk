@@ -1,6 +1,7 @@
 /**
- * The rows of the Hull Rules editor: every ship class, collapsed by default, and
- * under an expanded class the hulls that carry a rule or were added from the search. Pure.
+ * The rows of the Hull Rules editor: the ship classes that carry a rule (or hold a listed hull),
+ * collapsed by default, and under an expanded class the hulls that carry a rule or were added from
+ * the search. A class with no rule is not listed; the search adds it. Pure.
  */
 import type { HullRuleScope } from '../srpTypes';
 import type { HullCatalog } from './hullCatalog';
@@ -29,15 +30,34 @@ export function listedHullIds(
   return new Set([...ids].filter((id) => catalog.hull(id) !== undefined));
 }
 
+/**
+ * Class ids to list on their own: those with a rule in the form, plus the ones the pilot added or
+ * edited this session (a class set back to No rule stays until Save).
+ */
+export function listedClassIds(
+  form: SrpSettingsForm,
+  catalog: HullCatalog,
+  kept: readonly number[]
+): Set<number> {
+  const ids = new Set(kept);
+  for (const [key, draft] of Object.entries(form.rules)) {
+    if (!key.startsWith('class:') || draft.kind === 'none') continue;
+    ids.add(Number(key.slice(6)));
+  }
+  return new Set([...ids].filter((id) => catalog.hullsByClass.has(id)));
+}
+
 export function buildHullRuleRows(
   catalog: HullCatalog,
   className: (classId: number) => string,
   listed: ReadonlySet<number>,
-  expanded: ReadonlySet<number>
+  expanded: ReadonlySet<number>,
+  listedClasses: ReadonlySet<number> = new Set()
 ): HullRuleRow[] {
   const classes = [...catalog.classIds].sort((a, b) => className(a).localeCompare(className(b)));
   return classes.flatMap((classId) => {
     const hulls = (catalog.hullsByClass.get(classId) ?? []).filter((h) => listed.has(h.id));
+    if (hulls.length === 0 && !listedClasses.has(classId)) return [];
     const classRow: HullRuleRow = {
       scope: 'class',
       id: classId,

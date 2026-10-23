@@ -99,6 +99,7 @@ export function SrpSettingsEditor({
   const hulls = useHullCatalog();
   const [form, setForm] = useState<SrpSettingsForm>(() => formFromSettings(settings));
   const [added, setAdded] = useState<number[]>([]);
+  const [keptClasses, setKeptClasses] = useState<number[]>([]);
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(new Set());
   const [saving, setSaving] = useState(false);
   const [reclaimOpen, setReclaimOpen] = useState(false);
@@ -123,6 +124,9 @@ export function SrpSettingsEditor({
     if (classId !== undefined) setExpanded((prev) => new Set(prev).add(classId));
   };
 
+  const keepClass = (classId: number) =>
+    setKeptClasses((prev) => (prev.includes(classId) ? prev : [...prev, classId]));
+
   const copyLink = () =>
     writeToClipboard(link).then(
       () => flash('copied'),
@@ -144,6 +148,7 @@ export function SrpSettingsEditor({
   const discard = () => {
     setForm(formFromSettings(settings));
     setAdded([]);
+    setKeptClasses([]);
     setExpanded(new Set());
   };
 
@@ -251,6 +256,8 @@ export function SrpSettingsEditor({
           hulls={hulls}
           added={added}
           onAdd={addHull}
+          keptClasses={keptClasses}
+          onKeepClass={keepClass}
           expanded={expanded}
           onToggle={toggleClass}
         />

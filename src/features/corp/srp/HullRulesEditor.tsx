@@ -1,10 +1,11 @@
 /**
- * The Hull Rules panel body: an add-hull search over the whole SDE ship list, then
- * every ship class with its rule select and, under an expanded class, the hulls that carry a rule.
+ * The Hull Rules panel body: an add-hull-or-class search over the whole SDE ship list, then
+ * the ship classes that carry a rule, each with its rule select and, under an expanded class, the
+ * hulls that carry a rule. A class with no rule is not listed; the search adds it.
  * A hull's rule beats its class's. Table from `sm` up; one-line rows on a phone (classes collapsed,
  * ISK input only for Pay: fixed ISK). Rows come from `hullRuleRows.ts`.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
@@ -20,8 +21,14 @@ import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { HULL_RULE_KINDS } from '../srpTypes';
 import { HullSearchResults } from './HullSearchResults';
-import { searchHulls } from './hullCatalog';
-import { buildHullRuleRows, isNotCovered, listedHullIds, type HullRuleRow } from './hullRuleRows';
+import { searchClasses, searchHulls } from './hullCatalog';
+import {
+  buildHullRuleRows,
+  isNotCovered,
+  listedClassIds,
+  listedHullIds,
+  type HullRuleRow,
+} from './hullRuleRows';
 import {
   formProblems,
   ruleKey,
@@ -41,6 +48,9 @@ interface Props {
   /** Hull ids added from the search that have no rule yet; kept by the editor so they survive a re-render. */
   added: readonly number[];
   onAdd: (hullId: number) => void;
+  /** Class ids added or edited this session; they keep their row even at No rule until Save. */
+  keptClasses: readonly number[];
+  onKeepClass: (classId: number) => void;
   expanded: ReadonlySet<number>;
   onToggle: (classId: number) => void;
 }
@@ -51,6 +61,8 @@ export function HullRulesEditor({
   hulls,
   added,
   onAdd,
+  keptClasses,
+  onKeepClass,
   expanded,
   onToggle,
 }: Props) {
@@ -58,6 +70,8 @@ export function HullRulesEditor({
   const phone = useIsPhone();
   const { catalog, className } = hulls;
   const [query, setQuery] = useState('');
+  const rootRef = useRef<HTMLDivElement>(null);
+  const focusKey = useRef<string | null>(null);
   const problems = useMemo(() => formProblems(form), [form]);
   const listed = useMemo(
     () => (catalog ? listedHullIds(form, catalog, added) : new Set<number>()),
@@ -73,11 +87,61 @@ export function HullRulesEditor({
       }
     return open;
   }, [expanded, problems, catalog]);
-  const rows = useMemo(
-    () => (catalog ? buildHullRuleRows(catalog, className, listed, shown) : []),
-    [catalog, className, listed, shown]
+  const listedClasses = useMemo(
+    () => (catalog ? listedClassIds(form, catalog, keptClasses) : new Set<number>()),
+    [form, catalog, keptClasses]
   );
-  const results = useMemo(() => (catalog ? searchHulls(catalog, query) : []), [catalog, query]);
+  const rows = useMemo(
+    () => (catalog ? buildHullRuleRows(catalog, className, listed, shown, listedClasses) : []),
+    [catalog, className, listed, shown, listedClasses]
+  );
+  const results = useMemo(
+    () =>
+      catalog
+        ? [
+            ...searchClasses(catalog, className, query).map((c) => ({
+              scope: 'class' as const,
+              id: c.id,
+              name: c.name,
+              classLabel: '',
+              listed: listedClasses.has(c.id),
+            })),
+            ...searchHulls(catalog, query).map((h) => ({
+              scope: 'hull' as const,
+              id: h.id,
+              name: h.name,
+              classLabel: className(h.classId),
+              listed: listed.has(h.id),
+            })),
+          ]
+        : [],
+    [catalog, className, query, listed, listedClasses]
+  );
+
+  // A class added from the search takes focus on its rule select once its row is rendered.
+  useEffect(() => {
+    if (!focusKey.current) return;
+    const select = rootRef.current?.querySelector<HTMLSelectElement>(
+      `[data-rule-select="${focusKey.current}"]`
+    );
+    if (select) {
+      select.focus();
+      focusKey.current = null;
+    }
+  }, [rows]);
+
+  const addResult = (scope: 'hull' | 'class', id: number) => {
+    if (scope === 'hull') onAdd(id);
+    else {
+      onKeepClass(id);
+      // Default: Pay: corp percent. It is the rule a Director most often means by naming a class
+      // (spelling out the percent for it), and unlike Officer decides it never stalls a claim.
+      if (ruleOf(form, 'class', id).kind === 'none')
+        onChange(setRule(form, 'class', id, { ...ruleOf(form, 'class', id), kind: 'pay-percent' }));
+      focusKey.current = ruleKey('class', id);
+    }
+    setQuery('');
+  };
 
   // An invalid percent is not shown as the rule's meaning: the field already says what is wrong.
   const percentNote = (): string | null =>
@@ -101,8 +165,10 @@ export function HullRulesEditor({
       : t('srp.settings.hullRules.officerTypes');
   };
 
-  const choose = (row: HullRuleRow, kind: RuleChoice) =>
+  const choose = (row: HullRuleRow, kind: RuleChoice) => {
+    if (row.scope === 'class') onKeepClass(row.id);
     onChange(setRule(form, row.scope, row.id, { ...ruleOf(form, row.scope, row.id), kind }));
+  };
   const setIsk = (row: HullRuleRow, isk: string) =>
     onChange(setRule(form, row.scope, row.id, { ...ruleOf(form, row.scope, row.id), isk }));
 
@@ -115,6 +181,7 @@ export function HullRulesEditor({
     <NativeSelect
       size="sm"
       className={className_}
+      data-rule-select={ruleKey(row.scope, row.id)}
       aria-label={t('srp.settings.hullRules.ruleFor', { name: row.name })}
       value={ruleOf(form, row.scope, row.id).kind}
       onChange={(e) => choose(row, e.target.value as RuleChoice)}
@@ -240,7 +307,7 @@ export function HullRulesEditor({
   };
 
   return (
-    <div className="grid gap-3">
+    <div ref={rootRef} className="grid gap-3">
       <div className="grid gap-2">
         <SearchInput
           className="w-full sm:max-w-sm"
@@ -250,22 +317,11 @@ export function HullRulesEditor({
           disabled={!catalog}
           onChange={(e) => setQuery(e.target.value)}
         />
-        {query.trim() !== '' && (
-          <HullSearchResults
-            results={results.map((h) => ({
-              id: h.id,
-              name: h.name,
-              classLabel: className(h.classId),
-              listed: listed.has(h.id),
-            }))}
-            onAdd={(id) => {
-              onAdd(id);
-              setQuery('');
-            }}
-          />
-        )}
+        {query.trim() !== '' && <HullSearchResults results={results} onAdd={addResult} />}
       </div>
-      {phone ? (
+      {rows.length === 0 ? (
+        catalog && <p className="text-sm text-text-dim">{t('srp.settings.hullRules.empty')}</p>
+      ) : phone ? (
         <ul aria-label={t('srp.settings.hullRules.tableLabel')} className="min-w-0">
           {rows.map(phoneLine)}
         </ul>

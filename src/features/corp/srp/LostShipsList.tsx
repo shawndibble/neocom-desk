@@ -29,6 +29,23 @@ export function LostShipsList({ rows, onFile, busyKillmailId = null }: LostShips
         primary: true,
         render: (r) => <span className="font-medium">{r.hullName}</span>,
       },
+      { id: 'system', header: t('srpMember.lost.system'), render: (r) => r.systemName },
+      {
+        id: 'lost',
+        header: t('srpMember.lost.lost'),
+        render: (r) => (
+          <span className="tabular-nums">
+            {formatDateOnly(new Date(r.killedAt), timeZone)}{' '}
+            <span className="text-text-dim">
+              (
+              {t('srpMember.lost.ago', {
+                count: r.ageDays,
+              })}
+              )
+            </span>
+          </span>
+        ),
+      },
       {
         id: 'action',
         header: t('srpMember.lost.file'),
@@ -56,23 +73,6 @@ export function LostShipsList({ rows, onFile, busyKillmailId = null }: LostShips
               return <Pill tone="danger">{t('srpMember.lost.notCovered')}</Pill>;
           }
         },
-      },
-      { id: 'system', header: t('srpMember.lost.system'), render: (r) => r.systemName },
-      {
-        id: 'lost',
-        header: t('srpMember.lost.lost'),
-        render: (r) => (
-          <span className="tabular-nums">
-            {formatDateOnly(new Date(r.killedAt), timeZone)}{' '}
-            <span className="text-text-dim">
-              (
-              {t('srpMember.lost.ago', {
-                count: r.ageDays,
-              })}
-              )
-            </span>
-          </span>
-        ),
       },
     ],
     [t, timeZone, onFile, busyKillmailId]
