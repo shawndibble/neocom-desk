@@ -79,6 +79,34 @@ async function requireMember(
   return { characterName: String(member.get('characterName') ?? '') };
 }
 
+/** A named buyer Character must itself be a Member, so contracts go to someone the Community knows. */
+async function requireBuyerMember(
+  tx: Transaction,
+  db: Firestore,
+  communityId: string,
+  buyerCharacterId: number | undefined
+): Promise<void> {
+  if (buyerCharacterId === undefined) return;
+  const buyer = await tx.get(memberRef(db, communityId, `char:${buyerCharacterId}`));
+  if (!buyer.exists) {
+    throw new HttpsError('failed-precondition', 'The buyer Character is not a Member', {
+      reason: 'buyer-not-member',
+    });
+  }
+}
+
+/** The stored form of a standing Request's terms; a standing Request has no expiry. */
+function standingFields(standing: NonNullable<PostRequestInput['standing']>) {
+  return {
+    standing: true,
+    rate: standing.rate,
+    rateBasis: standing.rateBasis,
+    hubId: standing.hubId,
+    buyerCharacterId: standing.buyerCharacterId ?? null,
+    buyLines: standing.buyLines,
+  };
+}
+
 /** How many Requests this Member has open: not closed, not past expiry. */
 async function countOpen(
   tx: Transaction,
@@ -90,7 +118,11 @@ async function countOpen(
   const mine = await tx.get(requestCollection(db, communityId).where('ownerUid', '==', uid));
   return mine.docs.filter((entry) =>
     isOpenRequest(
-      { closed: entry.get('closed') === true, expiresAt: Number(entry.get('expiresAt') ?? 0) },
+      {
+        closed: entry.get('closed') === true,
+        expiresAt: Number(entry.get('expiresAt') ?? 0),
+        standing: entry.get('standing') === true,
+      },
       now
     )
   ).length;
@@ -108,6 +140,7 @@ export async function postRequest(
     const { characterName } = await requireMember(tx, db, input.communityId, caller);
     const decision = decidePost(await countOpen(tx, db, input.communityId, caller.uid, now));
     if (decision !== 'ok') failRequestDecision(decision);
+    await requireBuyerMember(tx, db, input.communityId, input.standing?.buyerCharacterId);
     tx.set(ref, {
       ownerUid: caller.uid,
       ownerHash: caller.ownerHash,
@@ -118,8 +151,10 @@ export async function postRequest(
       notify: input.notify,
       createdAt: now,
       lastActivityAt: now,
-      expiresAt: now + REQUEST_LIFETIME_MS,
       closed: false,
+      ...(input.standing
+        ? standingFields(input.standing)
+        : { expiresAt: now + REQUEST_LIFETIME_MS }),
     });
   });
   return { requestId: ref.id };
@@ -147,17 +182,29 @@ export async function editRequest(
       ownerUid: snap.exists ? String(snap.get('ownerUid')) : null,
       callerUid: caller.uid,
       closed: snap.get('closed') === true,
-      hasPledges: pledges !== null && !pledges.empty,
+      // A standing Request's Pledges are quotes, not line slots: its buy lines stay editable.
+      hasPledges: snap.get('standing') !== true && pledges !== null && !pledges.empty,
       slotsKept: sameLineSlots(
         (snap.get('lines') as { typeId: number; kind: string }[] | undefined) ?? [],
         input.lines
       ),
     });
     if (decision !== 'ok') failRequestDecision(decision);
+    // An ordinary Request cannot become standing, or the reverse: they carry different fields.
+    if ((snap.get('standing') === true) !== (input.standing !== undefined)) {
+      throw new HttpsError(
+        'failed-precondition',
+        'A Request cannot change between standing and not',
+        {
+          reason: 'standing-locked',
+        }
+      );
+    }
+    await requireBuyerMember(tx, db, input.communityId, input.standing?.buyerCharacterId);
     tx.update(ref, {
       location: input.location,
       terms: input.terms,
-      lines: input.lines,
+      ...(input.standing ? standingFields(input.standing) : { lines: input.lines }),
       ...(input.notify ? { notify: input.notify } : {}),
       lastActivityAt: now,
     });
@@ -176,6 +223,11 @@ export async function extendRequest(
     await requireMember(tx, db, communityId, caller);
     const ref = requestCollection(db, communityId).doc(requestId);
     const snap = await tx.get(ref);
+    if (snap.get('standing') === true) {
+      throw new HttpsError('failed-precondition', 'A standing Request never expires', {
+        reason: 'standing',
+      });
+    }
     const expiry = Number(snap.get('expiresAt') ?? 0);
     const isOpen = snap.exists && snap.get('closed') !== true && expiry > now;
     const decision = decideExtend({
@@ -228,7 +280,7 @@ export async function setRequestClosed(
         closed: false,
         closedAt: null,
         lastActivityAt: now,
-        expiresAt: now + REQUEST_LIFETIME_MS,
+        ...(snap.get('standing') === true ? {} : { expiresAt: now + REQUEST_LIFETIME_MS }),
       });
     }
   });

@@ -24,6 +24,13 @@ import { FEED_SYNC_WINDOW_MS, rowsWithinSyncWindow } from '@/features/notificati
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
 import type { ProjectionRow } from '@/engine/projection';
 import { workbenchFitsUrl } from '@/features/fittings/workbenchFits';
+import { BUYBACK_GROUP_KEYS, MAX_RATE, MIN_RATE } from '@/engine/communities/buyback';
+import {
+  BUYBACK_GROUP_KEYS as FUNCTIONS_GROUP_KEYS,
+  BUYBACK_HUB_IDS,
+  MAX_RATE as FUNCTIONS_MAX_RATE,
+  MIN_RATE as FUNCTIONS_MIN_RATE,
+} from '../functions/src/communityRequests';
 
 describe('trade hubs', () => {
   it('SNAPSHOT_HUBS matches TRADE_HUBS ids, stations and regions, in order', () => {
@@ -92,4 +99,12 @@ describe('contracts and Workbench fits', () => {
       expect(workbenchFitsUrl(id)).toMatch(new RegExp(`^https://[^/]+/${workbenchFitsR2Key(id)}$`));
     }
   );
+});
+
+describe('standing buyback Requests', () => {
+  it('the callable names the same groups, hubs and rate bounds as the engine', () => {
+    expect([...FUNCTIONS_GROUP_KEYS]).toEqual(BUYBACK_GROUP_KEYS);
+    expect([...BUYBACK_HUB_IDS]).toEqual(TRADE_HUBS.map((h) => h.id));
+    expect([FUNCTIONS_MIN_RATE, FUNCTIONS_MAX_RATE]).toEqual([MIN_RATE, MAX_RATE]);
+  });
 });

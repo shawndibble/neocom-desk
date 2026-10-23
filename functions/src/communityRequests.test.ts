@@ -30,6 +30,7 @@ import {
   characterIdOfUid,
   parseRequestIdInput,
   parseSetClosedInput,
+  MAX_BUY_LINES,
 } from './communityRequests.js';
 
 const line = { typeId: 16634, name: 'Reactive Metals', quantity: 350000 };
@@ -397,5 +398,105 @@ describe('editing a Request', () => {
     expect(decideEdit({ ...base, closed: true })).toBe('closed');
     expect(decideEdit({ ...base, hasPledges: true })).toBe('lines-locked');
     expect(decideEdit({ ...base, hasPledges: true, slotsKept: true })).toBe('ok');
+  });
+});
+
+describe('standing buyback Requests', () => {
+  const standing = (over: Record<string, unknown> = {}) => ({
+    communityId: 'c1',
+    standing: true,
+    rate: 90,
+    rateBasis: 'buy',
+    hubId: 'jita',
+    buyLines: [
+      { kind: 'group', group: 'ore' },
+      { kind: 'type', typeId: 1230, name: 'Veldspar' },
+    ],
+    ...over,
+  });
+
+  it('parses a rate, basis, hub and buy lines, and keeps no item lines', () => {
+    expect(parsePostRequestInput(standing())).toEqual({
+      communityId: 'c1',
+      location: '',
+      terms: '',
+      lines: [],
+      notify: { app: true, mail: false },
+      standing: {
+        rate: 90,
+        rateBasis: 'buy',
+        hubId: 'jita',
+        buyLines: [
+          { kind: 'group', group: 'ore' },
+          { kind: 'type', typeId: 1230, name: 'Veldspar' },
+        ],
+      },
+    });
+  });
+
+  it('keeps a buyer Character when one is named', () => {
+    expect(parsePostRequestInput(standing({ buyerCharacterId: 9001 })).standing).toMatchObject({
+      buyerCharacterId: 9001,
+    });
+  });
+
+  it('takes a rate in tenths from 1 to 200', () => {
+    expect(parsePostRequestInput(standing({ rate: 92.5 })).standing?.rate).toBe(92.5);
+    for (const rate of [0, 200.1, 90.05, '90', null]) {
+      expect(() => parsePostRequestInput(standing({ rate }))).toThrow(/rate/);
+    }
+  });
+
+  it('refuses an unknown basis, hub or group', () => {
+    expect(() => parsePostRequestInput(standing({ rateBasis: 'mid' }))).toThrow(/basis/);
+    expect(() => parsePostRequestInput(standing({ hubId: 'hek2' }))).toThrow(/Trade Hub/);
+    expect(() =>
+      parsePostRequestInput(standing({ buyLines: [{ kind: 'group', group: 'ships' }] }))
+    ).toThrow(/group/);
+  });
+
+  it('needs at least one buy line, at most the cap, and no repeats', () => {
+    expect(() => parsePostRequestInput(standing({ buyLines: [] }))).toThrow(/at least one/);
+    const many = Array.from({ length: MAX_BUY_LINES + 1 }, (_, i) => ({
+      kind: 'type',
+      typeId: i + 1,
+      name: `T${i}`,
+    }));
+    expect(() => parsePostRequestInput(standing({ buyLines: many }))).toThrow(/at most/);
+    expect(() =>
+      parsePostRequestInput(
+        standing({
+          buyLines: [
+            { kind: 'group', group: 'ore' },
+            { kind: 'group', group: 'ore' },
+          ],
+        })
+      )
+    ).toThrow(/twice/);
+  });
+
+  it('ignores item lines on a standing Request, and buy lines on an ordinary one', () => {
+    expect(parsePostRequestInput(standing({ lines: [line] })).lines).toEqual([]);
+    expect(
+      parsePostRequestInput(post({ buyLines: [{ kind: 'group', group: 'ore' }] }))
+    ).not.toHaveProperty('standing');
+  });
+
+  it('never expires: open until closed', () => {
+    expect(isOpenRequest({ closed: false, expiresAt: 0, standing: true }, 10 ** 15)).toBe(true);
+    expect(isOpenRequest({ closed: true, expiresAt: 0, standing: true }, 0)).toBe(false);
+  });
+
+  it('is kept by the sweep until closed a week ago', () => {
+    const now = 10 ** 13;
+    expect(
+      decideRequestSweep({ closed: false, closedAt: null, expiresAt: NaN, standing: true }, now)
+    ).toBe('keep');
+    expect(
+      decideRequestSweep(
+        { closed: true, closedAt: now - CLOSED_RETENTION_MS, expiresAt: NaN, standing: true },
+        now
+      )
+    ).toBe('delete');
   });
 });
