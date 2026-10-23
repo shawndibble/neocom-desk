@@ -5,12 +5,19 @@ import {
 } from '@/features/corp/boardData';
 import { toBoardStructures } from '@/features/corp/boardSources';
 import { loadCorporationIndustryJobs } from '@/features/corp/jobs';
+import { loadCorporationSkyhooks, loadSkyhookDetails } from '@/features/corp/sovereignty';
+import { loadPlanetName } from '@/features/pi/names';
+import { parseInstant } from '@/engine/esiInstant';
 import { loadCorporationMemberIds } from '@/features/corp/members';
 import { loadCorporationWallets, loadCorporationWalletJournal } from '@/features/corp/wallet';
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapability } from '@/engine/corpRoles';
 import { resolveNames } from '@/features/character/names';
-import { projectCorpIndustryJobs, projectStructureFuel } from '@/engine/projection';
+import {
+  projectCorpIndustryJobs,
+  projectSkyhookRaids,
+  projectStructureFuel,
+} from '@/engine/projection';
 import type { CorporationIndustryJob } from '@/esi/endpoints';
 import type {
   CorpIndustryJobEntrySnapshot,
@@ -24,16 +31,25 @@ import type {
   CorpWalletJournalEntrySnapshot,
   CorpWalletSnapshot,
   CorpWalletThresholdFire,
+  SkyhookEntrySnapshot,
+  SkyhookRaidableFire,
+  SkyhookSnapshot,
   StructureFuelEntrySnapshot,
   StructureFuelLowFire,
   StructureFuelSnapshot,
 } from '@/engine/notificationDiffs';
-import { industryItemTypeId, type ItemNames, type MemberNames } from '../domainCopy';
+import {
+  industryItemTypeId,
+  type ItemNames,
+  type MemberNames,
+  type PlanetNames,
+} from '../domainCopy';
 import { NOTIFICATION_EVENT_ENTRIES, SNAPSHOT_SOURCES } from '../eventEntries';
 import { is, shapeGuard } from '../snapshotShape';
 import { defineDomain } from './defineDomain';
 import {
   DAY_MS,
+  HOUR_MS,
   currentThresholds,
   resolveProjectionNames,
   typeNameOrAbsent,
@@ -114,6 +130,100 @@ export const structureFuelDomain = defineDomain<
       nowMs
     );
   },
+});
+
+/* Skyhook raid windows (issue #4784) ---------------------------------------- */
+
+const isSkyhookEntrySnapshot = shapeGuard<SkyhookEntrySnapshot>({
+  skyhookId: is.number,
+  planetId: is.number,
+  windowStartMs: is.nullable(is.number),
+  windowEndMs: is.nullable(is.number),
+  unsecuredUnits: is.nullable(is.number),
+  leadMs: is.number,
+  minUnits: is.number,
+});
+
+/**
+ * The corp's skyhooks through the Sovereignty widget's own cached reads
+ * (`features/corp/sovereignty.ts`): the list plus one detail per skyhook, each
+ * under ESI's roughly hourly corp cache, so the poll adds no request beyond
+ * that window and never fans out past `ESI_FANOUT_CONCURRENCY`. A detail that
+ * cannot be read skips the poll (`null`) instead of writing a baseline that
+ * would announce that skyhook's window as new once it reads again. A skyhook
+ * ESI sends no window for is kept with a null window: not raidable now.
+ */
+export const skyhookDomain = defineDomain<
+  SkyhookEntrySnapshot,
+  SkyhookSnapshot,
+  SkyhookRaidableFire,
+  PlanetNames
+>({
+  source: SNAPSHOT_SOURCES.skyhooks,
+  stateKey: 'notifications.pollerState.skyhooks',
+  entriesKey: 'entries',
+  isEntry: isSkyhookEntrySnapshot,
+  load: async (characterId) => {
+    const context = await corpContextFor(characterId, 'canReadSkyhooks');
+    if (context === null) return null;
+    const { corporationId } = context;
+    const list = await loadCorporationSkyhooks(characterId, corporationId);
+    if (list.needsReauth || list.cached === null) return null;
+    const skyhooks = list.cached.data.skyhooks;
+    const details = await loadSkyhookDetails(
+      characterId,
+      corporationId,
+      skyhooks.map((skyhook) => skyhook.id)
+    );
+    const thresholds = await currentThresholds(characterId);
+    const entries: SkyhookEntrySnapshot[] = [];
+    for (const skyhook of skyhooks) {
+      const result = details.get(skyhook.id);
+      if (result === undefined || result.needsReauth || result.cached === null) return null;
+      const detail = result.cached.data;
+      const reagents = detail.reagents;
+      const unsecured = reagents?.reduce((sum, r) => sum + r.unsecured_stock, 0);
+      entries.push({
+        skyhookId: skyhook.id,
+        planetId: skyhook.planet_id,
+        windowStartMs: parseInstant(detail.theft_vulnerability?.start),
+        windowEndMs: parseInstant(detail.theft_vulnerability?.end),
+        // A non-number is unknown, never "0 at risk".
+        unsecuredUnits: unsecured !== undefined && Number.isFinite(unsecured) ? unsecured : null,
+        leadMs: thresholds.skyhookRaidableLeadHours * HOUR_MS,
+        minUnits: thresholds.skyhookRaidableMinUnits,
+      });
+    }
+    return entries;
+  },
+  toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
+  // As in the den domain: the baseline keeps the lead time the diff needs, while
+  // the Projection reads the current one so a Settings change rebuilt from that
+  // baseline projects the new warning time. Re-checks the role: a baseline
+  // outlives a lost Station_Manager role, and a Projection nothing re-verifies
+  // must not keep pushing for a corp the pilot can no longer read.
+  projection: async (characterId, characterName, snapshot, nowMs) => {
+    if ((await corpContextFor(characterId, 'canReadSkyhooks')) === null) return [];
+    const thresholds = await currentThresholds(characterId);
+    const entries = snapshot.entries.map((entry) => ({
+      ...entry,
+      leadMs: thresholds.skyhookRaidableLeadHours * HOUR_MS,
+      minUnits: thresholds.skyhookRaidableMinUnits,
+    }));
+    const planetNames = await resolveProjectionNames(
+      entries.filter((entry) => entry.windowStartMs !== null).map((entry) => entry.planetId),
+      loadPlanetName
+    );
+    return projectSkyhookRaids(
+      characterId,
+      characterName,
+      entries,
+      planetNames,
+      NOTIFICATION_EVENT_ENTRIES.skyhookRaidable.projection.push,
+      nowMs
+    );
+  },
+  names: async (fire) => ({ planet: (await loadPlanetName(fire.planetId)) ?? undefined }),
 });
 
 /* Corp industry jobs --------------------------------------------------------- */

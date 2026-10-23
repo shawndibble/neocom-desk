@@ -52,6 +52,7 @@ const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
   communityMemberJoined: 'world',
   communityRequestPledged: 'world',
   structureFuelLow: 'corp',
+  skyhookRaidable: 'corp',
   corpIndustryJobReady: 'corp',
   corpMemberJoined: 'corp',
   corpMemberLeft: 'corp',

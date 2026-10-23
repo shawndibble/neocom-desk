@@ -92,6 +92,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   eveNotification: '/alerts',
   // Corp events (issue #299): each lands on the corp route that shows it.
   structureFuelLow: '/corp',
+  skyhookRaidable: '/corp',
   // Not the corp board (issue #2302): that shows the job with nothing pointing
   // at it, and not at all once delivered. Active Jobs lists corp jobs and
   // keeps the one `?highlight=` names, whoever installed it.

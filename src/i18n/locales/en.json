@@ -10517,6 +10517,13 @@
         "outTitle": "Den out of reinforcement",
         "outBody": "{{character}}'s Mercenary Den on {{planet}} is out of reinforcement."
       },
+      "skyhookRaidable": {
+        "soonTitle": "Skyhook raidable soon",
+        "soonBody_one": "Your skyhook at {{planet}} becomes raidable in about {{count}} hour.",
+        "soonBody_other": "Your skyhook at {{planet}} becomes raidable in about {{count}} hours.",
+        "nowTitle": "Skyhook raidable now",
+        "nowBody": "Your skyhook at {{planet}} is raidable now."
+      },
       "mercenaryDenAnarchy": {
         "title": "Den anarchy rising",
         "body": "{{character}}'s Mercenary Den on {{planet}} has reached {{amount}}% anarchy."
@@ -12442,6 +12449,7 @@
         "planetaryExtractorExpiring": "Planetary extractor expiring",
         "mercenaryDenReinforced": "Mercenary Den reinforced",
         "mercenaryDenAnarchy": "Mercenary Den anarchy",
+        "skyhookRaidable": "Skyhook raidable",
         "marketOrderFilled": "Sell order filled",
         "marketOrderUndercut": "Market order undercut",
         "newCalendarEvent": "New calendar event",
@@ -12469,6 +12477,14 @@
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Planetary Industry always shows the real expiry.",
       "mercenaryDenReinforcedHint": "Scheduled up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. A den that leaves reinforcement early can still send it.",
+      "skyhookRaidableHint": "Scheduled up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Needs the Station Manager role.",
+      "skyhookRaidableLeadTimeLabel": "Warn this far before a skyhook becomes raidable:",
+      "skyhookRaidableLeadTimeOption_one": "{{count}} hour",
+      "skyhookRaidableLeadTimeOption_other": "{{count}} hours",
+      "skyhookRaidableMinUnitsLabel": "Danger alert when open with unsecured stock of at least:",
+      "skyhookRaidableMinUnitsOption_one": "{{count}} unit",
+      "skyhookRaidableMinUnitsOption_other": "{{count}} units",
+      "skyhookRaidableMinUnitsHint": "A window that opens with less than this sends a plain alert instead. EVE sends no silo size, so this counts the unsecured units a raid would take; 0 makes every open window a danger alert.",
       "mercenaryDenAnarchyForegroundOnlyHint": "Fires only while the app is open: ESI offers no way to be told when anarchy rises.",
       "mercenaryDenReinforcedLeadTimeLabel": "Warn this far before a den leaves reinforcement:",
       "mercenaryDenReinforcedLeadTimeOption_one": "{{count}} hour",
