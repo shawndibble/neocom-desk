@@ -37,6 +37,7 @@ import { stockTargetDomain } from './pollDomains/stockTargets';
 import { incursionDomain } from './pollDomains/incursions';
 import { communitiesDomain } from './pollDomains/communities';
 import { killsDomain } from './pollDomains/kills';
+import { mercenaryDensDomain } from './pollDomains/mercenaryDens';
 
 type Entry = Record<string, unknown>;
 
@@ -223,6 +224,20 @@ const CASES: Case[] = [
     domain: killsDomain,
     base: { killmailId: 1, timeMs: 1000, thresholdIsk: 0 },
     optional: { shipTypeId: 587, systemId: 30000142, value: 1_000_000 },
+  },
+  {
+    name: 'mercenary dens',
+    domain: mercenaryDensDomain,
+    base: {
+      denId: 1,
+      planetId: 40_000_001,
+      reinforcedUntilMs: 100,
+      anarchyAmount: 10,
+      anarchyLevel: 1,
+      leadMs: 5,
+      anarchyPct: 50,
+    },
+    nullable: ['reinforcedUntilMs', 'anarchyAmount', 'anarchyLevel'],
   },
 ];
 

@@ -34,6 +34,7 @@ import {
   DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS,
   DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
   DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
+  DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
   DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
   DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
   defaultedThresholds,
@@ -82,13 +83,15 @@ export {
   DEFAULT_WALLET_FOLD_INTO_CONTRACT,
   DEFAULT_INCURSION_NEARBY_JUMPS,
   DEFAULT_SHIP_LOST_MINIMUM_ISK,
+  DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+  DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
 } from './eventThresholdFields';
 
 /**
  * The slice of preferences the uploaded Projection reads (`projectionRebuild.ts`),
  * normalized so "absent" and "set to the default" compare equal: the master
  * switch, the browser gate, each Character's browser-channel opinions, and
- * the four thresholds a projecting domain uses. Feed flags and the wallet
+ * the lead-time thresholds a projecting domain uses. Feed flags and the wallet
  * thresholds feed no projection, so they are left out.
  */
 const DEFAULT_PROJECTION_ENTRY = JSON.stringify([
@@ -100,6 +103,7 @@ const DEFAULT_PROJECTION_ENTRY = JSON.stringify([
   DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS,
   DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
   DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
+  DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
 ]);
 
 function projectionInputs(value: NotificationPreferencesValue): string {
@@ -138,6 +142,7 @@ function projectionInputs(value: NotificationPreferencesValue): string {
       courierDeliveryDueLeadHours,
       contractExpiringLeadHours,
       ordersLapsingLeadHours,
+      mercenaryDenReinforcedLeadHours,
     } = characterEventThresholds(value, characterId);
     const entry = JSON.stringify([
       eventsOffDefault,
@@ -148,6 +153,7 @@ function projectionInputs(value: NotificationPreferencesValue): string {
       courierDeliveryDueLeadHours,
       contractExpiringLeadHours,
       ordersLapsingLeadHours,
+      mercenaryDenReinforcedLeadHours,
     ]);
     // An all-default Character reads the same as an absent one.
     if (entry !== DEFAULT_PROJECTION_ENTRY) characters[id] = entry;

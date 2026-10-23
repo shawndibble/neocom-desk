@@ -220,6 +220,45 @@ function toRow(
   };
 }
 
+/** What the alerts and the Calendar read of one den: no names, operations or jumps. */
+export interface CharacterDenState {
+  denId: number;
+  planetId: number;
+  /** The reinforcement exit; null when not reinforced or the detail could not be read. */
+  reinforcedUntilMs: number | null;
+  /** 0–100 within the level; null when the detail could not be read. */
+  anarchyAmount: number | null;
+  anarchyLevel: number | null;
+}
+
+export type CharacterDenStates =
+  { status: 'read'; dens: CharacterDenState[]; fetchedAt: Date } | { status: 'reauth' | 'failed' };
+
+/**
+ * One Character's dens through the same cached reads as the widget, minus its
+ * extras (operations, jumps, names): the poll domain and the Calendar need
+ * timers and anarchy only. A thrown read is `failed`, never an empty list.
+ */
+export async function loadCharacterDenStates(characterId: number): Promise<CharacterDenStates> {
+  try {
+    const entry = await loadCharacterDens(characterId, '', false);
+    if (entry.status !== 'read') return { status: entry.status };
+    return {
+      status: 'read',
+      fetchedAt: new Date(Math.min(...entry.reads.map((r) => r.fetchedAt.getTime()))),
+      dens: entry.dens.map(({ id, planetId, detail }) => ({
+        denId: id,
+        planetId,
+        reinforcedUntilMs: parseInstant(detail?.reinforcement_timer?.end),
+        anarchyAmount: detail?.evolution.anarchy.amount ?? null,
+        anarchyLevel: detail ? levelNumber(detail.evolution.anarchy.level) : null,
+      })),
+    };
+  } catch {
+    return { status: 'failed' };
+  }
+}
+
 /**
  * Every stored Character's dens. A read that found nothing for anyone and had
  * nothing cached throws, so the widget keeps its last value and offers Retry.

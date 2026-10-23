@@ -24,6 +24,8 @@ describe('THRESHOLD_FIELDS', () => {
       'walletFoldIntoContract',
       'incursionNearbyJumps',
       'shipLostMinimumIsk',
+      'mercenaryDenReinforcedLeadHours',
+      'mercenaryDenAnarchyPercent',
     ]);
   });
 
@@ -60,6 +62,8 @@ describe('defaultedThresholds', () => {
       walletFoldIntoContract: 1,
       incursionNearbyJumps: 5,
       shipLostMinimumIsk: 0,
+      mercenaryDenReinforcedLeadHours: 1,
+      mercenaryDenAnarchyPercent: 50,
     });
   });
 

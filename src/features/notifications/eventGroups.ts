@@ -30,6 +30,8 @@ const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
   industryJobComplete: 'industryPi',
   planetaryExtractionDone: 'industryPi',
   planetaryExtractorExpiring: 'industryPi',
+  mercenaryDenReinforced: 'industryPi',
+  mercenaryDenAnarchy: 'industryPi',
   marketOrderFilled: 'market',
   marketOrderUndercut: 'market',
   contractAccepted: 'market',

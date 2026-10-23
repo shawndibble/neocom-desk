@@ -97,6 +97,12 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   structureFuelLow: 'warning',
   corpWalletThreshold: 'warning',
   planetaryExtractorExpiring: 'warning',
+  // The one critical personal event (issue #4782): a reinforced den is a base under
+  // attack, so both its lead-time warning and its "out now" fire show in the Danger
+  // banner. Severity is per event, not per fire.
+  mercenaryDenReinforced: 'critical',
+  // Standing pressure on the skyhook, not yet a loss.
+  mercenaryDenAnarchy: 'warning',
   // A lead-time warning, same shape as the extractor one above.
   skillQueueEnding: 'warning',
   // A lead-time warning too (issue #1713) — the collateral is still recoverable.

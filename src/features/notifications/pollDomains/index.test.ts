@@ -209,6 +209,7 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       stockTargets: ['stockBelowTarget'],
       incursions: ['incursionNearby'],
       kills: ['shipLost'],
+      mercenaryDens: ['mercenaryDenReinforced', 'mercenaryDenAnarchy'],
       communities: ['communityJoinRequest', 'communityMemberJoined', 'communityRequestPledged'],
     });
   });
@@ -473,7 +474,7 @@ describe('projection wiring', () => {
     });
   });
 
-  it('gives exactly the ten fixed-future-timestamp domains a projection', () => {
+  it('gives exactly the eleven fixed-future-timestamp domains a projection', () => {
     const withProjection = POLL_DOMAINS.filter((domain) => domain.projection !== undefined).map(
       (domain) => domain.id
     );
@@ -486,6 +487,7 @@ describe('projection wiring', () => {
         'corpIndustryJobs',
         'eveNotification',
         'industryJobs',
+        'mercenaryDens',
         'orderExpiry',
         'skillQueue',
         'structureFuel',
