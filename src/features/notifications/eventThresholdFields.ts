@@ -36,6 +36,8 @@ export interface CharacterEventThresholds {
   walletFoldIntoContract?: number;
   /** Jumps from the Current System within which an Incursion fires `incursionNearby` (issue #3542) — one of `INCURSION_NEARBY_JUMP_OPTIONS`. */
   incursionNearbyJumps?: number;
+  /** Jumps from the Current System within which a raidable skyhook fires `skyhookRaidableNearby` (issue #4784) — one of `INCURSION_NEARBY_JUMP_OPTIONS`. */
+  skyhookRaidableNearbyJumps?: number;
   /** Least zKillboard total value, in ISK, a loss must carry to fire `shipLost` (issue #4772); 0 fires for every loss. */
   shipLostMinimumIsk?: number;
   /** Hours before a Mercenary Den's reinforcement exit that trigger `mercenaryDenReinforced` (issue #4782) — one of `MERCENARY_DEN_REINFORCED_LEAD_HOUR_OPTIONS`. */
@@ -95,6 +97,8 @@ export const DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS = 1;
 export const DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT = 50;
 /** Close enough to fly to on a whim, without an alert for every Incursion in the region. */
 export const DEFAULT_INCURSION_NEARBY_JUMPS = 5;
+/** Raid windows are hours long, so the same on-a-whim reach as an Incursion. */
+export const DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS = 5;
 /**
  * Matches the roster's own `ENDING_SOON_MS` display constant
  * (`features/skills/queueStatus.ts`) — a pilot's first warning should not
@@ -249,6 +253,16 @@ export const THRESHOLD_FIELDS: { readonly [K in ThresholdKey]: ThresholdField<K>
       labelKey: 'settings.notifications.incursionNearbyJumpsLabel',
       options: INCURSION_NEARBY_JUMP_OPTIONS,
       optionKey: 'settings.notifications.incursionNearbyJumpsOption',
+    },
+  },
+  skyhookRaidableNearbyJumps: {
+    key: 'skyhookRaidableNearbyJumps',
+    defaultValue: DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.skyhookRaidableNearbyJumpsLabel',
+      options: INCURSION_NEARBY_JUMP_OPTIONS,
+      optionKey: 'settings.notifications.skyhookRaidableNearbyJumpsOption',
     },
   },
   shipLostMinimumIsk: {

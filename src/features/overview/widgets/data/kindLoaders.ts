@@ -18,6 +18,8 @@ import type { PlexQuote } from '@/features/market/plexPrice';
 import type { BelowMarketSummaryContract } from '@/features/contractSearch/belowMarketSummary';
 import type { SurveySummary } from '@/engine/survey/series';
 import type { RouteKillSystem } from '@/engine/route/routeKillTrend';
+import type { RaidWindow } from '@/engine/corp/sovereignty';
+import { parseInstant } from '@/engine/esiInstant';
 import type { NetWorthSnapshotRow } from '@/engine/netWorth/snapshot';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 import type { CachedResult } from '@/esi/cache';
@@ -536,13 +538,26 @@ export interface RouteSafetyWidgetData {
   href: string | null;
   /** The saved route's systems in flight order, each with its kills over 24 hours. */
   systems: RouteKillSystem[];
+  /** Raidable skyhooks (public list) in the route's systems; empty when the list could not be read. */
+  raidable: RouteRaidableSkyhook[];
   fetchedAt: Date | null;
+}
+
+/** One skyhook raid window in a system of the saved route (issue #4784). The public list carries no silo size. */
+export interface RouteRaidableSkyhook {
+  key: string;
+  systemId: number;
+  name: string;
+  /** Jumps along the route from its first system. */
+  jumps: number;
+  window: RaidWindow;
 }
 
 const NO_ROUTE: RouteSafetyWidgetData = {
   hasRoute: false,
   href: null,
   systems: [],
+  raidable: [],
   fetchedAt: null,
 };
 
@@ -563,9 +578,11 @@ export async function loadRouteSafetyWidget(): Promise<RouteSafetyWidgetData> {
     import('@/sde/solarSystems'),
     import('@/features/route/routeSafetyLink'),
   ]);
-  const [kills, names] = await Promise.all([
+  const [kills, names, raidList] = await Promise.all([
     loadRouteKills24h(route.systems),
     loadSolarSystemsById().catch(() => null),
+    // Supplementary: an unread list costs the rows, never the widget.
+    import('./sovRaidsLoader').then((m) => m.loadRaidableList()).catch(() => null),
   ]);
   const systems = route.systems.map((systemId) => ({
     systemId,
@@ -575,10 +592,30 @@ export async function loadRouteSafetyWidget(): Promise<RouteSafetyWidgetData> {
   if (systems.every((system) => system.kills === null)) {
     throw new Error('Route kills could not be read');
   }
+  const routeIndex = new Map<number, number>();
+  route.systems.forEach((systemId, i) => {
+    if (!routeIndex.has(systemId)) routeIndex.set(systemId, i);
+  });
+  const raidable = (raidList?.data.skyhooks ?? []).flatMap((hook): RouteRaidableSkyhook[] => {
+    const jumps = routeIndex.get(hook.solar_system_id);
+    const startMs = parseInstant(hook.theft_vulnerability?.start);
+    const endMs = parseInstant(hook.theft_vulnerability?.end);
+    if (jumps === undefined || startMs === null || endMs === null) return [];
+    return [
+      {
+        key: `${hook.solar_system_id}:${hook.planet_id}`,
+        systemId: hook.solar_system_id,
+        name: names?.get(hook.solar_system_id)?.name ?? `#${hook.solar_system_id}`,
+        jumps,
+        window: { startMs, endMs },
+      },
+    ];
+  });
   return {
     hasRoute: true,
     href: routeStopsHref(route.fromId, route.stops),
     systems,
+    raidable,
     fetchedAt: new Date(),
   };
 }

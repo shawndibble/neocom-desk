@@ -13,6 +13,7 @@ import { formatEveClock } from '@/engine/survey/chatMessage';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { eveToday, rangeDates, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import { longestRemainingSeconds, secondsLeft } from '@/engine/clone/jumpTimers';
+import { liveRaids, raidState } from '@/engine/corp/sovereignty';
 import { formatCountdown, formatDuration } from '@/lib/duration';
 import { formatIskCompact, formatIskCompactSigned } from '@/lib/isk';
 import type { LayerId } from '@/engine/netWorth/series';
@@ -695,18 +696,44 @@ const routeSafety: Builder = (feeds, { t, now }) => {
         { key: 'kills', label: t(`${W}.routeSafety.col.kills`), align: 'end', priority: 1 },
         { key: 'level', label: t(`${W}.routeSafety.col.level`), priority: 2 },
       ],
-      rows: trend.rows.map((row) => ({
-        key: String(row.systemId),
-        cells: [
-          row.name,
-          row.count === null ? UNKNOWN : count(row.count),
-          row.level === null
-            ? UNKNOWN
-            : row.level === 'busy'
-              ? { text: levelWord(row.level), tone: 'caution' }
-              : levelWord(row.level),
-        ],
-      })),
+      rows: [
+        ...trend.rows.map((row) => ({
+          key: String(row.systemId),
+          cells: [
+            row.name,
+            row.count === null ? UNKNOWN : count(row.count),
+            row.level === null
+              ? UNKNOWN
+              : row.level === 'busy'
+                ? { text: levelWord(row.level), tone: 'caution' as const }
+                : levelWord(row.level),
+          ],
+        })),
+        // A condition per raidable skyhook on the route, in the same row style:
+        // no kills figure of its own, the window said plainly. Not a verdict.
+        ...liveRaids(data.raidable, now).map((hook) => {
+          const open = raidState(hook.window, now) === 'open';
+          const duration = formatCountdown(
+            ((open ? hook.window.endMs : hook.window.startMs) - now) / 1000
+          );
+          return {
+            key: `raid:${hook.key}`,
+            cells: [
+              hook.name,
+              '',
+              {
+                text: t('travel.sovRaids.routeRow', {
+                  window: t(open ? 'travel.sovRaids.windowOpen' : 'travel.sovRaids.windowIn', {
+                    duration,
+                  }),
+                  jumps: t('travel.sovRaids.jumps', { count: hook.jumps }),
+                }),
+                tone: 'caution' as const,
+              },
+            ],
+          };
+        }),
+      ],
     },
     summary: `${summary}${unreadNote}`,
     chart:

@@ -795,8 +795,46 @@ describe('routeSafety', () => {
       { systemId: 3, name: 'Amarr', kills: kills(1, 5 * HOUR) },
       { systemId: 4, name: 'Unread', kills: null },
     ],
+    raidable: [],
     fetchedAt: new Date(NOW),
     ...over,
+  });
+
+  it('adds a condition row per live raidable skyhook on the route, after the kill rows', () => {
+    const raidable = [
+      {
+        key: '3:9',
+        systemId: 3,
+        name: 'Amarr',
+        jumps: 2,
+        window: { startMs: NOW + HOUR, endMs: NOW + 5 * HOUR },
+      },
+      {
+        key: '2:8',
+        systemId: 2,
+        name: 'Niarja',
+        jumps: 1,
+        window: { startMs: NOW - HOUR, endMs: NOW + HOUR },
+      },
+      {
+        key: '1:7',
+        systemId: 1,
+        name: 'Efa',
+        jumps: 0,
+        window: { startMs: NOW - 5 * HOUR, endMs: NOW - HOUR },
+      },
+    ];
+    const view = buildView('routeSafety', { routeSafety: ok(data({ raidable })) }, ctx());
+    const rows = view.table?.rows ?? [];
+    expect(rows.slice(4).map((r) => [r.key, r.cells[0], r.cells[1]])).toEqual([
+      ['raid:2:8', 'Niarja', ''],
+      ['raid:3:9', 'Amarr', ''],
+    ]);
+    const text = (i: number) => rows[i]?.cells[2] as { text: string; tone: string };
+    expect(text(4).text).toContain('travel.sovRaids.routeRow');
+    expect(text(4).text).toContain('travel.sovRaids.windowOpen');
+    expect(text(5).text).toContain('travel.sovRaids.windowIn');
+    expect(text(4).tone).toBe('caution');
   });
 
   it('reads from its own feed and links to Route Safety on the saved route', () => {

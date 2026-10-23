@@ -295,6 +295,15 @@ const CATALOG = [
     defaultChannels: 'both',
     scope: requiredScope('getCharacterLocation'),
   },
+  // A skyhook raid window within the pilot's N jumps of their Current System
+  // (issue #4784, raider half). The raidable list is public; the location is
+  // the one scope it needs, as `incursionNearby` does.
+  {
+    id: 'skyhookRaidableNearby',
+    labelKey: 'settings.notifications.event.skyhookRaidableNearby',
+    defaultChannels: 'both',
+    scope: requiredScope('getCharacterLocation'),
+  },
   // A loss killmail of a tracked Character, read from public zKillboard (the
   // Overview's Kills widget read), so it needs no ESI scope (issue #4772).
   {
