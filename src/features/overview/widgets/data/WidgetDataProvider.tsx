@@ -53,11 +53,13 @@ import {
   loadHaulingWidget,
   loadBelowMarketWidget,
   loadJumpTimersWidget,
+  loadMercenaryDensWidget,
   loadRouteSafetyWidget,
   loadKillsWidget,
   loadOmegaWidget,
   loadTradingProfitWidget,
   loadSurveyWidget,
+  loadSovRaidsWidget,
 } from './kindLoaders';
 import {
   loadCorpAssetsFeed,
@@ -67,6 +69,7 @@ import {
   loadCorpMembersFeed,
   loadCorpRoleAuditFeed,
   loadCorpMiningFeed,
+  loadCorpSovereigntyFeed,
   loadCorpStarbasesFeed,
   loadCorpContractsFeed,
   loadCorpOrdersFeed,
@@ -272,6 +275,14 @@ function Source({ feed }: { feed: FeedId }) {
           cacheKey="overview:jump-timers"
         />
       );
+    case 'mercenaryDens':
+      return (
+        <SnapshotSource
+          feed="mercenaryDens"
+          load={loadMercenaryDensWidget}
+          cacheKey="overview:mercenary-dens"
+        />
+      );
     case 'location':
       return (
         <SnapshotSource feed="location" load={loadLocationWidget} cacheKey="overview:location" />
@@ -326,6 +337,14 @@ function Source({ feed }: { feed: FeedId }) {
       );
     case 'corpMining':
       return <SnapshotSource feed="corpMining" load={loadCorpMiningFeed} cacheKey="corp:mining" />;
+    case 'corpSovereignty':
+      return (
+        <SnapshotSource
+          feed="corpSovereignty"
+          load={loadCorpSovereigntyFeed}
+          cacheKey="corp:sovereignty"
+        />
+      );
     case 'corpStarbases':
       return (
         <SnapshotSource
@@ -348,6 +367,10 @@ function Source({ feed }: { feed: FeedId }) {
       return <SnapshotSource feed="corpKills" load={loadCorpKillsFeed} cacheKey="corp:kills" />;
     case 'incursions':
       return <IncursionsSource />;
+    case 'sovRaids':
+      return (
+        <SnapshotSource feed="sovRaids" load={loadSovRaidsWidget} cacheKey="overview:sov-raids" />
+      );
     case 'spExtras':
       return <SpExtrasSource />;
   }

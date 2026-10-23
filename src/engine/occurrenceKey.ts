@@ -47,12 +47,16 @@ import type {
   OrdersLapsingFire,
   EveNotificationFire,
   StructureFuelLowFire,
+  MercenaryDenReinforcedFire,
+  SkyhookRaidableFire,
+  MercenaryDenAnarchyFire,
   CorpIndustryJobNotificationFire,
   CorpMemberJoinedFire,
   CorpMemberLeftFire,
   CorpWalletThresholdFire,
   StructureReinforcementExitFire,
   PriceAlertTriggeredFire,
+  ShipLostFire,
 } from './notificationDiffs';
 import type {
   CommunityJoinRequestFire,
@@ -61,6 +65,7 @@ import type {
 } from './communities/communityAlert';
 import type { StockBelowTargetFire } from './stockTargets/stockAlert';
 import type { IncursionNearbyFire } from './incursions/incursionAlert';
+import type { SkyhookRaidableNearbyFire } from './skyhooks/skyhookAlert';
 import { parseInstant } from './esiInstant';
 import { DAY_MS } from '@/lib/age';
 
@@ -88,17 +93,22 @@ export type OccurrenceFire =
   | OrdersLapsingFire
   | EveNotificationFire
   | StructureFuelLowFire
+  | MercenaryDenReinforcedFire
+  | SkyhookRaidableFire
+  | MercenaryDenAnarchyFire
   | CorpIndustryJobNotificationFire
   | CorpMemberJoinedFire
   | CorpMemberLeftFire
   | CorpWalletThresholdFire
   | StructureReinforcementExitFire
   | PriceAlertTriggeredFire
+  | ShipLostFire
   | StockBelowTargetFire
   | CommunityJoinRequestFire
   | CommunityMemberJoinedFire
   | CommunityRequestPledgedFire
-  | IncursionNearbyFire;
+  | IncursionNearbyFire
+  | SkyhookRaidableNearbyFire;
 
 function dayBucket(nowMs: number): number {
   return Math.floor(nowMs / DAY_MS);
@@ -181,6 +191,18 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
       return [characterId, fire.eventId, fire.notificationId].join(':');
     case 'structureFuelLow':
       return [characterId, fire.eventId, fire.structureId, fire.fuelExpiresMs].join(':');
+    // A reinforcement is identified by its exit instant, so a fresh one is a new countdown; the
+    // lead warning and the "out now" fire of one exit are different occurrences.
+    case 'mercenaryDenReinforced':
+      return [characterId, fire.eventId, fire.denId, fire.reinforcedUntilMs, fire.phase].join(':');
+    // The window's opening instant, apart per phase (issue #4784). The phase is the key's last part
+    // on purpose: `alertGroups.ts` reads a `:danger` suffix as the Danger banner's severity, so
+    // that survives a push, a sync and a reload with no field of its own on the feed row.
+    case 'skyhookRaidable':
+      return [characterId, fire.eventId, fire.skyhookId, fire.windowStartMs, fire.phase].join(':');
+    // An edge with no natural id (foreground-only, never projected): the poll that saw the crossing is the occurrence, so a re-cross is new.
+    case 'mercenaryDenAnarchy':
+      return [characterId, fire.eventId, fire.denId, fire.thresholdPct, nowMs].join(':');
     case 'corpMemberJoined':
     case 'corpMemberLeft':
       return [characterId, fire.eventId, fire.memberCharacterId].join(':');
@@ -199,6 +221,9 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     // re-observation of the old one.
     case 'priceAlertTriggered':
       return [characterId, fire.eventId, fire.typeId, fire.targetPrice, fire.direction].join(':');
+    // The killmail itself: zKillboard ids a loss once and never changes it.
+    case 'shipLost':
+      return [characterId, fire.eventId, fire.killmailId].join(':');
     // The Character at the Community, at the time it asked or joined: someone
     // turned away who asks again, or a Member who leaves and rejoins, is a new
     // occurrence and must not be deduped against the first.
@@ -231,6 +256,11 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     // coming back is the same occurrence, not a second alert.
     case 'incursionNearby':
       return [characterId, fire.eventId, fire.constellationId, fire.stagingSystemId].join(':');
+    // Once per skyhook per raid window: the window's start names it, so the
+    // next window is a new occurrence and a window leaving range and coming
+    // back is not.
+    case 'skyhookRaidableNearby':
+      return [characterId, fire.eventId, fire.systemId, fire.planetId, fire.startMs].join(':');
     default: {
       const exhaustive: never = fire;
       throw new Error(`occurrenceKey: unhandled Notification Event ${JSON.stringify(exhaustive)}`);
@@ -266,6 +296,9 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
   switch (fire.eventId) {
     case 'walletBalanceChanged':
       return fire.dateMs;
+    // The killmail's own time, which a poll after days away must not replace.
+    case 'shipLost':
+      return pastOrNow(fire.timeMs);
     // The completed entry's `finish_date`, already in the past by the time
     // the diff fires (`isCompleted`). Null when the queue carried no date.
     case 'skillLevelComplete':
@@ -306,6 +339,9 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     case 'marketOrderFilled':
     case 'structureReinforcementExit':
     case 'structureFuelLow':
+    case 'mercenaryDenReinforced':
+    case 'skyhookRaidable':
+    case 'mercenaryDenAnarchy':
     case 'corpMemberJoined':
     case 'corpMemberLeft':
     case 'corpWalletThreshold':
@@ -321,6 +357,9 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     // The feed carries no spawn time; the poll that saw it in range is it.
     // falls through
     case 'incursionNearby':
+    // The list carries the window, not when it was published; the poll that saw it in range is it.
+    // falls through
+    case 'skyhookRaidableNearby':
     // Neither the waiting list nor the roster is read with a time the poll could use.
     // falls through
     case 'communityJoinRequest':

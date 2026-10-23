@@ -95,8 +95,17 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   // A standing fault: training stopped and nothing is replacing it.
   characterNotTraining: 'warning',
   structureFuelLow: 'warning',
+  // A lead-time warning, or a window open with little to lose; the one event with a second
+  // severity, which `entrySeverity` reads off the entry (issue #4784).
+  skyhookRaidable: 'warning',
   corpWalletThreshold: 'warning',
   planetaryExtractorExpiring: 'warning',
+  // The one critical personal event (issue #4782): a reinforced den is a base under
+  // attack, so both its lead-time warning and its "out now" fire show in the Danger
+  // banner. Severity is per event, not per fire.
+  mercenaryDenReinforced: 'critical',
+  // Standing pressure on the skyhook, not yet a loss.
+  mercenaryDenAnarchy: 'warning',
   // A lead-time warning, same shape as the extractor one above.
   skillQueueEnding: 'warning',
   // A lead-time warning too (issue #1713) — the collateral is still recoverable.
@@ -111,8 +120,12 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   marketOrderUndercut: 'warning',
   // A shelf running empty (issue #3521): a standing fault, not yet a loss.
   stockBelowTarget: 'warning',
+  // A hull already gone (issue #4772): nothing left to act on, but worth a look.
+  shipLost: 'warning',
   // Something to fly to, not a fault.
   incursionNearby: 'watch',
+  // A window to fly to, not a fault.
+  skyhookRaidableNearby: 'watch',
   // Someone is waiting on the admin; a new Member needs nothing.
   communityJoinRequest: 'watch',
   communityMemberJoined: 'watch',
@@ -144,6 +157,20 @@ export function alertSeverity(target: EntryChannelTarget): DeadlineSeverity {
     (target.kind === 'eveType' ? EVE_TYPE_SEVERITY[target.type] : EVENT_SEVERITY[target.eventId]) ??
     'watch'
   );
+}
+
+/**
+ * One entry's severity: its type's (`alertSeverity`), except that a
+ * `skyhookRaidable` entry whose Occurrence Key ends in `:danger` is critical
+ * (issue #4784): the window is open with the silo above the pilot's minimum.
+ * Read off the key, which is the feed row's id, so it survives a push, a
+ * sync and a reload with no field of its own.
+ */
+export function entrySeverity(
+  entry: Pick<NotificationFeedRecord, 'eventId' | 'eveType'> & { id?: string }
+): DeadlineSeverity {
+  if (entry.eventId === 'skyhookRaidable' && entry.id?.endsWith(':danger')) return 'critical';
+  return alertSeverity(entryChannelTarget(entry));
 }
 
 /**
@@ -189,7 +216,7 @@ export function groupAlertsByType(entries: readonly NotificationFeedRecord[]): A
       byKey.set(key, {
         key,
         target,
-        severity: alertSeverity(target),
+        severity: entrySeverity(entry),
         count: 1,
         newestFiredAt: entry.firedAt,
         entries: [entry],
@@ -199,6 +226,9 @@ export function groupAlertsByType(entries: readonly NotificationFeedRecord[]): A
     }
     existing.count += 1;
     existing.entries.push(entry);
+    // A group is as severe as its worst entry: one type can carry two severities.
+    const severity = entrySeverity(entry);
+    if (compareSeverity(severity, existing.severity) < 0) existing.severity = severity;
     // Never assume the caller handed them over in order: `readFeed` does, but
     // a filtered or merged list need not, and a group claiming the wrong
     // "newest" would sort itself into the wrong place.

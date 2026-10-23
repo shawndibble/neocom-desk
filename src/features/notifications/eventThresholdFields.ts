@@ -36,6 +36,18 @@ export interface CharacterEventThresholds {
   walletFoldIntoContract?: number;
   /** Jumps from the Current System within which an Incursion fires `incursionNearby` (issue #3542) — one of `INCURSION_NEARBY_JUMP_OPTIONS`. */
   incursionNearbyJumps?: number;
+  /** Jumps from the Current System within which a raidable skyhook fires `skyhookRaidableNearby` (issue #4784) — one of `INCURSION_NEARBY_JUMP_OPTIONS`. */
+  skyhookRaidableNearbyJumps?: number;
+  /** Least zKillboard total value, in ISK, a loss must carry to fire `shipLost` (issue #4772); 0 fires for every loss. */
+  shipLostMinimumIsk?: number;
+  /** Hours before a Mercenary Den's reinforcement exit that trigger `mercenaryDenReinforced` (issue #4782) — one of `MERCENARY_DEN_REINFORCED_LEAD_HOUR_OPTIONS`. */
+  mercenaryDenReinforcedLeadHours?: number;
+  /** Anarchy % (within the den's level) at which `mercenaryDenAnarchy` fires (issue #4782) — one of `MERCENARY_DEN_ANARCHY_PERCENT_OPTIONS`. */
+  mercenaryDenAnarchyPercent?: number;
+  /** Hours before a skyhook's theft window opens that trigger `skyhookRaidable` (issue #4784) — one of `SKYHOOK_RAIDABLE_LEAD_HOUR_OPTIONS`. */
+  skyhookRaidableLeadHours?: number;
+  /** Least unsecured reagent units that make an open window a danger Alert (issue #4784); 0 makes every open window one. */
+  skyhookRaidableMinUnits?: number;
 }
 
 export type ThresholdKey = keyof CharacterEventThresholds;
@@ -62,6 +74,12 @@ export const CONTRACT_EXPIRING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 1
 /** The lead times `ordersLapsing`'s inline control offers (issue #3797), all within the 72-hour Projection Horizon. */
 export const ORDERS_LAPSING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 12, 6];
 
+/** The lead times `mercenaryDenReinforced`'s inline control offers (issue #4782), all within the 72-hour Projection Horizon. */
+export const MERCENARY_DEN_REINFORCED_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 6, 1];
+
+/** The anarchy percentages `mercenaryDenAnarchy`'s inline control offers (issue #4782). */
+export const MERCENARY_DEN_ANARCHY_PERCENT_OPTIONS: readonly number[] = [25, 50, 75, 90];
+
 /** How near an Incursion must be for `incursionNearby` (issue #3542): a short hop up to a long trip. */
 export const INCURSION_NEARBY_JUMP_OPTIONS: readonly number[] = [3, 5, 10, 15, 20];
 
@@ -78,8 +96,22 @@ export const DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK = 50_000_000;
 export const DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK = 100_000_000;
 export const DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK = 1_000_000;
 export const DEFAULT_WALLET_FOLD_INTO_CONTRACT = 1;
+export const DEFAULT_SHIP_LOST_MINIMUM_ISK = 0;
+/** The lead times `skyhookRaidable`'s inline control offers (issue #4784), all within the 72-hour Projection Horizon. */
+export const SKYHOOK_RAIDABLE_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 6, 2, 1];
+
+/** The silo minimums `skyhookRaidable`'s inline control offers; ESI sends no silo capacity, so units, not a percent. */
+export const SKYHOOK_RAIDABLE_MIN_UNIT_OPTIONS: readonly number[] = [1, 100, 1000, 10000];
+
+export const DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS = 2;
+export const DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS = 1;
+
+export const DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS = 1;
+export const DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT = 50;
 /** Close enough to fly to on a whim, without an alert for every Incursion in the region. */
 export const DEFAULT_INCURSION_NEARBY_JUMPS = 5;
+/** Raid windows are hours long, so the same on-a-whim reach as an Incursion. */
+export const DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS = 5;
 /**
  * Matches the roster's own `ENDING_SOON_MS` display constant
  * (`features/skills/queueStatus.ts`) — a pilot's first warning should not
@@ -234,6 +266,65 @@ export const THRESHOLD_FIELDS: { readonly [K in ThresholdKey]: ThresholdField<K>
       labelKey: 'settings.notifications.incursionNearbyJumpsLabel',
       options: INCURSION_NEARBY_JUMP_OPTIONS,
       optionKey: 'settings.notifications.incursionNearbyJumpsOption',
+    },
+  },
+  skyhookRaidableNearbyJumps: {
+    key: 'skyhookRaidableNearbyJumps',
+    defaultValue: DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.skyhookRaidableNearbyJumpsLabel',
+      options: INCURSION_NEARBY_JUMP_OPTIONS,
+      optionKey: 'settings.notifications.skyhookRaidableNearbyJumpsOption',
+    },
+  },
+  shipLostMinimumIsk: {
+    key: 'shipLostMinimumIsk',
+    defaultValue: DEFAULT_SHIP_LOST_MINIMUM_ISK,
+    control: {
+      kind: 'iskAmount',
+      labelKey: 'settings.notifications.shipLostMinimumIskLabel',
+      inputIdPrefix: 'ship-lost-minimum',
+    },
+  },
+  mercenaryDenReinforcedLeadHours: {
+    key: 'mercenaryDenReinforcedLeadHours',
+    defaultValue: DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.mercenaryDenReinforcedLeadTimeLabel',
+      options: MERCENARY_DEN_REINFORCED_LEAD_HOUR_OPTIONS,
+      optionKey: 'settings.notifications.mercenaryDenReinforcedLeadTimeOption',
+    },
+  },
+  mercenaryDenAnarchyPercent: {
+    key: 'mercenaryDenAnarchyPercent',
+    defaultValue: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.mercenaryDenAnarchyPercentLabel',
+      options: MERCENARY_DEN_ANARCHY_PERCENT_OPTIONS,
+      optionKey: 'settings.notifications.mercenaryDenAnarchyPercentOption',
+    },
+  },
+  skyhookRaidableLeadHours: {
+    key: 'skyhookRaidableLeadHours',
+    defaultValue: DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.skyhookRaidableLeadTimeLabel',
+      options: SKYHOOK_RAIDABLE_LEAD_HOUR_OPTIONS,
+      optionKey: 'settings.notifications.skyhookRaidableLeadTimeOption',
+    },
+  },
+  skyhookRaidableMinUnits: {
+    key: 'skyhookRaidableMinUnits',
+    defaultValue: DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.skyhookRaidableMinUnitsLabel',
+      options: SKYHOOK_RAIDABLE_MIN_UNIT_OPTIONS,
+      optionKey: 'settings.notifications.skyhookRaidableMinUnitsOption',
     },
   },
 };

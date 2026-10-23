@@ -40,4 +40,8 @@ export * from './pollDomains/copy/corp';
 export * from './pollDomains/copy/stockTargets';
 export * from './pollDomains/copy/communities';
 export * from './pollDomains/copy/incursions';
+export * from './pollDomains/copy/skyhooks';
 export * from './pollDomains/copy/priceAlerts';
+export * from './pollDomains/copy/kills';
+export * from './pollDomains/copy/dens';
+export * from './pollDomains/copy/skyhooksNearby';

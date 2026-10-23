@@ -7,6 +7,9 @@
  */
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Tooltip } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import { useBuybackLinks } from '@/features/communities/buybackLinks';
 import { loadContractLocationName } from './contractLocationName';
 import { CONTRACT_TYPE_KEY } from './contractLabels';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
@@ -25,6 +28,7 @@ export function ContractIdentity({
   characterId: number | null;
 }) {
   const { t } = useTranslation();
+  const buyback = useBuybackLinks(characterId).get(contract.contract_id);
   const untitledCourier = isUntitledCourier(contract);
   const { start_location_id: startId, end_location_id: endId } = contract;
   const eligible = untitledCourier && characterId !== null && !!startId && !!endId;
@@ -40,7 +44,28 @@ export function ContractIdentity({
     loadRoute
   ).data;
 
-  if (!untitledCourier) return <>{contract.title || t(CONTRACT_TYPE_KEY[contract.type])}</>;
+  // A contract that is a buyback Quote's carries the Community mark (DESIGN.md 6c), not a column of its own.
+  const cue = buyback && (
+    <Tooltip
+      content={t('contracts.buyback.cue', {
+        title: buyback.requestTitle,
+        community: buyback.communityName,
+      })}
+    >
+      <span tabIndex={0} className="ml-1.5 inline-flex align-middle text-text-dim">
+        <Icon.NavCommunities aria-label={t('contracts.buyback.cueLabel')} role="img" />
+      </span>
+    </Tooltip>
+  );
+
+  if (!untitledCourier) {
+    return (
+      <>
+        {contract.title || t(CONTRACT_TYPE_KEY[contract.type])}
+        {cue}
+      </>
+    );
+  }
 
   const label =
     route?.start && route.end

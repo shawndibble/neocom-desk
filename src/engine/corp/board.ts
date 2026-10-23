@@ -17,6 +17,7 @@
  */
 
 import { severityForRemaining, type DeadlineSeverity } from '../character/severity';
+import { raidState, type SovereigntyKind } from './sovereignty';
 
 /**
  * The kinds of clock the board merges, in the order that breaks a deadline tie.
@@ -28,7 +29,9 @@ import { severityForRemaining, type DeadlineSeverity } from '../character/severi
  */
 export const CORP_BOARD_ITEM_KINDS = [
   'structureTimer',
+  'sovRaid',
   'structureFuel',
+  'sovHubFuel',
   'moonExtraction',
   'jobDelivery',
   'serviceOffline',
@@ -155,6 +158,27 @@ export interface BoardStarbaseSource {
   unanchorsAtMs: number | null;
 }
 
+/**
+ * A sovereignty raid window (issue #4775): a skyhook's theft window or a sov
+ * hub's vulnerability window. Epoch ms, both ends.
+ */
+export interface BoardSovereigntySource {
+  /** Unique across both kinds, e.g. `skyhook:5`. */
+  id: string;
+  name: string;
+  kind: SovereigntyKind;
+  startMs: number;
+  endMs: number;
+}
+
+/** When a sov hub's reagent bay empties: a fuel clock like a structure's. */
+export interface BoardHubFuelSource {
+  /** The hub's key, e.g. `hub:9`. */
+  id: string;
+  name: string;
+  runsOutMs: number;
+}
+
 export interface BoardExtractionSource {
   structureId: number;
   /** The refinery the drill is on, already named. */
@@ -191,6 +215,8 @@ export interface CorpBoardSources {
    */
   structures?: readonly BoardStructureSource[];
   starbases?: readonly BoardStarbaseSource[];
+  sovereignty?: readonly BoardSovereigntySource[];
+  hubFuel?: readonly BoardHubFuelSource[];
   extractions?: readonly BoardExtractionSource[];
   jobs?: readonly BoardJobSource[];
 }
@@ -351,6 +377,32 @@ function starbaseItems(
   return items;
 }
 
+/**
+ * Open: ranked by its close. Not yet open: by its opening. A hub past its end
+ * is in overtime, still vulnerable, so it stays on the board. A closed skyhook
+ * has no clock left.
+ */
+function sovereigntyItems(
+  raid: BoardSovereigntySource,
+  clock: Pick<CorpBoardSources, 'nowMs' | 'staleWindowMs'>
+): CorpBoardItem[] {
+  const state = raidState(raid, clock.nowMs, raid.kind);
+  if (state === 'closed') return [];
+  return [
+    timedItem(
+      {
+        id: `sov:${raid.id}`,
+        kind: 'sovRaid',
+        subject: raid.name,
+        detail: `${raid.kind}.${state}`,
+        typeId: null,
+      },
+      state === 'upcoming' ? raid.startMs : raid.endMs,
+      clock
+    ),
+  ];
+}
+
 function extractionItem(
   extraction: BoardExtractionSource,
   clock: Pick<CorpBoardSources, 'nowMs' | 'staleWindowMs'>
@@ -423,6 +475,22 @@ export function buildCorpBoard(sources: CorpBoardSources): CorpBoardItem[] {
 
   for (const structure of sources.structures ?? []) items.push(...structureItems(structure, clock));
   for (const starbase of sources.starbases ?? []) items.push(...starbaseItems(starbase, clock));
+  for (const raid of sources.sovereignty ?? []) items.push(...sovereigntyItems(raid, clock));
+  for (const hub of sources.hubFuel ?? []) {
+    items.push(
+      timedItem(
+        {
+          id: `fuel:${hub.id}`,
+          kind: 'sovHubFuel',
+          subject: hub.name,
+          detail: '',
+          typeId: null,
+        },
+        hub.runsOutMs,
+        clock
+      )
+    );
+  }
   for (const extraction of sources.extractions ?? []) items.push(extractionItem(extraction, clock));
   for (const job of sources.jobs ?? []) {
     // ESI often leaves a finished job's status at `active` past its end

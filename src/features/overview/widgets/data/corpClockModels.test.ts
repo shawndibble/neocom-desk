@@ -3,7 +3,7 @@ import type { BoardExtractionSource, BoardStructureSource } from '@/engine/corp/
 import type { CorporationIndustryJob } from '@/esi/endpoints';
 import { formatDateOnly } from '@/lib/timestamp';
 import type { MoonChunksBoardData, StructuresBoardData } from '../../data/boardData';
-import type { CorpJobsFeed, CorpStarbasesFeed } from './corpFeeds';
+import type { CorpJobsFeed, CorpSovereigntyFeed, CorpStarbasesFeed } from './corpFeeds';
 import { corpDeadlines, corpJobs, corpServices } from './corpClockModels';
 import type { BuildContext, FeedState, Feeds } from './types';
 
@@ -208,6 +208,52 @@ describe('corpDeadlines', () => {
     );
     expect(view.number.value).toBe('1');
     expect(view.status.error).toBe(true);
+  });
+
+  it('carries skyhook raid windows as sovRaid rows with severity from time remaining', () => {
+    const hook = (key: string, startMs: number, endMs: number, planetName: string) => ({
+      key,
+      kind: 'skyhook' as const,
+      structureId: 1,
+      systemId: 1,
+      planetName,
+      windowStartMs: startMs,
+      windowEndMs: endMs,
+      reagents: null,
+      state: null,
+      hubBay: null,
+    });
+    const raids = ok<CorpSovereigntyFeed>({
+      readable: true,
+      needsReauth: false,
+      fetchedAt: new Date(NOW),
+      fromCache: false,
+      rows: [
+        hook('skyhook:1', NOW + 2 * HOUR, NOW + 4 * HOUR, 'X-7OMU IV'),
+        hook('skyhook:2', NOW + 5 * DAY, NOW + 5 * DAY + HOUR, 'Efa VI'),
+      ],
+      systemNames: new Map(),
+      typeNames: new Map(),
+      prices: new Map(),
+      jumps: new Map(),
+    });
+    const view = corpDeadlines(
+      {
+        structures: structuresFeed([]),
+        moonChunks: moonFeed([]),
+        corpJobs: jobsFeed([]),
+        corpSovereignty: raids,
+      },
+      ctx
+    );
+    expect(view.rows.map((r) => [r.title, r.detail, r.tone])).toEqual([
+      ['X-7OMU IV', 'corp.board.detail.sovRaid.skyhook.upcoming', 'critical'],
+      ['Efa VI', 'corp.board.detail.sovRaid.skyhook.upcoming', 'watch'],
+    ]);
+    // Both land in the Deadline Strip's fortnight.
+    const chart = view.chart;
+    if (chart?.kind !== 'bars') throw new Error('expected the day-bar chart');
+    expect(chart.values.reduce((a: number, b: number) => a + b, 0)).toBe(2);
   });
 
   it('is not blocked by a starbase read this Character may not make', () => {

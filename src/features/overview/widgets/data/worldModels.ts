@@ -31,6 +31,7 @@ import type {
   Translate,
 } from './types';
 import { industry } from './industryModels';
+import { mercenaryDens } from './mercenaryDensModels';
 import { planetary } from './planetaryModels';
 import { moonChunks, structures } from './structureModels';
 
@@ -400,15 +401,24 @@ export const miningYield: Builder = (feeds, { t, now, range, scopeAll, activeCha
   };
 };
 
-/** The kinds built in this file, each with the feeds it reads. */
+// --- Skyhook raids ---------------------------------------------------------------
+
+/** Stand-in until `loadSovRaidsWidget` registers `sovRaidsModel.ts`: loading even over a restored snapshot; a failed read still shows failed. */
+const sovRaidsPending: Builder = (feeds) =>
+  blank(
+    '/travel/route',
+    statusOf(feeds.sovRaids, { loading: !feeds.sovRaids?.error, hasData: false })
+  );
 
 /** The kinds built in this file and its siblings, each with the feeds it reads. */
 export const WORLD_DEFS: Readonly<Record<string, KindDef>> = {
   industry: { feeds: ['industry'], build: industry },
   planetary: { feeds: ['planetary'], build: planetary },
+  mercenaryDens: { feeds: ['mercenaryDens'], build: mercenaryDens },
   structures: { feeds: ['structures'], build: structures },
   moonChunks: { feeds: ['moonChunks'], build: moonChunks },
   incursions: { feeds: ['incursions'], build: incursions },
+  sovRaids: { feeds: ['sovRaids'], build: sovRaidsPending },
   profit: { feeds: ['profit'], build: profit },
   miningYield: { feeds: ['miningYield'], build: miningYield },
 };

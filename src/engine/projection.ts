@@ -66,6 +66,11 @@ import {
   type ExtractorExpiringFire,
   type CalendarEventStartingFire,
   type StructureFuelLowFire,
+  type MercenaryDenReinforcedFire,
+  type SkyhookRaidableFire,
+  type SkyhookEntrySnapshot,
+  openPhase,
+  type DenEntrySnapshot,
   type StructureReinforcementExitFire,
 } from './notificationDiffs';
 import { reinforcementExitMs, parseEveNotificationPayload } from './eveNotificationPayload';
@@ -101,6 +106,8 @@ export const PROJECTABLE_EVENT_IDS = [
   'planetaryExtractorExpiring',
   'calendarEventStarting',
   'structureFuelLow',
+  'mercenaryDenReinforced',
+  'skyhookRaidable',
   'corpIndustryJobReady',
   'eveNotification',
 ] as const;
@@ -115,10 +122,11 @@ export type ProjectionWording = 'assert' | 'hedge';
  * hedges when an ordinary in-game action, taken while the app is closed,
  * routinely falsifies that prediction before it lands.
  *
- * Seven do. `courierDeliveryDue` (issue #1713) is falsified by delivering the
+ * Eight do. `courierDeliveryDue` (issue #1713) is falsified by delivering the
  * haul — the very thing it prompts. `contractExpiring` and `ordersLapsing`
  * (issue #3797) are falsified by relisting or accepting — likewise the very
- * thing they prompt. `structureFuelLow` is falsified by a refuel. Both planetary
+ * thing they prompt. `structureFuelLow` is falsified by a refuel.
+ * `mercenaryDenReinforced` is falsified by the den leaving reinforcement early. Both planetary
  * events are falsified by the move a pilot makes on every reset run —
  * stopping an extractor program and installing a new one. `skillQueueEnding`
  * (issue #1410) is falsified the same way by topping up the skill queue in
@@ -142,6 +150,8 @@ export type ProjectionWording = 'assert' | 'hedge';
 export function projectionWording(eventId: ProjectableEventId): ProjectionWording {
   switch (eventId) {
     case 'structureFuelLow':
+    case 'mercenaryDenReinforced':
+    case 'skyhookRaidable':
     case 'planetaryExtractionDone':
     case 'planetaryExtractorExpiring':
     case 'skillQueueEnding':
@@ -664,6 +674,103 @@ export function projectStructureFuel(
     rows.push(
       buildRow(characterId, 'structureFuelLow', fire, fireAt, copy(fire, characterName, {}))
     );
+  }
+  return rows;
+}
+
+/**
+ * A Mercenary Den's reinforcement exit (issue #4782): the lead-time warning at
+ * `exit - leadMs` and the "out now" push at the exit itself, each when it
+ * falls inside the horizon. `entry.leadMs` is baked in at `load()` time, as
+ * for `projectStructureFuel`. The two rows of one exit carry different
+ * Occurrence Keys (`phase`).
+ */
+export function projectMercenaryDens(
+  characterId: number,
+  characterName: string,
+  entries: readonly DenEntrySnapshot[],
+  planetNames: ReadonlyMap<number, string>,
+  copy: PushCopy<MercenaryDenReinforcedFire, { planet?: string }>,
+  nowMs: number,
+  horizonMs: number = PROJECTION_HORIZON_MS
+): ProjectionRow[] {
+  const rows: ProjectionRow[] = [];
+  for (const entry of entries) {
+    const end = entry.reinforcedUntilMs;
+    if (end === null) continue;
+    const phases = [
+      { phase: 'soon' as const, fireAt: end - entry.leadMs },
+      { phase: 'out' as const, fireAt: end },
+    ];
+    for (const { phase, fireAt } of phases) {
+      if (!inHorizon(fireAt, nowMs, horizonMs)) continue;
+      const fire: MercenaryDenReinforcedFire = {
+        eventId: 'mercenaryDenReinforced',
+        characterId,
+        denId: entry.denId,
+        planetId: entry.planetId,
+        reinforcedUntilMs: end,
+        thresholdMs: entry.leadMs,
+        phase,
+      };
+      const names = { planet: planetNames.get(entry.planetId) };
+      rows.push(
+        buildRow(
+          characterId,
+          'mercenaryDenReinforced',
+          fire,
+          fireAt,
+          copy(fire, characterName, names)
+        )
+      );
+    }
+  }
+  return rows;
+}
+
+/**
+ * A skyhook's theft window (issue #4784): the lead-time warning at
+ * `start - leadMs` and the "raidable now" push at the opening itself, each when
+ * it falls inside the horizon. The second is a danger Alert when the silo, as
+ * the snapshot last read it, is at or above the Character's minimum. A window
+ * already open projects nothing: the poll that saw it fired it. `entry.leadMs`
+ * is baked in at `load()` time, as for `projectStructureFuel`.
+ */
+export function projectSkyhookRaids(
+  characterId: number,
+  characterName: string,
+  entries: readonly SkyhookEntrySnapshot[],
+  planetNames: ReadonlyMap<number, string>,
+  copy: PushCopy<SkyhookRaidableFire, { planet?: string }>,
+  nowMs: number,
+  horizonMs: number = PROJECTION_HORIZON_MS
+): ProjectionRow[] {
+  const rows: ProjectionRow[] = [];
+  for (const entry of entries) {
+    const { windowStartMs: start, windowEndMs: end } = entry;
+    if (start === null || end === null) continue;
+    const phases = [
+      { phase: 'soon' as const, fireAt: start - entry.leadMs },
+      { phase: openPhase(entry), fireAt: start },
+    ];
+    for (const { phase, fireAt } of phases) {
+      if (!inHorizon(fireAt, nowMs, horizonMs)) continue;
+      const fire: SkyhookRaidableFire = {
+        eventId: 'skyhookRaidable',
+        characterId,
+        skyhookId: entry.skyhookId,
+        planetId: entry.planetId,
+        windowStartMs: start,
+        windowEndMs: end,
+        thresholdMs: entry.leadMs,
+        unsecuredUnits: entry.unsecuredUnits,
+        phase,
+      };
+      const names = { planet: planetNames.get(entry.planetId) };
+      rows.push(
+        buildRow(characterId, 'skyhookRaidable', fire, fireAt, copy(fire, characterName, names))
+      );
+    }
   }
   return rows;
 }

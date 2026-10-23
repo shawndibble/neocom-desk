@@ -17,6 +17,10 @@ import {
   COLLATERAL_RATIO_OPTIONS,
   useCourierCollateralRatio,
 } from '@/features/contractSearch/collateralThreshold';
+import {
+  ITEM_FLAG_MULTIPLE_OPTIONS,
+  useItemFlagMultiple,
+} from '@/features/contractSearch/contractFlagThreshold';
 import { LpValueField } from '@/features/settings/LpValueSettingsForm';
 import {
   ChipRow,
@@ -32,7 +36,10 @@ export function MarketDefaultsPanel() {
   const collateralRatio = useCourierCollateralRatio((state) => state.value);
   const setCollateralRatio = useCourierCollateralRatio((state) => state.setValue);
   const collateralHydrated = useHydratedStore(useCourierCollateralRatio);
-  const hydrated = hubHydrated && collateralHydrated;
+  const itemFlagMultiple = useItemFlagMultiple((state) => state.value);
+  const setItemFlagMultiple = useItemFlagMultiple((state) => state.setValue);
+  const itemFlagHydrated = useHydratedStore(useItemFlagMultiple);
+  const hydrated = hubHydrated && collateralHydrated && itemFlagHydrated;
 
   if (!hydrated) return <SettingsPanelLoading />;
 
@@ -67,6 +74,15 @@ export function MarketDefaultsPanel() {
             selected={collateralRatio}
             onSelect={(ratio) => void setCollateralRatio(ratio)}
             labelFor={(ratio) => t('settings.courierCollateralOption', { count: ratio })}
+          />
+
+          <ChipRow
+            label={t('settings.itemContractFlagLabel')}
+            hint={t('settings.itemContractFlagHint')}
+            options={ITEM_FLAG_MULTIPLE_OPTIONS}
+            selected={itemFlagMultiple}
+            onSelect={(multiple) => void setItemFlagMultiple(multiple)}
+            labelFor={(multiple) => t('settings.itemContractFlagOption', { count: multiple })}
           />
 
           <LpValueField id="settings-lp-value" />

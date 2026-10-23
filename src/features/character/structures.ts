@@ -271,6 +271,49 @@ export async function loadStructureInfo(
   return loadStructure(characterId, structureId);
 }
 
+/**
+ * Structure names already on this device, with no request and no roster sweep:
+ * ids never resolved are absent. One bulk read, for a page naming many places.
+ */
+export async function readCachedStructureNames(
+  structureIds: readonly number[]
+): Promise<Map<number, string>> {
+  const unique = [...new Set(structureIds)];
+  const names = new Map<number, string>();
+  if (unique.length === 0) return names;
+  const rows = await readCachedEntries<UniverseStructure>(
+    GLOBAL_CACHE_CHARACTER_ID,
+    unique.map(cacheKey)
+  );
+  for (const id of unique) {
+    const row = rows.get(cacheKey(id));
+    if (row?.value.name) names.set(id, row.value.name);
+  }
+  return names;
+}
+
+/**
+ * Like `loadStructureName`, but a structure this Character cannot see stays
+ * unresolved instead of asking every other Character in the roster, one after
+ * another. For a fan-out over every place a corporation holds assets, where
+ * the sweep multiplies one refusal into a request per roster member.
+ */
+export async function loadStructureNameNoRoster(
+  characterId: number,
+  structureId: number
+): Promise<string | null> {
+  const shared = await readCached<UniverseStructure>(
+    GLOBAL_CACHE_CHARACTER_ID,
+    cacheKey(structureId)
+  );
+  if (shared) return shared.name;
+  const { structure } = await loadOwnStructure(characterId, structureId);
+  if (structure) {
+    await writeCached(GLOBAL_CACHE_CHARACTER_ID, cacheKey(structureId), structure, Date.now());
+  }
+  return structure?.name ?? null;
+}
+
 /** Structure name, or null if unresolvable (no ACL access, offline, or uncached). */
 export async function loadStructureName(
   characterId: number,

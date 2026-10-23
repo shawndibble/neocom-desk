@@ -452,6 +452,30 @@ export const ESI_REGISTRY = {
     scope: 'esi-planets.manage_planets.v1',
     group: 'planets',
   },
+  /**
+   * Mercenary Dens (issue #4791). Character routes only: ESI has no corp den
+   * list and no role. In the default-on `planets` Permission, not an opt-in group.
+   */
+  getCharacterMercenaryDens: {
+    route: '/characters/{character_id}/structures/mercenary-dens',
+    scope: 'esi-structures.read_character.v1',
+    group: 'planets',
+  },
+  getCharacterMercenaryDen: {
+    route: '/characters/{character_id}/structures/mercenary-dens/{mercenary_den_id}',
+    scope: 'esi-structures.read_character.v1',
+    group: 'planets',
+  },
+  getCharacterMercenaryOperations: {
+    route: '/characters/{character_id}/mercenary-tactical-operations',
+    scope: 'esi-activities.read_character.v1',
+    group: 'planets',
+  },
+  getCharacterMercenaryOperation: {
+    route: '/characters/{character_id}/mercenary-tactical-operations/{operation_id}',
+    scope: 'esi-activities.read_character.v1',
+    group: 'planets',
+  },
   getCharacterPlanet: {
     route: '/characters/{character_id}/planets/{planet_id}',
     scope: 'esi-planets.manage_planets.v1',
@@ -635,6 +659,11 @@ export const ESI_REGISTRY = {
   // Route Safety's "Incursions near you" (issue #3540): one call lists them all.
   getIncursions: {
     route: '/incursions',
+    scope: PUBLIC,
+  },
+  // Skyhook raids (issue #4798): kept to the Character's alliance space by the caller.
+  getRaidableSkyhooks: {
+    route: '/skyhooks/raidable',
     scope: PUBLIC,
   },
   // Route Safety (issue #2328): one call each answers the whole universe, so a
@@ -829,6 +858,36 @@ export const ESI_REGISTRY = {
     route: '/corporations/{corporation_id}/members/titles',
     scope: 'esi-corporations.read_titles.v1',
     group: 'corp',
+  },
+  /**
+   * Skyhooks and sovereignty hubs (issue #4775). The corp reads sit behind
+   * `esi-structures.read_corporation.v1`, a different scope from the older
+   * `esi-corporations.read_structures.v1`; `x-required-roles` is Station_Manager
+   * on every route but the hub list (`canReadSkyhooks`). The systems list is public.
+   */
+  getCorporationSkyhooks: {
+    route: '/corporations/{corporation_id}/structures/skyhooks',
+    scope: 'esi-structures.read_corporation.v1',
+    group: 'corp',
+  },
+  getCorporationSkyhook: {
+    route: '/corporations/{corporation_id}/structures/skyhooks/{skyhook_id}',
+    scope: 'esi-structures.read_corporation.v1',
+    group: 'corp',
+  },
+  getCorporationSovereigntyHubs: {
+    route: '/corporations/{corporation_id}/structures/sovereignty-hubs',
+    scope: 'esi-structures.read_corporation.v1',
+    group: 'corp',
+  },
+  getCorporationSovereigntyHub: {
+    route: '/corporations/{corporation_id}/structures/sovereignty-hubs/{sovereignty_hub_id}',
+    scope: 'esi-structures.read_corporation.v1',
+    group: 'corp',
+  },
+  getSovereigntySystems: {
+    route: '/sovereignty/systems',
+    scope: PUBLIC,
   },
 } as const satisfies Record<EndpointName, EsiEndpointSpec>;
 

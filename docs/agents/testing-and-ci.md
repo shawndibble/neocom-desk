@@ -20,15 +20,15 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   and `npx vitest run <path>` for the file(s) you're touching. **Never run
   the full suite (`npm run test:run`) or `npm run build` locally** — CI's
   `validate` job runs `check:case`, `lint`, `format:check`, `typecheck`,
-  `build` and `rules` (the Firestore rules tests, plus the `functions/`
-  typecheck and tests) on every PR (`ci.yml` is PR-only; `deploy.yml` handles pushes to `develop`/`main`, and `cache-warm.yml` saves CI's dependency caches on `develop` so a PR's first run hits them), the `test` job runs `test:run` across four shards, and the
+  `build`, the Firestore rules tests and the `functions/`
+  typecheck and tests (all but `build` in the one `static` job) on every PR (`ci.yml` is PR-only; `deploy.yml` handles pushes to `develop`/`main`, and `cache-warm.yml` saves CI's dependency caches on `develop` so a PR's first run hits them), the `test` job runs `test:run` across four shards, and the
   `e2e` job runs Playwright across six (whole spec files dealt out by
   `e2e/shard-weights.json`; a new spec needs no entry, and
   `node scripts/e2e-shard.mjs --weights <ci-log>` refreshes the table) inside
   Playwright's container image, whose tag in `ci.yml` (and `cache-warm.yml`) must match
   `@playwright/test`; that's the gate, not a local
   pre-PR run. Both sharded jobs report through a single aggregate check
-  (`test`, `e2e`) because the `develop` and `main` rulesets require those exact names. In ticket-loop work (`/next-ticket`, `/implement`),
+  (`test`, `e2e`) because the `develop` and `main` rulesets require those exact names. The `e2e` shards are skipped (and `e2e` still reports green) when every file a PR changes is on `scripts/lib/e2eRelevance.mjs`'s safe list (docs, `functions/`, workflows other than `ci.yml`, unit tests, and the like); any other or unlisted path runs them. In ticket-loop work (`/next-ticket`, `/implement`),
   see `.claude/commands/next-ticket.md`'s "Pre-commit hook, then CI" for the
   exact cadence. `node scripts/next-ticket/gate.mjs [--build]` still exists
   as an optional, manual full-CI-mirror for ad-hoc branches — nothing in the

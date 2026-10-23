@@ -244,7 +244,7 @@ describe('Calendar', () => {
 
     expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /filter event types/i }));
-    expect(await screen.findByRole('menuitemcheckbox', { name: /industry jobs/i })).toBeVisible();
+    expect(await screen.findByRole('menuitemcheckbox', { name: /calendar events/i })).toBeVisible();
     expect(screen.queryByRole('menuitemcheckbox', { name: /moon chunks/i })).toBeNull();
     expect(extractionRequests).not.toHaveBeenCalled();
   });
@@ -471,7 +471,9 @@ describe('Calendar', () => {
         'skillTraining',
         'industryJob',
         'planetExtraction',
+        'mercenaryDen',
         'moonChunk',
+        'skyhookRaid',
         'contractExpiry',
         'orderExpiry',
         'skillPlan',

@@ -12,6 +12,12 @@ export const FUZZWORK_AGGREGATES_URL = 'https://market.fuzzwork.co.uk/aggregates
 
 /** Fuzzwork batches queries poorly past this many type IDs per request. */
 const MAX_TYPES_PER_REQUEST = 200;
+/**
+ * Batches in flight at once. A batch takes about a second, so thousands of
+ * types (Below market prices every listed item) took most of a minute one at a
+ * time; a few at once stays polite to a community-run server.
+ */
+const BATCH_CONCURRENCY = 4;
 
 export interface HubAggregate {
   /** Lowest sell order price, or null when the station has no sell orders. */
@@ -97,8 +103,19 @@ export async function fetchAggregates(
   const result = new Map<number, HubAggregate>();
   if (typeIds.length === 0) return result;
 
-  for (const batch of chunk(typeIds, MAX_TYPES_PER_REQUEST)) {
-    const body = await fetchBatch(locationId, batch, scope);
+  const batches = chunk(typeIds, MAX_TYPES_PER_REQUEST);
+  const bodies = new Array<RawAggregatesResponse>(batches.length);
+  let next = 0;
+  async function worker(): Promise<void> {
+    while (next < batches.length) {
+      const at = next++;
+      bodies[at] = await fetchBatch(locationId, batches[at], scope);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(BATCH_CONCURRENCY, batches.length) }, worker));
+
+  for (const [at, batch] of batches.entries()) {
+    const body = bodies[at];
     for (const typeId of batch) {
       const raw = body[String(typeId)];
       const sell = parseSide(raw?.sell, 'min');

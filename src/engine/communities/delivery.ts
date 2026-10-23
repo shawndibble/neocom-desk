@@ -15,6 +15,7 @@
  * Only the Request, the line, a quantity and contract ids ever leave this
  * module's result for Firestore: no prices, no issuer, no other contents.
  */
+import { isFinishedContractStatus } from '../contracts/contractStatus';
 import type { PledgeEntry, RequestLine } from './requests';
 
 /** Mirrors the rules' cap on `contractIds` a line. */
@@ -281,8 +282,6 @@ export interface ContractHeader {
   date_completed?: string;
 }
 
-const FINISHED = new Set(['finished', 'finished_issuer', 'finished_contractor']);
-
 export const contractCompletedAt = (c: ContractHeader): number =>
   Date.parse(c.date_completed ?? c.date_issued);
 
@@ -302,7 +301,7 @@ export function eligibleContracts<C extends ContractHeader>(
       c.issuer_id === myCharacterId &&
       !c.for_corporation &&
       c.type === 'item_exchange' &&
-      FINISHED.has(c.status) &&
+      isFinishedContractStatus(c.status) &&
       (requesterIds.has(c.assignee_id) || requesterIds.has(c.acceptor_id)) &&
       contractCompletedAt(c) >= since
   );

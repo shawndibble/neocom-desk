@@ -16,6 +16,11 @@ here — they go one per file in `docs/context/decisions/`.
 - **Account**: UI-level grouping of a user's Characters. Has no storage, no
   sync and no server-side identity, because EVE SSO exposes no account
   identifier. Never surfaced to the user as a thing to manage.
+- **Achievement score**: A Character's total score from EVE's in-game
+  achievements, from its public record (`achievement_score`). Shown with the
+  **Character title** as one line, "Title · 1,240 points", and as the optional
+  Title / Score column on Characters and Contacts. Not a standing and not
+  skill points.
 - **Acquisition Verdict**: Whether a Build Plan's product costs less to build
   than to buy outright at the trade hub. A personal-use comparison — no
   sales tax or broker fee applies, because nothing is being sold.
@@ -205,6 +210,10 @@ here — they go one per file in `docs/context/decisions/`.
   finished queue entry while training continues, and from **Skill Queue
   Ending**, which warns ahead of this state rather than reporting it once
   reached.
+- **Character title**: The cosmetic title a Character chooses to show,
+  earned through achievements (`character_title_id`, a UUID; names from the
+  SDE's `characterTitles`). Not the corporation title the same record carries
+  as `corporation_title`, which is a role bundle in one corporation.
 - **Charge Picker**: How a **Fitting**'s weapon group chooses its charge,
   ranking the options by this Fitting's own DPS, range and price, or by
   capacitor effect for a cap booster, or explaining crystals for a mining
@@ -241,8 +250,13 @@ here — they go one per file in `docs/context/decisions/`.
   share it, with a "missing from the Community" filter. Those rows are every
   blueprint reachable by any route — market, contract-only or LP store — so a
   gap is a blueprint nobody in the Community holds.
-- **Request**: A **Member**'s post in a **Community**'s Requests tab asking for items: one or more lines (item and quantity), an optional location and an optional one-line terms field. Any Member posts one; it carries no price. Its status (Open, Pledged, Part delivered, Delivered) is derived from its **Pledge**s; Closed is set by hand, and Expired follows 30 days after posting or the last Extend (Pledges do not push it); an expired or closed Request is kept 7 more days, then removed. The Community admin may remove any Request. Distinct from a **Join Request**, which asks to enter the Community.
+- **Request**: A **Member**'s post in a **Community**'s Requests tab asking for items: one or more lines (item and quantity), an optional location and an optional one-line terms field. Any Member posts one; it carries no price. Its status (Open, Pledged, Part delivered, Delivered) is derived from its **Pledge**s; Closed is set by hand, and Expired follows 30 days after posting or the last Extend (Pledges do not push it); an expired or closed Request is kept 7 more days, then removed. The Community admin may remove any Request. Distinct from a **Join Request**, which asks to enter the Community. A **Standing Request** is the one exception to the 30-day expiry and the no-price rule: it never expires and carries a **Rate**.
 - **Pledge**: A **Member**'s note on a **Request** line that they can provide a quantity of it. Non-exclusive: it reserves nothing and Pledges may add up to more than the need. It carries the delivered quantity, marked from the Member's own finished contracts, and an optional typed manual amount; the larger of the two is shown, never the sum. With nothing delivered, a Pledge not written for 14 days is stale: greyed, never released. The admin may remove a Pledge. Not a claim, which would imply a hold.
+- **Fleet Payout**: A **Member**'s live loot split in a **Community**'s Payouts tab. The boss (its owner) pastes a fleet list and a loot pile priced by **Appraisal**, picks a split rule (equal, or weighted by a typed number) and an optional hold-back %, and the app writes one **Fleet Share** per pilot. Only the boss must be a Member; other pilots are typed names. Expires 30 days after posting. Distinct from a **Payout**, which is mining-tax ISK a **Collector** sent a **Feeder**. The tab label is "Payouts"; the bare word stays with mining tax.
+- **Fleet Share**: One pilot's line on a **Fleet Payout**: whole ISK owed and a paid flag only the boss sets. A **Member** sees only their own; a typed-name pilot's is seen by the boss alone.
+- **Standing Request**: A **Request** that is a buyback: a **Member** names a **Rate**, a Trade Hub and what the corp buys (item types or groups such as "all ore"), and it has no quantities and no expiry. It stays open until its owner closes it, and the daily sweep skips it. Members Sell to it for a **Quote**; nobody Pledges on it. Distinct from **Standing (corp)**, a retired Corp Ops figure.
+- **Rate**: What a **Standing Request** pays, as a percent of a Trade Hub's buy or sell price, from 1 to 200 in tenths ("90% of Jita buy"). Distinct from an **Owner rate**, which a **Feeder** is owed.
+- **Quote**: One price for a Member's pasted pile on a **Standing Request**: each line's hub price at the **Rate**, summed. It is held 14 days on the Member's own Pledge document, with the lines and the hub prices used; a second paste replaces it. A Quote is a price, never a promise to buy.
 - **Community Offer**: A **BPC Sourcing** row sourced from a **Shared
   Blueprint** at 0 ISK, named for the **Member** holding it. Distinct from a
   contract **Offer**: nothing is listed or bought. A Shared BPO appears as
@@ -410,7 +424,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **Gallery**: A **Widget board**'s "Add a widget" drawer: that board's
   **Widget Kinds** with search and category chips. A kind may be added more
   than once. On the **Corp Board** it never offers a kind whose Corp
-  Capability the Character lacks.
+  Capability the Character lacks. "Browse all" widens the same drawer into a
+  category rail and a grid of previews, with Featured and "Not on your board".
 - **Gank Chokepoint**: one of the named systems haulers are most often killed in — Uedama, Sivala, Aufay, Balle, Tama, Rancer, Ahbazon. A property of _traffic_, not of security status. An explicit list rather than a derived rule. States where a haul goes, never that anything will happen to the hauler there.
 - **Goal Plan**: the PI Plan tab's answer to "here are my colonies and the products I want per day — what does each colony do?". Goals (products at a units/day rate) are expanded into demand, and a greedy solver assigns each enabled colony a role — extract and refine P0 to P1, host the P2+ factories, or sit idle. Measured against the **Baseline**: every colony selling the best P1 it can make by itself; the plan's **Lift** is its net ISK minus the Baseline. What it cannot cover is a **Shortfall**, either a **Type gap** (no enabled colony's planet type yields that P0) or a **Budget gap** (colonies that could yield it are full). Its output is a change list against what each colony runs today, never a fresh layout.
 - **Chain estimate**: a P3 or P4's ISK a day as a whole multi-planet chain: the Goal Plan's solver run on new planets the pilot would add. Always labelled "multi-planet, needs hauling" and an estimate, and never ranked against one-planet figures, except in Plan's opt-in **Bigger chain** section.
@@ -564,7 +579,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Production Run**: A manual, pilot-entered snapshot of one production batch off a **Build Plan**: materials cost, job fee and quantity as they stood at logging time, never re-derived afterward. Distinct from a Build Plan's live estimate, which moves with the market; a Production Run holds still so realized profit can be measured against what was actually paid. The pilot links what sold: a past sale, a watched open order, or a manual/private sale.
 - **Projection**: The set of rows a device uploads describing every **Scheduled Push** that becomes due inside the **Projection Horizon**, one per occurrence, with its **Occurrence Key**, fire time and rendered title and body. Built per device from that device's own notification preferences; the backend learns when something comes due, never the data behind it.
 - **Projection Horizon**: How far ahead a **Projection** reaches — 72 hours.
-- **Public Contract Offers snapshot**: The shared, read-only snapshot holding every for-sale line of every public item_exchange/auction contract, any item type, from the twice-hourly EVE Ref crawl behind **BPC Sourcing**. A line the issuer is _asking_ for is not in it. Published to Cloudflare R2 as one object per item type plus an `index.json` (ADR 0019), its only store; a reader takes the index, then only the types it uses. Read by **BPC Sourcing** and **Contract Search**; the **Public Courier Contracts snapshot** is its sibling for contracts that move an item.
+- **Public Contract Offers snapshot**: The shared, read-only snapshot holding every for-sale line of every public item_exchange/auction contract, any item type, from the twice-hourly EVE Ref crawl behind **BPC Sourcing**. A line the issuer is _asking_ for is not in it. Published to Cloudflare R2 as one object per item type plus an `index.json` (ADR 0019), its only store; a reader takes the index, then only the types it uses. A reader that needs every type, or every blueprint type, reads the index's few bundle shards instead. Read by **BPC Sourcing** and **Contract Search**; the **Public Courier Contracts snapshot** is its sibling for contracts that move an item.
 - **Public Courier Contracts snapshot**: The shared, read-only snapshot holding every outstanding public courier contract as a route and a fee: origin, destination, reward, collateral, volume and days-to-complete. Published by the same crawl as the **Public Contract Offers snapshot**, to Cloudflare R2 as one content-addressed object plus an `index.json` (ADR 0019), its only store; **Contract Search**'s Courier mode is its one reader.
 - **Published Snapshot**: A payload the backend republishes on its own clock and every signed-in client reads whole — the public contract offers and public courier contracts. Its **Freshness Window** matches the publish cadence, so it is longer than a Character's own data and unaffected by a manual Refresh.
 - **Pull Cursor**: How far a sync pass has read one remote collection for one Character: the highest `updatedAt` it has actually observed there. The next pass reads only documents above that mark. It describes what this device has seen, never the current time.
@@ -635,6 +650,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Clone Jump Ready**: Fires once when a Character's jump-clone cooldown ends: 24 hours minus the Effective Skill Level of Infomorph Synchronizing after the last clone jump. A **Scheduled Push** event; a Character who has never jumped never fires it.
 - **Courier Delivery Due**: Fires once an accepted courier contract's deliver-by deadline (never its expiry date) falls within a Character's configured lead time. A **Scheduled Push** warning ahead of **Contract Failed**, which only arrives after the collateral is already forfeited. Only for contracts the Character themselves accepted.
 - **Contract Expiring**: Fires once a contract the Character issued, still unaccepted (`outstanding`), has its expiry date inside their configured lead time, so they can relist it. A **Scheduled Push** warning. Never for a contract merely assigned to them; a courier in progress is **Courier Delivery Due**'s.
+- **Mercenary Den**: A Character's own den on a skyhook, read per Character (ESI has no corporation den route). Carries a state, a development and an anarchy level, and a reinforcement timer while it is reinforced.
+- **Mercenary Den Reinforced**: The **Notification Event** for a den's reinforcement exit: a warning at the Character's lead time and again at the exit. A hedged **Scheduled Push**, and the one critical personal event, so it reaches the Danger banner.
+- **Mercenary Den Anarchy**: The **Notification Event** for a den's anarchy reaching the Character's threshold. Fires once per crossing and only while the app is open.
 - **Orders Lapsing**: One batched alert, with a count, when the Character's own open market orders come within their configured lead time of lapsing. A single alert per window, never one per order; corp orders are excluded. A **Scheduled Push** warning.
 - **Incursion Nearby**: Fires once when an Incursion's staging system comes within a Character's chosen number of jumps of their **Current System**, counted on Route Safety's jump basis. Edge-triggered per constellation; a changed Current System or jump count re-baselines silently.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.

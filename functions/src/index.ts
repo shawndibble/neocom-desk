@@ -20,6 +20,7 @@ import { createR2Get } from './r2Publisher.js';
 import { runSyncActiveWars } from './activeWarsJob.js';
 import { runSyncLawlessSystems, runSyncMarketOpenPrices } from './marketHistoryJob.js';
 import {
+  runSyncCostIndices,
   runSyncLpStoreOffers,
   runSyncPublicContractOffers,
   runSyncWorkbenchFits,
@@ -196,6 +197,17 @@ import {
   setRequestClosed,
 } from './communityRequestsStore.js';
 import { removePledge, removeRequest, sweepRequests } from './communityRequestsCleanup.js';
+import {
+  parseCreateFleetPayoutInput,
+  parseFleetPayoutIdInput,
+  parseSetFleetShareDoneInput,
+} from './communityFleetPayouts.js';
+import {
+  createFleetPayout,
+  removeFleetPayout,
+  setFleetShareDone,
+} from './communityFleetPayoutsStore.js';
+import { sweepFleetPayouts } from './communityFleetPayoutsCleanup.js';
 import {
   MutamarketBusyError,
   MutamarketInputError,
@@ -651,6 +663,33 @@ export const removeCommunityRequestCallable = communityCallable(
   async (request) => {
     const { communityId, requestId } = parseRequestIdInput(request.data);
     await removeRequest(firestore(), callerOf(request), communityId, requestId);
+  }
+);
+
+// Fleet Payouts (issue #4779): creating counts the caller's open ones and links
+// Members, so it is a callable; set-paid is the boss's own; remove is the boss or admin.
+export const createCommunityFleetPayoutCallable = communityCallable(
+  'createCommunityFleetPayoutCallable',
+  COMMUNITY_CALLABLE_OPTIONS,
+  (request) =>
+    createFleetPayout(firestore(), callerOf(request), parseCreateFleetPayoutInput(request.data))
+);
+
+export const setCommunityFleetShareDoneCallable = communityCallable(
+  'setCommunityFleetShareDoneCallable',
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    const { communityId, payoutId, shareId, paid } = parseSetFleetShareDoneInput(request.data);
+    await setFleetShareDone(firestore(), callerOf(request), communityId, payoutId, shareId, paid);
+  }
+);
+
+export const removeCommunityFleetPayoutCallable = communityCallable(
+  'removeCommunityFleetPayoutCallable',
+  COMMUNITY_CALLABLE_OPTIONS,
+  async (request) => {
+    const { communityId, payoutId } = parseFleetPayoutIdInput(request.data);
+    await removeFleetPayout(firestore(), callerOf(request), communityId, payoutId);
   }
 );
 
@@ -1128,6 +1167,8 @@ export const corpTaxBookCall = onCall<unknown>(
  * - sweepCommunityRequests (issue #3812, ADR 0021): deletes Requests expired a week ago and
  *   Requests closed a week ago, with their Pledges. Bounded to 500 deletes a run; up to 500
  *   sequential reads and recursive deletes, so the function takes the 9-minute maximum timeout.
+ * - sweepCommunityFleetPayouts (issue #4779): deletes Fleet Payouts expired a week ago, with
+ *   their Shares. Bounded to 500 deletes a run.
  */
 export const dailyHousekeeping = onSchedule(
   { schedule: 'every 24 hours', secrets: [ALERTS_TOKEN_KEY], timeoutSeconds: 540 },
@@ -1151,6 +1192,21 @@ export const dailyHousekeeping = onSchedule(
               });
             } else {
               logInfo('Community Request sweep done', { deleted, failed, truncated });
+            }
+          },
+        },
+        {
+          name: 'sweepCommunityFleetPayouts',
+          run: async () => {
+            const { deleted, failed, truncated } = await sweepFleetPayouts(firestore(), Date.now());
+            if (failed > 0 || truncated) {
+              logWarn('Community Fleet Payout sweep incomplete, continues next run', {
+                deleted,
+                failed,
+                truncated,
+              });
+            } else {
+              logInfo('Community Fleet Payout sweep done', { deleted, failed, truncated });
             }
           },
         },
@@ -1310,16 +1366,39 @@ export const syncWorkbenchFits = onSchedule(
  *
  * Another Cloud Scheduler job past the free three, the same trade as
  * `syncWorkbenchFits`; the deployment now has eight scheduled functions.
+ *
+ * The system cost index history (`cost-indices/<systemId>.json`) rides
+ * this schedule rather than a ninth function: it needs the same R2 secrets and runs
+ * once a day. The two are independent; one failing still runs the other, and the run
+ * fails afterwards naming what failed. 1GiB/540s is the open prices job's budget for
+ * the same ~5,500 read-merge-write round trips (32 at a time).
  */
 
 export const syncLpStoreOffers = onSchedule(
   {
-    schedule: 'every 24 hours',
-    memory: '512MiB',
+    // A cron pinned to UTC, so the cost index half stamps a stable UTC date
+    // (`every 24 hours` drifts and could skip or repeat a date).
+    schedule: '30 0 * * *',
+    timeZone: 'Etc/UTC',
+    memory: '1GiB',
     timeoutSeconds: 540,
     secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
   },
-  runSyncLpStoreOffers
+  async () => {
+    const failed: string[] = [];
+    for (const [name, run] of [
+      ['LP store offers', runSyncLpStoreOffers],
+      ['cost indices', runSyncCostIndices],
+    ] as const) {
+      try {
+        await run();
+      } catch (err) {
+        failed.push(name);
+        logError(`${name} sync failed`, { error: String(err) });
+      }
+    }
+    if (failed.length > 0) throw new Error(`Sync failed: ${failed.join(', ')}`);
+  }
 );
 
 /**

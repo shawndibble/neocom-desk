@@ -147,4 +147,17 @@ describe('buildCharacterBoard', () => {
 
     expect(new Set(board.map((item) => item.id)).size).toBe(2);
   });
+
+  it('carries skyhook raid windows as their own kind, after moon chunks on a tie', () => {
+    const items = build({
+      skyhookRaids: [clock({ id: '5', subject: 'X-7OMU IV', detail: 'upcoming' })],
+      moonChunks: [clock({ id: '7' })],
+    });
+    expect(items.map((item) => item.kind)).toEqual(['moonChunk', 'skyhookRaid']);
+    expect(items[1]).toMatchObject({ id: 'skyhookRaid:5', sourceId: '5', remainingMs: 2 * HOUR });
+  });
+
+  it('leaves the kind off the board when the raid read is not readable', () => {
+    expect(build({ skyhookRaids: undefined })).toEqual([]);
+  });
 });

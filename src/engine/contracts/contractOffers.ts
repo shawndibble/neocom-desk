@@ -55,6 +55,15 @@ export interface PublicContractOfferRow {
    * contract out. Absent, not false, otherwise.
    */
   requestsItems?: true;
+  /**
+   * For-sale lines in the contract, the same on every offer row of one
+   * contract (`functions/src/publicContracts.ts`'s `applyLineCounts`). The
+   * Items board reads only the rows of the types it searched, so this is the
+   * one place it can learn a contract is a bundle, or holds several stacks.
+   * Absent on a snapshot published before the field existed: unknown, not
+   * single-line.
+   */
+  lineCount?: number;
   /** Epoch ms. */
   dateExpired: number;
 }

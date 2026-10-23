@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { KindView, ListRow, TableColumn } from './data/types';
-import { TABLE_ROWS, rowsToTable, tableOf, visibleColumns } from './tableModel';
+import { fitColumns, rowsToTable, tableOf, visibleColumns } from './tableModel';
 
 const col = (key: string, priority?: number, align?: 'start' | 'end'): TableColumn => ({
   key,
@@ -9,12 +9,6 @@ const col = (key: string, priority?: number, align?: 'start' | 'end'): TableColu
   align,
 });
 const FIVE = [col('a'), col('b'), col('c'), col('d'), col('e')];
-
-describe('TABLE_ROWS', () => {
-  it('shows 4, 5, 8 and 12 rows from Small to Full', () => {
-    expect(TABLE_ROWS).toEqual({ S: 4, M: 5, L: 8, F: 12 });
-  });
-});
 
 describe('visibleColumns', () => {
   it('keeps the first two columns at Small', () => {
@@ -90,5 +84,40 @@ describe('tableOf', () => {
   });
   it('falls back to the list rows', () => {
     expect(tableOf(base).rows).toHaveLength(2);
+  });
+});
+
+describe('fitColumns', () => {
+  const wide = (key: string, minWidth?: number, priority?: number): TableColumn => ({
+    key,
+    label: key,
+    minWidth,
+    priority,
+  });
+  const keys = (cols: TableColumn[]) => cols.map((c) => c.key);
+
+  it('keeps every column when they all fit', () => {
+    const cols = [wide('a', 100), wide('b', 100), wide('c', 100)];
+    expect(keys(fitColumns(cols, 300))).toEqual(['a', 'b', 'c']);
+  });
+
+  it('drops the worst priority first and keeps display order', () => {
+    const cols = [wide('a', 100), wide('b', 100, 3), wide('c', 100, 1), wide('d', 100, 2)];
+    expect(keys(fitColumns(cols, 300))).toEqual(['a', 'c', 'd']);
+  });
+
+  it('keeps the first column even when it is wider than the box', () => {
+    const cols = [wide('a', 500), wide('b', 50)];
+    expect(keys(fitColumns(cols, 200))).toEqual(['a']);
+  });
+
+  it('counts a missing minWidth as 64', () => {
+    const cols = [wide('a'), wide('b'), wide('c')];
+    expect(keys(fitColumns(cols, 128))).toEqual(['a', 'b']);
+  });
+
+  it('stops at the first column that does not fit, never skipping to a smaller one', () => {
+    const cols = [wide('a', 100), wide('b', 300, 1), wide('c', 50, 2)];
+    expect(keys(fitColumns(cols, 200))).toEqual(['a']);
   });
 });

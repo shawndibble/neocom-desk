@@ -36,6 +36,9 @@ import { priceAlertDomain } from './pollDomains/priceAlerts';
 import { stockTargetDomain } from './pollDomains/stockTargets';
 import { incursionDomain } from './pollDomains/incursions';
 import { communitiesDomain } from './pollDomains/communities';
+import { killsDomain } from './pollDomains/kills';
+import { mercenaryDensDomain } from './pollDomains/mercenaryDens';
+import { skyhookDomain } from './pollDomains/corp';
 
 type Entry = Record<string, unknown>;
 
@@ -216,6 +219,40 @@ const CASES: Case[] = [
     },
     optional: { requestId: 'r1', requestLabel: 'Hull' },
     badEnum: { kind: 'invite' },
+  },
+  {
+    name: 'kills',
+    domain: killsDomain,
+    base: { killmailId: 1, timeMs: 1000, thresholdIsk: 0 },
+    optional: { shipTypeId: 587, systemId: 30000142, value: 1_000_000 },
+  },
+  {
+    name: 'mercenary dens',
+    domain: mercenaryDensDomain,
+    base: {
+      denId: 1,
+      planetId: 40_000_001,
+      reinforcedUntilMs: 100,
+      anarchyAmount: 10,
+      anarchyLevel: 1,
+      leadMs: 5,
+      anarchyPct: 50,
+    },
+    nullable: ['reinforcedUntilMs', 'anarchyAmount', 'anarchyLevel'],
+  },
+  {
+    name: 'skyhooks',
+    domain: skyhookDomain,
+    base: {
+      skyhookId: 1,
+      planetId: 40_000_001,
+      windowStartMs: 100,
+      windowEndMs: 200,
+      unsecuredUnits: 5,
+      leadMs: 5,
+      minUnits: 0,
+    },
+    nullable: ['windowStartMs', 'windowEndMs', 'unsecuredUnits'],
   },
 ];
 

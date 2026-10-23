@@ -32,9 +32,11 @@ const ALL_IDS = [
   'miningYield',
   'survey',
   'planetary',
+  'mercenaryDens',
   'structures',
   'moonChunks',
   'incursions',
+  'sovRaids',
   'routeSafety',
   'hauling',
   'kills',
@@ -51,6 +53,7 @@ const CORP_IDS = [
   'corpDeadlines',
   'corpServices',
   'corpStarbases',
+  'corpSovereignty',
   'corpCustomsOffices',
   'corpWallet',
   'corpCashFlow',
@@ -72,7 +75,7 @@ const CORP_SOON = ['corpSrp'];
 const overviewKinds = () => boardKinds('overview');
 
 describe('widget kind catalogue', () => {
-  it('offers the Overview exactly the 30 kinds the mockups define', () => {
+  it('offers the Overview exactly the 31 kinds the mockups define', () => {
     expect(
       overviewKinds()
         .map((k) => k.id)
@@ -211,6 +214,7 @@ describe('widget kind catalogue', () => {
       'stock',
       'industry',
       'planetary',
+      'mercenaryDens',
       'structures',
       'moonChunks',
       'incursions',

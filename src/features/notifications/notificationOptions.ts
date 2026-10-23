@@ -47,6 +47,9 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   cloneJumpReady: '/clones',
   planetaryExtractionDone: '/planetary-industry',
   planetaryExtractorExpiring: '/planetary-industry',
+  // The Mercenary Dens widget (issue #4791) is the only den surface.
+  mercenaryDenReinforced: '/overview',
+  mercenaryDenAnarchy: '/overview',
   newMail: '/mail',
   newCalendarEvent: '/calendar',
   calendarEventStarting: '/calendar',
@@ -89,6 +92,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   eveNotification: '/alerts',
   // Corp events (issue #299): each lands on the corp route that shows it.
   structureFuelLow: '/corp',
+  skyhookRaidable: '/corp',
   // Not the corp board (issue #2302): that shows the job with nothing pointing
   // at it, and not at all once delivered. Active Jobs lists corp jobs and
   // keeps the one `?highlight=` names, whoever installed it.
@@ -103,6 +107,10 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   priceAlertTriggered: '/market/browser',
   stockBelowTarget: '/market/stock',
   incursionNearby: '/travel/route',
+  // The Overview, whose Route Safety widget lists the raidable skyhooks in range.
+  skyhookRaidableNearby: '/overview',
+  // The Overview, whose Kills widget lists the loss (issue #4772).
+  shipLost: '/overview',
   // The Communities page, where the admin lets the request in or sees the Member.
   communityJoinRequest: '/communities',
   communityMemberJoined: '/communities',

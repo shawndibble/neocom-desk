@@ -136,3 +136,11 @@ plus a small index, and have the client fetch only the types a search needs.
   `functions/src/index.ts` go away once the Firestore fallback is removed.
 - Supersedes nothing in ADR 0013's _decision to use a backend-fed shared
   snapshot_; it replaces only where that snapshot is stored and how it is read.
+
+## Addendum (2026-10-23): bundle shards
+
+Reading every type one object at a time proved too slow for whole-snapshot
+reads (Below market, BPC Sourcing). The writer also publishes the rows as a few
+content-addressed bundle shards named in `index.json`'s optional `bundles`
+field. Single-type searches still read per-type objects. See
+`docs/context/decisions/20261023-072929-whole-snapshot-contract-reads-use-bundle-shards.md`.

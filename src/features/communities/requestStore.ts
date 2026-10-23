@@ -9,12 +9,14 @@
 import {
   collection,
   collectionGroup,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
   query,
   runTransaction,
   serverTimestamp,
+  setDoc,
   where,
 } from 'firebase/firestore/lite';
 import { db as localDb } from '@/db';
@@ -26,7 +28,13 @@ import type {
   RequestNotify,
   RequestPledge,
 } from '@/engine/communities/requests';
-import { readNotify } from '@/engine/communities/requests';
+import { readNotify, readStanding } from '@/engine/communities/requests';
+import {
+  readQuote,
+  type HeldQuote,
+  type QuoteLinkRef,
+  type StandingRequest,
+} from '@/engine/communities/buyback';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
@@ -57,7 +65,9 @@ function readRequest(id: string, d: Record<string, unknown>): CommunityRequest |
   const lines = (Array.isArray(d.lines) ? d.lines : [])
     .map(readLine)
     .filter((line): line is RequestLine => line !== null);
-  if (lines.length === 0) return null;
+  const standing = readStanding(d);
+  // A standing Request asks through its buy lines and carries no item lines.
+  if (lines.length === 0 && !standing) return null;
   return {
     id,
     ownerUid: String(d.ownerUid ?? ''),
@@ -70,6 +80,7 @@ function readRequest(id: string, d: Record<string, unknown>): CommunityRequest |
     expiresAt: Number(d.expiresAt ?? 0),
     closed: d.closed === true,
     notify: readNotify(d.notify),
+    ...(standing ? { standing } : {}),
   };
 }
 
@@ -123,13 +134,27 @@ export interface PostRequestDraft {
   terms: string;
   lines: RequestLine[];
   notify: RequestNotify;
+  /** Present on a standing buyback Request: the rate, hub, buyer and what it buys. */
+  standing?: StandingRequest;
+}
+
+/** The callable's flat shape: a standing draft sends `standing: true` beside its terms. */
+function draftPayload({ standing, ...draft }: PostRequestDraft) {
+  if (!standing) return draft;
+  const { buyerCharacterId, ...terms } = standing;
+  return {
+    ...draft,
+    standing: true,
+    ...terms,
+    ...(buyerCharacterId !== null ? { buyerCharacterId } : {}),
+  };
 }
 
 export function postRequest(characterId: number, communityId: string, draft: PostRequestDraft) {
-  return callCommunity<PostRequestDraft & { communityId: string }, { requestId: string }>(
+  return callCommunity<Record<string, unknown>, { requestId: string }>(
     characterId,
     'postCommunityRequestCallable',
-    { communityId, ...draft }
+    { communityId, ...draftPayload(draft) }
   );
 }
 
@@ -143,7 +168,7 @@ export async function editRequest(
   await callCommunity(characterId, 'editCommunityRequestCallable', {
     communityId,
     requestId,
-    ...draft,
+    ...draftPayload(draft),
   });
 }
 
@@ -215,7 +240,8 @@ function readPledge(uid: string, d: Record<string, unknown>): RequestPledge | nu
     };
   }
   const stamp = d.updatedAt as { toMillis?: () => number } | undefined;
-  return { uid, lines, updatedAt: stamp?.toMillis?.() ?? 0 };
+  const quote = readQuote(d.quote);
+  return { uid, lines, ...(quote ? { quote } : {}), updatedAt: stamp?.toMillis?.() ?? 0 };
 }
 
 /** Every Member's Pledges on one Request. */
@@ -356,4 +382,108 @@ async function writeMyPledge(
   });
   if (withdrawn) return null;
   return readPledge(uid, (await getDoc(ref)).data() ?? {});
+}
+
+/**
+ * Holds (or, with null, clears) this Character's Quote on a standing Request.
+ * The Quote replaces any held one: one Quote per Member per Request. A standing
+ * Request takes no line Pledges, so the document is the Quote and nothing else.
+ */
+export async function saveMyQuote(
+  characterId: number,
+  communityId: string,
+  requestId: string,
+  quote: HeldQuote | null
+): Promise<RequestPledge | null> {
+  const uid = uidForCharacter(characterId);
+  const override = communityBackendOverride();
+  if (override?.saveQuote && override.loadPledges) {
+    override.saveQuote(communityId, requestId, quote);
+    return override.loadPledges(communityId, requestId).find((p) => p.uid === uid) ?? null;
+  }
+  return trackPledgeWrite(() =>
+    underFirebaseSession(async () => {
+      await ensureSignedIn(characterId);
+      const ref = doc(
+        getSyncFirestore(),
+        'communities',
+        communityId,
+        'itemRequests',
+        requestId,
+        'pledges',
+        uid
+      );
+      if (quote === null) {
+        await deleteDoc(ref);
+        return null;
+      }
+      const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
+      if (!ownerHash) throw new Error('This Character has no owner hash yet');
+      await setDoc(ref, {
+        ownerHash,
+        communityId,
+        lines: {},
+        quote,
+        updatedAt: serverTimestamp(),
+      });
+      return readPledge(uid, (await getDoc(ref)).data() ?? {});
+    })
+  );
+}
+
+/**
+ * Saves the contracts linked to this Character's held Quote, when the Quote is
+ * still the one that was matched (`quotedAt`): a second paste in the meantime
+ * replaced it, and its links start empty. Only ids and statuses are written.
+ */
+export async function saveQuoteLinks(
+  characterId: number,
+  communityId: string,
+  requestId: string,
+  quotedAt: number,
+  links: readonly QuoteLinkRef[]
+): Promise<void> {
+  const uid = uidForCharacter(characterId);
+  const withLinks = (quote: HeldQuote): HeldQuote => {
+    const next: HeldQuote = { ...quote };
+    if (links.length > 0) next.links = [...links];
+    else delete next.links;
+    return next;
+  };
+  const override = communityBackendOverride();
+  if (override?.saveQuote && override.loadPledges) {
+    const mine = override.loadPledges(communityId, requestId).find((p) => p.uid === uid);
+    if (mine?.quote?.quotedAt === quotedAt) {
+      override.saveQuote(communityId, requestId, withLinks(mine.quote));
+    }
+    return;
+  }
+  await trackPledgeWrite(() =>
+    underFirebaseSession(async () => {
+      await ensureSignedIn(characterId);
+      const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
+      if (!ownerHash) throw new Error('This Character has no owner hash yet');
+      const ref = doc(
+        getSyncFirestore(),
+        'communities',
+        communityId,
+        'itemRequests',
+        requestId,
+        'pledges',
+        uid
+      );
+      await runTransaction(getSyncFirestore(), async (tx) => {
+        const stored = await tx.get(ref);
+        const quote = stored.exists() ? readQuote(stored.data().quote) : undefined;
+        if (!quote || quote.quotedAt !== quotedAt) return;
+        tx.set(ref, {
+          ownerHash,
+          communityId,
+          lines: {},
+          quote: withLinks(quote),
+          updatedAt: serverTimestamp(),
+        });
+      });
+    })
+  );
 }

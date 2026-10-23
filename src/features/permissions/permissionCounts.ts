@@ -3,9 +3,10 @@
  * Settings › Permissions and the Character switcher. Pure: it takes a token's
  * scopes and nothing else, so no `TokenRecord` reaches feature code (ADR 0001).
  *
- * The total is every Permission, uniformly. Corporation is counted like the
- * rest: whether a Character holds a Corp Role is only knowable by asking ESI
- * per Character, which a roster of twenty must not do on every visit.
+ * Corporation is left out of both numbers: it only matters to a Character with
+ * a Corp Role, which is only knowable by asking ESI per Character (a roster of
+ * twenty must not do that on every visit), and the panel hides its row without
+ * one, so counting it showed a "missing" Permission nobody could see.
  */
 import { SCOPE_GROUPS } from '@/esi/registry';
 import { isPermissionGranted } from '@/esi/scopes';
@@ -20,10 +21,13 @@ export interface CharacterPermissionCount extends PermissionCount {
   name: string;
 }
 
+/** The Permissions the count covers: every one but Corporation. */
+export const COUNTED_PERMISSIONS = SCOPE_GROUPS.filter((group) => group !== 'corp');
+
 export function countGrantedPermissions(scopes: readonly string[]): PermissionCount {
   return {
-    granted: SCOPE_GROUPS.filter((group) => isPermissionGranted(group, scopes)).length,
-    total: SCOPE_GROUPS.length,
+    granted: COUNTED_PERMISSIONS.filter((group) => isPermissionGranted(group, scopes)).length,
+    total: COUNTED_PERMISSIONS.length,
   };
 }
 

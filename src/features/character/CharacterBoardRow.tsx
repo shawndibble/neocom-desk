@@ -15,11 +15,11 @@
  * the countdown beside it already said in words — and said nothing at all
  * about *what* was ending. The hue now matches the kind's dot in the Calendar
  * Map, its segment in the Day Ticker and its swatch in the filter menu, so one
- * glance down the rail sorts six kinds of clock apart.
+ * glance down the rail sorts nine kinds of clock apart.
  */
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { CharacterBoardItem, CharacterBoardItemKind } from '@/engine/character/board';
+import type { CharacterBoardItem } from '@/engine/character/board';
 import { isProjectedKind, pastDeadlineLabelKey } from '@/engine/character/board';
 import { formatDuration } from '@/lib/duration';
 import { formatTimeOfDay } from '@/lib/timestamp';
@@ -31,27 +31,22 @@ import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/u
 import { RESPONSE_KEY, RESPONSE_TEXT_TONE } from './calendarResponseTone';
 import { EventContextMenu } from './EventContextMenu';
 import { KIND_LABEL } from './calendarKindLabels';
+import { KIND_ICON } from './calendarKindIcons';
 import { KIND_TEXT } from '@/components/ui/kindTone';
-
-/** One glyph per kind, from the app's own vocabulary — the same icons those routes carry in the nav. */
-const KIND_ICON: Record<CharacterBoardItemKind, typeof Icon.Skills> = {
-  calendarEvent: Icon.CalendarEvent,
-  skillTraining: Icon.Skills,
-  industryJob: Icon.Industry,
-  planetExtraction: Icon.Planetary,
-  moonChunk: Icon.MoonMining,
-  contractExpiry: Icon.Contracts,
-  orderExpiry: Icon.Orders,
-  skillPlan: Icon.FlatList,
-};
 
 export interface CharacterBoardRowProps {
   item: CharacterBoardItem;
   /** Only calendar events have a detail to open; every other kind renders as a plain row. */
   onSelectEvent?: (eventId: number) => void;
+  /** Skyhook raids open a detail modal of their own; the source id is the skyhook's. */
+  onSelectSkyhook?: (skyhookId: number) => void;
 }
 
-export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProps) {
+export function CharacterBoardRow({
+  item,
+  onSelectEvent,
+  onSelectSkyhook,
+}: CharacterBoardRowProps) {
   const { t } = useTranslation();
   const zone = useTimeZone();
   const KindIcon = KIND_ICON[item.kind];
@@ -82,7 +77,7 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
         countdown's four characters.
       */}
       <KindIcon className={`size-4 shrink-0 ${KIND_TEXT[item.kind]}`} aria-hidden="true" />
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
           {/*
             Colour is never the only signal (DESIGN.md §7) — and here it needs
@@ -136,6 +131,22 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
           className="mt-1 shrink-0 text-text-faint group-hover:text-accent group-focus-visible:text-accent"
         />
       </Link>
+    );
+  }
+
+  if (item.kind === 'skyhookRaid' && onSelectSkyhook !== undefined) {
+    return (
+      <button
+        type="button"
+        onClick={() => onSelectSkyhook(Number(item.sourceId))}
+        className={cx(
+          'flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left',
+          rowInteractiveClassName,
+          focusRingInsetClassName
+        )}
+      >
+        {body}
+      </button>
     );
   }
 

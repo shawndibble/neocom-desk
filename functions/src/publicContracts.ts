@@ -191,6 +191,14 @@ export interface PublicContractOfferRow {
    * is bait, not a deal). Absent, not false, otherwise.
    */
   requestsItems?: true;
+  /**
+   * For-sale lines in the contract (one per stack: two stacks of one type are
+   * two lines), the same on every offer row of one contract, set by
+   * `applyLineCounts`. Always written, one included: a reader only ever sees
+   * the rows of the types it searched, so an absent count has to mean "an
+   * older publish", never "a single-line contract".
+   */
+  lineCount?: number;
   /** Epoch ms. */
   dateExpired: number;
 }
@@ -303,6 +311,20 @@ export function applyRequestedSide(rows: PublicContractOfferRow[], side: Request
   }
 }
 
+/**
+ * Stamps `lineCount` onto every offer row, in place: how many for-sale lines
+ * its contract carries. One price pays for every line, so a contract with more
+ * than one (other types, or two stacks of one) cannot be judged from a single
+ * row. Needs every row of every contract, so it runs once after the stream.
+ */
+export function applyLineCounts(rows: PublicContractOfferRow[]): void {
+  const linesByContract = new Map<number, number>();
+  for (const row of rows) {
+    linesByContract.set(row.contractId, (linesByContract.get(row.contractId) ?? 0) + 1);
+  }
+  for (const row of rows) row.lineCount = linesByContract.get(row.contractId)!;
+}
+
 /** One CSV column as a number, or absent when it is blank or unparsable. */
 function numericColumn(value: string): number | undefined {
   if (value === '') return undefined;
@@ -401,6 +423,7 @@ export function filterAndCompactPublicContractOffers(
     if (row) rows.push(row);
   }
   applyRequestedSide(rows, requestedSideByContract(items, eligibleContracts));
+  applyLineCounts(rows);
 
   return sortContractOfferRows(rows);
 }

@@ -635,6 +635,165 @@ describe('Requests', () => {
       await assertSucceeds(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1_000_000_000_000) })));
     });
 
+    describe('Quotes on a standing buyback Request (issue #4780)', () => {
+      const STANDING = `${C}/itemRequests/r-standing`;
+      const QUOTE = `${STANDING}/pledges/char:2`;
+      const standingRequest = (over: Record<string, unknown> = {}) => {
+        // A standing Request has no expiry and no item lines.
+        const base: Record<string, unknown> = request({ lines: [], ...over });
+        delete base.expiresAt;
+        return {
+          ...base,
+          standing: true,
+          rate: 90,
+          rateBasis: 'buy',
+          hubId: 'jita',
+          buyLines: [{ kind: 'group', group: 'ore' }],
+        };
+      };
+      const quote = (over: Record<string, unknown> = {}) => {
+        const quotedAt = Date.now();
+        return {
+          lines: [{ typeId: 1230, name: 'Veldspar', quantity: 1000, unitPrice: 10, total: 9000 }],
+          total: 9000,
+          quotedAt,
+          expiresAt: quotedAt + 14 * DAY,
+          ...over,
+        };
+      };
+      const quoteDoc = (over: Record<string, unknown> = {}, q: Record<string, unknown> = quote()) =>
+        pledgeDoc({}, { quote: q, ...over });
+
+      beforeEach(async () => {
+        await env.withSecurityRulesDisabled(async (ctx) => {
+          const db = ctx.firestore();
+          await setDoc(doc(db, STANDING), standingRequest());
+          await setDoc(
+            doc(db, `${C}/itemRequests/r-standing-closed`),
+            standingRequest({ closed: true })
+          );
+        });
+      });
+
+      it('lets a Member hold, replace and clear their own Quote, with no expiry on the Request', async () => {
+        const db = characterAuth(env, 2, 'hash-2').firestore();
+        await assertSucceeds(setDoc(doc(db, QUOTE), quoteDoc()));
+        await assertSucceeds(setDoc(doc(db, QUOTE), quoteDoc({}, quote({ total: 100 }))));
+        await assertSucceeds(
+          setDoc(
+            doc(db, QUOTE),
+            quoteDoc({}, quote({ rate: 92.5, rateBasis: 'sell', hubId: 'amarr' }))
+          )
+        );
+        await assertSucceeds(deleteDoc(doc(db, QUOTE)));
+      });
+
+      it('denies a Quote on an ordinary Request, and item lines on a standing one', async () => {
+        const db = characterAuth(env, 2, 'hash-2').firestore();
+        await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1) }, { quote: quote() })));
+        await assertFails(setDoc(doc(db, QUOTE), pledgeDoc({ 0: entry(1) }, { quote: quote() })));
+        await assertFails(setDoc(doc(db, QUOTE), pledgeDoc({ 0: entry(1) })));
+        await assertFails(setDoc(doc(db, QUOTE), pledgeDoc({})));
+      });
+
+      it('denies a Quote that is not held exactly 14 days, or not quoted about now', async () => {
+        const db = characterAuth(env, 2, 'hash-2').firestore();
+        const at = Date.now();
+        await assertFails(
+          setDoc(doc(db, QUOTE), quoteDoc({}, quote({ quotedAt: at, expiresAt: at + 30 * DAY })))
+        );
+        await assertFails(
+          setDoc(
+            doc(db, QUOTE),
+            quoteDoc({}, quote({ quotedAt: at - 3 * DAY, expiresAt: at + 11 * DAY }))
+          )
+        );
+      });
+
+      it('lets the Member add contract links to a held Quote days later, but not move its date', async () => {
+        const db = characterAuth(env, 2, 'hash-2').firestore();
+        const old = Date.now() - 6 * DAY;
+        const held = quote({ quotedAt: old, expiresAt: old + 14 * DAY });
+        await env.withSecurityRulesDisabled(async (ctx) => {
+          await setDoc(doc(ctx.firestore(), QUOTE), {
+            ...quoteDoc({}, held),
+            updatedAt: new Date(),
+          });
+        });
+        const links = [{ contractId: 9, status: 'outstanding' }];
+        await assertSucceeds(setDoc(doc(db, QUOTE), quoteDoc({}, { ...held, links })));
+        // A different old date is a new quote, and must be about now.
+        const other = Date.now() - 5 * DAY;
+        await assertFails(
+          setDoc(
+            doc(db, QUOTE),
+            quoteDoc({}, quote({ quotedAt: other, expiresAt: other + 14 * DAY }))
+          )
+        );
+        await assertFails(
+          setDoc(
+            doc(db, QUOTE),
+            quoteDoc(
+              {},
+              {
+                ...held,
+                links: Array.from({ length: 6 }, () => ({ contractId: 1, status: 'finished' })),
+              }
+            )
+          )
+        );
+        // The old date keeps only its own content: a new total under it is a different quote.
+        await assertFails(setDoc(doc(db, QUOTE), quoteDoc({}, { ...held, total: 1, links })));
+        await assertFails(
+          setDoc(doc(db, QUOTE), quoteDoc({}, { ...held, links: [{ contractId: 9 }] }))
+        );
+        await assertFails(
+          setDoc(
+            doc(db, QUOTE),
+            quoteDoc({}, { ...held, links: [{ contractId: 9, status: 'weird' }] })
+          )
+        );
+      });
+
+      it('denies a malformed Quote: total, lines and keys', async () => {
+        const db = characterAuth(env, 2, 'hash-2').firestore();
+        for (const bad of [
+          quote({ total: -1 }),
+          quote({ total: 1.5 }),
+          quote({ total: '9000' }),
+          quote({ lines: [] }),
+          quote({ lines: Array.from({ length: 51 }, () => ({ typeId: 1 })) }),
+          quote({ extra: 1 }),
+          quote({ rate: 0 }),
+          quote({ rate: 201 }),
+          quote({ rateBasis: 'mid' }),
+          quote({ hubId: 'nowhere' }),
+        ]) {
+          await assertFails(setDoc(doc(db, QUOTE), quoteDoc({}, bad)));
+        }
+      });
+
+      it('denies a Quote on a closed standing Request, by the owner, or in another Member’s name', async () => {
+        const member = characterAuth(env, 2, 'hash-2').firestore();
+        await assertFails(
+          setDoc(doc(member, `${C}/itemRequests/r-standing-closed/pledges/char:2`), quoteDoc())
+        );
+        const owner = characterAuth(env, 1, 'hash-1').firestore();
+        await assertFails(
+          setDoc(doc(owner, `${STANDING}/pledges/char:1`), quoteDoc({ ownerHash: 'hash-1' }))
+        );
+        await assertFails(setDoc(doc(owner, QUOTE), quoteDoc({ ownerHash: 'hash-1' })));
+      });
+
+      it('lets every Member read a Quote', async () => {
+        await env.withSecurityRulesDisabled(async (ctx) => {
+          await setDoc(doc(ctx.firestore(), QUOTE), { ...quoteDoc(), updatedAt: new Date() });
+        });
+        const db = characterAuth(env, 1, 'hash-1').firestore();
+        await assertSucceeds(getDoc(doc(db, QUOTE)));
+      });
+    });
+
     it('denies a line the Request does not have, and keys that are not line indexes', async () => {
       const db = characterAuth(env, 2, 'hash-2').firestore();
       await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 2: entry(1) })));
@@ -978,6 +1137,92 @@ describe('Requests', () => {
       await assertFails(getDoc(doc(db, `${REQ}/pledgeMails/char:42`)));
       await assertFails(getDocs(collection(db, `${REQ}/pledgeMails`)));
       await assertFails(setDoc(doc(db, `${REQ}/pledgeMails/char:42`), { sentAt: 1 }));
+    }
+  });
+});
+
+describe('Fleet Payouts', () => {
+  const PAYOUT = `${C}/fleetPayouts/p1`;
+  const payout = {
+    ownerUid: 'char:1',
+    ownerName: 'One',
+    name: 'Roam',
+    totalIsk: 100,
+    holdBackPct: 10,
+    rule: 'equal',
+    memberUids: ['char:2'],
+    shareCount: 2,
+    paidCount: 0,
+    createdAt: 1,
+    expiresAt: Date.now() + 86_400_000,
+  };
+  const share = (memberUid: string | null) => ({
+    pilotName: 'Pilot',
+    characterId: 5,
+    memberUid,
+    weight: 1,
+    isk: 45,
+    paid: false,
+    paidAt: 0,
+  });
+
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(doc(db, PAYOUT), payout);
+      await setDoc(doc(db, `${PAYOUT}/shares/0`), share('char:2'));
+      await setDoc(doc(db, `${PAYOUT}/shares/1`), share(null));
+    });
+  });
+
+  it('lets a Member read and list Payouts, and no outsider', async () => {
+    const two = characterAuth(env, 2, 'hash-2').firestore();
+    await assertSucceeds(getDoc(doc(two, PAYOUT)));
+    await assertSucceeds(getDocs(collection(two, `${C}/fleetPayouts`)));
+    const outsider = characterAuth(env, 9, 'hash-9').firestore();
+    await assertFails(getDoc(doc(outsider, PAYOUT)));
+    await assertFails(getDocs(collection(outsider, `${C}/fleetPayouts`)));
+    await assertFails(getDoc(doc(characterAuth(env, 2, 'wrong-hash').firestore(), PAYOUT)));
+  });
+
+  it('lets the boss list every Share', async () => {
+    const one = characterAuth(env, 1, 'hash-1').firestore();
+    const snap = await assertSucceeds(getDocs(collection(one, `${PAYOUT}/shares`)));
+    expect(snap.size).toBe(2);
+    await assertSucceeds(getDoc(doc(one, `${PAYOUT}/shares/1`)));
+  });
+
+  it('lets another Member read only their own Share', async () => {
+    const two = characterAuth(env, 2, 'hash-2').firestore();
+    await assertSucceeds(getDoc(doc(two, `${PAYOUT}/shares/0`)));
+    await assertFails(getDoc(doc(two, `${PAYOUT}/shares/1`)));
+    await assertFails(getDocs(collection(two, `${PAYOUT}/shares`)));
+    const mine = await assertSucceeds(
+      getDocs(query(collection(two, `${PAYOUT}/shares`), where('memberUid', '==', 'char:2')))
+    );
+    expect(mine.size).toBe(1);
+    await assertFails(
+      getDocs(query(collection(two, `${PAYOUT}/shares`), where('memberUid', '==', 'char:1')))
+    );
+  });
+
+  it('keeps Shares from outsiders', async () => {
+    const outsider = characterAuth(env, 9, 'hash-9').firestore();
+    await assertFails(getDoc(doc(outsider, `${PAYOUT}/shares/0`)));
+    await assertFails(
+      getDocs(query(collection(outsider, `${PAYOUT}/shares`), where('memberUid', '==', 'char:9')))
+    );
+  });
+
+  it('denies every client write, the boss included', async () => {
+    for (const n of [1, 2]) {
+      const db = characterAuth(env, n, `hash-${n}`).firestore();
+      await assertFails(setDoc(doc(db, `${C}/fleetPayouts/new`), payout));
+      await assertFails(updateDoc(doc(db, PAYOUT), { paidCount: 1 }));
+      await assertFails(deleteDoc(doc(db, PAYOUT)));
+      await assertFails(setDoc(doc(db, `${PAYOUT}/shares/9`), share(null)));
+      await assertFails(updateDoc(doc(db, `${PAYOUT}/shares/0`), { paid: true }));
+      await assertFails(deleteDoc(doc(db, `${PAYOUT}/shares/0`)));
     }
   });
 });

@@ -30,6 +30,12 @@ import {
   DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
   DEFAULT_WALLET_FOLD_INTO_CONTRACT,
   DEFAULT_INCURSION_NEARBY_JUMPS,
+  DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS,
+  DEFAULT_SHIP_LOST_MINIMUM_ISK,
+  DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+  DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
+  DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
+  DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
   updateNotificationPrefs,
   toggleEventChannelPref,
   toggleEveTypeChannelPref,
@@ -265,6 +271,12 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
       walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
+      skyhookRaidableNearbyJumps: DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS,
+      shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
+      mercenaryDenReinforcedLeadHours: DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+      mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
+      skyhookRaidableLeadHours: DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
+      skyhookRaidableMinUnits: DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
     });
   });
 
@@ -287,6 +299,12 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
       walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
+      skyhookRaidableNearbyJumps: DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS,
+      shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
+      mercenaryDenReinforcedLeadHours: DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+      mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
+      skyhookRaidableLeadHours: DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
+      skyhookRaidableMinUnits: DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
     });
   });
 
@@ -310,6 +328,12 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
       walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
+      skyhookRaidableNearbyJumps: DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS,
+      shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
+      mercenaryDenReinforcedLeadHours: DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+      mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
+      skyhookRaidableLeadHours: DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
+      skyhookRaidableMinUnits: DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
     });
   });
 
@@ -342,6 +366,12 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       walletBalanceChangedThresholdIsk: 10_500_000,
       walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
+      skyhookRaidableNearbyJumps: DEFAULT_SKYHOOK_RAIDABLE_NEARBY_JUMPS,
+      shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
+      mercenaryDenReinforcedLeadHours: DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+      mercenaryDenAnarchyPercent: DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
+      skyhookRaidableLeadHours: DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
+      skyhookRaidableMinUnits: DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
     });
   });
 

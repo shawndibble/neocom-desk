@@ -54,9 +54,14 @@ const NO_HUB_PRICES = { prices: new Map(), unreachable: false };
 const getHubPricesWithStatus = vi.fn<(...args: unknown[]) => Promise<typeof NO_HUB_PRICES>>(
   async () => NO_HUB_PRICES
 );
+// Blueprint originals are priced region-wide for the row flags (#4773).
+const getRegionSellPrices = vi.fn<(...args: unknown[]) => Promise<Map<number, number | null>>>(
+  async () => new Map()
+);
 vi.mock('@/market/prices', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/market/prices')>()),
   getHubPricesWithStatus: (...args: unknown[]) => getHubPricesWithStatus(...args),
+  getRegionSellPrices: (...args: unknown[]) => getRegionSellPrices(...args),
 }));
 vi.mock('@/features/abyssal/mutaplasmidData', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/abyssal/mutaplasmidData')>()),
@@ -322,8 +327,9 @@ function cachedSnapshot(
     regionIds: [...new Set(rows.map((row) => row.regionId))],
     r2: {},
   });
-  loadOffersForTypes.mockImplementation(async (_index: unknown, ids: ReadonlySet<number>) =>
-    rows.filter((row) => ids.has(row.typeId))
+  // `null` asks for every type (Below market, a search naming none).
+  loadOffersForTypes.mockImplementation(async (_index: unknown, ids: ReadonlySet<number> | null) =>
+    rows.filter((row) => ids === null || ids.has(row.typeId))
   );
   return snapshotRead([], overrides);
 }
@@ -2212,7 +2218,7 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('reads every listed type on a search that names no item', async () => {
+    it('reads every offer on a search that names no item', async () => {
       loadPublicContractOffers.mockReturnValue(
         deferred<R2SnapshotRead<PublicContractOfferRow>>().promise
       );
@@ -2221,7 +2227,7 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
       renderWithRouter(['/?items.maxPrice=1000000000']);
 
       expect(await bodyRows()).toHaveLength(1);
-      expect(loadOffersForTypes).toHaveBeenCalledWith(INDEX, new Set([34, 35]));
+      expect(loadOffersForTypes).toHaveBeenCalledWith(INDEX, null);
     });
   });
 
@@ -2440,5 +2446,69 @@ describe('ContractSearchPanel — Below market (#3989)', () => {
     ).toBeInTheDocument();
     // The column picker acts on the offer table, which this view replaces.
     expect(screen.queryByRole('button', { name: /columns/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('ContractSearchPanel — overpriced flags (#4773)', () => {
+  // Tritanium sells at 8,000 at the hub; 100 units are worth 800,000.
+  const FAIR = row({ contractId: 11, price: 900_000, lineCount: 1 });
+  const TRAP = row({ contractId: 12, price: 9_000_000, lineCount: 1 });
+  /** The same ask inside a five-type bundle: its price pays for every line. */
+  const BUNDLE = row({ contractId: 13, price: 9_500_000, lineCount: 5 });
+  /** Published before the line count existed: unknown, never single-type. */
+  /** Two stacks of Tritanium on one contract: the one price pays for both. */
+  const STACK_A = row({ contractId: 15, price: 9_900_000, lineCount: 2 });
+  const STACK_B = row({ contractId: 15, price: 9_900_000, quantity: 50, lineCount: 2 });
+  const OLD_PUBLISH = row({ contractId: 14, price: 8_800_000 });
+  const FLAG = { name: 'Priced far above market' };
+
+  beforeEach(() => {
+    getHubPricesWithStatus.mockResolvedValue({
+      prices: new Map([[34, { sellMin: 8_000, buyMax: null, sellVolume: 0, buyVolume: 0 }]]),
+      unreachable: false,
+    });
+    loadPublicContractOffers.mockResolvedValue(cachedSnapshot([FAIR, TRAP, BUNDLE, OLD_PUBLISH]));
+  });
+
+  afterEach(() => {
+    getHubPricesWithStatus.mockImplementation(async () => NO_HUB_PRICES);
+  });
+
+  it('marks only the single-type contract asking far above the hub sell', async () => {
+    renderWithRouter();
+    const flag = await screen.findByRole('img', FLAG);
+    expect(screen.getAllByRole('img', FLAG)).toHaveLength(1);
+    expect(flag.closest('tr')).toHaveTextContent('9M');
+    // 4 offers, one marker: the bundle and the unknown-count row stay unflagged.
+    expect(await bodyRows()).toHaveLength(4);
+  });
+
+  it('never marks a contract that carries several stacks', async () => {
+    loadPublicContractOffers.mockResolvedValue(cachedSnapshot([STACK_A, STACK_B]));
+    renderWithRouter();
+    expect(await bodyRows()).toHaveLength(2);
+    expect(screen.queryByRole('img', FLAG)).not.toBeInTheDocument();
+  });
+
+  it('says nothing while the hub has no price for the item', async () => {
+    getHubPricesWithStatus.mockResolvedValue({ prices: new Map(), unreachable: false });
+    renderWithRouter();
+    await bodyRows();
+    expect(screen.queryByRole('img', FLAG)).not.toBeInTheDocument();
+  });
+
+  it('Hide overpriced drops the flagged row and says how many it hid', async () => {
+    renderWithRouter(['/?items.minQty=0&items.hideOverpriced=1']);
+    expect(await screen.findByText('1 overpriced contract hidden')).toBeInTheDocument();
+    const rows = await bodyRows();
+    expect(rows).toHaveLength(3);
+    expect(screen.queryByRole('img', FLAG)).not.toBeInTheDocument();
+  });
+
+  it('prints no count when nothing is flagged', async () => {
+    getHubPricesWithStatus.mockResolvedValue({ prices: new Map(), unreachable: false });
+    renderWithRouter(['/?items.minQty=0&items.hideOverpriced=1']);
+    expect(await bodyRows()).toHaveLength(4);
+    expect(screen.queryByText(/overpriced contract/)).not.toBeInTheDocument();
   });
 });

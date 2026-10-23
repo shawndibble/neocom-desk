@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { captureException } from '@sentry/react';
-import { annotateFailure, reportFailure, resetReportedFailures } from './reportFailure';
+import {
+  addFailureTag,
+  annotateFailure,
+  reportFailure,
+  resetReportedFailures,
+  tagAnnotatedEvent,
+} from './reportFailure';
 import { scrubEvent } from './scrub';
 
 vi.mock('@sentry/react', () => ({ captureException: vi.fn() }));
@@ -107,5 +113,24 @@ describe('reportFailure edge cases', () => {
     const sent = vi.mocked(captureException).mock.calls[0][0] as Error;
     expect(sent).toBeInstanceOf(Error);
     expect(sent.message).not.toContain('abc123secret');
+  });
+});
+
+describe('tagAnnotatedEvent', () => {
+  it('copies an annotated errors tags onto the event, without overriding its own', () => {
+    const error = new Error('x');
+    addFailureTag(error, { callable: 'saveAlertGrant', error_codes: 'functions/internal' });
+    const event = tagAnnotatedEvent({ tags: { subsystem: 'auth', error_codes: 'kept' } }, error);
+    expect(event.tags).toEqual({
+      callable: 'saveAlertGrant',
+      error_codes: 'kept',
+      subsystem: 'auth',
+    });
+  });
+
+  it('leaves the event of an unannotated error alone', () => {
+    const event = { tags: { a: 'b' } };
+    expect(tagAnnotatedEvent(event, Object.assign(new Error('x'), { code: 'c' }))).toBe(event);
+    expect(tagAnnotatedEvent(event, undefined)).toBe(event);
   });
 });

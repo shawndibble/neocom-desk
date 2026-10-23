@@ -33,13 +33,14 @@ import type {
   CorpKillsFeed,
   CorpMembersFeed,
   CorpMiningFeed,
+  CorpSovereigntyFeed,
   CorpStarbasesFeed,
   CorpWalletFeed,
 } from './corpFeeds';
 import type { CorpStockTargets } from '@/features/corp/stockTargets';
 import type { BoardDeadline } from '../nextDeadline';
 import type { WidgetStateInput } from '../state';
-import type { CalendarEventsChoice, WidgetRange } from '../layout';
+import type { CalendarEventsChoice, RaidsWhere, WidgetRange } from '../layout';
 import type { ChartModel } from '../charts/types';
 import type { SkillsQueuePanelData, WalletPanelData } from './loaders';
 import type {
@@ -50,6 +51,7 @@ import type {
   HaulingWidgetData,
   BelowMarketWidgetData,
   JumpTimersWidgetData,
+  MercenaryDensWidgetData,
   SurveyWidgetData,
   MiningYieldWidgetData,
   NetWorthWidgetData,
@@ -58,6 +60,7 @@ import type {
   KillsWidgetData,
   OmegaWidgetData,
   TradingProfitWidgetData,
+  SovRaidsWidgetData,
 } from './kindLoaders';
 
 /** The narrow slice of i18next's `t` the adapters need. */
@@ -146,6 +149,8 @@ export interface TableColumn {
    * This is a second, CSS-only way to drop a column beside `priority` and the size's budget.
    */
   hideNarrow?: boolean;
+  /** Px this column needs (header or widest typical cell, plus padding); used when the table sets `fitWidth`. Default 64. */
+  minWidth?: number;
   /**
    * On the first column: never narrower than 7rem, however many other columns are drawn.
    * Opt-in, because a floor can push a table past its widget: set it only where the first
@@ -169,6 +174,42 @@ export interface TableRowModel {
   tone?: DeadlineSeverity;
   /** Set only when the row leads somewhere narrower than the widget's own title link. */
   to?: string;
+  /**
+   * The row opens a modal with these facts instead of linking away (DESIGN §6c
+   * "Widget rows"). A row has `to` or `detail`, never both.
+   */
+  detail?: RowDetailModel;
+}
+
+/** What a widget row's modal shows: plain data, drawn by the widget shell. */
+/** The tones a `RowDetailModel` badge can take (the `Pill` tones). */
+export type DetailTone = 'neutral' | 'success' | 'warning' | 'danger';
+
+export interface RowDetailModel {
+  title: string;
+  /** A status line above the facts: a toned badge, then plain text, then an optional dim note. */
+  status?: { badge: string; tone: DetailTone; text?: string; note?: string };
+  /** Labelled facts, in reading order; each value is already formatted. */
+  facts: { label: string; value: string }[];
+  /** Bars under their own heading, each with a badge and a readout (a den's Development and Anarchy). */
+  meters?: {
+    title: string;
+    items: {
+      label: string;
+      badge: string;
+      value: number;
+      max: number;
+      readout: string;
+      note?: string;
+    }[];
+  };
+  /** A titled list, each entry a toned badge, its text and a trailing value. */
+  list?: {
+    title: string;
+    items: { key: string; badge: string; tone: DetailTone; text: string; value: string }[];
+  };
+  /** Where it is: Set destination, and the jump count as a link to Route Safety. */
+  place?: { systemId: number; name: string; jumps?: number };
 }
 
 export interface TableModel {
@@ -180,6 +221,8 @@ export interface TableModel {
    * where the caller also passes `paging`.
    */
   pageable?: boolean;
+  /** Opt in to never scrolling sideways: columns beyond what the measured box holds (by `priority`, `minWidth`) are dropped. */
+  fitWidth?: true;
   /** One quiet line under the rows ("38 of 49 slots"), when the table has a fact that is not a row. */
   footer?: string;
 }
@@ -248,6 +291,7 @@ export interface FeedMap {
   structures: StructuresBoardData;
   moonChunks: MoonChunksBoardData;
   incursions: IncursionsBoardData;
+  sovRaids: SovRaidsWidgetData;
   spExtras: SpExtras;
   journal: JournalData;
   netWorth: NetWorthWidgetData;
@@ -259,6 +303,7 @@ export interface FeedMap {
   belowMarket: BelowMarketWidgetData;
   clones: ClonesWidgetData;
   jumpTimers: JumpTimersWidgetData;
+  mercenaryDens: MercenaryDensWidgetData;
   location: LocationWidgetData;
   routeSafety: RouteSafetyWidgetData;
   kills: KillsWidgetData;
@@ -274,6 +319,7 @@ export interface FeedMap {
   corpMembers: CorpMembersFeed;
   corpMining: CorpMiningFeed;
   corpStarbases: CorpStarbasesFeed;
+  corpSovereignty: CorpSovereigntyFeed;
   corpContracts: CorpContractsFeed;
   corpOrders: CorpOrdersFeed;
   corpKills: CorpKillsFeed;
@@ -298,6 +344,10 @@ export interface BuildContext {
   plexPer30Days?: number;
   /** Which calendar events a Coming up widget lists; left out, accepted and tentative. */
   calendarEvents?: CalendarEventsChoice;
+  /** Skyhook raids: whose space it lists; left out, My alliance. */
+  raidsWhere?: RaidsWhere;
+  /** Skyhook raids Near me: the jumps radius; left out, the default. */
+  raidsRadius?: number;
   /** The Time format clock days are cut on (`useTimeZone`); left out, the machine's own. */
   zone?: DayZone;
 }

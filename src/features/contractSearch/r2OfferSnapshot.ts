@@ -5,6 +5,12 @@
  * reads the index, then only the types it uses — instead of the ~40-75 MB the
  * whole snapshot adds up to.
  *
+ * A reader that needs every type (Below market, a search naming no type) or
+ * every blueprint type (BPC Sourcing) reads the index's bundle shards instead:
+ * the same rows in a handful of big objects, where thousands of small reads
+ * took minutes. An index published before the shards existed falls back to the
+ * per-type objects.
+ *
  * Reading the objects the index names is what rules out a half-old, half-new
  * snapshot: an object's name carries its content hash, so it never changes, and
  * a newer publish names different objects.
@@ -24,12 +30,15 @@ const INDEX_STALE_AFTER_MS = 30 * 60_000;
 const READ_TIMEOUT_MS = 20_000;
 /** What the writer names an object (`functions/src/contractOfferObjects.ts`); anything else is not fetched. */
 const OBJECT_NAME = /^contract-offers\/types\/[\w.-]+\.json$/;
+const BUNDLE_NAME = /^contract-offers\/bundles\/[\w.-]+\.json$/;
 
 /** `contract-offers/index.json` as `functions/src/contractOfferObjects.ts` writes it. */
 export interface R2OfferIndex {
   lastSyncedAt: number;
   types: Record<string, { count: number; cheapest: number | null; objects: string[] }>;
   regionIds: number[];
+  /** Every row in a few shards: blueprint types apart from the rest. */
+  bundles?: { blueprints: string[]; others: string[] };
 }
 
 function isIndexEntry(value: unknown): value is R2OfferIndex['types'][string] {
@@ -44,7 +53,20 @@ function isIndexEntry(value: unknown): value is R2OfferIndex['types'][string] {
   );
 }
 
-/** The index, or `null` when it is not the shape the writer produces. */
+function parseBundles(raw: unknown): R2OfferIndex['bundles'] {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const { blueprints, others } = raw as Record<string, unknown>;
+  const valid = (names: unknown): names is string[] =>
+    Array.isArray(names) &&
+    names.every((name) => typeof name === 'string' && BUNDLE_NAME.test(name));
+  return valid(blueprints) && valid(others) ? { blueprints, others } : undefined;
+}
+
+/**
+ * The index, or `null` when it is not the shape the writer produces. Bad
+ * bundles are dropped rather than failing the index: the per-type objects
+ * still answer every read.
+ */
 export function parseR2OfferIndex(raw: unknown): R2OfferIndex | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const { lastSyncedAt, types, regionIds } = raw as Record<string, unknown>;
@@ -53,7 +75,10 @@ export function parseR2OfferIndex(raw: unknown): R2OfferIndex | null {
   const entries = Object.entries(types);
   if (!entries.every(([key, entry]) => /^\d+$/.test(key) && isIndexEntry(entry))) return null;
   if (!Array.isArray(regionIds) || !regionIds.every((id) => typeof id === 'number')) return null;
-  return { lastSyncedAt, types: types as R2OfferIndex['types'], regionIds };
+  const index: R2OfferIndex = { lastSyncedAt, types: types as R2OfferIndex['types'], regionIds };
+  const bundles = parseBundles((raw as Record<string, unknown>).bundles);
+  if (bundles) index.bundles = bundles;
+  return index;
 }
 
 /** The fields every consumer reads unguarded; a row without them would throw in a render. */
@@ -126,19 +151,19 @@ export function r2ObjectsForTypes(index: R2OfferIndex, typeIds: Iterable<number>
 }
 
 /**
- * The offers of just these types, from only the objects the index names. `null`
- * when any read fails, so the caller falls back whole rather than serving a
- * type with rows missing.
+ * The rows of these objects, in order. `null` when any read fails, so the
+ * caller falls back whole rather than serving a type with rows missing.
  */
-export async function loadR2TypeRows(
+async function readObjects(
   index: R2OfferIndex,
-  typeIds: Iterable<number>
+  wanted: readonly string[]
 ): Promise<PublicContractOfferRow[] | null> {
   const named = new Set(Object.values(index.types).flatMap((entry) => entry.objects));
+  for (const name of index.bundles?.blueprints ?? []) named.add(name);
+  for (const name of index.bundles?.others ?? []) named.add(name);
   // Objects of an older publish can never be asked for again.
   for (const name of objectMemo.keys()) if (!named.has(name)) objectMemo.delete(name);
 
-  const wanted = r2ObjectsForTypes(index, typeIds);
   const byName = new Map<string, PublicContractOfferRow[]>();
   let next = 0;
   async function worker(): Promise<void> {
@@ -156,4 +181,33 @@ export async function loadR2TypeRows(
     return null;
   }
   return wanted.flatMap((name) => byName.get(name) ?? []);
+}
+
+/** The offers of just these types, from only the objects the index names; `null` when a read failed. */
+export function loadR2TypeRows(
+  index: R2OfferIndex,
+  typeIds: Iterable<number>
+): Promise<PublicContractOfferRow[] | null> {
+  return readObjects(index, r2ObjectsForTypes(index, typeIds));
+}
+
+/** Every offer: the bundle shards when the index names them, else every type's objects. */
+export function loadR2AllRows(index: R2OfferIndex): Promise<PublicContractOfferRow[] | null> {
+  if (!index.bundles) return loadR2TypeRows(index, Object.keys(index.types).map(Number));
+  return readObjects(index, [...index.bundles.blueprints, ...index.bundles.others]);
+}
+
+/**
+ * The offers of these blueprint types: the blueprints shards narrowed to them
+ * when the index names shards, else just their own objects.
+ */
+export async function loadR2BlueprintRows(
+  index: R2OfferIndex,
+  typeIds: Iterable<number>
+): Promise<PublicContractOfferRow[] | null> {
+  if (!index.bundles) return loadR2TypeRows(index, typeIds);
+  const rows = await readObjects(index, index.bundles.blueprints);
+  if (!rows) return null;
+  const wanted = new Set(typeIds);
+  return rows.filter((row) => wanted.has(row.typeId));
 }

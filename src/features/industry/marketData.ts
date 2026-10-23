@@ -116,7 +116,7 @@ export function clearCostIndexCache(): void {
   persistedGeneration += 1;
 }
 
-async function loadSystemCostIndices(
+export async function loadSystemCostIndices(
   activity: CostIndexActivity,
   now: () => number = Date.now
 ): Promise<Map<number, number> | null> {

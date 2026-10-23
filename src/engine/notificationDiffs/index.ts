@@ -12,3 +12,6 @@ export * from './contracts';
 export * from './market';
 export * from './eveNotifications';
 export * from './corp';
+export * from './kills';
+export * from './dens';
+export * from './skyhooks';

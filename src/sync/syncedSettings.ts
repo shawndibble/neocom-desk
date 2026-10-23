@@ -338,6 +338,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.industryBuildGroups',
   'sync.industryFacilityDefaults',
   'sync.industryReactionFacilityDefaults',
+  'sync.itemContractFlagMultiple',
   'sync.loyaltyLpValue',
   'sync.marketHub',
   'sync.marketPricePercent',

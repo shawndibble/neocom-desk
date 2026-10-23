@@ -8,6 +8,9 @@ import { createFeedStore } from './data/feedStore';
 import { FeedStoreContext } from './data/feedStoreContext';
 import { Gallery } from './Gallery';
 import { boardKinds } from './kinds';
+import { NO_CORP_CAPABILITIES, type CorpCapabilities } from '@/engine/corpRoles';
+import { corpWidgetBoard } from '@/features/corp/grid/corpGrid';
+import { WidgetBoardContext, type WidgetBoard } from './board';
 
 const OVERVIEW_KINDS = boardKinds('overview');
 import { MAX_WIDGETS, type OverviewLayout, type Widget } from './layout';
@@ -30,19 +33,26 @@ const START: OverviewLayout = {
   widgets: [w('a', 'wallet'), w('b', 'training'), w('c', 'mail')],
 };
 
-function Host({ initial }: { initial: OverviewLayout }) {
+function Host({ initial, board }: { initial: OverviewLayout; board?: WidgetBoard }) {
   const [layout, setLayout] = useState(initial);
   const [open, setOpen] = useState(false);
   const store = useMemo(() => createFeedStore(), []);
+  const body = (
+    <OverviewEditProvider layout={layout} onLayoutChange={setLayout}>
+      <button type="button" onClick={() => setOpen(true)}>
+        Add widget
+      </button>
+      <Gallery open={open} onClose={() => setOpen(false)} />
+    </OverviewEditProvider>
+  );
   return (
     <MemoryRouter>
       <FeedStoreContext.Provider value={store}>
-        <OverviewEditProvider layout={layout} onLayoutChange={setLayout}>
-          <button type="button" onClick={() => setOpen(true)}>
-            Add widget
-          </button>
-          <Gallery open={open} onClose={() => setOpen(false)} />
-        </OverviewEditProvider>
+        {board ? (
+          <WidgetBoardContext.Provider value={board}>{body}</WidgetBoardContext.Provider>
+        ) : (
+          body
+        )}
       </FeedStoreContext.Provider>
     </MemoryRouter>
   );
@@ -51,12 +61,17 @@ function Host({ initial }: { initial: OverviewLayout }) {
 async function openGallery({
   initial = START,
   isPhone = false,
-}: { initial?: OverviewLayout; isPhone?: boolean } = {}) {
+  board,
+  wide = false,
+}: { initial?: OverviewLayout; isPhone?: boolean; board?: WidgetBoard; wide?: boolean } = {}) {
   phone.value = isPhone;
   const user = userEvent.setup();
-  render(<Host initial={initial} />);
+  render(<Host initial={initial} board={board} />);
   await user.click(screen.getByRole('button', { name: 'Add widget' }));
   const dialog = await screen.findByRole('dialog', { name: 'Add a widget' });
+  // A desktop opens in Browse all; most cases here are about the drawer, one Quick add away.
+  if (!isPhone && !wide)
+    await user.click(within(dialog).getByRole('button', { name: 'Quick add' }));
   return { user, dialog };
 }
 
@@ -184,7 +199,7 @@ describe('Gallery', () => {
   });
 
   it('moves focus to the search box on open, closes on Escape and gives focus back', async () => {
-    const { user } = await openGallery();
+    const { user } = await openGallery({ wide: true });
     await waitFor(() =>
       expect(screen.getByRole('searchbox', { name: 'Search widgets' })).toHaveFocus()
     );
@@ -209,5 +224,107 @@ describe('Gallery on a phone', () => {
     expect(within(dialog).getByRole('button', { name: 'Add Open orders' }).className).toContain(
       'min-h-11'
     );
+  });
+});
+
+describe('Gallery Browse all', () => {
+  const browse = (opts: Parameters<typeof openGallery>[0] = {}) =>
+    openGallery({ ...opts, wide: true });
+
+  it('opens a desktop in Browse all', async () => {
+    const { dialog } = await browse();
+    expect(dialog.className).toContain('max-w-[min(80vw,88rem)]');
+    expect(within(dialog).getByRole('button', { name: 'Quick add' })).toBeInTheDocument();
+  });
+
+  it('narrows to the drawer and widens again, keeping the search text', async () => {
+    const { user, dialog } = await openGallery();
+    expect(dialog.className).toContain('max-w-[460px]');
+    await user.type(within(dialog).getByRole('searchbox'), 'wal');
+    await user.click(within(dialog).getByRole('button', { name: 'Browse all' }));
+    const wide = screen.getByRole('dialog', { name: 'Add a widget' });
+    expect(wide.className).toContain('max-w-[min(80vw,88rem)]');
+    expect(within(wide).getByRole('searchbox')).toHaveValue('wal');
+    await user.click(within(wide).getByRole('button', { name: 'Quick add' }));
+    expect(screen.getByRole('dialog', { name: 'Add a widget' }).className).toContain(
+      'max-w-[460px]'
+    );
+  });
+
+  it('hides kinds already on the board until the filter is turned off', async () => {
+    const { user, dialog } = await browse();
+    expect(within(dialog).queryByRole('button', { name: /^Add (another )?Wallet$/ })).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Not on your board' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Not on your board' }));
+    expect(within(dialog).getByRole('button', { name: 'Add another Wallet' })).toBeInTheDocument();
+  });
+
+  it('leads with Featured and does not repeat those kinds below it', async () => {
+    const { dialog } = await browse({ initial: { version: 1, widgets: [] } });
+    const headings = within(dialog)
+      .getAllByRole('heading', { level: 3 })
+      .map((h) => h.textContent);
+    expect(headings[0]).toBe('Featured');
+    expect(within(dialog).getAllByRole('button', { name: 'Add Wallet' })).toHaveLength(1);
+  });
+
+  it('keeps the dialog open to add several widgets, and Done closes it', async () => {
+    const { user, dialog } = await browse({ initial: { version: 1, widgets: [] } });
+    await user.click(within(dialog).getByRole('button', { name: 'Add Wallet' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Add Training' }));
+    expect(screen.getByRole('dialog', { name: 'Add a widget' })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Done' }));
+    expect(screen.queryByRole('dialog', { name: 'Add a widget' })).toBeNull();
+  });
+
+  it('keeps a card in place after Add, so its Added confirmation shows', async () => {
+    const { user, dialog } = await browse({ initial: { version: 1, widgets: [] } });
+    await user.click(within(dialog).getByRole('button', { name: 'Add Wallet' }));
+    expect(within(itemOf(dialog, 'Wallet')).getByRole('status')).toHaveTextContent('Added');
+    expect(within(dialog).getByRole('button', { name: 'Add another Wallet' })).toBeInTheDocument();
+  });
+
+  it('drops the previews in the list layout', async () => {
+    const { user, dialog } = await browse({ initial: { version: 1, widgets: [] } });
+    expect(within(dialog).getAllByTestId('gallery-preview').length).toBeGreaterThan(0);
+    await user.click(within(dialog).getByRole('button', { name: 'List' }));
+    expect(within(dialog).queryByTestId('gallery-preview')).toBeNull();
+  });
+
+  it('says so when every widget is already on the board', async () => {
+    const all = {
+      version: 1 as const,
+      widgets: OVERVIEW_KINDS.map((k, i) => w(`w${i}`, k.id)),
+    };
+    const { user, dialog } = await browse({ initial: all });
+    expect(
+      within(dialog).getByText('Every widget here is already on your board')
+    ).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Show all widgets' }));
+    expect(within(dialog).getAllByRole('listitem').length).toBeGreaterThan(0);
+  });
+
+  it('offers no Browse all on a phone', async () => {
+    const { dialog } = await openGallery({ isPhone: true });
+    expect(within(dialog).queryByRole('button', { name: 'Browse all' })).toBeNull();
+  });
+
+  it('serves the Corp Board with its own categories and Featured set', async () => {
+    const caps = Object.fromEntries(
+      Object.keys(NO_CORP_CAPABILITIES).map((k) => [k, true])
+    ) as unknown as CorpCapabilities;
+    const { dialog } = await browse({
+      initial: { version: 1, widgets: [] },
+      board: corpWidgetBoard(caps),
+    });
+    const headings = within(dialog)
+      .getAllByRole('heading', { level: 3 })
+      .map((h) => h.textContent);
+    expect(headings[0]).toBe('Featured');
+    expect(headings).toContain('Structures and timers');
+    expect(within(dialog).queryByText('Wallet', { selector: 'div' })).toBeNull();
   });
 });

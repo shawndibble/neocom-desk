@@ -68,6 +68,8 @@ export interface WidgetKindDef {
   hasPlexPlan: boolean;
   /** Whether the kind lists calendar events and lets the pilot pick which (accepted and tentative, or all). */
   hasCalendarEvents: boolean;
+  /** Whether the kind has the Where setting (My alliance / Near me) and its jumps radius. */
+  hasRaidsWhere: boolean;
   /** ESI endpoints the kind needs, for the "needs permission" state. */
   endpoints: readonly EsiEndpointId[];
   emptyMessageKey: string;
@@ -92,6 +94,7 @@ interface Spec {
   range?: true;
   plexPlan?: true;
   calendarEvents?: true;
+  raidsWhere?: true;
   soon?: true;
   endpoints: readonly EsiEndpointId[];
 }
@@ -257,6 +260,18 @@ const SPECS: Record<string, Spec> = {
     size: 'M',
     endpoints: ['getCharacterPlanets'],
   },
+  mercenaryDens: {
+    category: 'planets',
+    views: NT,
+    view: 'table',
+    size: 'L',
+    endpoints: [
+      'getCharacterMercenaryDens',
+      'getCharacterMercenaryDen',
+      'getCharacterMercenaryOperations',
+      'getCharacterMercenaryOperation',
+    ],
+  },
   structures: {
     category: 'planets',
     corp: 'corpClocks',
@@ -280,6 +295,14 @@ const SPECS: Record<string, Spec> = {
     views: NT,
     view: 'table',
     size: 'S',
+    endpoints: [],
+  },
+  sovRaids: {
+    category: 'space',
+    views: NT,
+    view: 'table',
+    size: 'M',
+    raidsWhere: true,
     endpoints: [],
   },
   routeSafety: {
@@ -330,7 +353,12 @@ const SPECS: Record<string, Spec> = {
   // --- Corp Board only ----------------------------------------------------
   corpDeadlines: {
     corp: 'corpClocks',
-    capabilities: ['canReadStructures', 'canReadMoonExtractions', 'canReadIndustry'],
+    capabilities: [
+      'canReadStructures',
+      'canReadMoonExtractions',
+      'canReadIndustry',
+      'canReadSkyhooks',
+    ],
     views: NCT,
     view: 'chart',
     size: 'L',
@@ -338,6 +366,8 @@ const SPECS: Record<string, Spec> = {
       'getCorporationStructures',
       'getCorporationMiningExtractions',
       'getCorporationIndustryJobs',
+      'getCorporationSkyhooks',
+      'getCorporationSovereigntyHubs',
     ],
   },
   corpServices: {
@@ -355,6 +385,20 @@ const SPECS: Record<string, Spec> = {
     view: 'table',
     size: 'M',
     endpoints: ['getCorporationStarbases', 'getCorporationStarbase'],
+  },
+  corpSovereignty: {
+    corp: 'corpClocks',
+    capabilities: ['canReadSkyhooks'],
+    views: NCT,
+    view: 'table',
+    size: 'M',
+    endpoints: [
+      'getCorporationSkyhooks',
+      'getCorporationSkyhook',
+      'getCorporationSovereigntyHubs',
+      'getCorporationSovereigntyHub',
+      'getUniversePlanet',
+    ],
   },
   corpCustomsOffices: {
     corp: 'corpClocks',
@@ -476,6 +520,7 @@ export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(SPECS).map(
   hasRange: s.range === true,
   hasPlexPlan: s.plexPlan === true,
   hasCalendarEvents: s.calendarEvents === true,
+  hasRaidsWhere: s.raidsWhere === true,
   endpoints: s.endpoints,
   emptyMessageKey: `overview.widgets.${id}.empty`,
   availability: s.soon ? 'comingSoon' : 'available',

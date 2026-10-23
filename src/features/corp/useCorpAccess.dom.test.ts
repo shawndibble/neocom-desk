@@ -220,6 +220,7 @@ describe('useCorpAccess — roles-without-grant', () => {
       'esi-corporations.read_structures.v1',
       'esi-industry.read_corporation_mining.v1',
       'esi-contracts.read_corporation_contracts.v1',
+      'esi-structures.read_corporation.v1',
     ]);
   });
 
@@ -264,6 +265,8 @@ describe('useCorpAccess — ready', () => {
       canReadRoleAudit: true,
       canReadContracts: true,
       canReadOrders: true,
+      canReadDivisions: true,
+      canReadSkyhooks: true,
     });
   });
 

@@ -45,6 +45,8 @@ const SUMS_ACROSS = new Set([
   'tradingProfit',
   // Every Character's jobs and job slots; the builder narrows to the header Character.
   'industry',
+  // Every Character's dens; the builder narrows to the header Character.
+  'mercenaryDens',
 ]);
 
 export function kindSumsAcrossCharacters(kind: string): boolean {
@@ -53,8 +55,8 @@ export function kindSumsAcrossCharacters(kind: string): boolean {
 
 /**
  * Every widget kind: the feeds it reads and the builder that draws it. The Corp
- * overview's own kinds join through `registerKindDefs` when its route loads, so
- * their builders and copy stay out of the startup graph the Overview loads.
+ * overview's kinds and Skyhook raids join later through `registerKindDefs`, keeping
+ * their builders and copy off the Overview's startup graph.
  */
 const KINDS: Record<string, KindDef> = {
   ...ACCOUNT_DEFS,
@@ -72,7 +74,7 @@ const kindFeeds: Record<string, readonly FeedId[]> = Object.fromEntries(
 /** Kind -> the feeds it reads. A kind absent here reads no feed and draws without data. */
 export const KIND_FEEDS: Readonly<Record<string, readonly FeedId[]>> = kindFeeds;
 
-/** Adds kinds that load with their own route (the Corp Board's); idempotent. */
+/** Adds or replaces kinds that load later; idempotent. */
 export function registerKindDefs(defs: Readonly<Record<string, KindDef>>): void {
   for (const [kind, def] of Object.entries(defs)) {
     KINDS[kind] = def;

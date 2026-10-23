@@ -8,6 +8,9 @@
  * corp-scoped keys and the 403 handling are theirs, not a second copy.
  */
 import { diffRoster } from '@/engine/corp/members';
+import type { CachedResult, StatusResult } from '@/esi/cache';
+import { jumpsFromCurrent } from '@/features/route/jumpsFromCurrent';
+import { planetInfo } from './spaceLookups';
 import { summariseBay } from '@/engine/corp/starbases';
 import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -35,6 +38,12 @@ import {
   loadCorporationMemberTracking,
   toMemberActivity,
 } from '@/features/corp/members';
+import {
+  loadCorporationSkyhooks,
+  loadCorporationSovereigntyHubs,
+  loadHubDetails,
+  loadSkyhookDetails,
+} from '@/features/corp/sovereignty';
 import { loadCorporationStarbases, loadStarbaseDetails } from '@/features/corp/starbases';
 import { readPreviousRoster } from '@/features/corp/rosterState';
 import { loadObserverFeed } from '@/features/corp/taxBook/esiFeed';
@@ -47,7 +56,6 @@ import { isNpcCorporationId } from '@/esi/entityIds';
 import { DAY_MS } from '@/lib/age';
 import { fetchCorporationStatsRead } from '@/lib/zkillboard';
 import { parseInstant } from '@/engine/esiInstant';
-import type { CachedResult, StatusResult } from '@/esi/cache';
 import type {
   CorpAssetsFeed,
   CorpCustomsFeed,
@@ -58,6 +66,8 @@ import type {
   CorpKillsFeed,
   CorpMembersFeed,
   CorpMiningFeed,
+  CorpSovereigntyFeed,
+  CorpSovereigntyRow,
   CorpStarbaseRow,
   CorpStarbasesFeed,
   CorpOrdersFeed,
@@ -94,12 +104,13 @@ export async function loadCorpWallet(characterId: number): Promise<CorpWalletFee
     journalDivision: MASTER_WALLET_DIVISION,
     journal: null,
   };
-  const access = await gate(characterId, 'canReadWallet');
-  if (access === null) return empty;
-  const { corporationId } = access;
+  // Not `gate()`: this loader also needs `canReadDivisions` from the same access.
+  const resolved = await resolveCorpReadAccess(characterId);
+  if (resolved === null || !resolved.can('canReadWallet')) return empty;
+  const { corporationId } = resolved;
   const [wallets, divisions, journal] = await Promise.all([
     loadCorporationWallets(characterId, corporationId),
-    loadCorporationDivisions(characterId, corporationId),
+    loadCorporationDivisions(characterId, corporationId, resolved.can('canReadDivisions')),
     loadCorporationWalletJournal(characterId, corporationId, MASTER_WALLET_DIVISION),
   ]);
   if (wallets.cached === null) {
@@ -474,5 +485,138 @@ export async function loadCorpKills(characterId: number): Promise<CorpKillsFeed>
     corporationId,
     stats: result.kind === 'stats' ? result.stats : null,
     failed: null,
+  };
+}
+
+export async function loadCorpSovereignty(characterId: number): Promise<CorpSovereigntyFeed> {
+  const empty: CorpSovereigntyFeed = {
+    ...UNREADABLE,
+    rows: [],
+    systemNames: new Map(),
+    typeNames: new Map(),
+    prices: new Map(),
+    jumps: new Map(),
+  };
+  const access = await gate(characterId, 'canReadSkyhooks');
+  if (access === null) return empty;
+  const { corporationId } = access;
+  const [skyhooks, hubs] = await Promise.all([
+    loadCorporationSkyhooks(characterId, corporationId),
+    loadCorporationSovereigntyHubs(characterId, corporationId),
+  ]);
+  if (skyhooks.cached === null && hubs.cached === null) {
+    if (skyhooks.needsReauth || hubs.needsReauth) return { ...empty, needsReauth: true };
+    throw new CorpReadFailed('sovereignty');
+  }
+  const skyhookList = skyhooks.cached?.data.skyhooks ?? [];
+  const hubList = hubs.cached?.data.sovereignty_hubs ?? [];
+  const [skyhookDetails, hubDetails, planets] = await Promise.all([
+    loadSkyhookDetails(
+      characterId,
+      corporationId,
+      skyhookList.map((s) => s.id)
+    ),
+    loadHubDetails(
+      characterId,
+      corporationId,
+      hubList.map((h) => h.id)
+    ),
+    planetInfo([...new Set(skyhookList.map((s) => s.planet_id))]),
+  ]);
+
+  // Every detail read failing says the reads are down, not that nothing is raidable.
+  const details = [...skyhookDetails.values(), ...hubDetails.values()];
+  if (details.length > 0 && details.every((result) => result.cached === null)) {
+    if (details.some((result) => result.needsReauth)) return { ...empty, needsReauth: true };
+    throw new CorpReadFailed('sovereignty');
+  }
+
+  const rows: CorpSovereigntyRow[] = [
+    ...skyhookList.map((skyhook): CorpSovereigntyRow => {
+      const detail = skyhookDetails.get(skyhook.id)?.cached?.data;
+      const window = detail?.theft_vulnerability;
+      const planet = planets.get(skyhook.planet_id);
+      const reagents = detail?.reagents?.map((r) => ({
+        typeId: r.type_id,
+        secured: r.secured_stock,
+        unsecured: r.unsecured_stock,
+      }));
+      return {
+        key: `skyhook:${skyhook.id}`,
+        kind: 'skyhook',
+        structureId: skyhook.id,
+        systemId: planet?.systemId ?? null,
+        planetName: planet?.name ?? null,
+        windowStartMs: parseInstant(window?.start),
+        windowEndMs: parseInstant(window?.end),
+        // A non-number is unknown, never "0 at risk".
+        reagents:
+          reagents === undefined ||
+          reagents.some((r) => !Number.isFinite(r.secured) || !Number.isFinite(r.unsecured))
+            ? null
+            : reagents,
+        state: detail?.state ?? null,
+        hubBay: null,
+      };
+    }),
+    ...hubList.map((hub): CorpSovereigntyRow => {
+      const detail = hubDetails.get(hub.id)?.cached?.data;
+      const window = detail?.vulnerability_window;
+      const reagents = detail?.reagent_bay.reagents ?? [];
+      const updatedMs = parseInstant(detail?.reagent_bay.last_updated);
+      const amount = reagents.reduce((sum, r) => sum + r.amount, 0);
+      const burningPerHour = reagents.reduce((sum, r) => sum + r.burning_per_hour, 0);
+      return {
+        key: `hub:${hub.id}`,
+        kind: 'hub',
+        structureId: hub.id,
+        systemId: hub.solar_system_id,
+        planetName: null,
+        windowStartMs: parseInstant(window?.start),
+        windowEndMs: parseInstant(window?.end),
+        reagents: null,
+        state: null,
+        // An unreadable timestamp or a non-number is unknown, never "0 hours left".
+        hubBay:
+          detail === undefined ||
+          reagents.length === 0 ||
+          updatedMs === null ||
+          !Number.isFinite(amount + burningPerHour)
+            ? null
+            : { amount, burningPerHour, updatedMs },
+      };
+    }),
+  ];
+
+  const systemIds = [
+    ...new Set(rows.flatMap((row) => (row.systemId === null ? [] : [row.systemId]))),
+  ];
+  const reagentTypeIds = [
+    ...new Set(rows.flatMap((row) => row.reagents ?? []).map((r) => r.typeId)),
+  ];
+  const [systems, jumps, typeNames, prices] = await Promise.all([
+    import('@/sde/solarSystems').then((m) => m.loadSolarSystemsById()).catch(() => null),
+    jumpsFromCurrent(characterId, systemIds),
+    reagentTypeIds.length === 0
+      ? new Map<number, string>()
+      : loadTypeNames(reagentTypeIds).catch(() => new Map<number, string>()),
+    reagentTypeIds.length === 0
+      ? new Map<number, number>()
+      : getAveragePriceByType().catch(() => new Map<number, number>()),
+  ]);
+  const systemNames = new Map<number, string>();
+  for (const systemId of systemIds) {
+    const name = systems?.get(systemId)?.name;
+    if (name !== undefined) systemNames.set(systemId, name);
+  }
+  return {
+    readable: true,
+    needsReauth: false,
+    ...readAge([skyhooks, hubs, ...skyhookDetails.values(), ...hubDetails.values()]),
+    rows,
+    systemNames,
+    typeNames,
+    prices,
+    jumps,
   };
 }

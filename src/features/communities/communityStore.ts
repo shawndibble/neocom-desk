@@ -59,6 +59,11 @@ export function communityRequestsUrl(communityId: string): string {
   return `${window.location.origin}${base}/communities?community=${encodeURIComponent(communityId)}&tab=requests`;
 }
 
+/** The in-app path to one Request on a Community's board: the Requests tab with its panel open. */
+export function communityRequestPath(communityId: string, requestId: string): string {
+  return `/communities?community=${encodeURIComponent(communityId)}&tab=requests&request=${encodeURIComponent(requestId)}`;
+}
+
 export function isCommunityAdmin(community: CommunitySummary, characterId: number): boolean {
   return community.adminUid === uidForCharacter(characterId);
 }

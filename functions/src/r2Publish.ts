@@ -70,15 +70,11 @@ export async function publishOffersToR2(
   });
   await stateRef.set(result.state);
   const outcome = r2PublishOutcome(result);
-  const { uploaded, skipped, failed, remaining, indexWritten, firstError } = result;
-  (outcome.kind === 'complete' ? logInfo : logWarn)('public contract offers R2 publish', {
-    uploaded,
-    skipped,
-    failed,
-    remaining,
-    indexWritten,
-    firstError,
-  });
+  const { uploaded, skipped, failed, remaining, indexWritten, bundlesWritten, firstError } = result;
+  (outcome.kind === 'complete' && bundlesWritten ? logInfo : logWarn)(
+    'public contract offers R2 publish',
+    { uploaded, skipped, failed, remaining, indexWritten, bundlesWritten, firstError }
+  );
   return outcome;
 }
 

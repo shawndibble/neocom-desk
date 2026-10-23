@@ -2209,7 +2209,6 @@
     "tools": "Plan tools",
     "toolsActions": "Actions",
     "toolsAttributes": "Attributes",
-    "attributesCurrentNote": "Your clone's current sheet; the lenses below only re-cost the plan.",
     "attributesImpossible": "EVE reports attributes totalling {{total}}, but a character's base sheet always totals 99, so this one cannot be read. Estimates below use a default spread — check that this app can see your implants.",
     "importExport": "Import / Export",
     "export": "Export",
@@ -2230,19 +2229,37 @@
     "optimizeRemaps": "Optimize remaps",
     "optimize": "Optimize",
     "optimizeForMe": "Optimize for me",
-    "optimizeForMeItem": "Optimize for me…",
+    "optimizeForMeItem": "Optimize for me",
     "optimizeForMeHint": "Fastest order and remaps, high priority first",
-    "optimizeModeReorder": "Reorder only…",
+    "optimizeModeReorder": "Reorder only",
     "optimizeModeReorderHint": "Group similar skills by priority, no remaps",
-    "sortShortest": "Shortest first…",
+    "sortShortest": "Shortest first",
     "sortShortestTooltip": "Fastest skills first, honoring priority and prerequisites",
-    "optimizeModeRemaps": "Place remaps only…",
+    "optimizeModeRemaps": "Place remaps only",
     "optimizeModeRemapsHint": "Keep the current order, just place remaps",
-    "optimizeModeMarkers": "Use my remap markers…",
+    "optimizeModeMarkers": "Use my remap markers",
     "optimizeModeMarkersHint": "Optimize attributes at your existing remap markers",
     "optimizeModeMarkersDisabledHint": "Add a remap marker first",
     "optimizeForMeTitle": "Optimize for me",
     "optimizeForMeTotal": "Total {{before}} → {{after}}",
+    "reorderNoGain": "Nothing to gain: your order is already as fast as this sort can make it. The total stays {{total}}, so the plan is unchanged.",
+    "optimizeForMeNoGain": "Nothing to gain: your order and attributes are already as fast as the optimizer can make them. The total stays {{total}}, so the plan is unchanged.",
+    "compareView": "Plan to show",
+    "compareCurrentTab": "Current",
+    "compareOptimizedTab": "Optimized",
+    "compareCurrent": "Current · {{total}}",
+    "compareOptimized": "Optimized · {{total}}",
+    "compareMovesTo": "moves to {{position}}",
+    "compareMovedUp_one": "Moved up {{count}} place",
+    "compareMovedUp_other": "Moved up {{count}} places",
+    "compareMovedDown_one": "Moved down {{count}} place",
+    "compareMovedDown_other": "Moved down {{count}} places",
+    "compareNewMarker": "New remap marker.",
+    "compareSaves": "saves {{duration}}",
+    "compareMoved_one": "{{count}} skill moves",
+    "compareMoved_other": "{{count}} skills move",
+    "compareMarkers_one": "{{count}} remap marker added",
+    "compareMarkers_other": "{{count}} remap markers added",
     "remapSaves": "Remapping saves {{duration}}",
     "whatIfChip": {
       "label": "What-if {{lens}}",
@@ -2471,7 +2488,7 @@
       "cancel": "Cancel"
     },
     "fitGoal": {
-      "add": "Add fit goal…",
+      "add": "Add fit goal",
       "title": "Fit goal",
       "empty": "No saved fittings yet.",
       "loading": "Checking…",
@@ -2874,6 +2891,15 @@
     "time": "Time",
     "jobTime": "Main job time",
     "costIndexWithSystem": "Cost index ({{system}})",
+    "costIndexTrend": {
+      "open": "Cost index trend for {{system}} (now {{value}})",
+      "title": "{{system}} cost index, last {{days}} days",
+      "summary": "7d ago {{weekAgo}} · today {{today}}",
+      "index": "Cost index",
+      "nearby": "Cheaper systems nearby",
+      "jumps_one": "{{count}} jump",
+      "jumps_other": "{{count}} jumps"
+    },
     "costIndexTooltip": "<b>Can be slightly off:</b> ESI rounds it to 4 decimals. The build system's manufacturing activity level, which drives the job's cost-index fee. Read live from ESI for the build system named above — the trade hub sets material and product prices, never this.",
     "revenue": "Revenue",
     "salesTax": "Sales tax",
@@ -4011,7 +4037,8 @@
       "pi": "PI",
       "spReady": "SP ready",
       "alerts": "Alerts",
-      "starred": "Starred"
+      "starred": "Starred",
+      "achievement": "Title / Score"
     },
     "jobSlotCategory": {
       "manufacturing": "Mfg",
@@ -4021,7 +4048,12 @@
     "openJobsTooltip": "{{used}}/{{max}} slots used",
     "spReadyYes": "Ready",
     "extractionTotal": "Ready extractions net {{isk}} ISK across characters, {{each}} each ({{hub}}: sell injector − buy extractor, before fees)",
-    "extractionUnpriced": "Extraction net unavailable: no sell orders at {{hub}}"
+    "extractionUnpriced": "Extraction net unavailable: no sell orders at {{hub}}",
+    "achievement": {
+      "points_one": "{{points}} point",
+      "points_other": "{{points}} points",
+      "line": "{{title}} · {{points}}"
+    }
   },
   "overview": {
     "title": "Overview",
@@ -4739,6 +4771,79 @@
           "programs": "Programs"
         }
       },
+      "mercenaryDens": {
+        "title": "Mercenary dens",
+        "description": "Your dens: reinforcement, operations and Anarchy",
+        "empty": "No Mercenary Dens found.",
+        "unit_one": "den",
+        "unit_other": "dens",
+        "reinforcedUnit_one": "den reinforced",
+        "reinforcedUnit_other": "dens reinforced",
+        "reinforcedNext": "{{planet}}, out in {{duration}}",
+        "operationsUnit_one": "operation ready",
+        "operationsUnit_other": "operations ready",
+        "operationsNext": "{{planet}}, expires in {{duration}}",
+        "readyNote_one": "{{count}} operation ready",
+        "readyNote_other": "{{count}} operations ready",
+        "unnamed": "Planet #{{id}}",
+        "level": "Level {{level}}",
+        "state": {
+          "running": "Running",
+          "reinforced": "Reinforced, {{duration}}",
+          "paused": "Paused",
+          "disabled": "Disabled"
+        },
+        "operations": {
+          "none": "None",
+          "ready_one": "{{count}} ready, {{duration}}",
+          "ready_other": "{{count}} ready, {{duration}}",
+          "started": "Started, {{duration}}"
+        },
+        "col": {
+          "planet": "Planet",
+          "state": "State",
+          "operations": "Operations",
+          "anarchy": "Anarchy",
+          "infomorphs": "Infomorphs",
+          "jumps": "Jumps",
+          "character": "Character",
+          "development": "Development"
+        },
+        "deadline": {
+          "reinforced": "Den at {{planet}} leaves reinforcement",
+          "operation": "Operation at {{planet}} expires"
+        },
+        "summary_one": "{{count}} den, {{reinforced}} reinforced.",
+        "summary_other": "{{count}} dens, {{reinforced}} reinforced.",
+        "underHour": "Under 1h",
+        "unread_one": "{{count}} character could not be read.",
+        "unread_other": "{{count}} characters could not be read.",
+        "detail": {
+          "title": "{{planet}} mercenary den",
+          "state": {
+            "reinforced": "Reinforced",
+            "paused": "Paused",
+            "disabled": "Disabled",
+            "running": "Running"
+          },
+          "stateUnknown": "Unknown",
+          "comesOut": "Comes out in {{duration}}",
+          "shieldsNote": "Keys can't be taken until the den's shields repair above 50%.",
+          "disabledNote": "The character no longer has the skill to run this den.",
+          "owner": "Skyhook owner",
+          "evolution": "Evolution",
+          "amount": "{{amount}} / 100",
+          "anarchyNote": "At level 2 the den takes workforce from the skyhook. Run an operation to lower it.",
+          "operation": {
+            "available": "Available",
+            "started": "Started",
+            "done": "Done"
+          },
+          "operationName": "Tactical operation",
+          "expiresIn": "expires in {{duration}}",
+          "ended": "Ended"
+        }
+      },
       "structures": {
         "title": "Structures",
         "description": "Reinforcement timers, fuel and offline services",
@@ -4790,6 +4895,11 @@
           "influence": "Influence",
           "constellation": "Constellation"
         }
+      },
+      "sovRaids": {
+        "title": "Skyhook raids",
+        "description": "Skyhooks that can be raided now or soon, in your alliance's space or near you",
+        "empty": "No skyhook can be raided now or soon."
       },
       "routeSafety": {
         "title": "Route safety",
@@ -4964,6 +5074,57 @@
         "most": "{{name}} has {{count}}",
         "summary_one": "{{count}} structure service is offline.",
         "summary_other": "{{count}} structure services are offline across {{structures}} structures."
+      },
+      "rowDetail": {
+        "jumps_one": "{{count}} jump away",
+        "jumps_other": "{{count}} jumps away",
+        "route": "Route safety",
+        "routeLabel": "Open route safety to {{place}}"
+      },
+      "corpSovereignty": {
+        "title": "Sovereignty",
+        "description": "Skyhook theft windows and what each puts at risk",
+        "empty": "The corporation has no skyhooks.",
+        "unit_one": "skyhook raidable in 6h",
+        "unit_other": "skyhooks raidable in 6h",
+        "nextOpensIn": "{{subject}} opens in {{duration}}",
+        "nextOpenNow": "{{subject}} is open now",
+        "atRisk": "{{isk}} ISK unsecured",
+        "windowIn": "in {{duration}}",
+        "windowOpen": "Open, {{duration}} left",
+        "windowClosed": "Closed",
+        "windowOvertime": "Overtime",
+        "units_one": "{{count}} unit",
+        "units_other": "{{count}} units",
+        "nothingAtRisk": "Nothing",
+        "deadline": "Raid window opens at {{subject}}",
+        "hubDeadline": "Sov hub reagents run out at {{subject}}",
+        "col": {
+          "skyhook": "Skyhook",
+          "window": "Window opens",
+          "unsecured": "Unsecured"
+        },
+        "fact": {
+          "window": "Theft window",
+          "windowUpcoming": "opens in {{opens}} · closes in {{closes}}",
+          "state": "State",
+          "unsecured": "Unsecured",
+          "secured": "Secured"
+        },
+        "state": {
+          "Unspecified": "Unknown",
+          "ShieldVulnerable": "Shield vulnerable",
+          "ArmorReinforced": "Armor reinforced",
+          "ArmorVulnerable": "Armor vulnerable",
+          "HullReinforced": "Hull reinforced",
+          "HullVulnerable": "Hull vulnerable"
+        },
+        "chartNote": "Theft windows, next 48 hours",
+        "chartNow": "Now",
+        "chartTo": "+{{duration}}",
+        "chartSummary": "{{note}}: {{windows}}",
+        "summary_one": "{{count}} of {{total}} skyhooks is raidable.",
+        "summary_other": "{{count}} of {{total}} skyhooks are raidable."
       },
       "corpStarbases": {
         "title": "Starbases",
@@ -5376,6 +5537,17 @@
       "added": "Added",
       "noMatchHint": "Try another word, or clear the search to see every widget.",
       "clearSearch": "Clear search",
+      "browseAll": "Browse all",
+      "quickAdd": "Quick add",
+      "done": "Done",
+      "featured": "Featured",
+      "notOnBoard": "Not on your board",
+      "density": "Layout",
+      "densityGrid": "Grid",
+      "densityList": "List",
+      "allOnBoard": "Every widget here is already on your board",
+      "allOnBoardHint": "Show all widgets to add another of any of them.",
+      "showAll": "Show all widgets",
       "samples": {
         "training": {
           "note": "Advanced Industry V · 4 skills queued",
@@ -5461,6 +5633,12 @@
           "unit": "colonies run dry",
           "note": "in 2h 10m",
           "runsDry": "Extractor runs dry"
+        },
+        "mercenaryDens": {
+          "unit": "den reinforced",
+          "note": "Efa VII, out in 14h",
+          "reinforced": "Reinforced",
+          "ready": "2 ready"
         },
         "structures": {
           "unit": "low on fuel",
@@ -5558,6 +5736,13 @@
         "committed": "Accepted and tentative",
         "all": "All events"
       },
+      "where": "Where",
+      "whereChoice": {
+        "alliance": "My alliance",
+        "near": "Near me"
+      },
+      "radius": "Radius",
+      "radiusJumps": "{{count}} jumps",
       "rename": "Rename",
       "renameTitle": "Rename {{title}}",
       "renameLabel": "Name",
@@ -5826,6 +6011,12 @@
       "outside": "Another sale of this item used more units than your wallet buys, so we can't tell which stock this one used."
     },
     "marginWorking": "Cost {{unitCost}} each from your wallet buys\nSales tax {{salesTax}}",
+    "marginPercent": "Margin %",
+    "marginPercentTooltip": "Margin as a share of what the units cost you. Blank where the sale has no margin.",
+    "unitCost": "Unit cost",
+    "unitCostTooltip": "What each unit cost, averaged from the oldest wallet buys the sale used up.",
+    "location": "Location",
+    "locationFallback": "Location #{{id}}",
     "transactionsRange": "{{from}} – {{to}}",
     "tradingMargin": "Margin",
     "tradingMatched_one": "{{matched}} of {{count}} sale matched",
@@ -5879,6 +6070,14 @@
     "journalItemSold": "Sold {{quantity}} × {{unitPrice}} = {{total}}",
     "journalContractLink": "Contract",
     "journalMiningTaxLink": "Mining tax",
+    "journalInsuranceLossLink": "View loss",
+    "insuranceLoss": {
+      "title": "Insured loss",
+      "loading": "Finding the loss…",
+      "failed": "Couldn't read your losses from zKillboard. Try again later.",
+      "none": "No matching loss found on zKillboard.",
+      "noneOlder": "This payout is older than the losses zKillboard lists here."
+    },
     "journalMiningTaxReasonLink": "{{reason}} — open Mining tax row",
     "dailyGoal": "Daily goal",
     "dailyGoalIdTitle": "Goal id {{id}}",
@@ -6133,8 +6332,8 @@
       "assigned_one": "Assigned {{count}} mining entry to {{name}}.",
       "assigned_other": "Assigned {{count}} mining entries to {{name}}.",
       "willAssign": "Your ore from this moon will be assigned to {{name}} at {{pct}}% as it reaches your mining ledger.",
-      "connected": "Assigning to {{name}} until {{time}}",
-      "connectedNoLocation": "Assigning to {{name}} once the survey has a location",
+      "connected": "Auto-assigning moon tax until {{time}}",
+      "connectedNoLocation": "Auto-assigning moon tax once the survey has a location",
       "openTax": "Mining Tax",
       "stop": "Stop",
       "undo": "Undo"
@@ -6244,6 +6443,14 @@
     "reauthHint": "Log in again to fetch this character's personal mining ledger.",
     "reauthAction": "Log in again with EVE Online",
     "reauthCharacterHint": "{{character}} needs to log in again to see their mining ledger.",
+    "surveyConnections": {
+      "title": "Auto-assigning moon tax",
+      "line": "{{name}} at {{pct}}%",
+      "noLocation": "Waiting for the survey to have a location",
+      "until": "until {{time}}",
+      "overlap": "Shares ore with the survey for {{name}}. Ore both claim stays unassigned for you to assign.",
+      "stopFailed": "Couldn't stop that. Try again."
+    },
     "emptyTitle": "No mining ledger entries match this filter",
     "emptyHint": "Mine a moon and check back — ESI's personal mining ledger updates daily.",
     "managePayeesAction": "Payees",
@@ -7406,7 +7613,9 @@
       "skillTraining": "Skill queue",
       "industryJob": "Industry jobs",
       "planetExtraction": "Planets",
+      "mercenaryDen": "Mercenary dens",
       "moonChunk": "Moon chunks",
+      "skyhookRaid": "Skyhook raids",
       "contractExpiry": "Contracts",
       "orderExpiry": "Market orders",
       "skillPlan": "Skill plan"
@@ -7415,6 +7624,10 @@
       "moonChunk": {
         "arrival": "arrives",
         "decay": "decays if not fractured"
+      },
+      "skyhookRaid": {
+        "upcoming": "raid window opens",
+        "open": "raid window closes"
       },
       "industryJob": {
         "active": "in progress",
@@ -7430,7 +7643,26 @@
         "auction": "auction",
         "loan": "loan",
         "unknown": "contract"
+      },
+      "mercenaryDen": {
+        "reinforcement": "leaves reinforcement",
+        "operation": "operation expires"
       }
+    },
+    "skyhookRaid": {
+      "system": "System",
+      "unsecured": "Unsecured stock",
+      "secured": "Secured stock",
+      "windowOpens": "Window opens",
+      "windowCloses": "Window closes",
+      "state": {
+        "upcoming": "Not open yet",
+        "open": "Open now"
+      },
+      "units_one": "{{count}} unit",
+      "units_other": "{{count}} units",
+      "unknown": "Unknown",
+      "note": "ESI does not send the silo's capacity, so this is the stock a raider could take, not a fill percentage."
     },
     "filter": {
       "title": "Event types",
@@ -9021,7 +9253,11 @@
     "detailAbyssalEstimateNote": "MutaMarket's model estimate for each module's exact rolls, not a sale price.",
     "detailAbyssalWhy": "An abyssal module is worth its own rolls, so it has no market price; MutaMarket can only estimate one it can identify.",
     "statusFilterLabel": "Status",
-    "typeFilterLabel": "Contract type"
+    "typeFilterLabel": "Contract type",
+    "buyback": {
+      "cue": "Buyback: {{title}} in {{community}}",
+      "cueLabel": "Buyback contract"
+    }
   },
   "contractDetail": {
     "regionLabel": "Region",
@@ -9056,6 +9292,18 @@
     "priceCheckIncludedBelow": "Included is below Requested",
     "priceCheckIncludedLevel": "Included is level with Requested",
     "priceCheckYourSearch": "Your search",
+    "flagOverpriced": "Asks {{times}} times the {{hub}} sell price ({{unit}} each). At the hub the same {{count}} would cost about {{cost}}.",
+    "flagCopy": "Asks {{price}} for a copy with {{runs}} runs. The original sells for {{original}} in {{region}} and has unlimited runs.",
+    "flagCopyNoRuns": "Asks {{price}} for a copy. The original sells for {{original}} in {{region}} and has unlimited runs.",
+    "flagBundleShare_one": "Your search is {{share}} of this contract's value at {{hub}} {{side}}. The price pays for {{count}} other line.",
+    "flagBundleShare_other": "Your search is {{share}} of this contract's value at {{hub}} {{side}}. The price pays for {{count}} other lines.",
+    "flagBundleShareUnderOne_one": "Your search is under 1% of this contract's value at {{hub}} {{side}}. The price pays for {{count}} other line.",
+    "flagBundleShareUnderOne_other": "Your search is under 1% of this contract's value at {{hub}} {{side}}. The price pays for {{count}} other lines.",
+    "flagBundleUnpriced_one": "The price pays for {{count}} other line, and some lines have no {{hub}} price, so how it compares is unknown.",
+    "flagBundleUnpriced_other": "The price pays for {{count}} other lines, and some lines have no {{hub}} price, so how it compares is unknown.",
+    "flagThreshold": "Flagged at {{times}} times the hub sell. Change it in Settings › Market.",
+    "flagSideSell": "sell orders",
+    "flagSideBuy": "buy orders",
     "priceCheckOtherItems": "Other items",
     "priceCheckOtherItemsNote_one": "{{count}} line you did not search for",
     "priceCheckOtherItemsNote_other": "{{count}} lines you did not search for",
@@ -9091,7 +9339,9 @@
     "timelineRejected": "Rejected",
     "timelineFailed": "Failed",
     "timelineReversed": "Reversed",
-    "timelineExpired": "Expired"
+    "timelineExpired": "Expired",
+    "buyback": "Buyback · {{title}} in {{community}}",
+    "buybackDiffers": "Price differs from quote · {{quoted}} ISK quoted"
   },
   "bpcContracts": {
     "title": "BPC Sourcing",
@@ -9465,7 +9715,90 @@
       "blueprints": "Blueprints",
       "fittings": "Fittings",
       "plans": "Skill plans",
-      "requests": "Requests"
+      "requests": "Requests",
+      "payouts": "Payouts"
+    },
+    "payouts": {
+      "new": "New payout…",
+      "empty": "No payouts yet",
+      "emptyHint": "Split a fleet's loot: paste the fleet list and the loot, and each pilot gets a share to be paid.",
+      "loadFailed": "Couldn't load this Community's payouts.",
+      "tableLabel": "Fleet payouts",
+      "columns": {
+        "payout": "Payout",
+        "status": "Status",
+        "age": "Age"
+      },
+      "boss": "Boss: {{name}}",
+      "you": "You",
+      "paidOf": "{{paid}} of {{total}} paid",
+      "done": "All paid",
+      "expired": "Expired",
+      "myShare": "Your share: {{isk}} ISK",
+      "myShareLoading": "Loading your share…",
+      "myShareFailed": "Couldn't load your share.",
+      "youPaid": "Paid",
+      "youUnpaid": "Not paid yet",
+      "isk": "{{isk}} ISK",
+      "detail": {
+        "total": "Loot value",
+        "holdBack": "Held back ({{pct}}%)",
+        "rule": "Split",
+        "ruleEqual": "Equal shares",
+        "ruleWeighted": "By weight",
+        "sharesLabel": "Shares",
+        "paidToggle": "Paid: {{name}}",
+        "member": "Member",
+        "typedName": "Typed name",
+        "weight": "Weight {{weight}}",
+        "loadFailed": "Couldn't load the shares.",
+        "setFailed": "Couldn't update that share. Try again.",
+        "yourPilot": "Pilot: {{name}}",
+        "noShare": "You aren't on this payout's list.",
+        "remove": "Remove payout…",
+        "removeTitle": "Remove this payout?",
+        "removeBody": "{{name}} and all its shares are deleted for everyone. Pilots you haven't marked paid lose the record of what they're owed.",
+        "removeAction": "Remove payout"
+      },
+      "compose": {
+        "title": "New payout",
+        "name": "Name",
+        "namePlaceholder": "Tuesday Havens fleet",
+        "fleet": "Paste the fleet list (one pilot per line)",
+        "resolving": "Checking pilots…",
+        "resolveFailed": "Couldn't check the pilots against EVE. Edit the list or paste it again to retry.",
+        "nameTooLong": "A pilot name is over {{max}} characters. Paste names only, one per line.",
+        "tooManyPilots": "{{count}} pilots is over the {{max}}-pilot limit.",
+        "pilotsLabel": "Pilots",
+        "include": "Include {{name}}",
+        "member": "Member",
+        "notFound": "Typed name",
+        "notFoundHint": "EVE doesn't know this name. It is paid as typed, with no Member link.",
+        "weightOf": "{{name}} weight",
+        "loot": "Paste the loot",
+        "hub": "Price at",
+        "percent": "Price % of market",
+        "basis": "Value at",
+        "basisBuy": "Buy orders",
+        "basisSell": "Sell orders",
+        "pricing": "Pricing…",
+        "priceFailed": "Couldn't price the loot. Try again.",
+        "pricesUnreachable": "Prices are unavailable right now.",
+        "pileValue": "Loot value: {{isk}} ISK",
+        "unreadable_one": "{{count}} line wasn't read and is left out.",
+        "unreadable_other": "{{count}} lines weren't read and are left out.",
+        "rule": "Split",
+        "ruleEqual": "Equal",
+        "ruleWeighted": "Weighted",
+        "holdBack": "Hold back (%)",
+        "holdBackHint": "Kept by the boss before the split, 0 to {{max}}.",
+        "preview": "Each pilot gets",
+        "previewRow": "{{isk}} ISK",
+        "heldBack": "Held back: {{isk}} ISK",
+        "create": "Create payout",
+        "failed": "Couldn't create the payout. Try again.",
+        "tooManyOpen": "You already have the most open payouts a Member can hold here. Remove one first."
+      }
     },
     "plans": {
       "hint": "Skill Plans are shared one at a time, never all at once. Members can copy a shared plan to their own plans; it keeps your later edits up to date here.",
@@ -9681,7 +10014,8 @@
         "removePledgeTitle": "Remove {{name}}'s Pledge?",
         "removePledgeBody": "Their Pledge on this request is deleted. The request and the other Pledges stay.",
         "removePledgeAction": "Remove Pledge",
-        "unknownPledger": "Former Member"
+        "unknownPledger": "Former Member",
+        "quoteSummary": "Quote {{price}} ISK"
       },
       "pledgeStale": "No delivery in {{days}} days, so this Pledge is greyed out. Update it or withdraw it.",
       "pledgeFailed": "Couldn't save that Pledge. Try again.",
@@ -9785,6 +10119,82 @@
         "dailyCap": "Not mailed: you have used today's {{max}} Request mails.",
         "failed": "Not mailed: couldn't reach the server.",
         "needsPermission": "{{name}} asked for a mail when you Pledge. Sending it needs the Send mail Permission."
+      },
+      "buyback": {
+        "title": "New buyback",
+        "editTitle": "Edit buyback",
+        "toggle": "Standing buyback",
+        "toggleHint": "Buy items at a fixed rate. It stays open until you close it.",
+        "rate": "Rate (%)",
+        "rateInvalid": "Rate must be from 1 to 200 percent, in tenths.",
+        "basis": "Percent of the hub",
+        "basisBuy": "Buy price",
+        "basisSell": "Sell price",
+        "hub": "Trade Hub",
+        "buyer": "Contracts go to",
+        "buyerHint": "Members make the item exchange contract to this Character.",
+        "buys": "Buys",
+        "group": {
+          "ore": "All ore",
+          "ice": "All ice",
+          "minerals": "All minerals",
+          "gas": "All gas",
+          "pi": "All planetary",
+          "salvage": "All salvage"
+        },
+        "addLabel": "Add an item",
+        "addPlaceholder": "Or add a single item…",
+        "typesLabel": "Items bought",
+        "needBuy": "Pick at least one group or item.",
+        "post": "Post buyback",
+        "standing": "Standing",
+        "rateLine": "{{rate}}% of {{hub}} {{basis}}",
+        "basisWordBuy": "buy",
+        "basisWordSell": "sell",
+        "contractsTo": "Contracts to {{name}}",
+        "termsLabel": "Buyback terms",
+        "noExpiry": "Open until closed",
+        "buysLabel": "Buys",
+        "buyerUnknown": "Character {{id}}",
+        "contractStatus": {
+          "outstanding": "Outstanding",
+          "inProgress": "In progress",
+          "finished": "Finished",
+          "expired": "Expired",
+          "rejected": "Rejected"
+        },
+        "priceDiffers": "Price differs from quote · {{quoted}} ISK quoted",
+        "contractsLabel": "Your contracts for this quote",
+        "quotesLabel": "Quotes",
+        "quotesTitle": "Quotes from Members",
+        "noQuotes": "No quotes held yet.",
+        "contractNeedsPermission": "Reading contracts needs a Permission you have not granted, so this quote shows no contract status.",
+        "contractReadFailed": "Contracts could not be read, so the status shown may be old.",
+        "contractIssued": "Issued {{age}}",
+        "noContracts": "No contract to {{name}} for these items yet.",
+        "linked": "Contract {{id}}",
+        "unverified": "Not confirmed in your contracts"
+      },
+      "sellTo": {
+        "label": "Sell to this buyback",
+        "title": "Sell to {{name}}",
+        "paste": "Paste what you want to sell (an Appraisal, an inventory copy)",
+        "pasteAgain": "Paste again to replace your quote",
+        "getQuote": "Get quote",
+        "clear": "Clear quote",
+        "heldUntil": "Held until {{date}}",
+        "expired": "Expired {{date}}",
+        "nextStep": "Make an item exchange contract to {{name}} for {{price}} ISK.",
+        "linesLabel": "Items in your quote",
+        "nothing": "Nothing in that paste is bought here at a price, so there is no quote.",
+        "notBought": "Not bought here, left out: {{names}}",
+        "unpriced": "No hub price for: {{names}}. Left out.",
+        "unmatched": "Not recognised, left out: {{names}}",
+        "dropped_one": "{{count}} more item was left out: a quote holds at most 50 lines.",
+        "dropped_other": "{{count}} more items were left out: a quote holds at most 50 lines.",
+        "failed": "Couldn't get a quote. Try again.",
+        "clearFailed": "Couldn't clear the quote. Try again.",
+        "stale": "The buyback changed since you quoted, so this price may be out of date. Paste again for a current quote."
       }
     }
   },
@@ -10135,6 +10545,24 @@
         "title": "Contract expiring",
         "body": "{{character}}'s issued contract expires in under {{hours}} hours."
       },
+      "mercenaryDenReinforced": {
+        "soonTitle": "Den leaving reinforcement soon",
+        "soonBody_one": "{{character}}'s Mercenary Den on {{planet}} comes out of reinforcement in about {{count}} hour.",
+        "soonBody_other": "{{character}}'s Mercenary Den on {{planet}} comes out of reinforcement in about {{count}} hours.",
+        "outTitle": "Den out of reinforcement",
+        "outBody": "{{character}}'s Mercenary Den on {{planet}} is out of reinforcement."
+      },
+      "skyhookRaidable": {
+        "soonTitle": "Skyhook raidable soon",
+        "soonBody_one": "Your skyhook at {{planet}} becomes raidable in about {{count}} hour.",
+        "soonBody_other": "Your skyhook at {{planet}} becomes raidable in about {{count}} hours.",
+        "nowTitle": "Skyhook raidable now",
+        "nowBody": "Your skyhook at {{planet}} is raidable now."
+      },
+      "mercenaryDenAnarchy": {
+        "title": "Den anarchy rising",
+        "body": "{{character}}'s Mercenary Den on {{planet}} has reached {{amount}}% anarchy."
+      },
       "ordersLapsing": {
         "title": "Market orders lapsing",
         "body_one": "{{character}} has {{count}} market order that lapses in under {{hours}} hours.",
@@ -10149,6 +10577,14 @@
         "title_other": "Incursion {{count}} jumps away",
         "body_one": "{{constellation}}, staging in {{system}}: {{state}}, {{count}} jump from your current system.",
         "body_other": "{{constellation}}, staging in {{system}}: {{state}}, {{count}} jumps from your current system."
+      },
+      "skyhookRaidableNearby": {
+        "windowOpen": "now, for another {{duration}}",
+        "windowIn": "in {{duration}}",
+        "title_one": "Raidable skyhook {{count}} jump away",
+        "title_other": "Raidable skyhook {{count}} jumps away",
+        "body_one": "{{planet}} in {{system}} can be raided {{window}}, {{count}} jump from your current system.",
+        "body_other": "{{planet}} in {{system}} can be raided {{window}}, {{count}} jumps from your current system."
       },
       "communityJoinRequest": {
         "title": "Join request for {{community}}",
@@ -10170,6 +10606,13 @@
         "body": "{{list}}: {{listed}} of {{target}} listed.",
         "bodyHangar_one": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} is in your hangar there.",
         "bodyHangar_other": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} are in your hangar there."
+      },
+      "shipLost": {
+        "title": "Ship lost",
+        "lostShip": "Lost your {{ship}}",
+        "lostShipUnknown": "Lost a ship",
+        "inSystem": "{{lost}} in {{system}}",
+        "withValue": "{{where}} · {{value}} ISK"
       },
       "priceAlertTriggered": {
         "title": "Price alert",
@@ -11553,7 +11996,7 @@
     },
     "planets": {
       "label": "Planets",
-      "caption": "Your planetary colonies."
+      "caption": "Your planetary colonies and Mercenary Dens."
     },
     "mail": {
       "label": "Mail",
@@ -11734,13 +12177,14 @@
     "analyticsLabel": "Send page views",
     "analyticsHint": "Sends only the page name to Google Analytics. Never character, corporation or other IDs.",
     "offline": {
-      "hint": "Large reference files download when a page first needs them. Download all to work offline.",
+      "hint": "Large reference files and app pages download when first needed, or in the background on Wi-Fi. Download everything to work offline.",
       "packsLabel": "Downloaded on this device",
       "packs": {
         "itemInfo": "Item info",
         "market": "Market data",
         "planetary": "Planetary Industry data",
-        "reference": "Reference data"
+        "reference": "Reference data",
+        "appPages": "App pages"
       },
       "packLine_one": "{{name}} ({{count}} file): {{cached}} of {{total}} downloaded",
       "packLine_other": "{{name}} ({{count}} files): {{cached}} of {{total}} downloaded",
@@ -11867,7 +12311,7 @@
             "notifications": "Notifications: your notification preferences.",
             "defaults": "Defaults: trade hub, industry facility, reaction facility, assumed ME/TE, PI expiring-soon window, corp dark threshold, default characters shown.",
             "industry": "Industry: build groups and BPC Sourcing's hide auctions / hide PLEX.",
-            "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, and the structure broker fees you typed.",
+            "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, item contract flag multiple, and the structure broker fees you typed.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
             "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, how the Assign form edits ore values, and the moon surveys you connected to a payee with Manage Taxes. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
@@ -11897,6 +12341,7 @@
           "fittings": "Fittings you share: name, hull and share code. Never notes or your skills.",
           "plans": "Skill Plans you share, one at a time: name and ordered skill targets. Never milestones, implants or your trained skills.",
           "requests": "Requests you post: the items and quantities, a location, a one-line note, whether you want to hear about Pledges in the app or by mail, and your Character's name.",
+          "payouts": "Fleet Payouts you open as the boss: the name, the loot value, the split, and each pilot's name and ISK with whether you marked it paid. Pilots who are not in the Community are stored by the name you typed. A Member can read only their own line; you read all of them. Deleted 30 days after posting.",
           "pledges": "Pledges you make: quantities, what you marked delivered, and the IDs of the contracts behind it. The contract IDs and delivered amounts come from your finished contracts, read on this device and uploaded while the app is open. Nothing else about the contracts is.",
           "mail": "Mail about invites and Pledges is sent from your own Character, so its text goes to EVE and not to us. Our server records only who was mailed and when, to enforce a daily limit."
         },
@@ -12046,6 +12491,9 @@
         "newMail": "New mail",
         "planetaryExtractionDone": "Planetary extraction done",
         "planetaryExtractorExpiring": "Planetary extractor expiring",
+        "mercenaryDenReinforced": "Mercenary Den reinforced",
+        "mercenaryDenAnarchy": "Mercenary Den anarchy",
+        "skyhookRaidable": "Skyhook raidable",
         "marketOrderFilled": "Sell order filled",
         "marketOrderUndercut": "Market order undercut",
         "newCalendarEvent": "New calendar event",
@@ -12065,12 +12513,30 @@
         "corpWalletThreshold": "Corp wallet threshold",
         "stockBelowTarget": "Stock target running low",
         "incursionNearby": "Incursion nearby",
+        "skyhookRaidableNearby": "Raidable skyhook nearby",
         "communityJoinRequest": "Community join request",
         "communityMemberJoined": "Community member joined",
         "communityRequestPledged": "Pledge on your Request",
-        "priceAlertTriggered": "Quickbar price alert"
+        "priceAlertTriggered": "Quickbar price alert",
+        "shipLost": "Ship lost"
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Planetary Industry always shows the real expiry.",
+      "mercenaryDenReinforcedHint": "Scheduled up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. A den that leaves reinforcement early can still send it.",
+      "skyhookRaidableHint": "Scheduled up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Needs the Station Manager role.",
+      "skyhookRaidableLeadTimeLabel": "Warn this far before a skyhook becomes raidable:",
+      "skyhookRaidableLeadTimeOption_one": "{{count}} hour",
+      "skyhookRaidableLeadTimeOption_other": "{{count}} hours",
+      "skyhookRaidableMinUnitsLabel": "Danger alert when open with unsecured stock of at least:",
+      "skyhookRaidableMinUnitsOption_one": "{{count}} unit",
+      "skyhookRaidableMinUnitsOption_other": "{{count}} units",
+      "skyhookRaidableMinUnitsHint": "A window that opens with less than this sends a plain alert instead, and an empty silo always does. EVE sends no silo size, so this counts the unsecured units a raid would take; 1 means any stock at risk is a danger alert. The larger steps are guesses, not game values.",
+      "mercenaryDenAnarchyForegroundOnlyHint": "Fires only while the app is open: ESI offers no way to be told when anarchy rises.",
+      "mercenaryDenReinforcedLeadTimeLabel": "Warn this far before a den leaves reinforcement:",
+      "mercenaryDenReinforcedLeadTimeOption_one": "{{count}} hour",
+      "mercenaryDenReinforcedLeadTimeOption_other": "{{count}} hours",
+      "mercenaryDenAnarchyPercentLabel": "Alert when anarchy reaches:",
+      "mercenaryDenAnarchyPercentOption_one": "{{count}}%",
+      "mercenaryDenAnarchyPercentOption_other": "{{count}}%",
       "marketOrderUndercutStationOnlyHint": "Checks your order's own station only, and only while the app is open.",
       "corpGroup": "Corp notifications",
       "corpEventBestEffortHint": "Best effort: fires only while the app is open. Not a substitute for in-game alerts.",
@@ -12090,9 +12556,15 @@
       "skillQueueEndingLeadTimeLabel": "Warn this far before the skill queue runs dry:",
       "skillQueueEndingLeadTimeOption_one": "{{count}} hour",
       "skillQueueEndingLeadTimeOption_other": "{{count}} hours",
+      "shipLostMinimumIskLabel": "Minimum loss value (ISK):",
+      "shipLostMinimumIskHint": "Leave at 0 to hear about every loss. Shorthand works: 500m, 1.5b (b billion, m million, t thousand). Read from zKillboard while the app is open.",
       "incursionNearbyJumpsLabel": "Alert when an Incursion is within:",
       "incursionNearbyJumpsOption_one": "{{count}} jump",
       "incursionNearbyJumpsOption_other": "{{count}} jumps",
+      "skyhookRaidableNearbyJumpsLabel": "Alert when a raidable skyhook is within:",
+      "skyhookRaidableNearbyJumpsOption_one": "{{count}} jump",
+      "skyhookRaidableNearbyJumpsOption_other": "{{count}} jumps",
+      "skyhookRaidableNearbyRouteRulesHint": "Jumps counted from your current system with Route Safety's route rules. Fires once per skyhook per raid window, only while the app is open.",
       "incursionNearbyRouteRulesHint": "Jumps counted from your current system with Route Safety's route rules (preference, avoided systems, wormholes, jump bridges). Fires once per Incursion, only while the app is open.",
       "structureFuelLowThresholdLabel": "Warn when fuel remaining drops below:",
       "structureFuelLowThresholdOption_one": "{{count}} day",
@@ -12246,6 +12718,9 @@
     "courierCollateralLabel": "Flag courier collateral at",
     "courierCollateralHint": "Warns High collateral when a courier contract's collateral reaches this many times its reward.",
     "courierCollateralOption": "{{count}}× reward",
+    "itemContractFlagLabel": "Flag item contracts at",
+    "itemContractFlagHint": "Flags an item contract asking this many times the hub sell price on the Items board. A blueprint copy is flagged when it asks more than the original, whatever this says.",
+    "itemContractFlagOption": "{{count}}× hub sell",
     "bpcMarketHubLabel": "Market hub",
     "bpcMarketHubHint": "Where BPC Sourcing checks BPO prices and LP offers. Same as the Market default trade hub.",
     "bpcHideAuctionsLabel": "Hide auctions",
@@ -12460,7 +12935,19 @@
         "moonArrival": "Moon chunk ready to fracture",
         "moonDecay": "Moon chunk breaks up on its own",
         "jobReady": "Job finished, waiting on delivery",
-        "serviceOffline": "{{service}} is offline"
+        "serviceOffline": "{{service}} is offline",
+        "hubReagents": "Sov hub reagents run out",
+        "sovRaid": {
+          "skyhook": {
+            "upcoming": "Skyhook raid window opens",
+            "open": "Skyhook raid window closes"
+          },
+          "hub": {
+            "upcoming": "Sov hub becomes vulnerable",
+            "open": "Sov hub vulnerability ends",
+            "overtime": "Sov hub is in overtime"
+          }
+        }
       },
       "severity": {
         "critical": "Critical",
@@ -12826,6 +13313,16 @@
     "itemColumn": "Item",
     "qtyColumn": "Qty",
     "priceColumn": "Price",
+    "flag": {
+      "overpricedLabel": "Priced far above market",
+      "overpricedHint": "Asks {{times}} times the {{hub}} sell price.",
+      "copyLabel": "Copy asks more than the original",
+      "copyHint": "Asks {{times}} times what the original sells for in {{region}} ({{price}} ISK). A copy is the cheaper way in."
+    },
+    "filterHideOverpriced": "Hide overpriced",
+    "filterHideOverpricedHint": "Hides item contracts flagged as priced far above the hub: {{times}} times the hub sell for an item, or a copy asking more than its original. A contract with other lines is never flagged, so never hidden. Up to 100 different items are priced at once; a wider browse is not flagged.",
+    "overpricedHidden_one": "{{count}} overpriced contract hidden",
+    "overpricedHidden_other": "{{count}} overpriced contracts hidden",
     "regionColumn": "Region",
     "systemColumn": "System",
     "itemsJumpsColumn": "Jumps",
@@ -13080,6 +13577,49 @@
     "unconfirmed": "The connection timed out. Couldn't confirm it opened in EVE — check your client."
   },
   "travel": {
+    "sovRaids": {
+      "noAlliance": "This Character is in no alliance, so it has no space to defend.",
+      "noSov": "Your alliance holds no sovereignty, so it has no skyhooks to defend.",
+      "unit_one": "skyhook raidable in our space",
+      "unit_other": "skyhooks raidable in our space",
+      "nextOpenNow": "{{subject}} open now",
+      "nextOpensIn": "{{subject}} opens in {{duration}}",
+      "jumps_one": "{{count}} jump",
+      "jumps_other": "{{count}} jumps",
+      "routeRow": "Raidable skyhook: {{window}}, {{jumps}} along the route",
+      "windowOpen": "open, {{duration}} left",
+      "windowIn": "in {{duration}}",
+      "underCacheWindow": "under {{duration}}",
+      "staleEmpty": "As of a read {{age}}. Refresh to check again.",
+      "deadline": "Raid window opens at {{subject}}",
+      "col": {
+        "skyhook": "Skyhook",
+        "window": "Theft window",
+        "jumps": "Jumps"
+      },
+      "fact": {
+        "window": "Theft window",
+        "openNow": "open now · closes in {{closes}}",
+        "upcoming": "opens in {{opens}} · closes in {{closes}}",
+        "heldBy": "Held by"
+      },
+      "summary_one": "{{count}} skyhook in your alliance's space can be raided now or soon.",
+      "summary_other": "{{count}} skyhooks in your alliance's space can be raided now or soon.",
+      "near": {
+        "unit_one": "raidable within {{radius}} jumps",
+        "unit_other": "raidable within {{radius}} jumps",
+        "reach": "Windows reach a few hours ahead",
+        "yourAlliance": "Your alliance",
+        "beyond_one": "{{count}} more beyond {{radius}} jumps",
+        "beyond_other": "{{count}} more beyond {{radius}} jumps",
+        "none": "No raidable skyhooks within {{radius}} jumps",
+        "noneHint": "The list reaches a few hours ahead. Widen the radius or check back.",
+        "locationUnknown": "Your location is unknown",
+        "locationUnknownHint": "Jumps need your current system. Set it, or let the app read your location.",
+        "summary_one": "{{count}} raidable skyhook within {{radius}} jumps.",
+        "summary_other": "{{count}} raidable skyhooks within {{radius}} jumps."
+      }
+    },
     "zkillFailure": {
       "offline": "Couldn't reach zKillboard. Check your connection, then try again.",
       "rateLimited": "zKillboard is rate-limiting requests. Try again shortly."
@@ -15413,6 +15953,7 @@
       "externalLink": "Trailing external icon: leaves Neocom Desk",
       "hintText": "Dotted underline: has a tooltip (HintText)",
       "communityMark": "Community icon with a tooltip: another Member shared this Fitting",
+      "figureHistory": "Small dim glyph after a figure: click or tap for its history in a popover",
       "infoTooltip": "? circle: explains a term (InfoTooltip)",
       "chartPoint": "Highlighted column or dot on a chart: hover or tap reads that point (ChartHover)",
       "addPreview": "Readout under the Add panel list: hover or keyboard-focus a module row to see what adding it changes (never on touch)",
@@ -15477,6 +16018,7 @@
       "addToCalendar": "Add to Google Calendar",
       "hintText": "Truncated name",
       "hintContent": "The full name, in a tooltip.",
+      "figureHistory": "4.4%",
       "communityMark": "Shared in a Community",
       "communityMarkContent": "Shared by Bob in Pals. Last updated 1 Oct 2026.",
       "chartLast": "This week",

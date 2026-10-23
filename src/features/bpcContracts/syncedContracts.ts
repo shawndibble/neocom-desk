@@ -17,7 +17,7 @@ import {
   GLOBAL_CACHE_CHARACTER_ID,
   type CachedResult,
 } from '@/esi/cache';
-import { loadR2OfferIndex, loadR2TypeRows } from '@/features/contractSearch/r2OfferSnapshot';
+import { loadR2BlueprintRows, loadR2OfferIndex } from '@/features/contractSearch/r2OfferSnapshot';
 import { loadBlueprints } from '@/sde/loadSde';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import {
@@ -54,7 +54,8 @@ export interface PublicBpcContractsSnapshot {
 /**
  * Only the blueprint types are read, found by crossing the R2 index's listed
  * types with the SDE's blueprints, instead of every type (ADR 0019, issue
- * #3746). `null` when R2 or the SDE cannot answer: R2 is the only store (issue
+ * #3746) — from the index's blueprints bundle shards when it names them, a few
+ * reads instead of one per blueprint type. `null` when R2 or the SDE cannot answer: R2 is the only store (issue
  * #4270), so that is the panel's "unavailable" state, never a Firestore read.
  *
  * One consequence: a contract's other lines are not read, so a bundle mixing
@@ -74,7 +75,7 @@ async function fetchSnapshot(): Promise<PublicBpcContractsSnapshot | null> {
     const typeIds = Object.keys(blueprints)
       .map(Number)
       .filter((typeId) => String(typeId) in index.data.types);
-    const offers = await loadR2TypeRows(index.data, typeIds);
+    const offers = await loadR2BlueprintRows(index.data, typeIds);
     if (!offers) return null;
     return {
       rows: bpcRowsFromContractOffers(offers),
@@ -89,10 +90,13 @@ async function fetchSnapshot(): Promise<PublicBpcContractsSnapshot | null> {
 /**
  * Cache-through the same way every ESI-backed view loads (`fromCache` for
  * the offline banner, a manual refresh re-fetches) even though the live side
- * is R2, not ESI — `loadWithCache` only needs a `fetchLive`.
+ * is R2, not ESI — `loadWithCache` only needs a `fetchLive`. A lapsed copy is
+ * served while the next publish is read behind it, so a visit after the
+ * 30-minute window opens on the last snapshot instead of waiting on the read.
  */
 export function loadPublicBpcContracts(): Promise<CachedResult<PublicBpcContractsSnapshot> | null> {
   return loadWithCache(GLOBAL_CACHE_CHARACTER_ID, CACHE_KEY, fetchSnapshot, {
     staleAfterMs: SNAPSHOT_PUBLISH_INTERVAL_MS,
+    allowStaleServe: true,
   });
 }

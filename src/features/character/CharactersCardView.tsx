@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { CharacterRecord } from '@/db';
 import { CharacterCard } from '@/features/character/CharacterCard';
+import type { AchievementLookup } from '@/features/character/useCharacterAchievements';
 import { GroupSectionHeader } from '@/features/character/GroupSectionHeader';
 import type { AttentionEntry } from '@/features/character/rosterAttention';
 import type { RosterCore } from '@/features/character/rosterView';
@@ -37,6 +38,7 @@ export function CharactersCardView({
   onToggleStar,
   onMoveToGroup,
   onRemove,
+  achievements,
   onRenameGroup,
   onRemoveGroup,
   onMoveGroup,
@@ -60,6 +62,7 @@ export function CharactersCardView({
   onToggleStar: (characterId: number) => void;
   onMoveToGroup: (characterId: number, groupId: string | null) => void;
   onRemove: (characterId: number, name: string) => void;
+  achievements: AchievementLookup;
   onRenameGroup: (groupId: string, name: string) => void;
   onRemoveGroup: (groupId: string) => void;
   onMoveGroup: (index: number, direction: -1 | 1) => void;
@@ -106,6 +109,7 @@ export function CharactersCardView({
               onToggleStar={onToggleStar}
               onMoveToGroup={onMoveToGroup}
               onRemove={onRemove}
+              achievement={achievements.partsOf(characterId)}
             />
           );
         })}

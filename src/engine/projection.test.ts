@@ -8,10 +8,13 @@ import {
   projectColonies,
   projectCalendar,
   projectStructureFuel,
+  projectMercenaryDens,
+  projectSkyhookRaids,
   projectEveNotificationReinforcementExit,
   reinforcementExitStructureIds,
 } from './projection';
 import { occurrenceKey } from './occurrenceKey';
+import { diffSkyhookRaidable } from './notificationDiffs';
 import type { NotificationFire, EveNotificationEntrySnapshot } from './notificationDiffs';
 import { SHARED_NOTIFICATION_WORDING } from './notificationWording';
 import {
@@ -20,6 +23,8 @@ import {
   corpIndustryJobCopy,
   eveNotificationCopy,
   industryJobCopy,
+  mercenaryDenReinforcedCopy,
+  skyhookRaidableCopy,
   skillQueueCopy,
   structureFuelCopy,
 } from '@/features/notifications/domainCopy';
@@ -35,6 +40,8 @@ describe('projectionWording', () => {
     'planetaryExtractionDone',
     'planetaryExtractorExpiring',
     'skillQueueEnding',
+    'mercenaryDenReinforced',
+    'skyhookRaidable',
   ] as const)(
     'hedges %s, which an ordinary in-game action can falsify before it fires',
     (eventId) => {
@@ -503,6 +510,109 @@ describe('projectCalendar', () => {
       { calendarEventId: 99, startMs: T0 + 5 * HOUR_MS, response: 'accepted' as const },
     ];
     expect(projectCalendar(7, 'Kestrel', entries, calendarCopy.push, T0)).toHaveLength(1);
+  });
+});
+
+describe('projectSkyhookRaids', () => {
+  const hook = (windowStartMs: number | null, extra: object = {}) => ({
+    skyhookId: 5,
+    planetId: 40_000_001,
+    windowStartMs,
+    windowEndMs: windowStartMs === null ? null : windowStartMs + 4 * HOUR_MS,
+    unsecuredUnits: 500,
+    leadMs: 2 * HOUR_MS,
+    minUnits: 0,
+    ...extra,
+  });
+  const names = new Map([[40_000_001, 'X-7OMU IV']]);
+  const project = (entries: ReturnType<typeof hook>[], nowMs = T0) =>
+    projectSkyhookRaids(7, 'Kestrel', entries, names, skyhookRaidableCopy.push, nowMs);
+
+  it('projects a hedged warning one lead time before the window and a push at the opening', () => {
+    const rows = project([hook(T0 + 10 * HOUR_MS)]);
+    expect(rows.map((r) => r.fireAt)).toEqual([T0 + 8 * HOUR_MS, T0 + 10 * HOUR_MS]);
+    expect(new Set(rows.map((r) => r.occurrenceKey)).size).toBe(2);
+    expect(rows[1].body).toContain('X-7OMU IV');
+    expect(rows[1].body).toContain('was due');
+  });
+
+  it('keys the opening push as danger above the silo minimum and plain below it', () => {
+    const above = project([hook(T0 + 10 * HOUR_MS, { minUnits: 100 })]);
+    expect(above[1].occurrenceKey).toMatch(/:danger$/);
+    const below = project([hook(T0 + 10 * HOUR_MS, { minUnits: 1000 })]);
+    expect(below[1].occurrenceKey).toMatch(/:open$/);
+    // An unread silo is never called safe.
+    const unread = project([hook(T0 + 10 * HOUR_MS, { minUnits: 1000, unsecuredUnits: null })]);
+    expect(unread[1].occurrenceKey).toMatch(/:danger$/);
+  });
+
+  it('projects the same keys the live diff would fire with', () => {
+    const rows = project([hook(T0 + 10 * HOUR_MS)]);
+    const live = diffSkyhookRaidable(
+      7,
+      { entries: [hook(T0 + 10 * HOUR_MS)], nowMs: T0 + 9 * HOUR_MS },
+      { entries: [hook(T0 + 10 * HOUR_MS)], nowMs: T0 + 10 * HOUR_MS + 1 }
+    );
+    expect(live).toHaveLength(1);
+    expect(rows.map((r) => r.occurrenceKey)).toContain(occurrenceKey(live[0], T0));
+  });
+
+  it('projects only the opening when the warning time has passed, nothing for an open or far window', () => {
+    expect(project([hook(T0 + HOUR_MS)]).map((r) => r.fireAt)).toEqual([T0 + HOUR_MS]);
+    expect(project([hook(T0 - HOUR_MS)])).toEqual([]);
+    expect(project([hook(null)])).toEqual([]);
+    expect(project([hook(T0 + PROJECTION_HORIZON_MS + 3 * HOUR_MS)])).toEqual([]);
+  });
+});
+
+describe('projectMercenaryDens', () => {
+  const den = (reinforcedUntilMs: number | null) => ({
+    denId: 5,
+    planetId: 40_000_001,
+    reinforcedUntilMs,
+    anarchyAmount: 10,
+    anarchyLevel: 1,
+    leadMs: HOUR_MS,
+    anarchyPct: 50,
+  });
+  const names = new Map([[40_000_001, 'Efa III']]);
+  const project = (entries: ReturnType<typeof den>[], nowMs = T0) =>
+    projectMercenaryDens(7, 'Kestrel', entries, names, mercenaryDenReinforcedCopy.push, nowMs);
+
+  it('projects a hedged warning one lead time before the exit and a push at the exit', () => {
+    const rows = project([den(T0 + 10 * HOUR_MS)]);
+    expect(rows.map((r) => r.fireAt)).toEqual([T0 + 9 * HOUR_MS, T0 + 10 * HOUR_MS]);
+    expect(new Set(rows.map((r) => r.occurrenceKey)).size).toBe(2);
+    expect(rows[1].body).toContain('was due to come out of reinforcement');
+    expect(rows[1].body).toContain('Efa III');
+  });
+
+  it('projects only the exit when the warning time has already passed', () => {
+    const rows = project([den(T0 + 30 * 60_000)]);
+    expect(rows.map((r) => r.fireAt)).toEqual([T0 + 30 * 60_000]);
+  });
+
+  it('projects nothing for an unreinforced den or an exit beyond the horizon', () => {
+    expect(project([den(null)])).toEqual([]);
+    expect(project([den(T0 + PROJECTION_HORIZON_MS + 2 * HOUR_MS)])).toEqual([]);
+  });
+
+  it('keys a row like the live poll fire for the same exit', () => {
+    const [soon] = project([den(T0 + 10 * HOUR_MS)]);
+    expect(soon.occurrenceKey).toEqual(
+      occurrenceKey(
+        {
+          eventId: 'mercenaryDenReinforced',
+          characterId: 7,
+          denId: 5,
+          planetId: 40_000_001,
+          reinforcedUntilMs: T0 + 10 * HOUR_MS,
+          thresholdMs: HOUR_MS,
+          phase: 'soon',
+        },
+        T0 + 9 * HOUR_MS
+      )
+    );
   });
 });
 

@@ -35,6 +35,9 @@ import { CommunitySharedPlans } from './CommunitySharedPlans';
 import { isOpenRequest } from '@/engine/communities/requests';
 import { isContentTab, type CommunityTab, type ContentTab } from './communityTabs';
 import { RequestsTab } from './RequestsTab';
+import { FleetPayoutsTab } from './FleetPayoutsTab';
+import { useFleetPayouts } from './useFleetPayouts';
+import { fleetPayoutProgress, isExpired } from '@/engine/communities/fleetPayouts';
 import { markRequestsSeen, watchRequestsViewed } from './requestBadge';
 import { useCommunityRequests } from './useCommunityRequests';
 import { CommunityMemberList } from './CommunityMemberList';
@@ -90,6 +93,7 @@ export function CommunityDetail({
   initialTab = 'blueprints',
   initialSharing = false,
   initialPanel,
+  initialRequestId,
 }: {
   community: CommunitySummary;
   characterId: number;
@@ -105,6 +109,8 @@ export function CommunityDetail({
   initialSharing?: boolean;
   /** A Manage window to open on (`?tab=invites`, the old Invites tab's link). */
   initialPanel?: ManagePanel;
+  /** A Request to open the side panel on (`?request=`): a link from a buyback contract. */
+  initialRequestId?: string;
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -127,6 +133,12 @@ export function CommunityDetail({
   // The board is read once its tab has been opened, then kept for the tab's count.
   const [requestsOpened, setRequestsOpened] = useState(initialTab === 'requests');
   const board = useCommunityRequests(characterId, community.id, requestsOpened);
+  // Same lazy read for Payouts; its tab count is the viewer's own unfinished payouts as boss.
+  const [payoutsOpened, setPayoutsOpened] = useState(initialTab === 'payouts');
+  const fleet = useFleetPayouts(characterId, community.id, payoutsOpened);
+  const myOpenPayouts = fleet.payouts?.filter(
+    (p) => p.ownerUid === myUid && !fleetPayoutProgress(p).done && !isExpired(p, now)
+  ).length;
   const openRequests = board.requests?.filter((r) => isOpenRequest(r, now)).length;
   // Looking at the Requests tab is what makes them not new for the Communities nav badge.
   const requestsShown = tab === 'requests' && board.requests !== null;
@@ -303,6 +315,11 @@ export function CommunityDetail({
               count: openRequests,
             },
             {
+              id: 'payouts',
+              label: t('communities.tabs.payouts'),
+              count: myOpenPayouts || undefined,
+            },
+            {
               id: 'members',
               label: t('communities.members'),
               // The roster once loaded, so the tab and the header card never disagree.
@@ -315,6 +332,7 @@ export function CommunityDetail({
             // My sharing follows the content tabs; the roster has none.
             if (!isContentTab(next) && sharingOpen) closeSharing();
             if (next === 'requests') setRequestsOpened(true);
+            if (next === 'payouts') setPayoutsOpened(true);
             setTab(next);
           }}
           label={t('communities.tabs.label')}
@@ -332,6 +350,7 @@ export function CommunityDetail({
             </div>
           ) : tab === 'requests' ? (
             <RequestsTab
+              initialRequestId={initialRequestId}
               characterId={characterId}
               communityId={community.id}
               communityName={community.name}
@@ -345,6 +364,17 @@ export function CommunityDetail({
               now={now}
               onReload={board.reload}
               refreshPledges={board.refreshPledges}
+            />
+          ) : tab === 'payouts' ? (
+            <FleetPayoutsTab
+              characterId={characterId}
+              communityId={community.id}
+              myUid={myUid}
+              members={members}
+              payouts={fleet.payouts}
+              failed={fleet.failed}
+              now={now}
+              onReload={fleet.reload}
             />
           ) : (
             <Panel>

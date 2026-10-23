@@ -65,6 +65,8 @@ export default function DemoBoard() {
         setWidgets((all) => all.map((w) => (w.id === id ? { ...w, rowsPerPage } : w))),
       setPlexPer30Days: none,
       setCalendarEvents: none,
+      setRaidsWhere: none,
+      setRaidsRadius: none,
       rename: none,
       setShowOnPhone: none,
     }),

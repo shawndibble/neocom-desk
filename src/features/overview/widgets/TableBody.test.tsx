@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { TableModel } from './data/types';
@@ -125,5 +126,109 @@ describe('TableBody grow column', () => {
       </MemoryRouter>
     );
     expect(screen.getByRole('cell', { name: 'Bob' })).toHaveClass('w-full');
+  });
+});
+
+describe('TableBody row detail', () => {
+  const model: TableModel = {
+    columns: [
+      { key: 'hook', label: 'Skyhook', priority: 0 },
+      { key: 'opens', label: 'Window opens', align: 'end', priority: 1 },
+    ],
+    rows: [
+      {
+        key: 'a',
+        cells: ['X-7OMU IV', 'in 2h'],
+        detail: {
+          title: 'X-7OMU IV',
+          facts: [{ label: 'Theft window', value: 'in 2h · closes in 6h' }],
+          place: { systemId: 30000142, name: 'X-7OMU', jumps: 7 },
+        },
+      },
+    ],
+  };
+
+  it('opens the row facts in a modal, with the jumps linking to Route Safety', async () => {
+    renderTable(model);
+    const opener = screen.getByRole('button', { name: 'X-7OMU IV' });
+    expect(opener).toHaveAttribute('aria-haspopup', 'dialog');
+    await userEvent.click(opener);
+    const dialog = screen.getByRole('dialog', { name: 'X-7OMU IV' });
+    expect(dialog).toHaveTextContent('in 2h · closes in 6h');
+    expect(screen.getByRole('link', { name: /route safety to X-7OMU/i })).toHaveTextContent(
+      '7 jumps away'
+    );
+  });
+
+  it('draws the optional status line, bars and list', async () => {
+    renderTable({
+      ...model,
+      rows: [
+        {
+          ...model.rows[0],
+          detail: {
+            ...model.rows[0].detail!,
+            status: {
+              badge: 'Reinforced',
+              tone: 'danger',
+              text: 'Comes out in 14h',
+              note: 'Shields first.',
+            },
+            meters: {
+              title: 'Evolution',
+              items: [
+                { label: 'Anarchy', badge: 'Level 1', value: 62, max: 100, readout: '62 / 100' },
+              ],
+            },
+            list: {
+              title: 'Operations',
+              items: [
+                {
+                  key: 'a',
+                  badge: 'Available',
+                  tone: 'warning',
+                  text: 'Tactical operation',
+                  value: 'expires in 9h',
+                },
+              ],
+            },
+          },
+        },
+      ],
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'X-7OMU IV' }));
+    const dialog = screen.getByRole('dialog', { name: 'X-7OMU IV' });
+    expect(dialog).toHaveTextContent('Comes out in 14h');
+    expect(dialog).toHaveTextContent('Shields first.');
+    expect(screen.getByRole('progressbar', { name: 'Anarchy' })).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('expires in 9h');
+  });
+
+  it('draws no navigation caret for a row that opens a modal', () => {
+    const { container } = renderTable(model);
+    expect(container.querySelector('thead th[aria-hidden="true"]')).toBeNull();
+  });
+});
+
+describe('TableBody fitWidth', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('drops the low-priority column when the measured box is narrow', () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(private cb: ResizeObserverCallback) {}
+        observe() {
+          this.cb([{ contentRect: { width: 150 } } as ResizeObserverEntry], this as never);
+        }
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+    renderTable({ ...table, fitWidth: true });
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Change' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Done' })).not.toBeInTheDocument();
+    expect(screen.queryByText('40%')).not.toBeInTheDocument();
   });
 });

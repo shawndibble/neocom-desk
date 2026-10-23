@@ -279,6 +279,7 @@ export function Communities() {
             initialTab={initialTab}
             initialSharing={initialSharing}
             initialPanel={tabParam === INVITES_TAB_PARAM ? 'invites' : undefined}
+            initialRequestId={params.get('request') ?? undefined}
             characterId={characterId}
             onChanged={() => refresh()}
             onPatch={(patch) =>

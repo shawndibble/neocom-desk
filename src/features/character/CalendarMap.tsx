@@ -3,15 +3,16 @@
  *
  * The grid used to hold up to three event chips per cell and defer the rest to
  * a Week view. It no longer holds anything — a cell shows its date, how many
- * clocks land on it, and one dot per *kind* of clock. The detail lives in the
- * Coming Up Rail beside it, which has the width for it.
+ * clocks land on it, and one glyph per *kind* of clock, in the kind's icon and
+ * hue (shape as well as colour, DESIGN.md §7). The detail lives in the Coming
+ * Up Rail beside it, which has the width for it.
  *
- * **One dot per kind, not per item.** The dots used to be one per clock, all
- * painted the day's worst severity — so four dots repeated the count sitting
- * two inches away and a `+N` overflow was needed for busy days. Now the number
- * carries how much and the dots carry what of, which is the question the grid
- * is actually good at answering: there are only six kinds, so no cell can
- * overflow and the dots line up in the same order in every cell.
+ * **One glyph per kind, not per item.** The marks used to be one dot per clock,
+ * all painted the day's worst severity — so four dots repeated the count
+ * sitting two inches away and a `+N` overflow was needed for busy days. Now the
+ * number carries how much and the glyphs carry what of, which is the question
+ * the grid is actually good at answering: there are only ten kinds, so a cell
+ * wraps at worst and the glyphs line up in the same order in every cell.
  *
  * **Past days are drawn, hatched and captioned.** ESI's `/calendar` returns
  * events from now only and the cache replaces its row wholesale, so no past
@@ -23,7 +24,7 @@
  * is: the five other clocks on this board can be *overdue*, and an industry
  * job sitting `ready` since Tuesday buckets onto Tuesday. Hatching therefore
  * means "nothing new can land here", not "nothing is here" — which is why
- * these cells still draw their count and their dots.
+ * these cells still draw their count and their glyphs.
  */
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useTranslation } from 'react-i18next';
@@ -34,7 +35,8 @@ import { weekdayLabels, type GridDay, type WeekStart } from '@/lib/calendarGrid'
 import { cx } from '@/lib/cx';
 import { focusRingInsetClassName, interactiveClassName } from '@/components/ui/controlStyles';
 
-import { kindDotClassName } from '@/components/ui/kindTone';
+import { KIND_TEXT } from '@/components/ui/kindTone';
+import { KIND_ICON } from './calendarKindIcons';
 import { useDayLoadLabel } from './dayLoadLabel';
 
 export interface CalendarMapProps {
@@ -101,7 +103,7 @@ export function CalendarMap({
           // The hatch claims a day is *structurally incapable* of holding
           // anything — ESI returns events from now only. A past day that holds
           // a retained late-night op (`engine/character/calendarRetention.ts`)
-          // is visibly capable, so hatching it would contradict the dot inside
+          // is visibly capable, so hatching it would contradict the glyph inside
           // it. Empty past days keep the hatch, which is the case it is for.
           const isPast = dayStartMs < todayMs && load === undefined;
           const isSelected = selectedDayMs === dayStartMs;
@@ -111,7 +113,7 @@ export function CalendarMap({
               type="button"
               aria-pressed={isSelected}
               /*
-                DESIGN.md §7: colour is never the only signal. The dots carry
+                DESIGN.md §7: colour is never the only signal. The glyphs carry
                 the kinds visually and nothing else does, so the day's own name
                 lists them in words — which is also what makes the weekday
                 header row safe to hide from assistive tech.
@@ -146,10 +148,17 @@ export function CalendarMap({
                 )}
               </span>
               {load && (
-                <span className="mt-auto flex flex-wrap items-center gap-1 pt-1">
-                  {load.kinds.map((kind) => (
-                    <span key={kind} aria-hidden="true" className={kindDotClassName(kind)} />
-                  ))}
+                <span className="mt-auto flex flex-wrap items-center gap-0.5 pt-1">
+                  {load.kinds.map((kind) => {
+                    const Glyph = KIND_ICON[kind];
+                    return (
+                      <Glyph
+                        key={kind}
+                        aria-hidden="true"
+                        className={`size-3 shrink-0 ${KIND_TEXT[kind]}`}
+                      />
+                    );
+                  })}
                 </span>
               )}
             </button>

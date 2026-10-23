@@ -346,6 +346,7 @@ describe('Route safety widget', () => {
           { systemId: 1, name: 'Efa', kills: [] },
           { systemId: 2, name: 'Niarja', kills: [Date.now() - 60_000, Date.now() - 120_000] },
         ],
+        raidable: [],
         fetchedAt: new Date(),
         ...over,
       },

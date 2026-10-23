@@ -6,6 +6,7 @@ import {
   useNavigationType,
 } from 'react-router-dom';
 import * as Sentry from '@sentry/react';
+import { tagAnnotatedEvent } from './observability/reportFailure';
 import { scrubBreadcrumb, scrubEvent } from './observability/scrub';
 import { visitorTags } from './observability/visitor';
 import { onCacheMiss } from './esi/cacheMissSignal';
@@ -72,7 +73,7 @@ if (dsn) {
     tracePropagationTargets: [],
 
     // Last line of defence for the SSO handshake — see observability/scrub.ts.
-    beforeSend: scrubEvent,
+    beforeSend: (event, hint) => scrubEvent(tagAnnotatedEvent(event, hint.originalException)),
     beforeSendTransaction: scrubEvent,
     beforeBreadcrumb: scrubBreadcrumb,
   });

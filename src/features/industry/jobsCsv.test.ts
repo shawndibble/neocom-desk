@@ -49,9 +49,7 @@ describe('jobsCsvColumns', () => {
     const row = job({ blueprint_type_id: 999, runs: 42 });
     const values = Object.fromEntries(columns.map((c) => [c.header, c.value(row)]));
     expect(values['industry.csvJobBlueprintTypeId']).toBe(999);
-    expect(typeof values['industry.csvJobBlueprintTypeId']).toBe('number');
     expect(values['industry.csvJobRuns']).toBe(42);
-    expect(typeof values['industry.csvJobRuns']).toBe('number');
   });
 
   it('routes the activity column through activityI18nKey with the { id } interpolation', () => {

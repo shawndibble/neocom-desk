@@ -12,6 +12,7 @@
 import { createContext, useContext } from 'react';
 import type {
   CalendarEventsChoice,
+  RaidsWhere,
   OverviewLayout,
   WidgetRange,
   WidgetScope,
@@ -40,6 +41,8 @@ export interface OverviewEditActions {
   setRowsPerPage: (id: string, rows: RowsPerPage) => void;
   setPlexPer30Days: (id: string, plex: number) => void;
   setCalendarEvents: (id: string, choice: CalendarEventsChoice) => void;
+  setRaidsWhere: (id: string, where: RaidsWhere) => void;
+  setRaidsRadius: (id: string, radius: number) => void;
   rename: (id: string, title: string) => void;
   setShowOnPhone: (id: string, show: boolean) => void;
 }
@@ -80,6 +83,8 @@ export const OverviewEditContext = createContext<OverviewEdit>({
   setRowsPerPage: none,
   setPlexPer30Days: none,
   setCalendarEvents: none,
+  setRaidsWhere: none,
+  setRaidsRadius: none,
   rename: none,
   setShowOnPhone: none,
 });

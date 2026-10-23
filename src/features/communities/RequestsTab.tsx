@@ -1,3 +1,4 @@
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantMissingLink } from '@/app/GrantMissingLink';
@@ -14,7 +15,9 @@ import {
   type DataTableColumn,
   NeedsConnection,
 } from '@/components/ui';
+import { db } from '@/db';
 import { permissionsForEndpoints } from '@/esi/registry';
+import { uidForCharacter } from '@/sync/uid';
 import {
   filterRequests,
   isOpenRequest,
@@ -35,7 +38,14 @@ import { ComposeRequestDialog } from './ComposeRequestDialog';
 import { MyPledgesPanel } from './MyPledgesPanel';
 import { PledgeBar } from './PledgeBar';
 import { RequestPanel } from './RequestPanel';
-import { STATUS_TONE, formatLeft, formatShortAge } from './requestFormat';
+import type { BuyerOption } from './BuybackFields';
+import {
+  STATUS_TONE,
+  formatLeft,
+  formatShortAge,
+  requestHeadline,
+  standingRateLine,
+} from './requestFormat';
 import { LOCATION_ENDPOINTS, useRequestDistance } from './useRequestDistance';
 import { useSharedBlueprintTypes } from './useSharedBlueprintTypes';
 
@@ -71,6 +81,7 @@ const STATUS_ORDER: Record<RequestStatus, number> = {
  * free text, a place off the stargate map) are left out and counted.
  */
 export function RequestsTab({
+  initialRequestId,
   characterId,
   communityId,
   communityName,
@@ -85,6 +96,8 @@ export function RequestsTab({
   onReload,
   refreshPledges,
 }: {
+  /** A Request to open the panel on at first: the link a buyback contract carries. */
+  initialRequestId?: string;
   characterId: number;
   communityId: string;
   communityName: string;
@@ -109,13 +122,30 @@ export function RequestsTab({
   const distanceNoteId = useId();
   const [filter, setFilter] = useState<RequestFilter>('open');
   const [query, setQuery] = useState('');
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(initialRequestId ?? null);
+  // A link to a Request (`?request=`) opens its panel, also when the board is already showing.
+  const [seenRequestId, setSeenRequestId] = useState(initialRequestId);
+  if (initialRequestId !== seenRequestId) {
+    setSeenRequestId(initialRequestId);
+    if (initialRequestId) setOpenId(initialRequestId);
+  }
   const [composing, setComposing] = useState(false);
   const [pledgesOpen, setPledgesOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [jumps, setJumps] = useState<JumpRange>('any');
   const currentSystem = useCurrentSystem();
   const maxJumps = jumpRangeLimit(jumps);
+  // Who a buyback's contracts may go to: this device's Characters that are in the Community.
+  const localCharacters = useLiveQuery(() => db.characters.toArray(), []);
+  const buyers = useMemo<BuyerOption[]>(
+    () =>
+      (localCharacters ?? [])
+        .filter(
+          (c) => c.characterId === characterId || memberNames.has(uidForCharacter(c.characterId))
+        )
+        .map((c) => ({ characterId: c.characterId, name: c.name })),
+    [localCharacters, memberNames, characterId]
+  );
   const shared = useSharedBlueprintTypes(characterId, communityId, myUid, requests !== null);
   const sharedItems = shared.status === 'ready' ? shared.items : undefined;
   const distance = useRequestDistance(characterId, currentSystem, maxJumps !== null);
@@ -162,10 +192,7 @@ export function RequestsTab({
       render: ({ request, mine }) => (
         <span className="block min-w-0">
           <span className="block truncate font-medium text-accent">
-            {request.lines[0].name}
-            {request.lines.length > 1
-              ? ` ${t('communities.board.more', { count: request.lines.length - 1 })}`
-              : ''}
+            {requestHeadline(request, t)}
           </span>
           <span className="block truncate text-text-dim">
             {[mine ? t('communities.board.you') : request.ownerName, request.location]
@@ -174,7 +201,7 @@ export function RequestsTab({
           </span>
         </span>
       ),
-      sortValue: ({ request }) => request.lines[0].name.toLowerCase(),
+      sortValue: ({ request }) => requestHeadline(request, t).toLowerCase(),
     },
     {
       id: 'terms',
@@ -186,14 +213,17 @@ export function RequestsTab({
       id: 'progress',
       header: t('communities.board.columns.progress'),
       className: 'whitespace-nowrap',
-      render: ({ progress, request }) => (
-        <PledgeBar
-          needed={request.lines.length}
-          pledged={progress.pledgedLines}
-          delivered={progress.deliveredLines}
-          unit="lines"
-        />
-      ),
+      render: ({ progress, request }) =>
+        request.standing ? (
+          <span className="tabular-nums">{standingRateLine(request.standing, t)}</span>
+        ) : (
+          <PledgeBar
+            needed={request.lines.length}
+            pledged={progress.pledgedLines}
+            delivered={progress.deliveredLines}
+            unit="lines"
+          />
+        ),
     },
     {
       id: 'status',
@@ -208,7 +238,11 @@ export function RequestsTab({
       align: 'right',
       className: 'whitespace-nowrap text-text-dim',
       render: ({ request }) =>
-        `${formatShortAge(now - request.createdAt, t)} · ${formatLeft(request.expiresAt, now, t)}`,
+        `${formatShortAge(now - request.createdAt, t)} · ${
+          request.standing
+            ? t('communities.board.buyback.standing')
+            : formatLeft(request.expiresAt, now, t)
+        }`,
       sortValue: ({ request }) => request.createdAt,
     },
   ];
@@ -238,6 +272,7 @@ export function RequestsTab({
     <ComposeRequestDialog
       characterId={characterId}
       communityId={communityId}
+      buyers={buyers}
       onClose={() => setComposing(false)}
       onPosted={() => {
         setFilter('mine');
@@ -251,7 +286,12 @@ export function RequestsTab({
     <ComposeRequestDialog
       characterId={characterId}
       communityId={communityId}
-      editing={{ request: editing, linesLocked: (pledges.get(editing.id) ?? []).length > 0 }}
+      buyers={buyers}
+      editing={{
+        request: editing,
+        // A standing Request's Pledges are quotes, which never pin its buy list.
+        linesLocked: !editing.standing && (pledges.get(editing.id) ?? []).length > 0,
+      }}
       onClose={() => setEditingId(null)}
       onPosted={onReload}
     />

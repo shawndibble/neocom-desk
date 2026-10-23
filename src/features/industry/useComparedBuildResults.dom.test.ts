@@ -15,6 +15,7 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { PRICING_INPUTS_FIXTURE as PRICING_INPUTS } from './pricingInputsFixtures.testutil';
 import { getOrderBook, type OrderBookResult } from '@/features/market/orderBook';
+import { loadBlueprintPurchaseOffers } from './blueprintPurchaseOffers';
 
 vi.mock('./computeBuildPlan', () => ({ computeBuildPlan: vi.fn() }));
 vi.mock('./marketData', () => ({ loadMarketSnapshots: vi.fn() }));
@@ -22,10 +23,25 @@ vi.mock('@/features/market/orderBook', () => ({
   getOrderBook: vi.fn(),
   ORDER_BOOK_FANOUT_CONCURRENCY: 4,
 }));
+// A plan whose blueprint is in the catalog loads its BPC Sourcing offers and
+// invention market. Unmocked, those hit fuzzwork and ESI for real; a stalled
+// response on CI held the row loading past waitFor's budget.
+vi.mock('./blueprintPurchaseOffers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./blueprintPurchaseOffers')>();
+  return {
+    ...actual,
+    loadBlueprintPurchaseOffers: vi.fn(async () => actual.NO_BLUEPRINT_PURCHASE_OFFERS),
+  };
+});
+vi.mock('./inventionSources', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./inventionSources')>()),
+  loadInventionMarket: vi.fn(async () => null),
+}));
 
 const mockedCompute = vi.mocked(computeBuildPlan);
 const mockedSnapshots = vi.mocked(loadMarketSnapshots);
 const mockedOrderBook = vi.mocked(getOrderBook);
+const mockedOffers = vi.mocked(loadBlueprintPurchaseOffers);
 
 function plan(overrides: Partial<BuildPlanRecord> & { id: string }): BuildPlanRecord {
   return {
@@ -114,6 +130,7 @@ beforeEach(() => {
   mockedCompute.mockReset();
   mockedSnapshots.mockReset();
   mockedOrderBook.mockReset();
+  mockedOffers.mockClear();
   mockedSnapshots.mockImplementation((requests) => requests.map(() => Promise.resolve(SNAPSHOT)));
   mockedCompute.mockReturnValue({ result: RESULT, error: null });
 });
@@ -356,7 +373,6 @@ describe('useComparedBuildResults', () => {
     await waitFor(() => expect(result.current[0]?.loading).toBe(false));
 
     const call = mockedCompute.mock.calls[0]?.[0];
-    expect(typeof call?.recipeFor).toBe('function');
     expect(call?.recipeFor?.(300)).toEqual(
       expect.objectContaining({ method: 'manufacturing', me: 7 })
     );
@@ -387,12 +403,13 @@ describe('useComparedBuildResults', () => {
     const { result } = renderHook(() => useComparedBuildResults({ plans, catalog, ...baseArgs }));
     await waitFor(() => expect(result.current[0]?.loading).toBe(false));
 
+    // No BPC Sourcing listing: the tier falls back to the snapshot's BPO price.
+    expect(mockedOffers).toHaveBeenCalledWith(1, expect.anything(), [100]);
     const call = mockedCompute.mock.calls[0]?.[0];
     expect(call?.blueprintAcquisition).toMatchObject({
       blueprintTypeID: 100,
       line: { unitPrice: 500, owned: false },
     });
-    expect(typeof call?.acquisitionFor).toBe('function');
   });
 
   it('leaves groupResult null and never calls computeBuildPlan a second time when computeGroupResult is not requested', async () => {

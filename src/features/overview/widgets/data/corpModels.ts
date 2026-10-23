@@ -9,6 +9,7 @@ import { corpAssets } from './corpAssetsModels';
 import { corpContracts } from './corpContractsModels';
 import { corpOrders } from './corpOrdersModels';
 import { corpDeadlines, corpJobs, corpServices } from './corpClockModels';
+import { corpSovereignty } from './corpSovereigntyModels';
 import { corpStarbases } from './corpStarbaseModels';
 import { corpCustomsOffices } from './corpCustomsModels';
 import { corpRoleAudit } from './corpRoleAuditModels';
@@ -18,11 +19,12 @@ import { corpInactive, corpMembers, corpMining } from './corpPeopleModels';
 
 export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
   corpDeadlines: {
-    feeds: ['structures', 'moonChunks', 'corpJobs', 'corpStarbases'],
+    feeds: ['structures', 'moonChunks', 'corpJobs', 'corpStarbases', 'corpSovereignty'],
     build: corpDeadlines,
   },
   corpServices: { feeds: ['structures'], build: corpServices },
   corpStarbases: { feeds: ['corpStarbases'], build: corpStarbases },
+  corpSovereignty: { feeds: ['corpSovereignty'], build: corpSovereignty },
   corpJobs: { feeds: ['corpJobs'], build: corpJobs },
   corpCustomsOffices: { feeds: ['corpCustoms'], build: corpCustomsOffices },
   corpRoleAudit: { feeds: ['corpRoleAudit'], build: corpRoleAudit },

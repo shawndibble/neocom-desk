@@ -85,6 +85,33 @@ describe('fetchAggregates', () => {
     expect(result.size).toBe(450);
   });
 
+  it('keeps a few batches in flight at once, never more than four', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, async ({ request }) => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        const types = new URL(request.url).searchParams.get('types')!.split(',');
+        return HttpResponse.json(
+          Object.fromEntries(
+            types.map((id) => [id, { buy: { max: id, orderCount: '1' }, sell: {} }])
+          )
+        );
+      })
+    );
+
+    const typeIds = Array.from({ length: 1500 }, (_, i) => i + 1);
+    const result = await fetchAggregates(60003760, typeIds);
+
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(4);
+    expect([...result.keys()]).toEqual(typeIds);
+    expect(result.get(1234)?.buyMax).toBe(1234);
+  });
+
   it('returns an empty map without any request when typeIds is empty', async () => {
     let requests = 0;
     server.use(

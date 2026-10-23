@@ -29,6 +29,7 @@ vi.mock('@/features/corp/assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/corp/assets')>()),
   loadCorporationAssets: vi.fn(),
   loadCorpAssetLabels: vi.fn(),
+  resolveMissingLocationNames: vi.fn(),
 }));
 // Show info's modal fetches the type's dogma/market data; a stub that names
 // its item is all the name-button tests need to see it opened.
@@ -246,6 +247,7 @@ beforeEach(() => {
       [EMPTY_OFFICE, 'Amarr VIII - Emperor Family Academy'],
     ]),
   });
+  mocked.resolveMissingLocationNames.mockResolvedValue(new Map());
   mockedAccess.mockReturnValue(accessOf('ready', { canReadAssets: true }));
 });
 
@@ -585,5 +587,30 @@ describe('row actions', () => {
         { typeId: 35, name: 'Pyerite' },
       ]);
     });
+  });
+
+  it('paints the ledger before place names resolve, then fills them in', async () => {
+    mocked.loadCorpAssetLabels.mockResolvedValue({
+      types: new Map([
+        [34, 'Tritanium'],
+        [35, 'Pyerite'],
+        [587, 'Rifter'],
+        [691, 'Rifter Blueprint'],
+        [27, 'Office'],
+      ]),
+      locations: new Map(),
+    });
+    let resolvePlaces: (names: Map<number, string>) => void = () => {};
+    mocked.resolveMissingLocationNames.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePlaces = resolve;
+      })
+    );
+
+    await ledger('/corp/assets?group=location');
+    expect(screen.queryByText('Jita IV - Moon 4')).not.toBeInTheDocument();
+
+    resolvePlaces(new Map([[OFFICE, 'Jita IV - Moon 4']]));
+    expect(await screen.findByText('Jita IV - Moon 4')).toBeInTheDocument();
   });
 });

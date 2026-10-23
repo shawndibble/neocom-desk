@@ -280,9 +280,11 @@ describe('the real en.json against the real sources', () => {
     }
   });
 
+  // Overview widget copy can never leave the shell (the Overview is a startup root), so each
+  // new Overview kind spends this budget.
   it('moves most of the locale out of the shell', () => {
     const shellBytes = JSON.stringify(plan.shell).length;
-    expect(shellBytes / JSON.stringify(en).length).toBeLessThan(0.3);
+    expect(shellBytes / JSON.stringify(en).length).toBeLessThan(0.305);
   });
 
   it('keeps the Corp Board widget builders, and so their copy, out of the startup graph', () => {

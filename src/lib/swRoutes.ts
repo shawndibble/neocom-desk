@@ -26,6 +26,25 @@ export function isVersionedSdeData(
   );
 }
 
+/**
+ * A hashed script or stylesheet under `<base>assets/`: a build chunk. The name
+ * carries a content hash, so cache-first is always right. The boot chunks are
+ * precached and answered before this route is reached.
+ */
+export function isLazyChunk(
+  url: URL,
+  requestMode: RequestMode,
+  selfOrigin: string,
+  baseUrl: string
+): boolean {
+  return (
+    requestMode !== 'navigate' &&
+    url.origin === selfOrigin &&
+    url.pathname.startsWith(`${baseUrl}assets/`) &&
+    /\.(js|css)$/.test(url.pathname)
+  );
+}
+
 /** A type's icon, render or blueprint art on the EVE image server. */
 export function isEveTypeImage(url: URL): boolean {
   return url.origin === EVE_IMAGE_ORIGIN && url.pathname.startsWith('/types/');
@@ -42,7 +61,9 @@ export function isEvePortraitImage(url: URL): boolean {
  * An object of an R2 contract snapshot (ADR 0019): a per-type offers object or
  * the courier rows object. Its name carries its
  * content hash, so the bytes behind a URL never change. The sibling `index.json`
- * is deliberately not matched: it changes every publish.
+ * is deliberately not matched: it changes every publish. Nor are the offers
+ * bundle shards: ~1 MB each and replaced nearly every publish, they would crowd
+ * this cache, and the browser's HTTP cache already keeps them (`immutable`).
  */
 export function isContractSnapshotObject(url: URL): boolean {
   return (

@@ -448,3 +448,94 @@ describe('PublicContractDetailModal — system row', () => {
     });
   });
 });
+
+describe('PublicContractDetailModal — flag sentences (#4773)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    configureClipboard(null);
+    loadContractLocationName.mockResolvedValue('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
+  });
+
+  it('words an overpriced flag with the multiple, the unit price, what the hub would cost, and where to change it', async () => {
+    showItems([item({ record_id: 1, quantity: 2 })]);
+    renderModal(null, {
+      askingIsk: 20_000_000_000,
+      flag: { kind: 'overpriced', multiple: 10, hubSell: 1_000_000_000, quantity: 2 },
+      flagMultiple: 10,
+    });
+
+    expect(
+      await screen.findByText(
+        'Asks 10 times the Jita sell price (1,000,000,000 ISK each). At the hub the same 2 would cost about 2,000,000,000 ISK.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Flagged at 10 times the hub sell. Change it in Settings › Market.')
+    ).toBeInTheDocument();
+  });
+
+  it('words a copy above its original, and does not name a threshold it ignores', async () => {
+    showItems([item({ record_id: 1, is_blueprint_copy: true, runs: 5 })]);
+    renderModal(null, {
+      askingIsk: 9_400_000,
+      flag: { kind: 'copy-above-original', original: 6_800_000, asking: 9_400_000, runs: 5 },
+      flagMultiple: 10,
+    });
+
+    expect(
+      await screen.findByText(
+        'Asks 9,400,000 ISK for a copy with 5 runs. The original sells for 6,800,000 ISK in The Forge and has unlimited runs.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Flagged at/)).not.toBeInTheDocument();
+  });
+
+  it('says a searched line is a small share of a padded bundle, which only this panel can say', async () => {
+    showItems([
+      item({ record_id: 1, quantity: 1 }),
+      item({ record_id: 2, type_id: 40519, quantity: 100 }),
+    ]);
+    renderModal(null, { askingIsk: 11_000_000_000, searchedTypeIds: new Set([40520]) });
+
+    expect(
+      await screen.findByText(
+        "Your search is 9% of this contract's value at Jita sell orders. The price pays for 1 other line."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('says how little it can tell when the other lines have no hub price', async () => {
+    showItems([
+      item({ record_id: 1, quantity: 1 }),
+      item({ record_id: 2, type_id: 99999, quantity: 3 }),
+    ]);
+    renderModal(null, { askingIsk: 11_000_000_000, searchedTypeIds: new Set([40520]) });
+
+    expect(
+      await screen.findByText(
+        'The price pays for 1 other line, and some lines have no Jita price, so how it compares is unknown.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Your search is/)).not.toBeInTheDocument();
+  });
+
+  it('stays silent when the searched line is most of the contract', async () => {
+    showItems([
+      item({ record_id: 1, quantity: 100 }),
+      item({ record_id: 2, type_id: 40519, quantity: 1 }),
+    ]);
+    renderModal(null, { askingIsk: 11_000_000_000, searchedTypeIds: new Set([40520]) });
+
+    await screen.findByText('1 line you did not search for');
+    expect(screen.queryByText(/Your search is/)).not.toBeInTheDocument();
+  });
+
+  it('says nothing about a plain contract with no flag', async () => {
+    showItems([item({ record_id: 1, quantity: 5 })]);
+    renderModal(null, { askingIsk: 4_500_000_000 });
+
+    await screen.findByText('5,000,000,000 ISK');
+    expect(screen.queryByText(/Asks \d/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Your search is/)).not.toBeInTheDocument();
+  });
+});

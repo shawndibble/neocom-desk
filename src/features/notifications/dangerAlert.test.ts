@@ -32,6 +32,29 @@ describe('isDangerEntry', () => {
     expect(isDangerEntry(attack('a', 1))).toBe(true);
     expect(isDangerEntry(mail('m', 1))).toBe(false);
     expect(isDangerEntry(entry('f', 'structureFuelLow', 1))).toBe(false);
+    // A reinforced den is the one critical personal event (issue #4782); its anarchy is a warning.
+    expect(isDangerEntry(entry('d', 'mercenaryDenReinforced', 1))).toBe(true);
+    expect(isDangerEntry(entry('a', 'mercenaryDenAnarchy', 1))).toBe(false);
+  });
+
+  it('reads a skyhook raid as danger only from its :danger Occurrence Key (issue #4784)', () => {
+    const key = (phase: string) => `1:skyhookRaidable:5:1000:${phase}`;
+    expect(isDangerEntry(entry(key('danger'), 'skyhookRaidable', 1))).toBe(true);
+    expect(isDangerEntry(entry(key('open'), 'skyhookRaidable', 1))).toBe(false);
+    expect(isDangerEntry(entry(key('soon'), 'skyhookRaidable', 1))).toBe(false);
+  });
+
+  it('shows the danger skyhook entry in the banner and the group wears its worst severity', () => {
+    const rows = [
+      entry('1:skyhookRaidable:5:1000:soon', 'skyhookRaidable', 1),
+      entry('1:skyhookRaidable:5:1000:danger', 'skyhookRaidable', 2),
+    ];
+    expect(selectDangerBanner(rows)?.id).toBe('1:skyhookRaidable:5:1000:danger');
+    expect(groupAlertsByType(rows)[0].severity).toBe('critical');
+    expect(groupAlertsByType([rows[0]])[0].severity).toBe('warning');
+    expect(markAllReadTargets(rows).map((row) => row.id)).toEqual([
+      '1:skyhookRaidable:5:1000:soon',
+    ]);
   });
 });
 

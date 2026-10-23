@@ -6,12 +6,18 @@ import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { db } from '@/db';
 import { TransactionsPanel } from './TransactionsPanel';
+import {
+  DEFAULT_VISIBLE_TRANSACTIONS_COLUMNS,
+  TRANSACTIONS_COLUMN_IDS,
+  useVisibleTransactionsColumns,
+} from './transactionsColumns';
 import { WithPageHeaderSlots } from './__fixtures__/pageHeaderSlots';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import { loadWalletJournal, loadWalletTransactionsWithStatus } from '@/features/character/wallet';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadAllCharactersJournals } from '@/features/character/walletJournalAll';
 import * as download from '@/lib/download';
+import { usePlaceDetails } from '@/features/places';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 
 vi.mock('@/features/character/wallet', () => ({
@@ -21,6 +27,11 @@ vi.mock('@/features/character/wallet', () => ({
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn() }));
 vi.mock('@/features/character/walletJournalAll', () => ({ loadAllCharactersJournals: vi.fn() }));
+
+vi.mock('@/features/places', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/places')>()),
+  usePlaceDetails: vi.fn(() => new Map()),
+}));
 
 const mockedLoadTransactions = vi.mocked(loadWalletTransactionsWithStatus);
 const mockedLoadJournal = vi.mocked(loadWalletJournal);
@@ -78,6 +89,7 @@ function renderPanel(url = '/market/history') {
 beforeEach(() => {
   vi.clearAllMocks();
   useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
+  useVisibleTransactionsColumns.setState({ value: DEFAULT_VISIBLE_TRANSACTIONS_COLUMNS });
   mockedTypeNames.mockResolvedValue(TYPE_NAMES);
   mockedLoadJournal.mockResolvedValue(null);
 });
@@ -305,6 +317,11 @@ describe('TransactionsPanel — desktop filter and totals', () => {
 });
 
 describe('TransactionsPanel — margin', () => {
+  // Margin is off by default; these tests are about what it says once ticked.
+  beforeEach(() => {
+    useVisibleTransactionsColumns.setState({ value: TRANSACTIONS_COLUMN_IDS });
+  });
+
   const BUY = transaction({
     transaction_id: 1,
     journal_ref_id: 11,
@@ -367,6 +384,17 @@ describe('TransactionsPanel — margin', () => {
     renderPanel();
     const row = await screen.findByRole('row', { name: /Damage Control II.*Sell/ });
     expect(marginCell(row)).toHaveTextContent('No sales tax line found');
+  });
+
+  it('shows Margin % and Unit cost off the same working as the margin', async () => {
+    load([taxFor(2, -49_766.4), taxFor(3, -100)]);
+    renderPanel();
+    const row = await screen.findByRole('row', { name: /Damage Control II.*Sell/ });
+    // 132,633.6 over 3 × 400,000
+    expect(row.querySelector('td[data-label="Margin %"]')).toHaveTextContent('11.1%');
+    expect(row.querySelector('td[data-label="Unit cost"]')).toHaveTextContent('400,000');
+    const noBuy = await screen.findByRole('row', { name: /Tritanium/ });
+    expect(noBuy.querySelector('td[data-label="Margin %"]')).toHaveTextContent('—');
   });
 
   it('totals the sales without a margin under the figures', async () => {
@@ -455,7 +483,7 @@ describe('TransactionsPanel — phone', () => {
     });
   }
 
-  it('stays a plain table with a Sold / Bought / Net strip, shedding side and margin (date is the default sort: it stays)', async () => {
+  it('stays a plain table with a Sold / Bought / Net strip, shedding side (date is the default sort: it stays)', async () => {
     load([
       transaction({ transaction_id: 1, date: '2026-09-20T13:27:00Z' }),
       transaction({
@@ -471,11 +499,12 @@ describe('TransactionsPanel — phone', () => {
     expect(await screen.findAllByRole('link', { name: 'Damage Control II' })).toHaveLength(2);
     expect(screen.getByRole('table')).toBeInTheDocument();
     const row = screen.getAllByRole('row')[1];
-    expect(row.querySelector('td[data-label="Side"]')).toHaveClass('max-sm:hidden');
+    // Side starts unticked on a phone, so it isn't rendered at all.
+    expect(row.querySelector('td[data-label="Side"]')).toBeNull();
     expect(row.querySelector('td[data-label="Date"]')).not.toHaveClass('max-sm:hidden');
     // Date over time: the date and the time are separate block spans below `sm`.
     expect(row.querySelectorAll('td[data-label="Date"] span.max-sm\\:block')).toHaveLength(2);
-    expect(row.querySelector('td[data-label="Margin"]')).toHaveClass('max-sm:hidden');
+    expect(row.querySelector('td[data-label="Margin"]')).toBeNull();
     expect(row.querySelector('td[data-label="Total"]')).not.toHaveClass('max-sm:hidden');
     const summary = screen.getByRole('region', { name: 'Totals for the transactions shown' });
     expect(within(summary).getByText('+1,382,400')).toBeInTheDocument();
@@ -508,5 +537,59 @@ describe('TransactionsPanel — phone', () => {
     expect(row).toHaveAttribute('data-row-key', '7');
     expect(row).toHaveClass('row-pulse');
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+});
+
+describe('TransactionsPanel — column picker', () => {
+  it('opens without Margin, and ticking it in the Columns menu shows it', async () => {
+    mockTransactions({
+      data: [transaction()],
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+    });
+    renderPanel();
+
+    await screen.findByRole('link', { name: 'Damage Control II' });
+    expect(screen.queryByRole('columnheader', { name: /Margin/ })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Margin' }));
+    await userEvent.keyboard('{Escape}');
+
+    expect(await screen.findByRole('columnheader', { name: /Margin/ })).toBeInTheDocument();
+  });
+});
+
+describe('TransactionsPanel — location column', () => {
+  it('stays off until ticked, then names the place and falls back to its id', async () => {
+    mockTransactions({
+      data: [transaction({ location_id: 60003760 })],
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+    });
+    vi.mocked(usePlaceDetails).mockImplementation((refs) =>
+      refs.length > 0
+        ? new Map([
+            [
+              '1:60003760',
+              { name: 'Jita IV - Moon 4', systemId: null, security: null, jumps: undefined },
+            ],
+          ])
+        : new Map()
+    );
+    renderPanel();
+
+    await screen.findByRole('link', { name: 'Damage Control II' });
+    expect(screen.queryByText('Jita IV - Moon 4')).not.toBeInTheDocument();
+    // Nothing is asked for while the column is off.
+    expect(vi.mocked(usePlaceDetails).mock.calls.every(([refs]) => refs.length === 0)).toBe(true);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Location' }));
+    await userEvent.keyboard('{Escape}');
+
+    expect(await screen.findByRole('link', { name: 'Jita IV - Moon 4' })).toBeInTheDocument();
   });
 });

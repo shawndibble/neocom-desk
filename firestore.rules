@@ -760,19 +760,69 @@ service cloud.firestore {
               && (!('48' in changed) || !('48' in lines) || (48 < n && pledgeEntryOk(lines['48'])))
               && (!('49' in changed) || !('49' in lines) || (49 < n && pledgeEntryOk(lines['49'])))));
           }
+          // A Quote on a standing buyback Request (issue #4780): the Member's priced
+          // pile, held 14 days. Only the scalars and the line count are bound here;
+          // the lines are display-only (the 1000-expression budget has no room to
+          // walk them), and no price, issuer or item ever reaches the buyer except
+          // what the Member typed into their own document.
+          function pledgeLinkOk(e) {
+            return e is map && e.keys().hasOnly(['contractId', 'status'])
+              && e.contractId is int && e.contractId > 0
+              && e.status in ['outstanding', 'inProgress', 'finished', 'expired', 'rejected'];
+          }
+          // Rules cannot loop: the five links the quote may hold, unrolled.
+          function pledgeLinksOk(links) {
+            return (links.size() <= 0 || pledgeLinkOk(links[0]))
+              && (links.size() <= 1 || pledgeLinkOk(links[1]))
+              && (links.size() <= 2 || pledgeLinkOk(links[2]))
+              && (links.size() <= 3 || pledgeLinkOk(links[3]))
+              && (links.size() <= 4 || pledgeLinkOk(links[4]));
+          }
+          function pledgeQuoteOk() {
+            let q = request.resource.data.quote;
+            let now = request.time.toMillis();
+            // The seller's client rewrites its own quote to add contract links days later:
+            // an unchanged `quotedAt` keeps its place, a new one must be about now.
+            let before = resource == null ? null : resource.data.get('quote', null);
+            // Only the links may change under an old date: new lines, a new total or a new rate
+            // under a date from days ago would read as held while it is not.
+            let keepsDate = before != null
+              && before.get('quotedAt', null) == q.quotedAt
+              && before.get('expiresAt', null) == q.expiresAt
+              && before.get('total', null) == q.total
+              && before.get('lines', null) == q.lines
+              && before.get('rate', null) == q.get('rate', null)
+              && before.get('rateBasis', null) == q.get('rateBasis', null)
+              && before.get('hubId', null) == q.get('hubId', null);
+            return q is map
+              && q.keys().hasOnly(['lines', 'total', 'quotedAt', 'expiresAt', 'rate', 'rateBasis', 'hubId', 'links'])
+              && (!('links' in q) || (q.links is list && q.links.size() <= 5 && pledgeLinksOk(q.links)))
+              && (!('rate' in q) || (q.rate is number && q.rate >= 1 && q.rate <= 200))
+              && (!('rateBasis' in q) || q.rateBasis in ['buy', 'sell'])
+              && (!('hubId' in q) || q.hubId in ['jita', 'amarr', 'dodixie', 'rens', 'hek'])
+              && q.lines is list && q.lines.size() >= 1 && q.lines.size() <= 50
+              && q.total is int && q.total >= 0 && q.total <= 1000000000000000
+              && q.quotedAt is int && q.expiresAt is int
+              && q.expiresAt == q.quotedAt + 1209600000
+              && (keepsDate || (q.quotedAt >= now - 86400000 && q.quotedAt <= now + 86400000));
+          }
           function pledgeWritable() {
             let r = pledgeRequest();
+            let standing = r.get('standing', false) == true;
             return isMember()
               && request.auth.uid == pledgeUid
               && r.ownerUid != request.auth.uid
               && r.closed == false
-              && r.expiresAt > request.time.toMillis()
-              && request.resource.data.keys().hasOnly(['ownerHash', 'communityId', 'lines', 'updatedAt'])
+              && (standing || r.expiresAt > request.time.toMillis())
+              && request.resource.data.keys().hasOnly(['ownerHash', 'communityId', 'lines', 'quote', 'updatedAt'])
               && request.resource.data.ownerHash == request.auth.token.ownerHash
               && request.resource.data.communityId == communityId
               && request.resource.data.lines is map
-              && request.resource.data.lines.size() >= 1
               && request.resource.data.lines.size() <= 50
+              // A standing Request takes a Quote and no line Pledges; an ordinary one the reverse.
+              && (standing
+                ? (request.resource.data.lines.size() == 0 && 'quote' in request.resource.data && pledgeQuoteOk())
+                : (request.resource.data.lines.size() >= 1 && !('quote' in request.resource.data)))
               && request.resource.data.updatedAt == request.time
               && pledgeLinesOk();
           }
@@ -786,6 +836,25 @@ service cloud.firestore {
         // bookkeeping, never read or written by a client.
         match /pledgeMails/{pledgerUid} {
           allow read, write: if false;
+        }
+      }
+
+      // Fleet Payouts (issue #4779): a Member's loot split, read by the whole
+      // Community (the boss's Payouts list finds "mine" through `memberUids`).
+      // Written only by the callables (open cap, Member linking), never by a
+      // client. Its Shares are private: the boss lists them all; any other
+      // Member reads only the Share carrying their own uid, so their query
+      // must filter `memberUid == uid`.
+      match /fleetPayouts/{payoutId} {
+        allow get, list: if isMember();
+        allow write: if false;
+
+        match /shares/{shareId} {
+          allow get, list: if isMember()
+            && (get(/databases/$(database)/documents/communities/$(communityId)/fleetPayouts/$(payoutId)).data.ownerUid
+                == request.auth.uid
+              || resource.data.memberUid == request.auth.uid);
+          allow write: if false;
         }
       }
 

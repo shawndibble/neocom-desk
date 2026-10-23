@@ -3,7 +3,7 @@
  * it: which entries are danger, what the bell badge says, what "Mark all read"
  * may touch, and which chip a notification type sits under.
  *
- * Danger is `alertSeverity(...) === 'critical'` (`alertGroups.ts`) — the one
+ * Danger is `entrySeverity(...) === 'critical'` (`alertGroups.ts`) — the one
  * judgement of consequence the app already makes, reused rather than restated.
  * Acknowledging a danger Alert is dismissing its feed entries, so there is no
  * "acknowledged" state here: an undismissed danger entry is an unacknowledged
@@ -12,12 +12,13 @@
  * Pure: no fetch/DOM/Dexie, no clock.
  */
 import type { NotificationFeedRecord } from '@/db';
-import { alertGroupKey, alertSeverity, type AlertTypeGroup } from './alertGroups';
-import { entryChannelTarget } from './feedSelection';
+import { alertGroupKey, entrySeverity, type AlertTypeGroup } from './alertGroups';
 import { notificationUrlFor } from './notificationOptions';
 
-export function isDangerEntry(entry: Pick<NotificationFeedRecord, 'eventId' | 'eveType'>): boolean {
-  return alertSeverity(entryChannelTarget(entry)) === 'critical';
+export function isDangerEntry(
+  entry: Pick<NotificationFeedRecord, 'eventId' | 'eveType'> & { id?: string }
+): boolean {
+  return entrySeverity(entry) === 'critical';
 }
 
 const live = (entries: readonly NotificationFeedRecord[]) =>
@@ -80,10 +81,13 @@ const EVENT_CHIP: Readonly<Record<string, TopicChip>> = {
   corpIndustryJobReady: 'industry',
   planetaryExtractionDone: 'industry',
   planetaryExtractorExpiring: 'industry',
+  mercenaryDenReinforced: 'industry',
+  mercenaryDenAnarchy: 'industry',
   newMail: 'mail',
   newCalendarEvent: 'mail',
   calendarEventStarting: 'mail',
   structureFuelLow: 'structures',
+  skyhookRaidable: 'structures',
   skillLevelComplete: 'skills',
   characterNotTraining: 'skills',
   skillQueueEnding: 'skills',

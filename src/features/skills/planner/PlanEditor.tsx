@@ -735,6 +735,8 @@ export function PlanEditor({
     implants: effectiveImplants,
     cloneState,
     onUpdate,
+    pricing,
+    loadedAtMs,
   });
 
   // #112: merge "Your entries" and the computed queue into one row list —
@@ -1286,7 +1288,6 @@ export function PlanEditor({
       hint: t('plans.optimizeForMeHint'),
       disabled: scheduled.length === 0,
       onSelect: handleOptimizeForMe,
-      emphasize: true,
     },
     {
       key: 'reorder',
@@ -1368,6 +1369,11 @@ export function PlanEditor({
               label: t('plans.addMarker'),
               onClick: handleAddMarker,
             })}
+            {toolAction({
+              icon: <Icon.Ships size={Icon.ICON_SIZE.sm} />,
+              label: t('plans.fitGoal.add'),
+              onClick: () => setFitGoalOpen(true),
+            })}
             {markerConfirm && confirmation(t('plans.markerAdded'))}
             {/* Standing, not a post-click toast: the moment the plan carries
                 a Remap Marker, what it saves is a fact about the plan, and
@@ -1433,12 +1439,8 @@ export function PlanEditor({
             implantBonuses={implants}
             boosterBonus={acceleratorBonusOf(attributeBaseline)}
             dense
+            short
           />
-          {/* Says which half of this section is fact. An earlier draft read
-              "every estimate on this page is costed against these", which is
-              false the moment the lens leaves "current" — the estimates are
-              costed against the lens, not against the chips. */}
-          <p className="text-[0.6875rem] text-text-dim">{t('plans.attributesCurrentNote')}</p>
           {/* An impossible sheet is reported, never quietly approximated: the
               scheduler below is running on the placeholder spread, and a
               number presented without that caveat is the bug this fixes. */}
@@ -1695,11 +1697,6 @@ export function PlanEditor({
           {/* Plan Milestones (GLOSSARY.md) whose entry was removed from the plan
             entirely — no row exists to flag any more, so they surface here
             instead of vanishing silently. */}
-          <div>
-            <Button size="sm" onClick={() => setFitGoalOpen(true)}>
-              {t('plans.fitGoal.add')}
-            </Button>
-          </div>
           {orphanedMilestones.length > 0 && (
             <div className="flex flex-wrap gap-2 text-xs">
               {orphanedMilestones.map((status) => (
@@ -1975,38 +1972,36 @@ export function PlanEditor({
         </div>
       </Modal>
 
-      <Modal
-        open={reorderPreview !== null}
-        onClose={() => setReorderPreview(null)}
-        title={t(
-          reorderPreview?.kind === 'shortest'
-            ? 'plans.sortShortestPreviewTitle'
-            : 'plans.reorderPreviewTitle'
-        )}
-      >
-        <ul className="max-h-56 overflow-y-auto text-xs">
-          {reorderPreview?.steps.map((step, i) => (
-            <li
-              key={`${step.skillTypeID}-${step.level}-${i}`}
-              className="border-b border-line py-1 last:border-b-0"
-            >
-              {nameFor(step.skillTypeID)} {romanLevel(step.level)}
-            </li>
-          ))}
-        </ul>
-        <div className="mt-2 flex gap-2">
-          <Button variant="primary" size="sm" onClick={acceptReorder}>
-            {t('plans.reorderAccept')}
-          </Button>
-          <Button size="sm" onClick={() => setReorderPreview(null)}>
-            {t('plans.reorderReject')}
-          </Button>
-        </div>
-      </Modal>
+      <OptimizeForMeModal
+        kind={reorderPreview?.kind}
+        preview={
+          reorderPreview
+            ? {
+                order: reorderPreview.order,
+                remaps: {
+                  segments: [],
+                  totalSeconds: reorderPreview.totalSeconds,
+                  currentSeconds: reorderPreview.totalSeconds,
+                  savingsSeconds: 0,
+                },
+              }
+            : null
+        }
+        currentOrder={scheduled}
+        totalSeconds={totalSeconds}
+        prioritized={[...priorityMap.values()].some((priority) => priority !== 'normal')}
+        nameFor={nameFor}
+        stepLabel={stepLabel}
+        implants={effectiveImplants}
+        onAccept={acceptReorder}
+        onReject={() => setReorderPreview(null)}
+      />
 
       <OptimizeForMeModal
         preview={optimizeForMePreview}
+        currentOrder={scheduled}
         totalSeconds={totalSeconds}
+        prioritized={[...priorityMap.values()].some((priority) => priority !== 'normal')}
         nameFor={nameFor}
         stepLabel={stepLabel}
         implants={effectiveImplants}

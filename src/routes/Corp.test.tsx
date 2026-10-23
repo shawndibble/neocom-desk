@@ -371,6 +371,8 @@ describe('the layout', () => {
     await user.click(await screen.findByRole('button', { name: 'Add widget' }));
 
     const gallery = await screen.findByRole('dialog', { name: 'Add a widget' });
+    // It opens in Browse all, which hides what is already on the board.
+    await user.click(within(gallery).getByRole('button', { name: 'Not on your board' }));
     expect(within(gallery).getByText('Inactive members')).toBeInTheDocument();
     // Coming soon, listed for everyone.
     expect(within(gallery).getByText('Corp kills')).toBeInTheDocument();
@@ -402,6 +404,8 @@ describe('the layout', () => {
     await user.click(screen.getByRole('button', { name: 'Customize' }));
     await user.click(await screen.findByRole('button', { name: 'Add widget' }));
     const gallery = await screen.findByRole('dialog', { name: 'Add a widget' });
+    // It opens in Browse all, which hides what is already on the board.
+    await user.click(within(gallery).getByRole('button', { name: 'Not on your board' }));
     await user.click(within(gallery).getByRole('button', { name: 'Add another Members' }));
     // The edit shows at once (the Gallery's own preview aside), though nothing is written yet.
     const onPage = screen

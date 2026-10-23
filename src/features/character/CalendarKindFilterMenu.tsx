@@ -33,14 +33,20 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from '@/components/ui';
 import { DropdownMenuTrigger } from '@/components/ui';
 import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { CHARACTER_BOARD_ITEM_KINDS, type CharacterBoardItemKind } from '@/engine/character/board';
 import { KIND_LABEL } from './calendarKindLabels';
-import { kindDotClassName } from '@/components/ui/kindTone';
+import { KIND_TEXT } from '@/components/ui/kindTone';
+import { KIND_ICON } from './calendarKindIcons';
 import type { SkillPlanChoice } from './calendarSkillPlan';
 
 export interface CalendarKindFilterMenuProps {
@@ -64,6 +70,11 @@ export interface CalendarKindFilterMenuProps {
   skillPlanError: string | null;
   /** Picks a plan, or null to stop projecting one. */
   onChooseSkillPlan: (planId: string | null) => void;
+}
+
+function KindGlyph({ kind }: { kind: CharacterBoardItemKind }) {
+  const Glyph = KIND_ICON[kind];
+  return <Glyph aria-hidden="true" className={`size-4 shrink-0 ${KIND_TEXT[kind]}`} />;
 }
 
 export function CalendarKindFilterMenu({
@@ -100,6 +111,19 @@ export function CalendarKindFilterMenu({
     return counts.get(kind) ?? 0;
   }
 
+  /**
+   * A kind with nothing coming up is not worth a row. Three cases stay: one
+   * the pilot hid (the row is how they turn it back on — their choice is
+   * remembered, so it must stay reachable), one that could not be read or
+   * needs a scope (the row says why, and absence would hide that), and the
+   * Skill plan row while no plan is chosen.
+   */
+  function hasRow(kind: CharacterBoardItemKind) {
+    if ((kind === 'moonChunk' || kind === 'skyhookRaid') && !readable.has(kind)) return false;
+    if (hiddenSet.has(kind) || needsReauth.has(kind) || !readable.has(kind)) return true;
+    return (counts.get(kind) ?? 0) > 0;
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -116,9 +140,10 @@ export function CalendarKindFilterMenu({
       <DropdownMenuContent align="end" className="min-w-56">
         <p className={cx(eyebrowClassName, 'px-2 py-1.5')}>{t('calendar.filter.title')}</p>
         {CHARACTER_BOARD_ITEM_KINDS.filter(
-          // A source the Character was never allowed to ask about gets no row,
-          // rather than an "Unavailable" hinting at corp access they lack.
-          (kind) => kind !== 'moonChunk' || readable.has(kind)
+          // A moon-chunk source the Character was never allowed to ask about
+          // gets no row, rather than an "Unavailable" hinting at corp access
+          // they lack. Kinds with nothing due also drop out: see `hasRow`.
+          hasRow
         ).map((kind) => (
           <DropdownMenuCheckboxItem
             key={kind}
@@ -129,12 +154,12 @@ export function CalendarKindFilterMenu({
             onCheckedChange={() => onToggle(kind)}
           >
             {/*
-              The swatch makes this menu the legend for the six hues the rail,
-              the map and the ticker paint — the one place a pilot can learn
-              that mint means Planets. Decorative only: the label it sits
-              beside already says the same thing (DESIGN.md §5, §7).
+              The glyph in its hue makes this menu the legend for the icons and
+              colours the rail, the map and the ticker draw — the one place a
+              pilot learns that a mint planet means Planets. Decorative only:
+              the label beside it already says the same thing (DESIGN.md §5, §7).
             */}
-            <span aria-hidden="true" className={`shrink-0 ${kindDotClassName(kind)}`} />
+            <KindGlyph kind={kind} />
             <span className="flex-1">{t(KIND_LABEL[kind])}</span>
             <span className="ml-2 text-[0.6875rem] text-text-dim tabular-nums">
               {countLabel(kind)}
@@ -142,25 +167,35 @@ export function CalendarKindFilterMenu({
           </DropdownMenuCheckboxItem>
         ))}
         <DropdownMenuSeparator />
-        <p className={cx(eyebrowClassName, 'px-2 py-1.5')}>{t('calendar.skillPlan.title')}</p>
-        {skillPlanChoices.length === 0 ? (
-          <p className="px-2 py-1.5 text-xs text-text-dim">{t('calendar.skillPlan.none')}</p>
-        ) : (
-          skillPlanChoices.map((plan) => (
-            <DropdownMenuCheckboxItem
-              key={plan.id}
-              checked={plan.id === chosenSkillPlanId}
-              onSelect={(event) => event.preventDefault()}
-              // Picking the chosen plan again stops projecting it; picking any
-              // other replaces it — one plan per Character.
-              onCheckedChange={() =>
-                onChooseSkillPlan(plan.id === chosenSkillPlanId ? null : plan.id)
-              }
-            >
-              <span className="flex-1 truncate">{plan.name}</span>
-            </DropdownMenuCheckboxItem>
-          ))
-        )}
+        {/* One plan per Character, so a radio group in a submenu rather than a
+            section of its own in the kinds list. Picking the chosen plan again
+            stops projecting it (see `onValueChange`'s empty-string case). */}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>{t('calendar.skillPlan.title')}</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {skillPlanChoices.length === 0 ? (
+              <p className="px-2 py-1.5 text-xs text-text-dim">{t('calendar.skillPlan.none')}</p>
+            ) : (
+              <DropdownMenuRadioGroup
+                value={chosenSkillPlanId ?? ''}
+                onValueChange={(id) => onChooseSkillPlan(id === '' ? null : id)}
+              >
+                {skillPlanChoices.map((plan) => (
+                  <DropdownMenuRadioItem
+                    key={plan.id}
+                    value={plan.id}
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      if (plan.id === chosenSkillPlanId) onChooseSkillPlan(null);
+                    }}
+                  >
+                    <span className="flex-1 truncate">{plan.name}</span>
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            )}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         {skillPlanError !== null && (
           <p className="px-2 py-1.5 text-xs text-text-dim">
             {t('calendar.skillPlan.errorReason', { reason: skillPlanError })}

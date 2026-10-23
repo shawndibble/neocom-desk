@@ -18,6 +18,7 @@ import {
   type RequestPledge,
 } from '@/engine/communities/requests';
 import { formatAge } from '@/lib/age';
+import { formatIsk } from '@/lib/isk';
 import { itemsSummary, mailSubject } from '@/engine/communities/requestMail';
 import { mailSafe } from '@/lib/mailSafe';
 import { characterIdForUid } from '@/sync/uid';
@@ -25,7 +26,10 @@ import { communityRequestsUrl } from './communityStore';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { MessageRequesterButton } from './MessageRequesterButton';
 import { PledgeRow } from './PledgeRow';
+import { BuyerQuotes } from './BuyerQuotes';
+import { SellToSection } from './SellToSection';
 import { callableErrorReason } from './callableError';
+import { buyerOf } from './quoteLinks';
 import {
   buildPledgeMail,
   pledgeMailDeps,
@@ -36,7 +40,8 @@ import { MAX_REQUEST_MAILS_PER_DAY } from '@/engine/communities/requests';
 import { notePledgeEdit } from './pledgeWrites';
 import { DELIVERY_ENDPOINTS, slotKey } from './requestDelivery';
 import { useDeliverySync } from './useDeliverySync';
-import { describeExpiry } from './requestFormat';
+import { buybackLineKey } from '@/engine/communities/buyback';
+import { buyLineLabel, describeExpiry, requestHeadline, standingRateLine } from './requestFormat';
 import {
   extendRequest,
   removePledge,
@@ -134,7 +139,8 @@ export function RequestPanel({
   }, [request.id, refreshPledges, t]);
 
   const myPledge = pledges.find((p) => p.uid === myUid);
-  const mayPledge = canPledge(request, myUid, now);
+  // A buyback is sold to, not pledged on: Sell to arrives with the quote.
+  const mayPledge = !request.standing && canPledge(request, myUid, now);
   const lacksContracts = useCharacterLacksEndpoints(characterId, DELIVERY_ENDPOINTS);
   const lacksSendMail = useCharacterLacksEndpoints(characterId, SEND_MAIL);
   const wantsMail = mayPledge && request.notify.mail;
@@ -217,19 +223,33 @@ export function RequestPanel({
   };
 
   const requesterId = mine ? null : characterIdForUid(request.ownerUid);
-  const items = itemsSummary(
-    request.lines.map((line) => line.name),
-    (count) => t('communities.board.more', { count })
-  );
+  const items = request.standing
+    ? requestHeadline(request, t)
+    : itemsSummary(
+        request.lines.map((line) => line.name),
+        (count) => t('communities.board.more', { count })
+      );
+  const buyerId = request.standing?.buyerCharacterId ?? null;
+  // The Character the contracts go to, and so who reads the Quotes' contracts.
+  const contractBuyerId = buyerOf(request);
+  const isBuyerView = request.standing !== undefined && (mine || contractBuyerId === characterId);
+  // A buyer is a Member, so the roster names them; never fall back to the requester, who is not who the contract goes to.
+  const buyerName =
+    buyerId === null
+      ? request.ownerName
+      : (memberNames.get(`char:${buyerId}`) ??
+        t('communities.board.buyback.buyerUnknown', { id: buyerId }));
 
   const place = request.location;
   const posted = t('communities.board.posted', { age: formatAge(now - request.createdAt, t) });
   const closes = request.closed
     ? t('communities.board.closedNote')
-    : describeExpiry(request.expiresAt, now, t, {
-        underDay: 'communities.board.closesUnderDay',
-        days: 'communities.board.closesIn',
-      });
+    : request.standing
+      ? t('communities.board.buyback.noExpiry')
+      : describeExpiry(request.expiresAt, now, t, {
+          underDay: 'communities.board.closesUnderDay',
+          days: 'communities.board.closesIn',
+        });
 
   return (
     <SlideOver
@@ -249,43 +269,87 @@ export function RequestPanel({
             {request.terms}
           </p>
         )}
-        <ul className="divide-y divide-line" aria-label={t('communities.board.linesLabel')}>
-          {request.lines.map((line, index) => {
-            const own = myPledge?.lines[index];
-            const key = lineKey(line);
-            return (
-              <PledgeRow
-                key={key}
-                line={line}
-                spec={lineSpec(line, t)}
-                progress={lineProgress(index, line, pledges)}
-                own={own}
-                stale={own !== undefined && isStalePledge(own, myPledge?.updatedAt ?? 0, now)}
-                canPledge={mayPledge}
-                busy={pledgeBusy === key}
-                onPledge={(quantity) =>
-                  void changePledge(key, (lines) => withPledgeLine(lines, index, quantity), {
-                    mail: true,
-                  })
-                }
-                onWithdraw={() =>
-                  void changePledge(key, (lines) => withdrawPledgeLine(lines, index))
-                }
-                flags={delivery?.flags.get(slotKey(request.id, index))}
-                manualEntry={mayPledge}
-                onSaveDelivered={(amount) =>
-                  // A cleared amount falls back to contracts: run the sync again after saving.
-                  void changePledge(key, (lines) => {
-                    const stored = lines[index];
-                    return stored
-                      ? { ...lines, [index]: pledgeEntryAfterManual(stored, amount) }
-                      : lines;
-                  }).then(() => setSyncTick((n) => n + 1))
-                }
-              />
-            );
-          })}
-        </ul>
+        {request.standing && (
+          <section
+            aria-label={t('communities.board.buyback.termsLabel')}
+            className="space-y-2 rounded-xs border border-line bg-panel-2 px-3 py-2"
+          >
+            <p className="text-base font-medium tabular-nums">
+              {standingRateLine(request.standing, t)}
+            </p>
+            <p className="text-xs text-text-dim">
+              {t('communities.board.buyback.contractsTo', { name: buyerName })}
+            </p>
+            <ul aria-label={t('communities.board.buyback.buysLabel')} className="text-xs">
+              {request.standing.buyLines.map((line) => (
+                <li key={buybackLineKey(line)}>{buyLineLabel(line, t)}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {request.standing && isBuyerView && contractBuyerId !== null && (
+          <BuyerQuotes
+            request={request}
+            pledges={pledges}
+            memberNames={memberNames}
+            communityId={communityId}
+            communityName={communityName}
+            buyerCharacterId={contractBuyerId}
+            now={now}
+          />
+        )}
+        {request.standing && !isBuyerView && !request.closed && (
+          <SellToSection
+            request={request}
+            standing={request.standing}
+            communityName={communityName}
+            characterId={characterId}
+            communityId={communityId}
+            myPledge={myPledge}
+            buyerName={buyerName}
+            now={now}
+            refreshPledges={refreshPledges}
+          />
+        )}
+        {request.lines.length > 0 && (
+          <ul className="divide-y divide-line" aria-label={t('communities.board.linesLabel')}>
+            {request.lines.map((line, index) => {
+              const own = myPledge?.lines[index];
+              const key = lineKey(line);
+              return (
+                <PledgeRow
+                  key={key}
+                  line={line}
+                  spec={lineSpec(line, t)}
+                  progress={lineProgress(index, line, pledges)}
+                  own={own}
+                  stale={own !== undefined && isStalePledge(own, myPledge?.updatedAt ?? 0, now)}
+                  canPledge={mayPledge}
+                  busy={pledgeBusy === key}
+                  onPledge={(quantity) =>
+                    void changePledge(key, (lines) => withPledgeLine(lines, index, quantity), {
+                      mail: true,
+                    })
+                  }
+                  onWithdraw={() =>
+                    void changePledge(key, (lines) => withdrawPledgeLine(lines, index))
+                  }
+                  flags={delivery?.flags.get(slotKey(request.id, index))}
+                  manualEntry={mayPledge}
+                  onSaveDelivered={(amount) =>
+                    // A cleared amount falls back to contracts: run the sync again after saving.
+                    void changePledge(key, (lines) => {
+                      const stored = lines[index];
+                      return stored
+                        ? { ...lines, [index]: pledgeEntryAfterManual(stored, amount) }
+                        : lines;
+                    }).then(() => setSyncTick((n) => n + 1))
+                  }
+                />
+              );
+            })}
+          </ul>
+        )}
         {mayPledge && (
           <p className="text-xs text-text-dim">
             {t('communities.board.deliveryNote', { name: request.ownerName })}
@@ -297,7 +361,7 @@ export function RequestPanel({
             <GrantMissingLink groups={DELIVERY_GROUPS} />
           </p>
         )}
-        {!mayPledge && !mine && myPledge && (
+        {!mayPledge && !mine && !request.standing && myPledge && (
           <p className="text-xs text-text-dim">{t('communities.board.deliveryClosed')}</p>
         )}
         {delivery?.status === 'read-failed' && (
@@ -353,9 +417,13 @@ export function RequestPanel({
                   <li key={pledge.uid} className="flex min-h-11 items-center gap-2 py-1.5 text-xs">
                     <span className="min-w-0 flex-1 truncate">{name}</span>
                     <span className="text-text-dim">
-                      {t('communities.board.admin.pledgeSummary', {
-                        count: Object.keys(pledge.lines).length,
-                      })}
+                      {pledge.quote
+                        ? t('communities.board.admin.quoteSummary', {
+                            price: formatIsk(pledge.quote.total),
+                          })
+                        : t('communities.board.admin.pledgeSummary', {
+                            count: Object.keys(pledge.lines).length,
+                          })}
                     </span>
                     <NeedsConnection>
                       <Button
@@ -405,17 +473,21 @@ export function RequestPanel({
                     {t('communities.board.edit')}
                   </Button>
                 </NeedsConnection>
-                <NeedsConnection>
-                  <Button
-                    size="sm"
-                    loading={busy === 'extend'}
-                    onClick={() =>
-                      void run('extend', () => extendRequest(characterId, communityId, request.id))
-                    }
-                  >
-                    {t('communities.board.extend')}
-                  </Button>
-                </NeedsConnection>
+                {!request.standing && (
+                  <NeedsConnection>
+                    <Button
+                      size="sm"
+                      loading={busy === 'extend'}
+                      onClick={() =>
+                        void run('extend', () =>
+                          extendRequest(characterId, communityId, request.id)
+                        )
+                      }
+                    >
+                      {t('communities.board.extend')}
+                    </Button>
+                  </NeedsConnection>
+                )}
                 <NeedsConnection>
                   <Button
                     size="sm"

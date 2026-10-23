@@ -31,6 +31,7 @@ import {
   parseQuantity,
   requestProgress,
   requestStatus,
+  readStanding,
   type CommunityRequest,
   type RequestLine,
   type RequestPledge,
@@ -552,5 +553,93 @@ describe('pledgedRequestLines', () => {
   it('skips lines with no Pledge and a Pledge past the Request’s lines', () => {
     expect(pledgedRequestLines(request, { 9: { quantity: 1 } })).toEqual([]);
     expect(pledgedRequestLines(request, { 1: { quantity: 0 } })).toEqual([]);
+  });
+});
+
+describe('standing buyback Requests', () => {
+  const standing = (over: Partial<CommunityRequest> = {}) =>
+    request({
+      lines: [],
+      expiresAt: 0,
+      standing: {
+        rate: 90,
+        rateBasis: 'buy',
+        hubId: 'jita',
+        buyerCharacterId: null,
+        buyLines: [{ kind: 'group', group: 'ore' }],
+      },
+      ...over,
+    });
+
+  it('never expires: open until its owner closes it', () => {
+    expect(isOpenRequest(standing(), 10 ** 15)).toBe(true);
+    expect(requestStatus(standing(), [], 10 ** 15)).toBe('open');
+    expect(requestStatus(standing({ closed: true }), [], 0)).toBe('closed');
+  });
+
+  it('stays open whatever Pledges it holds: a quote is not a delivery', () => {
+    const quoted = pledge('a', {});
+    expect(requestStatus(standing(), [quoted], 10 ** 15)).toBe('open');
+  });
+
+  it('is found by the name of a type it buys', () => {
+    const named = standing({
+      standing: {
+        rate: 90,
+        rateBasis: 'buy',
+        hubId: 'jita',
+        buyerCharacterId: null,
+        buyLines: [{ kind: 'type', typeId: 1230, name: 'Veldspar' }],
+      },
+    });
+    const found = filterRequests([named], {
+      filter: 'open',
+      query: 'veldspar',
+      myUid: 'x',
+      now: 1,
+    });
+    expect(found).toHaveLength(1);
+  });
+
+  it('is found by the word for a group it buys', () => {
+    const found = filterRequests([standing()], {
+      filter: 'open',
+      query: 'ore',
+      myUid: 'x',
+      now: 1,
+    });
+    expect(found).toHaveLength(1);
+  });
+
+  it('is not an I-can-fill Request: it asks for no blueprints', () => {
+    expect(canFillRequest(standing(), [{ typeId: 1, runs: -1 }])).toBe(false);
+  });
+
+  it('reads back from a stored document, and an ordinary one reads as not standing', () => {
+    expect(
+      readStanding({
+        standing: true,
+        rate: 92.5,
+        rateBasis: 'sell',
+        hubId: 'amarr',
+        buyerCharacterId: 77,
+        buyLines: [
+          { kind: 'group', group: 'ice' },
+          { kind: 'type', typeId: 34, name: 'Tritanium' },
+          { kind: 'group', group: 'ships' },
+        ],
+      })
+    ).toEqual({
+      rate: 92.5,
+      rateBasis: 'sell',
+      hubId: 'amarr',
+      buyerCharacterId: 77,
+      buyLines: [
+        { kind: 'group', group: 'ice' },
+        { kind: 'type', typeId: 34, name: 'Tritanium' },
+      ],
+    });
+    expect(readStanding({ lines: [] })).toBeUndefined();
+    expect(readStanding({ standing: true, rate: 'x' })).toBeUndefined();
   });
 });

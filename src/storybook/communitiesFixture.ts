@@ -16,6 +16,8 @@ import type {
   RequestLine,
   RequestPledge,
 } from '@/engine/communities/requests';
+import type { FleetPayout, FleetPayoutDraft, FleetShare } from '@/engine/communities/fleetPayouts';
+import type { BuybackHubId, BuybackLine } from '@/engine/communities/buyback';
 import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
 import type { SharedFitting } from '@/engine/communities/sharedFittings';
 import type { SharedBlueprint } from '@/engine/communities/sharedLibrary';
@@ -318,6 +320,83 @@ export function createCommunitiesFixture(
     },
   };
 
+  const fleetPayout = (
+    id: string,
+    ownerUid: string,
+    ownerName: string,
+    name: string,
+    ageDays: number,
+    memberUids: string[],
+    paidCount: number,
+    shareCount: number
+  ): FleetPayout => ({
+    id,
+    ownerUid,
+    ownerName,
+    name,
+    totalIsk: 4_800_000_000,
+    holdBackPct: 10,
+    rule: 'equal',
+    memberUids,
+    shareCount,
+    paidCount,
+    createdAt: now - ageDays * DAY,
+    expiresAt: now - ageDays * DAY + 30 * DAY,
+  });
+  const fleetShare = (
+    index: number,
+    pilotName: string,
+    characterId: number | null,
+    memberUid: string | null,
+    paid: boolean
+  ): FleetShare => ({
+    id: String(index),
+    pilotName,
+    characterId,
+    memberUid,
+    weight: 1,
+    isk: 1_080_000_000,
+    paid,
+    paidAt: paid ? now - DAY : 0,
+  });
+  const fleetPayouts: Record<string, FleetPayout[]> = {
+    [SAMPLE_ADMIN_COMMUNITY_ID]: [
+      // Mine, half paid.
+      fleetPayout(
+        'fp-1',
+        ME,
+        SAMPLE_ACTIVE_CHARACTER.name,
+        'Thursday Rorqual roam',
+        2,
+        [OTHER],
+        2,
+        4
+      ),
+      // Someone else's, with me on the list.
+      fleetPayout('fp-2', 'char:2119000002', 'Dax Orrelin', 'Wormhole ratting', 5, [ME], 0, 3),
+      // Past its 30 days: the page does not show it.
+      fleetPayout('fp-3', ME, SAMPLE_ACTIVE_CHARACTER.name, 'Old moon pop', 40, [], 3, 3),
+    ],
+  };
+  const fleetShares: Record<string, Record<string, FleetShare[]>> = {
+    [SAMPLE_ADMIN_COMMUNITY_ID]: {
+      'fp-1': [
+        fleetShare(0, SAMPLE_ACTIVE_CHARACTER.name, SAMPLE_ACTIVE_CHARACTER.characterId, ME, true),
+        fleetShare(1, SAMPLE_CHARACTERS[1].name, SAMPLE_CHARACTERS[1].characterId, OTHER, true),
+        fleetShare(2, 'Pilot Not In Community', 2119000050, null, false),
+        fleetShare(3, 'Typed Name', null, null, false),
+      ],
+      'fp-2': [
+        fleetShare(0, 'Dax Orrelin', 2119000002, 'char:2119000002', false),
+        fleetShare(1, SAMPLE_ACTIVE_CHARACTER.name, SAMPLE_ACTIVE_CHARACTER.characterId, ME, false),
+        fleetShare(2, 'Outside Pilot', 2119000051, null, false),
+      ],
+      'fp-3': [
+        fleetShare(0, SAMPLE_ACTIVE_CHARACTER.name, SAMPLE_ACTIVE_CHARACTER.characterId, ME, true),
+      ],
+    },
+  };
+
   const byId = (id: string) => communities.find((community) => community.id === id);
   const patch = (id: string, change: Partial<CommunitySummary>) => {
     const community = byId(id);
@@ -338,6 +417,11 @@ export function createCommunitiesFixture(
       const others = (board[requestId] ?? []).filter((p) => p.uid !== ME);
       board[requestId] = lines ? [...others, pledge(ME, lines, 0)] : others;
     },
+    saveQuote: (id, requestId, quote) => {
+      const board = (pledges[id] ??= {});
+      const others = (board[requestId] ?? []).filter((p) => p.uid !== ME);
+      board[requestId] = quote ? [...others, { ...pledge(ME, {}, 0), quote }] : others;
+    },
     syncDeliveries: () => ({
       status: 'ok',
       updated: 0,
@@ -347,6 +431,9 @@ export function createCommunitiesFixture(
           : []
       ),
     }),
+    loadFleetPayouts: (id) => (fleetPayouts[id] ?? []).map((entry) => ({ ...entry })),
+    loadFleetShares: (id, payoutId) =>
+      (fleetShares[id]?.[payoutId] ?? []).map((entry) => ({ ...entry })),
     loadPlans: (id) => (plans[id] ?? []).map((entry) => ({ ...entry })),
     call: (name, data) => {
       const { communityId, memberUid, accept, requireApproval } = data as {
@@ -362,6 +449,12 @@ export function createCommunitiesFixture(
             terms: string;
             lines: RequestLine[];
             notify?: CommunityRequest['notify'];
+            standing?: true;
+            rate?: number;
+            rateBasis?: 'buy' | 'sell';
+            hubId?: BuybackHubId;
+            buyerCharacterId?: number;
+            buyLines?: BuybackLine[];
           };
           const posted = wanted(
             `req-${Math.random().toString(36).slice(2, 8)}`,
@@ -373,6 +466,16 @@ export function createCommunitiesFixture(
             draft.lines
           );
           if (draft.notify) posted.notify = draft.notify;
+          if (draft.standing && draft.rate && draft.rateBasis && draft.hubId && draft.buyLines) {
+            posted.standing = {
+              rate: draft.rate,
+              rateBasis: draft.rateBasis,
+              hubId: draft.hubId,
+              buyerCharacterId: draft.buyerCharacterId ?? null,
+              buyLines: draft.buyLines,
+            };
+            posted.expiresAt = 0;
+          }
           itemRequests[communityId] = [posted, ...(itemRequests[communityId] ?? [])];
           return { requestId: posted.id };
         }
@@ -413,6 +516,64 @@ export function createCommunitiesFixture(
           if (board?.[requestId]) {
             board[requestId] = board[requestId].filter((entry) => entry.uid !== pledgeUid);
           }
+          return {};
+        }
+        case 'createCommunityFleetPayoutCallable': {
+          const draft = data as FleetPayoutDraft;
+          const id = `fp-${Math.random().toString(36).slice(2, 8)}`;
+          const listed = new Set((members[communityId] ?? []).map((m) => m.uid));
+          const shares = draft.shares.map((line, index) => {
+            const uid = line.characterId === null ? null : uidForCharacter(line.characterId);
+            return {
+              id: String(index),
+              pilotName: line.pilotName,
+              characterId: line.characterId,
+              memberUid: uid && listed.has(uid) ? uid : null,
+              weight: line.weight,
+              isk: line.isk,
+              paid: false,
+              paidAt: 0,
+            };
+          });
+          const created = fleetPayout(
+            id,
+            ME,
+            SAMPLE_ACTIVE_CHARACTER.name,
+            draft.name,
+            0,
+            [],
+            0,
+            shares.length
+          );
+          created.totalIsk = draft.totalIsk;
+          created.holdBackPct = draft.holdBackPct;
+          created.rule = draft.rule;
+          created.memberUids = shares.flatMap((s) => (s.memberUid ? [s.memberUid] : []));
+          fleetPayouts[communityId] = [created, ...(fleetPayouts[communityId] ?? [])];
+          (fleetShares[communityId] ??= {})[id] = shares;
+          return { payoutId: id };
+        }
+        case 'setCommunityFleetShareDoneCallable': {
+          const { payoutId, shareId, paid } = data as {
+            payoutId: string;
+            shareId: string;
+            paid: boolean;
+          };
+          const share = fleetShares[communityId]?.[payoutId]?.find((s) => s.id === shareId);
+          const owner = fleetPayouts[communityId]?.find((p) => p.id === payoutId);
+          if (share && owner && share.paid !== paid) {
+            share.paid = paid;
+            share.paidAt = paid ? now : 0;
+            owner.paidCount += paid ? 1 : -1;
+          }
+          return {};
+        }
+        case 'removeCommunityFleetPayoutCallable': {
+          const { payoutId } = data as { payoutId: string };
+          fleetPayouts[communityId] = (fleetPayouts[communityId] ?? []).filter(
+            (p) => p.id !== payoutId
+          );
+          delete fleetShares[communityId]?.[payoutId];
           return {};
         }
         case 'revokeCommunityInviteCallable':

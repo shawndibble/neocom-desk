@@ -23,6 +23,12 @@ describe('THRESHOLD_FIELDS', () => {
       'walletBalanceChangedThresholdIsk',
       'walletFoldIntoContract',
       'incursionNearbyJumps',
+      'skyhookRaidableNearbyJumps',
+      'shipLostMinimumIsk',
+      'mercenaryDenReinforcedLeadHours',
+      'mercenaryDenAnarchyPercent',
+      'skyhookRaidableLeadHours',
+      'skyhookRaidableMinUnits',
     ]);
   });
 
@@ -58,6 +64,12 @@ describe('defaultedThresholds', () => {
       walletBalanceChangedThresholdIsk: 1_000_000,
       walletFoldIntoContract: 1,
       incursionNearbyJumps: 5,
+      skyhookRaidableNearbyJumps: 5,
+      shipLostMinimumIsk: 0,
+      mercenaryDenReinforcedLeadHours: 1,
+      mercenaryDenAnarchyPercent: 50,
+      skyhookRaidableLeadHours: 2,
+      skyhookRaidableMinUnits: 1,
     });
   });
 

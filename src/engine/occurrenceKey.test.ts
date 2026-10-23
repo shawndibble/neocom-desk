@@ -15,12 +15,15 @@ import type {
   MarketOrderUndercutFire,
   EveNotificationFire,
   StructureFuelLowFire,
+  MercenaryDenReinforcedFire,
+  SkyhookRaidableFire,
   CorpIndustryJobNotificationFire,
   CorpMemberJoinedFire,
   CorpMemberLeftFire,
   CorpWalletThresholdFire,
   StructureReinforcementExitFire,
   PriceAlertTriggeredFire,
+  ShipLostFire,
 } from './notificationDiffs';
 
 const T0 = 1_700_000_000_000;
@@ -307,6 +310,43 @@ describe('occurrenceKey', () => {
     expect(occurrenceKey(projectedExit, T0)).not.toEqual(occurrenceKey(live, T0));
   });
 
+  it('keys skyhookRaidable on the window opening, apart per phase, with the phase last', () => {
+    const soon: SkyhookRaidableFire = {
+      eventId: 'skyhookRaidable',
+      characterId: 7,
+      skyhookId: 5,
+      planetId: 40_000_001,
+      windowStartMs: T0 + 3_600_000,
+      windowEndMs: T0 + 7_200_000,
+      thresholdMs: 3_600_000,
+      unsecuredUnits: 10,
+      phase: 'soon',
+    };
+    expect(occurrenceKey(soon, T0)).toEqual(occurrenceKey({ ...soon }, T0 + 1000));
+    expect(occurrenceKey({ ...soon, phase: 'danger' }, T0)).toMatch(/:danger$/);
+    expect(occurrenceKey(soon, T0)).not.toEqual(occurrenceKey({ ...soon, phase: 'open' }, T0));
+    expect(occurrenceKey(soon, T0)).not.toEqual(
+      occurrenceKey({ ...soon, windowStartMs: T0 + 90_000_000 }, T0)
+    );
+  });
+
+  it('keys mercenaryDenReinforced on the exit instant, apart for the warning and the exit', () => {
+    const soon: MercenaryDenReinforcedFire = {
+      eventId: 'mercenaryDenReinforced',
+      characterId: 7,
+      denId: 5,
+      planetId: 40_000_001,
+      reinforcedUntilMs: T0 + 3_600_000,
+      thresholdMs: 3_600_000,
+      phase: 'soon',
+    };
+    expect(occurrenceKey(soon, T0)).toEqual(occurrenceKey({ ...soon }, T0 + 1000));
+    expect(occurrenceKey(soon, T0)).not.toEqual(occurrenceKey({ ...soon, phase: 'out' }, T0));
+    expect(occurrenceKey(soon, T0)).not.toEqual(
+      occurrenceKey({ ...soon, reinforcedUntilMs: T0 + 90_000_000 }, T0)
+    );
+  });
+
   it('keys structureFuelLow on structureId and the fuel countdown it belongs to', () => {
     const fire: StructureFuelLowFire = {
       eventId: 'structureFuelLow',
@@ -575,6 +615,19 @@ describe('occurrenceFiredAt', () => {
       occurredMs: T0 + 30_000,
     };
     expect(occurrenceFiredAt(fire, T0)).toBe(T0);
+  });
+
+  it('keys shipLost on the killmail and dates it by the killmail, never later than the poll', () => {
+    const fire: ShipLostFire = {
+      eventId: 'shipLost',
+      characterId: 7,
+      killmailId: 123,
+      timeMs: T0 - 5_000,
+    };
+    expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey(fire, T0 + 60_000));
+    expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, killmailId: 124 }, T0));
+    expect(occurrenceFiredAt(fire, T0)).toBe(T0 - 5_000);
+    expect(occurrenceFiredAt({ ...fire, timeMs: T0 + 1 }, T0)).toBe(T0);
   });
 
   it('dates priceAlertTriggered by the poll that noticed the crossing', () => {

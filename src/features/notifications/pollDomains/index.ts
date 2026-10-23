@@ -42,6 +42,7 @@ import { marketOrderDomain, marketOrderUndercutDomain, orderExpiryDomain } from 
 import { eveNotificationDomain } from './eveNotifications';
 import {
   structureFuelDomain,
+  skyhookDomain,
   corpIndustryJobDomain,
   corpRosterDomain,
   corpWalletDomain,
@@ -49,7 +50,10 @@ import {
 import { priceAlertDomain } from './priceAlerts';
 import { stockTargetDomain } from './stockTargets';
 import { incursionDomain } from './incursions';
+import { skyhookNearbyDomain } from './skyhooksNearby';
 import { communitiesDomain } from './communities';
+import { killsDomain } from './kills';
+import { mercenaryDensDomain } from './mercenaryDens';
 
 export type { AnyNotificationFire } from '../eventEntries';
 export type { PollDomain } from './defineDomain';
@@ -74,13 +78,17 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   orderExpiryDomain,
   eveNotificationDomain,
   structureFuelDomain,
+  skyhookDomain,
   corpIndustryJobDomain,
   corpRosterDomain,
   corpWalletDomain,
   priceAlertDomain,
   stockTargetDomain,
   incursionDomain,
+  skyhookNearbyDomain,
   communitiesDomain,
+  killsDomain,
+  mercenaryDensDomain,
 ];
 
 const DOMAIN_BY_EVENT: ReadonlyMap<NotificationEventId, PollDomain> = new Map(

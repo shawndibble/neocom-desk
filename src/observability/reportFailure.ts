@@ -60,6 +60,11 @@ export function annotateFailure(error: unknown, tags: Record<string, string>): v
   if (typeof error === 'object' && error !== null) annotations.set(error, tags);
 }
 
+/** Add a tag to a failure without losing the ones already on it, or its own `code`. */
+export function addFailureTag(error: unknown, tags: Record<string, string>): void {
+  annotateFailure(error, { ...failureAnnotation(error), ...tags });
+}
+
 /**
  * The annotation, or failing that the error's own `code` (a FirebaseError's
  * `functions/internal`, say): Sentry groups these by message, and "Request
@@ -69,8 +74,27 @@ export function failureAnnotation(error: unknown): Record<string, string> | unde
   if (typeof error !== 'object' || error === null) return undefined;
   const annotated = annotations.get(error);
   if (annotated) return annotated;
+  return codeTag(error);
+}
+
+function codeTag(error: object): Record<string, string> | undefined {
   const { code } = error as { code?: unknown };
   return typeof code === 'string' ? { error_codes: code } : undefined;
+}
+
+/**
+ * `beforeSend`'s other half: an error that reaches Sentry by the global handlers
+ * (an unhandled rejection, an error boundary) rather than `reportFailure` still
+ * carries the tags its thrower put on it. The event's own tags win.
+ */
+export function tagAnnotatedEvent<E extends { tags?: Record<string, unknown> }>(
+  event: E,
+  original: unknown
+): E {
+  const annotated =
+    typeof original === 'object' && original !== null ? annotations.get(original) : undefined;
+  if (!annotated) return event;
+  return { ...event, tags: { ...annotated, ...event.tags } };
 }
 
 /**

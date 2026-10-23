@@ -125,11 +125,12 @@ BPC hints say a page filter can still flip either for one search. Facility defau
 
 ### Market (`/settings/market`)
 
-| Setting                    | Control                                                                                                                   | Default                                                             | Storage key                           | Sync |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------- | ---- |
-| Trade hub                  | select of `TRADE_HUBS` (5 hubs; first = default)                                                                          | `DEFAULT_TRADE_HUB` (`market/hubs.ts:105`)                          | `sync.marketHub` (legacy `marketHub`) | Yes  |
-| Flag courier collateral at | chips 20x / 50x / 100x / 200x reward                                                                                      | 50 (`HIGH_COLLATERAL_RATIO`, `engine/contracts/courierRisk.ts:153`) | `sync.courierHighCollateralRatio`     | Yes  |
-| LP value                   | ISK input, commit on blur/Enter, Esc reverts, "Use market rate" button when custom; blank or 0 = each store's market rate | 0                                                                   | `sync.loyaltyLpValue`                 | Yes  |
+| Setting                    | Control                                                                                                                   | Default                                                                | Storage key                           | Sync |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------- | ---- |
+| Trade hub                  | select of `TRADE_HUBS` (5 hubs; first = default)                                                                          | `DEFAULT_TRADE_HUB` (`market/hubs.ts:105`)                             | `sync.marketHub` (legacy `marketHub`) | Yes  |
+| Flag courier collateral at | chips 20x / 50x / 100x / 200x reward                                                                                      | 50 (`HIGH_COLLATERAL_RATIO`, `engine/contracts/courierRisk.ts:153`)    | `sync.courierHighCollateralRatio`     | Yes  |
+| Flag item contracts at     | chips 5x / 10x / 20x / 50x hub sell                                                                                       | 10 (`DEFAULT_ITEM_FLAG_MULTIPLE`, `engine/contracts/contractFlags.ts`) | `sync.itemContractFlagMultiple`       | Yes  |
+| LP value                   | ISK input, commit on blur/Enter, Esc reverts, "Use market rate" button when custom; blank or 0 = each store's market rate | 0                                                                      | `sync.loyaltyLpValue`                 | Yes  |
 
 Hub drives LP store prices, item lookups, Hauling Opportunities start. Market browser keeps its own per-device hub. Mining tax uses each payee's hub. Market Appraisal price percent (`sync.marketPricePercent`) is synced but edited on the Appraisal tab.
 
@@ -204,14 +205,14 @@ Per event row (all Characters): two checkboxes (Device, Alerts), default both on
 Events (`NOTIFICATION_EVENTS`, `events.ts`), with scope endpoint:
 
 - Skills: `skillLevelComplete`, `characterNotTraining`, `skillQueueEnding` (queue); `spExtractionReady` (skills; opt-in via SP extraction monitoring setting)
-- Industry: `industryJobComplete`; `cloneJumpReady` (clones); `newMail`; `planetaryExtractionDone`, `planetaryExtractorExpiring` (planets)
+- Industry: `industryJobComplete`; `cloneJumpReady` (clones); `newMail`; `planetaryExtractionDone`, `planetaryExtractorExpiring`, `mercenaryDenReinforced`, `mercenaryDenAnarchy` (planets; the anarchy row says it fires only while the app is open)
 - Market/contracts: `marketOrderFilled`, `marketOrderUndercut` (orders); `contractAccepted`, `contractCompleted`, `contractFailed`, `courierDeliveryDue`, `contractExpiring` (contracts); `ordersLapsing` (orders); `walletBalanceChanged` (wallet)
 - Calendar: `newCalendarEvent`, `calendarEventStarting`
 - `eveNotification`: CCP's in-game notifications, with a per-type breakdown grouped by Notification Family (per-family select-all per channel). Per-type defaults: Overview only, except attack/loss alerts which also pop up
-- Corp group (own header with select-all, one shared Needs-permission line, best-effort disclosure): `structureFuelLow` (structures), `corpIndustryJobReady`, `corpMemberJoined`, `corpMemberLeft`, `corpWalletThreshold`
-- No scope: `priceAlertTriggered`
+- Corp group (own header with select-all, one shared Needs-permission line, best-effort disclosure): `structureFuelLow` (structures), `skyhookRaidable` (Station Manager; lead time and silo minimum), `corpIndustryJobReady`, `corpMemberJoined`, `corpMemberLeft`, `corpWalletThreshold`
+- No scope: `priceAlertTriggered`, `shipLost` (public zKillboard)
 
-Inline thresholds (shown when row enabled; stored per Character; change rebuilds the push Projection immediately): structure fuel low 7/3/1 days (default 7); extractor expiring 24/12/6/1 h (default 6); skill queue ending 48/24/12/6 h; courier delivery due 24/12/6/1 h (default 6); corp wallet balance floor ISK (default 50,000,000); corp wallet single-transaction ceiling ISK (default 100,000,000); wallet balance change threshold ISK (default 1,000,000). ISK fields (`ThresholdAmountInput`, commit on blur) accept `1b`/`500m`/`10t` shorthand via `parseIskAmount`; negative or unparsable input reverts to the stored value; value rounded to whole ISK. Defs: `eventThresholdFields.ts`.
+Inline thresholds (shown when row enabled; stored per Character; change rebuilds the push Projection immediately): structure fuel low 7/3/1 days (default 7); extractor expiring 24/12/6/1 h (default 6); skill queue ending 48/24/12/6 h; courier delivery due 24/12/6/1 h (default 6); corp wallet balance floor ISK (default 50,000,000); corp wallet single-transaction ceiling ISK (default 100,000,000); wallet balance change threshold ISK (default 1,000,000); ship lost minimum loss value ISK (default 0 = every loss). ISK fields (`ThresholdAmountInput`, commit on blur) accept `1b`/`500m`/`10t` shorthand via `parseIskAmount`; negative or unparsable input reverts to the stored value; value rounded to whole ISK. Defs: `eventThresholdFields.ts`.
 
 Storage: `notificationPreferences` (Dexie, device-local; `masterEnabled`, `browserEnabled`, `feedEnabled`, `perCharacter`, `eveNotificationTypesByCharacter`, `thresholdsByCharacter`; `preferencesStore.ts:26,132`). Feed half (event + eve-type toggles, fuel/wallet thresholds) also pushed as one blob `sync.notificationFeedPrefs` (`syncedPreferences.ts:34`) and merged on hydrate. Device-only writes (master, channel gates) never go to the wire. Panel refreshes app-icon badge when prefs change. Corp capabilities per stored Character read via `loadCharacterRoles` (cached 1 h).
 

@@ -5,6 +5,8 @@ import {
   severityForRemaining,
   type BoardExtractionSource,
   type BoardJobSource,
+  type BoardHubFuelSource,
+  type BoardSovereigntySource,
   type BoardStarbaseSource,
   type BoardStructureSource,
   type CorpBoardItem,
@@ -504,6 +506,10 @@ describe('CORP_BOARD_ITEM_KINDS', () => {
         },
       ],
       jobs: [{ jobId: 1, subject: 'Job', endMs: at(DAY), status: 'ready', typeId: null }],
+      sovereignty: [
+        { id: 'skyhook:1', name: 'Skyhook', kind: 'skyhook', startMs: at(DAY), endMs: at(2 * DAY) },
+      ],
+      hubFuel: [{ id: 'hub:9', name: 'Efa', runsOutMs: at(DAY) }],
     });
     const produced = new Set(items.map((item) => item.kind));
     expect([...produced].sort()).toEqual([...CORP_BOARD_ITEM_KINDS].sort());
@@ -556,5 +562,84 @@ describe('starbases', () => {
   it('does not tick a reinforcement shorter than the cache window', () => {
     const [item] = sbBoard([starbase({ reinforcedUntilMs: at(20 * MINUTE) })]);
     expect(item!.withinStaleWindow).toBe(true);
+  });
+});
+
+describe('sovereignty raid windows', () => {
+  const raid = (over: Partial<BoardSovereigntySource> = {}): BoardSovereigntySource => ({
+    id: 'skyhook:5',
+    name: 'Skyhook (X-7OMU)',
+    kind: 'skyhook',
+    startMs: at(6 * HOUR),
+    endMs: at(8 * HOUR),
+    ...over,
+  });
+
+  const sovBoard = (sovereignty: BoardSovereigntySource[]) =>
+    board({ nowMs: NOW, staleWindowMs: STALE_WINDOW, sovereignty });
+
+  it('ranks a window that has not opened by when it opens', () => {
+    const [item] = sovBoard([raid()]);
+    expect(item).toMatchObject({
+      kind: 'sovRaid',
+      subject: 'Skyhook (X-7OMU)',
+      detail: 'skyhook.upcoming',
+      deadlineMs: at(6 * HOUR),
+      timing: 'timed',
+    });
+  });
+
+  it('ranks an open window by when it closes', () => {
+    const [item] = sovBoard([raid({ startMs: at(-HOUR), endMs: at(2 * HOUR) })]);
+    expect(item).toMatchObject({ detail: 'skyhook.open', deadlineMs: at(2 * HOUR) });
+  });
+
+  it('drops a window that already closed', () => {
+    expect(sovBoard([raid({ startMs: at(-3 * HOUR), endMs: at(-HOUR) })])).toEqual([]);
+  });
+
+  it('keeps a hub past its window end as overtime, still vulnerable', () => {
+    const items = sovBoard([
+      raid({ id: 'hub:9', kind: 'hub', startMs: at(-3 * HOUR), endMs: at(-HOUR) }),
+    ]);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ detail: 'hub.overtime', timing: 'timed' });
+    expect(items[0]!.severity).toBe('critical');
+  });
+
+  it('takes severity from the time remaining until the ranked end of the window', () => {
+    const [far] = sovBoard([raid({ startMs: at(3 * DAY), endMs: at(3 * DAY + HOUR) })]);
+    const [soon] = sovBoard([raid({ startMs: at(HOUR), endMs: at(2 * HOUR) })]);
+    const [open] = sovBoard([raid({ startMs: at(-HOUR), endMs: at(20 * MINUTE) })]);
+    expect(far!.severity).toBe(severityForRemaining(3 * DAY));
+    expect(soon!.severity).toBe(severityForRemaining(HOUR));
+    expect(open!.severity).toBe(severityForRemaining(20 * MINUTE));
+    expect(open!.severity).not.toBe(far!.severity);
+  });
+
+  it('names a hub window as a hub', () => {
+    const [item] = sovBoard([raid({ id: 'hub:9', kind: 'hub' })]);
+    expect(item!.detail).toBe('hub.upcoming');
+  });
+});
+
+describe('sov hub reagents', () => {
+  const hubBoard = (hubFuel: BoardHubFuelSource[]) =>
+    board({ nowMs: NOW, staleWindowMs: STALE_WINDOW, hubFuel });
+
+  it('is a fuel clock that runs out when the bay empties', () => {
+    const [item] = hubBoard([{ id: 'hub:9', name: 'Efa', runsOutMs: at(26 * HOUR) }]);
+    expect(item).toMatchObject({
+      id: 'fuel:hub:9',
+      kind: 'sovHubFuel',
+      subject: 'Efa',
+      deadlineMs: at(26 * HOUR),
+      timing: 'timed',
+    });
+  });
+
+  it('stays on the board once the bay is empty, overdue', () => {
+    const [item] = hubBoard([{ id: 'hub:9', name: 'Efa', runsOutMs: at(-HOUR) }]);
+    expect(item!.severity).toBe('critical');
   });
 });

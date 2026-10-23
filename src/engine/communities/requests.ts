@@ -11,6 +11,15 @@
 import { isRecord } from '../guards';
 import { parseLocalizedNumber } from '../numbers/parseLocalizedNumber';
 import { DAY_MS } from '@/lib/age';
+import {
+  BUYBACK_HUB_IDS,
+  RATE_BASES,
+  isBuybackGroup,
+  isValidRate,
+  type BuybackLine,
+  type HeldQuote,
+  type StandingRequest,
+} from './buyback';
 
 /** Mirrors `functions/src/communityRequests.ts`, which enforces them. */
 export const MAX_LINES_PER_REQUEST = 50;
@@ -48,6 +57,37 @@ export interface CommunityRequest {
   expiresAt: number;
   closed: boolean;
   notify: RequestNotify;
+  /** Set on a standing buyback Request: it carries no lines, never expires, and pays a rate. */
+  standing?: StandingRequest;
+}
+
+function readBuyLine(raw: unknown): BuybackLine | null {
+  if (!isRecord(raw)) return null;
+  if (raw.kind === 'group')
+    return isBuybackGroup(raw.group) ? { kind: 'group', group: raw.group } : null;
+  if (raw.kind === 'type' && typeof raw.typeId === 'number') {
+    return { kind: 'type', typeId: raw.typeId, name: String(raw.name ?? '') };
+  }
+  return null;
+}
+
+/** A stored standing Request's terms; undefined when the document is not one or does not read as one. */
+export function readStanding(d: Record<string, unknown>): StandingRequest | undefined {
+  if (d.standing !== true) return undefined;
+  const basis = RATE_BASES.find((b) => b === d.rateBasis);
+  const hub = BUYBACK_HUB_IDS.find((h) => h === d.hubId);
+  if (!isValidRate(d.rate) || !basis || !hub) return undefined;
+  const buyLines = (Array.isArray(d.buyLines) ? d.buyLines : [])
+    .map(readBuyLine)
+    .filter((line): line is BuybackLine => line !== null);
+  if (buyLines.length === 0) return undefined;
+  return {
+    rate: d.rate,
+    rateBasis: basis,
+    hubId: hub,
+    buyerCharacterId: typeof d.buyerCharacterId === 'number' ? d.buyerCharacterId : null,
+    buyLines,
+  };
 }
 
 /** One Member's quantity on one line: what they can provide, and what is marked delivered. */
@@ -76,6 +116,8 @@ export interface PledgeEntry {
 export interface RequestPledge {
   uid: string;
   lines: Readonly<Record<number, PledgeEntry>>;
+  /** The Member's held Quote on a standing buyback Request; absent on an ordinary one. */
+  quote?: HeldQuote;
   /** When the Member last wrote this document, ms since epoch. */
   updatedAt: number;
 }
@@ -133,6 +175,8 @@ export function requestStatus(
   now: number
 ): RequestStatus {
   if (request.closed) return 'closed';
+  // A standing Request is open until closed: its Pledges are quotes, which deliver nothing here.
+  if (request.standing) return 'open';
   if (request.expiresAt <= now) return 'expired';
   const progress = request.lines.map((line, i) => lineProgress(i, line, pledges));
   if (progress.length > 0 && progress.every((p) => p.delivered >= p.needed)) return 'delivered';
@@ -142,7 +186,7 @@ export function requestStatus(
 }
 
 export function isOpenRequest(request: CommunityRequest, now: number): boolean {
-  return !request.closed && request.expiresAt > now;
+  return !request.closed && (request.standing !== undefined || request.expiresAt > now);
 }
 
 export type RequestFilter = 'open' | 'mine' | 'canFill';
@@ -195,7 +239,13 @@ export function filterRequests(
           : isOpenRequest(request, options.now);
     if (!inFilter) return false;
     if (needle === '') return true;
-    return [request.ownerName, request.location, request.terms, ...request.lines.map((l) => l.name)]
+    return [
+      request.ownerName,
+      request.location,
+      request.terms,
+      ...request.lines.map((l) => l.name),
+      ...(request.standing?.buyLines.map((l) => (l.kind === 'type' ? l.name : l.group)) ?? []),
+    ]
       .join('\n')
       .toLowerCase()
       .includes(needle);

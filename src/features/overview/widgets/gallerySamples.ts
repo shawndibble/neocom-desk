@@ -489,6 +489,16 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         })),
       },
     },
+    mercenaryDens: {
+      value: '1',
+      unit: t('overview.gallery.samples.mercenaryDens.unit'),
+      note: t('overview.gallery.samples.mercenaryDens.note'),
+      rows: [
+        ['Efa VII', t('overview.gallery.samples.mercenaryDens.reinforced'), '14h'],
+        ['X-7OMU IV', t('overview.gallery.samples.mercenaryDens.ready'), '9h'],
+        ['4-HWWF II', t('overview.widgets.mercenaryDens.state.running'), '—'],
+      ],
+    },
     planetary: {
       value: '4',
       unit: t('overview.gallery.samples.planetary.unit'),
@@ -571,6 +581,42 @@ function buildSamples(t: TFunction): Record<string, Sample> {
           t('overview.widgets.corpStarbases.fuelCell', { blocks: '2,940', duration: '6d 3h' }),
         ],
       ],
+    },
+    corpSovereignty: {
+      value: '2',
+      unit: t('overview.widgets.corpSovereignty.unit', { count: 2 }),
+      note: t('overview.widgets.corpSovereignty.nextOpensIn', {
+        subject: 'X-7OMU IV',
+        duration: '2h',
+      }),
+      rows: [
+        ['X-7OMU IV', t('overview.widgets.corpSovereignty.windowIn', { duration: '2h' }), '412M'],
+        ['Efa II', t('overview.widgets.corpSovereignty.windowIn', { duration: '5h' }), '96.5M'],
+      ],
+      chart: ((): ChartModel => {
+        const first = t('overview.widgets.corpSovereignty.windowIn', { duration: '2h' });
+        const second = t('overview.widgets.corpSovereignty.windowIn', { duration: '5h' });
+        const note = t('overview.widgets.corpSovereignty.chartNote');
+        return {
+          kind: 'gantt',
+          rows: [
+            { key: 'a', label: 'X-7OMU IV', startMs: 2, endMs: 6, text: first, color: 'warning' },
+            { key: 'b', label: 'Efa II', startMs: 5, endMs: 9, text: second, color: 'warning' },
+          ],
+          axis: { from: 0, to: 48, now: 0 },
+          labels: {
+            from: '',
+            now: t('overview.widgets.corpSovereignty.chartNow'),
+            to: t('overview.widgets.corpSovereignty.chartTo', { duration: '48h' }),
+          },
+          note,
+          summary: note,
+          fallback: hbars([
+            ['X-7OMU IV', 0.96, first],
+            ['Efa II', 0.9, second],
+          ]) as Extract<ChartModel, { kind: 'hbars' }>,
+        };
+      })(),
     },
     corpJobs: {
       value: '3',
@@ -800,6 +846,26 @@ function buildSamples(t: TFunction): Record<string, Sample> {
           'Tash-Murkon',
           t('overview.gallery.samples.incursions.mobilizing'),
           t('overview.gallery.samples.incursions.jumps', { count: 14 }),
+        ],
+      ],
+    },
+    sovRaids: {
+      value: '2',
+      unit: t('travel.sovRaids.unit', { count: 2 }),
+      note: [
+        t('travel.sovRaids.nextOpenNow', { subject: 'X-7OMU IV' }),
+        t('travel.sovRaids.jumps', { count: 7 }),
+      ].join(', '),
+      rows: [
+        [
+          'X-7OMU IV',
+          t('travel.sovRaids.windowOpen', { duration: '1h 20m' }),
+          t('travel.sovRaids.jumps', { count: 7 }),
+        ],
+        [
+          'Efa II',
+          t('travel.sovRaids.windowIn', { duration: '1h 40m' }),
+          t('travel.sovRaids.jumps', { count: 12 }),
         ],
       ],
     },

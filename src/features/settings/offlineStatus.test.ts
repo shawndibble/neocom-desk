@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  fetchLazyChunkList: vi.fn<() => Promise<string[]>>(async () => []),
+  cachedLazyChunks: vi.fn<(files: readonly string[]) => Promise<Set<string>>>(
+    async () => new Set<string>()
+  ),
   cachedLazySdeFiles: vi.fn<() => Promise<Set<string>>>(),
   warmLazySde: vi.fn(),
   hasControllingServiceWorker: vi.fn(() => true),
@@ -11,6 +15,10 @@ vi.mock('@/sde/warmLazySde', () => ({
   cachedLazySdeFiles: mocks.cachedLazySdeFiles,
   warmLazySde: mocks.warmLazySde,
   hasControllingServiceWorker: mocks.hasControllingServiceWorker,
+}));
+vi.mock('@/sde/lazyChunkList', () => ({
+  fetchLazyChunkList: mocks.fetchLazyChunkList,
+  cachedLazyChunks: mocks.cachedLazyChunks,
 }));
 vi.mock('@/features/fittings/dogmaEngineAssets', () => ({
   dogmaEngineAssetsCached: mocks.dogmaEngineAssetsCached,
@@ -41,6 +49,34 @@ describe('readOfflineStatus', () => {
       state: 'partial',
     });
     expect(status.totalCached).toBe(3);
+    expect(status.total).toBe(74);
+  });
+});
+
+describe('readOfflineStatus with build chunks', () => {
+  const CHUNKS = ['assets/A-1.js', 'assets/B-2.js', 'assets/C-3.js'];
+
+  it('lists the app pages as a pack and adds them to the totals', async () => {
+    mocks.cachedLazySdeFiles.mockResolvedValue(new Set());
+    mocks.dogmaEngineAssetsCached.mockResolvedValue(false);
+    mocks.fetchLazyChunkList.mockResolvedValue(CHUNKS);
+    mocks.cachedLazyChunks.mockResolvedValue(new Set([CHUNKS[0]]));
+    const status = await readOfflineStatus();
+    expect(status.packs.find((pack) => pack.id === 'appPages')).toMatchObject({
+      total: 3,
+      cached: 1,
+      state: 'partial',
+    });
+    expect(status.total).toBe(74 + 3);
+    expect(status.totalCached).toBe(1);
+  });
+
+  it('shows no app pages pack when the list cannot be read', async () => {
+    mocks.cachedLazySdeFiles.mockResolvedValue(new Set());
+    mocks.dogmaEngineAssetsCached.mockResolvedValue(false);
+    mocks.fetchLazyChunkList.mockResolvedValue([]);
+    const status = await readOfflineStatus();
+    expect(status.packs.some((pack) => pack.id === 'appPages')).toBe(false);
     expect(status.total).toBe(74);
   });
 });

@@ -83,6 +83,7 @@ export async function sweepRequests(
               closed: fresh.get('closed') === true,
               closedAt: typeof fresh.get('closedAt') === 'number' ? fresh.get('closedAt') : null,
               expiresAt: Number(fresh.get('expiresAt')),
+              standing: fresh.get('standing') === true,
             },
             now
           );

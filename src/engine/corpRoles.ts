@@ -91,6 +91,19 @@ export interface CorpCapabilities {
    * (issue #4612). `x-required-roles` is Accountant or Trader.
    */
   canReadOrders: boolean;
+  /**
+   * GET /corporations/{id}/divisions — the names the corp gave its wallet and
+   * hangar divisions (issue #4756). Director-only: `x-required-roles` is
+   * ["Director"] alone, narrower than the wallet it labels, so an Accountant
+   * reads the wallet and takes a 403 here.
+   */
+  canReadDivisions: boolean;
+  /**
+   * GET /corporations/{id}/structures/skyhooks and /sovereignty-hubs detail —
+   * raid windows and reagent bays (issue #4775). Station_Manager per
+   * `x-required-roles`, behind a scope the structure list does not use.
+   */
+  canReadSkyhooks: boolean;
 }
 
 export type CorpCapability = keyof CorpCapabilities;
@@ -116,6 +129,8 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadRoleAudit',
   'canReadContracts',
   'canReadOrders',
+  'canReadDivisions',
+  'canReadSkyhooks',
 ];
 
 /** The answer for a Character with no roles — and the shape of "not loaded yet". */
@@ -133,6 +148,8 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadRoleAudit: false,
   canReadContracts: false,
   canReadOrders: false,
+  canReadDivisions: false,
+  canReadSkyhooks: false,
 };
 
 /**
@@ -175,6 +192,10 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
   canReadContracts: [],
   // `x-required-roles` on /corporations/{id}/orders: Accountant or Trader.
   canReadOrders: ['Accountant', 'Trader'],
+  // `x-required-roles` on /corporations/{id}/divisions is ["Director"] alone.
+  canReadDivisions: [],
+  // `x-required-roles` on the skyhook routes and the hub detail is Station_Manager.
+  canReadSkyhooks: ['Station_Manager'],
 };
 
 /** Capabilities every corp member holds: ESI names no role for them, so they say nothing about roles. */

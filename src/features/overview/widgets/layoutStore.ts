@@ -18,7 +18,9 @@ import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { getKind } from './kinds';
 import {
   DEFAULT_RANGE,
+  DEFAULT_RAIDS_RADIUS,
   isPlexPlan,
+  isRaidsRadius,
   WIDGET_RANGES,
   type OverviewLayout,
   type Widget,
@@ -55,6 +57,14 @@ function parseWidget(raw: unknown): Widget | null {
   }
   if (!isRowsPerPage(raw.rowsPerPage)) delete out.rowsPerPage;
   if (!def.hasCalendarEvents || raw.calendarEvents !== 'all') delete out.calendarEvents;
+  if (!def.hasRaidsWhere || raw.raidsWhere !== 'near') delete out.raidsWhere;
+  if (
+    !def.hasRaidsWhere ||
+    !isRaidsRadius(raw.raidsRadius) ||
+    raw.raidsRadius === DEFAULT_RAIDS_RADIUS
+  ) {
+    delete out.raidsRadius;
+  }
   if (!def.hasPlexPlan || !isPlexPlan(raw.plexPer30Days)) delete out.plexPer30Days;
   return out as unknown as Widget;
 }

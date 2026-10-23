@@ -5,15 +5,18 @@
  * Single-line rows, a header in the micro style (only when a column has a
  * label), tabular numerals, numeric columns right-aligned, a severity icon
  * before the first cell of a toned row, the first column truncated, and the
- * whole row a link when it has a `to` (the trailing caret is the §6c cue).
- * No row buttons and no other chrome: the widget's title link and the row's own
- * link are the only ways out. Columns are chosen by `visibleColumns` from the
- * width budget the caller passes, never from the viewport. The one other way a
- * column goes is `hideNarrow`: CSS hides it while this table's own box is under
- * 28rem (a container query, so a phone's full-width widget drops it and a
- * half-width one on a desktop does too).
+ * whole row a link when it has a `to` (the trailing caret is the §6c cue), or
+ * a button that opens `RowDetailModal` when it has a `detail` (the first cell's
+ * accent name is the cue, §6c "Widget rows"). No row buttons and no other
+ * chrome: the widget's title link and the row's own link or modal are the only
+ * ways out. Columns are chosen by `visibleColumns` from the width budget the
+ * caller passes, never from the viewport, then by `fitColumns` for a
+ * `fitWidth` table. The one other way a column goes is `hideNarrow`: CSS hides
+ * it while this table's own box is under 28rem (a container query, so a
+ * phone's full-width widget drops it and a half-width one on a desktop does
+ * too).
  */
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -28,12 +31,14 @@ import {
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
 import { nextDataTableSort } from '@/components/ui/dataTableSort';
 import * as Icon from '@/components/ui/icons';
+import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { RowTappableContext } from '@/components/ui/tooltipHold';
 import { cx } from '@/lib/cx';
 import type { TableCell, TableColumn, TableModel, TableRowModel } from './data/types';
 import type { WidgetSize } from './kinds';
 import { fractionBar, type CellTone } from './data/cellKit';
-import { visibleColumns } from './tableModel';
+import { RowDetailModal } from './RowDetailModal';
+import { fitColumns, visibleColumns } from './tableModel';
 import {
   ROWS_PER_PAGE_OPTIONS,
   clampPage,
@@ -104,6 +109,9 @@ function cellTone(cell: TableCell): CellTone | undefined {
 
 const cellPad = 'pl-3 last:pr-3';
 
+/** Px of the `w-5` caret column a linked row adds. */
+const CARET_WIDTH = 20;
+
 /** A `hideNarrow` column is hidden until the table is 28rem across (see `TableColumn.hideNarrow`). */
 const HIDE_NARROW = 'hidden @md:table-cell';
 
@@ -115,6 +123,7 @@ function Row({
   compact,
   rowHeader,
   growKey,
+  onOpen,
 }: {
   row: TableRowModel;
   columns: readonly TableColumn[];
@@ -126,18 +135,21 @@ function Row({
   rowHeader: boolean;
   /** The visible column that truncates in the first one's place, when a table has one. */
   growKey: string | undefined;
+  /** Opens the row's detail modal; set only for a row with a `detail`. */
+  onOpen?: () => void;
 }) {
   const { t } = useTranslation();
   const toned = row.tone !== undefined && row.tone !== 'clear';
   // The icon (colour plus shape) marks only what needs a decision; a "watch" row just tints its figure.
   const flagged = row.tone === 'warning' || row.tone === 'critical';
   const linked = row.to !== undefined;
+  const opens = onOpen !== undefined;
   return (
     <tr
       className={cx(
         'group relative border-b border-line last:border-b-0',
-        linked ? 'h-11 md:h-7' : 'h-8 md:h-7',
-        linked && rowInteractiveClassName
+        linked || opens ? 'h-11 md:h-7' : 'h-8 md:h-7',
+        (linked || opens) && rowInteractiveClassName
       )}
     >
       {columns.map((column, i) => {
@@ -194,6 +206,22 @@ function Row({
                     >
                       {text}
                     </Link>
+                  </RowTappableContext.Provider>
+                ) : opens ? (
+                  <RowTappableContext.Provider value>
+                    <button
+                      type="button"
+                      aria-haspopup="dialog"
+                      onClick={onOpen}
+                      className={entityLinkClassName(
+                        cx(
+                          'min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:content-[""]',
+                          'focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-accent'
+                        )
+                      )}
+                    >
+                      {text}
+                    </button>
                   </RowTappableContext.Provider>
                 ) : (
                   <span className="min-w-0 truncate">{text}</span>
@@ -324,9 +352,29 @@ export function TableBody({
   className,
 }: TableBodyProps) {
   const { t } = useTranslation();
-  const columns = visibleColumns(table.columns, columnsFor);
+  // Only a `fitWidth` table measures; until the first measure it keeps the size-budget columns.
+  const [box, setBox] = useState<HTMLDivElement | null>(null);
+  const [boxWidth, setBoxWidth] = useState<number | null>(null);
+  const fit = table.fitWidth === true;
+  // Observed from a layout effect, so the first measure arrives before the first paint.
+  useLayoutEffect(() => {
+    if (!fit || !box || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[entries.length - 1]?.contentRect.width;
+      // Whole pixels, so a drag-resize does not re-render on every fraction.
+      if (width !== undefined) setBoxWidth(Math.round(width));
+    });
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [fit, box]);
+  const budgeted = visibleColumns(table.columns, columnsFor);
+  // The trailing caret column (`w-5`) takes its share of the box before any data column.
+  const caretWidth = table.rows.some((row) => row.to !== undefined) ? CARET_WIDTH : 0;
+  const columns = fit && boxWidth !== null ? fitColumns(budgeted, boxWidth - caretWidth) : budgeted;
   const indexes = columns.map((column) => table.columns.indexOf(column));
   const [sort, setSort] = useState<{ columnId: string; direction: 'asc' | 'desc' } | null>(null);
+  // The opened row's facts as they were on the click, so a refresh never swaps them mid-read.
+  const [opened, setOpened] = useState<TableRowModel | null>(null);
   // The page is remembered with the page size it was chosen under, so a size change
   // starts over on page 1 without an effect to reset it.
   const [pageState, setPageState] = useState({ page: 1, perPage: paging?.rowsPerPage });
@@ -360,7 +408,7 @@ export function TableBody({
   const growKey = columns.find((column, i) => i > 0 && column.grow)?.key;
   const caret = shown.some((row) => row.to !== undefined);
   return (
-    <div className={cx('@container', className)}>
+    <div ref={setBox} className={cx('@container', className)}>
       <table aria-label={ariaLabel} className="w-full border-collapse">
         {hasHeader && (
           <thead>
@@ -417,6 +465,7 @@ export function TableBody({
               compact={columnsFor === 'S'}
               rowHeader={!hasHeader}
               growKey={growKey}
+              onOpen={row.detail === undefined ? undefined : () => setOpened(row)}
             />
           ))}
         </tbody>
@@ -440,6 +489,7 @@ export function TableBody({
           {table.footer}
         </p>
       )}
+      <RowDetailModal detail={opened?.detail ?? null} onClose={() => setOpened(null)} />
     </div>
   );
 }

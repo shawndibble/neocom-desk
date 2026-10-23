@@ -3,6 +3,7 @@ import {
   isContractSnapshotObject,
   isEvePortraitImage,
   isEveTypeImage,
+  isLazyChunk,
   isVersionedSdeData,
 } from './swRoutes';
 
@@ -89,5 +90,32 @@ describe('isContractSnapshotObject', () => {
       isContractSnapshotObject(at('https://data.neocomdesk.com/courier-contracts/index.json'))
     ).toBe(false);
     expect(isContractSnapshotObject(at('/contract-offers/types/34.0123abcd.json'))).toBe(false);
+  });
+});
+
+describe('isLazyChunk', () => {
+  const match = (href: string, base = '/', mode: RequestMode = 'cors') =>
+    isLazyChunk(at(href), mode, ORIGIN, base);
+
+  it('matches a same-origin hashed script or stylesheet under assets/', () => {
+    expect(match('/assets/Market-AbC123.js')).toBe(true);
+    expect(match('/assets/Market-AbC123.css')).toBe(true);
+  });
+
+  it('follows the base URL', () => {
+    expect(match('/desk/assets/Market-AbC123.js', '/desk/')).toBe(true);
+    expect(match('/assets/Market-AbC123.js', '/desk/')).toBe(false);
+  });
+
+  it('ignores other origins, other folders and other file types', () => {
+    expect(isLazyChunk(new URL('https://cdn.example/assets/a.js'), 'cors', ORIGIN, '/')).toBe(
+      false
+    );
+    expect(match('/data/masteries.json')).toBe(false);
+    expect(match('/assets/logo.png')).toBe(false);
+  });
+
+  it('ignores a navigation', () => {
+    expect(match('/assets/Market-AbC123.js', '/', 'navigate')).toBe(false);
   });
 });

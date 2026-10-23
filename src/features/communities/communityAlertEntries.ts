@@ -57,11 +57,12 @@ async function loadPledgeEntries(
   requests: typeof import('./requestStore')
 ): Promise<CommunityAlertEntry[]> {
   const now = Date.now();
+  // A standing Request takes quotes, not Pledges, so it never raises a Pledge alert.
   // Only the Character's own Requests are read (one query on ownerUid); their
   // Pledges then come from one collection-group query for the Community, not
   // one read per Request.
   const mine = (await requests.loadMyRequests(characterId, community.id)).filter(
-    (request) => request.notify.app && isOpenRequest(request, now)
+    (request) => request.notify.app && !request.standing && isOpenRequest(request, now)
   );
   if (mine.length === 0) return [];
   const base = { communityId: community.id, communityName: community.name };

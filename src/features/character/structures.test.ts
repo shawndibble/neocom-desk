@@ -5,7 +5,11 @@ import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { onEsiAuthFailure } from '@/esi/authFailureSignal';
 import { db } from '@/db';
 import { STALE_AFTER, resetRevalidationState } from '@/esi/cache';
-import { loadStructureName } from './structures';
+import {
+  loadStructureName,
+  loadStructureNameNoRoster,
+  readCachedStructureNames,
+} from './structures';
 import { seedCharacter as seedCharacterRow } from '@/test/seed';
 
 const CHARACTER_ID = 42;
@@ -283,5 +287,48 @@ describe('loadStructureName', () => {
     const name = await loadStructureName(CHARACTER_ID, 1000000000003);
 
     expect(name).toBeNull();
+  });
+});
+
+describe('readCachedStructureNames', () => {
+  it('returns only the names already cached, with no request', async () => {
+    await db.esiCache.put({
+      characterId: 0,
+      key: 'structure:1000000000001',
+      value: { name: 'Cached Keepstar', owner_id: 1, solar_system_id: 1 },
+      fetchedAt: Date.now(),
+    });
+    const names = await readCachedStructureNames([1000000000001, 1000000000002]);
+    expect([...names]).toEqual([[1000000000001, 'Cached Keepstar']]);
+  });
+});
+
+describe('loadStructureNameNoRoster', () => {
+  it('does not sweep the roster when the character is refused', async () => {
+    await seedCharacter(CHARACTER_ID);
+    await seedCharacter(OTHER_CHARACTER_ID);
+    await seedCharacter(THIRD_CHARACTER_ID);
+    let calls = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/structures/1000000000001`, () => {
+        calls += 1;
+        return HttpResponse.json({ error: 'Forbidden' }, { status: 403 });
+      })
+    );
+
+    expect(await loadStructureNameNoRoster(CHARACTER_ID, 1000000000001)).toBeNull();
+    expect(calls).toBe(1);
+  });
+
+  it('resolves and shares the name like loadStructureName', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/structures/1000000000001`, () =>
+        HttpResponse.json({ name: 'Own Citadel', owner_id: 1, solar_system_id: 1 })
+      )
+    );
+    expect(await loadStructureNameNoRoster(CHARACTER_ID, 1000000000001)).toBe('Own Citadel');
+    expect((await readCachedStructureNames([1000000000001])).get(1000000000001)).toBe(
+      'Own Citadel'
+    );
   });
 });

@@ -41,6 +41,11 @@ import {
   type IncursionNearbyFire,
 } from '@/engine/incursions/incursionAlert';
 import {
+  diffSkyhookRaidableNearby,
+  type SkyhookAlertSnapshot,
+  type SkyhookRaidableNearbyFire,
+} from '@/engine/skyhooks/skyhookAlert';
+import {
   diffCommunityJoinRequest,
   diffCommunityMemberJoined,
   diffCommunityRequestPledged,
@@ -75,6 +80,9 @@ import {
   diffCorpMemberLeft,
   diffCorpWalletThreshold,
   diffPriceAlertTriggered,
+  diffShipLost,
+  type ShipLossSnapshot,
+  type ShipLostFire,
   type NotificationFire,
   type SpExtractionFire,
   type CloneJumpReadyFire,
@@ -91,6 +99,14 @@ import {
   type OrdersLapsingFire,
   type EveNotificationFire,
   type StructureFuelLowFire,
+  type MercenaryDenReinforcedFire,
+  type SkyhookRaidableFire,
+  type SkyhookSnapshot,
+  diffSkyhookRaidable,
+  type MercenaryDenAnarchyFire,
+  type DenSnapshot,
+  diffMercenaryDenReinforced,
+  diffMercenaryDenAnarchy,
   type CorpIndustryJobNotificationFire,
   type CorpMemberJoinedFire,
   type CorpMemberLeftFire,
@@ -132,12 +148,19 @@ import {
   ordersLapsingCopy,
   eveNotificationCopy,
   structureFuelCopy,
+  mercenaryDenReinforcedCopy,
+  skyhookRaidableCopy,
+  mercenaryDenAnarchyCopy,
   corpIndustryJobCopy,
   corpRosterCopy,
   corpWalletCopy,
   priceAlertCopy,
   stockBelowTargetCopy,
   incursionNearbyCopy,
+  skyhookRaidableNearbyCopy,
+  type SkyhookNames,
+  shipLostCopy,
+  type ShipLostNames,
   communityJoinRequestCopy,
   communityMemberJoinedCopy,
   communityRequestPledgedCopy,
@@ -172,13 +195,18 @@ export type AnyNotificationFire =
   | OrdersLapsingFire
   | EveNotificationFire
   | StructureFuelLowFire
+  | MercenaryDenReinforcedFire
+  | SkyhookRaidableFire
+  | MercenaryDenAnarchyFire
   | CorpIndustryJobNotificationFire
   | CorpMemberJoinedFire
   | CorpMemberLeftFire
   | CorpWalletThresholdFire
   | PriceAlertTriggeredFire
+  | ShipLostFire
   | StockBelowTargetFire
   | IncursionNearbyFire
+  | SkyhookRaidableNearbyFire
   | CommunityJoinRequestFire
   | CommunityMemberJoinedFire
   | CommunityRequestPledgedFire;
@@ -218,12 +246,16 @@ export const SNAPSHOT_SOURCES = {
   orderExpiry: source<OrderExpirySnapshot>('orderExpiry'),
   eveNotification: source<EveNotificationSnapshot, EveNotificationNames>('eveNotification'),
   structureFuel: source<StructureFuelSnapshot>('structureFuel'),
+  mercenaryDens: source<DenSnapshot, PlanetNames>('mercenaryDens'),
+  skyhooks: source<SkyhookSnapshot, PlanetNames>('skyhooks'),
   corpIndustryJobs: source<CorpIndustryJobSnapshot, ItemNames>('corpIndustryJobs'),
   corpRoster: source<CorpRosterSnapshot, MemberNames>('corpRoster'),
   corpWallet: source<CorpWalletSnapshot>('corpWallet'),
   priceAlert: source<PriceAlertSnapshot>('priceAlert'),
   stockTargets: source<StockAlertSnapshot>('stockTargets'),
+  kills: source<ShipLossSnapshot, ShipLostNames>('kills'),
   incursions: source<IncursionAlertSnapshot, IncursionNames>('incursions'),
+  skyhooksNearby: source<SkyhookAlertSnapshot, SkyhookNames>('skyhooksNearby'),
   communities: source<CommunityAlertSnapshot>('communities'),
 } as const;
 
@@ -404,6 +436,24 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     // before authorization.
     rowHintKey: 'settings.notifications.extractorExpiringHint',
   }),
+  // Per Character (issue #4782): ESI has no corporation den route.
+  mercenaryDenReinforced: defineEvent({
+    source: SNAPSHOT_SOURCES.mercenaryDens,
+    diff: diffMercenaryDenReinforced,
+    copy: mercenaryDenReinforcedCopy,
+    projection: { push: mercenaryDenReinforcedCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.mercenaryDenReinforcedLeadHours], hintKey: null },
+    rowHintKey: 'settings.notifications.mercenaryDenReinforcedHint',
+  }),
+  // Diff-based, so foreground-only: the server holds no den-scope token (ADR 0010).
+  mercenaryDenAnarchy: defineEvent({
+    source: SNAPSHOT_SOURCES.mercenaryDens,
+    diff: diffMercenaryDenAnarchy,
+    copy: mercenaryDenAnarchyCopy,
+    projection: null,
+    thresholds: { fields: [THRESHOLD_FIELDS.mercenaryDenAnarchyPercent], hintKey: null },
+    rowHintKey: 'settings.notifications.mercenaryDenAnarchyForegroundOnlyHint',
+  }),
   marketOrderFilled: defineEvent({
     source: SNAPSHOT_SOURCES.marketOrders,
     diff: diffMarketOrderFilled,
@@ -525,6 +575,18 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     },
     rowHintKey: null,
   }),
+  // Corp scope (issue #4784): a raid window is a known timestamp, so it projects.
+  skyhookRaidable: defineEvent({
+    source: SNAPSHOT_SOURCES.skyhooks,
+    diff: diffSkyhookRaidable,
+    copy: skyhookRaidableCopy,
+    projection: { push: skyhookRaidableCopy.push, everyOccurrence: true },
+    thresholds: {
+      fields: [THRESHOLD_FIELDS.skyhookRaidableLeadHours, THRESHOLD_FIELDS.skyhookRaidableMinUnits],
+      hintKey: 'settings.notifications.skyhookRaidableMinUnitsHint',
+    },
+    rowHintKey: 'settings.notifications.skyhookRaidableHint',
+  }),
   corpIndustryJobReady: defineEvent({
     source: SNAPSHOT_SOURCES.corpIndustryJobs,
     diff: diffCorpIndustryJobReady,
@@ -588,6 +650,29 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: {
       fields: [THRESHOLD_FIELDS.incursionNearbyJumps],
       hintKey: 'settings.notifications.incursionNearbyRouteRulesHint',
+    },
+    rowHintKey: null,
+  }),
+  skyhookRaidableNearby: defineEvent({
+    source: SNAPSHOT_SOURCES.skyhooksNearby,
+    diff: diffSkyhookRaidableNearby,
+    copy: skyhookRaidableNearbyCopy,
+    projection: null,
+    thresholds: {
+      fields: [THRESHOLD_FIELDS.skyhookRaidableNearbyJumps],
+      hintKey: 'settings.notifications.skyhookRaidableNearbyRouteRulesHint',
+    },
+    rowHintKey: null,
+  }),
+  shipLost: defineEvent({
+    source: SNAPSHOT_SOURCES.kills,
+    diff: diffShipLost,
+    copy: shipLostCopy,
+    // zKillboard is not polled server-side, so there is nothing to project.
+    projection: null,
+    thresholds: {
+      fields: [THRESHOLD_FIELDS.shipLostMinimumIsk],
+      hintKey: 'settings.notifications.shipLostMinimumIskHint',
     },
     rowHintKey: null,
   }),

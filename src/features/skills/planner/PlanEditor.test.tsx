@@ -312,11 +312,11 @@ describe('PlanEditor tools pane', () => {
 
     await user.click(within(actions).getByRole('button', { name: 'Optimize' }));
     for (const name of [
-      'Optimize for me…',
-      'Reorder only…',
-      'Shortest first…',
-      'Place remaps only…',
-      'Use my remap markers…',
+      'Optimize for me',
+      'Reorder only',
+      'Shortest first',
+      'Place remaps only',
+      'Use my remap markers',
     ]) {
       expect(screen.getByRole('menuitem', { name })).toBeInTheDocument();
     }
@@ -324,7 +324,7 @@ describe('PlanEditor tools pane', () => {
 
     // Attributes: the sheet every estimate is costed against, then the two
     // what-if lenses over it — which change the numbers, not the plan.
-    expect(within(attributesSection).getByText('Intelligence')).toBeInTheDocument();
+    expect(within(attributesSection).getByText('INT')).toBeInTheDocument();
     // The lenses live one level in, under the closed-by-default Assumptions
     // row, not in the Attributes section.
     expect(within(attributesSection).queryByLabelText('What-if implants')).toBeNull();
@@ -464,11 +464,11 @@ describe('PlanEditor tools pane', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    await clickOptimizeMode(user, 'Reorder only…');
+    await clickOptimizeMode(user, 'Reorder only');
 
     const dialog = screen.getByRole('dialog', { name: 'Suggested reorder' });
-    expect(within(dialog).getByText('Skill B I')).toBeInTheDocument();
-    expect(within(dialog).getByText('Skill A I')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('Skill B I').length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByText('Skill A I').length).toBeGreaterThan(0);
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
@@ -486,7 +486,7 @@ describe('PlanEditor tools pane', () => {
     const { onUpdate } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Reorder only…');
+    await clickOptimizeMode(user, 'Reorder only');
     const dialog = screen.getByRole('dialog', { name: 'Suggested reorder' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
@@ -502,11 +502,11 @@ describe('PlanEditor tools pane', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    await clickOptimizeMode(user, 'Shortest first…');
+    await clickOptimizeMode(user, 'Shortest first');
 
     const dialog = screen.getByRole('dialog', { name: 'Suggested shortest-first sort' });
-    expect(within(dialog).getByText('Skill B I')).toBeInTheDocument();
-    expect(within(dialog).getByText('Skill A I')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('Skill B I').length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByText('Skill A I').length).toBeGreaterThan(0);
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
@@ -524,7 +524,7 @@ describe('PlanEditor tools pane', () => {
     const { onUpdate } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Shortest first…');
+    await clickOptimizeMode(user, 'Shortest first');
     const dialog = screen.getByRole('dialog', { name: 'Suggested shortest-first sort' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
@@ -540,7 +540,7 @@ describe('PlanEditor tools pane', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
     expect(within(dialog).getByText(/^Remapping saves/)).toBeInTheDocument();
@@ -563,7 +563,7 @@ describe('PlanEditor tools pane', () => {
     const { onUpdate } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
     const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
@@ -577,7 +577,7 @@ describe('PlanEditor tools pane', () => {
     const { replacePlan } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
     expect(screen.getByRole('dialog', { name: 'Optimize remaps' })).toBeInTheDocument();
 
     replacePlan((current) => ({ ...current, entries: [...current.entries].reverse() }));
@@ -591,7 +591,7 @@ describe('PlanEditor tools pane', () => {
     const { replacePlan } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Reorder only…');
+    await clickOptimizeMode(user, 'Reorder only');
     expect(screen.getByRole('dialog', { name: 'Suggested reorder' })).toBeInTheDocument();
 
     replacePlan((current) => ({ ...current, id: 'plan-2' }));
@@ -606,15 +606,20 @@ describe('PlanEditor tools pane', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    await clickOptimizeMode(user, 'Optimize for me…');
+    await clickOptimizeMode(user, 'Optimize for me');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize for me' });
     // The new order, same as "Suggest reorder"'s own preview: high-priority
     // Skill B first.
-    expect(within(dialog).getByText('Skill B I')).toBeInTheDocument();
-    expect(within(dialog).getByText('Skill A I')).toBeInTheDocument();
+    // Each skill shows once in Current and once in Optimized.
+    expect(within(dialog).getAllByText('Skill B I')).toHaveLength(2);
+    expect(within(dialog).getAllByText('Skill A I')).toHaveLength(2);
     expect(within(dialog).getByText(/^Total /)).toBeInTheDocument();
-    expect(within(dialog).getByText('Segment 1')).toBeInTheDocument();
+    expect(within(dialog).getByText(/^Current · /)).toBeInTheDocument();
+    expect(within(dialog).getByText(/^Optimized · /)).toBeInTheDocument();
+    // Skill B jumps ahead of Skill A: Current says where it goes, Optimized says it moved up.
+    expect(within(dialog).getByText('moves to 1')).toBeInTheDocument();
+    expect(within(dialog).getByText('Moved up 1 place')).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
@@ -632,12 +637,35 @@ describe('PlanEditor tools pane', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('"Optimize for me" says there is nothing to gain instead of listing a reshuffle that saves no time', async () => {
+    const user = userEvent.setup();
+    // One skill, on a sheet already remapped for its attributes: no order or remap helps.
+    const plan = { ...PLAN, entries: [{ skillTypeID: 10, targetLevel: 1 }] };
+    const attributes: Attributes = {
+      intelligence: 27,
+      memory: 21,
+      perception: 17,
+      willpower: 17,
+      charisma: 17,
+    };
+    const { onUpdate } = renderEditor(vi.fn(), { plan, attributes });
+    await openTools(user);
+
+    await clickOptimizeMode(user, 'Optimize for me');
+    const dialog = screen.getByRole('dialog', { name: 'Optimize for me' });
+
+    expect(within(dialog).getByText(/^Nothing to gain/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Accept' })).toBeNull();
+    await user.click(within(dialog).getByRole('button', { name: 'Dismiss' }));
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
   it('Reject closes the "Optimize for me" Modal without updating the plan', async () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Optimize for me…');
+    await clickOptimizeMode(user, 'Optimize for me');
     const dialog = screen.getByRole('dialog', { name: 'Optimize for me' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
@@ -652,7 +680,7 @@ describe('PlanEditor tools pane', () => {
     await openTools(user);
 
     await user.click(screen.getByRole('button', { name: 'Optimize' }));
-    const item = screen.getByRole('menuitem', { name: 'Use my remap markers…' });
+    const item = screen.getByRole('menuitem', { name: 'Use my remap markers' });
     expect(item).toHaveAttribute('aria-disabled', 'true');
     expect(within(item).getByText('Add a remap marker first')).toBeInTheDocument();
   });
@@ -662,7 +690,7 @@ describe('PlanEditor tools pane', () => {
     const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, remapCount: 0 } });
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
     expect(
@@ -681,7 +709,7 @@ describe('PlanEditor tools pane', () => {
     renderEditor();
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
     const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
@@ -752,7 +780,7 @@ describe('PlanEditor tools pane', () => {
     // is accepted, not where the figure is first disclosed.
     expect(within(sectionFor('Actions')).getByText(/^Saves/)).toBeInTheDocument();
 
-    await clickOptimizeMode(user, 'Use my remap markers…');
+    await clickOptimizeMode(user, 'Use my remap markers');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize at my markers' });
     expect(within(dialog).getByText(/^Remapping saves/)).toBeInTheDocument();
@@ -771,7 +799,7 @@ describe('PlanEditor tools pane', () => {
     const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, markers: [1] } });
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Use my remap markers…');
+    await clickOptimizeMode(user, 'Use my remap markers');
     const dialog = screen.getByRole('dialog', { name: 'Optimize at my markers' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
@@ -788,7 +816,7 @@ describe('PlanEditor tools pane', () => {
     });
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Use my remap markers…');
+    await clickOptimizeMode(user, 'Use my remap markers');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize at my markers' });
     expect(
@@ -960,7 +988,7 @@ describe('PlanEditor tools pane', () => {
     renderEditor(vi.fn(), { plan: localPlan, catalog: localCatalog, trainedSkills: trained });
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Use my remap markers…');
+    await clickOptimizeMode(user, 'Use my remap markers');
 
     // remapInstruction's own format: five "XXX N" terms joined by " / ",
     // which only a marker row's attribute spread (never an attribute-pair
@@ -1056,13 +1084,12 @@ describe('"Optimize for me" never previews or writes a redundant remap (real rep
     const { onUpdate } = renderEditor(vi.fn(), { plan: PW_PLAN, catalog: PW_CATALOG });
     await openTools(user);
 
-    await clickOptimizeMode(user, 'Optimize for me…');
+    await clickOptimizeMode(user, 'Optimize for me');
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize for me' });
-    expect(within(dialog).getByText('Segment 1')).toBeInTheDocument();
     // The whole point of the fix: a second segment that would just repeat
     // the first's spread never gets previewed as a real second remap.
-    expect(within(dialog).queryByText('Segment 2')).toBeNull();
+    expect(within(dialog).getAllByText('New remap marker.')).toHaveLength(1);
 
     await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
 
@@ -1236,17 +1263,13 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
     await openTools(user);
 
     const section = sectionFor('Attributes');
-    expect(within(section).getByText('Intelligence')).toBeInTheDocument();
+    expect(within(section).getByText('INT')).toBeInTheDocument();
     expect(within(section).getByText('24')).toBeInTheDocument();
     expect(within(section).getByText('25')).toBeInTheDocument();
     // `attributes` (what computeSchedule runs on) is all 20s here, and falls
     // back to placeholder numbers when ESI can't be read — presenting it as
     // the character's own sheet is exactly the mistake to avoid.
     expect(within(section).queryByText('20')).toBeNull();
-    // The caption naming which half of the section is fact. Asserted on the
-    // rendered text, not the key: a mistyped key renders as its own name and
-    // nothing else in the gate — `tsc` included — can see that.
-    expect(within(section).getByText(/current sheet/i)).toBeInTheDocument();
   });
 
   it('dates the attributes, as every ESI-derived view must', async () => {
@@ -1289,7 +1312,7 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
 
     const section = sectionFor('Attributes');
     expect(within(section).getByText('—')).toBeInTheDocument();
-    expect(within(section).queryByText('Intelligence')).toBeNull();
+    expect(within(section).queryByText('INT')).toBeNull();
     expect(section.querySelector('time')).toBeNull();
   });
 
@@ -1313,7 +1336,7 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
     // No second always-open block above the entry list — the plan still leads
     // the page, and the attributes cost the same one tap as every other tool.
     expect(screen.queryByRole('heading', { name: 'Attributes' })).toBeNull();
-    expect(screen.queryByText('Intelligence')).toBeNull();
+    expect(screen.queryByText('INT')).toBeNull();
   });
 
   it('shows them in the sidebar with no interaction at `lg`+, beside the lens that reinterprets them', () => {

@@ -152,6 +152,32 @@ function ownerOf(
 }
 
 /**
+ * Another live connection this one shares ore with that nobody owns: same
+ * Character and system, a shared ore type, and `ownerOf` finds no single owner,
+ * so `planSurveyAutoAssign` leaves that ore for the pilot to assign.
+ */
+export function findOreClash(
+  connection: SurveyConnection,
+  connections: readonly SurveyConnection[],
+  nowMs: number
+): SurveyConnection | undefined {
+  if (connection.systemId === null) return undefined;
+  const sameField = connections.filter(
+    (c) =>
+      c.characterId === connection.characterId &&
+      c.systemId === connection.systemId &&
+      isConnectionLive(c, nowMs)
+  );
+  for (const typeId of connection.typeIds) {
+    const claimants = sameField.filter((c) => c.typeIds.includes(typeId));
+    if (claimants.length > 1 && ownerOf(claimants, nowMs) === undefined) {
+      return claimants.find((c) => c !== connection && c.surveyId !== connection.surveyId);
+    }
+  }
+  return undefined;
+}
+
+/**
  * The ore each live connection should assign now: per entry, what no stored
  * Assignment holds (entry quantity less every covering snapshot), grouped by
  * the connection whose ore types it is. Nothing for an entry when any of that

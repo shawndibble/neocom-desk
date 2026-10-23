@@ -18,6 +18,7 @@
  */
 
 import { romanLevel } from '@/engine/projection';
+import { isReinforced, openOperations, type Den } from '@/engine/character/mercenaryDens';
 import type {
   CalendarEventSummary,
   Contract,
@@ -29,6 +30,7 @@ import type {
 import { isActiveContractStatus } from '@/engine/contracts/contractStatus';
 import { courierDeliveryDeadlineMs } from '@/engine/contracts/courierDeadline';
 import { parseInstant } from '@/engine/esiInstant';
+import { raidState } from '@/engine/corp/sovereignty';
 import type { BoardCalendarEventSource, BoardClockSource } from '@/engine/character/board';
 import type { BoardExtractionSource } from '@/engine/corp/board';
 import { stepKey, type SkillPlanSchedule } from '@/engine/skills/skillPlanSchedule';
@@ -198,6 +200,85 @@ export function toMoonChunkSources(
       detail: arrived ? 'decay' : 'arrival',
       deadlineMs: arrived ? extraction.naturalDecayMs : extraction.chunkArrivalMs,
     };
+  });
+}
+
+/**
+ * A corp skyhook's theft window, read and named. The window ends are `null`
+ * when ESI gave none we could parse; the stock is `null` when a reagent
+ * count was not a number (unknown, never "0 at risk").
+ */
+export interface SkyhookRaid {
+  id: number;
+  /** The planet's name, else the system's, else `#<id>`. */
+  subject: string;
+  systemId: number | null;
+  systemName: string | null;
+  windowStartMs: number | null;
+  windowEndMs: number | null;
+  /** Units of reagent a raider could take. ESI sends no silo capacity, so there is no percentage. */
+  unsecuredUnits: number | null;
+  securedUnits: number | null;
+}
+
+/**
+ * One row per skyhook with a readable theft window that has not closed: ranked
+ * by its opening while ahead and by its close while open — the corp board's own
+ * rule for a `sovRaid`, via the same `raidState`. `detail` is `upcoming` or
+ * `open`; the view owns the wording.
+ */
+export function toSkyhookRaidSources(
+  raids: readonly SkyhookRaid[],
+  nowMs: number
+): BoardClockSource[] {
+  return raids.flatMap((raid) => {
+    if (raid.windowStartMs === null || raid.windowEndMs === null) return [];
+    const window = { startMs: raid.windowStartMs, endMs: raid.windowEndMs };
+    const state = raidState(window, nowMs);
+    if (state === 'closed') return [];
+    return [
+      {
+        id: String(raid.id),
+        subject: raid.subject,
+        detail: state === 'upcoming' ? 'upcoming' : 'open',
+        deadlineMs: state === 'upcoming' ? window.startMs : window.endMs,
+      },
+    ];
+  });
+}
+
+/** What a den needs to be a clock: the engine's `Den` plus where it is. */
+export type DenClockInput = Den & { planetId: number; planetName: string | null };
+
+/**
+ * One clock per open thing a den is waiting on: its reinforcement end while
+ * still ahead (a lapsed timer is a stale read, not a clock), and each
+ * available or started operation's expiry. `detail` says which.
+ */
+export function toMercenaryDenSources(
+  dens: readonly DenClockInput[],
+  nowMs: number
+): BoardClockSource[] {
+  return dens.flatMap((den) => {
+    const subject = den.planetName ?? `#${den.planetId}`;
+    const sources: BoardClockSource[] = [];
+    if (isReinforced(den, nowMs)) {
+      sources.push({
+        id: `${den.id}:reinforcement`,
+        subject,
+        detail: 'reinforcement',
+        deadlineMs: den.reinforcedUntilMs!,
+      });
+    }
+    openOperations(den.operations, nowMs).forEach((op, index) => {
+      sources.push({
+        id: `${den.id}:operation:${index}`,
+        subject,
+        detail: 'operation',
+        deadlineMs: op.expiresMs,
+      });
+    });
+    return sources;
   });
 }
 

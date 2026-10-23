@@ -5,8 +5,14 @@
  */
 import { getDecimalMark } from '@/lib/numberLocale';
 
-/** The lazy SDE packs, in display order (the fitting engine is a pack of its own, outside this list). */
-export const OFFLINE_PACK_IDS = ['itemInfo', 'market', 'planetary', 'reference'] as const;
+/** The packs, in display order: the lazy SDE files, then the build's route chunks (the fitting engine is a pack of its own, outside this list). */
+export const OFFLINE_PACK_IDS = [
+  'itemInfo',
+  'market',
+  'planetary',
+  'reference',
+  'appPages',
+] as const;
 export type OfflinePackId = (typeof OFFLINE_PACK_IDS)[number];
 
 /**
@@ -18,6 +24,8 @@ export function packFor(file: string): OfflinePackId {
   if (file.startsWith('typeInfo/')) return 'itemInfo';
   if (file.startsWith('market/') || file === 'marketWideTrees.json') return 'market';
   if (file.startsWith('pi-')) return 'planetary';
+  // A build chunk (`lazy-chunks.json`), not a `public/data` file.
+  if (file.startsWith('assets/')) return 'appPages';
   return 'reference';
 }
 
