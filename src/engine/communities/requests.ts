@@ -17,6 +17,7 @@ import {
   isBuybackGroup,
   isValidRate,
   type BuybackLine,
+  type HeldQuote,
   type StandingRequest,
 } from './buyback';
 
@@ -115,6 +116,8 @@ export interface PledgeEntry {
 export interface RequestPledge {
   uid: string;
   lines: Readonly<Record<number, PledgeEntry>>;
+  /** The Member's held Quote on a standing buyback Request; absent on an ordinary one. */
+  quote?: HeldQuote;
   /** When the Member last wrote this document, ms since epoch. */
   updatedAt: number;
 }

@@ -635,6 +635,110 @@ describe('Requests', () => {
       await assertSucceeds(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1_000_000_000_000) })));
     });
 
+    describe('Quotes on a standing buyback Request (issue #4780)', () => {
+      const STANDING = `${C}/itemRequests/r-standing`;
+      const QUOTE = `${STANDING}/pledges/char:2`;
+      const standingRequest = (over: Record<string, unknown> = {}) => {
+        // A standing Request has no expiry and no item lines.
+        const base: Record<string, unknown> = request({ lines: [], ...over });
+        delete base.expiresAt;
+        return {
+          ...base,
+          standing: true,
+          rate: 90,
+          rateBasis: 'buy',
+          hubId: 'jita',
+          buyLines: [{ kind: 'group', group: 'ore' }],
+        };
+      };
+      const quote = (over: Record<string, unknown> = {}) => {
+        const quotedAt = Date.now();
+        return {
+          lines: [{ typeId: 1230, name: 'Veldspar', quantity: 1000, unitPrice: 10, total: 9000 }],
+          total: 9000,
+          quotedAt,
+          expiresAt: quotedAt + 14 * DAY,
+          ...over,
+        };
+      };
+      const quoteDoc = (over: Record<string, unknown> = {}, q = quote()) =>
+        pledgeDoc({}, { quote: q, ...over });
+
+      beforeEach(async () => {
+        await env.withSecurityRulesDisabled(async (ctx) => {
+          const db = ctx.firestore();
+          await setDoc(doc(db, STANDING), standingRequest());
+          await setDoc(
+            doc(db, `${C}/itemRequests/r-standing-closed`),
+            standingRequest({ closed: true })
+          );
+        });
+      });
+
+      it('lets a Member hold, replace and clear their own Quote, with no expiry on the Request', async () => {
+        const db = characterAuth(env, 2, 'hash-2').firestore();
+        await assertSucceeds(setDoc(doc(db, QUOTE), quoteDoc()));
+        await assertSucceeds(setDoc(doc(db, QUOTE), quoteDoc({}, quote({ total: 100 }))));
+        await assertSucceeds(deleteDoc(doc(db, QUOTE)));
+      });
+
+      it('denies a Quote on an ordinary Request, and item lines on a standing one', async () => {
+        const db = characterAuth(env, 2, 'hash-2').firestore();
+        await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 0: entry(1) }, { quote: quote() })));
+        await assertFails(setDoc(doc(db, QUOTE), pledgeDoc({ 0: entry(1) }, { quote: quote() })));
+        await assertFails(setDoc(doc(db, QUOTE), pledgeDoc({ 0: entry(1) })));
+        await assertFails(setDoc(doc(db, QUOTE), pledgeDoc({})));
+      });
+
+      it('denies a Quote that is not held exactly 14 days, or not quoted about now', async () => {
+        const db = characterAuth(env, 2, 'hash-2').firestore();
+        const at = Date.now();
+        await assertFails(
+          setDoc(doc(db, QUOTE), quoteDoc({}, quote({ quotedAt: at, expiresAt: at + 30 * DAY })))
+        );
+        await assertFails(
+          setDoc(
+            doc(db, QUOTE),
+            quoteDoc({}, quote({ quotedAt: at - 3 * DAY, expiresAt: at + 11 * DAY }))
+          )
+        );
+      });
+
+      it('denies a malformed Quote: total, lines and keys', async () => {
+        const db = characterAuth(env, 2, 'hash-2').firestore();
+        for (const bad of [
+          quote({ total: -1 }),
+          quote({ total: 1.5 }),
+          quote({ total: '9000' }),
+          quote({ lines: [] }),
+          quote({ lines: Array.from({ length: 51 }, () => ({ typeId: 1 })) }),
+          quote({ extra: 1 }),
+        ]) {
+          await assertFails(setDoc(doc(db, QUOTE), quoteDoc({}, bad)));
+        }
+      });
+
+      it('denies a Quote on a closed standing Request, by the owner, or in another Member’s name', async () => {
+        const member = characterAuth(env, 2, 'hash-2').firestore();
+        await assertFails(
+          setDoc(doc(member, `${C}/itemRequests/r-standing-closed/pledges/char:2`), quoteDoc())
+        );
+        const owner = characterAuth(env, 1, 'hash-1').firestore();
+        await assertFails(
+          setDoc(doc(owner, `${STANDING}/pledges/char:1`), quoteDoc({ ownerHash: 'hash-1' }))
+        );
+        await assertFails(setDoc(doc(owner, QUOTE), quoteDoc({ ownerHash: 'hash-1' })));
+      });
+
+      it('lets every Member read a Quote', async () => {
+        await env.withSecurityRulesDisabled(async (ctx) => {
+          await setDoc(doc(ctx.firestore(), QUOTE), { ...quoteDoc(), updatedAt: new Date() });
+        });
+        const db = characterAuth(env, 1, 'hash-1').firestore();
+        await assertSucceeds(getDoc(doc(db, QUOTE)));
+      });
+    });
+
     it('denies a line the Request does not have, and keys that are not line indexes', async () => {
       const db = characterAuth(env, 2, 'hash-2').firestore();
       await assertFails(setDoc(doc(db, PLEDGE), pledgeDoc({ 2: entry(1) })));

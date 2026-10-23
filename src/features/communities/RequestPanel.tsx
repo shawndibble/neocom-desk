@@ -18,6 +18,7 @@ import {
   type RequestPledge,
 } from '@/engine/communities/requests';
 import { formatAge } from '@/lib/age';
+import { formatIsk } from '@/lib/isk';
 import { itemsSummary, mailSubject } from '@/engine/communities/requestMail';
 import { mailSafe } from '@/lib/mailSafe';
 import { characterIdForUid } from '@/sync/uid';
@@ -25,6 +26,7 @@ import { communityRequestsUrl } from './communityStore';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { MessageRequesterButton } from './MessageRequesterButton';
 import { PledgeRow } from './PledgeRow';
+import { SellToSection } from './SellToSection';
 import { callableErrorReason } from './callableError';
 import {
   buildPledgeMail,
@@ -276,6 +278,17 @@ export function RequestPanel({
             </ul>
           </section>
         )}
+        {request.standing && !mine && !request.closed && (
+          <SellToSection
+            request={request}
+            characterId={characterId}
+            communityId={communityId}
+            myPledge={myPledge}
+            buyerName={buyerName}
+            now={now}
+            refreshPledges={refreshPledges}
+          />
+        )}
         {request.lines.length > 0 && (
           <ul className="divide-y divide-line" aria-label={t('communities.board.linesLabel')}>
             {request.lines.map((line, index) => {
@@ -326,7 +339,7 @@ export function RequestPanel({
             <GrantMissingLink groups={DELIVERY_GROUPS} />
           </p>
         )}
-        {!mayPledge && !mine && myPledge && (
+        {!mayPledge && !mine && !request.standing && myPledge && (
           <p className="text-xs text-text-dim">{t('communities.board.deliveryClosed')}</p>
         )}
         {delivery?.status === 'read-failed' && (
@@ -382,9 +395,13 @@ export function RequestPanel({
                   <li key={pledge.uid} className="flex min-h-11 items-center gap-2 py-1.5 text-xs">
                     <span className="min-w-0 flex-1 truncate">{name}</span>
                     <span className="text-text-dim">
-                      {t('communities.board.admin.pledgeSummary', {
-                        count: Object.keys(pledge.lines).length,
-                      })}
+                      {pledge.quote
+                        ? t('communities.board.admin.quoteSummary', {
+                            price: formatIsk(pledge.quote.total),
+                          })
+                        : t('communities.board.admin.pledgeSummary', {
+                            count: Object.keys(pledge.lines).length,
+                          })}
                     </span>
                     <NeedsConnection>
                       <Button

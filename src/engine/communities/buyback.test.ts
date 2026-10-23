@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   BUYBACK_GROUPS,
+  MAX_QUOTE_LINES,
   QUOTE_HOLD_MS,
   buybackLineCovers,
   MAX_BUY_LINES,
+  buildQuote,
   isValidRate,
   parseRate,
+  readQuote,
+  unitPriceOf,
   RATE_BASES,
   BUYBACK_HUB_IDS,
   priceQuote,
@@ -134,5 +138,103 @@ describe('shared lists', () => {
     expect([...RATE_BASES]).toEqual(['buy', 'sell']);
     expect([...BUYBACK_HUB_IDS]).toEqual(['jita', 'amarr', 'dodixie', 'rens', 'hek']);
     expect(MAX_BUY_LINES).toBe(50);
+  });
+});
+
+describe('unitPriceOf', () => {
+  const agg = { sellMin: 12, buyMax: 9 };
+  it('reads the side the Request is a percent of', () => {
+    expect(unitPriceOf(agg, 'buy')).toBe(9);
+    expect(unitPriceOf(agg, 'sell')).toBe(12);
+  });
+  it('is null when the hub has no order on that side', () => {
+    expect(unitPriceOf({ sellMin: null, buyMax: 9 }, 'sell')).toBeNull();
+    expect(unitPriceOf({ sellMin: 12, buyMax: null }, 'buy')).toBeNull();
+  });
+});
+
+describe('buildQuote', () => {
+  const standing = {
+    rate: 90,
+    rateBasis: 'buy' as const,
+    hubId: 'jita' as const,
+    buyerCharacterId: null,
+    buyLines: [
+      { kind: 'group' as const, group: 'ore' as const },
+      { kind: 'type' as const, typeId: 34, name: 'Tritanium' },
+    ],
+  };
+  const veldspar = { typeId: 1230, name: 'Veldspar', groupId: 462, categoryId: 25, quantity: 1000 };
+  const trit = { typeId: 34, name: 'Tritanium', groupId: 18, categoryId: 4, quantity: 500 };
+  const ship = { typeId: 587, name: 'Rifter', groupId: 25, categoryId: 6, quantity: 1 };
+  const prices = new Map([
+    [1230, { sellMin: 12, buyMax: 10 }],
+    [34, { sellMin: 5, buyMax: 4 }],
+    [587, { sellMin: 400000, buyMax: 350000 }],
+  ]);
+  const now = 1_000_000;
+
+  it('prices what the Request buys at the rate and holds it 14 days', () => {
+    const { quote } = buildQuote([veldspar, trit], standing, prices, now);
+    expect(quote.total).toBe(9000 + 1800);
+    expect(quote.quotedAt).toBe(now);
+    expect(quote.expiresAt).toBe(now + QUOTE_HOLD_MS);
+    expect(quote.lines.map((l) => l.typeId)).toEqual([1230, 34]);
+  });
+
+  it('leaves out what no buy line covers, and says which', () => {
+    const result = buildQuote([veldspar, ship], standing, prices, now);
+    expect(result.quote.total).toBe(9000);
+    expect(result.notBought).toEqual([{ typeId: 587, name: 'Rifter' }]);
+  });
+
+  it('reports a covered item the hub has no price for', () => {
+    const result = buildQuote([veldspar], standing, new Map(), now);
+    expect(result.quote.total).toBe(0);
+    expect(result.unpriced).toEqual([{ typeId: 1230, name: 'Veldspar' }]);
+  });
+
+  it('uses the sell side when the Request is a percent of sell', () => {
+    const { quote } = buildQuote([veldspar], { ...standing, rateBasis: 'sell' }, prices, now);
+    expect(quote.lines[0].unitPrice).toBe(12);
+    expect(quote.total).toBe(10800);
+  });
+
+  it('adds up a type pasted twice', () => {
+    const { quote } = buildQuote([veldspar, { ...veldspar, quantity: 500 }], standing, prices, now);
+    expect(quote.lines).toHaveLength(1);
+    expect(quote.lines[0].quantity).toBe(1500);
+  });
+
+  it('keeps at most the line cap and counts what it dropped', () => {
+    const many = Array.from({ length: MAX_QUOTE_LINES + 3 }, (_, i) => ({
+      typeId: 5000 + i,
+      name: `Ore ${i}`,
+      groupId: 462,
+      categoryId: 25,
+      quantity: 1,
+    }));
+    const manyPrices = new Map(many.map((m) => [m.typeId, { sellMin: 2, buyMax: 2 }]));
+    const result = buildQuote(many, standing, manyPrices, now);
+    expect(result.quote.lines).toHaveLength(MAX_QUOTE_LINES);
+    expect(result.dropped).toBe(3);
+  });
+});
+
+describe('readQuote', () => {
+  const stored = {
+    lines: [{ typeId: 1230, name: 'Veldspar', quantity: 1000, unitPrice: 10, total: 9000 }],
+    total: 9000,
+    quotedAt: 5,
+    expiresAt: 5 + QUOTE_HOLD_MS,
+  };
+  it('reads a stored quote', () => {
+    expect(readQuote(stored)).toEqual(stored);
+  });
+  it('is undefined for anything that does not read as one', () => {
+    expect(readQuote(undefined)).toBeUndefined();
+    expect(readQuote({ ...stored, total: 'x' })).toBeUndefined();
+    expect(readQuote({ ...stored, lines: [] })).toBeUndefined();
+    expect(readQuote({ ...stored, lines: [{ typeId: 1 }] })).toBeUndefined();
   });
 });

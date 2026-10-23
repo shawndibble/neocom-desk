@@ -760,19 +760,39 @@ service cloud.firestore {
               && (!('48' in changed) || !('48' in lines) || (48 < n && pledgeEntryOk(lines['48'])))
               && (!('49' in changed) || !('49' in lines) || (49 < n && pledgeEntryOk(lines['49'])))));
           }
+          // A Quote on a standing buyback Request (issue #4780): the Member's priced
+          // pile, held 14 days. Only the scalars and the line count are bound here;
+          // the lines are display-only (the 1000-expression budget has no room to
+          // walk them), and no price, issuer or item ever reaches the buyer except
+          // what the Member typed into their own document.
+          function pledgeQuoteOk() {
+            let q = request.resource.data.quote;
+            let now = request.time.toMillis();
+            return q is map
+              && q.keys().hasOnly(['lines', 'total', 'quotedAt', 'expiresAt'])
+              && q.lines is list && q.lines.size() >= 1 && q.lines.size() <= 50
+              && q.total is int && q.total >= 0 && q.total <= 1000000000000000
+              && q.quotedAt is int && q.expiresAt is int
+              && q.expiresAt == q.quotedAt + 1209600000
+              && q.quotedAt >= now - 86400000 && q.quotedAt <= now + 86400000;
+          }
           function pledgeWritable() {
             let r = pledgeRequest();
+            let standing = r.get('standing', false) == true;
             return isMember()
               && request.auth.uid == pledgeUid
               && r.ownerUid != request.auth.uid
               && r.closed == false
-              && r.expiresAt > request.time.toMillis()
-              && request.resource.data.keys().hasOnly(['ownerHash', 'communityId', 'lines', 'updatedAt'])
+              && (standing || r.expiresAt > request.time.toMillis())
+              && request.resource.data.keys().hasOnly(['ownerHash', 'communityId', 'lines', 'quote', 'updatedAt'])
               && request.resource.data.ownerHash == request.auth.token.ownerHash
               && request.resource.data.communityId == communityId
               && request.resource.data.lines is map
-              && request.resource.data.lines.size() >= 1
               && request.resource.data.lines.size() <= 50
+              // A standing Request takes a Quote and no line Pledges; an ordinary one the reverse.
+              && (standing
+                ? (request.resource.data.lines.size() == 0 && 'quote' in request.resource.data && pledgeQuoteOk())
+                : (request.resource.data.lines.size() >= 1 && !('quote' in request.resource.data)))
               && request.resource.data.updatedAt == request.time
               && pledgeLinesOk();
           }

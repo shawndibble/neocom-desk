@@ -168,3 +168,112 @@ export const quoteExpiry = (quotedAt: number) => quotedAt + QUOTE_HOLD_MS;
 
 /** A quote is held until the moment it expires. */
 export const quoteIsHeld = (quote: { expiresAt: number }, now: number) => quote.expiresAt > now;
+
+/** The hub's best price on the side a Request is a percent of; null when that side has no orders. */
+export function unitPriceOf(
+  aggregate: { sellMin: number | null; buyMax: number | null },
+  basis: RateBasis
+): number | null {
+  return basis === 'buy' ? aggregate.buyMax : aggregate.sellMin;
+}
+
+/** One pasted type, with the SDE group the buy lines are matched against. */
+export interface PastedItem extends BuybackItem {
+  name: string;
+  quantity: number;
+}
+
+/** A Member's Quote as held on their Pledge document. Only the lines and the hub prices behind the figure. */
+export interface HeldQuote {
+  lines: QuoteLine[];
+  total: number;
+  quotedAt: number;
+  expiresAt: number;
+}
+
+export interface QuoteResult {
+  quote: HeldQuote;
+  /** Pasted types no buy line covers: not priced, never silently dropped. */
+  notBought: { typeId: number; name: string }[];
+  /** Covered types the hub has no price for on this side. */
+  unpriced: { typeId: number; name: string }[];
+  /** Priced types past the line cap. */
+  dropped: number;
+}
+
+/**
+ * A pasted pile priced for one standing Request: what its buy lines cover, at
+ * its Rate, from the hub prices given. A type pasted twice counts once, its
+ * quantities added. The Quote is held 14 days from `now`.
+ */
+export function buildQuote(
+  pasted: readonly PastedItem[],
+  standing: Pick<StandingRequest, 'buyLines' | 'rate' | 'rateBasis'>,
+  prices: ReadonlyMap<number, { sellMin: number | null; buyMax: number | null }>,
+  now: number
+): QuoteResult {
+  const merged = new Map<number, PastedItem>();
+  for (const item of pasted) {
+    const seen = merged.get(item.typeId);
+    merged.set(item.typeId, seen ? { ...seen, quantity: seen.quantity + item.quantity } : item);
+  }
+  const notBought: QuoteResult['notBought'] = [];
+  const unpriced: QuoteResult['unpriced'] = [];
+  const inputs: QuoteInput[] = [];
+  for (const item of merged.values()) {
+    if (!buybackCovers(standing.buyLines, item)) {
+      notBought.push({ typeId: item.typeId, name: item.name });
+      continue;
+    }
+    const aggregate = prices.get(item.typeId);
+    const unitPrice = aggregate ? unitPriceOf(aggregate, standing.rateBasis) : null;
+    if (unitPrice === null) unpriced.push({ typeId: item.typeId, name: item.name });
+    inputs.push({ typeId: item.typeId, name: item.name, quantity: item.quantity, unitPrice });
+  }
+  const priced = priceQuote(inputs, standing.rate);
+  const lines = priced.lines.slice(0, MAX_QUOTE_LINES);
+  return {
+    quote: {
+      lines,
+      total: lines.reduce((sum, line) => sum + line.total, 0),
+      quotedAt: now,
+      expiresAt: quoteExpiry(now),
+    },
+    notBought,
+    unpriced,
+    dropped: priced.lines.length - lines.length,
+  };
+}
+
+const isNum = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+/** A stored quote, or undefined when it does not read as one (a hand-edited or half-written document). */
+export function readQuote(raw: unknown): HeldQuote | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const d = raw as Record<string, unknown>;
+  if (!isNum(d.total) || !isNum(d.quotedAt) || !isNum(d.expiresAt)) return undefined;
+  if (!Array.isArray(d.lines) || d.lines.length === 0) return undefined;
+  const lines: QuoteLine[] = [];
+  for (const entry of d.lines) {
+    const l = entry as Record<string, unknown> | null;
+    if (
+      typeof l !== 'object' ||
+      l === null ||
+      !isNum(l.typeId) ||
+      !isNum(l.quantity) ||
+      !isNum(l.unitPrice) ||
+      !isNum(l.total)
+    ) {
+      return undefined;
+    }
+    lines.push({
+      typeId: l.typeId,
+      name: String(l.name ?? ''),
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      total: l.total,
+    });
+  }
+  return { lines, total: d.total, quotedAt: d.quotedAt, expiresAt: d.expiresAt };
+}

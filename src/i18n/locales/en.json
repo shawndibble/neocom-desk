@@ -9973,7 +9973,8 @@
         "removePledgeTitle": "Remove {{name}}'s Pledge?",
         "removePledgeBody": "Their Pledge on this request is deleted. The request and the other Pledges stay.",
         "removePledgeAction": "Remove Pledge",
-        "unknownPledger": "Former Member"
+        "unknownPledger": "Former Member",
+        "quoteSummary": "Quote {{price}} ISK"
       },
       "pledgeStale": "No delivery in {{days}} days, so this Pledge is greyed out. Update it or withdraw it.",
       "pledgeFailed": "Couldn't save that Pledge. Try again.",
@@ -10113,6 +10114,26 @@
         "termsLabel": "Buyback terms",
         "noExpiry": "Open until closed",
         "buysLabel": "Buys"
+      },
+      "sellTo": {
+        "label": "Sell to this buyback",
+        "title": "Sell to {{name}}",
+        "paste": "Paste what you want to sell (an Appraisal, an inventory copy)",
+        "pasteAgain": "Paste again to replace your quote",
+        "getQuote": "Get quote",
+        "clear": "Clear quote",
+        "heldUntil": "Held until {{date}}",
+        "expired": "Expired {{date}}",
+        "nextStep": "Make an item exchange contract to {{name}} for {{price}} ISK.",
+        "linesLabel": "Items in your quote",
+        "nothing": "Nothing in that paste is bought here at a price, so there is no quote.",
+        "notBought": "Not bought here, left out: {{names}}",
+        "unpriced": "No hub price for: {{names}}. Left out.",
+        "unmatched": "Not recognised, left out: {{names}}",
+        "dropped_one": "{{count}} more item was left out: a quote holds at most 50 lines.",
+        "dropped_other": "{{count}} more items were left out: a quote holds at most 50 lines.",
+        "failed": "Couldn’t get a quote. Try again.",
+        "clearFailed": "Couldn’t clear the quote. Try again."
       }
     }
   },

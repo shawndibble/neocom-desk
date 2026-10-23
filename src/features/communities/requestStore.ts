@@ -9,12 +9,14 @@
 import {
   collection,
   collectionGroup,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
   query,
   runTransaction,
   serverTimestamp,
+  setDoc,
   where,
 } from 'firebase/firestore/lite';
 import { db as localDb } from '@/db';
@@ -27,7 +29,7 @@ import type {
   RequestPledge,
 } from '@/engine/communities/requests';
 import { readNotify, readStanding } from '@/engine/communities/requests';
-import type { StandingRequest } from '@/engine/communities/buyback';
+import { readQuote, type HeldQuote, type StandingRequest } from '@/engine/communities/buyback';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
@@ -233,7 +235,8 @@ function readPledge(uid: string, d: Record<string, unknown>): RequestPledge | nu
     };
   }
   const stamp = d.updatedAt as { toMillis?: () => number } | undefined;
-  return { uid, lines, updatedAt: stamp?.toMillis?.() ?? 0 };
+  const quote = readQuote(d.quote);
+  return { uid, lines, ...(quote ? { quote } : {}), updatedAt: stamp?.toMillis?.() ?? 0 };
 }
 
 /** Every Member's Pledges on one Request. */
@@ -374,4 +377,51 @@ async function writeMyPledge(
   });
   if (withdrawn) return null;
   return readPledge(uid, (await getDoc(ref)).data() ?? {});
+}
+
+/**
+ * Holds (or, with null, clears) this Character's Quote on a standing Request.
+ * The Quote replaces any held one: one Quote per Member per Request. A standing
+ * Request takes no line Pledges, so the document is the Quote and nothing else.
+ */
+export async function saveMyQuote(
+  characterId: number,
+  communityId: string,
+  requestId: string,
+  quote: HeldQuote | null
+): Promise<RequestPledge | null> {
+  const uid = uidForCharacter(characterId);
+  const override = communityBackendOverride();
+  if (override?.saveQuote && override.loadPledges) {
+    override.saveQuote(communityId, requestId, quote);
+    return override.loadPledges(communityId, requestId).find((p) => p.uid === uid) ?? null;
+  }
+  return trackPledgeWrite(() =>
+    underFirebaseSession(async () => {
+      await ensureSignedIn(characterId);
+      const ref = doc(
+        getSyncFirestore(),
+        'communities',
+        communityId,
+        'itemRequests',
+        requestId,
+        'pledges',
+        uid
+      );
+      if (quote === null) {
+        await deleteDoc(ref);
+        return null;
+      }
+      const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
+      if (!ownerHash) throw new Error('This Character has no owner hash yet');
+      await setDoc(ref, {
+        ownerHash,
+        communityId,
+        lines: {},
+        quote,
+        updatedAt: serverTimestamp(),
+      });
+      return readPledge(uid, (await getDoc(ref)).data() ?? {});
+    })
+  );
 }
