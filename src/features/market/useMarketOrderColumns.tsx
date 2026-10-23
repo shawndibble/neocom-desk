@@ -6,6 +6,7 @@
 import { useCallback, useMemo } from 'react';
 import type { TFunction } from 'i18next';
 import type { DataTableColumn } from '@/components/ui';
+import { COL_DATE, COL_ISK, COL_QUANTITY, COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
 import {
   SELL_ORDER_COLUMN_IDS,
   BUY_ORDER_COLUMN_IDS,
@@ -136,6 +137,8 @@ export function useMarketOrderColumns({
       price: {
         id: 'price',
         header: t('market.price'),
+        // The figure plus the my-order and bait marks left of it.
+        width: '24ch',
         align: 'right',
         className: 'tabular-nums',
         // The phone card's headline figure: a book is scanned by price.
@@ -163,6 +166,7 @@ export function useMarketOrderColumns({
       fees: {
         id: 'fees',
         header: t('market.feesColumn'),
+        width: '16ch',
         align: 'right',
         className: 'tabular-nums text-text-dim',
         stackAffix: { before: t('market.feesAffix') },
@@ -172,6 +176,7 @@ export function useMarketOrderColumns({
       finalPrice: {
         id: 'finalPrice',
         header: t('market.finalPriceColumn'),
+        width: COL_ISK,
         align: 'right',
         className: 'tabular-nums',
         stackAffix: { before: t('market.finalPriceAffix') },
@@ -182,6 +187,7 @@ export function useMarketOrderColumns({
       quantity: {
         id: 'quantity',
         header: t('market.quantityColumn'),
+        width: COL_QUANTITY,
         align: 'right',
         className: 'tabular-nums',
         stackAffix: { before: t('market.quantityAffix') },
@@ -219,6 +225,7 @@ export function useMarketOrderColumns({
       security: {
         id: 'security',
         header: t('market.securityColumn'),
+        width: '10ch',
         align: 'right',
         className: 'tabular-nums',
         sortValue: (o) => resolveOrderLocation(o, npcStationMap, solarSystemMap).security,
@@ -229,6 +236,7 @@ export function useMarketOrderColumns({
       jumps: {
         id: 'jumps',
         header: t('market.jumpsColumn'),
+        width: COL_SMALL_NUMBER,
         align: 'right',
         className: 'tabular-nums',
         sortValue: (o) => {
@@ -251,6 +259,7 @@ export function useMarketOrderColumns({
       expiry: {
         id: 'expiry',
         header: t('market.expiry'),
+        width: COL_DATE,
         // Shown or hidden by the column picker alone, never by width; the
         // card keeps it too, behind a word saying what the date is.
         className: 'whitespace-nowrap text-text-dim',
@@ -261,6 +270,7 @@ export function useMarketOrderColumns({
       range: {
         id: 'range',
         header: t('market.range'),
+        width: '14ch',
         className: 'text-text-dim',
         // Station < solarsystem < N jumps < region, in that order — not
         // alphabetical, which would put "region" ahead of "station".
@@ -271,6 +281,7 @@ export function useMarketOrderColumns({
       minVolume: {
         id: 'minVolume',
         header: t('market.minVolume'),
+        width: COL_QUANTITY,
         align: 'right',
         // Off by default (`DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS`), then
         // shown or hidden by the column picker alone, as Expires is.

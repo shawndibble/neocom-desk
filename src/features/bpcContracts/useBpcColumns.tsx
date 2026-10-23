@@ -4,6 +4,7 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { cx } from '@/lib/cx';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { COL_DATETIME, COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
 import { DataTableDenseCell, IskAmount, sortRows, type DataTableColumn } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
@@ -79,6 +80,7 @@ export function useBpcColumns({
       source: {
         id: 'source',
         header: t('bpcContracts.sourceColumn'),
+        width: '12ch',
         sortValue: (row) => row.source,
         render: (row) => (
           <span className={cx(eyebrowClassName, 'inline-flex items-center')}>
@@ -97,6 +99,7 @@ export function useBpcColumns({
       location: {
         id: 'location',
         header: t('bpcContracts.locationColumn'),
+        className: 'truncate',
         sortValue: (row) => (row.source === 'lp' ? row.corpName : (row.locationName ?? '')),
         render: (row) => {
           // An LP offer has no station here: the store's corporation is its place.
@@ -111,7 +114,10 @@ export function useBpcColumns({
           const system = row.systemId == null ? undefined : solarSystems?.get(row.systemId);
           const place = (
             <>
-              <span className="max-sm:inline-block max-sm:max-w-36 max-sm:truncate max-sm:align-bottom">
+              <span
+                title={name}
+                className="max-sm:inline-block max-sm:max-w-36 max-sm:truncate max-sm:align-bottom"
+              >
                 {name}
               </span>
               {system && <SecurityStatus security={system.security} />}
@@ -139,6 +145,7 @@ export function useBpcColumns({
         // filter's own status has nothing to say about a row it never saw.
         id: 'jumps',
         header: t('bpcContracts.jumpsColumn'),
+        width: COL_SMALL_NUMBER,
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => jumpsCellSortValue(bpcRowJumps(row)),
@@ -151,6 +158,7 @@ export function useBpcColumns({
       me: {
         id: 'me',
         header: t('bpcContracts.meColumn'),
+        width: '6ch',
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => row.me,
@@ -162,6 +170,7 @@ export function useBpcColumns({
       te: {
         id: 'te',
         header: t('bpcContracts.teColumn'),
+        width: '6ch',
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => row.te,
@@ -171,6 +180,7 @@ export function useBpcColumns({
       runs: {
         id: 'runs',
         header: t('bpcContracts.runsColumn'),
+        width: COL_SMALL_NUMBER,
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => row.runs ?? undefined,
@@ -189,6 +199,7 @@ export function useBpcColumns({
       qty: {
         id: 'qty',
         header: t('bpcContracts.qtyColumn'),
+        width: COL_SMALL_NUMBER,
         align: 'right',
         className: 'tabular-nums',
         sortValue: (row) => row.quantity,
@@ -198,6 +209,7 @@ export function useBpcColumns({
       price: {
         id: 'price',
         header: t('bpcContracts.priceColumn'),
+        width: '20ch',
         align: 'right',
         // The headline figure of the dense phone card, on the title line.
         cardCorner: true,
@@ -296,6 +308,7 @@ export function useBpcColumns({
       iskPerRun: {
         id: 'iskPerRun',
         header: t('bpcContracts.iskPerRunColumn'),
+        width: '16ch',
         align: 'right',
         className: 'tabular-nums whitespace-nowrap',
         // Same rule as the Courier board's ISK/jump: no rate sinks the row in
@@ -330,6 +343,8 @@ export function useBpcColumns({
       region: {
         id: 'region',
         header: t('bpcContracts.regionColumn'),
+        width: '18ch',
+        className: 'truncate',
         // An owned row's `regionId` comes from its resolved location
         // (issue #796) rather than `contract.regionId` — before that
         // resolution existed this column had nothing to show an owned row at
@@ -348,6 +363,7 @@ export function useBpcColumns({
       space: {
         id: 'space',
         header: t('bpcContracts.spaceColumn'),
+        width: '12ch',
         sortValue: (row) => row.space ?? '',
         render: (row) =>
           row.space ? t(`common.spaceOption.${row.space}`) : t('bpcContracts.notApplicable'),
@@ -355,6 +371,7 @@ export function useBpcColumns({
       expires: {
         id: 'expires',
         header: t('bpcContracts.expiresColumn'),
+        width: COL_DATETIME,
         className: 'whitespace-nowrap text-text-dim',
         // Infinity sorts an owned row last, rather than epoch 0 reading as
         // "expires soonest."
@@ -414,6 +431,7 @@ export function useBpcColumns({
         id: 'item',
         header: t('bpcContracts.itemColumn'),
         primary: true,
+        className: 'truncate',
         sortValue: itemSortValue,
         render: (row) => {
           const name = blueprintNames.get(row.typeId) ?? `#${row.typeId}`;
@@ -446,7 +464,7 @@ export function useBpcColumns({
               // item with its Market link) or, for a market row, the item's
               // Market entry (DESIGN.md §6c, a row's primary action beats
               // name links inside it).
-              <span className={entityLinkClassName('max-sm:block max-sm:truncate')}>{name}</span>
+              <span className={entityLinkClassName('block truncate')}>{name}</span>
             );
           if (row.source === 'community') {
             return (

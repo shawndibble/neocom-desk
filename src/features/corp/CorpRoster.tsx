@@ -176,6 +176,7 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
         id: 'lastSeen',
         header: t('corp.members.columnLastSeen'),
         align: 'right',
+        width: '16ch',
         className: 'whitespace-nowrap tabular-nums',
         // The one tone on the table: a member past the dark threshold. Applied
         // to this cell rather than the whole row, so the amber reads as a
@@ -207,6 +208,7 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
       {
         id: 'ship',
         header: t('corp.members.columnShip'),
+        width: '24ch',
         className: 'truncate',
         render: (row) =>
           row.shipTypeId === null ? (
@@ -237,6 +239,8 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
       {
         id: 'joined',
         header: t('corp.members.columnJoined'),
+        // `formatDateOnly` on one line: "10/23/2026".
+        width: '12ch',
         className: 'whitespace-nowrap tabular-nums text-text-dim',
         render: (row) =>
           row.startMs === null ? DASH : formatDateOnly(new Date(row.startMs), timeZone),
@@ -245,8 +249,12 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
       {
         id: 'roles',
         header: t('corp.members.columnRoles'),
+        width: '24ch',
         className: 'truncate',
-        render: (row) => rolesText(row.roles) ?? DASH,
+        render: (row) => {
+          const roles = rolesText(row.roles);
+          return roles ? <span title={roles}>{roles}</span> : DASH;
+        },
         sortValue: (row) => rolesText(row.roles) ?? undefined,
       },
     ],

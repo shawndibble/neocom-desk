@@ -4,8 +4,8 @@
  * realistic value of the kind, plus padding.
  */
 
-/** `2026-10-23 14:05` on one line. */
-export const COL_DATETIME = '16ch';
+/** `formatTimestamp` on one line: `12/31/2026, 11:59 PM`, 20 characters. */
+export const COL_DATETIME = '21ch';
 /** Date over time on two lines; the date is the longer one. */
 export const COL_DATETIME_STACKED = '10ch';
 /** `2026-10-23` alone. */

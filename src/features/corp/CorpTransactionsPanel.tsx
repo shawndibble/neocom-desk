@@ -18,6 +18,7 @@
  */
 import { formatCount } from '@/lib/formatCount';
 import { useMemo, type ReactNode } from 'react';
+import { COL_DATETIME, COL_ISK, COL_QUANTITY } from '@/components/ui/dataTableWidths';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -184,6 +185,7 @@ export function CorpTransactionsPanel({
       {
         id: 'date',
         header: t('wallet.date'),
+        width: COL_DATETIME,
         className: 'whitespace-nowrap text-text-dim',
         render: (txn) => formatTimestamp(new Date(txn.date), timeZone),
         sortValue: (txn) => txn.date,
@@ -191,6 +193,7 @@ export function CorpTransactionsPanel({
       {
         id: 'item',
         header: t('wallet.item'),
+        className: 'truncate',
         /** Pinned while the figures scroll sideways on a phone. */
         stickyStart: true,
         stickyStartOnPanel: true,
@@ -200,6 +203,7 @@ export function CorpTransactionsPanel({
       {
         id: 'side',
         header: t('wallet.side'),
+        width: '8ch',
         render: (txn) => (txn.is_buy ? t('wallet.buy') : t('wallet.sell')),
         sortValue: (txn) => (txn.is_buy ? 0 : 1),
       },
@@ -207,7 +211,8 @@ export function CorpTransactionsPanel({
         id: 'quantity',
         header: t('wallet.quantity'),
         align: 'right',
-        className: 'tabular-nums',
+        width: COL_QUANTITY,
+        className: 'tabular-nums whitespace-nowrap',
         render: (txn) => formatCount(txn.quantity),
         sortValue: (txn) => txn.quantity,
       },
@@ -215,7 +220,8 @@ export function CorpTransactionsPanel({
         id: 'unitPrice',
         header: t('wallet.unitPrice'),
         align: 'right',
-        className: 'tabular-nums',
+        width: COL_ISK,
+        className: 'tabular-nums whitespace-nowrap',
         render: (txn) => formatIsk(txn.unit_price, 2),
         sortValue: (txn) => txn.unit_price,
       },
@@ -223,7 +229,8 @@ export function CorpTransactionsPanel({
         id: 'total',
         header: t('wallet.total'),
         align: 'right',
-        className: 'tabular-nums',
+        width: COL_ISK,
+        className: 'tabular-nums whitespace-nowrap',
         cellClassName: (txn) => iskToneClass(transactionTotal(txn)),
         render: (txn) => formatIsk(transactionTotal(txn), 2),
         sortValue: (txn) => transactionTotal(txn),

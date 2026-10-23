@@ -9,6 +9,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { focusRingClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { COL_ISK, COL_QUANTITY } from '@/components/ui/dataTableWidths';
 import { cx } from '@/lib/cx';
 import type { TripLine, TripOverride } from '@/engine/market/haulingPlan';
 import { HAULING_THRESHOLDS, type DemandKind } from '@/engine/market/haulingMarket';
@@ -125,6 +126,7 @@ export function useHaulingTable({
     {
       id: 'select',
       header: '',
+      width: '7ch',
       headerClassName: 'w-8',
       className: 'w-8',
       stackEdge: 'start',
@@ -198,12 +200,13 @@ export function useHaulingTable({
                 ? 'market.hauling.columns.hubFromTip'
                 : 'market.hauling.columns.hubToTip'
             ),
+            width: '14ch',
             headerClassName: 'whitespace-nowrap',
-            className: 'whitespace-nowrap',
+            className: 'truncate',
             sortValue: (row: HaulingViewRow) => hubAtAnyEnd(row, anyEnd).systemName,
             render: (row: HaulingViewRow) => {
               const hub = hubAtAnyEnd(row, anyEnd);
-              return hub.systemName;
+              return <span title={hub.systemName}>{hub.systemName}</span>;
             },
           },
         ]),
@@ -211,6 +214,7 @@ export function useHaulingTable({
       id: 'buy',
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.buy'),
+      width: '17ch',
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: { before: `${t('market.hauling.columns.buy')} ` },
@@ -224,6 +228,7 @@ export function useHaulingTable({
       headerTooltip: t(
         instant ? 'market.hauling.columns.buyOrderTip' : 'market.hauling.columns.expectedTip'
       ),
+      width: '17ch',
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: {
@@ -241,6 +246,8 @@ export function useHaulingTable({
       headerTooltip: t(
         instant ? 'market.hauling.columns.profitInstantTip' : 'market.hauling.columns.profitTip'
       ),
+      // The signed figure, or the figure over its margin line.
+      width: COL_ISK,
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
       // The phone card's headline figure, on the title line.
@@ -279,6 +286,7 @@ export function useHaulingTable({
       headerTooltip: t(
         instant ? 'market.hauling.columns.marginInstantTip' : 'market.hauling.columns.marginTip'
       ),
+      width: '10ch',
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
       cellClassName: (row) =>
@@ -291,6 +299,7 @@ export function useHaulingTable({
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.iskPerM3'),
       headerTooltip: t('market.hauling.columns.iskPerM3Tip'),
+      width: '13ch',
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: { after: t('market.hauling.perM3Short') },
@@ -302,6 +311,7 @@ export function useHaulingTable({
       id: 'm3',
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.m3'),
+      width: COL_QUANTITY,
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: { after: ` ${t('market.hauling.columns.m3')}` },
@@ -316,6 +326,8 @@ export function useHaulingTable({
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.days'),
       headerTooltip: t('market.hauling.columns.daysTip'),
+      // Mark, days and the demand words ("Sells most days").
+      width: '24ch',
       className: 'tabular-nums whitespace-nowrap',
       stackAffix: { after: t('market.hauling.daysShort') },
       sortValue: (row) => (row.mode === 'list' ? row.sale.daysToSell : undefined),
@@ -341,6 +353,8 @@ export function useHaulingTable({
       id: 'bring',
       headerClassName: 'whitespace-nowrap',
       header: t('market.hauling.columns.bring'),
+      // The 5rem input plus the cell's padding.
+      width: '16ch',
       align: 'right',
       className: 'whitespace-nowrap',
       stackEdge: 'end',

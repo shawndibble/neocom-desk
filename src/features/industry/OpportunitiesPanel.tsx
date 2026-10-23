@@ -70,6 +70,7 @@ import { priceVsMedianFor, usePriceVsMedian } from './usePriceVsMedian';
 import { Vs90dFigure } from './Vs90dFigure';
 import { vs90dTooltip } from './vs90d';
 import { StartPlanButton } from './StartPlanButton';
+import { COL_ICON, COL_SMALL_NUMBER } from '@/components/ui/dataTableWidths';
 import { opportunitiesCsvColumns } from './opportunitiesCsv';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -385,6 +386,7 @@ export function OpportunitiesPanel({
       // list stopped going through `DataTable` at all.
       id: 'select',
       header: '',
+      width: COL_ICON,
       className: 'w-8',
       // The label is the 44px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
       render: (row) => (
@@ -427,6 +429,7 @@ export function OpportunitiesPanel({
     {
       id: 'blueprint',
       header: t('industry.opportunitiesBlueprint'),
+      width: '20ch',
       sortValue: SORT_VALUE.blueprint,
       render: (row) => {
         const original = row.candidate.blueprint.runs === -1;
@@ -444,6 +447,7 @@ export function OpportunitiesPanel({
     {
       id: 'unitMargin',
       header: t('industry.opportunitiesUnitMargin'),
+      width: '12ch',
       align: 'right',
       className: 'tabular-nums',
       sortValue: SORT_VALUE.unitMargin,
@@ -462,6 +466,7 @@ export function OpportunitiesPanel({
     {
       id: 'margin',
       header: t('industry.margin'),
+      width: COL_SMALL_NUMBER,
       align: 'right',
       className: 'tabular-nums',
       sortValue: SORT_VALUE.margin,
@@ -470,6 +475,7 @@ export function OpportunitiesPanel({
     {
       id: 'vs90d',
       header: t('industry.vs90d'),
+      width: COL_SMALL_NUMBER,
       headerTooltip: vs90dTooltip(t),
       align: 'right',
       className: 'tabular-nums',
@@ -479,6 +485,7 @@ export function OpportunitiesPanel({
     {
       id: 'stockCovers',
       header: t('industry.opportunitiesStockCovers'),
+      width: '10ch',
       align: 'right',
       className: 'tabular-nums',
       sortValue: SORT_VALUE.stockCovers,
@@ -487,6 +494,7 @@ export function OpportunitiesPanel({
     {
       id: 'stillToBuy',
       header: t('industry.opportunitiesStillToBuy'),
+      width: '12ch',
       align: 'right',
       className: 'tabular-nums',
       sortValue: SORT_VALUE.stillToBuy,
@@ -500,6 +508,7 @@ export function OpportunitiesPanel({
     {
       id: 'duration',
       header: t('industry.time'),
+      width: '12ch',
       align: 'right',
       className: 'tabular-nums',
       sortValue: SORT_VALUE.duration,
@@ -508,6 +517,7 @@ export function OpportunitiesPanel({
     {
       id: 'iskPerHour',
       header: t('industry.iskPerHour'),
+      width: '12ch',
       align: 'right',
       className: 'tabular-nums',
       sortValue: SORT_VALUE.iskPerHour,
@@ -524,6 +534,7 @@ export function OpportunitiesPanel({
     {
       id: 'orderDepth',
       header: t('industry.opportunitiesOrderDepthLabel'),
+      width: '14ch',
       sortValue: SORT_VALUE.orderDepth,
       render: (row) => (
         <span className="flex items-center gap-1">
@@ -550,6 +561,7 @@ export function OpportunitiesPanel({
       // Compare button, which needs 2+ selected rows to do anything.
       id: 'action',
       header: '',
+      width: '16ch',
       render: (row) => (
         <StartPlanButton
           onStart={() => onStartPlan(row.candidate.catalogEntry)}
