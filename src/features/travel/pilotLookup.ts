@@ -8,6 +8,10 @@ import { EsiError } from '@/esi/errors';
 import { affiliationFetchedAt, resolveAffiliations } from '@/features/character/affiliations';
 import { resolveNames } from '@/features/character/names';
 import { loadPublicCharacterInfoWithAge } from '@/features/character/publicInfoData';
+import {
+  achievementFromPublicInfo,
+  type CharacterAchievement,
+} from '@/features/character/achievement';
 
 export interface PilotSummary {
   characterId: number;
@@ -24,6 +28,8 @@ export interface PilotProfile {
   allianceName: string | null;
   /** Null when ESI left it out of the public record. */
   securityStatus: number | null;
+  /** Achievement score and displayed title (issue #4777); a score of 0 and no title when ESI sent neither. */
+  achievement: CharacterAchievement;
   /**
    * When this was last read from ESI. The affiliation read when there is one,
    * since that is the part that moves; else the public record's. A profile
@@ -123,6 +129,7 @@ export async function loadPilotProfile(characterId: number): Promise<PilotProfil
     allianceId,
     allianceName: allianceId === null ? null : (names.get(allianceId) ?? null),
     securityStatus: info.security_status ?? null,
+    achievement: achievementFromPublicInfo(info),
     fetchedAt,
   };
 }

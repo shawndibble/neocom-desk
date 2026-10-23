@@ -13,6 +13,7 @@ import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const CHARACTER_COLUMN_IDS = [
   'name',
+  'achievement',
   'corp',
   'group',
   'spTotal',

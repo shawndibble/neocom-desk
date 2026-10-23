@@ -25,6 +25,8 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { type CharacterGroup, type CharacterSortStats } from '@/features/character/groups';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { AffiliationName } from '@/features/character/CharacterCard';
+import { achievementColumn } from '@/features/character/achievementColumn';
+import type { AchievementLookup } from '@/features/character/useCharacterAchievements';
 import {
   UNGROUPED_VALUE,
   characterLastSynced,
@@ -112,7 +114,8 @@ export function buildColumns(
   onToggleStarred: (characterId: number) => void,
   timeZone: 'UTC' | undefined,
   groups: readonly CharacterGroup[],
-  onMoveToGroup: (characterId: number, groupId: string | null) => void
+  onMoveToGroup: (characterId: number, groupId: string | null) => void,
+  achievements: AchievementLookup
 ): Record<CharacterColumnId, DataTableColumn<CharacterRow>> {
   return {
     name: {
@@ -133,6 +136,7 @@ export function buildColumns(
         </span>
       ),
     },
+    achievement: achievementColumn(t, (row) => row.character.characterId, achievements, false),
     corp: {
       id: 'corp',
       header: t('characters.column.corp'),

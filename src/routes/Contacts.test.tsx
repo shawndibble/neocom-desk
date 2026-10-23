@@ -11,6 +11,10 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { App } from '@/app/App';
+import {
+  DEFAULT_VISIBLE_CONTACTS_CHARACTER_COLUMNS,
+  contactsCharacterColumnsStore,
+} from '@/features/character/contactsColumns';
 import * as routeChunks from '@/app/routeChunks';
 import * as download from '@/lib/download';
 
@@ -503,6 +507,66 @@ describe('Contacts', () => {
     render(<App />);
     expect(await screen.findByText('Log in again to see your contacts')).toBeInTheDocument();
     expect(screen.queryByText(/no contacts cached/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('Contacts Title / Score column', () => {
+  const NPC_AGENT = 3_008_416;
+
+  // Device-local and module-scoped: put the default back even when a test fails midway.
+  afterEach(async () => {
+    await act(() =>
+      contactsCharacterColumnsStore.getState().setValue(DEFAULT_VISIBLE_CONTACTS_CHARACTER_COLUMNS)
+    );
+  });
+
+  /** Records every public-record read; each answers with a score, no title. */
+  function recordPublicReads(): number[] {
+    const ids: number[] = [];
+    server.use(
+      http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () =>
+        HttpResponse.json([
+          ...contactsPayload,
+          { contact_id: NPC_AGENT, contact_type: 'character', standing: 5 },
+        ])
+      ),
+      http.get(`${ESI}/characters/:id`, ({ params }) => {
+        ids.push(Number(params.id));
+        return HttpResponse.json({
+          name: 'Someone',
+          corporation_id: 2001,
+          birthday: '2020-01-01T00:00:00Z',
+          bloodline_id: 1,
+          gender: 'male',
+          race_id: 1,
+          achievement_score: 1240,
+        });
+      })
+    );
+    return ids;
+  }
+
+  it('is off by default, and reads no public record while off', async () => {
+    const ids = recordPublicReads();
+    render(<App />);
+    await screen.findByText('Good Friend');
+    expect(screen.queryByRole('columnheader', { name: /Title \/ Score/ })).toBeNull();
+    expect(screen.queryByText('1,240 points')).toBeNull();
+    expect(ids).toEqual([]);
+  });
+
+  it('reads only player Characters once shown: no corp, alliance or NPC agent', async () => {
+    const user = userEvent.setup();
+    const ids = recordPublicReads();
+    render(<App />);
+    await screen.findByText('Good Friend');
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Title / Score' }));
+    // The picker stays open for another pick; close it so the table is back in reach.
+    await user.keyboard('{Escape}');
+    expect(await screen.findByRole('columnheader', { name: /Title \/ Score/ })).toBeInTheDocument();
+    expect(await screen.findAllByText('1,240 points')).toHaveLength(2);
+    expect([...ids].sort((a, b) => a - b)).toEqual([1001, 1005]);
   });
 });
 

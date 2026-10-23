@@ -91,7 +91,11 @@ export interface CharacterPublicInfo {
   faction_id?: number;
   security_status?: number;
   description?: string;
-  title?: string;
+  /** Title in their corporation, a role bundle; not `character_title_id`. */
+  corporation_title?: string;
+  achievement_score?: number;
+  /** Cosmetic title, a `characterTitles` UUID; absent when none. */
+  character_title_id?: string;
 }
 
 export function getCharacterPublicInfo(

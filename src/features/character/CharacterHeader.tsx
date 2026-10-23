@@ -7,6 +7,7 @@ import { cx } from '@/lib/cx';
 import { AlertsBell, CharacterAvatar, StatChip, StatChips } from '@/components/ui';
 import { AllianceLink, CorporationLink } from '@/features/entities';
 import { usePublicInfo } from '@/stores/publicInfo';
+import { CharacterAchievementLine } from './AchievementLine';
 
 interface CharacterHeaderProps {
   characterId: number;
@@ -32,7 +33,7 @@ interface CharacterHeaderProps {
 }
 
 /**
- * The Character overview's shared header: portrait, name, corp/alliance, SP.
+ * The Character overview's shared header: portrait, name, corp/alliance, title · score, SP.
  *
  * `PageHeader` is still every *other* route's top line (docs/DESIGN.md §4);
  * this replaces it for the three views behind `OverviewSubNav`, which read as
@@ -125,6 +126,7 @@ export function CharacterHeader({
             </>
           )}
         </p>
+        <CharacterAchievementLine characterId={characterId} />
       </div>
       {/* Controls sit in this flex row, then the bell: the Overview's Next and Customize, Employment History's Refresh and export. */}
       {actions}
