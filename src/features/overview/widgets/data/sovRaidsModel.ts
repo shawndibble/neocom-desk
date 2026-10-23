@@ -21,6 +21,14 @@ import type { BuildContext, Feeds, KindView, TableRowModel } from './types';
 
 const TO = '/travel/route';
 
+/** Never claims more precision than the read: under its window reads "under 10m". */
+const untilText =
+  (data: SovRaidsWidgetData, t: BuildContext['t']) =>
+  (remainingMs: number): string =>
+    remainingMs < data.freshForMs
+      ? t('travel.sovRaids.underCacheWindow', { duration: formatCountdown(data.freshForMs / 1000) })
+      : formatCountdown(remainingMs / 1000);
+
 /** No alliance, or an alliance holding no sov: the empty state with its reason, never a lock. */
 function nothingToDefend(
   feed: Feeds['sovRaids'],
@@ -52,13 +60,7 @@ function myAlliance(
   }
   if (!data.holdsSov) return nothingToDefend(feed, data, t('travel.sovRaids.noSov'));
 
-  // Never claims more precision than the read: under its window reads "under 10m".
-  const until = (remainingMs: number): string =>
-    remainingMs < data.freshForMs
-      ? t('travel.sovRaids.underCacheWindow', {
-          duration: formatCountdown(data.freshForMs / 1000),
-        })
-      : formatCountdown(remainingMs / 1000);
+  const until = untilText(data, t);
 
   const mine = data.skyhooks.filter((hook) => hook.holderId === data.alliance?.id);
   const live = liveRaids(mine, now);
@@ -196,12 +198,7 @@ function nearMe(
   { t, now, raidsRadius }: BuildContext
 ): KindView {
   const radius = raidsRadius ?? DEFAULT_RAIDS_RADIUS;
-  const until = (remainingMs: number): string =>
-    remainingMs < data.freshForMs
-      ? t('travel.sovRaids.underCacheWindow', {
-          duration: formatCountdown(data.freshForMs / 1000),
-        })
-      : formatCountdown(remainingMs / 1000);
+  const until = untilText(data, t);
 
   const { within, beyond } = nearRaids(data.skyhooks, data.jumps, radius, now);
   const views = within.map((hook) => {
