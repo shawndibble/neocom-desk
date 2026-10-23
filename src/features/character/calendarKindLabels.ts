@@ -14,6 +14,7 @@ export const KIND_LABEL: Record<CharacterBoardItemKind, string> = {
   planetExtraction: 'calendar.kind.planetExtraction',
   mercenaryDen: 'calendar.kind.mercenaryDen',
   moonChunk: 'calendar.kind.moonChunk',
+  skyhookRaid: 'calendar.kind.skyhookRaid',
   contractExpiry: 'calendar.kind.contractExpiry',
   orderExpiry: 'calendar.kind.orderExpiry',
   skillPlan: 'calendar.kind.skillPlan',

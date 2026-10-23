@@ -607,6 +607,16 @@ describe('sovereignty raid windows', () => {
     expect(items[0]!.severity).toBe('critical');
   });
 
+  it('takes severity from the time remaining until the ranked end of the window', () => {
+    const [far] = sovBoard([raid({ startMs: at(3 * DAY), endMs: at(3 * DAY + HOUR) })]);
+    const [soon] = sovBoard([raid({ startMs: at(HOUR), endMs: at(2 * HOUR) })]);
+    const [open] = sovBoard([raid({ startMs: at(-HOUR), endMs: at(20 * MINUTE) })]);
+    expect(far!.severity).toBe(severityForRemaining(3 * DAY));
+    expect(soon!.severity).toBe(severityForRemaining(HOUR));
+    expect(open!.severity).toBe(severityForRemaining(20 * MINUTE));
+    expect(open!.severity).not.toBe(far!.severity);
+  });
+
   it('names a hub window as a hub', () => {
     const [item] = sovBoard([raid({ id: 'hub:9', kind: 'hub' })]);
     expect(item!.detail).toBe('hub.upcoming');

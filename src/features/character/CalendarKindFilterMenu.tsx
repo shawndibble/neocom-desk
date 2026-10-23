@@ -119,7 +119,7 @@ export function CalendarKindFilterMenu({
    * Skill plan row while no plan is chosen.
    */
   function hasRow(kind: CharacterBoardItemKind) {
-    if (kind === 'moonChunk' && !readable.has(kind)) return false;
+    if ((kind === 'moonChunk' || kind === 'skyhookRaid') && !readable.has(kind)) return false;
     if (hiddenSet.has(kind) || needsReauth.has(kind) || !readable.has(kind)) return true;
     return (counts.get(kind) ?? 0) > 0;
   }

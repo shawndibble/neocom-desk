@@ -473,6 +473,7 @@ describe('Calendar', () => {
         'planetExtraction',
         'mercenaryDen',
         'moonChunk',
+        'skyhookRaid',
         'contractExpiry',
         'orderExpiry',
         'skillPlan',

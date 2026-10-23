@@ -17,6 +17,7 @@ export const KIND_ICON: Record<CharacterBoardItemKind, typeof Icon.Skills> = {
   planetExtraction: Icon.Planetary,
   mercenaryDen: Icon.MercenaryDen,
   moonChunk: Icon.MoonMining,
+  skyhookRaid: Icon.PiSkyhook,
   contractExpiry: Icon.Contracts,
   orderExpiry: Icon.Orders,
   skillPlan: Icon.FlatList,

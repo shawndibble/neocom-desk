@@ -16,6 +16,8 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { loadCalendarBoard } from '@/features/character/calendarBoardData';
 import { EventDetailModal } from '@/features/character/EventDetailModal';
+import { skyhookRaidDetail } from '@/features/character/skyhookRaidDetail';
+import { RowDetailModal } from '@/features/overview/widgets/RowDetailModal';
 import { CalendarMap, CalendarPastHint } from '@/features/character/CalendarMap';
 import { CalendarDayTicker } from '@/features/character/CalendarDayTicker';
 import { ComingUpRail } from '@/features/character/ComingUpRail';
@@ -175,6 +177,7 @@ export function Calendar() {
   const selectedDayMs = selectedDay !== null && selectedDay.zone === zone ? selectedDay.ms : null;
   const setSelectedDayMs = (ms: number | null) => setSelectedDay(ms === null ? null : { zone, ms });
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [selectedSkyhookId, setSelectedSkyhookId] = useState<number | null>(null);
 
   /**
    * RSVP responses applied locally, ahead of `data` catching up.
@@ -302,6 +305,10 @@ export function Calendar() {
 
   const events = useMemo(() => eventsWithOverrides ?? [], [eventsWithOverrides]);
   const selectedEvent = events.find((event) => event.event_id === selectedEventId) ?? null;
+  const skyhookDetail = useMemo(() => {
+    const raid = data?.skyhookRaidDetails.find((r) => r.id === selectedSkyhookId);
+    return raid === undefined ? null : skyhookRaidDetail(raid, nowMs, t, zone);
+  }, [data, selectedSkyhookId, nowMs, t, zone]);
 
   function goToday() {
     setAnchor(cellOf(Date.now(), zone));
@@ -479,11 +486,14 @@ export function Calendar() {
               selectedDayMs={selectedDayMs}
               onClearDay={() => setSelectedDayMs(null)}
               onSelectEvent={setSelectedEventId}
+              onSelectSkyhook={setSelectedSkyhookId}
               noKindsSelected={selected.size === 0}
             />
           </div>
         </>
       )}
+
+      <RowDetailModal detail={skyhookDetail} onClose={() => setSelectedSkyhookId(null)} />
 
       {selectedEvent && activeCharacterId !== null && (
         <EventDetailModal

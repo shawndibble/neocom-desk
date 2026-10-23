@@ -312,7 +312,6 @@
         "listTitle": "Choose a Fitting to load",
         "listNotSaved": "Nothing here is saved until you open one and choose Save to My Fittings.",
         "listError": "Not recognized: {{reason}}",
-        "open": "Open {{name}}",
         "unresolvedTitle_one": "{{count}} item in this Fitting wasn't recognized",
         "unresolvedTitle_other": "{{count}} items in this Fitting weren't recognized"
       },
@@ -7600,6 +7599,7 @@
       "planetExtraction": "Planets",
       "mercenaryDen": "Mercenary dens",
       "moonChunk": "Moon chunks",
+      "skyhookRaid": "Skyhook raids",
       "contractExpiry": "Contracts",
       "orderExpiry": "Market orders",
       "skillPlan": "Skill plan"
@@ -7608,6 +7608,10 @@
       "moonChunk": {
         "arrival": "arrives",
         "decay": "decays if not fractured"
+      },
+      "skyhookRaid": {
+        "upcoming": "raid window opens",
+        "open": "raid window closes"
       },
       "industryJob": {
         "active": "in progress",
@@ -7628,6 +7632,21 @@
         "reinforcement": "leaves reinforcement",
         "operation": "operation expires"
       }
+    },
+    "skyhookRaid": {
+      "system": "System",
+      "unsecured": "Unsecured stock",
+      "secured": "Secured stock",
+      "windowOpens": "Window opens",
+      "windowCloses": "Window closes",
+      "state": {
+        "upcoming": "Not open yet",
+        "open": "Open now"
+      },
+      "units_one": "{{count}} unit",
+      "units_other": "{{count}} units",
+      "unknown": "Unknown",
+      "note": "ESI does not send the silo's capacity, so this is the stock a raider could take, not a fill percentage."
     },
     "filter": {
       "title": "Event types",

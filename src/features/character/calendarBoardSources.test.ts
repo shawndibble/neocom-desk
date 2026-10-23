@@ -15,6 +15,7 @@ import {
   toMoonChunkSources,
   toOrderExpirySources,
   toPlanetExtractionSources,
+  toSkyhookRaidSources,
   toSkillPlanSources,
   toSkillTrainingSources,
 } from './calendarBoardSources';
@@ -262,6 +263,39 @@ describe('toMoonChunkSources', () => {
   it('keeps drills on different refineries distinct', () => {
     const sources = toMoonChunkSources([drill(), drill({ structureId: 1002 })], ARRIVES - 1);
     expect(sources.map((source) => source.id)).toEqual(['1001', '1002']);
+  });
+});
+
+describe('toSkyhookRaidSources', () => {
+  const NOW = Date.parse('2026-10-23T12:00:00Z');
+  const HOUR = 3_600_000;
+  const raid = (overrides = {}) => ({
+    id: 5,
+    subject: 'X-7OMU IV',
+    systemId: 30000001,
+    systemName: 'X-7OMU',
+    windowStartMs: NOW + 2 * HOUR,
+    windowEndMs: NOW + 4 * HOUR,
+    unsecuredUnits: 400,
+    securedUnits: 800,
+    ...overrides,
+  });
+
+  it('counts down to the window opening while it is still ahead', () => {
+    const [source] = toSkyhookRaidSources([raid()], NOW);
+    expect(source).toMatchObject({ id: '5', subject: 'X-7OMU IV', detail: 'upcoming' });
+    expect(source.deadlineMs).toBe(NOW + 2 * HOUR);
+  });
+
+  it('counts down to the window closing once it is open', () => {
+    const [source] = toSkyhookRaidSources([raid()], NOW + 3 * HOUR);
+    expect(source).toMatchObject({ detail: 'open' });
+    expect(source.deadlineMs).toBe(NOW + 4 * HOUR);
+  });
+
+  it('drops a closed window and a skyhook with no readable window', () => {
+    expect(toSkyhookRaidSources([raid()], NOW + 5 * HOUR)).toEqual([]);
+    expect(toSkyhookRaidSources([raid({ windowStartMs: null })], NOW)).toEqual([]);
   });
 });
 

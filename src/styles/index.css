@@ -118,7 +118,7 @@
    * Clock kinds — the app's one NOMINAL palette (DESIGN.md §1). Identity, not
    * magnitude and not status: these say which part of the app a deadline came
    * from. Every hue sits at least 20 ΔE (CIE76) from accent/success/warning/danger
-   * so none of them can be mistaken for a status tone, and all nine clear AA on
+   * so none of them can be mistaken for a status tone, and all ten clear AA on
    * bg, panel and panel-2 because they colour countdown text, not just dots.
    * mercenary-den (#c88be9, orchid) fills the gap between skill-training and
    * contract-expiry: 59 ΔE from the nearest status tone, 25 from skill-training.
@@ -129,6 +129,7 @@
   --color-kind-planet-extraction: #6fdecd;
   --color-kind-mercenary-den: #c88be9;
   --color-kind-moon-chunk: #a0a8b8;
+  --color-kind-skyhook-raid: #d9a7a0;
   --color-kind-contract-expiry: #f2879f;
   --color-kind-order-expiry: #c9d96a;
   --color-kind-skill-plan: #e0d0a8;
