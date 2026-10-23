@@ -26,6 +26,8 @@ describe('THRESHOLD_FIELDS', () => {
       'shipLostMinimumIsk',
       'mercenaryDenReinforcedLeadHours',
       'mercenaryDenAnarchyPercent',
+      'skyhookRaidableLeadHours',
+      'skyhookRaidableMinUnits',
     ]);
   });
 
@@ -64,6 +66,8 @@ describe('defaultedThresholds', () => {
       shipLostMinimumIsk: 0,
       mercenaryDenReinforcedLeadHours: 1,
       mercenaryDenAnarchyPercent: 50,
+      skyhookRaidableLeadHours: 2,
+      skyhookRaidableMinUnits: 0,
     });
   });
 

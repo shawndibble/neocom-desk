@@ -243,6 +243,14 @@ const CATALOG = [
     corpCapability: 'canReadStructures',
   },
   {
+    // Station_Manager reads the skyhook routes (issue #4784); one scope, shared with the Sovereignty widget.
+    id: 'skyhookRaidable',
+    labelKey: 'settings.notifications.event.skyhookRaidable',
+    defaultChannels: 'both',
+    scope: requiredScope('getCorporationSkyhooks'),
+    corpCapability: 'canReadSkyhooks',
+  },
+  {
     id: 'corpIndustryJobReady',
     labelKey: 'settings.notifications.event.corpIndustryJobReady',
     defaultChannels: 'both',
