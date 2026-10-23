@@ -16427,6 +16427,7 @@
         "failedFor": "Mail failed for {{names}}, status still saved.",
         "noScope": "No mail sent: mail permission missing.",
         "corpFallback": "your corporation",
+        "hullFallback": "your ship",
         "grantTitle": "Can't mail the pilot",
         "grantHint": "SRP result mails go out from your Character. Grant the mail permission to send them.",
         "grantAction": "Grant mail permission"
