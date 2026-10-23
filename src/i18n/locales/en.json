@@ -5485,9 +5485,7 @@
         },
         "status": {
           "pending": "Pending",
-          "approved": "Approved",
-          "paid": "Paid",
-          "rejected": "Rejected"
+          "approved": "Approved"
         },
         "empty": "No open claims",
         "emptyHint": "Pilots file claims on the SRP page. New ones show here while Pending.",

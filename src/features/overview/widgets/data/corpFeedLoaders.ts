@@ -468,11 +468,6 @@ export async function loadCorpOrders(characterId: number): Promise<CorpOrdersFee
 }
 
 /**
- * Not a corp-ESI read (no role, no scope): the corporation id is public, and
- * the totals are the ones the Public info Corporation tab shows, through the
- * same cached `fetchCorporationStats`, so widget and modal never disagree.
- */
-/**
  * SRP is Firestore, not ESI: the roles gate comes first, then the live officer check (which
  * also renews the 24 h record the claim rules read), then the open claims. A failure of either
  * call throws, so the widget shows Retry rather than a false "no claims".
@@ -497,7 +492,9 @@ export async function loadCorpSrp(characterId: number): Promise<CorpSrpFeed> {
     ...new Set(claims.flatMap((c) => (c.hullTypeId === null ? [] : [c.hullTypeId]))),
   ];
   const [typeNames, systems] = await Promise.all([
-    hullIds.length === 0 ? new Map<number, string>() : loadTypeNames(hullIds),
+    hullIds.length === 0
+      ? new Map<number, string>()
+      : loadTypeNames(hullIds).catch(() => new Map<number, string>()),
     claims.length === 0
       ? null
       : import('@/sde/solarSystems').then((m) => m.loadSolarSystemsById()).catch(() => null),
@@ -510,6 +507,11 @@ export async function loadCorpSrp(characterId: number): Promise<CorpSrpFeed> {
   return { ...base, enabled: true, claims, typeNames, systemNames };
 }
 
+/**
+ * Not a corp-ESI read (no role, no scope): the corporation id is public, and
+ * the totals are the ones the Public info Corporation tab shows, through the
+ * same cached `fetchCorporationStats`, so widget and modal never disagree.
+ */
 export async function loadCorpKills(characterId: number): Promise<CorpKillsFeed> {
   const none: CorpKillsFeed = { ...UNREADABLE, corporationId: null, stats: null, failed: null };
   const corporationId = await loadCorporationId(characterId);

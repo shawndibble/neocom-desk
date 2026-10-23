@@ -15,13 +15,16 @@ const C = 'overview.widgets.corpSrp';
 const SRP_PATH = '/corp/srp';
 const SETTINGS_PATH = '/corp/srp/settings';
 
-const byAge = (a: SrpClaimRow, b: SrpClaimRow) => a.filedAt - b.filedAt;
+const RANK: Record<SrpClaimRow['state'], number> = {
+  pending: 0,
+  approved: 1,
+  paid: 2,
+  rejected: 3,
+};
 
 /** Pending first (the queue an officer works), then Approved awaiting payment; oldest first in each. */
-function ordered(claims: readonly SrpClaimRow[]): SrpClaimRow[] {
-  const open = (state: SrpClaimRow['state']) => claims.filter((c) => c.state === state).sort(byAge);
-  return [...open('pending'), ...open('approved')];
-}
+const ordered = (claims: readonly SrpClaimRow[]): SrpClaimRow[] =>
+  [...claims].sort((a, b) => RANK[a.state] - RANK[b.state] || a.filedAt - b.filedAt);
 
 const isk = (amount: number, t: (k: string) => string) =>
   `${formatIsk(amount)} ${t('overview.isk')}`;
@@ -94,7 +97,7 @@ export const corpSrp: Builder = (feeds, { t }) => {
           amountCell(c),
           c.state === 'pending'
             ? { text: t(`${C}.status.pending`), tone: 'caution' }
-            : t(`${C}.status.${c.state}`),
+            : t(`${C}.status.approved`),
         ],
         to: SRP_PATH,
       })),

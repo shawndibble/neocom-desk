@@ -7,7 +7,8 @@ import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 
 /** A claim's `state` (mirror of `functions/src/srpTypes.ts`; #4850 adds the client copy). */
-export type SrpClaimState = 'pending' | 'approved' | 'paid' | 'rejected';
+const STATES = ['pending', 'approved', 'paid', 'rejected'] as const;
+export type SrpClaimState = (typeof STATES)[number];
 
 /**
  * The fields of a claim doc the widgets read. Narrow on purpose: the doc carries more
@@ -26,7 +27,6 @@ export interface SrpClaimRow {
 }
 
 const OPEN_STATES: SrpClaimState[] = ['pending', 'approved'];
-const STATES: readonly unknown[] = ['pending', 'approved', 'paid', 'rejected'];
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const text = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
 
@@ -34,7 +34,7 @@ const text = (v: unknown): string | null => (typeof v === 'string' && v !== '' ?
 export function toClaimRow(id: string, data: Record<string, unknown>): SrpClaimRow | null {
   const killmailId = num(data.killmailId) ?? (Number.isInteger(Number(id)) ? Number(id) : null);
   const state = data.state;
-  if (killmailId === null || !STATES.includes(state)) return null;
+  if (killmailId === null || !(STATES as readonly unknown[]).includes(state)) return null;
   return {
     killmailId,
     state: state as SrpClaimState,
