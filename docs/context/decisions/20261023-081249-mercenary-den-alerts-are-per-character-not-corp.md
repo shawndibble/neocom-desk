@@ -23,8 +23,7 @@ _Recorded 2026-10-23 · issue #4782._
   Its Settings row says so. It fires once per crossing of the Character's
   threshold (default 50 % within the den's level), re-arming when it drops
   below or the level changes, and stays quiet when the previous read was blank.
-- **Calendar kind `denReinforce`** ("Den reinforcement") is the ninth Clock
-  Kind: orchid `#cf75f0` (the only hue clear of every status tone and kind;
-  see DESIGN.md §1) with the `ShieldWarning` glyph (`Icon.DenReinforce`). It
-  is gated on the den scope before any read and its filter-menu row is hidden
-  when not readable, as for moon chunks.
+- **No Calendar kind from this ticket.** Develop gained the `mercenaryDen`
+  Clock Kind (#4806, with its own colour and glyph) while this was in flight,
+  and it already carries the reinforcement exit, so a second kind would
+  duplicate it. The ticket's Calendar section is satisfied by that.
