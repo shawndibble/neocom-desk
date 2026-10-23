@@ -49,7 +49,7 @@ async function probe(registration: ServiceWorkerRegistration): Promise<UpdateSta
   // the background (applying it, `forceUpdate`, waits on that install itself).
   const verdict = compareRelease(await fetchLatestRelease(), __APP_RELEASE__);
   if (verdict === 'same') return 'current';
-  if (verdict === 'newer') {
+  if (verdict === 'different') {
     registration.update().catch(() => undefined);
     return 'available';
   }

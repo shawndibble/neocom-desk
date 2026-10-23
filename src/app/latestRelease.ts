@@ -9,9 +9,9 @@
 export const RELEASE_FILE = 'version.json';
 
 /** Long enough for a slow link, short enough that Settings never hangs on it. */
-export const RELEASE_FETCH_TIMEOUT_MS = 5000;
+const RELEASE_FETCH_TIMEOUT_MS = 5000;
 
-export type ReleaseComparison = 'newer' | 'same' | 'unknown';
+export type ReleaseComparison = 'different' | 'same' | 'unknown';
 
 /**
  * `null` when the published release could not be read (offline, a host without
@@ -41,7 +41,8 @@ export async function fetchLatestRelease(
   }
 }
 
+/** `different`, not "newer": a rollback is also a build to move to. */
 export function compareRelease(latest: string | null, running: string): ReleaseComparison {
   if (latest === null) return 'unknown';
-  return latest === running ? 'same' : 'newer';
+  return latest === running ? 'same' : 'different';
 }

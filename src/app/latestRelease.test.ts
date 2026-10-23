@@ -13,8 +13,8 @@ describe('compareRelease', () => {
   it('is same for equal releases', () => {
     expect(compareRelease('neocom-desk@1+abc', 'neocom-desk@1+abc')).toBe('same');
   });
-  it('is newer when the published release differs from the running one', () => {
-    expect(compareRelease('neocom-desk@1+def', 'neocom-desk@1+abc')).toBe('newer');
+  it('is different when the published release differs from the running one', () => {
+    expect(compareRelease('neocom-desk@1+def', 'neocom-desk@1+abc')).toBe('different');
   });
   it('is unknown when the published release could not be read', () => {
     expect(compareRelease(null, 'neocom-desk@1+abc')).toBe('unknown');
