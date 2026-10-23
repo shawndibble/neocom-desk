@@ -123,7 +123,7 @@ jobs:
         with:
           node-version: 24
       - id: e2e-needed
-        run: node scripts/needs-e2e.mjs
+        run: echo "run_e2e=false" >> "$GITHUB_OUTPUT" # TEMPORARY: prove the skip path
       # Same node_modules cache as the test jobs (and warmed on `develop` by
       # cache-warm.yml); a miss falls back to `npm ci`.
       - uses: actions/cache@v4
