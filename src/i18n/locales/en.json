@@ -10177,6 +10177,13 @@
         "bodyHangar_one": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} is in your hangar there.",
         "bodyHangar_other": "{{list}}: {{listed}} of {{target}} listed. {{hangar}} are in your hangar there."
       },
+      "shipLost": {
+        "title": "Ship lost",
+        "lostShip": "Lost your {{ship}}",
+        "lostShipUnknown": "Lost a ship",
+        "inSystem": "{{lost}} in {{system}}",
+        "withValue": "{{where}} · {{value}} ISK"
+      },
       "priceAlertTriggered": {
         "title": "Price alert",
         "aboveBody": "{{item}} reached {{price}} ISK, at or above your {{target}} ISK target.",
@@ -12074,7 +12081,8 @@
         "communityJoinRequest": "Community join request",
         "communityMemberJoined": "Community member joined",
         "communityRequestPledged": "Pledge on your Request",
-        "priceAlertTriggered": "Quickbar price alert"
+        "priceAlertTriggered": "Quickbar price alert",
+        "shipLost": "Ship lost"
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Planetary Industry always shows the real expiry.",
       "marketOrderUndercutStationOnlyHint": "Checks your order's own station only, and only while the app is open.",
@@ -12096,6 +12104,8 @@
       "skillQueueEndingLeadTimeLabel": "Warn this far before the skill queue runs dry:",
       "skillQueueEndingLeadTimeOption_one": "{{count}} hour",
       "skillQueueEndingLeadTimeOption_other": "{{count}} hours",
+      "shipLostMinimumIskLabel": "Minimum loss value (ISK):",
+      "shipLostMinimumIskHint": "Leave at 0 to hear about every loss. Shorthand works: 500m, 1.5b (b billion, m million, t thousand). Read from zKillboard while the app is open.",
       "incursionNearbyJumpsLabel": "Alert when an Incursion is within:",
       "incursionNearbyJumpsOption_one": "{{count}} jump",
       "incursionNearbyJumpsOption_other": "{{count}} jumps",

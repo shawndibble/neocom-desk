@@ -51,6 +51,7 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
       walletBalanceChangedThresholdIsk: ['walletBalanceChanged'],
       walletFoldIntoContract: ['walletBalanceChanged'],
       incursionNearbyJumps: ['incursionNearby'],
+      shipLostMinimumIsk: ['shipLost'],
       structureFuelLowDays: ['structureFuelLow'],
       corpWalletBalanceFloorIsk: ['corpWalletThreshold'],
       corpWalletTransactionCeilingIsk: ['corpWalletThreshold'],

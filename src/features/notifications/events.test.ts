@@ -41,6 +41,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'priceAlertTriggered',
       'stockBelowTarget',
       'incursionNearby',
+      'shipLost',
       'communityJoinRequest',
       'communityMemberJoined',
       'communityRequestPledged',

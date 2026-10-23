@@ -75,6 +75,9 @@ import {
   diffCorpMemberLeft,
   diffCorpWalletThreshold,
   diffPriceAlertTriggered,
+  diffShipLost,
+  type ShipLossSnapshot,
+  type ShipLostFire,
   type NotificationFire,
   type SpExtractionFire,
   type CloneJumpReadyFire,
@@ -138,6 +141,8 @@ import {
   priceAlertCopy,
   stockBelowTargetCopy,
   incursionNearbyCopy,
+  shipLostCopy,
+  type ShipLostNames,
   communityJoinRequestCopy,
   communityMemberJoinedCopy,
   communityRequestPledgedCopy,
@@ -177,6 +182,7 @@ export type AnyNotificationFire =
   | CorpMemberLeftFire
   | CorpWalletThresholdFire
   | PriceAlertTriggeredFire
+  | ShipLostFire
   | StockBelowTargetFire
   | IncursionNearbyFire
   | CommunityJoinRequestFire
@@ -223,6 +229,7 @@ export const SNAPSHOT_SOURCES = {
   corpWallet: source<CorpWalletSnapshot>('corpWallet'),
   priceAlert: source<PriceAlertSnapshot>('priceAlert'),
   stockTargets: source<StockAlertSnapshot>('stockTargets'),
+  kills: source<ShipLossSnapshot, ShipLostNames>('kills'),
   incursions: source<IncursionAlertSnapshot, IncursionNames>('incursions'),
   communities: source<CommunityAlertSnapshot>('communities'),
 } as const;
@@ -588,6 +595,18 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: {
       fields: [THRESHOLD_FIELDS.incursionNearbyJumps],
       hintKey: 'settings.notifications.incursionNearbyRouteRulesHint',
+    },
+    rowHintKey: null,
+  }),
+  shipLost: defineEvent({
+    source: SNAPSHOT_SOURCES.kills,
+    diff: diffShipLost,
+    copy: shipLostCopy,
+    // zKillboard is not polled server-side, so there is nothing to project.
+    projection: null,
+    thresholds: {
+      fields: [THRESHOLD_FIELDS.shipLostMinimumIsk],
+      hintKey: 'settings.notifications.shipLostMinimumIskHint',
     },
     rowHintKey: null,
   }),

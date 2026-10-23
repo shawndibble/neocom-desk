@@ -688,7 +688,7 @@ Issue #1285. The work lands in two places, and the compiler holds you to the sec
 1. Add a row to the catalog in `src/features/notifications/events.ts`: id, label key, scope, corp capability and `defaultChannels`. Add the label string at `settings.notifications.event.<id>` in `en.json`. This half is service-worker-safe, and the `NotificationEventId` union is derived from it.
 2. Once the id exists, `NOTIFICATION_EVENT_ENTRIES` in `src/features/notifications/eventEntries.ts` fails to typecheck until the event has an **Event Entry**. The entry names every required field:
    - `source`: the `SNAPSHOT_SOURCES` handle of the poll domain it reads.
-   - `diff`: an engine diff, written test-first in `src/engine/notificationDiffs.ts`.
+   - `diff`: an engine diff, written test-first in `src/engine/notificationDiffs/`.
    - `copy`: its live wording in `domainCopy.ts` and `notifications.fired.*` strings.
    - `projection`: either a push renderer or `null`. `engine/projection.ts`'s `PROJECTABLE_EVENT_IDS` decides which, per id.
    - `thresholds`: fields from `eventThresholdFields.ts`, or `null`.

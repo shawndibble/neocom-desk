@@ -30,6 +30,7 @@ import {
   DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
   DEFAULT_WALLET_FOLD_INTO_CONTRACT,
   DEFAULT_INCURSION_NEARBY_JUMPS,
+  DEFAULT_SHIP_LOST_MINIMUM_ISK,
   updateNotificationPrefs,
   toggleEventChannelPref,
   toggleEveTypeChannelPref,
@@ -265,6 +266,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
       walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
+      shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
     });
   });
 
@@ -287,6 +289,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
       walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
+      shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
     });
   });
 
@@ -310,6 +313,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       walletBalanceChangedThresholdIsk: DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
       walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
+      shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
     });
   });
 
@@ -342,6 +346,7 @@ describe('characterEventThresholds / withCharacterEventThreshold', () => {
       walletBalanceChangedThresholdIsk: 10_500_000,
       walletFoldIntoContract: DEFAULT_WALLET_FOLD_INTO_CONTRACT,
       incursionNearbyJumps: DEFAULT_INCURSION_NEARBY_JUMPS,
+      shipLostMinimumIsk: DEFAULT_SHIP_LOST_MINIMUM_ISK,
     });
   });
 

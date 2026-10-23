@@ -36,6 +36,8 @@ export interface CharacterEventThresholds {
   walletFoldIntoContract?: number;
   /** Jumps from the Current System within which an Incursion fires `incursionNearby` (issue #3542) — one of `INCURSION_NEARBY_JUMP_OPTIONS`. */
   incursionNearbyJumps?: number;
+  /** Least zKillboard total value, in ISK, a loss must carry to fire `shipLost` (issue #4772); 0 fires for every loss. */
+  shipLostMinimumIsk?: number;
 }
 
 export type ThresholdKey = keyof CharacterEventThresholds;
@@ -78,6 +80,7 @@ export const DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK = 50_000_000;
 export const DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK = 100_000_000;
 export const DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK = 1_000_000;
 export const DEFAULT_WALLET_FOLD_INTO_CONTRACT = 1;
+export const DEFAULT_SHIP_LOST_MINIMUM_ISK = 0;
 /** Close enough to fly to on a whim, without an alert for every Incursion in the region. */
 export const DEFAULT_INCURSION_NEARBY_JUMPS = 5;
 /**
@@ -234,6 +237,15 @@ export const THRESHOLD_FIELDS: { readonly [K in ThresholdKey]: ThresholdField<K>
       labelKey: 'settings.notifications.incursionNearbyJumpsLabel',
       options: INCURSION_NEARBY_JUMP_OPTIONS,
       optionKey: 'settings.notifications.incursionNearbyJumpsOption',
+    },
+  },
+  shipLostMinimumIsk: {
+    key: 'shipLostMinimumIsk',
+    defaultValue: DEFAULT_SHIP_LOST_MINIMUM_ISK,
+    control: {
+      kind: 'iskAmount',
+      labelKey: 'settings.notifications.shipLostMinimumIskLabel',
+      inputIdPrefix: 'ship-lost-minimum',
     },
   },
 };
