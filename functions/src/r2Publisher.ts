@@ -1,7 +1,8 @@
 /**
  * Publishes the offers snapshot to Cloudflare R2 (ADR 0019, issue #3745): one
  * gzip object per item type, named by content hash and uploaded only when its
- * hash changed, then `index.json` last. The upload itself is injected (`R2Put`)
+ * hash changed, then the bundle shards (the same rows in a few big objects),
+ * then `index.json` last. The upload itself is injected (`R2Put`)
  * so this stays testable; `createR2Put` is the SigV4 implementation.
  *
  * Config: `R2_ENDPOINT` (https://<account>.r2.cloudflarestorage.com) and
@@ -16,6 +17,7 @@
 import type { R2Put } from './r2Client.js';
 import {
   R2_INDEX_KEY,
+  buildBundleObjects,
   buildContractOfferR2Index,
   buildTypeObjects,
   gzipObjectBody,
@@ -48,6 +50,8 @@ export interface R2PublishState {
   hashes: Record<string, string>;
   /** When every object was last uploaded in one successful pass; `null` until one completes. */
   fullUploadAt: number | null;
+  /** Bundle shard names in R2 as of the last publish; absent before bundles existed. */
+  bundles?: string[];
 }
 
 export interface R2PublishResult {
@@ -57,6 +61,11 @@ export interface R2PublishResult {
   /** Changed types not attempted because the time budget ran out; the next run resumes them. */
   remaining: number;
   indexWritten: boolean;
+  /**
+   * The index names the bundle shards. False leaves readers on the per-type
+   * objects, which is slower but complete, so it never fails the run.
+   */
+  bundlesWritten: boolean;
   /** First upload error message, so an auth or network fault is diagnosable from the log. */
   firstError: string | null;
   state: R2PublishState;
@@ -155,8 +164,28 @@ export async function publishContractOffersToR2(args: {
   // Names in the index must all exist, so a failed type holds the index back:
   // readers keep the previous index and its (still present) objects.
   let indexWritten = false;
+  let bundleNames: string[] = [];
+  let bundles: ReturnType<typeof buildBundleObjects> | undefined;
   if (failed === 0 && remaining === 0) {
-    const index = buildContractOfferR2Index(rows, objects, lastSyncedAt);
+    // Shards change with any row, so most publishes upload them all; one already
+    // in R2 is skipped unless the lifecycle refresh is due. A failed shard drops
+    // the bundles from this index only.
+    const built = buildBundleObjects(objects, rows);
+    const parts = [...built.blueprints, ...built.others];
+    const inR2 = new Set(refresh ? [] : (previous?.bundles ?? []));
+    try {
+      await runPool(
+        parts.filter((part) => !inR2.has(part.name)),
+        UPLOAD_CONCURRENCY,
+        (part) => put(part.name, gzipObjectBody(part.body), OBJECT_HEADERS),
+        () => false
+      );
+      bundles = built;
+      bundleNames = parts.map((part) => part.name);
+    } catch (error) {
+      firstError ??= String(error);
+    }
+    const index = buildContractOfferR2Index(rows, objects, lastSyncedAt, bundles);
     try {
       await put(R2_INDEX_KEY, JSON.stringify(index), INDEX_HEADERS);
       indexWritten = true;
@@ -172,9 +201,11 @@ export async function publishContractOffersToR2(args: {
     failed,
     remaining,
     indexWritten,
+    bundlesWritten: indexWritten && bundles !== undefined,
     firstError,
     state: {
       hashes,
+      bundles: indexWritten ? bundleNames : (previous?.bundles ?? []),
       // A failed or budget-cut refresh pass drops to `null` so the next run resumes from the
       // recorded hashes instead of re-uploading everything every 30 minutes.
       fullUploadAt:

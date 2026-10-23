@@ -64,17 +64,14 @@ export function useEarlyOffers(
   typeIds: ReadonlySet<number> | null,
   enabled: boolean
 ): EarlyOffers {
-  // The full snapshot is never downloaded, so a search that names no type (a
-  // region or price filter alone) reads every listed type instead.
-  const wanted = useMemo<ReadonlySet<number> | null>(
-    () => typeIds ?? (index ? new Set(index.types.keys()) : null),
-    [typeIds, index]
-  );
+  // A search that names no type (a region or price filter alone, or Below
+  // market) reads every offer, from the index's bundle shards.
+  const wantedCount = typeIds?.size ?? index?.types.size ?? 0;
   const key = useMemo(() => {
-    if (!enabled || index === null || wanted === null || wanted.size === 0) return null;
+    if (!enabled || index === null || wantedCount === 0) return null;
     const scope = typeIds === null ? 'all' : idSetKey(typeIds);
     return `${index.lastSyncedAt}:${scope}`;
-  }, [enabled, index, wanted, typeIds]);
+  }, [enabled, index, wantedCount, typeIds]);
 
   const [answer, setAnswer] = useState<{
     key: string;
@@ -82,10 +79,10 @@ export function useEarlyOffers(
   } | null>(null);
 
   useEffect(() => {
-    if (key === null || index === null || wanted === null) return;
+    if (key === null || index === null) return;
     let cancelled = false;
     const timer = setTimeout(() => {
-      void loadOffersForTypes(index, wanted).then((rows) => {
+      void loadOffersForTypes(index, typeIds).then((rows) => {
         if (!cancelled) setAnswer({ key, rows });
       });
     }, SETTLE_MS);
@@ -97,7 +94,7 @@ export function useEarlyOffers(
   }, [key]);
 
   // An R2 index listing no type has nothing to read and nothing coming.
-  if (enabled && index && wanted?.size === 0) return NO_OFFERS;
+  if (enabled && index && wantedCount === 0) return NO_OFFERS;
   if (key === null) return NONE;
   if (answer?.key !== key) return NONE;
   return answer.rows === null ? { rows: null, failed: true } : { rows: answer.rows };

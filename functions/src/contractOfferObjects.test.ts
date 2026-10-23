@@ -1,8 +1,10 @@
 import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import {
+  buildBundleObjects,
   buildContractOfferR2Index,
   buildTypeObjects,
+  bundleObjectName,
   gzipObjectBody,
   typeObjectName,
 } from './contractOfferObjects.js';
@@ -94,5 +96,94 @@ describe('buildContractOfferR2Index', () => {
       objects: [t34.parts[0].name],
     });
     expect(index.types['35'].cheapest).toBeNull();
+  });
+});
+
+describe('bundleObjectName', () => {
+  it('names the group, the shard and the content hash', () => {
+    expect(bundleObjectName('blueprints', 0, 'abc123')).toBe(
+      'contract-offers/bundles/blueprints.0.abc123.json'
+    );
+  });
+});
+
+describe('buildBundleObjects', () => {
+  const bpc = (over: Partial<PublicContractOfferRow> = {}) =>
+    row({ typeId: 999, isBlueprintCopy: true, me: 10, te: 20, runs: 5, ...over });
+  const parse = (bodies: { body: string }[]) => bodies.flatMap((b) => JSON.parse(b.body));
+
+  it('puts every row of a blueprint type in the blueprints group, the rest in others', () => {
+    const rows = [
+      row(),
+      bpc(),
+      // A BPO: no copy flag, but ME/TE make the type a blueprint.
+      row({ contractId: 2, typeId: 1000, me: 0, te: 0 }),
+      // Same blueprint type without ME/TE still rides with its type.
+      row({ contractId: 3, typeId: 999 }),
+      row({ contractId: 4, typeId: 35 }),
+    ];
+    const bundles = buildBundleObjects(buildTypeObjects(rows), rows);
+    expect(
+      parse(bundles.blueprints)
+        .map((r) => r.typeId)
+        .sort()
+    ).toEqual([1000, 999, 999]);
+    expect(
+      parse(bundles.others)
+        .map((r) => r.typeId)
+        .sort()
+    ).toEqual([34, 35]);
+  });
+
+  it('keeps every row exactly once across shards', () => {
+    const rows = Array.from({ length: 30 }, (_, i) => row({ contractId: i, typeId: 100 + i }));
+    const bundles = buildBundleObjects(buildTypeObjects(rows), rows, { maxBundleBytes: 500 });
+    expect(bundles.others.length).toBeGreaterThan(1);
+    expect(
+      parse(bundles.others)
+        .map((r) => r.contractId)
+        .sort((a, b) => a - b)
+    ).toEqual(rows.map((r) => r.contractId));
+    expect(bundles.blueprints).toEqual([]);
+    bundles.others.forEach((part, shard) =>
+      expect(part.name).toMatch(
+        new RegExp(`^contract-offers/bundles/others\\.${shard}\\.\\w+\\.json$`)
+      )
+    );
+  });
+
+  it('names shards by content, independent of row order', () => {
+    const rows = [row(), row({ contractId: 2, typeId: 35 })];
+    const reversed = [...rows].reverse();
+    const a = buildBundleObjects(buildTypeObjects(rows), rows);
+    const b = buildBundleObjects(buildTypeObjects(reversed), reversed);
+    expect(b.others.map((p) => p.name)).toEqual(a.others.map((p) => p.name));
+    const changed = [row({ price: 5 }), rows[1]];
+    const c = buildBundleObjects(buildTypeObjects(changed), changed);
+    expect(c.others[0].name).not.toBe(a.others[0].name);
+  });
+
+  it('includes the rows of a type split by region', () => {
+    const rows = [row({ regionId: 1 }), row({ contractId: 2, regionId: 2 })];
+    const objects = buildTypeObjects(rows, { maxObjectBytes: 10 });
+    expect(parse(buildBundleObjects(objects, rows).others)).toHaveLength(2);
+  });
+});
+
+describe('buildContractOfferR2Index bundles', () => {
+  it('names the bundle shards when given them', () => {
+    const rows = [row()];
+    const objects = buildTypeObjects(rows);
+    const bundles = buildBundleObjects(objects, rows);
+    const index = buildContractOfferR2Index(rows, objects, 1, bundles);
+    expect(index.bundles).toEqual({
+      blueprints: [],
+      others: bundles.others.map((p) => p.name),
+    });
+  });
+
+  it('leaves bundles out when not given them', () => {
+    const rows = [row()];
+    expect(buildContractOfferR2Index(rows, buildTypeObjects(rows), 1).bundles).toBeUndefined();
   });
 });

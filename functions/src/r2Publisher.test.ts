@@ -39,7 +39,11 @@ function recorder(failOn?: (key: string) => boolean): { puts: Put[]; put: R2Put 
 
 const rows = [row(), row({ typeId: 35 })];
 const INDEX_KEY = 'contract-offers/index.json';
-const typePuts = (puts: Put[]) => puts.filter((p) => p.key !== INDEX_KEY);
+const typePuts = (puts: Put[]) => puts.filter((p) => p.key.startsWith('contract-offers/types/'));
+const bundlePuts = (puts: Put[]) =>
+  puts.filter((p) => p.key.startsWith('contract-offers/bundles/'));
+const nonBundlePuts = (puts: Put[]) =>
+  puts.filter((p) => !p.key.startsWith('contract-offers/bundles/'));
 
 describe('publishContractOffersToR2', () => {
   it('uploads every type then index.json last, with the right headers', async () => {
@@ -82,7 +86,7 @@ describe('publishContractOffersToR2', () => {
       put,
     });
     expect(typePuts(puts)).toHaveLength(0);
-    expect(puts.map((p) => p.key)).toEqual([INDEX_KEY]);
+    expect(nonBundlePuts(puts).map((p) => p.key)).toEqual([INDEX_KEY]);
     expect(result).toMatchObject({ uploaded: 0, skipped: 2 });
   });
 
@@ -180,6 +184,97 @@ describe('publishContractOffersToR2', () => {
       put: recorder().put,
     });
     expect(Object.keys(result.state.hashes)).toEqual(['34']);
+  });
+});
+
+describe('publishContractOffersToR2 bundles', () => {
+  const bpRows = [row(), row({ contractId: 2, typeId: 999, isBlueprintCopy: true, me: 1, te: 2 })];
+
+  it('uploads the bundle shards after the types and names them in the index', async () => {
+    const puts: Put[] = [];
+    let index: { bundles?: { blueprints: string[]; others: string[] } } | null = null;
+    const result = await publishContractOffersToR2({
+      rows: bpRows,
+      lastSyncedAt: 1,
+      previous: null,
+      now: 1000,
+      put: async (key, body, headers) => {
+        puts.push({ key, headers });
+        if (key === INDEX_KEY) index = JSON.parse(String(body));
+      },
+    });
+    const bundles = bundlePuts(puts);
+    expect(bundles.map((p) => p.key.split('/').at(-1)!.split('.')[0]).sort()).toEqual([
+      'blueprints',
+      'others',
+    ]);
+    expect(bundles[0].headers['Cache-Control']).toBe('public, max-age=31536000, immutable');
+    const keys = puts.map((p) => p.key);
+    expect(Math.min(...bundles.map((p) => keys.indexOf(p.key)))).toBeGreaterThan(
+      Math.max(...typePuts(puts).map((p) => keys.indexOf(p.key)))
+    );
+    expect(keys.at(-1)).toBe(INDEX_KEY);
+    expect(index!.bundles!.blueprints).toHaveLength(1);
+    expect(index!.bundles!.others).toHaveLength(1);
+    expect(result.bundlesWritten).toBe(true);
+    expect(result.state.bundles).toEqual([
+      ...index!.bundles!.blueprints,
+      ...index!.bundles!.others,
+    ]);
+  });
+
+  it('skips unchanged shards on the next publish but still names them', async () => {
+    const first = await publishContractOffersToR2({
+      rows: bpRows,
+      lastSyncedAt: 1,
+      previous: null,
+      now: 1000,
+      put: recorder().put,
+    });
+    const { puts, put } = recorder();
+    const result = await publishContractOffersToR2({
+      rows: bpRows,
+      lastSyncedAt: 2,
+      previous: first.state,
+      now: 2000,
+      put,
+    });
+    expect(bundlePuts(puts)).toHaveLength(0);
+    expect(result.bundlesWritten).toBe(true);
+    expect(result.state.bundles).toEqual(first.state.bundles);
+  });
+
+  it('still writes the index, without bundles, when a shard upload fails', async () => {
+    let index: { bundles?: unknown } | null = null;
+    const result = await publishContractOffersToR2({
+      rows: bpRows,
+      lastSyncedAt: 1,
+      previous: null,
+      now: 1000,
+      put: async (key, body) => {
+        if (key.startsWith('contract-offers/bundles/')) throw new Error('boom');
+        if (key === INDEX_KEY) index = JSON.parse(String(body));
+      },
+    });
+    expect(result.indexWritten).toBe(true);
+    expect(result.bundlesWritten).toBe(false);
+    expect(index!.bundles).toBeUndefined();
+    expect(result.state.bundles).toEqual([]);
+    expect(result.firstError).toContain('boom');
+    expect(r2PublishOutcome(result).kind).toBe('complete');
+  });
+
+  it('uploads no shard while the types are incomplete', async () => {
+    const { puts, put } = recorder((key) => key.includes('/types/34.'));
+    const result = await publishContractOffersToR2({
+      rows: bpRows,
+      lastSyncedAt: 1,
+      previous: null,
+      now: 1000,
+      put,
+    });
+    expect(bundlePuts(puts)).toHaveLength(0);
+    expect(result.bundlesWritten).toBe(false);
   });
 });
 

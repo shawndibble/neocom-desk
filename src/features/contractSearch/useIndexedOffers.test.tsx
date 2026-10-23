@@ -26,12 +26,11 @@ beforeEach(() => {
 });
 
 describe('useEarlyOffers', () => {
-  it('reads every listed type for a search that names none, since no full snapshot is downloading', async () => {
+  it('reads every offer for a search that names no type', async () => {
     const { result } = renderHook(() => useEarlyOffers(R2_INDEX, null, true));
 
     await waitFor(() => expect(result.current.rows).toEqual([ROW]));
-    const asked = loadOffersForTypes.mock.calls[0][1] as ReadonlySet<number>;
-    expect(asked.size).toBe(20);
+    expect(loadOffersForTypes.mock.calls[0][1]).toBeNull();
   });
 
   it('has no cap on how many objects a named search may read', async () => {
