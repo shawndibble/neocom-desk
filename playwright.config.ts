@@ -107,6 +107,9 @@ const PREVIEW_SERVER: NonNullable<PlaywrightTestConfig['webServer']> = {
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
+  // CI: 3 workers on a 4-vCPU shard (#4749 experiment; default is 2). Locally
+  // Playwright's own default applies.
+  workers: process.env.CI ? 3 : undefined,
   retries: 1,
   /*
    * `list` for the CI log, `html` for the failure itself.
