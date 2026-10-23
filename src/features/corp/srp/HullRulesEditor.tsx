@@ -14,6 +14,7 @@ import {
   SearchInput,
   type DataTableColumn,
 } from '@/components/ui';
+import { focusRingClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -154,7 +155,8 @@ export function HullRulesEditor({
         aria-expanded={open}
         onClick={() => onToggle(row.id)}
         className={cx(
-          'flex min-w-0 items-center gap-1.5 text-left font-semibold',
+          'flex min-w-0 items-center gap-1.5 rounded-xs text-left font-semibold',
+          focusRingClassName,
           tall ? 'min-h-11 flex-1' : 'min-h-9'
         )}
       >

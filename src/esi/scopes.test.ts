@@ -133,6 +133,11 @@ describe('scopesForGroup', () => {
     expect(SCOPES).not.toContain('esi-characters.read_fatigue.v1');
   });
 
+  it("lists exactly the killmails group's scopes", () => {
+    expect([...scopesForGroup('killmails')]).toEqual(['esi-killmails.read_killmails.v1']);
+    expect(SCOPES).not.toContain('esi-killmails.read_killmails.v1');
+  });
+
   it("lists exactly the corpProjects group's scopes (issue #4786)", () => {
     expect([...scopesForGroup('corpProjects')]).toEqual(['esi-corporations.read_projects.v1']);
     expect(SCOPES).not.toContain('esi-corporations.read_projects.v1');
@@ -267,10 +272,10 @@ describe('PERMISSIONS', () => {
   // Hand-written, not derived from DEFAULT_ON_GROUPS/OPT_IN_GROUPS above: those
   // are filtered by `defaultOn` itself, so a derived expectation here would
   // pass no matter which way a group's flag flipped.
-  it('marks corp, structureMarkets, jumpFatigue and corpProjects opt-in and every other group default-on', () => {
+  it('marks corp, structureMarkets, jumpFatigue, corpProjects and killmails opt-in and every other group default-on', () => {
     const optIn = SCOPE_GROUPS.filter((group) => !PERMISSIONS[group].defaultOn);
     expect([...optIn].sort()).toEqual(
-      ['corp', 'structureMarkets', 'jumpFatigue', 'corpProjects'].sort()
+      ['corp', 'structureMarkets', 'jumpFatigue', 'corpProjects', 'killmails'].sort()
     );
   });
 });

@@ -1,37 +1,15 @@
 /**
- * `/corp/srp` (issue #4851, epic #4608, ADR 0026): the corp's ship replacement program. Behind
- * the Corp gate with `canManageSrp` (Director or Accountant), like the other `/corp*` routes. Its
- * views (`features/corp/srp/srpViews.ts`) narrow further: Settings is a Director's.
+ * `/corp/srp` (issues #4851, #4852, epic #4608, ADR 0026): one role-aware page. No Corp Access
+ * gate: a member of an SRP corporation files with no corp scope. Officer views (Settings, later
+ * the queue) are listed by `features/corp/srp/srpViews.ts` for a pilot with `canManageSrp` and
+ * check the server's verdict themselves.
  */
-import { useTranslation } from 'react-i18next';
-import { LoadFailedState, Spinner } from '@/components/ui';
-import { CorpDenied } from '@/features/corp/CorpDenied';
 import { SrpPage } from '@/features/corp/srp/SrpPage';
-import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
+import { useSrpNavVisible } from '@/features/corp/srp/useSrpNavVisible';
+import { useCorpAccess } from '@/features/corp/useCorpAccess';
 
 export function CorpSrp() {
-  const { t } = useTranslation();
-  const gate = useCorpRouteGate((c) => c.canManageSrp);
-  switch (gate.status) {
-    case 'loading':
-      return <Spinner label={t('common.loading')} />;
-    case 'failed':
-      return (
-        <LoadFailedState
-          title={t('corp.rolesUnavailable')}
-          hint={t('corp.rolesUnavailableHint')}
-          onRetry={gate.retry}
-        />
-      );
-    case 'denied':
-      return (
-        <CorpDenied
-          reason={gate.reason}
-          title={t('srp.noAccessTitle')}
-          hint={t('srp.noAccessHint')}
-        />
-      );
-    case 'ready':
-      return <SrpPage canManageSrp={gate.capabilities.canManageSrp} />;
-  }
+  const { state, capabilities } = useCorpAccess();
+  const srpOn = useSrpNavVisible();
+  return <SrpPage canManageSrp={state === 'ready' && capabilities.canManageSrp} srpOn={srpOn} />;
 }

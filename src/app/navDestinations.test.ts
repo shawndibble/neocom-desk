@@ -152,6 +152,7 @@ describe('listNavDestinations', () => {
     locked: NO_LOCKS,
     corpVisible: true,
     corpCapabilities: ALL_CORP_VIEWS,
+    srpVisible: true,
     t,
   });
   const byPath = (path: string) => all.find((entry) => entry.path === path);
@@ -255,16 +256,27 @@ describe('listNavDestinations', () => {
     expect(byPath('/corp')).toMatchObject({ locked: false });
   });
 
-  it('lists SRP only with canManageSrp, hidden rather than locked', () => {
-    const list = (canManageSrp: boolean) =>
+  it('lists SRP for an SRP-corp member or a canManageSrp officer, once, hidden rather than locked', () => {
+    const list = (corpVisible: boolean, srpVisible: boolean, canManageSrp: boolean) =>
       listNavDestinations({
         locked: NO_LOCKS,
-        corpVisible: true,
+        corpVisible,
         corpCapabilities: { ...NO_CORP_VIEWS, canManageSrp },
+        srpVisible,
         t,
-      });
-    expect(list(true).some((entry) => entry.path === '/corp/srp')).toBe(true);
-    expect(list(false).some((entry) => entry.path === '/corp/srp')).toBe(false);
+      }).map((entry) => entry.path);
+    // A member with no Corp Access.
+    expect(list(false, true, false)).toContain('/corp/srp');
+    expect(list(false, true, false)).not.toContain('/corp');
+    // An officer, even where SRP is still off.
+    expect(list(true, false, true)).toContain('/corp/srp');
+    // Neither door.
+    expect(list(false, false, false)).not.toContain('/corp/srp');
+    expect(list(true, false, false)).not.toContain('/corp/srp');
+    // canManageSrp without Corp Access ready is not a door.
+    expect(list(false, false, true)).not.toContain('/corp/srp');
+    expect(list(true, true, true).filter((path) => path === '/corp/srp')).toHaveLength(1);
+    expect(byPath('/corp/srp')).toMatchObject({ gating: 'srp', locked: false });
   });
 
   it("lists Overview's sub-views with their own route's lock", () => {

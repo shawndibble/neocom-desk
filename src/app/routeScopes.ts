@@ -157,7 +157,10 @@ export const ROUTE_REQUIREMENTS = {
    * that can read the ledger hide the entry rather than lock it.
    */
   '/corp/moons': UNGATED,
-  /** UNGATED: `canManageSrp` is an in-game role (Director or Accountant), which no login can grant. */
+  /**
+   * UNGATED: a member of an SRP corporation files with no corp scope or role, and `canManageSrp`
+   * is an in-game role no login can grant. Officer views check their capability themselves.
+   */
   '/corp/srp': UNGATED,
   // The drill-down's deeper levels (issue #779): every level renders the same
   // component off the same gate, so it gates identically.

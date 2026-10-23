@@ -10,6 +10,7 @@ import { focusRingClassName, interactiveClassName } from '@/components/ui/contro
 import { useHiddenTabPaths } from './useHiddenTabPaths';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
 import { useCorpViewCapabilities } from '@/features/corp/useCorpViewCapabilities';
+import { useSrpNavVisible } from '@/features/corp/srp/useSrpNavVisible';
 import { useCommandPalette } from '@/features/commandPalette/store';
 import {
   isNavPageAvailable,
@@ -76,6 +77,7 @@ export function MobileMoreSheet({
   const { pathname, search } = useLocation();
   const corpVisible = useCorpNavVisible();
   const corpCapabilities = useCorpViewCapabilities();
+  const srpVisible = useSrpNavVisible();
   const hiddenTabPaths = useHiddenTabPaths();
   const hidden = useHiddenNav((state) => state.value);
   const recent = useRecentNav((state) => state.value);
@@ -102,8 +104,8 @@ export function MobileMoreSheet({
   );
 
   const inSheet = (page: NavPage) =>
-    page.gating === 'corp'
-      ? isNavPageAvailable(page, corpVisible, corpCapabilities)
+    page.gating === 'corp' || page.gating === 'srp'
+      ? isNavPageAvailable(page, corpVisible, corpCapabilities, srpVisible)
       : page.path !== '/characters';
   const hiddenSet = new Set(hidden);
   const groups = SHEET_GROUPS.map((group) => ({

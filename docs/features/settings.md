@@ -97,7 +97,7 @@ Default / storage / sync for every control. "Local" = device-only.
 
 `src/features/permissions/PermissionsPanel.tsx`. Active Character only (message "select a character" when none).
 
-- One row per `SCOPE_GROUPS` entry (19; `src/esi/registry.ts:61`): wallet, marketOrders, contracts, assets, industry, mining, planets, mail, calendar, notifications, characterDetails, fittings, autopilot, currentShip (14 default-on = Base Grant), plus opt-in `corp`, `structureMarkets`, `jumpFatigue` and `corpProjects`. Label + caption from `PERMISSIONS[group]`.
+- One row per `SCOPE_GROUPS` entry (20; `src/esi/registry.ts:61`): wallet, marketOrders, contracts, assets, industry, mining, planets, mail, calendar, notifications, characterDetails, fittings, autopilot, currentShip (14 default-on = Base Grant), plus opt-in `corp`, `structureMarkets`, `jumpFatigue`, `corpProjects` and `killmails`. Label + caption from `PERMISSIONS[group]`.
 - Row status: Granted / Missing / Checking (never flashes Missing while loading).
 - Missing rows: checkbox, per-row Grant button (`beginEveLogin({characterId, groups:[group]})`), plus Select all / Select none / "Grant selected (N)" bar. Selection is tagged with Character id and dropped on switch.
 - Corporation row: hidden when Corp Access is `none` (no corp role). Shows `not-granted` note ("roles unknown") or the corp roles held (`corpRoleLabel`). Grantable for `not-granted` and `roles-without-grant`.

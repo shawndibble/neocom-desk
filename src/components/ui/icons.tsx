@@ -98,6 +98,7 @@ import { MagnifyingGlass } from '@phosphor-icons/react/dist/csr/MagnifyingGlass'
 import { MapPin } from '@phosphor-icons/react/dist/csr/MapPin';
 import { MapTrifold } from '@phosphor-icons/react/dist/csr/MapTrifold';
 import { Minus } from '@phosphor-icons/react/dist/csr/Minus';
+import { Lifebuoy } from '@phosphor-icons/react/dist/csr/Lifebuoy';
 import { Moon } from '@phosphor-icons/react/dist/csr/Moon';
 import { Package } from '@phosphor-icons/react/dist/csr/Package';
 import { PaperPlaneRight } from '@phosphor-icons/react/dist/csr/PaperPlaneRight';
@@ -112,7 +113,6 @@ import { Rocket } from '@phosphor-icons/react/dist/csr/Rocket';
 import { RocketLaunch } from '@phosphor-icons/react/dist/csr/RocketLaunch';
 import { Scales } from '@phosphor-icons/react/dist/csr/Scales';
 import { ShareNetwork } from '@phosphor-icons/react/dist/csr/ShareNetwork';
-import { Lifebuoy } from '@phosphor-icons/react/dist/csr/Lifebuoy';
 import { ShieldCheck } from '@phosphor-icons/react/dist/csr/ShieldCheck';
 import { ShoppingCart } from '@phosphor-icons/react/dist/csr/ShoppingCart';
 import { Sliders } from '@phosphor-icons/react/dist/csr/Sliders';

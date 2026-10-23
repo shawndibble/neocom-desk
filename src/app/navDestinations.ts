@@ -23,8 +23,11 @@ import { TAB_ENDPOINTS, type AppRoutePath } from './routeScopes';
  *   its corporation known (GLOSSARY.md round 35) — an amber dot would offer a
  *   re-login for a role only CCP can grant.
  * - `ungated`: needs no scope at all (routeScopes.ts `UNGATED`).
+ * - `srp`: a Corp page any member reaches with no Corp Access: hidden, not locked,
+ *   unless the pilot's corporation has SRP on (`useSrpNavVisible`) or, with Corp Access
+ *   ready, the Character holds the page's `corpCapability`.
  */
-export type NavGating = 'scope' | 'corp' | 'ungated';
+export type NavGating = 'scope' | 'corp' | 'ungated' | 'srp';
 
 /**
  * `primary` sits at the top of the rail with no heading; `corp` follows it,
@@ -183,12 +186,13 @@ export const NAV_PAGES = [
     mobileTab: false,
     corpCapability: 'canReadMiningLedger',
   },
-  // SRP: listed for a Director or Accountant (`canManageSrp`); the page itself shows Settings to a Director.
+  // SRP: one entry, listed for a member of an SRP corporation (no Corp Access) or an officer with
+  // `canManageSrp`; the page shows each their own views (`features/corp/srp/srpViews.ts`).
   {
     path: '/corp/srp',
     labelKey: 'nav.corpSrp',
     group: 'corp',
-    gating: 'corp',
+    gating: 'srp',
     mobileTab: false,
     corpCapability: 'canManageSrp',
   },
@@ -388,8 +392,16 @@ export function navPageLabelKey(path: NavPagePath): string {
 export function isNavPageAvailable(
   page: NavPage,
   corpVisible: boolean,
-  corpCapabilities: Partial<Record<CorpViewCapability, boolean>>
+  corpCapabilities: Partial<Record<CorpViewCapability, boolean>>,
+  srpVisible = false
 ): boolean {
+  if (page.gating === 'srp') {
+    // Either door: the corporation has SRP on, or an officer can manage it (SRP may still be off).
+    return (
+      srpVisible ||
+      (corpVisible && !!page.corpCapability && corpCapabilities[page.corpCapability] === true)
+    );
+  }
   if (page.gating !== 'corp') return true;
   return corpVisible && (!page.corpCapability || corpCapabilities[page.corpCapability] === true);
 }
@@ -437,6 +449,8 @@ export interface ListNavDestinationsOptions {
   readonly corpVisible: boolean;
   /** `useCorpAccess().capabilities` — each Corp view shows only for its capability, as the Corp pages and Roles tab are gated. */
   readonly corpCapabilities: Pick<CorpCapabilities, CorpViewCapability>;
+  /** `useSrpNavVisible()` — the SRP page is left out entirely, never locked, when false. */
+  readonly srpVisible?: boolean;
   readonly t: (key: string) => string;
   /** Tab paths left out for now (Industry › Logs until a Production Run is logged). */
   readonly hiddenTabPaths?: ReadonlySet<string>;
@@ -454,12 +468,13 @@ export function listNavDestinations({
   locked,
   corpVisible,
   corpCapabilities,
+  srpVisible,
   t,
   hiddenTabPaths,
 }: ListNavDestinationsOptions): NavDestination[] {
   const out: NavDestination[] = [];
   for (const page of NAV_PAGES as readonly NavPage[]) {
-    if (!isNavPageAvailable(page, corpVisible, corpCapabilities)) continue;
+    if (!isNavPageAvailable(page, corpVisible, corpCapabilities, srpVisible)) continue;
     const pageLocked = page.gating === 'scope' && locked.has(page.path);
     const pageLabel = t(page.labelKey);
     out.push({
