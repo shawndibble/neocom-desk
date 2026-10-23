@@ -48,9 +48,13 @@ export interface SkyhookRaidableFire {
   phase: SkyhookRaidPhase;
 }
 
-/** At or above the minimum, or unread: an unknown stock is never called safe. */
+/**
+ * Unread, or holding some stock at or above the minimum. An unknown stock is never
+ * called safe; an empty silo always is, since a raid has nothing to take from it.
+ */
 export function siloAtRisk(entry: Pick<SkyhookEntrySnapshot, 'unsecuredUnits' | 'minUnits'>) {
-  return entry.unsecuredUnits === null || entry.unsecuredUnits >= entry.minUnits;
+  if (entry.unsecuredUnits === null) return true;
+  return entry.unsecuredUnits > 0 && entry.unsecuredUnits >= entry.minUnits;
 }
 
 /** The phase a window that is open at the snapshot's instant reports. */

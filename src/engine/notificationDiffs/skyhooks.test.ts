@@ -54,6 +54,14 @@ describe('diffSkyhookRaidable', () => {
     expect(fires[0].unsecuredUnits).toBe(100);
   });
 
+  it('fires a plain "open" for an empty silo whatever the threshold: nothing to steal', () => {
+    for (const minUnits of [0, 1]) {
+      const before = snap(NOW + 9 * HOUR, hook({ minUnits, unsecuredUnits: 0 }));
+      const open = snap(NOW + 10.5 * HOUR, hook({ minUnits, unsecuredUnits: 0 }));
+      expect(diffSkyhookRaidable(7, before, open).map((f) => f.phase)).toEqual(['open']);
+    }
+  });
+
   it('fires a plain "open" when the silo is below the threshold', () => {
     const before = snap(NOW + 9 * HOUR, hook({ minUnits: 1000 }));
     const open = snap(NOW + 10.5 * HOUR, hook({ minUnits: 1000, unsecuredUnits: 999 }));

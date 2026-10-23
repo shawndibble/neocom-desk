@@ -101,10 +101,10 @@ export const DEFAULT_SHIP_LOST_MINIMUM_ISK = 0;
 export const SKYHOOK_RAIDABLE_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 6, 2, 1];
 
 /** The silo minimums `skyhookRaidable`'s inline control offers; ESI sends no silo capacity, so units, not a percent. */
-export const SKYHOOK_RAIDABLE_MIN_UNIT_OPTIONS: readonly number[] = [0, 100, 1000, 10000];
+export const SKYHOOK_RAIDABLE_MIN_UNIT_OPTIONS: readonly number[] = [1, 100, 1000, 10000];
 
 export const DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS = 2;
-export const DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS = 0;
+export const DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS = 1;
 
 export const DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS = 1;
 export const DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT = 50;
