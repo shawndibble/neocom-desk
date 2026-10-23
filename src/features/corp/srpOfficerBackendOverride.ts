@@ -1,5 +1,5 @@
 /**
- * A stand-in for the SRP officer queue's backend, for Storybook (issue #4853): set, every
+ * A stand-in for the SRP officer queue's backend, for Storybook: set, every
  * `srpOfficerClient` call answers from memory. Never set by the app itself. Its own module, like
  * `srpBackendOverride.ts`, so a test that mocks the client still leaves it unset.
  */

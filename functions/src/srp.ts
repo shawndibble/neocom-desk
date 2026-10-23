@@ -1,4 +1,4 @@
-// SRP (issue #4848, ADR 0026): the pure half of the callables, input parsing
+// SRP (ADR 0026): the pure half of the callables, input parsing
 // with no Firestore. The admin-SDK half is srpStore.ts; the layout and shapes
 // are in srpTypes.ts.
 

@@ -27,7 +27,7 @@ import { loadCorporationOrders } from '@/features/corp/orders';
 import { loadStationBestPrices } from '@/features/market/orderCompetition';
 import { loadNpcStations } from '@/sde/loadMarketSde';
 import { CorpReadFailed } from '@/features/corp/corpRead';
-import { readOpenSrpClaims } from '@/features/corp/srpClaims';
+import { readSrpClaims } from '@/features/corp/srpOfficerClient';
 import { verifySrpOfficer } from '@/features/corp/srpClient';
 import { resolveCorpReadAccess, type CorpCapability } from '@/features/corp/corpReadAccess';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
@@ -483,26 +483,26 @@ export async function loadCorpSrp(characterId: number): Promise<CorpSrpFeed> {
   };
   const access = await gate(characterId, 'canManageSrp');
   if (access === null) return empty;
+  // Local table: load it while the officer check is in flight.
+  const systemsLoad = import('@/sde/solarSystems')
+    .then((m) => m.loadSolarSystemsById())
+    .catch(() => null);
   const verdict = await verifySrpOfficer(characterId, access.corporationId);
   if (!verdict.canManage) return empty;
   const base = { ...empty, readable: true, fetchedAt: new Date(), canSetUp: verdict.isDirector };
   if (!verdict.srpEnabled) return base;
-  const claims = await readOpenSrpClaims(characterId, access.corporationId);
-  const hullIds = [
-    ...new Set(claims.flatMap((c) => (c.hullTypeId === null ? [] : [c.hullTypeId]))),
-  ];
+  const claims = await readSrpClaims(characterId, access.corporationId);
+  const hullIds = [...new Set(claims.map((c) => c.hullTypeId))];
   const [typeNames, systems] = await Promise.all([
     hullIds.length === 0
       ? new Map<number, string>()
       : loadTypeNames(hullIds).catch(() => new Map<number, string>()),
-    claims.length === 0
-      ? null
-      : import('@/sde/solarSystems').then((m) => m.loadSolarSystemsById()).catch(() => null),
+    systemsLoad,
   ]);
   const systemNames = new Map<number, string>();
   for (const c of claims) {
-    const name = c.solarSystemId === null ? undefined : systems?.get(c.solarSystemId)?.name;
-    if (c.solarSystemId !== null && name !== undefined) systemNames.set(c.solarSystemId, name);
+    const name = systems?.get(c.solarSystemId)?.name;
+    if (name !== undefined) systemNames.set(c.solarSystemId, name);
   }
   return { ...base, enabled: true, claims, typeNames, systemNames };
 }

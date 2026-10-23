@@ -26,7 +26,13 @@ import type { RoleAuditData } from '@/features/corp/roleAudit';
 import type { WalletDivision } from '@/features/corp/divisions';
 import type { CorpAssetsSummary } from './corpAssetsSummary';
 import type { PilotStats, ZkillFailureReason } from '@/lib/zkillboard';
-import type { SrpClaimRow } from '@/features/corp/srpClaims';
+import type { SrpClaim } from '@/features/corp/srpClaimTypes';
+
+/** The fields of a claim the Corp SRP widget reads. */
+export type SrpClaimRow = Pick<
+  SrpClaim,
+  'killmailId' | 'state' | 'amount' | 'characterName' | 'hullTypeId' | 'solarSystemId' | 'filedAt'
+>;
 
 interface CorpFeedBase {
   readable: boolean;

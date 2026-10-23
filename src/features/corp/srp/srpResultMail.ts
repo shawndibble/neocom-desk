@@ -1,6 +1,5 @@
 /**
- * The mail an SRP officer's client sends a pilot when a claim is approved or rejected (issue
- * #4854, epic #4608). Best effort, sent from the officer's own Character with their own token
+ * The mail an SRP officer's client sends a pilot when a claim is approved or rejected. Best effort, sent from the officer's own Character with their own token
  * after the callable succeeded: a failed mail never undoes or blocks the decision, the in-app
  * state is the record. The builder and the summary are pure; `sendSrpResultMails` takes `send`.
  */
@@ -8,8 +7,6 @@ import type { TFunction } from 'i18next';
 import { clipToCodePoints, MAX_MAIL_SUBJECT } from '@/engine/communities/requestMail';
 import { formatIsk } from '@/lib/isk';
 import { mailSafe } from '@/lib/mailSafe';
-
-export const SEND_MAIL_ENDPOINTS = ['postCharacterMail'] as const;
 
 export type SrpMailKind = 'approved' | 'rejected';
 

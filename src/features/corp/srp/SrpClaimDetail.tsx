@@ -1,5 +1,5 @@
 /**
- * One claim's detail in a `SlideOver` (issue #4853): the facts, the amount with how it was
+ * One claim's detail in a `SlideOver`: the facts, the amount with how it was
  * reached, the audit trail, and the state's actions (pinned at the bottom on a phone). A row click
  * opens it, so the row itself carries nothing extra for it.
  */
@@ -7,7 +7,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Eyebrow, SlideOver, Spinner, textActionClassName } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
-import { Pill } from '@/components/ui/Pill';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -15,17 +14,10 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import type { SrpAuditEntry, SrpClaim } from '../srpClaimTypes';
 import type { ClaimColumnsContext } from './claimColumnsContext';
-import { CopyAmount, TypeAmountField } from './OfficerClaimCells';
+import { ClaimStatePill, CopyAmount, TypeAmountField } from './OfficerClaimCells';
 import { SrpAuditTrail } from './SrpAuditTrail';
 import { claimBasisLine } from './srpClaimText';
 import { approveAmount } from './srpQueue';
-
-const STATE_TONE = {
-  pending: 'warning',
-  approved: 'warning',
-  paid: 'success',
-  rejected: 'danger',
-} as const;
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -90,7 +82,7 @@ export function SrpClaimDetail({
         <div className={cx('space-y-4', phone && 'flex-1 p-3')}>
           <dl className="space-y-2">
             <Row label={t('srp.officer.detail.state')}>
-              <Pill tone={STATE_TONE[claim.state]}>{t(`srp.officer.states.${claim.state}`)}</Pill>
+              <ClaimStatePill claim={claim} ctx={ctx} />
             </Row>
             <Row label={t('srp.officer.detail.pilot')}>
               <span className="flex flex-wrap items-center gap-x-3">

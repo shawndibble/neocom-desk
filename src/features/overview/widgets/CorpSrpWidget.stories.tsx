@@ -4,13 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/ui';
 import { Widget } from './Widget';
 import { corpSrp } from './data/corpSrpModels';
-import type { CorpSrpFeed } from './data/corpFeeds';
+import type { CorpSrpFeed, SrpClaimRow } from './data/corpFeeds';
 import type { BuildContext, KindView } from './data/types';
-import type { SrpClaimRow } from '@/features/corp/srpClaims';
 import type { Widget as WidgetModel } from './layout';
 
 /**
- * The Corp Board's `corpSrp` widget (issue #4855): the real builder over a sample feed, drawn in
+ * The Corp Board's `corpSrp` widget: the real builder over a sample feed, drawn in
  * the real Widget shell. States: Number, Table, empty, SRP not turned on. The phone stories use
  * the phone viewport; the shell hides the Killmail column there.
  */

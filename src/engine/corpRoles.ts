@@ -105,11 +105,8 @@ export interface CorpCapabilities {
    */
   canReadSkyhooks: boolean;
   /**
-   * Approve, reject, override and mark paid on a corporation's SRP Claims, and
-   * the officer reads of its claim queue (issue #4848, ADR 0026). Not an ESI
-   * read: it is the app's own officer gate, which the SRP callables re-check
-   * live against ESI. Director or Accountant, same as `canEdit` in
-   * `functions/src/corpTaxBook.ts`. Settings need a Director, checked there.
+   * Officer gate for SRP Claims (Director or Accountant), like canEdit in functions/src/corpTaxBook.ts.
+   * Not an ESI read; the callables re-check live. Settings need a Director.
    */
   canManageSrp: boolean;
 }

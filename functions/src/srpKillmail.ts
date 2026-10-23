@@ -1,4 +1,4 @@
-// SRP file-claim (issue #4850, ADR 0026): the pure half. Parsing a pasted killmail link, the
+// SRP file-claim (ADR 0026): the pure half. Parsing a pasted killmail link, the
 // claim window, the items an Appraisal prices, and mapping the corp's Hull Rules onto the
 // pricing engine. No Firestore, no fetch. The network seam is SrpKillmailSource; the
 // implementation is srpKillmailEsi.ts, the transaction is srpStore.ts.

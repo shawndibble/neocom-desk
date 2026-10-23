@@ -1,5 +1,5 @@
 /**
- * `/srp` (issue #4852, epic #4608, ADR 0026): a pilot's own SRP, file a claim, lost ships and My
+ * `/srp` (ADR 0026): a pilot's own SRP, file a claim, lost ships and My
  * claims, the third sub-view of the personal Overview. No Corp Access and no corp scope: any
  * pilot of an SRP corporation files. The sub-nav lists it only while the corporation has SRP on
  * (`NavSubView.visible`); typing the path with SRP off shows the "not set up" state, not a 404.

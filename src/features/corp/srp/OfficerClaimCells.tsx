@@ -1,13 +1,26 @@
-/** Cells the officer queue's columns and claim detail share (issue #4853). */
+/** Cells the officer queue's columns and claim detail share. */
 import type { ReactNode } from 'react';
 import { Button, Checkbox, IskInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { Pill } from '@/components/ui/Pill';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { formatIsk } from '@/lib/isk';
 import type { SrpClaim } from '../srpClaimTypes';
 import type { ClaimColumnsContext } from './claimColumnsContext';
 import { claimBasisLine } from './srpClaimText';
 import { approveAmount } from './srpQueue';
+
+const STATE_TONE = {
+  pending: 'warning',
+  approved: 'warning',
+  paid: 'success',
+  rejected: 'danger',
+} as const;
+
+/** A claim's state as a pill. */
+export function ClaimStatePill({ claim, ctx }: { claim: SrpClaim; ctx: ClaimColumnsContext }) {
+  return <Pill tone={STATE_TONE[claim.state]}>{ctx.t(`srp.officer.states.${claim.state}`)}</Pill>;
+}
 
 export function Pilot({ claim }: { claim: SrpClaim }) {
   return (

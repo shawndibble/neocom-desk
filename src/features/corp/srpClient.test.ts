@@ -16,11 +16,13 @@ vi.mock('firebase/firestore/lite', () => ({ doc: store.doc, getDoc: store.getDoc
 import {
   fileSrpClaim,
   getSrpStatus,
+  invalidateSrpOfficer,
   readSrpSettings,
   reclaimSrp,
   saveSrpSettings,
   turnOffSrp,
   turnOnSrp,
+  SRP_VERIFY_TTL_MS,
   verifySrpOfficer,
 } from './srpClient';
 
@@ -32,6 +34,8 @@ const sent = (action: string, data: Record<string, unknown>) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useRealTimers();
+  invalidateSrpOfficer();
   token.mockResolvedValue('access-token');
   fns.httpsCallable.mockReturnValue(fns.callable);
   fns.callable.mockResolvedValue({ data: { ok: true } });
@@ -79,5 +83,50 @@ describe('SRP client', () => {
     expect(store.doc).toHaveBeenCalledWith(undefined, 'corps', String(CORP), 'srp', 'settings');
     store.getDoc.mockResolvedValueOnce({ exists: () => false });
     await expect(readSrpSettings(7, CORP)).resolves.toBeNull();
+  });
+
+  describe('officer verdict memo', () => {
+    const verifies = () =>
+      fns.callable.mock.calls.filter(([c]) => c.action === 'verifySrpOfficerCallable').length;
+
+    it('asks once for concurrent and repeat calls within the TTL, then again after it', async () => {
+      vi.useFakeTimers();
+      await Promise.all([verifySrpOfficer(7, CORP), verifySrpOfficer(7, CORP)]);
+      await verifySrpOfficer(7, CORP);
+      expect(verifies()).toBe(1);
+      await verifySrpOfficer(8, CORP);
+      expect(verifies()).toBe(2);
+      vi.advanceTimersByTime(SRP_VERIFY_TTL_MS + 1);
+      await verifySrpOfficer(7, CORP);
+      expect(verifies()).toBe(3);
+    });
+
+    it('asks again after a write that changes it, or an explicit invalidation', async () => {
+      for (const write of [
+        turnOnSrp,
+        turnOffSrp,
+        reclaimSrp,
+        (c: number, k: number) => saveSrpSettings(c, k, { windowDays: 5 }),
+      ]) {
+        await verifySrpOfficer(7, CORP);
+        const before = verifies();
+        await verifySrpOfficer(7, CORP);
+        expect(verifies()).toBe(before);
+        await write(7, CORP);
+        await verifySrpOfficer(7, CORP);
+        expect(verifies()).toBe(before + 1);
+      }
+      invalidateSrpOfficer(7, CORP);
+      const n = verifies();
+      await verifySrpOfficer(7, CORP);
+      expect(verifies()).toBe(n + 1);
+    });
+
+    it('does not remember a failed ask', async () => {
+      fns.callable.mockRejectedValueOnce(new Error('offline'));
+      await expect(verifySrpOfficer(7, CORP)).rejects.toThrow();
+      await verifySrpOfficer(7, CORP);
+      expect(verifies()).toBe(2);
+    });
   });
 });

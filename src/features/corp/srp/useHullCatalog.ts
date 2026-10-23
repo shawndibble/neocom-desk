@@ -10,6 +10,19 @@ export interface HullCatalogState {
   className: (classId: number) => string;
 }
 
+let memo: { types: unknown; categories: unknown; catalog: HullCatalog } | null = null;
+
+/** Built once per loaded SDE (it walks every type); a remount reuses it. */
+function catalogFor(
+  types: Awaited<ReturnType<typeof loadTypes>>,
+  categories: Awaited<ReturnType<typeof loadGroupCategories>>
+): HullCatalog {
+  if (memo?.types !== types || memo.categories !== categories) {
+    memo = { types, categories, catalog: buildHullCatalog(types, categories) };
+  }
+  return memo.catalog;
+}
+
 /**
  * Hulls and classes from the shipped SDE, class names from ESI's group names (cached for good,
  * `loadGroupNames`). A class whose name is unknown reads "Class <id>" rather than vanishing.
@@ -23,7 +36,7 @@ export function useHullCatalog(): HullCatalogState {
     let cancelled = false;
     Promise.all([loadTypes(), loadGroupCategories()])
       .then(async ([types, categories]) => {
-        const built = buildHullCatalog(types, categories);
+        const built = catalogFor(types, categories);
         if (cancelled) return;
         setCatalog(built);
         const resolved = await loadGroupNames(built.classIds);

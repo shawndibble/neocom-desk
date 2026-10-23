@@ -1,5 +1,5 @@
 /**
- * `/corp/srp` Settings (issue #4851): the Director's view of the corp's SRP. Picks the state
+ * `/corp/srp` Settings: the Director's view of the corp's SRP. Picks the state
  * `useSrpSettings` reports: the form, the first-time "Turn on SRP", or a line for an officer who
  * may approve claims but not change settings. Hidden, never locked: Accountants never see the form.
  */

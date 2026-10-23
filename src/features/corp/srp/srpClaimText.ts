@@ -1,9 +1,15 @@
-/** Words for a claim's amount basis and a refusal from the officer callables (issue #4853). */
+/** Words for a claim's amount basis and a refusal from the officer callables. */
 import type { TFunction } from 'i18next';
 import { callableErrorReason } from '@/lib/callableError';
 import { formatIsk } from '@/lib/isk';
 import type { SrpClaim } from '../srpClaimTypes';
 import type { SrpClaimBasis } from '../srpTypes';
+
+/** When and by whom a closed claim was settled: paid wins over decided. */
+export const decidedLine = (claim: SrpClaim) => ({
+  at: claim.paidAt ?? claim.decidedAt,
+  by: claim.paidByName ?? claim.decidedByName,
+});
 
 export function basisText(t: TFunction, basis: SrpClaimBasis): string {
   return 'percent' in basis

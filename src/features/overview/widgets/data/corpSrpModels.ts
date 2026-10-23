@@ -1,13 +1,12 @@
 /**
- * Corp SRP builder (issue #4855, epic #4608): the open SRP Claims for an officer. Number is the
+ * Corp SRP builder: the open SRP Claims for an officer. Number is the
  * Pending count with the ISK owed (Approved, not yet Paid); Table lists the open claims. Same
  * contract as `models.ts`: pure, derived at render time.
  */
 import { formatIsk } from '@/lib/isk';
 import { formatNumber } from '@/lib/numberLocale';
-import type { SrpClaimRow } from '@/features/corp/srpClaims';
 import { blank, corpUnreadable, statusOf, UNKNOWN, type Builder } from './builderKit';
-import type { CorpSrpFeed } from './corpFeeds';
+import type { CorpSrpFeed, SrpClaimRow } from './corpFeeds';
 import type { TableCell, TableRowModel } from './types';
 
 const C = 'overview.widgets.corpSrp';
@@ -30,9 +29,8 @@ const isk = (amount: number, t: (k: string) => string) =>
   `${formatIsk(amount)} ${t('overview.isk')}`;
 
 function killmailName(claim: SrpClaimRow, data: CorpSrpFeed): string {
-  const hull = claim.hullTypeId === null ? undefined : data.typeNames.get(claim.hullTypeId);
-  const system =
-    claim.solarSystemId === null ? undefined : data.systemNames.get(claim.solarSystemId);
+  const hull = data.typeNames.get(claim.hullTypeId);
+  const system = data.systemNames.get(claim.solarSystemId);
   const parts = [hull, system].filter((p): p is string => p !== undefined);
   return parts.length === 0 ? `#${claim.killmailId}` : parts.join(', ');
 }

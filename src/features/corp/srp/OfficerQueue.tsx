@@ -1,11 +1,12 @@
 /**
- * The officer queue (issue #4853, epic #4608): a summary line, Pending / Owed / History, the
+ * The officer queue: a summary line, Pending / Owed / History, the
  * claim tables with their per-row and bulk actions, the claim detail and the activity feed. Pure
  * view of what `useSrpQueue` loaded; every change goes through its callables and reloads.
  */
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
+import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import {
   Button,
   DataTable,
@@ -37,12 +38,7 @@ import { ChangeAmountDialog, RejectClaimDialog } from './OfficerDialogs';
 import { SrpActivityFeed } from './SrpActivityFeed';
 import { SrpBulkBar } from './SrpBulkBar';
 import { SrpClaimDetail } from './SrpClaimDetail';
-import {
-  groupByPilot,
-  SEND_MAIL_ENDPOINTS,
-  withMailSummary,
-  type SrpMailClaim,
-} from './srpResultMail';
+import { groupByPilot, withMailSummary, type SrpMailClaim } from './srpResultMail';
 import { failureText } from './srpClaimText';
 import {
   approveAmount,
@@ -242,6 +238,11 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
   };
 
   const counts = { pending: split.pending.length, owed: split.owed.length };
+  const tabItems: { id: QueueTab; label: string; count?: number }[] = [
+    { id: 'pending', label: t('srp.officer.tabs.pending'), count: counts.pending },
+    { id: 'owed', label: t('srp.officer.tabs.owed'), count: counts.owed },
+    { id: 'history', label: t('srp.officer.tabs.history') },
+  ];
   const empty = {
     pending: [t('srp.officer.empty.pendingTitle'), t('srp.officer.empty.pendingHint')],
     owed: [t('srp.officer.empty.owedTitle'), t('srp.officer.empty.owedHint')],
@@ -277,23 +278,10 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           uppercase={false}
           value={tab}
           onChange={changeTab}
-          options={[
-            {
-              value: 'pending',
-              label: t('srp.officer.phoneTab', {
-                label: t('srp.officer.tabs.pending'),
-                count: counts.pending,
-              }),
-            },
-            {
-              value: 'owed',
-              label: t('srp.officer.phoneTab', {
-                label: t('srp.officer.tabs.owed'),
-                count: counts.owed,
-              }),
-            },
-            { value: 'history', label: t('srp.officer.tabs.history') },
-          ]}
+          options={tabItems.map(({ id, label, count }) => ({
+            value: id,
+            label: count === undefined ? label : t('srp.officer.phoneTab', { label, count }),
+          }))}
         />
       ) : (
         <Tabs
@@ -301,21 +289,11 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           label={t('srp.officer.tabsLabel')}
           value={tab}
           onChange={(id) => changeTab(QUEUE_TABS.find((x) => x === id) ?? 'pending')}
-          tabs={[
-            {
-              id: 'pending',
-              label: t('srp.officer.tabs.pending'),
-              count: counts.pending,
-              countTone: 'warning',
-            },
-            {
-              id: 'owed',
-              label: t('srp.officer.tabs.owed'),
-              count: counts.owed,
-              countTone: 'warning',
-            },
-            { id: 'history', label: t('srp.officer.tabs.history') },
-          ]}
+          tabs={tabItems.map(({ id, label, count }) => ({
+            id,
+            label,
+            ...(count !== undefined && { count, countTone: 'warning' as const }),
+          }))}
         />
       )}
       <Panel title={t(`srp.officer.title.${tab}`)} padded={false}>

@@ -1,4 +1,4 @@
-// SRP file-claim (issue #4850): the real SrpKillmailSource. Killmail and hull group from public
+// SRP file-claim: the real SrpKillmailSource. Killmail and hull group from public
 // ESI (no token), the killmail's value from zKillboard (third party, fails soft), and the Jita
 // Appraisal value from Fuzzwork's station aggregates, the same price source the Appraisal tab
 // uses (ADR 0002). Every request names us; zKillboard and Fuzzwork get one polite call each and

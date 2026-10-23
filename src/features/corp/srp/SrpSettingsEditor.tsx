@@ -1,5 +1,5 @@
 /**
- * `/corp/srp` Settings, the form (issue #4851): on/off, how the amount is worked out (killmail
+ * `/corp/srp` Settings, the form: on/off, how the amount is worked out (killmail
  * and Jita Appraisal percents), Hull Rules, claim window and Fleet-or-FC. Edits stay in the form
  * until Save; an `UnsavedChangesBar` pins Discard and Save while there are edits. Percents are
  * 1-100 or blank (blank skips that step), as in `engine/srpPricing.ts`.
@@ -19,6 +19,7 @@ import {
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import * as Icon from '@/components/ui/icons';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { writeToClipboard } from '@/lib/clipboard';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { ActionResult, SettingsHint } from '@/features/settings/settingsFields';
@@ -123,7 +124,7 @@ export function SrpSettingsEditor({
   };
 
   const copyLink = () =>
-    navigator.clipboard.writeText(link).then(
+    writeToClipboard(link).then(
       () => flash('copied'),
       () => flash('failed')
     );

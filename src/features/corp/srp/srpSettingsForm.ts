@@ -1,5 +1,5 @@
 /**
- * The SRP settings form as plain data (issue #4851, epic #4608): saved settings in, the
+ * The SRP settings form as plain data: saved settings in, the
  * strings the inputs edit, the problems that block Save, and the patch
  * `saveSrpSettingsCallable` takes. Pure: no fetch, DOM or Dexie.
  *

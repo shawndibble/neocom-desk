@@ -1,4 +1,4 @@
-// SRP retention (issue #4856, ADR 0026): Paid and Rejected SRP Claims are deleted one
+// SRP retention (ADR 0026): Paid and Rejected SRP Claims are deleted one
 // year after they close. Pure timing only; the sweep is srpCleanup.ts.
 
 /** One year, as 365 days. */

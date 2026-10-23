@@ -153,7 +153,7 @@ describe('pricingInput', () => {
 describe('srpPricing mirror', () => {
   it('matches src/engine/srpPricing.ts', () => {
     const body = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
-    const mirror = body('./srpPricing.ts').split('\n').slice(2).join('\n');
+    const mirror = body('./srpPricing.ts').split('\n').slice(1).join('\n');
     expect(mirror).toBe(body('../../src/engine/srpPricing.ts'));
   });
 });

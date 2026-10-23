@@ -1,5 +1,5 @@
 /**
- * The rows of the Hull Rules editor (issue #4851): every ship class, collapsed by default, and
+ * The rows of the Hull Rules editor: every ship class, collapsed by default, and
  * under an expanded class the hulls that carry a rule or were added from the search. Pure.
  */
 import type { HullRuleScope } from '../srpTypes';

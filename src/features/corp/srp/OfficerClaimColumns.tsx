@@ -1,10 +1,9 @@
 /**
- * The officer queue's table columns (issue #4853): Pending, Owed and History, each as the desktop
+ * The officer queue's table columns: Pending, Owed and History, each as the desktop
  * table and the phone's dense card (DESIGN.md §4a, `stackLayout="dense"`). Handlers come in as a
  * context so the columns stay plain data.
  */
 import { Button, type DataTableColumn } from '@/components/ui';
-import { Pill } from '@/components/ui/Pill';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import type { SrpClaim } from '../srpClaimTypes';
@@ -13,13 +12,14 @@ import {
   AmountCell,
   ApproveReject,
   ButtonPair,
+  ClaimStatePill,
   CopyAmount,
   Pilot,
   PendingAmount,
   SelectBox,
   TypeAmountField,
 } from './OfficerClaimCells';
-import { claimBasisLine } from './srpClaimText';
+import { claimBasisLine, decidedLine } from './srpClaimText';
 import { canBulkApprove } from './srpQueue';
 
 const when = (ctx: ClaimColumnsContext, ms: number) => formatTimestamp(new Date(ms), ctx.zone);
@@ -165,19 +165,14 @@ export function historyColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpCla
     {
       id: 'state',
       header: ctx.t('srp.officer.columns.state'),
-      render: (row) => (
-        <Pill tone={row.state === 'paid' ? 'success' : 'danger'}>
-          {ctx.t(`srp.officer.states.${row.state}`)}
-        </Pill>
-      ),
+      render: (row) => <ClaimStatePill claim={row} ctx={ctx} />,
     },
     {
       id: 'decided',
       header: ctx.t('srp.officer.columns.decided'),
       className: 'whitespace-nowrap tabular-nums',
       render: (row) => {
-        const at = row.paidAt ?? row.decidedAt;
-        const by = row.paidByName ?? row.decidedByName;
+        const { at, by } = decidedLine(row);
         return (
           <span className="block">
             {at !== undefined && when(ctx, at)}
@@ -316,9 +311,7 @@ export function phoneHistoryColumns(ctx: ClaimColumnsContext): DataTableColumn<S
       render: (row) => (
         <span className="inline-flex items-center gap-2">
           <span className="font-semibold">{row.characterName}</span>
-          <Pill tone={row.state === 'paid' ? 'success' : 'danger'}>
-            {ctx.t(`srp.officer.states.${row.state}`)}
-          </Pill>
+          <ClaimStatePill claim={row} ctx={ctx} />
         </span>
       ),
     },
@@ -327,12 +320,8 @@ export function phoneHistoryColumns(ctx: ClaimColumnsContext): DataTableColumn<S
       id: 'meta',
       header: ctx.t('srp.officer.columns.decided'),
       render: (row) => {
-        const at = row.paidAt ?? row.decidedAt;
-        return [
-          ctx.names.hull(row.hullTypeId),
-          at !== undefined && when(ctx, at),
-          row.paidByName ?? row.decidedByName,
-        ]
+        const { at, by } = decidedLine(row);
+        return [ctx.names.hull(row.hullTypeId), at !== undefined && when(ctx, at), by]
           .filter(Boolean)
           .join(' · ');
       },

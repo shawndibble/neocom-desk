@@ -9,8 +9,8 @@ vi.mock('@/features/corp/corpReadAccess', () => ({
 vi.mock('@/features/corp/srpClient', () => ({
   verifySrpOfficer: (...a: unknown[]) => verifySrpOfficer(...a),
 }));
-vi.mock('@/features/corp/srpClaims', () => ({
-  readOpenSrpClaims: (...a: unknown[]) => readOpenSrpClaims(...a),
+vi.mock('@/features/corp/srpOfficerClient', () => ({
+  readSrpClaims: (...a: unknown[]) => readOpenSrpClaims(...a),
 }));
 vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: async () => new Map([[587, 'Rifter']]),

@@ -1,5 +1,5 @@
 /**
- * SRP Reimbursement chain (epic #4608, ADR 0026). Pure: no fetch/DOM/Dexie.
+ * SRP Reimbursement chain (ADR 0026). Pure: no fetch/DOM/Dexie.
  *
  * Chain:
  *  1. Hull Rule Pay with a fixed ISK amount for the hull, else its class

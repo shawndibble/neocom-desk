@@ -1,5 +1,5 @@
 /**
- * One audit entry as a sentence (issue #4853): the officer feed and a claim's audit trail share it.
+ * One audit entry as a sentence: the officer feed and a claim's audit trail share it.
  * The entry's `byName` is the actor, so the sentence carries what they did, not who.
  */
 import type { TFunction } from 'i18next';
@@ -13,7 +13,7 @@ const isk = (value: number | null): string => (value === null ? '?' : formatIsk(
 
 export function auditText(t: TFunction, entry: SrpAuditEntry): string {
   const d = entry.detail;
-  const id = text(d.killmailId) || String(num(d.killmailId) ?? '');
+  const id = String(num(d.killmailId) ?? '');
   const amount = num(d.amount);
   const base = `srp.officer.audit.${entry.action}`;
   if (!isSrpAuditAction(entry.action)) return t('srp.officer.audit.other');

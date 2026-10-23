@@ -1,5 +1,5 @@
 /**
- * SRP's backend as the client sees it (issue #4848, epic #4608, ADR 0026): every write goes
+ * SRP's backend as the client sees it (ADR 0026): every write goes
  * through the callables in functions/src/srp*.ts. Only a short-lived access token is sent, for
  * the live role check or the member check; the refresh token never leaves Dexie.
  */
@@ -35,15 +35,54 @@ export async function readSrpSettings(
   return snap.exists() ? (snap.data() as SrpSettings) : null;
 }
 
-/** Checks the Character's roles with ESI and records officer access for 24 hours. */
+/** A verdict is reused this long; writes re-check on the server regardless. */
+export const SRP_VERIFY_TTL_MS = 5 * 60 * 1000;
+const verdicts = new Map<
+  string,
+  { at: number; verdict?: SrpOfficerVerdict; inflight?: Promise<SrpOfficerVerdict> }
+>();
+
+/** Drops the remembered verdict: after a write that changes it, or a refusal that doubts it. */
+export function invalidateSrpOfficer(characterId?: number, corporationId?: number): void {
+  if (characterId === undefined || corporationId === undefined) verdicts.clear();
+  else verdicts.delete(`${characterId}:${corporationId}`);
+}
+
+/**
+ * Checks the Character's roles with ESI and records officer access for 24 hours. Remembered per
+ * Character and corporation for five minutes, and one ask at a time, as several views mount together.
+ */
 export async function verifySrpOfficer(
   characterId: number,
   corporationId: number
 ): Promise<SrpOfficerVerdict> {
   const stand = srpBackendOverride();
   if (stand) return stand.verify();
-  const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'verifySrpOfficerCallable', { corporationId, accessToken });
+  const key = `${characterId}:${corporationId}`;
+  const held = verdicts.get(key);
+  if (held?.inflight) return held.inflight;
+  if (held?.verdict && Date.now() - held.at < SRP_VERIFY_TTL_MS) return held.verdict;
+  const inflight = getValidAccessToken(characterId)
+    .then((accessToken) =>
+      call<Record<string, unknown>, SrpOfficerVerdict>(characterId, 'verifySrpOfficerCallable', {
+        corporationId,
+        accessToken,
+      })
+    )
+    .then(
+      (verdict) => {
+        if (verdicts.get(key)?.inflight === inflight) {
+          verdicts.set(key, { at: Date.now(), verdict });
+        }
+        return verdict;
+      },
+      (err: unknown) => {
+        if (verdicts.get(key)?.inflight === inflight) verdicts.delete(key);
+        throw err;
+      }
+    );
+  verdicts.set(key, { at: 0, inflight });
+  return inflight;
 }
 
 /** Any member: is SRP on for the corporation, and the rules a claim is priced by. */
@@ -59,7 +98,11 @@ export async function turnOnSrp(characterId: number, corporationId: number): Pro
   const stand = srpBackendOverride();
   if (stand) return stand.turnOn();
   const accessToken = await getValidAccessToken(characterId);
-  await call(characterId, 'turnOnSrpCallable', { corporationId, accessToken });
+  try {
+    await call(characterId, 'turnOnSrpCallable', { corporationId, accessToken });
+  } finally {
+    invalidateSrpOfficer(characterId, corporationId);
+  }
 }
 
 /** A Director turns SRP off: members stop seeing it; claims and rules are kept. */
@@ -67,7 +110,11 @@ export async function turnOffSrp(characterId: number, corporationId: number): Pr
   const stand = srpBackendOverride();
   if (stand) return stand.turnOff();
   const accessToken = await getValidAccessToken(characterId);
-  await call(characterId, 'turnOffSrpCallable', { corporationId, accessToken });
+  try {
+    await call(characterId, 'turnOffSrpCallable', { corporationId, accessToken });
+  } finally {
+    invalidateSrpOfficer(characterId, corporationId);
+  }
 }
 
 /** A Director saves any of the percents, Hull Rules, claim window and Fleet-or-FC requirement. */
@@ -79,7 +126,11 @@ export async function saveSrpSettings(
   const stand = srpBackendOverride();
   if (stand) return stand.save(settings);
   const accessToken = await getValidAccessToken(characterId);
-  await call(characterId, 'saveSrpSettingsCallable', { corporationId, accessToken, settings });
+  try {
+    await call(characterId, 'saveSrpSettingsCallable', { corporationId, accessToken, settings });
+  } finally {
+    invalidateSrpOfficer(characterId, corporationId);
+  }
 }
 
 /** The CEO reclaims SRP: becomes owner, turns it on, and every other officer must re-verify. */
@@ -90,7 +141,11 @@ export async function reclaimSrp(
   const stand = srpBackendOverride();
   if (stand) return stand.reclaim();
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, 'reclaimSrpCallable', { corporationId, accessToken });
+  try {
+    return await call(characterId, 'reclaimSrpCallable', { corporationId, accessToken });
+  } finally {
+    invalidateSrpOfficer(characterId, corporationId);
+  }
 }
 
 /**

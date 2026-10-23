@@ -1,5 +1,5 @@
 /**
- * The Hull Rules panel body (issue #4851): an add-hull search over the whole SDE ship list, then
+ * The Hull Rules panel body: an add-hull search over the whole SDE ship list, then
  * every ship class with its rule select and, under an expanded class, the hulls that carry a rule.
  * A hull's rule beats its class's. Table from `sm` up; one-line rows on a phone (classes collapsed,
  * ISK input only for Pay: fixed ISK). Rows come from `hullRuleRows.ts`.
@@ -58,6 +58,7 @@ export function HullRulesEditor({
   const phone = useIsPhone();
   const { catalog, className } = hulls;
   const [query, setQuery] = useState('');
+  const problems = useMemo(() => formProblems(form), [form]);
   const listed = useMemo(
     () => (catalog ? listedHullIds(form, catalog, added) : new Set<number>()),
     [form, catalog, added]
@@ -66,18 +67,17 @@ export function HullRulesEditor({
   const shown = useMemo(() => {
     const open = new Set(expanded);
     if (catalog)
-      for (const key of formProblems(form).fixedIsk) {
+      for (const key of problems.fixedIsk) {
         const hull = key.startsWith('hull:') ? catalog.hull(Number(key.slice(5))) : undefined;
         if (hull) open.add(hull.classId);
       }
     return open;
-  }, [expanded, form, catalog]);
+  }, [expanded, problems, catalog]);
   const rows = useMemo(
     () => (catalog ? buildHullRuleRows(catalog, className, listed, shown) : []),
     [catalog, className, listed, shown]
   );
   const results = useMemo(() => (catalog ? searchHulls(catalog, query) : []), [catalog, query]);
-  const problems = formProblems(form);
 
   // An invalid percent is not shown as the rule's meaning: the field already says what is wrong.
   const percentNote = (): string | null =>

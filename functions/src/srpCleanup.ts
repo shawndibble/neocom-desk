@@ -1,4 +1,4 @@
-// SRP retention sweep (issue #4856, ADR 0026): the scheduled sweep that deletes Paid and
+// SRP retention sweep (ADR 0026): the scheduled sweep that deletes Paid and
 // Rejected SRP Claims one year after they close, leaving one srpAudit entry per corporation
 // per run (claim ids only). Timing is the pure `decideSrpClaimSweep` in srpRetention.ts.
 

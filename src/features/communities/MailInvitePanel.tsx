@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { Field, Fields, TextInput, NeedsConnection, Button } from '@/components/ui';
+import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import { sendMail } from '@/features/character/mail';
 import { resolvePilotByName } from '@/features/travel/pilotLookup';
 import { mailSafe } from '@/lib/mailSafe';
@@ -19,8 +20,6 @@ import {
   type CommunitySummary,
   type SentMailInvite,
 } from './communityStore';
-
-const SEND_MAIL = ['postCharacterMail'] as const;
 
 type Problem =
   | 'notFound'
@@ -49,7 +48,7 @@ export function MailInvitePanel({
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const inputId = useId();
-  const lacksScope = useCharacterLacksEndpoints(characterId, SEND_MAIL);
+  const lacksScope = useCharacterLacksEndpoints(characterId, SEND_MAIL_ENDPOINTS);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<Problem | null>(null);
@@ -158,7 +157,7 @@ export function MailInvitePanel({
       <p className="text-xs text-text-dim">{t('communities.mailInvite.hint')}</p>
       <GrantNote
         characterId={characterId}
-        endpoints={SEND_MAIL}
+        endpoints={SEND_MAIL_ENDPOINTS}
         title={t('communities.mailInvite.grantTitle')}
         hint={t('communities.mailInvite.grantHint')}
         actionLabel={t('communities.mailInvite.grantAction')}

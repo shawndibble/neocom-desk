@@ -83,10 +83,7 @@ export interface NavPage {
   readonly corpCapability?: CorpViewCapability;
   /** For a Corp page: tab ids listed only with the given capability (Members › Roles). */
   readonly corpTabCapabilities?: Readonly<Record<string, CorpViewCapability>>;
-  /**
-   * Tab ids listed only while a live condition holds (`NavSubView.visible`'s rules): hidden,
-   * never locked. A page left with fewer than two tabs lists none, as the page draws no tab bar.
-   */
+  /** Tab ids listed only while `NavSubView.visible`'s condition holds. Fewer than two tabs lists none. */
   readonly conditionalTabs?: Readonly<Record<string, 'srp'>>;
   /**
    * Views that are routes of their own but live in this page's sub-nav rather
@@ -111,9 +108,9 @@ export interface NavSubView {
   /** i18n keys of other names it goes by: the palette also matches these (Wallet › LP Store ← "loyalty points"). */
   readonly searchKeys?: readonly string[];
   /**
-   * Listed only while a live condition holds: hidden, never locked or dimmed, otherwise.
-   * `srp`: the pilot's corporation has SRP on (`useSrpNavVisible`). The route itself stays
-   * reachable by typing it.
+   * Listed only while a live condition holds; otherwise hidden, never locked or dimmed, and the
+   * route stays reachable by typing it. Not a scope gate: such routes are UNGATED (routeScopes.ts).
+   * `srp`: the pilot's corporation has SRP on (`useSrpNavVisible`).
    */
   readonly visible?: 'srp';
 }
@@ -201,8 +198,6 @@ export const NAV_PAGES = [
     mobileTab: false,
     corpCapability: 'canReadMiningLedger',
   },
-  // Officer SRP (Queue, Settings): listed for `canManageSrp`. A pilot's own claims are the
-  // Overview's SRP sub-view (`/srp`).
   {
     path: '/corp/srp',
     labelKey: 'nav.corpSrp',
@@ -210,9 +205,7 @@ export const NAV_PAGES = [
     gating: 'corp',
     mobileTab: false,
     corpCapability: 'canManageSrp',
-    // Both tabs are officer views; the Queue needs SRP on, so an officer of a corp that has not
-    // turned it on lands on Settings with no tab bar (`srpViews.ts` holds the same rules).
-    corpTabCapabilities: { queue: 'canManageSrp', settings: 'canManageSrp' },
+    // The Queue needs SRP on; without it Settings is the only tab and none are listed (`srpViews.ts`).
     conditionalTabs: { queue: 'srp' },
   },
   {
@@ -460,7 +453,7 @@ export interface ListNavDestinationsOptions {
   readonly corpVisible: boolean;
   /** `useCorpAccess().capabilities` — each Corp view shows only for its capability, as the Corp pages and Roles tab are gated. */
   readonly corpCapabilities: Pick<CorpCapabilities, CorpViewCapability>;
-  /** `useSrpNavVisible()` — the `/srp` sub-view is left out entirely, never locked, when false. */
+  /** `useSrpNavVisible()`: drives `NavSubView.visible: 'srp'`. */
   readonly srpVisible?: boolean;
   readonly t: (key: string) => string;
   /** Tab paths left out for now (Industry › Logs until a Production Run is logged). */

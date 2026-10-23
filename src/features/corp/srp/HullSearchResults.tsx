@@ -10,7 +10,7 @@ export interface HullSearchResult {
 }
 
 /**
- * The add-hull search's result list (issue #4851). Feature-local: nothing else adds a hull to a
+ * The add-hull search's result list. Feature-local: nothing else adds a hull to a
  * list this way. Every match is listed and the list scrolls; a capped list would hide hulls.
  */
 export function HullSearchResults({

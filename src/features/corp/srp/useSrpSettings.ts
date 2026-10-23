@@ -1,5 +1,5 @@
 /**
- * `/corp/srp` Settings' data (issue #4851): verify the Character as an SRP officer first (it
+ * `/corp/srp` Settings' data: verify the Character as an SRP officer first (it
  * records the 24-hour officer access the rules need), then read `corps/{id}/srp/settings`,
  * the same order the Corp Tax Book's `useCorpBook` uses. Firestore is the `lite` build with no
  * listeners, so every change reloads. Settings need a Director (the CEO counts as one), which

@@ -944,6 +944,11 @@ export function isScopeRequired(requirement: ScopeRequirement): requirement is S
   return requirement !== PUBLIC;
 }
 
+/** The endpoints a panel needs to send a mail from the active Character. */
+export const SEND_MAIL_ENDPOINTS = [
+  'postCharacterMail',
+] as const satisfies readonly EsiEndpointId[];
+
 /**
  * Distinct Permissions the given endpoints belong to, in declaration order.
  * An endpoint declaring no `group` (Core Grant) contributes nothing — a

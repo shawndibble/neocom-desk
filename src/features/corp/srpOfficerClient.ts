@@ -1,5 +1,5 @@
 /**
- * The SRP officer queue's backend as the client sees it (issue #4853, epic #4608, ADR 0026).
+ * The SRP officer queue's backend as the client sees it (ADR 0026).
  * Reads go straight to Firestore under the rules (`verifySrpOfficer` first, which records the
  * 24-hour officer access); every change is a callable that re-checks the Character's roles live,
  * guards the state change in a transaction and audits it. Only a short-lived access token is
@@ -26,6 +26,7 @@ import type {
   SrpClaimOutcome,
   SrpMarkPaidItem,
 } from './srpClaimTypes';
+import { invalidateSrpOfficer } from './srpClient';
 import { call } from './taxBook/bookClient';
 
 const corpDoc = (corporationId: number, name: string) =>
@@ -49,7 +50,7 @@ export async function readSrpClaims(
 
 /**
  * The newest closed (Paid or Rejected) claims, newest first. `closedAt` exists only on closed
- * claims, so ordering by it leaves the open ones out; retention (#4856) bounds the rest.
+ * claims, so ordering by it leaves the open ones out; retention bounds the rest.
  */
 export async function readSrpHistory(
   characterId: number,
@@ -103,6 +104,15 @@ export async function readSrpClaimAudit(
     .sort((a, b) => a.at - b.at);
 }
 
+/** A refusal that says the remembered officer verdict or the view it came from may be stale. */
+const DOUBTED_REASONS: ReadonlySet<string> = new Set([
+  'amount-changed',
+  'permission-denied',
+  'not-an-officer',
+  'role-required',
+  'wrong-corp',
+]);
+
 async function officerCall<Out>(
   characterId: number,
   corporationId: number,
@@ -110,7 +120,21 @@ async function officerCall<Out>(
   data: Record<string, unknown>
 ): Promise<Out> {
   const accessToken = await getValidAccessToken(characterId);
-  return call(characterId, name, { corporationId, accessToken, ...data });
+  try {
+    const out = await call<Record<string, unknown>, Out>(characterId, name, {
+      corporationId,
+      accessToken,
+      ...data,
+    });
+    const results = (out as Partial<SrpBatchOutcome>).results;
+    if (results?.some((r) => !r.ok && DOUBTED_REASONS.has(r.reason))) {
+      invalidateSrpOfficer(characterId, corporationId);
+    }
+    return out;
+  } catch (err) {
+    invalidateSrpOfficer(characterId, corporationId);
+    throw err;
+  }
 }
 
 /** Pending to Approved. A typed or differing `amount` is recorded; a differing one needs a `reason`. */

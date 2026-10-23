@@ -176,15 +176,15 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired }: BodyPro
   );
 
   const lost = data.losses;
-  const hasLostRows = lost.state === 'ready' && lost.value.length > 0;
-  const lostList =
-    lost.state === 'ready' && lost.value.length > 0 ? (
-      <LostShipsList
-        rows={lost.value}
-        onFile={fileFromList}
-        busyKillmailId={typeof filing === 'number' ? filing : null}
-      />
-    ) : null;
+  const lostRows = lost.state === 'ready' ? lost.value : [];
+  const hasLostRows = lostRows.length > 0;
+  const lostList = hasLostRows ? (
+    <LostShipsList
+      rows={lostRows}
+      onFile={fileFromList}
+      busyKillmailId={typeof filing === 'number' ? filing : null}
+    />
+  ) : null;
   const listErrorLine = listError ? (
     <p role="alert" className="px-3 py-2 text-sm text-danger">
       {listError}
@@ -206,7 +206,7 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired }: BodyPro
       <LoadFailedState title={t('srpMember.lost.loadFailed')} onRetry={data.retry} />
     ) : lost.state === 'loading' ? (
       <Spinner />
-    ) : lost.state === 'ready' && lost.value.length === 0 ? (
+    ) : lost.state === 'ready' && !hasLostRows ? (
       <EmptyState title={t('srpMember.lost.empty.title')} hint={t('srpMember.lost.empty.hint')} />
     ) : null;
 

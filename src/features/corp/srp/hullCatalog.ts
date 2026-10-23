@@ -1,5 +1,5 @@
 /**
- * The hulls and hull classes a Hull Rule can name (issue #4851), from the SDE the app already
+ * The hulls and hull classes a Hull Rule can name, from the SDE the app already
  * ships: every type in the Ship category (`types.json` + `groupCategories.json`, as
  * `fittings/hullNames.ts` does), and its ship group as the class (HullRuleScope 'class' keys on
  * a ship group id, ADR 0026). Group names are not in the SDE snapshot: `useHullCatalog` reads them

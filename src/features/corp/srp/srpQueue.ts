@@ -1,8 +1,9 @@
 /**
- * The officer queue's pure side (issue #4853): which claims belong on which tab, and the sums the
+ * The officer queue's pure side: which claims belong on which tab, and the sums the
  * summary line and the bulk bar show. No fetch, no React.
  */
 import { callableErrorReason } from '@/lib/callableError';
+import { chunk } from '@/lib/chunk';
 import type { SrpBatchOutcome, SrpBatchResult, SrpClaim } from '../srpClaimTypes';
 
 export type QueueTab = 'pending' | 'owed' | 'history';
@@ -68,14 +69,13 @@ export async function runInBatches<I extends { killmailId: number }>(
   call: (chunk: I[]) => Promise<SrpBatchOutcome>
 ): Promise<SrpBatchOutcome> {
   const results: SrpBatchResult[] = [];
-  for (let at = 0; at < items.length; at += MAX_SRP_BATCH) {
-    const chunk = items.slice(at, at + MAX_SRP_BATCH);
+  for (const batch of chunk(items, MAX_SRP_BATCH)) {
     try {
-      results.push(...(await call(chunk)).results);
+      results.push(...(await call(batch)).results);
     } catch (error) {
       const reason = callableErrorReason(error) ?? 'generic';
       results.push(
-        ...chunk.map((c) => ({
+        ...batch.map((c) => ({
           ok: false as const,
           killmailId: c.killmailId,
           reason,

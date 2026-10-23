@@ -120,10 +120,9 @@ export const CORP_SCOPES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonl
    */
   canReadSkyhooks: ['esi-structures.read_corporation.v1'],
   /**
-   * Director or Accountant (issue #4848). The SRP callables re-check the roles
-   * live, which needs only the roles scope. Additive (below): every Character
-   * holding this capability already holds that scope in the corp group, and a
-   * future SRP scope must not demote an older grant.
+   * Officer gate for SRP Claims (Director or Accountant), like canEdit in functions/src/corpTaxBook.ts.
+   * Not an ESI read; the callables re-check live. Settings need a Director.
+   * Additive (below): the roles scope is already in the corp group.
    */
   canManageSrp: ['esi-characters.read_corporation_roles.v1'],
 };

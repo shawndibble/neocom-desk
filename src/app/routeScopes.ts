@@ -116,10 +116,7 @@ export const ROUTE_REQUIREMENTS = {
   // corporationhistory has "security": [] in the ESI spec — public, no scope
   // to gate on, same reasoning as /market.
   '/employment-history': UNGATED,
-  /**
-   * UNGATED: a member of an SRP corporation files with no corp scope or role. The killmails
-   * opt-in that fills the lost-ships list is asked for on the page itself.
-   */
+  // No corp scope or role to file; the killmails opt-in is asked for on the page.
   '/srp': UNGATED,
 
   /**
@@ -162,10 +159,7 @@ export const ROUTE_REQUIREMENTS = {
    * that can read the ledger hide the entry rather than lock it.
    */
   '/corp/moons': UNGATED,
-  /**
-   * UNGATED: `canManageSrp` is an in-game role no login can grant, so the entry hides rather than
-   * locks. Officer views check their capability themselves. A pilot's own claims are `/srp`.
-   */
+  // Hidden for non-officers, never locked (see `NavSubView.visible`); the views check `canManageSrp`.
   '/corp/srp': UNGATED,
   // The drill-down's deeper levels (issue #779): every level renders the same
   // component off the same gate, so it gates identically.

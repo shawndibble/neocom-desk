@@ -1,5 +1,5 @@
 /**
- * `/corp/srp` (issues #4851, #4853, epic #4608, ADR 0026): the officer's SRP, Queue and Settings,
+ * `/corp/srp` (ADR 0026): the officer's SRP, Queue and Settings,
  * for a pilot with `canManageSrp` (`features/corp/srp/srpViews.ts`). A pilot's own claims are the
  * Overview's SRP sub-view at `/srp` (`routes/Srp.tsx`); a pilot who is no officer and opens this
  * path is sent there.

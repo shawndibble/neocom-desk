@@ -4,7 +4,7 @@ import { SrpSettingsView } from './SrpSettingsView';
 import type { SrpTabId } from './srpTabs';
 
 /**
- * The officer views of `/corp/srp`, in tab order (issues #4851-#4853; epic #4608).
+ * The officer views of `/corp/srp`, in tab order.
  * `SrpPage` shows one visible view bare and several behind a tab bar. A view is a tab in
  * `srpTabs.ts` plus an entry here with its own `visible` rule. Hidden, never locked: a view that
  * is not `visible` is not listed.

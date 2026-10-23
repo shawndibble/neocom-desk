@@ -1,5 +1,5 @@
 /**
- * `/corp/srp` Claims (issue #4853): the officer's queue. Picks the state `useSrpQueue` reports:
+ * `/corp/srp` Claims: the officer's queue. Picks the state `useSrpQueue` reports:
  * the queue itself, or a line for roles that do not open it. Hidden, never locked: only a
  * Director or Accountant sees this view at all.
  */

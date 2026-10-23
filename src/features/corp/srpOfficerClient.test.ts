@@ -26,6 +26,7 @@ import {
   markSrpClaimsPaid,
   rejectSrpClaim,
 } from './srpOfficerClient';
+import { invalidateSrpOfficer, verifySrpOfficer } from './srpClient';
 
 const CORP = 98000001;
 const sent = (action: string, data: Record<string, unknown>) => {
@@ -35,6 +36,7 @@ const sent = (action: string, data: Record<string, unknown>) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  invalidateSrpOfficer();
   token.mockResolvedValue('access-token');
   fns.httpsCallable.mockReturnValue(fns.callable);
   fns.callable.mockResolvedValue({ data: { ok: true } });
@@ -60,5 +62,21 @@ describe('SRP officer client', () => {
     await markSrpClaimsPaid(7, CORP, items);
     sent('markSrpClaimsPaidCallable', { ...auth, claims: items });
     expect(token).toHaveBeenCalledWith(7);
+  });
+
+  it('forgets the remembered officer verdict after a refusal or a failed call', async () => {
+    const verifies = () =>
+      fns.callable.mock.calls.filter(([c]) => c.action === 'verifySrpOfficerCallable').length;
+    await verifySrpOfficer(7, CORP);
+    fns.callable.mockResolvedValueOnce({
+      data: { results: [{ ok: false, killmailId: 5, reason: 'amount-changed', message: 'm' }] },
+    });
+    await markSrpClaimsPaid(7, CORP, [{ killmailId: 5, expectedAmount: 1 }]);
+    await verifySrpOfficer(7, CORP);
+    expect(verifies()).toBe(2);
+    fns.callable.mockRejectedValueOnce(new Error('permission-denied'));
+    await expect(rejectSrpClaim(7, CORP, 5, 'x')).rejects.toThrow();
+    await verifySrpOfficer(7, CORP);
+    expect(verifies()).toBe(3);
   });
 });

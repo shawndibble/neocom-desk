@@ -1,5 +1,4 @@
-// Client mirror of the SRP claim doc and the officer callables' shapes (issue #4853, epic #4608,
-// ADR 0026). Mirrors `functions/src/srpOfficer.ts` and what `fileSrpClaim` writes; kept as its
+// Client mirror of the SRP claim doc and the officer callables' shapes (ADR 0026). Mirrors `functions/src/srpOfficer.ts` and what `fileSrpClaim` writes; kept as its
 // own copy because the Cloud Functions package is built separately.
 import type { SrpClaimBasis, SrpClaimState } from './srpTypes';
 
@@ -53,7 +52,7 @@ export interface SrpAuditEntry {
   detail: Record<string, unknown>;
 }
 
-/** What an officer action returns, and what the result mail (#4854) needs. */
+/** What an officer action returns, and what the result mail needs. */
 export interface SrpClaimOutcome {
   killmailId: number;
   state: SrpClaimState;

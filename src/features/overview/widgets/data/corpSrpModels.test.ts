@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { SrpClaimRow } from '@/features/corp/srpClaims';
 import { corpSrp } from './corpSrpModels';
-import type { CorpSrpFeed } from './corpFeeds';
+import type { CorpSrpFeed, SrpClaimRow } from './corpFeeds';
 import type { BuildContext, FeedState, Feeds } from './types';
 
 const t = (key: string, options?: Record<string, unknown>) =>
@@ -70,8 +69,8 @@ describe('corpSrp builder', () => {
     expect(b).toBe('—');
   });
 
-  it('names the killmail by hull and system, falling back to its id', () => {
-    const v = corpSrp(feeds([claim(1), claim(2, { hullTypeId: null, solarSystemId: null })]), ctx);
+  it('names the killmail by hull and system, falling back to its id when unnamed', () => {
+    const v = corpSrp(feeds([claim(1), claim(2, { hullTypeId: 999, solarSystemId: 998 })]), ctx);
     expect(v.table!.rows[0]!.cells[1]).toBe('Rifter, Jita');
     expect(v.table!.rows[1]!.cells[1]).toBe('#2');
   });

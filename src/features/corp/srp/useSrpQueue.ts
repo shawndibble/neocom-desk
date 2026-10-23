@@ -1,10 +1,6 @@
 /**
- * `/corp/srp` officer queue's data (issue #4853): verify the Character as an SRP officer first
- * (it records the 24-hour officer access the rules need), then read the corporation's claims and
- * its audit log. The queue reads only the open claims (Pending, Approved); History loads when its
- * tab opens, newest 100 first, and "Load older" widens it. Firestore is the `lite` build with no
- * listeners: an action applies the callable's outcome to what is on screen and re-reads only the
- * activity (or, after a refusal, the open claims too), never the whole collection.
+ * `/corp/srp` officer queue's data: verify the Character as an officer first, then read open claims;
+ * History loads on its tab. Firestore lite has no listeners: actions patch what is on screen and re-read the activity.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';

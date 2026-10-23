@@ -6,7 +6,7 @@ import { SRP_TABS } from './srpTabs';
 import { SRP_VIEWS } from './srpViews';
 
 /**
- * `/corp/srp`'s body (issues #4851-#4853): the page header and the officer views `srpViews.ts`
+ * `/corp/srp`'s body: the page header and the officer views `srpViews.ts`
  * lists for this pilot. One view renders bare; two or more get a tab bar (`SRP_TABS`, a path
  * segment). A tab the pilot has no view for (a stale link, or Queue where SRP is off) falls back
  * to the first they have.

@@ -1,12 +1,12 @@
 /**
- * Mails the pilot a claim's result from the active officer's Character (issue #4854). Never
+ * Mails the pilot a claim's result from the active officer's Character. Never
  * throws: whatever goes wrong comes back as a `MailRun` the result line reports.
  */
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { db } from '@/db';
 import { sendMail } from '@/features/character/mail';
-import { requiredScopesForEndpoints } from '@/esi/registry';
+import { requiredScopesForEndpoints, SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
 import {
@@ -15,7 +15,6 @@ import {
   type MailRun,
   type SrpMailClaim,
   type SrpMailKind,
-  SEND_MAIL_ENDPOINTS,
 } from './srpResultMail';
 
 export interface DecidedClaim {

@@ -1,7 +1,6 @@
-// Mirror of src/engine/srpPricing.ts (Functions builds separately and cannot import from src/).
-// Keep identical below this line; srpKillmail.test.ts checks it. Issue #4850.
+// Mirror of src/engine/srpPricing.ts; srpKillmail.test.ts checks they match.
 /**
- * SRP Reimbursement chain (epic #4608, ADR 0026). Pure: no fetch/DOM/Dexie.
+ * SRP Reimbursement chain (ADR 0026). Pure: no fetch/DOM/Dexie.
  *
  * Chain:
  *  1. Hull Rule Pay with a fixed ISK amount for the hull, else its class
