@@ -236,11 +236,11 @@ suite('SRP callables (emulator)', () => {
       await turnOnSrp(deps(), who(DIRECTOR), call(DIRECTOR));
     });
 
-    it('records Director and Accountant access for 24h and stores no token', async () => {
+    it('records Director and Accountant access for 1h and stores no token', async () => {
       const verdict = await verifySrpOfficer(deps(), who(ACCOUNTANT), call(ACCOUNTANT));
       expect(verdict).toMatchObject({ canManage: true, isDirector: false, srpEnabled: true });
       const record = (await officerDoc(ACCOUNTANT)).data();
-      expect(record).toMatchObject({ canEdit: true, checkedAt: T0, expiresAt: T0 + 86_400_000 });
+      expect(record).toMatchObject({ canEdit: true, checkedAt: T0, expiresAt: T0 + 3_600_000 });
       expect(JSON.stringify(record)).not.toContain('tok-');
     });
 

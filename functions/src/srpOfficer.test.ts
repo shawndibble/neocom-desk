@@ -7,7 +7,8 @@ import {
   parseApproveBatch,
   parseApproveItem,
   parseChangeAmount,
-  parseKillmailIds,
+  parseMarkPaidBatch,
+  parseMarkPaidItem,
   parseReject,
 } from './srpOfficer.js';
 
@@ -38,9 +39,22 @@ describe('parsing', () => {
     expect(() => parseApproveBatch({ claims: [] })).toThrow();
     expect(() => parseApproveBatch({ claims: [{ killmailId: 1 }, { killmailId: 1 }] })).toThrow();
     expect(() =>
-      parseKillmailIds({ killmailIds: Array.from({ length: 51 }, (_, i) => i + 1) })
+      parseMarkPaidBatch({ killmailIds: Array.from({ length: 51 }, (_, i) => i + 1) })
     ).toThrow();
-    expect(parseKillmailIds({ killmailIds: [1, 2] })).toEqual([1, 2]);
+    expect(parseMarkPaidBatch({ killmailIds: [1, 2] })).toEqual([
+      { killmailId: 1 },
+      { killmailId: 2 },
+    ]);
+    expect(parseMarkPaidBatch({ claims: [{ killmailId: 1, expectedAmount: 5 }] })).toEqual([
+      { killmailId: 1, expectedAmount: 5 },
+    ]);
+    expect(parseMarkPaidItem({ killmailId: 1, expectedAmount: null })).toEqual({
+      killmailId: 1,
+      expectedAmount: null,
+    });
+    expect(parseApproveItem({ killmailId: 5, expectedAmount: 9 }).expectedAmount).toBe(9);
+    expect(parseApproveItem({ killmailId: 5, expectedAmount: null }).expectedAmount).toBeNull();
+    expect(() => parseApproveItem({ killmailId: 5, expectedAmount: 0 })).toThrow();
     expect(() => parseReject({ killmailId: 1, reason: '   ' })).toThrow();
     expect(() => parseReject({ killmailId: 1 })).toThrow();
     expect(() => parseChangeAmount({ killmailId: 1, amount: 5 })).toThrow();
@@ -88,6 +102,58 @@ describe('decisions', () => {
     expect(d.outcome.reason).toBe('no');
   });
 
+  it('refuses an own claim for every decision', () => {
+    const own = { ...pending, characterId: 2 };
+    const approved = { ...own, state: 'approved' };
+    expect(code(() => decideApprove(own, { killmailId: 1 }, officer, NOW))).toBe('own-claim');
+    expect(code(() => decideReject(own, { killmailId: 1, reason: 'x' }, officer, NOW))).toBe(
+      'own-claim'
+    );
+    expect(
+      code(() => decideChangeAmount(own, { killmailId: 1, amount: 3, reason: 'x' }, officer, NOW))
+    ).toBe('own-claim');
+    expect(code(() => decideMarkPaid(approved, { killmailId: 1 }, officer, NOW))).toBe('own-claim');
+  });
+
+  it('refuses a stale expectedAmount, accepts a matching or omitted one', () => {
+    expect(
+      code(() => decideApprove(pending, { killmailId: 1, expectedAmount: 99 }, officer, NOW))
+    ).toBe('amount-changed');
+    expect(
+      code(() =>
+        decideApprove(typed, { killmailId: 1, expectedAmount: 99, amount: 5 }, officer, NOW)
+      )
+    ).toBe('amount-changed');
+    expect(
+      code(() => decideApprove(pending, { killmailId: 1, expectedAmount: 100 }, officer, NOW))
+    ).toBe('ok');
+    expect(
+      code(() =>
+        decideApprove(typed, { killmailId: 1, expectedAmount: null, amount: 5 }, officer, NOW)
+      )
+    ).toBe('ok');
+    const approved = { ...pending, state: 'approved' };
+    expect(
+      code(() => decideMarkPaid(approved, { killmailId: 1, expectedAmount: 5 }, officer, NOW))
+    ).toBe('amount-changed');
+    expect(
+      code(() => decideMarkPaid(approved, { killmailId: 1, expectedAmount: 100 }, officer, NOW))
+    ).toBe('ok');
+  });
+
+  it('changes an approved amount in place: no state change, no closedAt', () => {
+    const d = decideChangeAmount(
+      { ...pending, state: 'approved' },
+      { killmailId: 1, amount: 60, reason: 'b' },
+      officer,
+      NOW
+    );
+    expect(d.patch).toMatchObject({ amount: 60, computedAmount: 100 });
+    expect(d.patch).not.toHaveProperty('state');
+    expect(d.patch).not.toHaveProperty('closedAt');
+    expect(d.outcome.state).toBe('approved');
+  });
+
   it('changes a pending amount and keeps the first computed one', () => {
     const first = decideChangeAmount(
       pending,
@@ -111,32 +177,36 @@ describe('decisions', () => {
 
   it('marks only an approved claim paid, with closedAt', () => {
     const approved = { ...pending, state: 'approved' };
-    expect(decideMarkPaid(approved, 1, officer, NOW).patch).toMatchObject({
+    expect(decideMarkPaid(approved, { killmailId: 1 }, officer, NOW).patch).toMatchObject({
       state: 'paid',
       closedAt: NOW,
     });
-    expect(code(() => decideMarkPaid(pending, 1, officer, NOW))).toBe('illegal-transition');
+    expect(code(() => decideMarkPaid(pending, { killmailId: 1 }, officer, NOW))).toBe(
+      'illegal-transition'
+    );
   });
 
   it('refuses every other transition and a missing claim', () => {
     for (const state of ['approved', 'paid', 'rejected']) {
       const claim = { ...pending, state };
+      if (state !== 'approved') {
+        expect(
+          code(() =>
+            decideChangeAmount(claim, { killmailId: 1, amount: 3, reason: 'x' }, officer, NOW)
+          )
+        ).toBe('illegal-transition');
+      }
       expect(code(() => decideApprove(claim, { killmailId: 1 }, officer, NOW))).toBe(
         'illegal-transition'
       );
       expect(code(() => decideReject(claim, { killmailId: 1, reason: 'x' }, officer, NOW))).toBe(
         'illegal-transition'
       );
-      expect(
-        code(() =>
-          decideChangeAmount(claim, { killmailId: 1, amount: 3, reason: 'x' }, officer, NOW)
-        )
-      ).toBe('illegal-transition');
     }
     for (const state of ['paid', 'rejected']) {
-      expect(code(() => decideMarkPaid({ ...pending, state }, 1, officer, NOW))).toBe(
-        'illegal-transition'
-      );
+      expect(
+        code(() => decideMarkPaid({ ...pending, state }, { killmailId: 1 }, officer, NOW))
+      ).toBe('illegal-transition');
     }
     expect(code(() => decideApprove(undefined, { killmailId: 1 }, officer, NOW))).toBe(
       'claim-not-found'

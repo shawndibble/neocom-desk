@@ -572,7 +572,7 @@ service cloud.firestore {
     //  - srpClaims: officers read all; a pilot reads only claims filed under their own
     //    verified Character uid and owner hash (a sold Character does not inherit them; queries
     //    must filter `uid == auth.uid` and `ownerHash == auth.token.ownerHash`).
-    //  - srpOfficers/{uid}: the 24h access record verifySrpOfficer writes; a Character may
+    //  - srpOfficers/{uid}: the 1h access record verifySrpOfficer writes; a Character may
     //    read only their own. Officer access needs canEdit (Director, Accountant or CEO) and
     //    the same ownerHash, so a demoted officer or a sold Character loses it.
     // Everything else under `corps/{id}` is closed (default deny).

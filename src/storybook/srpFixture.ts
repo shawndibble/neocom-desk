@@ -15,7 +15,7 @@ export function sampleSrpSettings(owner = SAMPLE_ACTIVE_CHARACTER.characterId): 
     appraisalPct: 60,
     hullRules: [
       { scope: 'class', id: 25, kind: 'pay-fixed', iskAmount: 1_500_000 },
-      { scope: 'class', id: 26, kind: 'pay-percent', pct: 70 },
+      { scope: 'class', id: 26, kind: 'pay-percent' },
       { scope: 'class', id: 27, kind: 'pay-fixed', iskAmount: 180_000_000 },
       { scope: 'class', id: 28, kind: 'officer-decides' },
       { scope: 'class', id: 547, kind: 'not-covered' },

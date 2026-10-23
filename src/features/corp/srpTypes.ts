@@ -24,7 +24,7 @@ export type HullRuleScope = 'hull' | 'class';
 
 export type HullRule =
   | { scope: HullRuleScope; id: number; kind: 'pay-fixed'; iskAmount: number }
-  | { scope: HullRuleScope; id: number; kind: 'pay-percent'; pct: number }
+  | { scope: HullRuleScope; id: number; kind: 'pay-percent' }
   | { scope: HullRuleScope; id: number; kind: 'not-covered' | 'officer-decides' };
 
 /** `corps/{corporationId}/srp/settings`. */

@@ -7,7 +7,7 @@
 //                                               id, so a second claim is a create conflict. Written by
 //                                               the file-claim callable (#4850); carries `uid`.
 //   corps/{corporationId}/srpAudit/{at~rand}    immutable audit log
-//   corps/{corporationId}/srpOfficers/{uid}     officer access record (24h) written by verifySrpOfficer
+//   corps/{corporationId}/srpOfficers/{uid}     officer access record (1h) written by verifySrpOfficer
 //
 // `srp` is the collection that holds the settings doc; claims, audit and officers are
 // sibling collections under the same `corps/{id}` umbrella.
@@ -39,7 +39,7 @@ export type HullRuleScope = 'hull' | 'class';
 
 export type HullRule =
   | { scope: HullRuleScope; id: number; kind: 'pay-fixed'; iskAmount: number }
-  | { scope: HullRuleScope; id: number; kind: 'pay-percent'; pct: number }
+  | { scope: HullRuleScope; id: number; kind: 'pay-percent' }
   | { scope: HullRuleScope; id: number; kind: 'not-covered' | 'officer-decides' };
 
 /** `corps/{corporationId}/srp/settings`. */

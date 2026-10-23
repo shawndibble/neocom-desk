@@ -237,6 +237,14 @@ suite('fileSrpClaim (emulator)', () => {
     expect(await reason(file(1001))).toBe('already-claimed');
   });
 
+  it("does not reveal another pilot's claim: not-your-loss comes before already-claimed", async () => {
+    await file(1001);
+    expect(await reason(file(1001, {}, OTHER_PILOT))).toBe('not-your-loss');
+    loss(1005, {}, { characterId: OTHER_PILOT });
+    await file(1005, {}, OTHER_PILOT);
+    expect(await reason(file(1005))).toBe('not-your-loss');
+  });
+
   it('refuses a hull the corp does not cover', async () => {
     await setRules({ hullRules: [{ scope: 'class', id: GROUP, kind: 'not-covered' }] });
     expect(await reason(file(1001))).toBe('not-covered');
