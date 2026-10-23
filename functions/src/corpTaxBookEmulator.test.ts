@@ -86,7 +86,7 @@ async function reason(promise: Promise<unknown>): Promise<string> {
 const edit = (id: number, data: Record<string, unknown>, token = false) =>
   editBook(deps(), who(id), token ? withToken(id) : { corporationId: CORP }, parseEditAction(data));
 
-const book = () => db.collection('corpTaxBooks').doc(String(CORP));
+const book = () => db.collection('corps').doc(String(CORP));
 const auditCount = async () => (await book().collection('audit').get()).size;
 
 const statement = (id: string, overrides: Record<string, unknown> = {}) => ({

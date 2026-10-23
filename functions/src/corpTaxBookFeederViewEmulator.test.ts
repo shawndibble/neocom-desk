@@ -133,7 +133,7 @@ const bookDeps = (): BookDeps => {
 const idCategory = async (id: number) =>
   id === 5 ? undefined : id >= 98_000_000 && id < 99_000_000 ? 'corporation' : 'character';
 const who = (id: number): Caller => ({ uid: `char:${id}`, ownerHash: `h${id}` });
-const collectorBook = () => db.collection('corpTaxBooks').doc(String(COLLECTOR));
+const collectorBook = () => db.collection('corps').doc(String(COLLECTOR));
 const feederRecord = async () =>
   (await collectorBook().collection('feeders').doc(String(FEEDER)).get()).data() as
     FeederRecord | undefined;
@@ -550,12 +550,9 @@ suite('moon owner view', () => {
     await save(await newInvite(), 6);
     await leaveFeeder(deps(), who(FEEDER_DIRECTOR), asDirector);
     // Joins another accounting corporation.
+    await db.collection('corps').doc(String(OTHER)).set({ active: true, corporationName: 'Other' });
     await db
-      .collection('corpTaxBooks')
-      .doc(String(OTHER))
-      .set({ active: true, corporationName: 'Other' });
-    await db
-      .collection('corpTaxBooks')
+      .collection('corps')
       .doc(String(OTHER))
       .collection('feeders')
       .doc(String(FEEDER))

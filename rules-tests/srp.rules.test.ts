@@ -140,7 +140,9 @@ describe('SRP rules', () => {
     await assertFails(getDoc(doc(db, `${CORP}/srp/settings`)));
     await assertFails(getDoc(doc(db, `${CORP}/srpAudit/e1`)));
     await assertFails(getDoc(doc(db, `${CORP}/srpOfficers/char:1`)));
-    await assertFails(getDoc(doc(db, CORP)));
+    // The `corps/{id}` document itself is the Corp Tax Book's settings (issue #4858): any
+    // Character may `get` it, so SRP never stores anything in it. Other names stay closed.
+    await assertFails(getDoc(doc(db, `${CORP}/unlisted/x`)));
   });
 
   it('lets a Character read only their own officer record, under their own owner hash', async () => {

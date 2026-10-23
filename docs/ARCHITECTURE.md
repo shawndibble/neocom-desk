@@ -471,7 +471,7 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   Member's own.
 - **Corp-shared data: the Corp Tax Book** (issues #4061/#4055, ADR 0023) is
   the fourth kind of Firebase data: a corporation's moon-mining tax record,
-  `corpTaxBooks/{corporationId}`, shared by every officer and gated by a
+  `corps/{corporationId}`, shared by every officer and gated by a
   verified corp role instead of a uid or a Community. The root doc holds the
   settings (start date, trade hub, Ore Form, dated rates, grace, minimum
   Statement, divisions, last sync); beside it are `officers/{uid}` (access
@@ -525,7 +525,7 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   client), one doc per corporation holding the holder's narrow-scope refresh
   token encrypted under the Alerts Grant's `ALERTS_TOKEN_KEY` with a
   `corpSyncGrant` purpose in the AAD. What officers read is
-  `corpTaxBooks/{corp}/meta/scheduledSync` (holder, active or stopped and why,
+  `corps/{corp}/meta/scheduledSync` (holder, active or stopped and why,
   last run). Callables: `saveCorpTaxBookSyncGrantCallable` (the holder, proven by
   the grant's own token) and `revokeCorpTaxBookSyncGrantCallable` (the holder, or
   the CEO with a live role check). A run refreshes and rotates the token,
@@ -548,7 +548,7 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   `claimedBy` and `claimedAt`; the audit entry is `claimPayment`, attributed to
   "Player claim". **The personal tab** (`src/features/miningTax/corpBook/`) is
   the member's view of the same book: `useCorpBookView` does a `get` of
-  `corpTaxBooks/{corp}` for the Character's corp (and any corp remembered in
+  `corps/{corp}` for the Character's corp (and any corp remembered in
   the `corpTaxBookCorps` setting, so a leaver keeps reading), reads only the
   member's own lines through the `uid`/`uids` rules, and
   `src/engine/corpTaxBook/personal.ts` (pure) overlays them on the Tax tab. No

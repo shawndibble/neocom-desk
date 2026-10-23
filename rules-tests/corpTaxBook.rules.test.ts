@@ -21,8 +21,8 @@ import { characterAuth, createRulesEnv } from './testEnv';
 // mining ledger to another, or lets a demoted officer keep reading it.
 let env: RulesTestEnvironment;
 
-const CORP = 'corpTaxBooks/98000001';
-const OTHER_CORP = 'corpTaxBooks/98000002';
+const CORP = 'corps/98000001';
+const OTHER_CORP = 'corps/98000002';
 const NOW = Date.now();
 const officer = (overrides: Record<string, unknown> = {}) => ({
   characterId: 1,
@@ -80,7 +80,7 @@ beforeEach(async () => {
 const OFFICER_ONLY = ['audit/e1', 'extractions/x1', 'meta/paid', 'meta/scheduledSync'];
 const OWN_LINE_PATHS = ['observed/a', 'payments/p1', 'statements/s1', 'dismissals/d1', 'miners/m1'];
 
-describe('corpTaxBooks rules', () => {
+describe('corps (Tax Book) rules', () => {
   it("lets a live officer read the whole book, and no other corp's", async () => {
     const db = characterAuth(env, 1, 'h1').firestore();
     for (const path of [...OFFICER_ONLY, ...OWN_LINE_PATHS]) {
@@ -147,7 +147,7 @@ describe('corpTaxBooks rules', () => {
   it('lets any signed-in character get the settings doc but never list books', async () => {
     const db = characterAuth(env, 77, 'h77').firestore();
     await assertSucceeds(getDoc(doc(db, CORP)));
-    await assertFails(getDocs(collection(db, 'corpTaxBooks')));
+    await assertFails(getDocs(collection(db, 'corps')));
   });
 
   it('lets an officer read only their own access record', async () => {

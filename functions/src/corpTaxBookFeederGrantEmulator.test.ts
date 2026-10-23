@@ -110,7 +110,7 @@ const bookDeps = (): BookDeps => {
   return { db, now: d.now, verifyToken: d.verify, readIdentity: d.readIdentity };
 };
 const who = (id: number): Caller => ({ uid: `char:${id}`, ownerHash: `h${id}` });
-const collectorBook = () => db.collection('corpTaxBooks').doc(String(COLLECTOR));
+const collectorBook = () => db.collection('corps').doc(String(COLLECTOR));
 const feederRecord = async () =>
   (await collectorBook().collection('feeders').doc(String(FEEDER)).get()).data() as
     FeederRecord | undefined;

@@ -103,7 +103,7 @@ const syncDeps = (): CorpSyncDeps => ({
   log: () => undefined,
 });
 
-const collectorBook = () => db.collection('corpTaxBooks').doc(String(COLLECTOR));
+const collectorBook = () => db.collection('corps').doc(String(COLLECTOR));
 const feederDoc = (corp: number) => collectorBook().collection('feeders').doc(String(corp));
 const feederRecord = async (corp: number) =>
   (await feederDoc(corp).get()).data() as FeederRecord | undefined;

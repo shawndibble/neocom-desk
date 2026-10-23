@@ -4,6 +4,15 @@
 
 Accepted (2026-10-23). Builds on ADR 0023. Issue #4608.
 
+Amended (2026-10-23, issue #4858): the Corp Tax Book now lives at `corps/{id}`
+too, with its subcollection names unchanged (`officers`, `observed`, `miners`,
+`feeders`, `meta`, `audit` and the rest) beside SRP's (`srp`, `srpClaims`,
+`srpAudit`, `srpOfficers`). The book's settings are the `corps/{id}` document
+itself. Only one test book existed, so the move was one cut-over and a copy
+script (`scripts/migrate-corp-tax-book.mjs`), not a long dual-read period. The
+token, invite, feeder-pointer, removal-link, billed-by and sync-grant collections
+stay top-level: they are keyed by token or character, not by book.
+
 ## Context
 
 A corporation's ship replacement program (SRP) needs one record every officer
@@ -31,9 +40,8 @@ Three facts shape the design:
 - **SRP lives in Firestore under `corps/{corporationId}/srp`**, written only
   through callables, each appending to an immutable audit log shown as an
   activity feed. A `corps/{id}` umbrella is the home for corp-shared data, so
-  officers and settings are managed in one place. The Corp Tax Book stays at
-  `corpTaxBooks/{id}` until a separate ticket moves it (copy first, keep the old
-  reads working while both exist).
+  officers and settings are managed in one place. The Corp Tax Book moved
+  there too (see the amendment below).
 - **Two caller checks, both from a short-lived access token** the client already
   holds. The function reads the Character's corporation (public affiliation) and,
   for officer calls, roles from ESI, then drops the token. No refresh token

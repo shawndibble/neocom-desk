@@ -225,7 +225,7 @@ Table order: Character (only if shown), Date (range for combined), System, Payee
 
 ### Corp Tax Book in the Tax tab (#4065, D12, D24, D28, D30)
 
-Only when a tracked Character's corp has an active Corp Tax Book (a `get` of `corpTaxBooks/{corp}`; a corp the Character left stays readable, remembered in the `corpTaxBookCorps` setting). No book, or any failed read: the tab is exactly as above. `useCorpBookView` reads the member's own lines (`uid`/`uids` rules) as each Character in turn, prices them at the book's hub and Ore Form with the tab's own loaders, and `overlayCorpBooks` (`src/engine/corpTaxBook/personal.ts`, pure) decides each day:
+Only when a tracked Character's corp has an active Corp Tax Book (a `get` of `corps/{corp}`; a corp the Character left stays readable, remembered in the `corpTaxBookCorps` setting). No book, or any failed read: the tab is exactly as above. `useCorpBookView` reads the member's own lines (`uid`/`uids` rules) as each Character in turn, prices them at the book's hub and Ore Form with the tab's own loaders, and `overlayCorpBooks` (`src/engine/corpTaxBook/personal.ts`, pure) decides each day:
 
 - **Pending corp record**: the day is not Billable (day end + grace, then an officer sync) or has no rate. A relabel of the unassigned row; the member's own allocation applies and nothing is owed to the corp.
 - **Billed**: Billable. The book decides quantity, price and rate for exactly what it observed; an issued Statement's lines are that decision, frozen. The row is owed to the virtual "<Corp> (Corp Tax Book)" Payee (display-only, never in Dexie, never offered to Assign) and takes its ore from the member's unassigned ore.
