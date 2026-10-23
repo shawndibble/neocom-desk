@@ -871,6 +871,23 @@
     padding-left: 0.25rem;
   }
 
+  /* A row with the in-flow ⋮ (Mining Tax) has a 44px line one, and the box and
+     the button centre in it. The title and the headline figure stay on the
+     baseline, which pins them to the top of that line, a box-height above
+     the box beside them; centre them with it. */
+  .dt-stacked.dt-stack-dense.dt-dense-lead tr:has(> td.dt-actions) td.dt-primary,
+  .dt-stacked.dt-stack-dense.dt-dense-lead tr:has(> td.dt-actions) td.dt-corner {
+    align-self: center;
+  }
+
+  /* The ⋮'s 44px touch box holds a 16px glyph, so beside the card's padding
+     it left the dots a thumb-width in from the edge the status and the
+     figures end at. Let the box overhang into the padding: the touch target
+     is the same, the dots sit near the card's right edge. */
+  .dt-stacked.dt-stack-dense.dt-dense-lead tr:has(> td.dt-actions) td.dt-actions {
+    margin-right: -0.75rem;
+  }
+
   /* Opt-in (`dt-dense-lead` on the table, Mining Tax): the tick box joins
      line one ahead of the title with a small gap, and the row keeps its
      ordinary left padding, so line two starts at the card's left edge under
