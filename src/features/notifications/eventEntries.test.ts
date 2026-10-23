@@ -55,6 +55,8 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
       shipLostMinimumIsk: ['shipLost'],
       mercenaryDenReinforcedLeadHours: ['mercenaryDenReinforced'],
       mercenaryDenAnarchyPercent: ['mercenaryDenAnarchy'],
+      skyhookRaidableLeadHours: ['skyhookRaidable'],
+      skyhookRaidableMinUnits: ['skyhookRaidable'],
       structureFuelLowDays: ['structureFuelLow'],
       corpWalletBalanceFloorIsk: ['corpWalletThreshold'],
       corpWalletTransactionCeilingIsk: ['corpWalletThreshold'],
@@ -69,6 +71,7 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
       'mercenaryDenReinforced',
       'mercenaryDenAnarchy',
       'marketOrderUndercut',
+      'skyhookRaidable',
     ]);
   });
 });
@@ -179,6 +182,33 @@ describe('one event through its entry', () => {
       'Kestrel: Keepstar was due to run out of fuel.'
     );
     expect(entry.thresholds.fields.map((field) => field.key)).toEqual(['structureFuelLowDays']);
+  });
+
+  it('skyhookRaidable: warns inside the lead time, pushes hedged, owns the lead and silo thresholds', () => {
+    const entry = NOTIFICATION_EVENT_ENTRIES.skyhookRaidable;
+    const hook = {
+      skyhookId: 5,
+      planetId: 40_000_001,
+      windowStartMs: T0 + 3_600_000 * 3,
+      windowEndMs: T0 + 3_600_000 * 7,
+      unsecuredUnits: 10,
+      leadMs: 7_200_000,
+      minUnits: 0,
+    };
+    const fires = entry.diff(
+      C,
+      { entries: [hook], nowMs: T0 },
+      { entries: [hook], nowMs: T0 + 3_600_000 * 1.5 }
+    );
+    expect(fires).toHaveLength(1);
+    expect(entry.copy.poll(fires[0], PILOT, { planet: 'X-7OMU IV' }).body).toBe(
+      'Your skyhook at X-7OMU IV becomes raidable in about 2 hours.'
+    );
+    expect(entry.projection.push(fires[0], PILOT, { planet: 'X-7OMU IV' }).body).toMatch(/was due/);
+    expect(entry.thresholds.fields.map((field) => field.key)).toEqual([
+      'skyhookRaidableLeadHours',
+      'skyhookRaidableMinUnits',
+    ]);
   });
 
   it('mercenaryDenReinforced: warns inside the lead window, pushes hedged, owns the lead-hours threshold', () => {

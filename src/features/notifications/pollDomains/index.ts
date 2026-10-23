@@ -42,6 +42,7 @@ import { marketOrderDomain, marketOrderUndercutDomain, orderExpiryDomain } from 
 import { eveNotificationDomain } from './eveNotifications';
 import {
   structureFuelDomain,
+  skyhookDomain,
   corpIndustryJobDomain,
   corpRosterDomain,
   corpWalletDomain,
@@ -77,6 +78,7 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   orderExpiryDomain,
   eveNotificationDomain,
   structureFuelDomain,
+  skyhookDomain,
   corpIndustryJobDomain,
   corpRosterDomain,
   corpWalletDomain,

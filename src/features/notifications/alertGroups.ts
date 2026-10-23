@@ -95,6 +95,9 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   // A standing fault: training stopped and nothing is replacing it.
   characterNotTraining: 'warning',
   structureFuelLow: 'warning',
+  // A lead-time warning, or a window open with little to lose; the one event with a second
+  // severity, which `entrySeverity` reads off the entry (issue #4784).
+  skyhookRaidable: 'warning',
   corpWalletThreshold: 'warning',
   planetaryExtractorExpiring: 'warning',
   // The one critical personal event (issue #4782): a reinforced den is a base under
@@ -157,6 +160,20 @@ export function alertSeverity(target: EntryChannelTarget): DeadlineSeverity {
 }
 
 /**
+ * One entry's severity: its type's (`alertSeverity`), except that a
+ * `skyhookRaidable` entry whose Occurrence Key ends in `:danger` is critical
+ * (issue #4784): the window is open with the silo above the pilot's minimum.
+ * Read off the key, which is the feed row's id, so it survives a push, a
+ * sync and a reload with no field of its own.
+ */
+export function entrySeverity(
+  entry: Pick<NotificationFeedRecord, 'eventId' | 'eveType'> & { id?: string }
+): DeadlineSeverity {
+  if (entry.eventId === 'skyhookRaidable' && entry.id?.endsWith(':danger')) return 'critical';
+  return alertSeverity(entryChannelTarget(entry));
+}
+
+/**
  * Worst first, then liveliest — a tie on severity breaks on the newest fire,
  * so two equally urgent types are ordered by which is still happening.
  */
@@ -199,7 +216,7 @@ export function groupAlertsByType(entries: readonly NotificationFeedRecord[]): A
       byKey.set(key, {
         key,
         target,
-        severity: alertSeverity(target),
+        severity: entrySeverity(entry),
         count: 1,
         newestFiredAt: entry.firedAt,
         entries: [entry],
@@ -209,6 +226,9 @@ export function groupAlertsByType(entries: readonly NotificationFeedRecord[]): A
     }
     existing.count += 1;
     existing.entries.push(entry);
+    // A group is as severe as its worst entry: one type can carry two severities.
+    const severity = entrySeverity(entry);
+    if (compareSeverity(severity, existing.severity) < 0) existing.severity = severity;
     // Never assume the caller handed them over in order: `readFeed` does, but
     // a filtered or merged list need not, and a group claiming the wrong
     // "newest" would sort itself into the wrong place.

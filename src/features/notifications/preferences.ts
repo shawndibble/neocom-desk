@@ -35,6 +35,8 @@ import {
   DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
   DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
   DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+  DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
+  DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
   DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
   DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
   defaultedThresholds,
@@ -86,6 +88,8 @@ export {
   DEFAULT_SHIP_LOST_MINIMUM_ISK,
   DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
   DEFAULT_MERCENARY_DEN_ANARCHY_PERCENT,
+  DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
+  DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
 } from './eventThresholdFields';
 
 /**
@@ -105,6 +109,8 @@ const DEFAULT_PROJECTION_ENTRY = JSON.stringify([
   DEFAULT_CONTRACT_EXPIRING_LEAD_HOURS,
   DEFAULT_ORDERS_LAPSING_LEAD_HOURS,
   DEFAULT_MERCENARY_DEN_REINFORCED_LEAD_HOURS,
+  DEFAULT_SKYHOOK_RAIDABLE_LEAD_HOURS,
+  DEFAULT_SKYHOOK_RAIDABLE_MIN_UNITS,
 ]);
 
 function projectionInputs(value: NotificationPreferencesValue): string {
@@ -144,6 +150,8 @@ function projectionInputs(value: NotificationPreferencesValue): string {
       contractExpiringLeadHours,
       ordersLapsingLeadHours,
       mercenaryDenReinforcedLeadHours,
+      skyhookRaidableLeadHours,
+      skyhookRaidableMinUnits,
     } = characterEventThresholds(value, characterId);
     const entry = JSON.stringify([
       eventsOffDefault,
@@ -155,6 +163,8 @@ function projectionInputs(value: NotificationPreferencesValue): string {
       contractExpiringLeadHours,
       ordersLapsingLeadHours,
       mercenaryDenReinforcedLeadHours,
+      skyhookRaidableLeadHours,
+      skyhookRaidableMinUnits,
     ]);
     // An all-default Character reads the same as an absent one.
     if (entry !== DEFAULT_PROJECTION_ENTRY) characters[id] = entry;

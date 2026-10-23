@@ -67,6 +67,9 @@ import {
   type CalendarEventStartingFire,
   type StructureFuelLowFire,
   type MercenaryDenReinforcedFire,
+  type SkyhookRaidableFire,
+  type SkyhookEntrySnapshot,
+  openPhase,
   type DenEntrySnapshot,
   type StructureReinforcementExitFire,
 } from './notificationDiffs';
@@ -104,6 +107,7 @@ export const PROJECTABLE_EVENT_IDS = [
   'calendarEventStarting',
   'structureFuelLow',
   'mercenaryDenReinforced',
+  'skyhookRaidable',
   'corpIndustryJobReady',
   'eveNotification',
 ] as const;
@@ -147,6 +151,7 @@ export function projectionWording(eventId: ProjectableEventId): ProjectionWordin
   switch (eventId) {
     case 'structureFuelLow':
     case 'mercenaryDenReinforced':
+    case 'skyhookRaidable':
     case 'planetaryExtractionDone':
     case 'planetaryExtractorExpiring':
     case 'skillQueueEnding':
@@ -717,6 +722,53 @@ export function projectMercenaryDens(
           fireAt,
           copy(fire, characterName, names)
         )
+      );
+    }
+  }
+  return rows;
+}
+
+/**
+ * A skyhook's theft window (issue #4784): the lead-time warning at
+ * `start - leadMs` and the "raidable now" push at the opening itself, each when
+ * it falls inside the horizon. The second is a danger Alert when the silo, as
+ * the snapshot last read it, is at or above the Character's minimum. A window
+ * already open projects nothing: the poll that saw it fired it. `entry.leadMs`
+ * is baked in at `load()` time, as for `projectStructureFuel`.
+ */
+export function projectSkyhookRaids(
+  characterId: number,
+  characterName: string,
+  entries: readonly SkyhookEntrySnapshot[],
+  planetNames: ReadonlyMap<number, string>,
+  copy: PushCopy<SkyhookRaidableFire, { planet?: string }>,
+  nowMs: number,
+  horizonMs: number = PROJECTION_HORIZON_MS
+): ProjectionRow[] {
+  const rows: ProjectionRow[] = [];
+  for (const entry of entries) {
+    const { windowStartMs: start, windowEndMs: end } = entry;
+    if (start === null || end === null) continue;
+    const phases = [
+      { phase: 'soon' as const, fireAt: start - entry.leadMs },
+      { phase: openPhase(entry), fireAt: start },
+    ];
+    for (const { phase, fireAt } of phases) {
+      if (!inHorizon(fireAt, nowMs, horizonMs)) continue;
+      const fire: SkyhookRaidableFire = {
+        eventId: 'skyhookRaidable',
+        characterId,
+        skyhookId: entry.skyhookId,
+        planetId: entry.planetId,
+        windowStartMs: start,
+        windowEndMs: end,
+        thresholdMs: entry.leadMs,
+        unsecuredUnits: entry.unsecuredUnits,
+        phase,
+      };
+      const names = { planet: planetNames.get(entry.planetId) };
+      rows.push(
+        buildRow(characterId, 'skyhookRaidable', fire, fireAt, copy(fire, characterName, names))
       );
     }
   }

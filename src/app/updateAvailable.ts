@@ -61,6 +61,25 @@ async function probe(registration: ServiceWorkerRegistration): Promise<UpdateSta
 }
 
 /**
+ * The timer and tab-resume check (`ReloadPrompt`): looks, never waits. The
+ * published release is read first, a small request in place of fetching
+ * `sw.js` every time: the running release means nothing to do, a different one
+ * marks `available` (so the Settings dot lights without a visit there) and
+ * starts the worker's download, and an unreadable one just asks the worker.
+ * Rejects when the worker check fails; the caller treats that as "next tick".
+ */
+export async function pollForUpdate(registration: ServiceWorkerRegistration): Promise<void> {
+  const verdict = compareRelease(await fetchLatestRelease(), __APP_RELEASE__);
+  if (verdict === 'same') return;
+  if (verdict === 'different') {
+    setStatus('available');
+    registration.update().catch(() => undefined);
+    return;
+  }
+  await registration.update();
+}
+
+/**
  * One bounded check for a newer build, written to `useUpdateStatus`. A worker
  * already waiting is `available` with no `checking` state. Run once per
  * Settings mount; never on a timer.

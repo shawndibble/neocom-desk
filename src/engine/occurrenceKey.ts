@@ -48,6 +48,7 @@ import type {
   EveNotificationFire,
   StructureFuelLowFire,
   MercenaryDenReinforcedFire,
+  SkyhookRaidableFire,
   MercenaryDenAnarchyFire,
   CorpIndustryJobNotificationFire,
   CorpMemberJoinedFire,
@@ -93,6 +94,7 @@ export type OccurrenceFire =
   | EveNotificationFire
   | StructureFuelLowFire
   | MercenaryDenReinforcedFire
+  | SkyhookRaidableFire
   | MercenaryDenAnarchyFire
   | CorpIndustryJobNotificationFire
   | CorpMemberJoinedFire
@@ -193,6 +195,11 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     // lead warning and the "out now" fire of one exit are different occurrences.
     case 'mercenaryDenReinforced':
       return [characterId, fire.eventId, fire.denId, fire.reinforcedUntilMs, fire.phase].join(':');
+    // The window's opening instant, apart per phase (issue #4784). The phase is the key's last part
+    // on purpose: `alertGroups.ts` reads a `:danger` suffix as the Danger banner's severity, so
+    // that survives a push, a sync and a reload with no field of its own on the feed row.
+    case 'skyhookRaidable':
+      return [characterId, fire.eventId, fire.skyhookId, fire.windowStartMs, fire.phase].join(':');
     // An edge with no natural id (foreground-only, never projected): the poll that saw the crossing is the occurrence, so a re-cross is new.
     case 'mercenaryDenAnarchy':
       return [characterId, fire.eventId, fire.denId, fire.thresholdPct, nowMs].join(':');
@@ -333,6 +340,7 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     case 'structureReinforcementExit':
     case 'structureFuelLow':
     case 'mercenaryDenReinforced':
+    case 'skyhookRaidable':
     case 'mercenaryDenAnarchy':
     case 'corpMemberJoined':
     case 'corpMemberLeft':

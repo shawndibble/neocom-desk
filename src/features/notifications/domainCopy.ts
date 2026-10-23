@@ -44,3 +44,4 @@ export * from './pollDomains/copy/skyhooks';
 export * from './pollDomains/copy/priceAlerts';
 export * from './pollDomains/copy/kills';
 export * from './pollDomains/copy/dens';
+export * from './pollDomains/copy/skyhooksNearby';

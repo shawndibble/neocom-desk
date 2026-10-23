@@ -36,6 +36,7 @@ describe('NOTIFICATION_EVENTS', () => {
       'walletBalanceChanged',
       'eveNotification',
       'structureFuelLow',
+      'skyhookRaidable',
       'corpIndustryJobReady',
       'corpMemberJoined',
       'corpMemberLeft',
@@ -82,6 +83,7 @@ describe('NOTIFICATION_EVENTS', () => {
   it('gives every corp event (issue #299) a corpCapability and no personal event one', () => {
     const CORP_EVENT_IDS = [
       'structureFuelLow',
+      'skyhookRaidable',
       'corpIndustryJobReady',
       'corpMemberJoined',
       'corpMemberLeft',
@@ -131,6 +133,7 @@ describe('NOTIFICATION_EVENTS', () => {
     );
     expect(corpEventIds).toEqual([
       'structureFuelLow',
+      'skyhookRaidable',
       'corpIndustryJobReady',
       'corpMemberJoined',
       'corpMemberLeft',
