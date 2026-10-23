@@ -452,6 +452,9 @@ export default defineConfig({
         test: {
           name: 'unit',
           environment: 'node',
+          // Trial (#4750): skip per-file module re-evaluation, ~33% of worker
+          // time is `import`. Node project only; `dom` stays isolated.
+          isolate: false,
           // `scripts/lib/**` is the one carve-out from the `src/`-only rule:
           // pure logic the SDE bake script (`scripts/build-sde.mjs`, plain
           // Node ESM, no TS/build step, deliberately outside `src/`) needs
