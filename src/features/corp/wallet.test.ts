@@ -81,12 +81,29 @@ describe('loadCorporationDivisions', () => {
       )
     );
 
-    const result = await loadCorporationDivisions(CHAR_ID, CORP_ID);
+    const result = await loadCorporationDivisions(CHAR_ID, CORP_ID, true);
 
     expect(result.cached?.data).toEqual(payload);
     expect(
       (await db.esiCache.get([CHAR_ID, corpCacheKey(CORP_ID, KEYS.divisions)]))?.value
     ).toEqual(payload);
+  });
+});
+
+describe('loadCorporationDivisions without the Director role', () => {
+  it('skips the call and answers with nothing, not a reauth', async () => {
+    let calls = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/corporations/${CORP_ID}/divisions`, () => {
+        calls += 1;
+        return HttpResponse.json({}, { status: 403 });
+      })
+    );
+
+    const result = await loadCorporationDivisions(CHAR_ID, CORP_ID, false);
+
+    expect(result).toEqual({ cached: null, needsReauth: false });
+    expect(calls).toBe(0);
   });
 });
 

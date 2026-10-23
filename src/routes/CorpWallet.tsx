@@ -128,11 +128,12 @@ interface CorpBalancesSnapshot {
 
 async function loadCorpBalances(
   characterId: number,
-  corporationId: number
+  corporationId: number,
+  canReadDivisions: boolean
 ): Promise<CorpBalancesSnapshot> {
   const [walletsResult, divisionsResult] = await Promise.all([
     loadCorporationWallets(characterId, corporationId),
-    loadCorporationDivisions(characterId, corporationId),
+    loadCorporationDivisions(characterId, corporationId, canReadDivisions),
   ]);
   return { walletsResult, divisionsResult };
 }
@@ -440,7 +441,7 @@ function CorpJournalPanel({
 }
 
 /** Mounted only once the gate is `ready` — see `useCorpRouteGate`. */
-function CorpWalletView() {
+function CorpWalletView({ canReadDivisions }: { canReadDivisions: boolean }) {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   // `undefined` while Dexie is still answering — every panel spins through
@@ -469,7 +470,7 @@ function CorpWalletView() {
     async () =>
       activeCharacterId === null || corporationId === null
         ? null
-        : loadCorpBalances(activeCharacterId, corporationId),
+        : loadCorpBalances(activeCharacterId, corporationId, canReadDivisions),
     { name: 'corp-wallet:balances', characterId: activeCharacterId }
   );
 
@@ -700,7 +701,10 @@ export function CorpWallet() {
         />
       </div>
     ) : gate.status === 'ready' ? (
-      <CorpWalletView />
+      <CorpWalletView
+        key={String(gate.capabilities.canReadDivisions)}
+        canReadDivisions={gate.capabilities.canReadDivisions}
+      />
     ) : null;
 
   return <CorpRolesGate gate={gate}>{content}</CorpRolesGate>;

@@ -87,9 +87,9 @@ describe('the required scope set', () => {
   it('unions without duplicating when several capabilities are held', () => {
     const scopes = requiredFor(['Director']);
     expect(new Set(scopes).size).toBe(scopes.length);
-    // Not one per capability: a capability may need more than one scope, and
-    // two do (corpScopes.ts).
-    expect(scopes.length).toBeGreaterThanOrEqual(CORP_CAPABILITIES.length);
+    // Not one per capability: a capability may need more than one scope, and a
+    // scope may serve more than one capability (corpScopes.ts).
+    expect(scopes.length).toBeGreaterThanOrEqual(CORP_CAPABILITIES.length - 2);
   });
 });
 

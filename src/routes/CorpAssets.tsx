@@ -197,7 +197,8 @@ async function loadAssetsSnapshot(
 
   const [assetsResult, divisionsResult, priceByTypeId] = await Promise.all([
     loadCorporationAssets(characterId, corporationId),
-    loadCorporationDivisions(characterId, corporationId),
+    // Assets are Director-only, so this read is always open here.
+    loadCorporationDivisions(characterId, corporationId, true),
     getAveragePriceByType(),
   ]);
 

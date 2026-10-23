@@ -104,6 +104,14 @@ describe('corpCapabilities', () => {
     expect(corpCapabilities(['Director']).canReadAssets).toBe(true);
   });
 
+  // GET /corporations/{id}/divisions declares x-required-roles ["Director"] alone,
+  // not the wallet's Accountant roles (#4756): an Accountant takes a 403 on it.
+  it('reads corp divisions as a Director only, never as an Accountant', () => {
+    expect(corpCapabilities(['Accountant']).canReadDivisions).toBe(false);
+    expect(corpCapabilities(['Junior_Accountant']).canReadDivisions).toBe(false);
+    expect(corpCapabilities(['Director']).canReadDivisions).toBe(true);
+  });
+
   /**
    * GET /corporations/{id}/blueprints declares ["Director"] and nothing else
    * (issue #839, verified against `x-required-roles` — the issue's own brief
