@@ -7,12 +7,13 @@ import './app/bootShellPreload';
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { reactErrorHandler } from '@sentry/react';
+import { reactErrorHandler, withScope } from '@sentry/react';
 import { App } from './app/App';
 import { BootCoverHost } from './app/BootCoverHost';
 import { BootUpdateGate } from './app/BootUpdateGate';
 import { hideBootCover, showBootCover } from './app/bootCover';
 import { installInputModality } from './app/inputModality';
+import { isRouteChunkFailure } from './app/routeChunks';
 import { LANDING_SHELL_BACKSTOP_MS, releaseLandingShell } from './app/landingShell';
 import { installTranslateGuard } from './app/translateGuard';
 import {
@@ -69,7 +70,15 @@ installInputModality();
 const reportError = reactErrorHandler();
 function releaseAndReport(...args: Parameters<typeof reportError>) {
   releaseLandingShell();
-  reportError(...args);
+  if (!isRouteChunkFailure(args[0])) return reportError(...args);
+  // A failed chunk is usually the visitor's network or a blocker, so it is a
+  // warning; a burst after a deploy is a broken release, which a Sentry alert
+  // on this tag counts. `reportError` captures synchronously, inside the scope.
+  withScope((scope) => {
+    scope.setLevel('warning');
+    scope.setTag('chunk_load', 'failed');
+    reportError(...args);
+  });
 }
 setTimeout(releaseLandingShell, LANDING_SHELL_BACKSTOP_MS);
 

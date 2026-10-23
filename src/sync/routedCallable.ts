@@ -6,6 +6,7 @@
  * callable's own name; `data` is what that callable takes.
  */
 import { httpsCallable } from 'firebase/functions';
+import { addFailureTag } from '@/observability/reportFailure';
 import { getSyncFunctions } from './firebaseApp';
 
 const ALERTS_CALLABLES = new Set(['registerDevice', 'saveAlertGrant', 'deleteAlertGrant']);
@@ -19,9 +20,15 @@ export function routerFor(name: string): 'communityCall' | 'corpTaxBookCall' | '
 }
 
 export async function callRouted<In, Out>(name: string, data: In): Promise<Out> {
-  const result = await httpsCallable<{ action: string; data: In }, Out>(
-    getSyncFunctions(),
-    routerFor(name)
-  )({ action: name, data });
-  return result.data;
+  try {
+    const result = await httpsCallable<{ action: string; data: In }, Out>(
+      getSyncFunctions(),
+      routerFor(name)
+    )({ action: name, data });
+    return result.data;
+  } catch (error) {
+    // Every callable shares a router, so the error alone only says "internal".
+    addFailureTag(error, { callable: name });
+    throw error;
+  }
 }
