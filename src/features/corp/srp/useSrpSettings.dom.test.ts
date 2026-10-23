@@ -17,6 +17,7 @@ vi.mock('@/stores/activeCharacter', () => ({
     select({ activeCharacterId: 7 }),
 }));
 
+import { readSrpProbe } from './srpNavProbe';
 import { useSrpSettings } from './useSrpSettings';
 
 const verdict = (over: Partial<SrpOfficerVerdict> = {}): SrpOfficerVerdict => ({
@@ -31,6 +32,7 @@ const verdict = (over: Partial<SrpOfficerVerdict> = {}): SrpOfficerVerdict => ({
 const settings = { corporationId: 98, enabled: true, updatedAt: 1 } as SrpSettings;
 
 beforeEach(() => {
+  localStorage.clear();
   vi.clearAllMocks();
   client.verifySrpOfficer.mockResolvedValue(verdict());
   client.readSrpSettings.mockResolvedValue(settings);
@@ -89,5 +91,23 @@ describe('useSrpSettings', () => {
     });
     await waitFor(() => expect(client.readSrpSettings.mock.calls.length).toBeGreaterThan(reads));
     expect(client.turnOnSrp).not.toHaveBeenCalled();
+  });
+
+  it('records the on/off answer for the nav as it reads and changes it', async () => {
+    const { result } = renderHook(() => useSrpSettings());
+    await waitFor(() => expect(result.current.state.status).toBe('ready'));
+    expect(readSrpProbe(7, 98, Date.now())).toEqual({ on: true, fresh: true });
+    client.readSrpSettings.mockResolvedValue({ ...settings, enabled: false });
+    await act(() => result.current.save({}, false));
+    expect(readSrpProbe(7, 98, Date.now())?.on).toBe(false);
+    client.readSrpSettings.mockResolvedValue(settings);
+    await act(() => result.current.turnOn());
+    expect(readSrpProbe(7, 98, Date.now())?.on).toBe(true);
+  });
+
+  it('records off when SRP was never turned on', async () => {
+    client.readSrpSettings.mockResolvedValue(null);
+    renderHook(() => useSrpSettings());
+    await waitFor(() => expect(readSrpProbe(7, 98, Date.now())?.on).toBe(false));
   });
 });

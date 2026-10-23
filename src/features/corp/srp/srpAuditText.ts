@@ -4,6 +4,7 @@
  */
 import type { TFunction } from 'i18next';
 import { formatIsk } from '@/lib/isk';
+import { isSrpAuditAction } from '../srpAuditAction';
 import type { SrpAuditEntry } from '../srpClaimTypes';
 
 const num = (value: unknown): number | null => (typeof value === 'number' ? value : null);
@@ -15,6 +16,7 @@ export function auditText(t: TFunction, entry: SrpAuditEntry): string {
   const id = text(d.killmailId) || String(num(d.killmailId) ?? '');
   const amount = num(d.amount);
   const base = `srp.officer.audit.${entry.action}`;
+  if (!isSrpAuditAction(entry.action)) return t('srp.officer.audit.other');
   switch (entry.action) {
     case 'fileClaim':
       return amount === null ? t(`${base}None`, { id }) : t(base, { id, isk: isk(amount) });
@@ -39,7 +41,7 @@ export function auditText(t: TFunction, entry: SrpAuditEntry): string {
     case 'saveSettings':
     case 'reclaim':
       return t(base, { id });
-    default:
-      return t('srp.officer.audit.other', { action: entry.action });
+    case 'retentionDelete':
+      return t(base, { count: num(d.count) ?? 0 });
   }
 }

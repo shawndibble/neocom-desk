@@ -3,15 +3,17 @@
  * claim tables with their per-row and bulk actions, the claim detail and the activity feed. Pure
  * view of what `useSrpQueue` loaded; every change goes through its callables and reloads.
  */
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import {
   Button,
   DataTable,
   EmptyState,
+  LoadFailedState,
   Panel,
   SegmentedControl,
+  Spinner,
   Tabs,
   Toast,
   type DataTableColumn,
@@ -35,7 +37,12 @@ import { ChangeAmountDialog, RejectClaimDialog } from './OfficerDialogs';
 import { SrpActivityFeed } from './SrpActivityFeed';
 import { SrpBulkBar } from './SrpBulkBar';
 import { SrpClaimDetail } from './SrpClaimDetail';
-import { SEND_MAIL_ENDPOINTS, withMailSummary, type SrpMailClaim } from './srpResultMail';
+import {
+  groupByPilot,
+  SEND_MAIL_ENDPOINTS,
+  withMailSummary,
+  type SrpMailClaim,
+} from './srpResultMail';
 import { failureText } from './srpClaimText';
 import {
   approveAmount,
@@ -73,12 +80,23 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
   const mailResult = useSrpResultMail();
 
   const split = useMemo(() => splitClaims(ready.claims), [ready.claims]);
-  const rows = tab === 'pending' ? split.pending : tab === 'owed' ? split.owed : split.history;
+  const history = ready.history;
+  const closed = useMemo(
+    () => (history.status === 'ready' ? splitClaims(history.claims).history : []),
+    [history]
+  );
+  const rows = tab === 'pending' ? split.pending : tab === 'owed' ? split.owed : closed;
   const selectable = tab === 'pending' ? rows.filter(canBulkApprove) : tab === 'owed' ? rows : [];
   // Ticks belong to the rows they were made on: a claim another officer closed drops off.
   const ticked = pruneSelection(selection, selectable);
   const owed = sumAmounts(split.owed);
-  const open = ready.claims.find((c) => c.killmailId === openId) ?? null;
+  const open = [...ready.claims, ...closed].find((c) => c.killmailId === openId) ?? null;
+
+  // History is read the first time its tab opens, not with the queue.
+  const loadHistory = data.loadHistory;
+  useEffect(() => {
+    if (tab === 'history' && history.status === 'idle') loadHistory();
+  }, [tab, history.status, loadHistory]);
 
   const changeTab = (next: QueueTab) => {
     setTab(next);
@@ -128,7 +146,8 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     decided: DecidedClaim[]
   ): Promise<string> => {
     const mail = await mailResult(kind, decided);
-    setMailMissing(mail.missingScope);
+    // A run with no pilots (every claim refused) says nothing about the grant: leave the note be.
+    if (groupByPilot(decided).length > 0) setMailMissing(mail.missingScope);
     return withMailSummary(t, head, mail);
   };
 
@@ -152,6 +171,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     void run(async () => {
       const out = await data.approve({
         killmailId: claim.killmailId,
+        expectedAmount: claim.amount,
         ...(claim.amount === null ? { amount } : {}),
       });
       setOpenId(null);
@@ -163,7 +183,10 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
 
   const markPaid = (claim: SrpClaim) =>
     void run(async () => {
-      const out = await data.markPaid(claim.killmailId);
+      const out = await data.markPaid({
+        killmailId: claim.killmailId,
+        expectedAmount: claim.amount,
+      });
       setOpenId(null);
       return t('srp.officer.results.paid', pilotIsk(out));
     });
@@ -203,12 +226,16 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     const chosen = selectable.filter((c) => ticked.includes(c.killmailId));
     void run(async () => {
       if (tab === 'pending') {
-        const out = await data.approveMany(chosen.map((c) => ({ killmailId: c.killmailId })));
+        const out = await data.approveMany(
+          chosen.map((c) => ({ killmailId: c.killmailId, expectedAmount: c.amount }))
+        );
         setSelection([]);
         const decided = out.results.flatMap((r) => (r.ok ? [decidedFrom(r)] : []));
         return withMail(batchLine('approvedMany', out), 'approved', decided);
       }
-      const out = await data.markPaidMany(chosen.map((c) => c.killmailId));
+      const out = await data.markPaidMany(
+        chosen.map((c) => ({ killmailId: c.killmailId, expectedAmount: c.amount }))
+      );
       setSelection([]);
       return batchLine('paidMany', out);
     });
@@ -312,7 +339,16 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
               </Button>
             </SrpBulkBar>
           )}
-          {rows.length === 0 ? (
+          {tab === 'history' && history.status !== 'ready' ? (
+            history.status === 'failed' ? (
+              <LoadFailedState
+                title={t('srp.officer.history.loadFailed')}
+                onRetry={data.loadHistory}
+              />
+            ) : (
+              <Spinner label={t('common.loading')} />
+            )
+          ) : rows.length === 0 ? (
             <EmptyState title={empty[0]} hint={empty[1]} />
           ) : (
             <DataTable
@@ -324,6 +360,11 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
               selectedRowKey={openId}
               stackLayout={phone ? 'dense' : 'labelled'}
             />
+          )}
+          {tab === 'history' && history.status === 'ready' && history.more && (
+            <div className="px-3 pb-3">
+              <Button onClick={data.loadOlderHistory}>{t('srp.officer.history.loadOlder')}</Button>
+            </div>
           )}
         </div>
       </Panel>

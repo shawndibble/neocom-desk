@@ -16395,7 +16395,13 @@
         "turnOff": "Turned SRP off",
         "saveSettings": "Saved SRP settings",
         "reclaim": "Reclaimed SRP",
-        "other": "{{action}}"
+        "retentionDelete_one": "Retention sweep removed {{count}} closed claim",
+        "retentionDelete_other": "Retention sweep removed {{count}} closed claims",
+        "other": "Other activity"
+      },
+      "history": {
+        "loadOlder": "Load older",
+        "loadFailed": "Couldn't load history"
       },
       "results": {
         "approved": "Approved {{pilot}}, {{isk}} ISK",
@@ -16439,6 +16445,8 @@
         "reason-required": "A reason is required.",
         "amount-required": "Type an amount first.",
         "amount-unchanged": "That is already the amount.",
+        "amount-changed": "The amount changed. Review it and try again.",
+        "own-claim": "You cannot decide your own claim. Another officer must.",
         "not-an-officer": "Your roles no longer allow SRP.",
         "wrong-corp": "That claim belongs to another corporation.",
         "role-required": "Your roles no longer allow that."

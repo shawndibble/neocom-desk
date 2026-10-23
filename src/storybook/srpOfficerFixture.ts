@@ -5,6 +5,7 @@ import type {
   SrpBatchResult,
   SrpClaim,
   SrpClaimOutcome,
+  SrpMarkPaidItem,
 } from '@/features/corp/srpClaimTypes';
 import type { SrpOfficerBackendOverride } from '@/features/corp/srpOfficerBackendOverride';
 import { SAMPLE_ACTIVE_CHARACTER } from './sampleData';
@@ -216,6 +217,9 @@ export function createSrpOfficerFixture(scenario: SrpOfficerScenario): SrpOffice
   const approve = (item: SrpApproveItem): SrpClaimOutcome => {
     requireState(item.killmailId, 'pending');
     const held = find(item.killmailId);
+    if (item.expectedAmount !== undefined && item.expectedAmount !== held.amount) {
+      throw refusal('amount-changed');
+    }
     const amount = item.amount ?? held.amount;
     if (amount === null) throw refusal('amount-required');
     tick += 1000;
@@ -239,8 +243,11 @@ export function createSrpOfficerFixture(scenario: SrpOfficerScenario): SrpOffice
       }
     }),
   });
-  const markPaid = (id: number): SrpClaimOutcome => {
+  const markPaid = ({ killmailId: id, expectedAmount }: SrpMarkPaidItem): SrpClaimOutcome => {
     requireState(id, 'approved');
+    if (expectedAmount !== undefined && expectedAmount !== find(id).amount) {
+      throw refusal('amount-changed');
+    }
     tick += 1000;
     const next = patch(id, {
       state: 'paid',
@@ -276,7 +283,7 @@ export function createSrpOfficerFixture(scenario: SrpOfficerScenario): SrpOffice
     approveMany: (items) =>
       settle(
         items.map((i) => i.killmailId),
-        (id) => approve({ killmailId: id })
+        (id) => approve(items.find((i) => i.killmailId === id)!)
       ),
     reject: (id, reason) => {
       requireState(id, 'pending');
@@ -293,7 +300,7 @@ export function createSrpOfficerFixture(scenario: SrpOfficerScenario): SrpOffice
       return outcome(next, reason);
     },
     change: (id, amount, reason) => {
-      requireState(id, 'pending');
+      if (find(id).state !== 'pending') requireState(id, 'approved');
       const held = find(id);
       const next = patch(id, {
         amount,
@@ -307,6 +314,10 @@ export function createSrpOfficerFixture(scenario: SrpOfficerScenario): SrpOffice
       return outcome(next, reason);
     },
     markPaid,
-    markPaidMany: (ids) => settle(ids, markPaid),
+    markPaidMany: (items) =>
+      settle(
+        items.map((i) => i.killmailId),
+        (id) => markPaid(items.find((i) => i.killmailId === id)!)
+      ),
   };
 }

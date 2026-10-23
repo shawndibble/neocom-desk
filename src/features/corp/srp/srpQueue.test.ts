@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { SrpClaim } from '../srpClaimTypes';
 import {
   approveAmount,
   canBulkApprove,
+  MAX_SRP_BATCH,
   pruneSelection,
+  runInBatches,
   splitClaims,
   sumAmounts,
   typedAmount,
@@ -70,5 +72,36 @@ describe('amounts', () => {
 describe('pruneSelection', () => {
   it('drops ticks for rows that are gone', () => {
     expect(pruneSelection([1, 2, 3], [claim(2), claim(3)])).toEqual([2, 3]);
+  });
+});
+
+describe('runInBatches', () => {
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => ({ killmailId: i + 1 }));
+  const okAll = async (chunk: { killmailId: number }[]) => ({
+    results: chunk.map((c) => ({
+      ok: true as const,
+      killmailId: c.killmailId,
+      state: 'approved' as const,
+      characterId: 1,
+      characterName: 'P',
+      amount: 1,
+    })),
+  });
+
+  it('splits at the server cap and merges the outcomes in order', async () => {
+    const call = vi.fn(okAll);
+    const out = await runInBatches(ids(120), call);
+    expect(call.mock.calls.map(([c]) => c.length)).toEqual([MAX_SRP_BATCH, MAX_SRP_BATCH, 20]);
+    expect(out.results.map((r) => r.killmailId)).toEqual(ids(120).map((i) => i.killmailId));
+  });
+  it('turns a failed chunk into per-claim refusals and carries on', async () => {
+    const call = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error('x'), { details: { reason: 'wrong-corp' } }))
+      .mockImplementation(okAll);
+    const out = await runInBatches(ids(60), call);
+    expect(out.results.filter((r) => !r.ok)).toHaveLength(50);
+    expect(out.results[0]).toMatchObject({ ok: false, reason: 'wrong-corp' });
+    expect(out.results.filter((r) => r.ok)).toHaveLength(10);
   });
 });

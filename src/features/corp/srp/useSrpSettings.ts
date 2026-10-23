@@ -16,6 +16,7 @@ import {
   turnOnSrp,
   verifySrpOfficer,
 } from '../srpClient';
+import { recordSrpProbe } from './srpNavProbe';
 import type { SrpOfficerVerdict, SrpSettings, SrpSettingsPatch } from '../srpTypes';
 
 export type SrpSettingsState =
@@ -76,6 +77,8 @@ export function useSrpSettings(): SrpSettingsData {
           throw error;
         });
         if (cancelled) return;
+        // What the server holds is the nav's answer too (the rail, More sheet and /srp sub-view).
+        recordSrpProbe(characterId, corporationId, settings?.enabled === true);
         setState(
           settings ? { status: 'ready', verdict, settings } : { status: 'never-on', verdict }
         );
@@ -97,6 +100,7 @@ export function useSrpSettings(): SrpSettingsData {
   const turnOn = useCallback(async () => {
     if (characterId === null || corporationId === null) return;
     await turnOnSrp(characterId, corporationId);
+    recordSrpProbe(characterId, corporationId, true);
     reload();
   }, [characterId, corporationId, reload]);
 
@@ -105,8 +109,14 @@ export function useSrpSettings(): SrpSettingsData {
       if (characterId === null || corporationId === null) return;
       try {
         if (Object.keys(patch).length > 0) await saveSrpSettings(characterId, corporationId, patch);
-        if (enabled === true) await turnOnSrp(characterId, corporationId);
-        if (enabled === false) await turnOffSrp(characterId, corporationId);
+        if (enabled === true) {
+          await turnOnSrp(characterId, corporationId);
+          recordSrpProbe(characterId, corporationId, true);
+        }
+        if (enabled === false) {
+          await turnOffSrp(characterId, corporationId);
+          recordSrpProbe(characterId, corporationId, false);
+        }
       } finally {
         // Even a half-done save changed something: show what the server holds.
         reload();

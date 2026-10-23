@@ -8,7 +8,10 @@ import {
   probeSrp,
   readSrpProbe,
   recordSrpProbe,
+  SRP_PROBE_FAILURE_BACKOFF_MS,
   SRP_PROBE_TTL_MS,
+  srpProbeBackingOff,
+  subscribeSrpProbe,
 } from './srpNavProbe';
 
 const CORP = 98000001;
@@ -53,5 +56,34 @@ describe('probeSrp', () => {
     expect(await probeSrp(7, CORP)).toBeNull();
     recordSrpProbe(7, CORP, true, 1);
     expect(await probeSrp(7, CORP)).toBe(true);
+  });
+});
+
+describe('probe backoff', () => {
+  it('skips the server for a while after a failure, then asks again', async () => {
+    status.mockRejectedValue(new Error('offline'));
+    await probeSrp(7, CORP);
+    await probeSrp(7, CORP);
+    await probeSrp(7, CORP);
+    expect(status).toHaveBeenCalledTimes(1);
+    expect(srpProbeBackingOff(7, CORP, Date.now())).toBe(true);
+    expect(srpProbeBackingOff(7, CORP, Date.now() + SRP_PROBE_FAILURE_BACKOFF_MS + 1)).toBe(false);
+  });
+  it('is per Character and corporation, and a recorded answer clears it', async () => {
+    status.mockRejectedValue(new Error('offline'));
+    await probeSrp(7, CORP);
+    expect(srpProbeBackingOff(8, CORP, Date.now())).toBe(false);
+    recordSrpProbe(7, CORP, true);
+    expect(srpProbeBackingOff(7, CORP, Date.now())).toBe(false);
+  });
+});
+
+describe('subscribers', () => {
+  it('hear a recorded answer', () => {
+    const listener = vi.fn();
+    const off = subscribeSrpProbe(listener);
+    recordSrpProbe(7, CORP, false);
+    expect(listener).toHaveBeenCalledTimes(1);
+    off();
   });
 });

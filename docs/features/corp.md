@@ -318,6 +318,11 @@ All pure, `nowMs` is a parameter (never `Date.now()` inside `src/engine`).
 - File: pasted link (zKillboard or ESI) plus Fleet or FC (required when the corp says so; File on a lost ship then fills the form in rather than filing without it). Refusals map from `details.reason` to a message beside the field that can fix it.
 - My claims: dense table, Rejected carries its reason and one Re-file with a required note; a row opens the detail dialog (sheet on a phone).
 
+## SRP, the officer view (`/corp/srp`, issues #4853, #4851)
+
+- Queue (Accountant or Director): Pending / Owed / History tables, per-row and bulk Approve, Reject (reason required, mailed to the pilot), Change amount (with reason), Mark paid; activity feed from `corps/{id}/srpAudit`. Reads: open claims (`state in [pending, approved]`) with the queue; History loads when its tab opens (newest 100 by `closedAt`, "Load older"). Actions are callables; each sends `expectedAmount` (the amount shown) and the server refuses with `amount-changed` if it moved. Bulk calls go in chunks of 50 (server cap).
+- Settings (Director or CEO): turn SRP on or off, Hull Rules, caps, claim window, retention. Saving records the on/off answer in the nav probe so the Queue tab and `/srp` sub-view update at once. A failed probe backs off 5 minutes.
+
 ## Improvement ideas
 
 - Add `/corp/structures` (sortable table: fuel days, state, services, location, moon extraction) and link the Structures widget's rows to it.
