@@ -7586,6 +7586,7 @@
       "skillTraining": "Skill queue",
       "industryJob": "Industry jobs",
       "planetExtraction": "Planets",
+      "mercenaryDen": "Mercenary dens",
       "moonChunk": "Moon chunks",
       "contractExpiry": "Contracts",
       "orderExpiry": "Market orders",
@@ -7610,6 +7611,10 @@
         "auction": "auction",
         "loan": "loan",
         "unknown": "contract"
+      },
+      "mercenaryDen": {
+        "reinforcement": "leaves reinforcement",
+        "operation": "operation expires"
       }
     },
     "filter": {

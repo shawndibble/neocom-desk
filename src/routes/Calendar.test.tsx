@@ -471,6 +471,7 @@ describe('Calendar', () => {
         'skillTraining',
         'industryJob',
         'planetExtraction',
+        'mercenaryDen',
         'moonChunk',
         'contractExpiry',
         'orderExpiry',

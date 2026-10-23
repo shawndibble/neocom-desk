@@ -1,5 +1,5 @@
 /**
- * Kind to tokens: fill and text tone, for the eight clocks the Calendar merges.
+ * Kind to tokens: fill and text tone, for the nine clocks the Calendar merges.
  *
  * The sibling of `severityTone.ts`, and deliberately its opposite. That one
  * colours a **magnitude** — how close a deadline is, on an ordered ladder.
@@ -16,10 +16,10 @@
  *
  * **Colour is never the only signal here** (DESIGN.md §7), and it never has to
  * be: every place a hue appears, the kind is also named or drawn. The rail's
- * rows carry `KIND_ICON` and the kind's own words; the filter menu — which is
- * the only legend these six hues will ever get — carries a swatch beside each
- * label; the map's cells and the ticker's columns name their kinds in the
- * `aria-label`. That is what lets the palette stay inside the house colour
+ * rows, the map's cells and the filter menu (the legend) all draw `KIND_ICON`
+ * in the hue, so a kind is told apart by shape too; the rows and the menu add
+ * its words, and the map's cells and the ticker's columns name their kinds in
+ * the `aria-label`. That is what lets the palette stay inside the house colour
  * band instead of being stretched for colour-blind separation it does not
  * need to carry alone: the closest pair under deuteranopia is industry/orders
  * at ΔE 12, which is a weak *reinforcement* rather than a lost signal.
@@ -32,6 +32,7 @@ export const KIND_FILL: Record<CharacterBoardItemKind, string> = {
   skillTraining: 'bg-kind-skill-training',
   industryJob: 'bg-kind-industry-job',
   planetExtraction: 'bg-kind-planet-extraction',
+  mercenaryDen: 'bg-kind-mercenary-den',
   moonChunk: 'bg-kind-moon-chunk',
   contractExpiry: 'bg-kind-contract-expiry',
   orderExpiry: 'bg-kind-order-expiry',
@@ -44,21 +45,12 @@ export const KIND_TEXT: Record<CharacterBoardItemKind, string> = {
   skillTraining: 'text-kind-skill-training',
   industryJob: 'text-kind-industry-job',
   planetExtraction: 'text-kind-planet-extraction',
+  mercenaryDen: 'text-kind-mercenary-den',
   moonChunk: 'text-kind-moon-chunk',
   contractExpiry: 'text-kind-contract-expiry',
   orderExpiry: 'text-kind-order-expiry',
   skillPlan: 'text-kind-skill-plan',
 };
-
-/**
- * A map dot: filled for a real clock, an outline for a projected one. The
- * shape is the signal, so a forecast is never read as a commitment by hue.
- */
-export function kindDotClassName(kind: CharacterBoardItemKind): string {
-  return isProjectedKind(kind)
-    ? 'size-1.5 rounded-full border border-kind-skill-plan'
-    : `size-1.5 rounded-full ${KIND_FILL[kind]}`;
-}
 
 /** A ticker segment (2px tall): solid for a real clock, a dashed line for a projected one. */
 export function kindSegmentClassName(kind: CharacterBoardItemKind): string {
