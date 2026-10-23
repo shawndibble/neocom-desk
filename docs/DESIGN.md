@@ -365,25 +365,12 @@ shape has to be carried into them by hand.
   `h-9` (36px, default). `DataTable`'s `density="compact"` option tightens
   both to `px-2 py-1`, for tables embedded in already-dense surfaces (e.g.
   the build-plan materials table inside a `Panel`).
-- Touch tier: `h-11` (44px) on a touch viewport — below `md` _or_ on a coarse
-  pointer (`@custom-variant touch (@media (pointer: coarse))` in `index.css`),
-  so a touch tablet or laptop keeps it at every width (`md:h-7 touch:h-9`; the
-  `touch:` variant is declared after `md:` and wins above it). `h-7`/`h-9` are
-  mouse-pointer sizes (WCAG 2.2's 24px floor with room to spare, not a thumb
-  target) and reusing them on a phone is what made early drafts of the Assets
-  page hard to tap. So the scale is **`sm` = `h-9 md:h-7 touch:h-9`, `md` =
-  `h-11 md:h-9 touch:h-11`** — pointer users never get the 44px box, touch users never get the
-  36px one.
-  **Exception: a link inside a dense identity block stays text height.** The pilot
-  profile's header (corporation and alliance, the zKillboard link) is three tight
-  lines beside a portrait; a 44px box around each link spread them apart and
-  hid the portrait's neighbours more than it helped a thumb. They keep the
-  text line (`#2520` first gave them 44px; this reverses that). It is an
-  exception for that header, not for a link in a table row or a button, and
-  it holds on a coarse-pointer tablet as much as on a phone. It stays inside
-  WCAG 2.5.8: the corporation and alliance are links in a line of text, which
-  the criterion exempts, and the zKillboard link sits a `gap-x-3` away from
-  its neighbours.
+- No 44px touch box. A control is the size its scale says (`sm` = `h-9 md:h-7
+touch:h-9`, `md` = `h-11 md:h-9 touch:h-11` today) and nothing more: don't
+  grow a control, pad a cell or overhang a hit area to reach a 44px target. The
+  bar is WCAG 2.5.8's 24px minimum, and no hit area may overlap another target.
+  Controls that already grow on touch keep doing so until their scale changes;
+  that is history, not a rule to copy into new work.
 - **The scale lives in one file.** `src/components/ui/controlStyles.ts` holds
   it, and every interactive control reads from it: `Button`, `IconButton`,
   `FilterChip`, `TextInput`, `SearchInput`, `NativeSelect`, `SelectTrigger`.
@@ -1368,14 +1355,17 @@ is clutter, and clutter hides the actions that matter.
 | Double tap     | Nothing. Controls set `touch-action: manipulation`, so there is no zoom delay.                                                                                                                                              |
 
 - **A chart's point readout** (`ChartHover`) is read-only, so it is exempt from the visible-grip rule: on touch a tap on the plot shows the bubble for the point under the finger, dragging sideways scrubs along it (the plot is `touch-action: pan-y`, so vertical scrolling still scrolls the page), and a tap elsewhere or a scroll dismisses it. It adds no control, so it never competes with the widget's own tap or its touch-and-hold menu.
-- **Touch sizing follows the input, not only the width.** Menu items and Select items are `touch:min-h-11`; a bare checkbox or radio gets its 44px target from its wrapping label (`touchCheckboxLabelClassName`, or a `tappableRowClassName` row) — never a pseudo-element or overlay; drag grips grow a 44px-tall hit area along the vertical axis only (`gripHitAreaClassName`), and the CompareDrawer's resize separator is itself 44px tall on touch (`resizeHandleTouchClassName`). No hit area may overlap another target (WCAG 2.5.8). Inline submenus apply on coarse pointers too, and Fittings' HTML5 drag requires a fine pointer. The 44px tier
-  applies below `md` _or_ on `(pointer: coarse)`, so a touch laptop or tablet
-  is treated as touch. Menu items, select items, checkboxes (through a 44px
-  label row) and drag grips meet it too.
+- **Touch sizing follows the input, not only the width.** The size a control
+  grows to on touch comes from the scale in §3 and applies below `md` _or_ on
+  `(pointer: coarse)`, so a touch laptop or tablet is treated as touch. There
+  is no 44px minimum to meet: no pseudo-element or overlay to enlarge a hit
+  area, and no hit area may overlap another target (WCAG 2.5.8). Inline
+  submenus apply on coarse pointers too, and Fittings' HTML5 drag requires a
+  fine pointer.
 - **Phone cards:**
   - The whole card is the primary action, and its title carries the accent
     cue.
-  - ⋮ is pinned top-right at 44px, only when the row has one.
+  - ⋮ is pinned top-right, only when the row has one.
   - `DataTable` draws a selected card's accent border itself.
   - A tap that fires as the finger lifts after a long-press is ignored.
 - **Bottom sheets** all behave the same way:
