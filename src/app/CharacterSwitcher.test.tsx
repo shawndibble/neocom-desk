@@ -4,19 +4,19 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
-import { SCOPE_GROUPS } from '@/esi/registry';
+import { COUNTED_PERMISSIONS } from '@/features/permissions/permissionCounts';
 import { scopesForGroup } from '@/esi/scopes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { seedCharacter, seedGrant } from '@/test/seed';
 import { CharacterSwitcher } from './CharacterSwitcher';
 
-const TOTAL = SCOPE_GROUPS.length;
+const TOTAL = COUNTED_PERMISSIONS.length;
 
 async function seed(id: number, name: string, n: number) {
   await seedCharacter(id, name, { addedAt: id });
   await seedGrant(
     id,
-    SCOPE_GROUPS.slice(0, n).flatMap((group) => [...scopesForGroup(group)])
+    COUNTED_PERMISSIONS.slice(0, n).flatMap((group) => [...scopesForGroup(group)])
   );
 }
 
