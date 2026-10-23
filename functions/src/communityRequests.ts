@@ -8,6 +8,18 @@
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
+  BUYBACK_GROUP_KEYS,
+  BUYBACK_HUB_IDS,
+  MAX_BUY_LINES,
+  MAX_RATE,
+  MIN_RATE,
+  RATE_BASES,
+  isValidRate,
+  type BuybackGroup,
+  type BuybackHubId,
+  type RateBasis,
+} from './buybackTerms.js';
+import {
   MAIL_MAX_ATTEMPTS_PER_TARGET,
   MAIL_RESERVATION_STALE_MS,
   boundedString,
@@ -42,6 +54,31 @@ export const EXPIRED_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 /** Far above any real stack; keeps a typo from becoming an unbounded number. */
 export const MAX_LINE_QUANTITY = 1_000_000_000_000;
 
+export {
+  BUYBACK_GROUP_KEYS,
+  BUYBACK_HUB_IDS,
+  MAX_BUY_LINES,
+  MAX_RATE,
+  MIN_RATE,
+  RATE_BASES,
+  type BuybackGroup,
+  type BuybackHubId,
+  type RateBasis,
+} from './buybackTerms.js';
+
+export type BuyLine =
+  { kind: 'type'; typeId: number; name: string } | { kind: 'group'; group: BuybackGroup };
+
+/** What makes a Request standing: it pays a rate, expires never, and asks for types or groups. */
+export interface StandingTerms {
+  rate: number;
+  rateBasis: RateBasis;
+  hubId: BuybackHubId;
+  /** The Character contracts go to; absent means the requester's own. */
+  buyerCharacterId?: number;
+  buyLines: BuyLine[];
+}
+
 export type RequestLineKind = 'item' | 'bpc' | 'bpo';
 const LINE_KINDS: readonly RequestLineKind[] = ['item', 'bpc', 'bpo'];
 
@@ -72,8 +109,10 @@ export interface PostRequestInput {
   communityId: string;
   location: string;
   terms: string;
+  /** Empty on a standing Request, which asks through `standing.buyLines`. */
   lines: RequestLine[];
   notify: RequestNotify;
+  standing?: StandingTerms;
 }
 
 /** An edit that omits `notify` (an older client) keeps the stored choice. */
@@ -164,8 +203,75 @@ export function parseNotify(raw: unknown): RequestNotify {
   return { app: d.app, mail: d.mail };
 }
 
+function parseBuyLine(raw: unknown): BuyLine {
+  const d = record(raw);
+  if (d.kind === 'group') {
+    if (!BUYBACK_GROUP_KEYS.includes(d.group as BuybackGroup)) {
+      throw new HttpsError('invalid-argument', 'unknown buyback group');
+    }
+    return { kind: 'group', group: d.group as BuybackGroup };
+  }
+  if (d.kind !== 'type') {
+    throw new HttpsError('invalid-argument', 'buy line kind must be type or group');
+  }
+  return {
+    kind: 'type',
+    typeId: positiveInt(d.typeId, 'typeId', 2_000_000_000),
+    name: boundedString(d.name, 'name', MAX_ITEM_NAME_LENGTH),
+  };
+}
+
+const buyLineKey = (line: BuyLine) =>
+  line.kind === 'type' ? `type:${line.typeId}` : `group:${line.group}`;
+
+function parseStanding(d: Record<string, unknown>): StandingTerms {
+  const { rate } = d;
+  if (!isValidRate(rate)) {
+    throw new HttpsError(
+      'invalid-argument',
+      `rate must be a percent from ${MIN_RATE} to ${MAX_RATE} in tenths`
+    );
+  }
+  if (!RATE_BASES.includes(d.rateBasis as RateBasis)) {
+    throw new HttpsError('invalid-argument', 'rate basis must be buy or sell');
+  }
+  if (!BUYBACK_HUB_IDS.includes(d.hubId as BuybackHubId)) {
+    throw new HttpsError('invalid-argument', 'unknown Trade Hub');
+  }
+  if (!Array.isArray(d.buyLines) || d.buyLines.length === 0) {
+    throw new HttpsError('invalid-argument', 'a buyback needs at least one buy line');
+  }
+  if (d.buyLines.length > MAX_BUY_LINES) {
+    throw new HttpsError('resource-exhausted', `A buyback holds at most ${MAX_BUY_LINES} lines`, {
+      reason: 'too-many-lines',
+    });
+  }
+  const buyLines = d.buyLines.map(parseBuyLine);
+  if (new Set(buyLines.map(buyLineKey)).size !== buyLines.length) {
+    throw new HttpsError('invalid-argument', 'a buy line is listed twice');
+  }
+  const buyer = optionalInt(d.buyerCharacterId, 'buyerCharacterId', 1, 2_000_000_000_000);
+  return {
+    rate,
+    rateBasis: d.rateBasis as RateBasis,
+    hubId: d.hubId as BuybackHubId,
+    ...(buyer !== undefined ? { buyerCharacterId: buyer } : {}),
+    buyLines,
+  };
+}
+
 export function parsePostRequestInput(data: unknown): PostRequestInput {
   const d = record(data);
+  if (d.standing === true) {
+    return {
+      communityId: docId(d.communityId, 'communityId'),
+      location: optionalText(d.location, 'location', MAX_LOCATION_LENGTH),
+      terms: optionalText(d.terms, 'terms', MAX_TERMS_LENGTH),
+      lines: [],
+      notify: parseNotify(d.notify),
+      standing: parseStanding(d),
+    };
+  }
   if (!Array.isArray(d.lines) || d.lines.length === 0) {
     throw new HttpsError('invalid-argument', 'a Request needs at least one line');
   }
@@ -225,10 +331,12 @@ export function parseSetClosedInput(data: unknown): SetClosedInput {
 
 /** Whether a stored Request still counts as open: not closed and not past its expiry. */
 export function isOpenRequest(
-  request: { closed: boolean; expiresAt: number },
+  request: { closed: boolean; expiresAt: number; standing?: boolean },
   now: number
 ): boolean {
-  return !request.closed && request.expiresAt > now;
+  if (request.closed) return false;
+  // A standing Request has no expiry: it stays open until its owner closes it.
+  return request.standing === true || request.expiresAt > now;
 }
 
 export type PostDecision = 'ok' | 'too-many-open-requests';
@@ -415,12 +523,14 @@ export type SweepDecision = 'keep' | 'delete';
  * guessed.
  */
 export function decideRequestSweep(
-  request: { closed: boolean; closedAt: number | null; expiresAt: number },
+  request: { closed: boolean; closedAt: number | null; expiresAt: number; standing?: boolean },
   now: number
 ): SweepDecision {
   if (request.closed && request.closedAt !== null) {
     return now - request.closedAt >= CLOSED_RETENTION_MS ? 'delete' : 'keep';
   }
+  // A standing Request never expires; only closing it starts the clock.
+  if (request.standing === true) return 'keep';
   if (!Number.isFinite(request.expiresAt)) return 'keep';
   return now - request.expiresAt >= EXPIRED_RETENTION_MS ? 'delete' : 'keep';
 }
