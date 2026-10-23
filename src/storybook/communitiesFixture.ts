@@ -17,6 +17,7 @@ import type {
   RequestPledge,
 } from '@/engine/communities/requests';
 import type { FleetPayout, FleetPayoutDraft, FleetShare } from '@/engine/communities/fleetPayouts';
+import type { BuybackHubId, BuybackLine } from '@/engine/communities/buyback';
 import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
 import type { SharedFitting } from '@/engine/communities/sharedFittings';
 import type { SharedBlueprint } from '@/engine/communities/sharedLibrary';
@@ -443,6 +444,12 @@ export function createCommunitiesFixture(
             terms: string;
             lines: RequestLine[];
             notify?: CommunityRequest['notify'];
+            standing?: true;
+            rate?: number;
+            rateBasis?: 'buy' | 'sell';
+            hubId?: BuybackHubId;
+            buyerCharacterId?: number;
+            buyLines?: BuybackLine[];
           };
           const posted = wanted(
             `req-${Math.random().toString(36).slice(2, 8)}`,
@@ -454,6 +461,16 @@ export function createCommunitiesFixture(
             draft.lines
           );
           if (draft.notify) posted.notify = draft.notify;
+          if (draft.standing && draft.rate && draft.rateBasis && draft.hubId && draft.buyLines) {
+            posted.standing = {
+              rate: draft.rate,
+              rateBasis: draft.rateBasis,
+              hubId: draft.hubId,
+              buyerCharacterId: draft.buyerCharacterId ?? null,
+              buyLines: draft.buyLines,
+            };
+            posted.expiresAt = 0;
+          }
           itemRequests[communityId] = [posted, ...(itemRequests[communityId] ?? [])];
           return { requestId: posted.id };
         }
