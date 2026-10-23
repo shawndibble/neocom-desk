@@ -299,13 +299,7 @@ function GalleryBody({
       : 'grid gap-2';
 
   // Featured leads the wide layout's All view; its kinds are not repeated below it.
-  const featured =
-    browse && category === 'all' && !query.trim()
-      ? featuredKinds(
-          board,
-          shown.filter((kind) => kind.availability !== 'comingSoon')
-        )
-      : [];
+  const featured = browse && category === 'all' && !query.trim() ? featuredKinds(board, shown) : [];
   const featuredIds = new Set(featured.map((kind) => kind.id));
 
   let list;
@@ -420,7 +414,7 @@ function GalleryBody({
           <div
             role="group"
             aria-label={t('overview.gallery.categoriesLabel')}
-            className="sticky top-20 grid gap-1.5"
+            className="grid gap-1.5"
           >
             {chips.map((chip) => chipButton(chip, 'w-full justify-between'))}
           </div>
