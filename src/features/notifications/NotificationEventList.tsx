@@ -50,7 +50,12 @@ export function NotificationEventList({
   const topicLabel = (topic: Topic) => t(`settings.notifications.group.${topic.id}`);
 
   const table = (topic: Topic) => (
-    <TopicTable topic={topic} context={context} extraTypesByCharacter={extraTypesByCharacter} />
+    <TopicTable
+      topic={topic}
+      context={context}
+      extraTypesByCharacter={extraTypesByCharacter}
+      showEveTypes={!searching}
+    />
   );
 
   if (searching) {
@@ -179,10 +184,12 @@ function TopicTable({
   topic,
   context,
   extraTypesByCharacter,
+  showEveTypes,
 }: {
   topic: Topic;
   context: EventRowContext;
   extraTypesByCharacter: ReadonlyMap<number, readonly string[]>;
+  showEveTypes: boolean;
 }) {
   const { t } = useTranslation();
   // Every corp event rides the one opt-in Corporation Permission, so the Topic says it once.
@@ -206,7 +213,11 @@ function TopicTable({
       )}
       <ul className="divide-y divide-line">
         {topic.id === 'eve' ? (
-          <EveNotificationRow context={context} extraTypesByCharacter={extraTypesByCharacter} />
+          <EveNotificationRow
+            context={context}
+            extraTypesByCharacter={extraTypesByCharacter}
+            showTypes={showEveTypes}
+          />
         ) : (
           topic.eventIds.map((eventId) => (
             <NotificationEventRow
