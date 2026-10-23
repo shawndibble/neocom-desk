@@ -402,18 +402,12 @@ export const miningYield: Builder = (feeds, { t, now, range, scopeAll, activeCha
 
 // --- Skyhook raids ---------------------------------------------------------------
 
-/**
- * Stands in for `sovRaidsModel.ts` until `loadSovRaidsWidget` registers it: the
- * builder and its copy load with the read, off the startup graph. Loading until
- * then, whatever a restored snapshot holds; a failed read still shows as one.
- */
+/** Stand-in until `loadSovRaidsWidget` registers `sovRaidsModel.ts`: loading even over a restored snapshot; a failed read still shows failed. */
 const sovRaidsPending: Builder = (feeds) =>
   blank(
     '/travel/route',
     statusOf(feeds.sovRaids, { loading: !feeds.sovRaids?.error, hasData: false })
   );
-
-/** The kinds built in this file, each with the feeds it reads. */
 
 /** The kinds built in this file and its siblings, each with the feeds it reads. */
 export const WORLD_DEFS: Readonly<Record<string, KindDef>> = {

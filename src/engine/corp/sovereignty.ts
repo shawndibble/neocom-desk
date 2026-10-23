@@ -42,7 +42,7 @@ export function raidHeadline(
   };
 }
 
-/** The systems `allianceId` holds sov in, from the public claims list (issue #4798). */
+/** The systems `allianceId` holds sov in, from the public claims list. */
 export function allianceSpace(
   systems: readonly { systemId: number; allianceId: number | null }[],
   allianceId: number

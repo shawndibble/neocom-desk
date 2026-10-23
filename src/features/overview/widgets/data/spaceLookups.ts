@@ -1,8 +1,6 @@
 /**
- * Where a skyhook is and how far: its planet's system and name, and jumps from
- * the Character's Current System. Shared by the Corp Board's Sovereignty
- * widget (#4775) and the Overview's Skyhook raids (#4798). Loaded behind
- * `import()` by both, never statically from the Overview's startup graph.
+ * Where a skyhook is and how far: planet system and name, jumps from the Current
+ * System. Only lazy modules import this; keep it off the Overview's startup graph.
  */
 import { getUniversePlanet } from '@/esi/endpoints';
 import { loadStaticEntity } from '@/esi/cache';
@@ -22,7 +20,7 @@ export async function planetInfo(
         planets.set(planetId, { systemId: planet.system_id, name: planet.name });
       }
     } catch {
-      // The row keeps its raid window and loses only its name.
+      // The row keeps its raid window; loses what the planet read supplied.
     }
   });
   return planets;
@@ -34,9 +32,10 @@ export async function jumpsFromCurrent(
   systemIds: readonly number[]
 ): Promise<Map<number, number>> {
   const jumps = new Map<number, number>();
+  if (systemIds.length === 0) return jumps;
   try {
     const origin = await loadCurrentSystemId(characterId);
-    if (origin === null || systemIds.length === 0) return jumps;
+    if (origin === null) return jumps;
     const basis = await loadJumpBasis();
     await Promise.all(
       systemIds.map(async (systemId) => {

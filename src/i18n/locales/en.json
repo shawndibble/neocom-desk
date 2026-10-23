@@ -13202,6 +13202,7 @@
       "windowOpen": "open, {{duration}} left",
       "windowIn": "in {{duration}}",
       "underCacheWindow": "under {{duration}}",
+      "staleEmpty": "As of a read {{age}}. Refresh to check again.",
       "deadline": "Raid window opens at {{subject}}",
       "col": {
         "skyhook": "Skyhook",

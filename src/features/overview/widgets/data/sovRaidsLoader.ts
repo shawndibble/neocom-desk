@@ -1,13 +1,8 @@
 /**
- * Skyhook raids (issue #4798): skyhooks in the Character's alliance space whose
- * theft window is open now or opens shortly, from public routes only, so any
- * line member sees them with no corp role. Behind `import()` from
- * `kindLoaders.ts`.
- *
- * `GET /skyhooks/raidable` lists every raidable skyhook in New Eden; it is kept
- * to the systems `GET /sovereignty/systems` says the alliance holds before any
- * planet is looked up. Whether a window is open, upcoming or closed is the
- * builder's call at render time, never made here.
+ * Skyhook raids' read (issue #4798), public routes only. `GET /skyhooks/raidable`
+ * lists every raidable skyhook in New Eden; it is cut to the systems
+ * `GET /sovereignty/systems` says the alliance holds before any planet is looked
+ * up. Open, upcoming or closed is the builder's call at render time.
  */
 import { allianceSpace, type RaidWindow } from '@/engine/corp/sovereignty';
 import { parseInstant } from '@/engine/esiInstant';
@@ -23,7 +18,6 @@ import { getRaidableSkyhooks, getSovereigntySystems } from '@/esi/endpoints';
 import { resolveNames } from '@/features/character/names';
 import { loadPublicCharacterInfoWithAge } from '@/features/character/publicInfoData';
 import { jumpsFromCurrent, planetInfo } from './spaceLookups';
-import { SOV_RAIDS_CACHE_WINDOW_MS } from './sovRaidsModel';
 
 export interface SovRaidSkyhook {
   key: string;
@@ -37,7 +31,6 @@ export interface SovRaidSkyhook {
 export interface SovRaidsWidgetData {
   /** Null when the Character is in no alliance. */
   alliance: { id: number; name: string | null } | null;
-  /** The alliance holds sov in at least one system. */
   holdsSov: boolean;
   /** Raidable skyhooks in the alliance's space, any state. */
   skyhooks: SovRaidSkyhook[];
@@ -46,6 +39,8 @@ export interface SovRaidsWidgetData {
   jumps: Map<number, number>;
   fetchedAt: Date | null;
   fromCache: boolean;
+  /** The reads' freshness window: a countdown under it is not shown to the minute. */
+  freshForMs: number;
 }
 
 /** A public, universe-wide read: one cache row under the global sentinel. */
@@ -54,10 +49,7 @@ async function readPublic<T>(
   fetch: (options: { etag?: string }) => Promise<EsiResult<T>>
 ): Promise<CachedResult<T> | null> {
   const { fetchLive, conditional } = conditionalFetch(fetch);
-  return loadWithCache(GLOBAL_CACHE_CHARACTER_ID, key, fetchLive, {
-    conditional,
-    staleAfterMs: SOV_RAIDS_CACHE_WINDOW_MS,
-  }).catch(() => null);
+  return loadWithCache(GLOBAL_CACHE_CHARACTER_ID, key, fetchLive, { conditional });
 }
 
 /**
@@ -79,6 +71,7 @@ export async function loadSovRaids(characterId: number): Promise<SovRaidsWidgetD
     jumps: new Map(),
     fetchedAt: character.fetchedAt,
     fromCache: false,
+    freshForMs: STALE_AFTER.default,
   };
   if (allianceId === undefined) return none;
 
@@ -126,5 +119,6 @@ export async function loadSovRaids(characterId: number): Promise<SovRaidsWidgetD
     jumps,
     fetchedAt: older.fetchedAt,
     fromCache: raidable.fromCache || claims.fromCache,
+    freshForMs: STALE_AFTER.default,
   };
 }

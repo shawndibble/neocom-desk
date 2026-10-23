@@ -825,11 +825,7 @@ export async function loadTradingProfitWidget(): Promise<TradingProfitWidgetData
 
 // --- Skyhook raids ---------------------------------------------------------------
 
-/**
- * Skyhooks in the Character's alliance space raidable now or soon (issue #4798).
- * The reads and the builder (with its copy) load behind `import()`; the builder
- * replaces the Overview's stand-in before the first read lands.
- */
+/** Reads and builder load behind `import()`; the builder replaces `worldModels.ts`'s stand-in before the first read lands. */
 export async function loadSovRaidsWidget(characterId: number): Promise<SovRaidsWidgetData> {
   const [{ loadSovRaids }, { sovRaids }] = await Promise.all([
     import('./sovRaidsLoader'),

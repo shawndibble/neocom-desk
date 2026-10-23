@@ -36,6 +36,7 @@ function data(over: Partial<SovRaidsWidgetData> = {}): SovRaidsWidgetData {
     jumps: new Map([[30001190, 7]]),
     fetchedAt: new Date(0),
     fromCache: false,
+    freshForMs: 10 * MIN,
     ...over,
   };
 }
@@ -140,6 +141,40 @@ describe('sovRaids', () => {
         to: '/travel/route',
       },
     ]);
+  });
+
+  it('keeps a skyhook with no readable window as unknown, never safe', () => {
+    const view = sovRaids(
+      feeds({ skyhooks: [{ ...hook('Efa', 0, 0), window: null }, hook('X7', HOUR, 3 * HOUR)] }),
+      ctx
+    );
+    expect(view.number.value).toBe('2');
+    expect(view.table?.rows.map((row) => row.cells.slice(0, 2))).toEqual([
+      ['X7 IV', { text: `${W}.windowIn{"duration":"1h 0m"}`, tone: 'caution' }],
+      ['Efa IV', '—'],
+    ]);
+    expect(view.table?.rows[1]?.tone).toBe('warning');
+    expect(view.table?.rows[1]?.detail?.facts[0]?.value).toBe('—');
+  });
+
+  it('keeps Set destination and jumps when only the system names are unread', () => {
+    const view = sovRaids(
+      feeds({ skyhooks: [hook('X7', HOUR, 3 * HOUR)], systemNames: new Map() }),
+      ctx
+    );
+    expect(view.table?.rows[0]?.detail?.place).toEqual({
+      systemId: 30001190,
+      name: 'X7 IV',
+      jumps: 7,
+    });
+  });
+
+  it('says how old an empty answer is once the read is past its window', () => {
+    const fresh = sovRaids(feeds({ fetchedAt: new Date(NOW - 5 * MIN) }), ctx);
+    expect(fresh.emptyHint).toBeUndefined();
+    const old = sovRaids(feeds({ fetchedAt: new Date(NOW - 3 * HOUR) }), ctx);
+    expect(old.status.isEmpty).toBe(true);
+    expect(old.emptyHint).toMatch(/^travel\.sovRaids\.staleEmpty/);
   });
 
   it('is empty with nothing raidable, not a lock', () => {
