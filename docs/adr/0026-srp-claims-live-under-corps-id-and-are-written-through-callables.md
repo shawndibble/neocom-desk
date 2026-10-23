@@ -42,7 +42,8 @@ Three facts shape the design:
     and at the time of the loss.
   - **Officer calls** follow ADR 0023's pattern: approve, reject, override and
     mark paid need Director or Accountant, re-checked live on the call. Settings
-    need a Director. The CEO can always reclaim.
+    need a Director. The CEO can always reclaim. An officer cannot decide their
+    own claim.
 - **The server verifies the killmail.** The callable fetches it from ESI and
   accepts the claim only when the victim is the signed-in Character, the victim's
   corporation at the time is this corp, the loss is within the claim window, and
@@ -91,4 +92,7 @@ Three facts shape the design:
   records a decision, not a payment.
 - Result mail is sent from the approving officer's client and can fail. The
   in-app claim state is the record.
+- A Rejected claim's refile-once memory ends when the retention sweep deletes it a year later. It matters only for claim windows over about 360 days.
+- Officer self-decisions are blocked: an officer's own claim needs another officer.
+- The officer access record read by rules lasts one hour (not the Tax Book's 24), so a demoted officer loses read access quickly.
 - An officer-less corp cannot use SRP. A Director must turn it on first.

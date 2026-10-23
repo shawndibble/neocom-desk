@@ -110,7 +110,7 @@ suite('SRP retention sweep (emulator)', () => {
       truncated: false,
     });
     const entries = await audit(CORP_A);
-    expect(entries.map((e) => e.detail.count).sort()).toEqual([50, 200, 200]);
+    expect(entries.map((e) => e.detail.count).sort((a, b) => a - b)).toEqual([50, 200, 200]);
     expect(entries.flatMap((e) => e.detail.claimIds)).toHaveLength(450);
   });
 });
