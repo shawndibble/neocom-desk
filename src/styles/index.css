@@ -655,6 +655,14 @@
     align-self: center;
   }
 
+  /* The ⋮ is a 44px thumb target, taller than the title: it stretches line one
+     to its own height, and the title and figure (baseline-aligned like the
+     rest of the row) would ride at the top of it while the ⋮ and a leading
+     tick box centre. Centre them too, so line one reads as one line. */
+  .dt-stacked.dt-stack-dense tr:has(> td.dt-actions) :is(td.dt-primary, td.dt-corner) {
+    align-self: center;
+  }
+
   /* The leading expand caret (`expandableRow.leadingIcon`) is a desktop cue:
      a card is itself the tap target. */
   .dt-stacked .dt-lead-caret {
