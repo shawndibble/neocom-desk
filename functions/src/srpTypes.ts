@@ -9,7 +9,7 @@
 //   corps/{corporationId}/srpAudit/{at~rand}    immutable audit log
 //   corps/{corporationId}/srpDoctrines/{id}      the corp's Doctrine Fit snapshots (DoctrineFit)
 //   corps/{corporationId}/srpOfficers/{uid}     officer access record (1h) written by verifySrpOfficer
-import type { DoctrineFitSnapshot } from './srpDoctrine.js';
+import type { DoctrineCheck, DoctrineFitSnapshot } from './srpDoctrine.js';
 
 export const CORPS_COLLECTION = 'corps';
 export const SRP_SETTINGS_COLLECTION = 'srp';
@@ -24,6 +24,9 @@ export const SRP_SCHEMA_VERSION = 1;
 export const DEFAULT_CLAIM_WINDOW_DAYS = 30;
 export const MAX_CLAIM_WINDOW_DAYS = 365;
 export const MAX_HULL_RULES = 500;
+/** Doctrine Fits a corp may keep, and the most one Hull Rule may list. */
+export const MAX_DOCTRINES = 100;
+export const MAX_RULE_DOCTRINES = 20;
 
 /** What a Hull Rule does for its hull or class (GLOSSARY.md "Hull Rule"). */
 export type HullRuleKind = 'pay-fixed' | 'pay-percent' | 'not-covered' | 'officer-decides';
@@ -56,6 +59,27 @@ export interface DoctrineFit {
   snapshot: DoctrineFitSnapshot;
   createdBy: number;
   createdAt: number;
+}
+
+/**
+ * The doctrine-fit result stored on a claim at filing (never re-evaluated). `doctrineName` is the
+ * matched or nearest fit's name then, so it stays readable after the fit is edited or deleted.
+ * Absent on claims filed before doctrine-fit existed: read as 'not-checked'.
+ */
+export type DoctrineCheckRecord = DoctrineCheck & { doctrineName?: string };
+
+/** What `saveSrpDoctrineCallable` takes: `id` absent creates, present replaces that fit. */
+export interface SaveDoctrineInput {
+  id?: string;
+  name: string;
+  snapshot: DoctrineFitSnapshot;
+}
+
+/** `previewSrpDoctrineCheckCallable` result: the check a filing now would store. */
+export interface DoctrinePreview {
+  killmailId: number;
+  hullTypeId: number;
+  check: DoctrineCheckRecord;
 }
 
 /** `corps/{corporationId}/srp/settings`. */
