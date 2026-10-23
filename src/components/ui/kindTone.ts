@@ -1,5 +1,5 @@
 /**
- * Kind to tokens: fill and text tone, for the nine clocks the Calendar merges.
+ * Kind to tokens: fill and text tone, for the ten clocks the Calendar merges.
  *
  * The sibling of `severityTone.ts`, and deliberately its opposite. That one
  * colours a **magnitude** — how close a deadline is, on an ordered ladder.

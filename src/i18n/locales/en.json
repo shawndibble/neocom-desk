@@ -312,6 +312,7 @@
         "listTitle": "Choose a Fitting to load",
         "listNotSaved": "Nothing here is saved until you open one and choose Save to My Fittings.",
         "listError": "Not recognized: {{reason}}",
+        "open": "Open {{name}}",
         "unresolvedTitle_one": "{{count}} item in this Fitting wasn't recognized",
         "unresolvedTitle_other": "{{count}} items in this Fitting weren't recognized"
       },
