@@ -28,6 +28,6 @@ PNG exports of the chosen mockups for ready tickets. Delete a folder (and its ro
 | [queue-remap-advice](queue-remap-advice/README.md) | Issue #4701 | Optimize queue at the foot of the Attributes card (full width, under the remap budget): one press makes a plan from the queue with the optimizer's Remap Markers and opens it, Undo toast; empty queue aria-disabled, already optimal makes no plan |
 | [compare-trade-hubs](compare-trade-hubs/README.md) | Issue #4696 (build: #4697) | Desktop as proposed (items × hubs, best sell over best buy, LOWEST/HIGHEST words, jumps in headers); table at every width (phone scrolls sideways, item pinned, "Hubs" label); own hub highlighted |
 | [optimize-compare](optimize-compare/README.md) | Issue #4793 | Optimize for me preview: wide Modal, Current and Optimized columns, moved rows tinted, remap markers dashed; Current / Optimized switch on phone |
-| [corp-sovereignty](corp-sovereignty/README.md) | Issue #4775 | Pick pending: A (raid clock, one row per skyhook, Gantt) or B (per system, hub fuel + next raid) |
+| [corp-sovereignty](corp-sovereignty/README.md) | Issues #4775, #4798 | Option A raid clock, two tiers: Corp Board `corpSovereignty` for Station_Manager (Gantt of theft windows, unsecured ISK, hub fuel to Deadlines); Overview `sovRaids` for members from public data (raidable now or soon, jumps); modal jumps link to Route Safety |
 
 First draft mockup; sample data. The ticket's Agent Brief text wins over the picture where they differ.

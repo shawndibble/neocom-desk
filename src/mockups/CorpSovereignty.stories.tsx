@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button, Modal, StatChip, StatChips } from '@/components/ui';
-import { Pill } from '@/components/ui/Pill';
 import { Widget } from '@/features/overview/widgets/Widget';
 import { JumpsLink } from '@/features/route/JumpsLink';
 import type { Widget as WidgetModel } from '@/features/overview/widgets/layout';
@@ -9,7 +8,7 @@ import type { KindView, TableModel } from '@/features/overview/widgets/data/type
 import { NewComponent } from './NewComponent';
 
 /**
- * Issue #4775: two options for the Corp Board's sovereignty widget, built on
+ * Issue #4775: the sovereignty widgets (Corp Board and Overview), built on
  * the ESI routes as they really are (OpenAPI, compatibility date 2026-05-19):
  *
  * - `GET /corporations/{id}/structures/skyhooks/{id}` (Station_Manager):
@@ -22,18 +21,23 @@ import { NewComponent } from './NewComponent';
  * - `GET /skyhooks/raidable` is public. Mercenary dens are character routes,
  *   so they are not in a corp widget.
  *
- * Option A, "Raid clock": one row per skyhook, sorted by when its theft window
- * opens; the Chart view is the existing Gantt of windows over 48h. Hub fuel goes
- * to Deadlines as a fuel row, like a structure's.
+ * Chosen (2026-10-23): Option A, two tiers.
  *
- * Option B, "Per system": one row per system with the hub's fuel, its next raid,
- * what is at risk and its upgrades. Two clocks share a row.
+ * Station_Manager tier, Corp Board (`corpSovereignty`): one row per skyhook,
+ * sorted by when its theft window opens; the Chart view is the existing Gantt
+ * of windows over 48h. Hub fuel goes to Deadlines as a fuel row, like a
+ * structure's.
+ *
+ * Member tier, Overview (`sovRaids`): public data only, so any Character in a
+ * sov-holding alliance sees skyhooks in its space raidable now or soon, with
+ * jumps. Option B (one row per system) was dropped: it hid every skyhook but
+ * the next in a system.
  *
  * The widgets are the real `Widget` shell drawn from a sample `KindView`; the
  * stand-in kind only supplies the shell and the title is overridden.
  *
- * New components in this mockup: `corpSovereignty` (the widget kind, both
- * options), `SkyhookModal` (A's row modal), `SystemModal` (B's row modal).
+ * New components in this mockup: `corpSovereignty` and `sovRaids` (the two
+ * widget kinds), `SkyhookModal` (the row modal, with and without stock).
  * Set destination is an ESI write, so it is dimmed offline (DESIGN §6c). The
  * jump count is a `JumpsLink` to Route Safety, not an external map. System ids
  * are sample values.
@@ -117,65 +121,45 @@ const RAID_VIEW = sample({
   },
 });
 
-// --- Option B: Per system --------------------------------------------------
+// --- Member tier: public data, Overview -------------------------------------
 
-const SYSTEM_TABLE: TableModel = {
+/**
+ * `GET /skyhooks/raidable` (public) lists skyhooks raidable now or shortly
+ * (about 2h ahead), with system, planet and window. Kept to systems whose
+ * `GET /sovereignty/systems` claim is the Character's alliance. No stock, no
+ * 48h look-ahead: those need Station_Manager.
+ */
+const MEMBER_TABLE: TableModel = {
   columns: [
-    { key: 'system', label: 'System', sortable: true },
-    { key: 'fuel', label: 'Hub fuel', sortable: true },
-    { key: 'raid', label: 'Next raid', sortable: true },
-    { key: 'risk', label: 'Unsecured', align: 'end', sortable: true },
-    { key: 'upg', label: 'Upgrades', hideNarrow: true },
+    { key: 'hook', label: 'Skyhook', sortable: true, nameFloor: true },
+    { key: 'window', label: 'Theft window', sortable: true },
+    { key: 'jumps', label: 'Jumps', align: 'end', sortable: true },
   ],
   rows: [
     {
       key: 'x7',
       tone: 'critical',
-      cells: [
-        'X-7OMU',
-        { text: '9d 4h', bar: 0.65 },
-        { text: 'in 2h', tone: 'bad' },
-        { text: '412M ISK', iskAmount: 412_000_000 },
-        '5 online',
-      ],
+      cells: ['X-7OMU IV', { text: 'open, 1h 20m left', tone: 'bad' }, '7'],
+      sort: ['X-7OMU IV', 0, 7],
     },
     {
       key: 'efa',
       tone: 'warning',
-      cells: [
-        'Efa',
-        { text: '1d 2h', bar: 0.08, tone: 'bad' },
-        { text: 'in 5h', tone: 'caution' },
-        { text: '97M ISK', iskAmount: 96_500_000 },
-        { text: '4 online, 1 low', tone: 'caution' },
-      ],
-    },
-    {
-      key: '4h',
-      cells: [
-        '4-HWWF',
-        { text: '21d', bar: 1 },
-        'in 1d',
-        { text: '677M ISK', iskAmount: 677_000_000 },
-        '6 online',
-      ],
-    },
-    {
-      key: 'cj',
-      cells: ['C-J6MT', { text: '14d 6h', bar: 0.7 }, 'in 2d', 'Nothing', '2 online'],
+      cells: ['Efa II', { text: 'in 1h 40m', tone: 'caution' }, '12'],
+      sort: ['Efa II', 1.7, 12],
     },
   ],
 };
 
-const SYSTEM_VIEW = sample({
+const MEMBER_VIEW = sample({
   number: {
-    value: '2h',
-    unit: 'to next sov clock',
+    value: '2',
+    unit: 'skyhooks raidable in our space',
     tone: 'critical',
-    secondary: { text: 'X-7OMU IV theft window opens', tone: 'bad' },
-    notes: ['Efa hub fuel runs out in 1d 2h'],
+    secondary: { text: 'X-7OMU IV open now, 7 jumps', tone: 'bad' },
   },
-  table: SYSTEM_TABLE,
+  table: MEMBER_TABLE,
+  to: '/travel/route',
 });
 
 // --- Deadlines (existing widget) ------------------------------------------
@@ -249,25 +233,29 @@ function OptionA() {
   );
 }
 
-function OptionB() {
+function MemberBoard({ modal }: { modal?: ReactNode }) {
   return (
-    <div className="grid gap-3 md:grid-cols-3">
-      <NewComponent name="corpSovereignty B · Number">
-        <Widget
-          widget={widget({ id: 'bn', size: 'S', view: 'number' })}
-          previewView={SYSTEM_VIEW}
-          onRemove={noop}
-        />
-      </NewComponent>
-      <div className="md:col-span-2">
-        <NewComponent name="corpSovereignty B · Table">
+    <div className="mx-auto max-w-6xl space-y-3 px-4 py-4">
+      <h1 className="text-xl font-semibold">Overview</h1>
+      <div className="grid gap-3 md:grid-cols-3">
+        <NewComponent name="sovRaids · Number">
           <Widget
-            widget={widget({ id: 'bt', size: 'L', view: 'table' })}
-            previewView={SYSTEM_VIEW}
+            widget={widget({ id: 'mn', title: 'Skyhook raids', size: 'S', view: 'number' })}
+            previewView={MEMBER_VIEW}
             onRemove={noop}
           />
         </NewComponent>
+        <div className="md:col-span-2">
+          <NewComponent name="sovRaids · Table">
+            <Widget
+              widget={widget({ id: 'mt', title: 'Skyhook raids', size: 'M', view: 'table' })}
+              previewView={MEMBER_VIEW}
+              onRemove={noop}
+            />
+          </NewComponent>
+        </div>
       </div>
+      {modal}
     </div>
   );
 }
@@ -304,26 +292,16 @@ function SkyhookModal() {
   );
 }
 
-function SystemModal() {
+function MemberModal() {
   return (
-    <Modal open onClose={noop} title="Efa">
-      <NewComponent name="SystemModal">
+    <Modal open onClose={noop} title="X-7OMU IV skyhook">
+      <NewComponent name="SkyhookModal (no role)">
         <div className="space-y-3">
           <StatChips>
-            <StatChip label="Hub fuel" value="runs out in 1d 2h" />
-            <StatChip label="Burn" value="120 Superionic Ice / h" />
-            <StatChip label="Hub vulnerable" value="18:00–22:00" />
+            <StatChip label="Theft window" value="open now · closes in 1h 20m" />
+            <StatChip label="Held by" value="Our alliance" />
           </StatChips>
-          <div className="flex flex-wrap gap-2">
-            <Pill>Cynosural Navigation · Online</Pill>
-            <Pill>Major Threat Detection · Online</Pill>
-            <Pill tone="warning">Pirate Detection · Low power</Pill>
-          </div>
-          <StatChips>
-            <StatChip label="Efa II skyhook" value="theft window in 5h 40m" />
-            <StatChip label="Unsecured" value="1,850 Superionic Ice · 96,500,000 ISK" />
-          </StatChips>
-          <Actions systemId={30003840} jumps={12} />
+          <Actions systemId={30001190} jumps={7} />
         </div>
       </NewComponent>
     </Modal>
@@ -361,23 +339,11 @@ export const OptionAModal: Story = {
   ),
 };
 
-/** @summary Option B, Per system: hub fuel, next raid, unsecured, upgrades. New component: corpSovereignty. */
-export const OptionBPerSystem: Story = {
-  render: () => (
-    <Board>
-      <OptionB />
-    </Board>
-  ),
-};
+/** @summary Member tier on the Overview: public data, skyhooks in our space raidable now or soon. New component: sovRaids. */
+export const MemberTier: Story = { render: () => <MemberBoard /> };
 
-/** @summary Option B on a phone. */
-export const OptionBPerSystemPhone: Story = { ...OptionBPerSystem, globals: phone };
+/** @summary The member tier on a phone. */
+export const MemberTierPhone: Story = { ...MemberTier, globals: phone };
 
-/** @summary Option B's row modal. New component: SystemModal. */
-export const OptionBModal: Story = {
-  render: () => (
-    <Board modal={<SystemModal />}>
-      <OptionB />
-    </Board>
-  ),
-};
+/** @summary The member tier's row modal: window and jumps, no stock. */
+export const MemberTierModal: Story = { render: () => <MemberBoard modal={<MemberModal />} /> };
