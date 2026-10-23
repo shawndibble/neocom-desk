@@ -10,7 +10,12 @@
  * then shows its "unavailable" state.
  */
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
-import { loadR2OfferIndex, loadR2TypeRows, type R2OfferIndex } from './r2OfferSnapshot';
+import {
+  loadR2AllRows,
+  loadR2OfferIndex,
+  loadR2TypeRows,
+  type R2OfferIndex,
+} from './r2OfferSnapshot';
 
 export interface OfferIndexType {
   typeId: number;
@@ -41,10 +46,13 @@ export async function loadOfferIndex(): Promise<OfferIndex | null> {
   return r2 ? offerIndexFromR2(r2.data) : null;
 }
 
-/** The offers of just these types, from the R2 objects the index names; `null` when a read failed. */
+/**
+ * The offers of just these types, from the R2 objects the index names, or of
+ * every type when `typeIds` is `null`; `null` when a read failed.
+ */
 export function loadOffersForTypes(
   index: OfferIndex,
-  typeIds: ReadonlySet<number>
+  typeIds: ReadonlySet<number> | null
 ): Promise<PublicContractOfferRow[] | null> {
-  return loadR2TypeRows(index.r2, typeIds);
+  return typeIds === null ? loadR2AllRows(index.r2) : loadR2TypeRows(index.r2, typeIds);
 }

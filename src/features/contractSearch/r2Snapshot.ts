@@ -38,8 +38,13 @@ export interface R2SnapshotSource<TRow> {
   read: () => Promise<R2Snapshot<TRow> | null>;
 }
 
-/** How many R2 objects are in flight at once: enough to hide round-trip latency, few enough not to starve the page's other requests. */
-export const CHUNK_READ_CONCURRENCY = 6;
+/**
+ * How many R2 objects are in flight at once: enough to hide round-trip latency.
+ * R2 answers over HTTP/2, so these share one connection rather than the
+ * browser's six-per-host HTTP/1.1 sockets, and the page's other requests go to
+ * other hosts (ESI, Fuzzwork).
+ */
+export const CHUNK_READ_CONCURRENCY = 24;
 
 /**
  * What one read of a snapshot yielded, and whether a newer one is still on its

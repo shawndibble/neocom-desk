@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
 import { resetRevalidationState } from '@/esi/cache';
 import {
+  loadR2AllRows,
+  loadR2BlueprintRows,
   loadR2OfferIndex,
   loadR2TypeRows,
   parseR2OfferIndex,
@@ -22,6 +24,13 @@ const INDEX: R2OfferIndex = {
     '35': { count: 2, cheapest: 20, objects: [obj(35, 'bbbb', 'r1.'), obj(35, 'bbbb', 'r2.')] },
   },
   regionIds: [10000002],
+};
+
+const bundle = (group: string, shard: number) =>
+  `contract-offers/bundles/${group}.${shard}.ffff.json`;
+const BUNDLES = {
+  blueprints: [bundle('blueprints', 0)],
+  others: [bundle('others', 0), bundle('others', 1)],
 };
 
 /** Serves each URL's body; anything else is a 404. */
@@ -71,6 +80,19 @@ describe('parseR2OfferIndex', () => {
     ['regionIds that are not numbers', { ...INDEX, regionIds: ['x'] }],
   ])('rejects %s', (_label, raw) => {
     expect(parseR2OfferIndex(raw)).toBeNull();
+  });
+
+  it('keeps the bundle shard names the writer adds', () => {
+    const withBundles = { ...INDEX, bundles: BUNDLES };
+    expect(parseR2OfferIndex(withBundles)).toEqual(withBundles);
+  });
+
+  it.each([
+    ['a name outside the bundles prefix', { blueprints: ['../x.json'], others: [] }],
+    ['a missing group', { blueprints: [] }],
+    ['not an object', 'nope'],
+  ])('drops bundles with %s but keeps the index', (_label, bundles) => {
+    expect(parseR2OfferIndex({ ...INDEX, bundles })).toEqual(INDEX);
   });
 });
 
@@ -161,5 +183,52 @@ describe('loadR2TypeRows', () => {
     expect(await loadR2TypeRows(INDEX, [34])).toBeNull();
     serve(files);
     expect(await loadR2TypeRows(INDEX, [34])).toEqual([row(34, 1)]);
+  });
+});
+
+describe('loadR2AllRows', () => {
+  const typeFiles = {
+    [`${ORIGIN}/${obj(34, 'aaaa')}`]: [row(34, 1)],
+    [`${ORIGIN}/${obj(35, 'bbbb', 'r1.')}`]: [row(35, 2)],
+    [`${ORIGIN}/${obj(35, 'bbbb', 'r2.')}`]: [row(35, 3)],
+  };
+  const bundleFiles = {
+    [`${ORIGIN}/${bundle('blueprints', 0)}`]: [row(999, 4)],
+    [`${ORIGIN}/${bundle('others', 0)}`]: [row(34, 1)],
+    [`${ORIGIN}/${bundle('others', 1)}`]: [row(35, 2), row(35, 3)],
+  };
+
+  it('reads the bundle shards instead of every type when the index names them', async () => {
+    const fetchMock = serve(bundleFiles);
+    const rows = await loadR2AllRows({ ...INDEX, bundles: BUNDLES });
+    expect(rows).toEqual([row(999, 4), row(34, 1), row(35, 2), row(35, 3)]);
+    expect(urlsRead(fetchMock).sort()).toEqual([...BUNDLES.blueprints, ...BUNDLES.others].sort());
+  });
+
+  it('falls back to every type object for an index without bundles', async () => {
+    serve(typeFiles);
+    expect(await loadR2AllRows(INDEX)).toEqual([row(34, 1), row(35, 2), row(35, 3)]);
+  });
+
+  it('is null when a shard cannot be read', async () => {
+    serve({ [`${ORIGIN}/${bundle('blueprints', 0)}`]: [row(999, 4)] });
+    expect(await loadR2AllRows({ ...INDEX, bundles: BUNDLES })).toBeNull();
+  });
+});
+
+describe('loadR2BlueprintRows', () => {
+  it('reads only the blueprints shards, keeping the asked types', async () => {
+    const fetchMock = serve({
+      [`${ORIGIN}/${bundle('blueprints', 0)}`]: [row(999, 4), row(1000, 5)],
+    });
+    const rows = await loadR2BlueprintRows({ ...INDEX, bundles: BUNDLES }, [999]);
+    expect(rows).toEqual([row(999, 4)]);
+    expect(urlsRead(fetchMock)).toEqual(BUNDLES.blueprints);
+  });
+
+  it('falls back to the asked types objects for an index without bundles', async () => {
+    const fetchMock = serve({ [`${ORIGIN}/${obj(34, 'aaaa')}`]: [row(34, 1)] });
+    expect(await loadR2BlueprintRows(INDEX, [34])).toEqual([row(34, 1)]);
+    expect(urlsRead(fetchMock)).toEqual([obj(34, 'aaaa')]);
   });
 });

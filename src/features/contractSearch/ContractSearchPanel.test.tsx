@@ -327,8 +327,9 @@ function cachedSnapshot(
     regionIds: [...new Set(rows.map((row) => row.regionId))],
     r2: {},
   });
-  loadOffersForTypes.mockImplementation(async (_index: unknown, ids: ReadonlySet<number>) =>
-    rows.filter((row) => ids.has(row.typeId))
+  // `null` asks for every type (Below market, a search naming none).
+  loadOffersForTypes.mockImplementation(async (_index: unknown, ids: ReadonlySet<number> | null) =>
+    rows.filter((row) => ids === null || ids.has(row.typeId))
   );
   return snapshotRead([], overrides);
 }
@@ -2217,7 +2218,7 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('reads every listed type on a search that names no item', async () => {
+    it('reads every offer on a search that names no item', async () => {
       loadPublicContractOffers.mockReturnValue(
         deferred<R2SnapshotRead<PublicContractOfferRow>>().promise
       );
@@ -2226,7 +2227,7 @@ describe('ContractSearchPanel — search first (issue #2921)', () => {
       renderWithRouter(['/?items.maxPrice=1000000000']);
 
       expect(await bodyRows()).toHaveLength(1);
-      expect(loadOffersForTypes).toHaveBeenCalledWith(INDEX, new Set([34, 35]));
+      expect(loadOffersForTypes).toHaveBeenCalledWith(INDEX, null);
     });
   });
 
