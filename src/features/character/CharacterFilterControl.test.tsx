@@ -213,9 +213,13 @@ describe('CharacterFilterControl', () => {
       expect(trigger.querySelectorAll('[data-stack-placeholder]')).toHaveLength(3);
       expect(trigger.querySelector('[data-stack-extra]')).toHaveTextContent('+2');
       for (let id = 1; id <= 5; id += 1) await seedCharacter(id, `Pilot ${id}`, { addedAt: id });
-      await waitFor(() => expect(faceIds(trigger)).toEqual(['1', '2', '3']));
+      // Seeding is one write per Character, so the first three faces can render
+      // before the last two exist; the "+2" is only true once all five have.
+      await waitFor(() => {
+        expect(faceIds(trigger)).toEqual(['1', '2', '3']);
+        expect(trigger.querySelector('[data-stack-extra]')).toHaveTextContent('+2');
+      });
       expect(trigger.querySelector('[data-stack-placeholder]')).toBeNull();
-      expect(trigger.querySelector('[data-stack-extra]')).toHaveTextContent('+2');
     });
 
     it("builds the stack from the page's own Characters when it passes them", async () => {
