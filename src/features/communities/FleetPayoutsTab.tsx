@@ -23,6 +23,9 @@ import { formatShortAge } from './requestFormat';
 import { useMyFleetShare } from './useMyFleetShare';
 import type { CommunityMember } from './communityStore';
 
+/** One array for "not loaded yet", so the roster effect does not re-run each render. */
+const NO_MEMBERS: never[] = [];
+
 /** What a listed Member sees in the status cell: their own Share only. */
 function MyShareCell({
   characterId,
@@ -194,7 +197,7 @@ export function FleetPayoutsTab({
         <ComposeFleetPayoutDialog
           characterId={characterId}
           communityId={communityId}
-          members={members ?? []}
+          members={members ?? NO_MEMBERS}
           onClose={() => setComposing(false)}
           onCreated={(payoutId) => {
             setOpenId(payoutId);

@@ -175,4 +175,24 @@ describe('FleetPayoutsTab', () => {
     });
     await waitFor(() => expect(onReload).toHaveBeenCalled());
   }, 9000);
+
+  it('keeps Create off when the ESI name check fails', async () => {
+    roster.resolveFleetRoster.mockRejectedValue(new Error('esi down'));
+    market.appraisePaste.mockResolvedValue({
+      appraisal: { totals: { buy: 1_000_000, sell: 2_000_000 } },
+      unmatched: [],
+      pricesUnreachable: false,
+    });
+    renderTab([]);
+    await userEvent.click(screen.getByRole('button', { name: 'New payout…' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Name'), 'Havens');
+    await userEvent.type(within(dialog).getByLabelText(/Paste the fleet list/), 'Aria Voss');
+    await userEvent.type(within(dialog).getByLabelText('Paste the loot'), '1 Tritanium');
+    expect(
+      await within(dialog).findByText(/Couldn't check the pilots/, undefined, { timeout: 3000 })
+    ).toBeInTheDocument();
+    await within(dialog).findByText('Loot value: 1,000,000 ISK', undefined, { timeout: 3000 });
+    expect(within(dialog).getByRole('button', { name: 'Create payout' })).toBeDisabled();
+  }, 9000);
 });

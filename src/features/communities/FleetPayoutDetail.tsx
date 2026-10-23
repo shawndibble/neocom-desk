@@ -124,6 +124,7 @@ export function FleetPayoutDetail({
   };
 
   const progress = fleetPayoutProgress(payout);
+  const paidLabel = t('communities.payouts.paidOf', { paid: progress.paid, total: progress.total });
   const rule = t(
     payout.rule === 'equal'
       ? 'communities.payouts.detail.ruleEqual'
@@ -170,14 +171,9 @@ export function FleetPayoutDetail({
               ))}
             </dl>
             <div className="space-y-1">
-              <p className="text-xs text-text-dim">
-                {t('communities.payouts.paidOf', { paid: progress.paid, total: progress.total })}
-              </p>
+              <p className="text-xs text-text-dim">{paidLabel}</p>
               <ProgressBar
-                label={t('communities.payouts.paidOf', {
-                  paid: progress.paid,
-                  total: progress.total,
-                })}
+                label={paidLabel}
                 value={progress.paid}
                 max={Math.max(1, progress.total)}
               />

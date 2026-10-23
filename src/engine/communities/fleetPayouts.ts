@@ -9,6 +9,7 @@ import { namesOf } from '../pilotList/nameLines';
 /** Mirrors `functions/src/communityFleetPayouts.ts`, which enforces them. */
 export const MAX_FLEET_SHARES = 250;
 export const MAX_PAYOUT_NAME_LENGTH = 60;
+export const MAX_PILOT_NAME_LENGTH = 40;
 export const MAX_OPEN_PAYOUTS_PER_MEMBER = 20;
 export const MAX_HOLD_BACK_PCT = 50;
 export const DEFAULT_HOLD_BACK_PCT = 10;

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   Checkbox,
+  InfoTooltip,
   Modal,
   NativeSelect,
   SegmentedControl,
@@ -17,6 +18,7 @@ import {
   MAX_HOLD_BACK_PCT,
   MAX_PAYOUT_ISK,
   MAX_PAYOUT_NAME_LENGTH,
+  MAX_PILOT_NAME_LENGTH,
   MAX_SHARE_WEIGHT,
   fleetNames,
   holdBackIsk,
@@ -185,6 +187,8 @@ export function ComposeFleetPayoutDialog({
   const ticked = pilots.filter((p) => !unticked.has(p.key));
   const weightOf = (p: Pilot) => (rule === 'equal' ? 1 : parseWeight(weights[p.key]));
   const weightsValid = ticked.every((p) => weightOf(p) !== null);
+  const rosterFailed = roster?.key === namesKey && roster.failed;
+  const nameTooLong = ticked.some((p) => p.pilotName.length > MAX_PILOT_NAME_LENGTH);
   const iskEach = splitIsk(
     pile,
     holdBackPct,
@@ -198,6 +202,8 @@ export function ComposeFleetPayoutDialog({
     ticked.length >= 1 &&
     ticked.length <= MAX_FLEET_SHARES &&
     weightsValid &&
+    !rosterFailed &&
+    !nameTooLong &&
     pile > 0;
 
   const create = async () => {
@@ -285,9 +291,14 @@ export function ComposeFleetPayoutDialog({
             </p>
           )}
           {resolving && <Spinner size="sm" label={t('communities.payouts.compose.resolving')} />}
-          {roster?.key === namesKey && roster.failed && (
+          {rosterFailed && (
             <p role="alert" className="text-warning">
               {t('communities.payouts.compose.resolveFailed')}
+            </p>
+          )}
+          {nameTooLong && (
+            <p role="alert" className="text-warning">
+              {t('communities.payouts.compose.nameTooLong', { max: MAX_PILOT_NAME_LENGTH })}
             </p>
           )}
         </div>
@@ -424,8 +435,13 @@ export function ComposeFleetPayoutDialog({
                       <span className="flex flex-wrap items-center gap-1 text-xs text-text-dim">
                         {pilot.isMember && <Pill>{t('communities.payouts.compose.member')}</Pill>}
                         {pilot.notFound && (
-                          <span title={t('communities.payouts.compose.notFoundHint')}>
+                          <span className="inline-flex items-center gap-1">
                             {t('communities.payouts.compose.notFound')}
+                            <InfoTooltip
+                              label={t('communities.payouts.compose.notFound')}
+                              content={t('communities.payouts.compose.notFoundHint')}
+                              glyph="info"
+                            />
                           </span>
                         )}
                       </span>
