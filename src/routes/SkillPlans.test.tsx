@@ -285,7 +285,12 @@ describe('SkillPlans Optimize queue', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'Optimize queue' }));
+    // The button is aria-disabled until the queue loads, and a click on it does
+    // nothing — wait for it to enable. Re-queried each poll: the node can remount.
+    const optimizeQueue = () => screen.getByRole('button', { name: 'Optimize queue' });
+    await screen.findByRole('button', { name: 'Optimize queue' });
+    await waitFor(() => expect(optimizeQueue()).not.toHaveAttribute('aria-disabled', 'true'));
+    await user.click(optimizeQueue());
 
     const stored = await waitFor(async () => {
       const all = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
