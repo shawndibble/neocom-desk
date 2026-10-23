@@ -112,6 +112,7 @@ import { Rocket } from '@phosphor-icons/react/dist/csr/Rocket';
 import { RocketLaunch } from '@phosphor-icons/react/dist/csr/RocketLaunch';
 import { Scales } from '@phosphor-icons/react/dist/csr/Scales';
 import { ShareNetwork } from '@phosphor-icons/react/dist/csr/ShareNetwork';
+import { Lifebuoy } from '@phosphor-icons/react/dist/csr/Lifebuoy';
 import { ShieldCheck } from '@phosphor-icons/react/dist/csr/ShieldCheck';
 import { ShoppingCart } from '@phosphor-icons/react/dist/csr/ShoppingCart';
 import { Sliders } from '@phosphor-icons/react/dist/csr/Sliders';
@@ -466,6 +467,8 @@ export const NavCorpMembers = withWeight(UserList);
 export const NavCorpWallet = withWeight(Vault);
 export const NavCorpAssets = withWeight(Warehouse);
 export const NavCorpMoons = withWeight(Moon);
+// SRP repays lost ships: a lifebuoy (`ReadOnly`'s shield would read as a lock).
+export const NavCorpSrp = withWeight(Lifebuoy);
 export const NavSkills = withWeight(GraduationCap);
 export const NavIndustry = withWeight(Factory);
 export const NavShips = withWeight(RocketLaunch);

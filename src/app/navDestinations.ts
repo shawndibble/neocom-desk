@@ -93,7 +93,12 @@ export interface NavPage {
 
 /** The Corp Capabilities a Corp page or tab is gated on — hidden, not locked, without one. */
 export type CorpViewCapability =
-  'canReadMembers' | 'canReadWallet' | 'canReadAssets' | 'canReadMiningLedger' | 'canReadRoleAudit';
+  | 'canReadMembers'
+  | 'canReadWallet'
+  | 'canReadAssets'
+  | 'canReadMiningLedger'
+  | 'canReadRoleAudit'
+  | 'canManageSrp';
 
 export interface NavSubView {
   readonly path: AppRoutePath;
@@ -177,6 +182,15 @@ export const NAV_PAGES = [
     gating: 'corp',
     mobileTab: false,
     corpCapability: 'canReadMiningLedger',
+  },
+  // SRP: listed for a Director or Accountant (`canManageSrp`); the page itself shows Settings to a Director.
+  {
+    path: '/corp/srp',
+    labelKey: 'nav.corpSrp',
+    group: 'corp',
+    gating: 'corp',
+    mobileTab: false,
+    corpCapability: 'canManageSrp',
   },
   {
     path: '/skills',

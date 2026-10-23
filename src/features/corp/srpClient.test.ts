@@ -10,9 +10,13 @@ vi.mock('@/sync/syncAuth', () => ({ ensureSignedIn: vi.fn().mockResolvedValue(un
 const token = vi.hoisted(() => vi.fn());
 vi.mock('@/auth/session', () => ({ getValidAccessToken: token }));
 
+const store = vi.hoisted(() => ({ doc: vi.fn(), getDoc: vi.fn() }));
+vi.mock('firebase/firestore/lite', () => ({ doc: store.doc, getDoc: store.getDoc }));
+
 import {
   fileSrpClaim,
   getSrpStatus,
+  readSrpSettings,
   reclaimSrp,
   saveSrpSettings,
   turnOffSrp,
@@ -66,5 +70,14 @@ describe('SRP client', () => {
   it('returns the callable’s answer', async () => {
     fns.callable.mockResolvedValue({ data: { officersRevoked: 2 } });
     expect(await reclaimSrp(7, CORP)).toEqual({ officersRevoked: 2 });
+  });
+
+  it('reads the settings doc under the corp umbrella, null when SRP was never turned on', async () => {
+    store.doc.mockReturnValue('ref');
+    store.getDoc.mockResolvedValueOnce({ exists: () => true, data: () => ({ enabled: true }) });
+    await expect(readSrpSettings(7, CORP)).resolves.toEqual({ enabled: true });
+    expect(store.doc).toHaveBeenCalledWith(undefined, 'corps', String(CORP), 'srp', 'settings');
+    store.getDoc.mockResolvedValueOnce({ exists: () => false });
+    await expect(readSrpSettings(7, CORP)).resolves.toBeNull();
   });
 });
