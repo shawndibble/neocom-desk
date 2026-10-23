@@ -1,6 +1,6 @@
 // Client mirror of `functions/src/srpTypes.ts` (ADR 0026; layout and field docs live there).
 // A copy, not an import: Functions builds separately; kept in step by hand.
-import type { DoctrineFitSnapshot } from '@/engine/srpDoctrine';
+import type { DoctrineCheck, DoctrineFitSnapshot } from '@/engine/srpDoctrine';
 
 /** A claim's window, in days from the loss: corp default and the range a Director may set. */
 export const DEFAULT_CLAIM_WINDOW_DAYS = 30;
@@ -38,6 +38,27 @@ export interface DoctrineFit {
   snapshot: DoctrineFitSnapshot;
   createdBy: number;
   createdAt: number;
+}
+
+/**
+ * The doctrine-fit result stored on a claim at filing (never re-evaluated). `doctrineName` is
+ * the matched or nearest fit's name then, so it stays readable after the fit is edited or deleted.
+ * Absent on claims filed before doctrine-fit existed: read as 'not-checked'.
+ */
+export type DoctrineCheckRecord = DoctrineCheck & { doctrineName?: string };
+
+/** What `saveSrpDoctrineCallable` takes: `id` absent creates, present replaces that fit. */
+export interface SaveDoctrineInput {
+  id?: string;
+  name: string;
+  snapshot: DoctrineFitSnapshot;
+}
+
+/** `previewSrpDoctrineCheckCallable`'s answer: the check a filing now would store. */
+export interface DoctrinePreview {
+  killmailId: number;
+  hullTypeId: number;
+  check: DoctrineCheckRecord;
 }
 
 /** `corps/{corporationId}/srp/settings`. */

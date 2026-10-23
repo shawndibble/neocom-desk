@@ -22,6 +22,8 @@ export interface RuleDraft {
   kind: RuleChoice;
   /** Plain digit string for `pay-fixed`; blank is a problem. */
   isk: string;
+  /** Doctrine Fit ids a claim on this hull must match (hull scope only); empty: not checked. */
+  doctrineIds: string[];
 }
 
 export interface SrpSettingsForm {
@@ -34,7 +36,7 @@ export interface SrpSettingsForm {
   rules: Record<string, RuleDraft>;
 }
 
-export const NO_RULE: RuleDraft = { kind: 'none', isk: '' };
+export const NO_RULE: RuleDraft = { kind: 'none', isk: '', doctrineIds: [] };
 const MAX_FIXED_ISK = 1e13;
 
 export const ruleKey = (scope: HullRuleScope, id: number) => `${scope}:${id}`;
@@ -52,12 +54,28 @@ export function setRule(
   return { ...form, rules: { ...form.rules, [ruleKey(scope, id)]: rule } };
 }
 
+/**
+ * Attaches the Doctrine Fits a hull's claims are checked against. A hull with no rule yet takes
+ * Pay: corp percent (the class-add default), since a rule needs a kind to hold the ids.
+ */
+export function setDoctrineIds(
+  form: SrpSettingsForm,
+  hullId: number,
+  doctrineIds: string[]
+): SrpSettingsForm {
+  const rule = ruleOf(form, 'hull', hullId);
+  if (rule.kind === 'none' && doctrineIds.length === 0) return form;
+  const kind = rule.kind === 'none' ? 'pay-percent' : rule.kind;
+  return setRule(form, 'hull', hullId, { ...rule, kind, doctrineIds });
+}
+
 export function formFromSettings(s: SrpSettings): SrpSettingsForm {
   const rules: Record<string, RuleDraft> = {};
   for (const r of s.hullRules) {
     rules[ruleKey(r.scope, r.id)] = {
       kind: r.kind,
       isk: r.kind === 'pay-fixed' ? String(r.iskAmount) : '',
+      doctrineIds: [...(r.doctrineIds ?? [])],
     };
   }
   return {
@@ -124,12 +142,18 @@ export function formProblems(form: SrpSettingsForm): FormProblems {
   return { ...problems, count };
 }
 
-function rulesOf(form: SrpSettingsForm): HullRule[] {
+/** `live`: ids of the Doctrine Fits that still exist; a deleted one is not sent. */
+function rulesOf(form: SrpSettingsForm, live?: ReadonlySet<string>): HullRule[] {
   const out: HullRule[] = [];
   for (const [key, draft] of Object.entries(form.rules)) {
     if (draft.kind === 'none') continue;
     const [scope, id] = key.split(':') as [HullRuleScope, string];
-    const base = { scope, id: Number(id) };
+    const ids = scope === 'hull' ? draft.doctrineIds.filter((d) => !live || live.has(d)) : [];
+    const base = {
+      scope,
+      id: Number(id),
+      ...(ids.length > 0 ? { doctrineIds: [...ids].sort() } : {}),
+    };
     if (draft.kind === 'pay-fixed') {
       out.push({ ...base, kind: 'pay-fixed', iskAmount: parseFixed(draft.isk) ?? 0 });
     } else if (draft.kind === 'pay-percent') {
@@ -145,7 +169,11 @@ function rulesOf(form: SrpSettingsForm): HullRule[] {
 const sameRules = (a: HullRule[], b: HullRule[]) => JSON.stringify(a) === JSON.stringify(b);
 
 /** Only what changed; the rules go as the whole list. Enabled is a separate callable, not here. */
-export function formToPatch(form: SrpSettingsForm, saved: SrpSettings): SrpSettingsPatch {
+export function formToPatch(
+  form: SrpSettingsForm,
+  saved: SrpSettings,
+  liveDoctrineIds?: ReadonlySet<string>
+): SrpSettingsPatch {
   const patch: SrpSettingsPatch = {};
   const km = parsePct(form.killmailPct);
   const ap = parsePct(form.appraisalPct);
@@ -157,11 +185,18 @@ export function formToPatch(form: SrpSettingsForm, saved: SrpSettings): SrpSetti
     patch.requireFleetOrFc = form.requireFleetOrFc;
   // Compared as the saved form would send them, so stale legacy pcts and list order never read
   // as edits.
-  const rules = rulesOf(form);
-  if (!sameRules(rules, rulesOf(formFromSettings(saved)))) patch.hullRules = rules;
+  const rules = rulesOf(form, liveDoctrineIds);
+  if (!sameRules(rules, rulesOf(formFromSettings(saved), liveDoctrineIds))) patch.hullRules = rules;
   return patch;
 }
 
-export function formIsDirty(form: SrpSettingsForm, saved: SrpSettings): boolean {
-  return form.enabled !== saved.enabled || Object.keys(formToPatch(form, saved)).length > 0;
+export function formIsDirty(
+  form: SrpSettingsForm,
+  saved: SrpSettings,
+  liveDoctrineIds?: ReadonlySet<string>
+): boolean {
+  return (
+    form.enabled !== saved.enabled ||
+    Object.keys(formToPatch(form, saved, liveDoctrineIds)).length > 0
+  );
 }

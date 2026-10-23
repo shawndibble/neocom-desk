@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Checkbox,
   DataTable,
   FieldError,
   IskInput,
@@ -19,7 +20,7 @@ import { focusRingClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { HULL_RULE_KINDS } from '../srpTypes';
+import { HULL_RULE_KINDS, type DoctrineFit } from '../srpTypes';
 import { HullSearchResults } from './HullSearchResults';
 import { searchClasses, searchHulls } from './hullCatalog';
 import {
@@ -33,6 +34,7 @@ import {
   formProblems,
   ruleKey,
   ruleOf,
+  setDoctrineIds,
   setRule,
   type RuleChoice,
   type SrpSettingsForm,
@@ -53,6 +55,8 @@ interface Props {
   onKeepClass: (classId: number) => void;
   expanded: ReadonlySet<number>;
   onToggle: (classId: number) => void;
+  /** The corp's Doctrine Fits: a hull row offers the ones built on its hull. */
+  doctrines: readonly DoctrineFit[];
 }
 
 export function HullRulesEditor({
@@ -65,6 +69,7 @@ export function HullRulesEditor({
   onKeepClass,
   expanded,
   onToggle,
+  doctrines,
 }: Props) {
   const { t } = useTranslation();
   const phone = useIsPhone();
@@ -213,6 +218,34 @@ export function HullRulesEditor({
     );
   };
 
+  /** A hull row's Doctrine Fits: tick the ones a claim must match; none ticked, not checked. */
+  const attach = (row: HullRuleRow) => {
+    if (row.scope !== 'hull') return null;
+    const fits = doctrines.filter((d) => d.snapshot.hullTypeId === row.id);
+    if (fits.length === 0) return null;
+    const ticked = ruleOf(form, 'hull', row.id).doctrineIds;
+    const toggle = (id: string, on: boolean) =>
+      onChange(setDoctrineIds(form, row.id, on ? [...ticked, id] : ticked.filter((x) => x !== id)));
+    return (
+      <div
+        role="group"
+        aria-label={t('srp.settings.doctrines.attach.legend', { name: row.name })}
+        className="grid gap-0.5"
+      >
+        {fits.map((d) => (
+          <label key={d.id} className="flex min-h-9 items-center gap-2 text-sm">
+            <Checkbox
+              checked={ticked.includes(d.id)}
+              onChange={(e) => toggle(d.id, e.target.checked)}
+            />
+            <span className="min-w-0 break-words">{d.name}</span>
+          </label>
+        ))}
+        <p className="text-xs text-text-dim">{t('srp.settings.doctrines.attach.hint')}</p>
+      </div>
+    );
+  };
+
   const toggleButton = (row: HullRuleRow, tall: boolean) => {
     const open = shown.has(row.id);
     const Caret = open ? Icon.Expanded : Icon.Descend;
@@ -266,6 +299,11 @@ export function HullRulesEditor({
           <span className="text-text-dim">{helper(row)}</span>
         ),
     },
+    {
+      id: 'doctrine',
+      header: t('srp.settings.doctrines.title'),
+      render: (row) => attach(row) ?? <span className="text-text-faint">-</span>,
+    },
   ];
 
   const phoneLine = (row: HullRuleRow) => {
@@ -302,6 +340,7 @@ export function HullRulesEditor({
             {countText ? `${countText} · ${helper(row)}` : helper(row)}
           </p>
         )}
+        {attach(row)}
       </li>
     );
   };

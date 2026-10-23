@@ -1,5 +1,6 @@
 import type { SrpBackendOverride } from '@/features/corp/srpBackendOverride';
-import type { SrpOfficerVerdict, SrpSettings } from '@/features/corp/srpTypes';
+import type { SrpDoctrineBackendOverride } from '@/features/corp/srpDoctrineBackendOverride';
+import type { DoctrineFit, SrpOfficerVerdict, SrpSettings } from '@/features/corp/srpTypes';
 import { SAMPLE_ACTIVE_CHARACTER } from './sampleData';
 
 export type SrpFixtureRole = 'director' | 'accountant' | 'ceo-not-owner';
@@ -22,6 +23,7 @@ export function sampleSrpSettings(owner = SAMPLE_ACTIVE_CHARACTER.characterId): 
       { scope: 'hull', id: 627, kind: 'officer-decides' },
       { scope: 'hull', id: 17715, kind: 'not-covered' },
       { scope: 'hull', id: 641, kind: 'pay-fixed', iskAmount: 220_000_000 },
+      { scope: 'hull', id: 24702, kind: 'pay-percent', doctrineIds: ['d-hurricane'] },
     ],
     windowDays: 30,
     requireFleetOrFc: true,
@@ -30,6 +32,72 @@ export function sampleSrpSettings(owner = SAMPLE_ACTIVE_CHARACTER.characterId): 
     ownerCharacterId: owner,
     updatedAt: NOW,
     updatedBy: owner,
+  };
+}
+
+/** Real SDE type ids: a Hurricane armour brawl and a second Hurricane fit, and a Cerberus. */
+export function sampleDoctrineFits(): DoctrineFit[] {
+  const by = SAMPLE_ACTIVE_CHARACTER.characterId;
+  return [
+    {
+      id: 'd-hurricane',
+      name: 'Hurricane - artillery',
+      snapshot: {
+        hullTypeId: 24702,
+        name: 'Hurricane - artillery',
+        modules: [2048, 2969, 2969, 2969, 2969, 3530, 12058],
+        rigs: [31055, 31059],
+      },
+      createdBy: by,
+      createdAt: NOW - 3 * 86_400_000,
+    },
+    {
+      id: 'd-hurricane-armour',
+      name: 'Hurricane - armour',
+      snapshot: {
+        hullTypeId: 24702,
+        name: 'Hurricane - armour',
+        modules: [2048, 3530, 20351, 12058, 2969, 2969],
+        rigs: [31055, 31055],
+      },
+      createdBy: by,
+      createdAt: NOW - 2 * 86_400_000,
+    },
+    {
+      id: 'd-cerberus',
+      name: 'Cerberus - shield',
+      snapshot: {
+        hullTypeId: 11993,
+        name: 'Cerberus - shield',
+        modules: [2024, 527, 448, 1999],
+        rigs: [31796],
+      },
+      createdBy: by,
+      createdAt: NOW - 86_400_000,
+    },
+  ];
+}
+
+/** An in-memory Doctrine Fit store for page stories; `start: 'empty'` has none. */
+export function createDoctrineFixture(start: 'sample' | 'empty'): SrpDoctrineBackendOverride {
+  let fits = start === 'sample' ? sampleDoctrineFits() : [];
+  return {
+    list: () => [...fits].sort((a, b) => b.createdAt - a.createdAt),
+    save: (input) => {
+      const id = input.id ?? `d-new-${fits.length + 1}`;
+      const fit: DoctrineFit = {
+        id,
+        name: input.name,
+        snapshot: { ...input.snapshot, name: input.name },
+        createdBy: SAMPLE_ACTIVE_CHARACTER.characterId,
+        createdAt: Date.now(),
+      };
+      fits = [...fits.filter((f) => f.id !== id), fit];
+      return { id };
+    },
+    remove: (id) => {
+      fits = fits.filter((f) => f.id !== id);
+    },
   };
 }
 
