@@ -12385,7 +12385,7 @@
         "shipLost": "Ship lost"
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. Planetary Industry always shows the real expiry.",
-      "mercenaryDenReinforcedHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. A den that leaves reinforcement early can still send it.",
+      "mercenaryDenReinforcedHint": "Scheduled up to 72 hours ahead, even with the app closed, once installed and enabled. Open the app at least that often to keep it current. A den that leaves reinforcement early can still send it.",
       "mercenaryDenAnarchyForegroundOnlyHint": "Fires only while the app is open: ESI offers no way to be told when anarchy rises.",
       "mercenaryDenReinforcedLeadTimeLabel": "Warn this far before a den leaves reinforcement:",
       "mercenaryDenReinforcedLeadTimeOption_one": "{{count}} hour",
