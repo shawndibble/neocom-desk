@@ -999,16 +999,27 @@ describe('Wallet', () => {
 
     it('spins in the picker while the page loads, as Mail and Contracts do', async () => {
       await seedSecondCharacter();
+      // Released at the end: a request that never settles stays in the ESI
+      // cache's module-level `inFlightLoads`, and every later test's wallet
+      // read joins it and hangs.
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => (release = resolve));
       server.use(
-        http.get(
-          `https://esi.evetech.net/characters/${CHAR_ID}/wallet`,
-          () => new Promise(() => {})
-        )
+        http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet`, async () => {
+          await gate;
+          return HttpResponse.json(1000);
+        })
       );
       render(<App />);
 
       const picker = await screen.findByRole('button', { name: 'This character' });
       expect(picker).toHaveAttribute('aria-busy', 'true');
+      release();
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'This character' })).not.toHaveAttribute(
+          'aria-busy'
+        )
+      );
     });
 
     it('only shows a "hasn\'t granted access" notice for a skipped character actually in the selected filter', async () => {
