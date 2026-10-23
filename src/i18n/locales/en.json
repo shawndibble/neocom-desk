@@ -10113,7 +10113,8 @@
         "contractsTo": "Contracts to {{name}}",
         "termsLabel": "Buyback terms",
         "noExpiry": "Open until closed",
-        "buysLabel": "Buys"
+        "buysLabel": "Buys",
+        "buyerUnknown": "Character {{id}}"
       },
       "sellTo": {
         "label": "Sell to this buyback",
@@ -10132,8 +10133,9 @@
         "unmatched": "Not recognised, left out: {{names}}",
         "dropped_one": "{{count}} more item was left out: a quote holds at most 50 lines.",
         "dropped_other": "{{count}} more items were left out: a quote holds at most 50 lines.",
-        "failed": "Couldn’t get a quote. Try again.",
-        "clearFailed": "Couldn’t clear the quote. Try again."
+        "failed": "Couldn't get a quote. Try again.",
+        "clearFailed": "Couldn't clear the quote. Try again.",
+        "stale": "The buyback changed since you quoted, so this price may be out of date. Paste again for a current quote."
       }
     }
   },

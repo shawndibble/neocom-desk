@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, NeedsConnection, TextArea } from '@/components/ui';
-import { quoteIsHeld } from '@/engine/communities/buyback';
+import { quoteIsCurrent, quoteIsHeld } from '@/engine/communities/buyback';
 import type { CommunityRequest, RequestPledge } from '@/engine/communities/requests';
 import { CopyablePrice } from '@/features/market/CopyablePrice';
 import { formatIsk } from '@/lib/isk';
@@ -43,6 +43,8 @@ export function SellToSection({
 
   const held = myPledge?.quote;
   const stillHeld = held !== undefined && quoteIsHeld(held, now);
+  const current = held === undefined || quoteIsCurrent(held, standing);
+  const heldDate = held ? formatDateOnly(new Date(held.expiresAt)) : '';
 
   const getQuote = async () => {
     setBusy('quote');
@@ -53,8 +55,11 @@ export function SellToSection({
       // Nothing priced is no quote: say why, keep what is held.
       if (result.quote.lines.length === 0) return;
       await saveMyQuote(characterId, communityId, request.id, result.quote);
-      await refreshPledges(request.id);
       setText('');
+      // The quote is saved: a failed re-read must not read as a failed quote.
+      await refreshPledges(request.id).catch((err: unknown) =>
+        console.warn('Pledges could not be re-read after a quote', err)
+      );
     } catch (err) {
       console.warn('Quote could not be made', err);
       setError(t('communities.board.sellTo.failed'));
@@ -68,8 +73,10 @@ export function SellToSection({
     setError(null);
     try {
       await saveMyQuote(characterId, communityId, request.id, null);
-      await refreshPledges(request.id);
       setNotes(null);
+      await refreshPledges(request.id).catch((err: unknown) =>
+        console.warn('Pledges could not be re-read after clearing a quote', err)
+      );
     } catch (err) {
       console.warn('Quote could not be cleared', err);
       setError(t('communities.board.sellTo.clearFailed'));
@@ -94,15 +101,16 @@ export function SellToSection({
             <CopyablePrice price={held.total}>{formatIsk(held.total)} ISK</CopyablePrice>
             <span className={stillHeld ? 'text-xs text-text-dim' : 'text-xs text-warning'}>
               {stillHeld
-                ? t('communities.board.sellTo.heldUntil', {
-                    date: formatDateOnly(new Date(held.expiresAt)),
-                  })
-                : t('communities.board.sellTo.expired', {
-                    date: formatDateOnly(new Date(held.expiresAt)),
-                  })}
+                ? t('communities.board.sellTo.heldUntil', { date: heldDate })
+                : t('communities.board.sellTo.expired', { date: heldDate })}
             </span>
           </p>
-          {stillHeld && (
+          {stillHeld && !current && (
+            <p role="status" className="text-xs text-warning">
+              {t('communities.board.sellTo.stale')}
+            </p>
+          )}
+          {stillHeld && current && (
             <p className="text-xs text-text-dim">
               {t('communities.board.sellTo.nextStep', {
                 name: buyerName,
@@ -113,8 +121,8 @@ export function SellToSection({
           <table className="w-full text-xs">
             <caption className="sr-only">{t('communities.board.sellTo.linesLabel')}</caption>
             <tbody className="divide-y divide-line">
-              {held.lines.map((line) => (
-                <tr key={line.typeId}>
+              {held.lines.map((line, index) => (
+                <tr key={`${line.typeId}-${index}`}>
                   <td className="py-1 pr-2">{line.name}</td>
                   <td className="py-1 pr-2 text-right tabular-nums text-text-dim">
                     {formatNumber(line.quantity)}
@@ -130,7 +138,15 @@ export function SellToSection({
         <span className="block text-xs text-text-dim">
           {held ? t('communities.board.sellTo.pasteAgain') : t('communities.board.sellTo.paste')}
         </span>
-        <TextArea rows={4} value={text} onChange={(e) => setText(e.target.value)} />
+        <TextArea
+          rows={4}
+          spellCheck={false}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onSubmitChord={() => {
+            if (busy === null && text.trim() !== '') void getQuote();
+          }}
+        />
       </label>
       <div className="flex flex-wrap items-center gap-2">
         <NeedsConnection>
@@ -138,7 +154,7 @@ export function SellToSection({
             size="sm"
             variant="primary"
             loading={busy === 'quote'}
-            disabled={text.trim() === ''}
+            disabled={text.trim() === '' || busy !== null}
             onClick={() => void getQuote()}
           >
             {t('communities.board.sellTo.getQuote')}
@@ -150,6 +166,7 @@ export function SellToSection({
               size="sm"
               variant="ghost"
               loading={busy === 'clear'}
+              disabled={busy !== null}
               onClick={() => void clear()}
             >
               {t('communities.board.sellTo.clear')}

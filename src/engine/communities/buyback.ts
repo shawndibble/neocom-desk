@@ -189,6 +189,22 @@ export interface HeldQuote {
   total: number;
   quotedAt: number;
   expiresAt: number;
+  /** What the Request paid when this was priced, so a later edit to it marks the quote stale. */
+  rate?: number;
+  rateBasis?: RateBasis;
+  hubId?: BuybackHubId;
+}
+
+/** Whether a quote still matches what the Request pays now. One from before the terms were recorded is trusted. */
+export function quoteIsCurrent(
+  quote: Pick<HeldQuote, 'rate' | 'rateBasis' | 'hubId'>,
+  standing: Pick<StandingRequest, 'rate' | 'rateBasis' | 'hubId'>
+): boolean {
+  return (
+    (quote.rate === undefined || quote.rate === standing.rate) &&
+    (quote.rateBasis === undefined || quote.rateBasis === standing.rateBasis) &&
+    (quote.hubId === undefined || quote.hubId === standing.hubId)
+  );
 }
 
 export interface QuoteResult {
@@ -208,7 +224,7 @@ export interface QuoteResult {
  */
 export function buildQuote(
   pasted: readonly PastedItem[],
-  standing: Pick<StandingRequest, 'buyLines' | 'rate' | 'rateBasis'>,
+  standing: Pick<StandingRequest, 'buyLines' | 'rate' | 'rateBasis' | 'hubId'>,
   prices: ReadonlyMap<number, { sellMin: number | null; buyMax: number | null }>,
   now: number
 ): QuoteResult {
@@ -238,6 +254,9 @@ export function buildQuote(
       total: lines.reduce((sum, line) => sum + line.total, 0),
       quotedAt: now,
       expiresAt: quoteExpiry(now),
+      rate: standing.rate,
+      rateBasis: standing.rateBasis,
+      hubId: standing.hubId,
     },
     notBought,
     unpriced,
@@ -252,7 +271,10 @@ const isNum = (value: unknown): value is number =>
 export function readQuote(raw: unknown): HeldQuote | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined;
   const d = raw as Record<string, unknown>;
-  if (!isNum(d.total) || !isNum(d.quotedAt) || !isNum(d.expiresAt)) return undefined;
+  if (!isNum(d.total) || d.total < 0 || !isNum(d.quotedAt) || !isNum(d.expiresAt)) return undefined;
+  // A date past what `Date` can hold would throw when shown.
+  if (!Number.isFinite(new Date(d.quotedAt).getTime())) return undefined;
+  if (!Number.isFinite(new Date(d.expiresAt).getTime())) return undefined;
   if (!Array.isArray(d.lines) || d.lines.length === 0) return undefined;
   const lines: QuoteLine[] = [];
   for (const entry of d.lines) {
@@ -262,8 +284,11 @@ export function readQuote(raw: unknown): HeldQuote | undefined {
       l === null ||
       !isNum(l.typeId) ||
       !isNum(l.quantity) ||
+      l.quantity <= 0 ||
       !isNum(l.unitPrice) ||
-      !isNum(l.total)
+      l.unitPrice < 0 ||
+      !isNum(l.total) ||
+      l.total < 0
     ) {
       return undefined;
     }
@@ -275,5 +300,15 @@ export function readQuote(raw: unknown): HeldQuote | undefined {
       total: l.total,
     });
   }
-  return { lines, total: d.total, quotedAt: d.quotedAt, expiresAt: d.expiresAt };
+  const rateBasis = RATE_BASES.find((b) => b === d.rateBasis);
+  const hubId = BUYBACK_HUB_IDS.find((h) => h === d.hubId);
+  return {
+    lines,
+    total: d.total,
+    quotedAt: d.quotedAt,
+    expiresAt: d.expiresAt,
+    ...(isValidRate(d.rate) ? { rate: d.rate } : {}),
+    ...(rateBasis ? { rateBasis } : {}),
+    ...(hubId ? { hubId } : {}),
+  };
 }

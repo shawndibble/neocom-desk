@@ -15,6 +15,7 @@ import {
   priceQuote,
   quoteExpiry,
   quoteIsHeld,
+  quoteIsCurrent,
 } from './buyback';
 
 describe('isValidRate', () => {
@@ -174,6 +175,11 @@ describe('buildQuote', () => {
   ]);
   const now = 1_000_000;
 
+  it('records the rate, basis and hub the quote was priced at', () => {
+    const { quote } = buildQuote([veldspar], standing, prices, now);
+    expect([quote.rate, quote.rateBasis, quote.hubId]).toEqual([90, 'buy', 'jita']);
+  });
+
   it('prices what the Request buys at the rate and holds it 14 days', () => {
     const { quote } = buildQuote([veldspar, trit], standing, prices, now);
     expect(quote.total).toBe(9000 + 1800);
@@ -231,10 +237,40 @@ describe('readQuote', () => {
   it('reads a stored quote', () => {
     expect(readQuote(stored)).toEqual(stored);
   });
+  it('keeps the rate, basis and hub it was priced at', () => {
+    const priced = { ...stored, rate: 90, rateBasis: 'buy', hubId: 'jita' };
+    expect(readQuote(priced)).toEqual(priced);
+  });
+  it('drops a rate, basis or hub that does not read, and keeps the quote', () => {
+    expect(readQuote({ ...stored, rate: 'x', rateBasis: 'mid', hubId: 'nowhere' })).toEqual(stored);
+  });
+  it('refuses negative figures and a date that is not a date', () => {
+    expect(readQuote({ ...stored, total: -1 })).toBeUndefined();
+    expect(readQuote({ ...stored, lines: [{ ...stored.lines[0], quantity: 0 }] })).toBeUndefined();
+    expect(
+      readQuote({ ...stored, lines: [{ ...stored.lines[0], unitPrice: -2 }] })
+    ).toBeUndefined();
+    expect(readQuote({ ...stored, expiresAt: 1e20 })).toBeUndefined();
+  });
   it('is undefined for anything that does not read as one', () => {
     expect(readQuote(undefined)).toBeUndefined();
     expect(readQuote({ ...stored, total: 'x' })).toBeUndefined();
     expect(readQuote({ ...stored, lines: [] })).toBeUndefined();
     expect(readQuote({ ...stored, lines: [{ typeId: 1 }] })).toBeUndefined();
+  });
+});
+
+describe('quoteIsCurrent', () => {
+  const standing = { rate: 90, rateBasis: 'buy' as const, hubId: 'jita' as const };
+  it('is current while the Request still pays what the quote was priced at', () => {
+    expect(quoteIsCurrent({ rate: 90, rateBasis: 'buy', hubId: 'jita' }, standing)).toBe(true);
+  });
+  it('is stale once the rate, basis or hub changed', () => {
+    expect(quoteIsCurrent({ rate: 85, rateBasis: 'buy', hubId: 'jita' }, standing)).toBe(false);
+    expect(quoteIsCurrent({ rate: 90, rateBasis: 'sell', hubId: 'jita' }, standing)).toBe(false);
+    expect(quoteIsCurrent({ rate: 90, rateBasis: 'buy', hubId: 'amarr' }, standing)).toBe(false);
+  });
+  it('trusts a quote from before the terms were recorded', () => {
+    expect(quoteIsCurrent({}, standing)).toBe(true);
   });
 });

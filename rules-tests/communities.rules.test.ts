@@ -679,6 +679,12 @@ describe('Requests', () => {
         const db = characterAuth(env, 2, 'hash-2').firestore();
         await assertSucceeds(setDoc(doc(db, QUOTE), quoteDoc()));
         await assertSucceeds(setDoc(doc(db, QUOTE), quoteDoc({}, quote({ total: 100 }))));
+        await assertSucceeds(
+          setDoc(
+            doc(db, QUOTE),
+            quoteDoc({}, quote({ rate: 92.5, rateBasis: 'sell', hubId: 'amarr' }))
+          )
+        );
         await assertSucceeds(deleteDoc(doc(db, QUOTE)));
       });
 
@@ -713,6 +719,10 @@ describe('Requests', () => {
           quote({ lines: [] }),
           quote({ lines: Array.from({ length: 51 }, () => ({ typeId: 1 })) }),
           quote({ extra: 1 }),
+          quote({ rate: 0 }),
+          quote({ rate: 201 }),
+          quote({ rateBasis: 'mid' }),
+          quote({ hubId: 'nowhere' }),
         ]) {
           await assertFails(setDoc(doc(db, QUOTE), quoteDoc({}, bad)));
         }

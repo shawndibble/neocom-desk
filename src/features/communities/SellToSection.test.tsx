@@ -129,12 +129,37 @@ describe('SellToSection', () => {
     await waitFor(() => expect(mocks.saveMyQuote).toHaveBeenCalledWith(1, 'c1', 'r1', null));
   });
 
+  it('says a held quote may be out of date once the Request changed its rate', () => {
+    setup(pledge(heldQuote({ rate: 85, rateBasis: 'buy', hubId: 'jita' })));
+    expect(screen.getByText(/The buyback changed since you quoted/)).toBeInTheDocument();
+    expect(screen.queryByText(/item exchange contract/)).not.toBeInTheDocument();
+  });
+
+  it('does not call a saved quote failed because the re-read failed', async () => {
+    mocks.quotePile.mockResolvedValue({
+      quote: heldQuote(),
+      notBought: [],
+      unpriced: [],
+      unmatched: [],
+      dropped: 0,
+    });
+    mocks.saveMyQuote.mockResolvedValue(null);
+    refreshPledges.mockRejectedValue(new Error('offline'));
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    setup();
+    await userEvent.type(screen.getByRole('textbox'), 'Veldspar 1000');
+    await userEvent.click(screen.getByRole('button', { name: 'Get quote' }));
+    await waitFor(() => expect(mocks.saveMyQuote).toHaveBeenCalled());
+    await waitFor(() => expect(refreshPledges).toHaveBeenCalled());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('says so when the quote could not be made', async () => {
     mocks.quotePile.mockRejectedValue(new Error('offline'));
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     setup();
     await userEvent.type(screen.getByRole('textbox'), 'Veldspar 1');
     await userEvent.click(screen.getByRole('button', { name: 'Get quote' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t get a quote');
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't get a quote");
   });
 });

@@ -43,7 +43,9 @@ export async function quotePile(
       categoryId: groupId === null ? null : (groupCategories[String(groupId)] ?? null),
     };
   });
-  const hub = TRADE_HUBS.find((h) => h.id === standing.hubId) ?? TRADE_HUBS[0];
+  const hub = TRADE_HUBS.find((h) => h.id === standing.hubId);
+  // The callable only stores a known hub: a missing one must not quietly price at Jita.
+  if (!hub) throw new Error(`Unknown Trade Hub ${standing.hubId}`);
   const prices =
     items.length === 0
       ? new Map()

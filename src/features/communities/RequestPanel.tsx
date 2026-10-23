@@ -227,9 +227,13 @@ export function RequestPanel({
         request.lines.map((line) => line.name),
         (count) => t('communities.board.more', { count })
       );
-  const buyerName = request.standing?.buyerCharacterId
-    ? (memberNames.get(`char:${request.standing.buyerCharacterId}`) ?? request.ownerName)
-    : request.ownerName;
+  const buyerId = request.standing?.buyerCharacterId ?? null;
+  // A buyer is a Member, so the roster names them; never fall back to the requester, who is not who the contract goes to.
+  const buyerName =
+    buyerId === null
+      ? request.ownerName
+      : (memberNames.get(`char:${buyerId}`) ??
+        t('communities.board.buyback.buyerUnknown', { id: buyerId }));
 
   const place = request.location;
   const posted = t('communities.board.posted', { age: formatAge(now - request.createdAt, t) });

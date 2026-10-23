@@ -769,7 +769,10 @@ service cloud.firestore {
             let q = request.resource.data.quote;
             let now = request.time.toMillis();
             return q is map
-              && q.keys().hasOnly(['lines', 'total', 'quotedAt', 'expiresAt'])
+              && q.keys().hasOnly(['lines', 'total', 'quotedAt', 'expiresAt', 'rate', 'rateBasis', 'hubId'])
+              && (!('rate' in q) || (q.rate is number && q.rate >= 1 && q.rate <= 200))
+              && (!('rateBasis' in q) || q.rateBasis in ['buy', 'sell'])
+              && (!('hubId' in q) || q.hubId in ['jita', 'amarr', 'dodixie', 'rens', 'hek'])
               && q.lines is list && q.lines.size() >= 1 && q.lines.size() <= 50
               && q.total is int && q.total >= 0 && q.total <= 1000000000000000
               && q.quotedAt is int && q.expiresAt is int
