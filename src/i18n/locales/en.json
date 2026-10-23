@@ -10077,6 +10077,43 @@
         "dailyCap": "Not mailed: you have used today's {{max}} Request mails.",
         "failed": "Not mailed: couldn't reach the server.",
         "needsPermission": "{{name}} asked for a mail when you Pledge. Sending it needs the Send mail Permission."
+      },
+      "buyback": {
+        "new": "New buyback…",
+        "title": "New buyback",
+        "editTitle": "Edit buyback",
+        "toggle": "Standing buyback",
+        "toggleHint": "Buy items at a fixed rate. It stays open until you close it.",
+        "rate": "Rate (%)",
+        "rateInvalid": "Rate must be from 1 to 200 percent, in tenths.",
+        "basis": "Percent of the hub",
+        "basisBuy": "Buy price",
+        "basisSell": "Sell price",
+        "hub": "Trade Hub",
+        "buyer": "Contracts go to",
+        "buyerHint": "Members make the item exchange contract to this Character.",
+        "buys": "Buys",
+        "group": {
+          "ore": "All ore",
+          "ice": "All ice",
+          "minerals": "All minerals",
+          "gas": "All gas",
+          "pi": "All planetary",
+          "salvage": "All salvage"
+        },
+        "addLabel": "Add an item",
+        "addPlaceholder": "Or add a single item…",
+        "typesLabel": "Items bought",
+        "needBuy": "Pick at least one group or item.",
+        "post": "Post buyback",
+        "standing": "Standing",
+        "rateLine": "{{rate}}% of {{hub}} {{basis}}",
+        "basisWordBuy": "buy",
+        "basisWordSell": "sell",
+        "contractsTo": "Contracts to {{name}}",
+        "termsLabel": "Buyback terms",
+        "noExpiry": "Open until closed",
+        "buysLabel": "Buys"
       }
     }
   },

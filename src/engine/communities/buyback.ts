@@ -16,6 +16,9 @@ export const MAX_QUOTE_LINES = 50;
 
 export type RateBasis = 'buy' | 'sell';
 
+/** The Trade Hubs a buyback may name: the ids of `src/market/hubs.ts`, which a parity test pins. */
+export type BuybackHubId = 'jita' | 'amarr' | 'dodixie' | 'rens' | 'hek';
+
 /** A Rate is a percent in tenths, so 92.5 is allowed and 92.55 is not. */
 export function isValidRate(value: unknown): value is number {
   return (
@@ -68,6 +71,16 @@ export const isBuybackGroup = (value: unknown): value is BuybackGroup =>
 /** What a standing Request buys: one item type, or every item of a group. */
 export type BuybackLine =
   { kind: 'type'; typeId: number; name: string } | { kind: 'group'; group: BuybackGroup };
+
+/** What makes a Request standing: the rate it pays, where, to whom, and what it buys. */
+export interface StandingRequest {
+  rate: number;
+  rateBasis: RateBasis;
+  hubId: BuybackHubId;
+  /** The Character contracts go to; null means the requester's own. */
+  buyerCharacterId: number | null;
+  buyLines: BuybackLine[];
+}
 
 /** A line's identity, for duplicate checks. */
 export const buybackLineKey = (line: BuybackLine) =>

@@ -36,7 +36,7 @@ import { MAX_REQUEST_MAILS_PER_DAY } from '@/engine/communities/requests';
 import { notePledgeEdit } from './pledgeWrites';
 import { DELIVERY_ENDPOINTS, slotKey } from './requestDelivery';
 import { useDeliverySync } from './useDeliverySync';
-import { describeExpiry } from './requestFormat';
+import { describeExpiry, requestHeadline, standingRateLine } from './requestFormat';
 import {
   extendRequest,
   removePledge,
@@ -134,7 +134,8 @@ export function RequestPanel({
   }, [request.id, refreshPledges, t]);
 
   const myPledge = pledges.find((p) => p.uid === myUid);
-  const mayPledge = canPledge(request, myUid, now);
+  // A buyback is sold to, not pledged on: Sell to arrives with the quote.
+  const mayPledge = !request.standing && canPledge(request, myUid, now);
   const lacksContracts = useCharacterLacksEndpoints(characterId, DELIVERY_ENDPOINTS);
   const lacksSendMail = useCharacterLacksEndpoints(characterId, SEND_MAIL);
   const wantsMail = mayPledge && request.notify.mail;
@@ -217,19 +218,26 @@ export function RequestPanel({
   };
 
   const requesterId = mine ? null : characterIdForUid(request.ownerUid);
-  const items = itemsSummary(
-    request.lines.map((line) => line.name),
-    (count) => t('communities.board.more', { count })
-  );
+  const items = request.standing
+    ? requestHeadline(request, t)
+    : itemsSummary(
+        request.lines.map((line) => line.name),
+        (count) => t('communities.board.more', { count })
+      );
+  const buyerName = request.standing?.buyerCharacterId
+    ? (memberNames.get(`char:${request.standing.buyerCharacterId}`) ?? request.ownerName)
+    : request.ownerName;
 
   const place = request.location;
   const posted = t('communities.board.posted', { age: formatAge(now - request.createdAt, t) });
   const closes = request.closed
     ? t('communities.board.closedNote')
-    : describeExpiry(request.expiresAt, now, t, {
-        underDay: 'communities.board.closesUnderDay',
-        days: 'communities.board.closesIn',
-      });
+    : request.standing
+      ? t('communities.board.buyback.noExpiry')
+      : describeExpiry(request.expiresAt, now, t, {
+          underDay: 'communities.board.closesUnderDay',
+          days: 'communities.board.closesIn',
+        });
 
   return (
     <SlideOver
@@ -248,6 +256,28 @@ export function RequestPanel({
             <span className="text-text-dim">{t('communities.board.termsLabel')} </span>
             {request.terms}
           </p>
+        )}
+        {request.standing && (
+          <section
+            aria-label={t('communities.board.buyback.termsLabel')}
+            className="space-y-2 rounded-xs border border-line bg-panel-2 px-3 py-2"
+          >
+            <p className="text-base font-medium tabular-nums">
+              {standingRateLine(request.standing, t)}
+            </p>
+            <p className="text-xs text-text-dim">
+              {t('communities.board.buyback.contractsTo', { name: buyerName })}
+            </p>
+            <ul aria-label={t('communities.board.buyback.buysLabel')} className="text-xs">
+              {request.standing.buyLines.map((line) => (
+                <li key={line.kind === 'type' ? `t${line.typeId}` : `g${line.group}`}>
+                  {line.kind === 'type'
+                    ? line.name
+                    : t(`communities.board.buyback.group.${line.group}`)}
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
         <ul className="divide-y divide-line" aria-label={t('communities.board.linesLabel')}>
           {request.lines.map((line, index) => {
@@ -405,17 +435,21 @@ export function RequestPanel({
                     {t('communities.board.edit')}
                   </Button>
                 </NeedsConnection>
-                <NeedsConnection>
-                  <Button
-                    size="sm"
-                    loading={busy === 'extend'}
-                    onClick={() =>
-                      void run('extend', () => extendRequest(characterId, communityId, request.id))
-                    }
-                  >
-                    {t('communities.board.extend')}
-                  </Button>
-                </NeedsConnection>
+                {!request.standing && (
+                  <NeedsConnection>
+                    <Button
+                      size="sm"
+                      loading={busy === 'extend'}
+                      onClick={() =>
+                        void run('extend', () =>
+                          extendRequest(characterId, communityId, request.id)
+                        )
+                      }
+                    >
+                      {t('communities.board.extend')}
+                    </Button>
+                  </NeedsConnection>
+                )}
                 <NeedsConnection>
                   <Button
                     size="sm"

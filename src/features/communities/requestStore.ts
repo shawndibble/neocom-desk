@@ -26,7 +26,8 @@ import type {
   RequestNotify,
   RequestPledge,
 } from '@/engine/communities/requests';
-import { readNotify } from '@/engine/communities/requests';
+import { readNotify, readStanding } from '@/engine/communities/requests';
+import type { StandingRequest } from '@/engine/communities/buyback';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
@@ -57,7 +58,9 @@ function readRequest(id: string, d: Record<string, unknown>): CommunityRequest |
   const lines = (Array.isArray(d.lines) ? d.lines : [])
     .map(readLine)
     .filter((line): line is RequestLine => line !== null);
-  if (lines.length === 0) return null;
+  const standing = readStanding(d);
+  // A standing Request asks through its buy lines and carries no item lines.
+  if (lines.length === 0 && !standing) return null;
   return {
     id,
     ownerUid: String(d.ownerUid ?? ''),
@@ -70,6 +73,7 @@ function readRequest(id: string, d: Record<string, unknown>): CommunityRequest |
     expiresAt: Number(d.expiresAt ?? 0),
     closed: d.closed === true,
     notify: readNotify(d.notify),
+    ...(standing ? { standing } : {}),
   };
 }
 
@@ -123,13 +127,27 @@ export interface PostRequestDraft {
   terms: string;
   lines: RequestLine[];
   notify: RequestNotify;
+  /** Present on a standing buyback Request: the rate, hub, buyer and what it buys. */
+  standing?: StandingRequest;
+}
+
+/** The callable's flat shape: a standing draft sends `standing: true` beside its terms. */
+function draftPayload({ standing, ...draft }: PostRequestDraft) {
+  if (!standing) return draft;
+  const { buyerCharacterId, ...terms } = standing;
+  return {
+    ...draft,
+    standing: true,
+    ...terms,
+    ...(buyerCharacterId !== null ? { buyerCharacterId } : {}),
+  };
 }
 
 export function postRequest(characterId: number, communityId: string, draft: PostRequestDraft) {
-  return callCommunity<PostRequestDraft & { communityId: string }, { requestId: string }>(
+  return callCommunity<Record<string, unknown>, { requestId: string }>(
     characterId,
     'postCommunityRequestCallable',
-    { communityId, ...draft }
+    { communityId, ...draftPayload(draft) }
   );
 }
 
@@ -143,7 +161,7 @@ export async function editRequest(
   await callCommunity(characterId, 'editCommunityRequestCallable', {
     communityId,
     requestId,
-    ...draft,
+    ...draftPayload(draft),
   });
 }
 
