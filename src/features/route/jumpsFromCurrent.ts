@@ -7,9 +7,11 @@ export async function jumpsFromCurrent(
   systemIds: readonly number[]
 ): Promise<Map<number, number>> {
   const jumps = new Map<number, number>();
+  // Nothing to measure: skip the location read.
+  if (systemIds.length === 0) return jumps;
   try {
     const origin = await loadCurrentSystemId(characterId);
-    if (origin === null || systemIds.length === 0) return jumps;
+    if (origin === null) return jumps;
     const basis = await loadJumpBasis();
     await Promise.all(
       systemIds.map(async (systemId) => {

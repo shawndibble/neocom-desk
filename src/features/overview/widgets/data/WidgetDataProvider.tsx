@@ -59,6 +59,7 @@ import {
   loadOmegaWidget,
   loadTradingProfitWidget,
   loadSurveyWidget,
+  loadSovRaidsWidget,
 } from './kindLoaders';
 import {
   loadCorpAssetsFeed,
@@ -366,6 +367,10 @@ function Source({ feed }: { feed: FeedId }) {
       return <SnapshotSource feed="corpKills" load={loadCorpKillsFeed} cacheKey="corp:kills" />;
     case 'incursions':
       return <IncursionsSource />;
+    case 'sovRaids':
+      return (
+        <SnapshotSource feed="sovRaids" load={loadSovRaidsWidget} cacheKey="overview:sov-raids" />
+      );
     case 'spExtras':
       return <SpExtrasSource />;
   }

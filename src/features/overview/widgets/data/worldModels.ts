@@ -401,7 +401,14 @@ export const miningYield: Builder = (feeds, { t, now, range, scopeAll, activeCha
   };
 };
 
-/** The kinds built in this file, each with the feeds it reads. */
+// --- Skyhook raids ---------------------------------------------------------------
+
+/** Stand-in until `loadSovRaidsWidget` registers `sovRaidsModel.ts`: loading even over a restored snapshot; a failed read still shows failed. */
+const sovRaidsPending: Builder = (feeds) =>
+  blank(
+    '/travel/route',
+    statusOf(feeds.sovRaids, { loading: !feeds.sovRaids?.error, hasData: false })
+  );
 
 /** The kinds built in this file and its siblings, each with the feeds it reads. */
 export const WORLD_DEFS: Readonly<Record<string, KindDef>> = {
@@ -411,6 +418,7 @@ export const WORLD_DEFS: Readonly<Record<string, KindDef>> = {
   structures: { feeds: ['structures'], build: structures },
   moonChunks: { feeds: ['moonChunks'], build: moonChunks },
   incursions: { feeds: ['incursions'], build: incursions },
+  sovRaids: { feeds: ['sovRaids'], build: sovRaidsPending },
   profit: { feeds: ['profit'], build: profit },
   miningYield: { feeds: ['miningYield'], build: miningYield },
 };

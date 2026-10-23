@@ -1,5 +1,5 @@
 /**
- * Sovereignty raid windows (issue #4775): pure maths over a skyhook's theft
+ * Sovereignty raid windows (issues #4775, #4798): pure maths over a skyhook's theft
  * window or a sov hub's vulnerability window, plus how long a hub's reagent
  * bay lasts. Epoch ms in, plain values out.
  */
@@ -40,6 +40,38 @@ export function raidHeadline(
     count: live.filter((window) => window.startMs <= nowMs + horizonMs).length,
     untilMs: Math.max(0, soonest - nowMs),
   };
+}
+
+/** The systems `allianceId` holds sov in, from the public claims list. */
+export function allianceSpace(
+  systems: readonly { systemId: number; allianceId: number | null }[],
+  allianceId: number
+): Set<number> {
+  return new Set(
+    systems.filter((system) => system.allianceId === allianceId).map((system) => system.systemId)
+  );
+}
+
+/**
+ * Skyhooks whose theft window is open or still ahead, soonest first: open
+ * windows closing soonest, then upcoming ones by when they open. A closed or
+ * unread window drops out; ties fall back to the key, so the order is stable.
+ */
+export function liveRaids<T extends { key: string; window: RaidWindow | null }>(
+  skyhooks: readonly T[],
+  nowMs: number
+): (T & { window: RaidWindow })[] {
+  const live = skyhooks.filter(
+    (s): s is T & { window: RaidWindow } =>
+      s.window !== null && raidState(s.window, nowMs) !== 'closed'
+  );
+  const rank = (window: RaidWindow) =>
+    raidState(window, nowMs) === 'open' ? [0, window.endMs] : [1, window.startMs];
+  return live.sort((a, b) => {
+    const [ra, ta] = rank(a.window);
+    const [rb, tb] = rank(b.window);
+    return ra - rb || ta - tb || a.key.localeCompare(b.key);
+  });
 }
 
 /**

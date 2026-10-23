@@ -661,6 +661,11 @@ export const ESI_REGISTRY = {
     route: '/incursions',
     scope: PUBLIC,
   },
+  // Skyhook raids (issue #4798): kept to the Character's alliance space by the caller.
+  getRaidableSkyhooks: {
+    route: '/skyhooks/raidable',
+    scope: PUBLIC,
+  },
   // Route Safety (issue #2328): one call each answers the whole universe, so a
   // route of any length costs two requests, never one per system.
   getUniverseSystemKills: {

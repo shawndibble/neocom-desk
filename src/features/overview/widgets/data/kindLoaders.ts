@@ -25,9 +25,12 @@ import { summarizeProductionRun } from '@/features/industry/productionRunSummary
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadCharacterLoyaltyPoints, splitEverMarks } from '@/features/character/loyalty';
 import { hasWalletScope, loadWalletJournalWithStatus } from '@/features/character/wallet';
+import type { SovRaidsWidgetData } from './sovRaidsLoader';
+import { registerKindDefs } from './models';
 
 export type { ClonesWidgetData } from '@/features/character/cloneVerdictLoad';
 export type { JumpTimersWidgetData } from '@/features/character/jumpTimers';
+export type { SovRaidsWidgetData };
 export type { MercenaryDensWidgetData } from '@/features/character/mercenaryDens';
 
 // --- Wallet journal ------------------------------------------------------------
@@ -825,4 +828,16 @@ export async function loadTradingProfitWidget(): Promise<TradingProfitWidgetData
     skippedCount: snapshot.skipped.length,
     fetchedAt: new Date(reads.length === 0 ? Date.now() : Math.min(...reads)),
   };
+}
+
+// --- Skyhook raids ---------------------------------------------------------------
+
+/** Reads and builder load behind `import()`; the builder replaces `worldModels.ts`'s stand-in before the first read lands. */
+export async function loadSovRaidsWidget(characterId: number): Promise<SovRaidsWidgetData> {
+  const [{ loadSovRaids }, { sovRaids }] = await Promise.all([
+    import('./sovRaidsLoader'),
+    import('./sovRaidsModel'),
+  ]);
+  registerKindDefs({ sovRaids: { feeds: ['sovRaids'], build: sovRaids } });
+  return loadSovRaids(characterId);
 }

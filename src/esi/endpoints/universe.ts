@@ -223,6 +223,22 @@ export function getIncursions(options: EndpointOptions = {}): Promise<EsiResult<
   return esiFetch<IncursionEntry[]>('/incursions', { ...options, endpointId: 'getIncursions' });
 }
 
+// --- GET /skyhooks/raidable (public) ---
+
+/** A skyhook whose theft window is open now or opens shortly; no owner, no stock. */
+export interface RaidableSkyhook {
+  solar_system_id: number;
+  planet_id: number;
+  theft_vulnerability?: { start: string; end: string };
+}
+
+/** Every skyhook raidable now or shortly, universe-wide (issue #4798). */
+export function getRaidableSkyhooks(
+  options: EndpointOptions = {}
+): Promise<EsiResult<{ skyhooks: RaidableSkyhook[] }>> {
+  return esiFetch('/skyhooks/raidable', { ...options, endpointId: 'getRaidableSkyhooks' });
+}
+
 // --- GET /universe/system_kills (public) ---
 
 /**

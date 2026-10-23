@@ -8,10 +8,9 @@
  * corp-scoped keys and the 403 handling are theirs, not a second copy.
  */
 import { diffRoster } from '@/engine/corp/members';
-import { getUniversePlanet } from '@/esi/endpoints';
-import { loadStaticEntity, type CachedResult, type StatusResult } from '@/esi/cache';
+import type { CachedResult, StatusResult } from '@/esi/cache';
 import { jumpsFromCurrent } from '@/features/route/jumpsFromCurrent';
-import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { planetInfo } from './spaceLookups';
 import { summariseBay } from '@/engine/corp/starbases';
 import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -487,24 +486,6 @@ export async function loadCorpKills(characterId: number): Promise<CorpKillsFeed>
     stats: result.kind === 'stats' ? result.stats : null,
     failed: null,
   };
-}
-
-/** Planet -> system and name for each skyhook; a planet that cannot be read is left out, not guessed. */
-async function planetInfo(
-  planetIds: readonly number[]
-): Promise<Map<number, { systemId: number; name: string | null }>> {
-  const planets = new Map<number, { systemId: number; name: string | null }>();
-  await mapWithConcurrencyLimit(planetIds, ESI_FANOUT_CONCURRENCY, async (planetId) => {
-    try {
-      const planet = (await loadStaticEntity('planet-info', planetId, getUniversePlanet))?.data;
-      if (planet !== undefined) {
-        planets.set(planetId, { systemId: planet.system_id, name: planet.name });
-      }
-    } catch {
-      // The row keeps its raid window and loses only its system.
-    }
-  });
-  return planets;
 }
 
 export async function loadCorpSovereignty(characterId: number): Promise<CorpSovereigntyFeed> {
