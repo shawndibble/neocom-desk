@@ -160,6 +160,50 @@ describe('TableBody row detail', () => {
     );
   });
 
+  it('draws the optional status line, bars and list', async () => {
+    renderTable({
+      ...model,
+      rows: [
+        {
+          ...model.rows[0],
+          detail: {
+            ...model.rows[0].detail!,
+            status: {
+              badge: 'Reinforced',
+              tone: 'danger',
+              text: 'Comes out in 14h',
+              note: 'Shields first.',
+            },
+            meters: {
+              title: 'Evolution',
+              items: [
+                { label: 'Anarchy', badge: 'Level 1', value: 62, max: 100, readout: '62 / 100' },
+              ],
+            },
+            list: {
+              title: 'Operations',
+              items: [
+                {
+                  key: 'a',
+                  badge: 'Available',
+                  tone: 'warning',
+                  text: 'Tactical operation',
+                  value: 'expires in 9h',
+                },
+              ],
+            },
+          },
+        },
+      ],
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'X-7OMU IV' }));
+    const dialog = screen.getByRole('dialog', { name: 'X-7OMU IV' });
+    expect(dialog).toHaveTextContent('Comes out in 14h');
+    expect(dialog).toHaveTextContent('Shields first.');
+    expect(screen.getByRole('progressbar', { name: 'Anarchy' })).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('expires in 9h');
+  });
+
   it('draws no navigation caret for a row that opens a modal', () => {
     const { container } = renderTable(model);
     expect(container.querySelector('thead th[aria-hidden="true"]')).toBeNull();

@@ -4807,7 +4807,8 @@
           "anarchy": "Anarchy",
           "infomorphs": "Infomorphs",
           "jumps": "Jumps",
-          "character": "Character"
+          "character": "Character",
+          "development": "Development"
         },
         "deadline": {
           "reinforced": "Den at {{planet}} leaves reinforcement",
@@ -4817,7 +4818,32 @@
         "summary_other": "{{count}} dens, {{reinforced}} reinforced.",
         "underHour": "Under 1h",
         "unread_one": "{{count}} character could not be read.",
-        "unread_other": "{{count}} characters could not be read."
+        "unread_other": "{{count}} characters could not be read.",
+        "detail": {
+          "title": "{{planet}} mercenary den",
+          "state": {
+            "reinforced": "Reinforced",
+            "paused": "Paused",
+            "disabled": "Disabled",
+            "running": "Running"
+          },
+          "stateUnknown": "Unknown",
+          "comesOut": "Comes out in {{duration}}",
+          "shieldsNote": "Keys can't be taken until the den's shields repair above 50%.",
+          "disabledNote": "The character no longer has the skill to run this den.",
+          "owner": "Skyhook owner",
+          "evolution": "Evolution",
+          "amount": "{{amount}} / 100",
+          "anarchyNote": "At level 2 the den takes workforce from the skyhook. Run an operation to lower it.",
+          "operation": {
+            "available": "Available",
+            "started": "Started",
+            "done": "Done"
+          },
+          "operationName": "Tactical operation",
+          "expiresIn": "expires in {{duration}}",
+          "ended": "Ended"
+        }
       },
       "structures": {
         "title": "Structures",

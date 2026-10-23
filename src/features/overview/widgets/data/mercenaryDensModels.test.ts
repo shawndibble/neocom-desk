@@ -29,6 +29,9 @@ const den = (over: Partial<MercenaryDenRow> = {}): MercenaryDenRow => ({
   reinforcedUntilMs: null,
   anarchyLevel: 0,
   developmentLevel: 1,
+  developmentAmount: 74,
+  anarchyAmount: 62,
+  skyhookOwnerId: 98000001,
   infomorphs: 184,
   operations: [],
   operationsRead: true,
@@ -44,6 +47,8 @@ const feeds = (over: Partial<MercenaryDensWidgetData> = {}): Feeds => ({
       granted: [1],
       failed: [],
       jumps: new Map([[30000142, 4]]),
+      systemNames: new Map([[30000142, 'Jita']]),
+      ownerNames: new Map([[98000001, 'Ashfall Holdings']]),
       fetchedAt: new Date(0),
       ...over,
     },
@@ -84,7 +89,7 @@ describe('mercenaryDens', () => {
     expect(mercenaryDens(feeds(), ctx).number.unit).toContain(`${W}.unit`);
   });
 
-  it('opts into width fit and lists dens worst first, linking each to Route Safety', () => {
+  it('opts into width fit and lists dens worst first, each opening its modal', () => {
     const view = mercenaryDens(
       feeds({
         rows: [den(), den({ key: '1:11', id: 11, planetName: 'X-7OMU IV', anarchyLevel: 2 })],
@@ -97,7 +102,8 @@ describe('mercenaryDens', () => {
       text: `${W}.level{"level":2}`,
       tone: 'bad',
     });
-    expect(view.table?.rows[0].to).toContain('/travel');
+    expect(view.table?.rows[0].to).toBeUndefined();
+    expect(view.table?.rows[0].detail?.title).toContain(`${W}.detail.title`);
     expect(text(view.table?.rows[1].cells[5])).toBe('4');
   });
 
@@ -185,5 +191,57 @@ describe('mercenaryDens', () => {
     );
     expect(view.deadlines.map((d) => d.at).sort()).toEqual([NOW + 9 * HOUR, NOW + 14 * HOUR]);
     expect(view.deadlines.find((d) => d.at === NOW + 14 * HOUR)?.severity).toBe('critical');
+  });
+
+  describe('the row modal', () => {
+    const detailOf = (over: Partial<MercenaryDenRow>) =>
+      mercenaryDens(feeds({ rows: [den(over)] }), ctx).table!.rows[0].detail!;
+
+    it('leads with reinforcement and the shields note', () => {
+      const detail = detailOf({ state: 'reinforced', reinforcedUntilMs: NOW + 14 * HOUR });
+      expect(detail.status).toMatchObject({
+        tone: 'danger',
+        badge: `${W}.detail.state.reinforced`,
+      });
+      expect(detail.status?.text).toContain(`${W}.detail.comesOut`);
+      expect(detail.status?.note).toBe(`${W}.detail.shieldsNote`);
+    });
+
+    it('names the skyhook owner and draws Development and Anarchy out of 100', () => {
+      const detail = detailOf({});
+      expect(detail.facts).toContainEqual({
+        label: `${W}.detail.owner`,
+        value: 'Ashfall Holdings',
+      });
+      expect(detail.meters?.items.map((m) => [m.value, m.max])).toEqual([
+        [74, 100],
+        [62, 100],
+      ]);
+    });
+
+    it('lists operations soonest first, and says None only when they were read', () => {
+      const listed = detailOf({
+        operations: [
+          { state: 'available', expiresMs: NOW + 9 * HOUR },
+          { state: 'started', expiresMs: NOW + 2 * HOUR },
+        ],
+      });
+      expect(listed.list?.items.map((item) => item.badge)).toEqual([
+        `${W}.detail.operation.started`,
+        `${W}.detail.operation.available`,
+      ]);
+      expect(detailOf({}).facts).toContainEqual({
+        label: `${W}.col.operations`,
+        value: `${W}.operations.none`,
+      });
+      expect(detailOf({ operationsRead: false }).facts).toContainEqual({
+        label: `${W}.col.operations`,
+        value: '—',
+      });
+    });
+
+    it('places the den by its system for Set destination and Route Safety', () => {
+      expect(detailOf({}).place).toEqual({ systemId: 30000142, name: 'Jita', jumps: 4 });
+    });
   });
 });

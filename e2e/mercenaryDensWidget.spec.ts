@@ -1,7 +1,8 @@
 /**
  * The Mercenary Dens widget (issue #4791) at every width: its table keeps the
  * columns that fit its own box, so neither the table nor the page ever
- * scrolls sideways. Four dens with long-ish cell text across two states.
+ * scrolls sideways. Four dens with long-ish cell text across two states. A
+ * row opens the den's modal.
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -101,3 +102,18 @@ for (const width of [390, 768, 1024, 1440, 1920]) {
     }
   });
 }
+
+test('a den row opens its modal with the evolution bars and Route Safety', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockDens(page);
+  await signInAndGoto(page, './overview', undefined, [
+    overviewLayoutSetting([{ kind: 'mercenaryDens', size: 'L', view: 'table' }]),
+  ]);
+  await page.getByRole('button', { name: 'Jita IV' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Jita IV mercenary den' });
+  await expect(dialog).toContainText('Reinforced');
+  await expect(dialog.getByRole('progressbar', { name: 'Anarchy' })).toBeVisible();
+  await expect(dialog.getByRole('link', { name: /route safety/i })).toBeVisible();
+  if (process.env.SHOT_DIR)
+    await page.screenshot({ path: `${process.env.SHOT_DIR}/dens-modal.png` });
+});

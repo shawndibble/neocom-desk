@@ -5,6 +5,8 @@
  */
 import {
   ANARCHY_SIPHON_LEVEL,
+  type DenOperation,
+  type DenState,
   OPERATION_SOON_MS,
   denHeadline,
   denSeverity,
@@ -14,20 +16,32 @@ import {
   sortDens,
 } from '@/engine/character/mercenaryDens';
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
-import type { MercenaryDenRow } from '@/features/character/mercenaryDens';
+import type { MercenaryDenRow, MercenaryDensWidgetData } from '@/features/character/mercenaryDens';
 import { routeToHref } from '@/features/route/routeSafetyLink';
 import { HOUR_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
 import { formatNumber } from '@/lib/numberLocale';
 import { blank, count, statusOf, UNKNOWN, type Builder } from './builderKit';
 import type { BoardDeadline } from '../nextDeadline';
-import type { NumberModel, TableCell, TableColumn, Translate } from './types';
+import type {
+  DetailTone,
+  NumberModel,
+  RowDetailModel,
+  TableCell,
+  TableColumn,
+  Translate,
+} from './types';
 
-const W = 'overview.widgets.mercenaryDens';
+/**
+ * This kind's copy key. A helper rather than `` `${W}.x` `` templates: the
+ * locale splitter reads a `${…}.x` template as naming every `x` key in every
+ * lazy section, and keeps them all in the startup shell.
+ */
+const k = (key: string) => `overview.widgets.mercenaryDens.${key}`;
 
 /** Den detail is an hour-old read, so its reinforcement clock never counts minutes inside that hour. */
 function reinforcementText(t: Translate, remainingMs: number): string {
-  return remainingMs < HOUR_MS ? t(`${W}.underHour`) : formatCountdown(remainingMs / 1000);
+  return remainingMs < HOUR_MS ? t(k(`underHour`)) : formatCountdown(remainingMs / 1000);
 }
 
 /** Operations are a five-minute read: their countdown is exact. */
@@ -36,7 +50,7 @@ function operationText(remainingMs: number): string {
 }
 
 function planetOf(t: Translate, row: MercenaryDenRow): string {
-  return row.planetName ?? t(`${W}.unnamed`, { id: row.planetId });
+  return row.planetName ?? t(k(`unnamed`), { id: row.planetId });
 }
 
 function stateCell(t: Translate, row: MercenaryDenRow, now: number): TableCell {
@@ -44,16 +58,16 @@ function stateCell(t: Translate, row: MercenaryDenRow, now: number): TableCell {
   switch (state) {
     case 'reinforced':
       return {
-        text: t(`${W}.state.reinforced`, {
+        text: t(k(`state.reinforced`), {
           duration: reinforcementText(t, row.reinforcedUntilMs! - now),
         }),
         tone: 'bad',
       };
     case 'paused':
     case 'disabled':
-      return { text: t(`${W}.state.${state}`), tone: 'caution' };
+      return { text: t(k(`state.${state}`)), tone: 'caution' };
     case 'running':
-      return t(`${W}.state.running`);
+      return t(k(`state.running`));
     case 'unknown':
       return UNKNOWN;
   }
@@ -63,18 +77,18 @@ function operationsCell(t: Translate, row: MercenaryDenRow, now: number): TableC
   if (!row.operationsRead) return UNKNOWN;
   const ready = readyOperations(row, now);
   const next = (ready[0] ?? openOperations(row.operations, now)[0])?.expiresMs;
-  if (next === undefined) return t(`${W}.operations.none`);
+  if (next === undefined) return t(k(`operations.none`));
   const duration = operationText(next - now);
   const text =
     ready.length > 0
-      ? t(`${W}.operations.ready`, { count: ready.length, duration })
-      : t(`${W}.operations.started`, { duration });
+      ? t(k(`operations.ready`), { count: ready.length, duration })
+      : t(k(`operations.started`), { duration });
   return next - now < OPERATION_SOON_MS ? { text, tone: 'caution' } : text;
 }
 
 function anarchyCell(t: Translate, row: MercenaryDenRow): TableCell {
   if (row.anarchyLevel === null) return UNKNOWN;
-  const text = t(`${W}.level`, { level: row.anarchyLevel });
+  const text = t(k(`level`), { level: row.anarchyLevel });
   return row.anarchyLevel >= ANARCHY_SIPHON_LEVEL ? { text, tone: 'bad' } : text;
 }
 
@@ -91,7 +105,7 @@ function deadlinesOf(
   if (denStateAt(row, now) === 'reinforced') {
     clocks.push({
       at: row.reinforcedUntilMs!,
-      note: t(`${W}.deadline.reinforced`, { planet }),
+      note: t(k(`deadline.reinforced`), { planet }),
       severity,
       to,
     });
@@ -100,12 +114,116 @@ function deadlinesOf(
   if (ready) {
     clocks.push({
       at: ready.expiresMs,
-      note: t(`${W}.deadline.operation`, { planet }),
+      note: t(k(`deadline.operation`), { planet }),
       severity: ready.expiresMs - now < OPERATION_SOON_MS ? 'warning' : 'watch',
       to,
     });
   }
   return clocks;
+}
+
+const STATE_TONE: Record<DenState, DetailTone> = {
+  reinforced: 'danger',
+  paused: 'warning',
+  disabled: 'warning',
+  running: 'success',
+  unknown: 'neutral',
+};
+
+const OPERATION_TONE: Record<DenOperation['state'], DetailTone> = {
+  available: 'warning',
+  started: 'neutral',
+  done: 'neutral',
+};
+
+function detailOf(
+  t: Translate,
+  data: MercenaryDensWidgetData,
+  row: MercenaryDenRow,
+  now: number
+): RowDetailModel {
+  const state = denStateAt(row, now);
+  const systemName = row.systemId === null ? undefined : data.systemNames.get(row.systemId);
+  const owner =
+    row.skyhookOwnerId === null
+      ? UNKNOWN
+      : (data.ownerNames.get(row.skyhookOwnerId) ?? `#${row.skyhookOwnerId}`);
+  const meter = (key: 'development' | 'anarchy', level: number | null, amount: number | null) => ({
+    label: t(k(`col.${key}`)),
+    badge: level === null ? UNKNOWN : t(k(`level`), { level }),
+    value: amount ?? 0,
+    max: 100,
+    readout: amount === null ? UNKNOWN : t(k(`detail.amount`), { amount }),
+    note: key === 'anarchy' ? t(k(`detail.anarchyNote`)) : undefined,
+  });
+  return {
+    title: t(k(`detail.title`), { planet: planetOf(t, row) }),
+    status: {
+      badge: state === 'unknown' ? t(k(`detail.stateUnknown`)) : t(k(`detail.state.${state}`)),
+      tone: STATE_TONE[state],
+      text:
+        state === 'reinforced'
+          ? t(k(`detail.comesOut`), {
+              duration: reinforcementText(t, row.reinforcedUntilMs! - now),
+            })
+          : undefined,
+      note:
+        state === 'reinforced'
+          ? t(k(`detail.shieldsNote`))
+          : state === 'disabled'
+            ? t(k(`detail.disabledNote`))
+            : undefined,
+    },
+    facts: [
+      {
+        label: t(k(`col.infomorphs`)),
+        value: row.infomorphs === null ? UNKNOWN : formatNumber(row.infomorphs),
+      },
+      { label: t(k(`col.character`)), value: row.characterName },
+      { label: t(k(`detail.owner`)), value: owner },
+      // No list to show: say so, unknown when the read had a gap, never an empty heading.
+      ...(row.operationsRead && row.operations.length > 0
+        ? []
+        : [
+            {
+              label: t(k(`col.operations`)),
+              value: row.operationsRead ? t(k(`operations.none`)) : UNKNOWN,
+            },
+          ]),
+    ],
+    meters: {
+      title: t(k(`detail.evolution`)),
+      items: [
+        meter('development', row.developmentLevel, row.developmentAmount),
+        meter('anarchy', row.anarchyLevel, row.anarchyAmount),
+      ],
+    },
+    list:
+      row.operationsRead && row.operations.length > 0
+        ? {
+            title: t(k(`col.operations`)),
+            items: row.operations
+              .map((op, index) => ({ op, index }))
+              .sort((a, b) => (a.op.expiresMs ?? 0) - (b.op.expiresMs ?? 0))
+              .map(({ op, index }) => ({
+                key: `${index}`,
+                badge: t(k(`detail.operation.${op.state}`)),
+                tone: OPERATION_TONE[op.state],
+                text: t(k(`detail.operationName`)),
+                value:
+                  op.expiresMs === null
+                    ? UNKNOWN
+                    : op.state !== 'done' && op.expiresMs > now
+                      ? t(k(`detail.expiresIn`), { duration: operationText(op.expiresMs - now) })
+                      : t(k(`detail.ended`)),
+              })),
+          }
+        : undefined,
+    place:
+      row.systemId === null || systemName === undefined
+        ? undefined
+        : { systemId: row.systemId, name: systemName, jumps: data.jumps.get(row.systemId) },
+  };
 }
 
 export const mercenaryDens: Builder = (feeds, { t, now, activeCharacterId, scopeAll }) => {
@@ -142,7 +260,7 @@ export const mercenaryDens: Builder = (feeds, { t, now, activeCharacterId, scope
   if (headline.kind === 'dens') {
     number = {
       value: count(headline.count),
-      unit: t(`${W}.unit`, { count: headline.count }),
+      unit: t(k(`unit`), { count: headline.count }),
       tone,
     };
   } else {
@@ -153,17 +271,17 @@ export const mercenaryDens: Builder = (feeds, { t, now, activeCharacterId, scope
         : operationText(headline.remainingMs);
     number = {
       value: count(headline.count),
-      unit: t(`${W}.${headline.kind}Unit`, { count: headline.count }),
+      unit: t(k(`${headline.kind}Unit`), { count: headline.count }),
       tone,
       secondary: next
         ? {
-            text: t(`${W}.${headline.kind}Next`, { planet: planetOf(t, next), duration }),
+            text: t(k(`${headline.kind}Next`), { planet: planetOf(t, next), duration }),
             tone: 'caution',
           }
         : undefined,
       notes:
         headline.kind === 'reinforced' && readyCount > 0
-          ? [t(`${W}.readyNote`, { count: readyCount })]
+          ? [t(k(`readyNote`), { count: readyCount })]
           : undefined,
     };
   }
@@ -171,27 +289,27 @@ export const mercenaryDens: Builder = (feeds, { t, now, activeCharacterId, scope
   // Only All characters names whose den it is, and only when there is more than one Character.
   const showCharacter = everyone && data.granted.length > 1;
   const columns: TableColumn[] = [
-    { key: 'planet', label: t(`${W}.col.planet`), priority: 0, minWidth: 96 },
-    { key: 'state', label: t(`${W}.col.state`), priority: 1, minWidth: 124 },
+    { key: 'planet', label: t(k(`col.planet`)), priority: 0, minWidth: 96 },
+    { key: 'state', label: t(k(`col.state`)), priority: 1, minWidth: 124 },
     {
       key: 'operations',
-      label: t(`${W}.col.operations`),
+      label: t(k(`col.operations`)),
       align: 'end',
       priority: 2,
       minWidth: 112,
     },
-    { key: 'anarchy', label: t(`${W}.col.anarchy`), align: 'end', priority: 3, minWidth: 80 },
+    { key: 'anarchy', label: t(k(`col.anarchy`)), align: 'end', priority: 3, minWidth: 80 },
     {
       key: 'infomorphs',
-      label: t(`${W}.col.infomorphs`),
+      label: t(k(`col.infomorphs`)),
       align: 'end',
       priority: 4,
       minWidth: 96,
     },
-    { key: 'jumps', label: t(`${W}.col.jumps`), align: 'end', priority: 5, minWidth: 64 },
+    { key: 'jumps', label: t(k(`col.jumps`)), align: 'end', priority: 5, minWidth: 64 },
   ];
   if (showCharacter) {
-    columns.push({ key: 'character', label: t(`${W}.col.character`), priority: 6, minWidth: 116 });
+    columns.push({ key: 'character', label: t(k(`col.character`)), priority: 6, minWidth: 116 });
   }
 
   const jumpsText = (row: MercenaryDenRow): string => {
@@ -229,13 +347,12 @@ export const mercenaryDens: Builder = (feeds, { t, now, activeCharacterId, scope
           key: row.key,
           cells,
           tone: severity,
-          // TODO(#4774): open the den's modal once a row can; until then, Route Safety to its system.
-          to: row.systemId === null ? undefined : routeToHref(row.systemId),
+          detail: detailOf(t, data, row, now),
         };
       }),
-      footer: unread > 0 ? t(`${W}.unread`, { count: unread }) : undefined,
+      footer: unread > 0 ? t(k(`unread`), { count: unread }) : undefined,
     },
     deadlines: views.flatMap(({ row, severity }) => deadlinesOf(t, row, severity, now)),
-    summary: t(`${W}.summary`, { count: rows.length, reinforced }),
+    summary: t(k(`summary`), { count: rows.length, reinforced }),
   };
 };
