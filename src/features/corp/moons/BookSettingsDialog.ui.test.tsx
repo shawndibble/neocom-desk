@@ -100,4 +100,20 @@ describe('BookSettingsDialog tabs', () => {
     await user.click(screen.getByRole('tab', { name: 'Pricing & billing' }));
     expect(screen.getByRole('textbox', { name: 'Grace after day end (hours)' })).toHaveValue('12');
   });
+
+  it('opens on Access and sync when it reopens after the EVE opt-in', () => {
+    render(
+      <MemoryRouter
+        initialEntries={[{ pathname: '/', state: { corpSyncGrant: { status: 'on' } } }]}
+      >
+        <BookProvider value={bookSettingsValue()}>
+          <BookSettingsDialog open onClose={() => {}} />
+        </BookProvider>
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('tab', { name: 'Access & sync' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+  });
 });

@@ -15665,7 +15665,8 @@
         "scheduled": "Scheduled",
         "addRateTitle": "Add a rate",
         "ratesLive": "A rate saves as soon as you add it. The other tabs save with Save.",
-        "statements": "Statements"
+        "statements": "Statements",
+        "sections": "Settings sections"
       },
       "grouping": {
         "title": "Characters",

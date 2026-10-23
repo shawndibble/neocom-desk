@@ -1,6 +1,7 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import { chunkRateFor } from '@/engine/corpTaxBook/extraction';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -28,6 +29,7 @@ import { cx } from '@/lib/cx';
 import { TRADE_HUBS } from '@/market/hubs';
 import { callableErrorText } from './feederErrorText';
 import { useBook } from './useBook';
+import { Label } from './BookDialogs';
 import { isk } from './moonsFormat';
 import { AutomaticSyncSection } from './AutomaticSyncSection';
 import { DeleteBookSection } from './DeleteBookSection';
@@ -42,15 +44,6 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <h3 className={eyebrowClassName}>{title}</h3>
       {children}
     </section>
-  );
-}
-
-function Label({ text, children }: { text: string; children: ReactNode }) {
-  return (
-    <label className="block space-y-1">
-      <span className="block text-xs text-text-dim">{text}</span>
-      {children}
-    </label>
   );
 }
 
@@ -226,7 +219,14 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
     );
 
   const tabsId = useTabsId();
-  const [tab, setTab] = useState<'rates' | 'billing' | 'extractions' | 'access'>('rates');
+  const fieldId = useId();
+  // Back from EVE's page after the Automatic sync opt-in: open where its notice is shown.
+  const { state: routerState } = useLocation();
+  const [tab, setTab] = useState<'rates' | 'billing' | 'extractions' | 'access'>(() =>
+    (routerState as { corpSyncGrant?: unknown } | null)?.corpSyncGrant !== undefined
+      ? 'access'
+      : 'rates'
+  );
   const tabs: TabItem[] = [
     { id: 'rates', label: t('corpTaxBook.moons.settings.tabs.rates'), count: rates.length },
     { id: 'billing', label: t('corpTaxBook.moons.settings.tabs.billing') },
@@ -266,7 +266,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
           tabs={tabs}
           value={tab}
           onChange={(id) => setTab(id as typeof tab)}
-          label={t('corpTaxBook.moons.settings.title')}
+          label={t('corpTaxBook.moons.settings.sections')}
         />
         <TabPanel tabsId={tabsId} tabId={tab} className="space-y-5">
           {tab === 'rates' && (
@@ -512,20 +512,23 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
                       aria-label={t('corpTaxBook.moons.settings.minimum')}
                     />
                   </Field>
-                  <Field label={t('corpTaxBook.moons.settings.grace')}>
+                  <Field label={t('corpTaxBook.moons.settings.grace')} htmlFor={`${fieldId}-grace`}>
                     <TextInput
                       className="w-20"
                       inputMode="numeric"
-                      aria-label={t('corpTaxBook.moons.settings.grace')}
+                      id={`${fieldId}-grace`}
                       value={grace}
                       onChange={(e) => setGrace(e.target.value)}
                     />
                   </Field>
-                  <Field label={t('corpTaxBook.moons.settings.overdue')}>
+                  <Field
+                    label={t('corpTaxBook.moons.settings.overdue')}
+                    htmlFor={`${fieldId}-overdue`}
+                  >
                     <TextInput
                       className="w-20"
                       inputMode="numeric"
-                      aria-label={t('corpTaxBook.moons.settings.overdue')}
+                      id={`${fieldId}-overdue`}
                       value={overdue}
                       onChange={(e) => setOverdue(e.target.value)}
                     />
@@ -558,12 +561,13 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
               <Fields variant="form">
                 <Field
                   label={t('corpTaxBook.moons.settings.chunk')}
+                  htmlFor={`${fieldId}-chunk`}
                   note={t('corpTaxBook.moons.settings.chunkHint')}
                 >
                   <TextInput
                     className="w-28"
                     inputMode="numeric"
-                    aria-label={t('corpTaxBook.moons.settings.chunk')}
+                    id={`${fieldId}-chunk`}
                     value={chunk}
                     onChange={(e) => setChunk(e.target.value)}
                     placeholder="30000"
@@ -575,6 +579,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
                     <Field
                       key={id}
                       label={t('corpTaxBook.moons.settings.expiry', { name: names.refinery(id) })}
+                      htmlFor={`${fieldId}-expiry-${id}`}
                       note={
                         learned
                           ? t('corpTaxBook.moons.settings.measured', {
@@ -594,9 +599,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
                       <TextInput
                         className="w-20"
                         inputMode="numeric"
-                        aria-label={t('corpTaxBook.moons.settings.expiry', {
-                          name: names.refinery(id),
-                        })}
+                        id={`${fieldId}-expiry-${id}`}
                         value={expiry[String(id)] ?? ''}
                         placeholder="48"
                         onChange={(e) =>
