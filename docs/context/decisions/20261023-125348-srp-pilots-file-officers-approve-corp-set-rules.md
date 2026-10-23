@@ -15,3 +15,4 @@ _Recorded 2026-10-23 · issue #4608._
 - **Result mail is best effort.** The approving officer's client sends it. The in-app status is the record.
 - **Names.** **SRP Claim** and **Reimbursement**; "Payout" stays with mining tax.
 - **Data lives under a `corps/{id}` umbrella** (`corps/{id}/srp`), written only through callables. The Corp Tax Book moves under it in a separate ticket; it stays put until then.
+- **A hull with no Hull Rule runs the percent chain if the corp set one up.** If no percent is set, the claim has no computed amount and the officer types it. **Officer decides** always means the officer types the amount.

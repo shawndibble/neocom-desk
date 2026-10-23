@@ -313,8 +313,9 @@ here — they go one per file in `docs/context/decisions/`.
   from a **Payout**, which is mining-tax ISK a **Collector** sent a **Feeder**.
 - **Hull Rule**: A corporation's setting for one hull or hull class under SRP:
   **Pay** (a fixed ISK amount, or the corp's percent of value), **Not covered**
-  (a pilot cannot file it), or **Officer decides**. A hull with no Hull Rule is
-  Officer decides.
+  (a pilot cannot file it), or **Officer decides**. A hull with no Hull Rule
+  follows the corp's percent chain when one is set up; with none set up it has
+  no computed amount and the officer types it.
 - **Corp Board**: `/corp`, a **Widget board** of corp **Widgets** the pilot
   chooses, sizes, orders, renames and removes, on the same engine as the
   Overview. Replaces the fixed Corp Ops Board (Standing, Deadline Strip, Kind
