@@ -16,7 +16,7 @@ import {
   SearchInput,
   type DataTableColumn,
 } from '@/components/ui';
-import { focusRingClassName } from '@/components/ui/controlStyles';
+import { focusRingClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -223,7 +223,8 @@ export function HullRulesEditor({
     if (row.scope !== 'hull') return null;
     const fits = doctrines.filter((d) => d.snapshot.hullTypeId === row.id);
     if (fits.length === 0) return null;
-    const ticked = ruleOf(form, 'hull', row.id).doctrineIds;
+    const { kind, doctrineIds: ticked } = ruleOf(form, 'hull', row.id);
+    const needsRule = kind === 'none';
     const toggle = (id: string, on: boolean) =>
       onChange(setDoctrineIds(form, row.id, on ? [...ticked, id] : ticked.filter((x) => x !== id)));
     return (
@@ -233,15 +234,22 @@ export function HullRulesEditor({
         className="grid gap-0.5"
       >
         {fits.map((d) => (
-          <label key={d.id} className="flex min-h-9 items-center gap-2 text-sm">
+          <label key={d.id} className={cx(tappableRowClassName, 'flex items-center gap-2 text-sm')}>
             <Checkbox
               checked={ticked.includes(d.id)}
+              disabled={needsRule}
               onChange={(e) => toggle(d.id, e.target.checked)}
             />
             <span className="min-w-0 break-words">{d.name}</span>
           </label>
         ))}
-        <p className="text-xs text-text-dim">{t('srp.settings.doctrines.attach.hint')}</p>
+        <p className="text-xs text-text-dim">
+          {t(
+            needsRule
+              ? 'srp.settings.doctrines.attach.needsRule'
+              : 'srp.settings.doctrines.attach.hint'
+          )}
+        </p>
       </div>
     );
   };

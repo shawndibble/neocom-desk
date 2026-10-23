@@ -51,12 +51,15 @@ export function setRule(
   id: number,
   rule: RuleDraft
 ): SrpSettingsForm {
-  return { ...form, rules: { ...form.rules, [ruleKey(scope, id)]: rule } };
+  // No rule holds no Doctrine Fits: they would not be saved, so they are not kept in the form.
+  const next = rule.kind === 'none' ? { ...rule, doctrineIds: [] } : rule;
+  return { ...form, rules: { ...form.rules, [ruleKey(scope, id)]: next } };
 }
 
 /**
- * Attaches the Doctrine Fits a hull's claims are checked against. A hull with no rule yet takes
- * Pay: corp percent (the class-add default), since a rule needs a kind to hold the ids.
+ * Attaches the Doctrine Fits a hull's claims are checked against. A hull with no rule of its own
+ * cannot hold them (a rule needs a kind, and picking one for the Director could change what the
+ * hull pays), so this is inert there until the Director picks a rule.
  */
 export function setDoctrineIds(
   form: SrpSettingsForm,
@@ -64,9 +67,7 @@ export function setDoctrineIds(
   doctrineIds: string[]
 ): SrpSettingsForm {
   const rule = ruleOf(form, 'hull', hullId);
-  if (rule.kind === 'none' && doctrineIds.length === 0) return form;
-  const kind = rule.kind === 'none' ? 'pay-percent' : rule.kind;
-  return setRule(form, 'hull', hullId, { ...rule, kind, doctrineIds });
+  return rule.kind === 'none' ? form : setRule(form, 'hull', hullId, { ...rule, doctrineIds });
 }
 
 export function formFromSettings(s: SrpSettings): SrpSettingsForm {

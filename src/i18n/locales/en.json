@@ -16047,8 +16047,7 @@
       "hint": "Hull, system, time and amount are filled in from the killmail.",
       "filed": "Claim filed.",
       "filedFor": "Claim filed for {{hull}}.",
-      "doctrineChecking": "Checking your fit against the corp's Doctrine Fits…",
-      "checkedFirst": "This hull is checked against a Doctrine Fit. Check the result, then file."
+      "doctrineChecking": "Checking your fit against the corp's Doctrine Fits…"
     },
     "lost": {
       "title": "Or pick a lost ship",
@@ -16611,7 +16610,7 @@
         "attach": {
           "legend": "Doctrine Fits for {{name}}",
           "hint": "Claims must match one. None ticked: not checked.",
-          "none": "No Doctrine Fit for this hull yet"
+          "needsRule": "Pick this hull's own rule first."
         }
       }
     },
@@ -16632,7 +16631,6 @@
         "line": "{{count}}× {{name}}"
       },
       "pilotNote": "You can still file. An officer decides, and a note under Fleet or FC helps.",
-      "checking": "Checking your fit…",
       "queueFlag": "Off doctrine",
       "detailLabel": "Doctrine"
     }

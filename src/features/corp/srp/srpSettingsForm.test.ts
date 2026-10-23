@@ -150,18 +150,21 @@ describe('srpSettingsForm', () => {
       expect(sent).toEqual({ scope: 'hull', id: 17715, kind: 'officer-decides' });
     });
 
-    it('attaching to a hull with no rule gives it Pay: corp percent', () => {
-      const form = setDoctrineIds(formFromSettings(saved), 999, ['a']);
-      expect(ruleOf(form, 'hull', 999)).toEqual({
-        kind: 'pay-percent',
-        isk: '',
-        doctrineIds: ['a'],
-      });
+    it('a hull with no rule cannot take a Doctrine Fit, so ticking never changes its pay', () => {
+      const form = formFromSettings(saved);
+      expect(setDoctrineIds(form, 999, ['a'])).toBe(form);
+      expect(ruleOf(form, 'hull', 999).kind).toBe('none');
     });
 
-    it('detaching the last doctrine from a no-rule hull leaves no rule behind', () => {
-      const form = setDoctrineIds(formFromSettings(saved), 999, []);
-      expect(ruleOf(form, 'hull', 999).kind).toBe('none');
+    it('setting a hull back to No rule drops its Doctrine Fits', () => {
+      const form = formFromSettings(withDoctrines);
+      const cleared = setRule(form, 'hull', 17715, {
+        ...ruleOf(form, 'hull', 17715),
+        kind: 'none',
+      });
+      expect(ruleOf(cleared, 'hull', 17715).doctrineIds).toEqual([]);
+      const patch = formToPatch(cleared, withDoctrines);
+      expect(patch.hullRules?.some((r) => r.id === 17715)).toBe(false);
     });
 
     it('a deleted doctrine never reads as an edit, nor goes out with the next save', () => {
