@@ -51,7 +51,7 @@ export const tabChevronClassName = [
   'absolute top-1/2 z-10 grid size-6 -translate-y-[calc(50%+0.5px)] place-items-center rounded-xs',
   'border border-line-bright bg-panel-2 text-text-dim shadow-sm',
   'touch:hidden hover:text-text active:text-accent',
-  'transition-colors duration-120 ease-out motion-reduce:transition-none',
+  interactiveClassName,
 ].join(' ');
 
 /**
