@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { JournalDescriptionCell } from './JournalDescriptionCell';
 import type { WalletJournalEntry } from '@/esi/endpoints';
+import { useInsuranceLossModalStore } from '@/stores/insuranceLossModal';
 
 vi.mock('./npcFactions', () => ({
   loadNpcFactions: vi.fn(
@@ -199,5 +200,43 @@ describe('JournalDescriptionCell', () => {
       </MemoryRouter>
     );
     expect(screen.queryByRole('link', { name: /mining tax/i })).toBeNull();
+  });
+
+  describe('insurance payout lines', () => {
+    const payout = entry({
+      ref_type: 'insurance',
+      description: 'Insurance paid',
+      amount: 5_000_000,
+    });
+    const renderCell = (e: WalletJournalEntry, lossCharacterId?: number) =>
+      render(
+        <MemoryRouter>
+          <JournalDescriptionCell
+            entry={e}
+            transaction={undefined}
+            itemName=""
+            lossCharacterId={lossCharacterId}
+          />
+        </MemoryRouter>
+      );
+
+    it('opens the loss for a positive payout', async () => {
+      renderCell(payout, 42);
+      await userEvent.click(screen.getByRole('button', { name: 'View loss' }));
+      expect(useInsuranceLossModalStore.getState().request).toEqual({
+        payoutDate: '2026-08-02T12:00:00Z',
+        characterId: 42,
+      });
+    });
+
+    it('offers nothing without a Character to match against', () => {
+      renderCell(payout);
+      expect(screen.queryByRole('button', { name: 'View loss' })).toBeNull();
+    });
+
+    it('offers nothing on a premium (negative) line', () => {
+      renderCell({ ...payout, amount: -100_000 }, 42);
+      expect(screen.queryByRole('button', { name: 'View loss' })).toBeNull();
+    });
   });
 });

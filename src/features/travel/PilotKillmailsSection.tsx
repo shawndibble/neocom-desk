@@ -6,15 +6,9 @@
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
-import { Button, Caret, Spinner, TypeIcon } from '@/components/ui';
+import { Button, Caret, TypeIcon } from '@/components/ui';
 import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
-import { encodeFittingShare } from '@/engine/fittings/fittingShare';
-import { fittingToShareInput } from '@/engine/fittings/shareMapper';
-import type { Fitting } from '@/engine/fittings/types';
 import { resolveNames } from '@/features/character/names';
-import { FittingModuleList } from '@/features/fittings/FittingModuleList';
-import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { cx } from '@/lib/cx';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { formatIskCompact } from '@/lib/isk';
@@ -30,12 +24,9 @@ import {
   type PilotKillmail,
   type PilotKillmailsResult,
 } from '@/lib/zkillboard';
-import { loadTypes } from '@/sde/loadSde';
-import { LossSummary } from './LossSummary';
-import { loadKillmailFit, type KillmailFitResult } from './pilotKillmailFit';
-
-type TypeLabel = (typeId: number) => string;
-type Expanded = 'loading' | KillmailFitResult;
+import { KillmailBody, type Expanded, type TypeLabel } from './KillmailBody';
+import { loadKillmailFit } from './pilotKillmailFit';
+import { useTypeLabel } from './useTypeLabel';
 
 /** Every id a row's names come from: pilots, corporations and the system. */
 function nameIds(detail: KillmailDetail | null): number[] {
@@ -56,7 +47,7 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
   const [expanded, setExpanded] = useState<ReadonlyMap<number, Expanded>>(new Map());
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set());
   const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
-  const [typeLabel, setTypeLabel] = useState<TypeLabel | null>(null);
+  const typeLabel = useTypeLabel();
   /** Killmails read or being read; a ref, so a quick double-click can't start a second read. */
   const reading = useRef(new Set<number>());
   const headingId = useId();
@@ -70,21 +61,6 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
       cancelled = true;
     };
   }, [characterId, attempt]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadTypes()
-      .then((types) => {
-        if (!cancelled) setTypeLabel(() => (id: number) => types[String(id)]?.name ?? `#${id}`);
-      })
-      .catch(() => {
-        // No type catalog: ids stand in for names rather than a spinner that never ends.
-        if (!cancelled) setTypeLabel(() => (id: number) => `#${id}`);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const entries = result?.ok ? result.entries : [];
   const detailOf = (entry: PilotKillmail): KillmailDetail | null => {
@@ -235,7 +211,6 @@ function KillmailRow({
   const other =
     detail === null ? null : entry.side === 'kill' ? detail.victimParty : detail.finalBlow;
   const time = detail?.time ? new Date(detail.time) : null;
-  const showLossSummary = entry.side === 'loss' && detail !== null;
 
   return (
     <li>
@@ -286,86 +261,15 @@ function KillmailRow({
         </span>
       </button>
       {isOpen && (
-        <div
+        <KillmailBody
           id={panelId}
-          className={cx(
-            'border-t border-line bg-panel-2 px-3 py-2',
-            showLossSummary && 'grid gap-x-4 gap-y-2 md:grid-cols-2'
-          )}
-        >
-          <KillmailFit read={read} typeLabel={typeLabel} />
-          {showLossSummary && (
-            <div className="min-w-0 border-t border-line pt-2 md:border-t-0 md:pt-0">
-              <LossSummary detail={detail} zkbValue={entry.value} />
-            </div>
-          )}
-        </div>
+          className="border-t border-line bg-panel-2 px-3 py-2"
+          entry={entry}
+          detail={detail}
+          read={read}
+          typeLabel={typeLabel}
+        />
       )}
     </li>
-  );
-}
-
-function KillmailFit({
-  read,
-  typeLabel,
-}: {
-  read: Expanded | undefined;
-  typeLabel: TypeLabel | null;
-}) {
-  const { t } = useTranslation();
-  if (read === undefined || read === 'loading' || typeLabel === null) {
-    return <Spinner size="sm" delayMs={200} label={t('travel.pilot.recent.fitLoading')} />;
-  }
-  if (!read.ok) {
-    return (
-      <p role="status" className="text-xs text-warning">
-        {t('travel.pilot.recent.fitFailed')}
-      </p>
-    );
-  }
-  if (read.fitting === null) {
-    return <p className="text-xs text-text-dim">{t('travel.pilot.recent.noFit')}</p>;
-  }
-  return <FitView fitting={read.fitting} typeLabel={typeLabel} />;
-}
-
-function FitView({ fitting, typeLabel }: { fitting: Fitting; typeLabel: TypeLabel }) {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  async function openInFittings() {
-    setBusy(true);
-    setFailed(false);
-    try {
-      const encoded = await encodeFittingShare(fittingToShareInput(fitting));
-      if (encoded.ok) navigate(fittingEditLocation(encoded.payload));
-      else setFailed(true);
-    } catch {
-      setFailed(true);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const isEmpty =
-    fitting.modules.length === 0 && fitting.drones.length === 0 && fitting.cargo.length === 0;
-  return (
-    <div className="space-y-2">
-      {isEmpty ? (
-        <p className="text-xs text-text-dim">{t('travel.pilot.recent.emptyFit')}</p>
-      ) : (
-        <FittingModuleList fitting={fitting} typeName={typeLabel} linkNames />
-      )}
-      <Button size="sm" disabled={busy} onClick={() => void openInFittings()}>
-        {t('travel.pilot.recent.openInFittings')}
-      </Button>
-      {failed && (
-        <p role="alert" className="text-xs text-danger">
-          {t('travel.pilot.recent.openFailed')}
-        </p>
-      )}
-    </div>
   );
 }

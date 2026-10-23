@@ -6059,6 +6059,14 @@
     "journalItemSold": "Sold {{quantity}} × {{unitPrice}} = {{total}}",
     "journalContractLink": "Contract",
     "journalMiningTaxLink": "Mining tax",
+    "journalInsuranceLossLink": "View loss",
+    "insuranceLoss": {
+      "title": "Insured loss",
+      "loading": "Finding the loss…",
+      "failed": "Couldn't read your losses from zKillboard. Try again later.",
+      "none": "No matching loss found on zKillboard.",
+      "noneOlder": "This payout is older than the losses zKillboard lists here."
+    },
     "journalMiningTaxReasonLink": "{{reason}} — open Mining tax row",
     "dailyGoal": "Daily goal",
     "dailyGoalIdTitle": "Goal id {{id}}",

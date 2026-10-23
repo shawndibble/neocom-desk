@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import type { JournalRow } from '@/engine/journalNetting';
 import { NO_NAMES } from '@/lib/emptyCollections';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
@@ -165,6 +166,10 @@ export function useWalletJournalView({
     },
     [taxLinks]
   );
+  const lossCharacterFor = useCallback(
+    (entry: JournalRow) => entry.characterId ?? activeCharacterId ?? undefined,
+    [activeCharacterId]
+  );
   const buildJournalColumns = useJournalColumnsBuilder();
   const journalColumns = useMemo(
     () =>
@@ -172,10 +177,13 @@ export function useWalletJournalView({
         personalLinkFor,
         personalNameFor,
         miningTaxHrefFor,
-        showingBeyondActive ? characterNameFor : undefined
+        showingBeyondActive ? characterNameFor : undefined,
+        undefined,
+        lossCharacterFor
       ),
     [
       buildJournalColumns,
+      lossCharacterFor,
       personalLinkFor,
       personalNameFor,
       miningTaxHrefFor,

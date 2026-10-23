@@ -126,3 +126,25 @@ export function matchInsurance(
   if (candidates.length === 0) return null;
   return { amount: candidates[0].amount, estimate: candidates.length > 1 };
 }
+
+/**
+ * The loss an insurance payout belongs to: the one whose kill time is closest
+ * to the payout, from a few minutes after it to an hour before. The mirror of
+ * `matchInsurance`. Null when none is in the window.
+ */
+export function matchLossToPayout<T extends { timeMs: number }>(
+  losses: readonly T[],
+  payoutMs: number
+): T | null {
+  let best: T | null = null;
+  let bestGap = Infinity;
+  for (const loss of losses) {
+    const gap = payoutMs - loss.timeMs;
+    if (gap < -INSURANCE_SKEW_MS || gap > INSURANCE_WINDOW_MS) continue;
+    if (Math.abs(gap) < bestGap) {
+      best = loss;
+      bestGap = Math.abs(gap);
+    }
+  }
+  return best;
+}

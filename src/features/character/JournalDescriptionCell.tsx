@@ -17,12 +17,13 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HintText } from '@/components/ui/HintText';
-import { Tooltip, TypeIcon } from '@/components/ui';
+import { Button, Tooltip, TypeIcon } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { WalletJournalEntry, WalletTransactionCommon } from '@/esi/endpoints';
 import { ItemInfoLink } from '@/features/entities';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { formatIsk } from '@/lib/isk';
+import { useInsuranceLossModalStore } from '@/stores/insuranceLossModal';
 import { BountyFactionSummary } from './BountyFactionSummary';
 import { bountyKillsOf } from './bountyKills';
 import { dailyGoalMessageIdOf, dailyGoalName } from './dailyGoal';
@@ -34,6 +35,8 @@ interface JournalDescriptionCellProps {
   itemName: string;
   /** Where the Moon Mining Tax row this line paid is, when a pilot linked it there. Built by the route, so this feature never imports `miningTax`. */
   miningTaxHref?: string;
+  /** The Character whose losses an insurance payout line can be matched against; absent where the line can't be (the corp journal). Opens the loss in a modal. */
+  lossCharacterId?: number;
 }
 
 export function JournalDescriptionCell({
@@ -41,8 +44,12 @@ export function JournalDescriptionCell({
   transaction,
   itemName,
   miningTaxHref,
+  lossCharacterId,
 }: JournalDescriptionCellProps) {
   const { t } = useTranslation();
+  const openLoss = useInsuranceLossModalStore((state) => state.open);
+  const canViewLoss =
+    lossCharacterId !== undefined && entry.ref_type === 'insurance' && (entry.amount ?? 0) > 0;
   const contractId = entry.context_id_type === 'contract_id' ? entry.context_id : undefined;
   // A bounty line's reason is its kill list as raw `typeID: count` pairs.
   const kills = useMemo(() => bountyKillsOf(entry), [entry]);
@@ -57,7 +64,7 @@ export function JournalDescriptionCell({
       </HintText>
     );
   }
-  if (!transaction && !entry.reason && contractId === undefined && !miningTaxHref) {
+  if (!transaction && !entry.reason && contractId === undefined && !miningTaxHref && !canViewLoss) {
     return <>{entry.description}</>;
   }
   // The memo ("Moon tax 10-05 Ainsan") is the link when there is one; a line with no memo gets a labelled link instead.
@@ -100,6 +107,15 @@ export function JournalDescriptionCell({
         <Link to={miningTaxHref} className={inlineLinkClassName}>
           {t('wallet.journalMiningTaxLink')}
         </Link>
+      )}
+      {canViewLoss && (
+        <Button
+          size="sm"
+          className="w-fit"
+          onClick={() => openLoss({ payoutDate: entry.date, characterId: lossCharacterId })}
+        >
+          {t('wallet.journalInsuranceLossLink')}
+        </Button>
       )}
       {transaction && fill && (
         <Tooltip content={fill}>
