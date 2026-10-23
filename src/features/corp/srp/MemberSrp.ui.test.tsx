@@ -195,4 +195,65 @@ describe('MemberSrp', () => {
         .some((l) => l.getAttribute('href')?.includes('stops='))
     ).toBe(true);
   });
+
+  describe('doctrine check', () => {
+    const paste = async (link: string) =>
+      userEvent.type(await screen.findByLabelText('Killmail link'), link);
+
+    it('shows Off doctrine with the diff for a checked hull, and the pilot can still file', async () => {
+      setup({ doctrine: true });
+      await paste('https://zkillboard.com/kill/123/hurricane');
+      expect(await screen.findByText('Off doctrine', undefined, { timeout: 3000 })).toBeTruthy();
+      expect(screen.getByText(/Hurricane - artillery/)).toBeTruthy();
+      expect(screen.getByText('Missing modules')).toBeTruthy();
+      expect(await screen.findByText('2× Hull 519')).toBeTruthy();
+      await userEvent.click(screen.getByRole('button', { name: 'File claim' }));
+      await waitFor(() => expect(file).toHaveBeenCalledTimes(1));
+    });
+
+    it('shows Matches <fit> when the fit is on doctrine', async () => {
+      setup({ doctrine: true });
+      await paste('https://zkillboard.com/kill/123/ondoctrine');
+      expect(
+        await screen.findByText('Matches Hurricane - artillery', undefined, { timeout: 3000 })
+      ).toBeTruthy();
+      expect(screen.queryByText('Off doctrine')).toBeNull();
+    });
+
+    it('shows nothing for a hull the corp does not check, and never asks when no hull is checked', async () => {
+      setup({ doctrine: true });
+      await paste('https://zkillboard.com/kill/8003/unchecked');
+      await waitFor(
+        () =>
+          expect(
+            screen.queryByText('Checking your fit against the corp’s Doctrine Fits…')
+          ).toBeNull(),
+        { timeout: 3000 }
+      );
+      expect(screen.queryByText('Off doctrine')).toBeNull();
+      expect(screen.queryByText(/Matches/)).toBeNull();
+      cleanup();
+      setup();
+      const preview = vi.spyOn(backend, 'previewDoctrine');
+      await paste('https://zkillboard.com/kill/123/hurricane');
+      await new Promise((r) => setTimeout(r, 600));
+      expect(preview).not.toHaveBeenCalled();
+    });
+
+    it('opens the form with the check instead of filing a checked lost ship in one tap', async () => {
+      setup({ doctrine: true });
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'File claim for Hurricane' })
+      );
+      expect(file).not.toHaveBeenCalled();
+      expect((screen.getByLabelText('Killmail link') as HTMLInputElement).value).toBe(
+        esiKillmailLink(8001, HASH)
+      );
+      expect(await screen.findByText('Off doctrine', undefined, { timeout: 3000 })).toBeTruthy();
+      await userEvent.click(screen.getByRole('button', { name: 'File claim' }));
+      await waitFor(() =>
+        expect(file).toHaveBeenCalledWith(7, 98765432, { killmail: esiKillmailLink(8001, HASH) })
+      );
+    });
+  });
 });

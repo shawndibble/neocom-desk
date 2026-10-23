@@ -2,6 +2,8 @@ import { useId, type FormEvent, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Field, FieldError, Fields, TextInput } from '@/components/ui';
 import { cx } from '@/lib/cx';
+import type { DoctrineCheckRecord } from '../srpTypes';
+import { DoctrineCheckView } from './DoctrineCheckView';
 import { NotCoveredNote } from './NotCoveredNote';
 
 export interface FileFormErrors {
@@ -23,6 +25,8 @@ interface MemberFileFormProps {
   fleetRequired: boolean;
   windowDays: number;
   errors: FileFormErrors;
+  /** The doctrine check of the link above, once read; a hull the corp does not check has none. */
+  doctrine?: { check: DoctrineCheckRecord | undefined; checking: boolean };
   busy: boolean;
   onSubmit: () => void;
   /** Phone: the button spans the width and the hint line goes. */
@@ -39,6 +43,7 @@ export function MemberFileForm({
   fleetRequired,
   windowDays,
   errors,
+  doctrine,
   busy,
   onSubmit,
   fullWidth = false,
@@ -105,6 +110,13 @@ export function MemberFileForm({
           />
         </Field>
       </Fields>
+      <div aria-live="polite">
+        {doctrine?.checking ? (
+          <p className="text-xs text-text-dim">{t('srpMember.file.doctrineChecking')}</p>
+        ) : (
+          <DoctrineCheckView check={doctrine?.check} audience="pilot" />
+        )}
+      </div>
       {errors.notCovered ? <NotCoveredNote /> : null}
       {errors.form ? (
         <p role="alert" className="text-sm text-danger">
