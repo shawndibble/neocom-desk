@@ -88,7 +88,7 @@ export function EveNotificationRow({
         notes={missing !== null ? <PermissionNote {...missing} /> : undefined}
       />
       {showTypes && (
-        <li className="border-t border-line py-2">
+        <li className="py-2">
           <div className="space-y-2">
             <p className="text-[0.6875rem] text-text-dim">
               {t('settings.notifications.eveTypesHint')}
