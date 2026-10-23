@@ -40,7 +40,8 @@ import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { CHARACTER_BOARD_ITEM_KINDS, type CharacterBoardItemKind } from '@/engine/character/board';
 import { KIND_LABEL } from './calendarKindLabels';
-import { kindDotClassName } from '@/components/ui/kindTone';
+import { KIND_TEXT } from '@/components/ui/kindTone';
+import { KIND_ICON } from './calendarKindIcons';
 import type { SkillPlanChoice } from './calendarSkillPlan';
 
 export interface CalendarKindFilterMenuProps {
@@ -64,6 +65,11 @@ export interface CalendarKindFilterMenuProps {
   skillPlanError: string | null;
   /** Picks a plan, or null to stop projecting one. */
   onChooseSkillPlan: (planId: string | null) => void;
+}
+
+function KindGlyph({ kind }: { kind: CharacterBoardItemKind }) {
+  const Glyph = KIND_ICON[kind];
+  return <Glyph aria-hidden="true" className={`size-4 shrink-0 ${KIND_TEXT[kind]}`} />;
 }
 
 export function CalendarKindFilterMenu({
@@ -129,12 +135,12 @@ export function CalendarKindFilterMenu({
             onCheckedChange={() => onToggle(kind)}
           >
             {/*
-              The swatch makes this menu the legend for the six hues the rail,
-              the map and the ticker paint — the one place a pilot can learn
-              that mint means Planets. Decorative only: the label it sits
-              beside already says the same thing (DESIGN.md §5, §7).
+              The glyph in its hue makes this menu the legend for the icons and
+              colours the rail, the map and the ticker draw — the one place a
+              pilot learns that a mint planet means Planets. Decorative only:
+              the label beside it already says the same thing (DESIGN.md §5, §7).
             */}
-            <span aria-hidden="true" className={`shrink-0 ${kindDotClassName(kind)}`} />
+            <KindGlyph kind={kind} />
             <span className="flex-1">{t(KIND_LABEL[kind])}</span>
             <span className="ml-2 text-[0.6875rem] text-text-dim tabular-nums">
               {countLabel(kind)}

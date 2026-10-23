@@ -112,20 +112,21 @@ Never a status, never interactive. A fifth location reuses the first hue, so the
 
 ### Clock kinds — the one nominal palette
 
-| Token                    | Value     | Use                                     |
-| ------------------------ | --------- | --------------------------------------- |
-| `kind-calendar-event`    | `#7e9cfd` | Calendar events on the Coming Up board. |
-| `kind-skill-training`    | `#d8beff` | Skill-queue completions.                |
-| `kind-industry-job`      | `#e59a55` | Industry job deliveries.                |
-| `kind-planet-extraction` | `#6fdecd` | PI extractor program ends.              |
-| `kind-moon-chunk`        | `#a0a8b8` | Moon chunk arrivals and decays.         |
-| `kind-contract-expiry`   | `#f2879f` | Contract expiries.                      |
-| `kind-order-expiry`      | `#c9d96a` | Market-order expiries.                  |
-| `kind-skill-plan`        | `#e0d0a8` | Projected Skill Plan steps (outlined).  |
+| Token                    | Value     | Use                                                      |
+| ------------------------ | --------- | -------------------------------------------------------- |
+| `kind-calendar-event`    | `#7e9cfd` | Calendar events on the Coming Up board.                  |
+| `kind-skill-training`    | `#d8beff` | Skill-queue completions.                                 |
+| `kind-industry-job`      | `#e59a55` | Industry job deliveries.                                 |
+| `kind-planet-extraction` | `#6fdecd` | PI extractor program ends.                               |
+| `kind-mercenary-den`     | `#c88be9` | Mercenary Den reinforcement ends and operation expiries. |
+| `kind-moon-chunk`        | `#a0a8b8` | Moon chunk arrivals and decays.                          |
+| `kind-contract-expiry`   | `#f2879f` | Contract expiries.                                       |
+| `kind-order-expiry`      | `#c9d96a` | Market-order expiries.                                   |
+| `kind-skill-plan`        | `#e0d0a8` | Projected Skill Plan steps (outlined).                   |
 
 Every other color scale in this app is **ordinal or semantic** — `securityStatusColor`
 is a position on a numeric scale, `STANDING_TONE` and the severity ladder are
-magnitudes. These eight are **nominal**: no order, no magnitude, identity only. They say
+magnitudes. These nine are **nominal**: no order, no magnitude, identity only. They say
 which part of the app a deadline came from, and they are read by
 `src/components/ui/kindTone.ts` (`KIND_FILL`, `KIND_TEXT`).
 
@@ -135,12 +136,13 @@ which part of the app a deadline came from, and they are read by
 - **This is meant to be the app's only nominal set.** The next categorical thing that
   genuinely needs color extends these tokens rather than minting a parallel palette —
   the fork is the failure mode the Mail decision named when it refused per-folder hues.
-- Every hue sits **≥ 20 ΔE from `accent`, `success`, `warning` and `danger`**, so a
-  category can never be mistaken for a status tone. Check that distance before adding
-  or changing one.
-- **Color is never the identity on its own** (§7). Each of these appears next to the
-  kind's own glyph or its written name — the filter menu carries a swatch beside every
-  label and is the legend for the whole set.
+- Every hue sits **≥ 20 ΔE (CIE76) from `accent`, `success`, `warning` and `danger`**,
+  so a category can never be mistaken for a status tone. Check that distance before
+  adding or changing one, and keep the new hue inside the set's lightness and chroma
+  band (LCh L 66–84, C 22–56) so it reads as one of them, not a neon outlier.
+- **Color is never the identity on its own** (§7). Each of these is drawn as the kind's
+  own glyph (`features/character/calendarKindIcons.ts`) in its hue, on the rail's rows,
+  the map's day cells and the filter menu, which is the legend for the whole set.
 
 ### Security status
 
@@ -1446,7 +1448,7 @@ Every interactive element takes its states from one shared recipe in
 | `line-bright` on `panel-2` (resting field border, non-text ≥3:1) | 3.15                  |
 | `::selection` fill / `text`                                      | 4.64                  |
 
-Clock-kind tokens (§1) color countdown **text**, so all eight are measured on all three
+Clock-kind tokens (§1) color countdown **text**, so all nine are measured on all three
 surfaces — `bg` / `panel` / `panel-2`:
 
 | Token                    | Ratios                |
@@ -1455,6 +1457,7 @@ surfaces — `bg` / `panel` / `panel-2`:
 | `kind-skill-training`    | 11.72 / 11.01 / 10.27 |
 | `kind-industry-job`      | 8.37 / 7.86 / 7.33    |
 | `kind-planet-extraction` | 11.98 / 11.25 / 10.50 |
+| `kind-mercenary-den`     | 7.67 / 7.20 / 6.72    |
 | `kind-moon-chunk`        | 8.09 / 7.60 / 7.09    |
 | `kind-contract-expiry`   | 8.05 / 7.56 / 7.05    |
 | `kind-order-expiry`      | 12.54 / 11.78 / 10.99 |

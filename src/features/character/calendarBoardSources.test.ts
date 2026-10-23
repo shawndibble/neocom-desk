@@ -11,6 +11,7 @@ import {
   toCalendarEventSources,
   toContractExpirySources,
   toIndustryJobSources,
+  toMercenaryDenSources,
   toMoonChunkSources,
   toOrderExpirySources,
   toPlanetExtractionSources,
@@ -437,5 +438,68 @@ describe('toOrderExpirySources', () => {
 
   it('drops an order whose issue date will not parse', () => {
     expect(toOrderExpirySources([order({ issued: '' })], name)).toEqual([]);
+  });
+});
+
+describe('toMercenaryDenSources', () => {
+  const NOW = Date.parse('2026-10-23T10:00:00Z');
+  const HOUR = 3_600_000;
+  const den = (overrides = {}) => ({
+    id: 10,
+    planetId: 40000001,
+    planetName: 'Efa VII' as string | null,
+    state: 'running' as const,
+    reinforcedUntilMs: null as number | null,
+    anarchyLevel: 1,
+    operations: [] as { state: 'available' | 'started' | 'done'; expiresMs: number | null }[],
+    ...overrides,
+  });
+
+  it('gives a reinforced den its reinforcement end', () => {
+    expect(
+      toMercenaryDenSources([den({ state: 'reinforced', reinforcedUntilMs: NOW + 14 * HOUR })], NOW)
+    ).toEqual([
+      {
+        id: '10:reinforcement',
+        subject: 'Efa VII',
+        detail: 'reinforcement',
+        deadlineMs: NOW + 14 * HOUR,
+      },
+    ]);
+  });
+
+  it('gives each open operation its expiry, and skips done or lapsed ones', () => {
+    const sources = toMercenaryDenSources(
+      [
+        den({
+          operations: [
+            { state: 'available', expiresMs: NOW + 9 * HOUR },
+            { state: 'started', expiresMs: NOW + 2 * HOUR },
+            { state: 'done', expiresMs: NOW + 5 * HOUR },
+            { state: 'available', expiresMs: NOW - HOUR },
+          ],
+        }),
+      ],
+      NOW
+    );
+    expect(sources.map((s) => [s.detail, s.deadlineMs])).toEqual([
+      ['operation', NOW + 2 * HOUR],
+      ['operation', NOW + 9 * HOUR],
+    ]);
+    expect(new Set(sources.map((s) => s.id)).size).toBe(2);
+  });
+
+  it('drops a lapsed reinforcement timer from a stale read', () => {
+    expect(
+      toMercenaryDenSources([den({ state: 'reinforced', reinforcedUntilMs: NOW - HOUR })], NOW)
+    ).toEqual([]);
+  });
+
+  it('names an unnamed planet by its id', () => {
+    const [source] = toMercenaryDenSources(
+      [den({ planetName: null, state: 'reinforced', reinforcedUntilMs: NOW + HOUR })],
+      NOW
+    );
+    expect(source.subject).toBe('#40000001');
   });
 });

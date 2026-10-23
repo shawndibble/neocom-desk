@@ -36,6 +36,7 @@ import { ArrowDown } from '@phosphor-icons/react/dist/csr/ArrowDown';
 import { ArrowLineDown } from '@phosphor-icons/react/dist/csr/ArrowLineDown';
 import { ArrowLineUp } from '@phosphor-icons/react/dist/csr/ArrowLineUp';
 import { ArrowRight } from '@phosphor-icons/react/dist/csr/ArrowRight';
+import { CastleTurret } from '@phosphor-icons/react/dist/csr/CastleTurret';
 import { DiscordLogo } from '@phosphor-icons/react/dist/csr/DiscordLogo';
 import { GithubLogo } from '@phosphor-icons/react/dist/csr/GithubLogo';
 import { ArrowSquareOut } from '@phosphor-icons/react/dist/csr/ArrowSquareOut';
@@ -371,6 +372,8 @@ export const PiCustomsOffice = withWeight(Crosshair);
 /** Where a pilot fights: the main space on a Local list card. */
 export const Combat = withWeight(Crosshair);
 export const PiSkyhook = withWeight(ArrowLineUp);
+/** A Mercenary Den: the fortified structure a pilot anchors beside a skyhook. */
+export const MercenaryDen = withWeight(CastleTurret);
 /** Mail, calendar and contacts, grouped as one row. */
 export const Social = withWeight(EnvelopeSimple);
 /**

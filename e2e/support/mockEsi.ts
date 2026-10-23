@@ -193,6 +193,13 @@ export async function installEsiMock(page: Page): Promise<void> {
     if (PREFETCHED_EMPTY.has(path)) return json([]);
     if (path === `/characters/${CHARACTER_ID}/mail/labels`) return json(EMPTY_MAIL_LABELS);
     if (path === `/characters/${CHARACTER_ID}/clones`) return json(EMPTY_CLONES);
+    // Mercenary Dens (the Calendar's den clocks, the Overview widget): none unless a spec overrides.
+    if (path === `/characters/${CHARACTER_ID}/structures/mercenary-dens`) {
+      return json({ mercenary_dens: [] });
+    }
+    if (path === `/characters/${CHARACTER_ID}/mercenary-tactical-operations`) {
+      return json({ operations: [] });
+    }
     // `{}`, not a role list: ESI omits the array for a character with no corp
     // roles, and that is the fixture pilot. It puts `useCorpAccess` in `none`,
     // which renders nothing — so the corp grant prompt does not appear over

@@ -1,12 +1,13 @@
 /**
- * The character's Coming Up board: eight heterogeneous clocks in, one ordered
+ * The character's Coming Up board: nine heterogeneous clocks in, one ordered
  * list out.
  *
  * The corp side of this exists already (`engine/corp/board.ts`) and answers the
  * same question for a director. This is the same idea aimed at the pilot: a
  * fleet op they said they would attend, a skill about to finish and waste
  * training time, a job sitting undelivered, an extractor program running out,
- * a contract about to expire with collateral on it, a sell order about to
+ * a Mercenary Den leaving reinforcement or an operation about to expire, a
+ * contract about to expire with collateral on it, a sell order about to
  * lapse, and the steps of a Skill Plan projected past the queue. Six of those
  * live in ESI endpoints and, before this, on five separate routes. Merging them
  * into one deadline-ordered list *is* the feature.
@@ -43,6 +44,7 @@ export const CHARACTER_BOARD_ITEM_KINDS = [
   'skillTraining',
   'industryJob',
   'planetExtraction',
+  'mercenaryDen',
   'moonChunk',
   'contractExpiry',
   'orderExpiry',
@@ -117,6 +119,8 @@ export interface CharacterBoardSources {
   skillTraining?: readonly BoardClockSource[];
   industryJobs?: readonly BoardClockSource[];
   planetExtractions?: readonly BoardClockSource[];
+  /** Den reinforcement ends and tactical operation expiries. */
+  mercenaryDens?: readonly BoardClockSource[];
   /** Corp moon drills — absent unless the Character holds `canReadMoonExtractions`. */
   moonChunks?: readonly BoardClockSource[];
   contractExpiries?: readonly BoardClockSource[];
@@ -131,6 +135,7 @@ const SOURCE_KEY = {
   skillTraining: 'skillTraining',
   industryJob: 'industryJobs',
   planetExtraction: 'planetExtractions',
+  mercenaryDen: 'mercenaryDens',
   moonChunk: 'moonChunks',
   contractExpiry: 'contractExpiries',
   orderExpiry: 'orderExpiries',

@@ -3,7 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const tokens: { characterId: number; scopes: string[] }[] = [];
 const cache = new Map<string, unknown>();
 
-vi.mock('@/db', () => ({ db: { tokens: { toArray: () => Promise.resolve(tokens) } } }));
+vi.mock('@/db', () => ({
+  db: {
+    tokens: {
+      toArray: () => Promise.resolve(tokens),
+      get: (id: number) => Promise.resolve(tokens.find((t) => t.characterId === id)),
+    },
+  },
+}));
 vi.mock('@/features/character/allCharactersFanOut', () => ({
   fanOutAllCharacters: async ({
     scope,
@@ -54,7 +61,8 @@ vi.mock('@/features/route/jumpsFromCurrent', () => ({
   jumpsFromCurrent: () => Promise.resolve(new Map([[30000142, 4]])),
 }));
 
-const { DEN_SCOPE, OPERATION_SCOPE, loadMercenaryDensWidget } = await import('./mercenaryDens');
+const { DEN_SCOPE, OPERATION_SCOPE, loadCharacterDenRows, loadMercenaryDensWidget } =
+  await import('./mercenaryDens');
 
 const denDetail = (id: number, over: Record<string, unknown> = {}) => ({
   id,
@@ -161,5 +169,28 @@ describe('loadMercenaryDensWidget', () => {
     tokens.push({ characterId: 1, scopes: [DEN_SCOPE] });
     cache.set('1:mercenaryDens', 'down');
     await expect(loadMercenaryDensWidget(1)).rejects.toThrow();
+  });
+});
+
+describe('loadCharacterDenRows', () => {
+  it('asks to log in again when the token lacks the den scope', async () => {
+    tokens.push({ characterId: 1, scopes: [] });
+    expect(await loadCharacterDenRows(1)).toEqual({ cached: null, needsReauth: true });
+  });
+
+  it("reads one Character's dens as rows, with the read's age", async () => {
+    tokens.push({ characterId: 1, scopes: [DEN_SCOPE] });
+    cache.set('1:mercenaryDens', { mercenary_dens: [{ id: 10, planet_id: 40000001 }] });
+    cache.set('1:mercenaryDen:10', denDetail(10));
+    const result = await loadCharacterDenRows(1);
+    expect(result.cached?.data).toHaveLength(1);
+    expect(result.cached?.data[0]).toMatchObject({ id: 10, planetName: 'Planet 40000001' });
+    expect(result.cached?.fetchedAt).toEqual(new Date(1_000));
+  });
+
+  it('is unreadable, not empty, when the list read is down', async () => {
+    tokens.push({ characterId: 1, scopes: [DEN_SCOPE] });
+    cache.set('1:mercenaryDens', 'down');
+    expect(await loadCharacterDenRows(1)).toEqual({ cached: null, needsReauth: false });
   });
 });

@@ -8,7 +8,12 @@
  * unknown row, an operations read with any gap is unknown rather than "none",
  * and a Character whose reads fail is `failed`, not "needs permission".
  */
-import { conditionalFetch, loadWithCacheStatus, type CachedResult } from '@/esi/cache';
+import {
+  conditionalFetch,
+  loadWithCacheStatus,
+  type CachedResult,
+  type StatusResult,
+} from '@/esi/cache';
 import type { EsiResult } from '@/esi/client';
 import {
   getCharacterMercenaryDen,
@@ -272,5 +277,35 @@ export async function loadMercenaryDensWidget(
     systemNames,
     ownerNames,
     fetchedAt: stamps.length === 0 ? null : new Date(Math.min(...stamps)),
+  };
+}
+
+/**
+ * One Character's dens as rows, for the Calendar's den clocks: the same reads
+ * as the widget, without the other Characters, jumps or owner names. `cached`
+ * is null when the list could not be read; `needsReauth` when the token lacks
+ * the den scope or ESI refused it.
+ */
+export async function loadCharacterDenRows(
+  characterId: number
+): Promise<StatusResult<MercenaryDenRow[]>> {
+  const scopes = (await db.tokens.get(characterId))?.scopes ?? [];
+  if (!scopes.includes(DEN_SCOPE)) return { cached: null, needsReauth: true };
+  const entry = await loadCharacterDens(characterId, '', scopes.includes(OPERATION_SCOPE)).catch(
+    () => null
+  );
+  if (entry === null || entry.status !== 'read') {
+    return { cached: null, needsReauth: entry?.status === 'reauth' };
+  }
+  const planets = await planetInfo([...new Set(entry.dens.map((den) => den.planetId))]);
+  const oldest = Math.min(...entry.reads.map((read) => read.fetchedAt.getTime()));
+  return {
+    cached: {
+      data: entry.dens.map((den) => toRow(entry, den, planets)),
+      fetchedAt: new Date(oldest),
+      fromCache: entry.reads.some((read) => read.fromCache),
+      truncated: false,
+    },
+    needsReauth: false,
   };
 }

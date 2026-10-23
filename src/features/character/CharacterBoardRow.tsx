@@ -15,11 +15,11 @@
  * the countdown beside it already said in words — and said nothing at all
  * about *what* was ending. The hue now matches the kind's dot in the Calendar
  * Map, its segment in the Day Ticker and its swatch in the filter menu, so one
- * glance down the rail sorts six kinds of clock apart.
+ * glance down the rail sorts nine kinds of clock apart.
  */
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import type { CharacterBoardItem, CharacterBoardItemKind } from '@/engine/character/board';
+import type { CharacterBoardItem } from '@/engine/character/board';
 import { isProjectedKind, pastDeadlineLabelKey } from '@/engine/character/board';
 import { formatDuration } from '@/lib/duration';
 import { formatTimeOfDay } from '@/lib/timestamp';
@@ -31,19 +31,8 @@ import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/u
 import { RESPONSE_KEY, RESPONSE_TEXT_TONE } from './calendarResponseTone';
 import { EventContextMenu } from './EventContextMenu';
 import { KIND_LABEL } from './calendarKindLabels';
+import { KIND_ICON } from './calendarKindIcons';
 import { KIND_TEXT } from '@/components/ui/kindTone';
-
-/** One glyph per kind, from the app's own vocabulary — the same icons those routes carry in the nav. */
-const KIND_ICON: Record<CharacterBoardItemKind, typeof Icon.Skills> = {
-  calendarEvent: Icon.CalendarEvent,
-  skillTraining: Icon.Skills,
-  industryJob: Icon.Industry,
-  planetExtraction: Icon.Planetary,
-  moonChunk: Icon.MoonMining,
-  contractExpiry: Icon.Contracts,
-  orderExpiry: Icon.Orders,
-  skillPlan: Icon.FlatList,
-};
 
 export interface CharacterBoardRowProps {
   item: CharacterBoardItem;

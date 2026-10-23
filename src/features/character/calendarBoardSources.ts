@@ -18,6 +18,7 @@
  */
 
 import { romanLevel } from '@/engine/projection';
+import { isReinforced, openOperations, type Den } from '@/engine/character/mercenaryDens';
 import type {
   CalendarEventSummary,
   Contract,
@@ -198,6 +199,41 @@ export function toMoonChunkSources(
       detail: arrived ? 'decay' : 'arrival',
       deadlineMs: arrived ? extraction.naturalDecayMs : extraction.chunkArrivalMs,
     };
+  });
+}
+
+/** What a den needs to be a clock: the engine's `Den` plus where it is. */
+export type DenClockInput = Den & { planetId: number; planetName: string | null };
+
+/**
+ * One clock per open thing a den is waiting on: its reinforcement end while
+ * still ahead (a lapsed timer is a stale read, not a clock), and each
+ * available or started operation's expiry. `detail` says which.
+ */
+export function toMercenaryDenSources(
+  dens: readonly DenClockInput[],
+  nowMs: number
+): BoardClockSource[] {
+  return dens.flatMap((den) => {
+    const subject = den.planetName ?? `#${den.planetId}`;
+    const sources: BoardClockSource[] = [];
+    if (isReinforced(den, nowMs)) {
+      sources.push({
+        id: `${den.id}:reinforcement`,
+        subject,
+        detail: 'reinforcement',
+        deadlineMs: den.reinforcedUntilMs!,
+      });
+    }
+    openOperations(den.operations, nowMs).forEach((op, index) => {
+      sources.push({
+        id: `${den.id}:operation:${index}`,
+        subject,
+        detail: 'operation',
+        deadlineMs: op.expiresMs,
+      });
+    });
+    return sources;
   });
 }
 
