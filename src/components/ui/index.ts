@@ -62,6 +62,7 @@ export { useFilterSurface } from './filterSurface';
 export { Disclosure, Caret } from './Disclosure';
 export { RowCaret } from './RowCaret';
 export { FieldError } from './FieldError';
+export { UnsavedChangesBar } from './UnsavedChangesBar';
 export { Eyebrow } from './Eyebrow';
 export { eyebrowClassName } from './eyebrowClassName';
 export { Fields, Field } from './Fields';

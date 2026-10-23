@@ -18,6 +18,7 @@ const ALL_CORP_VIEWS = {
   canReadAssets: true,
   canReadMiningLedger: true,
   canReadRoleAudit: true,
+  canManageSrp: true,
 };
 const NO_CORP_VIEWS = {
   canReadMembers: false,
@@ -25,6 +26,7 @@ const NO_CORP_VIEWS = {
   canReadAssets: false,
   canReadMiningLedger: false,
   canReadRoleAudit: false,
+  canManageSrp: false,
 };
 
 const MOONS_TAB_PATHS = [
@@ -61,7 +63,14 @@ describe('railGroups', () => {
       { labelKey: null, paths: ['/overview'] },
       {
         labelKey: 'nav.groups.corp',
-        paths: ['/corp', '/corp/members', '/corp/wallet', '/corp/assets', '/corp/moons'],
+        paths: [
+          '/corp',
+          '/corp/members',
+          '/corp/wallet',
+          '/corp/assets',
+          '/corp/moons',
+          '/corp/srp',
+        ],
       },
       {
         labelKey: 'nav.groups.progression',
@@ -244,6 +253,18 @@ describe('listNavDestinations', () => {
     });
     expect(hidden.some((entry) => entry.path.startsWith('/corp'))).toBe(false);
     expect(byPath('/corp')).toMatchObject({ locked: false });
+  });
+
+  it('lists SRP only with canManageSrp, hidden rather than locked', () => {
+    const list = (canManageSrp: boolean) =>
+      listNavDestinations({
+        locked: NO_LOCKS,
+        corpVisible: true,
+        corpCapabilities: { ...NO_CORP_VIEWS, canManageSrp },
+        t,
+      });
+    expect(list(true).some((entry) => entry.path === '/corp/srp')).toBe(true);
+    expect(list(false).some((entry) => entry.path === '/corp/srp')).toBe(false);
   });
 
   it("lists Overview's sub-views with their own route's lock", () => {
