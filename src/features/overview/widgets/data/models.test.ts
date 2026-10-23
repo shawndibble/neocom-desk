@@ -33,8 +33,9 @@ describe('feedsFor', () => {
     expect(feedsFor(['unknownKindFromANewerBuild'])).toEqual([]);
   });
 
-  it('gives every built kind at least one feed', () => {
+  it('gives every built kind at least one feed, except the clock', () => {
     for (const [kind, feeds] of Object.entries(KIND_FEEDS)) {
+      if (kind === 'eveTime') continue;
       expect(feeds.length, kind).toBeGreaterThan(0);
     }
   });

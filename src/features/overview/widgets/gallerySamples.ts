@@ -832,6 +832,12 @@ function buildSamples(t: TFunction): Record<string, Sample> {
       note: t('overview.widgets.corpKills.secondary', { losses: '312', efficiency: '81%' }),
       rows: [],
     },
+    eveTime: {
+      value: 'Fri 14:32',
+      unit: t('overview.widgets.eveTime.unit'),
+      note: '2026-10-23',
+      rows: [],
+    },
     incursions: {
       value: '6',
       unit: t('overview.gallery.samples.incursions.unit'),
