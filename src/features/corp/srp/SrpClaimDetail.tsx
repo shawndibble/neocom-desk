@@ -15,6 +15,7 @@ import { CharacterLink } from '@/features/entities';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import type { SrpAuditEntry, SrpClaim } from '../srpClaimTypes';
 import type { ClaimColumnsContext } from './claimColumnsContext';
+import { DoctrineCheckView } from './DoctrineCheckView';
 import { ClaimStatePill, CopyAmount, TypeAmountField } from './OfficerClaimCells';
 import { SrpAuditTrail } from './SrpAuditTrail';
 import { claimBasisLine } from './srpClaimText';
@@ -95,6 +96,11 @@ export function SrpClaimDetail({
                 />
               </span>
             </Row>
+            {claim.doctrineCheck && claim.doctrineCheck.status !== 'not-checked' && (
+              <Row label={t('srp.doctrine.detailLabel')}>
+                <DoctrineCheckView check={claim.doctrineCheck} audience="officer" />
+              </Row>
+            )}
             <Row label={t('srp.officer.detail.killmail')}>
               <ExternalLink href={`https://zkillboard.com/kill/${claim.killmailId}/`}>
                 {t('srp.officer.detail.killmailLink', { id: claim.killmailId })}

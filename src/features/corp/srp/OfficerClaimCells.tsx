@@ -22,6 +22,12 @@ export function ClaimStatePill({ claim, ctx }: { claim: SrpClaim; ctx: ClaimColu
   return <Pill tone={STATE_TONE[claim.state]}>{ctx.t(`srp.officer.states.${claim.state}`)}</Pill>;
 }
 
+/** The queue's flag for a claim whose fit matched no Doctrine Fit; the detail has the diff. */
+export function OffDoctrineFlag({ claim, ctx }: { claim: SrpClaim; ctx: ClaimColumnsContext }) {
+  if (claim.doctrineCheck?.status !== 'off-doctrine') return null;
+  return <Pill tone="warning">{ctx.t('srp.doctrine.queueFlag')}</Pill>;
+}
+
 export function Pilot({ claim }: { claim: SrpClaim }) {
   return (
     <span className="block min-w-0">
