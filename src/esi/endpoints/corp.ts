@@ -429,3 +429,112 @@ export function getCorporationMemberTitles(
     endpointId: 'getCorporationMemberTitles',
   });
 }
+
+// --- Skyhooks and sovereignty hubs (esi-structures.read_corporation.v1) ---
+
+/** An ISO instant window; both ends are always sent together. */
+export interface SovereigntyWindow {
+  start: string;
+  end: string;
+}
+
+/** Station_Manager (`canReadSkyhooks`). The list names each skyhook's planet, not its system. */
+export function getCorporationSkyhooks(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<{ skyhooks: { id: number; planet_id: number }[] }>> {
+  return esiFetch(`/corporations/${corporationId}/structures/skyhooks`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationSkyhooks',
+  });
+}
+
+export interface CorporationSkyhookDetail {
+  id: number;
+  planet_id: number;
+  is_active: boolean;
+  state: string;
+  reagents?: {
+    last_cycle: string;
+    secured_stock: number;
+    unsecured_stock: number;
+    type_id: number;
+  }[];
+  reinforcement_timer?: { end: string };
+  /** When the skyhook can be raided. */
+  theft_vulnerability?: SovereigntyWindow;
+}
+
+export function getCorporationSkyhook(
+  characterId: number,
+  corporationId: number,
+  skyhookId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationSkyhookDetail>> {
+  return esiFetch(`/corporations/${corporationId}/structures/skyhooks/${skyhookId}`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationSkyhook',
+  });
+}
+
+export function getCorporationSovereigntyHubs(
+  characterId: number,
+  corporationId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<{ sovereignty_hubs: { id: number; solar_system_id: number }[] }>> {
+  return esiFetch(`/corporations/${corporationId}/structures/sovereignty-hubs`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationSovereigntyHubs',
+  });
+}
+
+export interface CorporationSovereigntyHubDetail {
+  id: number;
+  solar_system_id: number;
+  reagent_bay: {
+    last_updated: string;
+    reagents: { type_id: number; amount: number; burning_per_hour: number }[];
+  };
+  /** Past `end` means overtime; past `start` means vulnerable. */
+  vulnerability_window?: SovereigntyWindow;
+}
+
+/** Station_Manager (`canReadSkyhooks`). */
+export function getCorporationSovereigntyHub(
+  characterId: number,
+  corporationId: number,
+  hubId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CorporationSovereigntyHubDetail>> {
+  return esiFetch(`/corporations/${corporationId}/structures/sovereignty-hubs/${hubId}`, {
+    ...options,
+    characterId,
+    endpointId: 'getCorporationSovereigntyHub',
+  });
+}
+
+// --- GET /sovereignty/systems (public) ---
+
+/** The development levels (0-5) and Activity Defense Multiplier of a claimed system. */
+export interface SovereigntyDevelopment {
+  activity_defense_multiplier: number;
+  military_level: number;
+  industrial_level: number;
+  strategic_level: number;
+}
+
+export interface SovereigntySystem {
+  solar_system_id: number;
+  /** Only an alliance claim carries development. */
+  claim?: { alliance?: { development?: SovereigntyDevelopment } };
+}
+
+export function getSovereigntySystems(
+  options: EndpointOptions = {}
+): Promise<EsiResult<{ solar_systems: SovereigntySystem[] }>> {
+  return esiFetch('/sovereignty/systems', { ...options, endpointId: 'getSovereigntySystems' });
+}

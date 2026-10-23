@@ -28,6 +28,7 @@ import { severityForRemaining, type DeadlineSeverity } from '../character/severi
  */
 export const CORP_BOARD_ITEM_KINDS = [
   'structureTimer',
+  'sovRaid',
   'structureFuel',
   'moonExtraction',
   'jobDelivery',
@@ -155,6 +156,19 @@ export interface BoardStarbaseSource {
   unanchorsAtMs: number | null;
 }
 
+/**
+ * A sovereignty raid window (issue #4775): a skyhook's theft window or a sov
+ * hub's vulnerability window. Epoch ms, both ends.
+ */
+export interface BoardSovereigntySource {
+  /** Unique across both kinds, e.g. `skyhook:5`. */
+  id: string;
+  name: string;
+  kind: 'skyhook' | 'hub';
+  startMs: number;
+  endMs: number;
+}
+
 export interface BoardExtractionSource {
   structureId: number;
   /** The refinery the drill is on, already named. */
@@ -191,6 +205,7 @@ export interface CorpBoardSources {
    */
   structures?: readonly BoardStructureSource[];
   starbases?: readonly BoardStarbaseSource[];
+  sovereignty?: readonly BoardSovereigntySource[];
   extractions?: readonly BoardExtractionSource[];
   jobs?: readonly BoardJobSource[];
 }
@@ -351,6 +366,28 @@ function starbaseItems(
   return items;
 }
 
+/** Open: ranked by its close. Not yet open: by its opening. Closed: no clock left. */
+function sovereigntyItems(
+  raid: BoardSovereigntySource,
+  clock: Pick<CorpBoardSources, 'nowMs' | 'staleWindowMs'>
+): CorpBoardItem[] {
+  if (raid.endMs <= clock.nowMs) return [];
+  const open = raid.startMs <= clock.nowMs;
+  return [
+    timedItem(
+      {
+        id: `sov:${raid.id}`,
+        kind: 'sovRaid',
+        subject: raid.name,
+        detail: `${raid.kind}.${open ? 'open' : 'upcoming'}`,
+        typeId: null,
+      },
+      open ? raid.endMs : raid.startMs,
+      clock
+    ),
+  ];
+}
+
 function extractionItem(
   extraction: BoardExtractionSource,
   clock: Pick<CorpBoardSources, 'nowMs' | 'staleWindowMs'>
@@ -423,6 +460,7 @@ export function buildCorpBoard(sources: CorpBoardSources): CorpBoardItem[] {
 
   for (const structure of sources.structures ?? []) items.push(...structureItems(structure, clock));
   for (const starbase of sources.starbases ?? []) items.push(...starbaseItems(starbase, clock));
+  for (const raid of sources.sovereignty ?? []) items.push(...sovereigntyItems(raid, clock));
   for (const extraction of sources.extractions ?? []) items.push(extractionItem(extraction, clock));
   for (const job of sources.jobs ?? []) {
     // ESI often leaves a finished job's status at `active` past its end

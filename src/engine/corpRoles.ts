@@ -98,6 +98,12 @@ export interface CorpCapabilities {
    * reads the wallet and takes a 403 here.
    */
   canReadDivisions: boolean;
+  /**
+   * GET /corporations/{id}/structures/skyhooks and /sovereignty-hubs detail —
+   * raid windows and reagent bays (issue #4775). Station_Manager per
+   * `x-required-roles`, behind a scope the structure list does not use.
+   */
+  canReadSkyhooks: boolean;
 }
 
 export type CorpCapability = keyof CorpCapabilities;
@@ -124,6 +130,7 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadContracts',
   'canReadOrders',
   'canReadDivisions',
+  'canReadSkyhooks',
 ];
 
 /** The answer for a Character with no roles — and the shape of "not loaded yet". */
@@ -142,6 +149,7 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadContracts: false,
   canReadOrders: false,
   canReadDivisions: false,
+  canReadSkyhooks: false,
 };
 
 /**
@@ -186,6 +194,8 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
   canReadOrders: ['Accountant', 'Trader'],
   // `x-required-roles` on /corporations/{id}/divisions is ["Director"] alone.
   canReadDivisions: [],
+  // `x-required-roles` on the skyhook routes and the hub detail is Station_Manager.
+  canReadSkyhooks: ['Station_Manager'],
 };
 
 /** Capabilities every corp member holds: ESI names no role for them, so they say nothing about roles. */

@@ -112,6 +112,7 @@ describe('scopesForGroup', () => {
         'esi-corporations.read_blueprints.v1',
         'esi-corporations.read_starbases.v1',
         'esi-planets.read_customs_offices.v1',
+        'esi-structures.read_corporation.v1',
         'esi-corporations.read_titles.v1',
         'esi-contracts.read_corporation_contracts.v1',
         'esi-markets.read_corporation_orders.v1',

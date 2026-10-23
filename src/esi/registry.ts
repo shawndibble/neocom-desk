@@ -830,6 +830,36 @@ export const ESI_REGISTRY = {
     scope: 'esi-corporations.read_titles.v1',
     group: 'corp',
   },
+  /**
+   * Skyhooks and sovereignty hubs (issue #4775). The corp reads sit behind
+   * `esi-structures.read_corporation.v1`, a different scope from the older
+   * `esi-corporations.read_structures.v1`; `x-required-roles` is Station_Manager
+   * on every route but the hub list (`canReadSkyhooks`). The systems list is public.
+   */
+  getCorporationSkyhooks: {
+    route: '/corporations/{corporation_id}/structures/skyhooks',
+    scope: 'esi-structures.read_corporation.v1',
+    group: 'corp',
+  },
+  getCorporationSkyhook: {
+    route: '/corporations/{corporation_id}/structures/skyhooks/{skyhook_id}',
+    scope: 'esi-structures.read_corporation.v1',
+    group: 'corp',
+  },
+  getCorporationSovereigntyHubs: {
+    route: '/corporations/{corporation_id}/structures/sovereignty-hubs',
+    scope: 'esi-structures.read_corporation.v1',
+    group: 'corp',
+  },
+  getCorporationSovereigntyHub: {
+    route: '/corporations/{corporation_id}/structures/sovereignty-hubs/{sovereignty_hub_id}',
+    scope: 'esi-structures.read_corporation.v1',
+    group: 'corp',
+  },
+  getSovereigntySystems: {
+    route: '/sovereignty/systems',
+    scope: PUBLIC,
+  },
 } as const satisfies Record<EndpointName, EsiEndpointSpec>;
 
 export type EsiEndpointId = keyof typeof ESI_REGISTRY;

@@ -51,6 +51,7 @@ const CORP_IDS = [
   'corpDeadlines',
   'corpServices',
   'corpStarbases',
+  'corpSovereignty',
   'corpCustomsOffices',
   'corpWallet',
   'corpCashFlow',

@@ -572,6 +572,15 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ],
       ],
     },
+    corpSovereignty: {
+      value: '2',
+      unit: t('overview.widgets.corpSovereignty.unit', { count: 2 }),
+      note: t('overview.widgets.corpSovereignty.opensIn', { duration: '6h' }),
+      rows: [
+        ['X-7OMU', t('overview.widgets.corpSovereignty.windowIn', { duration: '6h' }), '2 / 1 / 3'],
+        ['Efa', t('overview.widgets.corpSovereignty.windowIn', { duration: '1d 4h' }), '4 / 0 / 2'],
+      ],
+    },
     corpJobs: {
       value: '3',
       unit: t('overview.widgets.corpJobs.unit'),

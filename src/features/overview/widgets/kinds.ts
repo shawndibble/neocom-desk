@@ -356,6 +356,21 @@ const SPECS: Record<string, Spec> = {
     size: 'M',
     endpoints: ['getCorporationStarbases', 'getCorporationStarbase'],
   },
+  corpSovereignty: {
+    corp: 'corpClocks',
+    capabilities: ['canReadSkyhooks'],
+    views: NT,
+    view: 'table',
+    size: 'M',
+    endpoints: [
+      'getCorporationSkyhooks',
+      'getCorporationSkyhook',
+      'getCorporationSovereigntyHubs',
+      'getCorporationSovereigntyHub',
+      'getSovereigntySystems',
+      'getUniversePlanet',
+    ],
+  },
   corpCustomsOffices: {
     corp: 'corpClocks',
     capabilities: ['canReadCustomsOffices'],

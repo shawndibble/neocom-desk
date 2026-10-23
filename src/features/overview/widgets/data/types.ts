@@ -33,6 +33,7 @@ import type {
   CorpKillsFeed,
   CorpMembersFeed,
   CorpMiningFeed,
+  CorpSovereigntyFeed,
   CorpStarbasesFeed,
   CorpWalletFeed,
 } from './corpFeeds';
@@ -274,6 +275,7 @@ export interface FeedMap {
   corpMembers: CorpMembersFeed;
   corpMining: CorpMiningFeed;
   corpStarbases: CorpStarbasesFeed;
+  corpSovereignty: CorpSovereigntyFeed;
   corpContracts: CorpContractsFeed;
   corpOrders: CorpOrdersFeed;
   corpKills: CorpKillsFeed;

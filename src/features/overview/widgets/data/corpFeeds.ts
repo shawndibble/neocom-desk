@@ -169,6 +169,35 @@ export interface CorpKillsFeed extends CorpFeedBase {
   failed: ZkillFailureReason | null;
 }
 
+/** One skyhook or sov hub, reduced to what the Sovereignty builder reads. */
+export interface CorpSovereigntyRow {
+  /** `skyhook:5` or `hub:9`: unique across both. */
+  key: string;
+  kind: 'skyhook' | 'hub';
+  structureId: number;
+  /** Null when the system could not be resolved (a skyhook lists only its planet). */
+  systemId: number | null;
+  /** The raid window; null when ESI sent none or its detail was not read. */
+  windowStartMs: number | null;
+  windowEndMs: number | null;
+  /**
+   * A skyhook's reagent stock (secured plus unsecured) at its last cycle. ESI
+   * sends no silo capacity, so there is no percent; null when unread.
+   */
+  stock: number | null;
+  /** A hub's reagent bay, run down to now by the builder; null when unread or empty-handed. */
+  hubBay: { amount: number; burningPerHour: number; updatedMs: number } | null;
+}
+
+export interface CorpSovereigntyFeed extends CorpFeedBase {
+  rows: CorpSovereigntyRow[];
+  systemNames: ReadonlyMap<number, string>;
+  /** Development levels (0-5) by system; absent for a system with no alliance claim. */
+  development: ReadonlyMap<number, { military: number; industrial: number; strategic: number }>;
+  /** Stargate jumps from the Current System; absent when it or the route is unknown. */
+  jumps: ReadonlyMap<number, number>;
+}
+
 export async function loadCorpWalletFeed(characterId: number): Promise<CorpWalletFeed> {
   const { loadCorpWallet } = await import('./corpFeedLoaders');
   return loadCorpWallet(characterId);
@@ -222,4 +251,9 @@ export async function loadCorpCustomsFeed(characterId: number): Promise<CorpCust
 export async function loadCorpRoleAuditFeed(characterId: number): Promise<CorpRoleAuditFeed> {
   const { loadCorpRoleAudit } = await import('./corpFeedLoaders');
   return loadCorpRoleAudit(characterId);
+}
+
+export async function loadCorpSovereigntyFeed(characterId: number): Promise<CorpSovereigntyFeed> {
+  const { loadCorpSovereignty } = await import('./corpFeedLoaders');
+  return loadCorpSovereignty(characterId);
 }
