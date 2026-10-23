@@ -146,8 +146,12 @@ export function DataTableHeader<T>({
           <th
             role="columnheader"
             scope="col"
-            style={fixedLayout ? { width: `${TRAILING_COL_ACTIONS_REM}rem` } : undefined}
-            className={cx('relative p-0', !fixedLayout && 'w-0')}
+            // Always, not only for `fixedLayout`: a caller can force `table-fixed`
+            // itself, and a zero here would collapse the column under it (the ⋮
+            // then overflows the table's edge). An auto layout lets the button's
+            // own width win over this one.
+            style={{ width: `${TRAILING_COL_ACTIONS_REM}rem` }}
+            className="relative p-0"
           >
             <span className="sr-only">{t('common.dataTable.actionsHeader')}</span>
           </th>
