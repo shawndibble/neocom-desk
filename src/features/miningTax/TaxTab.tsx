@@ -109,6 +109,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 import { AttentionStrip, type AttentionItem } from '@/features/miningTax/AttentionStrip';
+import { SurveyConnectionsPanel } from '@/features/miningTax/SurveyConnectionsPanel';
 import { OwedBalances } from '@/features/miningTax/OwedBalances';
 import { ContinueSessionCard } from '@/features/miningTax/ContinueSessionCard';
 import { splitLedger } from '@/features/miningTax/ledgerSections';
@@ -317,6 +318,10 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
   // The Characters the ledger tracks, which can be fewer than the roster: the
   // picker's faces and "+N" follow them, matching its "· N".
   const characterIds = useMemo(() => characters.map((c) => c.characterId), [characters]);
+  const characterNames = useMemo(
+    () => new Map(characters.map((c) => [c.characterId, c.characterName])),
+    [characters]
+  );
 
   const { madePayments, paymentSources } = useMadePayments(
     characters.map((c) => c.characterId).join(',')
@@ -1097,6 +1102,13 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
             {data && data.fromCache && <CachedNotice fetchedAt={data.fetchedAt} />}
 
             <AttentionStrip items={attentionItems} />
+
+            <SurveyConnectionsPanel
+              characterIds={characterIds}
+              characterNames={characterNames}
+              systemNames={systemNames}
+              typeNames={data?.typeNames ?? NO_NAMES}
+            />
 
             {/* Until a Payee exists there is nothing to assign an entry to, so
               the balances and ledger would all read as blank. Point at the

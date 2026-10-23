@@ -6332,8 +6332,8 @@
       "assigned_one": "Assigned {{count}} mining entry to {{name}}.",
       "assigned_other": "Assigned {{count}} mining entries to {{name}}.",
       "willAssign": "Your ore from this moon will be assigned to {{name}} at {{pct}}% as it reaches your mining ledger.",
-      "connected": "Assigning to {{name}} until {{time}}",
-      "connectedNoLocation": "Assigning to {{name}} once the survey has a location",
+      "connected": "Auto-assigning moon tax until {{time}}",
+      "connectedNoLocation": "Auto-assigning moon tax once the survey has a location",
       "openTax": "Mining Tax",
       "stop": "Stop",
       "undo": "Undo"
@@ -6442,6 +6442,14 @@
     "reauthTitle": "Some characters need to log in again",
     "reauthHint": "Log in again to fetch this character's personal mining ledger.",
     "reauthAction": "Log in again with EVE Online",
+    "surveyConnections": {
+      "title": "Auto-assigning moon tax",
+      "line": "{{name}} at {{pct}}%",
+      "noLocation": "Waiting for the survey to have a location",
+      "until": "until {{time}}",
+      "overlap": "Shares ore with the survey for {{name}}. Ore both claim stays unassigned for you to assign.",
+      "stopFailed": "Couldn't stop that. Try again."
+    },
     "reauthCharacterHint": "{{character}} needs to log in again to see their mining ledger.",
     "emptyTitle": "No mining ledger entries match this filter",
     "emptyHint": "Mine a moon and check back — ESI's personal mining ledger updates daily.",
