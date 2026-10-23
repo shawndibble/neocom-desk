@@ -264,6 +264,7 @@ describe('useCorpAccess — ready', () => {
       canReadRoleAudit: true,
       canReadContracts: true,
       canReadOrders: true,
+      canReadDivisions: true,
     });
   });
 

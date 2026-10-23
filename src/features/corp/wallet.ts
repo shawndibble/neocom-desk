@@ -55,11 +55,20 @@ export function loadCorporationWallets(
   });
 }
 
-/** The names the corporation gave its hangar and wallet divisions. */
-export function loadCorporationDivisions(
+/**
+ * The names the corporation gave its hangar and wallet divisions.
+ *
+ * Director-only on ESI's side (`canReadDivisions`), narrower than the wallet it
+ * labels: without the role the call is skipped, since it can only 403 and would
+ * spend an ESI error-limit request on every load. Callers fall back to
+ * "Division N" for the nameless result.
+ */
+export async function loadCorporationDivisions(
   characterId: number,
-  corporationId: number
+  corporationId: number,
+  canReadDivisions: boolean
 ): Promise<StatusResult<CorporationDivisions>> {
+  if (!canReadDivisions) return { cached: null, needsReauth: false };
   const { fetchLive, conditional } = conditionalFetch((options) =>
     getCorporationDivisions(characterId, corporationId, options)
   );
