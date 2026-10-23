@@ -34,6 +34,15 @@ const DEV_SPECS = /\.dev\.spec\.ts$/;
 const skipBuilt = process.env.E2E_SKIP_BUILT === '1';
 
 /**
+ * Whether to boot the Vite dev server. Playwright starts every `webServer`
+ * entry whatever specs the run holds, and on a 4-vCPU CI shard an idle dev
+ * server competes with the two workers for CPU. CI sets `E2E_NEEDS_DEV=1`
+ * only on a shard whose spec list holds a `*.dev.spec.ts` file (see the
+ * `e2e-shard` run step in ci.yml); a local run (no `CI`) always boots it.
+ */
+const needsDevServer = !process.env.CI || process.env.E2E_NEEDS_DEV === '1';
+
+/**
  * Build-time and dev-time env must agree, or the two projects render
  * different apps: these are baked into the bundle by `npm run build` in CI's
  * `e2e` job (see .github/workflows/ci.yml) and read from the dev server's
@@ -149,13 +158,17 @@ export default defineConfig({
         ]),
   ],
   webServer: [
-    {
-      // Port 5173 is pinned+busy elsewhere; 5199 is this suite's own port.
-      command: `npm run dev -- --port ${DEV_PORT} --strictPort`,
-      url: DEV_BASE_URL,
-      reuseExistingServer: !process.env.CI,
-      env: E2E_ENV,
-    },
+    ...(needsDevServer
+      ? [
+          {
+            // Port 5173 is pinned+busy elsewhere; 5199 is this suite's own port.
+            command: `npm run dev -- --port ${DEV_PORT} --strictPort`,
+            url: DEV_BASE_URL,
+            reuseExistingServer: !process.env.CI,
+            env: E2E_ENV,
+          },
+        ]
+      : []),
     ...(skipBuilt ? [] : [PREVIEW_SERVER]),
   ],
 });
