@@ -473,7 +473,10 @@ export async function fileSrpClaim(
   const values: ClaimValues = { killmailValue: zkill.totalValue, appraisalValue: null };
   let result = priceSrpClaim(pricingInput(settings, hullTypeId, classId, values));
   const settled = result.kind === 'amount' || (result.kind === 'officer' && result.suggested);
-  if (!settled && pricingInput(settings, hullTypeId, classId, values).appraisalPercent !== null) {
+  if (
+    !settled &&
+    (pricingInput(settings, hullTypeId, classId, values).appraisalPercent ?? 0) >= 1
+  ) {
     values.appraisalValue = await softJita(deps.killmails, appraisalItems(km.victim));
     result = priceSrpClaim(pricingInput(settings, hullTypeId, classId, values));
   }
@@ -506,7 +509,12 @@ export async function fileSrpClaim(
     hullRule: rule ? { scope: rule.scope, id: rule.id, kind: rule.kind } : null,
     killmailValue: values.killmailValue,
     appraisalValue: values.appraisalValue,
-    valueSource: values.killmailValue ? 'zkillboard' : values.appraisalValue ? 'appraisal' : 'none',
+    valueSource:
+      values.killmailValue !== null
+        ? 'zkillboard'
+        : values.appraisalValue !== null
+          ? 'appraisal'
+          : 'none',
     fleetOrFc: input.fleetOrFc,
     note: input.note,
     schemaVersion: SRP_SCHEMA_VERSION,
@@ -514,6 +522,9 @@ export async function fileSrpClaim(
   await deps.db.runTransaction(async (tx) => {
     const existing = (await tx.get(ref)).data();
     const decision = refileDecision(existing);
+    if (decision === 'refile' && input.note === null) {
+      fail('invalid-argument', 'A re-filed claim needs a note', 'note-required');
+    }
     if (decision === 'new') {
       tx.create(ref, { ...base, refileCount: 0 });
     } else {

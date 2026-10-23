@@ -41,6 +41,18 @@ async function esiGet(url: string, fetchImpl: typeof fetch): Promise<unknown> {
 const asNumber = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null;
 
+function cleanItems(raw: unknown): KillmailItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((i: Record<string, unknown>) => ({
+    ...(asNumber(i?.item_type_id) !== null
+      ? { item_type_id: asNumber(i.item_type_id) as number }
+      : {}),
+    quantity_dropped: asNumber(i?.quantity_dropped) ?? 0,
+    quantity_destroyed: asNumber(i?.quantity_destroyed) ?? 0,
+    ...(Array.isArray(i?.items) ? { items: cleanItems(i.items) } : {}),
+  }));
+}
+
 export function parseEsiKillmail(killmailId: number, body: unknown): EsiKillmail {
   const b = body as {
     killmail_time?: unknown;
@@ -66,7 +78,7 @@ export function parseEsiKillmail(killmailId: number, body: unknown): EsiKillmail
       characterId: asNumber(b?.victim?.character_id),
       corporationId: asNumber(b?.victim?.corporation_id),
       shipTypeId,
-      items: Array.isArray(b?.victim?.items) ? (b.victim.items as KillmailItem[]) : [],
+      items: cleanItems(b?.victim?.items),
     },
   };
 }
@@ -113,7 +125,8 @@ export function srpKillmailSource(fetchImpl: typeof fetch = fetch): SrpKillmailS
     },
 
     async jitaValue(items) {
-      const typeIds = [...items.keys()].slice(0, MAX_APPRAISAL_TYPES);
+      if (items.size > MAX_APPRAISAL_TYPES) return null; // a partial total would underpay
+      const typeIds = [...items.keys()];
       let total = 0;
       try {
         for (let i = 0; i < typeIds.length; i += FUZZWORK_BATCH) {
