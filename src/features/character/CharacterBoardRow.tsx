@@ -82,7 +82,7 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
         countdown's four characters.
       */}
       <KindIcon className={`size-4 shrink-0 ${KIND_TEXT[item.kind]}`} aria-hidden="true" />
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
           {/*
             Colour is never the only signal (DESIGN.md §7) — and here it needs
