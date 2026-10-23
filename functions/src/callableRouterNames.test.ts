@@ -32,7 +32,7 @@ describe('callable router names', () => {
     const routed = new Set(registrations.map((m) => m[1]));
     const loose = [
       ...index.matchAll(
-        /export const (\w+(?:Communit|CorpTaxBook|CorpOfficer)\w*Callable) = onCall/g
+        /export const (\w+(?:Communit|CorpTaxBook|CorpOfficer|Srp)\w*Callable) = onCall/g
       ),
     ];
     expect(loose.map((m) => m[1]).filter((n) => !routed.has(n))).toEqual([]);
@@ -44,7 +44,7 @@ describe('callable router names', () => {
     for (const file of clientSources(join(__dirname, '../../src'))) {
       const text = readFileSync(file, 'utf8');
       for (const m of text.matchAll(
-        /'((?:\w*Communit\w*|\w*CorpTaxBook\w*|verifyCorpOfficer)Callable|registerDevice|saveAlertGrant|deleteAlertGrant)'/g
+        /'((?:\w*Communit\w*|\w*CorpTaxBook\w*|\w*Srp\w*|verifyCorpOfficer)Callable|registerDevice|saveAlertGrant|deleteAlertGrant)'/g
       )) {
         used.add(m[1]);
       }

@@ -566,6 +566,55 @@ service cloud.firestore {
       }
     }
 
+    // SRP (issue #4848, ADR 0026): corp-shared data under the `corps/{id}` umbrella, written
+    // only by the SRP callables (functions/src/srpStore.ts). No client write, anywhere.
+    //  - srp/settings, srpAudit: officers only (the settings reach members through a callable).
+    //  - srpClaims: officers read all; a pilot reads only claims filed under their own
+    //    verified Character uid and owner hash (a sold Character does not inherit them; queries
+    //    must filter `uid == auth.uid` and `ownerHash == auth.token.ownerHash`).
+    //  - srpOfficers/{uid}: the 24h access record verifySrpOfficer writes; a Character may
+    //    read only their own. Officer access needs canEdit (Director, Accountant or CEO) and
+    //    the same ownerHash, so a demoted officer or a sold Character loses it.
+    // Everything else under `corps/{id}` is closed (default deny).
+    match /corps/{corporationId} {
+      function isSrpCharacter() {
+        return request.auth != null && request.auth.uid.matches('char:[0-9]+');
+      }
+      function srpOfficerPath() {
+        return /databases/$(database)/documents/corps/$(corporationId)/srpOfficers/$(request.auth.uid);
+      }
+      function isSrpOfficer() {
+        return isSrpCharacter()
+          && exists(srpOfficerPath())
+          && get(srpOfficerPath()).data.canEdit == true
+          && get(srpOfficerPath()).data.ownerHash == request.auth.token.ownerHash
+          && get(srpOfficerPath()).data.expiresAt > request.time.toMillis();
+      }
+
+      match /srp/{docId} {
+        allow get, list: if isSrpOfficer();
+        allow write: if false;
+      }
+
+      match /srpClaims/{killmailId} {
+        allow get, list: if isSrpOfficer()
+          || (isSrpCharacter() && resource.data.uid == request.auth.uid
+            && resource.data.ownerHash == request.auth.token.ownerHash);
+        allow write: if false;
+      }
+
+      match /srpAudit/{entryId} {
+        allow get, list: if isSrpOfficer();
+        allow write: if false;
+      }
+
+      match /srpOfficers/{officerUid} {
+        allow get: if isSrpCharacter() && request.auth.uid == officerUid
+          && resource.data.ownerHash == request.auth.token.ownerHash;
+        allow list, write: if false;
+      }
+    }
+
     match /corpTaxBookTokens/{token} {
       allow read, write: if false;
     }

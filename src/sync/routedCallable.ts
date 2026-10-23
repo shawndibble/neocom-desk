@@ -13,7 +13,7 @@ const ALERTS_CALLABLES = new Set(['registerDevice', 'saveAlertGrant', 'deleteAle
 
 export function routerFor(name: string): 'communityCall' | 'corpTaxBookCall' | 'alertsCall' {
   if (ALERTS_CALLABLES.has(name)) return 'alertsCall';
-  if (name.includes('CorpTaxBook') || name === 'verifyCorpOfficerCallable')
+  if (name.includes('CorpTaxBook') || name.includes('Srp') || name === 'verifyCorpOfficerCallable')
     return 'corpTaxBookCall';
   if (name.includes('Communit')) return 'communityCall';
   throw new Error(`No callable router for ${name}`);
