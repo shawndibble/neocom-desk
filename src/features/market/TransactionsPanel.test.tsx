@@ -17,7 +17,7 @@ import { loadWalletJournal, loadWalletTransactionsWithStatus } from '@/features/
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadAllCharactersJournals } from '@/features/character/walletJournalAll';
 import * as download from '@/lib/download';
-import { usePlaceLabels } from '@/features/communities/useBlueprintPlaces';
+import { usePlaceDetails } from '@/features/places';
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 
 vi.mock('@/features/character/wallet', () => ({
@@ -28,8 +28,9 @@ vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn() }));
 vi.mock('@/features/character/walletJournalAll', () => ({ loadAllCharactersJournals: vi.fn() }));
 
-vi.mock('@/features/communities/useBlueprintPlaces', () => ({
-  usePlaceLabels: vi.fn(() => new Map()),
+vi.mock('@/features/places', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/places')>()),
+  usePlaceDetails: vi.fn(() => new Map()),
 }));
 
 const mockedLoadTransactions = vi.mocked(loadWalletTransactionsWithStatus);
@@ -568,9 +569,14 @@ describe('TransactionsPanel — location column', () => {
       fromCache: false,
       truncated: false,
     });
-    vi.mocked(usePlaceLabels).mockImplementation((_id, ids) =>
-      ids.length > 0
-        ? new Map([[60003760, { name: 'Jita IV - Moon 4', systemName: 'Jita' }]])
+    vi.mocked(usePlaceDetails).mockImplementation((refs) =>
+      refs.length > 0
+        ? new Map([
+            [
+              '1:60003760',
+              { name: 'Jita IV - Moon 4', systemId: null, security: null, jumps: undefined },
+            ],
+          ])
         : new Map()
     );
     renderPanel();
@@ -578,7 +584,7 @@ describe('TransactionsPanel — location column', () => {
     await screen.findByRole('link', { name: 'Damage Control II' });
     expect(screen.queryByText('Jita IV - Moon 4')).not.toBeInTheDocument();
     // Nothing is asked for while the column is off.
-    expect(vi.mocked(usePlaceLabels).mock.calls.every(([, ids]) => ids.length === 0)).toBe(true);
+    expect(vi.mocked(usePlaceDetails).mock.calls.every(([refs]) => refs.length === 0)).toBe(true);
 
     await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
     await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Location' }));

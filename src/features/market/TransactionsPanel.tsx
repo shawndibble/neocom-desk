@@ -31,7 +31,7 @@ import {
 } from '@/features/character/walletTransactionFilter';
 import { useUrlFilter } from '@/lib/useUrlState';
 import { ItemInfoLink, PlaceLink } from '@/features/entities';
-import { usePlaceLabels } from '@/features/communities/useBlueprintPlaces';
+import { placeKey, usePlaceDetails, type PlaceRef } from '@/features/places';
 import { formatPercent } from '@/features/industry/format';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -40,7 +40,7 @@ import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapsh
 import { formatMarketIsk } from '@/lib/isk';
 import { splitTimestamp } from '@/lib/timestamp';
 import { HintText } from '@/components/ui/HintText';
-import type { MarginGap } from '@/engine/market/realizedMargin';
+import type { MarginGap, RealizedMargin } from '@/engine/market/realizedMargin';
 import { useTimeZone } from '@/lib/timeFormat';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
@@ -87,7 +87,7 @@ const HISTORY_CHARACTER_PARAMS = { 'txn.chars': characterFilterParam('current') 
 /** Margin over what the sold units cost, as a percent; null when the sale has no margin. */
 function marginPercentOf(
   txn: WalletTransaction,
-  margin: { unitCost: number; margin: number } | undefined
+  margin: RealizedMargin | undefined
 ): number | null {
   if (!margin) return null;
   const cost = margin.unitCost * txn.quantity;
@@ -254,16 +254,34 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
     TRANSACTIONS_PHONE_OFF_BY_DEFAULT
   );
   // Names only while Location is ticked: a structure's name is a lookup each.
-  const locationIds = useMemo(
-    () =>
-      isVisible('location') ? [...new Set(filteredTransactions.map((txn) => txn.location_id))] : [],
-    [isVisible, filteredTransactions]
+  const locationOn = isVisible('location');
+  // Under All a fill's place is asked as the Character that made it, since a
+  // structure's name is ACL-checked per Character.
+  const placeOwnerOf = useCallback(
+    (txn: WalletTransaction) =>
+      allScope ? (txn as PooledTransaction).characterId : activeCharacterId,
+    [allScope, activeCharacterId]
   );
-  const placeLabels = usePlaceLabels(activeCharacterId ?? 0, locationIds);
+  const placeRefs = useMemo<PlaceRef[]>(() => {
+    if (!locationOn) return [];
+    const byKey = new Map<string, PlaceRef>();
+    for (const txn of filteredTransactions) {
+      const ref = { locationId: txn.location_id, characterId: placeOwnerOf(txn) };
+      byKey.set(placeKey(ref), ref);
+    }
+    return [...byKey.values()];
+  }, [locationOn, filteredTransactions, placeOwnerOf]);
+  const placeDetails = usePlaceDetails(placeRefs, {
+    scopeId: activeCharacterId,
+    enabled: locationOn,
+    origin: null,
+    basis: null,
+  });
   const placeNameFor = useCallback(
-    (locationId: number) =>
-      placeLabels.get(locationId)?.name ?? t('wallet.locationFallback', { id: locationId }),
-    [placeLabels, t]
+    (txn: WalletTransaction) =>
+      placeDetails.get(placeKey({ locationId: txn.location_id, characterId: placeOwnerOf(txn) }))
+        ?.name ?? t('wallet.locationFallback', { id: txn.location_id }),
+    [placeDetails, placeOwnerOf, t]
   );
 
   const columns = useMemo<DataTableColumn<WalletTransaction>[]>(
@@ -411,10 +429,8 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         id: 'location',
         header: t('wallet.location'),
         className: 'whitespace-nowrap',
-        render: (txn) => (
-          <PlaceLink id={txn.location_id}>{placeNameFor(txn.location_id)}</PlaceLink>
-        ),
-        sortValue: (txn) => placeNameFor(txn.location_id),
+        render: (txn) => <PlaceLink id={txn.location_id}>{placeNameFor(txn)}</PlaceLink>,
+        sortValue: (txn) => placeNameFor(txn),
       },
     ],
     [t, typeNames, timeZone, nameFor, margins, gaps, allScope, placeNameFor]
