@@ -750,6 +750,10 @@ const CORP_TAX_BOOK_OPTIONS = { maxInstances: 5 };
 const corpTaxBookActions = createActionGroup();
 const corpTaxBookCallable = (name: string, options: CallableOptions, handler: CallableHandler) =>
   onCall<unknown>(options, corpTaxBookActions.register(name, handler));
+/** A Corp Tax Book router action with no deployed function of its own. New callables use this. */
+const corpTaxBookAction = (name: string, handler: CallableHandler): void => {
+  corpTaxBookActions.register(name, handler);
+};
 
 // Collector books (issue #4507): invite links for a feeder corporation. Codes only; the UI maps them later.
 export const createCorpTaxBookFeederInviteCallable = corpTaxBookCallable(
@@ -1118,8 +1122,9 @@ export const editCorpTaxBookCallable = corpTaxBookCallable(
     )
 );
 
-// SRP (ADR 0026): data under corps/{id}, written only by these callables. Served by
-// the Corp Tax Book router (one more deployed function would add a quota hit for nothing).
+// SRP (ADR 0026): data under corps/{id}, written only by these callables. Router-only: each is
+// an action of `corpTaxBookCall`, never its own deployed function (a deploy has a per-minute
+// mutation quota). Clients call it through `callRouted`.
 const srpDeps = (): SrpDeps => ({
   ...corpTaxBookDeps(),
   lookupCorporation: esiCorporationLookup(),
@@ -1127,133 +1132,99 @@ const srpDeps = (): SrpDeps => ({
 
 const srpFileDeps = (): SrpFileDeps => ({ ...srpDeps(), killmails: srpKillmailSource() });
 
-export const verifySrpOfficerCallable = corpTaxBookCallable(
-  'verifySrpOfficerCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => verifySrpOfficer(srpDeps(), callerOf(request), parseBookCall(request.data))
+corpTaxBookAction('verifySrpOfficerCallable', (request) =>
+  verifySrpOfficer(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 // A member (no corp role, no corp scope): is SRP on for my corporation, and what are its rules.
-export const getSrpStatusCallable = corpTaxBookCallable(
-  'getSrpStatusCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => getSrpStatus(srpDeps(), callerOf(request), parseBookCall(request.data))
+corpTaxBookAction('getSrpStatusCallable', (request) =>
+  getSrpStatus(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 // A member files an SRP Claim against their own killmail: the server verifies the loss and prices it.
-export const fileSrpClaimCallable = corpTaxBookCallable(
-  'fileSrpClaimCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    fileSrpClaim(
-      srpFileDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseFileClaimInput(request.data)
-    )
+corpTaxBookAction('fileSrpClaimCallable', (request) =>
+  fileSrpClaim(
+    srpFileDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseFileClaimInput(request.data)
+  )
 );
 
-export const turnOnSrpCallable = corpTaxBookCallable(
-  'turnOnSrpCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => turnOnSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
+corpTaxBookAction('turnOnSrpCallable', (request) =>
+  turnOnSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
-export const turnOffSrpCallable = corpTaxBookCallable(
-  'turnOffSrpCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => turnOffSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
+corpTaxBookAction('turnOffSrpCallable', (request) =>
+  turnOffSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
-export const saveSrpSettingsCallable = corpTaxBookCallable(
-  'saveSrpSettingsCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    saveSrpSettings(
-      srpDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseSrpSettingsPatch((request.data as { settings?: unknown } | null)?.settings)
-    )
+corpTaxBookAction('saveSrpSettingsCallable', (request) =>
+  saveSrpSettings(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseSrpSettingsPatch((request.data as { settings?: unknown } | null)?.settings)
+  )
 );
 
 // Officer queue: each re-checks Director/Accountant live and guards the state change in a transaction.
-export const approveSrpClaimCallable = corpTaxBookCallable(
-  'approveSrpClaimCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    approveSrpClaim(
-      srpDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseApproveItem(request.data)
-    )
+corpTaxBookAction('approveSrpClaimCallable', (request) =>
+  approveSrpClaim(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseApproveItem(request.data)
+  )
 );
 
-export const approveSrpClaimsCallable = corpTaxBookCallable(
-  'approveSrpClaimsCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    approveSrpClaims(
-      srpDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseApproveBatch(request.data)
-    )
+corpTaxBookAction('approveSrpClaimsCallable', (request) =>
+  approveSrpClaims(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseApproveBatch(request.data)
+  )
 );
 
-export const rejectSrpClaimCallable = corpTaxBookCallable(
-  'rejectSrpClaimCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    rejectSrpClaim(
-      srpDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseReject(request.data)
-    )
+corpTaxBookAction('rejectSrpClaimCallable', (request) =>
+  rejectSrpClaim(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseReject(request.data)
+  )
 );
 
-export const changeSrpClaimAmountCallable = corpTaxBookCallable(
-  'changeSrpClaimAmountCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    changeSrpClaimAmount(
-      srpDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseChangeAmount(request.data)
-    )
+corpTaxBookAction('changeSrpClaimAmountCallable', (request) =>
+  changeSrpClaimAmount(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseChangeAmount(request.data)
+  )
 );
 
-export const markSrpClaimPaidCallable = corpTaxBookCallable(
-  'markSrpClaimPaidCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    markSrpClaimPaid(
-      srpDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseMarkPaidItem(request.data)
-    )
+corpTaxBookAction('markSrpClaimPaidCallable', (request) =>
+  markSrpClaimPaid(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseMarkPaidItem(request.data)
+  )
 );
 
-export const markSrpClaimsPaidCallable = corpTaxBookCallable(
-  'markSrpClaimsPaidCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    markSrpClaimsPaid(
-      srpDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseMarkPaidBatch(request.data)
-    )
+corpTaxBookAction('markSrpClaimsPaidCallable', (request) =>
+  markSrpClaimsPaid(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseMarkPaidBatch(request.data)
+  )
 );
 
-export const reclaimSrpCallable = corpTaxBookCallable(
-  'reclaimSrpCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => reclaimSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
+corpTaxBookAction('reclaimSrpCallable', (request) =>
+  reclaimSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 // A player claims their own Unmatched donation (D5): uid-authorised, no officer role.
