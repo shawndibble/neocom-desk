@@ -140,7 +140,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
       claim: {
         killmailId: o.killmailId,
         hull: claim ? names.hull(claim.hullTypeId) : t('srp.officer.mail.hullFallback'),
-        amount: o.amount ?? 0,
+        amount: o.amount ?? claim?.amount ?? 0,
         ...extra,
       },
     };
