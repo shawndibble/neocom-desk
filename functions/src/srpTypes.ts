@@ -7,7 +7,9 @@
 //                                               id, so a second claim is a create conflict. Written by
 //                                               the file-claim callable; carries `uid`.
 //   corps/{corporationId}/srpAudit/{at~rand}    immutable audit log
+//   corps/{corporationId}/srpDoctrines/{id}      the corp's Doctrine Fit snapshots (DoctrineFit)
 //   corps/{corporationId}/srpOfficers/{uid}     officer access record (1h) written by verifySrpOfficer
+import type { DoctrineFitSnapshot } from './srpDoctrine.js';
 
 export const CORPS_COLLECTION = 'corps';
 export const SRP_SETTINGS_COLLECTION = 'srp';
@@ -15,6 +17,7 @@ export const SRP_SETTINGS_DOC = 'settings';
 export const SRP_CLAIMS = 'srpClaims';
 export const SRP_AUDIT = 'srpAudit';
 export const SRP_OFFICERS = 'srpOfficers';
+export const SRP_DOCTRINES = 'srpDoctrines';
 
 export const SRP_SCHEMA_VERSION = 1;
 /** A claim's window, in days from the loss: corp default and the range a Director may set. */
@@ -34,10 +37,26 @@ export const HULL_RULE_KINDS: readonly HullRuleKind[] = [
 /** `hull` keys on an SDE type id, `class` on a ship group id. A hull rule wins over its class's. */
 export type HullRuleScope = 'hull' | 'class';
 
-export type HullRule =
+export type HullRule = (
   | { scope: HullRuleScope; id: number; kind: 'pay-fixed'; iskAmount: number }
   | { scope: HullRuleScope; id: number; kind: 'pay-percent' }
-  | { scope: HullRuleScope; id: number; kind: 'not-covered' | 'officer-decides' };
+  | { scope: HullRuleScope; id: number; kind: 'not-covered' | 'officer-decides' }
+) & {
+  /** Doctrine Fits a claim on this hull must match; absent or empty: the hull is not checked. */
+  doctrineIds?: string[];
+};
+
+/**
+ * A corp's Doctrine Fit (GLOSSARY.md): a snapshot of a Director's pasted or picked fit, so
+ * later edits to a source Fitting never change it. `corps/{corporationId}/srpDoctrines/{id}`.
+ */
+export interface DoctrineFit {
+  id: string;
+  name: string;
+  snapshot: DoctrineFitSnapshot;
+  createdBy: number;
+  createdAt: number;
+}
 
 /** `corps/{corporationId}/srp/settings`. */
 export interface SrpSettings {
