@@ -430,13 +430,13 @@ export function getCorporationMemberTitles(
   });
 }
 
-// --- Skyhooks and sovereignty hubs (esi-structures.read_corporation.v1) ---
-
 /** An ISO instant window; both ends are always sent together. */
 export interface SovereigntyWindow {
   start: string;
   end: string;
 }
+
+// --- GET /corporations/{corporation_id}/structures/skyhooks (esi-structures.read_corporation.v1) ---
 
 /** Station_Manager (`canReadSkyhooks`). The list names each skyhook's planet, not its system. */
 export function getCorporationSkyhooks(
@@ -467,6 +467,8 @@ export interface CorporationSkyhookDetail {
   theft_vulnerability?: SovereigntyWindow;
 }
 
+// --- GET /corporations/{corporation_id}/structures/skyhooks/{skyhook_id} (esi-structures.read_corporation.v1) ---
+
 export function getCorporationSkyhook(
   characterId: number,
   corporationId: number,
@@ -479,6 +481,8 @@ export function getCorporationSkyhook(
     endpointId: 'getCorporationSkyhook',
   });
 }
+
+// --- GET /corporations/{corporation_id}/structures/sovereignty-hubs (esi-structures.read_corporation.v1) ---
 
 export function getCorporationSovereigntyHubs(
   characterId: number,
@@ -502,6 +506,8 @@ export interface CorporationSovereigntyHubDetail {
   /** Past `end` means overtime; past `start` means vulnerable. */
   vulnerability_window?: SovereigntyWindow;
 }
+
+// --- GET /corporations/{corporation_id}/structures/sovereignty-hubs/{sovereignty_hub_id} (esi-structures.read_corporation.v1) ---
 
 /** Station_Manager (`canReadSkyhooks`). */
 export function getCorporationSovereigntyHub(
