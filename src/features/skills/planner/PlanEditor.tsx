@@ -2006,6 +2006,7 @@ export function PlanEditor({
 
       <OptimizeForMeModal
         preview={optimizeForMePreview}
+        currentOrder={scheduled}
         totalSeconds={totalSeconds}
         nameFor={nameFor}
         stepLabel={stepLabel}

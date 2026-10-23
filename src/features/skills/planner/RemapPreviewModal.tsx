@@ -1,6 +1,10 @@
+import { useState } from 'react';
 import { romanLevel } from '@/engine/projection';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal } from '@/components/ui';
+import { Button, Eyebrow, Modal, SegmentedControl } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
+import { Ascending, Descending } from '@/components/ui/icons';
+import { cx } from '@/lib/cx';
 import type { OptimizeForMeResult, RemapSegment } from '@/engine/optimizer';
 import type { StepKey } from '@/engine/skills/skillPlanSchedule';
 import type { Implants, PlanStep } from '@/engine/types';
@@ -8,6 +12,7 @@ import { formatCountdown } from '@/lib/duration';
 import { useTimeZone } from '@/lib/timeFormat';
 import { yearlyRemapAfterNote } from './optimizeHelpers';
 import type { OptimizeVerdict } from './optimizeVerdict';
+import { compareOrders, type CurrentCompareRow, type ProposedCompareRow } from './optimizeCompare';
 import { remapInstruction } from './remapInstruction';
 
 interface RemapSegmentListProps {
@@ -151,6 +156,8 @@ export function RemapPreviewModal({
 interface OptimizeForMeModalProps {
   /** Null while closed. */
   preview: OptimizeForMeResult | null;
+  /** The plan as it stands, in training order: the "Current" side. */
+  currentOrder: readonly PlanStep[];
   /** The plan's current total, shown as the "before" of the before/after line. */
   totalSeconds: number;
   nameFor: (skillTypeID: number) => string;
@@ -160,9 +167,116 @@ interface OptimizeForMeModalProps {
   onReject: () => void;
 }
 
-/** The "Optimize for me" Accept/Reject preview: new order and remap segments together. */
+type CompareSide = 'current' | 'proposed';
+
+/** Words for a screen reader and the tooltip-free eye alike: the arrow is never the only cue. */
+function MovedPill({ from, position }: { from: number; position: number }) {
+  const { t } = useTranslation();
+  const up = position < from;
+  const Icon = up ? Ascending : Descending;
+  const count = Math.abs(from - position);
+  return (
+    <Pill tone="warning" className="inline-flex shrink-0 items-center gap-0.5">
+      <Icon aria-hidden size={10} />
+      <span aria-hidden>{count}</span>
+      <span className="sr-only">
+        {t(up ? 'plans.compareMovedUp' : 'plans.compareMovedDown', { count })}
+      </span>
+    </Pill>
+  );
+}
+
+function CurrentList({
+  rows,
+  nameFor,
+}: {
+  rows: readonly CurrentCompareRow[];
+  nameFor: (id: number) => string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <ol className="space-y-0.5 text-xs">
+      {rows.map(({ step, position, movesTo }) => (
+        <li
+          key={`${step.skillTypeID}-${step.level}`}
+          className={cx(
+            'flex items-center gap-2 rounded-xs px-2 py-1',
+            movesTo === null ? 'border-b border-line' : 'bg-warning/10'
+          )}
+        >
+          <span className="w-5 shrink-0 tabular-nums text-text-dim">{position}</span>
+          <span className={cx('min-w-0 flex-1 truncate', movesTo !== null && 'font-semibold')}>
+            {nameFor(step.skillTypeID)} {romanLevel(step.level)}
+          </span>
+          {movesTo !== null && (
+            <span className="shrink-0 text-text-dim">
+              {t('plans.compareMovesTo', { position: movesTo })}
+            </span>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function ProposedList({
+  rows,
+  nameFor,
+  stepLabel,
+  implants,
+}: {
+  rows: readonly ProposedCompareRow[];
+  nameFor: (id: number) => string;
+  stepLabel: (step: PlanStep) => string;
+  implants: Implants;
+}) {
+  const { t } = useTranslation();
+  return (
+    <ol className="space-y-0.5 text-xs">
+      {rows.map((row) => {
+        if (row.kind === 'remap') {
+          return (
+            <li
+              key={`remap-${row.segment.startIndex}`}
+              className="my-1 rounded-xs border border-dashed border-accent bg-accent/10 px-2 py-1 text-accent"
+            >
+              <span className="font-semibold">{t('plans.compareNewMarker')}</span>{' '}
+              {t('plans.segmentRemap', {
+                skill: stepLabel(row.before),
+                attributes: remapInstruction(row.segment.attributes, implants),
+              })}
+            </li>
+          );
+        }
+        const moved = row.from !== null;
+        return (
+          <li
+            key={`${row.step.skillTypeID}-${row.step.level}`}
+            className={cx(
+              'flex items-center gap-2 rounded-xs px-2 py-1',
+              moved ? 'bg-warning/10' : 'border-b border-line'
+            )}
+          >
+            <span className="w-5 shrink-0 tabular-nums text-text-dim">{row.position}</span>
+            <span className={cx('min-w-0 flex-1 truncate', moved && 'font-semibold')}>
+              {nameFor(row.step.skillTypeID)} {romanLevel(row.step.level)}
+            </span>
+            {row.from !== null && <MovedPill from={row.from} position={row.position} />}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/**
+ * The "Optimize for me" Accept/Reject preview: the plan as it is and as the
+ * optimizer would leave it, side by side (stacked behind a switch on a phone),
+ * so the pilot sees what moved and where the remap markers land.
+ */
 export function OptimizeForMeModal({
   preview,
+  currentOrder,
   totalSeconds,
   nameFor,
   stepLabel,
@@ -171,41 +285,72 @@ export function OptimizeForMeModal({
   onReject,
 }: OptimizeForMeModalProps) {
   const { t } = useTranslation();
+  const [side, setSide] = useState<CompareSide>('proposed');
+  const rows = preview ? compareOrders(currentOrder, preview.order, preview.remaps.segments) : null;
+  const before = formatCountdown(totalSeconds);
+  const after = preview ? formatCountdown(preview.remaps.totalSeconds) : '';
+  const saved = preview ? totalSeconds - preview.remaps.totalSeconds : 0;
+  const moved = rows ? rows.current.filter((r) => r.movesTo !== null).length : 0;
+  const markers = rows ? rows.proposed.filter((r) => r.kind === 'remap').length : 0;
   return (
-    <Modal open={preview !== null} onClose={onReject} title={t('plans.optimizeForMeTitle')}>
-      {preview && (
-        <div className="space-y-2 text-xs">
-          <p className="font-semibold text-success">
-            {t('plans.optimizeForMeTotal', {
-              before: formatCountdown(totalSeconds),
-              after: formatCountdown(preview.remaps.totalSeconds),
-            })}
-          </p>
-          <ul className="max-h-56 overflow-y-auto">
-            {preview.order.map((step, i) => (
-              <li
-                key={`${step.skillTypeID}-${step.level}-${i}`}
-                className="border-b border-line py-1 last:border-b-0"
-              >
-                {nameFor(step.skillTypeID)} {romanLevel(step.level)}
-              </li>
-            ))}
-          </ul>
-          <div className="max-h-56 overflow-y-auto">
-            <RemapSegmentList
-              segments={preview.remaps.segments}
-              anchorAt={(segment) => preview.order[segment.startIndex]}
-              stepLabel={stepLabel}
-              implants={implants}
+    <Modal
+      open={preview !== null}
+      onClose={onReject}
+      title={t('plans.optimizeForMeTitle')}
+      placement="wide"
+      footer={
+        preview && (
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
+            <p className="text-xs">
+              <span className="font-semibold text-success">
+                {t('plans.optimizeForMeTotal', { before, after })}
+              </span>
+              <span className="text-text-dim">
+                {saved > 0 && ` · ${t('plans.compareSaves', { duration: formatCountdown(saved) })}`}
+                {` · ${t('plans.compareMoved', { count: moved })}`}
+                {` · ${t('plans.compareMarkers', { count: markers })}`}
+              </span>
+            </p>
+            <div className="flex gap-2">
+              <Button variant="primary" size="sm" onClick={onAccept}>
+                {t('plans.remapAccept')}
+              </Button>
+              <Button size="sm" onClick={onReject}>
+                {t('plans.remapReject')}
+              </Button>
+            </div>
+          </div>
+        )
+      }
+    >
+      {rows && (
+        <div className="space-y-2">
+          <div className="md:hidden">
+            <SegmentedControl
+              label={t('plans.compareView')}
+              fill
+              value={side}
+              onChange={setSide}
+              options={[
+                { value: 'current', label: t('plans.compareCurrentTab') },
+                { value: 'proposed', label: t('plans.compareOptimizedTab') },
+              ]}
             />
           </div>
-          <div className="flex gap-2">
-            <Button variant="primary" size="sm" onClick={onAccept}>
-              {t('plans.remapAccept')}
-            </Button>
-            <Button size="sm" onClick={onReject}>
-              {t('plans.remapReject')}
-            </Button>
+          <div className="grid gap-4 md:grid-cols-2">
+            <section className={cx('space-y-1', side !== 'current' && 'max-md:hidden')}>
+              <Eyebrow>{t('plans.compareCurrent', { total: before })}</Eyebrow>
+              <CurrentList rows={rows.current} nameFor={nameFor} />
+            </section>
+            <section className={cx('space-y-1', side !== 'proposed' && 'max-md:hidden')}>
+              <Eyebrow>{t('plans.compareOptimized', { total: after })}</Eyebrow>
+              <ProposedList
+                rows={rows.proposed}
+                nameFor={nameFor}
+                stepLabel={stepLabel}
+                implants={implants}
+              />
+            </section>
           </div>
         </div>
       )}
