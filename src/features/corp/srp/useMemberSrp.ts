@@ -103,11 +103,16 @@ export function useMemberSrp(characterId: number, corporationId: number): Member
     ];
     if (typeIds.length === 0) return;
     let cancelled = false;
-    void loadTypeNames(typeIds).then((map) => !cancelled && setHullNames(map));
-    void loadSolarSystemsById().then((byId) => {
-      if (cancelled || !byId) return;
-      setSystems(byId);
-    });
+    // A failed SDE read leaves the `#id` fallbacks in place.
+    loadTypeNames(typeIds)
+      .then((map) => !cancelled && setHullNames(map))
+      .catch(() => undefined);
+    loadSolarSystemsById()
+      .then((byId) => {
+        if (cancelled || !byId) return;
+        setSystems(byId);
+      })
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };

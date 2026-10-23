@@ -1,5 +1,6 @@
 /** The member page's reads and writes, with a stand-in for Storybook and tests (never set by the app). */
 import { collection, getDocs, query, where } from 'firebase/firestore/lite';
+import { isSyncConfigured } from '@/app/syncStatus';
 import { db as localDb } from '@/db';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -81,7 +82,11 @@ async function readMyClaims(characterId: number, corporationId: number): Promise
 }
 
 const real: SrpMemberBackend = {
-  status: getSrpStatus,
+  // SRP lives in the cloud backend; with none configured there is no SRP to find, not a failed load.
+  status: async (characterId, corporationId) =>
+    isSyncConfigured()
+      ? getSrpStatus(characterId, corporationId)
+      : { corporationId, enabled: false },
   claims: readMyClaims,
   file: fileSrpClaim,
   lostLosses: loadLostLosses,
