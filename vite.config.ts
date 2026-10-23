@@ -232,6 +232,27 @@ function spaFallbackHtml() {
   };
 }
 
+/**
+ * Emits `version.json` (`{ release }`) beside `index.html`: the running app
+ * compares it with its own `__APP_RELEASE__` to learn of a new build in one
+ * small request (src/app/latestRelease.ts), instead of waiting on the service
+ * worker's precache. Kept out of the precache (`globIgnores`) so it is always
+ * read from the network.
+ */
+function releaseFilePlugin() {
+  return {
+    name: 'neocom-release-file',
+    apply: 'build' as const,
+    generateBundle(this: { emitFile: (file: object) => void }) {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'version.json',
+        source: JSON.stringify({ release }),
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: '/',
   build: {
@@ -371,6 +392,7 @@ export default defineConfig({
           '**/screenshots/**',
           '**/icons/icon-512*.png',
           '**/brand/**',
+          '**/version.json',
         ],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
@@ -387,6 +409,7 @@ export default defineConfig({
         ]
       : []),
     spaFallbackHtml(),
+    releaseFilePlugin(),
   ],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
