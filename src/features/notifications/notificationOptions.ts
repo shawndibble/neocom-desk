@@ -107,6 +107,8 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   priceAlertTriggered: '/market/browser',
   stockBelowTarget: '/market/stock',
   incursionNearby: '/travel/route',
+  // The Overview, whose Route Safety widget lists the raidable skyhooks in range.
+  skyhookRaidableNearby: '/overview',
   // The Overview, whose Kills widget lists the loss (issue #4772).
   shipLost: '/overview',
   // The Communities page, where the admin lets the request in or sees the Member.

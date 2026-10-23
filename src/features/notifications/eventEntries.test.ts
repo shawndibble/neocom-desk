@@ -51,6 +51,7 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
       walletBalanceChangedThresholdIsk: ['walletBalanceChanged'],
       walletFoldIntoContract: ['walletBalanceChanged'],
       incursionNearbyJumps: ['incursionNearby'],
+      skyhookRaidableNearbyJumps: ['skyhookRaidableNearby'],
       shipLostMinimumIsk: ['shipLost'],
       mercenaryDenReinforcedLeadHours: ['mercenaryDenReinforced'],
       mercenaryDenAnarchyPercent: ['mercenaryDenAnarchy'],

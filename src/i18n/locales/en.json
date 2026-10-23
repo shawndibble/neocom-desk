@@ -10563,6 +10563,14 @@
         "body_one": "{{constellation}}, staging in {{system}}: {{state}}, {{count}} jump from your current system.",
         "body_other": "{{constellation}}, staging in {{system}}: {{state}}, {{count}} jumps from your current system."
       },
+      "skyhookRaidableNearby": {
+        "windowOpen": "now, for another {{duration}}",
+        "windowIn": "in {{duration}}",
+        "title_one": "Raidable skyhook {{count}} jump away",
+        "title_other": "Raidable skyhook {{count}} jumps away",
+        "body_one": "{{planet}} in {{system}} can be raided {{window}}, {{count}} jump from your current system.",
+        "body_other": "{{planet}} in {{system}} can be raided {{window}}, {{count}} jumps from your current system."
+      },
       "communityJoinRequest": {
         "title": "Join request for {{community}}",
         "body": "{{name}} asked to join {{community}} and is waiting for you to let them in."
@@ -12490,6 +12498,7 @@
         "corpWalletThreshold": "Corp wallet threshold",
         "stockBelowTarget": "Stock target running low",
         "incursionNearby": "Incursion nearby",
+        "skyhookRaidableNearby": "Raidable skyhook nearby",
         "communityJoinRequest": "Community join request",
         "communityMemberJoined": "Community member joined",
         "communityRequestPledged": "Pledge on your Request",
@@ -12537,6 +12546,10 @@
       "incursionNearbyJumpsLabel": "Alert when an Incursion is within:",
       "incursionNearbyJumpsOption_one": "{{count}} jump",
       "incursionNearbyJumpsOption_other": "{{count}} jumps",
+      "skyhookRaidableNearbyJumpsLabel": "Alert when a raidable skyhook is within:",
+      "skyhookRaidableNearbyJumpsOption_one": "{{count}} jump",
+      "skyhookRaidableNearbyJumpsOption_other": "{{count}} jumps",
+      "skyhookRaidableNearbyRouteRulesHint": "Jumps counted from your current system with Route Safety's route rules. Fires once per skyhook per raid window, only while the app is open.",
       "incursionNearbyRouteRulesHint": "Jumps counted from your current system with Route Safety's route rules (preference, avoided systems, wormholes, jump bridges). Fires once per Incursion, only while the app is open.",
       "structureFuelLowThresholdLabel": "Warn when fuel remaining drops below:",
       "structureFuelLowThresholdOption_one": "{{count}} day",
@@ -13558,6 +13571,7 @@
       "nextOpensIn": "{{subject}} opens in {{duration}}",
       "jumps_one": "{{count}} jump",
       "jumps_other": "{{count}} jumps",
+      "routeRow": "Raidable skyhook: {{window}}, {{jumps}} along the route",
       "windowOpen": "open, {{duration}} left",
       "windowIn": "in {{duration}}",
       "underCacheWindow": "under {{duration}}",

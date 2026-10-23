@@ -65,6 +65,7 @@ import type {
 } from './communities/communityAlert';
 import type { StockBelowTargetFire } from './stockTargets/stockAlert';
 import type { IncursionNearbyFire } from './incursions/incursionAlert';
+import type { SkyhookRaidableNearbyFire } from './skyhooks/skyhookAlert';
 import { parseInstant } from './esiInstant';
 import { DAY_MS } from '@/lib/age';
 
@@ -106,7 +107,8 @@ export type OccurrenceFire =
   | CommunityJoinRequestFire
   | CommunityMemberJoinedFire
   | CommunityRequestPledgedFire
-  | IncursionNearbyFire;
+  | IncursionNearbyFire
+  | SkyhookRaidableNearbyFire;
 
 function dayBucket(nowMs: number): number {
   return Math.floor(nowMs / DAY_MS);
@@ -254,6 +256,11 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     // coming back is the same occurrence, not a second alert.
     case 'incursionNearby':
       return [characterId, fire.eventId, fire.constellationId, fire.stagingSystemId].join(':');
+    // Once per skyhook per raid window: the window's start names it, so the
+    // next window is a new occurrence and a window leaving range and coming
+    // back is not.
+    case 'skyhookRaidableNearby':
+      return [characterId, fire.eventId, fire.systemId, fire.planetId, fire.startMs].join(':');
     default: {
       const exhaustive: never = fire;
       throw new Error(`occurrenceKey: unhandled Notification Event ${JSON.stringify(exhaustive)}`);
@@ -350,6 +357,9 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     // The feed carries no spawn time; the poll that saw it in range is it.
     // falls through
     case 'incursionNearby':
+    // The list carries the window, not when it was published; the poll that saw it in range is it.
+    // falls through
+    case 'skyhookRaidableNearby':
     // Neither the waiting list nor the roster is read with a time the poll could use.
     // falls through
     case 'communityJoinRequest':

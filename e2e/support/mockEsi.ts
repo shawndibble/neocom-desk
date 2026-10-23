@@ -156,6 +156,8 @@ export async function installEsiMock(page: Page): Promise<void> {
     if (/^\/markets\/\d+\/history\/?$/.test(path)) return json([]);
     // Route Safety's Incursions near you (issue #3540): none active unless a spec overrides.
     if (path === '/incursions') return json([]);
+    // The raidable skyhook list (issue #4784): public, none raidable unless a spec overrides.
+    if (path === '/skyhooks/raidable') return json({ skyhooks: [] });
     if (path === '/industry/systems') return json(INDUSTRY_SYSTEMS);
 
     // usePublicInfo.loadMany's bulk roster lookup (src/stores/publicInfo.ts):

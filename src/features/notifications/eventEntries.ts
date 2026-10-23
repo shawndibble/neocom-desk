@@ -41,6 +41,11 @@ import {
   type IncursionNearbyFire,
 } from '@/engine/incursions/incursionAlert';
 import {
+  diffSkyhookRaidableNearby,
+  type SkyhookAlertSnapshot,
+  type SkyhookRaidableNearbyFire,
+} from '@/engine/skyhooks/skyhookAlert';
+import {
   diffCommunityJoinRequest,
   diffCommunityMemberJoined,
   diffCommunityRequestPledged,
@@ -152,6 +157,8 @@ import {
   priceAlertCopy,
   stockBelowTargetCopy,
   incursionNearbyCopy,
+  skyhookRaidableNearbyCopy,
+  type SkyhookNames,
   shipLostCopy,
   type ShipLostNames,
   communityJoinRequestCopy,
@@ -199,6 +206,7 @@ export type AnyNotificationFire =
   | ShipLostFire
   | StockBelowTargetFire
   | IncursionNearbyFire
+  | SkyhookRaidableNearbyFire
   | CommunityJoinRequestFire
   | CommunityMemberJoinedFire
   | CommunityRequestPledgedFire;
@@ -247,6 +255,7 @@ export const SNAPSHOT_SOURCES = {
   stockTargets: source<StockAlertSnapshot>('stockTargets'),
   kills: source<ShipLossSnapshot, ShipLostNames>('kills'),
   incursions: source<IncursionAlertSnapshot, IncursionNames>('incursions'),
+  skyhooksNearby: source<SkyhookAlertSnapshot, SkyhookNames>('skyhooksNearby'),
   communities: source<CommunityAlertSnapshot>('communities'),
 } as const;
 
@@ -641,6 +650,17 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: {
       fields: [THRESHOLD_FIELDS.incursionNearbyJumps],
       hintKey: 'settings.notifications.incursionNearbyRouteRulesHint',
+    },
+    rowHintKey: null,
+  }),
+  skyhookRaidableNearby: defineEvent({
+    source: SNAPSHOT_SOURCES.skyhooksNearby,
+    diff: diffSkyhookRaidableNearby,
+    copy: skyhookRaidableNearbyCopy,
+    projection: null,
+    thresholds: {
+      fields: [THRESHOLD_FIELDS.skyhookRaidableNearbyJumps],
+      hintKey: 'settings.notifications.skyhookRaidableNearbyRouteRulesHint',
     },
     rowHintKey: null,
   }),

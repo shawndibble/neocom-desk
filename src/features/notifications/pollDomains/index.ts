@@ -50,6 +50,7 @@ import {
 import { priceAlertDomain } from './priceAlerts';
 import { stockTargetDomain } from './stockTargets';
 import { incursionDomain } from './incursions';
+import { skyhookNearbyDomain } from './skyhooksNearby';
 import { communitiesDomain } from './communities';
 import { killsDomain } from './kills';
 import { mercenaryDensDomain } from './mercenaryDens';
@@ -84,6 +85,7 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   priceAlertDomain,
   stockTargetDomain,
   incursionDomain,
+  skyhookNearbyDomain,
   communitiesDomain,
   killsDomain,
   mercenaryDensDomain,

@@ -14,7 +14,7 @@ import {
   type CachedResult,
 } from '@/esi/cache';
 import type { EsiResult } from '@/esi/client';
-import { getRaidableSkyhooks, getSovereigntySystems } from '@/esi/endpoints';
+import { getRaidableSkyhooks, getSovereigntySystems, type RaidableSkyhook } from '@/esi/endpoints';
 import { resolveNames } from '@/features/character/names';
 import { loadPublicCharacterInfoWithAge } from '@/features/character/publicInfoData';
 import { jumpsFromCurrent } from '@/features/route/jumpsFromCurrent';
@@ -53,6 +53,11 @@ async function readPublic<T>(
   return loadWithCache(GLOBAL_CACHE_CHARACTER_ID, key, fetchLive, { conditional });
 }
 
+/** The universe-wide raidable list, one cache row read per its cache header (issues #4798, #4784). */
+export function loadRaidableList(): Promise<CachedResult<{ skyhooks: RaidableSkyhook[] }> | null> {
+  return readPublic('skyhooks-raidable', getRaidableSkyhooks);
+}
+
 /**
  * Throws when the Character's record or either public list cannot be read, so
  * the widget keeps its last good read: an unread list is not "no raids".
@@ -77,7 +82,7 @@ export async function loadSovRaids(characterId: number): Promise<SovRaidsWidgetD
   if (allianceId === undefined) return none;
 
   const [raidable, claims, names] = await Promise.all([
-    readPublic('skyhooks-raidable', getRaidableSkyhooks),
+    loadRaidableList(),
     readPublic('sovereignty-systems', getSovereigntySystems),
     resolveNames([allianceId]).catch(() => new Map<number, string>()),
   ]);

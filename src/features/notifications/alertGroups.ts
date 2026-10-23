@@ -124,6 +124,8 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   shipLost: 'warning',
   // Something to fly to, not a fault.
   incursionNearby: 'watch',
+  // A window to fly to, not a fault.
+  skyhookRaidableNearby: 'watch',
   // Someone is waiting on the admin; a new Member needs nothing.
   communityJoinRequest: 'watch',
   communityMemberJoined: 'watch',

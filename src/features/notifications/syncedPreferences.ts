@@ -141,6 +141,7 @@ function isThresholds(raw: unknown): raw is CharacterEventThresholds {
     isOptionalFiniteNumber(r.walletBalanceChangedThresholdIsk) &&
     isOptionalFiniteNumber(r.walletFoldIntoContract) &&
     isOptionalFiniteNumber(r.incursionNearbyJumps) &&
+    isOptionalFiniteNumber(r.skyhookRaidableNearbyJumps) &&
     isOptionalFiniteNumber(r.shipLostMinimumIsk)
   );
 }
