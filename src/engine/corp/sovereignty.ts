@@ -9,10 +9,17 @@ export interface RaidWindow {
   endMs: number;
 }
 
-export type RaidState = 'upcoming' | 'open' | 'closed';
+export type SovereigntyKind = 'skyhook' | 'hub';
 
-export function raidState(window: RaidWindow, nowMs: number): RaidState {
-  if (window.endMs <= nowMs) return 'closed';
+/** `overtime`: a hub past its window end, which ESI still counts as vulnerable. */
+export type RaidState = 'upcoming' | 'open' | 'overtime' | 'closed';
+
+export function raidState(
+  window: RaidWindow,
+  nowMs: number,
+  kind: SovereigntyKind = 'skyhook'
+): RaidState {
+  if (window.endMs <= nowMs) return kind === 'hub' ? 'overtime' : 'closed';
   return window.startMs <= nowMs ? 'open' : 'upcoming';
 }
 

@@ -19,6 +19,7 @@ import type {
   CorporationOrder,
 } from '@/esi/endpoints';
 import type { HubAggregate } from '@/market/fuzzwork';
+import type { SovereigntyKind } from '@/engine/corp/sovereignty';
 import type { MemberActivity, RosterDiff } from '@/engine/corp/members';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { RoleAuditData } from '@/features/corp/roleAudit';
@@ -173,7 +174,7 @@ export interface CorpKillsFeed extends CorpFeedBase {
 export interface CorpSovereigntyRow {
   /** `skyhook:5` or `hub:9`: unique across both. */
   key: string;
-  kind: 'skyhook' | 'hub';
+  kind: SovereigntyKind;
   structureId: number;
   /** Null when the system could not be resolved (a skyhook lists only its planet). */
   systemId: number | null;

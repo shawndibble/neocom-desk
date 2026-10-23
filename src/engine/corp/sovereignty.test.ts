@@ -15,6 +15,12 @@ describe('raidState', () => {
   it('is closed at the end', () => {
     expect(raidState({ startMs: at(-2 * HOUR), endMs: NOW }, NOW)).toBe('closed');
   });
+  it('keeps a hub past its end in overtime, still vulnerable', () => {
+    expect(raidState({ startMs: at(-2 * HOUR), endMs: at(-HOUR) }, NOW, 'hub')).toBe('overtime');
+  });
+  it('still closes a skyhook past its end', () => {
+    expect(raidState({ startMs: at(-2 * HOUR), endMs: at(-HOUR) }, NOW, 'skyhook')).toBe('closed');
+  });
 });
 
 describe('raidHeadline', () => {

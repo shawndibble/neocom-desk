@@ -10,7 +10,13 @@
  */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
 import type { BoardSovereigntySource } from '@/engine/corp/board';
-import { hubReagentHoursLeft, raidHeadline, raidState } from '@/engine/corp/sovereignty';
+import {
+  hubReagentHoursLeft,
+  raidHeadline,
+  raidState,
+  type RaidState,
+  type RaidWindow,
+} from '@/engine/corp/sovereignty';
 import { routeToHref } from '@/features/route/routeSafetyLink';
 import { formatCountdown } from '@/lib/duration';
 import { formatNumber } from '@/lib/numberLocale';
@@ -27,21 +33,26 @@ function systemOf(feed: CorpSovereigntyFeed, row: CorpSovereigntyRow): string {
   return (row.systemId === null ? undefined : feed.systemNames.get(row.systemId)) ?? UNKNOWN;
 }
 
+function windowOf(row: CorpSovereigntyRow): RaidWindow | null {
+  return row.windowStartMs === null || row.windowEndMs === null
+    ? null
+    : { startMs: row.windowStartMs, endMs: row.windowEndMs };
+}
+
+/** Null when the window was not read: unknown, never safe. */
+function stateOf(row: CorpSovereigntyRow, now: number): RaidState | null {
+  const window = windowOf(row);
+  return window === null ? null : raidState(window, now, row.kind);
+}
+
 /** Due soon's view of the windows: every one ESI sent both ends of. */
 export function toBoardSovereignty(feed: CorpSovereigntyFeed): BoardSovereigntySource[] {
-  return feed.rows.flatMap((row) =>
-    row.windowStartMs === null || row.windowEndMs === null
+  return feed.rows.flatMap((row) => {
+    const window = windowOf(row);
+    return window === null
       ? []
-      : [
-          {
-            id: row.key,
-            name: systemOf(feed, row),
-            kind: row.kind,
-            startMs: row.windowStartMs,
-            endMs: row.windowEndMs,
-          },
-        ]
-  );
+      : [{ id: row.key, name: systemOf(feed, row), kind: row.kind, ...window }];
+  });
 }
 
 /** A countdown that never claims more precision than the hour-old read behind it. */
@@ -51,20 +62,20 @@ function untilText(t: Translate, remainingMs: number): string {
     : formatCountdown(remainingMs / 1000);
 }
 
-/** An open window is critical; one opening within a day, a warning. */
+/** An open window (or a hub in overtime) is critical; one opening within a day, a warning. */
 function tone(row: CorpSovereigntyRow, now: number): DeadlineSeverity {
-  if (row.windowStartMs === null || row.windowEndMs === null) return 'clear';
-  const state = raidState({ startMs: row.windowStartMs, endMs: row.windowEndMs }, now);
-  if (state === 'open') return 'critical';
-  return state === 'upcoming' && row.windowStartMs - now < DAY_MS ? 'warning' : 'clear';
+  const state = stateOf(row, now);
+  if (state === 'open' || state === 'overtime') return 'critical';
+  return state === 'upcoming' && (row.windowStartMs ?? Infinity) - now < DAY_MS
+    ? 'warning'
+    : 'clear';
 }
 
 /** Soonest first: open windows, then upcoming; closed or unknown last. */
 function sortKey(row: CorpSovereigntyRow, now: number): number {
-  if (row.windowStartMs === null || row.windowEndMs === null) return Infinity;
-  const state = raidState({ startMs: row.windowStartMs, endMs: row.windowEndMs }, now);
-  if (state === 'closed') return Infinity;
-  return Math.max(row.windowStartMs, now);
+  const state = stateOf(row, now);
+  if (state === null || state === 'closed') return Infinity;
+  return Math.max(row.windowStartMs ?? now, now);
 }
 
 export const corpSovereignty: Builder = (feeds, { t, now }) => {
@@ -81,21 +92,21 @@ export const corpSovereignty: Builder = (feeds, { t, now }) => {
   );
   const skyhooks = rows.filter((row) => row.kind === 'skyhook');
   const headline = raidHeadline(
-    skyhooks.flatMap((row) =>
-      row.windowStartMs === null || row.windowEndMs === null
-        ? []
-        : [{ startMs: row.windowStartMs, endMs: row.windowEndMs }]
-    ),
+    skyhooks.flatMap((row) => windowOf(row) ?? []),
     now
   );
 
   const windowText = (row: CorpSovereigntyRow): string => {
-    if (row.windowStartMs === null || row.windowEndMs === null) return UNKNOWN;
-    switch (raidState({ startMs: row.windowStartMs, endMs: row.windowEndMs }, now)) {
+    const window = windowOf(row);
+    switch (stateOf(row, now)) {
+      case null:
+        return UNKNOWN;
       case 'open':
-        return t(`${W}.windowOpen`, { duration: untilText(t, row.windowEndMs - now) });
+        return t(`${W}.windowOpen`, { duration: untilText(t, window!.endMs - now) });
       case 'upcoming':
-        return t(`${W}.windowIn`, { duration: untilText(t, row.windowStartMs - now) });
+        return t(`${W}.windowIn`, { duration: untilText(t, window!.startMs - now) });
+      case 'overtime':
+        return t(`${W}.windowOvertime`);
       case 'closed':
         return t(`${W}.windowClosed`);
     }
@@ -127,9 +138,8 @@ export const corpSovereignty: Builder = (feeds, { t, now }) => {
               : t(`${W}.opensIn`, { duration: untilText(t, headline.untilMs) }),
         };
 
-  const nextWindow = rows.find(
-    (row) => sortKey(row, now) !== Infinity && tone(row, now) !== 'critical'
-  );
+  // An open or overtime window is already underway: Next wants the one still ahead.
+  const nextWindow = rows.find((row) => stateOf(row, now) === 'upcoming');
   return {
     ...blank(null, statusOf(feed, { isEmpty: rows.length === 0 })),
     fetchedAt: data.fetchedAt,
@@ -171,16 +181,17 @@ export const corpSovereignty: Builder = (feeds, { t, now }) => {
         to: row.systemId === null ? undefined : routeToHref(row.systemId),
       })),
     },
-    deadlines: nextWindow
-      ? [
-          {
-            at: nextWindow.windowStartMs ?? 0,
-            note: t(`${W}.deadline`, { subject: systemOf(data, nextWindow) }),
-            severity: tone(nextWindow, now),
-            to: '/corp',
-          },
-        ]
-      : [],
+    deadlines:
+      nextWindow?.windowStartMs != null
+        ? [
+            {
+              at: nextWindow.windowStartMs,
+              note: t(`${W}.deadline`, { subject: systemOf(data, nextWindow) }),
+              severity: tone(nextWindow, now),
+              to: '/corp',
+            },
+          ]
+        : [],
     summary: t(`${W}.summary`, { count: headline.count, total: rows.length }),
   };
 };

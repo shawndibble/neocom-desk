@@ -9,6 +9,15 @@
  */
 import { diffRoster } from '@/engine/corp/members';
 import { getSovereigntySystems, getUniversePlanet } from '@/esi/endpoints';
+import {
+  conditionalFetch,
+  GLOBAL_CACHE_CHARACTER_ID,
+  loadStaticEntity,
+  loadWithCache,
+  type CachedResult,
+  type StatusResult,
+} from '@/esi/cache';
+import { CORP_CACHE_WINDOW_MS } from '../../data/corpCards';
 import { loadCurrentSystemId } from '@/features/route/currentSystem';
 import { jumpsBetween, loadJumpBasis } from '@/features/route/jumpBasis';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -57,7 +66,6 @@ import { isNpcCorporationId } from '@/esi/entityIds';
 import { DAY_MS } from '@/lib/age';
 import { fetchCorporationStatsRead } from '@/lib/zkillboard';
 import { parseInstant } from '@/engine/esiInstant';
-import type { CachedResult, StatusResult } from '@/esi/cache';
 import type {
   CorpAssetsFeed,
   CorpCustomsFeed,
@@ -490,12 +498,17 @@ export async function loadCorpKills(characterId: number): Promise<CorpKillsFeed>
   };
 }
 
+function finiteOrNull(value: number): number | null {
+  return Number.isFinite(value) ? value : null;
+}
+
 /** Planet -> system for each skyhook; a planet that cannot be read is left out, not guessed. */
 async function planetSystems(planetIds: readonly number[]): Promise<Map<number, number>> {
   const systems = new Map<number, number>();
   await mapWithConcurrencyLimit(planetIds, ESI_FANOUT_CONCURRENCY, async (planetId) => {
     try {
-      const systemId = (await getUniversePlanet(planetId)).data?.system_id;
+      const systemId = (await loadStaticEntity('planet-info', planetId, getUniversePlanet))?.data
+        .system_id;
       if (systemId !== undefined) systems.set(planetId, systemId);
     } catch {
       // The row keeps its raid window and loses only its system.
@@ -511,7 +524,15 @@ async function sovereigntyDevelopment(): Promise<CorpSovereigntyFeed['developmen
     { military: number; industrial: number; strategic: number }
   >();
   try {
-    for (const system of (await getSovereigntySystems()).data?.solar_systems ?? []) {
+    // The whole public list, so one hour-long copy beats a download per widget load.
+    const { fetchLive, conditional } = conditionalFetch((options) =>
+      getSovereigntySystems(options)
+    );
+    const list = await loadWithCache(GLOBAL_CACHE_CHARACTER_ID, 'sovereigntySystems', fetchLive, {
+      staleAfterMs: CORP_CACHE_WINDOW_MS,
+      conditional,
+    });
+    for (const system of list?.data.solar_systems ?? []) {
       const level = system.claim?.alliance?.development;
       if (level === undefined) continue;
       development.set(system.solar_system_id, {
@@ -536,10 +557,12 @@ async function jumpsFromCurrent(
     const origin = await loadCurrentSystemId(characterId);
     if (origin === null || systemIds.length === 0) return jumps;
     const basis = await loadJumpBasis();
-    for (const systemId of systemIds) {
-      const result = await jumpsBetween(origin, systemId, basis);
-      if (result.kind === 'known') jumps.set(systemId, result.jumps);
-    }
+    await Promise.all(
+      systemIds.map(async (systemId) => {
+        const result = await jumpsBetween(origin, systemId, basis);
+        if (result.kind === 'known') jumps.set(systemId, result.jumps);
+      })
+    );
   } catch {
     // No distance column rather than a failed widget.
   }
@@ -582,6 +605,13 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
     sovereigntyDevelopment(),
   ]);
 
+  // Every detail read failing says the reads are down, not that nothing is raidable.
+  const details = [...skyhookDetails.values(), ...hubDetails.values()];
+  if (details.length > 0 && details.every((result) => result.cached === null)) {
+    if (details.some((result) => result.needsReauth)) return { ...empty, needsReauth: true };
+    throw new CorpReadFailed('sovereignty');
+  }
+
   const rows: CorpSovereigntyRow[] = [
     ...skyhookList.map((skyhook): CorpSovereigntyRow => {
       const detail = skyhookDetails.get(skyhook.id)?.cached?.data;
@@ -596,7 +626,9 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
         stock:
           detail?.reagents === undefined
             ? null
-            : detail.reagents.reduce((sum, r) => sum + r.secured_stock + r.unsecured_stock, 0),
+            : finiteOrNull(
+                detail.reagents.reduce((sum, r) => sum + r.secured_stock + r.unsecured_stock, 0)
+              ),
         hubBay: null,
       };
     }),
@@ -604,6 +636,9 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
       const detail = hubDetails.get(hub.id)?.cached?.data;
       const window = detail?.vulnerability_window;
       const reagents = detail?.reagent_bay.reagents ?? [];
+      const updatedMs = parseInstant(detail?.reagent_bay.last_updated);
+      const amount = reagents.reduce((sum, r) => sum + r.amount, 0);
+      const burningPerHour = reagents.reduce((sum, r) => sum + r.burning_per_hour, 0);
       return {
         key: `hub:${hub.id}`,
         kind: 'hub',
@@ -612,14 +647,14 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
         windowStartMs: parseInstant(window?.start),
         windowEndMs: parseInstant(window?.end),
         stock: null,
+        // An unreadable timestamp or a non-number is unknown, never "0 hours left".
         hubBay:
-          detail === undefined || reagents.length === 0
+          detail === undefined ||
+          reagents.length === 0 ||
+          updatedMs === null ||
+          !Number.isFinite(amount + burningPerHour)
             ? null
-            : {
-                amount: reagents.reduce((sum, r) => sum + r.amount, 0),
-                burningPerHour: reagents.reduce((sum, r) => sum + r.burning_per_hour, 0),
-                updatedMs: parseInstant(detail.reagent_bay.last_updated) ?? 0,
-              },
+            : { amount, burningPerHour, updatedMs },
       };
     }),
   ];

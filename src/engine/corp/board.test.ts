@@ -596,6 +596,15 @@ describe('sovereignty raid windows', () => {
     expect(sovBoard([raid({ startMs: at(-3 * HOUR), endMs: at(-HOUR) })])).toEqual([]);
   });
 
+  it('keeps a hub past its window end as overtime, still vulnerable', () => {
+    const items = sovBoard([
+      raid({ id: 'hub:9', kind: 'hub', startMs: at(-3 * HOUR), endMs: at(-HOUR) }),
+    ]);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ detail: 'hub.overtime', timing: 'timed' });
+    expect(items[0]!.severity).toBe('critical');
+  });
+
   it('names a hub window as a hub', () => {
     const [item] = sovBoard([raid({ id: 'hub:9', kind: 'hub' })]);
     expect(item!.detail).toBe('hub.upcoming');

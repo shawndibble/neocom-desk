@@ -121,6 +121,33 @@ describe('corpSovereignty', () => {
     expect(view.deadlines).toEqual([]);
   });
 
+  it('shows a hub past its window end as overtime, critical, and not as closed', () => {
+    const view = corpSovereignty(
+      feeds({
+        rows: [
+          row({
+            key: 'hub:9',
+            kind: 'hub',
+            stock: null,
+            windowStartMs: NOW - 3 * HOUR,
+            windowEndMs: NOW - HOUR,
+          }),
+        ],
+      }),
+      ctx
+    );
+    expect(view.table!.rows[0]!.cells[2]).toBe('overview.widgets.corpSovereignty.windowOvertime');
+    expect(view.table!.rows[0]!.tone).toBe('critical');
+  });
+
+  it('shows a closed skyhook as closed', () => {
+    const view = corpSovereignty(
+      feeds({ rows: [row({ windowStartMs: NOW - 3 * HOUR, windowEndMs: NOW - HOUR })] }),
+      ctx
+    );
+    expect(view.table!.rows[0]!.cells[2]).toBe('overview.widgets.corpSovereignty.windowClosed');
+  });
+
   it('feeds the next window to the header Next button', () => {
     const view = corpSovereignty(feeds(), ctx);
     expect(view.deadlines).toHaveLength(1);

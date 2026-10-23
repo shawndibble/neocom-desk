@@ -4981,6 +4981,7 @@
         "windowIn": "in {{duration}}",
         "windowOpen": "Open, {{duration}} left",
         "windowClosed": "Closed",
+        "windowOvertime": "Overtime",
         "hubHours_one": "{{count}} hour left",
         "hubHours_other": "{{count}} hours left",
         "deadline": "Raid window opens at {{subject}}",
@@ -12518,7 +12519,8 @@
           },
           "hub": {
             "upcoming": "Sov hub becomes vulnerable",
-            "open": "Sov hub vulnerability ends"
+            "open": "Sov hub vulnerability ends",
+            "overtime": "Sov hub is in overtime"
           }
         }
       },

@@ -17,6 +17,7 @@
  */
 
 import { severityForRemaining, type DeadlineSeverity } from '../character/severity';
+import { raidState, type SovereigntyKind } from './sovereignty';
 
 /**
  * The kinds of clock the board merges, in the order that breaks a deadline tie.
@@ -164,7 +165,7 @@ export interface BoardSovereigntySource {
   /** Unique across both kinds, e.g. `skyhook:5`. */
   id: string;
   name: string;
-  kind: 'skyhook' | 'hub';
+  kind: SovereigntyKind;
   startMs: number;
   endMs: number;
 }
@@ -366,23 +367,27 @@ function starbaseItems(
   return items;
 }
 
-/** Open: ranked by its close. Not yet open: by its opening. Closed: no clock left. */
+/**
+ * Open: ranked by its close. Not yet open: by its opening. A hub past its end
+ * is in overtime, still vulnerable, so it stays on the board. A closed skyhook
+ * has no clock left.
+ */
 function sovereigntyItems(
   raid: BoardSovereigntySource,
   clock: Pick<CorpBoardSources, 'nowMs' | 'staleWindowMs'>
 ): CorpBoardItem[] {
-  if (raid.endMs <= clock.nowMs) return [];
-  const open = raid.startMs <= clock.nowMs;
+  const state = raidState(raid, clock.nowMs, raid.kind);
+  if (state === 'closed') return [];
   return [
     timedItem(
       {
         id: `sov:${raid.id}`,
         kind: 'sovRaid',
         subject: raid.name,
-        detail: `${raid.kind}.${open ? 'open' : 'upcoming'}`,
+        detail: `${raid.kind}.${state}`,
         typeId: null,
       },
-      open ? raid.endMs : raid.startMs,
+      state === 'upcoming' ? raid.startMs : raid.endMs,
       clock
     ),
   ];
