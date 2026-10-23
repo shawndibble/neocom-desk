@@ -281,7 +281,7 @@ export function phoneOwedColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpC
         [
           ctx.names.hull(row.hullTypeId),
           row.decidedAt !== undefined &&
-            ctx.t('srp.officer.columns.approved').toLowerCase() + ' ' + when(ctx, row.decidedAt),
+            ctx.t('srp.officer.approvedAt', { when: when(ctx, row.decidedAt) }),
           row.decidedByName,
         ]
           .filter(Boolean)

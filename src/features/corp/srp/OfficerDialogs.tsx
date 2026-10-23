@@ -165,7 +165,9 @@ export function ChangeAmountDialog({
     >
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
         <dt className="text-text-dim">{t('srp.officer.change.computed')}</dt>
-        <dd className="font-semibold tabular-nums">{formatIsk(computed ?? 0)} ISK</dd>
+        <dd className="font-semibold tabular-nums">
+          {t('srp.officer.iskAmount', { isk: formatIsk(computed ?? 0) })}
+        </dd>
         <dt className="text-text-dim">{t('srp.officer.change.basis')}</dt>
         <dd>{claimBasisLine(t, claim)}</dd>
       </dl>

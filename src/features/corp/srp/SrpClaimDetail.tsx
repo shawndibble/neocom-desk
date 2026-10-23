@@ -132,7 +132,7 @@ export function SrpClaimDetail({
               ) : (
                 <span className="block tabular-nums">
                   <span className="text-base font-semibold">
-                    {formatIsk(claim.amount ?? 0)} ISK
+                    {t('srp.officer.iskAmount', { isk: formatIsk(claim.amount ?? 0) })}
                   </span>
                   <span className="block text-xs text-text-dim">{claimBasisLine(t, claim)}</span>
                   {claim.overrideReason && claim.computedAmount !== undefined && (

@@ -49,7 +49,9 @@ export function SrpBulkBar({
               <span className="block font-semibold">
                 {t('srp.officer.bulk.selected', { count: selected })}
               </span>
-              <span className="block text-xs text-text-dim">{formatIskCompact(total)} ISK</span>
+              <span className="block text-xs text-text-dim">
+                {t('srp.officer.iskAmount', { isk: formatIskCompact(total) })}
+              </span>
             </div>
             <button type="button" className={textActionClassName()} onClick={onSelectNone}>
               {t('srp.officer.bulk.clear')}

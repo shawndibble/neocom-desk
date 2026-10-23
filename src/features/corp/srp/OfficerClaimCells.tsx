@@ -9,8 +9,6 @@ import type { ClaimColumnsContext } from './claimColumnsContext';
 import { claimBasisLine } from './srpClaimText';
 import { approveAmount } from './srpQueue';
 
-const iskText = (value: number) => `${formatIsk(value)} ISK`;
-
 export function Pilot({ claim }: { claim: SrpClaim }) {
   return (
     <span className="block min-w-0">
@@ -70,7 +68,9 @@ export function AmountCell({ claim, ctx }: { claim: SrpClaim; ctx: ClaimColumnsC
   const { t } = ctx;
   return (
     <span className="block text-right tabular-nums max-sm:text-left">
-      <span className="font-semibold">{iskText(claim.amount ?? 0)}</span>
+      <span className="font-semibold">
+        {ctx.t('srp.officer.iskAmount', { isk: formatIsk(claim.amount ?? 0) })}
+      </span>
       {claim.computedAmount !== undefined && claim.overrideByName ? (
         <span className="block text-xs text-text-dim">
           {claim.computedAmount !== null && (

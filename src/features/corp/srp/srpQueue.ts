@@ -48,9 +48,6 @@ export function approveAmount(claim: SrpClaim, typed: string | undefined): numbe
   return claim.amount ?? typedAmount(typed);
 }
 
-/** The amount the officer paid or will pay: what the claim holds. Approved claims always hold one. */
-export const owedAmount = (claim: SrpClaim): number => claim.amount ?? 0;
-
 /** Ticks belong to the rows they were made on: drop any that left the list. */
 export function pruneSelection(selected: readonly number[], rows: readonly SrpClaim[]): number[] {
   const ids = new Set(rows.map((r) => r.killmailId));

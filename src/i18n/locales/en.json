@@ -16151,6 +16151,9 @@
         "reason": "Reason"
       },
       "filed": "Filed {{when}}",
+      "approvedAt": "approved {{when}}",
+      "iskAmount": "{{isk}} ISK",
+      "phoneTab": "{{label}} {{count}}",
       "by": "by {{name}}",
       "states": {
         "pending": "Pending",

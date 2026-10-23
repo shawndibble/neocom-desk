@@ -61,7 +61,10 @@ async function settle(
   try {
     return { ok: true, ...(await run()) };
   } catch (err) {
-    if (!(err instanceof HttpsError)) throw err;
+    // Any failure is that claim's result: the claims before it are already committed.
+    if (!(err instanceof HttpsError)) {
+      return { ok: false, killmailId, reason: 'internal', message: 'Could not save this claim' };
+    }
     const reason = (err.details as { reason?: string } | undefined)?.reason;
     return { ok: false, killmailId, reason: reason ?? err.code, message: err.message };
   }

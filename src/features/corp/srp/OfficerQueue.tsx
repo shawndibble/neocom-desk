@@ -210,8 +210,20 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           value={tab}
           onChange={changeTab}
           options={[
-            { value: 'pending', label: `${t('srp.officer.tabs.pending')} ${counts.pending}` },
-            { value: 'owed', label: `${t('srp.officer.tabs.owed')} ${counts.owed}` },
+            {
+              value: 'pending',
+              label: t('srp.officer.phoneTab', {
+                label: t('srp.officer.tabs.pending'),
+                count: counts.pending,
+              }),
+            },
+            {
+              value: 'owed',
+              label: t('srp.officer.phoneTab', {
+                label: t('srp.officer.tabs.owed'),
+                count: counts.owed,
+              }),
+            },
             { value: 'history', label: t('srp.officer.tabs.history') },
           ]}
         />
