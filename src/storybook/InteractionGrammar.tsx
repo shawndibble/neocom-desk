@@ -184,7 +184,10 @@ export function InteractionGrammar() {
           </Tooltip>
         </Cue>
         <Cue rule={k('rules.figureHistory')}>
-          <button type="button" className="inline-flex items-center gap-1">
+          <button
+            type="button"
+            className={`inline-flex items-center gap-1 rounded-xs ${focusRingClassName}`}
+          >
             {k('samples.figureHistory')}
             <Icon.Market aria-hidden className="size-3 text-text-dim" />
           </button>
