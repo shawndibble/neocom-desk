@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button, Modal, StatChip, StatChips } from '@/components/ui';
-import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Pill } from '@/components/ui/Pill';
 import { Widget } from '@/features/overview/widgets/Widget';
+import { JumpsLink } from '@/features/route/JumpsLink';
 import type { Widget as WidgetModel } from '@/features/overview/widgets/layout';
 import type { KindView, TableModel } from '@/features/overview/widgets/data/types';
 import { NewComponent } from './NewComponent';
@@ -34,7 +34,9 @@ import { NewComponent } from './NewComponent';
  *
  * New components in this mockup: `corpSovereignty` (the widget kind, both
  * options), `SkyhookModal` (A's row modal), `SystemModal` (B's row modal).
- * Set destination is an ESI write, so it is dimmed offline (DESIGN §6c).
+ * Set destination is an ESI write, so it is dimmed offline (DESIGN §6c). The
+ * jump count is a `JumpsLink` to Route Safety, not an external map. System ids
+ * are sample values.
  */
 
 const NOW = Date.now();
@@ -270,11 +272,14 @@ function OptionB() {
   );
 }
 
-function Actions({ system }: { system: string }) {
+/** Set destination, and the jump count from the Character's system as a link to Route Safety. */
+function Actions({ systemId, jumps }: { systemId: number; jumps: number }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <Button variant="ghost">Set destination</Button>
-      <ExternalLink href={`https://evemaps.dotlan.net/system/${system}`}>Dotlan</ExternalLink>
+      <JumpsLink systemId={systemId} label={`${jumps} jumps, open route safety`}>
+        {jumps} jumps away
+      </JumpsLink>
     </div>
   );
 }
@@ -292,7 +297,7 @@ function SkyhookModal() {
             <StatChip label="Unsecured" value="4,200 Magmatic Gas · 412,000,000 ISK" />
             <StatChip label="Secured" value="11,800 Magmatic Gas" />
           </StatChips>
-          <Actions system="X-7OMU" />
+          <Actions systemId={30001190} jumps={7} />
         </div>
       </NewComponent>
     </Modal>
@@ -318,7 +323,7 @@ function SystemModal() {
             <StatChip label="Efa II skyhook" value="theft window in 5h 40m" />
             <StatChip label="Unsecured" value="1,850 Superionic Ice · 96,500,000 ISK" />
           </StatChips>
-          <Actions system="Efa" />
+          <Actions systemId={30003840} jumps={12} />
         </div>
       </NewComponent>
     </Modal>

@@ -8,7 +8,8 @@ Story: `src/mockups/CorpSovereignty.stories.tsx` (`mockups-corpsovereignty--opti
 
 - `GET /corporations/{id}/structures/skyhooks/{id}`: Station_Manager role, `esi-structures.read_corporation.v1`. `theft_vulnerability {start, end}`, `reagents[] {secured_stock, unsecured_stock}`, `state`. No silo capacity, so no "% full": the widget shows the unsecured stock, which is what a raider can take.
 - `GET /corporations/{id}/structures/sovereignty-hubs/{id}`: same role and scope. `reagent_bay.reagents[] {amount, burning_per_hour}` gives a fuel clock; `upgrades[] {power_state}`; `vulnerability_window`.
-- `GET /skyhooks/raidable`: public.
+- `GET /skyhooks/raidable`: public, no role. Only skyhooks raidable now or "shortly" (system, planet, window), so no 48h look-ahead and no stock.
+- `GET /sovereignty/systems`: public. Each system's alliance, holding corp, ADM and Military / Industry / Strategic levels, and the hub's vulnerability window.
 - Mercenary dens are character routes (`/characters/{id}/structures/mercenary-dens`), so they stay out of a corp widget.
 
 ## Options
@@ -19,6 +20,8 @@ Story: `src/mockups/CorpSovereignty.stories.tsx` (`mockups-corpsovereignty--opti
 | A. Row modal | ![](option-a-modal-desktop.png) | ![](option-a-modal-phone.png) |
 | B. Per system: hub fuel, next raid, unsecured, upgrades | ![](option-b-per-system-desktop.png) | ![](option-b-per-system-phone.png) |
 | B. Row modal | ![](option-b-modal-desktop.png) | ![](option-b-modal-phone.png) |
+
+The row modal's jump count is a `JumpsLink` to Route Safety ("7 jumps away"), not an external map.
 
 In both, every theft window and every hub's fuel clock is also a row in Deadlines and counts toward the header's Next button.
 
