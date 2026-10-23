@@ -50,6 +50,7 @@ import { priceAlertDomain } from './priceAlerts';
 import { stockTargetDomain } from './stockTargets';
 import { incursionDomain } from './incursions';
 import { communitiesDomain } from './communities';
+import { killsDomain } from './kills';
 
 export type { AnyNotificationFire } from '../eventEntries';
 export type { PollDomain } from './defineDomain';
@@ -81,6 +82,7 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   stockTargetDomain,
   incursionDomain,
   communitiesDomain,
+  killsDomain,
 ];
 
 const DOMAIN_BY_EVENT: ReadonlyMap<NotificationEventId, PollDomain> = new Map(

@@ -32,9 +32,10 @@ interface NotificationEventTraits {
   /** i18next key under the `settings.notifications.event.*` namespace. */
   readonly labelKey: string;
   /**
-   * Absent only for `priceAlertTriggered` (issue #680): every other event
-   * reads ESI data and so needs a real OAuth grant to fetch at all, but
-   * price alerts poll Quickbar (local Dexie) and the public Fuzzwork
+   * Absent for `priceAlertTriggered` (issue #680) and `shipLost` (issue
+   * #4772): every other event reads ESI data (or a synced backend) and so needs a
+   * real OAuth grant to fetch at all, but ship losses come from public
+   * zKillboard, and price alerts poll Quickbar (local Dexie) and the public Fuzzwork
    * aggregate path, neither of which is behind any scope. `enabledEventsFor`
    * (`foregroundPoller.ts`) treats an absent scope as always-satisfied,
    * rather than this catalog borrowing an unrelated scope as a fake gate.
@@ -279,6 +280,13 @@ const CATALOG = [
     labelKey: 'settings.notifications.event.incursionNearby',
     defaultChannels: 'both',
     scope: requiredScope('getCharacterLocation'),
+  },
+  // A loss killmail of a tracked Character, read from public zKillboard (the
+  // Overview's Kills widget read), so it needs no ESI scope (issue #4772).
+  {
+    id: 'shipLost',
+    labelKey: 'settings.notifications.event.shipLost',
+    defaultChannels: 'both',
   },
   // A Character asking to join a Community the pilot administers. Read from the
   // sync backend, so it needs no ESI scope. In the bell and as a notification:

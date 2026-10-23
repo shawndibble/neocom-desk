@@ -21,6 +21,7 @@ import type {
   CorpWalletThresholdFire,
   StructureReinforcementExitFire,
   PriceAlertTriggeredFire,
+  ShipLostFire,
 } from './notificationDiffs';
 
 const T0 = 1_700_000_000_000;
@@ -575,6 +576,19 @@ describe('occurrenceFiredAt', () => {
       occurredMs: T0 + 30_000,
     };
     expect(occurrenceFiredAt(fire, T0)).toBe(T0);
+  });
+
+  it('keys shipLost on the killmail and dates it by the killmail, never later than the poll', () => {
+    const fire: ShipLostFire = {
+      eventId: 'shipLost',
+      characterId: 7,
+      killmailId: 123,
+      timeMs: T0 - 5_000,
+    };
+    expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey(fire, T0 + 60_000));
+    expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, killmailId: 124 }, T0));
+    expect(occurrenceFiredAt(fire, T0)).toBe(T0 - 5_000);
+    expect(occurrenceFiredAt({ ...fire, timeMs: T0 + 1 }, T0)).toBe(T0);
   });
 
   it('dates priceAlertTriggered by the poll that noticed the crossing', () => {

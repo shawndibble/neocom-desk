@@ -23,6 +23,7 @@ describe('THRESHOLD_FIELDS', () => {
       'walletBalanceChangedThresholdIsk',
       'walletFoldIntoContract',
       'incursionNearbyJumps',
+      'shipLostMinimumIsk',
     ]);
   });
 
@@ -58,6 +59,7 @@ describe('defaultedThresholds', () => {
       walletBalanceChangedThresholdIsk: 1_000_000,
       walletFoldIntoContract: 1,
       incursionNearbyJumps: 5,
+      shipLostMinimumIsk: 0,
     });
   });
 

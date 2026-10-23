@@ -36,6 +36,7 @@ import { priceAlertDomain } from './pollDomains/priceAlerts';
 import { stockTargetDomain } from './pollDomains/stockTargets';
 import { incursionDomain } from './pollDomains/incursions';
 import { communitiesDomain } from './pollDomains/communities';
+import { killsDomain } from './pollDomains/kills';
 
 type Entry = Record<string, unknown>;
 
@@ -216,6 +217,12 @@ const CASES: Case[] = [
     },
     optional: { requestId: 'r1', requestLabel: 'Hull' },
     badEnum: { kind: 'invite' },
+  },
+  {
+    name: 'kills',
+    domain: killsDomain,
+    base: { killmailId: 1, timeMs: 1000, thresholdIsk: 0 },
+    optional: { shipTypeId: 587, systemId: 30000142, value: 1_000_000 },
   },
 ];
 

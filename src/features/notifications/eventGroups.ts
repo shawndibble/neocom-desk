@@ -45,6 +45,7 @@ const GROUP_OF: Record<NotificationEventId, EventGroupKey | 'corp' | 'eve'> = {
   newCalendarEvent: 'mailCalendar',
   calendarEventStarting: 'mailCalendar',
   incursionNearby: 'world',
+  shipLost: 'world',
   communityJoinRequest: 'world',
   communityMemberJoined: 'world',
   communityRequestPledged: 'world',

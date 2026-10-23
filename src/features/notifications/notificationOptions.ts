@@ -103,6 +103,8 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   priceAlertTriggered: '/market/browser',
   stockBelowTarget: '/market/stock',
   incursionNearby: '/travel/route',
+  // The Overview, whose Kills widget lists the loss (issue #4772).
+  shipLost: '/overview',
   // The Communities page, where the admin lets the request in or sees the Member.
   communityJoinRequest: '/communities',
   communityMemberJoined: '/communities',
