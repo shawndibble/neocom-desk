@@ -16108,7 +16108,172 @@
     "noAccessTitle": "SRP needs the Director or Accountant role",
     "noAccessHint": "Only a Director or Accountant of the corporation can open SRP here. Roles can only be changed in game.",
     "tabs": {
+      "queue": "Claims",
       "settings": "Settings"
+    },
+    "officer": {
+      "deniedTitle": "SRP claims are not open to your roles",
+      "deniedHint": "EVE did not confirm an SRP officer role for this character. Roles can only be changed in game.",
+      "loadFailed": "Couldn't load SRP claims",
+      "summary": {
+        "pending_one": "{{count}} pending",
+        "pending_other": "{{count}} pending",
+        "owed": "{{isk}} ISK owed"
+      },
+      "tabsLabel": "SRP claims",
+      "tabs": {
+        "pending": "Pending",
+        "owed": "Owed",
+        "history": "History"
+      },
+      "title": {
+        "pending": "Pending claims",
+        "owed": "Approved claims, not yet paid",
+        "history": "Paid and rejected claims"
+      },
+      "empty": {
+        "pendingTitle": "No claims waiting",
+        "pendingHint": "New claims from pilots show up here.",
+        "owedTitle": "Nothing owed",
+        "owedHint": "Approved claims wait here until you pay them in game and mark them paid.",
+        "historyTitle": "No paid or rejected claims yet",
+        "historyHint": "Closed claims stay here until the retention period ends."
+      },
+      "columns": {
+        "pilot": "Pilot",
+        "hull": "Hull",
+        "lost": "Lost",
+        "fleetOrFc": "Fleet or FC",
+        "amount": "Amount",
+        "approved": "Approved",
+        "state": "State",
+        "decided": "Decided",
+        "reason": "Reason"
+      },
+      "filed": "Filed {{when}}",
+      "by": "by {{name}}",
+      "states": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "paid": "Paid",
+        "rejected": "Rejected"
+      },
+      "basis": {
+        "hull-fixed": "Hull Rule: fixed",
+        "class-fixed": "Class price",
+        "killmail-percent": "Killmail value × {{percent}}%",
+        "appraisal-percent": "Jita appraisal × {{percent}}%",
+        "none": "No amount: officer types it",
+        "suggested": "Suggested {{isk}} ISK ({{basis}})"
+      },
+      "amountChanged": "changed by {{name}}",
+      "amountTyped": "typed by {{name}}",
+      "typeAmount": "Type amount",
+      "amountFor": "Amount for {{pilot}}",
+      "hullFallback": "Hull {{id}}",
+      "systemFallback": "System {{id}}",
+      "actions": {
+        "approve": "Approve",
+        "reject": "Reject…",
+        "markPaid": "Mark paid",
+        "copy": "Copy",
+        "copyAmount": "Copy amount",
+        "copied": "Copied",
+        "copyLabel": "Copy {{isk}} ISK for {{pilot}}",
+        "changeAmount": "Change amount…",
+        "select": "Select {{pilot}}, {{hull}}"
+      },
+      "bulk": {
+        "selectAll": "Select all ({{count}})",
+        "selectNone": "Select none",
+        "selected": "{{count}} selected",
+        "clear": "Clear",
+        "approve": "Approve ({{count}})",
+        "markPaid": "Mark paid ({{count}})"
+      },
+      "reject": {
+        "title": "Reject {{pilot}}'s claim?",
+        "body": "{{hull}} lost at {{system}}, {{isk}} ISK. The claim moves to History as Rejected.",
+        "reason": "Reason (required, sent to the pilot)",
+        "confirm": "Reject claim",
+        "mailNote": "The pilot reads this reason with the result."
+      },
+      "change": {
+        "title": "Change amount for {{pilot}}",
+        "computed": "Computed",
+        "basis": "Basis",
+        "newAmount": "New amount",
+        "reason": "Reason (required, kept in the audit trail)",
+        "effect": "{{from}} → {{to}} ISK. The computed amount stays visible on the claim.",
+        "confirm": "Save amount"
+      },
+      "logged": "Logged with your name and reason. Your role is checked again when you confirm.",
+      "detail": {
+        "title": "{{pilot}} · {{hull}}",
+        "subtitle": "Lost at {{system}}",
+        "state": "State",
+        "pilot": "Pilot",
+        "killmail": "Killmail",
+        "killmailLink": "{{id}} on zKillboard",
+        "lost": "Lost",
+        "filed": "Filed",
+        "fleetOrFc": "Fleet or FC",
+        "note": "Note",
+        "amount": "Amount",
+        "computed": "Computed {{isk}} ISK. Changed by {{name}}: {{reason}}",
+        "rejection": "Rejection reason",
+        "auditTitle": "Audit trail",
+        "auditLoading": "Loading the audit trail",
+        "auditFailed": "Couldn't load the audit trail",
+        "auditEmpty": "No entries yet",
+        "previous": "Earlier rejection: {{reason}}"
+      },
+      "activity": {
+        "title": "Activity",
+        "meta": "Every action, newest first",
+        "count_one": "{{count}} action",
+        "count_other": "{{count}} actions",
+        "show": "Show activity",
+        "hide": "Hide activity",
+        "empty": "No activity yet",
+        "system": "System"
+      },
+      "audit": {
+        "fileClaim": "Filed claim killmail {{id}} for {{isk}} ISK",
+        "fileClaimNone": "Filed claim killmail {{id}}, no amount worked out",
+        "refileClaim": "Re-filed claim killmail {{id}}",
+        "approveClaim": "Approved killmail {{id}} for {{isk}} ISK",
+        "approveClaimOverride": "Approved killmail {{id}} for {{isk}} ISK (changed from {{from}}): {{reason}}",
+        "rejectClaim": "Rejected killmail {{id}}: {{reason}}",
+        "changeClaimAmount": "Changed amount of killmail {{id}} from {{from}} to {{isk}} ISK: {{reason}}",
+        "markClaimPaid": "Marked killmail {{id}} paid, {{isk}} ISK",
+        "turnOn": "Turned SRP on",
+        "turnOff": "Turned SRP off",
+        "saveSettings": "Saved SRP settings",
+        "reclaim": "Reclaimed SRP",
+        "other": "{{action}}"
+      },
+      "results": {
+        "approved": "Approved {{pilot}}, {{isk}} ISK",
+        "rejected": "Rejected {{pilot}}'s claim",
+        "changed": "Amount for {{pilot}} is now {{isk}} ISK",
+        "paid": "Marked {{pilot}} paid, {{isk}} ISK",
+        "approvedMany": "Approved {{ok}} of {{total}}",
+        "paidMany": "Marked {{ok}} of {{total}} paid",
+        "someFailed": "{{count}} not changed: {{reasons}}",
+        "copyFailed": "Couldn't copy the amount"
+      },
+      "failed": {
+        "generic": "Couldn't save that. Try again.",
+        "claim-not-found": "That claim is gone.",
+        "illegal-transition": "Another officer already decided that claim.",
+        "reason-required": "A reason is required.",
+        "amount-required": "Type an amount first.",
+        "amount-unchanged": "That is already the amount.",
+        "not-an-officer": "Your roles no longer allow SRP.",
+        "wrong-corp": "That claim belongs to another corporation.",
+        "role-required": "Your roles no longer allow that."
+      }
     },
     "settings": {
       "deniedTitle": "SRP is not open to your roles",

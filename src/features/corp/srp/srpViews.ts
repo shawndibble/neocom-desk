@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import { SrpOfficerView } from './SrpOfficerView';
 import { SrpSettingsView } from './SrpSettingsView';
 
 /**
@@ -17,6 +18,13 @@ export interface SrpView {
 }
 
 export const SRP_VIEWS: readonly SrpView[] = [
+  {
+    id: 'queue',
+    labelKey: 'srp.tabs.queue',
+    component: SrpOfficerView,
+    // Director or Accountant (the page's own gate); the server re-checks the roles on every action.
+    visible: ({ canManageSrp }) => canManageSrp,
+  },
   {
     id: 'settings',
     labelKey: 'srp.tabs.settings',

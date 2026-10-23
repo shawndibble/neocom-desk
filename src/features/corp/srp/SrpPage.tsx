@@ -1,19 +1,20 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader, Tabs, useTabsId } from '@/components/ui';
+import { usePageTab } from '@/lib/usePageTab';
+import { SRP_TABS } from './srpPaths';
 import { SRP_VIEWS } from './srpViews';
 
 /**
- * `/corp/srp`'s body (issue #4851): the page header and the views `srpViews.ts` lists for this
- * pilot. One view renders bare; two or more get a tab bar (local state, no URL segment yet:
- * when the second view lands, register `/corp/srp` in `pageTabs.ts` and swap `useState` for
- * `usePageTab`, as the Moons page does).
+ * `/corp/srp`'s body (issues #4851, #4853): the page header and the views `srpViews.ts` lists for
+ * this pilot. One view renders bare; two or more get a tab bar whose tab is the URL segment
+ * (`srpPaths.ts`, registered in `pageTabs.ts`). A tab the pilot may not see falls back to the
+ * first view they may.
  */
 export function SrpPage({ canManageSrp }: { canManageSrp: boolean }) {
   const { t } = useTranslation();
   const tabsId = useTabsId();
   const views = SRP_VIEWS.filter((v) => v.visible({ canManageSrp }));
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, select] = usePageTab(SRP_TABS);
   const view = views.find((v) => v.id === selected) ?? views[0];
   if (!view) return null;
   const View = view.component;
@@ -25,7 +26,9 @@ export function SrpPage({ canManageSrp }: { canManageSrp: boolean }) {
           tabsId={tabsId}
           label={t('srp.title')}
           value={view.id}
-          onChange={setSelected}
+          onChange={(id) =>
+            select(SRP_TABS.tabs.find((tab) => tab.id === id)?.id ?? SRP_TABS.defaultTab)
+          }
           tabs={views.map((v) => ({ id: v.id, label: t(v.labelKey) }))}
         />
       )}
