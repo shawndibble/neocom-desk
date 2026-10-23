@@ -24,9 +24,9 @@ import {
   type PilotKillmail,
   type PilotKillmailsResult,
 } from '@/lib/zkillboard';
-import { loadTypes } from '@/sde/loadSde';
 import { KillmailBody, type Expanded, type TypeLabel } from './KillmailBody';
 import { loadKillmailFit } from './pilotKillmailFit';
+import { useTypeLabel } from './useTypeLabel';
 
 /** Every id a row's names come from: pilots, corporations and the system. */
 function nameIds(detail: KillmailDetail | null): number[] {
@@ -47,7 +47,7 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
   const [expanded, setExpanded] = useState<ReadonlyMap<number, Expanded>>(new Map());
   const [open, setOpen] = useState<ReadonlySet<number>>(new Set());
   const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
-  const [typeLabel, setTypeLabel] = useState<TypeLabel | null>(null);
+  const typeLabel = useTypeLabel();
   /** Killmails read or being read; a ref, so a quick double-click can't start a second read. */
   const reading = useRef(new Set<number>());
   const headingId = useId();
@@ -61,21 +61,6 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
       cancelled = true;
     };
   }, [characterId, attempt]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadTypes()
-      .then((types) => {
-        if (!cancelled) setTypeLabel(() => (id: number) => types[String(id)]?.name ?? `#${id}`);
-      })
-      .catch(() => {
-        // No type catalog: ids stand in for names rather than a spinner that never ends.
-        if (!cancelled) setTypeLabel(() => (id: number) => `#${id}`);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const entries = result?.ok ? result.entries : [];
   const detailOf = (entry: PilotKillmail): KillmailDetail | null => {

@@ -33,6 +33,7 @@ import * as Icon from '@/components/ui/icons';
 import type { UseTableExport } from '@/components/ui/useTableExport';
 import type { JournalCoverage, JournalRow } from '@/engine/journalNetting';
 import { ActiveFilterRow } from '@/features/character/ActiveFilterRow';
+import { InsuranceLossHost } from '@/features/character/InsuranceLossHost';
 import { IskFlowChart } from '@/features/character/IskFlowChart';
 import { IskBreakdownPanel } from '@/features/character/IskBreakdownPanel';
 import { journalRefLabel } from '@/features/character/journalRefLabel';
@@ -502,6 +503,7 @@ export function JournalTable({
           />
         </div>
       )}
+      <InsuranceLossHost />
     </>
   );
 }

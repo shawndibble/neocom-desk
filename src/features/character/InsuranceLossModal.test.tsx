@@ -34,10 +34,10 @@ function loss(killmailId: number, time: string): PilotKillmail {
   };
 }
 
-function renderModal() {
+function renderModal(payoutDate = '2026-10-01T10:31:00Z') {
   return render(
     <MemoryRouter>
-      <InsuranceLossModal payoutDate="2026-10-01T10:31:00Z" characterId={42} onClose={() => {}} />
+      <InsuranceLossModal payoutDate={payoutDate} characterId={42} onClose={() => {}} />
     </MemoryRouter>
   );
 }
@@ -67,6 +67,16 @@ describe('InsuranceLossModal', () => {
     });
     renderModal();
     expect(await screen.findByText(/No matching loss found/)).toBeTruthy();
+  });
+
+  it('says the payout is older than the list when it predates what zKillboard reaches', async () => {
+    history.mockResolvedValue({
+      ok: true,
+      entries: [loss(1, '2026-09-20T10:30:00Z')],
+      reachesBackTo: Date.parse('2026-09-15T00:00:00Z'),
+    });
+    renderModal('2026-09-01T10:31:00Z');
+    expect(await screen.findByText(/older than the losses/)).toBeTruthy();
   });
 
   it('says so when zKillboard cannot be read', async () => {

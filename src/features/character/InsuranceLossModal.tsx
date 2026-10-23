@@ -10,16 +10,16 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Spinner } from '@/components/ui';
 import { matchLossToPayout } from '@/engine/losses/netLoss';
-import { KillmailBody, type Expanded, type TypeLabel } from '@/features/travel/KillmailBody';
+import { KillmailBody, type Expanded } from '@/features/travel/KillmailBody';
 import { loadKillmailFit } from '@/features/travel/pilotKillmailFit';
+import { useTypeLabel } from '@/features/travel/useTypeLabel';
 import { parseInstant } from '@/engine/esiInstant';
 import { fetchPilotKillmailHistory, type PilotKillmail } from '@/lib/zkillboard';
-import { loadTypes } from '@/sde/loadSde';
 
 type Found =
   | { state: 'loading' }
   | { state: 'failed' }
-  | { state: 'none' }
+  | { state: 'none'; olderThanList: boolean }
   | { state: 'found'; entry: PilotKillmail; read: Expanded };
 
 interface InsuranceLossModalProps {
@@ -32,21 +32,7 @@ interface InsuranceLossModalProps {
 export function InsuranceLossModal({ payoutDate, characterId, onClose }: InsuranceLossModalProps) {
   const { t } = useTranslation();
   const [found, setFound] = useState<Found>({ state: 'loading' });
-  const [typeLabel, setTypeLabel] = useState<TypeLabel | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadTypes()
-      .then((types) => {
-        if (!cancelled) setTypeLabel(() => (id: number) => types[String(id)]?.name ?? `#${id}`);
-      })
-      .catch(() => {
-        if (!cancelled) setTypeLabel(() => (id: number) => `#${id}`);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const typeLabel = useTypeLabel();
 
   useEffect(() => {
     let cancelled = false;
@@ -55,11 +41,15 @@ export function InsuranceLossModal({ payoutDate, characterId, onClose }: Insuran
       const history = await fetchPilotKillmailHistory(characterId);
       if (cancelled) return;
       if (!history.ok || payoutMs === null) return setFound({ state: 'failed' });
-      const losses = history.entries
-        .filter((entry) => entry.side === 'loss' && entry.detail?.time != null)
-        .map((entry) => ({ entry, timeMs: Date.parse(entry.detail?.time ?? '') }));
+      const losses = history.entries.flatMap((entry) => {
+        const timeMs = entry.side === 'loss' ? parseInstant(entry.detail?.time ?? undefined) : null;
+        return timeMs === null ? [] : [{ entry, timeMs }];
+      });
       const match = matchLossToPayout(losses, payoutMs);
-      if (match === null) return setFound({ state: 'none' });
+      if (match === null) {
+        const olderThanList = history.reachesBackTo !== null && payoutMs < history.reachesBackTo;
+        return setFound({ state: 'none', olderThanList });
+      }
       const read = await loadKillmailFit(match.entry);
       if (!cancelled) setFound({ state: 'found', entry: match.entry, read });
     })();
@@ -79,7 +69,9 @@ export function InsuranceLossModal({ payoutDate, characterId, onClose }: Insuran
         </p>
       )}
       {found.state === 'none' && (
-        <p className="text-sm text-text-dim">{t('wallet.insuranceLoss.none')}</p>
+        <p className="text-sm text-text-dim">
+          {t(found.olderThanList ? 'wallet.insuranceLoss.noneOlder' : 'wallet.insuranceLoss.none')}
+        </p>
       )}
       {found.state === 'found' && (
         <KillmailBody

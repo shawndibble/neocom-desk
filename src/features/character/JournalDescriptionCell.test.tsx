@@ -5,16 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { JournalDescriptionCell } from './JournalDescriptionCell';
 import type { WalletJournalEntry } from '@/esi/endpoints';
-
-vi.mock('./InsuranceLossModal', () => ({
-  InsuranceLossModal: ({
-    payoutDate,
-    characterId,
-  }: {
-    payoutDate: string;
-    characterId: number;
-  }) => <div role="dialog">{`loss ${characterId} ${payoutDate}`}</div>,
-}));
+import { useInsuranceLossModalStore } from '@/stores/insuranceLossModal';
 
 vi.mock('./npcFactions', () => ({
   loadNpcFactions: vi.fn(
@@ -232,7 +223,10 @@ describe('JournalDescriptionCell', () => {
     it('opens the loss for a positive payout', async () => {
       renderCell(payout, 42);
       await userEvent.click(screen.getByRole('button', { name: 'View loss' }));
-      expect(await screen.findByRole('dialog')).toHaveTextContent('loss 42 2026-08-02T12:00:00Z');
+      expect(useInsuranceLossModalStore.getState().request).toEqual({
+        payoutDate: '2026-08-02T12:00:00Z',
+        characterId: 42,
+      });
     });
 
     it('offers nothing without a Character to match against', () => {

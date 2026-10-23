@@ -13,16 +13,17 @@
  * (see `Tooltip`).
  */
 import { formatCount } from '@/lib/formatCount';
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HintText } from '@/components/ui/HintText';
-import { Tooltip, TypeIcon } from '@/components/ui';
+import { Button, Tooltip, TypeIcon } from '@/components/ui';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import type { WalletJournalEntry, WalletTransactionCommon } from '@/esi/endpoints';
 import { ItemInfoLink } from '@/features/entities';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { formatIsk } from '@/lib/isk';
+import { useInsuranceLossModalStore } from '@/stores/insuranceLossModal';
 import { BountyFactionSummary } from './BountyFactionSummary';
 import { bountyKillsOf } from './bountyKills';
 import { dailyGoalMessageIdOf, dailyGoalName } from './dailyGoal';
@@ -38,10 +39,6 @@ interface JournalDescriptionCellProps {
   lossCharacterId?: number;
 }
 
-const LazyInsuranceLossModal = lazy(() =>
-  import('./InsuranceLossModal').then((m) => ({ default: m.InsuranceLossModal }))
-);
-
 export function JournalDescriptionCell({
   entry,
   transaction,
@@ -50,7 +47,7 @@ export function JournalDescriptionCell({
   lossCharacterId,
 }: JournalDescriptionCellProps) {
   const { t } = useTranslation();
-  const [lossOpen, setLossOpen] = useState(false);
+  const openLoss = useInsuranceLossModalStore((state) => state.open);
   const canViewLoss =
     lossCharacterId !== undefined && entry.ref_type === 'insurance' && (entry.amount ?? 0) > 0;
   const contractId = entry.context_id_type === 'contract_id' ? entry.context_id : undefined;
@@ -112,22 +109,13 @@ export function JournalDescriptionCell({
         </Link>
       )}
       {canViewLoss && (
-        <button
-          type="button"
-          className={`${inlineLinkClassName} w-fit text-left`}
-          onClick={() => setLossOpen(true)}
+        <Button
+          size="sm"
+          className="w-fit"
+          onClick={() => openLoss({ payoutDate: entry.date, characterId: lossCharacterId })}
         >
           {t('wallet.journalInsuranceLossLink')}
-        </button>
-      )}
-      {lossOpen && lossCharacterId !== undefined && (
-        <Suspense fallback={null}>
-          <LazyInsuranceLossModal
-            payoutDate={entry.date}
-            characterId={lossCharacterId}
-            onClose={() => setLossOpen(false)}
-          />
-        </Suspense>
+        </Button>
       )}
       {transaction && fill && (
         <Tooltip content={fill}>
