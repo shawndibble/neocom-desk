@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button, Modal, ProgressBar, StatChip, StatChips } from '@/components/ui';
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Pill } from '@/components/ui/Pill';
 import { Widget } from '@/features/overview/widgets/Widget';
 import type { Widget as WidgetModel } from '@/features/overview/widgets/layout';
@@ -180,14 +181,7 @@ function Board({ modal }: { modal?: boolean }) {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="ghost">Set destination</Button>
-              <a
-                className="inline-flex items-center text-accent underline"
-                href="https://evemaps.dotlan.net/system/X-7OMU"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Dotlan
-              </a>
+              <ExternalLink href="https://evemaps.dotlan.net/system/X-7OMU">Dotlan</ExternalLink>
             </div>
           </div>
         </NewComponent>
