@@ -76,6 +76,9 @@ function rateLabel(
   }
 }
 
+/** The settings dialog's four tabs. */
+export type SettingsTab = 'rates' | 'billing' | 'extractions' | 'access';
+
 /**
  * The book's settings (D21: from the page header's gear): the dated rates
  * (corp default, Guest default, per-Miner, per-moon, per-refinery, per-moon-owner), hub and Ore Form, grace,
@@ -83,8 +86,6 @@ function rateLabel(
  * expiry and the dismissal approval limit. A rate is never retroactive, so a
  * new one starts today or later; everything else saves as one patch.
  */
-export type SettingsTab = 'rates' | 'billing' | 'extractions' | 'access';
-
 export function BookSettingsDialog({
   open,
   onClose,
