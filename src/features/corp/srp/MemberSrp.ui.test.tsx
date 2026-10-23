@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { createSrpMemberFixture } from '@/storybook/srpMemberFixture';
 import { MemberSrp } from './MemberSrp';
@@ -31,7 +32,11 @@ function setup(options: Parameters<typeof createSrpMemberFixture>[1] = {}) {
   backend = createSrpMemberFixture(Date.now(), options);
   file = vi.spyOn(backend, 'file');
   setSrpMemberBackendOverride(backend);
-  render(<MemberSrp characterId={7} corporationId={98765432} />);
+  render(
+    <MemoryRouter>
+      <MemberSrp characterId={7} corporationId={98765432} />
+    </MemoryRouter>
+  );
 }
 
 beforeEach(() => {
@@ -53,6 +58,13 @@ describe('MemberSrp', () => {
     setup();
     const lost = await screen.findByRole('table', { name: 'My lost ships' });
     await within(lost).findByRole('button', { name: 'File claim for Hurricane' });
+    const hull = within(lost).getAllByRole('link', { name: 'Hurricane' })[0]!;
+    expect(hull.getAttribute('href')).toContain('info=type-');
+    expect(
+      within(lost)
+        .getAllByRole('link')
+        .some((l) => l.getAttribute('href')?.includes('stops='))
+    ).toBe(true);
     expect(within(lost).getByText('Claimed')).toBeTruthy();
     expect(within(lost).getByText('Not covered')).toBeTruthy();
     expect(within(lost).getByText('Too old')).toBeTruthy();
@@ -176,5 +188,11 @@ describe('MemberSrp', () => {
     await userEvent.click(await within(claims).findByText('Cerberus'));
     expect(await screen.findByText('Waiting for an officer')).toBeTruthy();
     expect(screen.getByRole('link', { name: /View killmail/ })).toBeTruthy();
+    const dialog = screen.getByRole('dialog');
+    expect(
+      within(dialog)
+        .getAllByRole('link')
+        .some((l) => l.getAttribute('href')?.includes('stops='))
+    ).toBe(true);
   });
 });

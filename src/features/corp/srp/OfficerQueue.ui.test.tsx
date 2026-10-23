@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { SrpClaim, SrpClaimOutcome } from '../srpClaimTypes';
 
@@ -67,7 +68,11 @@ function setup(claims: SrpClaim[], history: SrpHistoryState = { status: 'idle' }
     })),
     claimAudit: vi.fn(async () => []),
   } satisfies SrpQueueData;
-  render(<OfficerQueue data={data} ready={data.state as never} />);
+  render(
+    <MemoryRouter>
+      <OfficerQueue data={data} ready={data.state as never} />
+    </MemoryRouter>
+  );
   return data;
 }
 
@@ -256,6 +261,16 @@ describe('OfficerQueue detail and change amount', () => {
     await userEvent.click(save);
     await waitFor(() => expect(data.change).toHaveBeenCalledWith(1, 700_000, 'Missing mods'));
     expect(data.claimAudit).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('OfficerQueue detail entity links', () => {
+  it('links the pilot in the detail, and nowhere in the clickable row', async () => {
+    setup(pendingSet());
+    expect(screen.queryByRole('link', { name: 'Pilot1' })).toBeNull();
+    await userEvent.click(screen.getAllByText('Pilot1')[0]!);
+    const link = await screen.findByRole('link', { name: 'Pilot1' });
+    expect(link.getAttribute('href')).toContain('info=character-');
   });
 });
 

@@ -1,7 +1,8 @@
 import { useId, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Button, FieldError, Modal, TextArea, TextInput } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
+import { SystemLink } from '@/features/entities';
 import { formatIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -153,7 +154,13 @@ export function ClaimDetailDialog({
           </span>
         </div>
         <p className="text-text-dim">
-          {t('srpMember.detail.lostIn', { date: date(claim.killedAt), system: systemName })}
+          <Trans
+            i18nKey="srpMember.detail.lostIn"
+            values={{ date: date(claim.killedAt), system: systemName }}
+            components={{
+              system: <SystemLink systemId={claim.solarSystemId}>{systemName}</SystemLink>,
+            }}
+          />
         </p>
         {claim.rejectionReason ? (
           <p>

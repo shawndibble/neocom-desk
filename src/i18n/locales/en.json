@@ -16103,7 +16103,7 @@
       }
     },
     "detail": {
-      "lostIn": "Lost {{date}} in {{system}}",
+      "lostIn": "Lost {{date}} in <system>{{system}}</system>",
       "viewKillmail": "View killmail",
       "timeline": {
         "filed": "{{date}}: you filed this claim",
