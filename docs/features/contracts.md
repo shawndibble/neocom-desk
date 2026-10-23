@@ -103,6 +103,11 @@ States (in order, `ContractSearchPanel.tsx:964-1031`):
 5. 0 rows: "No public contracts synced yet … check back shortly" (separate copy for courier).
 6. Rows: filter bar + table.
 
+### Price flags (#4773)
+
+- A `Icon.Warn` marker before the Price figure (`ContractFlagMark`, engine `engine/contracts/contractFlags.ts`): an item asking at least the pilot's multiple (`sync.itemContractFlagMultiple`, presets 5/10/20/50, default 10, Settings › Market) times the hub's best sell for every unit, or a blueprint copy asking more than the original's lowest sell in the hub's region. The tooltip states the multiple; the detail slide-over words each flag beside the price check and, for a bundle, the searched line's share of the contract's value.
+- Silent when it cannot tell: no hub price yet or more than 100 distinct types on screen (`useContractFlagPrices.ts`), a barter or unpriced PLEX ask, an auction with no buyout, a contract that also asks for items, a contract with other lines, or a row without `typeCount`. The board reads only the rows of the types searched, so the bundle test needs `typeCount` (distinct for-sale types per contract), stamped by `functions/src/publicContracts.ts` `applyTypeCounts` and read from R2; a snapshot published before it carries none and flags nothing until the next publish (Cloud Functions are not auto-deployed). Decision `20261023-074200`.
+
 ### Filter bar (`FilterBar`; below md a funnel sheet with active-count badge; search stays inline)
 
 - Search box "Search item name…": ranked search (`rankedSearch`) over only item types currently listed (`listedContractTypeOptions`), limit 50 types for free text; `deferredTypeQuery` so a keystroke does not stall on ~370k rows (#2024).
@@ -110,6 +115,7 @@ States (in order, `ContractSearchPanel.tsx:964-1031`):
 - Max price (`IskInput`, shorthand ok). Min quantity (number).
 - Sale kind chips Exchange / Auction (toggle; `items.kind`).
 - Exclude (`CheckboxSelect`): Hide auctions; Hide PLEX requests (tooltip "Hide contracts asking for PLEX in return, rather than ISK").
+- Hide overpriced chip (`items.hideOverpriced`, in the funnel like Market Browser's Hide bait sells): drops the rows the price flag marks and prints a dim "N overpriced contracts hidden" under the filter bar. Judged after the engine's filter, since it needs hub prices.
 - Jump range (`JumpRangeSelect`): Any, current system only, 3/5/10/15/20 jumps under the Jump Basis. `CurrentSystemPicker`: game location by default or a hand-picked system, stored device-local per Character (`currentSystemPicks`), writes immediately (not part of the draft). `JumpRangeNote` explains missing origin.
 - Column picker (button "Columns") + export menu in the bar's actions.
 - Active count: counts controls touched (half-typed `1e` still counts), not parsed values.

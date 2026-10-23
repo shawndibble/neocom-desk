@@ -55,6 +55,14 @@ export interface PublicContractOfferRow {
    * contract out. Absent, not false, otherwise.
    */
   requestsItems?: true;
+  /**
+   * Distinct for-sale item types in the contract, the same on every offer row
+   * of one contract (`functions/src/publicContracts.ts`'s `applyTypeCounts`).
+   * The Items board reads only the rows of the types it searched, so this is
+   * the one place it can learn a contract is a bundle. Absent on a snapshot
+   * published before the field existed: unknown, not single-type.
+   */
+  typeCount?: number;
   /** Epoch ms. */
   dateExpired: number;
 }

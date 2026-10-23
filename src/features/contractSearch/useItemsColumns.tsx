@@ -4,7 +4,7 @@
  * detail modal and jumps readout share.
  */
 import { formatCount } from '@/lib/formatCount';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { IskAmount, type DataTableColumn } from '@/components/ui';
 import { entityLinkClassName } from '@/components/ui/entityLinkClassName';
@@ -44,6 +44,8 @@ interface ItemsColumnsInput {
   jumpRangeFilter: ReturnType<typeof useJumpRangeFilter>;
   plexPrice: number | null;
   visibleItemsColumns: readonly ContractSearchItemsColumnId[];
+  /** The marker before a row's price, or nothing: the flag judgement lives with the caller. */
+  priceFlag?: (row: PublicContractOfferRow) => ReactNode;
 }
 
 export function useItemsColumns({
@@ -53,6 +55,7 @@ export function useItemsColumns({
   jumpRangeFilter,
   plexPrice,
   visibleItemsColumns,
+  priceFlag,
 }: ItemsColumnsInput) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -124,7 +127,10 @@ export function useItemsColumns({
               plexAskLabel(row)
             ) : (
               // Long press, not tap: the row's own tap opens the offer's detail modal.
-              <IskAmount value={offerAskingPrice(row, plexPrice)} />
+              <>
+                {priceFlag?.(row)}
+                <IskAmount value={offerAskingPrice(row, plexPrice)} />
+              </>
             )}
             {row.isAuction && (
               // An auction's number is a starting bid unless the seller set a
@@ -221,7 +227,7 @@ export function useItemsColumns({
         stackAffix: { before: t('contractSearch.mobile.expiresAffix') },
       },
     }),
-    [t, regionNames, offerLocations, timeZone, offerJumps, plexPrice, plexAskLabel]
+    [t, regionNames, offerLocations, timeZone, offerJumps, plexPrice, plexAskLabel, priceFlag]
   );
 
   const columns = useMemo<DataTableColumn<PublicContractOfferRow>[]>(() => {

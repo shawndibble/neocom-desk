@@ -191,6 +191,14 @@ export interface PublicContractOfferRow {
    * is bait, not a deal). Absent, not false, otherwise.
    */
   requestsItems?: true;
+  /**
+   * Distinct for-sale item types in the contract (a Multi-Type Contract when
+   * above one), the same on every offer row of one contract, set by
+   * `applyTypeCounts`. Always written, one included: a reader only ever sees
+   * the rows of the types it searched, so an absent count has to mean "an
+   * older publish", never "a single-type contract".
+   */
+  typeCount?: number;
   /** Epoch ms. */
   dateExpired: number;
 }
@@ -303,6 +311,21 @@ export function applyRequestedSide(rows: PublicContractOfferRow[], side: Request
   }
 }
 
+/**
+ * Stamps `typeCount` onto every offer row, in place: how many distinct for-sale
+ * item types its contract carries. Two stacks of one type are one type, not a
+ * bundle. Needs every row of every contract, so it runs once after the stream.
+ */
+export function applyTypeCounts(rows: PublicContractOfferRow[]): void {
+  const typesByContract = new Map<number, Set<number>>();
+  for (const row of rows) {
+    const types = typesByContract.get(row.contractId);
+    if (types) types.add(row.typeId);
+    else typesByContract.set(row.contractId, new Set([row.typeId]));
+  }
+  for (const row of rows) row.typeCount = typesByContract.get(row.contractId)!.size;
+}
+
 /** One CSV column as a number, or absent when it is blank or unparsable. */
 function numericColumn(value: string): number | undefined {
   if (value === '') return undefined;
@@ -401,6 +424,7 @@ export function filterAndCompactPublicContractOffers(
     if (row) rows.push(row);
   }
   applyRequestedSide(rows, requestedSideByContract(items, eligibleContracts));
+  applyTypeCounts(rows);
 
   return sortContractOfferRows(rows);
 }

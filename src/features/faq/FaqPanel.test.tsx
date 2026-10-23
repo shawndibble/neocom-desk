@@ -70,6 +70,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.miningTaxOreValueMode': /Assign form edits ore values/i,
   'sync.miningTaxSurveyConnections': /moon surveys you connected/i,
   'sync.courierHighCollateralRatio': /courier collateral warning/i,
+  'sync.itemContractFlagMultiple': /item contract flag/i,
   'sync.bpcHideAuctions': /hide auctions/i,
   'sync.bpcHidePlex': /hide PLEX/i,
   'sync.targetSkillPlan': /target skill plan/i,

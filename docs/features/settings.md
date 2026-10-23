@@ -125,11 +125,12 @@ BPC hints say a page filter can still flip either for one search. Facility defau
 
 ### Market (`/settings/market`)
 
-| Setting                    | Control                                                                                                                   | Default                                                             | Storage key                           | Sync |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------- | ---- |
-| Trade hub                  | select of `TRADE_HUBS` (5 hubs; first = default)                                                                          | `DEFAULT_TRADE_HUB` (`market/hubs.ts:105`)                          | `sync.marketHub` (legacy `marketHub`) | Yes  |
-| Flag courier collateral at | chips 20x / 50x / 100x / 200x reward                                                                                      | 50 (`HIGH_COLLATERAL_RATIO`, `engine/contracts/courierRisk.ts:153`) | `sync.courierHighCollateralRatio`     | Yes  |
-| LP value                   | ISK input, commit on blur/Enter, Esc reverts, "Use market rate" button when custom; blank or 0 = each store's market rate | 0                                                                   | `sync.loyaltyLpValue`                 | Yes  |
+| Setting                    | Control                                                                                                                   | Default                                                                | Storage key                           | Sync |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------- | ---- |
+| Trade hub                  | select of `TRADE_HUBS` (5 hubs; first = default)                                                                          | `DEFAULT_TRADE_HUB` (`market/hubs.ts:105`)                             | `sync.marketHub` (legacy `marketHub`) | Yes  |
+| Flag courier collateral at | chips 20x / 50x / 100x / 200x reward                                                                                      | 50 (`HIGH_COLLATERAL_RATIO`, `engine/contracts/courierRisk.ts:153`)    | `sync.courierHighCollateralRatio`     | Yes  |
+| Flag item contracts at     | chips 5x / 10x / 20x / 50x hub sell                                                                                       | 10 (`DEFAULT_ITEM_FLAG_MULTIPLE`, `engine/contracts/contractFlags.ts`) | `sync.itemContractFlagMultiple`       | Yes  |
+| LP value                   | ISK input, commit on blur/Enter, Esc reverts, "Use market rate" button when custom; blank or 0 = each store's market rate | 0                                                                      | `sync.loyaltyLpValue`                 | Yes  |
 
 Hub drives LP store prices, item lookups, Hauling Opportunities start. Market browser keeps its own per-device hub. Mining tax uses each payee's hub. Market Appraisal price percent (`sync.marketPricePercent`) is synced but edited on the Appraisal tab.
 

@@ -6,6 +6,7 @@ import {
   compactContractOfferRow,
   accumulateRequestedSide,
   applyRequestedSide,
+  applyTypeCounts,
   emptyRequestedSide,
   requestedSideByContract,
   filterAndCompactPublicContractOffers,
@@ -306,6 +307,48 @@ describe('applyRequestedSide', () => {
     applyRequestedSide(patched, { plex: new Map([['1', 1000]]), items: new Set(['1']) });
     expect(patched[2]).not.toHaveProperty('requestedPlex');
     expect(patched[2]).not.toHaveProperty('requestsItems');
+  });
+});
+
+describe('applyTypeCounts', () => {
+  const base = {
+    regionId: 10000002,
+    locationId: 60003760,
+    price: 1,
+    isAuction: false,
+    quantity: 1,
+    dateExpired: Date.parse(FUTURE),
+  };
+
+  it('stamps every row with how many distinct for-sale types its contract carries', () => {
+    const rows: PublicContractOfferRow[] = [
+      { ...base, contractId: 1, typeId: 34 },
+      { ...base, contractId: 1, typeId: 35 },
+      { ...base, contractId: 1, typeId: 36 },
+      { ...base, contractId: 2, typeId: 34 },
+    ];
+    applyTypeCounts(rows);
+    expect(rows.map((r) => [r.contractId, r.typeId, r.typeCount])).toEqual([
+      [1, 34, 3],
+      [1, 35, 3],
+      [1, 36, 3],
+      [2, 34, 1],
+    ]);
+  });
+
+  it('counts a type listed twice once: two stacks of one ore are not a bundle', () => {
+    const rows: PublicContractOfferRow[] = [
+      { ...base, contractId: 1, typeId: 34 },
+      { ...base, contractId: 1, typeId: 34, quantity: 5 },
+    ];
+    applyTypeCounts(rows);
+    expect(rows.map((r) => r.typeCount)).toEqual([1, 1]);
+  });
+
+  it('writes the count even when it is one, so a reader can tell single from unknown', () => {
+    const rows: PublicContractOfferRow[] = [{ ...base, contractId: 7, typeId: 34 }];
+    applyTypeCounts(rows);
+    expect(rows[0]).toHaveProperty('typeCount', 1);
   });
 });
 
