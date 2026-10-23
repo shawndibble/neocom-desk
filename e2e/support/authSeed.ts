@@ -153,7 +153,7 @@ export async function signInAndGoto(
 export interface SeededWidget {
   kind: string;
   size?: 'S' | 'M' | 'L' | 'F';
-  view?: 'number' | 'chart' | 'list';
+  view?: 'number' | 'chart' | 'table' | 'list';
 }
 
 export function overviewLayoutSetting(widgets: readonly SeededWidget[]): {

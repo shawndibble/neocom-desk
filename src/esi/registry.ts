@@ -452,6 +452,30 @@ export const ESI_REGISTRY = {
     scope: 'esi-planets.manage_planets.v1',
     group: 'planets',
   },
+  /**
+   * Mercenary Dens (issue #4791). Character routes only: ESI has no corp den
+   * list and no role. In the default-on `planets` Permission, not an opt-in group.
+   */
+  getCharacterMercenaryDens: {
+    route: '/characters/{character_id}/structures/mercenary-dens',
+    scope: 'esi-structures.read_character.v1',
+    group: 'planets',
+  },
+  getCharacterMercenaryDen: {
+    route: '/characters/{character_id}/structures/mercenary-dens/{mercenary_den_id}',
+    scope: 'esi-structures.read_character.v1',
+    group: 'planets',
+  },
+  getCharacterMercenaryOperations: {
+    route: '/characters/{character_id}/mercenary-tactical-operations',
+    scope: 'esi-activities.read_character.v1',
+    group: 'planets',
+  },
+  getCharacterMercenaryOperation: {
+    route: '/characters/{character_id}/mercenary-tactical-operations/{operation_id}',
+    scope: 'esi-activities.read_character.v1',
+    group: 'planets',
+  },
   getCharacterPlanet: {
     route: '/characters/{character_id}/planets/{planet_id}',
     scope: 'esi-planets.manage_planets.v1',
