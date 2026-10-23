@@ -489,6 +489,16 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         })),
       },
     },
+    mercenaryDens: {
+      value: '1',
+      unit: t('overview.gallery.samples.mercenaryDens.unit'),
+      note: t('overview.gallery.samples.mercenaryDens.note'),
+      rows: [
+        ['Efa VII', t('overview.gallery.samples.mercenaryDens.reinforced'), '14h'],
+        ['X-7OMU IV', t('overview.gallery.samples.mercenaryDens.ready'), '9h'],
+        ['4-HWWF II', t('overview.widgets.mercenaryDens.state.running'), '—'],
+      ],
+    },
     planetary: {
       value: '4',
       unit: t('overview.gallery.samples.planetary.unit'),

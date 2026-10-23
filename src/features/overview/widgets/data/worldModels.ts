@@ -31,6 +31,7 @@ import type {
   Translate,
 } from './types';
 import { industry } from './industryModels';
+import { mercenaryDens } from './mercenaryDensModels';
 import { planetary } from './planetaryModels';
 import { moonChunks, structures } from './structureModels';
 
@@ -406,6 +407,7 @@ export const miningYield: Builder = (feeds, { t, now, range, scopeAll, activeCha
 export const WORLD_DEFS: Readonly<Record<string, KindDef>> = {
   industry: { feeds: ['industry'], build: industry },
   planetary: { feeds: ['planetary'], build: planetary },
+  mercenaryDens: { feeds: ['mercenaryDens'], build: mercenaryDens },
   structures: { feeds: ['structures'], build: structures },
   moonChunks: { feeds: ['moonChunks'], build: moonChunks },
   incursions: { feeds: ['incursions'], build: incursions },

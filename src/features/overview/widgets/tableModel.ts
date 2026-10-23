@@ -6,7 +6,8 @@
  * its builder (`models.ts` / `kindModels.ts`). Order the columns as the name
  * first, then the one "key" figure, then the rest; give each a `priority` (1 is
  * kept longest). Small keeps the name and the best-priority column, Medium
- * four, Large and Full all. A kind that sets nothing gets `rowsToTable`.
+ * four, Large and Full all; `fitColumns` then trims a `fitWidth` table to its box.
+ * A kind that sets nothing gets `rowsToTable`.
  */
 import type { WidgetSize } from './kinds';
 import type { KindView, ListRow, TableCell, TableColumn, TableModel } from './data/types';
@@ -27,6 +28,31 @@ export function visibleColumns(columns: readonly TableColumn[], size: WidgetSize
     .slice(0, budget - 1)
     .map(({ index }) => index);
   const kept = new Set([0, ...keep]);
+  return columns.filter((_, index) => kept.has(index));
+}
+
+const DEFAULT_MIN_WIDTH = 64;
+
+/**
+ * The columns that fit a box `boxWidth` px across: the first always, then the best by priority
+ * while their `minWidth`s (default 64) sum to no more than the box; in their own order.
+ * `TableBody` measures the box (ResizeObserver on its wrapper, never the cells), so a
+ * `fitWidth` table never scrolls sideways.
+ */
+export function fitColumns(columns: readonly TableColumn[], boxWidth: number): TableColumn[] {
+  if (columns.length === 0) return [];
+  const need = (column: TableColumn) => column.minWidth ?? DEFAULT_MIN_WIDTH;
+  let used = need(columns[0]);
+  const kept = new Set([0]);
+  const ranked = columns
+    .map((column, index) => ({ index, rank: column.priority ?? index }))
+    .filter(({ index }) => index > 0)
+    .sort((a, b) => a.rank - b.rank || a.index - b.index);
+  for (const { index } of ranked) {
+    used += need(columns[index]);
+    if (used > boxWidth) break;
+    kept.add(index);
+  }
   return columns.filter((_, index) => kept.has(index));
 }
 

@@ -10,8 +10,7 @@
 import { diffRoster } from '@/engine/corp/members';
 import { getUniversePlanet } from '@/esi/endpoints';
 import { loadStaticEntity, type CachedResult, type StatusResult } from '@/esi/cache';
-import { loadCurrentSystemId } from '@/features/route/currentSystem';
-import { jumpsBetween, loadJumpBasis } from '@/features/route/jumpBasis';
+import { jumpsFromCurrent } from '@/features/route/jumpsFromCurrent';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { summariseBay } from '@/engine/corp/starbases';
 import { resolveNames } from '@/features/character/names';
@@ -506,28 +505,6 @@ async function planetInfo(
     }
   });
   return planets;
-}
-
-/** Jumps from the Current System, under the Route Safety basis; empty when the origin is unknown. */
-async function jumpsFromCurrent(
-  characterId: number,
-  systemIds: readonly number[]
-): Promise<Map<number, number>> {
-  const jumps = new Map<number, number>();
-  try {
-    const origin = await loadCurrentSystemId(characterId);
-    if (origin === null || systemIds.length === 0) return jumps;
-    const basis = await loadJumpBasis();
-    await Promise.all(
-      systemIds.map(async (systemId) => {
-        const result = await jumpsBetween(origin, systemId, basis);
-        if (result.kind === 'known') jumps.set(systemId, result.jumps);
-      })
-    );
-  } catch {
-    // No distance column rather than a failed widget.
-  }
-  return jumps;
 }
 
 export async function loadCorpSovereignty(characterId: number): Promise<CorpSovereigntyFeed> {

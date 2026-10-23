@@ -51,6 +51,7 @@ import type {
   HaulingWidgetData,
   BelowMarketWidgetData,
   JumpTimersWidgetData,
+  MercenaryDensWidgetData,
   SurveyWidgetData,
   MiningYieldWidgetData,
   NetWorthWidgetData,
@@ -147,6 +148,8 @@ export interface TableColumn {
    * This is a second, CSS-only way to drop a column beside `priority` and the size's budget.
    */
   hideNarrow?: boolean;
+  /** Px this column needs (header or widest typical cell, plus padding); used when the table sets `fitWidth`. Default 64. */
+  minWidth?: number;
   /**
    * On the first column: never narrower than 7rem, however many other columns are drawn.
    * Opt-in, because a floor can push a table past its widget: set it only where the first
@@ -195,6 +198,8 @@ export interface TableModel {
    * where the caller also passes `paging`.
    */
   pageable?: boolean;
+  /** Opt in to never scrolling sideways: columns beyond what the measured box holds (by `priority`, `minWidth`) are dropped. */
+  fitWidth?: true;
   /** One quiet line under the rows ("38 of 49 slots"), when the table has a fact that is not a row. */
   footer?: string;
 }
@@ -274,6 +279,7 @@ export interface FeedMap {
   belowMarket: BelowMarketWidgetData;
   clones: ClonesWidgetData;
   jumpTimers: JumpTimersWidgetData;
+  mercenaryDens: MercenaryDensWidgetData;
   location: LocationWidgetData;
   routeSafety: RouteSafetyWidgetData;
   kills: KillsWidgetData;

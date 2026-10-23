@@ -4766,6 +4766,53 @@
           "programs": "Programs"
         }
       },
+      "mercenaryDens": {
+        "title": "Mercenary dens",
+        "description": "Your dens: reinforcement, operations and Anarchy",
+        "empty": "No Mercenary Dens found.",
+        "unit_one": "den",
+        "unit_other": "dens",
+        "reinforcedUnit_one": "den reinforced",
+        "reinforcedUnit_other": "dens reinforced",
+        "reinforcedNext": "{{planet}}, out in {{duration}}",
+        "operationsUnit_one": "operation ready",
+        "operationsUnit_other": "operations ready",
+        "operationsNext": "{{planet}}, expires in {{duration}}",
+        "readyNote_one": "{{count}} operation ready",
+        "readyNote_other": "{{count}} operations ready",
+        "unnamed": "Planet #{{id}}",
+        "level": "Level {{level}}",
+        "state": {
+          "running": "Running",
+          "reinforced": "Reinforced, {{duration}}",
+          "paused": "Paused",
+          "disabled": "Disabled"
+        },
+        "operations": {
+          "none": "None",
+          "ready_one": "{{count}} ready, {{duration}}",
+          "ready_other": "{{count}} ready, {{duration}}",
+          "started": "Started, {{duration}}"
+        },
+        "col": {
+          "planet": "Planet",
+          "state": "State",
+          "operations": "Operations",
+          "anarchy": "Anarchy",
+          "infomorphs": "Infomorphs",
+          "jumps": "Jumps",
+          "character": "Character"
+        },
+        "deadline": {
+          "reinforced": "Den at {{planet}} leaves reinforcement",
+          "operation": "Operation at {{planet}} expires"
+        },
+        "summary_one": "{{count}} den, {{reinforced}} reinforced.",
+        "summary_other": "{{count}} dens, {{reinforced}} reinforced.",
+        "underHour": "Under 1h",
+        "unread_one": "{{count}} character could not be read.",
+        "unread_other": "{{count}} characters could not be read."
+      },
       "structures": {
         "title": "Structures",
         "description": "Reinforcement timers, fuel and offline services",
@@ -5539,6 +5586,12 @@
           "unit": "colonies run dry",
           "note": "in 2h 10m",
           "runsDry": "Extractor runs dry"
+        },
+        "mercenaryDens": {
+          "unit": "den reinforced",
+          "note": "Efa VII, out in 14h",
+          "reinforced": "Reinforced",
+          "ready": "2 ready"
         },
         "structures": {
           "unit": "low on fuel",
@@ -11644,7 +11697,7 @@
     },
     "planets": {
       "label": "Planets",
-      "caption": "Your planetary colonies."
+      "caption": "Your planetary colonies and Mercenary Dens."
     },
     "mail": {
       "label": "Mail",

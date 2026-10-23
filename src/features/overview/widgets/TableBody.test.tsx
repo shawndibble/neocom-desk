@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -163,5 +163,28 @@ describe('TableBody row detail', () => {
   it('draws no navigation caret for a row that opens a modal', () => {
     const { container } = renderTable(model);
     expect(container.querySelector('thead th[aria-hidden="true"]')).toBeNull();
+  });
+});
+
+describe('TableBody fitWidth', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('drops the low-priority column when the measured box is narrow', () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(private cb: ResizeObserverCallback) {}
+        observe() {
+          this.cb([{ contentRect: { width: 150 } } as ResizeObserverEntry], this as never);
+        }
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+    renderTable({ ...table, fitWidth: true });
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Change' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Done' })).not.toBeInTheDocument();
+    expect(screen.queryByText('40%')).not.toBeInTheDocument();
   });
 });

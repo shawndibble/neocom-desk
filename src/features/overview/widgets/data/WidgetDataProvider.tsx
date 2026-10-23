@@ -53,6 +53,7 @@ import {
   loadHaulingWidget,
   loadBelowMarketWidget,
   loadJumpTimersWidget,
+  loadMercenaryDensWidget,
   loadRouteSafetyWidget,
   loadKillsWidget,
   loadOmegaWidget,
@@ -271,6 +272,14 @@ function Source({ feed }: { feed: FeedId }) {
           feed="jumpTimers"
           load={loadJumpTimersWidget}
           cacheKey="overview:jump-timers"
+        />
+      );
+    case 'mercenaryDens':
+      return (
+        <SnapshotSource
+          feed="mercenaryDens"
+          load={loadMercenaryDensWidget}
+          cacheKey="overview:mercenary-dens"
         />
       );
     case 'location':

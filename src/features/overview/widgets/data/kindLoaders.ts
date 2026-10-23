@@ -28,6 +28,7 @@ import { hasWalletScope, loadWalletJournalWithStatus } from '@/features/characte
 
 export type { ClonesWidgetData } from '@/features/character/cloneVerdictLoad';
 export type { JumpTimersWidgetData } from '@/features/character/jumpTimers';
+export type { MercenaryDensWidgetData } from '@/features/character/mercenaryDens';
 
 // --- Wallet journal ------------------------------------------------------------
 
@@ -268,6 +269,12 @@ export function loadClonesWidget(characterId: number) {
 
 export function loadJumpTimersWidget(characterId: number) {
   return import('@/features/character/jumpTimers').then((m) => m.loadJumpTimersWidget(characterId));
+}
+
+export function loadMercenaryDensWidget(characterId: number) {
+  return import('@/features/character/mercenaryDens').then((m) =>
+    m.loadMercenaryDensWidget(characterId)
+  );
 }
 
 // --- Location and ship ---------------------------------------------------------
