@@ -67,12 +67,12 @@ export interface WhatWeStoreGroup {
 
 /** A line in the Communities group: the Firestore collections below point at these. */
 export type CommunityFaqItemId =
-  'membership' | 'blueprints' | 'fittings' | 'plans' | 'requests' | 'pledges' | 'mail';
+  'membership' | 'blueprints' | 'fittings' | 'plans' | 'requests' | 'payouts' | 'pledges' | 'mail';
 
 /**
  * Every collection Communities keep on the server, and the "What do Communities
  * share?" line that tells the pilot about it. `members`, `library`, `requests`
- * (Join Requests), `mailInvites`, `itemRequests`, `pledges`, `pledgeMails`,
+ * (Join Requests), `mailInvites`, `itemRequests`, `fleetPayouts`, `shares`, `pledges`, `pledgeMails`,
  * `fittings` and `skillPlans` sit under `communities/{id}`; the last three sit
  * under `characters/{uid}` and are bookkeeping (which Communities a Character is
  * in, and the day's mail counts). Exhaustive on purpose.
@@ -83,6 +83,8 @@ export const COMMUNITY_COLLECTION_FAQ_ITEM = {
   requests: 'membership',
   mailInvites: 'membership',
   itemRequests: 'requests',
+  fleetPayouts: 'payouts',
+  shares: 'payouts',
   pledges: 'pledges',
   pledgeMails: 'mail',
   fittings: 'fittings',
@@ -99,6 +101,7 @@ const COMMUNITY_ITEMS: readonly (WhatWeStoreItem & { id: CommunityFaqItemId })[]
   'fittings',
   'plans',
   'requests',
+  'payouts',
   'pledges',
   'mail',
 ].map((id) => ({ id: id as CommunityFaqItemId, labelKey: `settings.faq.store.communities.${id}` }));
