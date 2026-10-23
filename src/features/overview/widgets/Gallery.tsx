@@ -411,7 +411,7 @@ function GalleryBody({
           </Button>
         </div>
         {/* A rail from lg up; narrower, one row of chips above the list, as in the drawer. */}
-        <div className="grid items-start gap-4 p-3 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 p-3 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8">
           <div
             role="group"
             aria-label={t('overview.gallery.categoriesLabel')}
