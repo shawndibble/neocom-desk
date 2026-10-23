@@ -21,15 +21,18 @@ export type WidgetKindId = string;
 export const KIND_CATEGORIES = [
   'character',
   'money',
+  'trade',
   'industry',
   'planets',
-  'space',
+  'travel',
+  'conflict',
   'messages',
 ] as const;
 
 /** The Corp Board's Gallery groups, in Gallery order. */
 export const CORP_KIND_CATEGORIES = [
   'corpClocks',
+  'corpStructures',
   'corpMoney',
   'corpPeople',
   'corpIndustry',
@@ -122,7 +125,7 @@ const SPECS: Record<string, Spec> = {
     endpoints: ['getCharacterLocation', 'getCharacterShip'],
   },
   jumpTimers: {
-    category: 'character',
+    category: 'travel',
     views: NT,
     view: 'number',
     size: 'S',
@@ -165,21 +168,21 @@ const SPECS: Record<string, Spec> = {
     endpoints: ['getCharacterWallet', 'getCharacterAssets', 'getCharacterOrders'],
   },
   orders: {
-    category: 'money',
+    category: 'trade',
     views: NCT,
     view: 'table',
     size: 'L',
     endpoints: ['getCharacterOrders'],
   },
   priceWatch: {
-    category: 'money',
+    category: 'trade',
     views: NT,
     view: 'table',
     size: 'M',
     endpoints: [],
   },
   stock: {
-    category: 'money',
+    category: 'trade',
     views: NCT,
     view: 'table',
     size: 'M',
@@ -195,7 +198,7 @@ const SPECS: Record<string, Spec> = {
     endpoints: ['getCharacterWalletJournal', 'getCharacterWalletTransactions'],
   },
   tradingProfit: {
-    category: 'money',
+    category: 'trade',
     views: NCT,
     view: 'number',
     size: 'M',
@@ -210,7 +213,7 @@ const SPECS: Record<string, Spec> = {
     endpoints: ['getCharacterLoyaltyPoints'],
   },
   belowMarket: {
-    category: 'money',
+    category: 'trade',
     views: NT,
     view: 'number',
     size: 'S',
@@ -274,7 +277,7 @@ const SPECS: Record<string, Spec> = {
   },
   structures: {
     category: 'planets',
-    corp: 'corpClocks',
+    corp: 'corpStructures',
     capabilities: ['canReadStructures'],
     views: NCT,
     view: 'table',
@@ -291,14 +294,14 @@ const SPECS: Record<string, Spec> = {
     endpoints: ['getCorporationMiningExtractions'],
   },
   incursions: {
-    category: 'space',
+    category: 'conflict',
     views: NT,
     view: 'table',
     size: 'S',
     endpoints: [],
   },
   sovRaids: {
-    category: 'space',
+    category: 'conflict',
     views: NT,
     view: 'table',
     size: 'M',
@@ -306,21 +309,21 @@ const SPECS: Record<string, Spec> = {
     endpoints: [],
   },
   routeSafety: {
-    category: 'space',
+    category: 'travel',
     views: NCT,
     view: 'chart',
     size: 'M',
     endpoints: [],
   },
   hauling: {
-    category: 'space',
+    category: 'trade',
     views: NT,
     view: 'number',
     size: 'M',
     endpoints: [],
   },
   kills: {
-    category: 'space',
+    category: 'conflict',
     views: NCT,
     view: 'number',
     size: 'M',
@@ -328,7 +331,7 @@ const SPECS: Record<string, Spec> = {
     endpoints: [],
   },
   // The game clock (UTC); reads no feed, so it needs no permission and is always ready.
-  eveTime: { category: 'space', views: N, view: 'number', size: 'S', endpoints: [] },
+  eveTime: { category: 'travel', views: N, view: 'number', size: 'S', endpoints: [] },
   comingUp: {
     category: 'messages',
     views: NT,
@@ -373,7 +376,7 @@ const SPECS: Record<string, Spec> = {
     ],
   },
   corpServices: {
-    corp: 'corpClocks',
+    corp: 'corpStructures',
     capabilities: ['canReadStructures'],
     views: NT,
     view: 'table',
@@ -381,7 +384,7 @@ const SPECS: Record<string, Spec> = {
     endpoints: ['getCorporationStructures'],
   },
   corpStarbases: {
-    corp: 'corpClocks',
+    corp: 'corpStructures',
     capabilities: ['canReadStarbases'],
     views: NT,
     view: 'table',
