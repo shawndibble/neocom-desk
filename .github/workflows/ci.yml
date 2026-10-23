@@ -83,7 +83,8 @@ jobs:
       # The checks are independent; each runs even when the one before it
       # failed, so one red result never hides the others. Still
       # `!cancelled()`, so a superseded run stops.
-      - run: npm run check:case
+      - if: ${{ !cancelled() }}
+        run: npm run check:case
       - if: ${{ !cancelled() }}
         run: npm run lint
       - if: ${{ !cancelled() }}
@@ -236,7 +237,7 @@ jobs:
     # 259s to 354s on the same suite.
     #
     # Six shards, down from eight, for the runner budget (top of file): eight
-    # plus `static`, `build` and the four `test-shard`s held up to 14 runners
+    # plus `static` and the four `test-shard`s held up to 13 runners
     # per PR at the peak, so two PRs in flight queued. The e2e path isn't the
     # critical one: shards start ~100s in (after `build`) and ran ~160–300s
     # at eight, while `test-shard` runs ~370–410s from the start. Six run

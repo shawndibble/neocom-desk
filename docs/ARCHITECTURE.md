@@ -587,7 +587,7 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   ESI token (ADR 0010).
 - Firestore rules tests live in `rules-tests/` (`@firebase/rules-unit-testing`,
   `vitest.rules.config.ts`) and run only via `npm run test:rules`, which starts
-  the Firestore emulator (needs a JRE; CI's `rules` job installs Java 21). They
+  the Firestore emulator (needs a JRE; CI's `static` job installs Java 21). They
   are not part of `npm run test:run`.
 - `esi/client.COMPATIBILITY_DATE` is a pinned constant (`X-Compatibility-Date`
   header) — bump deliberately, not silently, when adopting a newer ESI
