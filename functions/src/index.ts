@@ -20,6 +20,7 @@ import { createR2Get } from './r2Publisher.js';
 import { runSyncActiveWars } from './activeWarsJob.js';
 import { runSyncLawlessSystems, runSyncMarketOpenPrices } from './marketHistoryJob.js';
 import {
+  runSyncCostIndices,
   runSyncLpStoreOffers,
   runSyncPublicContractOffers,
   runSyncWorkbenchFits,
@@ -1310,16 +1311,39 @@ export const syncWorkbenchFits = onSchedule(
  *
  * Another Cloud Scheduler job past the free three, the same trade as
  * `syncWorkbenchFits`; the deployment now has eight scheduled functions.
+ *
+ * The system cost index history (`cost-indices/<systemId>.json`) rides
+ * this schedule rather than a ninth function: it needs the same R2 secrets and runs
+ * once a day. The two are independent; one failing still runs the other, and the run
+ * fails afterwards naming what failed. 1GiB/540s is the open prices job's budget for
+ * the same ~5,500 read-merge-write round trips (32 at a time).
  */
 
 export const syncLpStoreOffers = onSchedule(
   {
-    schedule: 'every 24 hours',
-    memory: '512MiB',
+    // A cron pinned to UTC, so the cost index half stamps a stable UTC date
+    // (`every 24 hours` drifts and could skip or repeat a date).
+    schedule: '30 0 * * *',
+    timeZone: 'Etc/UTC',
+    memory: '1GiB',
     timeoutSeconds: 540,
     secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
   },
-  runSyncLpStoreOffers
+  async () => {
+    const failed: string[] = [];
+    for (const [name, run] of [
+      ['LP store offers', runSyncLpStoreOffers],
+      ['cost indices', runSyncCostIndices],
+    ] as const) {
+      try {
+        await run();
+      } catch (err) {
+        failed.push(name);
+        logError(`${name} sync failed`, { error: String(err) });
+      }
+    }
+    if (failed.length > 0) throw new Error(`Sync failed: ${failed.join(', ')}`);
+  }
 );
 
 /**

@@ -183,6 +183,15 @@ export function InteractionGrammar() {
             </span>
           </Tooltip>
         </Cue>
+        <Cue rule={k('rules.figureHistory')}>
+          <button
+            type="button"
+            className={`inline-flex items-center gap-1 rounded-xs ${focusRingClassName}`}
+          >
+            {k('samples.figureHistory')}
+            <Icon.Market aria-hidden className="size-3 text-text-dim" />
+          </button>
+        </Cue>
         <Cue rule={k('rules.infoTooltip')}>
           <span>{k('samples.term')}</span>
           <InfoTooltip label={k('samples.infoLabel')} content={k('samples.infoContent')} />
