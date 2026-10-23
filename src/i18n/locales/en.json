@@ -15668,9 +15668,9 @@
         },
         "tabs": {
           "rates": "Rates",
-          "billing": "Pricing & billing",
+          "billing": "Billing",
           "extractions": "Extractions",
-          "access": "Access & sync"
+          "access": "Access"
         },
         "scheduled": "Scheduled",
         "addRateTitle": "Add a rate",

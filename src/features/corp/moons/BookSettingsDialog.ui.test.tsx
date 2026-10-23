@@ -84,7 +84,7 @@ describe('BookSettingsDialog tabs', () => {
     renderDialog();
     expect(screen.getByRole('tab', { name: /Rates/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByText('Trade hub')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: 'Pricing & billing' }));
+    await user.click(screen.getByRole('tab', { name: 'Billing' }));
     expect(screen.getByText('Trade hub')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add rate' })).not.toBeInTheDocument();
   });
@@ -92,12 +92,12 @@ describe('BookSettingsDialog tabs', () => {
   it('keeps an edit made on one tab when another tab is opened', async () => {
     const user = userEvent.setup();
     renderDialog();
-    await user.click(screen.getByRole('tab', { name: 'Pricing & billing' }));
+    await user.click(screen.getByRole('tab', { name: 'Billing' }));
     const grace = screen.getByRole('textbox', { name: 'Grace after day end (hours)' });
     await user.clear(grace);
     await user.type(grace, '12');
     await user.click(screen.getByRole('tab', { name: 'Extractions' }));
-    await user.click(screen.getByRole('tab', { name: 'Pricing & billing' }));
+    await user.click(screen.getByRole('tab', { name: 'Billing' }));
     expect(screen.getByRole('textbox', { name: 'Grace after day end (hours)' })).toHaveValue('12');
   });
 
@@ -111,9 +111,6 @@ describe('BookSettingsDialog tabs', () => {
         </BookProvider>
       </MemoryRouter>
     );
-    expect(screen.getByRole('tab', { name: 'Access & sync' })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
+    expect(screen.getByRole('tab', { name: 'Access' })).toHaveAttribute('aria-selected', 'true');
   });
 });

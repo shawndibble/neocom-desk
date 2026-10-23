@@ -83,7 +83,18 @@ function rateLabel(
  * expiry and the dismissal approval limit. A rate is never retroactive, so a
  * new one starts today or later; everything else saves as one patch.
  */
-export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export type SettingsTab = 'rates' | 'billing' | 'extractions' | 'access';
+
+export function BookSettingsDialog({
+  open,
+  onClose,
+  initialTab,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** The tab it opens on; a return from EVE's opt-in opens Access either way. */
+  initialTab?: SettingsTab;
+}) {
   const { t } = useTranslation();
   const { settings, view, names, edit, canEdit, verdict, data } = useBook();
   const [hubId, setHubId] = useState(settings.hubId);
@@ -222,13 +233,13 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
   const fieldId = useId();
   // Back from EVE's page after the Automatic sync opt-in: open where its notice is shown.
   const { state: routerState } = useLocation();
-  const [tab, setTab] = useState<'rates' | 'billing' | 'extractions' | 'access'>(() =>
+  const [tab, setTab] = useState<SettingsTab>(() =>
     (routerState as { corpSyncGrant?: unknown } | null)?.corpSyncGrant !== undefined
       ? 'access'
-      : 'rates'
+      : (initialTab ?? 'rates')
   );
   const tabs: TabItem[] = [
-    { id: 'rates', label: t('corpTaxBook.moons.settings.tabs.rates'), count: rates.length },
+    { id: 'rates', label: t('corpTaxBook.moons.settings.tabs.rates') },
     { id: 'billing', label: t('corpTaxBook.moons.settings.tabs.billing') },
     { id: 'extractions', label: t('corpTaxBook.moons.settings.tabs.extractions') },
     { id: 'access', label: t('corpTaxBook.moons.settings.tabs.access') },
@@ -265,7 +276,7 @@ export function BookSettingsDialog({ open, onClose }: { open: boolean; onClose: 
           tabsId={tabsId}
           tabs={tabs}
           value={tab}
-          onChange={(id) => setTab(id as typeof tab)}
+          onChange={(id) => setTab(id as SettingsTab)}
           label={t('corpTaxBook.moons.settings.sections')}
         />
         <TabPanel tabsId={tabsId} tabId={tab} className="space-y-5">
