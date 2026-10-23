@@ -232,7 +232,7 @@ describe('MoonTaxReadout', () => {
     const mine = await createPayee(7, { name: 'moon corp', defaultTaxPct: 5 });
     renderReadout();
     fireEvent.click(screen.getByRole('button', { name: 'Manage Taxes' }));
-    expect(await screen.findByText(/Assigning to moon corp until/)).toBeTruthy();
+    expect(await screen.findByText(/Auto-assigning moon tax until/)).toBeTruthy();
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByTestId('where').textContent).toBe('/s/abc123XYZ');
     expect(await db.payees.toArray()).toEqual([mine]);

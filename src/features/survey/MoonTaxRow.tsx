@@ -23,7 +23,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Button, TextInput, Toast } from '@/components/ui';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { buttonClassName } from '@/components/ui/buttonClassName';
 import type { SurveyConnection } from '@/engine/miningTax/surveyConnection';
 import { eveWhen } from '@/lib/eveTime';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
@@ -54,7 +54,7 @@ export interface TaxSurvey {
   published: SurveyTaxShare | null;
 }
 
-/** "Assigning to … until …", with the Tax tab and Stop: what a connected Survey shows in place of Manage Taxes. */
+/** "Auto-assigning moon tax until …", with the Tax tab and Stop: what a connected Survey shows in place of Manage Taxes. */
 function ConnectedNote({
   connection,
   nowMs,
@@ -68,16 +68,16 @@ function ConnectedNote({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 sm:ml-auto">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 sm:ml-auto">
       <span role="status" className="text-sm text-text-dim">
         {connection.systemId === null
-          ? t('survey.moonTax.connectedNoLocation', { name: connection.payeeName })
-          : t('survey.moonTax.connected', {
-              name: connection.payeeName,
-              time: eveWhen(connection.untilMs, nowMs),
-            })}
+          ? t('survey.moonTax.connectedNoLocation')
+          : t('survey.moonTax.connected', { time: eveWhen(connection.untilMs, nowMs) })}
       </span>
-      <Link to={MINING_TAX_HREF} className={inlineLinkClassName}>
+      <Link
+        to={MINING_TAX_HREF}
+        className={buttonClassName({ size: 'sm', className: 'touch:min-h-11' })}
+      >
         {t('survey.moonTax.openTax')}
       </Link>
       <Button id={stopId} size="sm" variant="ghost" className="touch:min-h-11" onClick={onStop}>
