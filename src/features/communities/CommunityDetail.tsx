@@ -93,6 +93,7 @@ export function CommunityDetail({
   initialTab = 'blueprints',
   initialSharing = false,
   initialPanel,
+  initialRequestId,
 }: {
   community: CommunitySummary;
   characterId: number;
@@ -108,6 +109,8 @@ export function CommunityDetail({
   initialSharing?: boolean;
   /** A Manage window to open on (`?tab=invites`, the old Invites tab's link). */
   initialPanel?: ManagePanel;
+  /** A Request to open the side panel on (`?request=`): a link from a buyback contract. */
+  initialRequestId?: string;
 }) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
@@ -347,6 +350,7 @@ export function CommunityDetail({
             </div>
           ) : tab === 'requests' ? (
             <RequestsTab
+              initialRequestId={initialRequestId}
               characterId={characterId}
               communityId={community.id}
               communityName={community.name}

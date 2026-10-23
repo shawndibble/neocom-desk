@@ -973,3 +973,78 @@ describe('ContractDetailModal', () => {
     });
   });
 });
+
+/** Issue #4780: a contract that is a buyback Quote's names the Request, links to it and flags another price. */
+describe('ContractDetailModal buyback line', () => {
+  const BUYBACK = {
+    requestId: 'req-9',
+    communityId: 'c-1',
+    communityName: 'Efa Miners',
+    requestTitle: 'All ore',
+    quotedTotal: 18_205_203,
+  };
+  const handlers = () =>
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/stations/60003760`, () =>
+        HttpResponse.json({
+          station_id: 60003760,
+          name: 'Jita IV',
+          type_id: 1,
+          system_id: 30000142,
+        })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/contracts/12345/items`, () =>
+        HttpResponse.json([])
+      )
+    );
+
+  beforeEach(async () => {
+    await db.settings.clear();
+  });
+
+  it('shows no buyback line for an ordinary contract', async () => {
+    handlers();
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE_OUTSTANDING,
+      issuerName: 'Mero',
+      onClose: () => {},
+    });
+    await screen.findByText('12345');
+    expect(screen.queryByText(/^Buyback/)).not.toBeInTheDocument();
+  });
+
+  it('links a buyback contract to its Request', async () => {
+    handlers();
+    await db.settings.put({
+      key: `buybackLinks:${CHAR_ID}`,
+      value: { '12345': BUYBACK },
+    });
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE_OUTSTANDING,
+      issuerName: 'Mero',
+      onClose: () => {},
+    });
+    const link = await screen.findByRole('link', { name: 'Buyback · All ore in Efa Miners' });
+    expect(link).toHaveAttribute('href', '/communities?community=c-1&tab=requests&request=req-9');
+    expect(screen.queryByText(/Price differs from quote/)).not.toBeInTheDocument();
+  });
+
+  it('flags a contract at another price than the quote', async () => {
+    handlers();
+    await db.settings.put({
+      key: `buybackLinks:${CHAR_ID}`,
+      value: { '12345': { ...BUYBACK, quotedTotal: 42_100_000 } },
+    });
+    renderModal({
+      characterId: CHAR_ID,
+      contract: ITEM_EXCHANGE_OUTSTANDING,
+      issuerName: 'Mero',
+      onClose: () => {},
+    });
+    expect(
+      await screen.findByText('Price differs from quote · 42,100,000 ISK quoted')
+    ).toBeInTheDocument();
+  });
+});

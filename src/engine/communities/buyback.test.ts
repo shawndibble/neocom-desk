@@ -244,6 +244,16 @@ describe('readQuote', () => {
   it('drops a rate, basis or hub that does not read, and keeps the quote', () => {
     expect(readQuote({ ...stored, rate: 'x', rateBasis: 'mid', hubId: 'nowhere' })).toEqual(stored);
   });
+  it('keeps linked contracts, and drops a link that does not read', () => {
+    const links = [
+      { contractId: 7, status: 'finished' },
+      { contractId: 8, status: 'weird' },
+      { contractId: -1, status: 'outstanding' },
+      'x',
+    ];
+    expect(readQuote({ ...stored, links })?.links).toEqual([{ contractId: 7, status: 'finished' }]);
+    expect(readQuote({ ...stored, links: [] })).toEqual(stored);
+  });
   it('refuses negative figures and a date that is not a date', () => {
     expect(readQuote({ ...stored, total: -1 })).toBeUndefined();
     expect(readQuote({ ...stored, lines: [{ ...stored.lines[0], quantity: 0 }] })).toBeUndefined();

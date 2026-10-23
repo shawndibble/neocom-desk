@@ -183,6 +183,23 @@ export interface PastedItem extends BuybackItem {
   quantity: number;
 }
 
+/** What a contract linked to a Quote is doing, in the words a buyer and a seller both use. */
+export type QuoteContractStatus =
+  'outstanding' | 'inProgress' | 'finished' | 'expired' | 'rejected';
+export const QUOTE_CONTRACT_STATUSES: readonly QuoteContractStatus[] = [
+  'outstanding',
+  'inProgress',
+  'finished',
+  'expired',
+  'rejected',
+];
+
+/** A contract linked to a Quote, as stored: its id and status, never its price, issuer or items. */
+export interface QuoteLinkRef {
+  contractId: number;
+  status: QuoteContractStatus;
+}
+
 /** A Member's Quote as held on their Pledge document. Only the lines and the hub prices behind the figure. */
 export interface HeldQuote {
   lines: QuoteLine[];
@@ -193,6 +210,8 @@ export interface HeldQuote {
   rate?: number;
   rateBasis?: RateBasis;
   hubId?: BuybackHubId;
+  /** The seller's contracts that match it, newest first. */
+  links?: QuoteLinkRef[];
 }
 
 /** Whether a quote still matches what the Request pays now. One from before the terms were recorded is trusted. */
@@ -302,6 +321,15 @@ export function readQuote(raw: unknown): HeldQuote | undefined {
   }
   const rateBasis = RATE_BASES.find((b) => b === d.rateBasis);
   const hubId = BUYBACK_HUB_IDS.find((h) => h === d.hubId);
+  const links = Array.isArray(d.links)
+    ? d.links.flatMap((entry): QuoteLinkRef[] => {
+        const l = entry as Record<string, unknown> | null;
+        const status = QUOTE_CONTRACT_STATUSES.find((s) => s === l?.status);
+        return l && isNum(l.contractId) && l.contractId > 0 && status
+          ? [{ contractId: l.contractId, status }]
+          : [];
+      })
+    : [];
   return {
     lines,
     total: d.total,
@@ -310,5 +338,6 @@ export function readQuote(raw: unknown): HeldQuote | undefined {
     ...(isValidRate(d.rate) ? { rate: d.rate } : {}),
     ...(rateBasis ? { rateBasis } : {}),
     ...(hubId ? { hubId } : {}),
+    ...(links.length > 0 ? { links } : {}),
   };
 }

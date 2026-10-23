@@ -29,7 +29,12 @@ import type {
   RequestPledge,
 } from '@/engine/communities/requests';
 import { readNotify, readStanding } from '@/engine/communities/requests';
-import { readQuote, type HeldQuote, type StandingRequest } from '@/engine/communities/buyback';
+import {
+  readQuote,
+  type HeldQuote,
+  type QuoteLinkRef,
+  type StandingRequest,
+} from '@/engine/communities/buyback';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
@@ -422,6 +427,63 @@ export async function saveMyQuote(
         updatedAt: serverTimestamp(),
       });
       return readPledge(uid, (await getDoc(ref)).data() ?? {});
+    })
+  );
+}
+
+/**
+ * Saves the contracts linked to this Character's held Quote, when the Quote is
+ * still the one that was matched (`quotedAt`): a second paste in the meantime
+ * replaced it, and its links start empty. Only ids and statuses are written.
+ */
+export async function saveQuoteLinks(
+  characterId: number,
+  communityId: string,
+  requestId: string,
+  quotedAt: number,
+  links: readonly QuoteLinkRef[]
+): Promise<void> {
+  const uid = uidForCharacter(characterId);
+  const withLinks = (quote: HeldQuote): HeldQuote => {
+    const next: HeldQuote = { ...quote };
+    if (links.length > 0) next.links = [...links];
+    else delete next.links;
+    return next;
+  };
+  const override = communityBackendOverride();
+  if (override?.saveQuote && override.loadPledges) {
+    const mine = override.loadPledges(communityId, requestId).find((p) => p.uid === uid);
+    if (mine?.quote?.quotedAt === quotedAt) {
+      override.saveQuote(communityId, requestId, withLinks(mine.quote));
+    }
+    return;
+  }
+  await trackPledgeWrite(() =>
+    underFirebaseSession(async () => {
+      await ensureSignedIn(characterId);
+      const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
+      if (!ownerHash) throw new Error('This Character has no owner hash yet');
+      const ref = doc(
+        getSyncFirestore(),
+        'communities',
+        communityId,
+        'itemRequests',
+        requestId,
+        'pledges',
+        uid
+      );
+      await runTransaction(getSyncFirestore(), async (tx) => {
+        const stored = await tx.get(ref);
+        const quote = stored.exists() ? readQuote(stored.data().quote) : undefined;
+        if (!quote || quote.quotedAt !== quotedAt) return;
+        tx.set(ref, {
+          ownerHash,
+          communityId,
+          lines: {},
+          quote: withLinks(quote),
+          updatedAt: serverTimestamp(),
+        });
+      });
     })
   );
 }
