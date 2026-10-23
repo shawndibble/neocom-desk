@@ -1455,6 +1455,45 @@ describe('DataTable virtualize', () => {
       );
     });
 
+    it('pads the header width by the cell padding', () => {
+      renderSized({ virtualize: true });
+      expect(screen.getByRole('columnheader', { name: 'Amount' }).getAttribute('style')).toContain(
+        '12ch'
+      );
+      expect(screen.getByRole('table').getAttribute('style')).toContain('min-width');
+    });
+
+    it('leaves a phone-hidden column out of the min-width on a phone', () => {
+      const cols: DataTableColumn<Row>[] = [
+        { id: 'item', header: 'Item', render: (row) => row.item },
+        { id: 'amount', header: 'Amount', width: '12ch', render: (row) => row.amount },
+        { id: 'extra', header: 'Extra', width: '77ch', phoneHidden: true, render: () => 'x' },
+      ];
+      const real = window.matchMedia;
+      window.matchMedia = ((media: string) =>
+        ({
+          media,
+          matches: media === PHONE_QUERY,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList) as typeof window.matchMedia;
+      try {
+        render(
+          <DataTable
+            label="Offers"
+            columns={cols}
+            rows={many}
+            rowKey={(row) => row.id}
+            responsive="table"
+            virtualize
+          />
+        );
+        expect(screen.getByRole('table').getAttribute('style')).not.toContain('77ch');
+      } finally {
+        window.matchMedia = real;
+      }
+    });
+
     it('keeps the auto layout when not windowed', () => {
       renderSized({});
       expect(screen.getByRole('table')).not.toHaveClass('table-fixed');

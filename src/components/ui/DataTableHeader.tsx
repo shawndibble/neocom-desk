@@ -5,6 +5,11 @@ import { focusRingInsetClassName, interactiveClassName } from './controlStyles';
 import * as Icon from './icons';
 import { InfoTooltip } from './Tooltip';
 import { stickyStartClass } from './dataTableSticky';
+import {
+  columnCellWidth,
+  TRAILING_COL_ACTIONS_REM,
+  TRAILING_COL_EXPAND_REM,
+} from './dataTableWidths';
 import type { DataTableColumn, DataTableSort } from './DataTable';
 
 interface Props<T> {
@@ -61,7 +66,11 @@ export function DataTableHeader<T>({
               key={column.id}
               role="columnheader"
               scope="col"
-              style={fixedLayout && column.width ? { width: column.width } : undefined}
+              style={
+                fixedLayout && column.width
+                  ? { width: columnCellWidth(column.width, density) }
+                  : undefined
+              }
               className={cx(
                 sortable ? 'p-0' : headerTextClass[i],
                 column.stickyStart && stickyStartClass(column),
@@ -119,7 +128,8 @@ export function DataTableHeader<T>({
             role="columnheader"
             scope="col"
             aria-hidden="true"
-            className={cx('p-0', fixedLayout ? 'w-8' : 'w-0')}
+            style={fixedLayout ? { width: `${TRAILING_COL_EXPAND_REM}rem` } : undefined}
+            className={cx('p-0', !fixedLayout && 'w-0')}
           />
         )}
         {rowMoreActions && (
@@ -136,7 +146,8 @@ export function DataTableHeader<T>({
           <th
             role="columnheader"
             scope="col"
-            className={cx('relative p-0', fixedLayout ? 'w-10' : 'w-0')}
+            style={fixedLayout ? { width: `${TRAILING_COL_ACTIONS_REM}rem` } : undefined}
+            className={cx('relative p-0', !fixedLayout && 'w-0')}
           >
             <span className="sr-only">{t('common.dataTable.actionsHeader')}</span>
           </th>

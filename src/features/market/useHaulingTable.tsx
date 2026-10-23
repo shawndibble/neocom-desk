@@ -127,8 +127,6 @@ export function useHaulingTable({
       id: 'select',
       header: '',
       width: '7ch',
-      headerClassName: 'w-8',
-      className: 'w-8',
       stackEdge: 'start',
       // The label is the 44px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
       render: (row) => (
