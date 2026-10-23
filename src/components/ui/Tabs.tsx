@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
+import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import * as Icon from './icons';
 import { panelDomId, tabDomId, useTabPanelProps } from './tabPanel';
 import { pageScrollDelta, scrollEdges, wheelScrollDelta, type ScrollEdges } from './tabScroll';
@@ -97,11 +98,13 @@ export function Tabs({
   // anything until Enter/Space says so.
   const [manualFocusId, setManualFocusId] = useState(value);
   const focusedId = activation === 'manual' ? manualFocusId : value;
+  const reducedMotion = usePrefersReducedMotion();
   const [edges, setEdges] = useState<ScrollEdges>({ before: false, after: false });
 
   // Chevrons and wheel travel both need to know which ends still have tabs
   // beyond them. Recomputed on scroll and on any resize of the frame or the
-  // bar (a count badge growing, a window resize).
+  // bar (a tab added, a count badge growing, a window resize), so it needs no
+  // dependency on `tabs`, which callers often pass as a fresh array.
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
@@ -118,7 +121,7 @@ export function Tabs({
       scroller.removeEventListener('scroll', update);
       observer?.disconnect();
     };
-  }, [tabs]);
+  }, []);
 
   // Native listener, not `onWheel`: React registers wheel passively, and
   // taking the event over means calling `preventDefault`.
@@ -140,7 +143,7 @@ export function Tabs({
     if (!scroller) return;
     scroller.scrollBy({
       left: pageScrollDelta(direction, scroller.clientWidth),
-      behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      behavior: reducedMotion ? 'auto' : 'smooth',
     });
   }
 

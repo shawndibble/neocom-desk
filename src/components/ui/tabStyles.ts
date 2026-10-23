@@ -43,9 +43,11 @@ export const tabScrollerClassName = 'tab-scroller overflow-x-auto overscroll-x-c
  * The edge chevron a pointer user clicks to travel an overflowing bar. A small
  * chip over the scroller's edge fade (not inside it, or the mask would fade it
  * too), centred on the tabs above the baseline hairline; a chip rather than a
- * bare caret because a bare one lands on a half-faded label, and is not drawn at all on touch: there
- * the swipe and the cut-off tab are the cue, and a 24px target would be too
- * small to be a second one.
+ * bare caret because a bare one lands on a half-faded label. Not drawn at all
+ * on touch: there the swipe and the cut-off tab are the cue, and a 24px target
+ * would be too small to be a second one. Not an `IconButton`, whose required
+ * label and focus ring are exactly what this control must not have: it is a
+ * pointer shortcut, out of the tab order and the accessibility tree.
  */
 export const tabChevronClassName = [
   'absolute top-1/2 z-10 grid size-6 -translate-y-[calc(50%+0.5px)] place-items-center rounded-xs',
