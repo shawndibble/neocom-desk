@@ -61,7 +61,7 @@ export const DEFAULT_ON_GROUPS: readonly ScopeGroup[] = SCOPE_GROUPS.filter(
  * default-on Permission. The plain login and Add Character request exactly
  * this set.
  *
- * Opt-in Permissions (`corp`, `structureMarkets`, `jumpFatigue`) are excluded by design
+ * Opt-in Permissions (`corp`, `structureMarkets`, `jumpFatigue`, `corpProjects`) are excluded by design
  * (issue #295, issue #538). Registering a corp endpoint the ordinary way
  * would put "read your corporation's wallets, assets and members" on the
  * consent screen of the ~95% of users who hold no corp role and can never

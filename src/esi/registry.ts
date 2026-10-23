@@ -69,6 +69,7 @@ export const SCOPE_GROUPS = [
   'corp',
   'structureMarkets',
   'jumpFatigue',
+  'corpProjects',
 ] as const;
 export type ScopeGroup = (typeof SCOPE_GROUPS)[number];
 
@@ -176,6 +177,11 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
   jumpFatigue: {
     labelKey: 'permissions.jumpFatigue.label',
     captionKey: 'permissions.jumpFatigue.caption',
+    defaultOn: false,
+  },
+  corpProjects: {
+    labelKey: 'permissions.corpProjects.label',
+    captionKey: 'permissions.corpProjects.caption',
     defaultOn: false,
   },
 };
@@ -884,6 +890,27 @@ export const ESI_REGISTRY = {
     route: '/corporations/{corporation_id}/structures/sovereignty-hubs/{sovereignty_hub_id}',
     scope: 'esi-structures.read_corporation.v1',
     group: 'corp',
+  },
+  /**
+   * Corporation Projects (issue #4786). Opt-in, and a Permission of their own
+   * rather than part of `corp`: the reads need no corp role, and widening `corp`
+   * would move every already-granted corp Character to `roles-without-grant`
+   * (docs/features/corp.md). All three share the `corp-project` rate group.
+   */
+  getCorporationProjects: {
+    route: '/corporations/{corporation_id}/projects',
+    scope: 'esi-corporations.read_projects.v1',
+    group: 'corpProjects',
+  },
+  getCorporationProject: {
+    route: '/corporations/{corporation_id}/projects/{project_id}',
+    scope: 'esi-corporations.read_projects.v1',
+    group: 'corpProjects',
+  },
+  getCorporationProjectContribution: {
+    route: '/corporations/{corporation_id}/projects/{project_id}/contribution/{character_id}',
+    scope: 'esi-corporations.read_projects.v1',
+    group: 'corpProjects',
   },
   getSovereigntySystems: {
     route: '/sovereignty/systems',

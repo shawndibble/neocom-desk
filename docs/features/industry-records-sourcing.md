@@ -28,6 +28,7 @@ Where brief items actually live (code differs from the obvious guess):
 | BPC Sourcing search                        | `/industry/sourcing` `BpcSourcingPanel.tsx`                                                                           | 5 sources, filters, autocomplete, strip, 200-row table, CSV                                                   |
 | BPC contract detail modal                  | `BpcContractModal.tsx` -> `PublicContractDetailModal`                                                                 | Row click on contract rows                                                                                    |
 | BPO badge/cards                            | `BpoBadge.tsx`, `BpoCard.tsx`, `bpoAvailability.ts`                                                                   | Contract + market originals                                                                                   |
+| Build Opportunities (Corp projects view)   | `corpProjects/CorpProjectsPanel.tsx`                                                                                  | Open manufacture Corporation Projects as a buyer, profit at cap, compare seeding                              |
 | Build Opportunities (Ranked)               | `/industry/opportunities` `OpportunitiesPanel.tsx`                                                                    | Owned blueprints ranked by ISK/hour, compare seeding, CSV                                                     |
 | All owned view                             | `OwnedBlueprintsPanel.tsx`                                                                                            | Library of owned BPO/BPC (+corp), column picker, CSV                                                          |
 | Market-Wide Build Opportunities            | `MarketWideOpportunitiesPanel.tsx`                                                                                    | Opt-in scan, filters, paging by 200, CSV                                                                      |
@@ -200,6 +201,15 @@ Two panels, Market-Wide first.
 - Table: sort `opps.ownedSort` default blueprint asc; owner column appears only when >1 owner; row click / Start plan button when catalog entry exists (blueprint with no catalog entry is inert); BPO runs show unlimited and sort as max; quantity = stack size for originals.
 - `MobileOwnedBlueprintList`: cards, sort toolbar, identical copies folded, card tap = Start plan; no selection or menu.
 - States: loading; no blueprints (`ownedBlueprintsEmptyTitle`); no match for filters.
+
+### 6b2. Corp projects view, `corpProjects/CorpProjectsPanel.tsx` (`opps.view=corp`, issue #4786)
+
+- What: the open manufacture Corporation Projects of each selected Character's corporation, as a buyer: reward per unit x units the Character can still contribute, against the build cost and the blueprint. Not listed: other project kinds, projects naming a market group or several types, projects with nothing left to contribute, reaction blueprints.
+- Visibility (hide rule): the option is absent unless some selected Character holds the opt-in `corpProjects` Permission (`esi-corporations.read_projects.v1`), has a corporation and that corporation has a listed project (`useCorpProjects`). A stale `?opps.view=corp` falls back to Ranked.
+- Data: `getCorporationProjects` (cursor walk, Active, limit 100), `getCorporationProject` per project, `getCorporationProjectContribution` per manufacture project; all rate group `corp-project`. One cache row per Character and corporation (`loadCorpManufactureProjects`, key `manufactureProjects`), read when Opportunities opens, never polled. Pure maths in `src/engine/corpProjects/corpProjects.ts`.
+- Pricing: each row's plan (`planForCorpProject`: runs for the remaining units, the Character's hub, owned materials claimed) is resolved by `useComparedBuildResults`, one `CharacterPricing` per Character, so the figures match Compare. Blueprint source: Owned (own BPO/BPC, ME/TE), Community offer (0 ISK), Cheapest copy (price added to cost), or the amber "Assuming a copy" (priced 0).
+- Controls: the panel's view toggle, "Add N to Compare" as the Compare icon button once two rows are ticked (seeds plans with runs = units, owned by the active Character). No CSV, no stock filter, no sort URL.
+- Table: Select, Project (item, units, reward each, Character when >1), Blueprint, Profit at cap, Ends in (amber under 48 h); default sort profit at cap desc; a row opens in place to the working (reward, build cost, copy, profit, cap and pool bars). Phone: `CorpProjectCards`, the Opportunities card shape, tap opens the working.
 
 ### 6c. Market-Wide Build Opportunities, `MarketWideOpportunitiesPanel.tsx`
 

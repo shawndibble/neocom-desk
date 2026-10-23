@@ -58,6 +58,8 @@ import {
 import { hubOrderKey, useHubOrderCounts, type HubOrderTarget } from './useHubOrderCounts';
 import { useHubDailyOrders } from './useHubDailyOrders';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useIsDesktop } from '@/lib/useIsDesktop';
+import { CompareMatrix } from './CompareMatrix';
 
 const formatOnePlace = createNumberFormat({ maximumFractionDigits: 1 });
 
@@ -125,6 +127,7 @@ export function BuildPlanCompare({
   onOpenPlan,
 }: BuildPlanCompareProps) {
   const { t } = useTranslation();
+  const isDesktop = useIsDesktop();
   const hubChoice = useCompareHub((state) => state.value);
   // One hub for every row prices each plan there, so the cost, revenue and profit
   // columns follow the picker as well as the hub order-book ones.
@@ -464,19 +467,28 @@ export function BuildPlanCompare({
             : t('industry.compareHubOrdersHint')}
         </p>
       )}
-      <div className="overflow-x-auto">
-        <DataTable
-          {...compareExport.tableProps}
+      {isDesktop ? (
+        <div className="overflow-x-auto">
+          <DataTable
+            {...compareExport.tableProps}
+            columns={shownColumns}
+            rows={rows}
+            rowKey={(row) => row.planId}
+            label={t('industry.compareTableLabel')}
+            defaultSort={{ columnId: 'plan', direction: 'asc' }}
+          />
+        </div>
+      ) : (
+        // A phone has no width to read a comparison across, so the plans become
+        // the columns and each shown metric a row (issue #4786).
+        <CompareMatrix
           columns={shownColumns}
           rows={rows}
           rowKey={(row) => row.planId}
           label={t('industry.compareTableLabel')}
-          // A comparison table: read across its columns, so it scrolls sideways
-          // on a phone with the plan name pinned rather than stacking into cards.
-          responsive="table"
-          defaultSort={{ columnId: 'plan', direction: 'asc' }}
+          emphasisColumnId="profit"
         />
-      </div>
+      )}
     </Panel>
   );
 }

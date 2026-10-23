@@ -7,6 +7,7 @@ import type { BlueprintCatalog } from './blueprintCatalog';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
 import { OpportunitiesPanel } from './OpportunitiesPanel';
+import { PRICING_INPUTS_FIXTURE } from './pricingInputsFixtures.testutil';
 import {
   OPPORTUNITIES_DEFAULT_COLUMNS,
   useVisibleOpportunitiesColumns,
@@ -30,6 +31,10 @@ const stub = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/useIsDesktop', () => ({ useIsDesktop: () => true }));
+
+// What the Characters' corporations have open (issue #4786); each case sets its own.
+const corp = vi.hoisted(() => ({ entries: [] as unknown[], loading: false }));
+vi.mock('./corpProjects/useCorpProjects', () => ({ useCorpProjects: () => corp }));
 
 // No market-history reads in this test; each case sets the figures it wants.
 const vs90d = vi.hoisted(() => ({ values: new Map<string, number | null>() }));
@@ -86,6 +91,8 @@ beforeEach(async () => {
   vs90d.values = new Map();
   stub.manualRefreshOnly = false;
   stub.needsRefresh = false;
+  corp.entries = [];
+  corp.loading = false;
   loadCharacterBlueprints.mockReset();
   loadCharacterBlueprints.mockResolvedValue({ cached: { data: [], fetchedAt: new Date() } });
   await db.characters.clear();
@@ -119,7 +126,9 @@ describe('OpportunitiesPanel', () => {
           activeCharacterId={CHARACTER_ID}
           ownedStockSnapshot={SNAPSHOT}
           assumedMe={0}
+          pricingInputs={PRICING_INPUTS_FIXTURE}
           onAddToCompare={() => {}}
+          onAddProjectsToCompare={() => {}}
           onStartPlan={() => Promise.resolve(false)}
         />
       ),
@@ -151,7 +160,9 @@ describe('OpportunitiesPanel', () => {
             activeCharacterId={CHARACTER_ID}
             ownedStockSnapshot={SNAPSHOT}
             assumedMe={0}
+            pricingInputs={PRICING_INPUTS_FIXTURE}
             onAddToCompare={() => {}}
+            onAddProjectsToCompare={() => {}}
             onStartPlan={() => Promise.resolve(false)}
           />
         ),
@@ -242,7 +253,9 @@ describe('OpportunitiesPanel', () => {
             activeCharacterId={CHARACTER_ID}
             ownedStockSnapshot={SNAPSHOT}
             assumedMe={0}
+            pricingInputs={PRICING_INPUTS_FIXTURE}
             onAddToCompare={() => {}}
+            onAddProjectsToCompare={() => {}}
             onStartPlan={() => Promise.resolve(false)}
             {...handlers}
           />,
@@ -343,7 +356,9 @@ describe('OpportunitiesPanel', () => {
           activeCharacterId={CHARACTER_ID}
           ownedStockSnapshot={SNAPSHOT}
           assumedMe={0}
+          pricingInputs={PRICING_INPUTS_FIXTURE}
           onAddToCompare={() => {}}
+          onAddProjectsToCompare={() => {}}
           onStartPlan={() => Promise.resolve(false)}
         />
       ),
@@ -412,7 +427,9 @@ describe('OpportunitiesPanel', () => {
             activeCharacterId={CHARACTER_ID}
             ownedStockSnapshot={SNAPSHOT}
             assumedMe={0}
+            pricingInputs={PRICING_INPUTS_FIXTURE}
             onAddToCompare={() => {}}
+            onAddProjectsToCompare={() => {}}
             onStartPlan={() => Promise.resolve(false)}
           />
         ),
@@ -429,6 +446,68 @@ describe('OpportunitiesPanel', () => {
 
       fireEvent.click(second);
       expect(screen.getByRole('button', { name: 'Add 2 to Compare' })).toBeInTheDocument();
+    });
+  });
+  describe('Corp projects view (issue #4786)', () => {
+    const renderAt = (url: string) =>
+      render(
+        withItemActions(
+          <OpportunitiesPanel
+            catalog={CATALOG}
+            pi={null}
+            facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
+            activeCharacterId={CHARACTER_ID}
+            ownedStockSnapshot={SNAPSHOT}
+            assumedMe={0}
+            pricingInputs={PRICING_INPUTS_FIXTURE}
+            onAddToCompare={() => {}}
+            onAddProjectsToCompare={() => {}}
+            onStartPlan={() => Promise.resolve(false)}
+          />
+        ),
+        {
+          wrapper: ({ children }) => <MemoryRouter initialEntries={[url]}>{children}</MemoryRouter>,
+        }
+      );
+    const project = {
+      id: 'p1',
+      name: 'Hulls',
+      typeId: 24702,
+      rewardEach: 100,
+      poolInitial: 1000,
+      poolRemaining: 1000,
+      cap: 5,
+      contributed: 0,
+      expires: null,
+    };
+
+    it('titles the panel Build and lists no Corp projects when there is nothing to show', async () => {
+      renderAt('/');
+      expect(await screen.findByText('Build')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Corp projects' })).toBeNull();
+    });
+
+    it('reads a stale ?opps.view=corp as Ranked once the reads settle empty', async () => {
+      renderAt('/?opps.view=corp');
+      expect(await screen.findByRole('button', { name: 'Ranked' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      expect(screen.queryByRole('button', { name: 'Corp projects' })).toBeNull();
+    });
+
+    it('adds Corp projects after All owned and switches to it', async () => {
+      corp.entries = [{ characterId: CHARACTER_ID, corporationId: 500, projects: [project] }];
+      renderAt('/');
+      const button = await screen.findByRole('button', { name: 'Corp projects' });
+      expect(button).toHaveAttribute('aria-pressed', 'false');
+      fireEvent.click(button);
+      // The sample catalog builds nothing, so the view says so rather than showing a bare table.
+      expect(await screen.findByText('No open manufacture projects')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Corp projects' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
     });
   });
 });

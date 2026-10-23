@@ -147,7 +147,7 @@ export function opportunitySnapshotRequest(
 }
 
 /** Owned-materials claiming for one blueprint's material list, from whole-account detected stock — same free-first rule a real Build Plan applies. */
-function ownedMaterialSourcing(
+export function ownedMaterialSourcing(
   materials: readonly { typeID: number; quantity: number }[],
   stock: DetectedOwnedStockMap
 ): MaterialSourcingMap {
