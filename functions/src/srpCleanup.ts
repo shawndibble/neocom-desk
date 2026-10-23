@@ -59,44 +59,51 @@ export async function sweepSrpClaims(
   const result: SrpSweepResult = { deleted: 0, failed: 0, truncated: false };
 
   for (const corp of await db.collection(CORPS_COLLECTION).listDocuments()) {
-    const query = corp.collection(SRP_CLAIMS).where('closedAt', '<=', now - SRP_RETENTION_MS);
-    for await (const page of pages(query, 'closedAt', pageSize)) {
-      for (const candidate of page) {
-        if (decideSrpClaimSweep(candidate.data(), now) !== 'delete') continue;
-        if (result.deleted >= maxDeletes) {
-          result.truncated = true;
-          return result;
-        }
-        try {
-          const done = await db.runTransaction(async (tx) => {
-            const fresh = await tx.get(candidate.ref);
-            if (!fresh.exists || decideSrpClaimSweep(fresh.data() ?? {}, now) !== 'delete') {
-              return false;
-            }
-            tx.delete(fresh.ref);
-            tx.set(
-              corp.collection(SRP_AUDIT).doc(`${String(now).padStart(15, '0')}~sweep-${fresh.id}`),
-              {
-                at: now,
-                by: null,
-                byName: 'retention sweep',
-                action: 'retentionDelete',
-                detail: {
-                  claimId: fresh.id,
-                  state: fresh.get('state'),
-                  characterId: characterIdOf(fresh.get('uid')),
-                  closedAt: fresh.get('closedAt'),
-                  deletedAt: now,
-                },
+    try {
+      const query = corp.collection(SRP_CLAIMS).where('closedAt', '<=', now - SRP_RETENTION_MS);
+      for await (const page of pages(query, 'closedAt', pageSize)) {
+        for (const candidate of page) {
+          if (decideSrpClaimSweep(candidate.data(), now) !== 'delete') continue;
+          if (result.deleted >= maxDeletes) {
+            result.truncated = true;
+            return result;
+          }
+          try {
+            const done = await db.runTransaction(async (tx) => {
+              const fresh = await tx.get(candidate.ref);
+              if (!fresh.exists || decideSrpClaimSweep(fresh.data() ?? {}, now) !== 'delete') {
+                return false;
               }
-            );
-            return true;
-          });
-          if (done) result.deleted += 1;
-        } catch {
-          result.failed += 1;
+              tx.delete(fresh.ref);
+              tx.set(
+                corp
+                  .collection(SRP_AUDIT)
+                  .doc(`${String(now).padStart(15, '0')}~sweep-${fresh.id}`),
+                {
+                  at: now,
+                  by: null,
+                  byName: 'retention sweep',
+                  action: 'retentionDelete',
+                  detail: {
+                    claimId: fresh.id,
+                    state: fresh.get('state'),
+                    characterId: characterIdOf(fresh.get('uid')),
+                    closedAt: fresh.get('closedAt'),
+                    deletedAt: now,
+                  },
+                }
+              );
+              return true;
+            });
+            if (done) result.deleted += 1;
+          } catch {
+            result.failed += 1;
+          }
         }
       }
+    } catch {
+      // One corp's failing query must not skip the rest; retried next run.
+      result.failed += 1;
     }
   }
   return result;
