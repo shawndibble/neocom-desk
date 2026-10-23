@@ -1,4 +1,5 @@
-import { characterGet } from './characterRequest';
+import { characterGet, characterPages } from './characterRequest';
+import type { PaginatedResult } from '../paginated';
 import type { KillmailVictim } from '@/engine/fittings/linkLoader';
 import { esiFetch } from '../client';
 import type { EsiResult } from '../client';
@@ -79,7 +80,8 @@ export interface Killmail {
   killmail_id: number;
   /** When it died (ISO). */
   killmail_time?: string;
-  victim: KillmailVictim;
+  solar_system_id?: number;
+  victim: KillmailVictim & { character_id?: number; corporation_id?: number };
 }
 
 export function getKillmail(
@@ -91,4 +93,23 @@ export function getKillmail(
     ...options,
     endpointId: 'getKillmail',
   });
+}
+
+// --- GET /characters/{character_id}/killmails/recent (esi-killmails.read_killmails.v1) ---
+
+/** One kill or loss the Character was on: the id and hash `getKillmail` takes. */
+export interface CharacterKillmailRef {
+  killmail_id: number;
+  killmail_hash: string;
+}
+
+/**
+ * The Character's recent killmails, kills and losses alike, newest first (issue #4852). Paginated
+ * (X-Pages, 50 a page). Opt-in `killmails` Permission: the SRP page asks for it at the point of need.
+ */
+export function getCharacterKillmailsRecent(
+  characterId: number,
+  options: EndpointOptions & { maxPages?: number } = {}
+): Promise<PaginatedResult<CharacterKillmailRef>> {
+  return characterPages<CharacterKillmailRef>('getCharacterKillmailsRecent', characterId, options);
 }

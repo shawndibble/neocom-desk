@@ -70,6 +70,7 @@ export const SCOPE_GROUPS = [
   'structureMarkets',
   'jumpFatigue',
   'corpProjects',
+  'killmails',
 ] as const;
 export type ScopeGroup = (typeof SCOPE_GROUPS)[number];
 
@@ -182,6 +183,11 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
   corpProjects: {
     labelKey: 'permissions.corpProjects.label',
     captionKey: 'permissions.corpProjects.caption',
+    defaultOn: false,
+  },
+  killmails: {
+    labelKey: 'permissions.killmails.label',
+    captionKey: 'permissions.killmails.caption',
     defaultOn: false,
   },
 };
@@ -595,6 +601,16 @@ export const ESI_REGISTRY = {
   getKillmail: {
     route: '/killmails/{killmail_id}/{killmail_hash}',
     scope: PUBLIC,
+  },
+  /**
+   * The SRP page's lost-ships list (issue #4852). Opt-in and a Permission of its own: only a
+   * pilot filing a claim by pick needs it, and pasting a link works without it
+   * (docs/context/decisions/20261023-125348-srp-pilots-file-officers-approve-corp-set-rules.md).
+   */
+  getCharacterKillmailsRecent: {
+    route: '/characters/{character_id}/killmails/recent',
+    scope: 'esi-killmails.read_killmails.v1',
+    group: 'killmails',
   },
   getUniverseType: {
     route: '/universe/types/{type_id}',

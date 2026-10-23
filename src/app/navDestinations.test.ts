@@ -61,7 +61,14 @@ describe('railGroups', () => {
       { labelKey: null, paths: ['/overview'] },
       {
         labelKey: 'nav.groups.corp',
-        paths: ['/corp', '/corp/members', '/corp/wallet', '/corp/assets', '/corp/moons'],
+        paths: [
+          '/corp',
+          '/corp/members',
+          '/corp/wallet',
+          '/corp/assets',
+          '/corp/moons',
+          '/corp/srp',
+        ],
       },
       {
         labelKey: 'nav.groups.progression',
@@ -143,6 +150,7 @@ describe('listNavDestinations', () => {
     locked: NO_LOCKS,
     corpVisible: true,
     corpCapabilities: ALL_CORP_VIEWS,
+    srpVisible: true,
     t,
   });
   const byPath = (path: string) => all.find((entry) => entry.path === path);
@@ -244,6 +252,22 @@ describe('listNavDestinations', () => {
     });
     expect(hidden.some((entry) => entry.path.startsWith('/corp'))).toBe(false);
     expect(byPath('/corp')).toMatchObject({ locked: false });
+  });
+
+  it('lists SRP for a member of an SRP corporation with no Corp Access, and for nobody else (issue #4852)', () => {
+    const list = (corpVisible: boolean, srpVisible: boolean) =>
+      listNavDestinations({
+        locked: NO_LOCKS,
+        corpVisible,
+        corpCapabilities: NO_CORP_VIEWS,
+        srpVisible,
+        t,
+      }).map((entry) => entry.path);
+    expect(list(false, true)).toContain('/corp/srp');
+    expect(list(false, true)).not.toContain('/corp');
+    expect(list(false, false)).not.toContain('/corp/srp');
+    expect(list(true, false)).not.toContain('/corp/srp');
+    expect(byPath('/corp/srp')).toMatchObject({ gating: 'srp', locked: false });
   });
 
   it("lists Overview's sub-views with their own route's lock", () => {

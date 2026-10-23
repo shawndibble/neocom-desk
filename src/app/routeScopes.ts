@@ -157,6 +157,11 @@ export const ROUTE_REQUIREMENTS = {
    * that can read the ledger hide the entry rather than lock it.
    */
   '/corp/moons': UNGATED,
+  /**
+   * UNGATED: a member of an SRP corporation needs no corp scope and no role to file
+   * (issue #4852). Its rail entry is `gating: 'srp'`, hidden unless the corporation has SRP on.
+   */
+  '/corp/srp': UNGATED,
   // The drill-down's deeper levels (issue #779): every level renders the same
   // component off the same gate, so it gates identically.
   '/corp/assets/*': UNGATED,

@@ -16,6 +16,7 @@ import { useLockedRoutes } from '@/app/useGrantedScopes';
 import { useCorpViewCapabilities } from '@/features/corp/useCorpViewCapabilities';
 import { useHiddenTabPaths } from '@/app/useHiddenTabPaths';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
+import { useSrpNavVisible } from '@/features/corp/srp/useSrpNavVisible';
 import { openPublicInfoModal } from '@/stores/publicInfoModal';
 import { CONTACT_TYPE_KEY } from '@/features/character/contactsFilter';
 import {
@@ -55,6 +56,7 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
   const navigate = useNavigate();
   const locked = useLockedRoutes(NAV_LOCK_PATHS);
   const corpVisible = useCorpNavVisible();
+  const srpVisible = useSrpNavVisible();
   const hiddenTabPaths = useHiddenTabPaths();
   const capabilities = useCorpViewCapabilities();
   const characters = useCharacters();
@@ -72,10 +74,11 @@ function useShippedProviders(onShowItem: (item: ShownMarketItem) => void): Palet
         locked,
         corpVisible,
         corpCapabilities: capabilities,
+        srpVisible,
         t,
         hiddenTabPaths,
       }),
-    [locked, corpVisible, capabilities, t, hiddenTabPaths]
+    [locked, corpVisible, capabilities, srpVisible, t, hiddenTabPaths]
   );
 
   // Its own memo, keyed only on what it reads: the provider holds the loaded

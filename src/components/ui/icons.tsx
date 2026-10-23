@@ -98,6 +98,7 @@ import { MagnifyingGlass } from '@phosphor-icons/react/dist/csr/MagnifyingGlass'
 import { MapPin } from '@phosphor-icons/react/dist/csr/MapPin';
 import { MapTrifold } from '@phosphor-icons/react/dist/csr/MapTrifold';
 import { Minus } from '@phosphor-icons/react/dist/csr/Minus';
+import { Lifebuoy } from '@phosphor-icons/react/dist/csr/Lifebuoy';
 import { Moon } from '@phosphor-icons/react/dist/csr/Moon';
 import { Package } from '@phosphor-icons/react/dist/csr/Package';
 import { PaperPlaneRight } from '@phosphor-icons/react/dist/csr/PaperPlaneRight';
@@ -466,6 +467,7 @@ export const NavCorpMembers = withWeight(UserList);
 export const NavCorpWallet = withWeight(Vault);
 export const NavCorpAssets = withWeight(Warehouse);
 export const NavCorpMoons = withWeight(Moon);
+export const NavCorpSrp = withWeight(Lifebuoy);
 export const NavSkills = withWeight(GraduationCap);
 export const NavIndustry = withWeight(Factory);
 export const NavShips = withWeight(RocketLaunch);
