@@ -49,7 +49,6 @@ interface MemberClaimsListProps {
 /**
  * The pilot's claims, open ones first. One `DataTable`: columns on desktop, dense two-line cards
  * on a phone. A Rejected claim carries its reason and, once, a Re-file (full width on a phone).
- * Feature-level: the Re-file rule and wording are SRP's.
  */
 export function MemberClaimsList({
   claims,

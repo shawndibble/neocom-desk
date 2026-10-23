@@ -1,12 +1,4 @@
-/**
- * `/corp/srp` (epic #4608). One page, role-aware: a member of an SRP corporation files and follows
- * claims (`MemberSrp`, issue #4852); the officer queue and the Director's settings plug in at
- * `srpViewFor` (features/corp/srp/srpView.ts) (issues #4851 and after) without the route changing.
- *
- * No Corp Access gate: the corporation comes from public affiliation, so a pilot with no corp
- * scope and no role reaches the member view. A corporation without SRP shows an explanation, not
- * a lock (`MemberSrp`).
- */
+/** `/corp/srp`: one role-aware page. No Corp Access gate; the corp comes from public affiliation. */
 import { useTranslation } from 'react-i18next';
 import { EmptyState, PageHeader, Spinner } from '@/components/ui';
 import { useActiveCorporationIdState } from '@/features/corp/owner';

@@ -254,7 +254,7 @@ describe('listNavDestinations', () => {
     expect(byPath('/corp')).toMatchObject({ locked: false });
   });
 
-  it('lists SRP for a member of an SRP corporation with no Corp Access, and for nobody else (issue #4852)', () => {
+  it('lists SRP for a member of an SRP corporation with no Corp Access, and for nobody else', () => {
     const list = (corpVisible: boolean, srpVisible: boolean) =>
       listNavDestinations({
         locked: NO_LOCKS,

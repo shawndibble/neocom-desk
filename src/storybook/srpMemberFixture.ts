@@ -1,5 +1,5 @@
 /**
- * Sample SRP data for the member page's stories (issue #4852): the corp's rules, the pilot's
+ * Sample SRP data for the member page's stories: the corp's rules, the pilot's
  * claims in every state and their lost ships, answered in place of the backend through
  * `setSrpMemberBackendOverride`. Never imported by the app.
  */

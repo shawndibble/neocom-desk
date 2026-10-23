@@ -1,8 +1,6 @@
 /**
- * The pilot's own losses for the SRP page (issue #4852): `/characters/{id}/killmails/recent`
- * lists kills and losses alike as bare id + hash, so each is read from the public killmail
- * endpoint and kept only if this Character died in this corporation (the server refuses the
- * rest). Killmails never change, so a read is kept for the session.
+ * The pilot's own losses: the recent-killmails list mixes kills and losses as bare id + hash, so each
+ * is read and filtered. Killmails never change, so reads are kept for the session.
  */
 import { loadWithCache } from '@/esi/cache';
 import { isCredentialFailure } from '@/esi/client';
@@ -41,8 +39,8 @@ export async function collectLosses(input: CollectLossesInput): Promise<LostLoss
       failed += 1; // one unreadable killmail must not hide the rest
       return;
     }
-    const { victim } = km ?? {};
-    if (!km || !victim) return;
+    if (!km?.victim) return;
+    const { victim } = km;
     if (victim.character_id !== input.characterId) return;
     if (victim.corporation_id !== input.corporationId) return;
     const killedAt = km.killmail_time ? Date.parse(km.killmail_time) : NaN;

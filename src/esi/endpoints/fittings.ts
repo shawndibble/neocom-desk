@@ -104,7 +104,7 @@ export interface CharacterKillmailRef {
 }
 
 /**
- * The Character's recent killmails, kills and losses alike, newest first (issue #4852). Paginated
+ * The Character's recent killmails, kills and losses alike, newest first. Paginated
  * (X-Pages, 50 a page). Opt-in `killmails` Permission: the SRP page asks for it at the point of need.
  */
 export function getCharacterKillmailsRecent(

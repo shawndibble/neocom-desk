@@ -20,7 +20,6 @@ interface RefileDialogProps {
   claim: MemberClaim;
   hullName: string;
   busy: boolean;
-  /** A refusal, already translated. */
   error?: string;
   /** The corp requires a Fleet or FC and the original claim named none: ask for it here. */
   needsFleet: boolean;

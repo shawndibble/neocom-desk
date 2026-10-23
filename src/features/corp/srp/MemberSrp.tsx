@@ -1,10 +1,4 @@
-/**
- * `/corp/srp` for a member (issue #4852, epic #4608): file an SRP Claim by pasting a killmail link
- * or picking one of the pilot's lost ships, then follow My claims. Needs no Corp Access: the corp
- * comes from public affiliation and the rules from `getSrpStatus`. Laid out per the approved
- * mockups: desktop is one File a claim panel over My claims; a phone leads with the lost ships and
- * folds the paste form under them.
- */
+/** Member view: file by pasted link or by picking a lost ship, follow My claims. No Corp Access needed. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {

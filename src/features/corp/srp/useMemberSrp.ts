@@ -1,5 +1,5 @@
 /**
- * The member page's data (issue #4852): the corp's rules, the pilot's own claims and, once the
+ * The member page's data: the corp's rules, the pilot's own claims and, once the
  * killmail Permission is granted, their lost ships with hull and system names. Reads go through
  * `srpMemberBackend` so Storybook and tests stand in for the network.
  */
@@ -17,7 +17,6 @@ export type Load<T> = { state: 'loading' } | { state: 'failed' } | { state: 'rea
 
 export interface LostRow extends LostLoss {
   kind: LostRowKind;
-  /** Whole days since the loss, when the list was read. */
   ageDays: number;
   hullName: string;
   systemName: string;
@@ -93,7 +92,7 @@ export function useMemberSrp(characterId: number, corporationId: number): Member
 
   const lossList = losses.state === 'ready' ? losses.value.losses : null;
   const [hullNames, setHullNames] = useState<ReadonlyMap<number, string>>(new Map());
-  const [systemNames, setSystemNames] = useState<ReadonlyMap<number, string>>(new Map());
+  const [systems, setSystems] = useState<ReadonlyMap<number, { name: string }>>(new Map());
   const claimList = claims.state === 'ready' ? claims.value : null;
   useEffect(() => {
     const typeIds = [
@@ -107,7 +106,7 @@ export function useMemberSrp(characterId: number, corporationId: number): Member
     void loadTypeNames(typeIds).then((map) => !cancelled && setHullNames(map));
     void loadSolarSystemsById().then((byId) => {
       if (cancelled || !byId) return;
-      setSystemNames(new Map([...byId].map(([id, s]) => [id, s.name])));
+      setSystems(byId);
     });
     return () => {
       cancelled = true;
@@ -117,9 +116,9 @@ export function useMemberSrp(characterId: number, corporationId: number): Member
   const names = useMemo(
     () => ({
       hull: (typeId: number) => hullNames.get(typeId) ?? `#${typeId}`,
-      system: (systemId: number) => systemNames.get(systemId) ?? `#${systemId}`,
+      system: (systemId: number) => systems.get(systemId)?.name ?? `#${systemId}`,
     }),
-    [hullNames, systemNames]
+    [hullNames, systems]
   );
 
   const lossesState: MemberSrp['losses'] = useMemo(() => {

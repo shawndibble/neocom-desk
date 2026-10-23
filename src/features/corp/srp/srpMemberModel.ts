@@ -1,8 +1,4 @@
-/**
- * The pure half of the SRP member page (issue #4852, epic #4608): which row a lost ship is, who
- * may re-file, how claims are ordered, and which message a refusal reads as. No fetch, no React.
- * The server prices and decides; this only mirrors enough of its rules to label rows the same way.
- */
+/** Pure rules of the SRP member page: row kinds, re-file, ordering, refusal messages. */
 import { DAY_MS } from '@/lib/age';
 import { callableErrorReason } from '@/lib/callableError';
 import type { HullRule, SrpClaimBasis, SrpClaimState } from '../srpTypes';
@@ -68,7 +64,6 @@ export function lostRowKind(loss: LostLoss, ctx: LostRowContext): LostRowKind {
   return 'open';
 }
 
-/** A Rejected claim may be re-filed once. */
 export function canRefile(claim: Pick<MemberClaim, 'state' | 'refileCount'>): boolean {
   return claim.state === 'rejected' && claim.refileCount < 1;
 }
@@ -82,7 +77,6 @@ export function orderClaims(claims: readonly MemberClaim[]): MemberClaim[] {
   );
 }
 
-/** The link the file-claim callable reads for a killmail whose hash is known. */
 export function esiKillmailLink(killmailId: number, hash: string): string {
   return `https://esi.evetech.net/latest/killmails/${killmailId}/${hash}/`;
 }

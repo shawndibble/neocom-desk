@@ -23,7 +23,7 @@ import { TAB_ENDPOINTS, type AppRoutePath } from './routeScopes';
  *   its corporation known (GLOSSARY.md round 35) — an amber dot would offer a
  *   re-login for a role only CCP can grant.
  * - `ungated`: needs no scope at all (routeScopes.ts `UNGATED`).
- * - `srp`: a Corp page any member reaches with no Corp Access (issue #4852): hidden, not locked,
+ * - `srp`: a Corp page any member reaches with no Corp Access: hidden, not locked,
  *   unless the pilot's corporation has SRP on (`useSrpNavVisible`).
  */
 export type NavGating = 'scope' | 'corp' | 'ungated' | 'srp';

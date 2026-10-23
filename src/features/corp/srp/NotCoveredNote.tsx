@@ -4,7 +4,6 @@ import * as Icon from '@/components/ui/icons';
 /**
  * Filing is blocked: the corp's Hull Rule says Not covered. `hull` is named when the page knows
  * it (a pick from the lost-ships list); a pasted link's refusal comes without a hull name.
- * Feature-level, not a `components/ui` primitive: nothing outside SRP words a refusal this way.
  */
 export function NotCoveredNote({ hull }: { hull?: string }) {
   const { t } = useTranslation();

@@ -17,7 +17,6 @@ interface LostShipsListProps {
  * The pilot's own losses, each with its outcome: a one-tap File, or Claimed, Too old (past the
  * corp's window) or Not covered (a Hull Rule). One `DataTable`: columns on desktop, dense
  * two-line cards on a phone (DESIGN.md §4a), the File button at the card's right.
- * Feature-level: the rows and wording are SRP's; the table is the primitive.
  */
 export function LostShipsList({ rows, onFile, busyKillmailId = null }: LostShipsListProps) {
   const { t } = useTranslation();

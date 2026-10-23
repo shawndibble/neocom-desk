@@ -1,9 +1,6 @@
 /**
- * Whether the pilot's corporation has SRP on, for the nav (issue #4852): any member may read it
- * (`getSrpStatus`, no corp scope, no role), so the SRP entry shows for everyone in an SRP corp
- * and for nobody else. The answer is kept per Character and corporation for an hour: a callable
- * on every boot for every pilot is not worth an entry that changes a few times a year. Unknown
- * reads as hidden, never as a flicker (`useCorpNavVisible`'s stance).
+ * Whether the pilot's corp has SRP on, for the nav: `getSrpStatus` needs no role or scope.
+ * Cached 1h per Character and corporation; unknown reads as hidden.
  */
 export const SRP_PROBE_TTL_MS = 60 * 60 * 1000;
 /** Player corporation ids start here; NPC corporations (1,000,000s) never run SRP. */

@@ -1,10 +1,4 @@
-/**
- * What the member's SRP page reads and writes (issue #4852): the corp's rules through
- * `getSrpStatus`, the pilot's own claims straight from Firestore (the rules let a pilot read only
- * claims under their own uid and ownerHash), filing through `fileSrpClaim`, and the lost-ships
- * list from ESI. Its own module, with a stand-in like the Communities backend's, so Storybook
- * and tests show every state with no network or sign-in. Never set by the app itself.
- */
+/** The member page's reads and writes, with a stand-in for Storybook and tests (never set by the app). */
 import { collection, getDocs, query, where } from 'firebase/firestore/lite';
 import { db as localDb } from '@/db';
 import { getSyncFirestore } from '@/sync/firebaseApp';

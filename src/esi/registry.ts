@@ -603,7 +603,7 @@ export const ESI_REGISTRY = {
     scope: PUBLIC,
   },
   /**
-   * The SRP page's lost-ships list (issue #4852). Opt-in and a Permission of its own: only a
+   * The SRP page's lost-ships list. Opt-in and a Permission of its own: only a
    * pilot filing a claim by pick needs it, and pasting a link works without it
    * (docs/context/decisions/20261023-125348-srp-pilots-file-officers-approve-corp-set-rules.md).
    */

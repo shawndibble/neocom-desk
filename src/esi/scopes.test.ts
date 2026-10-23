@@ -133,7 +133,7 @@ describe('scopesForGroup', () => {
     expect(SCOPES).not.toContain('esi-characters.read_fatigue.v1');
   });
 
-  it("lists exactly the killmails group's scopes (issue #4852)", () => {
+  it("lists exactly the killmails group's scopes", () => {
     expect([...scopesForGroup('killmails')]).toEqual(['esi-killmails.read_killmails.v1']);
     expect(SCOPES).not.toContain('esi-killmails.read_killmails.v1');
   });
