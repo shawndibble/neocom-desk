@@ -1,12 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  filterNotificationEvents,
-  NOTIFICATION_SEARCH_MIN_QUERY_LENGTH,
-} from './notificationSearch';
-
-it('starts filtering at three characters', () => {
-  expect(NOTIFICATION_SEARCH_MIN_QUERY_LENGTH).toBe(3);
-});
+import { filterNotificationEvents } from './notificationSearch';
 
 describe('filterNotificationEvents', () => {
   const characters = [

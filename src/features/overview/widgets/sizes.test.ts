@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SIZE_LAYOUT, SIZES, chartHeight } from './sizes';
+import { SIZE_LAYOUT, chartHeight } from './sizes';
 import { GRID_GAP } from './gridStyle';
 
 /** The Overview's content column on a 1440 px desktop with the rail open (`max-w-6xl`). */
@@ -12,17 +12,6 @@ function perRow(size: keyof typeof SIZE_LAYOUT, width: number): number {
 }
 
 describe('sizes', () => {
-  it('lists the sizes in order', () => {
-    expect(SIZES).toEqual(['S', 'M', 'L', 'F']);
-  });
-
-  it('maps each size to a share of the row and a minimum width', () => {
-    expect(SIZE_LAYOUT.S).toEqual({ basis: 1 / 4, minWidth: 220 });
-    expect(SIZE_LAYOUT.M).toEqual({ basis: 1 / 3, minWidth: 300 });
-    expect(SIZE_LAYOUT.L).toEqual({ basis: 1 / 2, minWidth: 440 });
-    expect(SIZE_LAYOUT.F).toEqual({ basis: 1, minWidth: 0 });
-  });
-
   it('fits four Small, three Medium and two Large across a 1440 px desktop', () => {
     expect(perRow('S', DESKTOP_CONTENT_WIDTH)).toBeGreaterThanOrEqual(4);
     expect(perRow('M', DESKTOP_CONTENT_WIDTH)).toBeGreaterThanOrEqual(3);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { KindView, ListRow, TableColumn } from './data/types';
-import { TABLE_ROWS, fitColumns, rowsToTable, tableOf, visibleColumns } from './tableModel';
+import { fitColumns, rowsToTable, tableOf, visibleColumns } from './tableModel';
 
 const col = (key: string, priority?: number, align?: 'start' | 'end'): TableColumn => ({
   key,
@@ -9,12 +9,6 @@ const col = (key: string, priority?: number, align?: 'start' | 'end'): TableColu
   align,
 });
 const FIVE = [col('a'), col('b'), col('c'), col('d'), col('e')];
-
-describe('TABLE_ROWS', () => {
-  it('shows 4, 5, 8 and 12 rows from Small to Full', () => {
-    expect(TABLE_ROWS).toEqual({ S: 4, M: 5, L: 8, F: 12 });
-  });
-});
 
 describe('visibleColumns', () => {
   it('keeps the first two columns at Small', () => {

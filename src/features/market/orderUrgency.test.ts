@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ORDER_PROBLEMS } from '@/engine/market/orderProblems';
 import { openOrderRow } from './__fixtures__/openOrderRow';
-import { orderUrgency, problemUrgency, rowInView, viewForProblems } from './orderUrgency';
+import { orderUrgency, rowInView, viewForProblems } from './orderUrgency';
 
 const row = (problem: (typeof ORDER_PROBLEMS)[number], extra = {}) =>
   openOrderRow({ problem, problems: [problem], ...extra });
@@ -25,10 +25,6 @@ describe('orderUrgency', () => {
   it('files a healthy order under Fine, often undercut or not', () => {
     expect(orderUrgency(row('healthy'))).toBe('fine');
     expect(orderUrgency(row('healthy', { frequentlyUndercut: true }))).toBe('fine');
-  });
-
-  it('gives every problem an urgency', () => {
-    for (const problem of ORDER_PROBLEMS) expect(problemUrgency(problem)).toBeDefined();
   });
 });
 

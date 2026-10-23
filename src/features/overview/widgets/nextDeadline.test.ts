@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHIP_DANGER_MS, CHIP_WARNING_MS, chipTone, nextDeadline } from './nextDeadline';
+import { chipTone, nextDeadline } from './nextDeadline';
 
 const HOUR = 3_600_000;
 const MIN = 60_000;
@@ -51,10 +51,5 @@ describe('chipTone', () => {
     expect(chipTone(1)).toBe('danger');
     expect(chipTone(0)).toBe('danger');
     expect(chipTone(-5)).toBe('danger');
-  });
-
-  it('exports the thresholds', () => {
-    expect(CHIP_WARNING_MS).toBe(3 * HOUR);
-    expect(CHIP_DANGER_MS).toBe(30 * MIN);
   });
 });

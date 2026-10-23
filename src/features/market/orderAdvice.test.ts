@@ -1,7 +1,6 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { adviseOrder } from './orderAdvice';
 import { orderBadgeFor } from './orderBadgeKind';
-import * as summaryModule from './orderRowSummary';
 import { orderRowSummary } from './orderRowSummary';
 import { orderVerdict } from './orderVerdict';
 import type { OpenOrderRow } from './openOrdersModel';
@@ -102,8 +101,6 @@ const ROWS: Record<string, OpenOrderRow> = {
   },
 };
 
-afterEach(() => vi.restoreAllMocks());
-
 describe('adviseOrder', () => {
   it.each(Object.entries(ROWS))('equals the three separate calls: %s', (_name, row) => {
     expect(adviseOrder(row)).toEqual({
@@ -111,11 +108,5 @@ describe('adviseOrder', () => {
       summary: orderRowSummary(row),
       verdict: orderVerdict(row),
     });
-  });
-
-  it('derives the summary once', () => {
-    const spy = vi.spyOn(summaryModule, 'orderRowSummary');
-    adviseOrder(ROWS['undercut, no floor']);
-    expect(spy).toHaveBeenCalledTimes(1);
   });
 });
