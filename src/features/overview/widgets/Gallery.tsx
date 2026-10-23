@@ -19,23 +19,42 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { useEffect, useId, useMemo, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { Button, EmptyState, FilterChip, Modal, SearchInput, SlideOver } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  FilterChip,
+  Modal,
+  SearchInput,
+  SegmentedControl,
+  SlideOver,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { boardKey, categoryOn, useWidgetBoard } from './board';
+import {
+  categoryCounts,
+  featuredKinds,
+  groupByCategory,
+  kindInstanceCounts,
+  matchKinds,
+  notOnBoard,
+  type CategoryFilter,
+} from './galleryFilter';
 import { useOverviewEdit } from './editContext';
 import { sampleHasChart, sampleView } from './gallerySamples';
-import { type KindCategory, type WidgetKindDef, type WidgetSize, type WidgetView } from './kinds';
+import { type WidgetKindDef, type WidgetSize, type WidgetView } from './kinds';
 import { MAX_WIDGETS, newWidget } from './layout';
 import { Widget } from './Widget';
-
-type CategoryFilter = 'all' | KindCategory;
 
 interface GalleryProps {
   open: boolean;
   onClose: () => void;
 }
+
+/** The drawer's width, and the wide "Browse all" layout's: most of the page, so the board's left edge stays in view. */
+const COMPACT_WIDTH = 'max-w-[460px]';
+const BROWSE_WIDTH = 'max-w-[min(70vw,72rem)]';
 
 /** How long the "Added" confirmation stays on a card. */
 const ADDED_MS = 2200;
@@ -94,6 +113,8 @@ function GalleryItem({
   count,
   full,
   isPhone,
+  showPreview,
+  dim,
   justAdded,
   onAdd,
 }: {
@@ -101,6 +122,9 @@ function GalleryItem({
   count: number;
   full: boolean;
   isPhone: boolean;
+  showPreview: boolean;
+  /** Already on the board: quieter, so what is still missing stands out. */
+  dim: boolean;
   justAdded: boolean;
   onAdd: (kind: string) => void;
 }) {
@@ -138,7 +162,8 @@ function GalleryItem({
     <li
       className={cx(
         'grid gap-2 rounded-xs border border-line bg-panel-2 p-3',
-        soon && 'opacity-60'
+        soon && 'opacity-60',
+        dim && 'opacity-75'
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -180,18 +205,27 @@ function GalleryItem({
           {status}
         </span>
       </div>
-      {!isPhone && !soon && <Preview kind={kind} />}
+      {showPreview && !soon && <Preview kind={kind} />}
     </li>
   );
 }
 
+type Density = 'grid' | 'list';
+
 function GalleryBody({
   isPhone,
+  browse,
+  onToggleBrowse,
+  onDone,
   onAdded,
   searchRef,
   subtitle,
 }: {
   isPhone: boolean;
+  /** The wide "Browse all" layout (a desktop only mode): rail, grid, Featured, filters. */
+  browse: boolean;
+  onToggleBrowse: () => void;
+  onDone: () => void;
   onAdded: () => void;
   searchRef: RefObject<HTMLInputElement | null>;
   /** The count line: the drawer carries it in its title bar, so only the sheet draws it here. */
@@ -203,7 +237,10 @@ function GalleryBody({
   const searchId = useId();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<CategoryFilter>('all');
+  const [unusedOnly, setUnusedOnly] = useState(true);
+  const [density, setDensity] = useState<Density>('grid');
   const [justAdded, setJustAdded] = useState<string | null>(null);
+  const [addedHere, setAddedHere] = useState<ReadonlySet<string>>(new Set());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -212,27 +249,23 @@ function GalleryBody({
     []
   );
 
-  const counts = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const w of edit.layout.widgets) map.set(w.kind, (map.get(w.kind) ?? 0) + 1);
-    return map;
-  }, [edit.layout.widgets]);
+  const counts = useMemo(() => kindInstanceCounts(edit.layout.widgets), [edit.layout.widgets]);
   const full = edit.layout.widgets.length >= MAX_WIDGETS;
 
-  const needle = query.trim().toLowerCase();
   const offered = board.kinds.filter(board.canDraw);
-  const matching = offered.filter(
-    (kind) => !needle || `${t(kind.titleKey)} ${t(kind.descKey)}`.toLowerCase().includes(needle)
-  );
-  const groupOf = (kind: WidgetKindDef) => categoryOn(board, kind);
-  const items = matching.filter((kind) => category === 'all' || groupOf(kind) === category);
+  const matching = matchKinds(offered, query, (kind) => `${t(kind.titleKey)} ${t(kind.descKey)}`);
+  // "Not on your board" only narrows the wide layout: the drawer keeps listing everything.
+  const hidingUsed = browse && unusedOnly;
+  const shown = hidingUsed ? notOnBoard(matching, counts, addedHere) : matching;
+  const catCounts = categoryCounts(shown, board);
+  const items = shown.filter((kind) => category === 'all' || categoryOn(board, kind) === category);
 
   const chips: { id: CategoryFilter; label: string; count: number }[] = [
-    { id: 'all', label: t('overview.gallery.categories.all'), count: matching.length },
+    { id: 'all', label: t('overview.gallery.categories.all'), count: catCounts.all },
     ...board.categories.map((id) => ({
       id,
       label: t(`overview.gallery.categories.${id}`),
-      count: matching.filter((kind) => groupOf(kind) === id).length,
+      count: catCounts[id],
     })),
   ];
 
@@ -240,11 +273,13 @@ function GalleryBody({
     edit.add(id);
     onAdded();
     if (isPhone) return;
+    setAddedHere((prev) => new Set(prev).add(id));
     setJustAdded(id);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setJustAdded(null), ADDED_MS);
   };
 
+  const withPreview = !isPhone && !(browse && density === 'list');
   const renderItem = (kind: WidgetKindDef) => (
     <GalleryItem
       key={kind.id}
@@ -252,43 +287,141 @@ function GalleryBody({
       count={counts.get(kind.id) ?? 0}
       full={full}
       isPhone={isPhone}
+      showPreview={withPreview}
+      dim={browse && (counts.get(kind.id) ?? 0) > 0}
       justAdded={justAdded === kind.id}
       onAdd={add}
     />
   );
+  const listClass =
+    browse && density === 'grid'
+      ? 'grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-2'
+      : 'grid gap-2';
+
+  // Featured leads the wide layout's All view; its kinds are not repeated below it.
+  const featured = browse && category === 'all' && !query.trim() ? featuredKinds(board, shown) : [];
+  const featuredIds = new Set(featured.map((kind) => kind.id));
 
   let list;
   if (items.length === 0) {
     list = (
       <EmptyState
-        title={t('overview.gallery.noMatch', { query: query.trim() })}
-        hint={t('overview.gallery.noMatchHint')}
+        title={
+          query.trim()
+            ? t('overview.gallery.noMatch', { query: query.trim() })
+            : t('overview.gallery.allOnBoard')
+        }
+        hint={
+          query.trim() ? t('overview.gallery.noMatchHint') : t('overview.gallery.allOnBoardHint')
+        }
         action={
-          <Button size={isPhone ? 'md' : 'sm'} onClick={() => setQuery('')}>
-            {t('overview.gallery.clearSearch')}
-          </Button>
+          query.trim() ? (
+            <Button size={isPhone ? 'md' : 'sm'} onClick={() => setQuery('')}>
+              {t('overview.gallery.clearSearch')}
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => setUnusedOnly(false)}>
+              {t('overview.gallery.showAll')}
+            </Button>
+          )
         }
       />
     );
   } else if (category === 'all') {
     list = (
       <div className="grid gap-5">
-        {board.categories.map((id) => {
-          const group = items.filter((kind) => groupOf(kind) === id);
-          if (group.length === 0) return null;
-          return (
-            <section key={id} aria-labelledby={`gallery-group-${id}`} className="grid gap-2">
-              <h3 id={`gallery-group-${id}`} className={eyebrowClassName}>
-                {t(`overview.gallery.categories.${id}`)}
-              </h3>
-              <ul className="grid gap-2">{group.map(renderItem)}</ul>
-            </section>
-          );
-        })}
+        {featured.length > 0 && (
+          <section aria-labelledby="gallery-group-featured" className="grid gap-2">
+            <h3 id="gallery-group-featured" className={eyebrowClassName}>
+              {t('overview.gallery.featured')}
+            </h3>
+            <ul className={listClass}>{featured.map(renderItem)}</ul>
+          </section>
+        )}
+        {groupByCategory(
+          items.filter((kind) => !featuredIds.has(kind.id)),
+          board
+        ).map((group) => (
+          <section
+            key={group.category}
+            aria-labelledby={`gallery-group-${group.category}`}
+            className="grid gap-2"
+          >
+            <h3 id={`gallery-group-${group.category}`} className={eyebrowClassName}>
+              {t(`overview.gallery.categories.${group.category}`)}
+            </h3>
+            <ul className={listClass}>{group.kinds.map(renderItem)}</ul>
+          </section>
+        ))}
       </div>
     );
   } else {
-    list = <ul className="grid gap-2">{items.map(renderItem)}</ul>;
+    list = <ul className={listClass}>{items.map(renderItem)}</ul>;
+  }
+
+  const search = (
+    <SearchInput
+      ref={searchRef}
+      id={searchId}
+      aria-label={t('overview.gallery.search')}
+      placeholder={t('overview.gallery.search')}
+      value={query}
+      onChange={(event) => setQuery(event.target.value)}
+    />
+  );
+  const chipButton = (chip: (typeof chips)[number], className?: string) => (
+    <FilterChip
+      key={chip.id}
+      label={chip.label}
+      count={chip.count}
+      countLabel={t('overview.gallery.chipCount', { count: chip.count })}
+      size={isPhone ? 'md' : 'sm'}
+      className={className}
+      selected={category === chip.id}
+      onToggle={() => setCategory(chip.id)}
+    />
+  );
+
+  if (browse) {
+    return (
+      <>
+        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-line bg-panel px-3 py-3">
+          <div className="min-w-48 flex-1">{search}</div>
+          <FilterChip
+            label={t('overview.gallery.notOnBoard')}
+            size="md"
+            selected={unusedOnly}
+            onToggle={() => setUnusedOnly((on) => !on)}
+          />
+          <SegmentedControl
+            size="md"
+            label={t('overview.gallery.density')}
+            value={density}
+            onChange={setDensity}
+            options={[
+              { value: 'grid', label: t('overview.gallery.densityGrid') },
+              { value: 'list', label: t('overview.gallery.densityList') },
+            ]}
+          />
+          <Button size="md" variant="ghost" onClick={onToggleBrowse}>
+            {t('overview.gallery.quickAdd')}
+          </Button>
+          <Button size="md" variant="primary" onClick={onDone}>
+            {t('overview.gallery.done')}
+          </Button>
+        </div>
+        <div className="grid grid-cols-[11rem_minmax(0,1fr)] items-start gap-4 p-3">
+          <div
+            role="group"
+            aria-label={t('overview.gallery.categoriesLabel')}
+            className="grid gap-1.5"
+          >
+            {chips.map((chip) => chipButton(chip, 'w-full justify-between'))}
+          </div>
+          {list}
+        </div>
+      </>
+    );
   }
 
   return (
@@ -301,32 +434,23 @@ function GalleryBody({
         )}
       >
         {isPhone && <p className="text-xs text-text-dim">{subtitle}</p>}
-        <SearchInput
-          ref={searchRef}
-          id={searchId}
-          aria-label={t('overview.gallery.search')}
-          placeholder={t('overview.gallery.search')}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
+        {isPhone ? (
+          search
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">{search}</div>
+            <Button size="md" variant="ghost" onClick={onToggleBrowse}>
+              {t('overview.gallery.browseAll')}
+            </Button>
+          </div>
+        )}
         {/* One row that scrolls sideways: a wrapped block of chips is three ragged lines. */}
         <div
           role="group"
           aria-label={t('overview.gallery.categoriesLabel')}
           className="relative -mx-3 flex min-w-0 gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:thin]"
         >
-          {chips.map((chip) => (
-            <FilterChip
-              key={chip.id}
-              label={chip.label}
-              count={chip.count}
-              countLabel={t('overview.gallery.chipCount', { count: chip.count })}
-              size={isPhone ? 'md' : 'sm'}
-              className="shrink-0"
-              selected={category === chip.id}
-              onToggle={() => setCategory(chip.id)}
-            />
-          ))}
+          {chips.map((chip) => chipButton(chip, 'shrink-0'))}
         </div>
       </div>
       <div className={isPhone ? 'pt-3' : 'p-3'}>{list}</div>
@@ -340,6 +464,7 @@ export function Gallery({ open, onClose }: GalleryProps) {
   const board = useWidgetBoard();
   const isPhone = useIsPhone();
   const searchRef = useRef<HTMLInputElement>(null);
+  const [browse, setBrowse] = useState(false);
   const title = t('overview.gallery.title');
   const subtitle = t(boardKey(board, 'gallery.subtitle'), {
     total: board.kinds.filter(board.canDraw).length,
@@ -351,7 +476,15 @@ export function Gallery({ open, onClose }: GalleryProps) {
     // behind it: closing on Add lets the pilot see what they added.
     return (
       <Modal open={open} onClose={onClose} title={title} placement="sheet-full">
-        <GalleryBody isPhone onAdded={onClose} searchRef={searchRef} subtitle={subtitle} />
+        <GalleryBody
+          isPhone
+          browse={false}
+          onToggleBrowse={noop}
+          onDone={onClose}
+          onAdded={onClose}
+          searchRef={searchRef}
+          subtitle={subtitle}
+        />
       </Modal>
     );
   }
@@ -363,9 +496,17 @@ export function Gallery({ open, onClose }: GalleryProps) {
       subtitle={subtitle}
       flush
       initialFocusRef={searchRef}
-      maxWidthClassName="max-w-[460px]"
+      maxWidthClassName={browse ? BROWSE_WIDTH : COMPACT_WIDTH}
     >
-      <GalleryBody isPhone={false} onAdded={noop} searchRef={searchRef} subtitle={subtitle} />
+      <GalleryBody
+        isPhone={false}
+        browse={browse}
+        onToggleBrowse={() => setBrowse((on) => !on)}
+        onDone={onClose}
+        onAdded={noop}
+        searchRef={searchRef}
+        subtitle={subtitle}
+      />
     </SlideOver>
   );
 }
