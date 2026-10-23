@@ -9,6 +9,7 @@ import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { App } from '@/app/App';
+import * as routeChunks from '@/app/routeChunks';
 import type { SkillType } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -222,13 +223,7 @@ function toolsSection(title: string): HTMLElement {
 
 let clipboardWriteText: ReturnType<typeof vi.fn<ClipboardWriter>>;
 
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
-afterAll(() => server.close());
-afterEach(() => {
-  server.resetHandlers();
-  configureClipboard(null);
-});
-beforeEach(async () => {
+async function resetSession() {
   await db.characters.clear();
   await db.tokens.clear();
   await db.settings.clear();
@@ -259,7 +254,26 @@ beforeEach(async () => {
   });
 
   window.history.pushState({}, '', '/skills/plans');
+}
+
+beforeAll(async () => {
+  server.listen({ onUnhandledRequest: 'error' });
+  // One throwaway render of the plans page, so no test pays for the first one:
+  // a worker's first `App` render (lazy route chunks, jsdom, React warm-up) is
+  // seconds, and it landed on whichever test ran first, past its 1s findBy.
+  await Promise.all([routeChunks.loadSkillPlans(), routeChunks.loadSkillPlanEditor()]);
+  await resetSession();
+  const { unmount } = render(<App />);
+  await screen.findByRole('button', { name: 'New plan' }, { timeout: 25_000 });
+  unmount();
+  server.resetHandlers();
+}, 30_000);
+afterAll(() => server.close());
+afterEach(() => {
+  server.resetHandlers();
+  configureClipboard(null);
 });
+beforeEach(resetSession);
 
 /** Opens the "All plans…" popover from the plan card. */
 async function openAllPlans(user: ReturnType<typeof userEvent.setup>) {
@@ -1113,7 +1127,7 @@ describe('SkillPlans editor: optimize remaps', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
 
     // A savings verdict now gets its own Accept/Reject Modal, next to the
     // button that produced it — it used to render inline, then a Panel of
@@ -1154,7 +1168,7 @@ describe('SkillPlans editor: optimize remaps', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
 
     expect(
       await screen.findByText(
@@ -1198,7 +1212,7 @@ describe('SkillPlans editor: optimize remaps', () => {
 
     await screen.findByText('Your entries');
     const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
 
     expect(
       await screen.findByText('This plan has 0 remaps to spend, so nothing was placed.')
@@ -1225,7 +1239,7 @@ describe('SkillPlans editor: optimize remaps', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
     expect(await screen.findByText(/^Remapping saves/)).toBeInTheDocument();
 
     const entriesPanel = screen.getByText('Your entries').closest('section')!;
@@ -1265,7 +1279,7 @@ describe('SkillPlans editor: optimize remaps', () => {
 
     await screen.findByText('Your entries');
     const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
 
     // Additive: the full panel result (asserted elsewhere above) still
     // renders — this only checks the new beside-the-button confirmation.
@@ -1336,7 +1350,7 @@ describe('SkillPlans editor: remap markers', () => {
 
     await screen.findByText('Your entries');
     await user.click(screen.getByRole('button', { name: 'Optimize' }));
-    const optimizeItem = screen.getByRole('menuitem', { name: 'Use my remap markers…' });
+    const optimizeItem = screen.getByRole('menuitem', { name: 'Use my remap markers' });
     expect(optimizeItem).not.toHaveAttribute('aria-disabled', 'true');
     await user.click(optimizeItem);
 
@@ -1376,7 +1390,7 @@ describe('SkillPlans editor: remap markers', () => {
 
     await screen.findByText('Your entries');
     const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
-    await clickOptimizeMode(user, 'Use my remap markers…');
+    await clickOptimizeMode(user, 'Use my remap markers');
 
     expect(
       await screen.findByText(
@@ -1423,7 +1437,7 @@ describe('SkillPlans editor: remap markers', () => {
 
     await screen.findByText('Your entries');
     await user.click(screen.getByRole('button', { name: 'Optimize' }));
-    expect(screen.getByRole('menuitem', { name: 'Use my remap markers…' })).toHaveAttribute(
+    expect(screen.getByRole('menuitem', { name: 'Use my remap markers' })).toHaveAttribute(
       'aria-disabled',
       'true'
     );
@@ -1453,7 +1467,7 @@ describe('SkillPlans editor: the remap cap is disclosed', () => {
     goToPlanEditor();
     render(<App />);
     await openPlanTools();
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
     await screen.findByText(/^Remapping saves|^No remap improves/);
   };
 
@@ -1548,7 +1562,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
       expect(within(header()).queryByText('Remap savings')).not.toBeInTheDocument();
     });
 
-    await clickOptimizeMode(user, 'Place remaps only…');
+    await clickOptimizeMode(user, 'Place remaps only');
     await screen.findByText(/^Remapping saves|^No remap improves/);
 
     await waitFor(() => {
@@ -1651,7 +1665,7 @@ describe('SkillPlans editor: suggest reorder', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    await clickOptimizeMode(user, 'Reorder only…');
+    await clickOptimizeMode(user, 'Reorder only');
 
     expect(await screen.findByRole('heading', { name: 'Suggested reorder' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Accept' }));
@@ -1685,7 +1699,7 @@ describe('SkillPlans editor: suggest reorder', () => {
 
     await screen.findByText('Your entries');
     const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
-    await clickOptimizeMode(user, 'Reorder only…');
+    await clickOptimizeMode(user, 'Reorder only');
 
     // Additive: the reorder-preview modal (asserted elsewhere above) still
     // opens — this only checks the new beside-the-button confirmation.

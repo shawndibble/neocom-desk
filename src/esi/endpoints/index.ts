@@ -23,6 +23,7 @@ export * from './fittings';
 export * from './industry';
 export * from './mail';
 export * from './market';
+export * from './mercenaryDens';
 export * from './pi';
 export * from './ui';
 export * from './universe';

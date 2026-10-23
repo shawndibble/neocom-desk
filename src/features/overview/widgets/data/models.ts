@@ -45,6 +45,8 @@ const SUMS_ACROSS = new Set([
   'tradingProfit',
   // Every Character's jobs and job slots; the builder narrows to the header Character.
   'industry',
+  // Every Character's dens; the builder narrows to the header Character.
+  'mercenaryDens',
 ]);
 
 export function kindSumsAcrossCharacters(kind: string): boolean {

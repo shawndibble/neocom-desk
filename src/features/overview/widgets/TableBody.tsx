@@ -9,13 +9,14 @@
  * a button that opens `RowDetailModal` when it has a `detail` (the first cell's
  * accent name is the cue, §6c "Widget rows"). No row buttons and no other
  * chrome: the widget's title link and the row's own link or modal are the only
- * ways out. Columns are chosen by `visibleColumns` from the
- * width budget the caller passes, never from the viewport. The one other way a
- * column goes is `hideNarrow`: CSS hides it while this table's own box is under
- * 28rem (a container query, so a phone's full-width widget drops it and a
- * half-width one on a desktop does too).
+ * ways out. Columns are chosen by `visibleColumns` from the width budget the
+ * caller passes, never from the viewport, then by `fitColumns` for a
+ * `fitWidth` table. The one other way a column goes is `hideNarrow`: CSS hides
+ * it while this table's own box is under 28rem (a container query, so a
+ * phone's full-width widget drops it and a half-width one on a desktop does
+ * too).
  */
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
@@ -37,7 +38,7 @@ import type { TableCell, TableColumn, TableModel, TableRowModel } from './data/t
 import type { WidgetSize } from './kinds';
 import { fractionBar, type CellTone } from './data/cellKit';
 import { RowDetailModal } from './RowDetailModal';
-import { visibleColumns } from './tableModel';
+import { fitColumns, visibleColumns } from './tableModel';
 import {
   ROWS_PER_PAGE_OPTIONS,
   clampPage,
@@ -107,6 +108,9 @@ function cellTone(cell: TableCell): CellTone | undefined {
 }
 
 const cellPad = 'pl-3 last:pr-3';
+
+/** Px of the `w-5` caret column a linked row adds. */
+const CARET_WIDTH = 20;
 
 /** A `hideNarrow` column is hidden until the table is 28rem across (see `TableColumn.hideNarrow`). */
 const HIDE_NARROW = 'hidden @md:table-cell';
@@ -348,7 +352,25 @@ export function TableBody({
   className,
 }: TableBodyProps) {
   const { t } = useTranslation();
-  const columns = visibleColumns(table.columns, columnsFor);
+  // Only a `fitWidth` table measures; until the first measure it keeps the size-budget columns.
+  const [box, setBox] = useState<HTMLDivElement | null>(null);
+  const [boxWidth, setBoxWidth] = useState<number | null>(null);
+  const fit = table.fitWidth === true;
+  // Observed from a layout effect, so the first measure arrives before the first paint.
+  useLayoutEffect(() => {
+    if (!fit || !box || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[entries.length - 1]?.contentRect.width;
+      // Whole pixels, so a drag-resize does not re-render on every fraction.
+      if (width !== undefined) setBoxWidth(Math.round(width));
+    });
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [fit, box]);
+  const budgeted = visibleColumns(table.columns, columnsFor);
+  // The trailing caret column (`w-5`) takes its share of the box before any data column.
+  const caretWidth = table.rows.some((row) => row.to !== undefined) ? CARET_WIDTH : 0;
+  const columns = fit && boxWidth !== null ? fitColumns(budgeted, boxWidth - caretWidth) : budgeted;
   const indexes = columns.map((column) => table.columns.indexOf(column));
   const [sort, setSort] = useState<{ columnId: string; direction: 'asc' | 'desc' } | null>(null);
   // The opened row's facts as they were on the click, so a refresh never swaps them mid-read.
@@ -386,7 +408,7 @@ export function TableBody({
   const growKey = columns.find((column, i) => i > 0 && column.grow)?.key;
   const caret = shown.some((row) => row.to !== undefined);
   return (
-    <div className={cx('@container', className)}>
+    <div ref={setBox} className={cx('@container', className)}>
       <table aria-label={ariaLabel} className="w-full border-collapse">
         {hasHeader && (
           <thead>

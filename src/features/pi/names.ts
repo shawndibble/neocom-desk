@@ -17,7 +17,8 @@ function planetInfoKey(planetId: number): string {
   return `${PLANET_INFO_PREFIX}:${planetId}`;
 }
 
-async function loadPlanetInfoRow(planetId: number): Promise<UniversePlanet | null> {
+/** A planet's universe row (name, system), cached for good. */
+export async function loadPlanetInfoRow(planetId: number): Promise<UniversePlanet | null> {
   const result = await loadStaticEntity(PLANET_INFO_PREFIX, planetId, getUniversePlanet);
   return result?.data ?? null;
 }

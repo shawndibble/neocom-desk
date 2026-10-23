@@ -9,7 +9,8 @@
  */
 import { diffRoster } from '@/engine/corp/members';
 import type { CachedResult, StatusResult } from '@/esi/cache';
-import { jumpsFromCurrent, planetInfo } from './spaceLookups';
+import { jumpsFromCurrent } from '@/features/route/jumpsFromCurrent';
+import { planetInfo } from './spaceLookups';
 import { summariseBay } from '@/engine/corp/starbases';
 import { resolveNames } from '@/features/character/names';
 import { loadTypeNames } from '@/features/character/typeNames';

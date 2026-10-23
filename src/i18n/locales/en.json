@@ -2230,19 +2230,20 @@
     "optimizeRemaps": "Optimize remaps",
     "optimize": "Optimize",
     "optimizeForMe": "Optimize for me",
-    "optimizeForMeItem": "Optimize for me…",
+    "optimizeForMeItem": "Optimize for me",
     "optimizeForMeHint": "Fastest order and remaps, high priority first",
-    "optimizeModeReorder": "Reorder only…",
+    "optimizeModeReorder": "Reorder only",
     "optimizeModeReorderHint": "Group similar skills by priority, no remaps",
-    "sortShortest": "Shortest first…",
+    "sortShortest": "Shortest first",
     "sortShortestTooltip": "Fastest skills first, honoring priority and prerequisites",
-    "optimizeModeRemaps": "Place remaps only…",
+    "optimizeModeRemaps": "Place remaps only",
     "optimizeModeRemapsHint": "Keep the current order, just place remaps",
-    "optimizeModeMarkers": "Use my remap markers…",
+    "optimizeModeMarkers": "Use my remap markers",
     "optimizeModeMarkersHint": "Optimize attributes at your existing remap markers",
     "optimizeModeMarkersDisabledHint": "Add a remap marker first",
     "optimizeForMeTitle": "Optimize for me",
     "optimizeForMeTotal": "Total {{before}} → {{after}}",
+    "reorderNoGain": "Nothing to gain: your order is already as fast as this sort can make it. The total stays {{total}}, so the plan is unchanged.",
     "optimizeForMeNoGain": "Nothing to gain: your order and attributes are already as fast as the optimizer can make them. The total stays {{total}}, so the plan is unchanged.",
     "compareView": "Plan to show",
     "compareCurrentTab": "Current",
@@ -4765,6 +4766,53 @@
           "programs": "Programs"
         }
       },
+      "mercenaryDens": {
+        "title": "Mercenary dens",
+        "description": "Your dens: reinforcement, operations and Anarchy",
+        "empty": "No Mercenary Dens found.",
+        "unit_one": "den",
+        "unit_other": "dens",
+        "reinforcedUnit_one": "den reinforced",
+        "reinforcedUnit_other": "dens reinforced",
+        "reinforcedNext": "{{planet}}, out in {{duration}}",
+        "operationsUnit_one": "operation ready",
+        "operationsUnit_other": "operations ready",
+        "operationsNext": "{{planet}}, expires in {{duration}}",
+        "readyNote_one": "{{count}} operation ready",
+        "readyNote_other": "{{count}} operations ready",
+        "unnamed": "Planet #{{id}}",
+        "level": "Level {{level}}",
+        "state": {
+          "running": "Running",
+          "reinforced": "Reinforced, {{duration}}",
+          "paused": "Paused",
+          "disabled": "Disabled"
+        },
+        "operations": {
+          "none": "None",
+          "ready_one": "{{count}} ready, {{duration}}",
+          "ready_other": "{{count}} ready, {{duration}}",
+          "started": "Started, {{duration}}"
+        },
+        "col": {
+          "planet": "Planet",
+          "state": "State",
+          "operations": "Operations",
+          "anarchy": "Anarchy",
+          "infomorphs": "Infomorphs",
+          "jumps": "Jumps",
+          "character": "Character"
+        },
+        "deadline": {
+          "reinforced": "Den at {{planet}} leaves reinforcement",
+          "operation": "Operation at {{planet}} expires"
+        },
+        "summary_one": "{{count}} den, {{reinforced}} reinforced.",
+        "summary_other": "{{count}} dens, {{reinforced}} reinforced.",
+        "underHour": "Under 1h",
+        "unread_one": "{{count}} character could not be read.",
+        "unread_other": "{{count}} characters could not be read."
+      },
       "structures": {
         "title": "Structures",
         "description": "Reinforcement timers, fuel and offline services",
@@ -5543,6 +5591,12 @@
           "unit": "colonies run dry",
           "note": "in 2h 10m",
           "runsDry": "Extractor runs dry"
+        },
+        "mercenaryDens": {
+          "unit": "den reinforced",
+          "note": "Efa VII, out in 14h",
+          "reinforced": "Reinforced",
+          "ready": "2 ready"
         },
         "structures": {
           "unit": "low on fuel",
@@ -11648,7 +11702,7 @@
     },
     "planets": {
       "label": "Planets",
-      "caption": "Your planetary colonies."
+      "caption": "Your planetary colonies and Mercenary Dens."
     },
     "mail": {
       "label": "Mail",

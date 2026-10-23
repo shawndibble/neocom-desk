@@ -69,6 +69,8 @@ describe('SCOPES (Base Grant)', () => {
         'esi-clones.read_clones.v1',
         'esi-universe.read_structures.v1',
         'esi-planets.manage_planets.v1',
+        'esi-structures.read_character.v1',
+        'esi-activities.read_character.v1',
         'esi-characters.read_contacts.v1',
         'esi-characters.read_loyalty.v1',
         'esi-characters.read_standings.v1',

@@ -257,6 +257,18 @@ const SPECS: Record<string, Spec> = {
     size: 'M',
     endpoints: ['getCharacterPlanets'],
   },
+  mercenaryDens: {
+    category: 'planets',
+    views: NT,
+    view: 'table',
+    size: 'L',
+    endpoints: [
+      'getCharacterMercenaryDens',
+      'getCharacterMercenaryDen',
+      'getCharacterMercenaryOperations',
+      'getCharacterMercenaryOperation',
+    ],
+  },
   structures: {
     category: 'planets',
     corp: 'corpClocks',

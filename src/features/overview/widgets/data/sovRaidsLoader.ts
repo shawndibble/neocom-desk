@@ -17,7 +17,8 @@ import type { EsiResult } from '@/esi/client';
 import { getRaidableSkyhooks, getSovereigntySystems } from '@/esi/endpoints';
 import { resolveNames } from '@/features/character/names';
 import { loadPublicCharacterInfoWithAge } from '@/features/character/publicInfoData';
-import { jumpsFromCurrent, planetInfo } from './spaceLookups';
+import { jumpsFromCurrent } from '@/features/route/jumpsFromCurrent';
+import { planetInfo } from './spaceLookups';
 
 export interface SovRaidSkyhook {
   key: string;

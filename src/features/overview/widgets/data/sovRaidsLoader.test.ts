@@ -13,6 +13,8 @@ vi.mock('@/esi/cache', async (importOriginal) => ({
 }));
 vi.mock('./spaceLookups', () => ({
   planetInfo: (...a: unknown[]) => planetInfo(...a),
+}));
+vi.mock('@/features/route/jumpsFromCurrent', () => ({
   jumpsFromCurrent: (...a: unknown[]) => jumpsFromCurrent(...a),
 }));
 vi.mock('@/features/character/names', () => ({
