@@ -83,6 +83,7 @@ export function SettleSentOnAndMethod({
         <p className={SETTLE_FIELD_LABEL}>{t('miningTax.settleUpPaidOnLabel')}</p>
         <TextInput
           type="date"
+          size="sm"
           value={paidOn}
           onChange={(e) => onPaidOn(e.target.value)}
           aria-label={t('miningTax.settleUpPaidOnLabel')}

@@ -2243,6 +2243,7 @@
     "optimizeModeMarkersDisabledHint": "Add a remap marker first",
     "optimizeForMeTitle": "Optimize for me",
     "optimizeForMeTotal": "Total {{before}} → {{after}}",
+    "optimizeForMeNoGain": "Nothing to gain: your order and attributes are already as fast as the optimizer can make them. The total stays {{total}}, so the plan is unchanged.",
     "compareView": "Plan to show",
     "compareCurrentTab": "Current",
     "compareOptimizedTab": "Optimized",
