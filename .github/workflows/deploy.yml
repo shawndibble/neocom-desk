@@ -137,7 +137,7 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_VAPID_KEY: ${{ vars.VITE_FIREBASE_VAPID_KEY }}
           VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
-      # Idempotent: creates the project on the first run, then finds it there.
-      - run: npx --yes wrangler@4 pages project create "$PAGES_PROJECT" --production-branch "$PAGES_BRANCH"
-        continue-on-error: true
+      # The Pages project already exists. If it is ever recreated (or PAGES_PROJECT
+      # changes), create it once by hand first:
+      #   npx wrangler@4 pages project create "$PAGES_PROJECT" --production-branch "$PAGES_BRANCH"
       - run: npx --yes wrangler@4 pages deploy dist --project-name "$PAGES_PROJECT" --branch "$PAGES_BRANCH" --commit-hash "$GITHUB_SHA" --commit-dirty=true
