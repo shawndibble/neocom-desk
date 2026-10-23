@@ -2893,7 +2893,11 @@
     "costIndexTrend": {
       "open": "Cost index trend for {{system}} (now {{value}})",
       "title": "{{system}} cost index, last {{days}} days",
-      "summary": "7d ago {{weekAgo}} · today {{today}}"
+      "summary": "7d ago {{weekAgo}} · today {{today}}",
+      "index": "Cost index",
+      "nearby": "Cheaper systems nearby",
+      "jumps_one": "{{count}} jump",
+      "jumps_other": "{{count}} jumps"
     },
     "costIndexTooltip": "<b>Can be slightly off:</b> ESI rounds it to 4 decimals. The build system's manufacturing activity level, which drives the job's cost-index fee. Read live from ESI for the build system named above — the trade hub sets material and product prices, never this.",
     "revenue": "Revenue",
