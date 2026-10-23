@@ -27,6 +27,7 @@ export interface ComingUpRailProps {
   selectedDayMs: number | null;
   onClearDay: () => void;
   onSelectEvent: (eventId: number) => void;
+  onSelectSkyhook?: (skyhookId: number) => void;
   /** True when the pilot has deselected every kind — a different answer from "nothing due". */
   noKindsSelected: boolean;
 }
@@ -37,6 +38,7 @@ export function ComingUpRail({
   selectedDayMs,
   onClearDay,
   onSelectEvent,
+  onSelectSkyhook,
   noKindsSelected,
 }: ComingUpRailProps) {
   const { t, i18n } = useTranslation();
@@ -84,7 +86,11 @@ export function ComingUpRail({
           <ul className="divide-y divide-line">
             {group.items.map((item) => (
               <li key={item.id}>
-                <CharacterBoardRow item={item} onSelectEvent={onSelectEvent} />
+                <CharacterBoardRow
+                  item={item}
+                  onSelectEvent={onSelectEvent}
+                  onSelectSkyhook={onSelectSkyhook}
+                />
               </li>
             ))}
           </ul>

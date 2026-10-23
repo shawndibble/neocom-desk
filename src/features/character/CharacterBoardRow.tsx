@@ -38,9 +38,15 @@ export interface CharacterBoardRowProps {
   item: CharacterBoardItem;
   /** Only calendar events have a detail to open; every other kind renders as a plain row. */
   onSelectEvent?: (eventId: number) => void;
+  /** Skyhook raids open a detail modal of their own; the source id is the skyhook's. */
+  onSelectSkyhook?: (skyhookId: number) => void;
 }
 
-export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProps) {
+export function CharacterBoardRow({
+  item,
+  onSelectEvent,
+  onSelectSkyhook,
+}: CharacterBoardRowProps) {
   const { t } = useTranslation();
   const zone = useTimeZone();
   const KindIcon = KIND_ICON[item.kind];
@@ -125,6 +131,22 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
           className="mt-1 shrink-0 text-text-faint group-hover:text-accent group-focus-visible:text-accent"
         />
       </Link>
+    );
+  }
+
+  if (item.kind === 'skyhookRaid' && onSelectSkyhook !== undefined) {
+    return (
+      <button
+        type="button"
+        onClick={() => onSelectSkyhook(Number(item.sourceId))}
+        className={cx(
+          'flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left',
+          rowInteractiveClassName,
+          focusRingInsetClassName
+        )}
+      >
+        {body}
+      </button>
     );
   }
 

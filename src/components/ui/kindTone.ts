@@ -1,5 +1,5 @@
 /**
- * Kind to tokens: fill and text tone, for the nine clocks the Calendar merges.
+ * Kind to tokens: fill and text tone, for the ten clocks the Calendar merges.
  *
  * The sibling of `severityTone.ts`, and deliberately its opposite. That one
  * colours a **magnitude** — how close a deadline is, on an ordered ladder.
@@ -34,6 +34,7 @@ export const KIND_FILL: Record<CharacterBoardItemKind, string> = {
   planetExtraction: 'bg-kind-planet-extraction',
   mercenaryDen: 'bg-kind-mercenary-den',
   moonChunk: 'bg-kind-moon-chunk',
+  skyhookRaid: 'bg-kind-skyhook-raid',
   contractExpiry: 'bg-kind-contract-expiry',
   orderExpiry: 'bg-kind-order-expiry',
   skillPlan: 'bg-kind-skill-plan',
@@ -47,6 +48,7 @@ export const KIND_TEXT: Record<CharacterBoardItemKind, string> = {
   planetExtraction: 'text-kind-planet-extraction',
   mercenaryDen: 'text-kind-mercenary-den',
   moonChunk: 'text-kind-moon-chunk',
+  skyhookRaid: 'text-kind-skyhook-raid',
   contractExpiry: 'text-kind-contract-expiry',
   orderExpiry: 'text-kind-order-expiry',
   skillPlan: 'text-kind-skill-plan',

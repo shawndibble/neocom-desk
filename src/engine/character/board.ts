@@ -1,5 +1,5 @@
 /**
- * The character's Coming Up board: nine heterogeneous clocks in, one ordered
+ * The character's Coming Up board: ten heterogeneous clocks in, one ordered
  * list out.
  *
  * The corp side of this exists already (`engine/corp/board.ts`) and answers the
@@ -46,6 +46,7 @@ export const CHARACTER_BOARD_ITEM_KINDS = [
   'planetExtraction',
   'mercenaryDen',
   'moonChunk',
+  'skyhookRaid',
   'contractExpiry',
   'orderExpiry',
   'skillPlan',
@@ -123,6 +124,8 @@ export interface CharacterBoardSources {
   mercenaryDens?: readonly BoardClockSource[];
   /** Corp moon drills — absent unless the Character holds `canReadMoonExtractions`. */
   moonChunks?: readonly BoardClockSource[];
+  /** Corp skyhook theft windows — absent unless the Character holds `canReadSkyhooks`. */
+  skyhookRaids?: readonly BoardClockSource[];
   contractExpiries?: readonly BoardClockSource[];
   orderExpiries?: readonly BoardClockSource[];
   /** Projected Skill Plan steps — a forecast, not an ESI clock. */
@@ -137,6 +140,7 @@ const SOURCE_KEY = {
   planetExtraction: 'planetExtractions',
   mercenaryDen: 'mercenaryDens',
   moonChunk: 'moonChunks',
+  skyhookRaid: 'skyhookRaids',
   contractExpiry: 'contractExpiries',
   orderExpiry: 'orderExpiries',
   skillPlan: 'skillPlan',

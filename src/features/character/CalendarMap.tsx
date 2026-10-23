@@ -11,7 +11,7 @@
  * all painted the day's worst severity — so four dots repeated the count
  * sitting two inches away and a `+N` overflow was needed for busy days. Now the
  * number carries how much and the glyphs carry what of, which is the question
- * the grid is actually good at answering: there are only nine kinds, so a cell
+ * the grid is actually good at answering: there are only ten kinds, so a cell
  * wraps at worst and the glyphs line up in the same order in every cell.
  *
  * **Past days are drawn, hatched and captioned.** ESI's `/calendar` returns
