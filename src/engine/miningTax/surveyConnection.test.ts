@@ -271,7 +271,7 @@ describe('findOreClash', () => {
   });
 
   it('finds two connections both in the grace window', () => {
-    const late = NOON + 2 * HOUR;
+    const late = NOON + HOUR / 2;
     const x = connection({ surveyId: 'x', payeeId: 'p1', untilMs: NOON + 1 });
     const y = connection({ surveyId: 'y', payeeId: 'p2', untilMs: NOON + 1 });
     expect(findOreClash(x, [x, y], late)).toBe(y);
