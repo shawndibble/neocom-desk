@@ -21,6 +21,7 @@ import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
 import { SHIPS_TABS } from '@/features/fittings/shipsTabs';
 import { CORP_MEMBERS_TABS, legacyCorpMembersLocation } from '@/features/corp/corpMembersTabs';
 import { MOONS_TABS } from '@/features/corp/moons/moonsPaths';
+import { SRP_TABS } from '@/features/corp/srp/srpTabs';
 import { ROUTE_REQUIREMENTS, type AppRoutePath } from './routeScopes';
 
 export const CONTACTS_TABS = definePageTabs('/contacts', [
@@ -152,6 +153,7 @@ export const ASSETS_TABS = definePageTabs('/assets', [
 export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/corp/members': CORP_MEMBERS_TABS,
   '/corp/moons': MOONS_TABS,
+  '/corp/srp': SRP_TABS,
   '/assets': ASSETS_TABS,
   '/contacts': CONTACTS_TABS,
   '/contracts': CONTRACTS_TABS,

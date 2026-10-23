@@ -83,6 +83,8 @@ export interface NavPage {
   readonly corpCapability?: CorpViewCapability;
   /** For a Corp page: tab ids listed only with the given capability (Members › Roles). */
   readonly corpTabCapabilities?: Readonly<Record<string, CorpViewCapability>>;
+  /** Tab ids listed only while `NavSubView.visible`'s condition holds. Fewer than two tabs lists none. */
+  readonly conditionalTabs?: Readonly<Record<string, 'srp'>>;
   /**
    * Views that are routes of their own but live in this page's sub-nav rather
    * than its `PAGE_TABS` (`OverviewSubNav`). Listed as the
@@ -93,13 +95,29 @@ export interface NavPage {
 
 /** The Corp Capabilities a Corp page or tab is gated on — hidden, not locked, without one. */
 export type CorpViewCapability =
-  'canReadMembers' | 'canReadWallet' | 'canReadAssets' | 'canReadMiningLedger' | 'canReadRoleAudit';
+  | 'canReadMembers'
+  | 'canReadWallet'
+  | 'canReadAssets'
+  | 'canReadMiningLedger'
+  | 'canReadRoleAudit'
+  | 'canManageSrp';
 
 export interface NavSubView {
   readonly path: AppRoutePath;
   readonly labelKey: string;
   /** i18n keys of other names it goes by: the palette also matches these (Wallet › LP Store ← "loyalty points"). */
   readonly searchKeys?: readonly string[];
+  /**
+   * Listed only while a live condition holds; otherwise hidden, never locked or dimmed, and the
+   * route stays reachable by typing it. Not a scope gate: such routes are UNGATED (routeScopes.ts).
+   * `srp`: the pilot's corporation has SRP on (`useSrpNavVisible`).
+   */
+  readonly visible?: 'srp';
+}
+
+/** Whether a sub-view is listed right now (`NavSubView.visible`). */
+export function isSubViewVisible(view: NavSubView, srpVisible: boolean): boolean {
+  return view.visible !== 'srp' || srpVisible;
 }
 
 /**
@@ -116,6 +134,8 @@ export const NAV_PAGES = [
     subViews: [
       { path: '/clones', labelKey: 'nav.clones' },
       { path: '/employment-history', labelKey: 'nav.employmentHistory' },
+      // Player SRP (file a claim, My claims): ungated, listed only for a corp with SRP on.
+      { path: '/srp', labelKey: 'nav.srp', visible: 'srp' },
     ],
   },
   /*
@@ -177,6 +197,16 @@ export const NAV_PAGES = [
     gating: 'corp',
     mobileTab: false,
     corpCapability: 'canReadMiningLedger',
+  },
+  {
+    path: '/corp/srp',
+    labelKey: 'nav.corpSrp',
+    group: 'corp',
+    gating: 'corp',
+    mobileTab: false,
+    corpCapability: 'canManageSrp',
+    // The Queue needs SRP on; without it Settings is the only tab and none are listed (`srpViews.ts`).
+    conditionalTabs: { queue: 'srp' },
   },
   {
     path: '/skills',
@@ -423,6 +453,8 @@ export interface ListNavDestinationsOptions {
   readonly corpVisible: boolean;
   /** `useCorpAccess().capabilities` — each Corp view shows only for its capability, as the Corp pages and Roles tab are gated. */
   readonly corpCapabilities: Pick<CorpCapabilities, CorpViewCapability>;
+  /** `useSrpNavVisible()`: drives `NavSubView.visible: 'srp'`. */
+  readonly srpVisible?: boolean;
   readonly t: (key: string) => string;
   /** Tab paths left out for now (Industry › Logs until a Production Run is logged). */
   readonly hiddenTabPaths?: ReadonlySet<string>;
@@ -440,6 +472,7 @@ export function listNavDestinations({
   locked,
   corpVisible,
   corpCapabilities,
+  srpVisible,
   t,
   hiddenTabPaths,
 }: ListNavDestinationsOptions): NavDestination[] {
@@ -479,18 +512,23 @@ export function listNavDestinations({
     };
     // Members without the role audit has one tab and draws no tab bar: list none.
     const allTabs = navTabs(page);
-    const shownTabs = page.corpTabCapabilities
+    const narrowed = !!page.corpTabCapabilities || !!page.conditionalTabs;
+    const shownTabs = narrowed
       ? allTabs.filter((tab) => {
           const needed = page.corpTabCapabilities?.[tab.id];
-          return !needed || corpCapabilities[needed];
+          return (
+            (!needed || corpCapabilities[needed]) &&
+            !(page.conditionalTabs?.[tab.id] && !srpVisible)
+          );
         })
       : allTabs;
-    for (const tab of page.corpTabCapabilities && shownTabs.length < 2 ? [] : shownTabs) {
+    for (const tab of narrowed && shownTabs.length < 2 ? [] : shownTabs) {
       if (page.corpTabs?.includes(tab.id) && !corpVisible) continue;
       if (hiddenTabPaths?.has(tab.path)) continue;
       out.push(tabEntry(tab.path, tab.labelKey, pageLocked || locked.has(tab.path)));
     }
     for (const view of page.subViews ?? []) {
+      if (!isSubViewVisible(view, srpVisible === true)) continue;
       out.push(tabEntry(view.path, view.labelKey, locked.has(view.path), view.searchKeys));
     }
   }

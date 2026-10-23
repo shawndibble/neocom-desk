@@ -267,6 +267,7 @@ describe('useCorpAccess — ready', () => {
       canReadOrders: true,
       canReadDivisions: true,
       canReadSkyhooks: true,
+      canManageSrp: true,
     });
   });
 

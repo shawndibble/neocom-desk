@@ -16,6 +16,7 @@ import {
 import { commandPaletteDisplayKey, isApplePlatform } from '@/lib/shortcuts';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useCorpViewCapabilities } from '@/features/corp/useCorpViewCapabilities';
+import { useSrpNavVisible } from '@/features/corp/srp/useSrpNavVisible';
 import { useActiveCorporationId } from '@/features/corp/owner';
 import { useHiddenTabPaths } from './useHiddenTabPaths';
 import { useCommandPalette } from '@/features/commandPalette/store';
@@ -222,6 +223,7 @@ const RailNavBody = memo(function RailNavBody({
   const capabilities = useCorpViewCapabilities();
   const corporationId = useActiveCorporationId();
   const corpVisible = corpState === 'ready' && corporationId !== null;
+  const srpVisible = useSrpNavVisible();
   const hiddenList = useHiddenNav((state) => state.value);
   const hidden = useMemo(() => new Set(hiddenList), [hiddenList]);
   const [editing, setEditing] = useState(false);
@@ -246,11 +248,12 @@ const RailNavBody = memo(function RailNavBody({
           locked,
           corpVisible,
           corpCapabilities: capabilities,
+          srpVisible,
           t,
           hiddenTabPaths,
         })
       ),
-    [locked, corpVisible, capabilities, t, hiddenTabPaths]
+    [locked, corpVisible, capabilities, srpVisible, t, hiddenTabPaths]
   );
 
   const groupId = useId();

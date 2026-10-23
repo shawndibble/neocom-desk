@@ -22,6 +22,7 @@ const SUB_NAV_PAGES: Partial<Record<AppRoutePath, AppRoutePath>> = {
   '/skills/certificates': '/skills',
   '/clones': '/overview',
   '/employment-history': '/overview',
+  '/srp': '/overview',
 };
 
 /** How long a page that is still loading gets to render its `<h1>`. */

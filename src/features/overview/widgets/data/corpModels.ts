@@ -15,6 +15,7 @@ import { corpCustomsOffices } from './corpCustomsModels';
 import { corpRoleAudit } from './corpRoleAuditModels';
 import { corpCashFlow, corpIncome, corpWallet } from './corpMoneyModels';
 import { corpKills } from './corpOpsModels';
+import { corpSrp } from './corpSrpModels';
 import { corpInactive, corpMembers, corpMining } from './corpPeopleModels';
 
 export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
@@ -38,4 +39,5 @@ export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
   corpContracts: { feeds: ['corpContracts'], build: corpContracts },
   corpAssets: { feeds: ['corpAssets', 'corpStockTargets'], build: corpAssets },
   corpKills: { feeds: ['corpKills'], build: corpKills },
+  corpSrp: { feeds: ['corpSrp'], build: corpSrp },
 };

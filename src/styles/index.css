@@ -1405,7 +1405,8 @@
   :root {
     --sticky-clearance: calc(
       var(--onboarding-banner-clearance, 0px) + var(--selection-toolbar-clearance, 0px) +
-        var(--compare-drawer-clearance, 0px) + var(--hauling-trip-bar-clearance, 0px)
+        var(--compare-drawer-clearance, 0px) + var(--hauling-trip-bar-clearance, 0px) +
+        var(--unsaved-bar-clearance, 0px)
     );
   }
   /* From md up the page reserves nothing by default (computed `auto`), so
@@ -1416,13 +1417,16 @@
       scroll-padding-bottom: var(--sticky-clearance);
     }
   }
-  /* Hauling's trip bar sits on top of the tab bar, so its term already
-     covers the tab bar: take that back out rather than count it twice. */
+  /* Hauling's trip bar and the unsaved-changes bar sit on top of the tab bar, so their term
+     already covers the tab bar: take that back out rather than count it twice. */
   @media (width < 48rem) {
     :root {
       scroll-padding-bottom: calc(
         var(--sticky-clearance) + var(--bottom-nav-clearance) -
-          min(var(--hauling-trip-bar-clearance, 0px), var(--bottom-nav-clearance))
+          min(
+            var(--hauling-trip-bar-clearance, 0px) + var(--unsaved-bar-clearance, 0px),
+            var(--bottom-nav-clearance)
+          )
       );
     }
   }

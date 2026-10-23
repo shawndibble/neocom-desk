@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLockedRoutes } from '@/app/useGrantedScopes';
+import { useSrpNavVisible } from '@/features/corp/srp/useSrpNavVisible';
 import type { AppRoutePath } from '@/app/routeScopes';
 import { cx } from '@/lib/cx';
 import { Tooltip } from '@/components/ui';
@@ -19,13 +20,14 @@ function subNavClass({ isActive }: { isActive: boolean }): string {
 
 /**
  * Module-level so `useLockedRoutes`' memo — keyed on `[granted, paths]` —
- * survives a re-render. Only `/clones` is gated (routeScopes.ts); `/overview`
- * and `/employment-history` are UNGATED and can never appear in the result.
+ * survives a re-render. Only `/clones` is gated (routeScopes.ts); `/overview`,
+ * `/employment-history` and `/srp` are UNGATED and can never appear in the result.
  */
 const TAB_PATHS = [
   '/overview',
   '/clones',
   '/employment-history',
+  '/srp',
 ] as const satisfies readonly AppRoutePath[];
 
 /** The Clones tab; wears the re-auth marker and tooltip when its scope is missing. */
@@ -49,7 +51,7 @@ function ClonesTab({ locked }: { locked: boolean }) {
 }
 
 /**
- * Sub-navigation across the three Character-overview views. Real navigation
+ * Sub-navigation across the Character-overview views (SRP joins them while the corporation has SRP on). Real navigation
  * (routes), not a `Tabs` widget — same reasoning as `SkillsSubNav`, and the
  * paths stay top-level rather than nesting under `/overview`, so each view
  * keeps its own `ScopeGate` and every existing bookmark still resolves.
@@ -61,6 +63,8 @@ function ClonesTab({ locked }: { locked: boolean }) {
 export function OverviewSubNav({ trailing }: { trailing?: ReactNode }) {
   const { t } = useTranslation();
   const locked = useLockedRoutes(TAB_PATHS);
+  // Hidden, never locked or dimmed, unless the pilot's corporation has SRP on (`NavSubView.visible`).
+  const srpVisible = useSrpNavVisible();
 
   return (
     <div className="flex items-stretch">
@@ -79,6 +83,11 @@ export function OverviewSubNav({ trailing }: { trailing?: ReactNode }) {
           <NavLink to="/employment-history" className={subNavClass}>
             {t('nav.employmentHistory')}
           </NavLink>
+          {srpVisible && (
+            <NavLink to="/srp" className={subNavClass}>
+              {t('nav.srp')}
+            </NavLink>
+          )}
         </nav>
       </div>
       {/* Outside the scroller, so a narrow phone scrolls the tabs and never hides this. */}

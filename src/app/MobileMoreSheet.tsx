@@ -9,6 +9,7 @@ import { focusRingClassName, interactiveClassName } from '@/components/ui/contro
 import { useHiddenTabPaths } from './useHiddenTabPaths';
 import { useCorpNavVisible } from '@/features/corp/useCorpNavVisible';
 import { useCorpViewCapabilities } from '@/features/corp/useCorpViewCapabilities';
+import { useSrpNavVisible } from '@/features/corp/srp/useSrpNavVisible';
 import { useCommandPalette } from '@/features/commandPalette/store';
 import {
   isNavPageAvailable,
@@ -30,6 +31,7 @@ const ALL_CORP_VIEWS = {
   canReadAssets: true,
   canReadMiningLedger: true,
   canReadRoleAudit: true,
+  canManageSrp: true,
 };
 
 const TILE_GRID = 'grid grid-cols-4 gap-1.5';
@@ -74,6 +76,7 @@ export function MobileMoreSheet({
   const { pathname, search } = useLocation();
   const corpVisible = useCorpNavVisible();
   const corpCapabilities = useCorpViewCapabilities();
+  const srpVisible = useSrpNavVisible();
   const hiddenTabPaths = useHiddenTabPaths();
   const hidden = useHiddenNav((state) => state.value);
   const recent = useRecentNav((state) => state.value);
@@ -88,10 +91,11 @@ export function MobileMoreSheet({
         locked: NO_LOCKS,
         corpVisible: true,
         corpCapabilities: ALL_CORP_VIEWS,
+        srpVisible,
         t,
         hiddenTabPaths,
       }),
-    [t, hiddenTabPaths]
+    [srpVisible, t, hiddenTabPaths]
   );
   const byPath = useMemo(
     () => new Map(destinations.map((destination) => [destination.path, destination])),

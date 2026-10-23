@@ -116,6 +116,8 @@ export const ROUTE_REQUIREMENTS = {
   // corporationhistory has "security": [] in the ESI spec — public, no scope
   // to gate on, same reasoning as /market.
   '/employment-history': UNGATED,
+  // No corp scope or role to file; the killmails opt-in is asked for on the page.
+  '/srp': UNGATED,
 
   /**
    * UNGATED, and emphatically not because it needs no scopes — it needs seven.
@@ -157,6 +159,8 @@ export const ROUTE_REQUIREMENTS = {
    * that can read the ledger hide the entry rather than lock it.
    */
   '/corp/moons': UNGATED,
+  // Hidden for non-officers, never locked (see `NavSubView.visible`); the views check `canManageSrp`.
+  '/corp/srp': UNGATED,
   // The drill-down's deeper levels (issue #779): every level renders the same
   // component off the same gate, so it gates identically.
   '/corp/assets/*': UNGATED,

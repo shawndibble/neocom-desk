@@ -70,6 +70,7 @@ export const SCOPE_GROUPS = [
   'structureMarkets',
   'jumpFatigue',
   'corpProjects',
+  'killmails',
 ] as const;
 export type ScopeGroup = (typeof SCOPE_GROUPS)[number];
 
@@ -182,6 +183,11 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
   corpProjects: {
     labelKey: 'permissions.corpProjects.label',
     captionKey: 'permissions.corpProjects.caption',
+    defaultOn: false,
+  },
+  killmails: {
+    labelKey: 'permissions.killmails.label',
+    captionKey: 'permissions.killmails.caption',
     defaultOn: false,
   },
 };
@@ -596,6 +602,16 @@ export const ESI_REGISTRY = {
     route: '/killmails/{killmail_id}/{killmail_hash}',
     scope: PUBLIC,
   },
+  /**
+   * The SRP page's lost-ships list. Opt-in and a Permission of its own: only a
+   * pilot filing a claim by pick needs it, and pasting a link works without it
+   * (docs/context/decisions/20261023-125348-srp-pilots-file-officers-approve-corp-set-rules.md).
+   */
+  getCharacterKillmailsRecent: {
+    route: '/characters/{character_id}/killmails/recent',
+    scope: 'esi-killmails.read_killmails.v1',
+    group: 'killmails',
+  },
   getUniverseType: {
     route: '/universe/types/{type_id}',
     scope: PUBLIC,
@@ -927,6 +943,11 @@ export type Scope = Exclude<(typeof ESI_REGISTRY)[EsiEndpointId]['scope'], Publi
 export function isScopeRequired(requirement: ScopeRequirement): requirement is Scope {
   return requirement !== PUBLIC;
 }
+
+/** The endpoints a panel needs to send a mail from the active Character. */
+export const SEND_MAIL_ENDPOINTS = [
+  'postCharacterMail',
+] as const satisfies readonly EsiEndpointId[];
 
 /**
  * Distinct Permissions the given endpoints belong to, in declaration order.

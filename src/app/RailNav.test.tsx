@@ -12,6 +12,7 @@ import { DEFAULT_MOBILE_TABS, useMobileTabs } from '@/lib/mobileTabs';
 import { useHiddenNav, useRecentNav } from './navPreferences';
 import { defaultHiddenNav } from './navRail';
 import { Layout } from './Layout';
+import { useSrpNavVisible } from '@/features/corp/srp/useSrpNavVisible';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
 vi.mocked(useCorpAccess).mockReturnValue({
@@ -22,6 +23,8 @@ vi.mocked(useCorpAccess).mockReturnValue({
   readFailed: false,
   retry: () => {},
 });
+
+vi.mock('@/features/corp/srp/useSrpNavVisible', () => ({ useSrpNavVisible: vi.fn() }));
 
 import { IDLE_SYNC_STATUS } from '@/sync/statusFixtures';
 vi.mock('@/sync', () => ({
@@ -70,6 +73,7 @@ beforeEach(async () => {
     readFailed: false,
     retry: () => {},
   });
+  vi.mocked(useSrpNavVisible).mockReturnValue(false);
   setPhone(false);
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: true });
@@ -168,6 +172,50 @@ describe('the rail', () => {
       'aria-expanded',
       'false'
     );
+  });
+
+  it('lists SRP under Overview for a pilot whose corp has SRP on, and not in the Corporation group', async () => {
+    vi.mocked(useSrpNavVisible).mockReturnValue(true);
+    renderAt('/srp');
+    const views = within(rail()).getByRole('list', { name: 'Overview' });
+    expect(within(views).getByRole('link', { name: 'SRP' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(within(rail()).queryByRole('group', { name: 'Corporation' })).not.toBeInTheDocument();
+  });
+
+  it('leaves SRP off the Overview views, hidden rather than dimmed, while the corp has SRP off', () => {
+    renderAt('/clones');
+    const views = within(rail()).getByRole('list', { name: 'Overview' });
+    expect(within(views).queryByRole('link', { name: 'SRP' })).not.toBeInTheDocument();
+  });
+
+  it('lists only the SRP tabs an officer can see under Corp SRP', async () => {
+    vi.mocked(useCorpAccess).mockReturnValue({
+      state: 'ready',
+      capabilities: { ...NO_CORP_CAPABILITIES, canManageSrp: true },
+      missingScopes: [],
+      roles: ['Director'],
+      readFailed: false,
+      retry: () => {},
+    });
+    await db.characters.put({
+      characterId: 42,
+      name: 'Pilot',
+      ownerHash: 'h',
+      addedAt: 0,
+      corporationId: 98000001,
+    });
+    useActiveCharacter.setState({ activeCharacterId: 42, hydrated: true });
+    vi.mocked(useSrpNavVisible).mockReturnValue(true);
+    renderAt('/corp/srp/queue');
+    const views = await within(rail()).findByRole('list', { name: 'SRP' });
+    expect(
+      within(views)
+        .getAllByRole('link')
+        .map((link) => link.textContent)
+    ).toEqual(['Queue', 'Settings']);
   });
 
   it('opens a sub-view’s page even where its path does not nest under it', () => {

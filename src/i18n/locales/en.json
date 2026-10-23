@@ -31,6 +31,7 @@
     "corpWallet": "Corp Wallet",
     "corpAssets": "Corp Assets",
     "corpMoons": "Moons",
+    "corpSrp": "SRP",
     "skills": "Skills",
     "industry": "Industry",
     "ships": "Ships",
@@ -46,6 +47,7 @@
     "clones": "Clones",
     "pi": "PI",
     "employmentHistory": "Employment",
+    "srp": "SRP",
     "assets": "Assets",
     "mail": "Mail",
     "calendar": "Calendar",
@@ -3878,7 +3880,7 @@
     "trust": {
       "readOnly": {
         "name": "Six writes, and nothing else",
-        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, a reply or forward you write, or a Community invite you send by mail, goes out through your account, saving a Fitting to EVE recreates it on the game's side, setting a route's waypoints replaces your autopilot waypoints in the client, and Open in EVE opens a window in the client. Nothing else in the app writes to EVE."
+        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, a reply or forward you write, a Community invite you send by mail, or the result of an SRP claim you approve or reject, goes out through your account, saving a Fitting to EVE recreates it on the game's side, setting a route's waypoints replaces your autopilot waypoints in the client, and Open in EVE opens a window in the client. Nothing else in the app writes to EVE."
       },
       "token": {
         "name": "Your login stays on this device",
@@ -3920,7 +3922,7 @@
       "readMore": "Read more in the privacy policy",
       "writes": {
         "q": "Can it move ISK or change anything in EVE?",
-        "a": "It cannot move ISK. It writes to EVE only when you act: opening a mail marks it read, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written."
+        "a": "It cannot move ISK. It writes to EVE only when you act: opening a mail marks it read, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send, and the result mail an SRP officer's Approve or Reject sends the pilot), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written."
       },
       "free": {
         "q": "Is it free?",
@@ -5469,8 +5471,32 @@
       },
       "corpSrp": {
         "title": "Ship replacement",
-        "description": "SRP claims waiting and paid",
-        "empty": "This widget is coming soon."
+        "description": "Open SRP claims and the ISK owed",
+        "unit_one": "open claim",
+        "unit_other": "open claims",
+        "owed": "{{amount}} owed",
+        "owedNote": "Approved, not yet Paid",
+        "review": "Review claims",
+        "footer": "{{amount}} owed, Approved and not yet Paid",
+        "col": {
+          "pilot": "Pilot",
+          "killmail": "Killmail",
+          "amount": "Amount",
+          "status": "Status"
+        },
+        "status": {
+          "pending": "Pending",
+          "approved": "Approved"
+        },
+        "empty": "No open claims",
+        "emptyHint": "Pilots file claims on the SRP page. New ones show here while Pending.",
+        "open": "Open SRP",
+        "off": "SRP is not turned on",
+        "offHintDirector": "A Director turns it on and sets the rules in SRP settings.",
+        "offHintOfficer": "A Director turns it on and sets the rules.",
+        "setUp": "Set up SRP",
+        "summary_one": "{{count}} open SRP claim, {{owed}} owed.",
+        "summary_other": "{{count}} open SRP claims, {{owed}} owed."
       }
     },
     "header": {
@@ -12089,6 +12115,10 @@
       "label": "Corporation projects",
       "caption": "Your corporation's open manufacture projects, and how much of each you can still build."
     },
+    "killmails": {
+      "label": "Killmails",
+      "caption": "Your own losses, so you can pick one to file for ship replacement."
+    },
     "core": {
       "skills": {
         "label": "Skills & skill queue",
@@ -12397,7 +12427,7 @@
           "crashes": "Crash reports: the error, the page it happened on and the addresses of recent requests, which can include EVE character or item IDs. The app doesn't attach your IP address; request and response bodies are never captured; EVE tokens are stripped first. Usage statistics: each page you open is counted in Google Analytics by the page's name only, never an ID or a search, and not tied to your character. Turn this off in Settings › App & backup › Analytics.",
           "shareLinks": "Share Links: the appraisal, Fitting, D-Scan or Survey you shared (items, scan text, a Survey's location and notes, and the Character names of whoever started it or pasted a scan), under a random link ID with no account or Character ID. Anyone with the link can read it, and anyone with a Survey link can add scans. It stops working after 7 days and is then deleted automatically, up to a day later. It can't be deleted sooner.",
           "removal": "Removing a character clears it from this device only; adding it back restores its synced copy. That copy is deleted after 90 days with no device syncing it, or right away from Settings › Log out & delete › Delete all data.",
-          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written.",
+          "writes": "Writes to EVE, only when you act: opening a mail marks it read in EVE, answering a calendar invite sends your reply, Mail sends what you wrote through your account (so do Community invite mails and Pledge mails, once you press Send, and the result mail an SRP officer's Approve or Reject sends the pilot), saving a Fitting to EVE creates or replaces it there, Route Safety's Set waypoints in game replaces your autopilot waypoints, and Open in EVE opens a window in your client. Nothing else is ever written.",
           "export": "Backups (Settings › App & backup) are password-encrypted files, login tokens included. One is written only when you press the button, and saved only where you put it. We never see it."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
@@ -15993,6 +16023,120 @@
       }
     }
   },
+  "srpMember": {
+    "title": "SRP",
+    "notSetUp": {
+      "title": "SRP is not set up for your corporation",
+      "hint": "Your corp has not turned on ship replacement. There is no SRP item in the menu until it does. Ask a director if you expected one."
+    },
+    "loadFailed": "Couldn't load SRP",
+    "file": {
+      "title": "File a claim",
+      "pasteTitle": "Paste a killmail link",
+      "pasteInstead": "Paste a killmail link instead",
+      "link": "Killmail link",
+      "linkNote": "A zKillboard or ESI killmail link for one of your own losses, within {{days}} days.",
+      "linkPlaceholder": "https://zkillboard.com/kill/…",
+      "fleet": "Fleet or FC",
+      "fleetOptional": "Fleet or FC (optional)",
+      "fleetNoteRequired": "Your corp asks for this on every claim.",
+      "fleetNote": "Who ran the fleet, if there was one.",
+      "fleetPlaceholder": "e.g. Kestrel Vane",
+      "submit": "File claim",
+      "filing": "Filing…",
+      "hint": "Hull, system, time and amount are filled in from the killmail.",
+      "filed": "Claim filed.",
+      "filedFor": "Claim filed for {{hull}}."
+    },
+    "lost": {
+      "title": "Or pick a lost ship",
+      "phoneTitle": "Your recent losses",
+      "label": "My lost ships",
+      "ship": "Ship",
+      "system": "System",
+      "lost": "Lost",
+      "file": "File",
+      "fileShip": "File claim for {{hull}}",
+      "claimed": "Claimed",
+      "old": "Too old",
+      "notCovered": "Not covered",
+      "ago": "{{count}}d ago",
+      "empty": {
+        "title": "No recent losses",
+        "hint": "Losses in your corporation show here once ESI lists them. Pasting a link works for any of them."
+      },
+      "loadFailed": "Couldn't load your losses",
+      "grantTitle": "Show my lost ships",
+      "grantHint": "Neocom Desk needs permission to read your killmails. Pasting a link works without it.",
+      "grantAction": "Grant killmail access"
+    },
+    "notCovered": {
+      "withHull": "{{hull}} is not covered.",
+      "withoutHull": "That hull is not covered.",
+      "body": "Your corp's SRP does not repay this hull, so there is nothing to file. Ask an officer if you think the rule is wrong."
+    },
+    "claims": {
+      "title": "My claims",
+      "label": "My SRP claims",
+      "ship": "Ship",
+      "status": "Status",
+      "lost": "Lost",
+      "filed": "Filed",
+      "system": "System",
+      "amount": "Reimbursement",
+      "reason": "Reason",
+      "officerSets": "Officer sets amount",
+      "officerWillSet": "Officer will set the amount",
+      "reasonLabel": "Reason:",
+      "refile": "Re-file…",
+      "refileShip": "Re-file claim for {{hull}}",
+      "refiledFinal": "Re-filed once, final.",
+      "empty": {
+        "title": "No claims yet",
+        "hint": "Lost a ship in the last {{days}} days? File it above and the corp will repay you."
+      },
+      "states": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "paid": "Paid",
+        "rejected": "Rejected"
+      }
+    },
+    "detail": {
+      "lostIn": "Lost {{date}} in {{system}}",
+      "viewKillmail": "View killmail",
+      "timeline": {
+        "filed": "{{date}}: you filed this claim",
+        "pending": "Waiting for an officer",
+        "approved": "Approved, waiting for payment",
+        "paid": "Paid to you in game",
+        "rejected": "Rejected by an officer"
+      }
+    },
+    "refile": {
+      "title": "Re-file {{hull}} claim",
+      "rejected": "Rejected: {{reason}}",
+      "once": "You can re-file once. Add a note for the officer.",
+      "note": "Note",
+      "submit": "Re-file claim",
+      "cancel": "Cancel"
+    },
+    "errors": {
+      "srpOff": "SRP is off for your corporation right now.",
+      "notYourLoss": "Paste a killmail where you were the victim.",
+      "lossInOtherCorp": "You were in a different corporation when that ship died.",
+      "outsideWindow": "That loss is older than your corp's claim window.",
+      "alreadyClaimed": "That killmail already has a claim.",
+      "notCovered": "Your corp does not cover that hull.",
+      "fleetOrFcRequired": "Fleet or FC is required by your corp.",
+      "noteRequired": "Add a note for the officer.",
+      "hashUnavailable": "Couldn't look that killmail up. Paste its ESI link, or try again shortly.",
+      "killmailNotFound": "That killmail was not found.",
+      "wrongCorp": "You are not in this corporation any more.",
+      "badKillmailLink": "Paste a zKillboard or ESI killmail link.",
+      "generic": "Couldn't file the claim. Check your connection and try again."
+    }
+  },
   "interactionGrammar": {
     "title": "Interaction grammar (§6c)",
     "intro": "One cue per intent. Each item names its DESIGN.md §6c rule; compare the rendering to the rule to spot drift.",
@@ -16117,6 +16261,310 @@
       "toggleOff": "Toggle off",
       "region": "Region",
       "pending": "RSVP pending"
+    }
+  },
+  "srp": {
+    "title": "SRP",
+    "tabs": {
+      "queue": "Queue",
+      "settings": "Settings"
+    },
+    "officer": {
+      "deniedTitle": "SRP claims are not open to your roles",
+      "deniedHint": "EVE did not confirm an SRP officer role for this character. Roles can only be changed in game.",
+      "loadFailed": "Couldn't load SRP claims",
+      "summary": {
+        "pending_one": "{{count}} pending",
+        "pending_other": "{{count}} pending",
+        "owed": "{{isk}} ISK owed"
+      },
+      "tabsLabel": "SRP claims",
+      "tabs": {
+        "pending": "Pending",
+        "owed": "Owed",
+        "history": "History"
+      },
+      "title": {
+        "pending": "Pending claims",
+        "owed": "Approved claims, not yet paid",
+        "history": "Paid and rejected claims"
+      },
+      "empty": {
+        "pendingTitle": "No claims waiting",
+        "pendingHint": "New claims from pilots show up here.",
+        "owedTitle": "Nothing owed",
+        "owedHint": "Approved claims wait here until you pay them in game and mark them paid.",
+        "historyTitle": "No paid or rejected claims yet",
+        "historyHint": "Closed claims stay here until the retention period ends."
+      },
+      "columns": {
+        "pilot": "Pilot",
+        "hull": "Hull",
+        "lost": "Lost",
+        "fleetOrFc": "Fleet or FC",
+        "amount": "Amount",
+        "approved": "Approved",
+        "state": "State",
+        "decided": "Decided",
+        "reason": "Reason"
+      },
+      "filed": "Filed {{when}}",
+      "approvedAt": "approved {{when}}",
+      "iskAmount": "{{isk}} ISK",
+      "phoneTab": "{{label}} {{count}}",
+      "by": "by {{name}}",
+      "states": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "paid": "Paid",
+        "rejected": "Rejected"
+      },
+      "basis": {
+        "hull-fixed": "Hull Rule: fixed",
+        "class-fixed": "Class price",
+        "killmail-percent": "Killmail value × {{percent}}%",
+        "appraisal-percent": "Jita appraisal × {{percent}}%",
+        "none": "No amount: officer types it",
+        "suggested": "Suggested {{isk}} ISK ({{basis}})"
+      },
+      "amountChanged": "changed by {{name}}",
+      "amountTyped": "typed by {{name}}",
+      "typeAmount": "Type amount",
+      "amountFor": "Amount for {{pilot}}",
+      "hullFallback": "Hull {{id}}",
+      "systemFallback": "System {{id}}",
+      "actions": {
+        "approve": "Approve",
+        "reject": "Reject…",
+        "markPaid": "Mark paid",
+        "copy": "Copy",
+        "copyAmount": "Copy amount",
+        "copied": "Copied",
+        "copyLabel": "Copy {{isk}} ISK for {{pilot}}",
+        "changeAmount": "Change amount…",
+        "select": "Select {{pilot}}, {{hull}}"
+      },
+      "bulk": {
+        "selectAll": "Select all ({{count}})",
+        "selectNone": "Select none",
+        "selected": "{{count}} selected",
+        "clear": "Clear",
+        "approve": "Approve ({{count}})",
+        "markPaid": "Mark paid ({{count}})"
+      },
+      "reject": {
+        "title": "Reject {{pilot}}'s claim?",
+        "body": "{{hull}} lost at {{system}}, {{isk}} ISK. The claim moves to History as Rejected.",
+        "reason": "Reason (required, sent to the pilot)",
+        "confirm": "Reject claim",
+        "mailNote": "The pilot reads this reason with the result."
+      },
+      "change": {
+        "title": "Change amount for {{pilot}}",
+        "computed": "Computed",
+        "basis": "Basis",
+        "newAmount": "New amount",
+        "reason": "Reason (required, kept in the audit trail)",
+        "effect": "{{from}} → {{to}} ISK. The computed amount stays visible on the claim.",
+        "confirm": "Save amount"
+      },
+      "logged": "Logged with your name and reason. Your role is checked again when you confirm.",
+      "detail": {
+        "title": "{{pilot}} · {{hull}}",
+        "subtitle": "Lost at {{system}}",
+        "state": "State",
+        "pilot": "Pilot",
+        "killmail": "Killmail",
+        "killmailLink": "{{id}} on zKillboard",
+        "lost": "Lost",
+        "filed": "Filed",
+        "fleetOrFc": "Fleet or FC",
+        "note": "Note",
+        "amount": "Amount",
+        "computed": "Computed {{isk}} ISK. Changed by {{name}}: {{reason}}",
+        "rejection": "Rejection reason",
+        "auditTitle": "Audit trail",
+        "auditLoading": "Loading the audit trail",
+        "auditFailed": "Couldn't load the audit trail",
+        "auditEmpty": "No entries yet",
+        "previous": "Earlier rejection: {{reason}}"
+      },
+      "activity": {
+        "title": "Activity",
+        "meta": "Every action, newest first",
+        "count_one": "{{count}} action",
+        "count_other": "{{count}} actions",
+        "show": "Show activity",
+        "hide": "Hide activity",
+        "empty": "No activity yet",
+        "system": "System"
+      },
+      "audit": {
+        "fileClaim": "Filed claim killmail {{id}} for {{isk}} ISK",
+        "fileClaimNone": "Filed claim killmail {{id}}, no amount worked out",
+        "refileClaim": "Re-filed claim killmail {{id}}",
+        "approveClaim": "Approved killmail {{id}} for {{isk}} ISK",
+        "approveClaimOverride": "Approved killmail {{id}} for {{isk}} ISK (changed from {{from}}): {{reason}}",
+        "rejectClaim": "Rejected killmail {{id}}: {{reason}}",
+        "changeClaimAmount": "Changed amount of killmail {{id}} from {{from}} to {{isk}} ISK: {{reason}}",
+        "markClaimPaid": "Marked killmail {{id}} paid, {{isk}} ISK",
+        "turnOn": "Turned SRP on",
+        "turnOff": "Turned SRP off",
+        "saveSettings": "Saved SRP settings",
+        "reclaim": "Reclaimed SRP",
+        "retentionDelete_one": "Retention sweep removed {{count}} closed claim",
+        "retentionDelete_other": "Retention sweep removed {{count}} closed claims",
+        "other": "Other activity"
+      },
+      "history": {
+        "loadOlder": "Load older",
+        "loadFailed": "Couldn't load history"
+      },
+      "results": {
+        "approved": "Approved {{pilot}}, {{isk}} ISK",
+        "rejected": "Rejected {{pilot}}'s claim",
+        "changed": "Amount for {{pilot}} is now {{isk}} ISK",
+        "paid": "Marked {{pilot}} paid, {{isk}} ISK",
+        "approvedMany": "Approved {{ok}} of {{total}}",
+        "paidMany": "Marked {{ok}} of {{total}} paid",
+        "someFailed": "{{count}} not changed: {{reasons}}",
+        "copyFailed": "Couldn't copy the amount"
+      },
+      "mail": {
+        "approvedSubject_one": "SRP approved: {{hull}}",
+        "approvedSubject_other": "SRP approved: {{count}} claims",
+        "rejectedSubject_one": "SRP rejected: {{hull}}",
+        "rejectedSubject_other": "SRP rejected: {{count}} claims",
+        "greeting": "Hi {{pilot}},",
+        "approvedIntro_one": "Your SRP claim was approved.",
+        "approvedIntro_other": "Your SRP claims were approved.",
+        "rejectedIntro_one": "Your SRP claim was rejected.",
+        "rejectedIntro_other": "Your SRP claims were rejected.",
+        "approvedLine": "{{hull}} (killmail {{id}}): {{isk}} ISK",
+        "rejectedLine": "{{hull}} (killmail {{id}}). Reason: {{reason}}",
+        "approvedOutro": "It will be paid in game by an officer of {{corp}}. You will get a separate payment.",
+        "rejectedOutro_one": "You can re-file it once from the SRP page.",
+        "rejectedOutro_other": "You can re-file each once from the SRP page.",
+        "sentTo_one": "Mail sent to {{count}} pilot.",
+        "sentTo_other": "Mail sent to {{count}} pilots.",
+        "failedFor": "Mail failed for {{names}}, status still saved.",
+        "noScope": "No mail sent: mail permission missing.",
+        "corpFallback": "your corporation",
+        "hullFallback": "your ship",
+        "grantTitle": "Can't mail the pilot",
+        "grantHint": "SRP result mails go out from your Character. Grant the mail permission to send them.",
+        "grantAction": "Grant mail permission"
+      },
+      "failed": {
+        "generic": "Couldn't save that. Try again.",
+        "claim-not-found": "That claim is gone.",
+        "illegal-transition": "Another officer already decided that claim.",
+        "reason-required": "A reason is required.",
+        "amount-required": "Type an amount first.",
+        "amount-unchanged": "That is already the amount.",
+        "amount-changed": "The amount changed. Review it and try again.",
+        "own-claim": "You cannot decide your own claim. Another officer must.",
+        "not-an-officer": "Your roles no longer allow SRP.",
+        "wrong-corp": "That claim belongs to another corporation.",
+        "role-required": "Your roles no longer allow that."
+      }
+    },
+    "settings": {
+      "deniedTitle": "SRP is not open to your roles",
+      "deniedHint": "EVE did not confirm an SRP officer role for this character. Roles can only be changed in game.",
+      "loadFailed": "Couldn't load SRP settings",
+      "directorOnlyTitle": "SRP settings are for Directors",
+      "directorOnlyHint": "Only a Director or the CEO can turn SRP on or change its settings.",
+      "programTitle": "Ship replacement program",
+      "directorsOnly": "Directors only. Changes apply to every officer and pilot in the corp.",
+      "onLabel": "SRP",
+      "onValue": "SRP is on",
+      "onNote": "Off hides the pilot page and stops new claims. Claims and rules are kept.",
+      "linkLabel": "Link for corp chat",
+      "linkNote": "Post it so pilots find the page.",
+      "copyLink": "Copy link",
+      "copied": "Copied",
+      "copyFailed": "Copy failed",
+      "reclaimLabel": "Ownership",
+      "reclaimNote": "Another Director owns SRP. As CEO you can take it back; every other officer then verifies again.",
+      "reclaimAction": "Reclaim SRP",
+      "reclaimTitle": "Reclaim SRP?",
+      "reclaimBody": "You become the owner and SRP turns on. Every other officer has to verify again before they can open it.",
+      "reclaimFailed": "Couldn't reclaim SRP. Try again.",
+      "amountTitle": "How the amount is worked out",
+      "chain": {
+        "hull": "The hull's fixed price, if its Hull Rule has one.",
+        "killmail": "Killmail value × Killmail percent.",
+        "appraisal": "Jita Appraisal of the killmail's items × Jita Appraisal percent.",
+        "officer": "Otherwise the officer types it."
+      },
+      "killmailPct": "Killmail percent",
+      "killmailPctNote": "Leave blank to skip this step.",
+      "appraisalPct": "Jita Appraisal percent",
+      "appraisalPctNote": "Used when the killmail has no value. Leave blank to skip.",
+      "percentOff": "Off",
+      "percentInvalid": "Enter a percent from 1 to 100, or leave blank.",
+      "claimsTitle": "Claims",
+      "windowLabel": "Claim window",
+      "windowNote": "Days after the loss that a pilot can still file.",
+      "windowUnit": "days",
+      "windowInvalid": "Enter 1 to 365 days.",
+      "fleetLabel": "Fleet or FC",
+      "fleetNote": "Pilots must name the fleet or FC when they file.",
+      "fleetValue": "Required on every claim",
+      "unsaved": "Unsaved changes",
+      "problems_one": "{{count}} problem to fix before saving",
+      "problems_other": "{{count}} problems to fix before saving",
+      "discard": "Discard",
+      "save": "Save",
+      "saveFailed": "Couldn't save. Check your connection and try again.",
+      "firstTime": {
+        "title": "SRP is not turned on",
+        "hint": "SRP repays pilots for lost ships. Pilots file a claim from a killmail, officers approve and pay it. Turn it on to set percents and rules.",
+        "action": "Turn on SRP",
+        "failed": "Couldn't turn SRP on. Try again.",
+        "note": "Only a Director can turn SRP on. The CEO can reclaim it."
+      },
+      "hullRules": {
+        "title": "Hull Rules",
+        "meta": "A hull beats its class. A hull with no rule follows the percents above.",
+        "tableLabel": "Hull Rules",
+        "hullOrClass": "Hull or class",
+        "rule": "Rule",
+        "amount": "Amount",
+        "ruleFor": "Rule for {{name}}",
+        "fixedFor": "Fixed price for {{name}}",
+        "fixedRequired": "Enter an ISK amount, or pick another rule.",
+        "hullCount_one": "{{count}} hull rule",
+        "hullCount_other": "{{count}} hull rules",
+        "ruleCount_one": "{{count}} rule",
+        "ruleCount_other": "{{count}} rules",
+        "classFallback": "Class {{id}}",
+        "searchLabel": "Add a hull or class",
+        "searchPlaceholder": "Add a hull or class by name…",
+        "resultsLabel": "Matching hulls and classes",
+        "noResults": "No hull or class matches.",
+        "classTag": "Class",
+        "empty": "No hull rules yet. Every hull follows the percents above.",
+        "add": "Add",
+        "addNamed": "Add {{name}}",
+        "listed": "Already listed",
+        "kinds": {
+          "none": "No rule",
+          "noneHull": "No rule (follows class)",
+          "pay-fixed": "Pay: fixed ISK",
+          "pay-percent": "Pay: corp percent",
+          "not-covered": "Not covered",
+          "officer-decides": "Officer decides"
+        },
+        "percentKillmail": "{{pct}}% of killmail value",
+        "percentAppraisal": "{{pct}}% of Jita Appraisal",
+        "percentNeeded": "Set a percent above first",
+        "followsPercent": "Follows percent: {{note}}",
+        "followsClass": "Follows {{name}}",
+        "officerTypes": "Officer types it",
+        "notCoveredNote": "Pilots cannot file it"
+      }
     }
   }
 }

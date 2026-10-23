@@ -18,6 +18,7 @@ const ALL_CORP_VIEWS = {
   canReadAssets: true,
   canReadMiningLedger: true,
   canReadRoleAudit: true,
+  canManageSrp: true,
 };
 const NO_CORP_VIEWS = {
   canReadMembers: false,
@@ -25,6 +26,7 @@ const NO_CORP_VIEWS = {
   canReadAssets: false,
   canReadMiningLedger: false,
   canReadRoleAudit: false,
+  canManageSrp: false,
 };
 
 const MOONS_TAB_PATHS = [
@@ -61,7 +63,14 @@ describe('railGroups', () => {
       { labelKey: null, paths: ['/overview'] },
       {
         labelKey: 'nav.groups.corp',
-        paths: ['/corp', '/corp/members', '/corp/wallet', '/corp/assets', '/corp/moons'],
+        paths: [
+          '/corp',
+          '/corp/members',
+          '/corp/wallet',
+          '/corp/assets',
+          '/corp/moons',
+          '/corp/srp',
+        ],
       },
       {
         labelKey: 'nav.groups.progression',
@@ -112,6 +121,7 @@ describe('NAV_LOCK_PATHS', () => {
         // Each page's sub-views, which the rail lists under the open page.
         '/clones',
         '/employment-history',
+        '/srp',
         '/skills/plans',
         '/skills/trained',
         '/skills/certificates',
@@ -143,6 +153,7 @@ describe('listNavDestinations', () => {
     locked: NO_LOCKS,
     corpVisible: true,
     corpCapabilities: ALL_CORP_VIEWS,
+    srpVisible: true,
     t,
   });
   const byPath = (path: string) => all.find((entry) => entry.path === path);
@@ -244,6 +255,62 @@ describe('listNavDestinations', () => {
     });
     expect(hidden.some((entry) => entry.path.startsWith('/corp'))).toBe(false);
     expect(byPath('/corp')).toMatchObject({ locked: false });
+  });
+
+  it('lists officer SRP for a canManageSrp officer with Corp Access, once, hidden rather than locked', () => {
+    const list = (corpVisible: boolean, srpVisible: boolean, canManageSrp: boolean) =>
+      listNavDestinations({
+        locked: NO_LOCKS,
+        corpVisible,
+        corpCapabilities: { ...NO_CORP_VIEWS, canManageSrp },
+        srpVisible,
+        t,
+      }).map((entry) => entry.path);
+    // An officer, even where SRP is still off.
+    expect(list(true, false, true)).toContain('/corp/srp');
+    // A member of an SRP corp is not a door: their SRP is the Overview's sub-view.
+    expect(list(false, true, false)).not.toContain('/corp/srp');
+    expect(list(true, true, false)).not.toContain('/corp/srp');
+    // canManageSrp without Corp Access ready is not a door.
+    expect(list(false, false, true)).not.toContain('/corp/srp');
+    expect(list(true, true, true).filter((path) => path === '/corp/srp')).toHaveLength(1);
+    expect(byPath('/corp/srp')).toMatchObject({ gating: 'corp', locked: false });
+  });
+
+  it('lists only the officer SRP tabs this pilot can see, never all of them', () => {
+    const tabs = (srpVisible: boolean, canManageSrp: boolean) =>
+      listNavDestinations({
+        locked: NO_LOCKS,
+        corpVisible: true,
+        corpCapabilities: { ...NO_CORP_VIEWS, canManageSrp },
+        srpVisible,
+        t,
+      })
+        .filter((entry) => entry.pagePath === '/corp/srp' && entry.kind === 'tab')
+        .map((entry) => entry.path);
+    expect(tabs(true, true)).toEqual(['/corp/srp/queue', '/corp/srp/settings']);
+    // SRP off: Settings alone, so no tab bar and nothing listed under the page.
+    expect(tabs(false, true)).toEqual([]);
+    expect(tabs(true, false)).toEqual([]);
+  });
+
+  it('lists the SRP sub-view of Overview only while the corporation has SRP on, never locked', () => {
+    const srpEntry = (srpVisible: boolean | undefined, locked: ReadonlySet<string> = NO_LOCKS) =>
+      listNavDestinations({
+        locked,
+        corpVisible: false,
+        corpCapabilities: NO_CORP_VIEWS,
+        srpVisible,
+        t,
+      }).find((entry) => entry.path === '/srp');
+    expect(srpEntry(true)).toMatchObject({
+      kind: 'tab',
+      pagePath: '/overview',
+      breadcrumb: 'nav.overview › nav.srp',
+      locked: false,
+    });
+    expect(srpEntry(false)).toBeUndefined();
+    expect(srpEntry(undefined)).toBeUndefined();
   });
 
   it("lists Overview's sub-views with their own route's lock", () => {

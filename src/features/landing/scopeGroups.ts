@@ -60,6 +60,7 @@ export const LANDING_SCOPE_GROUPS: readonly { id: string; rows: readonly ScopeRo
       { kind: 'group', group: 'autopilot' },
       { kind: 'group', group: 'openWindow' },
       { kind: 'group', group: 'jumpFatigue' },
+      { kind: 'group', group: 'killmails' },
     ],
   },
   {

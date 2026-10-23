@@ -1,6 +1,6 @@
 # Overview (triage board)
 
-Route `/overview` (`src/routes/Overview.tsx`). Landing page for a signed-in Character: `Root` sends active-Character users here (`src/app/App.tsx:230`), first-ever login lands here (`Callback.tsx`). First of three Character-overview tabs (`OverviewSubNav`: Overview / Clones / Employment; see `clones.md`, `employment-history.md`). Page is UNGATED (`src/app/routeScopes.ts:95`); gating is per card because the page mixes skills, queue and wallet scopes.
+Route `/overview` (`src/routes/Overview.tsx`). Landing page for a signed-in Character: `Root` sends active-Character users here (`src/app/App.tsx:230`), first-ever login lands here (`Callback.tsx`). First of the Character-overview tabs (`OverviewSubNav`: Overview / Clones / Employment, plus SRP while the corp has SRP on, `/srp`; see `clones.md`, `employment-history.md`, `corp.md` "SRP"). Page is UNGATED (`src/app/routeScopes.ts:95`); gating is per card because the page mixes skills, queue and wallet scopes.
 
 | Feature                                                                       | Where                                                   |
 | ----------------------------------------------------------------------------- | ------------------------------------------------------- |

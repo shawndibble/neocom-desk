@@ -104,6 +104,11 @@ export interface CorpCapabilities {
    * `x-required-roles`, behind a scope the structure list does not use.
    */
   canReadSkyhooks: boolean;
+  /**
+   * Officer gate for SRP Claims (Director or Accountant), like canEdit in functions/src/corpTaxBook.ts.
+   * Not an ESI read; the callables re-check live. Settings need a Director.
+   */
+  canManageSrp: boolean;
 }
 
 export type CorpCapability = keyof CorpCapabilities;
@@ -131,6 +136,7 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadOrders',
   'canReadDivisions',
   'canReadSkyhooks',
+  'canManageSrp',
 ];
 
 /** The answer for a Character with no roles — and the shape of "not loaded yet". */
@@ -150,6 +156,7 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadOrders: false,
   canReadDivisions: false,
   canReadSkyhooks: false,
+  canManageSrp: false,
 };
 
 /**
@@ -196,6 +203,8 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
   canReadDivisions: [],
   // `x-required-roles` on the skyhook routes and the hub detail is Station_Manager.
   canReadSkyhooks: ['Station_Manager'],
+  // Director (via the Director clause) or Accountant; Junior_Accountant only views the Tax Book.
+  canManageSrp: ['Accountant'],
 };
 
 /** Capabilities every corp member holds: ESI names no role for them, so they say nothing about roles. */

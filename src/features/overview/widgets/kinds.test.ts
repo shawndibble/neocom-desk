@@ -71,7 +71,7 @@ const CORP_IDS = [
   'corpSrp',
 ];
 
-const CORP_SOON = ['corpSrp'];
+const CORP_SOON: string[] = [];
 
 const overviewKinds = () => boardKinds('overview');
 
@@ -120,6 +120,14 @@ describe('widget kind catalogue', () => {
     expect(kindOpenTo(deadlines, null)).toBe(false);
     expect(kindOpenTo(deadlines, { ...NO_CORP_CAPABILITIES, canReadIndustry: true })).toBe(true);
     expect(kindOpenTo(getKind('wallet')!, null)).toBe(true);
+  });
+
+  it('gates the SRP widget on the SRP officer capability alone', () => {
+    const srp = getKind('corpSrp')!;
+    expect(srp.availability).toBe('available');
+    expect(kindOpenTo(srp, NO_CORP_CAPABILITIES)).toBe(false);
+    expect(kindOpenTo(srp, { ...NO_CORP_CAPABILITIES, canManageSrp: true })).toBe(true);
+    expect(kindOpenTo(srp, { ...NO_CORP_CAPABILITIES, canReadContracts: true })).toBe(false);
   });
 
   it('marks the corp kinds with no data source yet as coming soon', () => {
