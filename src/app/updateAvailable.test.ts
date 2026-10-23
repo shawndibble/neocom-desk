@@ -145,6 +145,20 @@ describe('pollForUpdate', () => {
     expect(status()).toBe('available');
   });
 
+  it('swallows a failed worker download when it already knows a build is there', async () => {
+    const registration = fakeRegistration();
+    registration.update.mockRejectedValue(new Error('network'));
+    fetchLatestRelease.mockResolvedValue('neocom-desk@9+newer');
+    await expect(pollForUpdate(registration as never)).resolves.toBeUndefined();
+    expect(status()).toBe('available');
+  });
+
+  it('lets the caller see a failed worker check when the release cannot be read', async () => {
+    const registration = fakeRegistration();
+    registration.update.mockRejectedValue(new Error('offline'));
+    await expect(pollForUpdate(registration as never)).rejects.toThrow('offline');
+  });
+
   it('asks the worker when the published release cannot be read', async () => {
     const registration = fakeRegistration();
     await pollForUpdate(registration as never);
