@@ -159,6 +159,8 @@ export function RemapPreviewModal({
 }
 
 interface OptimizeForMeModalProps {
+  /** Which flow produced the preview: Optimize for me (order + remaps), or a reorder-only sort (order only, markers untouched). */
+  kind?: 'optimize' | 'attributes' | 'shortest';
   /** Null while closed. */
   preview: OptimizeForMeResult | null;
   /** The plan as it stands, in training order: the "Current" side. */
@@ -288,6 +290,7 @@ function ProposedRow({
  * so the pilot sees what moved and where the remap markers land.
  */
 export function OptimizeForMeModal({
+  kind = 'optimize',
   preview,
   currentOrder,
   totalSeconds,
@@ -306,12 +309,23 @@ export function OptimizeForMeModal({
   const saved = preview ? totalSeconds - preview.remaps.totalSeconds : 0;
   const moved = rows ? rows.current.filter((r) => r.movesTo !== null).length : 0;
   const markers = rows ? rows.proposed.filter((r) => r.kind === 'remap').length : 0;
-  const gain = optimizeForMeHasGain({ savedSeconds: saved, markers, prioritized });
+  const reorderOnly = kind !== 'optimize';
+  // A reorder-only sort is worth accepting whenever the order changes, even at the same total.
+  const gain =
+    (reorderOnly && moved > 0) ||
+    optimizeForMeHasGain({ savedSeconds: saved, markers, prioritized });
+  const title = t(
+    kind === 'shortest'
+      ? 'plans.sortShortestPreviewTitle'
+      : kind === 'attributes'
+        ? 'plans.reorderPreviewTitle'
+        : 'plans.optimizeForMeTitle'
+  );
   return (
     <Modal
       open={preview !== null}
       onClose={onReject}
-      title={t('plans.optimizeForMeTitle')}
+      title={title}
       placement={gain ? 'wide' : 'center'}
       footer={
         preview &&
@@ -328,7 +342,7 @@ export function OptimizeForMeModal({
               <span className="text-text-dim">
                 {saved > 0 && ` · ${t('plans.compareSaves', { duration: formatCountdown(saved) })}`}
                 {` · ${t('plans.compareMoved', { count: moved })}`}
-                {` · ${t('plans.compareMarkers', { count: markers })}`}
+                {!reorderOnly && ` · ${t('plans.compareMarkers', { count: markers })}`}
               </span>
             </p>
             <div className="flex gap-2">
@@ -344,7 +358,9 @@ export function OptimizeForMeModal({
       }
     >
       {rows && !gain && (
-        <p className="text-xs text-text-dim">{t('plans.optimizeForMeNoGain', { total: before })}</p>
+        <p className="text-xs text-text-dim">
+          {t(reorderOnly ? 'plans.reorderNoGain' : 'plans.optimizeForMeNoGain', { total: before })}
+        </p>
       )}
       {rows && gain && (
         <div className="space-y-2">
