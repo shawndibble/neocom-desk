@@ -22,6 +22,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsPhone } from '@/lib/useIsPhone';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { SettingsHint } from '@/features/settings/settingsFields';
 import { NewComponent } from './NewComponent';
@@ -483,11 +484,13 @@ export function SrpSettingsPage({
               inline
               note="Off hides the pilot page and the Corp Board widget's data."
             >
-              <Checkbox
-                id={`${uid}-on`}
-                checked={s.enabled}
-                onChange={(e) => patch({ enabled: e.target.checked })}
-              />
+              <label className={touchCheckboxLabelClassName}>
+                <Checkbox
+                  id={`${uid}-on`}
+                  checked={s.enabled}
+                  onChange={(e) => patch({ enabled: e.target.checked })}
+                />
+              </label>
               <span className="text-sm">SRP is on</span>
             </Field>
             <Field
@@ -583,11 +586,13 @@ export function SrpSettingsPage({
             inline
             note="Pilots must name the fleet or FC when they file."
           >
-            <Checkbox
-              id={`${uid}-fc`}
-              checked={s.fleetRequired}
-              onChange={(e) => patch({ fleetRequired: e.target.checked })}
-            />
+            <label className={touchCheckboxLabelClassName}>
+              <Checkbox
+                id={`${uid}-fc`}
+                checked={s.fleetRequired}
+                onChange={(e) => patch({ fleetRequired: e.target.checked })}
+              />
+            </label>
             <span className="text-sm">Required on every claim</span>
           </Field>
         </Fields>

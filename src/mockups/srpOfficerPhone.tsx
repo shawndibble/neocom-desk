@@ -14,6 +14,7 @@ import {
 } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import { focusRingClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { NewComponent } from './NewComponent';
 import { compactIsk, isk } from './srpOfficerParts';
@@ -251,7 +252,10 @@ export function PhoneResultToast({ title, detail }: { title: string; detail: str
           <p>{title}</p>
           <p className="text-xs text-text-dim">{detail}</p>
         </div>
-        <button type="button" className="text-accent text-sm font-semibold underline">
+        <button
+          type="button"
+          className={cx('text-accent text-sm font-semibold underline', focusRingClassName)}
+        >
           Undo
         </button>
       </div>
