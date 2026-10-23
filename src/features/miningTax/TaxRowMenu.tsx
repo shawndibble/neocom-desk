@@ -61,7 +61,9 @@ export function TaxRowMenu({ dr, systemName, onAction, children }: TaxRowMenuPro
         >
           {action.id === 'takeOut'
             ? t('miningTax.combined.takeOut', { date: action.member.row.entry.date })
-            : t(LABEL_KEY[action.id])}
+            : action.id === 'unassign' && dr.groupMembers
+              ? t('miningTax.combined.unassignAll')
+              : t(LABEL_KEY[action.id])}
         </MenuItem>
       ))}
     </Fragment>

@@ -32,7 +32,9 @@ export type RowMenuAction =
 /** Corp Tax Book rows are decided by the book: view them, and pay while owed. */
 function corpRowActions(dr: DisplayRow): RowMenuAction[][] {
   const state = dr.corp?.kind === 'row' ? dr.corp.view.state : null;
-  const owing = state === 'billed' || state === 'sent-waiting';
+  const owing =
+    (state === 'billed' || state === 'sent-waiting') &&
+    (dr.corp?.kind === 'row' ? (dr.corp.view.taxOwed ?? 0) > 0 : false);
   return owing ? [[{ id: 'view' }, { id: 'corpPay' }]] : [[{ id: 'view' }]];
 }
 

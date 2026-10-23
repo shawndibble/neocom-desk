@@ -214,7 +214,10 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
     errorTargets.linkTransactionTarget !== linkTransactionTarget
   ) {
     setErrorTargets({ detailTarget, linkTransactionTarget });
-    if (detailTarget !== failedMenuRow) setActionError(null);
+    if (detailTarget !== failedMenuRow) {
+      setActionError(null);
+      setFailedMenuRow(null);
+    }
   }
 
   // Settle up's rows, re-read from every load by Assignment id: a recheck
@@ -333,7 +336,9 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
       if (!menuRow) actions.openDetail(null);
       refresh();
     });
-    if (menuRow && !result.ok && result.reason !== 'already-assigned') {
+    if (menuRow && !result.ok) {
+      // Stale view (already assigned): the reload already ran, so a note is all there is to say.
+      if (result.reason === 'already-assigned') return onToast(t('miningTax.saveFailed'));
       setFailedMenuRow(menuRow);
       actions.openDetail(menuRow);
     }
@@ -504,8 +509,10 @@ export const TaxDialogsHost = memo(function TaxDialogsHost(props: TaxDialogsHost
       t,
       useMiningTaxCompressedOre.getState().value
     );
-    void writeToClipboard(text);
-    onToast(t('miningTax.detail.breakdown.copied'));
+    writeToClipboard(text).then(
+      () => onToast(t('miningTax.detail.breakdown.copied')),
+      () => onToast(t('miningTax.detail.breakdown.copyFailed'))
+    );
   }
 
   /** The row menu's actions: View details opens the modal, the rest do what its buttons do. */

@@ -7100,6 +7100,7 @@
         "edited": "Edited by hand",
         "copy": "Copy pricing as text",
         "copied": "Copied",
+        "copyFailed": "Couldn't copy to the clipboard.",
         "caveat": "Hub, ore form and unit prices are your current settings, re-read for the day mined. The bill itself is frozen.",
         "drift": "Unit prices are re-read for the day mined and now differ from the figures this bill was frozen at ({{value}} ISK). Hub and ore form are your current settings.",
         "driftText": "Note: unit prices were re-read when copied and may not multiply out to the frozen total above.",

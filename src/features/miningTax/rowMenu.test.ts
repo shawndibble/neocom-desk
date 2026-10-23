@@ -125,9 +125,15 @@ describe('rowMenuActions', () => {
     const corp = {
       kind: 'row',
       corpName: 'Corp',
-      view: { state: 'billed', corporationId: 1 },
+      view: { state: 'billed', corporationId: 1, taxOwed: 100 },
     } as unknown as DisplayRow['corp'];
     expect(ids(rowMenuActions(dr({ corp })))).toEqual(['view', 'corpPay']);
+    const zero = {
+      kind: 'row',
+      corpName: 'Corp',
+      view: { state: 'billed', corporationId: 1, taxOwed: 0 },
+    } as unknown as DisplayRow['corp'];
+    expect(ids(rowMenuActions(dr({ corp: zero })))).toEqual(['view']);
     const settled = {
       kind: 'row',
       corpName: 'Corp',
