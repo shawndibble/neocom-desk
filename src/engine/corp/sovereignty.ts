@@ -50,3 +50,16 @@ export function hubReagentHoursLeft(
   const elapsedHours = Math.max(0, (nowMs - bay.updatedMs) / 3_600_000);
   return Math.max(0, Math.floor(bay.amount / bay.burningPerHour - elapsedHours));
 }
+
+/**
+ * When a hub's reagent bay empties: `last_updated` plus the amount at the burn
+ * rate. Epoch ms; may be in the past. Null when nothing burns.
+ */
+export function hubReagentsRunOutMs(bay: {
+  amount: number;
+  burningPerHour: number;
+  updatedMs: number;
+}): number | null {
+  if (bay.burningPerHour <= 0) return null;
+  return bay.updatedMs + (bay.amount / bay.burningPerHour) * 3_600_000;
+}

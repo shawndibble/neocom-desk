@@ -5,6 +5,7 @@ import {
   severityForRemaining,
   type BoardExtractionSource,
   type BoardJobSource,
+  type BoardHubFuelSource,
   type BoardSovereigntySource,
   type BoardStarbaseSource,
   type BoardStructureSource,
@@ -608,5 +609,27 @@ describe('sovereignty raid windows', () => {
   it('names a hub window as a hub', () => {
     const [item] = sovBoard([raid({ id: 'hub:9', kind: 'hub' })]);
     expect(item!.detail).toBe('hub.upcoming');
+  });
+});
+
+describe('sov hub reagents', () => {
+  const hubBoard = (hubFuel: BoardHubFuelSource[]) =>
+    board({ nowMs: NOW, staleWindowMs: STALE_WINDOW, hubFuel });
+
+  it('is a fuel clock that runs out when the bay empties', () => {
+    const [item] = hubBoard([{ id: 'hub:9', name: 'Efa', runsOutMs: at(26 * HOUR) }]);
+    expect(item).toMatchObject({
+      id: 'fuel:hub:9',
+      kind: 'structureFuel',
+      subject: 'Efa',
+      detail: 'hubReagents',
+      deadlineMs: at(26 * HOUR),
+      timing: 'timed',
+    });
+  });
+
+  it('stays on the board once the bay is empty, overdue', () => {
+    const [item] = hubBoard([{ id: 'hub:9', name: 'Efa', runsOutMs: at(-HOUR) }]);
+    expect(item!.severity).toBe('critical');
   });
 });

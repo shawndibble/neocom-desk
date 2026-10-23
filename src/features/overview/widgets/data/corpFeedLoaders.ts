@@ -498,23 +498,22 @@ export async function loadCorpKills(characterId: number): Promise<CorpKillsFeed>
   };
 }
 
-function finiteOrNull(value: number): number | null {
-  return Number.isFinite(value) ? value : null;
-}
-
-/** Planet -> system for each skyhook; a planet that cannot be read is left out, not guessed. */
-async function planetSystems(planetIds: readonly number[]): Promise<Map<number, number>> {
-  const systems = new Map<number, number>();
+/** Planet -> system and name for each skyhook; a planet that cannot be read is left out, not guessed. */
+async function planetInfo(
+  planetIds: readonly number[]
+): Promise<Map<number, { systemId: number; name: string | null }>> {
+  const planets = new Map<number, { systemId: number; name: string | null }>();
   await mapWithConcurrencyLimit(planetIds, ESI_FANOUT_CONCURRENCY, async (planetId) => {
     try {
-      const systemId = (await loadStaticEntity('planet-info', planetId, getUniversePlanet))?.data
-        .system_id;
-      if (systemId !== undefined) systems.set(planetId, systemId);
+      const planet = (await loadStaticEntity('planet-info', planetId, getUniversePlanet))?.data;
+      if (planet !== undefined) {
+        planets.set(planetId, { systemId: planet.system_id, name: planet.name });
+      }
     } catch {
       // The row keeps its raid window and loses only its system.
     }
   });
-  return systems;
+  return planets;
 }
 
 /** Development of every claimed system; empty when the public read fails. */
@@ -574,6 +573,8 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
     ...UNREADABLE,
     rows: [],
     systemNames: new Map(),
+    typeNames: new Map(),
+    prices: new Map(),
     development: new Map(),
     jumps: new Map(),
   };
@@ -601,7 +602,7 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
       corporationId,
       hubList.map((h) => h.id)
     ),
-    planetSystems([...new Set(skyhookList.map((s) => s.planet_id))]),
+    planetInfo([...new Set(skyhookList.map((s) => s.planet_id))]),
     sovereigntyDevelopment(),
   ]);
 
@@ -616,19 +617,27 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
     ...skyhookList.map((skyhook): CorpSovereigntyRow => {
       const detail = skyhookDetails.get(skyhook.id)?.cached?.data;
       const window = detail?.theft_vulnerability;
+      const planet = planets.get(skyhook.planet_id);
+      // A non-number is unknown, never "0 at risk".
+      const reagents = detail?.reagents?.map((r) => ({
+        typeId: r.type_id,
+        secured: r.secured_stock,
+        unsecured: r.unsecured_stock,
+      }));
       return {
         key: `skyhook:${skyhook.id}`,
         kind: 'skyhook',
         structureId: skyhook.id,
-        systemId: planets.get(skyhook.planet_id) ?? null,
+        systemId: planet?.systemId ?? null,
+        planetName: planet?.name ?? null,
         windowStartMs: parseInstant(window?.start),
         windowEndMs: parseInstant(window?.end),
-        stock:
-          detail?.reagents === undefined
+        reagents:
+          reagents === undefined ||
+          reagents.some((r) => !Number.isFinite(r.secured) || !Number.isFinite(r.unsecured))
             ? null
-            : finiteOrNull(
-                detail.reagents.reduce((sum, r) => sum + r.secured_stock + r.unsecured_stock, 0)
-              ),
+            : reagents,
+        state: detail?.state ?? null,
         hubBay: null,
       };
     }),
@@ -644,9 +653,11 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
         kind: 'hub',
         structureId: hub.id,
         systemId: hub.solar_system_id,
+        planetName: null,
         windowStartMs: parseInstant(window?.start),
         windowEndMs: parseInstant(window?.end),
-        stock: null,
+        reagents: null,
+        state: null,
         // An unreadable timestamp or a non-number is unknown, never "0 hours left".
         hubBay:
           detail === undefined ||
@@ -662,9 +673,18 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
   const systemIds = [
     ...new Set(rows.flatMap((row) => (row.systemId === null ? [] : [row.systemId]))),
   ];
-  const [systems, jumps] = await Promise.all([
+  const reagentTypeIds = [
+    ...new Set(rows.flatMap((row) => row.reagents ?? []).map((r) => r.typeId)),
+  ];
+  const [systems, jumps, typeNames, prices] = await Promise.all([
     import('@/sde/solarSystems').then((m) => m.loadSolarSystemsById()).catch(() => null),
     jumpsFromCurrent(characterId, systemIds),
+    reagentTypeIds.length === 0
+      ? new Map<number, string>()
+      : loadTypeNames(reagentTypeIds).catch(() => new Map<number, string>()),
+    reagentTypeIds.length === 0
+      ? new Map<number, number>()
+      : getAveragePriceByType().catch(() => new Map<number, number>()),
   ]);
   const systemNames = new Map<number, string>();
   for (const systemId of systemIds) {
@@ -677,6 +697,8 @@ export async function loadCorpSovereignty(characterId: number): Promise<CorpSove
     ...readAge([skyhooks, hubs, ...skyhookDetails.values(), ...hubDetails.values()]),
     rows,
     systemNames,
+    typeNames,
+    prices,
     development,
     jumps,
   };

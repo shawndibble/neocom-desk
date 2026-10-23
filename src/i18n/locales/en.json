@@ -4986,35 +4986,57 @@
         "summary_one": "{{count}} structure service is offline.",
         "summary_other": "{{count}} structure services are offline across {{structures}} structures."
       },
+      "rowDetail": {
+        "jumps_one": "{{count}} jump away",
+        "jumps_other": "{{count}} jumps away",
+        "route": "Route safety",
+        "routeLabel": "Open route safety to {{place}}"
+      },
       "corpSovereignty": {
         "title": "Sovereignty",
-        "description": "Skyhook and sov hub raid windows",
-        "empty": "The corporation has no skyhooks or sov hubs.",
+        "description": "Skyhook theft windows and what each puts at risk",
+        "empty": "The corporation has no skyhooks.",
         "unit_one": "skyhook raidable",
         "unit_other": "skyhooks raidable",
-        "opensIn": "next in {{duration}}",
-        "openNow": "one is open now",
+        "nextOpensIn": "{{subject}} opens in {{duration}}",
+        "nextOpenNow": "{{subject}} is open now",
+        "atRisk": "{{isk}} ISK unsecured",
         "windowIn": "in {{duration}}",
         "windowOpen": "Open, {{duration}} left",
         "windowClosed": "Closed",
         "windowOvertime": "Overtime",
-        "hubHours_one": "{{count}} hour left",
-        "hubHours_other": "{{count}} hours left",
+        "units_one": "{{count}} unit",
+        "units_other": "{{count}} units",
+        "nothingAtRisk": "Nothing",
         "deadline": "Raid window opens at {{subject}}",
-        "kind": {
-          "skyhook": "Skyhook",
-          "hub": "Sov hub"
-        },
+        "hubDeadline": "Sov hub reagents run out at {{subject}}",
         "col": {
-          "system": "System",
-          "kind": "Structure",
-          "window": "Next raid window",
-          "reagents": "Reagents",
-          "adm": "ADM (Mil / Ind / Strat)",
-          "jumps": "Jumps"
+          "skyhook": "Skyhook",
+          "window": "Window opens",
+          "unsecured": "Unsecured"
         },
-        "summary_one": "{{count}} skyhook is raidable, across {{total}} structures.",
-        "summary_other": "{{count}} skyhooks are raidable, across {{total}} structures."
+        "fact": {
+          "window": "Theft window",
+          "windowValue": "{{state}} · closes in {{closes}}",
+          "state": "State",
+          "unsecured": "Unsecured",
+          "secured": "Secured",
+          "development": "Development (Mil / Ind / Strat)"
+        },
+        "state": {
+          "Unspecified": "Unknown",
+          "ShieldVulnerable": "Shield vulnerable",
+          "ArmorReinforced": "Armor reinforced",
+          "ArmorVulnerable": "Armor vulnerable",
+          "HullReinforced": "Hull reinforced",
+          "HullVulnerable": "Hull vulnerable"
+        },
+        "chartNote": "Theft windows, next 48 hours",
+        "chartNow": "Now",
+        "chartTo": "+{{duration}}",
+        "chartSummary": "{{note}}: {{windows}}",
+        "summary_one": "{{count}} of {{total}} skyhooks is raidable.",
+        "summary_other": "{{count}} of {{total}} skyhooks are raidable."
       },
       "corpStarbases": {
         "title": "Starbases",
@@ -12528,6 +12550,7 @@
         "moonDecay": "Moon chunk breaks up on its own",
         "jobReady": "Job finished, waiting on delivery",
         "serviceOffline": "{{service}} is offline",
+        "hubReagents": "Sov hub reagents run out",
         "sovRaid": {
           "skyhook": {
             "upcoming": "Skyhook raid window opens",

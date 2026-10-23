@@ -170,6 +170,13 @@ export interface CorpKillsFeed extends CorpFeedBase {
   failed: ZkillFailureReason | null;
 }
 
+/** One reagent in a skyhook's silo at its last cycle. Only `unsecured` can be stolen. */
+export interface SkyhookReagent {
+  typeId: number;
+  secured: number;
+  unsecured: number;
+}
+
 /** One skyhook or sov hub, reduced to what the Sovereignty builder reads. */
 export interface CorpSovereigntyRow {
   /** `skyhook:5` or `hub:9`: unique across both. */
@@ -178,14 +185,18 @@ export interface CorpSovereigntyRow {
   structureId: number;
   /** Null when the system could not be resolved (a skyhook lists only its planet). */
   systemId: number | null;
+  /** A skyhook's planet ("X-7OMU IV"); null for a hub or when unresolved. */
+  planetName: string | null;
   /** The raid window; null when ESI sent none or its detail was not read. */
   windowStartMs: number | null;
   windowEndMs: number | null;
   /**
-   * A skyhook's reagent stock (secured plus unsecured) at its last cycle. ESI
-   * sends no silo capacity, so there is no percent; null when unread.
+   * A skyhook's silo by reagent at its last cycle. ESI sends no silo capacity,
+   * so there is no percent; null when unread (and for a hub).
    */
-  stock: number | null;
+  reagents: SkyhookReagent[] | null;
+  /** A skyhook's structure state as ESI sends it (`ShieldVulnerable`…); null when unread. */
+  state: string | null;
   /** A hub's reagent bay, run down to now by the builder; null when unread or empty-handed. */
   hubBay: { amount: number; burningPerHour: number; updatedMs: number } | null;
 }
@@ -193,6 +204,10 @@ export interface CorpSovereigntyRow {
 export interface CorpSovereigntyFeed extends CorpFeedBase {
   rows: CorpSovereigntyRow[];
   systemNames: ReadonlyMap<number, string>;
+  /** Reagent names by type id. */
+  typeNames: ReadonlyMap<number, string>;
+  /** Average price by type id; empty when the price read failed (units only, never 0 ISK). */
+  prices: ReadonlyMap<number, number>;
   /** Development levels (0-5) by system; absent for a system with no alliance claim. */
   development: ReadonlyMap<number, { military: number; industrial: number; strategic: number }>;
   /** Stargate jumps from the Current System; absent when it or the route is unknown. */

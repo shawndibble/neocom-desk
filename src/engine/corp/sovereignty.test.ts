@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hubReagentHoursLeft, raidHeadline, raidState } from './sovereignty';
+import { hubReagentHoursLeft, hubReagentsRunOutMs, raidHeadline, raidState } from './sovereignty';
 
 const HOUR = 3_600_000;
 const NOW = 1_000 * HOUR;
@@ -60,5 +60,16 @@ describe('hubReagentHoursLeft', () => {
   });
   it('is unknown when nothing burns', () => {
     expect(hubReagentHoursLeft({ amount: 10, burningPerHour: 0, updatedMs: NOW }, NOW)).toBeNull();
+  });
+});
+
+describe('hubReagentsRunOutMs', () => {
+  it('is when the bay empties at its burn rate, from its last update', () => {
+    expect(hubReagentsRunOutMs({ amount: 100, burningPerHour: 10, updatedMs: at(-2 * HOUR) })).toBe(
+      at(8 * HOUR)
+    );
+  });
+  it('is unknown when nothing burns', () => {
+    expect(hubReagentsRunOutMs({ amount: 10, burningPerHour: 0, updatedMs: NOW })).toBeNull();
   });
 });

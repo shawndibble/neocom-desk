@@ -23,7 +23,7 @@ import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from '.
 import { fractionBar } from './cellKit';
 import { hbarsFromRows } from './chartBuilders';
 import type { CorpJobsFeed } from './corpFeeds';
-import { toBoardSovereignty } from './corpSovereigntyModels';
+import { toBoardHubFuel, toBoardSovereignty } from './corpSovereigntyModels';
 import { toBoardStarbases } from './corpStarbaseModels';
 import { elapsedShare } from './industryModels';
 import { shortStructureName } from './structureModels';
@@ -38,6 +38,7 @@ function subjectOf(item: CorpBoardItem): string {
 function whatOf(item: CorpBoardItem, t: Translate): string {
   switch (item.kind) {
     case 'structureFuel':
+      if (item.detail === 'hubReagents') return t('corp.board.detail.hubReagents');
       return t(item.timing === 'passed' ? 'corp.board.detail.fuelDry' : 'corp.board.detail.fuel');
     case 'structureTimer':
       return item.detail === 'unanchoring'
@@ -156,6 +157,7 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
     jobs: jobsData ? toBoardJobs(jobsData.jobs, jobsData.typeNames) : undefined,
     starbases: towersData ? toBoardStarbases(towersData, now) : undefined,
     sovereignty: raidsData ? toBoardSovereignty(raidsData) : undefined,
+    hubFuel: raidsData ? toBoardHubFuel(raidsData) : undefined,
   });
   // The board is already soonest-first; an offline service has no clock, so it is no deadline.
   const timed = items.filter((item) => item.timing !== 'untimed');

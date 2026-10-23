@@ -330,7 +330,12 @@ const SPECS: Record<string, Spec> = {
   // --- Corp Board only ----------------------------------------------------
   corpDeadlines: {
     corp: 'corpClocks',
-    capabilities: ['canReadStructures', 'canReadMoonExtractions', 'canReadIndustry'],
+    capabilities: [
+      'canReadStructures',
+      'canReadMoonExtractions',
+      'canReadIndustry',
+      'canReadSkyhooks',
+    ],
     views: NCT,
     view: 'chart',
     size: 'L',
@@ -359,7 +364,7 @@ const SPECS: Record<string, Spec> = {
   corpSovereignty: {
     corp: 'corpClocks',
     capabilities: ['canReadSkyhooks'],
-    views: NT,
+    views: NCT,
     view: 'table',
     size: 'M',
     endpoints: [

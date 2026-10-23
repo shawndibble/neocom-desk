@@ -1,36 +1,48 @@
 /**
- * The Sovereignty widget (issue #4775): corp skyhooks and sov hubs with their
- * raid windows, and the adapter that lends those windows to Due soon. Same
- * contract as `models.ts`: pure, derived at render time.
+ * The Sovereignty widget (issue #4775): the corp's skyhooks, one row each, by
+ * when their theft window opens, and the adapters that lend raid windows and
+ * hub reagent run-outs to Due soon. Same contract as `models.ts`: pure,
+ * derived at render time.
  *
- * ESI sends no skyhook silo capacity, so a skyhook shows its reagent stock and
- * no percent; a sov hub's bay is run down to hours left from its burn rate.
- * Raid windows come from an hour-old read, so nothing under the corp cache
- * window is ticked down.
+ * ESI sends no skyhook silo capacity, so a skyhook shows its unsecured stock
+ * (what a raid takes) as ISK, or as units when a reagent has no price; never a
+ * percent and never "0 ISK". Sov hubs are not rows: their reagent bay is a fuel
+ * clock in Due soon. Raid windows come from an hour-old read, so nothing under
+ * the corp cache window is ticked down.
  */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
-import type { BoardSovereigntySource } from '@/engine/corp/board';
+import type { BoardHubFuelSource, BoardSovereigntySource } from '@/engine/corp/board';
 import {
-  hubReagentHoursLeft,
+  hubReagentsRunOutMs,
   raidHeadline,
   raidState,
   type RaidState,
   type RaidWindow,
 } from '@/engine/corp/sovereignty';
-import { routeToHref } from '@/features/route/routeSafetyLink';
 import { formatCountdown } from '@/lib/duration';
+import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { formatNumber } from '@/lib/numberLocale';
 import { CORP_CACHE_WINDOW_MS } from '../../data/corpCards';
+import type { BoardDeadline } from '../nextDeadline';
 import { blank, corpUnreadable, count, statusOf, UNKNOWN, type Builder } from './builderKit';
+import { hbarsFromRows } from './chartBuilders';
 import type { CorpSovereigntyFeed, CorpSovereigntyRow } from './corpFeeds';
-import type { TableRowModel, Translate } from './types';
+import type { ChartModel } from '../charts/types';
+import type { RowDetailModel, TableCell, TableRowModel, Translate } from './types';
 
 const W = 'overview.widgets.corpSovereignty';
 const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
+/** How far ahead the Gantt looks: a theft window comes round every 3 to 4 days. */
+const CHART_AHEAD_MS = 48 * HOUR_MS;
 
 function systemOf(feed: CorpSovereigntyFeed, row: CorpSovereigntyRow): string {
   return (row.systemId === null ? undefined : feed.systemNames.get(row.systemId)) ?? UNKNOWN;
+}
+
+/** A skyhook by its planet ("X-7OMU IV"), else its system. */
+function nameOf(feed: CorpSovereigntyFeed, row: CorpSovereigntyRow): string {
+  return row.planetName ?? systemOf(feed, row);
 }
 
 function windowOf(row: CorpSovereigntyRow): RaidWindow | null {
@@ -51,7 +63,15 @@ export function toBoardSovereignty(feed: CorpSovereigntyFeed): BoardSovereigntyS
     const window = windowOf(row);
     return window === null
       ? []
-      : [{ id: row.key, name: systemOf(feed, row), kind: row.kind, ...window }];
+      : [{ id: row.key, name: nameOf(feed, row), kind: row.kind, ...window }];
+  });
+}
+
+/** Due soon's view of the hubs: when each reagent bay runs out. */
+export function toBoardHubFuel(feed: CorpSovereigntyFeed): BoardHubFuelSource[] {
+  return feed.rows.flatMap((row) => {
+    const runsOutMs = row.hubBay === null ? null : hubReagentsRunOutMs(row.hubBay);
+    return runsOutMs === null ? [] : [{ id: row.key, name: systemOf(feed, row), runsOutMs }];
   });
 }
 
@@ -62,7 +82,7 @@ function untilText(t: Translate, remainingMs: number): string {
     : formatCountdown(remainingMs / 1000);
 }
 
-/** An open window (or a hub in overtime) is critical; one opening within a day, a warning. */
+/** An open window is critical; one opening within a day, a warning. */
 function tone(row: CorpSovereigntyRow, now: number): DeadlineSeverity {
   const state = stateOf(row, now);
   if (state === 'open' || state === 'overtime') return 'critical';
@@ -78,19 +98,53 @@ function sortKey(row: CorpSovereigntyRow, now: number): number {
   return Math.max(row.windowStartMs ?? now, now);
 }
 
+/** The unsecured stock: units, and ISK only when every reagent in it has a price. */
+function atRisk(
+  feed: CorpSovereigntyFeed,
+  row: CorpSovereigntyRow
+): { units: number; isk: number | null } | null {
+  if (row.reagents === null) return null;
+  const held = row.reagents.filter((r) => r.unsecured > 0);
+  const units = held.reduce((sum, r) => sum + r.unsecured, 0);
+  const prices = held.map((r) => feed.prices.get(r.typeId));
+  const isk = prices.every((price) => price !== undefined)
+    ? held.reduce((sum, r, i) => sum + r.unsecured * prices[i]!, 0)
+    : null;
+  return { units, isk };
+}
+
+function reagentLine(
+  feed: CorpSovereigntyFeed,
+  row: CorpSovereigntyRow,
+  pick: 'secured' | 'unsecured'
+): string {
+  if (row.reagents === null) return UNKNOWN;
+  const held = row.reagents.filter((r) => r[pick] > 0);
+  if (held.length === 0) return formatNumber(0);
+  return held
+    .map((r) => {
+      const name = feed.typeNames.get(r.typeId) ?? UNKNOWN;
+      const price = feed.prices.get(r.typeId);
+      const units = `${formatNumber(r[pick])} ${name}`;
+      return price === undefined ? units : `${units} · ${formatIsk(r[pick] * price)} ISK`;
+    })
+    .join(', ');
+}
+
 export const corpSovereignty: Builder = (feeds, { t, now }) => {
   const feed = feeds.corpSovereignty;
   const data = feed?.data ?? null;
   if (!data) return blank(null, statusOf(feed));
   if (!data.readable) return corpUnreadable(null, feed, data.needsReauth, t);
 
-  const rows = [...data.rows].sort(
-    (a, b) =>
-      sortKey(a, now) - sortKey(b, now) ||
-      systemOf(data, a).localeCompare(systemOf(data, b)) ||
-      a.key.localeCompare(b.key)
-  );
-  const skyhooks = rows.filter((row) => row.kind === 'skyhook');
+  const skyhooks = data.rows
+    .filter((row) => row.kind === 'skyhook')
+    .sort(
+      (a, b) =>
+        sortKey(a, now) - sortKey(b, now) ||
+        nameOf(data, a).localeCompare(nameOf(data, b)) ||
+        a.key.localeCompare(b.key)
+    );
   const headline = raidHeadline(
     skyhooks.flatMap((row) => windowOf(row) ?? []),
     now
@@ -111,37 +165,106 @@ export const corpSovereignty: Builder = (feeds, { t, now }) => {
         return t(`${W}.windowClosed`);
     }
   };
-  const reagentText = (row: CorpSovereigntyRow): string => {
-    if (row.kind === 'skyhook') return row.stock === null ? UNKNOWN : formatNumber(row.stock);
-    const hours = row.hubBay === null ? null : hubReagentHoursLeft(row.hubBay, now);
-    return hours === null ? UNKNOWN : t(`${W}.hubHours`, { count: hours });
+  const riskCell = (row: CorpSovereigntyRow): TableCell => {
+    const risk = atRisk(data, row);
+    if (risk === null) return UNKNOWN;
+    if (risk.units === 0) return t(`${W}.nothingAtRisk`);
+    return risk.isk === null
+      ? t(`${W}.units`, { count: risk.units })
+      : { text: formatIskCompact(risk.isk), iskAmount: risk.isk };
   };
-  const admText = (row: CorpSovereigntyRow): string => {
+  const detailOf = (row: CorpSovereigntyRow): RowDetailModel => {
     const level = row.systemId === null ? undefined : data.development.get(row.systemId);
-    return level === undefined
-      ? UNKNOWN
-      : `${level.military} / ${level.industrial} / ${level.strategic}`;
+    const name = row.systemId === null ? undefined : data.systemNames.get(row.systemId);
+    const window = windowOf(row);
+    return {
+      title: nameOf(data, row),
+      facts: [
+        {
+          label: t(`${W}.fact.window`),
+          value:
+            window === null
+              ? UNKNOWN
+              : t(`${W}.fact.windowValue`, {
+                  state: windowText(row),
+                  closes: untilText(t, Math.max(0, window.endMs - now)),
+                }),
+        },
+        {
+          label: t(`${W}.fact.state`),
+          value: row.state === null ? UNKNOWN : t(`${W}.state.${row.state}`),
+        },
+        { label: t(`${W}.fact.unsecured`), value: reagentLine(data, row, 'unsecured') },
+        { label: t(`${W}.fact.secured`), value: reagentLine(data, row, 'secured') },
+        {
+          label: t(`${W}.fact.development`),
+          value:
+            level === undefined
+              ? UNKNOWN
+              : `${level.military} / ${level.industrial} / ${level.strategic}`,
+        },
+      ],
+      place:
+        row.systemId === null || name === undefined
+          ? undefined
+          : { systemId: row.systemId, name, jumps: data.jumps.get(row.systemId) },
+    };
   };
-  const jumpsText = (row: CorpSovereigntyRow): string => {
-    const jumps = row.systemId === null ? undefined : data.jumps.get(row.systemId);
-    return jumps === undefined ? UNKNOWN : formatNumber(jumps);
-  };
-  const kindText = (row: CorpSovereigntyRow) => t(`${W}.kind.${row.kind}`);
 
+  const soonest = skyhooks.find((row) => {
+    const state = stateOf(row, now);
+    return state === 'open' || state === 'upcoming';
+  });
   const secondary =
-    headline.untilMs === null
+    soonest === undefined || headline.untilMs === null
       ? undefined
       : {
-          text:
+          text: [
             headline.untilMs === 0
-              ? t(`${W}.openNow`)
-              : t(`${W}.opensIn`, { duration: untilText(t, headline.untilMs) }),
+              ? t(`${W}.nextOpenNow`, { subject: nameOf(data, soonest) })
+              : t(`${W}.nextOpensIn`, {
+                  subject: nameOf(data, soonest),
+                  duration: untilText(t, headline.untilMs),
+                }),
+            ...((risk) =>
+              risk?.isk != null && risk.isk > 0
+                ? [t(`${W}.atRisk`, { isk: formatIskCompact(risk.isk) })]
+                : [])(atRisk(data, soonest)),
+          ].join(', '),
         };
 
-  // An open or overtime window is already underway: Next wants the one still ahead.
-  const nextWindow = rows.find((row) => stateOf(row, now) === 'upcoming');
+  // An open window is already underway: Next wants the one still ahead.
+  const nextWindow = skyhooks.find((row) => stateOf(row, now) === 'upcoming');
+  const nextRunOut = toBoardHubFuel(data)
+    .filter((hub) => hub.runsOutMs > now)
+    .sort((a, b) => a.runsOutMs - b.runsOutMs)[0];
+  const deadlines: BoardDeadline[] = [
+    ...(nextWindow?.windowStartMs != null
+      ? [
+          {
+            at: nextWindow.windowStartMs,
+            note: t(`${W}.deadline`, { subject: nameOf(data, nextWindow) }),
+            severity: tone(nextWindow, now),
+            to: '/corp',
+          },
+        ]
+      : []),
+    ...(nextRunOut === undefined
+      ? []
+      : [
+          {
+            at: nextRunOut.runsOutMs,
+            note: t(`${W}.hubDeadline`, { subject: nextRunOut.name }),
+            severity: (nextRunOut.runsOutMs - now < DAY_MS
+              ? 'warning'
+              : 'clear') as DeadlineSeverity,
+            to: '/corp',
+          },
+        ]),
+  ];
+
   return {
-    ...blank(null, statusOf(feed, { isEmpty: rows.length === 0 })),
+    ...blank(null, statusOf(feed, { isEmpty: skyhooks.length === 0 })),
     fetchedAt: data.fetchedAt,
     fromCache: data.fromCache,
     number: {
@@ -150,48 +273,84 @@ export const corpSovereignty: Builder = (feeds, { t, now }) => {
       secondary,
       tone: worstSeverity(skyhooks.map((row) => tone(row, now))),
     },
-    rows: rows.map((row) => ({
+    rows: skyhooks.map((row) => ({
       key: row.key,
-      title: systemOf(data, row),
-      detail: kindText(row),
+      title: nameOf(data, row),
       value: windowText(row),
       tone: tone(row, now),
     })),
     table: {
       columns: [
-        { key: 'system', label: t(`${W}.col.system`), priority: 0 },
-        { key: 'kind', label: t(`${W}.col.kind`), priority: 3, hideNarrow: true },
-        { key: 'window', label: t(`${W}.col.window`), align: 'end', priority: 1 },
-        { key: 'reagents', label: t(`${W}.col.reagents`), align: 'end', priority: 2 },
-        { key: 'adm', label: t(`${W}.col.adm`), align: 'end', priority: 4, hideNarrow: true },
-        { key: 'jumps', label: t(`${W}.col.jumps`), align: 'end', priority: 3, hideNarrow: true },
+        { key: 'skyhook', label: t(`${W}.col.skyhook`), priority: 0, nameFloor: true },
+        { key: 'window', label: t(`${W}.col.window`), align: 'end', priority: 2 },
+        { key: 'unsecured', label: t(`${W}.col.unsecured`), align: 'end', priority: 1 },
       ],
-      rows: rows.map((row): TableRowModel => ({
+      rows: skyhooks.map((row): TableRowModel => ({
         key: row.key,
-        cells: [
-          systemOf(data, row),
-          kindText(row),
-          windowText(row),
-          reagentText(row),
-          admText(row),
-          jumpsText(row),
-        ],
+        cells: [nameOf(data, row), windowText(row), riskCell(row)],
         tone: tone(row, now),
-        // The existing safety route to the system, not a new view.
-        to: row.systemId === null ? undefined : routeToHref(row.systemId),
+        detail: detailOf(row),
       })),
     },
-    deadlines:
-      nextWindow?.windowStartMs != null
-        ? [
-            {
-              at: nextWindow.windowStartMs,
-              note: t(`${W}.deadline`, { subject: systemOf(data, nextWindow) }),
-              severity: tone(nextWindow, now),
-              to: '/corp',
-            },
-          ]
-        : [],
-    summary: t(`${W}.summary`, { count: headline.count, total: rows.length }),
+    chart: raidChart(t, data, skyhooks, now, windowText),
+    deadlines,
+    summary: t(`${W}.summary`, { count: headline.count, total: skyhooks.length }),
   };
 };
+
+/** Theft windows that open or are open in the next 48 hours; undefined with none. */
+function raidChart(
+  t: Translate,
+  data: CorpSovereigntyFeed,
+  skyhooks: readonly CorpSovereigntyRow[],
+  now: number,
+  windowText: (row: CorpSovereigntyRow) => string
+): ChartModel | undefined {
+  const ahead = skyhooks.flatMap((row) => {
+    const window = windowOf(row);
+    return window !== null && window.endMs > now && window.startMs < now + CHART_AHEAD_MS
+      ? [{ row, window }]
+      : [];
+  });
+  const fallback = hbarsFromRows(
+    t,
+    ahead.map(({ row, window }) => {
+      // Sooner is longer: the share is how much of the 48 hours is already used up.
+      const share = 1 - Math.max(0, window.startMs - now) / CHART_AHEAD_MS;
+      return {
+        key: row.key,
+        label: nameOf(data, row),
+        value: share,
+        share,
+        text: windowText(row),
+        color: tone(row, now) === 'clear' ? ('accent' as const) : ('warning' as const),
+      };
+    }),
+    t(`${W}.chartNote`)
+  );
+  if (!fallback) return undefined;
+  const note = t(`${W}.chartNote`);
+  return {
+    kind: 'gantt',
+    rows: ahead.map(({ row, window }) => ({
+      key: row.key,
+      label: nameOf(data, row),
+      startMs: window.startMs,
+      endMs: window.endMs,
+      text: windowText(row),
+      color: tone(row, now) === 'clear' ? ('accent' as const) : ('warning' as const),
+    })),
+    axis: { from: now, to: now + CHART_AHEAD_MS, now },
+    labels: {
+      from: '',
+      now: t(`${W}.chartNow`),
+      to: t(`${W}.chartTo`, { duration: formatCountdown(CHART_AHEAD_MS / 1000) }),
+    },
+    note,
+    summary: t(`${W}.chartSummary`, {
+      note,
+      windows: ahead.map(({ row }) => `${nameOf(data, row)} ${windowText(row)}`).join('; '),
+    }),
+    fallback,
+  };
+}
