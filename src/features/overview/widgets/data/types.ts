@@ -40,7 +40,7 @@ import type {
 import type { CorpStockTargets } from '@/features/corp/stockTargets';
 import type { BoardDeadline } from '../nextDeadline';
 import type { WidgetStateInput } from '../state';
-import type { CalendarEventsChoice, WidgetRange } from '../layout';
+import type { CalendarEventsChoice, RaidsWhere, WidgetRange } from '../layout';
 import type { ChartModel } from '../charts/types';
 import type { SkillsQueuePanelData, WalletPanelData } from './loaders';
 import type {
@@ -344,6 +344,10 @@ export interface BuildContext {
   plexPer30Days?: number;
   /** Which calendar events a Coming up widget lists; left out, accepted and tentative. */
   calendarEvents?: CalendarEventsChoice;
+  /** Skyhook raids: whose space it lists; left out, My alliance. */
+  raidsWhere?: RaidsWhere;
+  /** Skyhook raids Near me: the jumps radius; left out, the default. */
+  raidsRadius?: number;
   /** The Time format clock days are cut on (`useTimeZone`); left out, the machine's own. */
   zone?: DayZone;
 }

@@ -8,7 +8,12 @@ import {
 import { useTicker } from '@/lib/ticker';
 import { useTimeZone } from '@/lib/timeFormat';
 import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
-import { DEFAULT_RANGE, type CalendarEventsChoice, type WidgetRange } from '../layout';
+import {
+  DEFAULT_RAIDS_RADIUS,
+  DEFAULT_RANGE,
+  type CalendarEventsChoice,
+  type WidgetRange,
+} from '../layout';
 import type { FeedStore } from './feedStore';
 import { useFeedStore } from './feedStoreContext';
 import { buildView, KIND_FEEDS } from './models';
@@ -25,10 +30,13 @@ export interface ViewRequest {
   plexPer30Days?: number;
   /** Which calendar events the widget lists; left out, accepted and tentative. */
   calendarEvents?: CalendarEventsChoice;
+  /** Skyhook raids: 'near' lists any holder's space within `raidsRadius` jumps; left out, My alliance. */
+  raidsWhere?: 'near';
+  raidsRadius?: number;
 }
 
 export const viewKey = (request: ViewRequest): string =>
-  `${request.kind}:${request.scopeAll ? 1 : 0}:${request.range ?? DEFAULT_RANGE}:${request.plexPer30Days ?? DEFAULT_PLEX_PER_30_DAYS}:${request.calendarEvents === 'all' ? 1 : 0}`;
+  `${request.kind}:${request.scopeAll ? 1 : 0}:${request.range ?? DEFAULT_RANGE}:${request.plexPer30Days ?? DEFAULT_PLEX_PER_30_DAYS}:${request.calendarEvents === 'all' ? 1 : 0}:${request.raidsWhere === 'near' ? (request.raidsRadius ?? DEFAULT_RAIDS_RADIUS) : 0}`;
 
 const NO_FEEDS: readonly FeedId[] = [];
 
@@ -57,7 +65,10 @@ function cachedView(
   store: FeedStore,
   request: ViewRequest,
   feedIds: readonly FeedId[],
-  ctx: Omit<BuildContext, 'scopeAll' | 'range' | 'plexPer30Days' | 'calendarEvents'>
+  ctx: Omit<
+    BuildContext,
+    'scopeAll' | 'range' | 'plexPer30Days' | 'calendarEvents' | 'raidsWhere' | 'raidsRadius'
+  >
 ): KindView {
   let cache = viewCaches.get(store);
   if (!cache) viewCaches.set(store, (cache = new Map()));
@@ -78,6 +89,8 @@ function cachedView(
     range: request.range ?? DEFAULT_RANGE,
     plexPer30Days: request.plexPer30Days ?? DEFAULT_PLEX_PER_30_DAYS,
     calendarEvents: request.calendarEvents === 'all' ? 'all' : 'committed',
+    raidsWhere: request.raidsWhere === 'near' ? 'near' : 'alliance',
+    raidsRadius: request.raidsRadius ?? DEFAULT_RAIDS_RADIUS,
   });
   cache.set(id, { deps, view });
   return view;
@@ -142,12 +155,15 @@ export function useWidgetView(
   scopeAll: boolean,
   range?: WidgetRange,
   plexPer30Days?: number,
-  calendarEvents?: CalendarEventsChoice
+  calendarEvents?: CalendarEventsChoice,
+  raidsWhere?: 'near',
+  raidsRadius?: number
 ): KindView {
-  const requests = useMemo(
-    () => [{ kind, scopeAll, range, plexPer30Days, calendarEvents }],
-    [kind, scopeAll, range, plexPer30Days, calendarEvents]
+  const request = useMemo<ViewRequest>(
+    () => ({ kind, scopeAll, range, plexPer30Days, calendarEvents, raidsWhere, raidsRadius }),
+    [kind, scopeAll, range, plexPer30Days, calendarEvents, raidsWhere, raidsRadius]
   );
+  const requests = useMemo(() => [request], [request]);
   const views = useKindViews(requests);
-  return views.get(viewKey({ kind, scopeAll, range, plexPer30Days, calendarEvents })) as KindView;
+  return views.get(viewKey(request)) as KindView;
 }

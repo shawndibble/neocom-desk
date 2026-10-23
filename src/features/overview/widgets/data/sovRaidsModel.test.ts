@@ -22,6 +22,7 @@ const W = 'travel.sovRaids';
 const hook = (key: string, startMs: number, endMs: number, over: Partial<SovRaidSkyhook> = {}) => ({
   key,
   systemId: 30001190,
+  holderId: 99 as number | null,
   planetName: `${key} IV`,
   window: { startMs: NOW + startMs, endMs: NOW + endMs },
   ...over,
@@ -32,6 +33,7 @@ function data(over: Partial<SovRaidsWidgetData> = {}): SovRaidsWidgetData {
     alliance: { id: 99, name: 'Test Alliance' },
     holdsSov: true,
     skyhooks: [],
+    holderNames: new Map([[77, 'Brave Collective']]),
     systemNames: new Map([[30001190, 'X-7OMU']]),
     jumps: new Map([[30001190, 7]]),
     fetchedAt: new Date(0),
@@ -202,6 +204,156 @@ describe('sovRaids', () => {
     const view = sovRaids({ sovRaids: { loading: true, error: false, data: null } }, ctx);
     expect(view.status.loading).toBe(true);
     expect(view.status.isEmpty).toBe(false);
+  });
+});
+
+describe('sovRaids My alliance', () => {
+  it("lists only the Character's alliance, whoever else is raidable", () => {
+    const view = sovRaids(
+      feeds({
+        skyhooks: [hook('Ours', HOUR, 3 * HOUR), hook('Theirs', HOUR, 3 * HOUR, { holderId: 77 })],
+      }),
+      ctx
+    );
+    expect(view.table?.rows.map((row) => row.key)).toEqual(['Ours']);
+    expect(view.number.value).toBe('1');
+  });
+});
+
+describe('sovRaids Near me', () => {
+  const near: BuildContext = { ...ctx, raidsWhere: 'near', raidsRadius: 8 };
+  const FAR = 30002000;
+  const jumps = new Map([
+    [30001190, 3],
+    [FAR, 12],
+  ]);
+
+  it('lists any holder within the radius, open first, and marks your alliance', () => {
+    const view = sovRaids(
+      feeds({
+        jumps,
+        skyhooks: [
+          hook('Soon', HOUR, 3 * HOUR, { holderId: 77 }),
+          hook('Open', -HOUR, 2 * HOUR, { holderId: 77 }),
+          hook('Mine', 2 * HOUR, 4 * HOUR),
+        ],
+      }),
+      near
+    );
+    expect(view.table?.rows.map((row) => row.cells)).toEqual([
+      [
+        'Open IV',
+        { text: `${W}.windowOpen{"duration":"2h 0m"}`, tone: 'good' },
+        '3',
+        'Brave Collective',
+      ],
+      ['Soon IV', `${W}.windowIn{"duration":"1h 0m"}`, '3', 'Brave Collective'],
+      [
+        'Mine IV',
+        { text: `${W}.windowIn{"duration":"2h 0m"}`, tone: 'caution' },
+        '3',
+        { text: `${W}.near.yourAlliance`, tone: 'caution' },
+      ],
+    ]);
+    expect(view.table?.columns.map((c) => c.key)).toEqual(['skyhook', 'window', 'jumps', 'held']);
+    expect(view.table?.columns[3]?.priority).toBe(3);
+    expect(view.number.value).toBe('3');
+    expect(view.number.unit).toBe(`${W}.near.unit{"count":3,"radius":8}`);
+    expect(view.number.tone).toBe('clear');
+    expect(view.number.secondary?.tone).toBe('good');
+    expect(view.table?.footer).toBeUndefined();
+  });
+
+  it('turns an open window amber with under ten minutes left, with the words', () => {
+    const view = sovRaids(
+      feeds({ jumps, skyhooks: [hook('Late', -HOUR, 9 * MIN, { holderId: 77 })] }),
+      near
+    );
+    expect(view.table?.rows[0]?.cells[1]).toEqual({
+      text: `${W}.windowOpen{"duration":"${W}.underCacheWindow{\\"duration\\":\\"10m\\"}"}`,
+      tone: 'caution',
+    });
+    expect(view.number.secondary?.tone).toBe('caution');
+  });
+
+  it('says how many the radius cut, and honours a wider radius', () => {
+    const skyhooks = [
+      hook('Near', HOUR, 3 * HOUR, { holderId: 77 }),
+      hook('Far', HOUR, 3 * HOUR, { holderId: 77, systemId: FAR }),
+    ];
+    const cut = sovRaids(feeds({ jumps, skyhooks }), near);
+    expect(cut.table?.footer).toBe(`${W}.near.beyond{"count":1,"radius":8}`);
+    expect(cut.number.value).toBe('1');
+    const wide = sovRaids(feeds({ jumps, skyhooks }), { ...near, raidsRadius: 15 });
+    expect(wide.number.value).toBe('2');
+    expect(wide.table?.footer).toBeUndefined();
+  });
+
+  it('works for a Character in no alliance', () => {
+    const view = sovRaids(
+      feeds({
+        alliance: null,
+        holdsSov: false,
+        jumps,
+        skyhooks: [hook('Open', -HOUR, 2 * HOUR, { holderId: 77 })],
+      }),
+      near
+    );
+    expect(view.number.value).toBe('1');
+    expect(view.emptyMessage).toBeUndefined();
+  });
+
+  it('feeds Next only the own alliance windows still ahead', () => {
+    const view = sovRaids(
+      feeds({
+        jumps,
+        skyhooks: [
+          hook('Theirs', HOUR, 3 * HOUR, { holderId: 77 }),
+          hook('Mine', 2 * HOUR, 4 * HOUR),
+        ],
+      }),
+      near
+    );
+    expect(view.deadlines.map((d) => d.note)).toEqual([`${W}.deadline{"subject":"Mine IV"}`]);
+  });
+
+  it('opens a row modal naming the holder', () => {
+    const view = sovRaids(
+      feeds({ jumps, skyhooks: [hook('Theirs', HOUR, 3 * HOUR, { holderId: 77 })] }),
+      near
+    );
+    expect(view.table?.rows[0]?.detail?.facts[1]).toEqual({
+      label: `${W}.fact.heldBy`,
+      value: 'Brave Collective',
+    });
+    expect(view.table?.rows[0]?.detail?.place?.jumps).toBe(3);
+  });
+
+  it('says none within the radius, with the stale age once the read is old', () => {
+    const fresh = sovRaids(
+      feeds({
+        jumps,
+        skyhooks: [hook('Far', HOUR, 3 * HOUR, { systemId: FAR })],
+        fetchedAt: new Date(NOW - MIN),
+      }),
+      near
+    );
+    expect(fresh.status.isEmpty).toBe(true);
+    expect(fresh.emptyMessage).toBe(`${W}.near.none{"radius":8}`);
+    expect(fresh.emptyHint).toBe(`${W}.near.noneHint`);
+    expect(fresh.table?.footer).toBeUndefined();
+    const old = sovRaids(feeds({ jumps, fetchedAt: new Date(NOW - 3 * HOUR) }), near);
+    expect(old.emptyHint).toMatch(/^travel\.sovRaids\.staleEmpty/);
+  });
+
+  it('says the location is unknown, guessing nothing, when no distance is known', () => {
+    const view = sovRaids(
+      feeds({ jumps: new Map(), skyhooks: [hook('Open', -HOUR, 2 * HOUR, { holderId: 77 })] }),
+      near
+    );
+    expect(view.number.value).toBe('0');
+    expect(view.emptyMessage).toBe(`${W}.near.locationUnknown`);
+    expect(view.emptyHint).toBe(`${W}.near.locationUnknownHint`);
   });
 });
 

@@ -248,6 +248,27 @@ describe('Widget menu', () => {
     expect(screen.queryByRole('menuitemradio', { name: '90d' })).toBeNull();
   });
 
+  it('offers Where to Skyhook raids, and the jumps radius only under Near me', async () => {
+    const raids: OverviewLayout = { version: 1, widgets: [w('r', 'sovRaids', { view: 'table' })] };
+    const { user, seen } = setup({ initial: raids });
+    await user.click(screen.getByRole('button', { name: 'Settings for Skyhook raids' }));
+    expect(screen.getByRole('menuitemradio', { name: 'My alliance' })).toBeChecked();
+    expect(screen.queryByRole('menuitemradio', { name: '15 jumps' })).toBeNull();
+    await user.click(screen.getByRole('menuitemradio', { name: 'Near me' }));
+    expect(seen.current.widgets[0].raidsWhere).toBe('near');
+
+    await user.click(screen.getByRole('button', { name: 'Settings for Skyhook raids' }));
+    expect(screen.getByRole('menuitemradio', { name: '8 jumps' })).toBeChecked();
+    await user.click(screen.getByRole('menuitemradio', { name: '15 jumps' }));
+    expect(seen.current.widgets[0].raidsRadius).toBe(15);
+  });
+
+  it('gives a kind with no Where setting no Where group', async () => {
+    const { user } = setup();
+    await user.click(screen.getByRole('button', { name: 'Settings for Mail' }));
+    expect(screen.queryByRole('menuitemradio', { name: 'Near me' })).toBeNull();
+  });
+
   it('disables All characters for a kind that reads the header Character only, with the reason', async () => {
     const { user } = setup();
     await user.click(screen.getByRole('button', { name: 'Settings for Mail' }));

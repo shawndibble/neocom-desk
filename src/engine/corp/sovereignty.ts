@@ -74,6 +74,48 @@ export function liveRaids<T extends { key: string; window: RaidWindow | null }>(
   });
 }
 
+/** The theft link takes ten minutes, so a window with less than this left is closing. */
+export const THEFT_LINK_MS = 10 * 60_000;
+
+/** An open window with under `THEFT_LINK_MS` left. */
+export function closingSoon(window: RaidWindow, nowMs: number): boolean {
+  return raidState(window, nowMs) === 'open' && window.endMs - nowMs < THEFT_LINK_MS;
+}
+
+/**
+ * The raidable skyhooks a hunter can act on: live ones within `radius` jumps
+ * (a system with no known distance is left out, nothing guessed), open first
+ * by fewer jumps, then upcoming by opening and then fewer jumps. A hook with no
+ * readable window stays, last. `beyond` counts live hooks the radius cut.
+ */
+export function nearRaids<T extends { key: string; systemId: number; window: RaidWindow | null }>(
+  skyhooks: readonly T[],
+  jumps: ReadonlyMap<number, number>,
+  radius: number,
+  nowMs: number
+): { within: T[]; beyond: number } {
+  const within: T[] = [];
+  let beyond = 0;
+  for (const hook of skyhooks) {
+    const away = jumps.get(hook.systemId);
+    if (away === undefined) continue;
+    if (hook.window !== null && raidState(hook.window, nowMs) === 'closed') continue;
+    if (away > radius) beyond += 1;
+    else within.push(hook);
+  }
+  const rank = (hook: T): [number, number, number] => {
+    const away = jumps.get(hook.systemId)!;
+    if (hook.window === null) return [2, 0, away];
+    return raidState(hook.window, nowMs) === 'open' ? [0, 0, away] : [1, hook.window.startMs, away];
+  };
+  within.sort((a, b) => {
+    const [ra, ta, ja] = rank(a);
+    const [rb, tb, jb] = rank(b);
+    return ra - rb || ta - tb || ja - jb || a.key.localeCompare(b.key);
+  });
+  return { within, beyond };
+}
+
 /**
  * When a hub's reagent bay empties: `last_updated` plus the amount at the burn
  * rate. Epoch ms; may be in the past. Null when nothing burns.

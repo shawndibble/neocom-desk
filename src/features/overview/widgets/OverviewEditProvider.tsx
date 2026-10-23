@@ -32,6 +32,8 @@ import {
   setRowsPerPage,
   setPlexPer30Days,
   setCalendarEvents,
+  setRaidsRadius,
+  setRaidsWhere,
   setScope,
   setShowOnPhone,
   setView,
@@ -206,6 +208,8 @@ export function OverviewEditProvider({
       setRowsPerPage: (id, rows) => commit(setRowsPerPage(layoutRef.current, id, rows)),
       setPlexPer30Days: (id, plex) => commit(setPlexPer30Days(layoutRef.current, id, plex)),
       setCalendarEvents: (id, choice) => commit(setCalendarEvents(layoutRef.current, id, choice)),
+      setRaidsWhere: (id, where) => commit(setRaidsWhere(layoutRef.current, id, where)),
+      setRaidsRadius: (id, radius) => commit(setRaidsRadius(layoutRef.current, id, radius)),
       rename: (id, title) => commit(renameWidget(layoutRef.current, id, title)),
       setShowOnPhone: (id, show) => commit(setShowOnPhone(layoutRef.current, id, show)),
     };

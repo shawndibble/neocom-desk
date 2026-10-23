@@ -65,36 +65,64 @@ beforeEach(() => {
 });
 
 describe('loadSovRaids', () => {
-  it("keeps raidable skyhooks to the alliance's space, and looks up only those", async () => {
+  it('lists every raidable skyhook with its holder, and measures them all once', async () => {
     const feed = await loadSovRaids(1);
-    expect(planetInfo).toHaveBeenCalledWith([40001]);
-    expect(jumpsFromCurrent).toHaveBeenCalledWith(1, [OURS]);
+    expect(jumpsFromCurrent).toHaveBeenCalledTimes(1);
+    expect(jumpsFromCurrent).toHaveBeenCalledWith(1, [OURS, THEIRS]);
     expect(feed).toMatchObject({
       alliance: { id: ALLIANCE, name: 'Test Alliance' },
       holdsSov: true,
-      skyhooks: [
-        {
-          key: `${OURS}:40001`,
-          systemId: OURS,
-          planetName: 'X-7OMU IV',
-          window: { startMs: Date.parse(window.start), endMs: Date.parse(window.end) },
-        },
-      ],
       fetchedAt: new Date(4000),
     });
+    expect(feed.skyhooks).toEqual([
+      {
+        key: `${OURS}:40001`,
+        systemId: OURS,
+        holderId: ALLIANCE,
+        planetName: 'X-7OMU IV',
+        window: { startMs: Date.parse(window.start), endMs: Date.parse(window.end) },
+      },
+      {
+        key: `${THEIRS}:40002`,
+        systemId: THEIRS,
+        holderId: 77,
+        planetName: null,
+        window: { startMs: Date.parse(window.start), endMs: Date.parse(window.end) },
+      },
+    ]);
     expect(feed.systemNames.get(OURS)).toBe('X-7OMU');
     expect(feed.jumps.get(OURS)).toBe(7);
+    expect(feed.holderNames.get(ALLIANCE)).toBe('Test Alliance');
   });
 
-  it('reads nothing public for a Character in no alliance', async () => {
+  it("looks up planets only for the alliance's skyhooks and those within the widest radius", async () => {
+    jumpsFromCurrent.mockResolvedValue(
+      new Map([
+        [OURS, 40],
+        [THEIRS, 16],
+      ])
+    );
+    await loadSovRaids(1);
+    expect(planetInfo).toHaveBeenCalledWith([40001]);
+    jumpsFromCurrent.mockResolvedValue(
+      new Map([
+        [OURS, 40],
+        [THEIRS, 15],
+      ])
+    );
+    await loadSovRaids(1);
+    expect(planetInfo).toHaveBeenLastCalledWith([40001, 40002]);
+  });
+
+  it('still reads the public lists for a Character in no alliance, for Near me', async () => {
     loadPublicCharacterInfoWithAge.mockResolvedValue({
       info: { corporation_id: 1 },
       fetchedAt: new Date(1000),
     });
     const feed = await loadSovRaids(1);
     expect(feed.alliance).toBeNull();
-    expect(feed.skyhooks).toEqual([]);
-    expect(loadWithCache).not.toHaveBeenCalled();
+    expect(feed.holdsSov).toBe(false);
+    expect(feed.skyhooks).toHaveLength(2);
   });
 
   it('throws when the Character record is unread: unknown is not "no alliance"', async () => {
@@ -108,8 +136,7 @@ describe('loadSovRaids', () => {
     });
     const feed = await loadSovRaids(1);
     expect(feed.holdsSov).toBe(false);
-    expect(feed.skyhooks).toEqual([]);
-    expect(planetInfo).toHaveBeenCalledWith([]);
+    expect(feed.skyhooks[0]?.holderId).toBeNull();
   });
 
   it('throws when either public list is unread, so the last good read stays', async () => {

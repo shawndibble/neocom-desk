@@ -40,6 +40,10 @@ import {
   MAX_PLEX_PLAN,
   MAX_WIDGETS,
   CALENDAR_EVENTS_CHOICES,
+  DEFAULT_RAIDS_RADIUS,
+  RAIDS_RADII,
+  RAIDS_WHERES,
+  type RaidsWhere,
   WIDGET_RANGES,
   type CalendarEventsChoice,
   type Widget,
@@ -276,6 +280,37 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
               </DropdownMenuRadioGroup>
             </>
           )}
+          {kind.hasRaidsWhere && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>{t('overview.menu.where')}</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={widget.raidsWhere ?? 'alliance'}
+                onValueChange={(next) => edit.setRaidsWhere(widget.id, next as RaidsWhere)}
+              >
+                {RAIDS_WHERES.map((where) => (
+                  <DropdownMenuRadioItem key={where} value={where}>
+                    {t(`overview.menu.whereChoice.${where}`)}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+              {widget.raidsWhere === 'near' && (
+                <>
+                  <DropdownMenuLabel>{t('overview.menu.radius')}</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    value={String(widget.raidsRadius ?? DEFAULT_RAIDS_RADIUS)}
+                    onValueChange={(next) => edit.setRaidsRadius(widget.id, Number(next))}
+                  >
+                    {RAIDS_RADII.map((jumps) => (
+                      <DropdownMenuRadioItem key={jumps} value={String(jumps)}>
+                        {t('overview.menu.radiusJumps', { count: jumps })}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </>
+              )}
+            </>
+          )}
           {kind.hasPlexPlan && (
             <>
               <DropdownMenuSeparator />
@@ -288,6 +323,7 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
           {(board.characterScope ||
             kind.hasRange ||
             kind.hasCalendarEvents ||
+            kind.hasRaidsWhere ||
             kind.hasPlexPlan) && <DropdownMenuSeparator />}
           <DropdownMenuItem onSelect={() => run(() => (inert ? undefined : setRenaming(true)))}>
             {t('overview.menu.rename')}

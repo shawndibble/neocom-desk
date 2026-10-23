@@ -4898,8 +4898,8 @@
       },
       "sovRaids": {
         "title": "Skyhook raids",
-        "description": "Skyhooks in your alliance's space that can be raided now or soon",
-        "empty": "No skyhook in your alliance's space can be raided now or soon."
+        "description": "Skyhooks that can be raided now or soon, in your alliance's space or near you",
+        "empty": "No skyhook can be raided now or soon."
       },
       "routeSafety": {
         "title": "Route safety",
@@ -5736,6 +5736,13 @@
         "committed": "Accepted and tentative",
         "all": "All events"
       },
+      "where": "Where",
+      "whereChoice": {
+        "alliance": "My alliance",
+        "near": "Near me"
+      },
+      "radius": "Radius",
+      "radiusJumps": "{{count}} jumps",
       "rename": "Rename",
       "renameTitle": "Rename {{title}}",
       "renameLabel": "Name",
@@ -13589,7 +13596,21 @@
         "heldBy": "Held by"
       },
       "summary_one": "{{count}} skyhook in your alliance's space can be raided now or soon.",
-      "summary_other": "{{count}} skyhooks in your alliance's space can be raided now or soon."
+      "summary_other": "{{count}} skyhooks in your alliance's space can be raided now or soon.",
+      "near": {
+        "unit_one": "raidable within {{radius}} jumps",
+        "unit_other": "raidable within {{radius}} jumps",
+        "reach": "Windows reach a few hours ahead",
+        "yourAlliance": "Your alliance",
+        "beyond_one": "{{count}} more beyond {{radius}} jumps",
+        "beyond_other": "{{count}} more beyond {{radius}} jumps",
+        "none": "No raidable skyhooks within {{radius}} jumps",
+        "noneHint": "The list reaches a few hours ahead. Widen the radius or check back.",
+        "locationUnknown": "Your location is unknown",
+        "locationUnknownHint": "Jumps need your current system. Set it, or let the app read your location.",
+        "summary_one": "{{count}} raidable skyhook within {{radius}} jumps.",
+        "summary_other": "{{count}} raidable skyhooks within {{radius}} jumps."
+      }
     },
     "zkillFailure": {
       "offline": "Couldn't reach zKillboard. Check your connection, then try again.",

@@ -68,6 +68,8 @@ export interface WidgetKindDef {
   hasPlexPlan: boolean;
   /** Whether the kind lists calendar events and lets the pilot pick which (accepted and tentative, or all). */
   hasCalendarEvents: boolean;
+  /** Whether the kind has the Where setting (My alliance / Near me) and its jumps radius. */
+  hasRaidsWhere: boolean;
   /** ESI endpoints the kind needs, for the "needs permission" state. */
   endpoints: readonly EsiEndpointId[];
   emptyMessageKey: string;
@@ -92,6 +94,7 @@ interface Spec {
   range?: true;
   plexPlan?: true;
   calendarEvents?: true;
+  raidsWhere?: true;
   soon?: true;
   endpoints: readonly EsiEndpointId[];
 }
@@ -299,6 +302,7 @@ const SPECS: Record<string, Spec> = {
     views: NT,
     view: 'table',
     size: 'M',
+    raidsWhere: true,
     endpoints: [],
   },
   routeSafety: {
@@ -516,6 +520,7 @@ export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(SPECS).map(
   hasRange: s.range === true,
   hasPlexPlan: s.plexPlan === true,
   hasCalendarEvents: s.calendarEvents === true,
+  hasRaidsWhere: s.raidsWhere === true,
   endpoints: s.endpoints,
   emptyMessageKey: `overview.widgets.${id}.empty`,
   availability: s.soon ? 'comingSoon' : 'available',

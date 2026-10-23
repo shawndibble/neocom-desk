@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   allianceSpace,
   hubReagentsRunOutMs,
+  closingSoon,
   liveRaids,
+  nearRaids,
   raidHeadline,
   raidState,
 } from './sovereignty';
@@ -122,5 +124,81 @@ describe('liveRaids', () => {
       'a',
       'b',
     ]);
+  });
+});
+
+describe('closingSoon', () => {
+  it('is true for an open window with under ten minutes left', () => {
+    expect(closingSoon({ startMs: at(-HOUR), endMs: at(9 * 60_000) }, NOW)).toBe(true);
+  });
+  it('is false at ten minutes, with longer left, before opening, and once closed', () => {
+    expect(closingSoon({ startMs: at(-HOUR), endMs: at(10 * 60_000) }, NOW)).toBe(false);
+    expect(closingSoon({ startMs: at(-HOUR), endMs: at(HOUR) }, NOW)).toBe(false);
+    expect(closingSoon({ startMs: at(60_000), endMs: at(5 * 60_000) }, NOW)).toBe(false);
+    expect(closingSoon({ startMs: at(-HOUR), endMs: NOW }, NOW)).toBe(false);
+  });
+});
+
+describe('nearRaids', () => {
+  const hook = (key: string, startH: number, endH: number, systemId = 1) => ({
+    key,
+    systemId,
+    window: { startMs: at(startH * HOUR), endMs: at(endH * HOUR) } as {
+      startMs: number;
+      endMs: number;
+    } | null,
+  });
+  const jumps = new Map([
+    [1, 3],
+    [2, 9],
+    [3, 2],
+    [4, 6],
+  ]);
+
+  it('cuts at the radius and counts what the cut left out', () => {
+    const near = nearRaids(
+      [hook('a', -1, 1, 1), hook('far', -1, 1, 2), hook('c', 1, 3, 3)],
+      jumps,
+      8,
+      NOW
+    );
+    expect(near.within.map((h) => h.key)).toEqual(['a', 'c']);
+    expect(near.beyond).toBe(1);
+  });
+  it('keeps a hook exactly at the radius', () => {
+    expect(nearRaids([hook('far', -1, 1, 2)], jumps, 9, NOW).within).toHaveLength(1);
+  });
+  it('lists open first by fewer jumps, then upcoming by opening, ties by fewer jumps', () => {
+    const order = nearRaids(
+      [
+        hook('upLate', 3, 5, 3),
+        hook('upSoonFar', 1, 3, 4),
+        hook('upSoonNear', 1, 3, 3),
+        hook('openFar', -1, 1, 4),
+        hook('openNear', -2, 1, 3),
+      ],
+      jumps,
+      8,
+      NOW
+    ).within.map((h) => h.key);
+    expect(order).toEqual(['openNear', 'openFar', 'upSoonNear', 'upSoonFar', 'upLate']);
+  });
+  it('drops closed windows, keeps unread ones last, and ignores systems with no known distance', () => {
+    const near = nearRaids(
+      [
+        hook('closed', -3, -1, 1),
+        { ...hook('unread', 0, 0, 1), window: null },
+        hook('up', 1, 2, 3),
+        hook('lost', 1, 2, 99),
+      ],
+      jumps,
+      8,
+      NOW
+    );
+    expect(near.within.map((h) => h.key)).toEqual(['up', 'unread']);
+    expect(near.beyond).toBe(0);
+  });
+  it('does not count a closed window beyond the radius', () => {
+    expect(nearRaids([hook('closedFar', -3, -1, 2)], jumps, 8, NOW).beyond).toBe(0);
   });
 });
