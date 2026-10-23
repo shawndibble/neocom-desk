@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { checkForUpdate, useUpdateStatus, watchRegistration } from './updateAvailable';
 
+const fetchLatestRelease = vi.fn();
+vi.mock('./latestRelease', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./latestRelease')>()),
+  fetchLatestRelease: () => fetchLatestRelease(),
+}));
+
 const getServiceWorkerRegistration = vi.fn();
 vi.mock('@/lib/serviceWorker', () => ({
   getServiceWorkerRegistration: () => getServiceWorkerRegistration(),
@@ -17,6 +23,9 @@ afterEach(() => vi.unstubAllGlobals());
 
 beforeEach(() => {
   getServiceWorkerRegistration.mockReset();
+  // Default: the published release is unreadable, so the worker is asked (the
+  // pre-existing path the tests below exercise).
+  fetchLatestRelease.mockReset().mockResolvedValue(null);
   useUpdateStatus.setState({ status: 'unknown' });
 });
 
@@ -71,6 +80,37 @@ describe('checkForUpdate', () => {
     await checkForUpdate();
     expect(status()).toBe('offline');
     expect(registration.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('checkForUpdate against the published release', () => {
+  it('is available at once for a newer release, without waiting for the install', async () => {
+    const registration = fakeRegistration();
+    // An install that never finishes: the status must not depend on it.
+    registration.update.mockReturnValue(new Promise(() => undefined));
+    getServiceWorkerRegistration.mockResolvedValue(registration);
+    fetchLatestRelease.mockResolvedValue('neocom-desk@9+newer');
+    await checkForUpdate();
+    expect(status()).toBe('available');
+    expect(registration.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('is current for the same release, without asking the worker', async () => {
+    const registration = fakeRegistration();
+    getServiceWorkerRegistration.mockResolvedValue(registration);
+    fetchLatestRelease.mockResolvedValue(__APP_RELEASE__);
+    await checkForUpdate();
+    expect(status()).toBe('current');
+    expect(registration.update).not.toHaveBeenCalled();
+  });
+
+  it('still reports available when starting the worker download fails', async () => {
+    const registration = fakeRegistration();
+    registration.update.mockRejectedValue(new Error('network'));
+    getServiceWorkerRegistration.mockResolvedValue(registration);
+    fetchLatestRelease.mockResolvedValue('neocom-desk@9+newer');
+    await checkForUpdate();
+    expect(status()).toBe('available');
   });
 });
 

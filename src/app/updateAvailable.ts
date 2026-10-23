@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getServiceWorkerRegistration } from '@/lib/serviceWorker';
+import { compareRelease, fetchLatestRelease } from './latestRelease';
 import { INSTALL_TIMEOUT_MS, timeout, waitForInstall } from './swUpdate';
 
 /**
@@ -43,6 +44,17 @@ export function watchRegistration(registration: ServiceWorkerRegistration) {
 }
 
 async function probe(registration: ServiceWorkerRegistration): Promise<UpdateStatus> {
+  // The published release says at once whether a build exists, with no wait on
+  // the download: a newer one is `available` now, and the worker fetches it in
+  // the background (applying it, `forceUpdate`, waits on that install itself).
+  const verdict = compareRelease(await fetchLatestRelease(), __APP_RELEASE__);
+  if (verdict === 'same') return 'current';
+  if (verdict === 'newer') {
+    registration.update().catch(() => undefined);
+    return 'available';
+  }
+  // Unreadable (no `version.json`, a flaky read): ask the worker, and wait for
+  // it to say, as before.
   await registration.update();
   await waitForInstall(registration);
   return registration.waiting ? 'available' : 'current';
