@@ -34,6 +34,10 @@ interface PanelProps {
    * the body. Anything that acts on the panel goes in `actions`; a control
    * belonging to the title itself goes in `leading`. This group does not wrap,
    * so a `meta` holding more than one thing carries its own `flex-wrap`.
+   *
+   * Bare text here inherits the header's small dim type (the group sets it), so a
+   * caller passes a string and not a hand-styled span; a `meta` that needs a
+   * different tone or `tabular-nums` still sets its own classes.
    */
   meta?: ReactNode;
   /**
@@ -125,7 +129,7 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
           className={`flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 py-1 pr-3 md:min-h-9 ${metaOwnRow ? 'max-md:flex-wrap' : ''} ${leading ? 'pl-1' : 'pl-3'}`}
         >
           <div
-            className={`flex min-w-0 items-center gap-2 ${wrapMeta ? 'max-md:flex-wrap' : ''} ${metaOwnRow ? 'max-md:contents' : ''}`}
+            className={`flex min-w-0 items-center gap-2 text-[0.6875rem] text-text-dim ${wrapMeta ? 'max-md:flex-wrap' : ''} ${metaOwnRow ? 'max-md:contents' : ''}`}
           >
             {leading}
             {title && (
