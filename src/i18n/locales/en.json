@@ -5826,6 +5826,12 @@
       "outside": "Another sale of this item used more units than your wallet buys, so we can't tell which stock this one used."
     },
     "marginWorking": "Cost {{unitCost}} each from your wallet buys\nSales tax {{salesTax}}",
+    "marginPercent": "Margin %",
+    "marginPercentTooltip": "Margin as a share of what the units cost you. Blank where the sale has no margin.",
+    "unitCost": "Unit cost",
+    "unitCostTooltip": "What each unit cost, averaged from the oldest wallet buys the sale used up.",
+    "location": "Location",
+    "locationFallback": "Location #{{id}}",
     "transactionsRange": "{{from}} – {{to}}",
     "tradingMargin": "Margin",
     "tradingMatched_one": "{{matched}} of {{count}} sale matched",
