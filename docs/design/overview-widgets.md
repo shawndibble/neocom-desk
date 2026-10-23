@@ -140,8 +140,8 @@ Drawer (desktop, right, 460px) / sheet (phone). Search box, category chips
 (All, then the categories).
 Each item: name, description, an Add / **Add another** button, and
 a real Medium-size preview of the widget (desktop only). Categories:
-Character · Money and market · Industry and mining · Planets and structures ·
-Space and travel · Messages and schedule.
+Character · Money · Market and hauling · Industry and mining · Planets and
+structures · Travel · Combat and raids · Messages and schedule.
 
 ## 7. First run and roles
 
