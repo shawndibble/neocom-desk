@@ -61,9 +61,25 @@ export function guarded<M>(importer: () => Promise<M | undefined>): Promise<M> {
     const recovery = staleBuildRecoveryOutcome();
     return (recovery ?? Promise.resolve(false)).then((reloading) => {
       if (reloading) return new Promise<never>(() => {});
-      throw new Error('Route chunk unavailable');
+      throw new RouteChunkUnavailableError();
     });
   });
+}
+
+/**
+ * A route chunk that would not load and could not be recovered by a reload:
+ * the visitor's connection or a content blocker, as often as not. Its own class
+ * so `main.tsx` can report a lone one as a warning, not an error.
+ */
+class RouteChunkUnavailableError extends Error {
+  constructor() {
+    super('Route chunk unavailable');
+    this.name = 'RouteChunkUnavailableError';
+  }
+}
+
+export function isRouteChunkFailure(error: unknown): boolean {
+  return error instanceof RouteChunkUnavailableError;
 }
 
 /** A loader that also hands back its component synchronously once loaded. */

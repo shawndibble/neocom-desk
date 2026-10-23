@@ -4,6 +4,7 @@ const fns = vi.hoisted(() => ({ callable: vi.fn(), httpsCallable: vi.fn() }));
 vi.mock('firebase/functions', () => ({ httpsCallable: fns.httpsCallable }));
 vi.mock('./firebaseApp', () => ({ getSyncFunctions: () => 'functions' }));
 
+import { failureAnnotation } from '@/observability/reportFailure';
 import { callRouted, routerFor } from './routedCallable';
 
 describe('routerFor', () => {
@@ -39,5 +40,15 @@ describe('callRouted', () => {
       data: { inviteCode: 'x' },
     });
     expect(out).toEqual({ ok: true });
+  });
+
+  it('names the callable, and keeps the error code, on a failure it rethrows', async () => {
+    const failure = Object.assign(new Error('internal'), { code: 'functions/internal' });
+    fns.callable.mockRejectedValue(failure);
+    await expect(callRouted('saveAlertGrant', {})).rejects.toBe(failure);
+    expect(failureAnnotation(failure)).toEqual({
+      callable: 'saveAlertGrant',
+      error_codes: 'functions/internal',
+    });
   });
 });

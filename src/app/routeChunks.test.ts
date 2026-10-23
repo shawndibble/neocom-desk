@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { ComponentType } from 'react';
-import { guarded, named, remembered } from './routeChunks';
+import { guarded, isRouteChunkFailure, named, remembered } from './routeChunks';
 
 const Page: ComponentType = () => null;
 
@@ -98,5 +98,14 @@ describe('remembered', () => {
     expect(load.peek()).toBeUndefined();
     await expect(load()).resolves.toEqual({ default: Page });
     expect(importer).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('isRouteChunkFailure', () => {
+  it('recognises the error guarded() throws, and nothing else', async () => {
+    const thrown = await guarded(() => Promise.resolve(undefined)).catch((e: unknown) => e);
+    expect(isRouteChunkFailure(thrown)).toBe(true);
+    expect(isRouteChunkFailure(new Error('boom'))).toBe(false);
+    expect(isRouteChunkFailure('Route chunk unavailable')).toBe(false);
   });
 });
