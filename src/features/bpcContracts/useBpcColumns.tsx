@@ -114,10 +114,7 @@ export function useBpcColumns({
           const system = row.systemId == null ? undefined : solarSystems?.get(row.systemId);
           const place = (
             <>
-              <span
-                title={name}
-                className="max-sm:inline-block max-sm:max-w-36 max-sm:truncate max-sm:align-bottom"
-              >
+              <span className="max-sm:inline-block max-sm:max-w-36 max-sm:truncate max-sm:align-bottom">
                 {name}
               </span>
               {system && <SecurityStatus security={system.security} />}

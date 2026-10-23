@@ -440,11 +440,7 @@ export function TransactionsPanel({ headerSlots }: TransactionsPanelProps) {
         id: 'location',
         header: t('wallet.location'),
         className: 'truncate',
-        render: (txn) => (
-          <span title={placeNameFor(txn)}>
-            <PlaceLink id={txn.location_id}>{placeNameFor(txn)}</PlaceLink>
-          </span>
-        ),
+        render: (txn) => <PlaceLink id={txn.location_id}>{placeNameFor(txn)}</PlaceLink>,
         sortValue: (txn) => placeNameFor(txn),
       },
     ],

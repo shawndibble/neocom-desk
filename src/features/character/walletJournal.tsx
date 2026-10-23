@@ -117,7 +117,7 @@ export function useJournalColumnsBuilder(): (
               width: '22ch',
               className: 'max-sm:px-1 sm:truncate',
               headerClassName: 'max-sm:px-1',
-              render: (entry) => <span title={nameOf(entry)}>{nameOf(entry)}</span>,
+              render: nameOf,
               sortValue: nameOf,
             },
           ]
@@ -130,7 +130,7 @@ export function useJournalColumnsBuilder(): (
               width: '22ch',
               className: 'max-sm:px-1 sm:truncate',
               headerClassName: 'max-sm:px-1',
-              render: (entry) => <span title={playerNameFor(entry)}>{playerNameFor(entry)}</span>,
+              render: playerNameFor,
               sortValue: playerNameFor,
             },
           ]
@@ -164,10 +164,7 @@ export function useJournalColumnsBuilder(): (
           width: '24ch',
           className: 'max-sm:px-1 sm:truncate',
           headerClassName: 'max-sm:px-1',
-          render: (entry) => {
-            const label = journalRefLabel(journalRefKey(entry), t);
-            return <span title={label}>{label}</span>;
-          },
+          render: (entry) => journalRefLabel(journalRefKey(entry), t),
           sortValue: (entry) => journalRefLabel(journalRefKey(entry), t),
         },
         ...playerColumn,

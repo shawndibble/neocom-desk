@@ -204,7 +204,7 @@ export function useHaulingTable({
             sortValue: (row: HaulingViewRow) => hubAtAnyEnd(row, anyEnd).systemName,
             render: (row: HaulingViewRow) => {
               const hub = hubAtAnyEnd(row, anyEnd);
-              return <span title={hub.systemName}>{hub.systemName}</span>;
+              return hub.systemName;
             },
           },
         ]),

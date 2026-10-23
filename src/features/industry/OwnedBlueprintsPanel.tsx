@@ -305,10 +305,7 @@ export function OwnedBlueprintsPanel({
       header: t('industry.ownedBlueprintsLocation'),
       className: 'truncate',
       sortValue: locationSortValue,
-      render: (row) => {
-        const label = locationLabel(row) ?? t('industry.ownedBlueprintsResolvingLocation');
-        return <span title={label}>{label}</span>;
-      },
+      render: (row) => locationLabel(row) ?? t('industry.ownedBlueprintsResolvingLocation'),
     },
     {
       id: 'owner',
@@ -321,7 +318,7 @@ export function OwnedBlueprintsPanel({
           row.owner.kind === 'character'
             ? row.owner.name
             : t('industry.ownedBlueprintsCorporation');
-        return <span title={owner}>{owner}</span>;
+        return owner;
       },
     },
     {

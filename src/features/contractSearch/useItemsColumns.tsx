@@ -248,7 +248,7 @@ export function useItemsColumns({
         sortValue: (row) => typeNames.get(row.typeId) ?? `#${row.typeId}`,
         render: (row) => (
           // Plain: the row opens the contract modal, whose item lines link to Market.
-          <span className={entityLinkClassName()} title={typeNames.get(row.typeId)}>
+          <span className={entityLinkClassName()}>
             {typeNames.get(row.typeId) ?? `#${row.typeId}`}
           </span>
         ),

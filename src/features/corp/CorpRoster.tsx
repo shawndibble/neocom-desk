@@ -251,10 +251,7 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
         header: t('corp.members.columnRoles'),
         width: '24ch',
         className: 'truncate',
-        render: (row) => {
-          const roles = rolesText(row.roles);
-          return roles ? <span title={roles}>{roles}</span> : DASH;
-        },
+        render: (row) => rolesText(row.roles) ?? DASH,
         sortValue: (row) => rolesText(row.roles) ?? undefined,
       },
     ],
