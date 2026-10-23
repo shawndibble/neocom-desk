@@ -57,9 +57,21 @@ beforeEach(async () => {
     );
     // The officer of another corporation: a valid record, but under the wrong corp.
     await setDoc(doc(db, `${OTHER_CORP}/srpOfficers/char:8`), officer({ characterId: 8 }));
-    await setDoc(doc(db, `${CORP}/srpClaims/111`), { uid: 'char:2', killmailId: 111 });
-    await setDoc(doc(db, `${CORP}/srpClaims/222`), { uid: 'char:3', killmailId: 222 });
-    await setDoc(doc(db, `${OTHER_CORP}/srpClaims/333`), { uid: 'char:2', killmailId: 333 });
+    await setDoc(doc(db, `${CORP}/srpClaims/111`), {
+      uid: 'char:2',
+      ownerHash: 'h2',
+      killmailId: 111,
+    });
+    await setDoc(doc(db, `${CORP}/srpClaims/222`), {
+      uid: 'char:3',
+      ownerHash: 'h3',
+      killmailId: 222,
+    });
+    await setDoc(doc(db, `${OTHER_CORP}/srpClaims/333`), {
+      uid: 'char:2',
+      ownerHash: 'h2',
+      killmailId: 333,
+    });
     await setDoc(doc(db, `${CORP}/srpAudit/e1`), { action: 'turnOn' });
   });
 });
@@ -95,11 +107,31 @@ describe('SRP rules', () => {
     await assertSucceeds(getDoc(doc(db, `${CORP}/srpClaims/111`)));
     await assertFails(getDoc(doc(db, `${CORP}/srpClaims/222`)));
     await assertSucceeds(
-      getDocs(query(collection(db, `${CORP}/srpClaims`), where('uid', '==', 'char:2')))
+      getDocs(
+        query(
+          collection(db, `${CORP}/srpClaims`),
+          where('uid', '==', 'char:2'),
+          where('ownerHash', '==', 'h2')
+        )
+      )
     );
     await assertFails(getDocs(collection(db, `${CORP}/srpClaims`)));
     await assertFails(
       getDocs(query(collection(db, `${CORP}/srpClaims`), where('uid', '==', 'char:3')))
+    );
+  });
+
+  it('does not let a sold Character (same uid, new owner hash) read the old owner’s claims', async () => {
+    const db = characterAuth(env, 2, 'new-owner').firestore();
+    await assertFails(getDoc(doc(db, `${CORP}/srpClaims/111`)));
+    await assertFails(
+      getDocs(
+        query(
+          collection(db, `${CORP}/srpClaims`),
+          where('uid', '==', 'char:2'),
+          where('ownerHash', '==', 'h2')
+        )
+      )
     );
   });
 

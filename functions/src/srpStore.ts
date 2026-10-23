@@ -118,6 +118,7 @@ export async function authorizeSrpOfficer(
   options: { live: boolean } = { live: true }
 ): Promise<OfficerAccess> {
   const claims = await verifiedClaims(deps, caller, call.accessToken);
+  const accessToken = call.accessToken as string; // verifiedClaims refused an absent one
   const now = deps.now();
   const officerRef = officersOf(deps.db, call.corporationId).doc(caller.uid);
   const held = (await officerRef.get()).data() as OfficerAccess | undefined;
@@ -133,9 +134,10 @@ export async function authorizeSrpOfficer(
     access = held;
   } else {
     if (!claims.scopes.includes(ROLES_SCOPE)) {
+      if (held) await officerRef.delete();
       fail('failed-precondition', 'Grant the corporation roles scope first', 'missing-scope');
     }
-    const identity = await deps.readIdentity(claims.characterId, call.accessToken!);
+    const identity = await deps.readIdentity(claims.characterId, accessToken);
     if (identity.corporationId !== call.corporationId) {
       if (held) await officerRef.delete();
       fail('permission-denied', 'Not a member of this corporation', 'wrong-corp');

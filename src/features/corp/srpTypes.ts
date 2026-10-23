@@ -59,11 +59,13 @@ export interface SrpSettingsPatch {
 
 /**
  * The fields of an SRP Claim doc that rules and the officer gate rely on. The
- * file-claim callable (#4850) writes the rest. `uid` is the filer's verified
- * `char:{id}`, which is what lets a pilot read only their own claims.
+ * file-claim callable (#4850) writes the rest. `uid` and `ownerHash` are the filer's
+ * verified identity, which is what lets a pilot read only their own claims.
  */
 export interface SrpClaimKey {
   uid: string;
+  /** The filer's ownerHash at filing; rules require it to match the reader's token. */
+  ownerHash: string;
   corporationId: number;
   killmailId: number;
 }
