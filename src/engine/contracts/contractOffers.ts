@@ -56,13 +56,14 @@ export interface PublicContractOfferRow {
    */
   requestsItems?: true;
   /**
-   * Distinct for-sale item types in the contract, the same on every offer row
-   * of one contract (`functions/src/publicContracts.ts`'s `applyTypeCounts`).
-   * The Items board reads only the rows of the types it searched, so this is
-   * the one place it can learn a contract is a bundle. Absent on a snapshot
-   * published before the field existed: unknown, not single-type.
+   * For-sale lines in the contract, the same on every offer row of one
+   * contract (`functions/src/publicContracts.ts`'s `applyLineCounts`). The
+   * Items board reads only the rows of the types it searched, so this is the
+   * one place it can learn a contract is a bundle, or holds several stacks.
+   * Absent on a snapshot published before the field existed: unknown, not
+   * single-line.
    */
-  typeCount?: number;
+  lineCount?: number;
   /** Epoch ms. */
   dateExpired: number;
 }

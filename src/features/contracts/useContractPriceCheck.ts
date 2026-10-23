@@ -10,6 +10,7 @@
  */
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { BundleSplit } from '@/engine/contracts/contractFlags';
 import {
   iskPriceCheck,
   itemSwapPriceCheck,
@@ -36,7 +37,7 @@ export interface ContractPriceCheckView {
    * The searched lines' value against the rest at the side on screen, when a
    * search is active: what the padded-bundle sentence (#4773) is worded from.
    */
-  split?: { mine: number; rest: number; unpricedLines: number; restLines: number; side: PriceSide };
+  split?: BundleSplit & { restLines: number; side: PriceSide };
 }
 
 export interface ContractPriceCheckArgs {

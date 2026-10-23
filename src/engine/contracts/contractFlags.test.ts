@@ -3,8 +3,7 @@ import type { PublicContractOfferRow } from './contractOffers';
 import {
   bundleShareOfValue,
   contractFlagFor,
-  countFlagged,
-  hideFlagged,
+  splitFlagged,
   type ContractFlagContext,
 } from './contractFlags';
 
@@ -15,7 +14,7 @@ function row(overrides: Partial<PublicContractOfferRow> = {}): PublicContractOff
     locationId: 60003760,
     typeId: 2048,
     price: 6_200_000,
-    typeCount: 1,
+    lineCount: 1,
     isAuction: false,
     quantity: 1,
     dateExpired: 0,
@@ -55,11 +54,15 @@ describe('contractFlagFor', () => {
   });
 
   it('never flags a contract with other lines: its price pays for all of them', () => {
-    expect(contractFlagFor(row({ typeCount: 9 }), ctx())).toBeNull();
+    expect(contractFlagFor(row({ lineCount: 9 }), ctx())).toBeNull();
   });
 
   it('says nothing when the line count is unknown, as on a snapshot from before the field', () => {
-    expect(contractFlagFor(row({ typeCount: undefined }), ctx())).toBeNull();
+    expect(contractFlagFor(row({ lineCount: undefined }), ctx())).toBeNull();
+  });
+
+  it('says nothing about a contract with several stacks: its one price pays for all of them', () => {
+    expect(contractFlagFor(row({ lineCount: 2 }), ctx())).toBeNull();
   });
 
   it('says nothing about a contract that also asks for items: its price is not the whole ask', () => {
@@ -111,7 +114,7 @@ describe('contractFlagFor', () => {
   });
 });
 
-describe('hideFlagged and countFlagged', () => {
+describe('splitFlagged', () => {
   const rows = [
     row({ contractId: 1 }),
     row({ contractId: 2, price: 400_000 }),
@@ -119,12 +122,10 @@ describe('hideFlagged and countFlagged', () => {
   ];
   const flagOf = (r: PublicContractOfferRow) => contractFlagFor(r, ctx());
 
-  it('drops only the flagged rows and keeps the order', () => {
-    expect(hideFlagged(rows, flagOf).map((r) => r.contractId)).toEqual([2]);
-  });
-
-  it('counts what it would hide', () => {
-    expect(countFlagged(rows, flagOf)).toBe(2);
+  it('keeps the unflagged rows and sets the flagged ones aside, in order', () => {
+    const { kept, hidden } = splitFlagged(rows, flagOf);
+    expect(kept.map((r) => r.contractId)).toEqual([2]);
+    expect(hidden.map((r) => r.contractId)).toEqual([1, 3]);
   });
 });
 

@@ -504,6 +504,21 @@ describe('PublicContractDetailModal — flag sentences (#4773)', () => {
     ).toBeInTheDocument();
   });
 
+  it('says how little it can tell when the other lines have no hub price', async () => {
+    showItems([
+      item({ record_id: 1, quantity: 1 }),
+      item({ record_id: 2, type_id: 99999, quantity: 3 }),
+    ]);
+    renderModal(null, { askingIsk: 11_000_000_000, searchedTypeIds: new Set([40520]) });
+
+    expect(
+      await screen.findByText(
+        'The price pays for 1 other line, and some lines have no Jita price, so how it compares is unknown.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Your search is/)).not.toBeInTheDocument();
+  });
+
   it('stays silent when the searched line is most of the contract', async () => {
     showItems([
       item({ record_id: 1, quantity: 100 }),

@@ -16,6 +16,7 @@ export function flagHint(flag: ContractFlag, hub: TradeHub, t: TFunction): strin
         hub: hub.systemName,
       })
     : t('contractSearch.flag.copyHint', {
+        times: (Math.round((flag.asking / flag.original) * 10) / 10).toString(),
         region: hub.regionName,
         price: formatIskAuto(flag.original, CONTRACT_ISK_CENTS_BELOW),
       });

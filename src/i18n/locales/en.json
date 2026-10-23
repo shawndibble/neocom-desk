@@ -9147,6 +9147,8 @@
     "flagBundleShare_other": "Your search is {{share}} of this contract's value at {{hub}} {{side}}. The price pays for {{count}} other lines.",
     "flagBundleShareUnderOne_one": "Your search is under 1% of this contract's value at {{hub}} {{side}}. The price pays for {{count}} other line.",
     "flagBundleShareUnderOne_other": "Your search is under 1% of this contract's value at {{hub}} {{side}}. The price pays for {{count}} other lines.",
+    "flagBundleUnpriced_one": "The price pays for {{count}} other line, and some lines have no {{hub}} price, so how it compares is unknown.",
+    "flagBundleUnpriced_other": "The price pays for {{count}} other lines, and some lines have no {{hub}} price, so how it compares is unknown.",
     "flagThreshold": "Flagged at {{times}} times the hub sell. Change it in Settings › Market.",
     "flagSideSell": "sell orders",
     "flagSideBuy": "buy orders",
@@ -12949,10 +12951,10 @@
       "overpricedLabel": "Priced far above market",
       "overpricedHint": "Asks {{times}} times the {{hub}} sell price.",
       "copyLabel": "Copy asks more than the original",
-      "copyHint": "Asks more than the original sells for in {{region}} ({{price}} ISK). A copy is the cheaper way in."
+      "copyHint": "Asks {{times}} times what the original sells for in {{region}} ({{price}} ISK). A copy is the cheaper way in."
     },
     "filterHideOverpriced": "Hide overpriced",
-    "filterHideOverpricedHint": "Hides item contracts flagged as priced far above the hub: {{times}} times the hub sell for an item, or a copy asking more than its original. A contract with other lines is never flagged, so never hidden.",
+    "filterHideOverpricedHint": "Hides item contracts flagged as priced far above the hub: {{times}} times the hub sell for an item, or a copy asking more than its original. A contract with other lines is never flagged, so never hidden. Up to 100 different items are priced at once; a wider browse is not flagged.",
     "overpricedHidden_one": "{{count}} overpriced contract hidden",
     "overpricedHidden_other": "{{count}} overpriced contracts hidden",
     "regionColumn": "Region",

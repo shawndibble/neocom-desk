@@ -6,7 +6,7 @@ import {
   compactContractOfferRow,
   accumulateRequestedSide,
   applyRequestedSide,
-  applyTypeCounts,
+  applyLineCounts,
   emptyRequestedSide,
   requestedSideByContract,
   filterAndCompactPublicContractOffers,
@@ -310,7 +310,7 @@ describe('applyRequestedSide', () => {
   });
 });
 
-describe('applyTypeCounts', () => {
+describe('applyLineCounts', () => {
   const base = {
     regionId: 10000002,
     locationId: 60003760,
@@ -320,15 +320,15 @@ describe('applyTypeCounts', () => {
     dateExpired: Date.parse(FUTURE),
   };
 
-  it('stamps every row with how many distinct for-sale types its contract carries', () => {
+  it('stamps every row with how many for-sale lines its contract carries', () => {
     const rows: PublicContractOfferRow[] = [
       { ...base, contractId: 1, typeId: 34 },
       { ...base, contractId: 1, typeId: 35 },
       { ...base, contractId: 1, typeId: 36 },
       { ...base, contractId: 2, typeId: 34 },
     ];
-    applyTypeCounts(rows);
-    expect(rows.map((r) => [r.contractId, r.typeId, r.typeCount])).toEqual([
+    applyLineCounts(rows);
+    expect(rows.map((r) => [r.contractId, r.typeId, r.lineCount])).toEqual([
       [1, 34, 3],
       [1, 35, 3],
       [1, 36, 3],
@@ -336,19 +336,19 @@ describe('applyTypeCounts', () => {
     ]);
   });
 
-  it('counts a type listed twice once: two stacks of one ore are not a bundle', () => {
+  it('counts two stacks of one type as two lines: the one price pays for both', () => {
     const rows: PublicContractOfferRow[] = [
       { ...base, contractId: 1, typeId: 34 },
       { ...base, contractId: 1, typeId: 34, quantity: 5 },
     ];
-    applyTypeCounts(rows);
-    expect(rows.map((r) => r.typeCount)).toEqual([1, 1]);
+    applyLineCounts(rows);
+    expect(rows.map((r) => r.lineCount)).toEqual([2, 2]);
   });
 
   it('writes the count even when it is one, so a reader can tell single from unknown', () => {
     const rows: PublicContractOfferRow[] = [{ ...base, contractId: 7, typeId: 34 }];
-    applyTypeCounts(rows);
-    expect(rows[0]).toHaveProperty('typeCount', 1);
+    applyLineCounts(rows);
+    expect(rows[0]).toHaveProperty('lineCount', 1);
   });
 });
 

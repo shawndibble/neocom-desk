@@ -68,12 +68,7 @@ import {
   type PublicContractOfferRow,
 } from '@/engine/contracts/contractOffers';
 import { bpcPerRunCheck } from '@/engine/contracts/bpcPerRunCheck';
-import {
-  contractFlagFor,
-  countFlagged,
-  hideFlagged,
-  type ContractFlag,
-} from '@/engine/contracts/contractFlags';
+import { contractFlagFor, splitFlagged, type ContractFlag } from '@/engine/contracts/contractFlags';
 import {
   resolveCourierRoutes,
   type PublicCourierContractRow,
@@ -653,14 +648,11 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
       contractFlagFor(row, { hubSell: flagPrices.sellFor(row), threshold: itemFlagMultiple }),
     [flagPrices, itemFlagMultiple]
   );
-  const shownRows = useMemo(
-    () => (uiFilter.hideOverpriced ? hideFlagged(displayRows, flagFor) : displayRows),
-    [uiFilter.hideOverpriced, displayRows, flagFor]
-  );
-  const hiddenOverpriced = useMemo(
-    () => (uiFilter.hideOverpriced ? countFlagged(displayRows, flagFor) : 0),
-    [uiFilter.hideOverpriced, displayRows, flagFor]
-  );
+  const { shownRows, hiddenOverpriced } = useMemo(() => {
+    if (!uiFilter.hideOverpriced) return { shownRows: displayRows, hiddenOverpriced: 0 };
+    const { kept, hidden } = splitFlagged(displayRows, flagFor);
+    return { shownRows: kept, hiddenOverpriced: hidden.length };
+  }, [uiFilter.hideOverpriced, displayRows, flagFor]);
 
   const suggestions = useMemo<Suggestion[]>(() => {
     if (selectedTypeId !== null || uiFilter.typeQuery.trim() === '') return [];
@@ -764,6 +756,15 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     });
   }
 
+  // Stable, so the column set is not rebuilt on every panel render.
+  const priceFlag = useCallback(
+    (row: PublicContractOfferRow) => {
+      const flag = flagFor(row);
+      return flag && <ContractFlagMark flag={flag} hub={flagPrices.hub} t={t} />;
+    },
+    [flagFor, flagPrices.hub, t]
+  );
+
   const { columns, itemsColumnsById, itemsCsvColumns, offerJumps, plexAskLabel } = useItemsColumns({
     typeNames,
     regionNames,
@@ -771,10 +772,7 @@ export function ContractSearchPanel({ mode, onStatusChange }: ContractSearchPane
     jumpRangeFilter,
     plexPrice,
     visibleItemsColumns,
-    priceFlag: (row) => {
-      const flag = flagFor(row);
-      return flag && <ContractFlagMark flag={flag} hub={flagPrices.hub} t={t} />;
-    },
+    priceFlag,
   });
 
   const itemsSortProps = useUrlSort(

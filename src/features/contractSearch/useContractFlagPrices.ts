@@ -5,8 +5,11 @@
  * both go through `market/prices`, which the Below market view already shares
  * and caches on the hub TTL, in one batched call per kind.
  *
- * A type with no price yet (still reading, unreachable, or nothing listed) is
- * simply absent, and `contractFlagFor` stays silent for it.
+ * Prices accumulate while the hub stays the same: narrowing or widening the
+ * search keeps what is already known, so a flag, and Hide overpriced's count,
+ * does not blink out while the next batch loads. A type with no price yet
+ * (still reading, unreachable, or nothing listed) is simply absent, and
+ * `contractFlagFor` stays silent for it.
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
@@ -38,6 +41,17 @@ function cappedIds(ids: Iterable<number>): number[] {
   return distinct.length > MAX_PRICED_TYPES ? [] : distinct;
 }
 
+/** The prices read for one hub so far; a different hub starts over. */
+interface Known {
+  hubId: string;
+  prices: PriceMap;
+}
+
+function merged(known: Known, hubId: string, fresh: PriceMap): Known {
+  const base = known.hubId === hubId ? known.prices : NONE;
+  return { hubId, prices: new Map([...base, ...fresh]) };
+}
+
 export function useContractFlagPrices(
   rows: readonly PublicContractOfferRow[],
   enabled: boolean
@@ -65,16 +79,12 @@ export function useContractFlagPrices(
   const plainKey = idSetKey(plainIds);
   const copyKey = idSetKey(copyIds);
 
-  const [plain, setPlain] = useState<{ key: string; prices: PriceMap }>({ key: '', prices: NONE });
-  const [originals, setOriginals] = useState<{ key: string; prices: PriceMap }>({
-    key: '',
-    prices: NONE,
-  });
+  const [plain, setPlain] = useState<Known>({ hubId: '', prices: NONE });
+  const [originals, setOriginals] = useState<Known>({ hubId: '', prices: NONE });
 
   useEffect(() => {
     if (plainIds.length === 0) return;
     let cancelled = false;
-    const key = `${hub.id}:${plainKey}`;
     void getHubPricesWithStatus(hub, plainIds).then(
       ({ prices }) => {
         if (cancelled) return;
@@ -82,7 +92,7 @@ export function useContractFlagPrices(
         for (const [typeId, aggregate] of prices) {
           if (aggregate.sellMin !== null) sells.set(typeId, aggregate.sellMin);
         }
-        setPlain({ key, prices: sells });
+        setPlain((known) => merged(known, hub.id, sells));
       },
       () => undefined
     );
@@ -96,13 +106,12 @@ export function useContractFlagPrices(
   useEffect(() => {
     if (copyIds.length === 0) return;
     let cancelled = false;
-    const key = `${hub.id}:${copyKey}`;
     void getRegionSellPrices(hub.regionId, copyIds).then(
       (prices) => {
         if (cancelled) return;
         const sells = new Map<number, number>();
         for (const [typeId, price] of prices) if (price !== null) sells.set(typeId, price);
-        setOriginals({ key, prices: sells });
+        setOriginals((known) => merged(known, hub.id, sells));
       },
       () => undefined
     );
@@ -112,15 +121,12 @@ export function useContractFlagPrices(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hub, copyKey]);
 
-  const plainCurrent = plain.key === `${hub.id}:${plainKey}` ? plain.prices : NONE;
-  const originalsCurrent = originals.key === `${hub.id}:${copyKey}` ? originals.prices : NONE;
-
-  return useMemo(
-    () => ({
+  return useMemo(() => {
+    const plainNow = plain.hubId === hub.id ? plain.prices : NONE;
+    const originalsNow = originals.hubId === hub.id ? originals.prices : NONE;
+    return {
       hub,
-      sellFor: (row) =>
-        (row.isBlueprintCopy ? originalsCurrent : plainCurrent).get(row.typeId) ?? null,
-    }),
-    [hub, plainCurrent, originalsCurrent]
-  );
+      sellFor: (row) => (row.isBlueprintCopy ? originalsNow : plainNow).get(row.typeId) ?? null,
+    };
+  }, [hub, plain, originals]);
 }

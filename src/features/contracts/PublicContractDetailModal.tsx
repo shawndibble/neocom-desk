@@ -268,6 +268,11 @@ export function PublicContractDetailModal({
     }
     const split = priceCheck?.split;
     const share = split ? bundleShareOfValue(split) : null;
+    if (split && share === null && split.unpricedLines > 0 && split.restLines > 0) {
+      notes.push(
+        t('contractDetail.flagBundleUnpriced', { hub: hub.systemName, count: split.restLines })
+      );
+    }
     if (split && share !== null && share < BUNDLE_MINORITY_SHARE) {
       const percent = Math.round(share * 100);
       notes.push(

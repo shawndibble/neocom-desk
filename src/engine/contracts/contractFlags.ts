@@ -5,16 +5,16 @@
  * A flag states a condition and its multiple, never a verdict
  * (`20260912-172628-courier-risk-flags-state-a-condition-never-a.md`), and
  * stays silent when it cannot tell: no hub price yet, a barter, an auction
- * with no buyout, a contract that also asks for items, or one with other
- * lines, or one whose line count is unknown (`row.typeCount` absent: a
- * snapshot from before the field). The bundle case follows
+ * with no buyout, a contract that also asks for items, one with more than one
+ * line (other types, or several stacks), or one whose line count is unknown
+ * (`row.lineCount` absent: a snapshot from before the field). The bundle case follows
  * `20260915-093419-multi-type-contract-price-treated-as-unknowable-never.md`:
  * one price pays for every line, so the row alone cannot call it overpriced.
  */
 import type { PublicContractOfferRow } from './contractOffers';
 import { buyoutOf, isUnpricedOffer } from './contractSearch';
 
-/** Proposed default, and Market Browser's `SELL_OUTLIER_FACTOR`. */
+/** The default multiple: Market Browser's `SELL_OUTLIER_FACTOR`. */
 export const DEFAULT_ITEM_FLAG_MULTIPLE = 10;
 
 export type ContractFlag =
@@ -29,14 +29,14 @@ export interface ContractFlagContext {
 }
 
 /**
- * Signals 1 and 2. A blueprint copy is held against the original's hub price,
+ * A blueprint copy is held against the original's hub price,
  * anything else against the hub sell of every unit the contract carries.
  */
 export function contractFlagFor(
   row: PublicContractOfferRow,
   { hubSell, threshold }: ContractFlagContext
 ): ContractFlag | null {
-  if (row.typeCount !== 1 || hubSell === null || hubSell <= 0) return null;
+  if (row.lineCount !== 1 || hubSell === null || hubSell <= 0) return null;
   if (row.requestsItems || isUnpricedOffer(row)) return null;
   // An auction's `price` is a starting bid, so only a buyout is an ask.
   if (row.isAuction && buyoutOf(row) === null) return null;
@@ -57,17 +57,18 @@ export function contractFlagFor(
     : null;
 }
 
-/** `rows` without the ones `flagOf` flags, in the order given. */
-export function hideFlagged<T>(rows: readonly T[], flagOf: (row: T) => ContractFlag | null): T[] {
-  return rows.filter((row) => flagOf(row) === null);
-}
-
-/** How many rows `hideFlagged` would drop, for the "N hidden" line. */
-export function countFlagged<T>(
+/**
+ * `rows` split into the ones to keep and the ones `flagOf` flags, order kept:
+ * what Hide overpriced shows and what its "N hidden" line counts.
+ */
+export function splitFlagged<T>(
   rows: readonly T[],
   flagOf: (row: T) => ContractFlag | null
-): number {
-  return rows.length - hideFlagged(rows, flagOf).length;
+): { kept: T[]; hidden: T[] } {
+  const kept: T[] = [];
+  const hidden: T[] = [];
+  for (const row of rows) (flagOf(row) === null ? kept : hidden).push(row);
+  return { kept, hidden };
 }
 
 /** A searched line worth less than this share of its contract's value is the minority of a padded bundle. */
@@ -78,11 +79,16 @@ export const BUNDLE_MINORITY_SHARE = 0.5;
  * sentence. `null` when any line has no hub price, since the share would then
  * be a guess, or when nothing is priced.
  */
-export function bundleShareOfValue(split: {
+export interface BundleSplit {
+  /** Value of the searched lines at the hub. */
   mine: number;
+  /** Value of the other lines. */
   rest: number;
+  /** Lines with no hub price, counted in neither total. */
   unpricedLines: number;
-}): number | null {
+}
+
+export function bundleShareOfValue(split: BundleSplit): number | null {
   const total = split.mine + split.rest;
   if (split.unpricedLines > 0 || total <= 0) return null;
   return split.mine / total;
