@@ -52,6 +52,16 @@ function FirstTime({ onTurnOn }: { onTurnOn: () => Promise<void> }) {
 export function SrpSettingsView() {
   const { t } = useTranslation();
   const data = useSrpSettings();
+  const [saveFailed, setSaveFailed] = useState(false);
+  // A half-done save reloads and remounts the form, so the failure line lives here.
+  const save: typeof data.save = async (patch, enabled) => {
+    setSaveFailed(false);
+    try {
+      await data.save(patch, enabled);
+    } catch {
+      setSaveFailed(true);
+    }
+  };
   const { state } = data;
   switch (state.status) {
     case 'loading':
@@ -79,7 +89,8 @@ export function SrpSettingsView() {
           settings={state.settings}
           verdict={state.verdict}
           characterId={data.characterId ?? 0}
-          onSave={data.save}
+          onSave={save}
+          saveFailed={saveFailed}
           onReclaim={data.reclaim}
         />
       );

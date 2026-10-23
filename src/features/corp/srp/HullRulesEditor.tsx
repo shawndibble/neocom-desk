@@ -61,9 +61,19 @@ export function HullRulesEditor({
     () => (catalog ? listedHullIds(form, catalog, added) : new Set<number>()),
     [form, catalog, added]
   );
+  // A hull whose fixed price is blank stays on screen even if its class is collapsed: Save is blocked on it.
+  const shown = useMemo(() => {
+    const open = new Set(expanded);
+    if (catalog)
+      for (const key of formProblems(form).fixedIsk) {
+        const hull = key.startsWith('hull:') ? catalog.hull(Number(key.slice(5))) : undefined;
+        if (hull) open.add(hull.classId);
+      }
+    return open;
+  }, [expanded, form, catalog]);
   const rows = useMemo(
-    () => (catalog ? buildHullRuleRows(catalog, className, listed, expanded) : []),
-    [catalog, className, listed, expanded]
+    () => (catalog ? buildHullRuleRows(catalog, className, listed, shown) : []),
+    [catalog, className, listed, shown]
   );
   const results = useMemo(() => (catalog ? searchHulls(catalog, query) : []), [catalog, query]);
   const problems = formProblems(form);
@@ -136,7 +146,7 @@ export function HullRulesEditor({
   };
 
   const toggleButton = (row: HullRuleRow, tall: boolean) => {
-    const open = expanded.has(row.id);
+    const open = shown.has(row.id);
     const Caret = open ? Icon.Expanded : Icon.Descend;
     return (
       <button

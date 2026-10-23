@@ -38,6 +38,8 @@ interface Props {
   verdict: SrpOfficerVerdict;
   characterId: number;
   onSave: (patch: ReturnType<typeof formToPatch>, enabled: boolean | null) => Promise<void>;
+  /** The last save failed (kept by the parent: a half-done save reloads and remounts this form). */
+  saveFailed: boolean;
   onReclaim: () => Promise<void>;
 }
 
@@ -82,7 +84,14 @@ function PercentField({
   );
 }
 
-export function SrpSettingsEditor({ settings, verdict, characterId, onSave, onReclaim }: Props) {
+export function SrpSettingsEditor({
+  settings,
+  verdict,
+  characterId,
+  onSave,
+  saveFailed,
+  onReclaim,
+}: Props) {
   const { t } = useTranslation();
   const uid = useId();
   const phone = useIsPhone();
@@ -91,7 +100,6 @@ export function SrpSettingsEditor({ settings, verdict, characterId, onSave, onRe
   const [added, setAdded] = useState<number[]>([]);
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(new Set());
   const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
   const [reclaimOpen, setReclaimOpen] = useState(false);
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
   const reclaimRef = useRef<HTMLButtonElement>(null);
@@ -122,14 +130,11 @@ export function SrpSettingsEditor({ settings, verdict, characterId, onSave, onRe
 
   const save = async () => {
     setSaving(true);
-    setFailed(false);
     try {
       await onSave(
         formToPatch(form, settings),
         form.enabled === settings.enabled ? null : form.enabled
       );
-    } catch {
-      setFailed(true);
     } finally {
       setSaving(false);
     }
@@ -138,7 +143,7 @@ export function SrpSettingsEditor({ settings, verdict, characterId, onSave, onRe
   const discard = () => {
     setForm(formFromSettings(settings));
     setAdded([]);
-    setFailed(false);
+    setExpanded(new Set());
   };
 
   const copyLabel =
@@ -303,7 +308,7 @@ export function SrpSettingsEditor({ settings, verdict, characterId, onSave, onRe
           onSave={() => void save()}
           saving={saving}
         >
-          {failed && (
+          {saveFailed && (
             <ActionResult kind="error" className="pt-1">
               {t('srp.settings.saveFailed')}
             </ActionResult>

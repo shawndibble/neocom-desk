@@ -61,7 +61,7 @@ export function UnsavedChangesBar({
         </p>
         <Button
           className="max-sm:flex-1"
-          onClick={onDiscard}
+          onClick={saving ? undefined : onDiscard}
           aria-disabled={saving ? true : undefined}
         >
           {discardLabel}

@@ -45,7 +45,16 @@ const DENIED = /permission-denied|unauthenticated|failed-precondition/;
 export function useSrpSettings(): SrpSettingsData {
   const characterId = useActiveCharacter((s) => s.activeCharacterId);
   const corporationId = useActiveCorporationId();
-  const [state, setState] = useState<SrpSettingsState>({ status: 'loading' });
+  const key =
+    characterId === null || corporationId === null ? null : `${characterId}:${corporationId}`;
+  // Tagged with the Character and corporation it was read for, so a switch shows loading, never the old corp's form.
+  const [loaded, setLoaded] = useState<{ key: string; state: SrpSettingsState } | null>(null);
+  const state: SrpSettingsState =
+    loaded !== null && loaded.key === key ? loaded.state : { status: 'loading' };
+  const setState = useCallback(
+    (next: SrpSettingsState) => key !== null && setLoaded({ key, state: next }),
+    [key]
+  );
   const [attempt, setAttempt] = useState(0);
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
@@ -60,7 +69,12 @@ export function useSrpSettings(): SrpSettingsData {
           setState({ status: 'not-director', verdict });
           return;
         }
-        const settings = await readSrpSettings(characterId, corporationId);
+        // verifySrpOfficer records officer access only once a settings doc exists, so before
+        // SRP was ever turned on the rules refuse this read: that is the first-time state.
+        const settings = await readSrpSettings(characterId, corporationId).catch((error) => {
+          if (/permission-denied/.test((error as { code?: string }).code ?? '')) return null;
+          throw error;
+        });
         if (cancelled) return;
         setState(
           settings ? { status: 'ready', verdict, settings } : { status: 'never-on', verdict }
@@ -78,7 +92,7 @@ export function useSrpSettings(): SrpSettingsData {
     return () => {
       cancelled = true;
     };
-  }, [characterId, corporationId, attempt]);
+  }, [characterId, corporationId, attempt, setState]);
 
   const turnOn = useCallback(async () => {
     if (characterId === null || corporationId === null) return;

@@ -56,6 +56,7 @@ function setup(over: { verdict?: Partial<SrpOfficerVerdict>; owner?: number } = 
       verdict={{ ...verdict, ...over.verdict }}
       characterId={7}
       onSave={onSave}
+      saveFailed={false}
       onReclaim={onReclaim}
     />
   );
@@ -122,6 +123,14 @@ describe('SrpSettingsEditor', () => {
     expect(screen.getByLabelText('Fixed price for Cruiser')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('keeps a hull with a blank fixed price on screen when its class is collapsed', async () => {
+    setup();
+    await userEvent.click(screen.getByRole('button', { name: /Cruiser/ }));
+    await userEvent.selectOptions(screen.getByLabelText('Rule for Thorax'), 'pay-fixed');
+    await userEvent.click(screen.getByRole('button', { name: /Cruiser/ }));
+    expect(screen.getByLabelText('Fixed price for Thorax')).toBeInTheDocument();
   });
 
   it('offers Reclaim only to a CEO when another Director owns SRP', () => {

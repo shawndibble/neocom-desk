@@ -59,6 +59,12 @@ describe('useSrpSettings', () => {
     await waitFor(() => expect(result.current.state.status).toBe('never-on'));
   });
 
+  it('treats a refused read after verify as never-on: no settings doc means no officer record yet', async () => {
+    client.readSrpSettings.mockRejectedValue({ code: 'permission-denied' });
+    const { result } = renderHook(() => useSrpSettings());
+    await waitFor(() => expect(result.current.state.status).toBe('never-on'));
+  });
+
   it('maps permission errors to denied and others to failed', async () => {
     client.verifySrpOfficer.mockRejectedValueOnce({ code: 'functions/permission-denied' });
     const denied = renderHook(() => useSrpSettings());
