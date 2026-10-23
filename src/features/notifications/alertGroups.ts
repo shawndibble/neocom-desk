@@ -225,9 +225,8 @@ export function groupAlertsByType(entries: readonly NotificationFeedRecord[]): A
     existing.count += 1;
     existing.entries.push(entry);
     // A group is as severe as its worst entry: one type can carry two severities.
-    if (compareSeverity(entrySeverity(entry), existing.severity) < 0) {
-      existing.severity = entrySeverity(entry);
-    }
+    const severity = entrySeverity(entry);
+    if (compareSeverity(severity, existing.severity) < 0) existing.severity = severity;
     // Never assume the caller handed them over in order: `readFeed` does, but
     // a filtered or merged list need not, and a group claiming the wrong
     // "newest" would sort itself into the wrong place.
