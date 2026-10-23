@@ -12740,11 +12740,10 @@
       "eve": "EVE time (UTC)"
     },
     "numberFormatLabel": "Number format",
-    "numberFormatHint": "How numbers are written. Pasted numbers read in either format.",
+    "numberFormatHint": "How numbers are written. Starts on your browser's format. Pasted numbers read in either format.",
     "numberFormat": {
-      "auto": "Match my browser ({{example}})",
-      "period": "Period decimal ({{example}})",
-      "comma": "Comma decimal ({{example}})"
+      "period": "English ({{example}})",
+      "comma": "European ({{example}})"
     },
     "weekStartLabel": "Week starts on",
     "weekStartHint": "First day of the week in the Calendar's Month and Fortnight grids.",
