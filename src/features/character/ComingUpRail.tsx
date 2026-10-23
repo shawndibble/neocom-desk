@@ -126,7 +126,7 @@ export function ComingUpRail({
           </button>
         )
       }
-      className="min-w-0 flex-1 md:min-w-72"
+      className="min-w-0 flex-1 md:max-w-lg md:min-w-72"
     >
       {content}
     </Panel>
