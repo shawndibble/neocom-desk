@@ -637,6 +637,29 @@ describe('PlanEditor tools pane', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('"Optimize for me" says there is nothing to gain instead of listing a reshuffle that saves no time', async () => {
+    const user = userEvent.setup();
+    // One skill, on a sheet already remapped for its attributes: no order or remap helps.
+    const plan = { ...PLAN, entries: [{ skillTypeID: 10, targetLevel: 1 }] };
+    const attributes: Attributes = {
+      intelligence: 27,
+      memory: 21,
+      perception: 17,
+      willpower: 17,
+      charisma: 17,
+    };
+    const { onUpdate } = renderEditor(vi.fn(), { plan, attributes });
+    await openTools(user);
+
+    await clickOptimizeMode(user, 'Optimize for me…');
+    const dialog = screen.getByRole('dialog', { name: 'Optimize for me' });
+
+    expect(within(dialog).getByText(/^Nothing to gain/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Accept' })).toBeNull();
+    await user.click(within(dialog).getByRole('button', { name: 'Dismiss' }));
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
   it('Reject closes the "Optimize for me" Modal without updating the plan', async () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();

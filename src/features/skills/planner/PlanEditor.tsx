@@ -2008,6 +2008,7 @@ export function PlanEditor({
         preview={optimizeForMePreview}
         currentOrder={scheduled}
         totalSeconds={totalSeconds}
+        prioritized={[...priorityMap.values()].some((priority) => priority !== 'normal')}
         nameFor={nameFor}
         stepLabel={stepLabel}
         implants={effectiveImplants}

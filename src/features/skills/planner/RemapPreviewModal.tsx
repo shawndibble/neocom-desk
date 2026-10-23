@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { romanLevel } from '@/engine/projection';
 import { useTranslation } from 'react-i18next';
 import { Button, Eyebrow, Modal, SegmentedControl } from '@/components/ui';
@@ -12,7 +12,12 @@ import { formatCountdown } from '@/lib/duration';
 import { useTimeZone } from '@/lib/timeFormat';
 import { yearlyRemapAfterNote } from './optimizeHelpers';
 import type { OptimizeVerdict } from './optimizeVerdict';
-import { compareOrders, type CurrentCompareRow, type ProposedCompareRow } from './optimizeCompare';
+import {
+  compareOrders,
+  optimizeForMeHasGain,
+  type CurrentCompareRow,
+  type ProposedCompareRow,
+} from './optimizeCompare';
 import { remapInstruction } from './remapInstruction';
 
 interface RemapSegmentListProps {
@@ -160,6 +165,8 @@ interface OptimizeForMeModalProps {
   currentOrder: readonly PlanStep[];
   /** The plan's current total, shown as the "before" of the before/after line. */
   totalSeconds: number;
+  /** True when the pilot ranked any skill above or below normal: a reorder alone is then worth previewing. */
+  prioritized: boolean;
   nameFor: (skillTypeID: number) => string;
   stepLabel: (step: PlanStep) => string;
   implants: Implants;
@@ -186,86 +193,92 @@ function MovedPill({ from, position }: { from: number; position: number }) {
   );
 }
 
-function CurrentList({
-  rows,
+/**
+ * Rows of both lists share one grid so a row is as tall on the left as on the
+ * right: a Remap Marker in Optimized gets a blank spacer opposite it in
+ * Current, and the pilot never reads a taller row as a skill added from nowhere.
+ * Below `md` only the chosen side shows, so the other side's cells are hidden.
+ */
+const ROW_BASE = 'flex min-h-8 items-center gap-2 border-b border-line px-2 py-1 text-xs';
+const sideClass = (own: CompareSide, shown: CompareSide) =>
+  cx(own === 'current' ? 'md:col-start-1' : 'md:col-start-2', own !== shown && 'max-md:hidden');
+
+function CurrentRow({
+  row,
+  gridRow,
+  shown,
   nameFor,
 }: {
-  rows: readonly CurrentCompareRow[];
+  row: CurrentCompareRow;
+  gridRow: number;
+  shown: CompareSide;
   nameFor: (id: number) => string;
 }) {
   const { t } = useTranslation();
+  const { step, position, movesTo } = row;
   return (
-    <ol className="space-y-0.5 text-xs">
-      {rows.map(({ step, position, movesTo }) => (
-        <li
-          key={`${step.skillTypeID}-${step.level}`}
-          className={cx(
-            'flex items-center gap-2 rounded-xs px-2 py-1',
-            movesTo === null ? 'border-b border-line' : 'bg-warning/10'
-          )}
-        >
-          <span className="w-5 shrink-0 tabular-nums text-text-dim">{position}</span>
-          <span className={cx('min-w-0 flex-1 truncate', movesTo !== null && 'font-semibold')}>
-            {nameFor(step.skillTypeID)} {romanLevel(step.level)}
-          </span>
-          {movesTo !== null && (
-            <span className="shrink-0 text-text-dim">
-              {t('plans.compareMovesTo', { position: movesTo })}
-            </span>
-          )}
-        </li>
-      ))}
-    </ol>
+    <li
+      style={{ gridRow }}
+      className={cx(ROW_BASE, sideClass('current', shown), movesTo !== null && 'bg-warning/10')}
+    >
+      <span className="w-5 shrink-0 tabular-nums text-text-dim">{position}</span>
+      <span className={cx('min-w-0 flex-1 truncate', movesTo !== null && 'font-semibold')}>
+        {nameFor(step.skillTypeID)} {romanLevel(step.level)}
+      </span>
+      {movesTo !== null && (
+        <span className="shrink-0 text-text-dim">
+          {t('plans.compareMovesTo', { position: movesTo })}
+        </span>
+      )}
+    </li>
   );
 }
 
-function ProposedList({
-  rows,
+function ProposedRow({
+  row,
+  gridRow,
+  shown,
   nameFor,
   stepLabel,
   implants,
 }: {
-  rows: readonly ProposedCompareRow[];
+  row: ProposedCompareRow;
+  gridRow: number;
+  shown: CompareSide;
   nameFor: (id: number) => string;
   stepLabel: (step: PlanStep) => string;
   implants: Implants;
 }) {
   const { t } = useTranslation();
+  if (row.kind === 'remap') {
+    return (
+      <li
+        style={{ gridRow }}
+        className={cx(
+          'border-b border-dashed border-accent bg-accent/10 px-2 py-1 text-xs text-accent',
+          sideClass('proposed', shown)
+        )}
+      >
+        <span className="font-semibold">{t('plans.compareNewMarker')}</span>{' '}
+        {t('plans.segmentRemap', {
+          skill: stepLabel(row.before),
+          attributes: remapInstruction(row.segment.attributes, implants),
+        })}
+      </li>
+    );
+  }
+  const moved = row.from !== null;
   return (
-    <ol className="space-y-0.5 text-xs">
-      {rows.map((row) => {
-        if (row.kind === 'remap') {
-          return (
-            <li
-              key={`remap-${row.segment.startIndex}`}
-              className="my-1 rounded-xs border border-dashed border-accent bg-accent/10 px-2 py-1 text-accent"
-            >
-              <span className="font-semibold">{t('plans.compareNewMarker')}</span>{' '}
-              {t('plans.segmentRemap', {
-                skill: stepLabel(row.before),
-                attributes: remapInstruction(row.segment.attributes, implants),
-              })}
-            </li>
-          );
-        }
-        const moved = row.from !== null;
-        return (
-          <li
-            key={`${row.step.skillTypeID}-${row.step.level}`}
-            className={cx(
-              'flex items-center gap-2 rounded-xs px-2 py-1',
-              moved ? 'bg-warning/10' : 'border-b border-line'
-            )}
-          >
-            <span className="w-5 shrink-0 tabular-nums text-text-dim">{row.position}</span>
-            <span className={cx('min-w-0 flex-1 truncate', moved && 'font-semibold')}>
-              {nameFor(row.step.skillTypeID)} {romanLevel(row.step.level)}
-            </span>
-            {row.from !== null && <MovedPill from={row.from} position={row.position} />}
-          </li>
-        );
-      })}
-    </ol>
+    <li
+      style={{ gridRow }}
+      className={cx(ROW_BASE, sideClass('proposed', shown), moved && 'bg-warning/10')}
+    >
+      <span className="w-5 shrink-0 tabular-nums text-text-dim">{row.position}</span>
+      <span className={cx('min-w-0 flex-1 truncate', moved && 'font-semibold')}>
+        {nameFor(row.step.skillTypeID)} {romanLevel(row.step.level)}
+      </span>
+      {row.from !== null && <MovedPill from={row.from} position={row.position} />}
+    </li>
   );
 }
 
@@ -278,6 +291,7 @@ export function OptimizeForMeModal({
   preview,
   currentOrder,
   totalSeconds,
+  prioritized,
   nameFor,
   stepLabel,
   implants,
@@ -292,14 +306,20 @@ export function OptimizeForMeModal({
   const saved = preview ? totalSeconds - preview.remaps.totalSeconds : 0;
   const moved = rows ? rows.current.filter((r) => r.movesTo !== null).length : 0;
   const markers = rows ? rows.proposed.filter((r) => r.kind === 'remap').length : 0;
+  const gain = optimizeForMeHasGain({ savedSeconds: saved, markers, prioritized });
   return (
     <Modal
       open={preview !== null}
       onClose={onReject}
       title={t('plans.optimizeForMeTitle')}
-      placement="wide"
+      placement={gain ? 'wide' : 'center'}
       footer={
-        preview && (
+        preview &&
+        (!gain ? (
+          <Button size="sm" onClick={onReject}>
+            {t('plans.remapDismiss')}
+          </Button>
+        ) : (
           <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <p className="text-xs">
               <span className="font-semibold text-success">
@@ -320,10 +340,13 @@ export function OptimizeForMeModal({
               </Button>
             </div>
           </div>
-        )
+        ))
       }
     >
-      {rows && (
+      {rows && !gain && (
+        <p className="text-xs text-text-dim">{t('plans.optimizeForMeNoGain', { total: before })}</p>
+      )}
+      {rows && gain && (
         <div className="space-y-2">
           <div className="md:hidden">
             <SegmentedControl
@@ -337,20 +360,56 @@ export function OptimizeForMeModal({
               ]}
             />
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <section className={cx('space-y-1', side !== 'current' && 'max-md:hidden')}>
-              <Eyebrow>{t('plans.compareCurrent', { total: before })}</Eyebrow>
-              <CurrentList rows={rows.current} nameFor={nameFor} />
-            </section>
-            <section className={cx('space-y-1', side !== 'proposed' && 'max-md:hidden')}>
-              <Eyebrow>{t('plans.compareOptimized', { total: after })}</Eyebrow>
-              <ProposedList
-                rows={rows.proposed}
-                nameFor={nameFor}
-                stepLabel={stepLabel}
-                implants={implants}
-              />
-            </section>
+          <div className="grid md:grid-cols-[1fr_1fr] md:gap-x-4">
+            <Eyebrow
+              className={cx('col-start-1 row-start-1 pb-1', side !== 'current' && 'max-md:hidden')}
+            >
+              {t('plans.compareCurrent', { total: before })}
+            </Eyebrow>
+            <Eyebrow
+              className={cx(
+                'col-start-1 row-start-1 pb-1 md:col-start-2',
+                side !== 'proposed' && 'max-md:hidden'
+              )}
+            >
+              {t('plans.compareOptimized', { total: after })}
+            </Eyebrow>
+            <ol className="contents">
+              {(() => {
+                // Current's row k sits opposite Optimized's row k; a marker row has a spacer opposite.
+                let currentIndex = 0;
+                return rows.proposed.map((row, k) => {
+                  const gridRow = k + 2;
+                  const current = row.kind === 'step' ? rows.current[currentIndex++] : undefined;
+                  return (
+                    <Fragment key={k}>
+                      {current ? (
+                        <CurrentRow
+                          row={current}
+                          gridRow={gridRow}
+                          shown={side}
+                          nameFor={nameFor}
+                        />
+                      ) : (
+                        <li
+                          aria-hidden
+                          style={{ gridRow }}
+                          className="md:col-start-1 max-md:hidden"
+                        />
+                      )}
+                      <ProposedRow
+                        row={row}
+                        gridRow={gridRow}
+                        shown={side}
+                        nameFor={nameFor}
+                        stepLabel={stepLabel}
+                        implants={implants}
+                      />
+                    </Fragment>
+                  );
+                });
+              })()}
+            </ol>
           </div>
         </div>
       )}

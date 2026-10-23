@@ -273,10 +273,10 @@ export function SettleUpDialog({
     />
   );
 
-  // Its own row: the label names the paying Character, too long to share the To row.
+  // Its own row above To, at the right: the label names the paying Character, too long to share the To row.
   // Empty (and hidden) when no Character holds the Open in EVE permission.
   const openInEveRow = (p: { name: string; entityId?: number; payeeId?: string }) => (
-    <div key={`open:${p.name}`} className="flex px-2 py-1.5 empty:hidden">
+    <div key={`open:${p.name}`} className="flex justify-end px-2 py-1.5 empty:hidden">
       <PayeeOpenInEveButton
         name={p.name}
         entityId={p.entityId}
@@ -454,9 +454,9 @@ export function SettleUpDialog({
         <div className="divide-y divide-line rounded-xs border border-line bg-panel-2">
           {perPayee.length <= 1 ? (
             <>
+              {perPayee.length === 1 && openInEveRow(perPayee[0])}
               {perPayee.length === 1 &&
                 copyRow('to', t('miningTax.settleUp.toLabel'), perPayee[0].name, perPayee[0].name)}
-              {perPayee.length === 1 && openInEveRow(perPayee[0])}
               {copyRow(
                 'amount',
                 t('miningTax.settleUp.amountLabel'),
@@ -467,8 +467,8 @@ export function SettleUpDialog({
           ) : (
             perPayee.map((p) => (
               <div key={p.name} className="divide-y divide-line">
-                {copyRow(`to:${p.name}`, t('miningTax.settleUp.toLabel'), p.name, p.name)}
                 {openInEveRow(p)}
+                {copyRow(`to:${p.name}`, t('miningTax.settleUp.toLabel'), p.name, p.name)}
                 {copyRow(
                   `amount:${p.name}`,
                   t('miningTax.settleUp.amountLabel'),
