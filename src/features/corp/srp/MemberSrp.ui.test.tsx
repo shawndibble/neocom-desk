@@ -147,6 +147,24 @@ describe('MemberSrp', () => {
     );
   });
 
+  it('asks for a Fleet or FC when re-filing if the corp requires one and the claim named none', async () => {
+    setup({ requireFleetOrFc: true });
+    await userEvent.click(await screen.findByRole('button', { name: 'Re-file claim for Ferox' }));
+    await userEvent.type(screen.getByLabelText('Note'), 'It was a fleet.');
+    const submit = screen.getByRole('button', { name: 'Re-file claim' });
+    expect((submit as HTMLButtonElement).disabled).toBe(true);
+    // The dialog's field is the last one in the document; the page form's comes first.
+    await userEvent.type(screen.getAllByLabelText('Fleet or FC').at(-1)!, 'Kestrel Vane');
+    await userEvent.click(submit);
+    await waitFor(() =>
+      expect(file).toHaveBeenCalledWith(7, 98765432, {
+        killmail: esiKillmailLink(7004, HASH),
+        fleetOrFc: 'Kestrel Vane',
+        note: 'It was a fleet.',
+      })
+    );
+  });
+
   it('shows No claims yet when there are none', async () => {
     setup({ noClaims: true });
     expect(await screen.findByText('No claims yet')).toBeTruthy();

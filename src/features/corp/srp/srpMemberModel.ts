@@ -3,6 +3,7 @@
  * may re-file, how claims are ordered, and which message a refusal reads as. No fetch, no React.
  * The server prices and decides; this only mirrors enough of its rules to label rows the same way.
  */
+import { DAY_MS } from '@/lib/age';
 import { callableErrorReason } from '@/lib/callableError';
 import type { HullRule, SrpClaimBasis, SrpClaimState } from '../srpTypes';
 
@@ -47,8 +48,6 @@ export interface LostRowContext {
   now: number;
 }
 
-const DAY_MS = 86_400_000;
-
 /** The hull's own rule beats its class's, as the server's pricing does. */
 export function isHullNotCovered(
   rules: readonly HullRule[],
@@ -88,49 +87,37 @@ export function esiKillmailLink(killmailId: number, hash: string): string {
   return `https://esi.evetech.net/latest/killmails/${killmailId}/${hash}/`;
 }
 
+export type MemberErrorTarget = 'link' | 'fleet' | 'notCovered' | 'form';
+
 /**
- * Each `details.reason` the callables send, as a literal i18n key (literal so the locale
- * split and the unused-key check can see them).
+ * Each `details.reason` the callables send: its message as a literal i18n key (literal so the
+ * locale split and the unused-key check can see them) and where it shows.
  */
-export const MEMBER_ERROR_KEYS: Record<string, string> = {
-  'srp-off': 'srpMember.errors.srpOff',
-  'not-your-loss': 'srpMember.errors.notYourLoss',
-  'loss-in-other-corp': 'srpMember.errors.lossInOtherCorp',
-  'outside-window': 'srpMember.errors.outsideWindow',
-  'already-claimed': 'srpMember.errors.alreadyClaimed',
-  'not-covered': 'srpMember.errors.notCovered',
-  'fleet-or-fc-required': 'srpMember.errors.fleetOrFcRequired',
-  'note-required': 'srpMember.errors.noteRequired',
-  'hash-unavailable': 'srpMember.errors.hashUnavailable',
-  'killmail-not-found': 'srpMember.errors.killmailNotFound',
-  'wrong-corp': 'srpMember.errors.wrongCorp',
-  'bad-killmail-link': 'srpMember.errors.badKillmailLink',
-  generic: 'srpMember.errors.generic',
+const REASONS: Record<string, { key: string; target: MemberErrorTarget }> = {
+  'srp-off': { key: 'srpMember.errors.srpOff', target: 'form' },
+  'not-your-loss': { key: 'srpMember.errors.notYourLoss', target: 'link' },
+  'loss-in-other-corp': { key: 'srpMember.errors.lossInOtherCorp', target: 'link' },
+  'outside-window': { key: 'srpMember.errors.outsideWindow', target: 'link' },
+  'already-claimed': { key: 'srpMember.errors.alreadyClaimed', target: 'link' },
+  'not-covered': { key: 'srpMember.errors.notCovered', target: 'notCovered' },
+  'fleet-or-fc-required': { key: 'srpMember.errors.fleetOrFcRequired', target: 'fleet' },
+  'note-required': { key: 'srpMember.errors.noteRequired', target: 'form' },
+  'hash-unavailable': { key: 'srpMember.errors.hashUnavailable', target: 'link' },
+  'killmail-not-found': { key: 'srpMember.errors.killmailNotFound', target: 'link' },
+  'wrong-corp': { key: 'srpMember.errors.wrongCorp', target: 'form' },
+  'bad-killmail-link': { key: 'srpMember.errors.badKillmailLink', target: 'link' },
 };
+
+export const GENERIC_ERROR_KEY = 'srpMember.errors.generic';
 
 /** The i18n key for a refusal; an unknown reason, or none (offline), reads as the generic one. */
 export function memberErrorKey(error: unknown): string {
   const reason = callableErrorReason(error);
-  return (reason !== null ? MEMBER_ERROR_KEYS[reason] : undefined) ?? MEMBER_ERROR_KEYS.generic!;
+  return (reason !== null ? REASONS[reason]?.key : undefined) ?? GENERIC_ERROR_KEY;
 }
-
-export type MemberErrorTarget = 'link' | 'fleet' | 'note' | 'notCovered' | 'form';
-
-const ERROR_TARGETS: Record<string, MemberErrorTarget> = {
-  'bad-killmail-link': 'link',
-  'not-your-loss': 'link',
-  'loss-in-other-corp': 'link',
-  'outside-window': 'link',
-  'already-claimed': 'link',
-  'hash-unavailable': 'link',
-  'killmail-not-found': 'link',
-  'fleet-or-fc-required': 'fleet',
-  'note-required': 'note',
-  'not-covered': 'notCovered',
-};
 
 /** Where a refusal shows: beside the field that can fix it, else on the form. */
 export function memberErrorTarget(error: unknown): MemberErrorTarget {
   const reason = callableErrorReason(error);
-  return (reason !== null ? ERROR_TARGETS[reason] : undefined) ?? 'form';
+  return (reason !== null ? REASONS[reason]?.target : undefined) ?? 'form';
 }

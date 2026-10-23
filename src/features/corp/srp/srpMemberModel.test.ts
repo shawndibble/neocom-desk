@@ -4,7 +4,7 @@ import {
   canRefile,
   esiKillmailLink,
   lostRowKind,
-  MEMBER_ERROR_KEYS,
+  GENERIC_ERROR_KEY,
   memberErrorKey,
   memberErrorTarget,
   orderClaims,
@@ -126,12 +126,13 @@ describe('memberErrorKey', () => {
       'bad-killmail-link',
     ]) {
       const key = memberErrorKey(Object.assign(new Error('x'), { details: { reason } }));
-      expect(key).toBe(MEMBER_ERROR_KEYS[reason]);
+      expect(key).toMatch(/^srpMember\.errors\./);
+      expect(key).not.toBe(GENERIC_ERROR_KEY);
     }
   });
   it('falls back to the generic message for an unknown or missing reason', () => {
-    expect(memberErrorKey(new Error('offline'))).toBe(MEMBER_ERROR_KEYS.generic);
-    expect(memberErrorKey({ details: { reason: 'new-thing' } })).toBe(MEMBER_ERROR_KEYS.generic);
+    expect(memberErrorKey(new Error('offline'))).toBe(GENERIC_ERROR_KEY);
+    expect(memberErrorKey({ details: { reason: 'new-thing' } })).toBe(GENERIC_ERROR_KEY);
   });
 });
 
@@ -144,7 +145,6 @@ describe('memberErrorTarget', () => {
     expect(of('outside-window')).toBe('link');
     expect(of('already-claimed')).toBe('link');
     expect(of('not-covered')).toBe('notCovered');
-    expect(of('note-required')).toBe('note');
   });
   it('shows what no control can fix, and unknown errors, on the form itself', () => {
     expect(of('srp-off')).toBe('form');

@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, FieldError, Modal, TextArea } from '@/components/ui';
+import { Button, FieldError, Modal, TextArea, TextInput } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { formatIsk } from '@/lib/isk';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -22,7 +22,9 @@ interface RefileDialogProps {
   busy: boolean;
   /** A refusal, already translated. */
   error?: string;
-  onSubmit: (note: string) => void;
+  /** The corp requires a Fleet or FC and the original claim named none: ask for it here. */
+  needsFleet: boolean;
+  onSubmit: (note: string, fleetOrFc?: string) => void;
   onClose: () => void;
 }
 
@@ -32,6 +34,7 @@ export function RefileDialog({
   hullName,
   busy,
   error,
+  needsFleet,
   onSubmit,
   onClose,
 }: RefileDialogProps) {
@@ -40,6 +43,8 @@ export function RefileDialog({
   const noteId = useId();
   const errId = `${noteId}-err`;
   const [note, setNote] = useState('');
+  const [fleet, setFleet] = useState('');
+  const fleetId = useId();
   return (
     <Modal
       open
@@ -54,8 +59,8 @@ export function RefileDialog({
           <Button
             variant="primary"
             className="w-full sm:w-auto"
-            disabled={busy || note.trim() === ''}
-            onClick={() => onSubmit(note.trim())}
+            disabled={busy || note.trim() === '' || (needsFleet && fleet.trim() === '')}
+            onClick={() => onSubmit(note.trim(), needsFleet ? fleet.trim() : undefined)}
           >
             {t('srpMember.refile.submit')}
           </Button>
@@ -81,6 +86,20 @@ export function RefileDialog({
             aria-describedby={error ? errId : undefined}
           />
         </label>
+        {needsFleet ? (
+          <label htmlFor={fleetId} className="block space-y-1">
+            <span className="text-xs text-text-dim">{t('srpMember.file.fleet')}</span>
+            <TextInput
+              id={fleetId}
+              value={fleet}
+              onChange={(e) => setFleet(e.target.value)}
+              placeholder={t('srpMember.file.fleetPlaceholder')}
+              className="w-full"
+              autoComplete="off"
+              aria-required
+            />
+          </label>
+        ) : null}
         {error ? <FieldError id={errId}>{error}</FieldError> : null}
       </div>
     </Modal>

@@ -19,6 +19,7 @@ import type { LostLoss } from './srpMemberModel';
 /** ESI serves 50 a page; this bounds the detail reads one visit costs, newest first. */
 const MAX_PAGES = 3;
 const REFS_KEY = 'killmailsRecent';
+const REFS_STALE_MS = 60_000;
 
 export interface CollectLossesInput {
   refs: readonly CharacterKillmailRef[];
@@ -31,12 +32,14 @@ export interface CollectLossesInput {
 /** The refs that are this Character's losses in this corporation, newest first. */
 export async function collectLosses(input: CollectLossesInput): Promise<LostLoss[]> {
   const found: LostLoss[] = [];
+  let failed = 0;
   await mapWithConcurrencyLimit(input.refs, ESI_FANOUT_CONCURRENCY, async (ref) => {
     let km: Killmail | null;
     try {
       km = await input.readKillmail(ref.killmail_id, ref.killmail_hash);
     } catch {
-      return; // one unreadable killmail must not hide the rest
+      failed += 1; // one unreadable killmail must not hide the rest
+      return;
     }
     const { victim } = km ?? {};
     if (!km || !victim) return;
@@ -53,6 +56,10 @@ export async function collectLosses(input: CollectLossesInput): Promise<LostLoss
       killedAt,
     });
   });
+  // Every read failing is an outage, not a pilot with no losses: the page shows Retry.
+  if (input.refs.length > 0 && failed === input.refs.length) {
+    throw new Error('every killmail read failed');
+  }
   return found.sort((a, b) => b.killedAt - a.killedAt);
 }
 
@@ -81,11 +88,14 @@ export async function loadLostLosses(
     characterId,
     REFS_KEY,
     async () => (await getCharacterKillmailsRecent(characterId, { maxPages: MAX_PAGES })).items,
-    { detectAuthFailure: isCredentialFailure }
+    // Short, so a visit after a fresh loss is not answered by an old list.
+    { detectAuthFailure: isCredentialFailure, staleAfterMs: REFS_STALE_MS }
   );
+  // Nothing live and nothing cached is a failed read, not an empty list.
+  if (cached === null) throw new Error('killmails recent unavailable');
   const types = await loadTypes();
   return collectLosses({
-    refs: cached?.data ?? [],
+    refs: cached.data,
     readKillmail: readKillmailOnce,
     characterId,
     corporationId,

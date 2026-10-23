@@ -29,9 +29,12 @@ import {
   memberErrorTarget,
   type MemberClaim,
 } from './srpMemberModel';
-import { useMemberSrp, type LostRow, type MemberSrp as MemberData } from './useMemberSrp';
-
-const KILLMAIL_ENDPOINTS = ['getCharacterKillmailsRecent'] as const;
+import {
+  KILLMAIL_ENDPOINTS,
+  useMemberSrp,
+  type LostRow,
+  type MemberSrp as MemberData,
+} from './useMemberSrp';
 
 interface MemberSrpProps {
   characterId: number;
@@ -94,7 +97,7 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired }: BodyPro
   const [filing, setFiling] = useState<number | 'form' | null>(null);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [detail, setDetail] = useState<MemberClaim | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
   const [refiling, setRefiling] = useState<{ claim: MemberClaim; error?: string } | null>(null);
   const [refileBusy, setRefileBusy] = useState(false);
   const fleetRef = useRef<HTMLInputElement>(null);
@@ -108,6 +111,8 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired }: BodyPro
   });
 
   const claims = data.claims.state === 'ready' ? data.claims.value : [];
+  // By id, so the dialog follows a reload (a re-file) instead of holding the claim as it was.
+  const detail = claims.find((c) => c.killmailId === detailId) ?? null;
   const claimedHull = (typeId: number) => data.names.hull(typeId);
 
   const fileInput = useCallback(
@@ -156,12 +161,12 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired }: BodyPro
     void submit(esiKillmailLink(row.killmailId, row.killmailHash), row);
   }
 
-  async function refile(claim: MemberClaim, note: string) {
+  async function refile(claim: MemberClaim, note: string, fleetOrFc?: string) {
     setRefileBusy(true);
     try {
       await data.file({
         killmail: esiKillmailLink(claim.killmailId, claim.killmailHash),
-        ...(claim.fleetOrFc ? { fleetOrFc: claim.fleetOrFc } : {}),
+        ...((fleetOrFc ?? claim.fleetOrFc) ? { fleetOrFc: fleetOrFc ?? claim.fleetOrFc! } : {}),
         note,
       });
       setRefiling(null);
@@ -235,7 +240,7 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired }: BodyPro
           claims={claims}
           hullName={data.names.hull}
           systemName={data.names.system}
-          onOpen={setDetail}
+          onOpen={(claim) => setDetailId(claim.killmailId)}
           onRefile={(claim) => setRefiling({ claim })}
         />
       ) : (
@@ -289,10 +294,10 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired }: BodyPro
           claim={detail}
           hullName={data.names.hull(detail.hullTypeId)}
           systemName={data.names.system(detail.solarSystemId)}
-          onClose={() => setDetail(null)}
+          onClose={() => setDetailId(null)}
           onRefile={() => {
             setRefiling({ claim: detail });
-            setDetail(null);
+            setDetailId(null);
           }}
         />
       ) : null}
@@ -302,7 +307,8 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired }: BodyPro
           hullName={claimedHull(refiling.claim.hullTypeId)}
           busy={refileBusy}
           error={refiling.error}
-          onSubmit={(note) => void refile(refiling.claim, note)}
+          needsFleet={fleetRequired && !refiling.claim.fleetOrFc}
+          onSubmit={(note, fleetOrFc) => void refile(refiling.claim, note, fleetOrFc)}
           onClose={() => setRefiling(null)}
         />
       ) : null}

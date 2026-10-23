@@ -96,6 +96,8 @@ export const NotYourLoss: Story = {
     await canvas.findByText('Paste a killmail where you were the victim.');
   },
 };
+/** @summary A refused link, phone. */
+export const NotYourLossPhone: Story = { ...NotYourLoss, globals: phone };
 
 /** @summary The corp requires a Fleet or FC: File on a lost ship fills the form in and asks for it. */
 export const FleetRequired: Story = {

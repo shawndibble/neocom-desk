@@ -3,7 +3,8 @@
  * killmail Permission is granted, their lost ships with hull and system names. Reads go through
  * `srpMemberBackend` so Storybook and tests stand in for the network.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DAY_MS } from '@/lib/age';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
@@ -32,53 +33,57 @@ export interface MemberSrp {
   file: (input: FileSrpClaimInput) => Promise<FiledSrpClaim>;
 }
 
-const KILLMAIL_ENDPOINTS = ['getCharacterKillmailsRecent'] as const;
+export const KILLMAIL_ENDPOINTS = ['getCharacterKillmailsRecent'] as const;
 
-function useLoad<T>(
-  load: (() => Promise<T>) | null,
-  deps: readonly unknown[]
-): [Load<T>, () => void] {
-  const [result, setResult] = useState<Load<T>>({ state: 'loading' });
+/**
+ * Runs `load` whenever `key` changes (or `retry` is called). A result belongs to the key it was read
+ * for: after a Character or corporation switch the page reads `loading`, never the last one's data.
+ * A retry keeps what is shown until the new read lands.
+ */
+function useLoad<T>(key: string, load: (() => Promise<T>) | null): [Load<T>, () => void] {
+  const [stored, setStored] = useState<{ key: string; result: Load<T> } | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const loadRef = useRef(load);
   useEffect(() => {
-    if (load === null) return;
+    loadRef.current = load;
+  });
+  const active = load !== null;
+  useEffect(() => {
+    const read = loadRef.current;
+    if (read === null) return;
     let cancelled = false;
-    void load().then(
-      (value) => !cancelled && setResult({ state: 'ready', value }),
-      () => !cancelled && setResult({ state: 'failed' })
+    void read().then(
+      (value) => !cancelled && setStored({ key, result: { state: 'ready', value } }),
+      () => !cancelled && setStored({ key, result: { state: 'failed' } })
     );
     return () => {
       cancelled = true;
     };
-    // `load` is rebuilt every render; `deps` says when it would answer differently.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, attempt]);
+  }, [key, active, attempt]);
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
-  return [result, reload];
+  return [stored?.key === key ? stored.result : { state: 'loading' }, reload];
 }
 
 export function useMemberSrp(characterId: number, corporationId: number): MemberSrp {
   const backend = srpMemberBackend();
-  const [status, reloadStatus] = useLoad(
-    () => backend.status(characterId, corporationId),
-    [characterId, corporationId]
-  );
+  const scope = `${characterId}:${corporationId}`;
+  const [status, reloadStatus] = useLoad(scope, () => backend.status(characterId, corporationId));
   const enabled = status.state === 'ready' && status.value.enabled;
   const [claims, reloadClaims] = useLoad(
-    enabled ? () => backend.claims(characterId, corporationId) : null,
-    [characterId, corporationId, enabled]
+    scope,
+    enabled ? () => backend.claims(characterId, corporationId) : null
   );
 
   const granted = useEndpointsGranted(KILLMAIL_ENDPOINTS);
   const [losses, reloadLosses] = useLoad(
+    scope,
     enabled && granted === true
       ? async () => ({
           losses: await backend.lostLosses(characterId, corporationId),
           // When the read landed: "too old" is judged against it, not against each render.
           at: Date.now(),
         })
-      : null,
-    [characterId, corporationId, enabled, granted]
+      : null
   );
 
   // The page learned the answer: the nav entry follows it without waiting for its own probe.
@@ -129,7 +134,7 @@ export function useMemberSrp(characterId: number, corporationId: number): Member
       value: losses.value.losses.map((loss) => ({
         ...loss,
         kind: lostRowKind(loss, { claims: claimList ?? [], hullRules, windowDays, now }),
-        ageDays: Math.max(0, Math.floor((now - loss.killedAt) / 86_400_000)),
+        ageDays: Math.max(0, Math.floor((now - loss.killedAt) / DAY_MS)),
         hullName: names.hull(loss.hullTypeId),
         systemName: names.system(loss.solarSystemId),
       })),

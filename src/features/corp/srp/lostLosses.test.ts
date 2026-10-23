@@ -65,4 +65,18 @@ describe('collectLosses', () => {
     });
     expect(out.map((l) => l.killmailId)).toEqual([2]);
   });
+
+  it('throws when every killmail read fails, so the page can offer Retry', async () => {
+    await expect(
+      collectLosses({
+        refs: [{ killmail_id: 1, killmail_hash: HASH }],
+        readKillmail: async () => {
+          throw new Error('boom');
+        },
+        characterId: ME,
+        corporationId: CORP,
+        groupOf: () => 10,
+      })
+    ).rejects.toThrow();
+  });
 });
