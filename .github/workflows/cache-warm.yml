@@ -39,15 +39,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # `static`, `build`, `test-shard` and `rules` in ci.yml.
+  # `static` (which carries the Firestore rules tests), `build` and `test-shard` in ci.yml.
   node-modules:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: develop
-      # `rules`' setup-node npm cache: same two-lockfile key. Filled by the
-      # functions install below, which `rules` repeats on every run.
+      # `static`'s setup-node npm cache: same two-lockfile key. Filled by the
+      # functions install below, which `static` repeats on every run.
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -63,7 +63,7 @@ jobs:
       - if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
       - run: npm ci --prefix functions
-      # `rules`: firebase-tools (npx's download) and the Firestore emulator
+      # `static`: firebase-tools (npx's download) and the Firestore emulator
       # jar. The version is the one pinned in the `test:rules` script.
       - uses: actions/cache@v4
         id: firebase-tools

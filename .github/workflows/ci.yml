@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # `validate` below aggregates `static`, `build` and `rules` and keeps the
+  # `validate` below aggregates `static` and `build` and keeps the
   # context name the `develop`/`main` ruleset requires.
   #
   # Runner budget: GitHub Actions runs at most 20 jobs at once across the
@@ -29,10 +29,20 @@ jobs:
   # restore node_modules don't also take setup-node's npm download cache: on a
   # hit it is a wasted download, and on a miss each PR would save its own.
   #
-  # lint, format:check, typecheck and check:case used to be four jobs, each
-  # paying its own checkout and `npm ci`. Run back to back they take about as
-  # long as the slowest test shard, so one runner costs no wall time and
-  # saves three installs and three checks on every PR.
+  # One runner for every check that is not a test shard or the build: the root
+  # lint/format/typecheck/case checks, the functions/ gate, and the Firestore
+  # rules tests (rules-tests/, against the emulator, which needs a JRE; kept out
+  # of `test-shard` so `npm run test:run` never needs Java). Back to back they
+  # take about as long as the slowest test shard, so one runner costs no wall
+  # time and saves a checkout and install. `build` stays its own job: every
+  # `e2e-shard` waits on its `dist/`, and a job cannot hand an artifact on
+  # before it finishes.
+  #
+  # The functions/ gate: functions/ is its own package, with its own lockfile,
+  # tsconfig and vitest run — neither the root typecheck nor the pre-commit
+  # hook's copy of it ever reads it, so without these steps the Cloud
+  # Functions ship unchecked (issue #595). The rules tests are merge-blocking
+  # through `validate`.
   static:
     runs-on: ubuntu-latest
     steps:
@@ -40,6 +50,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: npm
+          # The npm download cache, for `npm ci --prefix functions` (and the
+          # root install on a node_modules miss). Keyed on both lockfiles, so
+          # a change to either refreshes it; cache-warm.yml saves the same key.
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
       # Same node_modules cache as the test jobs (and warmed on `develop` by
       # cache-warm.yml); a miss falls back to `npm ci`.
       - uses: actions/cache@v4
@@ -49,10 +70,34 @@ jobs:
           key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
       - if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
-      - run: npm run check:case
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run typecheck
+      # firebase-tools (npx's download) and the Firestore emulator jar are
+      # fetched on every run otherwise. Key carries the version pinned in the
+      # `test:rules` script — bump both together.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm/_npx
+            ~/.cache/firebase
+          key: firebase-tools-14.27.0-${{ runner.os }}
+      - run: npm ci --prefix functions
+      # The checks are independent; each runs even when the one before it
+      # failed, so one red result never hides the others. Still
+      # `!cancelled()`, so a superseded run stops.
+      - if: ${{ !cancelled() }}
+        run: npm run check:case
+      - if: ${{ !cancelled() }}
+        run: npm run lint
+      - if: ${{ !cancelled() }}
+        run: npm run format:check
+      - if: ${{ !cancelled() }}
+        run: npm run typecheck
+      - if: ${{ !cancelled() }}
+        run: npm run typecheck --prefix functions
+      - if: ${{ !cancelled() }}
+        run: npm test --prefix functions
+      # The Corp Tax Book callable tests (functions/) run in the same emulator session.
+      - if: ${{ !cancelled() }}
+        run: npm run test:rules
 
   # Builds once for the whole run. The `e2e-shard` jobs download this `dist/`
   # instead of each rebuilding it (one more build per shard, each after its own
@@ -99,13 +144,11 @@ jobs:
           retention-days: 1
 
   # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
-  # reasoning; this one aggregates `static` and `build` above and `rules`
-  # below instead of a matrix. `rules` is here for the functions/ typecheck
-  # and tests it carries, and that also makes the Firestore rules tests
-  # merge-blocking.
+  # reasoning; this one aggregates `static` and `build` above instead of
+  # a matrix.
   validate:
     if: ${{ !cancelled() }}
-    needs: [static, build, rules]
+    needs: [static, build]
     runs-on: ubuntu-latest
     steps:
       - name: Fail unless every validate job passed
@@ -151,65 +194,6 @@ jobs:
         run: npm ci
       - run: npm run test:run -- --shard=${{ matrix.shard }}/4
 
-  # Firestore rules tests (rules-tests/): run against the Firestore emulator,
-  # which needs a JRE. Kept out of `test-shard` so `npm run test:run` never
-  # needs Java. Not a required context of its own, but merge-blocking through
-  # `validate` since it took over the functions/ gate.
-  #
-  # The functions/ gate: functions/ is its own package, with its own
-  # lockfile, tsconfig and vitest run — neither the root typecheck nor the
-  # pre-commit hook's copy of it ever reads it, so without these steps the
-  # Cloud Functions ship unchecked (issue #595). They were a job of their own;
-  # this job already installs functions/ for the emulator tests, so a second
-  # checkout and install cost a runner (see "Runner budget" at the top).
-  rules:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          # The npm download cache, for `npm ci --prefix functions` (and the
-          # root install on a node_modules miss). Keyed on both lockfiles, so
-          # a change to either refreshes it; cache-warm.yml saves the same key.
-          cache-dependency-path: |
-            package-lock.json
-            functions/package-lock.json
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-      # Restoring node_modules skips the install (see "Caches" at the top);
-      # a miss falls back to `npm ci`.
-      - uses: actions/cache@v4
-        id: node-modules
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
-      - if: steps.node-modules.outputs.cache-hit != 'true'
-        run: npm ci
-      # firebase-tools (npx's download) and the Firestore emulator jar are
-      # fetched on every run otherwise. Key carries the version pinned in the
-      # `test:rules` script — bump both together.
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.npm/_npx
-            ~/.cache/firebase
-          key: firebase-tools-14.27.0-${{ runner.os }}
-      - run: npm ci --prefix functions
-      # The functions/ checks and the emulator tests are independent; each
-      # runs even when the one before it failed, so one red result never
-      # hides the others. Still `!cancelled()`, so a superseded run stops.
-      - if: ${{ !cancelled() }}
-        run: npm run typecheck --prefix functions
-      - if: ${{ !cancelled() }}
-        run: npm test --prefix functions
-      # The Corp Tax Book callable tests (functions/) run in the same emulator session.
-      - if: ${{ !cancelled() }}
-        run: npm run test:rules
-
   # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
   # reasoning — a matrix reports as `test-shard (1)`…`(4)`, none of which is
   # the required context, so this turns the shard results back into it.
@@ -253,7 +237,7 @@ jobs:
     # 259s to 354s on the same suite.
     #
     # Six shards, down from eight, for the runner budget (top of file): eight
-    # plus `static`, `rules` and the four `test-shard`s held up to 14 runners
+    # plus `static` and the four `test-shard`s held up to 13 runners
     # per PR at the peak, so two PRs in flight queued. The e2e path isn't the
     # critical one: shards start ~100s in (after `build`) and ran ~160–300s
     # at eight, while `test-shard` runs ~370–410s from the start. Six run
