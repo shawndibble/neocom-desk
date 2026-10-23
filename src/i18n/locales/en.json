@@ -4914,6 +4914,13 @@
           "event": "Event"
         }
       },
+      "eveTime": {
+        "title": "EVE time",
+        "description": "The game clock, UTC, with today's date",
+        "empty": "The clock is unavailable.",
+        "unit": "EVE time",
+        "summary": "EVE time {{time}}"
+      },
       "incursions": {
         "title": "Incursions",
         "description": "The nearest Incursions to your current system",
@@ -7726,6 +7733,10 @@
     "day": {
       "today": "Today · {{date}}",
       "tomorrow": "Tomorrow · {{date}}"
+    },
+    "clocks": {
+      "local": "Local",
+      "eve": "EVE"
     },
     "rail": {
       "title": "Coming up",

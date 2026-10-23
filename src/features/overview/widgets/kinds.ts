@@ -327,6 +327,8 @@ const SPECS: Record<string, Spec> = {
     range: true,
     endpoints: [],
   },
+  // The game clock (UTC); reads no feed, so it needs no permission and is always ready.
+  eveTime: { category: 'space', views: N, view: 'number', size: 'S', endpoints: [] },
   comingUp: {
     category: 'messages',
     views: NT,

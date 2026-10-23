@@ -42,6 +42,7 @@ const ALL_IDS = [
   'kills',
   'omega',
   'tradingProfit',
+  'eveTime',
   'comingUp',
   'contracts',
   'mail',
