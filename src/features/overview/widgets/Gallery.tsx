@@ -54,7 +54,7 @@ interface GalleryProps {
 
 /** The drawer's width, and the wide "Browse all" layout's: most of the page, so the board's left edge stays in view. */
 const COMPACT_WIDTH = 'max-w-[460px]';
-const BROWSE_WIDTH = 'max-w-[min(70vw,72rem)]';
+const BROWSE_WIDTH = 'max-w-[min(80vw,88rem)]';
 
 /** How long the "Added" confirmation stays on a card. */
 const ADDED_MS = 2200;
@@ -410,13 +410,14 @@ function GalleryBody({
             {t('overview.gallery.done')}
           </Button>
         </div>
-        <div className="grid grid-cols-[11rem_minmax(0,1fr)] items-start gap-4 p-3">
+        {/* A rail from lg up; narrower, one row of chips above the list, as in the drawer. */}
+        <div className="grid items-start gap-4 p-3 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-8">
           <div
             role="group"
             aria-label={t('overview.gallery.categoriesLabel')}
-            className="grid gap-1.5"
+            className="-mx-3 flex min-w-0 gap-1.5 overflow-x-auto px-3 pb-1 [scrollbar-width:thin] lg:mx-0 lg:grid lg:overflow-visible lg:px-0 lg:pb-0"
           >
-            {chips.map((chip) => chipButton(chip, 'w-full justify-between'))}
+            {chips.map((chip) => chipButton(chip, 'shrink-0 lg:w-full lg:justify-between'))}
           </div>
           {list}
         </div>
@@ -464,7 +465,8 @@ export function Gallery({ open, onClose }: GalleryProps) {
   const board = useWidgetBoard();
   const isPhone = useIsPhone();
   const searchRef = useRef<HTMLInputElement>(null);
-  const [browse, setBrowse] = useState(false);
+  // A desktop opens wide: the drawer is one press of Quick add away.
+  const [browse, setBrowse] = useState(true);
   const title = t('overview.gallery.title');
   const subtitle = t(boardKey(board, 'gallery.subtitle'), {
     total: board.kinds.filter(board.canDraw).length,

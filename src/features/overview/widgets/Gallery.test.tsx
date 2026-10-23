@@ -62,12 +62,16 @@ async function openGallery({
   initial = START,
   isPhone = false,
   board,
-}: { initial?: OverviewLayout; isPhone?: boolean; board?: WidgetBoard } = {}) {
+  wide = false,
+}: { initial?: OverviewLayout; isPhone?: boolean; board?: WidgetBoard; wide?: boolean } = {}) {
   phone.value = isPhone;
   const user = userEvent.setup();
   render(<Host initial={initial} board={board} />);
   await user.click(screen.getByRole('button', { name: 'Add widget' }));
   const dialog = await screen.findByRole('dialog', { name: 'Add a widget' });
+  // A desktop opens in Browse all; most cases here are about the drawer, one Quick add away.
+  if (!isPhone && !wide)
+    await user.click(within(dialog).getByRole('button', { name: 'Quick add' }));
   return { user, dialog };
 }
 
@@ -195,7 +199,7 @@ describe('Gallery', () => {
   });
 
   it('moves focus to the search box on open, closes on Escape and gives focus back', async () => {
-    const { user } = await openGallery();
+    const { user } = await openGallery({ wide: true });
     await waitFor(() =>
       expect(screen.getByRole('searchbox', { name: 'Search widgets' })).toHaveFocus()
     );
@@ -224,19 +228,22 @@ describe('Gallery on a phone', () => {
 });
 
 describe('Gallery Browse all', () => {
-  const browse = async (opts: Parameters<typeof openGallery>[0] = {}) => {
-    const out = await openGallery(opts);
-    await out.user.click(within(out.dialog).getByRole('button', { name: 'Browse all' }));
-    return out;
-  };
+  const browse = (opts: Parameters<typeof openGallery>[0] = {}) =>
+    openGallery({ ...opts, wide: true });
 
-  it('widens the same open drawer, keeping the search text, and narrows it back', async () => {
+  it('opens a desktop in Browse all', async () => {
+    const { dialog } = await browse();
+    expect(dialog.className).toContain('max-w-[min(80vw,88rem)]');
+    expect(within(dialog).getByRole('button', { name: 'Quick add' })).toBeInTheDocument();
+  });
+
+  it('narrows to the drawer and widens again, keeping the search text', async () => {
     const { user, dialog } = await openGallery();
     expect(dialog.className).toContain('max-w-[460px]');
     await user.type(within(dialog).getByRole('searchbox'), 'wal');
     await user.click(within(dialog).getByRole('button', { name: 'Browse all' }));
     const wide = screen.getByRole('dialog', { name: 'Add a widget' });
-    expect(wide.className).toContain('max-w-[min(70vw,72rem)]');
+    expect(wide.className).toContain('max-w-[min(80vw,88rem)]');
     expect(within(wide).getByRole('searchbox')).toHaveValue('wal');
     await user.click(within(wide).getByRole('button', { name: 'Quick add' }));
     expect(screen.getByRole('dialog', { name: 'Add a widget' }).className).toContain(
