@@ -536,7 +536,7 @@ export interface SovereigntyDevelopment {
 export interface SovereigntySystem {
   solar_system_id: number;
   /** Only an alliance claim carries development. */
-  claim?: { alliance?: { development?: SovereigntyDevelopment } };
+  claim?: { alliance?: { alliance_id?: number; development?: SovereigntyDevelopment } };
 }
 
 export function getSovereigntySystems(

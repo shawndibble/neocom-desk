@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { hubReagentsRunOutMs, raidHeadline, raidState } from './sovereignty';
+import {
+  allianceSpace,
+  hubReagentsRunOutMs,
+  liveRaids,
+  raidHeadline,
+  raidState,
+} from './sovereignty';
 
 const HOUR = 3_600_000;
 const NOW = 1_000 * HOUR;
@@ -71,5 +77,50 @@ describe('hubReagentsRunOutMs', () => {
   });
   it('is unknown when nothing burns', () => {
     expect(hubReagentsRunOutMs({ amount: 10, burningPerHour: 0, updatedMs: NOW })).toBeNull();
+  });
+});
+
+describe('allianceSpace', () => {
+  it('is the systems whose claim is the alliance, and no other', () => {
+    expect(
+      allianceSpace(
+        [
+          { systemId: 1, allianceId: 99 },
+          { systemId: 2, allianceId: 77 },
+          { systemId: 3, allianceId: null },
+          { systemId: 4, allianceId: 99 },
+        ],
+        99
+      )
+    ).toEqual(new Set([1, 4]));
+  });
+  it('is empty for an alliance holding no sov', () => {
+    expect(allianceSpace([{ systemId: 2, allianceId: 77 }], 99).size).toBe(0);
+  });
+});
+
+describe('liveRaids', () => {
+  const hook = (key: string, startH: number, endH: number) => ({
+    key,
+    window: { startMs: at(startH * HOUR), endMs: at(endH * HOUR) },
+  });
+
+  it('puts open windows first, closing soonest, then upcoming by opening', () => {
+    const order = liveRaids(
+      [hook('later', 2, 6), hook('openLong', -1, 3), hook('soon', 1, 5), hook('openShort', -2, 1)],
+      NOW
+    ).map((r) => r.key);
+    expect(order).toEqual(['openShort', 'openLong', 'soon', 'later']);
+  });
+  it('drops closed and unread windows', () => {
+    expect(
+      liveRaids([hook('closed', -3, -1), { key: 'unread', window: null }, hook('open', -1, 1)], NOW)
+    ).toEqual([hook('open', -1, 1)]);
+  });
+  it('breaks a tie on the key, so the order never shuffles', () => {
+    expect(liveRaids([hook('b', 1, 3), hook('a', 1, 3)], NOW).map((r) => r.key)).toEqual([
+      'a',
+      'b',
+    ]);
   });
 });

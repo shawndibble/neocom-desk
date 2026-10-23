@@ -59,6 +59,7 @@ import type {
   KillsWidgetData,
   OmegaWidgetData,
   TradingProfitWidgetData,
+  SovRaidsWidgetData,
 } from './kindLoaders';
 
 /** The narrow slice of i18next's `t` the adapters need. */
@@ -263,6 +264,7 @@ export interface FeedMap {
   structures: StructuresBoardData;
   moonChunks: MoonChunksBoardData;
   incursions: IncursionsBoardData;
+  sovRaids: SovRaidsWidgetData;
   spExtras: SpExtras;
   journal: JournalData;
   netWorth: NetWorthWidgetData;

@@ -839,6 +839,26 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ],
       ],
     },
+    sovRaids: {
+      value: '2',
+      unit: t('travel.sovRaids.unit', { count: 2 }),
+      note: [
+        t('travel.sovRaids.nextOpenNow', { subject: 'X-7OMU IV' }),
+        t('travel.sovRaids.jumps', { count: 7 }),
+      ].join(', '),
+      rows: [
+        [
+          'X-7OMU IV',
+          t('travel.sovRaids.windowOpen', { duration: '1h 20m' }),
+          t('travel.sovRaids.jumps', { count: 7 }),
+        ],
+        [
+          'Efa II',
+          t('travel.sovRaids.windowIn', { duration: '1h 40m' }),
+          t('travel.sovRaids.jumps', { count: 12 }),
+        ],
+      ],
+    },
     comingUp: {
       value: '1h 20m',
       note: t('overview.gallery.samples.comingUp.note'),

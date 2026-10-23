@@ -282,6 +282,13 @@ const SPECS: Record<string, Spec> = {
     size: 'S',
     endpoints: [],
   },
+  sovRaids: {
+    category: 'space',
+    views: NT,
+    view: 'table',
+    size: 'M',
+    endpoints: [],
+  },
   routeSafety: {
     category: 'space',
     views: NCT,

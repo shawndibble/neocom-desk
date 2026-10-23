@@ -4817,6 +4817,11 @@
           "constellation": "Constellation"
         }
       },
+      "sovRaids": {
+        "title": "Skyhook raids",
+        "description": "Skyhooks in your alliance's space that can be raided now or soon",
+        "empty": "No skyhook in your alliance's space can be raided now or soon."
+      },
       "routeSafety": {
         "title": "Route safety",
         "description": "Player kills along your saved route over the last 24 hours",
@@ -13185,6 +13190,33 @@
     "unconfirmed": "The connection timed out. Couldn't confirm it opened in EVE — check your client."
   },
   "travel": {
+    "sovRaids": {
+      "noAlliance": "This Character is in no alliance, so it has no space to defend.",
+      "noSov": "Your alliance holds no sovereignty, so it has no skyhooks to defend.",
+      "unit_one": "skyhook raidable in our space",
+      "unit_other": "skyhooks raidable in our space",
+      "nextOpenNow": "{{subject}} open now",
+      "nextOpensIn": "{{subject}} opens in {{duration}}",
+      "jumps_one": "{{count}} jump",
+      "jumps_other": "{{count}} jumps",
+      "windowOpen": "open, {{duration}} left",
+      "windowIn": "in {{duration}}",
+      "underCacheWindow": "under {{duration}}",
+      "deadline": "Raid window opens at {{subject}}",
+      "col": {
+        "skyhook": "Skyhook",
+        "window": "Theft window",
+        "jumps": "Jumps"
+      },
+      "fact": {
+        "window": "Theft window",
+        "openNow": "open now · closes in {{closes}}",
+        "upcoming": "opens in {{opens}} · closes in {{closes}}",
+        "heldBy": "Held by"
+      },
+      "summary_one": "{{count}} skyhook in your alliance's space can be raided now or soon.",
+      "summary_other": "{{count}} skyhooks in your alliance's space can be raided now or soon."
+    },
     "zkillFailure": {
       "offline": "Couldn't reach zKillboard. Check your connection, then try again.",
       "rateLimited": "zKillboard is rate-limiting requests. Try again shortly."
