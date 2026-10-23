@@ -417,6 +417,11 @@ export function createCommunitiesFixture(
       const others = (board[requestId] ?? []).filter((p) => p.uid !== ME);
       board[requestId] = lines ? [...others, pledge(ME, lines, 0)] : others;
     },
+    saveQuote: (id, requestId, quote) => {
+      const board = (pledges[id] ??= {});
+      const others = (board[requestId] ?? []).filter((p) => p.uid !== ME);
+      board[requestId] = quote ? [...others, { ...pledge(ME, {}, 0), quote }] : others;
+    },
     syncDeliveries: () => ({
       status: 'ok',
       updated: 0,
