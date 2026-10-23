@@ -38,6 +38,7 @@ import { incursionDomain } from './pollDomains/incursions';
 import { communitiesDomain } from './pollDomains/communities';
 import { killsDomain } from './pollDomains/kills';
 import { mercenaryDensDomain } from './pollDomains/mercenaryDens';
+import { skyhookDomain } from './pollDomains/corp';
 
 type Entry = Record<string, unknown>;
 
@@ -238,6 +239,20 @@ const CASES: Case[] = [
       anarchyPct: 50,
     },
     nullable: ['reinforcedUntilMs', 'anarchyAmount', 'anarchyLevel'],
+  },
+  {
+    name: 'skyhooks',
+    domain: skyhookDomain,
+    base: {
+      skyhookId: 1,
+      planetId: 40_000_001,
+      windowStartMs: 100,
+      windowEndMs: 200,
+      unsecuredUnits: 5,
+      leadMs: 5,
+      minUnits: 0,
+    },
+    nullable: ['windowStartMs', 'windowEndMs', 'unsecuredUnits'],
   },
 ];
 

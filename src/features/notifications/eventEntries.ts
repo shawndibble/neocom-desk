@@ -95,6 +95,9 @@ import {
   type EveNotificationFire,
   type StructureFuelLowFire,
   type MercenaryDenReinforcedFire,
+  type SkyhookRaidableFire,
+  type SkyhookSnapshot,
+  diffSkyhookRaidable,
   type MercenaryDenAnarchyFire,
   type DenSnapshot,
   diffMercenaryDenReinforced,
@@ -141,6 +144,7 @@ import {
   eveNotificationCopy,
   structureFuelCopy,
   mercenaryDenReinforcedCopy,
+  skyhookRaidableCopy,
   mercenaryDenAnarchyCopy,
   corpIndustryJobCopy,
   corpRosterCopy,
@@ -185,6 +189,7 @@ export type AnyNotificationFire =
   | EveNotificationFire
   | StructureFuelLowFire
   | MercenaryDenReinforcedFire
+  | SkyhookRaidableFire
   | MercenaryDenAnarchyFire
   | CorpIndustryJobNotificationFire
   | CorpMemberJoinedFire
@@ -234,6 +239,7 @@ export const SNAPSHOT_SOURCES = {
   eveNotification: source<EveNotificationSnapshot, EveNotificationNames>('eveNotification'),
   structureFuel: source<StructureFuelSnapshot>('structureFuel'),
   mercenaryDens: source<DenSnapshot, PlanetNames>('mercenaryDens'),
+  skyhooks: source<SkyhookSnapshot, PlanetNames>('skyhooks'),
   corpIndustryJobs: source<CorpIndustryJobSnapshot, ItemNames>('corpIndustryJobs'),
   corpRoster: source<CorpRosterSnapshot, MemberNames>('corpRoster'),
   corpWallet: source<CorpWalletSnapshot>('corpWallet'),
@@ -559,6 +565,18 @@ export const NOTIFICATION_EVENT_ENTRIES = {
       hintKey: 'settings.notifications.structureFuelLowNotDuplicateHint',
     },
     rowHintKey: null,
+  }),
+  // Corp scope (issue #4784): a raid window is a known timestamp, so it projects.
+  skyhookRaidable: defineEvent({
+    source: SNAPSHOT_SOURCES.skyhooks,
+    diff: diffSkyhookRaidable,
+    copy: skyhookRaidableCopy,
+    projection: { push: skyhookRaidableCopy.push, everyOccurrence: true },
+    thresholds: {
+      fields: [THRESHOLD_FIELDS.skyhookRaidableLeadHours, THRESHOLD_FIELDS.skyhookRaidableMinUnits],
+      hintKey: 'settings.notifications.skyhookRaidableMinUnitsHint',
+    },
+    rowHintKey: 'settings.notifications.skyhookRaidableHint',
   }),
   corpIndustryJobReady: defineEvent({
     source: SNAPSHOT_SOURCES.corpIndustryJobs,
