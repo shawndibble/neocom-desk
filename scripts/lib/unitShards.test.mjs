@@ -20,12 +20,30 @@ describe('parseVitestReports', () => {
   it('merges shards and normalises Windows separators', () => {
     const weights = parseVitestReports([
       { testResults: [file('C:\\repo\\src\\a.test.ts', 0, 1000)] },
-      { testResults: [file('/home/x/src/a.test.ts', 0, 500)] },
+      {
+        testResults: [
+          file('C:\\repo\\src\\a.test.ts', 0, 500),
+          file('C:\\repo\\scripts\\lib\\b.test.mjs', 0, 250),
+        ],
+      },
     ]);
-    expect(weights).toEqual({ 'src/a.test.ts': 1.5 });
+    expect(weights).toEqual({ 'scripts/lib/b.test.mjs': 0.25, 'src/a.test.ts': 1.5 });
   });
 
-  it('skips files outside src/ and scripts/', () => {
-    expect(parseVitestReports([{ testResults: [file('/r/other/x.test.ts', 0, 10)] }])).toEqual({});
+  it('finds the repo root even when the checkout sits under a src/ directory', () => {
+    const weights = parseVitestReports([
+      {
+        testResults: [
+          file('/home/x/src/neocom-desk/src/a.test.ts', 0, 1000),
+          file('/home/x/src/neocom-desk/scripts/lib/b.test.mjs', 0, 1000),
+        ],
+      },
+    ]);
+    expect(Object.keys(weights)).toEqual(['scripts/lib/b.test.mjs', 'src/a.test.ts']);
+  });
+
+  it('refuses reports it cannot root, rather than writing wrong keys', () => {
+    const lone = [{ testResults: [file('/r/other/x.test.ts', 0, 10)] }];
+    expect(() => parseVitestReports(lone)).toThrow(/cannot find the repo root/);
   });
 });

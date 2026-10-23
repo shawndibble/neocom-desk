@@ -7,9 +7,10 @@
  * `test:run` step (and upload the file) to produce them.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { parseVitestReports } from './lib/unitShards.mjs';
 
-const WEIGHTS_PATH = 'src/test/shard-weights.json';
+const WEIGHTS_PATH = fileURLToPath(new URL('../src/test/shard-weights.json', import.meta.url));
 const paths = process.argv.slice(2);
 if (paths.length === 0) {
   console.error('usage: unit-shard-weights.mjs <vitest-json-report>...');
@@ -22,4 +23,4 @@ if (Object.keys(weights).length === 0) {
   process.exit(1);
 }
 writeFileSync(WEIGHTS_PATH, JSON.stringify(weights, null, 2) + '\n');
-console.error(`wrote ${Object.keys(weights).length} weights to ${WEIGHTS_PATH}`);
+console.error(`wrote ${Object.keys(weights).length} weights to src/test/shard-weights.json`);

@@ -167,7 +167,9 @@ jobs:
     # `cores - 1` = 3 workers on a 4-vCPU runner at 93% utilisation, so there
     # is nothing left to reclaim on one machine.
     #
-    # Four, not more. `--shard=N/4` is vitest's flag, but the split is ours:
+    # Four: ~1700s of file time over four runners is ~420s each, level with the
+    # `static` job, and every extra runner repeats a checkout and cache restore.
+    # `--shard=N/4` is vitest's flag, but the split is ours:
     # vitest's own cuts a path-hash ordering into equal-COUNT slices, which
     # measured 231s / 515s / 347s / 600s of file time per shard (ideal 423s),
     # so the job waited on a shard carrying 35% of the work. The sequencer in

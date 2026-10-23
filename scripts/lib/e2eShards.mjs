@@ -6,6 +6,9 @@
  * tests) lands in one shard and that shard sets the job's wall time. This
  * deals whole files out by measured weight instead: heaviest first, each to
  * the lightest shard so far (longest-processing-time-first).
+ *
+ * `partitionByWeight` is generic and also deals out the unit-test shards
+ * (src/test/weightedShardSequencer.ts).
  */
 
 /** The weight of a file with no measurement: the median, so a new spec is neither free nor huge. */
