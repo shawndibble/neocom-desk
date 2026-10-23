@@ -60,6 +60,6 @@ export function boardKey(board: WidgetBoard, key: PageNamingKey): string {
 }
 
 /** The kind's Gallery group on `board`; a kind the board does not offer falls back to its own. */
-export function categoryOn(board: WidgetBoard, kind: WidgetKindDef): KindCategory {
+export function categoryOn(board: Pick<WidgetBoard, 'id'>, kind: WidgetKindDef): KindCategory {
   return kind.boards[board.id] ?? kind.category;
 }

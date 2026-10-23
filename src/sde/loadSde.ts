@@ -136,6 +136,8 @@ export const loadGameTypeNames = cached<string[]>('typeNames.json');
 
 /** Hole type ("M267") -> [max per jump, max total] in kg, for Route Safety's mass check (issue #2906). */
 export const loadWormholeMass = cached<Record<string, [number, number]>>('wormholeMass.json');
+/** ESI `character_title_id` (UUID) -> English title name (issue #4777). */
+export const loadCharacterTitles = cached<Record<string, string>>('characterTitles.json');
 /**
  * Published hull typeId -> [name, groupID, mass in kg, base jump drive?], for
  * the same check. The drive (issue #3147) is `[rangeLy, fuelTypeId, fuelPerLy]`

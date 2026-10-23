@@ -4038,7 +4038,8 @@
       "pi": "PI",
       "spReady": "SP ready",
       "alerts": "Alerts",
-      "starred": "Starred"
+      "starred": "Starred",
+      "achievement": "Title / Score"
     },
     "jobSlotCategory": {
       "manufacturing": "Mfg",
@@ -4048,7 +4049,12 @@
     "openJobsTooltip": "{{used}}/{{max}} slots used",
     "spReadyYes": "Ready",
     "extractionTotal": "Ready extractions net {{isk}} ISK across characters, {{each}} each ({{hub}}: sell injector − buy extractor, before fees)",
-    "extractionUnpriced": "Extraction net unavailable: no sell orders at {{hub}}"
+    "extractionUnpriced": "Extraction net unavailable: no sell orders at {{hub}}",
+    "achievement": {
+      "points_one": "{{points}} point",
+      "points_other": "{{points}} points",
+      "line": "{{title}} · {{points}}"
+    }
   },
   "overview": {
     "title": "Overview",
@@ -4801,7 +4807,8 @@
           "anarchy": "Anarchy",
           "infomorphs": "Infomorphs",
           "jumps": "Jumps",
-          "character": "Character"
+          "character": "Character",
+          "development": "Development"
         },
         "deadline": {
           "reinforced": "Den at {{planet}} leaves reinforcement",
@@ -4811,7 +4818,32 @@
         "summary_other": "{{count}} dens, {{reinforced}} reinforced.",
         "underHour": "Under 1h",
         "unread_one": "{{count}} character could not be read.",
-        "unread_other": "{{count}} characters could not be read."
+        "unread_other": "{{count}} characters could not be read.",
+        "detail": {
+          "title": "{{planet}} mercenary den",
+          "state": {
+            "reinforced": "Reinforced",
+            "paused": "Paused",
+            "disabled": "Disabled",
+            "running": "Running"
+          },
+          "stateUnknown": "Unknown",
+          "comesOut": "Comes out in {{duration}}",
+          "shieldsNote": "Keys can't be taken until the den's shields repair above 50%.",
+          "disabledNote": "The character no longer has the skill to run this den.",
+          "owner": "Skyhook owner",
+          "evolution": "Evolution",
+          "amount": "{{amount}} / 100",
+          "anarchyNote": "At level 2 the den takes workforce from the skyhook. Run an operation to lower it.",
+          "operation": {
+            "available": "Available",
+            "started": "Started",
+            "done": "Done"
+          },
+          "operationName": "Tactical operation",
+          "expiresIn": "expires in {{duration}}",
+          "ended": "Ended"
+        }
       },
       "structures": {
         "title": "Structures",
@@ -5506,6 +5538,17 @@
       "added": "Added",
       "noMatchHint": "Try another word, or clear the search to see every widget.",
       "clearSearch": "Clear search",
+      "browseAll": "Browse all",
+      "quickAdd": "Quick add",
+      "done": "Done",
+      "featured": "Featured",
+      "notOnBoard": "Not on your board",
+      "density": "Layout",
+      "densityGrid": "Grid",
+      "densityList": "List",
+      "allOnBoard": "Every widget here is already on your board",
+      "allOnBoardHint": "Show all widgets to add another of any of them.",
+      "showAll": "Show all widgets",
       "samples": {
         "training": {
           "note": "Advanced Industry V · 4 skills queued",

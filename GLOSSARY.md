@@ -16,6 +16,11 @@ here — they go one per file in `docs/context/decisions/`.
 - **Account**: UI-level grouping of a user's Characters. Has no storage, no
   sync and no server-side identity, because EVE SSO exposes no account
   identifier. Never surfaced to the user as a thing to manage.
+- **Achievement score**: A Character's total score from EVE's in-game
+  achievements, from its public record (`achievement_score`). Shown with the
+  **Character title** as one line, "Title · 1,240 points", and as the optional
+  Title / Score column on Characters and Contacts. Not a standing and not
+  skill points.
 - **Acquisition Verdict**: Whether a Build Plan's product costs less to build
   than to buy outright at the trade hub. A personal-use comparison — no
   sales tax or broker fee applies, because nothing is being sold.
@@ -205,6 +210,10 @@ here — they go one per file in `docs/context/decisions/`.
   finished queue entry while training continues, and from **Skill Queue
   Ending**, which warns ahead of this state rather than reporting it once
   reached.
+- **Character title**: The cosmetic title a Character chooses to show,
+  earned through achievements (`character_title_id`, a UUID; names from the
+  SDE's `characterTitles`). Not the corporation title the same record carries
+  as `corporation_title`, which is a role bundle in one corporation.
 - **Charge Picker**: How a **Fitting**'s weapon group chooses its charge,
   ranking the options by this Fitting's own DPS, range and price, or by
   capacitor effect for a cap booster, or explaining crystals for a mining
@@ -410,7 +419,8 @@ here — they go one per file in `docs/context/decisions/`.
 - **Gallery**: A **Widget board**'s "Add a widget" drawer: that board's
   **Widget Kinds** with search and category chips. A kind may be added more
   than once. On the **Corp Board** it never offers a kind whose Corp
-  Capability the Character lacks.
+  Capability the Character lacks. "Browse all" widens the same drawer into a
+  category rail and a grid of previews, with Featured and "Not on your board".
 - **Gank Chokepoint**: one of the named systems haulers are most often killed in — Uedama, Sivala, Aufay, Balle, Tama, Rancer, Ahbazon. A property of _traffic_, not of security status. An explicit list rather than a derived rule. States where a haul goes, never that anything will happen to the hauler there.
 - **Goal Plan**: the PI Plan tab's answer to "here are my colonies and the products I want per day — what does each colony do?". Goals (products at a units/day rate) are expanded into demand, and a greedy solver assigns each enabled colony a role — extract and refine P0 to P1, host the P2+ factories, or sit idle. Measured against the **Baseline**: every colony selling the best P1 it can make by itself; the plan's **Lift** is its net ISK minus the Baseline. What it cannot cover is a **Shortfall**, either a **Type gap** (no enabled colony's planet type yields that P0) or a **Budget gap** (colonies that could yield it are full). Its output is a change list against what each colony runs today, never a fresh layout.
 - **Chain estimate**: a P3 or P4's ISK a day as a whole multi-planet chain: the Goal Plan's solver run on new planets the pilot would add. Always labelled "multi-planet, needs hauling" and an estimate, and never ranked against one-planet figures, except in Plan's opt-in **Bigger chain** section.

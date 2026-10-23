@@ -182,10 +182,32 @@ export interface TableRowModel {
 }
 
 /** What a widget row's modal shows: plain data, drawn by the widget shell. */
+/** The tones a `RowDetailModel` badge can take (the `Pill` tones). */
+export type DetailTone = 'neutral' | 'success' | 'warning' | 'danger';
+
 export interface RowDetailModel {
   title: string;
+  /** A status line above the facts: a toned badge, then plain text, then an optional dim note. */
+  status?: { badge: string; tone: DetailTone; text?: string; note?: string };
   /** Labelled facts, in reading order; each value is already formatted. */
   facts: { label: string; value: string }[];
+  /** Bars under their own heading, each with a badge and a readout (a den's Development and Anarchy). */
+  meters?: {
+    title: string;
+    items: {
+      label: string;
+      badge: string;
+      value: number;
+      max: number;
+      readout: string;
+      note?: string;
+    }[];
+  };
+  /** A titled list, each entry a toned badge, its text and a trailing value. */
+  list?: {
+    title: string;
+    items: { key: string; badge: string; tone: DetailTone; text: string; value: string }[];
+  };
   /** Where it is: Set destination, and the jump count as a link to Route Safety. */
   place?: { systemId: number; name: string; jumps?: number };
 }

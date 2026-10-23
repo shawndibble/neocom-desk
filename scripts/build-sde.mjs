@@ -19,6 +19,7 @@ import { readCcpStaticDataFiles } from './lib/ccpStaticData.mjs';
 import { bakeCertificates } from './lib/certificates.mjs';
 import { bakeCertifiedPlans, factionNames, parseJsonl } from './lib/certifiedPlans.mjs';
 import { USER_AGENT as ESI_USER_AGENT } from './lib/constants.mjs';
+import { bakeCharacterTitles } from './lib/characterTitles.mjs';
 import { bakeShipMass, bakeWormholeMass } from './lib/jumpMass.mjs';
 import { bakeMutaplasmids, dogmaAttributeInfo } from './lib/mutaplasmids.mjs';
 import { ccpBuildFromSdeJsonl, fetchFuzzworkDump } from './lib/sdeBuild.mjs';
@@ -46,6 +47,7 @@ async function main() {
       'typeDogma.jsonl',
       'dynamicItemAttributes.jsonl',
       'dogmaAttributes.jsonl',
+      'characterTitles.jsonl',
     ],
     ESI_USER_AGENT
   );
@@ -187,6 +189,11 @@ async function main() {
       'wormholeMass.json looks wrong: expected 80+ types and M267 at 375 Mt per jump'
     );
   }
+  // --- characterTitles.json: title UUID -> English name (issue #4777) ---
+  const characterTitles = bakeCharacterTitles(parseJsonl(ccpStaticData['characterTitles.jsonl']));
+  if (Object.keys(characterTitles).length < 30) {
+    throw new Error('characterTitles.json looks wrong: expected 30+ titles with English names');
+  }
   await writeOutputs({
     lpCorporations,
     npcStations,
@@ -213,6 +220,7 @@ async function main() {
     mutaplasmids,
     wormholeMass,
     shipMass,
+    characterTitles,
     marketGroups,
     marketTypes,
     solarSystems,
