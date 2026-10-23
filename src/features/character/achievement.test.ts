@@ -1,17 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  achievementContactIds,
+  achievementFromPublicInfo,
+  achievementParts,
+  loadCharacterAchievement,
+} from './achievement';
 import type { PublicCharacterInfo } from './publicInfoData';
 
 const loadPublicCharacterInfo = vi.fn<(id: number) => Promise<PublicCharacterInfo | null>>();
 vi.mock('./publicInfoData', () => ({
   loadPublicCharacterInfo: (id: number) => loadPublicCharacterInfo(id),
 }));
-
-const {
-  achievementContactIds,
-  achievementFromPublicInfo,
-  achievementParts,
-  loadCharacterAchievement,
-} = await import('./achievement');
 
 const TITLE_ID = '0c231769-621e-53d5-bd49-ce07a7b4a544';
 const TITLES = { [TITLE_ID]: 'Selenologist' };
@@ -75,6 +74,10 @@ describe('achievementParts', () => {
     expect(achievementParts({ score: 0, titleId: 'unknown-uuid' }, TITLES)).toBeNull();
   });
 
+  it('never reads an inherited property as a title name', () => {
+    expect(achievementParts({ score: 0, titleId: 'constructor' }, TITLES)).toBeNull();
+  });
+
   it('drops the title until the table has loaded', () => {
     expect(achievementParts({ score: 0, titleId: TITLE_ID }, null)).toBeNull();
   });
@@ -111,7 +114,7 @@ describe('loadCharacterAchievement', () => {
 });
 
 describe('achievementContactIds', () => {
-  it('keeps player Character contacts only: no corporations, alliances, factions or NPC agents', () => {
+  it('keeps Character contacts only: no corporations, alliances or factions', () => {
     expect(
       achievementContactIds([
         { contact_id: 2120000001, contact_type: 'character', standing: 10 },
@@ -121,6 +124,6 @@ describe('achievementContactIds', () => {
         { contact_id: 3_008_416, contact_type: 'character', standing: 0 },
         { contact_id: 2120000005, contact_type: 'character', standing: -5 },
       ])
-    ).toEqual([2120000001, 2120000005]);
+    ).toEqual([2120000001, 3_008_416, 2120000005]);
   });
 });

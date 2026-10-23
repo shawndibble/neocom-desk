@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { cx } from '@/lib/cx';
+import { HintText } from '@/components/ui/HintText';
 import { formatCount } from '@/lib/formatCount';
-import { achievementParts, type AchievementParts, type CharacterAchievement } from './achievement';
-import { useCharacterAchievement, useCharacterTitleNames } from './useCharacterAchievements';
+import { EmptyCell } from './ContactCells';
+import type { AchievementParts } from './achievement';
+import { useCharacterAchievements } from './useCharacterAchievements';
 
 /** "1,240 points", or null for none. */
 function usePoints(score: number | null): string | null {
@@ -12,61 +13,30 @@ function usePoints(score: number | null): string | null {
     : t('characters.achievement.points', { count: score, points: formatCount(score) });
 }
 
-/** The full line as plain text, for the truncating line's `title`. */
-function useLineText(parts: AchievementParts): string {
+/** "Title · 1,240 points" under a Character's corporation (issue #4777). */
+export function AchievementLine({ parts }: { parts: AchievementParts | null | undefined }) {
   const { t } = useTranslation();
-  const points = usePoints(parts.score);
-  if (parts.title !== null && points !== null)
-    return t('characters.achievement.line', { title: parts.title, points });
-  return parts.title ?? points ?? '';
-}
-
-/**
- * "Title · 1,240 points" under a Character's corporation (issue #4777): Show
- * info, the Characters card, the Overview header. Nothing at all for a score
- * of 0 and no title.
- */
-export function AchievementLine({
-  achievement,
-  className,
-}: {
-  achievement: CharacterAchievement | null;
-  className?: string;
-}) {
-  const titleNames = useCharacterTitleNames(Boolean(achievement?.titleId));
-  const parts = achievement && achievementParts(achievement, titleNames);
+  const points = usePoints(parts?.score ?? null);
   if (!parts) return null;
-  return <AchievementLineText parts={parts} className={className} />;
-}
-
-function AchievementLineText({
-  parts,
-  className,
-}: {
-  parts: AchievementParts;
-  className?: string;
-}) {
-  const points = usePoints(parts.score);
-  const text = useLineText(parts);
+  const text =
+    parts.title !== null && points !== null
+      ? t('characters.achievement.line', { title: parts.title, points })
+      : (parts.title ?? points);
   return (
-    <span className={cx('block truncate text-xs text-text-dim', className)} title={text}>
-      {parts.title !== null && <b className="font-medium text-text">{parts.title}</b>}
-      {parts.title !== null && points !== null && ' · '}
-      {points}
+    <span className="block truncate text-xs text-text-dim">
+      <HintText content={text} onlyWhenTruncated>
+        {parts.title !== null && <b className="font-medium text-text">{parts.title}</b>}
+        {parts.title !== null && points !== null && ' · '}
+        {points}
+      </HintText>
     </span>
   );
 }
 
-/** `AchievementLine` for a Character it reads itself (a card, a header). */
-export function CharacterAchievementLine({
-  characterId,
-  className,
-}: {
-  characterId: number | undefined;
-  className?: string;
-}) {
-  const achievement = useCharacterAchievement(characterId);
-  return <AchievementLine achievement={achievement} className={className} />;
+/** `AchievementLine` for one Character it reads itself (the overview header). */
+export function CharacterAchievementLine({ characterId }: { characterId: number }) {
+  const achievements = useCharacterAchievements([characterId]);
+  return <AchievementLine parts={achievements.partsOf(characterId)} />;
 }
 
 /**
@@ -75,17 +45,14 @@ export function CharacterAchievementLine({
  * Characters table scrolls sideways instead, so its cell keeps two lines.
  */
 export function AchievementCell({
-  achievement,
-  titleNames,
-  stacks = false,
+  parts,
+  stacks,
 }: {
-  achievement: CharacterAchievement | null | undefined;
-  titleNames: Readonly<Record<string, string>> | null;
-  stacks?: boolean;
+  parts: AchievementParts | null | undefined;
+  stacks: boolean;
 }) {
-  const parts = achievement ? achievementParts(achievement, titleNames) : null;
   const points = usePoints(parts?.score ?? null);
-  if (!parts) return <span data-dense-omit="true">—</span>;
+  if (!parts) return <EmptyCell />;
   return (
     <span
       className={

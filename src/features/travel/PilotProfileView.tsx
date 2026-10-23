@@ -35,6 +35,7 @@ import { PilotKillmailsSection } from './PilotKillmailsSection';
 import { ZkillRatioMeters, ZkillStatsSection } from './ZkillStatsSection';
 import { pilotAge, type PilotProfile } from './pilotLookup';
 import { AchievementLine } from '@/features/character/AchievementLine';
+import { useAchievementParts } from '@/features/character/useCharacterAchievements';
 
 export interface PilotProfileViewProps {
   profile: PilotProfile;
@@ -164,6 +165,7 @@ function PilotIdentity({
   const corporationLabel =
     profile.corporationName ?? t('travel.pilot.unnamed', { id: profile.corporationId });
   const allianceLabel = (id: number) => profile.allianceName ?? t('travel.pilot.unnamed', { id });
+  const achievementParts = useAchievementParts(profile.achievement);
   return (
     <div className="flex items-start gap-3">
       <CharacterAvatar characterId={profile.characterId} size="lg" alt={profile.name} />
@@ -200,7 +202,7 @@ function PilotIdentity({
             <AllianceLink id={allianceId}>{allianceLabel(allianceId)}</AllianceLink>
           )}
         </p>
-        <AchievementLine achievement={profile.achievement} />
+        <AchievementLine parts={achievementParts} />
         <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-text-dim">
           <span>
             {t('travel.pilot.securityStatus')}{' '}

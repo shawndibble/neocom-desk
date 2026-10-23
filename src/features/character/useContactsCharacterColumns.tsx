@@ -12,11 +12,8 @@ import {
   type ContactsCharacterColumnId,
 } from '@/features/character/contactsColumns';
 import { achievementContactIds } from '@/features/character/achievement';
-import { AchievementCell } from '@/features/character/AchievementLine';
-import {
-  useCharacterAchievements,
-  useCharacterTitleNames,
-} from '@/features/character/useCharacterAchievements';
+import { achievementColumn } from '@/features/character/achievementColumn';
+import { useCharacterAchievements } from '@/features/character/useCharacterAchievements';
 import { contactLabelNames } from '@/features/character/contacts';
 import { contactTypeLabelKey } from '@/features/character/contactsFilter';
 import { buildContactStandingIndex } from '@/features/character/contactStandings';
@@ -81,15 +78,10 @@ export function useContactsCharacterColumns({
     );
   }, [contacts, affiliations, ownAffiliation]);
 
-  // Title / Score reads one public record per player Character contact, so
-  // only while its column shows; corps, alliances, factions and NPC agents never.
   const achievementIds = useMemo(() => achievementContactIds(contacts), [contacts]);
   const achievements = useCharacterAchievements(
     achievementIds,
     characterColumnVisibility.isVisible('achievement')
-  );
-  const titleNames = useCharacterTitleNames(
-    [...achievements.values()].some((achievement) => achievement?.titleId)
   );
 
   // The identity column (never hidden) plus the optional columns the picker
@@ -156,18 +148,7 @@ export function useContactsCharacterColumns({
             : entityName(contactNames, row.corporationId);
         },
       },
-      achievement: {
-        id: 'achievement',
-        header: t('characters.column.achievement'),
-        render: (contact) => (
-          <AchievementCell
-            achievement={achievements.get(contact.contact_id)}
-            titleNames={titleNames}
-            stacks
-          />
-        ),
-        sortValue: (contact) => achievements.get(contact.contact_id)?.score,
-      },
+      achievement: achievementColumn(t, (contact) => contact.contact_id, achievements, true),
       labels: {
         id: 'labels',
         header: t('contacts.labels'),
@@ -222,7 +203,7 @@ export function useContactsCharacterColumns({
         },
       },
     }),
-    [t, contactNames, contactLabels, affiliationRows, achievements, titleNames]
+    [t, contactNames, contactLabels, affiliationRows, achievements]
   );
   // The ids the table and picker offer: `labels` only when there is something to show.
   const availableCharacterColumnIds = useMemo(

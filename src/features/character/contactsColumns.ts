@@ -20,13 +20,8 @@ export type ContactsCharacterColumnId = (typeof CONTACTS_CHARACTER_COLUMN_IDS)[n
  * Every column but Title / Score (issue #4777): it costs one public-record
  * read per Character contact, so it shows only once picked.
  */
-export const DEFAULT_VISIBLE_CONTACTS_CHARACTER_COLUMNS: readonly ContactsCharacterColumnId[] = [
-  'type',
-  'affiliation',
-  'labels',
-  'standing',
-  'flags',
-];
+export const DEFAULT_VISIBLE_CONTACTS_CHARACTER_COLUMNS: readonly ContactsCharacterColumnId[] =
+  CONTACTS_CHARACTER_COLUMN_IDS.filter((id) => id !== 'achievement');
 
 export const contactsCharacterColumnsStore = createColumnVisibilitySetting({
   key: 'contactsCharacterVisibleColumns',

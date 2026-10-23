@@ -91,11 +91,10 @@ export interface CharacterPublicInfo {
   faction_id?: number;
   security_status?: number;
   description?: string;
-  /** The Character's title in their corporation (was `title` before compat date 2026-06-09). */
+  /** Title in their corporation, a role bundle; not `character_title_id`. */
   corporation_title?: string;
-  /** Total achievement score (compat date 2026-06-09). */
   achievement_score?: number;
-  /** The cosmetic title shown, a `characterTitles` UUID; absent when none (compat date 2026-06-09). */
+  /** Cosmetic title, a `characterTitles` UUID; absent when none. */
   character_title_id?: string;
 }
 

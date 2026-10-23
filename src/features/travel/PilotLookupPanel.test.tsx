@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import en from '@/i18n/locales/en.json';
+import type { PilotProfile } from './pilotLookup';
 
 const mocks = vi.hoisted(() => ({
   granted: undefined as boolean | undefined,
@@ -77,8 +78,9 @@ const PROFILE = {
   allianceId: 300,
   allianceName: 'Some Alliance',
   securityStatus: -2.345,
+  achievement: { score: 0, titleId: null },
   fetchedAt: new Date(Date.now() - 5 * 60_000),
-};
+} satisfies PilotProfile;
 
 const STATS = {
   kind: 'stats' as const,

@@ -28,7 +28,8 @@ import type { QueueInfo } from '@/features/character/rosterView';
 import type { CharacterGroup, CharacterSortStats } from '@/features/character/groups';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatDuration } from '@/lib/duration';
-import { CharacterAchievementLine } from '@/features/character/AchievementLine';
+import { AchievementLine } from '@/features/character/AchievementLine';
+import type { AchievementParts } from '@/features/character/achievement';
 import {
   UNGROUPED_VALUE,
   characterLastSynced,
@@ -53,6 +54,8 @@ interface CharacterCardProps {
   onToggleStar: (characterId: number) => void;
   onMoveToGroup: (characterId: number, groupId: string | null) => void;
   onRemove: (characterId: number, name: string) => void;
+  /** Score and title, from the roster's one batched read; undefined until loaded. */
+  achievement: AchievementParts | null | undefined;
 }
 
 type PiCardAttention = { kind: 'stopped' } | { kind: 'expiring'; expiryMs: number };
@@ -94,6 +97,7 @@ export function CharacterCard({
   onToggleStar,
   onMoveToGroup,
   onRemove,
+  achievement,
 }: CharacterCardProps) {
   // Own entry, not the page's whole map: a fetch for another card leaves this one alone.
   const info = usePublicInfo((state) => state.byCharacterId[character.characterId]);
@@ -181,7 +185,7 @@ export function CharacterCard({
               <span className="block truncate text-xs text-text-dim">
                 <AffiliationName name={info?.allianceName} />
               </span>
-              <CharacterAchievementLine characterId={character.characterId} />
+              <AchievementLine parts={achievement} />
             </span>
           </div>
           {/* Group and remove: the card's own controls, not part of the

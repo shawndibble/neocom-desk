@@ -191,6 +191,9 @@ async function main() {
   }
   // --- characterTitles.json: title UUID -> English name (issue #4777) ---
   const characterTitles = bakeCharacterTitles(parseJsonl(ccpStaticData['characterTitles.jsonl']));
+  if (Object.keys(characterTitles).length < 30) {
+    throw new Error('characterTitles.json looks wrong: expected 30+ titles with English names');
+  }
   await writeOutputs({
     lpCorporations,
     npcStations,

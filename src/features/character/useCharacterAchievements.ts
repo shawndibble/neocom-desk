@@ -1,53 +1,60 @@
 import { useMemo } from 'react';
-import { isNpcCharacterId } from '@/esi/entityIds';
+import { idSetKey } from '@/lib/idSetKey';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { useBatchedMap } from '@/lib/useBatchedMap';
 import { loadCharacterTitles } from '@/sde/loadSde';
-import { loadCharacterAchievement, type CharacterAchievement } from './achievement';
+import {
+  achievementParts,
+  loadCharacterAchievement,
+  type AchievementParts,
+  type CharacterAchievement,
+} from './achievement';
 
 const loadEntry = (entry: string) => loadCharacterAchievement(Number(entry));
-// Read through a wrapper so the table's loader is only touched once a title shows.
+// Read at call time: a test's @/sde/loadSde mock without this export throws on access.
 const loadTitles = () => loadCharacterTitles();
 
-const NO_IDS: readonly number[] = [];
+/** The baked `characterTitles` table, read only once a title is on screen. */
+function useTitleNames(needed: boolean): Readonly<Record<string, string>> | null {
+  const titles = useKeyedLoad(needed ? 'characterTitles' : null, loadTitles);
+  return titles.status === 'ready' ? titles.data : null;
+}
+
+export interface AchievementLookup {
+  /** Undefined until loaded; null when there is nothing to show. */
+  partsOf: (characterId: number) => AchievementParts | null | undefined;
+  scoreOf: (characterId: number) => number | undefined;
+}
 
 /**
- * Each Character's achievement score and title (issue #4777), a few public
- * records at a time. NPC agents are left out (they have neither), and with
- * `enabled` false nothing is read: Contacts reads only while its column shows.
- * A Character absent from the map has not loaded; null is a record that
- * could not be read.
+ * Each Character's score and title (issue #4777), a few public records at a
+ * time. With `enabled` false nothing is read: Contacts reads only while its
+ * column shows.
  */
 export function useCharacterAchievements(
   characterIds: readonly number[],
   enabled = true
-): ReadonlyMap<number, CharacterAchievement | null> {
-  const ids = enabled ? characterIds : NO_IDS;
-  const key = useMemo(
-    () => [...new Set(ids.filter((id) => !isNpcCharacterId(id)))].sort((a, b) => a - b).join(','),
-    [ids]
+): AchievementLookup {
+  const { values } = useBatchedMap(enabled ? idSetKey(characterIds) : '', loadEntry);
+  const titleNames = useTitleNames(
+    useMemo(() => [...values.values()].some((achievement) => achievement?.titleId), [values])
   );
-  const { values } = useBatchedMap(key, loadEntry);
   return useMemo(
-    () => new Map([...values].map(([entry, achievement]) => [Number(entry), achievement])),
-    [values]
+    () => ({
+      partsOf: (characterId) => {
+        const entry = String(characterId);
+        if (!values.has(entry)) return undefined;
+        const achievement = values.get(entry);
+        return achievement ? achievementParts(achievement, titleNames) : null;
+      },
+      scoreOf: (characterId) => values.get(String(characterId))?.score,
+    }),
+    [values, titleNames]
   );
 }
 
-/** One Character's, for a card or header; null until loaded or when there is none. */
-export function useCharacterAchievement(
-  characterId: number | undefined
-): CharacterAchievement | null {
-  const ids = useMemo(() => (characterId === undefined ? NO_IDS : [characterId]), [characterId]);
-  const achievements = useCharacterAchievements(ids);
-  return characterId === undefined ? null : (achievements.get(characterId) ?? null);
-}
-
-/**
- * The baked `characterTitles` table, read only once some Character on screen
- * shows a title (`needed`); null until then (a title shows as none meanwhile).
- */
-export function useCharacterTitleNames(needed: boolean): Readonly<Record<string, string>> | null {
-  const titles = useKeyedLoad(needed ? 'characterTitles' : null, loadTitles);
-  return titles.status === 'ready' ? titles.data : null;
+/** An already-read score and title (Show info's profile), with the title named. */
+export function useAchievementParts(achievement: CharacterAchievement): AchievementParts | null {
+  const titleNames = useTitleNames(achievement.titleId !== null);
+  return achievementParts(achievement, titleNames);
 }

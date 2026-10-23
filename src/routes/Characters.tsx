@@ -74,10 +74,7 @@ import { useCharactersHousekeeping } from '@/features/character/useCharactersHou
 import { characterLastSynced } from '@/features/character/rosterQueueChip';
 import { useCharactersView, activeRosterFilterCount } from '@/features/character/useCharactersView';
 import { buildColumns } from '@/features/character/charactersTableColumns';
-import {
-  useCharacterAchievements,
-  useCharacterTitleNames,
-} from '@/features/character/useCharacterAchievements';
+import { useCharacterAchievements } from '@/features/character/useCharacterAchievements';
 import { returnPathAfterSwitch } from '@/features/character/characterSwitchReturn';
 
 const DENSITY_LABEL_KEYS = {
@@ -202,18 +199,16 @@ export function Characters() {
     spExtractionEnabled,
   });
 
+  // One batched read for the roster: every card's line, or the table's column while it shows.
+  const achievements = useCharacterAchievements(
+    useMemo(() => (characters ?? []).map((character) => character.characterId), [characters]),
+    viewMode === 'card' || activeColumnIds.includes('achievement')
+  );
+
   // Not `useMemo`: `handleToggleStar` below closes over `starred`/`setStarred`
   // and is a fresh function every render anyway, so a memoized wrapper here
   // would just recompute every render regardless — `buildColumns` itself is
   // cheap (a handful of object literals, no per-character work).
-  // Card view's line reads each card's own; the table reads them only while its column shows.
-  const achievements = useCharacterAchievements(
-    useMemo(() => (characters ?? []).map((character) => character.characterId), [characters]),
-    viewMode === 'table' && activeColumnIds.includes('achievement')
-  );
-  const titleNames = useCharacterTitleNames(
-    [...achievements.values()].some((achievement) => achievement?.titleId)
-  );
   const columnsById = buildColumns(
     t,
     spExtractionThreshold,
@@ -222,8 +217,7 @@ export function Characters() {
     timeZone,
     groupsValue.groups,
     (id, groupId) => void handleMoveToGroup(id, groupId),
-    achievements,
-    titleNames
+    achievements
   );
 
   useCharactersHousekeeping({
@@ -533,6 +527,7 @@ export function Characters() {
             />
           ) : (
             <CharactersCardView
+              achievements={achievements}
               groups={groupsValue.groups}
               ungroupedIds={ungroupedIds}
               charactersById={charactersById}

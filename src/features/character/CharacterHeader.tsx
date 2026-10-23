@@ -33,7 +33,7 @@ interface CharacterHeaderProps {
 }
 
 /**
- * The Character overview's shared header: portrait, name, corp/alliance, SP.
+ * The Character overview's shared header: portrait, name, corp/alliance, title · score, SP.
  *
  * `PageHeader` is still every *other* route's top line (docs/DESIGN.md §4);
  * this replaces it for the three views behind `OverviewSubNav`, which read as

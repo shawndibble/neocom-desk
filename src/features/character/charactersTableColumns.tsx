@@ -25,8 +25,8 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { type CharacterGroup, type CharacterSortStats } from '@/features/character/groups';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { AffiliationName } from '@/features/character/CharacterCard';
-import { AchievementCell } from '@/features/character/AchievementLine';
-import type { CharacterAchievement } from '@/features/character/achievement';
+import { achievementColumn } from '@/features/character/achievementColumn';
+import type { AchievementLookup } from '@/features/character/useCharacterAchievements';
 import {
   UNGROUPED_VALUE,
   characterLastSynced,
@@ -115,9 +115,7 @@ export function buildColumns(
   timeZone: 'UTC' | undefined,
   groups: readonly CharacterGroup[],
   onMoveToGroup: (characterId: number, groupId: string | null) => void,
-  /** Read only while the Title / Score column shows (`useCharacterAchievements`). */
-  achievements: ReadonlyMap<number, CharacterAchievement | null>,
-  titleNames: Readonly<Record<string, string>> | null
+  achievements: AchievementLookup
 ): Record<CharacterColumnId, DataTableColumn<CharacterRow>> {
   return {
     name: {
@@ -138,17 +136,7 @@ export function buildColumns(
         </span>
       ),
     },
-    achievement: {
-      id: 'achievement',
-      header: t('characters.column.achievement'),
-      sortValue: (row) => achievements.get(row.character.characterId)?.score,
-      render: (row) => (
-        <AchievementCell
-          achievement={achievements.get(row.character.characterId)}
-          titleNames={titleNames}
-        />
-      ),
-    },
+    achievement: achievementColumn(t, (row) => row.character.characterId, achievements, false),
     corp: {
       id: 'corp',
       header: t('characters.column.corp'),
