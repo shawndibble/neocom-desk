@@ -106,4 +106,51 @@ describe('pooledTransactionMargins gaps', () => {
     ]);
     expect(gaps.get(rows[0].transaction_id)).toBe('noBuy');
   });
+
+  // ESI's real transaction_tax lines carry no context, and a sale's
+  // journal_ref_id names neither its market_transaction line nor its tax line.
+  describe('with a bare journal, as ESI sends it', () => {
+    const at = '2026-01-02T00:00:00Z';
+    const proceeds = (id: number, amount = 600): WalletJournalEntry => ({
+      id,
+      date: at,
+      ref_type: 'market_transaction',
+      description: '',
+      amount,
+    });
+    const bareTax = (id: number, amount: number): WalletJournalEntry => ({
+      id,
+      date: at,
+      ref_type: 'transaction_tax',
+      description: '',
+      amount,
+    });
+
+    it('pairs a sale with the tax line that follows its proceeds line of the same amount', () => {
+      const margins = transactionMargins([BUY, SALE], [proceeds(500), bareTax(501, -25.2)]);
+      expect(margins.get(2)).toEqual({ unitCost: 100, salesTax: 25.2, margin: 600 - 400 - 25.2 });
+    });
+
+    it('keeps two same-priced sales at one timestamp from taking the same tax line', () => {
+      const twin = { ...SALE, transaction_id: 3, journal_ref_id: 13 };
+      const buys = { ...BUY, quantity: 8 };
+      const { margins } = transactionMarginReport(
+        [buys, SALE, twin],
+        [proceeds(500), bareTax(501, -25.2), proceeds(502), bareTax(503, -25.2)]
+      );
+      expect(margins.get(2)?.salesTax).toBe(25.2);
+      expect(margins.get(3)?.salesTax).toBe(25.2);
+    });
+
+    it('gives no margin when no proceeds line matches the sale amount', () => {
+      const margins = transactionMargins([BUY, SALE], [proceeds(500, 999), bareTax(501, -41.9)]);
+      expect(margins.has(2)).toBe(false);
+    });
+
+    it('does not take a tax line from another timestamp', () => {
+      const late = { ...bareTax(501, -25.2), date: '2026-01-03T00:00:00Z' };
+      const margins = transactionMargins([BUY, SALE], [proceeds(500), late]);
+      expect(margins.has(2)).toBe(false);
+    });
+  });
 });
