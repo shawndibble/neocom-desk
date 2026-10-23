@@ -3,6 +3,8 @@
  * from EVE Ref's industry-systems dataset, so the Build Plan's trend shows from day
  * one instead of after the daily job has run for a week. Safe to re-run: the merge
  * replaces a date's column. Needs the `bzip2` binary (EVE Ref ships .json.bz2).
+ * Do not run it within an hour of 00:30 UTC: the daily job read-merge-writes the
+ * same objects, and two overlapping runs can drop one side's column.
  *
  *   cd functions
  *   R2_ENDPOINT=https://<account>.r2.cloudflarestorage.com R2_BUCKET=<bucket> \
@@ -40,7 +42,10 @@ async function lastFileOf(date) {
   if (!listing) return null;
   const hrefs = [...(await listing.text()).matchAll(/href="([^"]+\.json\.bz2)"/g)].map((m) => m[1]);
   const last = hrefs.sort().at(-1);
-  return last ? new URL(last, folder).href : null;
+  if (!last) return null;
+  const url = new URL(last, folder).href;
+  // A listing pointing off EVE Ref is not a file we asked for.
+  return url.startsWith(BASE) ? url : null;
 }
 
 async function loadDay(date) {
@@ -54,7 +59,8 @@ async function loadDay(date) {
   });
   if (run.status !== 0) throw new Error(`bzip2 failed for ${date}: ${run.stderr}`);
   const indices = parseCostIndices(JSON.parse(run.stdout.toString('utf8')));
-  return Object.keys(indices).length > 0 ? { date, indices } : null;
+  if (Object.keys(indices).length === 0) throw new Error(`no systems parsed for ${date}`);
+  return { date, indices };
 }
 
 const today = Date.now();

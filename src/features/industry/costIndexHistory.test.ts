@@ -48,6 +48,12 @@ describe('costIndexTrend', () => {
       )
     ).toBeNull();
   });
+  it('plots at most the latest 90 days', () => {
+    const series = Array.from({ length: 120 }, (_, i) => i / 1000);
+    const trend = costIndexTrend(parseCostIndexHistory(raw(120, series))!, 'manufacturing');
+    expect(trend?.points).toHaveLength(90);
+    expect(trend?.today).toBeCloseTo(0.119);
+  });
   it('is null for an activity the object lacks', () => {
     expect(
       costIndexTrend(parseCostIndexHistory(raw(8, Array(8).fill(0.02)))!, 'reaction')

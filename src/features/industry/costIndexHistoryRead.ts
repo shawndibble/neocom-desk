@@ -30,13 +30,13 @@ export async function loadCostIndexHistory(systemId: number): Promise<CostIndexH
   return cached?.data ?? null;
 }
 
-/** The history once read; `null` while loading, absent or failed. Skipped (no fetch) while `enabled` is false. */
-export function useCostIndexHistory(systemId: number | undefined, enabled: boolean) {
+/** The history once read; `null` while loading, absent or failed. */
+export function useCostIndexHistory(systemId: number | undefined) {
   const [state, setState] = useState<{ systemId: number; history: CostIndexHistory | null } | null>(
     null
   );
   useEffect(() => {
-    if (systemId === undefined || !enabled) return;
+    if (systemId === undefined) return;
     let live = true;
     void loadCostIndexHistory(systemId)
       .catch(() => null)
@@ -46,6 +46,6 @@ export function useCostIndexHistory(systemId: number | undefined, enabled: boole
     return () => {
       live = false;
     };
-  }, [systemId, enabled]);
+  }, [systemId]);
   return state && state.systemId === systemId ? state.history : null;
 }

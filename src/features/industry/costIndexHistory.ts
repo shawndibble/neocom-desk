@@ -22,10 +22,13 @@ export interface CostIndexTrend {
 
 /** Fewer days than this and a trend says nothing. */
 export const MIN_TREND_DAYS = 7;
+/** The trend's "ago" comparison, and the most days it plots. */
+const TREND_WINDOW_DAYS = 7;
+const MAX_TREND_DAYS = 90;
 const DAY_MS = 86_400_000;
 
 /** The Build Plan's activity as ESI's `/industry/systems` names it. */
-export function esiActivityName(activity: IndustryActivity): string {
+export function esiActivityName(activity: IndustryActivity): 'manufacturing' | 'reaction' {
   return activity === 'reaction' ? 'reaction' : 'manufacturing';
 }
 
@@ -64,8 +67,9 @@ export function costIndexTrend(history: CostIndexHistory, activity: string): Cos
     if (value !== null && date !== undefined) points.push({ date, value });
   });
   if (points.length < MIN_TREND_DAYS) return null;
+  points.splice(0, Math.max(0, points.length - MAX_TREND_DAYS));
   const last = points[points.length - 1]!;
-  const cutoff = Date.parse(last.date) - 7 * DAY_MS;
+  const cutoff = Date.parse(last.date) - TREND_WINDOW_DAYS * DAY_MS;
   const before = points.filter((p) => Date.parse(p.date) <= cutoff);
   const weekAgo = (before.length > 0 ? before[before.length - 1]! : points[0]!).value;
   return { points, weekAgo, today: last.value };

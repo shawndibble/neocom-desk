@@ -1,24 +1,18 @@
 /**
- * The system cost index history (issue #4778): ESI's `/industry/systems` (public,
- * no token) folded into one small R2 object per solar system, so the Build Plan
- * can chart a facility's trend. EVE Ref's own history is ~2 MB a file (every
- * system), too big for the app to read, so this copies it into per-system objects.
- * All activities are kept.
- *
- * Mutable keys with a short `max-age`; an R2 lifecycle rule must not cover the
- * prefix, as in `r2DailySnapshots.ts`. Fetch- and Firestore-free, and free of
- * relative runtime imports like `r2Client.ts`, so the one-off backfill script can
- * load it under plain Node type stripping: the reads and uploads are arguments.
+ * System cost index history: one small R2 object per solar system, all activities,
+ * since EVE Ref's own files (~2 MB, every system) are too big for the app to chart.
+ * Mutable keys, no lifecycle rule. Free of relative runtime imports so the backfill
+ * script loads it under Node type stripping.
  */
 import { gzipSync } from 'node:zlib';
 import type { R2Get, R2Put } from './r2Client.js';
+import type { WriteOpenPricesResult } from './r2DailySnapshots.js';
 
 export const COST_INDICES_R2_PREFIX = 'cost-indices/';
 /** Days kept per system; the oldest drop first. */
 export const COST_INDICES_MAX_DAYS = 120;
 export const INDUSTRY_SYSTEMS_URL = 'https://esi.evetech.net/industry/systems';
 
-/** One object per system, so a hover reads a few KB, not the whole universe. */
 const HEADERS = {
   'Content-Type': 'application/json',
   'Content-Encoding': 'gzip',
@@ -41,6 +35,7 @@ export interface StoredSystemCostIndices {
   activities: Record<string, Array<number | null>>;
 }
 
+/** One object per system, so a popover reads a few KB, not every system. */
 export function costIndicesR2Key(systemId: number): string {
   return `${COST_INDICES_R2_PREFIX}${systemId}.json`;
 }
@@ -108,12 +103,7 @@ export function mergeSystemCostIndices(
   return { systemId, lastSyncedAt, dates, activities };
 }
 
-export interface WriteCostIndicesResult {
-  written: number;
-  failed: number;
-  /** First failure's message, so an auth or network fault is diagnosable from the log. */
-  firstError: string | null;
-}
+export type WriteCostIndicesResult = WriteOpenPricesResult;
 
 /**
  * Merges `days` into every system's R2 object (read, merge, write). A system

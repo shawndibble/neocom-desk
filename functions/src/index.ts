@@ -1312,7 +1312,7 @@ export const syncWorkbenchFits = onSchedule(
  * Another Cloud Scheduler job past the free three, the same trade as
  * `syncWorkbenchFits`; the deployment now has eight scheduled functions.
  *
- * The system cost index history (issue #4778, `cost-indices/<systemId>.json`) rides
+ * The system cost index history (`cost-indices/<systemId>.json`) rides
  * this schedule rather than a ninth function: it needs the same R2 secrets and runs
  * once a day. The two are independent; one failing still runs the other, and the run
  * fails afterwards naming what failed. 1GiB/540s is the open prices job's budget for
@@ -1321,8 +1321,11 @@ export const syncWorkbenchFits = onSchedule(
 
 export const syncLpStoreOffers = onSchedule(
   {
-    schedule: 'every 24 hours',
-    memory: '512MiB',
+    // A cron pinned to UTC, so the cost index half stamps a stable UTC date
+    // (`every 24 hours` drifts and could skip or repeat a date).
+    schedule: '30 0 * * *',
+    timeZone: 'Etc/UTC',
+    memory: '1GiB',
     timeoutSeconds: 540,
     secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
   },

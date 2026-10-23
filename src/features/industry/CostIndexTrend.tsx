@@ -12,7 +12,7 @@ import { formatCostIndex } from './format';
 const CHART_HEIGHT = 56;
 
 interface CostIndexTrendProps {
-  /** The live figure, already formatted; shown as is, with or without the popover. */
+  /** Live figure, pre-formatted. */
   value: string;
   systemId: number | undefined;
   systemName: string;
@@ -27,7 +27,7 @@ interface CostIndexTrendProps {
  */
 export function CostIndexTrend({ value, systemId, systemName, activity }: CostIndexTrendProps) {
   const { t } = useTranslation();
-  const history = useCostIndexHistory(systemId, true);
+  const history = useCostIndexHistory(systemId);
   const trend = history ? costIndexTrend(history, esiActivityName(activity)) : null;
   if (!trend) return <>{value}</>;
   const summary = t('industry.costIndexTrend.summary', {

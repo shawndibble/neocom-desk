@@ -33,6 +33,7 @@ import {
 import { runWorkbenchSync } from './workbenchFits.js';
 import { r2WorkbenchHulls, workbenchFitsStore } from './workbenchFitsStore.js';
 import { PUBLIC_HOST_USER_AGENT } from './marketHistoryJob.js';
+import { ESI_COMPATIBILITY_DATE } from './esiNotifications.js';
 
 /** Doc under `systemConditions` holding the archive version the last publish was built from. */
 const PUBLIC_CONTRACTS_ARCHIVE_FINGERPRINT_DOC = 'publicContractsArchiveFingerprint';
@@ -186,6 +187,13 @@ export async function runSyncWorkbenchFits(): Promise<void> {
   logInfo('EVE Workbench fits sync', { ...result });
 }
 
+const ESI_PUBLIC_HEADERS = {
+  'User-Agent': PUBLIC_HOST_USER_AGENT,
+  'X-User-Agent': PUBLIC_HOST_USER_AGENT,
+  'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
+  Accept: 'application/json',
+};
+
 const LP_STORE_MAX_FAILED_SHARE = 0.1;
 
 /** Body of syncLpStoreOffers (see its doc in index.ts). */
@@ -196,12 +204,7 @@ export async function runSyncLpStoreOffers(): Promise<void> {
     corporations: LP_CORP_STATION_SYSTEMS,
     fetchJson: async (url) => {
       const response = await fetch(url, {
-        headers: {
-          'User-Agent': PUBLIC_HOST_USER_AGENT,
-          'X-User-Agent': PUBLIC_HOST_USER_AGENT,
-          'X-Compatibility-Date': '2026-08-01',
-          Accept: 'application/json',
-        },
+        headers: ESI_PUBLIC_HEADERS,
       });
       const body: unknown = response.ok ? await response.json().catch(() => null) : null;
       return { status: response.status, retryAfter: response.headers.get('Retry-After'), body };
@@ -222,17 +225,12 @@ export async function runSyncLpStoreOffers(): Promise<void> {
 export async function runSyncCostIndices(): Promise<void> {
   const r2 = r2ConfigOrThrow();
   const response = await fetch(INDUSTRY_SYSTEMS_URL, {
-    headers: {
-      'User-Agent': PUBLIC_HOST_USER_AGENT,
-      'X-User-Agent': PUBLIC_HOST_USER_AGENT,
-      'X-Compatibility-Date': '2026-08-01',
-      Accept: 'application/json',
-    },
+    headers: ESI_PUBLIC_HEADERS,
   });
   if (!response.ok) throw new Error(`industry systems: HTTP ${response.status}`);
   const indices = parseCostIndices(await response.json());
   const systems = Object.keys(indices).length;
-  // An empty list would stamp nothing useful; fail loudly and try again tomorrow.
+  // Fail loud rather than store an empty day.
   if (systems === 0) throw new Error('industry systems: no systems parsed');
   const date = new Date().toISOString().slice(0, 10);
   const result = await writeCostIndicesToR2(
