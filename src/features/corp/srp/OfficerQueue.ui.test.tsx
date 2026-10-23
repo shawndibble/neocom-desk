@@ -11,6 +11,9 @@ vi.mock('./useSrpClaimNames', () => ({
   }),
 }));
 
+const mailResult = vi.hoisted(() => vi.fn());
+vi.mock('./useSrpResultMail', () => ({ useSrpResultMail: () => mailResult }));
+
 import { OfficerQueue } from './OfficerQueue';
 import type { SrpQueueData } from './useSrpQueue';
 
@@ -69,7 +72,10 @@ const pendingSet = () => [
   claim(5, { state: 'paid', closedAt: 9, paidAt: 9, paidByName: 'Boss' }),
 ];
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mailResult.mockResolvedValue({ sent: [], failed: [], missingScope: false });
+});
 
 describe('OfficerQueue pending', () => {
   it('summarises the queue and offers a tick only where Approve can apply', () => {
@@ -104,6 +110,35 @@ describe('OfficerQueue pending', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Approve (2)' }));
     expect(data.approveMany).toHaveBeenCalledWith([{ killmailId: 1 }, { killmailId: 2 }]);
     expect(await screen.findByText('Approved 2 of 2')).toBeInTheDocument();
+  });
+
+  it('reports the result mail after a batch approve, and a failed one keeps the status', async () => {
+    mailResult.mockResolvedValue({ sent: ['Pilot1'], failed: ['Pilot2'], missingScope: false });
+    setup(pendingSet());
+    await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Approve (2)' }));
+    expect(
+      await screen.findByText(
+        'Approved 2 of 2. Mail sent to 1 pilot. Mail failed for Pilot2, status still saved.'
+      )
+    ).toBeInTheDocument();
+    expect(mailResult).toHaveBeenCalledWith('approved', [
+      expect.objectContaining({
+        characterId: 5001,
+        claim: { killmailId: 1, hull: 'Hull10', amount: 1_000_000 },
+      }),
+      expect.objectContaining({ characterId: 5002 }),
+    ]);
+  });
+
+  it('says so when the mail permission is missing, never blocking the approval', async () => {
+    mailResult.mockResolvedValue({ sent: [], failed: [], missingScope: true });
+    const data = setup(pendingSet());
+    await userEvent.click(screen.getAllByRole('button', { name: 'Approve' })[0]!);
+    expect(data.approve).toHaveBeenCalled();
+    expect(
+      await screen.findByText(/Approved Pilot1.*No mail sent: mail permission missing\./)
+    ).toBeInTheDocument();
   });
 
   it('says which claims a batch left alone', async () => {
@@ -145,6 +180,19 @@ describe('OfficerQueue reject', () => {
     await userEvent.type(within(dialog).getByRole('textbox'), '  Solo roam ');
     await userEvent.click(confirm);
     await waitFor(() => expect(data.reject).toHaveBeenCalledWith(1, 'Solo roam'));
+  });
+
+  it('mails the pilot the reason and reports it', async () => {
+    mailResult.mockResolvedValue({ sent: ['Pilot1'], failed: [], missingScope: false });
+    setup(pendingSet());
+    await userEvent.click(screen.getAllByRole('button', { name: 'Reject…' })[0]!);
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByRole('textbox'), 'Solo roam');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Reject claim' }));
+    expect(await screen.findByText(/Rejected Pilot1.*Mail sent to 1 pilot\./)).toBeInTheDocument();
+    expect(mailResult).toHaveBeenCalledWith('rejected', [
+      expect.objectContaining({ claim: expect.objectContaining({ reason: 'Solo roam' }) }),
+    ]);
   });
 
   it('keeps the dialog and the typed reason when the server refuses', async () => {
