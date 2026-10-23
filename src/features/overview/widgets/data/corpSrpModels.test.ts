@@ -94,7 +94,7 @@ describe('corpSrp builder', () => {
     expect(dir.status.isEmpty).toBe(true);
     expect(dir.emptyMessage).toBe('overview.widgets.corpSrp.off');
     expect(dir.emptyLinkLabel).toBe('overview.widgets.corpSrp.setUp');
-    expect(dir.to).toBe('/corp/srp/settings');
+    expect(dir.to).toBe('/corp/srp');
     const other = corpSrp(feeds([], { enabled: false, canSetUp: false }), ctx);
     expect(other.emptyLinkLabel).toBeUndefined();
     expect(other.emptyHint).toBe('overview.widgets.corpSrp.offHintOfficer');

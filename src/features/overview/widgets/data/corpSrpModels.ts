@@ -13,7 +13,7 @@ import type { TableCell, TableRowModel } from './types';
 const C = 'overview.widgets.corpSrp';
 /** The SRP page (ships in its own ticket) and its settings, where a Director turns SRP on. */
 const SRP_PATH = '/corp/srp';
-const SETTINGS_PATH = '/corp/srp/settings';
+const SETTINGS_PATH = '/corp/srp';
 
 const RANK: Record<SrpClaimRow['state'], number> = {
   pending: 0,

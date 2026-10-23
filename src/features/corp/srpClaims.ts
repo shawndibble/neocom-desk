@@ -5,10 +5,9 @@
 import { collection, getDocs, query, where } from 'firebase/firestore/lite';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
+import type { SrpClaimState } from './srpTypes';
 
-/** A claim's `state` (mirror of `functions/src/srpTypes.ts`; #4850 adds the client copy). */
-const STATES = ['pending', 'approved', 'paid', 'rejected'] as const;
-export type SrpClaimState = (typeof STATES)[number];
+const STATES: readonly SrpClaimState[] = ['pending', 'approved', 'paid', 'rejected'];
 
 /**
  * The fields of a claim doc the widgets read. Narrow on purpose: the doc carries more
