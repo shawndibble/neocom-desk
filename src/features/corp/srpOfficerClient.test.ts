@@ -51,10 +51,14 @@ describe('SRP officer client', () => {
     sent('rejectSrpClaimCallable', { ...auth, killmailId: 5, reason: 'solo' });
     await changeSrpClaimAmount(7, CORP, 5, 100, 'why');
     sent('changeSrpClaimAmountCallable', { ...auth, killmailId: 5, amount: 100, reason: 'why' });
-    await markSrpClaimPaid(7, CORP, 5);
-    sent('markSrpClaimPaidCallable', { ...auth, killmailId: 5 });
-    await markSrpClaimsPaid(7, CORP, [5, 6]);
-    sent('markSrpClaimsPaidCallable', { ...auth, killmailIds: [5, 6] });
+    await markSrpClaimPaid(7, CORP, { killmailId: 5, expectedAmount: 90 });
+    sent('markSrpClaimPaidCallable', { ...auth, killmailId: 5, expectedAmount: 90 });
+    const items = [
+      { killmailId: 5, expectedAmount: 90 },
+      { killmailId: 6, expectedAmount: null },
+    ];
+    await markSrpClaimsPaid(7, CORP, items);
+    sent('markSrpClaimsPaidCallable', { ...auth, claims: items });
     expect(token).toHaveBeenCalledWith(7);
   });
 });

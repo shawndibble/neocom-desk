@@ -9,6 +9,7 @@ import type {
   SrpBatchOutcome,
   SrpClaim,
   SrpClaimOutcome,
+  SrpMarkPaidItem,
 } from './srpClaimTypes';
 
 export interface SrpOfficerBackendOverride {
@@ -19,8 +20,8 @@ export interface SrpOfficerBackendOverride {
   approveMany: (items: SrpApproveItem[]) => SrpBatchOutcome;
   reject: (killmailId: number, reason: string) => SrpClaimOutcome;
   change: (killmailId: number, amount: number, reason: string) => SrpClaimOutcome;
-  markPaid: (killmailId: number) => SrpClaimOutcome;
-  markPaidMany: (killmailIds: number[]) => SrpBatchOutcome;
+  markPaid: (item: SrpMarkPaidItem) => SrpClaimOutcome;
+  markPaidMany: (items: SrpMarkPaidItem[]) => SrpBatchOutcome;
 }
 
 let override: SrpOfficerBackendOverride | null = null;

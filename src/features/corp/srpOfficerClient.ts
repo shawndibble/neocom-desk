@@ -4,7 +4,7 @@
  * 24-hour officer access); every change is a callable that re-checks the Character's roles live,
  * guards the state change in a transaction and audits it. Only a short-lived access token is
  * sent. Refusals carry a `details.reason`: claim-not-found, illegal-transition, reason-required,
- * amount-required, amount-unchanged, not-an-officer, wrong-corp, role-required.
+ * amount-required, amount-unchanged, amount-changed (the amount moved since the officer looked), not-an-officer, wrong-corp, role-required.
  */
 import {
   collection,
@@ -24,21 +24,50 @@ import type {
   SrpBatchOutcome,
   SrpClaim,
   SrpClaimOutcome,
+  SrpMarkPaidItem,
 } from './srpClaimTypes';
 import { call } from './taxBook/bookClient';
 
 const corpDoc = (corporationId: number, name: string) =>
   collection(getSyncFirestore(), 'corps', String(corporationId), name);
 
-/** Every claim of the corporation: retention (#4856) bounds the closed ones. */
+const isOpen = (c: SrpClaim) => c.state === 'pending' || c.state === 'approved';
+
+/** The Pending and Approved claims: what an officer works. A bounded, single-field query. */
 export async function readSrpClaims(
   characterId: number,
   corporationId: number
 ): Promise<SrpClaim[]> {
   const stand = srpOfficerBackendOverride();
-  if (stand) return stand.claims();
+  if (stand) return stand.claims().filter(isOpen);
   await ensureSignedIn(characterId);
-  const snap = await getDocs(corpDoc(corporationId, 'srpClaims'));
+  const snap = await getDocs(
+    query(corpDoc(corporationId, 'srpClaims'), where('state', 'in', ['pending', 'approved']))
+  );
+  return snap.docs.map((d) => d.data() as SrpClaim);
+}
+
+/**
+ * The newest closed (Paid or Rejected) claims, newest first. `closedAt` exists only on closed
+ * claims, so ordering by it leaves the open ones out; retention (#4856) bounds the rest.
+ */
+export async function readSrpHistory(
+  characterId: number,
+  corporationId: number,
+  count = 100
+): Promise<SrpClaim[]> {
+  const stand = srpOfficerBackendOverride();
+  if (stand) {
+    return stand
+      .claims()
+      .filter((c) => !isOpen(c))
+      .sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0))
+      .slice(0, count);
+  }
+  await ensureSignedIn(characterId);
+  const snap = await getDocs(
+    query(corpDoc(corporationId, 'srpClaims'), orderBy('closedAt', 'desc'), limitTo(count))
+  );
   return snap.docs.map((d) => d.data() as SrpClaim);
 }
 
@@ -135,23 +164,23 @@ export function changeSrpClaimAmount(
   });
 }
 
-/** Approved to Paid: the officer paid in game; the app moves no ISK. */
+/** Approved to Paid: the officer paid in game; the app moves no ISK. `expectedAmount` guards a stale view. */
 export function markSrpClaimPaid(
   characterId: number,
   corporationId: number,
-  killmailId: number
+  item: SrpMarkPaidItem
 ): Promise<SrpClaimOutcome> {
   const stand = srpOfficerBackendOverride();
-  if (stand) return Promise.resolve().then(() => stand.markPaid(killmailId));
-  return officerCall(characterId, corporationId, 'markSrpClaimPaidCallable', { killmailId });
+  if (stand) return Promise.resolve().then(() => stand.markPaid(item));
+  return officerCall(characterId, corporationId, 'markSrpClaimPaidCallable', { ...item });
 }
 
 export function markSrpClaimsPaid(
   characterId: number,
   corporationId: number,
-  killmailIds: number[]
+  items: SrpMarkPaidItem[]
 ): Promise<SrpBatchOutcome> {
   const stand = srpOfficerBackendOverride();
-  if (stand) return Promise.resolve().then(() => stand.markPaidMany(killmailIds));
-  return officerCall(characterId, corporationId, 'markSrpClaimsPaidCallable', { killmailIds });
+  if (stand) return Promise.resolve().then(() => stand.markPaidMany(items));
+  return officerCall(characterId, corporationId, 'markSrpClaimsPaidCallable', { claims: items });
 }

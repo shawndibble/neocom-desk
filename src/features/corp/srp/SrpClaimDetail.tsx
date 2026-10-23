@@ -146,15 +146,16 @@ export function SrpClaimDetail({
                   )}
                 </span>
               )}
-              {claim.state === 'pending' && claim.amount !== null && (
-                <button
-                  type="button"
-                  className={cx(textActionClassName(), 'mt-1')}
-                  onClick={() => onChangeAmount(claim)}
-                >
-                  {t('srp.officer.actions.changeAmount')}
-                </button>
-              )}
+              {(claim.state === 'pending' || claim.state === 'approved') &&
+                claim.amount !== null && (
+                  <button
+                    type="button"
+                    className={cx(textActionClassName(), 'mt-1')}
+                    onClick={() => onChangeAmount(claim)}
+                  >
+                    {t('srp.officer.actions.changeAmount')}
+                  </button>
+                )}
             </Row>
           </dl>
           <div className="space-y-2">

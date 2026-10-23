@@ -2,7 +2,8 @@
  * The officer queue's pure side (issue #4853): which claims belong on which tab, and the sums the
  * summary line and the bulk bar show. No fetch, no React.
  */
-import type { SrpClaim } from '../srpClaimTypes';
+import { callableErrorReason } from '@/lib/callableError';
+import type { SrpBatchOutcome, SrpBatchResult, SrpClaim } from '../srpClaimTypes';
 
 export type QueueTab = 'pending' | 'owed' | 'history';
 
@@ -52,4 +53,36 @@ export function approveAmount(claim: SrpClaim, typed: string | undefined): numbe
 export function pruneSelection(selected: readonly number[], rows: readonly SrpClaim[]): number[] {
   const ids = new Set(rows.map((r) => r.killmailId));
   return selected.filter((id) => ids.has(id));
+}
+
+/** The server refuses a batch over this many claims (`MAX_SRP_BATCH` in functions). */
+export const MAX_SRP_BATCH = 50;
+
+/**
+ * Runs a bulk call in server-sized chunks, one after another, and merges the per-claim results.
+ * A chunk that throws becomes a refusal for each of its claims, so one result line still says
+ * what happened to every claim.
+ */
+export async function runInBatches<I extends { killmailId: number }>(
+  items: readonly I[],
+  call: (chunk: I[]) => Promise<SrpBatchOutcome>
+): Promise<SrpBatchOutcome> {
+  const results: SrpBatchResult[] = [];
+  for (let at = 0; at < items.length; at += MAX_SRP_BATCH) {
+    const chunk = items.slice(at, at + MAX_SRP_BATCH);
+    try {
+      results.push(...(await call(chunk)).results);
+    } catch (error) {
+      const reason = callableErrorReason(error) ?? 'generic';
+      results.push(
+        ...chunk.map((c) => ({
+          ok: false as const,
+          killmailId: c.killmailId,
+          reason,
+          message: reason,
+        }))
+      );
+    }
+  }
+  return { results };
 }

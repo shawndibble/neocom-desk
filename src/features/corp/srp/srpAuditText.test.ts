@@ -52,7 +52,12 @@ describe('auditText', () => {
       'Filed claim killmail 5, no amount worked out'
     );
   });
-  it('falls back to the action name', () => {
-    expect(auditText(t, entry('somethingNew', {}))).toBe('somethingNew');
+  it('words the retention sweep with its count', () => {
+    expect(auditText(t, entry('retentionDelete', { count: 3, claimIds: [1, 2, 3] }))).toBe(
+      'Retention sweep removed 3 closed claims'
+    );
+  });
+  it('never shows a raw action string', () => {
+    expect(auditText(t, entry('somethingNew', {}))).toBe('Other activity');
   });
 });

@@ -46,7 +46,8 @@ export interface SrpClaim {
 export interface SrpAuditEntry {
   id: string;
   at: number;
-  by: number;
+  /** Null for the retention sweep. */
+  by: number | null;
   byName: string;
   action: string;
   detail: Record<string, unknown>;
@@ -75,4 +76,12 @@ export interface SrpApproveItem {
   /** An officer-typed amount, or one that differs from the worked-out one (then `reason` is needed). */
   amount?: number;
   reason?: string;
+  /** The amount the officer saw; the server refuses with `amount-changed` when it differs now. */
+  expectedAmount?: number | null;
+}
+
+/** One claim of a mark-paid call, with the amount the officer saw. */
+export interface SrpMarkPaidItem {
+  killmailId: number;
+  expectedAmount?: number | null;
 }

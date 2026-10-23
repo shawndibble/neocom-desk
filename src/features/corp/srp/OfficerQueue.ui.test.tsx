@@ -11,11 +11,13 @@ vi.mock('./useSrpClaimNames', () => ({
   }),
 }));
 
+vi.mock('@/app/GrantNote', () => ({ GrantNote: ({ title }: { title: string }) => <p>{title}</p> }));
+
 const mailResult = vi.hoisted(() => vi.fn());
 vi.mock('./useSrpResultMail', () => ({ useSrpResultMail: () => mailResult }));
 
 import { OfficerQueue } from './OfficerQueue';
-import type { SrpQueueData } from './useSrpQueue';
+import type { SrpHistoryState, SrpQueueData } from './useSrpQueue';
 
 const claim = (killmailId: number, over: Partial<SrpClaim> = {}): SrpClaim => ({
   killmailId,
@@ -44,19 +46,21 @@ const outcome = (id: number, state: SrpClaim['state']): SrpClaimOutcome => ({
   amount: 1_000_000,
 });
 
-function setup(claims: SrpClaim[]) {
+function setup(claims: SrpClaim[], history: SrpHistoryState = { status: 'idle' }) {
   const data = {
-    state: { status: 'ready', claims, activity: [] },
+    state: { status: 'ready', claims, activity: [], history },
     reload: vi.fn(),
+    loadHistory: vi.fn(),
+    loadOlderHistory: vi.fn(),
     approve: vi.fn(async (item: { killmailId: number }) => outcome(item.killmailId, 'approved')),
     approveMany: vi.fn(async (items: { killmailId: number }[]) => ({
       results: items.map((i) => ({ ok: true as const, ...outcome(i.killmailId, 'approved') })),
     })),
     reject: vi.fn(async (id: number) => outcome(id, 'rejected')),
     change: vi.fn(async (id: number) => outcome(id, 'pending')),
-    markPaid: vi.fn(async (id: number) => outcome(id, 'paid')),
-    markPaidMany: vi.fn(async (ids: number[]) => ({
-      results: ids.map((id) => ({ ok: true as const, ...outcome(id, 'paid') })),
+    markPaid: vi.fn(async (item: { killmailId: number }) => outcome(item.killmailId, 'paid')),
+    markPaidMany: vi.fn(async (items: { killmailId: number }[]) => ({
+      results: items.map((i) => ({ ok: true as const, ...outcome(i.killmailId, 'paid') })),
     })),
     claimAudit: vi.fn(async () => []),
   } satisfies SrpQueueData;
@@ -88,7 +92,7 @@ describe('OfficerQueue pending', () => {
   it('approves a row at its own amount, sending no amount', async () => {
     const data = setup(pendingSet());
     await userEvent.click(screen.getAllByRole('button', { name: 'Approve' })[0]!);
-    expect(data.approve).toHaveBeenCalledWith({ killmailId: 1 });
+    expect(data.approve).toHaveBeenCalledWith({ killmailId: 1, expectedAmount: 1_000_000 });
     expect(await screen.findByText(/Approved Pilot1/)).toBeInTheDocument();
   });
 
@@ -101,14 +105,21 @@ describe('OfficerQueue pending', () => {
     await userEvent.type(screen.getByLabelText('Amount for Pilot3'), '2500000');
     expect(approve).not.toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(approve);
-    expect(data.approve).toHaveBeenCalledWith({ killmailId: 3, amount: 2_500_000 });
+    expect(data.approve).toHaveBeenCalledWith({
+      killmailId: 3,
+      amount: 2_500_000,
+      expectedAmount: null,
+    });
   });
 
   it('bulk approves the ticked rows only', async () => {
     const data = setup(pendingSet());
     await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
     await userEvent.click(screen.getByRole('button', { name: 'Approve (2)' }));
-    expect(data.approveMany).toHaveBeenCalledWith([{ killmailId: 1 }, { killmailId: 2 }]);
+    expect(data.approveMany).toHaveBeenCalledWith([
+      { killmailId: 1, expectedAmount: 1_000_000 },
+      { killmailId: 2, expectedAmount: 1_000_000 },
+    ]);
     expect(await screen.findByText('Approved 2 of 2')).toBeInTheDocument();
   });
 
@@ -154,6 +165,32 @@ describe('OfficerQueue pending', () => {
     expect(
       await screen.findByText(/Approved 1 of 2\. 1 not changed: Another officer/)
     ).toBeInTheDocument();
+  });
+
+  it('words an amount that changed under the officer, plainly', async () => {
+    const data = setup(pendingSet());
+    data.approve.mockRejectedValueOnce(
+      Object.assign(new Error('x'), { details: { reason: 'amount-changed' } })
+    );
+    await userEvent.click(screen.getAllByRole('button', { name: 'Approve' })[0]!);
+    expect(
+      await screen.findByText('The amount changed. Review it and try again.')
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the grant-mail note when a run had no pilots to mail', async () => {
+    mailResult.mockResolvedValueOnce({ sent: [], failed: [], missingScope: true });
+    const data = setup(pendingSet());
+    await userEvent.click(screen.getAllByRole('button', { name: 'Approve' })[0]!);
+    expect(await screen.findByText("Can't mail the pilot")).toBeInTheDocument();
+    mailResult.mockResolvedValueOnce({ sent: [], failed: [], missingScope: false });
+    data.approveMany.mockResolvedValueOnce({
+      results: [{ ok: false, killmailId: 2, reason: 'illegal-transition', message: 'x' }],
+    } as never);
+    await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Approve (2)' }));
+    await screen.findByText(/Approved 0 of 1/);
+    expect(screen.getByText("Can't mail the pilot")).toBeInTheDocument();
   });
 
   it('shows a refusal as a line, not a crash', async () => {
@@ -230,24 +267,39 @@ describe('OfficerQueue owed and history', () => {
     const data = setup([...pendingSet(), claim(6, { state: 'approved', decidedAt: 6 })]);
     await userEvent.click(screen.getByRole('tab', { name: /Owed/ }));
     await userEvent.click(screen.getAllByRole('button', { name: 'Mark paid' })[0]!);
-    expect(data.markPaid).toHaveBeenCalledWith(4);
+    expect(data.markPaid).toHaveBeenCalledWith({ killmailId: 4, expectedAmount: 1_000_000 });
     await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
     await userEvent.click(screen.getByRole('button', { name: 'Mark paid (2)' }));
-    expect(data.markPaidMany).toHaveBeenCalledWith([4, 6]);
+    expect(data.markPaidMany).toHaveBeenCalledWith([
+      { killmailId: 4, expectedAmount: 1_000_000 },
+      { killmailId: 6, expectedAmount: 1_000_000 },
+    ]);
   });
 
   it('lists closed claims with their reason in History, without actions', async () => {
-    setup([
-      claim(7, {
-        state: 'rejected',
-        closedAt: 3,
-        rejectionReason: 'Solo roam',
-        decidedByName: 'Lena',
-      }),
-    ]);
+    setup([], {
+      status: 'ready',
+      limit: 100,
+      more: false,
+      claims: [
+        claim(7, {
+          state: 'rejected',
+          closedAt: 3,
+          rejectionReason: 'Solo roam',
+          decidedByName: 'Lena',
+        }),
+      ],
+    });
     await userEvent.click(screen.getByRole('tab', { name: 'History' }));
     expect(screen.getByText('Solo roam')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+  });
+
+  it('reads History only once its tab opens, and offers older ones when there may be more', async () => {
+    const data = setup([claim(1)]);
+    expect(data.loadHistory).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('tab', { name: 'History' }));
+    expect(data.loadHistory).toHaveBeenCalled();
   });
 
   it('says so when a tab is empty', async () => {
