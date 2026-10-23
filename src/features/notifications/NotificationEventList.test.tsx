@@ -189,11 +189,14 @@ describe('NotificationEventList on desktop', () => {
     expect(screen.queryByText(/alike/)).not.toBeInTheDocument();
   });
 
-  it('keeps the EVE type rows inline under the EVE row, each openable to its characters', async () => {
+  it('lists the EVE type rows under the EVE row without opening it, each openable to its characters', async () => {
     const user = userEvent.setup();
     render(<Harness ids={['eveNotification']} />);
 
-    await user.click(screen.getByRole('button', { name: 'EVE notifications' }));
+    expect(screen.getByRole('button', { name: 'EVE notifications' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
     await user.click(screen.getByRole('button', { name: 'Structure Under Attack' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -207,6 +210,26 @@ describe('NotificationEventList on desktop', () => {
       expect(byType?.[1]).toBeDefined();
       expect(byType?.[2]).toBeUndefined();
     });
+  });
+
+  it('shows the EVE type rows on the phone page too, with no sheet to open first', () => {
+    render(
+      <Harness
+        ids={['eveNotification']}
+        over={{ isDesktop: false }}
+        path="/settings/notifications?topic=eve"
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Structure Under Attack' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('keeps the EVE type rows out of a search stack, which would bury every other match', () => {
+    render(<Harness ids={['eveNotification']} searching />);
+    expect(screen.getByRole('button', { name: 'EVE notifications' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Structure Under Attack' })
+    ).not.toBeInTheDocument();
   });
 
   it('lets the user close a row a search opened', async () => {

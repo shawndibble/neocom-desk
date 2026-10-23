@@ -53,8 +53,6 @@ export interface AggregateRowProps {
   omitUnavailableNote?: boolean;
   /** The event's warn-ahead control: a button in the row, its body opening under the row. */
   warnAhead?: { label: string; body: ReactNode };
-  /** Controls shown under the chips when open. */
-  children?: ReactNode;
 }
 
 export function AggregateRow({
@@ -73,7 +71,6 @@ export function AggregateRow({
   notes,
   warnAhead,
   omitUnavailableNote = false,
-  children,
 }: AggregateRowProps) {
   const { t } = useTranslation();
   // null until the user toggles the row: then their choice wins over the search's.
@@ -127,7 +124,6 @@ export function AggregateRow({
         onToggle={onToggleOne}
         browserBlocked={browserBlocked}
       />
-      {children}
     </div>
   );
 

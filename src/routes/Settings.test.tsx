@@ -1013,11 +1013,10 @@ describe('Settings — Notifications (issue #170)', () => {
   it("names EVE's own notification types in words, not in ESI's CamelCase", async () => {
     const user = userEvent.setup();
     render(<App />);
-    await notificationsPanel();
+    const sheet = within(await notificationsPanel());
     await openTopic(user, 'EVE notifications');
 
-    const sheet = await openEvent(user, 'EVE notifications');
-
+    // Listed under the EVE notifications row; nothing to open first.
     expect(await sheet.findByText('Structure Under Attack')).toBeInTheDocument();
     expect(sheet.getByText('Corporation Bill Issued')).toBeInTheDocument();
     // The two reinforcement types share a fired title ("Structure reinforced")
