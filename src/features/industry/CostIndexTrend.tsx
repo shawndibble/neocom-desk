@@ -124,7 +124,8 @@ function CheaperNearby({
   index: number;
 }) {
   const { t } = useTranslation();
-  const [rows, setRows] = useState<Nearby[]>([]);
+  const key = `${systemId}:${activity}:${index}`;
+  const [loaded, setLoaded] = useState<{ key: string; rows: Nearby[] } | null>(null);
   useEffect(() => {
     let live = true;
     void (async () => {
@@ -135,19 +136,22 @@ function CheaperNearby({
       ]);
       if (!live || !graph || !systems || !indices) return;
       const found = cheaperNearbySystems(graph, systemId, indices, index);
-      setRows(
-        found.flatMap(({ systemId: id, jumps, index: value }) => {
+      setLoaded({
+        key,
+        rows: found.flatMap(({ systemId: id, jumps, index: value }) => {
           const system = systems.get(id);
           return system
             ? [{ id, name: system.name, security: system.security, jumps, index: value }]
             : [];
-        })
-      );
+        }),
+      });
     })();
     return () => {
       live = false;
     };
-  }, [systemId, activity, index]);
+  }, [key, systemId, activity, index]);
+  // Rows from a previous system or activity are never shown under a new one.
+  const rows = loaded?.key === key ? loaded.rows : [];
   if (rows.length === 0) return null;
   return (
     <ul
