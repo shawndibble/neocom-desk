@@ -8,7 +8,7 @@
  * (`numberFormat.ts`) pushes its resolved choice here.
  *
  * Until a choice is applied the mark comes from the browser's language, which
- * is also what the `auto` choice resolves to.
+ * is also the format the settings control starts on.
  */
 import type { DecimalMark } from '@/engine/numbers/parseLocalizedNumber';
 
@@ -27,7 +27,7 @@ export function detectDecimalMark(locale?: string): DecimalMark {
   }
 }
 
-/** The mark the `auto` choice stands for: the browser's language, read once. */
+/** The mark the browser's language writes, read once. */
 export const BROWSER_DECIMAL_MARK: DecimalMark = detectDecimalMark(
   typeof navigator === 'undefined' ? undefined : navigator.language
 );
@@ -57,10 +57,10 @@ const grouped = createNumberFormat({ maximumFractionDigits: 20 });
 /** A number in the active format, keeping whatever decimals it has. */
 export const formatNumber = (value: number): string => grouped(value);
 
-/** `1234567.89` written with a given mark, for the settings control's examples. */
+/** `1234.56` written with a given mark, for the settings control's examples. */
 export function numberFormatExample(mark: DecimalMark): string {
   return new Intl.NumberFormat(LOCALE_FOR[mark], {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(1234567.89);
+  }).format(1234.56);
 }

@@ -26,7 +26,7 @@ describe('numberLocale', () => {
   });
 
   it('shows an example of each format', () => {
-    expect(numberFormatExample('.')).toBe('1,234,567.89');
-    expect(numberFormatExample(',')).toBe('1.234.567,89');
+    expect(numberFormatExample('.')).toBe('1,234.56');
+    expect(numberFormatExample(',')).toBe('1.234,56');
   });
 });

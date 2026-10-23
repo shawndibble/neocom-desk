@@ -1,8 +1,8 @@
 /**
  * How numbers are written on screen: with a period or a comma before the
  * fraction. Device-local like the time format, because it is a fact about the
- * browser in front of the pilot, and `auto` (the default) follows that
- * browser's language, so nobody has to find the setting.
+ * browser in front of the pilot. Until the pilot picks one, nothing is saved and
+ * the browser's language decides, so nobody has to find the setting.
  *
  * Pasted text does not follow this: it is read by shape
  * (`engine/numbers/parseLocalizedNumber`), since a paste carries the EVE
@@ -14,17 +14,16 @@ import { BROWSER_DECIMAL_MARK, setDecimalMark } from '@/lib/numberLocale';
 
 export const NUMBER_FORMAT_SETTING_KEY = 'numberFormat';
 
-export type NumberFormatChoice = 'auto' | 'period' | 'comma';
+export type NumberFormatChoice = 'period' | 'comma';
 
-export const NUMBER_FORMATS: readonly NumberFormatChoice[] = ['auto', 'period', 'comma'];
+export const NUMBER_FORMATS: readonly NumberFormatChoice[] = ['period', 'comma'];
 
-export const DEFAULT_NUMBER_FORMAT: NumberFormatChoice = 'auto';
+/** The browser's own format. A row an older build saved as `auto` parses to null and lands here. */
+export const DEFAULT_NUMBER_FORMAT: NumberFormatChoice =
+  BROWSER_DECIMAL_MARK === ',' ? 'comma' : 'period';
 
-/** The mark a choice stands for right now. */
 export function decimalMarkFor(choice: NumberFormatChoice): DecimalMark {
-  if (choice === 'period') return '.';
-  if (choice === 'comma') return ',';
-  return BROWSER_DECIMAL_MARK;
+  return choice === 'comma' ? ',' : '.';
 }
 
 export const useNumberFormat = createLocalSetting<NumberFormatChoice>({
