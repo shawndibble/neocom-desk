@@ -71,6 +71,21 @@ firebase deploy --only functions,firestore
 `firebase deploy --only functions` runs the predeploy TypeScript build
 automatically. To deploy rules alone: `firebase deploy --only firestore:rules`.
 
+### Functions are routers, not one per action
+
+`functions/src/index.ts` deploys 16 functions: three routers (`communityCall`,
+`corpTaxBookCall`, `alertsCall`), `mintFirebaseToken`, `mutamarketEstimate` and the
+scheduled jobs. Every other "callable" (`editCorpTaxBookCallable`, `fileSrpClaimCallable`,
+`registerDevice`, and so on) is an **action** registered on a router and called from
+the client with `callRouted` (`src/sync/routedCallable.ts`). A deploy has a per-minute
+mutation quota, so a new callable is a `communityAction` / `corpTaxBookAction` /
+`alertsAction` registration, never a new `export const`.
+`functions/src/deployedFunctions.test.ts` fails if one is added without review.
+
+When a deploy finds functions on the project that the source no longer exports (the old
+per-name callables), it asks to delete them. Answer yes. If it hits a 429, rerun it, or
+delete in batches: `firebase functions:delete a b c --region us-central1 --force`.
+
 ### Index exemptions are a one-way-ish deploy
 
 `firestore.indexes.json`'s `fieldOverrides` exempt every field of every synced
