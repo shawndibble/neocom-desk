@@ -103,7 +103,7 @@ export function PlanResult({
     null
   );
   const [dontRemind, setDontRemind] = useState(false);
-  const focusAfterCommit = useFocusAfterCommit();
+  const focusAfterCommit = useFocusAfterCommit({ preventScroll: true });
   /** Pickup the ship being packed sits in; its heading takes focus once the Pack button is gone. */
   const packFrom = useRef<string | null>(null);
   const pickupHeading = () =>
@@ -148,6 +148,15 @@ export function PlanResult({
       : hull.name;
   /** Ships flown out: each is a flight of its own, outside the hauler's trips. */
   const flown = pickups.flatMap((p) => p.ships);
+  /** Flown hulls by name, in first-seen order, so duplicates read "Badger ×2". */
+  const flownGroups = [
+    ...flown
+      .reduce((groups, s) => {
+        const ship = name(s.typeId);
+        return groups.set(ship, (groups.get(ship) ?? 0) + 1);
+      }, new Map<string, number>())
+      .entries(),
+  ];
   /** Every flown ship is a trip of its own on top of the hauls. */
   const withShips = (hauls: number, tooBig = 0) => hauls + totals.shipsToFly + tooBig;
   /** Packed ships the active hauler cannot carry: flown, so each is a flight. */
@@ -259,16 +268,18 @@ export function PlanResult({
           })}
         </p>
       )}
-      {flown.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-text-dim">
-            {flown.map((s) => (
-              <li key={s.itemId} className="font-semibold text-text">
-                {t('assets.movePlan.flyShip', { ship: name(s.typeId) })}
-              </li>
-            ))}
-          </ul>
-        </div>
+      {flownGroups.length > 0 && (
+        <section className="flex flex-col gap-0.5">
+          <p className="m-0 text-sm [overflow-wrap:anywhere]">
+            <b className="font-bold">{t('assets.movePlan.flyingHeading')}:</b>{' '}
+            {flownGroups
+              .map(([ship, count]) =>
+                count > 1 ? t('assets.movePlan.flyingGrouped', { ship, count }) : ship
+              )
+              .join(', ')}
+          </p>
+          <p className="m-0 text-xs text-text-dim">{t('assets.movePlan.flyingHint')}</p>
+        </section>
       )}
       <dl className="m-0 flex flex-wrap gap-x-6 gap-y-1.5">
         <Stat
@@ -437,6 +448,7 @@ export function PlanResult({
                 if (asking) {
                   if (dontRemind) void setSkipRigWarning(true);
                   onPackShip(asking.itemId);
+                  focusAfterCommit(pickupHeading);
                 }
                 setAsking(null);
               }}

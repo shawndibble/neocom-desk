@@ -368,9 +368,61 @@ describe('PlanResult', () => {
       expect(screen.getByText('trips').parentElement?.textContent).toBe('3trips');
     });
 
-    it('names each ship being flown beside the cargo trips', () => {
+    it('names each ship being flown under one labelled section', () => {
       setup(0);
-      expect(screen.getByText('Fly Badger')).toBeTruthy();
+      expect(screen.getByText('Flying instead of packing:').parentElement?.textContent).toContain(
+        'Badger'
+      );
+      expect(screen.queryByText('Fly Badger')).toBeNull();
+    });
+
+    it('groups duplicate hulls with a count', () => {
+      const two = {
+        ...shipPlan,
+        perCharacter: [
+          {
+            ...shipPlan.perCharacter[0],
+            pickups: [
+              {
+                ...shipPlan.perCharacter[0].pickups[0],
+                ships: [
+                  ...shipPlan.perCharacter[0].pickups[0].ships,
+                  { ...shipPlan.perCharacter[0].pickups[0].ships[0], itemId: 501 },
+                ],
+              },
+            ],
+          },
+        ],
+      } as MovePlan;
+      render(
+        <MemoryRouter>
+          <PlanResult
+            state={{
+              plan: withActive(two),
+              destinationSystem: null,
+              destinationStation: 'Amarr VIII',
+              pickupSystems: new Map(),
+            }}
+            compareOpen={false}
+            headingRef={{ current: null }}
+            onToggleCompare={vi.fn()}
+            haulerOverride={undefined}
+            onPickHauler={vi.fn()}
+            onBack={vi.fn()}
+            onDone={vi.fn()}
+            onPackShip={vi.fn()}
+            onUnpackShip={vi.fn()}
+            rigsOf={() => 0}
+            canPack={() => true}
+            name={() => 'Badger'}
+            placeLabel={() => 'Jita 4-4'}
+            hueOf={() => 0}
+          />
+        </MemoryRouter>
+      );
+      expect(screen.getByText('Flying instead of packing:').parentElement?.textContent).toContain(
+        'Badger ×2'
+      );
     });
 
     it('still names the ship when nothing is hauled', () => {
@@ -413,7 +465,9 @@ describe('PlanResult', () => {
           />
         </MemoryRouter>
       );
-      expect(screen.getByText('Fly Badger')).toBeTruthy();
+      expect(screen.getByText('Flying instead of packing:').parentElement?.textContent).toContain(
+        'Badger'
+      );
       expect(screen.getByText('1 ship')).toBeTruthy();
     });
 

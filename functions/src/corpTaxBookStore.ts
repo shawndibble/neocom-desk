@@ -16,6 +16,7 @@ import {
   type Transaction,
 } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
+import { cacheOfficer, readOfficerCache, revokeOfficer } from './officerCache.js';
 import {
   ACCESS_TTL_MS,
   ADJUSTMENTS,
@@ -44,7 +45,6 @@ import {
   needsLiveCheck,
   dismissalNeedsDirector,
   defaultSettings,
-  isCacheFresh,
   parseRecordKey,
   parseStatement,
   moveStartRate,
@@ -156,17 +156,11 @@ export async function authorizeOfficer(
   const characterId = signedInCharacter(caller);
   const now = deps.now();
   const officerRef = sub(deps.db, call.corporationId, OFFICERS).doc(caller.uid);
-  const held = (await officerRef.get()).data() as OfficerAccess | undefined;
-  const heldUsable =
-    held !== undefined &&
-    held.ownerHash === caller.ownerHash &&
-    held.corporationId === call.corporationId &&
-    held.expiresAt > now &&
-    isCacheFresh(held.checkedAt, now);
+  const { held, usable } = await readOfficerCache(officerRef, caller, call.corporationId, now);
 
   let access: OfficerAccess;
   if (call.accessToken === undefined) {
-    if (!heldUsable) {
+    if (!usable) {
       fail(
         held ? 'failed-precondition' : 'permission-denied',
         'Verify as an officer first',
@@ -175,21 +169,19 @@ export async function authorizeOfficer(
     }
     if (options.live)
       fail('failed-precondition', 'This needs a fresh role check', 'live-check-required');
-    access = held;
+    access = usable;
   } else {
     const actor = await verifyCallerToken(deps, caller, call.accessToken);
     const { claims } = actor;
-    if (!options.live && heldUsable) {
-      access = held;
+    if (!options.live && usable) {
+      access = usable;
     } else {
       const { identity, roles } = await requireLiveRoles(deps, actor, {
         corporationId: call.corporationId,
         need: 'canView',
         denied: { message: 'No officer role in this corporation', reason: 'not-an-officer' },
         // A failed renewal revokes the read access the old check granted.
-        onDenied: async () => {
-          if (held) await officerRef.delete();
-        },
+        onDenied: () => revokeOfficer(officerRef, held),
       });
       access = {
         ...roles,
@@ -201,7 +193,8 @@ export async function authorizeOfficer(
         checkedAt: now,
         expiresAt: now + ACCESS_TTL_MS,
       };
-      if ((await bookRef(deps.db, call.corporationId).get()).exists) await officerRef.set(access);
+      if ((await bookRef(deps.db, call.corporationId).get()).exists)
+        await cacheOfficer(officerRef, access);
     }
   }
   if (!satisfies(access, need)) {
