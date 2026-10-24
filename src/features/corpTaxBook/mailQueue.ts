@@ -330,14 +330,20 @@ export function enqueuePayeeChangeMail(input: {
 /**
  * Queues the mail that tells each pilot how their SRP claims were decided. The mails are
  * written by the caller (they need the officer's i18n); the queue only paces and persists them.
- * `at` is the decision's stamp, so one decision is mailed once per pilot.
+ * A decision is its kind plus the claims it covers, so a double submit mails once per pilot.
  */
 export function enqueueSrpResultMails(input: {
-  /** The officer's corporation: scopes the queue row. */
+  /** The officer's corporation: scopes the queue row. 0 while it is not yet known. */
   corporationId: number;
   senderCharacterId: number;
-  at: number;
-  mails: readonly { recipient: { id: number; name: string }; subject: string; body: string }[];
+  kind: 'approved' | 'rejected';
+  mails: readonly {
+    recipient: { id: number; name: string };
+    /** The claims this mail covers (killmail ids). */
+    killmailIds: readonly number[];
+    subject: string;
+    body: string;
+  }[];
 }): Promise<{ queued: number }> {
   return queueNotices(
     {
@@ -347,7 +353,7 @@ export function enqueueSrpResultMails(input: {
     },
     input.mails.map((m) => ({
       recipient: m.recipient,
-      statementId: `srp:${input.at}:${m.recipient.id}`,
+      statementId: `srp:${input.kind}:${[...m.killmailIds].sort((x, y) => x - y).join(',')}:${m.recipient.id}`,
       mail: m,
     }))
   );
