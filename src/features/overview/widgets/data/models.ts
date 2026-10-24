@@ -10,7 +10,7 @@
  * inside a source's effect, so time-dependent text stays true as the clock
  * ticks and a build never invents a new object per render of a source.
  */
-import { blank, type Builder, type KindDef } from './builderKit';
+import { blank, failedBuilders, type Builder, type KindDef } from './builderKit';
 import { ACCOUNT_DEFS } from './accountModels';
 import { comingUp, sp, training } from './characterBuilders';
 import { KIND_DEFS } from './kindModels';
@@ -84,7 +84,7 @@ export function subscribeBuilders(listener: () => void): () => void {
 /**
  * Loads the real builder of each kind that declares `loadBuild`, once. Until it
  * lands `buildView` uses the declared stand-in; views rebuild on `builderEpoch`.
- * A failed load is forgotten so the next call retries.
+ * A failed load is forgotten so the next call retries, and flagged so the stand-in shows failed meanwhile.
  */
 export function ensureBuilders(kinds: readonly string[]): Promise<void> {
   const loads = kinds.flatMap((kind) => {
@@ -95,12 +95,17 @@ export function ensureBuilders(kinds: readonly string[]): Promise<void> {
       load = def.loadBuild().then(
         (build) => {
           lazyBuilders.set(kind, build);
+          failedBuilders.delete(kind);
           lazyLoads.delete(kind);
           lazyEpoch += 1;
           for (const listener of lazyListeners) listener();
         },
         (error: unknown) => {
           lazyLoads.delete(kind);
+          failedBuilders.add(kind);
+          // Views built over the stand-in as loading are stale: they now read failed.
+          lazyEpoch += 1;
+          for (const listener of lazyListeners) listener();
           throw error;
         }
       );
@@ -134,7 +139,14 @@ function placeholder(kind: string): KindView {
 export function buildView(kind: string, feeds: Feeds, ctx: BuildContext): KindView {
   const def = KINDS[kind];
   if (!def) return placeholder(kind);
-  return zeroIsClear((lazyBuilders.get(kind) ?? def.build)(feeds, ctx));
+  const lazy = lazyBuilders.get(kind);
+  if (lazy) return zeroIsClear(lazy(feeds, ctx));
+  const standIn = def.build(feeds, ctx);
+  // The real builder failed to load: the stand-in's loading would never end, so it shows failed (Retry reloads it).
+  if (failedBuilders.has(kind)) {
+    return zeroIsClear({ ...standIn, status: { ...standIn.status, loading: false, error: true } });
+  }
+  return zeroIsClear(standIn);
 }
 
 /**

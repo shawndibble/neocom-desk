@@ -41,6 +41,9 @@ export function statusOf(
   };
 }
 
+/** Kinds whose lazy builder failed to load and has not landed since; `models.ts` owns it. */
+export const failedBuilders = new Set<string>();
+
 export const NEUTRAL_NUMBER: NumberModel = { value: UNKNOWN, tone: 'clear' };
 
 /** A view with nothing in it yet; every builder starts from this and fills what it has. */
