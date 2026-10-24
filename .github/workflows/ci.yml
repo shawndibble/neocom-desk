@@ -155,27 +155,6 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  # TEMP (perf/chunk-import-map): chunk renames per deploy-like rebuild, import
-  # map off vs on. Not required; removed before merge.
-  measure-cascade:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - uses: actions/cache@v4
-        id: node-modules
-        with:
-          path: node_modules
-          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
-      - if: steps.node-modules.outputs.cache-hit != 'true'
-        run: npm ci
-      - run: node scripts/tmp-measure-cascade.mjs
-        env:
-          VITE_EVE_CLIENT_ID: e2e-fake-client
-          VITE_FIREBASE_PROJECT_ID: neocom-e2e
-
   # The name the `develop`/`main` ruleset requires. See the `e2e` job below for the full
   # reasoning; this one aggregates `static` and `build` above instead of
   # a matrix.

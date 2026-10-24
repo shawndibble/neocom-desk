@@ -5,9 +5,10 @@
  * Only the boot graph is precached: the entry's static imports (what
  * `index.html` modulepreloads), the css they pull in, and the signed-in shell
  * that boot preloads. Every other hashed chunk is a route a pilot may never
- * open, and each deploy rewrites hundreds of them (a changed leaf rewrites the
- * hashed filename inside every importer), so precaching them made every
- * install re-download most of the app whatever the connection.
+ * open; precaching them made every install download most of the app whatever
+ * the connection. Chunks import each other through an import map
+ * (`chunkImportMapping`), so a deploy renames only the chunks whose own code
+ * changed.
  *
  * Pure and import-free: `vite.config.ts` loads this file at config time, and
  * `sw.ts` uses `chunkKey`/`chunksToDelete`.

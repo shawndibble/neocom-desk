@@ -239,9 +239,7 @@ function deferredEntryHtml() {
           typeof page.source === 'string' ? page.source : new TextDecoder().decode(page.source)
         );
         const problem = importMapProblem(html);
-        // TEMP(measure): the import-map-off count build has no map to place.
-        if (problem && process.env.NEOCOM_CHUNK_IMPORT_MAP !== '0')
-          throw new Error(`deferredEntryHtml: ${problem}`);
+        if (problem) throw new Error(`deferredEntryHtml: ${problem}`);
         page.source = html;
       },
     },
@@ -339,8 +337,7 @@ export default defineConfig({
     // of unchanged chunks (docs/context/decisions/*-chunks-import-each-other-
     // through-an-import-map*). Module workers get no import map; Vite builds
     // them with `worker.rolldownOptions`, which leaves this off.
-    // TEMP(measure): NEOCOM_CHUNK_IMPORT_MAP=0 turns it off for the CI cascade count.
-    chunkImportMap: process.env.NEOCOM_CHUNK_IMPORT_MAP !== '0',
+    chunkImportMap: true,
     rolldownOptions: {
       output: {
         // Routes are already split per page (`src/app/routeChunks.ts`); what
@@ -502,8 +499,7 @@ export default defineConfig({
             // was renamed on every deploy whatever the import map does. Sentry
             // already reads the release from `Sentry.init` (src/instrument.ts),
             // and the maps match on the per-chunk debug ids, which stay.
-            // TEMP(measure): NEOCOM_SENTRY_INJECT=1 restores today's injection for the count.
-            release: { name: release, inject: process.env.NEOCOM_SENTRY_INJECT === '1' },
+            release: { name: release, inject: false },
             sourcemaps: { filesToDeleteAfterUpload: ['dist/**/*.map'] },
           }),
         ]
