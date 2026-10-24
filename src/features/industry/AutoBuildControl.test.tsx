@@ -48,21 +48,21 @@ describe('AutoBuildControl', () => {
     ]);
   });
 
-  it('shows a reserved Reactions chip when Reactions is not eligible — no Manufacturing or Planetary chip', () => {
+  it('says reactions are left out when Reactions is not eligible — no Manufacturing or Planetary chip', () => {
     render(<AutoBuildControl maxDepth={2} scope={['manufacturing']} onApply={vi.fn()} />);
 
     expect(screen.queryByText('Manufacturing')).not.toBeInTheDocument();
-    expect(screen.getByText('Reactions')).toHaveClass('text-text-dim');
+    expect(screen.getByText('no reactions')).toBeInTheDocument();
     expect(screen.queryByText('Planetary')).not.toBeInTheDocument();
   });
 
-  it('lights up Reactions once it is in scope (issue #698) — no Manufacturing or Planetary chip', () => {
+  it('says reactions are included once in scope (issue #698) — no Manufacturing or Planetary chip', () => {
     render(
       <AutoBuildControl maxDepth={2} scope={['manufacturing', 'reaction']} onApply={vi.fn()} />
     );
 
     expect(screen.queryByText('Manufacturing')).not.toBeInTheDocument();
-    expect(screen.getByText('Reactions')).not.toHaveClass('text-text-dim');
+    expect(screen.getByText('incl. reactions')).toBeInTheDocument();
     expect(screen.queryByText('Planetary')).not.toBeInTheDocument();
   });
 

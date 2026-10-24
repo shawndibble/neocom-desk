@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
@@ -8,14 +7,11 @@ import type { IndustryActivity } from '@/engine/industry/types';
 import { ChartHover } from '@/features/overview/widgets/charts/ChartHover';
 import { areaCoords } from '@/features/overview/widgets/charts/geometry';
 import { CHART_COLOR } from '@/features/overview/widgets/charts/palette';
-import { cheaperNearbySystems } from '@/engine/industry/cheaperNearbySystems';
-import { loadJumpGraph } from '@/sde/jumpGraph';
-import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { costIndexTrend, esiActivityName } from './costIndexHistory';
 import { useCostIndexHistory } from './costIndexHistoryRead';
 import { formatDateWithYear } from '@/lib/formatDateTick';
 import { formatCostIndex } from './format';
-import { loadSystemCostIndices } from './marketData';
+import { useCheaperNearbySystems } from './useCheaperNearbySystems';
 
 const CHART_HEIGHT = 56;
 
@@ -105,15 +101,7 @@ export function CostIndexTrend({
   );
 }
 
-interface Nearby {
-  id: number;
-  name: string;
-  security: number;
-  jumps: number;
-  index: number;
-}
-
-/** The 5 cheapest systems within 5 jumps, cheapest first. Renders nothing while loading, on a failed read, or when none is cheaper. */
+/** The popover's list of cheaper systems nearby. Renders nothing when there are none. */
 function CheaperNearby({
   systemId,
   activity,
@@ -124,34 +112,7 @@ function CheaperNearby({
   index: number;
 }) {
   const { t } = useTranslation();
-  const key = `${systemId}:${activity}:${index}`;
-  const [loaded, setLoaded] = useState<{ key: string; rows: Nearby[] } | null>(null);
-  useEffect(() => {
-    let live = true;
-    void (async () => {
-      const [graph, systems, indices] = await Promise.all([
-        loadJumpGraph().catch(() => undefined),
-        loadSolarSystemsById().catch(() => null),
-        loadSystemCostIndices(activity).catch(() => null),
-      ]);
-      if (!live || !graph || !systems || !indices) return;
-      const found = cheaperNearbySystems(graph, systemId, indices, index);
-      setLoaded({
-        key,
-        rows: found.flatMap(({ systemId: id, jumps, index: value }) => {
-          const system = systems.get(id);
-          return system
-            ? [{ id, name: system.name, security: system.security, jumps, index: value }]
-            : [];
-        }),
-      });
-    })();
-    return () => {
-      live = false;
-    };
-  }, [key, systemId, activity, index]);
-  // Rows from a previous system or activity are never shown under a new one.
-  const rows = loaded?.key === key ? loaded.rows : [];
+  const rows = useCheaperNearbySystems(systemId, activity, index);
   if (rows.length === 0) return null;
   return (
     <ul

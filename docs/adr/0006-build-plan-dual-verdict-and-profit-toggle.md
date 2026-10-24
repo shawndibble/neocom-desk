@@ -1,5 +1,10 @@
 # Build Plan results show two verdicts and a gross/net profit toggle
 
+> **Superseded in part (2026-10-24)** by
+> `docs/context/decisions/20261024-163816-build-plan-page-reads-verdict-first-on-a.md`:
+> both questions are still answered, but the Acquisition Verdict moved to Costs &
+> revenue and the plan page shows Net only, with no gross/net toggle.
+
 Manufacturing a Build Plan's product can be evaluated two ways: is it cheaper
 than buying it outright (an acquisition question — no market-selling fees
 apply, since nothing is being sold), or is manufacturing-to-sell profitable

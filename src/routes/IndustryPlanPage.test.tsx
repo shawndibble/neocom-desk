@@ -315,19 +315,17 @@ describe('IndustryPlanPage: jargon tooltips (UX-REVIEW #8)', () => {
 });
 
 describe('IndustryPlanPage: build plan settings grouping (#120)', () => {
-  it('groups Runs/ME/TE under Blueprint and the rest under Location & market', async () => {
+  it('keeps Runs in the hero and the rest under Location & market', async () => {
     const user = userEvent.setup();
     await db.buildPlans.add(seedPlan());
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Rifter' });
     await openSetup(user);
-    expect(screen.getByText('Blueprint')).toBeInTheDocument();
     expect(screen.getByText('Location & market')).toBeInTheDocument();
 
-    // Runs still renders as a field; ME/TE no longer do (Blueprint
-    // Acquisition, issue #838, resolves them automatically — shown only as
-    // setup chips, not editable inputs).
+    // Runs is a field in the hero's title row, not the setup form; ME/TE are
+    // not fields at all (Blueprint Acquisition, issue #838, resolves them).
     expect(screen.getByLabelText('Runs')).toBeInTheDocument();
     expect(screen.getByLabelText('Trade hub')).toBeInTheDocument();
     // Rig and facility tax belong to a player structure. The seeded plan is an
@@ -710,6 +708,8 @@ describe('IndustryPlanPage: owned-stock scope (#454)', () => {
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Rifter' });
+    // The scope lives in the Owned materials popover.
+    await user.click(screen.getByRole('button', { name: /^Owned materials/ }));
     const select = screen.getByRole('combobox', { name: 'Owned Material Source' });
     expect(select).toHaveTextContent('Everywhere');
 

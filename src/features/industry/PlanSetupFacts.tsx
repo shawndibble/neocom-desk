@@ -1,6 +1,5 @@
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
-import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import {
   FACILITY_PRESETS,
   resolveRigFit,
@@ -12,7 +11,6 @@ import type { TradeHub } from '@/market/hubs';
 import { cx } from '@/lib/cx';
 import { materialPriceBasisOf } from './priceBasis';
 import { rigFitSummaryLabel } from './rigFitLabels';
-import { formatCount } from '@/lib/formatCount';
 
 interface PlanSetupFactsProps {
   plan: BuildPlanRecord;
@@ -38,8 +36,9 @@ interface PlanSetupFactsProps {
 }
 
 /**
- * Read-only summary of the setup: plain label-over-value pairs, not chips —
- * a bordered, filled box reads as a button, and nothing here is clickable.
+ * Read-only summary of the setup on one line at the foot of the verdict hero:
+ * dim label then value, no boxes — nothing here is clickable; the Edit setup
+ * link beside it opens the form. Runs live in the hero's own title row.
  */
 export function PlanSetupFacts({
   plan,
@@ -58,17 +57,16 @@ export function PlanSetupFacts({
 }: PlanSetupFactsProps) {
   const { t } = useTranslation();
   const fact = (label: string, value: string, warn = false) => (
-    <div key={label} className="min-w-0">
-      <dt className={eyebrowClassName}>{label}</dt>
-      <dd className={cx('text-xs tabular-nums', warn ? 'text-warning' : 'text-text')}>
+    <div key={label} className="flex min-w-0 items-baseline gap-1.5">
+      <dt className="text-text-dim">{label}</dt>
+      <dd className={cx('tabular-nums', warn ? 'text-warning' : 'text-text')}>
         {warn && <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" className="mr-1 inline" />}
         {value}
       </dd>
     </div>
   );
   return (
-    <dl className="flex flex-wrap gap-x-6 gap-y-2">
-      {fact(t('industry.runs'), formatCount(plan.runs))}
+    <dl className="flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-xs">
       {activity === 'manufacturing' && lacksBlueprintRow && (
         <>
           {fact(t('industry.setupChipMe'), `${resolvedMe}%`)}

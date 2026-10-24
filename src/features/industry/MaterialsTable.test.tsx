@@ -123,18 +123,34 @@ function row(name: string): HTMLElement {
 
 // Textboxes, not spinbuttons: the fields mask their value ("338,600"), which
 // a `type="number"` input cannot hold.
-const ownedInput = (material: string) => screen.getByRole('textbox', { name: `Have: ${material}` });
-const priceInput = (material: string) =>
-  screen.getByRole('textbox', { name: `Price for ${material}` });
+/**
+ * Have and Price are edited in place (§6c): the value is a button until
+ * clicked, then the field. These open it when it is not open yet, so a test
+ * reaches the field the way a player does.
+ */
+function openField(name: string): HTMLElement {
+  const open = screen.queryByRole('textbox', { name });
+  if (open) return open;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${escaped}:`) }));
+  return screen.getByRole('textbox', { name });
+}
+const ownedInput = (material: string) => openField(`Have: ${material}`);
+/** The value shown at rest, before it is clicked into a field. */
+const valueButton = (name: string) =>
+  screen.getByRole('button', {
+    name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`),
+  });
+const priceInput = (material: string) => openField(`Price for ${material}`);
 const revertButton = (material: string) =>
   screen.getByRole('button', { name: `Reset ${material} to the market price` });
 const queryRevertButton = (material: string) =>
   screen.queryByRole('button', { name: `Reset ${material} to the market price` });
 const valueOf = (input: HTMLElement) => (input as HTMLInputElement).value;
 
-/** The row's To buy figure — Need less Have, which used to be a "Need:" caption under the quantity. */
+/** The row's Buy figure — Need less Have, which used to be a "Need:" caption under the quantity. */
 function toBuyOf(material: string): string {
-  const cell = row(material).querySelector('[data-label="To buy"]');
+  const cell = row(material).querySelector('[data-label="Buy"]');
   if (!cell) throw new Error(`no To buy cell for ${material}`);
   return cell.textContent ?? '';
 }
@@ -229,12 +245,12 @@ describe('MaterialsTable sourcing', () => {
     // Clamped to the requirement, so there is nothing left to buy. Still
     // listed under To buy: focus moved on to the Price field in the same
     // section, which holds the row in place.
-    expect(toBuyOf('Tritanium')).toBe('0');
+    expect(toBuyOf('Tritanium')).toBe('—');
     expect(tritanium.getByText('0 ISK', { selector: '.sr-only' })).toBeTruthy();
     // The number the player typed is kept — it is not an error to fix — and
     // comes back masked, since 5000 is what they typed but 5,000 is what the
-    // field shows once they leave it.
-    expect((ownedInput('Tritanium') as HTMLInputElement).value).toBe('5,000');
+    // value shows once they leave it.
+    expect(valueButton('Have: Tritanium')).toHaveTextContent('5,000');
     expect(screen.queryByRole('alert')).toBeNull();
     expect(tritanium.queryByText('No price')).toBeNull();
   });
@@ -279,7 +295,7 @@ describe('MaterialsTable sourcing', () => {
     // Fully owned — nothing left to buy, so the row is filed under the folded
     // Already have section, needs none and costs none.
     expandHave();
-    expect(toBuyOf('Pyerite')).toBe('0');
+    expect(toBuyOf('Pyerite')).toBe('—');
     expect(within(row('Pyerite')).getByText('0 ISK', { selector: '.sr-only' })).toBeTruthy();
   });
 
@@ -300,15 +316,18 @@ describe('MaterialsTable sourcing', () => {
     // A few stops ahead of it now: the phone-only sort picker `mobileSort`
     // always renders (real CSS hides it at this width; jsdom doesn't), plus
     // one header sort button per sortable column.
-    const target = ownedInput('Tritanium');
+    // Have is a value until edited; typing a digit on it opens the field with
+    // that digit, so tabbing down the column and typing works as it did when
+    // every cell was a field.
+    const target = valueButton('Have: Tritanium');
     for (let i = 0; i < 10 && document.activeElement !== target; i++) {
       await user.tab();
     }
     expect(document.activeElement).toBe(target);
     await user.keyboard('250');
-    // Tab out: blur is what commits.
+    // Tab out: blur is what commits, and focus lands on the next value.
     await user.tab();
-    expect(document.activeElement).toBe(priceInput('Tritanium'));
+    expect(document.activeElement).toBe(valueButton('Price for Tritanium'));
     expect(onChange).toHaveBeenCalledWith(34, { ownedQuantity: 250 });
     expect(toBuyOf('Tritanium')).toBe('750');
   });
@@ -346,12 +365,13 @@ describe('MaterialsTable stacked card', () => {
   it('starts every value at the card gutter below sm and right-aligns it from sm up', () => {
     render(<Harness />);
 
-    expect(ownedInput('Tritanium').parentElement).toHaveClass('items-start', 'sm:items-end');
-    // The price cell stacks field over source tag; the column starts at the
+    expect(valueButton('Have: Tritanium').parentElement).toHaveClass('items-start', 'sm:items-end');
+    // The price cell stacks value over source tag; the column starts at the
     // gutter on the card and hugs the right edge from sm up like the rest.
-    // Read off an overridden row, since a plain hub-priced one now carries no
-    // tag under its field at all.
-    expect(priceInput('Tritanium').parentElement).toHaveClass('items-start', 'sm:items-end');
+    expect(valueButton('Price for Tritanium').parentElement).toHaveClass(
+      'items-start',
+      'sm:items-end'
+    );
   });
 
   it('left-aligns the digits inside a sourcing field below sm, so they sit in the value column too', () => {
@@ -394,14 +414,14 @@ describe('MaterialsTable errand sections', () => {
     expect(within(table).getByText('Pyerite')).toBeTruthy();
   });
 
-  it('reads Need, Have, To buy left to right', () => {
+  it('reads Need, Have, Buy left to right', () => {
     render(<Harness />);
     const headers = within(screen.getByRole('table', { name: 'Materials: To buy' }))
       .getAllByRole('columnheader')
       .map((th) => th.textContent);
     expect(headers.indexOf('Need')).toBeGreaterThanOrEqual(0);
     expect(headers.indexOf('Need')).toBeLessThan(headers.indexOf('Have'));
-    expect(headers.indexOf('Have')).toBeLessThan(headers.indexOf('To buy'));
+    expect(headers.indexOf('Have')).toBeLessThan(headers.indexOf('Buy'));
   });
 
   it('folds fully owned materials under Already have, naming them while folded', () => {
@@ -446,8 +466,8 @@ describe('MaterialsTable errand sections', () => {
     // Tab on to the Price field: the commit lands, the row is now fully owned,
     // and the field focus is moving to must still be there.
     await user.tab();
-    expect(document.activeElement).toBe(priceInput('Tritanium'));
-    expect(toBuyOf('Tritanium')).toBe('0');
+    expect(document.activeElement).toBe(valueButton('Price for Tritanium'));
+    expect(toBuyOf('Tritanium')).toBe('—');
 
     // Leaving the section lets the row go to Already have, confirmed by a toast.
     await user.click(document.body);
@@ -489,25 +509,20 @@ describe('MaterialsTable on a phone', () => {
     expect(have).not.toHaveClass('text-text-faint');
   });
 
-  it('renders a ledger: the column header once per section, plain numbers on each row', () => {
+  it('reads each card as its errand, every number with its own word', () => {
     render(<Harness initial={{ 34: { ownedQuantity: 400 } }} />);
 
     expect(screen.queryByRole('table')).toBeNull();
-    const section = screen.getByRole('heading', { name: /^To buy/ }).closest('section')!;
-    // NEED | HAVE | BUY printed once, not as a label on every row.
-    expect(within(section).getAllByText('Need')).toHaveLength(1);
-    expect(within(section).getAllByText('Buy')).toHaveLength(1);
-
     const row = screen.getByText('Tritanium').closest('li')!;
-    expect(row).toHaveTextContent('1,000');
-    expect(row).toHaveTextContent('600');
+    // What to do, then how that number came about: no column header needed.
+    expect(row).toHaveTextContent('Buy 600');
+    expect(row).toHaveTextContent('Need 1,000');
     // Have is a number with a faint pencil, not a field stretched across its column.
     expect(within(row).queryByRole('textbox', { name: 'Have: Tritanium' })).toBeNull();
     const have = within(row).getByRole('button', { name: /^Have: Tritanium/ });
     expect(have).toHaveTextContent('400');
     expect(have).toHaveClass('text-accent');
     expect(have.querySelector('svg')).not.toBeNull();
-    expect(have.className).not.toContain('dashed');
 
     // A tap opens the field, focused; leaving it puts the number back.
     fireEvent.click(have);
@@ -517,12 +532,20 @@ describe('MaterialsTable on a phone', () => {
     expect(within(row).getByRole('button', { name: /^Have: Tritanium/ })).toBeTruthy();
   });
 
+  it('says nothing to buy on a fully owned card — no Buy 0, no price', () => {
+    render(<Harness initial={{ 34: { ownedQuantity: 1000 } }} />);
+    expandHave();
+    const row = screen.getByText('Tritanium').closest('li')!;
+    expect(row).not.toHaveTextContent('Buy');
+    expect(within(row).queryByRole('button', { name: /^Price for Tritanium/ })).toBeNull();
+  });
+
   it('keeps the section headings and their subtotals', () => {
     render(<Harness />);
     expect(screen.getByRole('heading', { name: /^To buy · 2/ })).toBeTruthy();
   });
 
-  it('puts Use assets and the price on the line under the numbers', () => {
+  it('puts the price with what to buy, and Use assets on the line under it', () => {
     const detection: OwnedStockDetection = {
       scopedQuantityFor: (typeID) => (typeID === 34 ? 9000 : 0),
       lowerBound: false,
@@ -537,9 +560,11 @@ describe('MaterialsTable on a phone', () => {
     const offer = within(row).getByRole('button', { name: /^Use assets/ });
     const price = within(row).getByRole('button', { name: /^Price for Tritanium/ });
     const have = within(row).getByRole('button', { name: /^Have: Tritanium/ });
-    const footer = offer.closest('li > div:last-child')!;
-    expect(footer).toContainElement(price);
-    expect(footer).not.toContainElement(have);
+    // The price sits with what to buy; the offer on the card's last line, under Need · Have.
+    const buyLine = price.closest('li > div')!;
+    expect(buyLine).toHaveTextContent('Buy');
+    expect(buyLine).not.toContainElement(offer);
+    expect(offer.closest('li > div:last-child')).not.toContainElement(have);
   });
 
   it('says Owned on a blueprint the pilot already has, with no strip and no price of 0', () => {
@@ -605,8 +630,8 @@ describe('MaterialsTable number mask', () => {
     render(<Harness hubPrices={BIG_PRICES} initial={{ 34: { ownedQuantity: 1000 } }} />);
     expandHave();
 
-    expect(valueOf(priceInput('Tritanium'))).toBe('338,600');
-    expect(valueOf(ownedInput('Tritanium'))).toBe('1,000');
+    expect(screen.getByText('338,600')).toBeInTheDocument();
+    expect(valueButton('Have: Tritanium')).toHaveTextContent('1,000');
   });
 
   it("keeps a price's own decimals rather than rounding them away", () => {
@@ -614,18 +639,18 @@ describe('MaterialsTable number mask', () => {
     // and has to come back as they left it.
     render(<Harness hubPrices={BIG_PRICES} />);
 
-    expect(valueOf(priceInput('Pyerite'))).toBe('6,622.35');
+    expect(valueButton('Price for Pyerite')).toHaveTextContent('6,622.35');
   });
 
   it('swaps the mask for a plain number to type into, and puts it back on the way out', async () => {
     const user = userEvent.setup();
     render(<Harness hubPrices={BIG_PRICES} />);
 
-    await user.click(priceInput('Tritanium'));
+    await user.click(valueButton('Price for Tritanium'));
     expect(valueOf(priceInput('Tritanium'))).toBe('338600');
 
     await user.tab();
-    expect(valueOf(priceInput('Tritanium'))).toBe('338,600');
+    expect(valueButton('Price for Tritanium')).toHaveTextContent('338,600');
   });
 
   it('stores no override for a masked field merely clicked into and left', async () => {
@@ -658,7 +683,7 @@ describe('MaterialsTable number mask', () => {
     await user.tab();
 
     expect(onChange).not.toHaveBeenCalled();
-    expect(valueOf(priceInput('Tritanium'))).toBe('401,000');
+    expect(valueButton('Price for Tritanium')).toHaveTextContent('401,000');
     expect(within(row('Tritanium')).queryByText('Hub')).toBeNull();
   });
 
@@ -670,15 +695,16 @@ describe('MaterialsTable number mask', () => {
     // table while the card keeps reading field-first.
     render(<Harness hubPrices={BIG_PRICES} onChange={vi.fn()} />);
 
-    const cell = priceInput('Tritanium').parentElement;
+    const cell = valueButton('Price for Tritanium').parentElement;
     expect(cell).toHaveClass('flex-col', 'sm:items-end');
-    expect(cell?.firstElementChild).toBe(priceInput('Tritanium'));
+    expect(cell?.firstElementChild).toBe(valueButton('Price for Tritanium'));
 
-    // And it holds once a row grows a revert button: the field is a fixed
-    // width against a fixed edge, so nothing beside it can move it.
+    // And it holds once a row grows a revert button.
     await setField(priceInput('Tritanium'), '7');
     expect(revertButton('Tritanium')).toBeInTheDocument();
-    expect(priceInput('Tritanium').parentElement?.firstElementChild).toBe(priceInput('Tritanium'));
+    expect(valueButton('Price for Tritanium').parentElement?.firstElementChild).toBe(
+      valueButton('Price for Tritanium')
+    );
   });
 
   it('accepts a separator the player types or pastes', async () => {
@@ -688,7 +714,7 @@ describe('MaterialsTable number mask', () => {
     await setField(priceInput('Tritanium'), '1,250,000');
 
     expect(onChange).toHaveBeenCalledWith(34, { overridePrice: 1250000 });
-    expect(valueOf(priceInput('Tritanium'))).toBe('1,250,000');
+    expect(valueButton('Price for Tritanium')).toHaveTextContent('1,250,000');
   });
 });
 
@@ -883,7 +909,7 @@ describe('MaterialsTable detected owned stock (issue #181)', () => {
 
     // 9,000 detected against a 1,000-unit requirement.
     expect(onChange).toHaveBeenCalledWith(34, { ownedQuantity: 1000 });
-    expect(within(row('Tritanium')).getByLabelText('Have: Tritanium')).toHaveValue('1,000');
+    expect(valueButton('Have: Tritanium')).toHaveTextContent('1,000');
   });
 
   it('drops the use action once the row already holds the clamped suggestion', () => {
@@ -1293,6 +1319,74 @@ describe('MaterialsTable build-here control', () => {
     );
     const heading = screen.getByRole('heading', { name: /^Building · 1/ });
     expect(within(heading.parentElement!).getByText('saves 100 ISK')).toHaveClass('text-success');
+  });
+
+  it('offers one link on the To buy heading to build every cheaper part at once', () => {
+    const cheaper = (savings: number): MakeOrBuy => ({
+      method: 'manufacturing',
+      verdict: 'build',
+      makeUnitPrice: 1,
+      buyUnitPrice: 2,
+      savings,
+      me: 0,
+      blueprintCost: 0,
+    });
+    const onBuildAll = vi.fn();
+    renderTable({
+      canBuildHere: () => true,
+      onToggleBuildHere: vi.fn(),
+      onBuildAll,
+      makeOrBuy: new Map([
+        [34, cheaper(2_000_000)],
+        [9840, cheaper(2_500_000)],
+      ]),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Build 2 cheaper parts · save 4.5M' }));
+    expect(onBuildAll).toHaveBeenCalledWith([34, 9840]);
+  });
+
+  it('leaves a single cheaper part to its own Build instead', () => {
+    renderTable({
+      canBuildHere: () => true,
+      onToggleBuildHere: vi.fn(),
+      onBuildAll: vi.fn(),
+      makeOrBuy: new Map([
+        [
+          9840,
+          {
+            method: 'manufacturing',
+            verdict: 'build',
+            makeUnitPrice: 1,
+            buyUnitPrice: 2,
+            savings: 100,
+            me: 0,
+            blueprintCost: 0,
+          },
+        ],
+      ]),
+    });
+    expect(screen.queryByRole('button', { name: /cheaper parts/ })).not.toBeInTheDocument();
+  });
+
+  it('says what the owned materials would sell for on the folded owned heading', () => {
+    renderTable({
+      materials: asRows(
+        materialCostLines(MENU_MATERIALS, { 34: 10 }, { 34: { ownedQuantity: 100 } })
+      ),
+      ownedSellNet: 925,
+    });
+    expect(screen.getByText('sells for 925 after fees')).toBeInTheDocument();
+  });
+
+  it('shows what a fully owned row would sell for in its Total cell', () => {
+    renderTable({
+      materials: asRows(
+        materialCostLines(MENU_MATERIALS, { 34: 10 }, { 34: { ownedQuantity: 100 } })
+      ),
+      sellValueFor: (typeID) => (typeID === 34 ? 925 : undefined),
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Already have/ }));
+    expect(screen.getByText('sells for 925')).toBeInTheDocument();
   });
 
   it('turns Build instead green, with what it saves, only when building is cheaper', () => {

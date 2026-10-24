@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import '@/i18n';
@@ -64,13 +64,16 @@ function renderSummary(overrides: Partial<Parameters<typeof ResultsSummary>[0]> 
               systemCostIndex={0.023}
               productName="Rifter"
               productTypeID={587}
-              productUnitPrice={100000}
+              productUnitPrice={100}
               productQuantity={10}
               costIndexSystemName="Jita"
-              onOpenBreakdown={vi.fn()}
               ownedSale={null}
-              nameFor={(typeID) => (typeID === 34 ? 'Tritanium' : `Type ${typeID}`)}
+              saleBasis="instant"
+              onSaleBasisChange={() => {}}
+              profitBasis={null}
+              profit={RESULT.profit}
               totalVolume={{ volume: 1234.5, anyUnknown: false }}
+              hubName="Jita"
               {...overrides}
             />
           }
@@ -105,61 +108,69 @@ describe('ResultsSummary: jargon tooltips (UX-REVIEW #8)', () => {
     // 3,737,181 x 0.00005 = 186.86 -> 187
     expect(document.getElementById(tooltipId)?.textContent).toContain('±187 ISK');
   });
+});
 
-  it('gives the ISK/hour chip an accessible tooltip explaining its basis (UX-REVIEW #13)', () => {
+describe('ResultsSummary: the ledger', () => {
+  it('reads from the sale down to the profit', () => {
     renderSummary();
-    const iskPerHourButton = screen.getByRole('button', { name: /about isk\/hour/i });
-    fireEvent.focus(iskPerHourButton);
-    const tooltipId = iskPerHourButton.getAttribute('aria-describedby')!;
-    expect(document.getElementById(tooltipId)?.textContent).not.toBe('');
+    const labels = [
+      'Rifter sale',
+      'Sales tax',
+      'Broker fee',
+      'Material cost',
+      'Total job cost',
+      'Profit',
+    ].map((label) => screen.getByText(label));
+    for (let i = 1; i < labels.length; i++) {
+      expect(labels[i - 1].compareDocumentPosition(labels[i])).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING
+      );
+    }
+    expect(screen.getByText('10 × 100')).toBeInTheDocument();
+    expect(screen.getByText('Profit').closest('div')?.parentElement).toHaveTextContent('435');
   });
 
-  it('makes the cost-index system explicit in its label, distinct per trade hub', () => {
-    renderSummary({ costIndexSystemName: 'Jita' });
-    expect(screen.getByText('Cost index (Jita)')).toBeInTheDocument();
+  it('states ISK to spend, the price of buying instead, job time and volume', () => {
+    renderSummary();
+    expect(screen.getByText('ISK to spend').nextElementSibling).toHaveTextContent('565');
+    expect(screen.getByText('Buying Rifter instead').nextElementSibling).toHaveTextContent(
+      '+435 more'
+    );
+    expect(screen.getByText('Main job time').nextElementSibling).toHaveTextContent('1h');
+  });
 
-    renderSummary({ costIndexSystemName: 'Amarr' });
-    expect(screen.getByText('Cost index (Amarr)')).toBeInTheDocument();
+  it("says where the product is priced, and the whole plan's time when it differs", () => {
+    renderSummary({ planSeconds: 7200 });
+    expect(screen.getByText('Rifter priced at').nextElementSibling).toHaveTextContent(
+      'Jita lowest sell'
+    );
+    expect(screen.getByText('Whole plan, on free slots').nextElementSibling).toHaveTextContent(
+      '2h'
+    );
+  });
+
+  it('has no Net/Gross toggle and no repeated margin or break-even rows', () => {
+    renderSummary();
+    expect(screen.queryByRole('button', { name: 'Gross' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Margin')).not.toBeInTheDocument();
+    expect(screen.queryByText(/break-even/i)).not.toBeInTheDocument();
+  });
+
+  it('puts the cheaper-system line inside the job cost breakdown', async () => {
+    renderSummary({ cheaperNearby: 'Sarum Prime (2 jumps) is 4.10%: about 4 ISK less.' });
+    expect(screen.queryByText(/Sarum Prime/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^total job cost/i }));
+    expect(screen.getByText(/Sarum Prime/)).toBeInTheDocument();
   });
 });
 
-describe('ResultsSummary: Costs stack (#116)', () => {
-  it('renders Material Cost, Job Fee, Total Cost, Main job time, and Cost Index as a stacked list', () => {
-    renderSummary();
-
-    expect(screen.getByText('Material cost')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^total job cost/i })).toBeInTheDocument();
-    expect(screen.getByText('Total cost')).toBeInTheDocument();
-    expect(screen.getByText('Main job time')).toBeInTheDocument();
-    expect(screen.getByText('Cost index (Jita)')).toBeInTheDocument();
-
-    // No more flat StatChip wrap for costs: values render as text within stacked row containers.
-    const totalCostRow = screen.getByText('Total cost').closest('div')!;
-    expect(totalCostRow).toHaveTextContent('565');
-  });
-
-  it('renders costs in stack order: Material Cost, Job Fee, Total Cost, Main job time, Cost Index', () => {
-    const { container } = renderSummary();
-    const text = container.textContent ?? '';
-    const materialIdx = text.indexOf('Material cost');
-    const jobFeeIdx = text.indexOf('Total job cost');
-    const totalIdx = text.indexOf('Total cost');
-    const timeIdx = text.indexOf('Main job time');
-    const costIndexIdx = text.indexOf('Cost index');
-
-    expect(materialIdx).toBeGreaterThanOrEqual(0);
-    expect(materialIdx).toBeLessThan(jobFeeIdx);
-    expect(jobFeeIdx).toBeLessThan(totalIdx);
-    expect(totalIdx).toBeLessThan(timeIdx);
-    expect(timeIdx).toBeLessThan(costIndexIdx);
-  });
-
+describe('ResultsSummary: job cost breakdown (#116)', () => {
   it('keeps the Job Fee row collapsed by default, hiding its breakdown', () => {
     renderSummary();
     const jobFeeButton = screen.getByRole('button', { name: /^total job cost/i });
     expect(jobFeeButton).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('EIV')).not.toBeInTheDocument();
-    expect(screen.queryByText('Cost index fee')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cost index · Jita/)).not.toBeInTheDocument();
     expect(screen.queryByText('SCC surcharge')).not.toBeInTheDocument();
     expect(screen.queryByText('Facility tax')).not.toBeInTheDocument();
   });
@@ -173,7 +184,7 @@ describe('ResultsSummary: Costs stack (#116)', () => {
     expect(jobFeeButton).toHaveAttribute('aria-expanded', 'true');
 
     expect(screen.getByText('EIV').closest('div')).toHaveTextContent('1,000');
-    expect(screen.getByText('Cost index fee').closest('div')).toHaveTextContent('50');
+    expect(screen.getByText(/Cost index · Jita/).closest('div')).toHaveTextContent('50');
     expect(screen.getByText('SCC surcharge').closest('div')).toHaveTextContent('10');
     expect(screen.getByText('Facility tax').closest('div')).toHaveTextContent('5');
   });
@@ -201,166 +212,33 @@ describe('ResultsSummary: Costs stack (#116)', () => {
     await userEvent.keyboard(' ');
     expect(jobFeeButton).toHaveAttribute('aria-expanded', 'false');
   });
-
-  it('leaves the Profit and Verdict rows unchanged from current behavior', () => {
-    renderSummary();
-    expect(screen.getByText('Profit')).toBeInTheDocument();
-  });
 });
 
-describe('ResultsSummary: split Acquisition Verdict / Sale Profitability, break-even price (#119)', () => {
-  it('opens the calculation breakdown when the break-even "?" is clicked', async () => {
-    const onOpenBreakdown = vi.fn();
-    renderSummary({ onOpenBreakdown });
-    await userEvent.click(screen.getByRole('button', { name: /about break-even price/i }));
-    expect(onOpenBreakdown).toHaveBeenCalledTimes(1);
-  });
-
-  it('shows a net break-even price next to Sale Profitability, unaffected by the Gross/Net toggle', async () => {
+describe('ResultsSummary: owned materials', () => {
+  it('says nothing about selling when nothing is owned', () => {
     renderSummary();
-    expect(screen.getByText('Break-even price').closest('div')).toHaveTextContent('93');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Gross' }));
-    expect(screen.getByText('Break-even price').closest('div')).toHaveTextContent('93');
+    expect(screen.queryByText('Your materials sell via')).not.toBeInTheDocument();
+    expect(screen.queryByText('Your materials')).not.toBeInTheDocument();
   });
 
-  it('shows the current market price alongside break-even price for comparison', () => {
-    renderSummary({ productUnitPrice: 100_000 });
-    expect(screen.getByText('Current market price').closest('div')).toHaveTextContent('100,000');
+  it('charges the forgone sale as a line on the sell-value basis', () => {
+    renderSummary({ ownedSale: OWNED_SALE, profitBasis: 'sellValue', profit: 435 - 92_500 });
+    // Sell now: 100 x 1,000 gross, less 7.5% sales tax, no broker fee.
+    expect(screen.getByText('Your materials').closest('div')?.parentElement).toHaveTextContent(
+      '-92,500'
+    );
   });
 
-  it('hides the break-even price when unpriced', () => {
-    renderSummary({
-      result: {
-        ...RESULT,
-        buyCost: null,
-        revenue: null,
-        salesTax: null,
-        brokerFee: null,
-        netRevenue: null,
-        profit: null,
-        marginPct: null,
-        iskPerHour: null,
-        grossProfit: null,
-        grossMargin: null,
-        grossIskPerHour: null,
-        breakEvenPrice: null,
-        unpriceable: true,
-        recommendation: 'unknown',
-      },
-      productUnitPrice: null,
-    });
-
-    expect(screen.queryByText('Break-even price')).not.toBeInTheDocument();
-  });
-});
-
-describe('ResultsSummary: Revenue block (#117)', () => {
-  it('renders the product line as name, qty produced, and shorthand unit price and total', () => {
-    renderSummary();
-
-    const row = screen.getByText('Rifter').closest('tr')!;
-    expect(screen.getByRole('columnheader', { name: 'Total' })).toBeInTheDocument();
-    expect(within(row).getByText('10')).toBeInTheDocument();
-    const [, , unitPrice, total] = within(row)
-      .getAllByRole('cell')
-      .map((cell) => cell.textContent);
-    expect(unitPrice).toBe('100K 100,000 ISK');
-    // total = revenue (1000), not unitPrice x qty (1_000_000) — pulled from the engine, not recomputed
-    expect(total).toBe('1K 1,000 ISK');
+  it('leaves the forgone sale out when owned materials count as free', () => {
+    renderSummary({ ownedSale: OWNED_SALE, profitBasis: 'free' });
+    expect(screen.queryByText('Your materials')).not.toBeInTheDocument();
   });
 
-  it('shows Sales Tax and Broker Fee as negative deductions, then an emphasized Net Revenue total', () => {
-    renderSummary();
-
-    const salesTaxRow = screen.getByText('Sales tax').closest('div')!;
-    expect(salesTaxRow).toHaveTextContent('-10');
-    expect(salesTaxRow.querySelector('.text-isk-neg')).not.toBeNull();
-
-    const brokerFeeRow = screen.getByText('Broker fee').closest('div')!;
-    expect(brokerFeeRow).toHaveTextContent('-5');
-    expect(brokerFeeRow.querySelector('.text-isk-neg')).not.toBeNull();
-
-    const netRevenueRow = screen.getByText('Net revenue').closest('div')!;
-    expect(netRevenueRow).toHaveTextContent('985');
-  });
-
-  it('orders Revenue rows: product line, Sales Tax, Broker Fee, Net Revenue', () => {
-    const { container } = renderSummary();
-    const text = container.textContent ?? '';
-    const productIdx = text.indexOf('Rifter');
-    const salesTaxIdx = text.indexOf('Sales tax');
-    const brokerFeeIdx = text.indexOf('Broker fee');
-    const netRevenueIdx = text.indexOf('Net revenue');
-
-    expect(productIdx).toBeGreaterThanOrEqual(0);
-    expect(productIdx).toBeLessThan(salesTaxIdx);
-    expect(salesTaxIdx).toBeLessThan(brokerFeeIdx);
-    expect(brokerFeeIdx).toBeLessThan(netRevenueIdx);
-  });
-
-  it('removes the old Product sell price / Sell value chips', () => {
-    renderSummary();
-    expect(screen.queryByText('Product sell price')).not.toBeInTheDocument();
-    expect(screen.queryByText('Sell value')).not.toBeInTheDocument();
-  });
-
-  it('hides the Revenue block entirely when the product is unpriced, rather than showing fabricated numbers', () => {
-    renderSummary({
-      result: {
-        ...RESULT,
-        buyCost: null,
-        revenue: null,
-        salesTax: null,
-        brokerFee: null,
-        netRevenue: null,
-        profit: null,
-        marginPct: null,
-        iskPerHour: null,
-        grossProfit: null,
-        grossMargin: null,
-        grossIskPerHour: null,
-        breakEvenPrice: 90,
-        unpriceable: true,
-        recommendation: 'unknown',
-      },
-      productUnitPrice: null,
-    });
-
-    expect(screen.queryByText('Sales tax')).not.toBeInTheDocument();
-    expect(screen.queryByText('Broker fee')).not.toBeInTheDocument();
-    expect(screen.queryByText('Net revenue')).not.toBeInTheDocument();
-  });
-});
-
-describe('ResultsSummary: Gross/Net profit toggle (#118)', () => {
-  it('defaults to Net, showing the net profit/margin/ISK-per-hour figures', () => {
-    renderSummary();
-
-    const netButton = screen.getByRole('button', { name: 'Net' });
-    const grossButton = screen.getByRole('button', { name: 'Gross' });
-    expect(netButton).toHaveAttribute('aria-pressed', 'true');
-    expect(grossButton).toHaveAttribute('aria-pressed', 'false');
-
-    expect(screen.getByText('Profit').closest('div')).toHaveTextContent('435');
-    expect(screen.getByText('Margin').closest('div')).toHaveTextContent('77');
-    expect(screen.getByText('ISK/hour').closest('div')).toHaveTextContent('435');
-  });
-
-  it('switches to gross figures when Gross is clicked, keeping Sales Tax/Broker Fee rows visible', async () => {
-    renderSummary();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Gross' }));
-
-    expect(screen.getByRole('button', { name: 'Gross' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Net' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByText('Profit').closest('div')).toHaveTextContent('460');
-    expect(screen.getByText('Margin').closest('div')).toHaveTextContent('82');
-    expect(screen.getByText('ISK/hour').closest('div')).toHaveTextContent('460');
-
-    // Toggling never hides the fee rows from the Revenue block (#117).
-    expect(screen.getByText('Sales tax')).toBeInTheDocument();
-    expect(screen.getByText('Broker fee')).toBeInTheDocument();
+  it('flips how the materials would be sold in place', async () => {
+    const changes: string[] = [];
+    renderSummary({ ownedSale: OWNED_SALE, onSaleBasisChange: (basis) => changes.push(basis) });
+    await userEvent.click(screen.getByRole('button', { name: 'Sell now' }));
+    expect(changes).toEqual(['order']);
   });
 });
 
@@ -409,55 +287,6 @@ describe('ResultsSummary: unpriced-product Market link (#409)', () => {
       screen.queryByRole('link', { name: /Rifter has no hub sell price/ })
     ).not.toBeInTheDocument();
     expect(screen.getByText(/Rifter has no hub sell price/)).toBeInTheDocument();
-  });
-});
-
-describe('ResultsSummary: use or sell the owned materials', () => {
-  it('stays hidden when the player owns none of the materials', () => {
-    renderSummary();
-    expect(screen.queryByText(/use or sell your materials/i)).toBeNull();
-  });
-
-  it('compares selling the owned stock against building with it, and switches basis', async () => {
-    renderSummary({ ownedSale: OWNED_SALE });
-
-    expect(screen.getByText(/use or sell your materials/i)).toBeTruthy();
-    // Sell now: 100 x 1,000 gross, less 7.5% sales tax, no broker fee.
-    // Shown twice: the totals row and the collapsed per-material disclosure.
-    expect(screen.getAllByText('92,500').length).toBeGreaterThan(0);
-    // The stock is worth far more than the 435 ISK the build nets.
-    expect(screen.getByText(/SELL — selling your materials beats building/i)).toBeTruthy();
-
-    await userEvent.click(screen.getByRole('button', { name: /sell order/i }));
-    // Sell order: 100 x 1,200 gross, less 7.5% sales tax and 3% broker fee.
-    expect(screen.getAllByText('107,400').length).toBeGreaterThan(0);
-  });
-
-  it('breaks the sale down per material behind a disclosure', async () => {
-    renderSummary({ ownedSale: OWNED_SALE });
-    await userEvent.click(screen.getByRole('button', { name: /^per material(?! actions)/i }));
-
-    expect(screen.getByRole('cell', { name: 'Tritanium' })).toBeTruthy();
-    expect(screen.getByRole('cell', { name: '100' })).toBeTruthy();
-  });
-
-  it('calls it for building when the build out-earns the stock', () => {
-    renderSummary({
-      ownedSale: OWNED_SALE,
-      result: { ...RESULT, profit: 500_000 },
-    });
-
-    expect(screen.getByText(/BUILD — using your materials beats selling them/i)).toBeTruthy();
-  });
-
-  it('gives no verdict when an owned material has no price on the chosen side', () => {
-    const unpriced = {
-      instant: ownedStockSale(OWNED_MATERIALS, {}, 'instant', {}),
-      order: ownedStockSale(OWNED_MATERIALS, {}, 'order', {}),
-    };
-    renderSummary({ ownedSale: unpriced });
-
-    expect(screen.getByText(/not enough price data to compare/i)).toBeTruthy();
   });
 });
 

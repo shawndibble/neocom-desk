@@ -32,6 +32,8 @@ interface SourcingInputProps {
   mine?: boolean;
   /** Takes focus on mount — a field the player has just asked to edit. */
   autoFocus?: boolean;
+  /** The first character typed on the value that opened this field; starts the draft with it. */
+  seed?: string;
   parse: (raw: string) => number | undefined;
   onCommit: (value: number | undefined) => void;
 }
@@ -65,17 +67,18 @@ export function SourcingInput({
   describedBy,
   mine = false,
   autoFocus,
+  seed,
   parse,
   onCommit,
 }: SourcingInputProps) {
-  const [draft, setDraft] = useState<string | null>(null);
+  const [draft, setDraft] = useState<string | null>(seed ?? null);
   const [editing, setEditing] = useState(false);
   // Leaving the page mid-edit (Back, a shortcut, a row scrolled out of a
   // virtualized list) unmounts the field without a blur, which would drop the
   // edit. The ref mirrors the uncommitted draft synchronously — cleared in the
   // same handler that commits on blur, so an unmount right after a blur never
   // commits twice — and the latest props, read only at unmount.
-  const pendingRef = useRef<string | null>(null);
+  const pendingRef = useRef<string | null>(seed ?? null);
   const latestRef = useRef({ value, parse, onCommit });
   useEffect(() => {
     latestRef.current = { value, parse, onCommit };
@@ -120,7 +123,14 @@ export function SourcingInput({
       // override of the stale price. Until a key is pressed the prop stays the
       // source of truth, exactly as it was before the mask existed.
       value={draft ?? (value === undefined ? '' : editing ? String(value) : maskNumber(value))}
-      onFocus={() => setEditing(true)}
+      onFocus={(event) => {
+        setEditing(true);
+        // A seeded draft keeps typing after the seed, not before it.
+        if (seed !== undefined) {
+          const end = event.currentTarget.value.length;
+          event.currentTarget.setSelectionRange(end, end);
+        }
+      }}
       onChange={(event) => {
         pendingRef.current = event.target.value;
         setDraft(event.target.value);
