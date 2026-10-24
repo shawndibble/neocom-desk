@@ -19,7 +19,9 @@ import {
   Toast,
   type DataTableColumn,
 } from '@/components/ui';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { writeToClipboard } from '@/lib/clipboard';
 import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -69,6 +71,8 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
   const [typed, setTyped] = useState<Record<number, string>>({});
   const [rejecting, setRejecting] = useState<SrpClaim | null>(null);
   const [changing, setChanging] = useState<SrpClaim | null>(null);
+  const [paying, setPaying] = useState<SrpClaim | null>(null);
+  const selfCharacterId = useActiveCharacter((s) => s.activeCharacterId);
   const [openId, setOpenId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -178,7 +182,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
   };
 
   const markPaid = (claim: SrpClaim) =>
-    void run(async () => {
+    run(async () => {
       const out = await data.markPaid({
         killmailId: claim.killmailId,
         expectedAmount: claim.amount,
@@ -205,7 +209,8 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     onType: (id, text) => setTyped((prev) => ({ ...prev, [id]: text })),
     onApprove: approve,
     onReject: setRejecting,
-    onMarkPaid: markPaid,
+    onMarkPaid: setPaying,
+    selfCharacterId,
     onCopy: copy,
     copiedId: copied,
     busy,
@@ -386,6 +391,26 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           }}
         />
       )}
+      <ConfirmDialog
+        open={paying !== null}
+        title={t('srp.officer.markPaid.title')}
+        body={
+          paying
+            ? t('srp.officer.markPaid.body', {
+                isk: formatIsk(paying.amount ?? 0),
+                pilot: paying.characterName,
+              })
+            : ''
+        }
+        actionLabel={t('srp.officer.actions.markPaid')}
+        danger={false}
+        cancelLabel={t('common.cancel')}
+        onConfirm={async () => {
+          // A refusal becomes the toast (`run`), so the dialog always closes.
+          if (paying) await markPaid(paying);
+        }}
+        onClose={() => setPaying(null)}
+      />
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
   );

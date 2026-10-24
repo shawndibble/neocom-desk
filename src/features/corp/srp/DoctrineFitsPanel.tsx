@@ -1,7 +1,8 @@
 /**
  * The Director's Doctrine Fits: a list of the corp's own copies, with Add from my Fittings… and
  * Paste EFT…. Each row carries one action, Delete…, so there is no ⋮ (§6c). Adds and deletes
- * are their own writes, apart from the settings form's Save: a Doctrine Fit is not a setting.
+ * are their own writes, apart from the settings form's Save (a Hull Rule names a fit by the id its
+ * add returns, so a fit cannot wait for Save); each says so with a toast.
  * Which hull checks which fit is set in Hull Rules.
  */
 import { useRef, useState } from 'react';
@@ -13,6 +14,7 @@ import {
   LoadFailedState,
   Panel,
   Spinner,
+  Toast,
   type DataTableColumn,
 } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -43,6 +45,7 @@ export function DoctrineFitsPanel({
   const { t } = useTranslation();
   const [adding, setAdding] = useState<DoctrineSource | null>(null);
   const [deleting, setDeleting] = useState<DoctrineFit | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const fits = state.status === 'ready' ? state.fits : [];
   const hullName = useDoctrineTypeNames(fits.map((f) => f.snapshot.hullTypeId));
@@ -133,6 +136,7 @@ export function DoctrineFitsPanel({
           onAdd={async (input) => {
             await onAdd(input);
             onAdded(input.snapshot.hullTypeId);
+            setToast(t('srp.settings.doctrines.added', { name: input.name }));
           }}
           onClose={() => setAdding(null)}
         />
@@ -146,10 +150,13 @@ export function DoctrineFitsPanel({
         failedLabel={t('srp.settings.doctrines.deleteFailed')}
         returnFocusFallback={() => triggerRef.current}
         onConfirm={async () => {
-          if (deleting) await onRemove(deleting.id);
+          if (!deleting) return;
+          await onRemove(deleting.id);
+          setToast(t('srp.settings.doctrines.deleted', { name: deleting.name }));
         }}
         onClose={() => setDeleting(null)}
       />
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </Panel>
   );
 }

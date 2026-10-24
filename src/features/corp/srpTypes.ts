@@ -99,6 +99,8 @@ export interface SrpOfficerVerdict {
   /** Director, Accountant or CEO: may approve, reject, override and mark paid. */
   canManage: boolean;
   srpEnabled: boolean;
+  /** A settings doc exists. Absent from servers that predate it: read the doc then. */
+  settingsExist?: boolean;
   /** Epoch ms: rules show the officer the claim queue until then. */
   expiresAt: number;
 }

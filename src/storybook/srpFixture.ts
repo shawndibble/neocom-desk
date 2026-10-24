@@ -117,6 +117,7 @@ export function createSrpFixture(
     isDirector: role !== 'accountant',
     canManage: true,
     srpEnabled: settings?.enabled === true,
+    settingsExist: settings !== null,
     expiresAt: NOW + 86_400_000,
   });
   return {

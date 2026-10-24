@@ -7,13 +7,14 @@ import { Button, type DataTableColumn } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import type { SrpClaim } from '../srpClaimTypes';
-import type { ClaimColumnsContext } from './claimColumnsContext';
+import { ownClaimReason, type ClaimColumnsContext } from './claimColumnsContext';
 import {
   AmountCell,
   ApproveReject,
   ButtonPair,
   ClaimStatePill,
   CopyAmount,
+  DecideTip,
   Pilot,
   PendingAmount,
   SelectBox,
@@ -43,7 +44,7 @@ const pilotColumn = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
   id: 'pilot',
   header: ctx.t('srp.officer.columns.pilot'),
   primary: true,
-  render: (row) => <Pilot claim={row} />,
+  render: (row) => <Pilot claim={row} ctx={ctx} />,
 });
 
 const lostColumn = (ctx: ClaimColumnsContext): DataTableColumn<SrpClaim> => ({
@@ -148,15 +149,17 @@ export function owedColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpClaim>
       header: '',
       align: 'right',
       render: (row) => (
-        <Button
-          size="sm"
-          variant="success"
-          className="whitespace-nowrap"
-          aria-disabled={ctx.busy || undefined}
-          onClick={() => ctx.onMarkPaid(row)}
-        >
-          {ctx.t('srp.officer.actions.markPaid')}
-        </Button>
+        <DecideTip reason={ownClaimReason(row, ctx)}>
+          <Button
+            size="sm"
+            variant="success"
+            className="whitespace-nowrap"
+            aria-disabled={ctx.busy || ownClaimReason(row, ctx) !== undefined || undefined}
+            onClick={() => ctx.onMarkPaid(row)}
+          >
+            {ctx.t('srp.officer.actions.markPaid')}
+          </Button>
+        </DecideTip>
       ),
     },
   ];
@@ -298,13 +301,15 @@ export function phoneOwedColumns(ctx: ClaimColumnsContext): DataTableColumn<SrpC
       render: (row) => (
         <ButtonPair>
           <CopyAmount claim={row} ctx={ctx} wide />
-          <Button
-            variant="primary"
-            aria-disabled={ctx.busy || undefined}
-            onClick={() => ctx.onMarkPaid(row)}
-          >
-            {ctx.t('srp.officer.actions.markPaid')}
-          </Button>
+          <DecideTip reason={ownClaimReason(row, ctx)}>
+            <Button
+              variant="primary"
+              aria-disabled={ctx.busy || ownClaimReason(row, ctx) !== undefined || undefined}
+              onClick={() => ctx.onMarkPaid(row)}
+            >
+              {ctx.t('srp.officer.actions.markPaid')}
+            </Button>
+          </DecideTip>
         </ButtonPair>
       ),
     },

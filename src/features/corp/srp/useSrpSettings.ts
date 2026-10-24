@@ -71,11 +71,15 @@ export function useSrpSettings(): SrpSettingsData {
           return;
         }
         // verifySrpOfficer records officer access only once a settings doc exists, so before
-        // SRP was ever turned on the rules refuse this read: that is the first-time state.
-        const settings = await readSrpSettings(characterId, corporationId).catch((error) => {
-          if (/permission-denied/.test((error as { code?: string }).code ?? '')) return null;
-          throw error;
-        });
+        // SRP was ever turned on the rules refuse the read (and the SDK logs it): the verdict
+        // says so instead. A server that predates `settingsExist` is read, refusal and all.
+        const settings =
+          verdict.settingsExist === false
+            ? null
+            : await readSrpSettings(characterId, corporationId).catch((error) => {
+                if (/permission-denied/.test((error as { code?: string }).code ?? '')) return null;
+                throw error;
+              });
         if (cancelled) return;
         // What the server holds is the nav's answer too (the rail, More sheet and /srp sub-view).
         recordSrpProbe(characterId, corporationId, settings?.enabled === true);

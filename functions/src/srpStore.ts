@@ -222,6 +222,8 @@ export interface VerifySrpOfficerResult {
   isDirector: boolean;
   canManage: boolean;
   srpEnabled: boolean;
+  /** A settings doc exists (SRP was turned on once); false before that, so a client skips the read the rules refuse. */
+  settingsExist: boolean;
   expiresAt: number;
 }
 
@@ -232,13 +234,15 @@ export async function verifySrpOfficer(
   call: BookCall
 ): Promise<VerifySrpOfficerResult> {
   const access = await authorizeSrpOfficer(deps, caller, call, 'edit', { live: false });
-  const settings = (await srpSettingsRef(deps.db, call.corporationId).get()).data();
+  const snap = await srpSettingsRef(deps.db, call.corporationId).get();
+  const settings = snap.data();
   return {
     corporationId: call.corporationId,
     isCeo: access.isCeo,
     isDirector: access.isDirector,
     canManage: access.canEdit,
     srpEnabled: settings?.enabled === true,
+    settingsExist: snap.exists,
     expiresAt: access.expiresAt,
   };
 }
