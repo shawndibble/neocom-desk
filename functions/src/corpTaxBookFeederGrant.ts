@@ -37,7 +37,7 @@ import {
 } from './corpTaxBook.js';
 import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
 import { closePeriod, isDayCovered, reopenPeriod } from './corpTaxBookEngine.js';
-import { ROLES_SCOPE, type CorporationLookup } from './corpTaxBookEsi.js';
+import { type CorporationLookup } from './corpTaxBookEsi.js';
 import {
   acceptInviteCore,
   type AcceptFeederInviteResult,
@@ -59,7 +59,12 @@ import {
   type Caller,
 } from './corpTaxBookStore.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
-import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
+import {
+  requireRolesScope,
+  signedInCharacter,
+  verifyAccessToken,
+  verifyCallerToken,
+} from './actorAuth.js';
 
 export interface FeederGrantDeps extends CorpSyncDeps {
   esi: SyncEsi;
@@ -206,14 +211,6 @@ export function feederGrantReadsStructures(scopes: readonly string[]): boolean {
   return scopes.includes(structures);
 }
 
-async function verifiedClaims(deps: CorpSyncDeps, accessToken: string): Promise<EveTokenClaims> {
-  try {
-    return await deps.verify(accessToken);
-  } catch {
-    throw new HttpsError('unauthenticated', 'EVE access token rejected');
-  }
-}
-
 /** The code Reconnect sends in place of an invite: rebind the grant of a corporation that already feeds a book. */
 export const RECONNECT_CODE = 'reconnect-existing';
 
@@ -320,13 +317,10 @@ export async function saveFeederGrant(
   caller: Caller,
   input: SaveFeederGrantInput
 ): Promise<SaveFeederGrantResult> {
-  const callerId = characterIdForUid(caller.uid);
-  if (callerId === undefined) {
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
-  }
+  const callerId = signedInCharacter(caller);
   // The alt need not be on the caller's account, so the token's Character is not
   // compared with the caller; the refresh token must be the same alt's, below.
-  const supplied = await verifiedClaims(deps, input.accessToken);
+  const supplied = await verifyAccessToken(deps.verify, input.accessToken);
   feederGrantReadsStructures(supplied.scopes);
 
   let refreshed: RefreshedTokens;
@@ -354,7 +348,7 @@ export async function saveFeederGrant(
   let previousGrant: CorpSyncGrantDoc | undefined;
   let grantWritten = false;
   try {
-    const claims = await verifiedClaims(deps, refreshed.accessToken);
+    const claims = await verifyAccessToken(deps.verify, refreshed.accessToken);
     if (claims.characterId !== supplied.characterId) {
       fail('permission-denied', 'Refresh token belongs to another Character', 'token-mismatch');
     }
@@ -558,17 +552,12 @@ export async function authorizeFeederCaller(
   input: FeederCall,
   standing: Standing
 ): Promise<FeederContext | null> {
-  const callerId = characterIdForUid(caller.uid);
-  if (callerId === undefined) {
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
-  }
-  const claims = await verifiedClaims(deps, input.accessToken);
-  if (claims.characterId !== callerId || claims.ownerHash !== caller.ownerHash) {
-    fail('permission-denied', 'The access token is for a different Character', 'token-mismatch');
-  }
-  if (!claims.scopes.includes(ROLES_SCOPE)) {
-    fail('failed-precondition', 'Grant the corporation roles scope first', 'missing-scope');
-  }
+  const { characterId: callerId, claims } = await verifyCallerToken(
+    { verifyToken: deps.verify },
+    caller,
+    input.accessToken
+  );
+  requireRolesScope(claims);
   const pointer = (
     await deps.db.collection(FEEDER_OF_COLLECTION).doc(String(input.corporationId)).get()
   ).data();
@@ -843,7 +832,7 @@ async function notFeeding(
   if (floor === null) return { status: 'none' };
   // The token was verified for this caller above; membership is read only for a former moon owner.
   const identity = await deps
-    .readIdentity(characterIdForUid(caller.uid)!, input.accessToken)
+    .readIdentity(signedInCharacter(caller), input.accessToken)
     .catch(() => null);
   if (identity?.corporationId !== input.corporationId) return { status: 'none' };
   const previous = previousIds(await readPrevious(deps.db, input.corporationId));

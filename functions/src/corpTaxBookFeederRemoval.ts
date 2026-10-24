@@ -42,7 +42,7 @@ import {
   type BookDeps,
   type Caller,
 } from './corpTaxBookStore.js';
-import { characterIdForUid } from './verifyEveToken.js';
+import { signedInCharacter } from './actorAuth.js';
 
 /** Slack on the link past the wait, for a mail read late. */
 const LINK_SLACK_MS = 24 * 3_600_000;
@@ -296,10 +296,7 @@ interface Resolved {
 const UNAVAILABLE: Resolved = { state: { available: false } };
 
 async function resolveLink(deps: BookDeps, caller: Caller, code: string): Promise<Resolved> {
-  const characterId = characterIdForUid(caller.uid);
-  if (characterId === undefined) {
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
-  }
+  const characterId = signedInCharacter(caller);
   const linkId = hashInviteCode(code);
   const link = (await linkRef(deps.db, linkId).get()).data() as RemovalLinkDoc | undefined;
   if (!link) return UNAVAILABLE;
@@ -370,7 +367,7 @@ export async function forceRemovalNow(
   };
   const { state, link, linkId } = await resolveLink(bookDeps, caller, input.code);
   if (!state.available || !link || !linkId) return { ended: false };
-  const characterId = characterIdForUid(caller.uid)!;
+  const characterId = signedInCharacter(caller);
   try {
     await endFeeder(deps, {
       collectorCorporationId: link.collectorCorporationId,
