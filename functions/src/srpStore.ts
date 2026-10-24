@@ -20,7 +20,7 @@ import {
   type Need,
   type OfficerAccess,
 } from './corpTaxBook.js';
-import { type CorporationLookup } from './corpTaxBookEsi.js';
+import type { CorporationLookup } from './corpTaxBookEsi.js';
 import { fail, type BookDeps, type Caller } from './corpTaxBookStore.js';
 import {
   appraisalItems,

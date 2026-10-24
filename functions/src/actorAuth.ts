@@ -88,7 +88,8 @@ export function requireRolesScope(claims: EveTokenClaims): void {
   }
 }
 
-export type DenyReason = 'missing-scope' | 'wrong-corp' | string;
+/** `missing-scope`, `wrong-corp`, or the caller's role reason. */
+export type DenyReason = string;
 
 export interface LiveRolesOptions {
   /** Refuse `wrong-corp` unless the Character is in this corporation now. */
@@ -118,7 +119,7 @@ export async function requireLiveRoles(
   };
   if (!actor.claims.scopes.includes(ROLES_SCOPE)) {
     await options.onDenied?.('missing-scope');
-    requireRolesScope(actor.claims);
+    requireRolesScope(actor.claims); // throws
   }
   const identity = await deps.readIdentity(actor.characterId, accessToken);
   if (options.corporationId !== undefined && identity.corporationId !== options.corporationId) {

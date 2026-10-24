@@ -37,7 +37,7 @@ import {
 } from './corpTaxBook.js';
 import { FEEDER_SYNC_SCOPES } from './corpSyncScopes.js';
 import { closePeriod, isDayCovered, reopenPeriod } from './corpTaxBookEngine.js';
-import { type CorporationLookup } from './corpTaxBookEsi.js';
+import type { CorporationLookup } from './corpTaxBookEsi.js';
 import {
   acceptInviteCore,
   type AcceptFeederInviteResult,

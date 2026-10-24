@@ -80,7 +80,7 @@ import {
   type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
-import { type IdentityReader } from './corpTaxBookEsi.js';
+import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
 import {
   fail,
