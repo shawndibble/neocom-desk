@@ -468,7 +468,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
       await user.click(screen.getByRole('button', { name: 'Filters' }));
       let sheet = await screen.findByRole('dialog');
       await user.click(within(sheet).getByRole('button', { name: 'Outstanding' }));
-      await user.click(within(sheet).getByRole('button', { name: 'Apply' }));
+      await user.keyboard('{Escape}');
       await user.type(
         screen.getByPlaceholderText('Search issuer, receiver or title…'),
         'zzzznomatch'

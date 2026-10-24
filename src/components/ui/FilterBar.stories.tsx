@@ -49,7 +49,7 @@ type Story = StoryObj<typeof meta>;
 /** @summary Search plus a funnel. Desktop: filters open in a box under the row and apply at once. */
 export const Desktop: Story = {};
 
-/** @summary At 390 wide the funnel opens a bottom sheet; edits are a draft until Apply. */
+/** @summary At 390 wide the funnel opens a bottom sheet; each pick applies at once. */
 export const PhoneSheet: Story = {
   globals: { viewport: { value: 'phone390', isRotated: false } },
 };

@@ -1019,7 +1019,7 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     expect(useHaulingBudget.getState().value).toBe(2_000);
   });
 
-  it('on a phone, both are drafts in the filter sheet: Apply commits them', async () => {
+  it('on a phone, Max spend in the filter sheet commits without an Apply step', async () => {
     phone = true;
     panelRem = 20;
     // jsdom's `matchMedia` never matches; the filter sheet needs the narrow query to.
@@ -1044,8 +1044,7 @@ describe('HaulingPanel filters: Max price per item and Max spend', () => {
     await user.click(screen.getByRole('button', { name: 'Filters' }));
     const sheet = screen.getByRole('dialog');
     await user.type(within(sheet).getByRole('textbox', { name: 'Max spend' }), '1000');
-    expect(useHaulingBudget.getState().value).toBeNull();
-    await user.click(within(sheet).getByRole('button', { name: 'Apply' }));
+    await user.keyboard('{Enter}');
     expect(useHaulingBudget.getState().value).toBe(1_000);
     expect(linkParam('spend')).toBe('1000');
   });

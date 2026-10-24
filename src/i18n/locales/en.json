@@ -13419,11 +13419,7 @@
     "open": "Filters",
     "openWithCount": "Filters ({{count}} active)",
     "apply": "Apply",
-    "cancel": "Cancel",
-    "discardTitle": "Discard filter changes?",
-    "discardBody": "The filters you changed have not been applied.",
-    "discard": "Discard",
-    "keepEditing": "Keep editing"
+    "cancel": "Cancel"
   },
   "contractSearch": {
     "title": "Contract Search",

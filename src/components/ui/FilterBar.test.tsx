@@ -160,64 +160,16 @@ describe('FilterBar', () => {
     expect(screen.getByRole('searchbox', { name: 'Search' })).toBeInTheDocument();
   });
 
-  it('applies sheet edits only on Apply', async () => {
+  it('commits a sheet edit as it is made, with no Apply step', async () => {
     useNarrowViewport();
     const user = userEvent.setup();
     render(<Harness />);
     await user.click(screen.getByRole('button', { name: 'Filters' }));
     await user.click(screen.getByRole('button', { name: 'Unread only' }));
-    expect(screen.getByText('unread:false from:')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(screen.getByText('unread:true from:')).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
-
-  it('throws sheet edits away on Cancel, and does not restore them on reopen', async () => {
-    useNarrowViewport();
-    const user = userEvent.setup();
-    render(<Harness />);
-    await user.click(screen.getByRole('button', { name: 'Filters' }));
-    await user.click(screen.getByRole('button', { name: 'Unread only' }));
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(screen.getByText('unread:false from:')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Filters' }));
-    expect(screen.getByRole('button', { name: 'Unread only' })).toHaveAttribute(
-      'aria-pressed',
-      'false'
-    );
-  });
-
-  it('hides Apply and Cancel while the discard prompt asks', async () => {
-    useNarrowViewport();
-    const user = userEvent.setup();
-    render(<Harness />);
-    await user.click(screen.getByRole('button', { name: 'Filters' }));
-    await user.click(screen.getByRole('button', { name: 'Unread only' }));
-    await user.keyboard('{Escape}');
-    expect(
-      screen.getByRole('alertdialog', { name: 'Discard filter changes?' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Keep editing' }));
-    expect(screen.getByRole('button', { name: 'Apply' })).toBeInTheDocument();
-  });
-
-  it('puts focus back on Apply after Keep editing when Escape was pressed there', async () => {
-    useNarrowViewport();
-    const user = userEvent.setup();
-    render(<Harness />);
-    await user.click(screen.getByRole('button', { name: 'Filters' }));
-    await user.click(screen.getByRole('button', { name: 'Unread only' }));
-    screen.getByRole('button', { name: 'Apply' }).focus();
-    await user.keyboard('{Escape}');
-    expect(screen.getByRole('button', { name: 'Keep editing' })).toHaveFocus();
-
-    await user.keyboard('{Enter}');
-    expect(screen.getByRole('button', { name: 'Apply' })).toHaveFocus();
   });
 
   it('names the trigger with the number of active filters', async () => {

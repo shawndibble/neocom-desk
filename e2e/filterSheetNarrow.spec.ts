@@ -44,7 +44,9 @@ async function signInToJournal(page: import('@playwright/test').Page) {
   await signInAndGoto(page, './wallet/journal');
 }
 
-test('collapses the filters behind a trigger at 390px and commits on Apply', async ({ page }) => {
+test('collapses the filters behind a trigger at 390px and commits each pick at once', async ({
+  page,
+}) => {
   await page.setViewportSize(PHONE);
   await signInToJournal(page);
 
@@ -62,8 +64,10 @@ test('collapses the filters behind a trigger at 390px and commits on Apply', asy
   await dialog.getByRole('combobox', { name: 'Ref type' }).click();
   await page.getByRole('option', { name: 'Bounty prizes' }).click();
   await expect(dialog.getByRole('combobox', { name: 'Ref type' })).toHaveText('Bounty prizes');
+  // Committed already, with no Apply step: the funnel behind counts it.
+  await expect(dialog.getByRole('button', { name: 'Apply' })).toHaveCount(0);
 
-  await dialog.getByRole('button', { name: 'Apply' }).click();
+  await dialog.getByRole('button', { name: 'Close' }).click();
   await expect(dialog).toBeHidden();
   // Focus returns to the funnel; that must not pop its tooltip over the neighbours.
   await expect(page.getByRole('tooltip')).toHaveCount(0);

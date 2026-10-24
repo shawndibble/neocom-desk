@@ -1,17 +1,8 @@
 import { eyebrowClassName } from './eyebrowClassName';
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type ComponentProps,
-  type ReactNode,
-  type RefObject,
-} from 'react';
+import { useId, useState, type ComponentProps, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
-import { Button } from './Button';
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { FilterSurfaceContext, useFilterSurface } from './filterSurface';
@@ -58,8 +49,7 @@ export function FilterField({ label, children, stretch = true, className = '' }:
   // `aria-label` is what a screen reader gets; this caption is for the eye.
   // `[&>*]:w-full` because the control carries the width it needs *in the row*
   // — `w-44` on Wallet's ref-type trigger, `w-36` on its date fields. Stacked
-  // in the sheet those read as half-empty fields against a full-width Apply
-  // bar. The child selector outspecifies the utility on the control itself, so
+  // in the sheet those read as half-empty fields in a column. The child selector outspecifies the utility on the control itself, so
   // no call site has to hold two widths.
   return (
     <div
@@ -74,7 +64,7 @@ export function FilterField({ label, children, stretch = true, className = '' }:
 interface FilterBarProps<T> {
   /** @summary The committed filter state. On desktop edits land here at once. */
   value: T;
-  /** @summary Commit: every edit on desktop, only Apply in the phone sheet. */
+  /** @summary Commit: called on every edit, on every surface. */
   onChange: (next: T) => void;
   /**
    * The search box. Stays in the row at every width — it is the page's primary
@@ -94,22 +84,21 @@ interface FilterBarProps<T> {
   /** Heading for the sheet. Defaults to "Filters". */
   title?: string;
   /**
-   * The controls, written once. Called with the draft to read and a setter to
-   * edit it — in the pointer-width box those are `value`/`onChange` straight through, in the
-   * sheet they are local state committed on Apply.
+   * The controls, written once. Called with `value` and `onChange` straight
+   * through — every surface commits each edit as it is made.
    */
   children: (draft: T, setDraft: (next: T) => void) => ReactNode;
   /**
    * View controls — a table's column picker, say — that sit between the search
    * box and the filter trigger, on the same line at every width. Not part of
-   * the draft: they act immediately and never move into the sheet.
+   * the filter value: they act immediately and never move into the sheet.
    */
   actions?: ReactNode;
   /**
    * View controls after the funnel, so the funnel sits right beside the search
    * box — for a row whose filters narrow the list and whose view controls
    * only arrange it (the Ship Tree ladder's Expand all / Collapse all and
-   * Legend). Like `actions`, never part of the draft and never in the sheet.
+   * Legend). Like `actions`, never part of the filter value and never in the sheet.
    */
   trailing?: ReactNode;
   /** Wrapper class for the row. */
@@ -158,16 +147,15 @@ interface FilterBarProps<T> {
  * A row of selects, date fields and chips is fine at 1280px and is most of the
  * screen at 390px — Wallet's journal filters alone stack to four rows on a
  * phone, above the table they exist to narrow. So on a narrow viewport the
- * controls move into a bottom sheet that the search box's trailing icon opens,
- * and edits there are a draft the user commits with Apply or throws away with
- * Cancel.
+ * controls move into a bottom sheet that the funnel opens. Edits there land
+ * at once, as in the box — the sheet stops short of the top, so the list
+ * re-filters above it as each control is picked.
  *
  * The two surfaces are a conditional render, not a CSS collapse — deliberately
- * unlike `DataTable`'s "one DOM at every width" (DESIGN.md §4a). Draft state
- * cannot exist in a CSS-only collapse: Apply/Cancel needs the sheet's controls
- * bound to different state than the row's. `children` is still written once,
- * as a function of the draft, so neither surface can drift from the other and
- * no control is ever mounted twice.
+ * unlike `DataTable`'s "one DOM at every width" (DESIGN.md §4a): the sheet is
+ * a modal, which no CSS breakpoint can turn into a box in the page flow.
+ * `children` is written once, as a function of the value, so neither surface
+ * can drift from the other and no control is ever mounted twice.
  *
  * @summary A page's one filter row: search, view actions and a funnel that opens the filters (a box on desktop, a bottom sheet on a phone).
  */
@@ -376,8 +364,8 @@ function CollapsibleFilterRow({
 }
 
 /**
- * The pointer-width surface for a funnel in a title bar: the same live (no
- * Apply) controls as `CollapsibleFilterRow`, anchored to the funnel rather
+ * The pointer-width surface for a funnel in a title bar: the same live
+ * controls as `CollapsibleFilterRow`, anchored to the funnel rather
  * than unfolding beneath it — beneath it is the inside of the bar.
  */
 function FilterPopover({
@@ -429,34 +417,17 @@ function FilterPopover({
   );
 }
 
-/** Structural equality for a filter value: plain data, arrays, Dates, Sets, Maps. */
-function sameFilters(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true;
-  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
-  if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
-  if (a instanceof Set && b instanceof Set) {
-    return a.size === b.size && [...a].every((item) => b.has(item));
-  }
-  if (a instanceof Map && b instanceof Map) {
-    return a.size === b.size && [...a].every(([k, v]) => b.has(k) && sameFilters(v, b.get(k)));
-  }
-  if (Array.isArray(a) !== Array.isArray(b)) return false;
-  const aKeys = Object.keys(a);
-  const bKeys = Object.keys(b);
-  if (aKeys.length !== bKeys.length) return false;
-  return aKeys.every(
-    (key) =>
-      Object.hasOwn(b, key) &&
-      sameFilters((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])
-  );
-}
-
 /**
  * The narrow half of `FilterBar`, as its own component so that widening the
- * window unmounts it and takes the open sheet and its draft with it. The
- * alternative — an effect closing the sheet when the viewport grows — would
- * leave a modal sitting over controls that are now in the row behind it, and
- * would cascade a render to do it.
+ * window unmounts it and takes the open sheet with it. The alternative — an
+ * effect closing the sheet when the viewport grows — would leave a modal
+ * sitting over controls that are now in the row behind it, and would cascade
+ * a render to do it.
+ *
+ * Edits commit as they are made, like the pointer-width box: the sheet stops
+ * short of the screen top, so the list above it re-filters as each chip is
+ * picked. Scrim, Escape, the close button, Back and a swipe down all close
+ * it and keep what was picked — there is no draft to apply or discard.
  */
 function FilterSheet<T>({
   value,
@@ -474,47 +445,20 @@ function FilterSheet<T>({
 }: FilterBarProps<T>) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(value);
-  // "Discard filter changes?", asked inside the sheet itself rather than in a
-  // second dialog: one overlay means one history entry for Back to own.
-  const [confirming, setConfirming] = useState(false);
-
-  const promptId = useId();
-  const keepEditingRef = useRef<HTMLButtonElement>(null);
-  const cancelRef = useRef<HTMLButtonElement>(null);
-  const applyRef = useRef<HTMLButtonElement>(null);
-  // What held focus as the prompt opened, set in `requestClose`. Draft
-  // controls stay mounted (hidden) under the prompt; the footer unmounts, so
-  // a footer button is kept as its ref and refocuses its remount.
-  const focusBeforePrompt = useRef<RefObject<Element | null> | null>(null);
-  // Focus follows the prompt in and back out: onto "Keep editing" (the safe
-  // choice) when it appears, and to what held focus before it when dismissed.
-  useEffect(() => {
-    if (confirming) {
-      keepEditingRef.current?.focus();
-    } else if (focusBeforePrompt.current) {
-      const target = focusBeforePrompt.current.current;
-      if (target instanceof HTMLElement) target.focus();
-      focusBeforePrompt.current = null;
-    }
-  }, [confirming]);
-
-  const closeSheet = () => {
-    setConfirming(false);
-    setOpen(false);
+  // The last value this sheet committed. A route whose filters live in the
+  // URL writes them with a replace — onto the sheet's own history entry while
+  // it is open — so Back, which pops that entry, would also undo every pick.
+  // Committing the last value again once the close has landed keeps Back the
+  // same as the close button: the sheet goes, the filters stay.
+  const [lastCommit, setLastCommit] = useState<{ value: T } | null>(null);
+  const commit = (next: T) => {
+    setLastCommit({ value: next });
+    onChange(next);
   };
-  // Scrim, Escape, ✕ and Back all land here (§6c "Tap outside"): with edits
-  // pending they ask first; Cancel and Apply skip it.
-  const requestClose = () => {
-    if (confirming) setConfirming(false);
-    else if (sameFilters(draft, value)) closeSheet();
-    else {
-      const active = document.activeElement;
-      focusBeforePrompt.current = [cancelRef, applyRef].find((ref) => ref.current === active) ?? {
-        current: active,
-      };
-      setConfirming(true);
-    }
+  const close = () => {
+    setOpen(false);
+    setLastCommit(null);
+    if (lastCommit) setTimeout(() => onChange(lastCommit.value), 0);
   };
 
   return (
@@ -528,90 +472,25 @@ function FilterSheet<T>({
       >
         {search}
         {actions}
-        {/*
-          The count rides on the trigger as a number, not as an accent tint:
-          "some filter is on" has to survive a viewer who can't tell the two
-          border colours apart (DESIGN.md §7). It repeats inside `label`, so
-          it is announced rather than only drawn.
-        */}
         <FilterTrigger
           activeCount={activeCount}
           expanded={open}
           haspopup="dialog"
           size={triggerSize}
           showLabel={triggerLabel}
-          onClick={() => {
-            // Seeded here rather than in an effect on `value`: a filter whose
-            // options arrive from a fetch would otherwise re-seed mid-edit and
-            // discard what the user had already picked. Seeding on every open
-            // is also what stops a cancelled draft resurrecting itself.
-            setDraft(value);
-            setOpen(true);
-          }}
+          onClick={() => setOpen(true)}
         />
         {trailing}
       </div>
-      <Modal
-        open={open}
-        onClose={requestClose}
-        title={title ?? t('filters.title')}
-        placement="sheet"
-        footer={
-          // Gone while the discard prompt asks: Apply beside "Discard
-          // changes?" would answer a question nobody asked.
-          !confirming && (
-            <div className="flex gap-2">
-              <Button ref={cancelRef} className="flex-1" onClick={closeSheet}>
-                {t('filters.cancel')}
-              </Button>
-              <Button
-                ref={applyRef}
-                variant="primary"
-                className="flex-1"
-                onClick={() => {
-                  onChange(draft);
-                  closeSheet();
-                }}
-              >
-                {t('filters.apply')}
-              </Button>
-            </div>
-          )
-        }
-      >
-        {confirming && (
-          <div
-            role="alertdialog"
-            aria-labelledby={`${promptId}-title`}
-            aria-describedby={`${promptId}-body`}
-            className="space-y-3"
-          >
-            <p id={`${promptId}-title`} className="text-sm font-semibold">
-              {t('filters.discardTitle')}
-            </p>
-            <p id={`${promptId}-body`} className="text-sm text-text-dim">
-              {t('filters.discardBody')}
-            </p>
-            <div className="flex gap-2">
-              <Button ref={keepEditingRef} className="flex-1" onClick={() => setConfirming(false)}>
-                {t('filters.keepEditing')}
-              </Button>
-              <Button variant="primary" className="flex-1" onClick={closeSheet}>
-                {t('filters.discard')}
-              </Button>
-            </div>
-          </div>
-        )}
-        <div hidden={confirming}>
-          <FilterSurfaceContext.Provider value="sheet">
-            {/*
+      <Modal open={open} onClose={close} title={title ?? t('filters.title')} placement="sheet">
+        <FilterSurfaceContext.Provider value="sheet">
+          {/*
             `items-start` so a chip keeps its own width in the column — only a
             `FilterField` marked `stretch` fills the sheet, and a full-width
             uppercase pill reads as a field it is not.
           */}
-            <div className="flex flex-col items-start gap-3">{children(draft, setDraft)}</div>
-          </FilterSurfaceContext.Provider>
-        </div>
+          <div className="flex flex-col items-start gap-3">{children(value, commit)}</div>
+        </FilterSurfaceContext.Provider>
       </Modal>
     </>
   );

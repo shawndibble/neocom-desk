@@ -282,12 +282,8 @@ describe('LoyaltyStore filters', () => {
     expect(screen.getByRole('button', { name: /Affordable/i })).toBeInTheDocument();
   });
 
-  /**
-   * The hub and the price basis are persisted preferences, so the mobile
-   * sheet's Cancel would have a store write to undo if the control wrote as it
-   * was changed. It must not: the draft stays local until Apply.
-   */
-  it('does not write the persisted trade hub until Apply', async () => {
+  /** The hub is a persisted preference; the phone sheet writes it as it is picked. */
+  it('writes the persisted trade hub as it is picked in the sheet', async () => {
     useNarrowViewport();
     const user = userEvent.setup();
     renderStore();
@@ -295,26 +291,10 @@ describe('LoyaltyStore filters', () => {
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
     await user.click(screen.getByRole('combobox', { name: /Market hub/i }));
     await user.click(screen.getByRole('option', { name: OTHER_HUB.systemName }));
-    expect(useMarketHub.getState().value).toBe('jita');
-
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(useMarketHub.getState().value).toBe(OTHER_HUB.id);
   });
 
-  it('leaves the persisted trade hub alone when the sheet is cancelled', async () => {
-    useNarrowViewport();
-    const user = userEvent.setup();
-    renderStore();
-
-    await user.click(screen.getByRole('button', { name: /^Filters/ }));
-    await user.click(screen.getByRole('combobox', { name: /Market hub/i }));
-    await user.click(screen.getByRole('option', { name: OTHER_HUB.systemName }));
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    expect(useMarketHub.getState().value).toBe('jita');
-  });
-
-  it('commits the chip filters on Apply', async () => {
+  it('commits the chip filters as they are picked in the sheet', async () => {
     useNarrowViewport();
     const user = userEvent.setup();
     renderStore();
@@ -322,7 +302,7 @@ describe('LoyaltyStore filters', () => {
     // "Affordable only" is on by default, so turning it off is one active filter.
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
     await user.click(screen.getByRole('button', { name: /Affordable/i }));
-    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    await user.keyboard('{Escape}');
 
     await user.click(screen.getByRole('button', { name: /^Filters/ }));
     expect(screen.getByRole('button', { name: /Affordable/i })).toHaveAttribute(
