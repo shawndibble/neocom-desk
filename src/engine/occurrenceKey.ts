@@ -253,14 +253,17 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
       ].join(':');
     // Once per Incursion: its constellation and staging system name it for
     // as long as it lasts, so no day bucket — an Incursion leaving range and
-    // coming back is the same occurrence, not a second alert.
+    // coming back is the same occurrence, not a second alert. No Character in
+    // the key: the Incursion is the world's, so two Characters in range of it
+    // share one feed row and one toast (the feed upserts by this key).
     case 'incursionNearby':
-      return [characterId, fire.eventId, fire.constellationId, fire.stagingSystemId].join(':');
+      return [fire.eventId, fire.constellationId, fire.stagingSystemId].join(':');
     // Once per skyhook per raid window: the window's start names it, so the
     // next window is a new occurrence and a window leaving range and coming
-    // back is not.
+    // back is not. No Character in the key, for the same reason as the
+    // Incursion above: two pilots in one system get one alert, not two.
     case 'skyhookRaidableNearby':
-      return [characterId, fire.eventId, fire.systemId, fire.planetId, fire.startMs].join(':');
+      return [fire.eventId, fire.systemId, fire.planetId, fire.startMs].join(':');
     default: {
       const exhaustive: never = fire;
       throw new Error(`occurrenceKey: unhandled Notification Event ${JSON.stringify(exhaustive)}`);
