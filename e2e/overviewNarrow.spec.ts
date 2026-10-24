@@ -10,7 +10,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { overviewLayoutSetting, signInAndGoto, type SeededWidget } from './support/authSeed';
-import { CHARACTER_ID, SCOPES } from './support/fixtureData';
+import { ALLIANCE_ID, CHARACTER_ID, CORPORATION_ID, SCOPES } from './support/fixtureData';
 import type { MarketOrder } from '../src/esi/endpoints';
 
 const PHONE = { width: 390, height: 844 };
@@ -231,6 +231,108 @@ for (const viewport of [{ width: 1280, height: 900 }, PHONE]) {
     // The button goes where the clock lives.
     await expect(next).toHaveAttribute('href', /\/contracts/);
     expect(await hasHorizontalOverflow(page)).toBe(false);
+  });
+}
+
+const LONG_CORP = 'Bureau of Unified Harvesting';
+const LONG_ALLIANCE = 'Plenitude Alliance';
+/** The header row's `gap-x-3` (12px) between the name block and Customize, less sub-pixel slack. */
+const HEADER_GAP_MIN = 8;
+
+async function mockLongAffiliation(page: Page) {
+  const corp = LONG_CORP;
+  const alliance = LONG_ALLIANCE;
+  const json = (body: unknown) => ({ contentType: 'application/json', body: JSON.stringify(body) });
+  await page.route(new RegExp(`esi\\.evetech\\.net/corporations/${CORPORATION_ID}/?$`), (route) =>
+    route.fulfill(
+      json({
+        name: corp,
+        ticker: 'BUH',
+        ceo_id: 1,
+        creator_id: 1,
+        member_count: 5,
+        tax_rate: 0.1,
+        alliance_id: ALLIANCE_ID,
+      })
+    )
+  );
+  await page.route(new RegExp(`esi\\.evetech\\.net/alliances/${ALLIANCE_ID}/?$`), (route) =>
+    route.fulfill(
+      json({
+        name: alliance,
+        ticker: 'PLNT',
+        creator_corporation_id: CORPORATION_ID,
+        creator_id: 1,
+        date_founded: '2019-01-01T00:00:00Z',
+      })
+    )
+  );
+  await page.route(/esi\.evetech\.net\/universe\/names/, (route) => {
+    const ids = route.request().postDataJSON() as number[];
+    return route.fulfill(
+      json(
+        ids.map((id) =>
+          id === CORPORATION_ID
+            ? { id, name: corp, category: 'corporation' }
+            : id === ALLIANCE_ID
+              ? { id, name: alliance, category: 'alliance' }
+              : { id, name: `Unknown ${id}`, category: 'character' }
+        )
+      )
+    );
+  });
+}
+
+function boxesOverlap(a: Box, b: Box): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+for (const viewport of [
+  PHONE,
+  { width: 768, height: 900 },
+  { width: 1024, height: 900 },
+  { width: 1280, height: 900 },
+]) {
+  test(`a long corporation / alliance line ends before Customize, on one header row, at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await mockLongAffiliation(page);
+    await page.setViewportSize(viewport);
+    await signInAndGoto(page, './overview', SCOPES, [
+      overviewLayoutSetting([{ kind: 'training', size: 'S' }]),
+    ]);
+    const header = page.locator('main header');
+    const allianceLink = header.getByRole('link', { name: LONG_ALLIANCE });
+    await expect(allianceLink).toBeVisible({ timeout: FIRST_LOAD_MS });
+    const customize = (await header.getByRole('button', { name: 'Customize' }).boundingBox())!;
+    const bell = (await header.getByRole('button', { name: /^Alerts/ }).boundingBox())!;
+    const name = (await header
+      .getByRole('heading', { level: 1 })
+      .locator('..')
+      .locator('..')
+      .boundingBox())!;
+    for (const link of [allianceLink, header.getByRole('link', { name: LONG_CORP })]) {
+      const box = (await link.boundingBox())!;
+      // The name truncates inside its own box, which ends before Customize's (the row's gap apart).
+      expect(box.x + box.width).toBeLessThanOrEqual(customize.x - HEADER_GAP_MIN);
+    }
+    // One row: the name block, Customize and the bell share a band; nothing wrapped under.
+    for (const control of [customize, bell]) {
+      expect(control.y).toBeLessThan(name.y + name.height);
+      expect(name.y).toBeLessThan(control.y + control.height);
+    }
+    // No target in the header overlaps another.
+    const targets = header.locator('a:visible, button:visible');
+    const boxes: Box[] = [];
+    for (let i = 0; i < (await targets.count()); i += 1)
+      boxes.push((await targets.nth(i).boundingBox())!);
+    for (let i = 0; i < boxes.length; i += 1) {
+      for (let j = i + 1; j < boxes.length; j += 1) {
+        expect(boxesOverlap(boxes[i]!, boxes[j]!), `header targets ${i} and ${j} overlap`).toBe(
+          false
+        );
+      }
+    }
   });
 }
 
