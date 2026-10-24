@@ -683,8 +683,9 @@ funnel, for the column picker's reason; see §6c.
 One sanctioned filter in `actions`: an exclusive axis the reader flips often,
 as a `SegmentedControl` with each segment's count (the Ship Tree ladder's All /
 Can fly / Can't fly). The counts answer the question before any tap, which a
-funnel would hide. It is not counted in `activeCount`, and below `md` it takes
-its own full-width row under the bar. The same ladder puts its view switch in
+funnel would hide. It is not counted in `activeCount`. Where it doesn't fit
+beside the search (below `xl`, with the rail) it takes its own row under the
+bar, full width below `md`. The same ladder puts its view switch in
 the `search` slot before the box, and its Legend at the end of `actions`, so the
 row stays one full-width `FilterBar` and the funnel's box opens under all of it.
 

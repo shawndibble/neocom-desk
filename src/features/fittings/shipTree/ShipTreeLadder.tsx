@@ -39,6 +39,7 @@ import { romanLevel } from '@/engine/projection';
 import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
+import { useMediaQuery } from '@/lib/useMediaQuery';
 import type { ShipTreeShip } from '@/sde/types';
 import { FlyDot } from './FlyDot';
 import { IsisThumb } from './IsisTile';
@@ -93,6 +94,10 @@ export function ShipTreeLadder({
   const { t } = useTranslation();
   const { data, statuses } = source;
   const narrow = useIsNarrow();
+  // Below `xl` (with the rail) the fly tabs don't fit beside the search, so
+  // they take a row of their own under the bar. Max-width, like useIsNarrow,
+  // so the never-matching test stub reads as the wide row.
+  const tabsOwnRow = useMediaQuery('(max-width: 79.999rem)');
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
   const filtered = isShipTreeFiltered(filter);
@@ -207,7 +212,7 @@ export function ShipTreeLadder({
             expandCollapse
           ) : (
             <>
-              {flyTabs}
+              {!tabsOwnRow && flyTabs}
               {expandCollapse}
               <span className="flex-1" />
               <LegendPopover />
@@ -224,7 +229,7 @@ export function ShipTreeLadder({
           />
         )}
       </FilterBar>
-      {narrow && flyTabs}
+      {(narrow || tabsOwnRow) && flyTabs}
       {elsewhere.length > 0 && (
         <div className="flex flex-wrap items-center gap-1 text-xs">
           <span className="text-text-dim">{t('ships.tree.otherFactions')}</span>
