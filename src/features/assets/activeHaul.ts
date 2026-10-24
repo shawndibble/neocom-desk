@@ -12,6 +12,7 @@ import type {
   HaulPlan,
   HaulPickupInput,
 } from '@/engine/route/haulPlan';
+import { replanInputs } from '@/engine/route/haulProgress';
 import { loadCurrentSystemId } from '@/features/route/currentSystem';
 import { loadJumpBasis } from '@/features/route/jumpBasis';
 import { planLocalHaul } from '@/features/route/localRoute';
@@ -26,6 +27,11 @@ export interface ActiveHaul {
   capacityM3: number;
   destination: HaulPlace;
   plan: HaulPlan;
+  /**
+   * Ids of the Legs ticked done (#4968). Kept on the snapshot, so it is keyed
+   * to `id`: a replacement or a re-plan starts with none. Absent means none.
+   */
+  doneLegIds?: number[];
 }
 
 function isArrayOfObjects(raw: unknown): raw is Record<string, unknown>[] {
@@ -61,7 +67,9 @@ function parseActiveHaul(raw: unknown): ActiveHaul | null {
     !isArrayOfObjects(plan.leftOut) ||
     !Array.isArray(plan.flown) ||
     typeof plan.totals !== 'object' ||
-    plan.totals === null
+    plan.totals === null ||
+    (r.doneLegIds !== undefined &&
+      !(Array.isArray(r.doneLegIds) && r.doneLegIds.every((n) => typeof n === 'number')))
   )
     return null;
   return raw as ActiveHaul;
@@ -145,6 +153,41 @@ export async function buildActiveHaul(args: BuildHaulArgs): Promise<ActiveHaul |
     capacityM3: active.hull.capacityM3,
     destination,
     plan: result.plan,
+  };
+}
+
+export type ReplanResult =
+  | { status: 'replanned'; haul: ActiveHaul }
+  /** A Character's hold is loaded and not yet delivered: re-planning would lose that delivery. */
+  | { status: 'loaded'; names: string[] }
+  /** The stargate snapshot could not be read, or nothing is left to plan. */
+  | { status: 'unknown' };
+
+/**
+ * Re-optimises what is left of a haul from where each Character is (#4968).
+ * The new snapshot has its own id and no ticks: Leg ids restart with the new
+ * plan. Only on the pilot's ask; a tick never re-orders the route.
+ */
+export async function replanActiveHaul(haul: ActiveHaul): Promise<ReplanResult> {
+  const { characters, loaded } = replanInputs(haul.plan, haul.doneLegIds ?? []);
+  if (loaded.length > 0) return { status: 'loaded', names: loaded };
+  if (characters.length === 0) return { status: 'unknown' };
+  const basis = await loadJumpBasis();
+  const result = await planLocalHaul(
+    { characters, capacityM3: haul.capacityM3, destination: haul.destination },
+    basis.rules,
+    basis.network
+  );
+  if (result.kind === 'unknown') return { status: 'unknown' };
+  return {
+    status: 'replanned',
+    haul: {
+      id: newId(),
+      createdAt: Date.now(),
+      capacityM3: haul.capacityM3,
+      destination: haul.destination,
+      plan: { ...result.plan, leftOut: [...result.plan.leftOut, ...haul.plan.leftOut] },
+    },
   };
 }
 

@@ -55,11 +55,27 @@ describe('useActiveHaul', () => {
     expect(useActiveHaul.getState().value).toEqual(haul);
     await useActiveHaul.getState().setValue(null);
   });
+
+  it('keeps ticked legs across a reload', async () => {
+    await useActiveHaul.getState().setValue({ ...haul, doneLegIds: [0, 1] });
+    useActiveHaul.setState({ value: null, hydrated: false });
+    await useActiveHaul.getState().hydrate();
+    expect(useActiveHaul.getState().value?.doneLegIds).toEqual([0, 1]);
+    await useActiveHaul.getState().setValue(null);
+  });
 });
 
 describe('useActiveHaul parse', () => {
   it('ignores a stored value that is not a haul', async () => {
     await db.settings.put({ key: 'activeHaul', value: { id: 1 } });
+    useActiveHaul.setState({ value: null, hydrated: false });
+    await useActiveHaul.getState().hydrate();
+    expect(useActiveHaul.getState().value).toBeNull();
+    await db.settings.delete('activeHaul');
+  });
+
+  it('ignores a haul whose ticked legs are not ids', async () => {
+    await db.settings.put({ key: 'activeHaul', value: { ...haul, doneLegIds: ['x'] } });
     useActiveHaul.setState({ value: null, hydrated: false });
     await useActiveHaul.getState().hydrate();
     expect(useActiveHaul.getState().value).toBeNull();
