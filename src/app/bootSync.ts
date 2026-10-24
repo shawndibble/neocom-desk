@@ -10,11 +10,11 @@
  * queries whenever the pass finishes.
  */
 
-import { scheduleIdle } from '@/lib/scheduleIdle';
-import { BOOT_PREFETCH_IDLE_TIMEOUT_MS } from './bootPrefetch';
+// Not imported from ./bootPrefetch: route tests mock that module wholesale.
+import { BOOT_IDLE_TIMEOUT_MS, scheduleIdle } from '@/lib/scheduleIdle';
 
 /** Upper bound on the wait for an idle slot: the boot prefetch's. */
-export const BOOT_SYNC_IDLE_TIMEOUT_MS = BOOT_PREFETCH_IDLE_TIMEOUT_MS;
+export const BOOT_SYNC_IDLE_TIMEOUT_MS = BOOT_IDLE_TIMEOUT_MS;
 
 /** Schedules `sync(characterId)` and returns its cancel (call it on Character switch). */
 export function scheduleBootSync(

@@ -8,11 +8,11 @@
  * route's own. Both waits are cheap — a warm-up only has to land before the
  * user opens a *second* page.
  */
-import { scheduleIdle } from '@/lib/scheduleIdle';
+import { BOOT_IDLE_TIMEOUT_MS, scheduleIdle } from '@/lib/scheduleIdle';
 import type { PrefetchSignal } from './prefetch';
 
 /** Upper bound on the wait for an idle slot (and the timer fallback's delay). */
-export const BOOT_PREFETCH_IDLE_TIMEOUT_MS = 2000;
+export const BOOT_PREFETCH_IDLE_TIMEOUT_MS = BOOT_IDLE_TIMEOUT_MS;
 
 /**
  * Schedules the warm-up for `characterId` and returns its cancel — call it on
