@@ -31,6 +31,7 @@ import { waypointSequence } from '@/engine/route/waypoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
 import { setWaypointsInGame } from './sendWaypoints';
+import { waypointFailureText } from './waypointFailureText';
 import type { RouteSafetyLeg } from './useRouteSafety';
 
 const ENDPOINTS: readonly EsiEndpointId[] = ['postAutopilotWaypoint'];
@@ -89,36 +90,11 @@ export function SetWaypoints({
         return;
       }
       const result = await setWaypointsInGame(id, waypoints);
-      if (!result.ok && result.offline) {
-        setOutcome({
-          tone: 'alert',
-          text: result.unconfirmed
-            ? result.set === 0
-              ? t('travel.waypoints.unconfirmed')
-              : t('travel.waypoints.unconfirmedPartway', {
-                  set: result.set,
-                  total: waypoints.length,
-                })
-            : result.set === 0
-              ? t('travel.waypoints.offline')
-              : t('travel.waypoints.offlinePartway', { set: result.set, total: waypoints.length }),
-        });
-        return;
-      }
       if (!result.ok) {
-        const message = result.message ?? t('travel.waypoints.unknownError');
         setOutcome({
           tone: 'alert',
-          text: result.needsPermission ? (
+          text: waypointFailureText(t, result, waypoints.length) ?? (
             <GrantMissingLink groups={permissionsForEndpoints(ENDPOINTS)} />
-          ) : result.set === 0 ? (
-            t('travel.waypoints.failed', { message })
-          ) : (
-            t('travel.waypoints.failedPartway', {
-              set: result.set,
-              total: waypoints.length,
-              message,
-            })
           ),
         });
         return;

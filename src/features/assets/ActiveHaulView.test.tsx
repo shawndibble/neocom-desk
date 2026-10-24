@@ -158,6 +158,7 @@ describe('ActiveHaulView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Show cargo for leg 2' }));
     expect(screen.getByText(/Drops 80 m³ at Jita 4-4\./)).toBeTruthy();
     expect(screen.getByText('Carrying 80 m³')).toBeTruthy();
+    expect(screen.getByText('Dodixie IX: 80 m³')).toBeTruthy();
   });
 
   it("sets one leg's stop, or every stop of the route, as waypoints", async () => {

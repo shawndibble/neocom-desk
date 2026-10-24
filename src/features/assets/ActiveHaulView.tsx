@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, Caret, Checkbox, Toast } from '@/components/ui';
@@ -11,7 +11,7 @@ import {
   touchCheckboxLabelClassName,
 } from '@/components/ui/controlStyles';
 import {
-  legCarry,
+  legHold,
   legCondition,
   legWaypointIds,
   sectionWaypointIds,
@@ -66,7 +66,9 @@ export function ActiveHaulView({
   const { t } = useTranslation();
   const { plan, destination } = haul;
   const done = haul.doneLegIds ?? [];
-  const legRows = useHaulLegRows(plan.sections.flatMap((s) => s.legs));
+  // Memoised on the plan: the hook's effect re-runs when this array's identity changes.
+  const allLegs = useMemo(() => plan.sections.flatMap((s) => s.legs), [plan]);
+  const legRows = useHaulLegRows(allLegs);
   // Each section's current Leg shows its cargo and the rest fold; a toggle flips that.
   const [flipped, setFlipped] = useState<ReadonlySet<number>>(new Set());
   const [clearing, setClearing] = useState(false);
@@ -322,6 +324,7 @@ function Section({
                 onTick={(checked) => onTick(leg, index + 1, checked)}
                 rows={legRows.get(leg.id)}
                 capacityM3={capacityM3}
+                legs={legs}
               />
               <Stop
                 name={leg.to.name}
@@ -399,6 +402,7 @@ function LegBlock({
   onTick,
   rows,
   capacityM3,
+  legs,
 }: {
   leg: HaulLeg;
   n: number;
@@ -409,13 +413,15 @@ function LegBlock({
   onTick: (checked: boolean) => void;
   rows: LegRows | undefined;
   capacityM3: number;
+  /** The Character's legs, for what is already in the hold. */
+  legs: readonly HaulLeg[];
 }) {
   const { t } = useTranslation();
   const href = legRouteHref(leg);
   const condition = rows?.status === 'ready' ? legCondition(rows.rows) : null;
   const volume = formatCubicMetres(leg.m3);
-  const carry = legCarry(leg);
-  const place = splitPlaceName(leg.to.name).system;
+  const hold = legHold(legs, leg);
+  const carried = hold.aboard.reduce((sum, l) => sum + l.m3, 0);
   return (
     <div
       className={cx(
@@ -490,24 +496,47 @@ function LegBlock({
         )}
       >
         <Caret expanded={expanded} />
-        {carry === 'loaded'
-          ? t('assets.movePlan.haul.carryLoaded', { volume })
+        {carried > 0
+          ? t('assets.movePlan.haul.carryLoaded', { volume: formatCubicMetres(carried) })
           : t('assets.movePlan.haul.carryEmpty')}
       </button>
       {expanded && (
-        <p className="m-0 text-sm tabular-nums">
-          {carry === 'loaded'
-            ? t('assets.movePlan.haul.carryDrops', { volume, place })
-            : t('assets.movePlan.haul.carryLoadsOnArrival', { volume, place })}
-          {capacityM3 > 0 && (
-            <span className="text-text-dim">
-              {' · '}
-              {t('assets.movePlan.haul.holdFill', {
-                percent: Math.round((leg.m3 / capacityM3) * 100),
-              })}
-            </span>
+        <div className="flex flex-col gap-1 text-sm tabular-nums">
+          {hold.aboard.length > 0 && (
+            <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+              {hold.aboard.map((load, i) => (
+                <li key={i}>
+                  {t('assets.movePlan.haul.cargoLine', {
+                    place: splitPlaceName(load.place).system,
+                    volume: formatCubicMetres(load.m3),
+                  })}
+                </li>
+              ))}
+            </ul>
           )}
-        </p>
+          {hold.loadsOnArrival ? (
+            <p className="m-0 text-text-dim">
+              {t('assets.movePlan.haul.carryLoadsOnArrival', {
+                volume: formatCubicMetres(hold.loadsOnArrival.m3),
+                place: splitPlaceName(hold.loadsOnArrival.place).system,
+              })}
+            </p>
+          ) : (
+            <p className="m-0 text-text-dim">
+              {t('assets.movePlan.haul.carryDrops', {
+                volume,
+                place: splitPlaceName(leg.to.name).system,
+              })}
+            </p>
+          )}
+          {carried > 0 && capacityM3 > 0 && (
+            <p className="m-0 text-text-dim">
+              {t('assets.movePlan.haul.holdFill', {
+                percent: Math.round((carried / capacityM3) * 100),
+              })}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

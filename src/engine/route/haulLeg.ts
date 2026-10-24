@@ -14,11 +14,10 @@ export type LegCondition =
 
 /** The worst security band the leg crosses, with how many systems sit in it. */
 export function legCondition(rows: readonly RouteSafetyRow[]): LegCondition {
-  if (rows.length === 0 || rows.some((r) => r.band === null)) return { kind: 'unknown' };
   const count = (band: RouteSafetyRow['band']) => rows.filter((r) => r.band === band).length;
   if (count('nullsec') > 0) return { kind: 'nullsec', count: count('nullsec') };
   if (count('lowsec') > 0) return { kind: 'lowsec', count: count('lowsec') };
-  return { kind: 'highsec' };
+  return rows.length === 0 || count(null) > 0 ? { kind: 'unknown' } : { kind: 'highsec' };
 }
 
 /** The stop a leg sets as a waypoint: its station when it has one, else its system. */
@@ -32,9 +31,30 @@ export function sectionWaypointIds(legs: readonly HaulLeg[]): number[] {
   return legs.flatMap(legWaypointIds).filter((id, index, all) => id !== all[index - 1]);
 }
 
-/** A pickup leg flies out to load; a delivery leg flies the load in. */
-export function legCarry(leg: HaulLeg): 'empty' | 'loaded' {
-  return leg.kind === 'delivery' ? 'loaded' : 'empty';
+/** One load in a hold: where it was picked up, and how much. */
+export interface HeldLoad {
+  place: string;
+  m3: number;
+}
+
+/**
+ * What a leg's hold carries, from the plan's own legs. A trip chains its
+ * pickups with the hold carried forward, so the first pickup leg flies empty,
+ * a later one carries the trip's earlier pickups, and the delivery carries
+ * them all. A pickup leg also loads at its end; `loadsOnArrival` says what.
+ */
+export function legHold(
+  legs: readonly HaulLeg[],
+  leg: HaulLeg
+): { aboard: HeldLoad[]; loadsOnArrival: HeldLoad | null } {
+  const at = legs.indexOf(leg);
+  const aboard = legs
+    .filter((l, i) => l.trip === leg.trip && l.kind === 'pickup' && i < at)
+    .map((l) => ({ place: l.to.name, m3: l.m3 }));
+  return {
+    aboard,
+    loadsOnArrival: leg.kind === 'pickup' ? { place: leg.to.name, m3: leg.m3 } : null,
+  };
 }
 
 /** A place name as the system, then the rest (station, moon) for a dimmer second line. */

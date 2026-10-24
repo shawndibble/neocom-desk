@@ -11,6 +11,7 @@ import { useCharacterLacksEndpoints } from '@/app/useGrantedScopes';
 import { Button, Tooltip } from '@/components/ui';
 import { permissionsForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import { setWaypointsInGame } from '@/features/travel/sendWaypoints';
+import { waypointFailureText } from '@/features/travel/waypointFailureText';
 import { useOnline } from '@/stores/network';
 
 const ENDPOINTS: readonly EsiEndpointId[] = ['postAutopilotWaypoint'];
@@ -54,28 +55,8 @@ export function HaulWaypointButton({
       const result = await setWaypointsInGame(characterId, ids);
       setDone(result.ok);
       if (result.ok) return;
-      if (result.offline) {
-        setAlert(
-          result.unconfirmed
-            ? result.set === 0
-              ? t('travel.waypoints.unconfirmed')
-              : t('travel.waypoints.unconfirmedPartway', { set: result.set, total: ids.length })
-            : result.set === 0
-              ? t('travel.waypoints.offline')
-              : t('travel.waypoints.offlinePartway', { set: result.set, total: ids.length })
-        );
-        return;
-      }
-      const message = result.message ?? t('travel.waypoints.unknownError');
-      setAlert(
-        result.needsPermission ? (
-          <GrantMissingLink groups={permissionsForEndpoints(ENDPOINTS)} />
-        ) : result.set === 0 ? (
-          t('travel.waypoints.failed', { message })
-        ) : (
-          t('travel.waypoints.failedPartway', { set: result.set, total: ids.length, message })
-        )
-      );
+      const text = waypointFailureText(t, result, ids.length);
+      setAlert(text ?? <GrantMissingLink groups={permissionsForEndpoints(ENDPOINTS)} />);
     } finally {
       setSending(false);
     }

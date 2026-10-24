@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { HaulLeg } from './haulPlan';
 import type { RouteSafetyRow } from './routeSafety';
 import {
-  legCarry,
   legCondition,
+  legHold,
   legWaypointIds,
   sectionWaypointIds,
   splitPlaceName,
@@ -56,6 +56,9 @@ describe('legCondition', () => {
     expect(legCondition([])).toEqual({ kind: 'unknown' });
     expect(legCondition([row('highsec'), row(null)])).toEqual({ kind: 'unknown' });
   });
+  it('still reports the lowsec it can see beside an unplaced system', () => {
+    expect(legCondition([row('lowsec'), row(null)])).toEqual({ kind: 'lowsec', count: 1 });
+  });
 });
 
 describe('waypoint ids', () => {
@@ -73,10 +76,35 @@ describe('waypoint ids', () => {
   });
 });
 
-describe('legCarry', () => {
-  it('flies empty to a pickup and carries the load on a delivery', () => {
-    expect(legCarry(leg({ kind: 'pickup' }))).toBe('empty');
-    expect(legCarry(leg({ kind: 'delivery' }))).toBe('loaded');
+describe('legHold', () => {
+  const at = (n: number) => ({ systemId: n, stationId: null, name: `P${n}` });
+  const legs = [
+    leg({ id: 0, trip: 1, kind: 'pickup', to: at(1), m3: 30 }),
+    leg({ id: 1, trip: 1, kind: 'pickup', to: at(2), m3: 50 }),
+    leg({ id: 2, trip: 1, kind: 'delivery', to: at(9), m3: 80 }),
+    leg({ id: 3, trip: 2, kind: 'pickup', to: at(3), m3: 20 }),
+  ];
+  it('flies the first pickup of a trip empty and loads on arrival', () => {
+    expect(legHold(legs, legs[0])).toEqual({
+      aboard: [],
+      loadsOnArrival: { place: 'P1', m3: 30 },
+    });
+  });
+  it('carries the earlier pickups of the trip to a later pickup', () => {
+    expect(legHold(legs, legs[1])).toEqual({
+      aboard: [{ place: 'P1', m3: 30 }],
+      loadsOnArrival: { place: 'P2', m3: 50 },
+    });
+  });
+  it('carries every pickup of the trip to the delivery, and not the next trip', () => {
+    expect(legHold(legs, legs[2])).toEqual({
+      aboard: [
+        { place: 'P1', m3: 30 },
+        { place: 'P2', m3: 50 },
+      ],
+      loadsOnArrival: null,
+    });
+    expect(legHold(legs, legs[3]).aboard).toEqual([]);
   });
 });
 
