@@ -36,3 +36,26 @@ export function chipTone(remainingMs: number): ChipTone {
   if (remainingMs < CHIP_WARNING_MS) return 'warning';
   return 'neutral';
 }
+
+/**
+ * What the header drew for the Next deadline once every read was in, remembered so the next
+ * load can hold the same room on a phone (where it is a line of its own) before the clocks
+ * arrive: a button (`link`), a plain readout (`text`, no page owns the clock), or nothing.
+ */
+export type NextShape = 'none' | 'link' | 'text';
+
+export function nextShape(next: Pick<BoardDeadline, 'to'> | null): NextShape {
+  if (next === null) return 'none';
+  return next.to === undefined ? 'text' : 'link';
+}
+
+/**
+ * The phone height to hold open for a remembered shape: the `md` button's `h-11`, the
+ * `text-sm` readout's one line, or nothing. Never seen (or unreadable) holds the button's
+ * room, the usual case for a Character in training.
+ */
+export function reservedNextHeight(remembered: string | null): 'h-11' | 'h-5' | null {
+  if (remembered === 'none') return null;
+  if (remembered === 'text') return 'h-5';
+  return 'h-11';
+}

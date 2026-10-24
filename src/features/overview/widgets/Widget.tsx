@@ -321,7 +321,12 @@ function WidgetFrame({
   const { state, showLastGood, reauthNote } = resolveWidget(view.status);
   const isPhone = useIsPhone();
   const sizeKey = heightKey(widget, characterId, isPhone);
-  const measureRef = useRememberHeight(sizeKey, rememberHeight && state !== 'loading');
+  // Only a settled body is worth standing the next skeleton at: a short error or permission
+  // prompt is a passing state, not this widget's height.
+  const measureRef = useRememberHeight(
+    sizeKey,
+    rememberHeight && (state === 'ok' || state === 'empty')
+  );
 
   // The grid only draws kinds it knows; a widget rendered alone without one has no title to show.
   if (!kind) return null;
@@ -333,7 +338,7 @@ function WidgetFrame({
       <Skeleton
         minHeight={
           (rememberHeight ? rememberedBodyHeight(sizeKey) : undefined) ??
-          estimatedBodyHeight(widget.view, widget.size, isPhone)
+          estimatedBodyHeight(widget.view, widget.size, isPhone, widget.rowsPerPage)
         }
       />
     );

@@ -29,7 +29,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { DataAgePopover } from './DataAgePopover';
 import { useOverviewRefresh } from './widgets/data/refreshContext';
 import { useOverviewEdit } from './widgets/editContext';
-import type { ChipTone } from './widgets/nextDeadline';
+import { nextShape, reservedNextHeight, type ChipTone } from './widgets/nextDeadline';
 import type { OverviewSummary } from './useOverviewSummary';
 
 /** The button's own ladder: amber under 3 h, red under 30 min (not the per-card severities). */
@@ -80,17 +80,18 @@ export function OverviewNext({ summary }: { summary: OverviewSummary }) {
   const { t } = useTranslation();
   const { next, remaining, tone, pending } = summary;
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
-  const hasNext = next !== null;
-  const hadNextKey = `overview.hadNext.${characterId ?? 0}`;
-  // Once every read is in, remember whether this Character had a clock, for the next load.
+  const shape = nextShape(next);
+  const shapeKey = `overview.nextShape.${characterId ?? 0}`;
+  // Once every read is in, remember what this Character's header drew, for the next load.
   useEffect(() => {
-    if (!pending) writeLocal(hadNextKey, hasNext ? '1' : '0');
-  }, [pending, hasNext, hadNextKey]);
+    if (!pending) writeLocal(shapeKey, shape);
+  }, [pending, shape, shapeKey]);
   if (!next) {
-    // On a phone the button is a line of its own: hold it open while the reads that may
-    // offer a clock are still out, unless last time there was none, so the board does not drop.
-    return pending && readLocal(hadNextKey) !== '0' ? (
-      <div aria-hidden="true" className="order-last h-11 basis-full md:hidden" />
+    // On a phone the button is a line of its own: hold last time's room open while the reads
+    // that may offer a clock are still out, so the board does not drop when it arrives.
+    const reserved = pending ? reservedNextHeight(readLocal(shapeKey)) : null;
+    return reserved ? (
+      <div aria-hidden="true" className={cx('order-last basis-full md:hidden', reserved)} />
     ) : null;
   }
   const content = (
