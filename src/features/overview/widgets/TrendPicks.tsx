@@ -10,7 +10,6 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
-  Checkbox,
   DropdownMenuCheckboxItem,
   DropdownMenuLabel,
   IconButton,
@@ -20,7 +19,12 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  disabledClassName,
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+  tappableRowClassName,
+} from '@/components/ui/controlStyles';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { useMarketHub } from '@/features/market/hub';
 import { TRADE_HUBS } from '@/market/hubs';
@@ -181,8 +185,23 @@ export function TrendItemsDialog({
   const hidden = picked
     .filter((id) => !drawnIds.has(id))
     .map((id) => names.get(id) ?? t('overview.menu.trendUnknownItem', { id }));
-  const toggle = (typeId: number, on: boolean) =>
+  const available = rows.filter((item) => !picked.includes(item.typeId));
+  const resultsRef = useRef<HTMLUListElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  // The row a pick leaves would drop keyboard focus with it; hand it to the next row, else the search box.
+  const refocus = useRef(false);
+  const [justAdded, setJustAdded] = useState<number | null>(null);
+  const toggle = (typeId: number, on: boolean) => {
+    refocus.current = on;
+    setJustAdded(on ? typeId : null);
     setEdited(on ? [...picked, typeId] : picked.filter((id) => id !== typeId));
+  };
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    const next = resultsRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)');
+    (next ?? searchRef.current)?.focus();
+  }, [picked]);
 
   return (
     <Modal open={open} onClose={onClose} title={t('overview.menu.trendItemsTitle', { title })}>
@@ -203,6 +222,7 @@ export function TrendItemsDialog({
         }}
       >
         <SearchInput
+          ref={searchRef}
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
@@ -233,31 +253,41 @@ export function TrendItemsDialog({
         )}
 
         <ul
+          ref={resultsRef}
           className="grid max-h-60 gap-1 overflow-y-auto"
           aria-label={t('overview.menu.trendList')}
         >
-          {rows.map((item) => {
-            const on = picked.includes(item.typeId);
-            return (
-              <li key={item.typeId}>
-                <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
-                  <Checkbox
-                    checked={on}
-                    disabled={!on && full}
-                    aria-describedby={!on && full ? noteId : undefined}
-                    onChange={(event) => toggle(item.typeId, event.target.checked)}
-                  />
-                  <span>{item.name}</span>
-                  {item.sourceId !== undefined && (
-                    <span className="ml-auto text-xs text-text-dim">
-                      {t(`overview.menu.trendSources.${item.sourceId}`)}
-                    </span>
-                  )}
-                </label>
-              </li>
-            );
-          })}
+          {/* A picked item leaves this list and shows only under Selected, so each item is in one place. */}
+          {available.map((item) => (
+            <li key={item.typeId}>
+              <button
+                type="button"
+                disabled={full}
+                aria-describedby={full ? noteId : undefined}
+                aria-label={t('overview.menu.trendAdd', { name: item.name })}
+                onClick={() => toggle(item.typeId, true)}
+                className={cx(
+                  'flex w-full items-center gap-2 rounded-xs px-1 text-left text-sm',
+                  tappableRowClassName,
+                  rowInteractiveClassName,
+                  focusRingInsetClassName,
+                  disabledClassName
+                )}
+              >
+                <Icon.AddRow size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
+                <span className="min-w-0 truncate">{item.name}</span>
+                {item.sourceId !== undefined && (
+                  <span className="ml-auto shrink-0 text-xs text-text-dim">
+                    {t(`overview.menu.trendSources.${item.sourceId}`)}
+                  </span>
+                )}
+              </button>
+            </li>
+          ))}
         </ul>
+        {!searching && rows.length > 0 && available.length === 0 && (
+          <p className="text-xs text-text-dim">{t('overview.menu.trendAllPicked')}</p>
+        )}
         {full && (
           <p id={noteId} className="text-xs text-text-dim">
             {t('overview.menu.trendFull', { max: TREND_MAX_SERIES })}
@@ -293,7 +323,10 @@ export function TrendItemsDialog({
               return (
                 <li
                   key={id}
-                  className="flex items-center justify-between gap-2 rounded-xs border border-line pl-2.5 text-sm"
+                  className={cx(
+                    'flex items-center justify-between gap-2 rounded-xs border border-line pl-2.5 text-sm',
+                    id === justAdded && 'row-pulse'
+                  )}
                 >
                   <span className="min-w-0 truncate">{name}</span>
                   <IconButton

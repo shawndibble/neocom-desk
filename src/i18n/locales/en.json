@@ -5954,6 +5954,8 @@
       "trendFull": "{{max}} items are picked, the most you can chart. Remove one to add another.",
       "trendSelectedLabel": "Selected items",
       "trendSelected": "Selected ({{count}} of {{max}})",
+      "trendAdd": "Add {{name}}",
+      "trendAllPicked": "Everything in this list is already selected.",
       "trendRemove": "Remove {{name}}",
       "trendHint": "Each item is drawn at each trade hub you tick, up to six lines. PLEX trades in one region, so it is drawn once.",
       "trendFollowQuickbar": "Follow my Quickbar",

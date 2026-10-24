@@ -1,3 +1,4 @@
+import { cx } from '@/lib/cx';
 import { useId, useState } from 'react';
 import { ChartHover } from './ChartHover';
 import { linesRuns, runFills } from './geometry';
@@ -85,14 +86,14 @@ export function Lines({ model, height }: { model: LinesChartModel; height: numbe
         </div>
       )}
       {!single && (
-        <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-[0.6875rem] text-text-dim">
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-x-3 gap-y-0.5 text-[0.6875rem] text-text-dim">
           {model.series.map((s) => {
             const on = picked && s.key === active;
             return (
               <li
                 key={s.key}
                 data-active={on || undefined}
-                className="flex items-center gap-1 rounded-xs tabular-nums"
+                className="flex min-w-0 items-center gap-1 rounded-xs tabular-nums"
                 onPointerEnter={() => setActive(s.key)}
                 onPointerLeave={() => setActive(null)}
               >
@@ -106,10 +107,15 @@ export function Lines({ model, height }: { model: LinesChartModel; height: numbe
                     strokeWidth={on ? 3 : 2}
                   />
                 </svg>
-                <span className={on ? 'font-semibold text-text underline' : 'text-text'}>
+                <span
+                  className={cx(
+                    'min-w-0 truncate',
+                    on ? 'font-semibold text-text underline' : 'text-text'
+                  )}
+                >
                   {s.label}
                 </span>
-                <span>{s.end}</span>
+                <span className="ml-auto shrink-0">{s.end}</span>
               </li>
             );
           })}
