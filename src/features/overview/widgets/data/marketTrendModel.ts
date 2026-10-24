@@ -150,7 +150,7 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
       { key: 'd30', label: t(`${W}.col.d30`), align: 'end' as const, priority: 3 },
     ],
     rows,
-    footer: [t(`${D}.footer`, { where }), ...notes].join(' '),
+    footer: notes.length > 0 ? notes.join(' ') : undefined,
   };
 
   const mover = changes
@@ -164,7 +164,6 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
       ? {
           value: trendText(mover.d7),
           unit: t(`${D}.unit`, { item: mover.item.label, days: 7 }),
-          secondary: { text: t(`${D}.footer`, { where }) },
           notes: data.omitted > 0 ? [t(`${D}.omitted`, { count: data.omitted })] : [],
           tone: 'clear',
         }
@@ -183,7 +182,8 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
 
   const volumes = data.items.map((i) => new Map(i.points.map((p) => [p.date, p.volume])));
   const rel = (v: number) => v / 100 - 1;
-  const smoothed = range >= SMOOTH_FROM_DAYS;
+  // One line is already readable, so only a crowd of lines gets the trailing average.
+  const smoothed = range >= SMOOTH_FROM_DAYS && plotted.length > 1;
   const lastOf = (values: (number | null)[]) => values.filter((v) => v !== null).at(-1) ?? null;
   // Percent change per day; a long range draws its trailing average so the tooltip (raw) keeps the real day.
   const lineValues = (values: (number | null)[]) => {

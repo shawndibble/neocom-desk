@@ -131,8 +131,7 @@ describe('marketTrend builder', () => {
 
   it('names the global market, not the hubs, when every line is global', () => {
     const view = marketTrend(data([short]), ctx(30, { trendItems: [44992], trendHubs: ['jita'] }));
-    expect(view.table!.footer).toContain('whereGlobal');
-    expect(view.table!.footer).not.toContain('Jita');
+    expect(view.summary).toContain('whereGlobal');
     expect(view.summary).not.toContain('Jita');
     if (view.chart?.kind !== 'lines') throw new Error('expected a lines chart');
     expect(view.chart.note).toBeUndefined();
@@ -172,8 +171,8 @@ describe('marketTrend builder', () => {
       'Zig',
       Array.from({ length: 31 }, (_, i) => (i % 2 === 0 ? 100 : 120))
     );
-    const long = marketTrend(data([zigzag]), ctx(30));
-    const raw = marketTrend(data([zigzag]), ctx(7));
+    const long = marketTrend(data([zigzag, rising]), ctx(30));
+    const raw = marketTrend(data([zigzag, rising]), ctx(7));
     if (long.chart?.kind !== 'lines' || raw.chart?.kind !== 'lines') throw new Error('lines');
     expect(long.chart.summary).toContain('summarySmoothed');
     expect(raw.chart.summary).not.toContain('summarySmoothed');
@@ -182,6 +181,13 @@ describe('marketTrend builder', () => {
     expect(long.chart.series[0]!.values[0]).toBe(0);
     // Tooltip is the day's own price, not the average.
     expect(long.chart.tips!.at(-1)!.rows[0]!.value).toContain('"price":"100"');
+  });
+
+  it('draws a lone line raw on a long range, smoothing only a crowd of lines', () => {
+    const view = marketTrend(data([rising]), ctx(30));
+    if (view.chart?.kind !== 'lines') throw new Error('lines');
+    expect(view.chart.summary).not.toContain('summarySmoothed');
+    expect(view.chart.series[0]!.values.at(-1)).toBeCloseTo((130 / 101 - 1) * 100);
   });
 
   it('keeps a smoothed line to the days it has data for, and ends the legend where the line ends', () => {
@@ -204,7 +210,7 @@ describe('marketTrend builder', () => {
 
   it('keeps the hub names for a mix of global and hub lines', () => {
     const view = marketTrend(data([rising, short]), ctx());
-    expect(view.table!.footer).toContain('whereHub');
+    expect(view.summary).toContain('whereHub');
   });
 
   it('surfaces lines dropped by the cap on the table and chart, not only the Number view', () => {
@@ -245,9 +251,8 @@ describe('marketTrend builder', () => {
         'Tritanium · Jita',
         'Tritanium · Amarr',
       ]);
-      expect(view.table!.footer).toBe(
-        'overview.widgets.data.marketTrend.footer{"where":"overview.widgets.chart.marketTrend.whereHub{\\"hub\\":\\"Jita, Amarr\\"}"}'
-      );
+      expect(view.summary).toContain('Jita, Amarr');
+      expect(view.table!.footer).toBeUndefined();
     });
 
     it('draws a global-market item once however many hubs', () => {

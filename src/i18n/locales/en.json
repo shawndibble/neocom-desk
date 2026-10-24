@@ -4606,7 +4606,6 @@
         },
         "marketTrend": {
           "unit": "{{item}} · {{days}} days",
-          "footer": "Daily average {{where}}.",
           "failedCell": "Not loaded",
           "omitted_one": "{{count}} more line isn't shown.",
           "omitted_other": "{{count}} more lines aren't shown.",
@@ -5876,9 +5875,6 @@
         },
         "belowMarket": {
           "note": "From your last Below market view"
-        },
-        "marketTrend": {
-          "note": "Daily average at Jita"
         }
       }
     },
