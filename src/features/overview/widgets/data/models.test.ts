@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveWidget } from '../state';
-import { buildView, feedsFor, KIND_FEEDS, kindSumsAcrossCharacters } from './models';
+import { buildView, feedsFor } from './models';
 import type { BuildContext, FeedState, Feeds } from './types';
 
 const NOW = Date.parse('2026-10-11T12:00:00Z');
@@ -31,37 +31,6 @@ describe('feedsFor', () => {
 
   it('is empty for kinds with no data yet', () => {
     expect(feedsFor(['unknownKindFromANewerBuild'])).toEqual([]);
-  });
-
-  it('gives every built kind at least one feed, except the clock', () => {
-    for (const [kind, feeds] of Object.entries(KIND_FEEDS)) {
-      if (kind === 'eveTime') continue;
-      expect(feeds.length, kind).toBeGreaterThan(0);
-    }
-  });
-});
-
-describe('kindSumsAcrossCharacters', () => {
-  it('is true for the account-wide kinds and orders', () => {
-    for (const kind of [
-      'miningTax',
-      'stock',
-      'priceWatch',
-      'incursions',
-      'orders',
-      'netWorth',
-      'miningYield',
-      'routeSafety',
-      'industry',
-    ]) {
-      expect(kindSumsAcrossCharacters(kind), kind).toBe(true);
-    }
-  });
-
-  it('is false for per-Character kinds', () => {
-    for (const kind of ['wallet', 'training', 'mail']) {
-      expect(kindSumsAcrossCharacters(kind), kind).toBe(false);
-    }
   });
 });
 

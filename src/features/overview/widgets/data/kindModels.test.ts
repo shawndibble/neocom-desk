@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { summarizeSurvey } from '@/engine/survey/series';
 import { formatDuration } from '@/lib/duration';
 import { resolveWidget } from '../state';
-import { buildView, feedsFor, KIND_FEEDS } from './models';
+import { buildView, feedsFor, feedsOf } from './models';
 import { humanizeRefType } from './kindModels';
 import type {
   BelowMarketWidgetData,
@@ -39,8 +39,8 @@ const iso = (ms: number) => new Date(ms).toISOString();
 
 describe('feeds for the later kinds', () => {
   it('reads each kind from its own feed, and wallet from the journal as well', () => {
-    expect(KIND_FEEDS.netWorth).toEqual(['netWorth']);
-    expect(KIND_FEEDS.walletFlow).toEqual(['journal']);
+    expect(feedsOf('netWorth')).toEqual(['netWorth']);
+    expect(feedsOf('walletFlow')).toEqual(['journal']);
     expect(feedsFor(['wallet', 'walletFlow']).sort()).toEqual(['journal', 'wallet']);
   });
 });
@@ -720,7 +720,7 @@ describe('survey', () => {
   });
 
   it('reads from its own feed and links to the Mining Survey tab', () => {
-    expect(KIND_FEEDS.survey).toEqual(['survey']);
+    expect(feedsOf('survey')).toEqual(['survey']);
     expect(buildView('survey', { survey: ok(data()) }, ctx()).to).toBe('/mining/survey');
   });
 
@@ -838,7 +838,7 @@ describe('routeSafety', () => {
   });
 
   it('reads from its own feed and links to Route Safety on the saved route', () => {
-    expect(KIND_FEEDS.routeSafety).toEqual(['routeSafety']);
+    expect(feedsOf('routeSafety')).toEqual(['routeSafety']);
     expect(buildView('routeSafety', { routeSafety: ok(data()) }, ctx()).to).toBe(
       '/travel/route?from=1&stops=3'
     );
@@ -927,7 +927,7 @@ describe('hauling', () => {
   });
 
   it('reads from its own feed and links to the Hauling tab', () => {
-    expect(KIND_FEEDS.hauling).toEqual(['hauling']);
+    expect(feedsOf('hauling')).toEqual(['hauling']);
     expect(buildView('hauling', { hauling: ok(data()) }, ctx()).to).toBe('/market/hauling');
   });
 
@@ -978,7 +978,7 @@ describe('belowMarket', () => {
   });
 
   it('reads from its own feed and links to Item search with Below market on', () => {
-    expect(KIND_FEEDS.belowMarket).toEqual(['belowMarket']);
+    expect(feedsOf('belowMarket')).toEqual(['belowMarket']);
     expect(buildView('belowMarket', { belowMarket: ok(data()) }, ctx()).to).toBe(
       '/contracts/search/items?items.belowMarket=1'
     );
@@ -1025,7 +1025,7 @@ describe('jumpTimers', () => {
   });
 
   it('reads from its own feed and links to the Clones page', () => {
-    expect(KIND_FEEDS.jumpTimers).toEqual(['jumpTimers']);
+    expect(feedsOf('jumpTimers')).toEqual(['jumpTimers']);
     expect(buildView('jumpTimers', { jumpTimers: ok(data()) }, ctx()).to).toBe('/clones');
   });
 
@@ -1124,7 +1124,7 @@ describe('kills', () => {
   });
 
   it('reads from its own feed', () => {
-    expect(KIND_FEEDS.kills).toEqual(['kills']);
+    expect(feedsOf('kills')).toEqual(['kills']);
   });
 
   it('counts the header Character’s kills and losses in the range, with the split beneath', () => {
@@ -1243,7 +1243,7 @@ describe('omega coverage', () => {
     buildView('omega', { omega: ok(d) }, ctx(over));
 
   it('reads its own feed and sums across Characters', () => {
-    expect(KIND_FEEDS.omega).toEqual(['omega']);
+    expect(feedsOf('omega')).toEqual(['omega']);
   });
 
   it('covers whole accounts: net 1.2B against 1.0B per account', () => {
@@ -1388,7 +1388,7 @@ describe('trading profit', () => {
     buildView('tradingProfit', { tradingProfit: ok(data()) }, ctx(over));
 
   it('reads its own feed', () => {
-    expect(KIND_FEEDS.tradingProfit).toEqual(['tradingProfit']);
+    expect(feedsOf('tradingProfit')).toEqual(['tradingProfit']);
   });
 
   it("pools every Character's buys under All characters, and leaves the header Character's sale unmatched", () => {

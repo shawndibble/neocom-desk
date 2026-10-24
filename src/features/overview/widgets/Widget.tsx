@@ -42,7 +42,7 @@ import type { KindView, NumberModel, NumberSecondary } from './data/types';
 import { useWidgetView } from './data/useWidgetView';
 import { getKind } from './kinds';
 import { Chart } from './charts/Chart';
-import { DEFAULT_RANGE, type Widget as WidgetModel } from './layout';
+import type { Widget as WidgetModel } from './layout';
 import { scopePresentation } from './scope';
 import { OVERVIEW_TICK_MS } from './data/tick';
 import { resolveWidget } from './state';
@@ -263,17 +263,9 @@ export function Widget(props: WidgetProps) {
 
 function LiveWidget(props: WidgetProps) {
   const { widget } = props;
-  const kind = getKind(widget.kind);
   const scope = scopePresentation(widget.kind, widget.scope);
-  const view = useWidgetView(
-    widget.kind,
-    scope.scopeAll,
-    kind?.hasRange ? (widget.range ?? DEFAULT_RANGE) : undefined,
-    kind?.hasPlexPlan ? widget.plexPer30Days : undefined,
-    kind?.hasCalendarEvents ? widget.calendarEvents : undefined,
-    kind?.hasRaidsWhere ? widget.raidsWhere : undefined,
-    kind?.hasRaidsWhere ? widget.raidsRadius : undefined
-  );
+  // The kind's declared settings pick what counts; the rest are ignored (`viewSettings.ts`).
+  const view = useWidgetView(widget.kind, scope.scopeAll, widget);
   return <WidgetFrame {...props} view={view} rememberHeight />;
 }
 
