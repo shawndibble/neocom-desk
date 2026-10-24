@@ -25,12 +25,8 @@ vi.mock('../srpOfficerClient', () => ({
   readAllSrpActivity: reads.activity,
 }));
 vi.mock('../srpDoctrineClient', () => ({ readSrpDoctrines: reads.doctrines }));
-vi.mock('./useSrpClaimNames', () => ({
-  useSrpClaimNames: () => ({
-    hull: (id: number) => `Type ${id}`,
-    system: (id: number) => `System ${id}`,
-  }),
-}));
+vi.mock('@/sde/loadSde', () => ({ loadTypes: () => Promise.resolve({}) }));
+vi.mock('@/sde/solarSystems', () => ({ loadSolarSystemsById: () => Promise.resolve(new Map()) }));
 
 beforeEach(() => {
   vi.restoreAllMocks();

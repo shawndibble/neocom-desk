@@ -9,11 +9,14 @@ import type { BookContextValue } from './bookContextValue';
 import type { OfficerVerdict } from '../taxBook/bookClient';
 
 const deleteBook = vi.fn();
+const readBookData = vi.fn();
 vi.mock('@/esi/endpoints/corp', () => ({
   getCorporationPublicInfo: () => Promise.resolve({ data: { ticker: 'TEST' } }),
 }));
 vi.mock('../taxBook/bookClient', () => ({
   deleteBook: (...a: unknown[]) => deleteBook(...a),
+  readBookData: (...a: unknown[]) => readBookData(...a),
+  readFullAudit: () => Promise.resolve([]),
   editBook: vi.fn(),
 }));
 
@@ -81,5 +84,19 @@ describe('DeleteBookSection', () => {
     await userEvent.click(confirm);
     await waitFor(() => expect(deleteBook).toHaveBeenCalledWith(ME, CORP));
     await waitFor(() => expect(reload).toHaveBeenCalled());
+  });
+
+  it('offers a copy first, and holds Delete only while that copy is being read', async () => {
+    let finish: (value: null) => void = () => {};
+    readBookData.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    renderSection({ isDirector: true }, ME, true);
+    const confirm = await screen.findByRole('button', { name: 'Delete the book' });
+    await userEvent.type(screen.getByRole('textbox'), 'test');
+    expect(confirm).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Download the book (.xlsx)' }));
+    expect(confirm).toBeDisabled();
+    finish(null);
+    await waitFor(() => expect(confirm).toBeEnabled());
+    expect(deleteBook).not.toHaveBeenCalled();
   });
 });

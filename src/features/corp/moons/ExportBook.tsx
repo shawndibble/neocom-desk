@@ -37,6 +37,7 @@ function useExportBook(): () => Promise<WorkbookDownload> {
         writeOffs: state.writeOffs ?? [],
         dismissals: state.dismissals,
         audit,
+        scheduledSync: data.scheduledSync,
       },
       names,
       t
@@ -45,7 +46,17 @@ function useExportBook(): () => Promise<WorkbookDownload> {
   }, [characterId, corporationId, names, t]);
 }
 
-function ExportBlock({ id, title, hint }: { id: string; title: string; hint: string }) {
+function ExportBlock({
+  id,
+  title,
+  hint,
+  onBusyChange,
+}: {
+  id: string;
+  title: string;
+  hint: string;
+  onBusyChange?: (busy: boolean) => void;
+}) {
   const { t } = useTranslation();
   const build = useExportBook();
   return (
@@ -54,7 +65,11 @@ function ExportBlock({ id, title, hint }: { id: string; title: string; hint: str
         {title}
       </h3>
       <p className="text-xs text-text-dim">{hint}</p>
-      <WorkbookDownloadButton label={t('corpTaxBook.export.action')} build={build} />
+      <WorkbookDownloadButton
+        label={t('corpTaxBook.export.action')}
+        build={build}
+        onBusyChange={onBusyChange}
+      />
       <p className="text-xs text-text-dim">{t('corpTaxBook.export.sheetList')}</p>
     </section>
   );
@@ -72,14 +87,18 @@ export function ExportBookSection() {
   );
 }
 
-/** The Delete the book confirmation's offer to keep a copy. Delete never waits on it. */
-export function ExportFirst() {
+/**
+ * The Delete the book confirmation's offer to keep a copy. Delete never requires it, but holds
+ * while a copy is being read, so the file is never cut short by the delete.
+ */
+export function ExportFirst({ onBusyChange }: { onBusyChange?: (busy: boolean) => void }) {
   const { t } = useTranslation();
   return (
     <ExportBlock
       id="export-first-heading"
       title={t('corpTaxBook.export.firstTitle')}
       hint={t('corpTaxBook.export.firstHint')}
+      onBusyChange={onBusyChange}
     />
   );
 }

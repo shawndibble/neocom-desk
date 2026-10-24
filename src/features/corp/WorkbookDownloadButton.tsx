@@ -19,17 +19,21 @@ export function WorkbookDownloadButton({
   label,
   build,
   className,
+  onBusyChange,
 }: {
   label: string;
   /** Reads the data, writes the workbook and starts the download. */
   build: () => Promise<WorkbookDownload>;
   className?: string;
+  /** Told when the build starts and ends: the Delete dialog holds Delete while the copy is read. */
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(null);
   const run = async () => {
     setBusy(true);
+    onBusyChange?.(true);
     setOutcome(null);
     try {
       setOutcome({ kind: 'done', result: await build() });
@@ -37,6 +41,7 @@ export function WorkbookDownloadButton({
       setOutcome({ kind: 'failed' });
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
     }
   };
   return (

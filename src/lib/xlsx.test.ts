@@ -72,6 +72,12 @@ describe('toXlsx', () => {
     expect(xml).toContain('A &amp; &lt;B&gt; &quot;C&quot;</t>');
   });
 
+  it("cuts text at Excel's per-cell limit so the file opens without a repair prompt", () => {
+    const xml = sheetXml(toXlsx([{ name: 'x'.repeat(40_000), qty: 1 }], columns, 'Sheet'));
+    expect(xml).toContain(`>${'x'.repeat(32_767)}</t>`);
+    expect(xml).not.toContain('x'.repeat(32_768));
+  });
+
   it('never turns formula-looking text into a formula', () => {
     const xml = sheetXml(toXlsx([{ name: '=SUM(A1)', qty: 1 }], columns, 'Sheet'));
     expect(xml).not.toContain('<f>');

@@ -47,6 +47,7 @@ export function DeleteBookDialog({ onClose }: { onClose: () => void }) {
   const { characterId, corporationId, reload } = useBook();
   const [expected, setExpected] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
+  const [exporting, setExporting] = useState(false);
   // The id stands in when the ticker is unreadable: the label then names it as the id.
   const [isId, setIsId] = useState(false);
   useEffect(() => {
@@ -83,13 +84,15 @@ export function DeleteBookDialog({ onClose }: { onClose: () => void }) {
       onClose={onClose}
       title={t('corpTaxBook.moons.settings.delete.confirmTitle')}
       confirmLabel={t('corpTaxBook.moons.settings.delete.confirm')}
-      canConfirm={expected !== null && typed.trim().toUpperCase() === expected.toUpperCase()}
+      canConfirm={
+        !exporting && expected !== null && typed.trim().toUpperCase() === expected.toUpperCase()
+      }
       danger
       showLogged={false}
       run={remove}
     >
       <p>{t('corpTaxBook.moons.settings.delete.body')}</p>
-      <ExportFirst />
+      <ExportFirst onBusyChange={setExporting} />
       <Label
         text={
           isId

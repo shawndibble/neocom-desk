@@ -74,6 +74,9 @@ function uniqueSheetNames(names: readonly string[]): string[] {
   });
 }
 
+/** Excel's limit for one cell's text; past it the file opens only through a repair prompt. */
+const MAX_CELL_TEXT = 32_767;
+
 function cellXml(ref: string, cell: ExportCell, style?: number): string {
   const s = style ? ` s="${style}"` : '';
   switch (cell.kind) {
@@ -84,7 +87,7 @@ function cellXml(ref: string, cell: ExportCell, style?: number): string {
     case 'date':
       return `<c r="${ref}" s="${STYLE_DATE}"><v>${cell.value.getTime() / MS_PER_DAY + UNIX_EPOCH_SERIAL}</v></c>`;
     case 'text':
-      return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${escapeXml(cell.value)}</t></is></c>`;
+      return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${escapeXml(cell.value.slice(0, MAX_CELL_TEXT))}</t></is></c>`;
   }
 }
 

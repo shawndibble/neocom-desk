@@ -81,7 +81,7 @@ export type CsvSurface =
   | 'corp-tax-book'
   | 'corp-srp';
 
-/** Every surface exports in every format; the name reads better at the menu. */
+/** A table surface exports in every format; a workbook surface (`corp-tax-book`, `corp-srp`) only as .xlsx. */
 export type ExportSurface = CsvSurface;
 
 /**

@@ -7,6 +7,7 @@ import { bookExportSheets, type BookExportInput } from './bookExport';
 const t = (key: string) => key;
 const names = {
   character: (id: number) => `Char ${id}`,
+  corporation: (id: number) => `Corp ${id}`,
   refinery: (id: number) => `Refinery ${id}`,
   moon: (id: number) => `Moon ${id}`,
   ore: (id: number) => `Ore ${id}`,

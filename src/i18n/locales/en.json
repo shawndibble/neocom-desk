@@ -16246,6 +16246,11 @@
         "owner": "Owner",
         "createdBy": "Turned on by",
         "lastSync": "Last sync",
+        "membersSeeFrom": "Members see the book from",
+        "automaticSync": "Automatic sync",
+        "automaticSyncOn": "On, held by {{name}}",
+        "automaticSyncStopped": "Stopped (was held by {{name}})",
+        "automaticSyncOff": "Off",
         "rate": {
           "corp": "Tax rate (%): corporation, from {{from}}",
           "guest": "Tax rate (%): guests, from {{from}}",
@@ -16991,7 +16996,8 @@
         "pay-percent": "Pays the corporation's percent",
         "not-covered": "Not covered",
         "officer-decides": "An officer decides"
-      }
+      },
+      "typeFallback": "Type {{id}}"
     }
   }
 }

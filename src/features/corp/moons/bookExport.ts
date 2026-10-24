@@ -6,6 +6,7 @@
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
+import type { ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
@@ -27,9 +28,16 @@ export interface BookExportInput {
   writeOffs: readonly RecordedWriteOff[];
   dismissals: readonly Dismissal[];
   audit: readonly AuditEntry[];
+  /** The Automatic sync's status; null when it was never turned on or was revoked. */
+  scheduledSync?: ScheduledSyncStatus | null;
 }
 
-export type BookExportNames = Pick<BookNames, 'character' | 'refinery' | 'moon' | 'ore'>;
+export type BookExportNames = Pick<
+  BookNames,
+  'character' | 'corporation' | 'refinery' | 'moon' | 'ore'
+>;
+
+type MinerName = (minerId: string | undefined) => string | null;
 
 /** Epoch ms as a UTC timestamp, which the writer turns into a date cell. */
 export const isoTime = (ms: number | null | undefined): string | null =>
@@ -67,15 +75,15 @@ function sheet<T>(
   };
 }
 
-function rateTarget(rate: TaxRate, names: BookExportNames): string | null {
+function rateTarget(rate: TaxRate, names: BookExportNames, minerName: MinerName): string | null {
   switch (rate.scope) {
     case 'corp':
     case 'guest':
       return null;
     case 'feeder':
-      return String(rate.feederId);
+      return names.corporation(rate.feederId);
     case 'miner':
-      return rate.minerId;
+      return minerName(rate.minerId);
     case 'moon':
       return names.moon(rate.moonId);
     case 'structure':
@@ -87,7 +95,9 @@ function rateTarget(rate: TaxRate, names: BookExportNames): string | null {
 
 function settingsRows(
   s: BookSettings,
+  scheduled: ScheduledSyncStatus | null,
   names: BookExportNames,
+  minerName: MinerName,
   t: CsvTranslate
 ): [string, ExportValue][] {
   const yes = t('corpTaxBook.export.yes');
@@ -113,9 +123,18 @@ function settingsRows(
     [label('owner'), s.ownerCharacterId === null ? null : names.character(s.ownerCharacterId)],
     [label('createdBy'), s.createdBy === null ? null : names.character(s.createdBy)],
     [label('lastSync'), isoTime(s.lastSync?.at)],
+    [label('membersSeeFrom'), isoTime(s.membersSeeFrom)],
+    [
+      label('automaticSync'),
+      scheduled
+        ? label(`automaticSync${scheduled.status === 'active' ? 'On' : 'Stopped'}`, {
+            name: scheduled.characterName,
+          })
+        : label('automaticSyncOff'),
+    ],
     ...s.rates.map((rate): [string, ExportValue] => [
       label(`rate.${rate.scope}`, {
-        target: rateTarget(rate, names),
+        target: rateTarget(rate, names, minerName),
         from: 'effectiveFrom' in rate ? rate.effectiveFrom : '',
       }),
       rate.pct,
@@ -134,7 +153,7 @@ export function bookExportSheets(
   const minerById = new Map(input.miners.map((m) => [m.id, m]));
   const minerIdOf = new Map(input.miners.flatMap((m) => m.characterIds.map((c) => [c, m.id])));
   /** A grouped Miner by its main character; a `solo:<id>` one by its only character. */
-  const minerName = (minerId: string | undefined): string | null => {
+  const minerName: MinerName = (minerId) => {
     if (!minerId) return null;
     const miner = minerById.get(minerId);
     if (miner) return names.character(miner.mainCharacterId);
@@ -299,10 +318,15 @@ export function bookExportSheets(
         ['finalStatementId', (m) => m.finalStatementId],
       ]
     ),
-    sheet(t, 'settings', settingsRows(input.settings, names, t), [
-      ['setting', ([label]) => label],
-      ['value', ([, value]) => value],
-    ]),
+    sheet(
+      t,
+      'settings',
+      settingsRows(input.settings, input.scheduledSync ?? null, names, minerName, t),
+      [
+        ['setting', ([label]) => label],
+        ['value', ([, value]) => value],
+      ]
+    ),
     sheet(
       t,
       'activity',
