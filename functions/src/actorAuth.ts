@@ -100,8 +100,10 @@ export function requireRolesScope(claims: EveTokenClaims): void {
 export interface LiveRolesOptions<Role extends string = string> {
   /** Refuse `wrong-corp` unless the Character is in this corporation now. */
   corporationId?: number;
-  /** The role the call needs. */
-  need: 'canView' | 'canEdit';
+  /** The reason for `wrong-corp` when the caller words it differently. */
+  wrongCorp?: Role;
+  /** The role the call needs: a flag of the decided roles, or a predicate over them. */
+  need: 'canView' | 'canEdit' | ((roles: OfficerRoles) => boolean);
   /** The refusal for a Character without the role. */
   denied: { message: string; reason: Role };
   /** Runs before any refusal, e.g. to revoke a cached grant the failed check supersedes. */
@@ -128,10 +130,15 @@ export async function requireLiveRoles<Role extends string>(
   }
   const identity = await deps.readIdentity(actor.characterId, actor.accessToken);
   if (options.corporationId !== undefined && identity.corporationId !== options.corporationId) {
-    return deny('permission-denied', 'Not a member of this corporation', DENY_REASON.wrongCorp);
+    return deny(
+      'permission-denied',
+      'Not a member of this corporation',
+      options.wrongCorp ?? DENY_REASON.wrongCorp
+    );
   }
   const roles = decideRoles(identity.roles, identity.ceoId === actor.characterId);
-  if (!roles[options.need]) {
+  const held = typeof options.need === 'function' ? options.need(roles) : roles[options.need];
+  if (!held) {
     return deny('permission-denied', options.denied.message, options.denied.reason);
   }
   return { identity, roles };
