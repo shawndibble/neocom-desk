@@ -5,9 +5,9 @@ import { TREND_PRESETS, trendPreset } from './trendPresets';
 
 const empty: OverviewLayout = { version: 1, widgets: [] };
 
-describe('Market Trend presets', () => {
-  it('offers PLEX, Large Skill Injector, Minerals and Ore, each within the series cap', () => {
-    expect(TREND_PRESETS.map((p) => p.id)).toEqual(['plex', 'injector', 'minerals', 'ore']);
+describe('Item prices presets', () => {
+  it('offers PLEX and the Large Skill Injector, each within the series cap', () => {
+    expect(TREND_PRESETS.map((p) => p.id)).toEqual(['plex', 'injector']);
     for (const p of TREND_PRESETS) {
       expect(p.items.length).toBeGreaterThan(0);
       expect(p.items.length).toBeLessThanOrEqual(TREND_MAX_SERIES);
@@ -17,9 +17,7 @@ describe('Market Trend presets', () => {
     expect(trendPreset('injector')?.items).toEqual([40520]);
   });
 
-  it('prices minerals and ore, three items each, at Jita; PLEX and the injector carry no hubs', () => {
-    expect(trendPreset('minerals')).toMatchObject({ items: [34, 35, 36], trendHubs: ['jita'] });
-    expect(trendPreset('ore')).toMatchObject({ items: [1230, 1228, 1224], trendHubs: ['jita'] });
+  it('carries no hubs: PLEX is one global market and the injector follows the pilot hub', () => {
     expect(trendPreset('plex')?.trendHubs).toBeUndefined();
     expect(trendPreset('injector')?.trendHubs).toBeUndefined();
   });

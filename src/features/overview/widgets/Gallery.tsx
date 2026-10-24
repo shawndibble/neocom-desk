@@ -77,13 +77,15 @@ function previewView(kind: WidgetKindDef, t: TFunction): WidgetView {
   return kind.views.includes('chart') && hasChart ? 'chart' : 'number';
 }
 
-function Preview({ kind }: { kind: WidgetKindDef }) {
+function Preview({ kind, sample }: { kind: WidgetKindDef; sample?: string }) {
   const { t } = useTranslation();
-  const view = useMemo(() => sampleView(kind.id, t), [kind.id, t]);
+  // A preset previews its own sample (a one-line chart), not its kind's.
+  const sampleKey = sample ?? kind.id;
+  const view = useMemo(() => sampleView(sampleKey, t), [sampleKey, t]);
   const widget = useMemo(() => {
-    const base = newWidget(kind.id, `preview-${kind.id}`);
-    return base ? { ...base, view: previewView(kind, t) } : null;
-  }, [kind, t]);
+    const base = newWidget(kind.id, `preview-${sampleKey}`);
+    return base ? { ...base, view: sample ? 'chart' : previewView(kind, t) } : null;
+  }, [kind, sample, sampleKey, t]);
   if (!view || !widget) return null;
   return (
     // Inert: a picture of the widget, not one. Nothing in it takes focus or a click.
@@ -216,15 +218,19 @@ const PRESET_KIND = 'marketTrend';
 
 /** A preset: adds the kind's widget with its items, title and view already set. Listed with its kind's card. */
 function PresetItem({
+  kind,
   preset,
   full,
   isPhone,
+  showPreview,
   justAdded,
   onAdd,
 }: {
+  kind: WidgetKindDef;
   preset: TrendPreset;
   full: boolean;
   isPhone: boolean;
+  showPreview: boolean;
   justAdded: boolean;
   onAdd: (preset: TrendPreset, title: string) => void;
 }) {
@@ -262,6 +268,12 @@ function PresetItem({
         {justAdded && <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
         {justAdded ? t('overview.gallery.added') : ''}
       </span>
+      {showPreview && (
+        <Preview
+          kind={kind}
+          sample={preset.id === 'plex' ? 'marketTrendPlex' : 'marketTrendInjector'}
+        />
+      )}
     </li>
   );
 }
@@ -369,9 +381,11 @@ function GalleryBody({
       ? presetsFor(kind).map((preset) => (
           <PresetItem
             key={`${kind.id}:${preset.id}`}
+            kind={kind}
             preset={preset}
             full={full}
             isPhone={isPhone}
+            showPreview={withPreview}
             justAdded={justAdded === `${kind.id}:${preset.id}`}
             onAdd={(p, title) =>
               add(
