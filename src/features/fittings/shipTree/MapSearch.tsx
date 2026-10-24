@@ -1,5 +1,5 @@
 /**
- * The map's search, over every faction's hulls: "/" focuses it, Enter
+ * The Ship Tree's search (map and ladder), over every faction's hulls: "/" focuses it, Enter
  * picks the first hit, Escape clears. Picking a hull is the caller's —
  * another faction's switches the tree to it.
  */
@@ -18,10 +18,13 @@ export function MapSearch({
   data,
   statuses,
   onPick,
+  className = 'w-full sm:w-72',
 }: {
   data: ShipTreeData;
   statuses: ReadonlyMap<number, ShipTreeHullStatus>;
   onPick: (ship: ShipTreeShip) => void;
+  /** Width of the box; the result list matches it. */
+  className?: string;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -50,7 +53,7 @@ export function MapSearch({
   }
 
   return (
-    <div className="relative w-full sm:w-72">
+    <div className={cx('relative', className)}>
       <SearchInput
         ref={inputRef}
         value={query}
@@ -74,7 +77,8 @@ export function MapSearch({
       {results.length > 0 && (
         <ul
           aria-label={t('ships.tree.searchResults')}
-          className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-xs border border-line-bright bg-panel py-1 shadow-lg shadow-black/50"
+          // At least 20rem (or the screen), so names stay readable beside a narrow box.
+          className="absolute z-20 mt-1 max-h-80 w-[max(100%,min(20rem,calc(100vw-2rem)))] overflow-y-auto rounded-xs border border-line-bright bg-panel py-1 shadow-lg shadow-black/50"
         >
           {results.map((s) => {
             const status = statuses.get(s.typeID);

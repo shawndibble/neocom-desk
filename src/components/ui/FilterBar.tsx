@@ -105,6 +105,13 @@ interface FilterBarProps<T> {
    * the draft: they act immediately and never move into the sheet.
    */
   actions?: ReactNode;
+  /**
+   * View controls after the funnel, so the funnel sits right beside the search
+   * box — for a row whose filters narrow the list and whose view controls
+   * only arrange it (the Ship Tree ladder's Expand all / Collapse all and
+   * Legend). Like `actions`, never part of the draft and never in the sheet.
+   */
+  trailing?: ReactNode;
   /** Wrapper class for the row. */
   className?: string;
   /**
@@ -172,6 +179,7 @@ export function FilterBar<T>({
   title,
   children,
   actions,
+  trailing,
   className = '',
   rowAlign = 'center',
   triggerSize,
@@ -187,6 +195,7 @@ export function FilterBar<T>({
         activeCount={activeCount}
         title={title}
         actions={actions}
+        trailing={trailing}
         className={className}
         rowAlign={rowAlign}
         triggerSize={triggerSize}
@@ -204,6 +213,7 @@ export function FilterBar<T>({
         activeCount={activeCount}
         title={title}
         actions={actions}
+        trailing={trailing}
         className={className}
         rowAlign={rowAlign}
         triggerSize={triggerSize}
@@ -222,6 +232,7 @@ export function FilterBar<T>({
       activeCount={activeCount}
       title={title}
       actions={actions}
+      trailing={trailing}
       className={className}
       rowAlign={rowAlign}
       triggerSize={triggerSize}
@@ -310,6 +321,7 @@ function CollapsibleFilterRow({
   activeCount,
   title,
   actions,
+  trailing,
   children,
   className = '',
   rowAlign = 'center',
@@ -320,6 +332,7 @@ function CollapsibleFilterRow({
   activeCount: number;
   title?: string;
   actions?: ReactNode;
+  trailing?: ReactNode;
   children: ReactNode;
   className?: string;
   rowAlign?: 'center' | 'end';
@@ -346,6 +359,7 @@ function CollapsibleFilterRow({
           showLabel={triggerLabel}
           onClick={() => setOpen((was) => !was)}
         />
+        {trailing}
       </div>
       {open && (
         <div
@@ -371,6 +385,7 @@ function FilterPopover({
   activeCount,
   title,
   actions,
+  trailing,
   children,
   className = '',
   rowAlign = 'center',
@@ -381,6 +396,7 @@ function FilterPopover({
   activeCount: number;
   title?: string;
   actions?: ReactNode;
+  trailing?: ReactNode;
   children: ReactNode;
   className?: string;
   rowAlign?: 'center' | 'end';
@@ -408,6 +424,7 @@ function FilterPopover({
           {children}
         </PopoverContent>
       </Popover>
+      {trailing}
     </div>
   );
 }
@@ -448,6 +465,7 @@ function FilterSheet<T>({
   activeCount = 0,
   title,
   actions,
+  trailing,
   children,
   className = '',
   rowAlign = 'center',
@@ -531,6 +549,7 @@ function FilterSheet<T>({
             setOpen(true);
           }}
         />
+        {trailing}
       </div>
       <Modal
         open={open}

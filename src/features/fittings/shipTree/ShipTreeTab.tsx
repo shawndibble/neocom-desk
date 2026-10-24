@@ -149,6 +149,17 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
     [view, filter, source.data, source.statuses]
   );
 
+  // Above a phone's map; under the ladder's toolbar, whose filters change its counts.
+  const factionBar = (
+    <FactionBar
+      data={source.data}
+      factionID={factionID}
+      statuses={source.statuses}
+      matches={factionMatches}
+      onFaction={onFaction}
+    />
+  );
+
   return (
     <>
       {source.masteriesStatus === 'unavailable' && (
@@ -159,15 +170,7 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
           </Button>
         </p>
       )}
-      {(view === 'ladder' || isPhone) && (
-        <FactionBar
-          data={source.data}
-          factionID={factionID}
-          statuses={source.statuses}
-          matches={factionMatches}
-          onFaction={onFaction}
-        />
-      )}
+      {view === 'map' && isPhone && factionBar}
       {view === 'map' ? (
         <ShipTreeMap
           source={source}
@@ -185,6 +188,7 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
           filter={filter}
           onFilter={setFilter}
           factionMatches={factionMatches}
+          factionBar={factionBar}
           onFaction={onFaction}
           onOpenShip={setSelected}
           viewSwitch={viewSwitch}

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { FilterBar, FilterField } from './FilterBar';
 import { FilterChip } from './FilterChip';
+import { IconButton } from './IconButton';
+import * as Icon from './icons';
 import { SearchInput } from './SearchInput';
 
 interface Filters {
@@ -54,3 +56,15 @@ export const PhoneSheet: Story = {
 
 /** @summary The funnel opens a popover anchored to it, for a panel title bar with no room beneath. */
 export const PopoverSurface: Story = { args: { pointerSurface: 'popover', triggerLabel: true } };
+
+/** @summary `trailing` view controls after the funnel, so the funnel sits beside the search box. */
+export const WithTrailing: Story = {
+  args: {
+    trailing: (
+      <>
+        <IconButton icon={<Icon.ExpandAll />} label="Expand all" />
+        <IconButton icon={<Icon.CollapseAll />} label="Collapse all" />
+      </>
+    ),
+  },
+};
