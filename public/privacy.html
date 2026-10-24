@@ -207,29 +207,31 @@
           <strong>SRP Claims:</strong> for each claim, the killmail, the claiming character's name
           and EVE character ID, the hull, solar system and loss value, the fleet or FC and note the
           pilot gave, the Reimbursement and the claim's state (Pending, Approved, Paid or Rejected).
-          Also the corporation's SRP settings, its Doctrine Fits and a log of what each officer did,
-          with the officer's name. The corporation's CEO, Directors and Accountants can read all of
-          it; a pilot can read only their own claims.
+          Also the corporation's SRP settings, its Doctrine Fits and its SRP log: each filing (with
+          the pilot's name, killmail, hull and amount) and each officer action (with the officer's
+          name). The corporation's CEO, Directors and Accountants can read all of it; a pilot can
+          read only their own claims.
         </li>
         <li>
           <strong>Corp Tax Book:</strong> what each character mined at the refineries the book
           covers (corp members, Guests who mined there from another corporation, and miners at a
           moon owner's refineries the book collects tax for), the Statements sent, the payments that
           settle them, write-offs and corrections, a log of which officer did each, and which books
-          bill each character. The CEO, Directors, Accountants and Junior Accountants can read the
-          whole book; a corp member can read only their own lines; a moon owner can read only its
-          own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's
-          verify link, sent by in-game mail, shows that Statement to whoever has the link, without
-          logging in.
+          bill each character (kept under that character's ID rather than the corporation's). The
+          CEO, Directors, Accountants and Junior Accountants can read the whole book; a corp member
+          can read only their own lines; a moon owner can read only its own mined volume, rate,
+          amount due and payouts, never what each miner owes. A Statement's verify link, sent by
+          in-game mail, shows that Statement to whoever has the link, without logging in.
         </li>
       </ul>
       <p>
         A Paid or Rejected SRP Claim is deleted automatically 365 days after it closes (the clean-up
-        runs daily). A Pending or Approved claim, the SRP settings and the officer log have no
-        expiry; Doctrine Fits stay until an officer deletes them. The Corp Tax Book has no expiry
-        either: its lines, Statements, payments, verify links and log stay until the officer who
-        turned the book on, or the corporation's CEO, deletes the book, which deletes everything in
-        it.
+        runs daily). A Pending or Approved claim, the SRP settings and the SRP log have no expiry,
+        so a deleted claim's filing stays in the log; Doctrine Fits stay until a Director or the CEO
+        deletes them. The Corp Tax Book has no expiry either: its lines, Statements, payments,
+        verify links and log stay until the officer who turned the book on, or the corporation's
+        CEO, deletes the book, which deletes everything in it. The record of which books bill a
+        character is kept apart and has no expiry.
       </p>
 
       <h2 id="share-links">Share Links</h2>
@@ -344,12 +346,12 @@
         <li>Share Links: 7 days.</li>
         <li>
           SRP Claims: a Paid or Rejected claim 365 days after it closes. Pending and Approved
-          claims, SRP settings and the officer log: no expiry. Doctrine Fits: until an officer
-          deletes them.
+          claims, SRP settings and the SRP log: no expiry. Doctrine Fits: until a Director or the
+          CEO deletes them.
         </li>
         <li>
           Corp Tax Book: no expiry, until the officer who turned it on or the corporation's CEO
-          deletes the book.
+          deletes the book. Which books bill a character: no expiry.
         </li>
         <li>
           Alerts when closed token: until you turn it off, remove the character, log out or delete

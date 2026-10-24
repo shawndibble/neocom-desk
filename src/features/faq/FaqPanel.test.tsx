@@ -11,9 +11,16 @@ import { SYNCED_SETTING_KEYS } from '@/sync/syncedSettings';
 import { FaqPanel } from './FaqPanel';
 import {
   COMMUNITY_COLLECTION_FAQ_ITEM,
+  CORP_COLLECTION_FAQ_ITEM,
   RETENTION_GROUPS,
   WHAT_WE_STORE_GROUPS,
 } from './whatWeStore';
+
+const functionsFile = (file: string) =>
+  readFileSync(resolve(process.cwd(), 'functions/src', file), 'utf8');
+/** The day count of a `NAME = <days> * 24 ...` constant in a functions file. */
+const daysIn = (source: string, name: string) =>
+  Number(new RegExp(`${name} = (\\d+) \\* 24`).exec(source)?.[1]);
 
 const QUESTIONS = 20;
 
@@ -141,7 +148,7 @@ describe('FaqPanel — What We Store', () => {
       'synced',
       'local',
       'communities',
-      'corp',
+      'corpRecords',
     ]);
   });
 
@@ -321,15 +328,12 @@ describe('FaqPanel: Communities', () => {
   });
 
   it('keeps the Community retention numbers equal to the code that enforces them', () => {
-    const functions = (file: string) =>
-      readFileSync(resolve(process.cwd(), 'functions/src', file), 'utf8');
-    const requests = functions('communityRequests.ts');
-    const days = (name: string) =>
-      Number(new RegExp(`${name} = (\\d+) \\* 24`).exec(requests)?.[1]);
+    const requests = functionsFile('communityRequests.ts');
+    const days = (name: string) => daysIn(requests, name);
     expect(days('REQUEST_LIFETIME_MS')).toBe(30);
     expect(days('CLOSED_RETENTION_MS')).toBe(7);
     expect(days('EXPIRED_RETENTION_MS')).toBe(7);
-    expect(functions('purgeStaleAccounts.ts')).toMatch(/ACCOUNT_INACTIVITY_DAYS = 90/);
+    expect(functionsFile('purgeStaleAccounts.ts')).toMatch(/ACCOUNT_INACTIVITY_DAYS = 90/);
     const server = RETENTION_GROUPS.find((group) => group.id === 'server');
     const text = (id: string) => {
       const item = server?.items.find((candidate) => candidate.id === id);
@@ -366,11 +370,32 @@ describe('FaqPanel: corporation records', () => {
     ).toBeInTheDocument();
   });
 
+  it('maps every collection the rules keep under corps/{id} to a line the pilot is told', () => {
+    const rules = readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8');
+    const corpBlocks = rules.slice(
+      rules.indexOf('match /corps/{corporationId} {'),
+      rules.indexOf('match /corpTaxBookTokens/')
+    );
+    const names = [...corpBlocks.matchAll(/match \/(\w+)\/\{\w+\}/g)]
+      .map((match) => match[1])
+      .filter((name) => name !== 'corps');
+    const officerOnly = /officerOnly in \[([^\]]+)\]/.exec(corpBlocks)?.[1] ?? '';
+    names.push(...[...officerOnly.matchAll(/'(\w+)'/g)].map((match) => match[1]));
+    expect(names).toEqual(expect.arrayContaining(['srpClaims', 'statements', 'audit']));
+    for (const name of names) {
+      expect(
+        CORP_COLLECTION_FAQ_ITEM,
+        `"${name}" is a corps collection in firestore.rules with no line in the FAQ`
+      ).toHaveProperty(name);
+    }
+    const group = WHAT_WE_STORE_GROUPS.find((g) => g.id === 'corpRecords');
+    expect(new Set(group?.items.map((item) => item.id))).toEqual(
+      new Set<string>(Object.values(CORP_COLLECTION_FAQ_ITEM))
+    );
+  });
+
   it('keeps the SRP retention equal to the sweep that enforces it', () => {
-    const retention = readFileSync(resolve(process.cwd(), 'functions/src/srpRetention.ts'), 'utf8');
-    expect(retention).toMatch(/SRP_RETENTION_MS = 365 \* 24 \* 60 \* 60 \* 1000/);
-    const ids = RETENTION_GROUPS.find((group) => group.id === 'server')?.items.map((i) => i.id);
-    expect(ids).toEqual(expect.arrayContaining(['srp', 'corpTaxBook']));
+    expect(daysIn(functionsFile('srpRetention.ts'), 'SRP_RETENTION_MS')).toBe(365);
     renderFaq();
     const shown = document.body.textContent ?? '';
     expect(shown).toMatch(/Paid or Rejected claim is deleted 365 days after it closes/);

@@ -22,9 +22,10 @@
  * against `firestore.rules`: a collection added there fails the test until it
  * is mapped to a line here.
  *
- * A corporation's own records are the fourth: SRP Claims (ADR 0026) and the
+ * Corporation records are a further group: SRP Claims (ADR 0026) and the
  * Corp Tax Book (ADR 0023) live under `corps/{id}`, belong to the corporation
- * rather than to one Character, and so outlive Delete all data.
+ * rather than to one Character, and so outlive Delete all data. Same typed-map
+ * guard ({@link CORP_COLLECTION_FAQ_ITEM}), checked against the `corps` rules.
  *
  * Deliberately honest about the four places where something EVE-derived, or
  * anything at all, does leave the device, because a section that overclaimed
@@ -97,6 +98,38 @@ export const COMMUNITY_COLLECTION_FAQ_ITEM = {
   mailInviteQuota: 'mail',
   requestMailQuota: 'mail',
 } as const satisfies Record<string, CommunityFaqItemId>;
+
+/** A line in the corporation records group. */
+export type CorpFaqItemId = 'srp' | 'corpTaxBook';
+
+/**
+ * Every collection under `corps/{id}` in `firestore.rules`, and the line that
+ * discloses it. Exhaustive on purpose, like the Community map.
+ */
+export const CORP_COLLECTION_FAQ_ITEM = {
+  officers: 'corpTaxBook',
+  observed: 'corpTaxBook',
+  payments: 'corpTaxBook',
+  statementLinks: 'corpTaxBook',
+  statements: 'corpTaxBook',
+  dismissals: 'corpTaxBook',
+  miners: 'corpTaxBook',
+  feeders: 'corpTaxBook',
+  feederViews: 'corpTaxBook',
+  adjustments: 'corpTaxBook',
+  writeOffs: 'corpTaxBook',
+  feederCoverage: 'corpTaxBook',
+  extractions: 'corpTaxBook',
+  declarations: 'corpTaxBook',
+  rebills: 'corpTaxBook',
+  meta: 'corpTaxBook',
+  audit: 'corpTaxBook',
+  srp: 'srp',
+  srpClaims: 'srp',
+  srpDoctrines: 'srp',
+  srpAudit: 'srp',
+  srpOfficers: 'srp',
+} as const satisfies Record<string, CorpFaqItemId>;
 
 /** The Community lines, as the panel lists them. */
 const COMMUNITY_ITEMS: readonly (WhatWeStoreItem & { id: CommunityFaqItemId })[] = [
@@ -189,13 +222,13 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
     items: COMMUNITY_ITEMS,
   },
   {
-    id: 'corp',
+    id: 'corpRecords',
     titleKey: 'settings.faq.store.corp.title',
     descriptionKey: 'settings.faq.store.corp.description',
-    items: [
-      { id: 'srp', labelKey: 'settings.faq.store.corp.srp' },
-      { id: 'corpTaxBook', labelKey: 'settings.faq.store.corp.corpTaxBook' },
-    ],
+    items: (['srp', 'corpTaxBook'] satisfies CorpFaqItemId[]).map((id) => ({
+      id,
+      labelKey: `settings.faq.store.corp.${id}`,
+    })),
   },
 ];
 
