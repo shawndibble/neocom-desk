@@ -13,7 +13,7 @@ const config: StorybookConfig = {
   // concerns of the app, not of a catalogue.
   viteFinal: (viteConfig) => {
     const appOnly =
-      /^(vite-plugin-pwa|neocom-spa-fallback|neocom-landing-shell|neocom-lazy-chunks|neocom-release-file|sentry-)/;
+      /^(vite-plugin-pwa|neocom-spa-fallback|neocom-landing-shell|neocom-lazy-chunks|neocom-shell-groups|neocom-release-file|sentry-)/;
     const strip = (plugins: unknown): unknown =>
       Array.isArray(plugins)
         ? plugins
