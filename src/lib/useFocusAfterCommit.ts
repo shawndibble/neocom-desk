@@ -47,10 +47,17 @@ export function firstConnected(candidates: readonly FocusCandidate[]): HTMLEleme
  * a dialog restored focus itself), or about a second passes. A second call
  * replaces the first. Never throws.
  *
+ * `{ preventScroll: true }` keeps the page where it is: focus still moves, but
+ * the browser does not scroll the target into view. Use it when the action
+ * runs mid-page and the user must not lose their place.
+ *
  * In a dialog flow request focus only after the dialog has closed. For targets
  * that appear after an async load, use `useRetryFocus` or `useFocusHeading`.
  */
-export function useFocusAfterCommit(): (...candidates: FocusCandidate[]) => void {
+export function useFocusAfterCommit(options?: {
+  preventScroll?: boolean;
+}): (...candidates: FocusCandidate[]) => void {
+  const preventScroll = options?.preventScroll ?? false;
   const [, setTick] = useState(0);
   const pending = useRef<readonly FocusCandidate[] | null>(null);
   const cancel = useRef<(() => void) | null>(null);
@@ -72,11 +79,12 @@ export function useFocusAfterCommit(): (...candidates: FocusCandidate[]) => void
       if (!el.hasAttribute('tabindex') && !el.matches('a[href],button,input,select,textarea')) {
         el.tabIndex = -1;
       }
-      el.focus();
+      if (preventScroll) el.focus({ preventScroll: true });
+      else el.focus();
     } catch {
       // Focus is best-effort; a throwing target must not break the handler.
     }
-  }, [drop]);
+  }, [drop, preventScroll]);
 
   // No dependency list: every commit of the host is another chance for a late candidate.
   useLayoutEffect(() => {
