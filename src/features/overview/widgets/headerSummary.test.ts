@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectDeadlines, fetchBreakdown, stalestFetch } from './headerSummary';
+import { anyStillLoading, collectDeadlines, fetchBreakdown, stalestFetch } from './headerSummary';
 
 const d = (at: number) => ({ at, note: 'n', severity: 'clear' as const, to: '/x' });
 
@@ -50,5 +50,34 @@ describe('fetchBreakdown', () => {
 
   it('is empty with nothing drawn', () => {
     expect(fetchBreakdown([])).toEqual([]);
+  });
+});
+
+describe('anyStillLoading', () => {
+  const status = (over: Partial<Parameters<typeof anyStillLoading>[0][number]['status']>) => ({
+    status: {
+      loading: false,
+      needsPermission: false,
+      error: false,
+      hasData: true,
+      isEmpty: false,
+      ...over,
+    },
+  });
+
+  it('is true while a view has nothing to show yet', () => {
+    expect(anyStillLoading([status({}), status({ loading: true, hasData: false })])).toBe(true);
+  });
+
+  it('is false once every view has data, failed or lacks permission', () => {
+    expect(
+      anyStillLoading([
+        status({}),
+        status({ loading: true }),
+        status({ error: true, hasData: false }),
+        status({ needsPermission: true, hasData: false }),
+      ])
+    ).toBe(false);
+    expect(anyStillLoading([])).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import i18n from '@/i18n';
@@ -14,6 +14,7 @@ import { WidgetGrid } from './WidgetGrid';
 import { Widget } from './Widget';
 import type { Widget as WidgetModel } from './layout';
 import type { KillsEntry } from './data/kindLoaders';
+import { heightKey, rememberedBodyHeight, resetRememberedHeights } from './skeletonHeight';
 
 vi.mock('./data/useWidgetView', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./data/useWidgetView')>();
@@ -64,6 +65,60 @@ function renderWidget(
   );
   return { onRemove, refresh };
 }
+
+describe('remembered skeleton height', () => {
+  const reported = 180;
+  beforeEach(() => {
+    localStorage.clear();
+    resetRememberedHeights();
+    // Reports a settled body height as soon as a node is observed.
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(private readonly callback: ResizeObserverCallback) {}
+        observe() {
+          this.callback(
+            [{ borderBoxSize: [{ blockSize: reported, inlineSize: 300 }] } as never],
+            this as never
+          );
+        }
+        disconnect() {}
+        unobserve() {}
+      }
+    );
+    return () => vi.unstubAllGlobals();
+  });
+
+  const key = () => heightKey(model(), useActiveCharacter.getState().activeCharacterId, false);
+
+  it('remembers a settled body for the next load', () => {
+    renderWidget(model(), (store) =>
+      store.set('mail', { data: mailData(7), error: false, loading: false })
+    );
+    expect(rememberedBodyHeight(key())).toBe(reported);
+  });
+
+  it('does not remember a failed read, a passing state rather than the widget height', () => {
+    renderWidget(model(), (store) =>
+      store.set('mail', { data: null, error: true, loading: false })
+    );
+    expect(rememberedBodyHeight(key())).toBeUndefined();
+  });
+
+  it('stands the skeleton at the remembered height', () => {
+    renderWidget(model(), (store) =>
+      store.set('mail', { data: mailData(7), error: false, loading: false })
+    );
+    cleanup();
+    renderWidget(model(), (store) =>
+      store.set('mail', { data: null, error: false, loading: true })
+    );
+    const region = screen.getByRole('region', { name: 'Mail' });
+    expect(within(region).getByText('Loading').parentElement).toHaveStyle({
+      minHeight: `${reported}px`,
+    });
+  });
+});
 
 describe('Widget states', () => {
   it('shows a busy skeleton with hidden text while the first read is in flight', () => {

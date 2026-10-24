@@ -48,4 +48,16 @@ describe('CharacterAvatar', () => {
     const selected = render(<CharacterAvatar characterId={CHARACTER_ID} selected />);
     expect(portrait(selected.container)).toHaveClass('border-accent');
   });
+
+  it('fetches a page-header portrait at high priority, never lazily', () => {
+    const { container } = render(
+      <CharacterAvatar characterId={CHARACTER_ID} size="lg" priority loading="lazy" />
+    );
+    const img = portrait(container);
+    expect(img).toHaveAttribute('fetchpriority', 'high');
+    expect(img).toHaveAttribute('loading', 'eager');
+
+    const plain = render(<CharacterAvatar characterId={CHARACTER_ID} />);
+    expect(portrait(plain.container)).not.toHaveAttribute('fetchpriority');
+  });
 });
