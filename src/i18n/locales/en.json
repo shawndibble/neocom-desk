@@ -11849,7 +11849,6 @@
         "minIskTiedUpOption": "{{amount}} ISK",
         "show": "Filters",
         "hide": "Hide filters",
-        "clearAll": "Clear all",
         "anyExpiry": "Any expiry",
         "anySize": "Any size",
         "sort": "Sort",

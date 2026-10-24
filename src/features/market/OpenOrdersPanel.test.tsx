@@ -937,15 +937,15 @@ describe('OpenOrdersPanel', () => {
       expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
     });
 
-    it('keeps the filter it applied removable, rather than silently narrowing', async () => {
-      const user = userEvent.setup();
+    it('says a filter is narrowing on the funnel, with no chip row beside it', async () => {
       renderMixedFixture('/market/orders?orders.problems=expiringOrStale');
       await findMatchCount('1 of 3 orders match');
 
-      // The chip row is the only thing telling the reader why they are seeing
-      // one order out of three, and the only way back to all of them.
-      await user.click(screen.getByRole('button', { name: /^Problem: Expiring or stale$/i }));
-      expect(await screen.findByRole('button', { name: 'Needs you (2)' })).toBeInTheDocument();
+      // The funnel's count is what tells the reader why they see one order of three.
+      expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /^Problem: Expiring or stale$/i })
+      ).not.toBeInTheDocument();
     });
 
     it('opens on the segment the link names, and says when it is empty', async () => {

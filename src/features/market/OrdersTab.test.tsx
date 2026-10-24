@@ -14,15 +14,18 @@ vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
 vi.mock('./OpenOrdersPanel', () => ({
   OpenOrdersPanel: ({
     corporation,
+    corporationNeedsGrant,
     onChooseCorporation,
     onLeaveCorporation,
   }: {
     corporation?: boolean;
+    corporationNeedsGrant?: boolean;
     onChooseCorporation?: () => void;
     onLeaveCorporation?: () => void;
   }) => (
     <>
       <p>{corporation ? 'corp orders' : 'character orders'}</p>
+      {corporationNeedsGrant && <p>corp grant asked</p>}
       {onChooseCorporation && <button onClick={onChooseCorporation}>Corporation</button>}
       {corporation && <button onClick={onLeaveCorporation}>This character</button>}
     </>
@@ -31,11 +34,13 @@ vi.mock('./OpenOrdersPanel', () => ({
 
 const SLOTS = {} as PageHeaderSlots;
 
-function access(state: string, canReadOrders: boolean) {
+const ORDERS_SCOPE = 'esi-markets.read_corporation_orders.v1';
+
+function access(state: string, canReadOrders: boolean, missingScopes: string[] = []) {
   vi.mocked(useCorpAccess).mockReturnValue({
     state,
     capabilities: { ...NO_CORP_CAPABILITIES, canReadOrders },
-    missingScopes: [],
+    missingScopes,
     roles: [],
     readFailed: false,
     retry: () => {},
@@ -81,6 +86,29 @@ describe('OrdersTab', () => {
     await userEvent.click(screen.getByRole('button', { name: 'This character' }));
     expect(screen.getByText('character orders')).toBeInTheDocument();
     expect(screen.getByTestId('search')).toHaveTextContent('');
+  });
+
+  it('offers Corporation to a role holder whose grant predates the orders scope, and asks for it', async () => {
+    // A Director (or Accountant/Trader) who granted corp access before corp
+    // orders shipped: the additive capability is off, the scope is missing.
+    access('ready', false, [ORDERS_SCOPE]);
+    renderTab('/market/orders');
+    await userEvent.click(screen.getByRole('button', { name: 'Corporation' }));
+    expect(await screen.findByText('corp orders')).toBeInTheDocument();
+    expect(screen.getByText('corp grant asked')).toBeInTheDocument();
+  });
+
+  it('does not offer Corporation when only some other corp scope is missing', () => {
+    access('ready', false, ['esi-corporations.read_divisions.v1']);
+    renderTab('/market/orders');
+    expect(screen.queryByRole('button', { name: 'Corporation' })).toBeNull();
+  });
+
+  it('asks for no grant when corp orders are readable', async () => {
+    access('ready', true);
+    renderTab('/market/orders?scope=corp');
+    expect(await screen.findByText('corp orders')).toBeInTheDocument();
+    expect(screen.queryByText('corp grant asked')).toBeNull();
   });
 
   it('opens straight on the corp view from ?scope=corp', async () => {
