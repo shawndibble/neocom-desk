@@ -275,7 +275,10 @@ export function MarkNotTaxDialog({
           at: payment.at.slice(0, 16).replace('T', ' '),
         })}
       </p>
-      <Label text={t('corpTaxBook.moons.dialogs.notTax.how')}>
+      <div className="space-y-1">
+        <span aria-hidden="true" className="block text-xs text-text-dim">
+          {t('corpTaxBook.moons.dialogs.notTax.how')}
+        </span>
         <SegmentedControl
           label={t('corpTaxBook.moons.dialogs.notTax.how')}
           value={mode}
@@ -283,13 +286,13 @@ export function MarkNotTaxDialog({
           options={[
             {
               value: 'all',
-              label: t('corpTaxBook.moons.dialogs.notTax.all', { amount: isk(payment.amount) }),
+              label: t('corpTaxBook.moons.dialogs.notTax.all'),
             },
             { value: 'part', label: t('corpTaxBook.moons.dialogs.notTax.part') },
           ]}
           uppercase={false}
         />
-      </Label>
+      </div>
       {mode === 'part' && (
         <Label text={t('corpTaxBook.moons.dialogs.notTax.amount')}>
           <IskInput

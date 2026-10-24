@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
-import { ProgressBar } from '@/components/ui';
+import { InfoTooltip, ProgressBar, textActionClassName } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { ExtractionRow, MinerStanding } from '@/engine/corpTaxBook/bookView';
 import type { ExtractionState } from '@/engine/corpTaxBook/extraction';
@@ -57,15 +57,41 @@ export function OverdueWord({ days }: { days: number | null }) {
   );
 }
 
-/** Ore make-up of a chunk, or D13's fallback. */
-export function OreLine({ row }: { row: Pick<ExtractionRow, 'oreLines'> }) {
+/** Ore make-up of a chunk, or D13's fallback. `onLink` adds the "Link a Survey…" action to the unknown case. */
+export function OreLine({
+  row,
+  onLink,
+}: {
+  row: Pick<ExtractionRow, 'oreLines'>;
+  onLink?: () => void;
+}) {
   const { t } = useTranslation();
   const { names } = useBook();
   if (row.oreLines.length === 0)
     return (
-      <span className="inline-flex items-center gap-1 text-warning">
-        <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-        {t('corpTaxBook.moons.oreUnknown')}
+      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="inline-flex items-center gap-1 text-warning">
+          <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+          {t('corpTaxBook.moons.oreUnknown')}
+          <InfoTooltip
+            label={t('corpTaxBook.moons.oreUnknownLabel')}
+            content={t('corpTaxBook.moons.oreUnknownWhy')}
+            glyph="info"
+          />
+        </span>
+        {onLink && (
+          <button
+            type="button"
+            className={textActionClassName()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onLink();
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            {t('corpTaxBook.moons.moon.link.open')}
+          </button>
+        )}
       </span>
     );
   const total = row.oreLines.reduce((s, l) => s + l.quantity, 0);

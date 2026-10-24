@@ -11,6 +11,7 @@ import {
   PageHeader,
   Panel,
   textActionClassName,
+  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import { extractionDetail, type ExtractionRow } from '@/engine/corpTaxBook/bookView';
@@ -127,9 +128,17 @@ export function MoonDetail({ id }: { id: string }) {
         meta={<StateWord state={row.state} />}
         actions={
           canEdit ? (
-            <Button size="sm" onClick={() => setDismissing(true)}>
-              {t('corpTaxBook.moons.moon.dismiss')}
-            </Button>
+            row.tax > 0 ? (
+              <Button size="sm" onClick={() => setDismissing(true)}>
+                {t('corpTaxBook.moons.moon.dismiss')}
+              </Button>
+            ) : (
+              <Tooltip content={t('corpTaxBook.moons.moon.dismissNone')}>
+                <Button size="sm" aria-disabled="true">
+                  {t('corpTaxBook.moons.moon.dismiss')}
+                </Button>
+              </Tooltip>
+            )
           ) : undefined
         }
       >

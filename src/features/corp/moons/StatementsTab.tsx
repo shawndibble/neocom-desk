@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { DataTable, Panel, type DataTableColumn } from '@/components/ui';
+import { DataTable, InfoTooltip, Panel, type DataTableColumn } from '@/components/ui';
 import { periodRows, type PeriodRow } from '@/engine/corpTaxBook/bookView';
 import { useBook } from './useBook';
 import { isk, periodLabel, shortDate } from './moonsFormat';
@@ -95,13 +95,28 @@ export function StatementsTab() {
           density="compact"
           stackColumns={2}
         />
-        <p className="border-t border-line px-3 py-2 text-xs text-text-dim">
-          {t('corpTaxBook.moons.periods.writeOffs', {
-            tolerance: isk(tolerance.reduce((s, w) => s + w.amount, 0)),
-            toleranceCount: tolerance.length,
-            lateCount: late.length,
-          })}
-        </p>
+        {(tolerance.length > 0 || late.length > 0) && (
+          <div className="flex items-start gap-2 border-t border-line px-3 py-2 text-xs text-text-dim">
+            <div className="space-y-0.5">
+              {tolerance.length > 0 && (
+                <p>
+                  {t('corpTaxBook.moons.periods.writeOffsTolerance', {
+                    tolerance: isk(tolerance.reduce((s, w) => s + w.amount, 0)),
+                    count: tolerance.length,
+                  })}
+                </p>
+              )}
+              {late.length > 0 && (
+                <p>{t('corpTaxBook.moons.periods.writeOffsLate', { count: late.length })}</p>
+              )}
+            </div>
+            <InfoTooltip
+              label={t('corpTaxBook.moons.periods.writeOffsLabel')}
+              content={t('corpTaxBook.moons.periods.writeOffsTip')}
+              glyph="info"
+            />
+          </div>
+        )}
       </Panel>
     </div>
   );

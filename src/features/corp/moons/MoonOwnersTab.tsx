@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { EmptyState } from '@/components/ui';
+import { Button, EmptyState } from '@/components/ui';
 import type { MoonOwnerRow } from '@/engine/corpTaxBook/moonOwners';
 import { useBook } from './useBook';
 import { moonOwnerPath } from './moonsPaths';
@@ -10,7 +10,7 @@ import { MoonOwnersTable } from './MoonOwnersTable';
 import { useMoonOwners } from './useMoonOwners';
 
 /** The Moon owners tab of `/corp/moons`: the book's moon owners, from the book's own data. */
-export function MoonOwnersTab() {
+export function MoonOwnersTab({ onInvite }: { onInvite?: () => void }) {
   const { t } = useTranslation();
   const { names, canEdit } = useBook();
   const [paying, setPaying] = useState<number | null>(null);
@@ -21,6 +21,15 @@ export function MoonOwnersTab() {
       <EmptyState
         title={t('corpTaxBook.moons.moonOwners.empty.title')}
         hint={t('corpTaxBook.moons.moonOwners.empty.hint')}
+        {...(canEdit && onInvite
+          ? {
+              action: (
+                <Button variant="ghost" onClick={onInvite}>
+                  {t('corpTaxBook.moons.moonOwners.invite')}
+                </Button>
+              ),
+            }
+          : {})}
       />
     );
   }

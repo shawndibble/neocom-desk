@@ -37,6 +37,7 @@ import { CorpDenied } from '@/features/corp/CorpDenied';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useCorpTaxBook } from '@/features/corp/taxBook/useCorpTaxBook';
 import { AuditFeed } from '@/features/corp/moons/AuditFeed';
+import { useAuditSubject } from '@/features/corp/moons/useAuditSubject';
 import { useBookAudit } from '@/features/corp/moons/useBookAudit';
 import { BookProvider } from '@/features/corp/moons/BookContext';
 import { useBook } from '@/features/corp/moons/useBook';
@@ -60,12 +61,13 @@ import { setMoonsTabsHidden } from '@/features/corp/moons/moonsTabsHidden';
 function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const audit = useBookAudit(200);
+  const subject = useAuditSubject();
   return (
     <SlideOver open={open} onClose={onClose} title={t('corpTaxBook.moons.activity.title')} wide>
       {audit.loading ? (
         <Spinner label={t('common.loading')} />
       ) : (
-        <AuditFeed entries={audit.entries} />
+        <AuditFeed entries={audit.entries} subject={subject} />
       )}
     </SlideOver>
   );
@@ -156,7 +158,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           {tab === 'extractions' && <ExtractionsTab />}
           {tab === 'miners' && <MinersTab />}
           {tab === 'statements' && <StatementsTab />}
-          {tab === 'moon-owners' && <MoonOwnersTab />}
+          {tab === 'moon-owners' && <MoonOwnersTab onInvite={() => setInviteOpen(true)} />}
         </>
       )}
       {detail?.kind === 'extraction' && <MoonDetail id={detail.id} />}

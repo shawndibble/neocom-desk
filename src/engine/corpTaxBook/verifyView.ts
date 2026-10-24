@@ -28,6 +28,8 @@ export interface VerifyPayload {
     startDate?: string;
     overdueDays?: number;
     minimumStatement?: number;
+    /** The book's Statement cadence; absent from older servers. */
+    cadence?: { kind: 'monthly' } | { kind: 'days'; days: number };
   };
   payments: { id: string; amount: number; at: string; source: 'donation' | 'manual' }[];
   settlement: {

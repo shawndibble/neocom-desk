@@ -125,13 +125,14 @@ beforeEach(() => {
 });
 
 describe('MinersTab', () => {
-  it('lists members by default and brings guests in with the Non-members filter', async () => {
+  it('lists members and non-members by default; turning Non-members off says what is hidden (CX-36)', async () => {
     renderBook(<MinersTab />);
     const table = screen.getByRole('table', { name: 'Miners' });
     expect(within(table).getByText('Pilot 1')).toBeInTheDocument();
-    expect(within(table).queryByText('Pilot 2')).not.toBeInTheDocument();
+    expect(within(table).getByText('Pilot 2')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Non-members/ }));
-    expect(await screen.findByText('Pilot 2')).toBeInTheDocument();
+    expect(within(table).queryByText('Pilot 2')).not.toBeInTheDocument();
+    expect(screen.getByText(/1 non-member hidden · .* owed/)).toBeInTheDocument();
   });
 });
 
