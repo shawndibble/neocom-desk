@@ -70,53 +70,81 @@ function assignment(
 describe('connectionWindow', () => {
   it('runs from the first scan’s UTC date until the ETA', () => {
     expect(
-      connectionWindow({
-        firstAt: Date.UTC(2026, 9, 20, 23, 30),
-        etaAt: NOON,
-        finished: false,
-        finishedAt: null,
-        lastAt: NOON - HOUR,
-        expiresAt: NOON + 24 * HOUR,
-      })
+      connectionWindow(
+        {
+          firstAt: Date.UTC(2026, 9, 20, 23, 30),
+          etaAt: NOON,
+          finished: false,
+          finishedAt: null,
+          lastAt: NOON - HOUR,
+          expiresAt: NOON + 24 * HOUR,
+        },
+        NOON
+      )
     ).toEqual({ fromDate: '2026-10-20', untilMs: NOON });
   });
 
   it('ends when the field was found empty', () => {
     expect(
-      connectionWindow({
-        firstAt: NOON - 3 * HOUR,
-        etaAt: null,
-        finished: true,
-        finishedAt: NOON,
-        lastAt: NOON,
-        expiresAt: NOON + 24 * HOUR,
-      }).untilMs
+      connectionWindow(
+        {
+          firstAt: NOON - 3 * HOUR,
+          etaAt: null,
+          finished: true,
+          finishedAt: NOON,
+          lastAt: NOON,
+          expiresAt: NOON + 24 * HOUR,
+        },
+        NOON
+      ).untilMs
     ).toBe(NOON);
   });
 
-  it('runs until the survey expires while there is no ETA yet', () => {
+  it('runs 12 hours from connecting while there is no ETA yet (one scan, no pace)', () => {
     expect(
-      connectionWindow({
-        firstAt: NOON,
-        etaAt: null,
-        finished: false,
-        finishedAt: null,
-        lastAt: NOON,
-        expiresAt: NOON + 24 * HOUR,
-      }).untilMs
-    ).toBe(NOON + 24 * HOUR);
+      connectionWindow(
+        {
+          firstAt: NOON,
+          etaAt: null,
+          finished: false,
+          finishedAt: null,
+          lastAt: NOON,
+          expiresAt: NOON + 48 * HOUR,
+        },
+        NOON + HOUR
+      ).untilMs
+    ).toBe(NOON + 13 * HOUR);
+  });
+
+  it('never runs a no-ETA window past the survey’s expiry', () => {
+    expect(
+      connectionWindow(
+        {
+          firstAt: NOON,
+          etaAt: null,
+          finished: false,
+          finishedAt: null,
+          lastAt: NOON,
+          expiresAt: NOON + 6 * HOUR,
+        },
+        NOON
+      ).untilMs
+    ).toBe(NOON + 6 * HOUR);
   });
 
   it('never runs past the survey’s expiry', () => {
     expect(
-      connectionWindow({
-        firstAt: NOON,
-        etaAt: NOON + 48 * HOUR,
-        finished: false,
-        finishedAt: null,
-        lastAt: NOON,
-        expiresAt: NOON + 24 * HOUR,
-      }).untilMs
+      connectionWindow(
+        {
+          firstAt: NOON,
+          etaAt: NOON + 48 * HOUR,
+          finished: false,
+          finishedAt: null,
+          lastAt: NOON,
+          expiresAt: NOON + 24 * HOUR,
+        },
+        NOON
+      ).untilMs
     ).toBe(NOON + 24 * HOUR);
   });
 });
