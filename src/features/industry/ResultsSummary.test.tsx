@@ -156,10 +156,12 @@ describe('ResultsSummary: the ledger', () => {
     expect(screen.queryByText(/break-even/i)).not.toBeInTheDocument();
   });
 
-  it('puts the cheaper-system line inside the job cost breakdown', async () => {
+  it('shows the cheaper-system note under the job cost whether or not the breakdown is open', () => {
     renderSummary({ cheaperNearby: 'Sarum Prime (2 jumps) is 4.10%: about 4 ISK less.' });
-    expect(screen.queryByText(/Sarum Prime/)).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /^total job cost/i }));
+    expect(screen.getByRole('button', { name: /^total job cost/i })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
     expect(screen.getByText(/Sarum Prime/)).toBeInTheDocument();
   });
 });

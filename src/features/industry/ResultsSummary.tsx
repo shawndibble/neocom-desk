@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Disclosure, EmptyState, InfoTooltip, Spinner, Tooltip } from '@/components/ui';
 import { focusRingClassName } from '@/components/ui/controlStyles';
+import * as Icon from '@/components/ui/icons';
 import type { BuildResult, IndustryActivity } from '@/engine/industry/types';
 import type { MaterialVolumeTotals } from '@/engine/industry/materialVolume';
 import type { LiquidationBasis, OwnedStockSale } from '@/engine/industry/ownedStockSale';
@@ -42,8 +43,8 @@ function CostRow({
     <div
       className={cx(
         'flex items-center justify-between gap-2 px-2.5 py-1.5 text-[0.6875rem]',
-        // Under the job cost's own label: padding, caret slot and its gap.
-        indented && 'pl-8'
+        // One step in from the job cost's own label (padding, caret slot, gap: pl-8).
+        indented && 'pl-12'
       )}
     >
       <span className="flex min-w-0 items-center gap-1.5 font-semibold tracking-widest text-text-dim uppercase">
@@ -301,8 +302,21 @@ export function ResultsSummary({
             value={formatIsk(result.jobFee.facilityTax)}
             indented
           />
-          {cheaperNearby && <div className="py-1.5 pr-2.5 pl-8 text-xs">{cheaperNearby}</div>}
         </Disclosure>
+        {/* Under the job cost it would lower, and shown whether or not the
+            breakdown is open: a saving folded away is one nobody finds. */}
+        {cheaperNearby && (
+          <div className="py-2 pr-2.5 pl-8">
+            <p className="flex items-start gap-2 rounded-xs bg-panel-2 px-2.5 py-2 text-xs">
+              <Icon.Tip
+                size={Icon.ICON_SIZE.sm}
+                aria-hidden="true"
+                className="mt-px shrink-0 text-accent"
+              />
+              <span>{cheaperNearby}</span>
+            </p>
+          </div>
+        )}
 
         {forgone !== null && (
           <CostRow

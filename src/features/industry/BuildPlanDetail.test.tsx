@@ -1776,6 +1776,26 @@ describe('BuildPlanDetail Break Even button', () => {
     expect(valueOf(runsInput())).toBe('250');
   });
 
+  it('follows the hero: offered when selling the owned stock beats building, though the build pays', async () => {
+    const user = userEvent.setup();
+    // Profitable with owned Tritanium counted free, a loss once it is
+    // charged at what it would sell for (a buy order at 1M a unit).
+    loadMarketSnapshot.mockResolvedValue({
+      hubPrices: { 34: 5, 587: 100_000_000 },
+      hubBuyPrices: { 34: 1_000_000, 587: 100_000_000 },
+      adjustedPrices: { 34: 4.5, 587: 100_000_000 },
+      systemCostIndex: 0.05,
+    });
+    breakEvenRuns.mockReturnValue(null);
+    render(<Harness plan={{ runs: 10, materialSourcing: { 34: { ownedQuantity: 1000 } } }} />);
+
+    await user.click(await breakEvenButton());
+
+    // The search probes profit on the sell-value basis: still a loss at 10 runs.
+    const profitAt = breakEvenRuns.mock.calls[0][0] as (runs: number) => number | null;
+    expect(profitAt(10)).toBeLessThan(0);
+  });
+
   it('is absent when the plan already makes a profit', async () => {
     const user = userEvent.setup();
     priceRifter(100_000_000); // clears the fixture's 150M blueprint cost over 10 runs

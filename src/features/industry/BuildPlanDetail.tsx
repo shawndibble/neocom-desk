@@ -732,13 +732,27 @@ export function BuildPlanDetail({
   const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices, bpcCoverage } =
     resolved;
 
-  /** Runs at which this plan's profit first reaches zero — buying a BPO is the case it exists for. */
+  /**
+   * Runs at which this plan's profit first reaches zero — buying a BPO is the
+   * case it exists for. On the hero's profit basis: on sell value, each trial's
+   * profit is net of what the owned stock that many runs would use could fetch,
+   * since a bigger job eats more of it.
+   */
   const applyBreakEvenRuns = () => {
-    const runs = breakEvenRuns(
-      (trial) => resolveAt({ ...plan, runs: trial }).result?.profit ?? null,
-      plan.runs
-    );
-    setNoBreakEvenAt(runs === null ? { plan, profit: result?.profit ?? null } : null);
+    const runs = breakEvenRuns((trial) => {
+      const trialResult = resolveAt({ ...plan, runs: trial }).result;
+      if (!trialResult || trialResult.profit === null) return null;
+      if (heroBasis !== 'sellValue' || !snapshot) return trialResult.profit;
+      const sale = ownedStockSale(
+        sellableMaterials(trialResult.materials),
+        saleBasis === 'instant' ? snapshot.hubBuyPrices : snapshot.hubPrices,
+        saleBasis,
+        modifiers.skills,
+        standing
+      );
+      return trialResult.profit - sale.net;
+    }, plan.runs);
+    setNoBreakEvenAt(runs === null ? { plan, profit: heroFigures?.profit ?? null } : null);
     if (runs !== null) update({ runs });
   };
 
@@ -1233,12 +1247,12 @@ export function BuildPlanDetail({
           <span className="tabular-nums">{formatDuration(planSeconds ?? result.seconds)}</span>
         </>
       )}
-      {pricesReady && result?.profit != null && result.profit < 0 && (
+      {pricesReady && heroFigures?.profit != null && heroFigures.profit < 0 && (
         <Button size="sm" onClick={applyBreakEvenRuns}>
           {t('industry.breakEvenRuns')}
         </Button>
       )}
-      {noBreakEvenAt?.plan === plan && noBreakEvenAt.profit === (result?.profit ?? null) && (
+      {noBreakEvenAt?.plan === plan && noBreakEvenAt.profit === (heroFigures?.profit ?? null) && (
         <span role="status" className="text-xs">
           {t('industry.breakEvenRunsNone')}
         </span>

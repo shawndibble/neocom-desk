@@ -3314,7 +3314,6 @@
       "line_one": "Uses {{count}} slot · done by {{time}}",
       "line_other": "Uses {{count}} slots · done by {{time}}",
       "show": "Show plan",
-      "hide": "Hide plan",
       "now": "Now",
       "stage": "{{time}}: {{jobs}}",
       "reaction_one": "{{count}} reaction",
