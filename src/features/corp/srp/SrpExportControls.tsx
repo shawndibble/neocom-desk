@@ -5,6 +5,7 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Field, Fields, Panel } from '@/components/ui';
+import { typeNameOr } from '@/lib/typeNameOr';
 import { downloadWorkbook, type WorkbookDownload } from '@/lib/downloadCsv';
 import { loadTypes } from '@/sde/loadSde';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
@@ -37,7 +38,7 @@ function useSrpExport(): () => Promise<WorkbookDownload> {
     const sheets = srpExportSheets(
       { settings, claims, audit, doctrines },
       {
-        type: (id) => types[id]?.name ?? t('srp.export.typeFallback', { id }),
+        type: (id) => typeNameOr(t, types[id]?.name, id),
         system: (id) => systems?.get(id)?.name ?? t('srp.officer.systemFallback', { id }),
         describe: (entry) => auditText(t, entry),
       },

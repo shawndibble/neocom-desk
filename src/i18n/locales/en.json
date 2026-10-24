@@ -16996,8 +16996,7 @@
         "pay-percent": "Pays the corporation's percent",
         "not-covered": "Not covered",
         "officer-decides": "An officer decides"
-      },
-      "typeFallback": "Type {{id}}"
+      }
     }
   }
 }
