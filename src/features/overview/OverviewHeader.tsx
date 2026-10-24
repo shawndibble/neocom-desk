@@ -10,6 +10,7 @@
  * footer and the command palette switch the active Character, and each
  * widget's own menu chooses its Character scope.
  */
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -23,6 +24,8 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatCountdown } from '@/lib/duration';
+import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { DataAgePopover } from './DataAgePopover';
 import { useOverviewRefresh } from './widgets/data/refreshContext';
 import { useOverviewEdit } from './widgets/editContext';
@@ -75,8 +78,21 @@ export function OverviewCachedNotice({ summary }: { summary: OverviewSummary }) 
  */
 export function OverviewNext({ summary }: { summary: OverviewSummary }) {
   const { t } = useTranslation();
-  const { next, remaining, tone } = summary;
-  if (!next) return null;
+  const { next, remaining, tone, pending } = summary;
+  const characterId = useActiveCharacter((state) => state.activeCharacterId);
+  const hasNext = next !== null;
+  const hadNextKey = `overview.hadNext.${characterId ?? 0}`;
+  // Once every read is in, remember whether this Character had a clock, for the next load.
+  useEffect(() => {
+    if (!pending) writeLocal(hadNextKey, hasNext ? '1' : '0');
+  }, [pending, hasNext, hadNextKey]);
+  if (!next) {
+    // On a phone the button is a line of its own: hold it open while the reads that may
+    // offer a clock are still out, unless last time there was none, so the board does not drop.
+    return pending && readLocal(hadNextKey) !== '0' ? (
+      <div aria-hidden="true" className="order-last h-11 basis-full md:hidden" />
+    ) : null;
+  }
   const content = (
     <>
       <span className="text-text-dim">{t('overview.header.next')}</span>
@@ -115,7 +131,9 @@ export function OverviewCustomize() {
   const { editing, startEditing } = useOverviewEdit();
   if (editing) return null;
   return (
-    <Button className="w-11 px-0 md:w-auto md:px-4" onClick={startEditing}>
+    // `shrink-0`: its min-content is the 16px icon, so a crowded header row could squeeze it
+    // under the 24px target floor (WCAG 2.5.8).
+    <Button className="w-11 shrink-0 px-0 md:w-auto md:px-4" onClick={startEditing}>
       <Icon.EditBoard size={Icon.ICON_SIZE.md} aria-hidden="true" />
       <span className="sr-only md:not-sr-only">{t('overview.header.customize')}</span>
     </Button>

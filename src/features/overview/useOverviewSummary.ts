@@ -3,7 +3,12 @@ import { useTicker } from '@/lib/ticker';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { OVERVIEW_TICK_MS } from './widgets/data/tick';
 import { useKindViews, viewKey } from './widgets/data/useWidgetView';
-import { collectDeadlines, fetchBreakdown, stalestFetch } from './widgets/headerSummary';
+import {
+  anyStillLoading,
+  collectDeadlines,
+  fetchBreakdown,
+  stalestFetch,
+} from './widgets/headerSummary';
 import type { Widget } from './widgets/layout';
 import { chipTone, nextDeadline } from './widgets/nextDeadline';
 import { useWidgetBoard } from './widgets/board';
@@ -42,6 +47,8 @@ export function useOverviewSummary(widgets: readonly Widget[]) {
   return {
     next,
     remaining,
+    /** A clock may still arrive: some drawn kind has not been read yet. */
+    pending: views.size < requests.length || anyStillLoading(all),
     tone: chipTone(remaining),
     fetchedAt: stalest.date,
     fromCache: stalest.fromCache,

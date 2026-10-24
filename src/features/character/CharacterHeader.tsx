@@ -87,6 +87,7 @@ export function CharacterHeader({
       <CharacterAvatar
         characterId={characterId}
         size="lg"
+        priority
         alt={t('characters.portraitAlt', { name: character?.name ?? '' })}
       />
       {/*
