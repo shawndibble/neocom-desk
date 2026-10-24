@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, Panel, TextInput } from '@/components/ui';
+import { Button, EmptyState, InfoTooltip, Panel, TextInput } from '@/components/ui';
 import { callableErrorText } from './feederErrorText';
 import { InviteLinkField } from './InviteLinkField';
 import { turnOnBook, type OfficerVerdict } from '../taxBook/bookClient';
@@ -19,6 +19,8 @@ export function TurnOnBook({
   onDone,
   collect = false,
   earliestStart,
+  onBack,
+  onTurnedOn,
 }: {
   characterId: number;
   corporationId: number;
@@ -26,13 +28,18 @@ export function TurnOnBook({
   onDone: () => void;
   collect?: boolean;
   earliestStart?: string;
+  /** Back to the three-way choice. */
+  onBack?: () => void;
+  /** The book now exists (not for a collecting book): the page runs the first sync. */
+  onTurnedOn?: () => void;
 }) {
   const { t } = useTranslation();
   const today = new Date().toISOString().slice(0, 10);
   const leaveDay = earliestStart ?? null;
-  // Untouched, it is the leave day once known (also the earliest pick), else today.
+  // Untouched, it is the first day of this month in EVE time, never before the leave day.
+  const monthStart = `${today.slice(0, 8)}01`;
   const [picked, setStartDate] = useState<string | null>(null);
-  const startDate = picked ?? leaveDay ?? today;
+  const startDate = picked ?? (leaveDay !== null && leaveDay > monthStart ? leaveDay : monthStart);
   const [rate, setRate] = useState('10');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +68,7 @@ export function TurnOnBook({
       if (!booked.current) {
         await turnOnBook(characterId, corporationId, startDate, pct);
         booked.current = true;
+        if (!collect) onTurnedOn?.();
       }
       if (collect) {
         const { code } = await createFeederInvite(characterId, corporationId);
@@ -91,21 +99,27 @@ export function TurnOnBook({
       <div className="space-y-3">
         <h2 className="text-base font-semibold">{t('corpTaxBook.moons.off.title')}</h2>
         <p className="text-text-dim">{t('corpTaxBook.moons.off.intro')}</p>
-        <label className="block space-y-1">
-          <span className="text-xs text-text-dim">{t('corpTaxBook.moons.settings.startDate')}</span>
+        <div className="space-y-1">
+          <span className="flex items-center gap-1.5 text-xs text-text-dim">
+            <label htmlFor="turn-on-start">{t('corpTaxBook.moons.settings.startDate')}</label>
+            <InfoTooltip
+              label={t('common.aboutLabel', { label: t('corpTaxBook.moons.settings.startDate') })}
+              content={t('corpTaxBook.moons.off.startHint')}
+            />
+          </span>
           <TextInput
+            id="turn-on-start"
             type="date"
             max={today}
             {...(leaveDay !== null ? { min: leaveDay } : {})}
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
           />
-        </label>
+        </div>
         <label className="block space-y-1">
           <span className="text-xs text-text-dim">{t('corpTaxBook.moons.off.rate')}</span>
           <TextInput inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} />
         </label>
-        <p className="text-xs text-text-dim">{t('corpTaxBook.moons.off.hint')}</p>
         <p className="text-xs text-text-dim">
           {t(
             collect
@@ -118,9 +132,16 @@ export function TurnOnBook({
             {error}
           </p>
         )}
-        <Button variant="primary" onClick={() => void submit()} disabled={!valid || busy}>
-          {t('corpTaxBook.moons.off.confirm')}
-        </Button>
+        <div className="flex gap-2">
+          {onBack && (
+            <Button variant="ghost" onClick={onBack} disabled={busy}>
+              {t('corpTaxBook.moons.setup.back')}
+            </Button>
+          )}
+          <Button variant="primary" onClick={() => void submit()} disabled={!valid || busy}>
+            {t('corpTaxBook.moons.off.confirm')}
+          </Button>
+        </div>
       </div>
     </Panel>
   );

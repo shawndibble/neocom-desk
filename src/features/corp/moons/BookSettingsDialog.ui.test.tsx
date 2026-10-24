@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -43,9 +43,8 @@ describe('BookSettingsDialog per-refinery rate (#4621)', () => {
     const options = screen.getAllByRole('option').map((o) => o.textContent);
     expect(options).toEqual(['Efa - Ashfall Tatara', 'Efa - Ashfall Athanor']);
     await user.click(screen.getByRole('option', { name: 'Efa - Ashfall Athanor' }));
-    const rates = screen.getByRole('button', { name: 'Add rate' }).closest('div.grid')!;
-    await user.type(within(rates as HTMLElement).getByLabelText('Rate (%)'), '4');
-    await user.click(screen.getByRole('button', { name: 'Add rate' }));
+    await user.type(screen.getByLabelText('Rate (%)'), '4');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(editBook).toHaveBeenCalledWith(7, 98000000, {
       action: 'addRate',
       rate: expect.objectContaining({ scope: 'structure', structureId: REFINERY_B, pct: 4 }),
@@ -68,9 +67,8 @@ describe('BookSettingsDialog per-moon-owner rate', () => {
     await user.click(screen.getByRole('combobox', { name: 'Moon owner' }));
     expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([`Corp ${OWNER}`]);
     await user.click(screen.getByRole('option', { name: `Corp ${OWNER}` }));
-    const rates = screen.getByRole('button', { name: 'Add rate' }).closest('div.grid')!;
-    await user.type(within(rates as HTMLElement).getByLabelText('Rate (%)'), '9');
-    await user.click(screen.getByRole('button', { name: 'Add rate' }));
+    await user.type(screen.getByLabelText('Rate (%)'), '9');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(editBook).toHaveBeenCalledWith(7, 98000000, {
       action: 'addRate',
       rate: expect.objectContaining({ scope: 'feeder', feederId: OWNER, pct: 9 }),
@@ -86,7 +84,7 @@ describe('BookSettingsDialog tabs', () => {
     expect(screen.queryByText('Trade hub')).not.toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'Billing' }));
     expect(screen.getByText('Trade hub')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Add rate' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Rate (%)')).not.toBeInTheDocument();
   });
 
   it('keeps an edit made on one tab when another tab is opened', async () => {
@@ -99,6 +97,51 @@ describe('BookSettingsDialog tabs', () => {
     await user.click(screen.getByRole('tab', { name: 'Extractions' }));
     await user.click(screen.getByRole('tab', { name: 'Billing' }));
     expect(screen.getByRole('textbox', { name: 'Grace after day end (hours)' })).toHaveValue('12');
+  });
+
+  it('has one save model: Save commits a filled rate and the settings, then reports it', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    render(
+      <MemoryRouter>
+        <BookProvider value={bookSettingsValue()}>
+          <BookSettingsDialog open onClose={() => {}} onSaved={onSaved} />
+        </BookProvider>
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole('button', { name: 'Add rate' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/with the reason/)).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('Rate (%)'), '12');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(editBook.mock.calls.map((c) => (c[2] as { action: string }).action)).toEqual([
+      'addRate',
+      'updateSettings',
+    ]);
+    expect(onSaved).toHaveBeenCalled();
+  });
+
+  it('moves the start date through Save, and names wallet divisions or falls back to numbers', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <BookProvider value={bookSettingsValue({ isDirector: true })}>
+          <BookSettingsDialog open onClose={() => {}} />
+        </BookProvider>
+      </MemoryRouter>
+    );
+    await user.click(screen.getByRole('tab', { name: 'Billing' }));
+    expect(screen.getByRole('checkbox', { name: 'Division 1' })).toBeInTheDocument();
+    const start = screen.getByLabelText('Start date (EVE time)');
+    fireEvent.change(start, { target: { value: '2026-09-20' } });
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(editBook).toHaveBeenCalledWith(
+      7,
+      98000000,
+      expect.objectContaining({
+        action: 'updateSettings',
+        patch: expect.objectContaining({ startDate: '2026-09-20' }),
+      })
+    );
   });
 
   it('opens on Access and sync when it reopens after the EVE opt-in', () => {

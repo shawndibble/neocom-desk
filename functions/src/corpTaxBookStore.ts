@@ -47,6 +47,7 @@ import {
   isCacheFresh,
   parseRecordKey,
   parseStatement,
+  startDateMoveReason,
   satisfies,
   utcDate,
   type BookCall,
@@ -795,8 +796,36 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           reason: 'director-approval',
         });
       }
-      const { structureExpiryHours, dismissApprovalAboveIsk, ...rest } = action.patch;
+      const { structureExpiryHours, dismissApprovalAboveIsk, showToMembers, startDate, ...rest } =
+        action.patch;
+      if ((startDate !== undefined || showToMembers) && !c.access.isDirector) {
+        throw new HttpsError('permission-denied', 'Only a Director sets this', {
+          reason: 'director-only',
+        });
+      }
       const update: Data = { ...rest };
+      if (showToMembers) update.membersSeeFrom = now;
+      const oldStart = c.book.startDate as string | undefined;
+      if (startDate !== undefined && startDate !== oldStart) {
+        const statements = await tx.get(col(c, STATEMENTS));
+        const reason = startDateMoveReason(
+          oldStart ?? startDate,
+          startDate,
+          utcDate(now),
+          await ownBookFloor((r) => tx.get(r), c.deps.db, c.corporationId),
+          statements.docs.map((d) => d.data() as never)
+        );
+        if (reason) fail('failed-precondition', 'The start date cannot move there', reason);
+        update.startDate = startDate;
+        // The start-date rate is dated at the start itself: it moves with it.
+        if (oldStart && startDate < oldStart) {
+          update.rates = rates.map((r) =>
+            r.scope === 'corp' && r.effectiveFrom === oldStart
+              ? { ...r, effectiveFrom: startDate }
+              : r
+          );
+        }
+      }
       if (structureExpiryHours) {
         update.structureExpiryHours = {
           ...(c.book.structureExpiryHours as Data | undefined),

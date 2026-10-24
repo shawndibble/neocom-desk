@@ -15315,7 +15315,7 @@
         "neverDetail": "Sync the book to pull the refinery ledger, extractions and donations.",
         "synced": "Last synced {{age}} by {{name}}",
         "stale": "Last synced {{age}} by {{name}} — the book is going stale",
-        "billableThrough": "Billable through {{date}} (day end + {{hours}}h grace, then a sync). The book warns here once nobody has synced for about 3 days.",
+        "billableThrough": "Billable through {{date}}",
         "noBillable": "No day is Billable until an officer syncs.",
         "failed": "The sync failed: {{message}}",
         "autoGroupFailed": "The sync worked, but grouping this account's Characters failed: {{message}}",
@@ -15330,7 +15330,12 @@
           "esi-unavailable": "EVE's servers did not answer, so nothing was synced."
         },
         "noRefineries": "This corporation has no refineries the book can read",
-        "noRefineriesDetail": "The book needs a corporation that owns refineries, read by an Accountant or Director of it. Donations still sync, but no mining is recorded until one is readable."
+        "noRefineriesDetail": "The book needs a corporation that owns refineries, read by an Accountant or Director of it. Donations still sync, but no mining is recorded until one is readable.",
+        "billableLabel": "Billable through",
+        "billableHint": "Day end + {{hours}}h grace, then a sync. The book warns here once nobody has synced for about 3 days.",
+        "hiddenLabel": "hidden from members",
+        "hiddenHint": "A new book stays out of members' Mining Tax pages for 3 days, so officers can set it up first.",
+        "showToMembers": "Show to members now"
       },
       "run": {
         "title": "{{period}} Statements",
@@ -15388,8 +15393,8 @@
         "needsRefineries": "The book is fed by the corporation's refineries, so it only works for a corporation that owns some and lets an Accountant or Director read them.",
         "notDirector": "A Director has to turn the book on. Ask one to open this page.",
         "rate": "Corp default tax rate (%)",
-        "hint": "Mining before the start date is kept as history and owes nothing. You can change the rate later; a new rate never reaches back over days already mined.",
-        "confirm": "Turn the book on"
+        "confirm": "Turn the book on",
+        "startHint": "EVE time (UTC). Mining before this day is kept as history and owes nothing. Once Statements cover days, the start can't move over them."
       },
       "setup": {
         "back": "Back",
@@ -15397,9 +15402,9 @@
         "granted": "Connected through {{name}}.",
         "left": "You have left. Nothing already collected was deleted. You can turn on your own book or pick another option.",
         "own": {
-          "title": "Run our own book",
-          "hint": "Track the moon mining tax for our own refineries in this app.",
-          "action": "Turn on our own book"
+          "title": "Run your corporation's book",
+          "hint": "Track the moon mining tax for your corporation's refineries in this app.",
+          "action": "Turn on your corporation's book"
         },
         "handled": {
           "title": "Let an accounting corporation handle it",
@@ -15443,7 +15448,10 @@
           "start-before-leave": "The book can start no earlier than the day the accounting corporation stopped handling your moons.",
           "survey-not-found": "That Survey could not be opened. Check the link, and that it has not expired.",
           "unknown-refinery": "That refinery has no mining for this corporation yet.",
-          "role-required": "Your Character does not hold the corporation role this needs."
+          "role-required": "Your Character does not hold the corporation role this needs.",
+          "start-over-billed": "A Statement already covers days before that date.",
+          "start-in-future": "The start date can't be in the future.",
+          "director-only": "Only a Director can do that."
         }
       },
       "consent": {
@@ -15663,7 +15671,6 @@
         "moon": "Moon",
         "pct": "Rate (%)",
         "effectiveFrom": "Effective from",
-        "addRate": "Add rate",
         "pricing": "Pricing",
         "hub": "Trade hub",
         "oreForm": "Ore Form",
@@ -15672,7 +15679,7 @@
           "raw": "Raw"
         },
         "billing": "Billing",
-        "startDate": "Start date",
+        "startDate": "Start date (EVE time)",
         "grace": "Grace after day end (hours)",
         "overdue": "Overdue after (days)",
         "minimum": "Minimum Statement",
@@ -15686,9 +15693,9 @@
         "division": "Division {{n}}",
         "extractions": "Extractions",
         "chunk": "Chunk rate (m³ per hour)",
-        "measured_one": "{{name}}: measured {{rate}} m³/h from {{count}} extraction",
-        "measured_other": "{{name}}: measured {{rate}} m³/h from {{count}} extractions",
-        "notMeasured": "{{name}}: not measured yet, uses {{rate}} m³/h",
+        "measured_one": "Chunk rate: measured {{rate}} m³/h from {{count}} extraction",
+        "measured_other": "Chunk rate: measured {{rate}} m³/h from {{count}} extractions",
+        "notMeasured": "Chunk rate: not measured yet, the {{rate}} m³/h fallback applies",
         "chunkHint": "Fallback for a refinery with no measured rate. Each refinery's own rate is learned from its Extraction notifications.",
         "expiry": "Field lasts after fracture, {{name}} (hours)",
         "approvals": "Approvals",
@@ -15709,11 +15716,12 @@
         },
         "delete": {
           "title": "Delete the book",
-          "hint": "Removes the book for good and starts the corporation over. Turning it on again leaves members' Mining Tax pages untouched for 3 days, so you can set it up first.",
+          "hint": "Erases the book for good so the corporation can start over.",
           "open": "Delete the book…",
           "confirmTitle": "Delete the book?",
           "body": "Every mining entry, payment, Statement and the activity log is erased, the automatic sync stops, and Statement verify links stop working. Members' Mining Tax pages stop showing this corporation's book. This can't be undone.",
-          "confirm": "Delete the book"
+          "confirm": "Delete the book",
+          "typeTicker": "Type {{ticker}} to confirm"
         },
         "tabs": {
           "rates": "Rates",
@@ -15723,9 +15731,11 @@
         },
         "scheduled": "Scheduled",
         "addRateTitle": "Add a rate",
-        "ratesLive": "A rate saves as soon as you add it. The other tabs save with Save.",
         "statements": "Statements",
-        "sections": "Settings sections"
+        "sections": "Settings sections",
+        "startHint": "Mining before this day owes nothing. Earlier is always allowed; later only while no Statement covers the days in between.",
+        "saved": "Settings saved",
+        "divisionNamed": "Division {{n}}, {{name}}"
       },
       "grouping": {
         "title": "Characters",
@@ -16036,6 +16046,11 @@
           "change": "Owed to them {{before}} → {{after}}. The wallet journal confirms it later and never counts it twice.",
           "afterCredit": "credit of {{amount}}"
         }
+      },
+      "failedHint": "Try again in a moment.",
+      "unverified": {
+        "title": "Couldn't verify your corp role",
+        "hint": "Try again or log in again."
       }
     }
   },

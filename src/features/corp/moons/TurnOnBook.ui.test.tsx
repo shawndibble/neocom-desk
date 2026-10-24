@@ -63,3 +63,30 @@ describe('TurnOnBook collecting for others', () => {
     configureClipboard(null);
   });
 });
+
+describe('TurnOnBook own book', () => {
+  it('labels the start date as EVE time, defaults to the first of this UTC month, and goes Back', async () => {
+    const onBack = vi.fn();
+    const onTurnedOn = vi.fn();
+    const onDone = vi.fn();
+    render(
+      <TurnOnBook
+        characterId={7}
+        corporationId={98}
+        verdict={verdict}
+        onDone={onDone}
+        onBack={onBack}
+        onTurnedOn={onTurnedOn}
+      />
+    );
+    const user = userEvent.setup();
+    const month = `${new Date().toISOString().slice(0, 8)}01`;
+    expect(screen.getByLabelText('Start date (EVE time)')).toHaveValue(month);
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    expect(onBack).toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Turn the book on' }));
+    expect(turnOnBook).toHaveBeenCalledWith(7, 98, month, 10);
+    expect(onTurnedOn).toHaveBeenCalledTimes(1);
+    expect(onDone).toHaveBeenCalled();
+  });
+});

@@ -27,7 +27,9 @@ const rates: TaxRate[] = [
 /** A moon owner that left: no rate can be set for it any more. */
 export const LEFT_OWNER = 98000003;
 
-export function bookSettingsValue(): Omit<BookContextValue, 'edit' | 'canEdit'> {
+export function bookSettingsValue(
+  roles: Partial<OfficerVerdict> = {}
+): Omit<BookContextValue, 'edit' | 'canEdit'> {
   const input: BookViewInput = {
     corporationId: BOOK,
     now: '2026-10-20T12:00:00Z',
@@ -66,6 +68,7 @@ export function bookSettingsValue(): Omit<BookContextValue, 'edit' | 'canEdit'> 
     canView: true,
     canEdit: true,
     bookActive: true,
+    ...roles,
   } as OfficerVerdict;
   const settings = {
     corporationId: BOOK,
