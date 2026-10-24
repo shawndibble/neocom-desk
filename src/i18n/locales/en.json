@@ -10652,8 +10652,10 @@
         "windowIn": "in {{duration}}",
         "title_one": "Raidable skyhook {{count}} jump away",
         "title_other": "Raidable skyhook {{count}} jumps away",
-        "body_one": "{{planet}} in {{system}} can be raided {{window}}, {{count}} jump from your current system.",
-        "body_other": "{{planet}} in {{system}} can be raided {{window}}, {{count}} jumps from your current system."
+        "whereNamed": "{{planet}} in {{system}}",
+        "whereUnnamed": "A skyhook in {{system}}",
+        "body_one": "{{where}} can be raided {{window}}, {{count}} jump from your current system.",
+        "body_other": "{{where}} can be raided {{window}}, {{count}} jumps from your current system."
       },
       "communityJoinRequest": {
         "title": "Join request for {{community}}",
