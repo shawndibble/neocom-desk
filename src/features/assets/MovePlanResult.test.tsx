@@ -409,7 +409,6 @@ describe('PlanResult', () => {
             haulerOverride={undefined}
             onPickHauler={vi.fn()}
             onBack={vi.fn()}
-            onDone={vi.fn()}
             onPackShip={vi.fn()}
             onUnpackShip={vi.fn()}
             rigsOf={() => 0}
