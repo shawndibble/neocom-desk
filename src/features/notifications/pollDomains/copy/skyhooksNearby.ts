@@ -16,7 +16,8 @@ function whereLabel(names: SkyhookNames, systemId: number): string {
   if (names.planet === undefined) {
     return fired('skyhookRaidableNearby', 'whereUnnamed', { system });
   }
-  if (names.system !== undefined && names.planet.startsWith(names.system)) return names.planet;
+  if (names.system !== undefined && names.planet.startsWith(`${names.system} `))
+    return names.planet;
   return fired('skyhookRaidableNearby', 'whereNamed', { planet: names.planet, system });
 }
 

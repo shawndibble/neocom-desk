@@ -118,6 +118,10 @@ describe('skyhookRaidableNearby copy', () => {
     expect(body({ planet: 'Moon', system: 'Efa' })).toMatch(/^Moon in Efa can be raided/);
   });
 
+  it('treats a planet that merely shares the system name as a prefix as a different name', () => {
+    expect(body({ planet: 'Efant I', system: 'Efa' })).toMatch(/^Efant I in Efa can be raided/);
+  });
+
   it('falls back to a generic skyhook, not a planet id', () => {
     expect(body({ system: 'U-HYZN' })).toMatch(/^A skyhook in U-HYZN can be raided/);
   });
