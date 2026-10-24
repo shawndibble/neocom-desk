@@ -239,7 +239,9 @@ function deferredEntryHtml() {
           typeof page.source === 'string' ? page.source : new TextDecoder().decode(page.source)
         );
         const problem = importMapProblem(html);
-        if (problem) throw new Error(`deferredEntryHtml: ${problem}`);
+        // TEMP(measure): the map-off count build has no map.
+        if (problem && process.env.NEOCOM_CHUNK_IMPORT_MAP !== '0')
+          throw new Error(`deferredEntryHtml: ${problem}`);
         page.source = html;
       },
     },
@@ -337,7 +339,8 @@ export default defineConfig({
     // of unchanged chunks (docs/context/decisions/*-chunks-import-each-other-
     // through-an-import-map*). Module workers get no import map; Vite builds
     // them with `worker.rolldownOptions`, which leaves this off.
-    chunkImportMap: true,
+    // TEMP(measure): NEOCOM_CHUNK_IMPORT_MAP=0 turns it off for the CI count.
+    chunkImportMap: process.env.NEOCOM_CHUNK_IMPORT_MAP !== '0',
     rolldownOptions: {
       output: {
         // Routes are already split per page (`src/app/routeChunks.ts`); what
