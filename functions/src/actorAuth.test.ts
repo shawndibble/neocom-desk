@@ -6,6 +6,7 @@ import {
   fail,
   requireRolesScope,
   requireLiveRoles,
+  DENY_REASON,
   signedInCharacter,
   verifyAccessToken,
   verifyCallerToken,
@@ -141,8 +142,25 @@ describe('verifyCallerToken', () => {
   });
 });
 
+describe('the verified actor', () => {
+  it('carries the token it verified, which requireLiveRoles reads ESI with', async () => {
+    const actor = await verifyCallerToken(
+      { verifyToken: async () => claims() },
+      caller,
+      'verified-tok'
+    );
+    expect(actor.accessToken).toBe('verified-tok');
+    const readIdentity = vi.fn(async () => ({ corporationId: 1, ceoId: 42, roles: [] }));
+    await requireLiveRoles({ readIdentity }, actor, {
+      need: 'canEdit',
+      denied: { message: 'no', reason: 'not-an-officer' },
+    });
+    expect(readIdentity).toHaveBeenCalledWith(42, 'verified-tok');
+  });
+});
+
 describe('requireLiveRoles', () => {
-  const actor = { characterId: 42, claims: claims() };
+  const actor = { characterId: 42, claims: claims(), accessToken: 'tok' };
   const identity = (over = {}) => ({
     corporationId: 99,
     ceoId: 1,
@@ -154,18 +172,34 @@ describe('requireLiveRoles', () => {
   it('refuses a token without the roles scope, and never reads ESI', async () => {
     const readIdentity = vi.fn();
     const e = await caught(
-      requireLiveRoles({ readIdentity }, { characterId: 42, claims: claims({ scopes: [] }) }, 't', {
-        need: 'canView',
-        denied,
-      })
+      requireLiveRoles(
+        { readIdentity },
+        { characterId: 42, claims: claims({ scopes: [] }), accessToken: 't' },
+        { need: 'canView', denied }
+      )
     );
     expect(e.code).toBe('failed-precondition');
     expect(reasonOf(e)).toBe('missing-scope');
     expect(readIdentity).not.toHaveBeenCalled();
   });
+  it('missing-scope runs onDenied once and always throws, never reading ESI', async () => {
+    const onDenied = vi.fn(async () => undefined);
+    const readIdentity = vi.fn();
+    const e = await caught(
+      requireLiveRoles(
+        { readIdentity },
+        { characterId: 42, claims: claims({ scopes: [] }), accessToken: 't' },
+        { need: 'canView', denied, onDenied }
+      )
+    );
+    expect(reasonOf(e)).toBe(DENY_REASON.missingScope);
+    expect(onDenied).toHaveBeenCalledTimes(1);
+    expect(onDenied).toHaveBeenCalledWith('missing-scope');
+    expect(readIdentity).not.toHaveBeenCalled();
+  });
   it('returns identity and decided roles', async () => {
     const readIdentity = vi.fn(async () => identity());
-    const out = await requireLiveRoles({ readIdentity }, actor, 'tok', {
+    const out = await requireLiveRoles({ readIdentity }, actor, {
       corporationId: 99,
       need: 'canEdit',
       denied,
@@ -178,14 +212,13 @@ describe('requireLiveRoles', () => {
     const out = await requireLiveRoles(
       { readIdentity: async () => identity({ ceoId: 42, roles: [] }) },
       actor,
-      't',
       { need: 'canEdit', denied }
     );
     expect(out.roles.isCeo).toBe(true);
   });
   it('refuses a different corporation: wrong-corp', async () => {
     const e = await caught(
-      requireLiveRoles({ readIdentity: async () => identity() }, actor, 't', {
+      requireLiveRoles({ readIdentity: async () => identity() }, actor, {
         corporationId: 5,
         need: 'canView',
         denied,
@@ -196,7 +229,7 @@ describe('requireLiveRoles', () => {
   });
   it('skips the corporation check when none is named', async () => {
     await expect(
-      requireLiveRoles({ readIdentity: async () => identity() }, actor, 't', {
+      requireLiveRoles({ readIdentity: async () => identity() }, actor, {
         need: 'canEdit',
         denied,
       })
@@ -207,7 +240,6 @@ describe('requireLiveRoles', () => {
       requireLiveRoles(
         { readIdentity: async () => identity({ roles: ['Junior_Accountant'] }) },
         actor,
-        't',
         { need: 'canEdit', denied }
       )
     );
@@ -218,7 +250,7 @@ describe('requireLiveRoles', () => {
   it('runs onDenied(reason) before each refusal', async () => {
     const onDenied = vi.fn<(reason: string) => Promise<void>>(async () => undefined);
     await caught(
-      requireLiveRoles({ readIdentity: async () => identity() }, actor, 't', {
+      requireLiveRoles({ readIdentity: async () => identity() }, actor, {
         corporationId: 5,
         need: 'canView',
         denied,
@@ -226,7 +258,7 @@ describe('requireLiveRoles', () => {
       })
     );
     await caught(
-      requireLiveRoles({ readIdentity: async () => identity({ roles: [] }) }, actor, 't', {
+      requireLiveRoles({ readIdentity: async () => identity({ roles: [] }) }, actor, {
         need: 'canView',
         denied,
         onDenied,
@@ -235,8 +267,7 @@ describe('requireLiveRoles', () => {
     await caught(
       requireLiveRoles(
         { readIdentity: vi.fn() },
-        { characterId: 42, claims: claims({ scopes: [] }) },
-        't',
+        { characterId: 42, claims: claims({ scopes: [] }), accessToken: 't' },
         { need: 'canView', denied, onDenied }
       )
     );
@@ -256,7 +287,6 @@ describe('requireLiveRoles', () => {
           },
         },
         actor,
-        't',
         { need: 'canView', denied }
       )
     );

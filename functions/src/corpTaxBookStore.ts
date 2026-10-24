@@ -186,7 +186,7 @@ export async function authorizeOfficer(
     if (!options.live && heldUsable) {
       access = held;
     } else {
-      const { identity, roles } = await requireLiveRoles(deps, actor, call.accessToken, {
+      const { identity, roles } = await requireLiveRoles(deps, actor, {
         corporationId: call.corporationId,
         need: 'canView',
         denied: { message: 'No officer role in this corporation', reason: 'not-an-officer' },
