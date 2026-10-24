@@ -230,7 +230,7 @@ export function updateNotificationPrefs(
     await useNotificationPreferences.getState().setValue(next);
     if (channel === 'browser') return;
     await setSyncedSetting(SYNCED_NOTIFICATION_FEED_PREFS_KEY, toSyncedFeedPrefs(next));
-    scheduleSync(characterId);
+    scheduleSync(characterId, { collections: ['settings'] });
   });
 }
 

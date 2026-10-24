@@ -29,7 +29,7 @@ describe('createPayee', () => {
 
     expect(payee).toMatchObject({ characterId: CHAR_A, name: 'Some Corp', defaultTaxPct: 10 });
     expect(await db.payees.get(payee.id)).toEqual(payee);
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A, { collections: ['payees'] });
   });
 
   it('omits systemId entirely when not given, rather than writing it as undefined', async () => {
@@ -55,7 +55,7 @@ describe('rememberPayeeEntity', () => {
 
     expect(updated.entityId).toBe(90_000_001);
     expect((await db.payees.get(payee.id))?.entityId).toBe(90_000_001);
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A, { collections: ['payees'] });
   });
 
   it('survives a later name or rate edit — updatePayee spreads the existing record', async () => {

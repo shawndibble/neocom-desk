@@ -113,7 +113,8 @@ async function commit<T>(
     return failure(cause);
   }
   const touched = typeof characterIds === 'function' ? characterIds(value) : characterIds;
-  for (const characterId of new Set(touched)) scheduleSync(characterId);
+  for (const characterId of new Set(touched))
+    scheduleSync(characterId, { collections: ['miningTaxAssignments', 'payees'] });
   return { ok: true, value };
 }
 

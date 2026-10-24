@@ -108,7 +108,7 @@ export function useTargetPlan(characterId: number | null): TargetPlan {
       });
 
       void setStored(withTargetPlanId(stored, characterId, result.planId));
-      if (isSyncConfigured()) scheduleSync(characterId);
+      if (isSyncConfigured()) scheduleSync(characterId, { collections: ['plans'] });
       return result;
     },
     [characterId, stored, setStored]
@@ -129,7 +129,8 @@ export function useTargetPlan(characterId: number | null): TargetPlan {
         const updated = { ...plan, ...edited, updatedAt: Date.now() };
         await db.skillPlans.put(updated);
       });
-      if (characterId !== null && isSyncConfigured()) scheduleSync(characterId);
+      if (characterId !== null && isSyncConfigured())
+        scheduleSync(characterId, { collections: ['plans'] });
     },
     [characterId]
   );

@@ -64,7 +64,9 @@ describe('repriceForOreForm', () => {
       '2026-09-04',
       false
     );
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, {
+      collections: ['miningTaxAssignments'],
+    });
   });
 
   it('clears the raw marker when flipping back to Compressed', async () => {

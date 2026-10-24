@@ -10,12 +10,14 @@ import { EDITABLE_COLLECTIONS } from './syncedCollections';
 /**
  * EVE changes a character's ownerHash when it is sold or transferred. If it
  * changed since our last sync, the local editable data belongs to the previous
- * owner — wipe it, its tombstones and its cached ESI responses.
+ * owner — wipe it, its tombstones and its cached ESI responses. Resolves
+ * true when it wiped, so the pass that follows re-pulls every collection.
  */
-export async function handleOwnerHashChange(character: CharacterRecord): Promise<void> {
+export async function handleOwnerHashChange(character: CharacterRecord): Promise<boolean> {
   const key = ownerHashKey(character.characterId);
   const stored = await db.settings.get(key);
-  if (stored !== undefined && stored.value !== character.ownerHash) {
+  const wiped = stored !== undefined && stored.value !== character.ownerHash;
+  if (wiped) {
     // One transaction: a crash mid-wipe must not leave rows gone but their
     // tombstones or pull cursors still the previous owner's. Dexie work only —
     // nothing here awaits Firestore or the network.
@@ -63,7 +65,8 @@ export async function handleOwnerHashChange(character: CharacterRecord): Promise
     // after a reload the marker is gone, the hash matches and the previous
     // owner's data reads normally. Leaving it makes the next sync re-detect;
     // the plan deletes above are idempotent.
-    if (outcome === 'suppressed') return;
+    if (outcome === 'suppressed') return true;
   }
   await db.settings.put({ key, value: character.ownerHash });
+  return wiped;
 }

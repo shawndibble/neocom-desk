@@ -137,7 +137,7 @@ describe('settleFillTimes', () => {
     expect(row?.firedAt).toBe(OBSERVED - 2 * HOUR);
     expect(row?.fillSettledAt).toBe(OBSERVED + 60_000);
     expect(row).not.toHaveProperty('syncedAt');
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, { collections: ['notificationFeed'] });
   });
 
   it('does not read the wallet when no row is provisional', async () => {

@@ -40,7 +40,7 @@ describe('reviseContractFeedRow', () => {
     expect(row?.body).toContain('300');
     expect(row?.firedAt).toBe(1_000);
     expect(row?.syncedAt).toBeUndefined();
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(7);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(7, { collections: ['notificationFeed'] });
   });
 
   it('adds a later poll’s lines to what the row already carries', async () => {

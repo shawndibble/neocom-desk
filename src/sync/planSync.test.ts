@@ -2162,7 +2162,7 @@ describe('sync orchestration', () => {
       const { order, release } = gateReads((path) => path === 'characters/char:2/plans');
       fakeTimers();
       const background = [triggerSync(2, 'background'), triggerSync(3, 'background')];
-      for (const priority of priorities) scheduleSync(1, 10, priority);
+      for (const priority of priorities) scheduleSync(1, { debounceMs: 10, priority });
       await vi.advanceTimersByTimeAsync(40);
 
       release();
@@ -2246,6 +2246,82 @@ describe('sync orchestration', () => {
   });
 });
 
+describe('a pass narrowed to the collections an edit touched (#4896)', () => {
+  /** Every pull cursor Character 1 holds, keyed by setting key. */
+  async function cursors(): Promise<Map<string, unknown>> {
+    const keys = REMOTE_COLLECTIONS.map((c) => pullCursorKey(1, c.remoteName));
+    const rows = await db.settings.bulkGet(keys);
+    return new Map(keys.map((key, i) => [key, rows[i]?.value]));
+  }
+
+  async function waitForPush(path: string, id: string): Promise<void> {
+    await vi.waitFor(() => expect(remoteStore.get(path)?.has(id)).toBe(true));
+    await vi.waitFor(() => expect(getSyncStatus(1).state).toBe('idle'));
+    await settle();
+  }
+
+  it('pulls and pushes only the named collections, leaving the rest untouched', async () => {
+    await triggerSync(1);
+    const before = await cursors();
+    vi.mocked(getDocs).mockClear();
+    vi.mocked(setDoc).mockClear();
+    // Another device's plan edit: a full pass would pull it, this one must not.
+    seedRemote(PLANS_PATH, [remoteDoc({ id: 'elsewhere', updatedAt: Date.now() + 1000 })]);
+
+    await db.quickbars.put(quickbar({ updatedAt: Date.now() }));
+    scheduleSync(1, { collections: ['quickbars'], debounceMs: 10 });
+    await waitForPush(QUICKBARS_PATH, '1');
+
+    // Pulled before it pushed: last-write-wins still saw the remote copy.
+    expect(vi.mocked(getDocs).mock.calls.map(([q]) => pathOf(q))).toEqual([QUICKBARS_PATH]);
+    // The quickbar push only — no heartbeat, which means "every collection synced".
+    expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1);
+    expect(await db.skillPlans.get('elsewhere')).toBeUndefined();
+    const after = await cursors();
+    for (const [key, value] of before) {
+      if (key === pullCursorKey(1, 'quickbars')) continue;
+      expect(after.get(key), key).toEqual(value);
+    }
+  });
+
+  it('runs a full pass when the ownerHash changed, whatever the edit named', async () => {
+    await triggerSync(1);
+    vi.mocked(getDocs).mockClear();
+    await db.characters.update(1, { ownerHash: 'hash-b' });
+
+    scheduleSync(1, { collections: ['quickbars'], debounceMs: 10 });
+    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(COLLECTION_COUNT));
+    await vi.waitFor(() => expect(getSyncStatus(1).state).toBe('idle'));
+    await settle();
+
+    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(COLLECTION_COUNT);
+  });
+
+  it('narrows the one-more-pass rerun to what the mid-pass write touched', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(getDocs).mockImplementation((async (target: FakeQuery) => {
+      if (target.col.path === PLANS_PATH) await gate;
+      return fake.getDocsImpl(target);
+    }) as never);
+    const first = triggerSync(1);
+    await settle();
+    await db.quickbars.put(quickbar({ updatedAt: Date.now() }));
+    // What the Overview's mining tax write does on boot, mid-way through pass 1.
+    scheduleSync(1, { collections: ['quickbars'], debounceMs: 0 });
+    await vi.waitFor(() => expect(hasPendingSync(1)).toBe(false));
+    release();
+    await first;
+
+    const reads = vi.mocked(getDocs).mock.calls.map(([q]) => pathOf(q));
+    expect(reads).toHaveLength(COLLECTION_COUNT + 1);
+    expect(reads.filter((path) => path === QUICKBARS_PATH)).toHaveLength(2);
+    expect(remoteStore.get(QUICKBARS_PATH)?.has('1')).toBe(true);
+  });
+});
+
 describe('hasPendingSync', () => {
   afterEach(() => {
     resetSyncHalt();
@@ -2263,7 +2339,7 @@ describe('hasPendingSync', () => {
     scheduleSync(1, 20);
     await triggerSync(1);
     expect(hasPendingSync(1)).toBe(false);
-    scheduleSync(2, 20, 'background');
+    scheduleSync(2, { debounceMs: 20, priority: 'background' });
     expect(hasPendingSync(2)).toBe(false);
     await haltSync();
   });

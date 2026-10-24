@@ -46,7 +46,7 @@ export function useQuickbar(activeCharacterId: number | null): Quickbar {
       items: next,
       updatedAt: Date.now(),
     });
-    if (isSyncConfigured()) scheduleSync(activeCharacterId);
+    if (isSyncConfigured()) scheduleSync(activeCharacterId, { collections: ['quickbars'] });
   }
 
   return {

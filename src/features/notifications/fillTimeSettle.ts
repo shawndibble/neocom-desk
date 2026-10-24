@@ -125,7 +125,7 @@ export async function settleFillTimes(
           });
       }
     });
-    scheduleSync(characterId);
+    scheduleSync(characterId, { collections: ['notificationFeed'] });
   } catch {
     // Retried on the next poll: the rows are still provisional.
   }
