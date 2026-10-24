@@ -6,9 +6,18 @@
  */
 import type { KindView } from './data/types';
 import type { BoardDeadline } from './nextDeadline';
+import { resolveWidgetState } from './state';
 
 export function collectDeadlines(views: readonly Pick<KindView, 'deadlines'>[]): BoardDeadline[] {
   return views.flatMap((view) => view.deadlines);
+}
+
+/**
+ * Some view on screen has nothing to show yet, so a clock may still arrive: the header
+ * holds the Next deadline's line open on a phone rather than pushing the board down later.
+ */
+export function anyStillLoading(views: readonly Pick<KindView, 'status'>[]): boolean {
+  return views.some((view) => resolveWidgetState(view.status) === 'loading');
 }
 
 export function stalestFetch(views: readonly Pick<KindView, 'fetchedAt' | 'fromCache'>[]): {

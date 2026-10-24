@@ -770,7 +770,7 @@ export function nextRunPeriod(view: BookView): StatementPeriod | undefined {
   const dates = [...view.charges.map((c) => c.date)].sort();
   const seen = new Set<string>();
   for (const date of dates) {
-    const period = statementPeriod(date, view.input.cadence);
+    const period = statementPeriod(date, view.input.cadence, view.input.startDate);
     if (seen.has(period.start)) continue;
     seen.add(period.start);
     if (period.end > view.billableThrough) continue;
@@ -844,12 +844,54 @@ export interface PeriodRow {
   start: string;
   end: string;
   /** issued: on a Statement but not (all) mailed yet; sent: mailed; overdue: one of its Statements is past due; paid: settled. */
-  status: 'issued' | 'sent' | 'overdue' | 'paid' | 'ready' | 'open';
+  status: 'issued' | 'sent' | 'overdue' | 'paid' | 'ready' | 'closed' | 'rollover' | 'open';
   miners: number;
   billed: number;
   paid: number;
   outstanding: number;
   issuedAt: string | null;
+}
+
+/**
+ * What a period's own days bill: its mined days not already on a Statement, not
+ * the run-to-date total a Statement for it would carry. `minimum` applies the
+ * book's minimum Statement; below it a Miner's amount rolls into a later one.
+ */
+function ownPeriodBilling(
+  view: BookView,
+  chargesByMiner: ReadonlyMap<string, BookView['charges']>,
+  period: StatementPeriod,
+  minimum: number
+) {
+  let miners = 0;
+  let billed = 0;
+  let rolled = 0;
+  let rolledAmount = 0;
+  const closed = new Set(view.input.miners.filter((m) => m.closedAt).map((m) => m.id));
+  const adjustments = view.input.adjustments.filter((a) => a.date >= period.start);
+  for (const m of view.miners) {
+    if (closed.has(m.id)) continue;
+    const draft = draftStatement({
+      minerId: m.id,
+      startDate: view.input.startDate > period.start ? view.input.startDate : period.start,
+      period,
+      charges: chargesByMiner.get(m.id) ?? [],
+      adjustments,
+      issued: view.internals.byMiner.get(m.id)!.statements,
+      paidStatementIds: view.input.paidStatementIds,
+      dismissals: view.input.dismissals,
+      billableThrough: view.billableThrough,
+      minimumAmount: minimum,
+    });
+    if (draft.kind === 'rolled-over') {
+      rolled += 1;
+      rolledAmount += draft.amount;
+    }
+    if (draft.kind !== 'statement') continue;
+    miners += 1;
+    billed += draft.amount;
+  }
+  return { miners, billed, rolled, rolledAmount };
 }
 
 export function periodRows(view: BookView): PeriodRow[] {
@@ -892,22 +934,58 @@ export function periodRows(view: BookView): PeriodRow[] {
     });
   }
   const ready = nextRunPeriod(view);
-  const today = statementPeriod(view.input.now.slice(0, 10), view.input.cadence);
-  const add = (period: StatementPeriod, status: 'ready' | 'open') => {
+  const today = statementPeriod(
+    view.input.now.slice(0, 10),
+    view.input.cadence,
+    view.input.startDate
+  );
+  const chargesByMiner = new Map<string, BookView['charges']>();
+  for (const c of view.charges) {
+    chargesByMiner.set(c.minerId, [...(chargesByMiner.get(c.minerId) ?? []), c]);
+  }
+  const add = (period: StatementPeriod, status: PeriodRow['status']) => {
     if (rows.some((r) => r.start === period.start)) return;
-    const plan = planStatementRun(view, period);
+    let row: Pick<PeriodRow, 'status' | 'miners' | 'billed'>;
+    if (status === 'ready') {
+      // The Send plan itself, so the row matches what Send will do.
+      const plan = planStatementRun(view, period);
+      row = {
+        status,
+        miners: plan.lines.length,
+        billed: plan.lines.reduce((s, l) => s + l.draft.amount, 0),
+      };
+    } else if (status === 'closed') {
+      const own = ownPeriodBilling(view, chargesByMiner, period, view.input.minimumStatement);
+      if (own.miners === 0 && own.rolled === 0) return;
+      row =
+        own.miners > 0
+          ? { status, miners: own.miners, billed: own.billed }
+          : { status: 'rollover', miners: own.rolled, billed: own.rolledAmount };
+    } else {
+      const own = ownPeriodBilling(view, chargesByMiner, period, 0);
+      row = { status, miners: own.miners, billed: own.billed };
+    }
     rows.push({
       start: period.start,
       end: period.end,
-      status,
-      miners: plan.lines.length,
-      billed: plan.lines.reduce((s, l) => s + l.draft.amount, 0),
+      ...row,
       paid: 0,
       outstanding: 0,
       issuedAt: null,
     });
   };
-  if (ready) add(ready, 'ready');
+  // Every period with unbilled days, not only the next one; a Statement still
+  // covers every day since the last, so only the earliest closed one is sendable.
+  const seen = new Set<string>();
+  for (const date of view.charges.map((c) => c.date).sort()) {
+    const period = statementPeriod(date, view.input.cadence, view.input.startDate);
+    if (seen.has(period.start)) continue;
+    seen.add(period.start);
+    if (period.start === ready?.start) add(period, 'ready');
+    else if (view.billableThrough !== undefined && period.end <= view.billableThrough)
+      add(period, 'closed');
+    else add(period, 'open');
+  }
   add(today, 'open');
   return rows.sort((a, b) => b.start.localeCompare(a.start));
 }

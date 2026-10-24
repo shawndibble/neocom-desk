@@ -73,10 +73,17 @@ beforeEach(async () => {
       killmailId: 333,
     });
     await setDoc(doc(db, `${CORP}/srpAudit/e1`), { action: 'turnOn' });
+    await setDoc(doc(db, `${CORP}/srpDoctrines/d1`), { id: 'd1', name: 'Fleet Rifter' });
   });
 });
 
-const OFFICER_ONLY = ['srp/settings', 'srpAudit/e1', 'srpClaims/111', 'srpClaims/222'];
+const OFFICER_ONLY = [
+  'srp/settings',
+  'srpAudit/e1',
+  'srpDoctrines/d1',
+  'srpClaims/111',
+  'srpClaims/222',
+];
 
 describe('SRP rules', () => {
   it("lets a live officer read the corp's SRP data, and no other corp's", async () => {
@@ -140,6 +147,8 @@ describe('SRP rules', () => {
     await assertFails(getDoc(doc(db, `${CORP}/srp/settings`)));
     await assertFails(getDoc(doc(db, `${CORP}/srpAudit/e1`)));
     await assertFails(getDoc(doc(db, `${CORP}/srpOfficers/char:1`)));
+    await assertFails(getDoc(doc(db, `${CORP}/srpDoctrines/d1`)));
+    await assertFails(getDocs(collection(db, `${CORP}/srpDoctrines`)));
     // The `corps/{id}` document itself is the Corp Tax Book's settings (issue #4858): any
     // Character may `get` it, so SRP never stores anything in it. Other names stay closed.
     await assertFails(getDoc(doc(db, `${CORP}/unlisted/x`)));
@@ -180,6 +189,9 @@ describe('SRP rules', () => {
       await assertFails(deleteDoc(doc(db, `${CORP}/srpClaims/111`)));
       await assertFails(setDoc(doc(db, `${CORP}/srpAudit/x`), { action: 'forged' }));
       await assertFails(deleteDoc(doc(db, `${CORP}/srpAudit/e1`)));
+      await assertFails(setDoc(doc(db, `${CORP}/srpDoctrines/d2`), { name: 'forged' }));
+      await assertFails(updateDoc(doc(db, `${CORP}/srpDoctrines/d1`), { name: 'x' }));
+      await assertFails(deleteDoc(doc(db, `${CORP}/srpDoctrines/d1`)));
       await assertFails(
         setDoc(doc(db, `${CORP}/srpOfficers/char:${id}`), officer({ characterId: id }))
       );

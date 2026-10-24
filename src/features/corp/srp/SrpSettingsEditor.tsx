@@ -24,6 +24,7 @@ import { useCopyFeedback } from '@/lib/useCopyFeedback';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { ActionResult, SettingsHint } from '@/features/settings/settingsFields';
 import type { SrpOfficerVerdict, SrpSettings } from '../srpTypes';
+import { DoctrineFitsPanel } from './DoctrineFitsPanel';
 import { HullRulesEditor } from './HullRulesEditor';
 import {
   formFromSettings,
@@ -33,6 +34,7 @@ import {
   type SrpSettingsForm,
 } from './srpSettingsForm';
 import { useHullCatalog } from './useHullCatalog';
+import { useSrpDoctrines } from './useSrpDoctrines';
 
 interface Props {
   settings: SrpSettings;
@@ -97,6 +99,10 @@ export function SrpSettingsEditor({
   const uid = useId();
   const phone = useIsPhone();
   const hulls = useHullCatalog();
+  const doctrines = useSrpDoctrines(characterId, settings.corporationId);
+  const fits = doctrines.state.status === 'ready' ? doctrines.state.fits : [];
+  // Only once the list is read: a deleted fit's id is then left out of what Save sends.
+  const liveIds = doctrines.state.status === 'ready' ? new Set(fits.map((f) => f.id)) : undefined;
   const [form, setForm] = useState<SrpSettingsForm>(() => formFromSettings(settings));
   const [added, setAdded] = useState<number[]>([]);
   const [keptClasses, setKeptClasses] = useState<number[]>([]);
@@ -108,7 +114,7 @@ export function SrpSettingsEditor({
 
   const link = `${window.location.origin}/srp`;
   const problems = formProblems(form);
-  const dirty = formIsDirty(form, settings);
+  const dirty = formIsDirty(form, settings, liveIds);
   const patch = (p: Partial<SrpSettingsForm>) => setForm({ ...form, ...p });
 
   const toggleClass = (classId: number) =>
@@ -137,7 +143,7 @@ export function SrpSettingsEditor({
     setSaving(true);
     try {
       await onSave(
-        formToPatch(form, settings),
+        formToPatch(form, settings, liveIds),
         form.enabled === settings.enabled ? null : form.enabled
       );
     } finally {
@@ -245,6 +251,15 @@ export function SrpSettingsEditor({
         </div>
       </Panel>
 
+      <DoctrineFitsPanel
+        state={doctrines.state}
+        characterId={characterId}
+        onAdd={doctrines.add}
+        onRemove={doctrines.remove}
+        onRetry={doctrines.reload}
+        onAdded={addHull}
+      />
+
       <Panel
         title={t('srp.settings.hullRules.title')}
         meta={t('srp.settings.hullRules.meta')}
@@ -260,6 +275,7 @@ export function SrpSettingsEditor({
           onKeepClass={keepClass}
           expanded={expanded}
           onToggle={toggleClass}
+          doctrines={fits}
         />
       </Panel>
 

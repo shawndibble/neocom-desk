@@ -15,8 +15,11 @@ export interface SrpView {
   component: ComponentType;
   /** A table-wide view takes the wide page column; a form keeps the narrow one. */
   wide?: boolean;
-  /** Who sees it. `srpOn`: the pilot's corporation has SRP on (`useSrpNavVisible`). */
-  visible: (who: { canManageSrp: boolean; srpOn: boolean }) => boolean;
+  /**
+   * Who sees it. `srpOn`: the pilot's corporation has SRP on (`useSrpNavVisible`). `isDirector`:
+   * holds the Director role (the CEO has it in game); the server's verdict still decides.
+   */
+  visible: (who: { canManageSrp: boolean; srpOn: boolean; isDirector: boolean }) => boolean;
 }
 
 export const SRP_VIEWS: readonly SrpView[] = [
@@ -31,7 +34,8 @@ export const SRP_VIEWS: readonly SrpView[] = [
   {
     id: 'settings',
     component: SrpSettingsView,
-    // The view itself narrows to a Director (the server's verdict); an Accountant sees a line saying so.
-    visible: ({ canManageSrp }) => canManageSrp,
+    // Directors only, so an Accountant's tab bar is just the Queue. Where SRP is off the Queue is
+    // hidden too and Settings stands alone: an Accountant there sees the line saying a Director turns it on.
+    visible: ({ canManageSrp, srpOn, isDirector }) => canManageSrp && (isDirector || !srpOn),
   },
 ];

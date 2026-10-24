@@ -83,7 +83,9 @@ describe('reconcileAssignments', () => {
     expect(updated?.reviewDiff).toEqual([{ typeId: TYPE_A, before: 100, after: 150 }]);
     // The stored snapshot itself is untouched — only status/reviewDiff moved.
     expect(updated?.oreLines).toEqual([{ typeId: TYPE_A, quantity: 100 }]);
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A, {
+      collections: ['miningTaxAssignments'],
+    });
     expect(assignmentsMock.planNeedsReviewResolution).not.toHaveBeenCalled();
   });
 
@@ -231,7 +233,9 @@ describe('reconcileAssignments', () => {
     expect((await db.miningTaxAssignments.get('a1'))?.reviewDiff).toEqual([
       { typeId: TYPE_A, before: 100, after: 200 },
     ]);
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A, {
+      collections: ['miningTaxAssignments'],
+    });
   });
 
   it('folds a brand-new ore type into the sole Assignment for that entry (a continuous mining session)', async () => {

@@ -1,15 +1,20 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { SrpClaim, SrpClaimOutcome } from '../srpClaimTypes';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 
 vi.mock('./useSrpClaimNames', () => ({
   useSrpClaimNames: () => ({
     hull: (id: number) => `Hull${id}`,
     system: (id: number) => `Sys${id}`,
   }),
+}));
+
+vi.mock('@/features/character/typeNames', () => ({
+  loadTypeNames: async (ids: number[]) => new Map(ids.map((id) => [id, `Item${id}`])),
 }));
 
 vi.mock('@/app/GrantNote', () => ({ GrantNote: ({ title }: { title: string }) => <p>{title}</p> }));
@@ -84,6 +89,7 @@ const pendingSet = () => [
   claim(5, { state: 'paid', closedAt: 9, paidAt: 9, paidByName: 'Boss' }),
 ];
 
+afterEach(() => useActiveCharacter.setState({ activeCharacterId: null }));
 beforeEach(() => {
   vi.clearAllMocks();
   mailResult.mockResolvedValue({ sent: [], failed: [], missingScope: false });
@@ -264,6 +270,25 @@ describe('OfficerQueue detail and change amount', () => {
   });
 });
 
+describe('OfficerQueue row menu', () => {
+  it('opens the ⋮ with the detail-only actions, and Change amount opens its dialog', async () => {
+    setup(pendingSet());
+    const more = screen.getAllByRole('button', { name: /More actions/ });
+    // Claim 3 has no figure to change, so it has no menu; the paid claim is not in Pending.
+    expect(more.length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /More actions.*Pilot3/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /More actions.*Pilot1/ }));
+    expect(await screen.findByRole('menuitem', { name: 'Change amount…' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Open in EVE/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /zKillboard/ })).toBeInTheDocument();
+    // Approve and Reject are the row's own buttons: not repeated in the menu.
+    expect(screen.queryByRole('menuitem', { name: 'Approve' })).toBeNull();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Change amount…' }));
+    expect(await screen.findByRole('dialog', { name: /Change amount/ })).toBeInTheDocument();
+  });
+});
+
 describe('OfficerQueue detail entity links', () => {
   it('links the pilot in the detail, and nowhere in the clickable row', async () => {
     setup(pendingSet());
@@ -274,12 +299,60 @@ describe('OfficerQueue detail entity links', () => {
   });
 });
 
+describe('OfficerQueue own claim', () => {
+  it("disables Approve, Reject and Mark paid on the officer's own claim, with the reason", async () => {
+    useActiveCharacter.setState({ activeCharacterId: 5001 });
+    const data = setup([...pendingSet(), claim(6, { state: 'approved', characterId: 5001 })]);
+    const approve = screen.getAllByRole('button', { name: 'Approve' })[0]!;
+    expect(approve).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getAllByRole('button', { name: 'Reject…' })[0]).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    // Hover first: a click leaves the pointer on the button, so a later hover
+    // fires no pointerenter and the bubble races the click's open/close.
+    await userEvent.hover(approve);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'You cannot decide your own claim. Another officer must.'
+    );
+    await userEvent.unhover(approve);
+    await userEvent.click(approve);
+    expect(data.approve).not.toHaveBeenCalled();
+    // Another officer's claim stays live.
+    expect(screen.getAllByRole('button', { name: 'Approve' })[1]).not.toHaveAttribute(
+      'aria-disabled'
+    );
+  });
+});
+
+describe('OfficerQueue own claim in bulk', () => {
+  it("skips the officer's own claim in Select all and disables its tick", async () => {
+    useActiveCharacter.setState({ activeCharacterId: 5001 });
+    const data = setup(pendingSet());
+    const boxes = screen.getAllByRole('checkbox');
+    expect(boxes[0]).toHaveAttribute('aria-disabled', 'true');
+    expect(boxes[1]).not.toHaveAttribute('aria-disabled');
+    await userEvent.click(boxes[0]!);
+    expect(boxes[0]).not.toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Select all (1)' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Approve (1)' }));
+    expect(data.approveMany).toHaveBeenCalledWith([{ killmailId: 2, expectedAmount: 1_000_000 }]);
+  });
+});
+
 describe('OfficerQueue owed and history', () => {
   it('marks a claim paid and bulk marks the ticked ones', async () => {
     const data = setup([...pendingSet(), claim(6, { state: 'approved', decidedAt: 6 })]);
     await userEvent.click(screen.getByRole('tab', { name: /Owed/ }));
     await userEvent.click(screen.getAllByRole('button', { name: 'Mark paid' })[0]!);
-    expect(data.markPaid).toHaveBeenCalledWith({ killmailId: 4, expectedAmount: 1_000_000 });
+    expect(data.markPaid).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Mark 1,000,000 ISK to Pilot4 as paid?')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Mark paid' }));
+    await waitFor(() =>
+      expect(data.markPaid).toHaveBeenCalledWith({ killmailId: 4, expectedAmount: 1_000_000 })
+    );
+    expect(await findLine(/Marked Pilot4 paid/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
     await userEvent.click(screen.getByRole('button', { name: 'Mark paid (2)' }));
     expect(data.markPaidMany).toHaveBeenCalledWith([
@@ -318,5 +391,50 @@ describe('OfficerQueue owed and history', () => {
     setup([claim(1)]);
     await userEvent.click(screen.getByRole('tab', { name: /Owed/ }));
     expect(screen.getByText('Nothing owed')).toBeInTheDocument();
+  });
+});
+
+describe('OfficerQueue doctrine check', () => {
+  const off = claim(1, {
+    doctrineCheck: {
+      status: 'off-doctrine',
+      doctrineId: 'd1',
+      doctrineName: 'Gila - armour',
+      diff: { missingModules: [2048], extraModules: [519, 519], missingRigs: [], extraRigs: [] },
+    },
+  });
+  const matched = claim(2, {
+    doctrineCheck: { status: 'matched', doctrineId: 'd2', doctrineName: 'Hurricane - artillery' },
+  });
+
+  it('flags an off-doctrine claim in the queue, and only that one', () => {
+    setup([off, matched, claim(3)]);
+    expect(screen.getAllByText('Off doctrine')).toHaveLength(1);
+  });
+
+  it('shows the stored diff and nearest fit in the detail, and the officer can still approve', async () => {
+    const data = setup([off]);
+    await userEvent.click(screen.getAllByText('Pilot1')[0]!);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Gila - armour/)).toBeInTheDocument();
+    expect(within(dialog).getByText('Missing modules')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Item2048')).toBeInTheDocument();
+    expect(within(dialog).getByText('2× Item519')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
+    expect(data.approve).toHaveBeenCalled();
+  });
+
+  it('names the matched fit in the detail, and shows nothing for old or unchecked claims', async () => {
+    setup([matched, claim(3), claim(4, { doctrineCheck: { status: 'not-checked' } })]);
+    await userEvent.click(screen.getAllByText('Pilot2')[0]!);
+    expect(await screen.findByText('Matches Hurricane - artillery')).toBeInTheDocument();
+    expect(screen.queryByText('Off doctrine')).toBeNull();
+  });
+
+  it('an old claim without doctrineCheck has no Doctrine row', async () => {
+    setup([claim(3)]);
+    await userEvent.click(screen.getAllByText('Pilot3')[0]!);
+    await screen.findByRole('dialog');
+    expect(screen.queryByText('Doctrine')).toBeNull();
   });
 });

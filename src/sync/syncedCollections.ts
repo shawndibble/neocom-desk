@@ -76,6 +76,29 @@ export type SyncedFaqItemId =
   | 'notificationFeed'
   | 'settings';
 
+/**
+ * Every collection's `remoteName`, spelled out so a mutation site can name the
+ * one it touched (`scheduleSync(id, { collections: [...] })`, issue #4896)
+ * and a typo fails to compile. `syncedCollections.test.ts` pins it to
+ * {@link REMOTE_COLLECTION_NAMES}.
+ */
+export type SyncedCollectionName =
+  | 'plans'
+  | 'buildPlans'
+  | 'quickbars'
+  | 'stationPins'
+  | 'planetRichness'
+  | 'productionRuns'
+  | 'productionSaleLinks'
+  | 'productionOrderWatches'
+  | 'productionLosses'
+  | 'netWorthSnapshots'
+  | 'payees'
+  | 'fittings'
+  | 'miningTaxAssignments'
+  | 'notificationFeed'
+  | 'settings';
+
 /** Minimum shape of a row in an editable collection's Dexie table. */
 export interface EditableRecord extends SyncRecord {
   characterId: number;
@@ -93,7 +116,7 @@ interface RemoteCollectionBase {
    * Firestore subcollection under /characters/{uid}. Byte-identical to what
    * is already stored and to its `firestore.rules` block — never rename.
    */
-  remoteName: string;
+  remoteName: SyncedCollectionName;
   faqItem: SyncedFaqItemId;
 }
 
@@ -785,6 +808,6 @@ export const REMOTE_COLLECTIONS: readonly SyncedCollection[] = [
   SYNCED_SETTINGS,
 ];
 
-export const REMOTE_COLLECTION_NAMES: readonly string[] = REMOTE_COLLECTIONS.map(
+export const REMOTE_COLLECTION_NAMES: readonly SyncedCollectionName[] = REMOTE_COLLECTIONS.map(
   (c) => c.remoteName
 );

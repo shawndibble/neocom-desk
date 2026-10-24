@@ -1,5 +1,5 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { chunkRateFor } from '@/engine/corpTaxBook/extraction';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -8,6 +8,7 @@ import {
   Checkbox,
   Field,
   Fields,
+  InfoTooltip,
   IskInput,
   Modal,
   SegmentedControl,
@@ -35,6 +36,8 @@ import { AutomaticSyncSection } from './AutomaticSyncSection';
 import { DeleteBookSection } from './DeleteBookSection';
 import { ReclaimBookSection } from './ReclaimBookSection';
 import { createNumberFormat } from '@/lib/numberLocale';
+import { useCorpAccess } from '../useCorpAccess';
+import { loadCorporationDivisions } from '../wallet';
 
 const formatDecimal = createNumberFormat({ maximumFractionDigits: 3 });
 
@@ -76,6 +79,34 @@ function rateLabel(
   }
 }
 
+/**
+ * The corporation's own names for its wallet divisions (the Corp Wallet's divisions read), by
+ * number. Empty without the role to read them or until loaded: the checkboxes fall back to numbers.
+ */
+function useWalletDivisionNames(characterId: number, corporationId: number): Map<number, string> {
+  const canRead = useCorpAccess().capabilities.canReadDivisions;
+  const [names, setNames] = useState(() => new Map<number, string>());
+  useEffect(() => {
+    let cancelled = false;
+    loadCorporationDivisions(characterId, corporationId, canRead).then(
+      (result) => {
+        if (cancelled) return;
+        const next = new Map<number, string>();
+        for (const entry of result.cached?.data.wallet ?? []) {
+          const name = entry.name?.trim();
+          if (entry.division !== undefined && name) next.set(entry.division, name);
+        }
+        setNames(next);
+      },
+      () => {}
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [characterId, corporationId, canRead]);
+  return names;
+}
+
 /** The settings dialog's four tabs. */
 export type SettingsTab = 'rates' | 'billing' | 'extractions' | 'access';
 
@@ -90,20 +121,29 @@ export function BookSettingsDialog({
   open,
   onClose,
   initialTab,
+  onSaved,
+  onDeleteBook,
 }: {
   open: boolean;
   onClose: () => void;
+  /** Save went through; the page owns the "Settings saved" toast, since this dialog closes. */
+  onSaved?: () => void;
+  /** "Delete the book" was pressed: the page closes this dialog and opens the one confirmation. */
+  onDeleteBook?: () => void;
   /** The tab it opens on; a return from EVE's opt-in opens Access either way. */
   initialTab?: SettingsTab;
 }) {
   const { t } = useTranslation();
-  const { settings, view, names, edit, canEdit, verdict, data } = useBook();
+  const { settings, view, names, edit, canEdit, verdict, data, characterId, corporationId } =
+    useBook();
+  const divisionNames = useWalletDivisionNames(characterId, corporationId);
   const [hubId, setHubId] = useState(settings.hubId);
   const [oreForm, setOreForm] = useState(settings.oreForm);
   const [grace, setGrace] = useState(String(settings.graceHours));
   const [minimum, setMinimum] = useState(String(settings.minimumStatement));
   const [overdue, setOverdue] = useState(String(settings.overdueDays));
   const [divisions, setDivisions] = useState<number[]>(settings.divisions);
+  const [startDate, setStartDate] = useState(settings.startDate);
   const [cadence, setCadence] = useState(settings.cadence.kind);
   const [cadenceDays, setCadenceDays] = useState(
     settings.cadence.kind === 'days' ? String(settings.cadence.days) : '14'
@@ -172,8 +212,45 @@ export function BookSettingsDialog({
     }
   };
 
+  const rateReady =
+    ratePct !== '' &&
+    Number(ratePct) >= 0 &&
+    Number(ratePct) <= 100 &&
+    rateFrom >= today &&
+    (rateScope !== 'miner' || rateMiner !== '') &&
+    (rateScope !== 'moon' || rateMoon !== '') &&
+    (rateScope !== 'structure' || rateRefinery !== '') &&
+    (rateScope !== 'feeder' || rateOwner !== '');
+  // One save model: Save commits the settings and a rate left in the form.
+  const rateFilled = ratePct !== '';
+
+  // The N-day anchor is the start date being saved, unless the officer kept a custom one:
+  // a stored anchor that is not the old start date stays.
+  const cadenceAnchor = () => {
+    const stored = settings.cadence.kind === 'days' ? settings.cadence.anchor : undefined;
+    const newStart = verdict.isDirector ? startDate : settings.startDate;
+    return stored !== undefined && stored !== settings.startDate ? stored : newStart;
+  };
+
   const save = () =>
     run(async () => {
+      let rateAdded = false;
+      if (rateFilled) {
+        const base = { pct: Number(ratePct), effectiveFrom: rateFrom };
+        const rate =
+          rateScope === 'miner'
+            ? { scope: 'miner', minerId: rateMiner, ...base }
+            : rateScope === 'moon'
+              ? { scope: 'moon', moonId: Number(rateMoon), ...base }
+              : rateScope === 'structure'
+                ? { scope: 'structure', structureId: Number(rateRefinery), ...base }
+                : rateScope === 'feeder'
+                  ? { scope: 'feeder', feederId: Number(rateOwner), ...base }
+                  : { scope: rateScope, ...base };
+        await edit({ action: 'addRate', rate });
+        rateAdded = true;
+        setRatePct('');
+      }
       const patch: Record<string, unknown> = {
         hubId,
         oreForm,
@@ -184,7 +261,7 @@ export function BookSettingsDialog({
         cadence:
           cadence === 'monthly'
             ? { kind: 'monthly' }
-            : { kind: 'days', days: Number(cadenceDays), anchor: settings.startDate },
+            : { kind: 'days', days: Number(cadenceDays), anchor: cadenceAnchor() },
         structureExpiryHours: Object.fromEntries(
           Object.entries(expiry)
             .filter(([, v]) => v !== '' && Number(v) > 0)
@@ -192,38 +269,24 @@ export function BookSettingsDialog({
         ),
       };
       if (chunk !== '') patch.chunkM3PerHour = Number(chunk);
-      if (verdict.isDirector)
+      if (verdict.isDirector) {
         patch.dismissApprovalAboveIsk = approval === '' ? null : Number(approval);
-      await edit({ action: 'updateSettings', patch });
+        if (startDate !== settings.startDate) patch.startDate = startDate;
+      }
+      try {
+        await edit({ action: 'updateSettings', patch });
+      } catch (e) {
+        if (!rateAdded) throw e;
+        // The rate is already committed and its form cleared: say so, so a retry is not read as a redo.
+        setError(
+          `${t('corpTaxBook.moons.settings.rateAddedSettingsFailed')} ${callableErrorText(t, e, 'corpTaxBook.moons.dialogs.failed')}`
+        );
+        return;
+      }
+      onSaved?.();
       onClose();
     });
 
-  const addRate = () =>
-    run(async () => {
-      const base = { pct: Number(ratePct), effectiveFrom: rateFrom };
-      const rate =
-        rateScope === 'miner'
-          ? { scope: 'miner', minerId: rateMiner, ...base }
-          : rateScope === 'moon'
-            ? { scope: 'moon', moonId: Number(rateMoon), ...base }
-            : rateScope === 'structure'
-              ? { scope: 'structure', structureId: Number(rateRefinery), ...base }
-              : rateScope === 'feeder'
-                ? { scope: 'feeder', feederId: Number(rateOwner), ...base }
-                : { scope: rateScope, ...base };
-      await edit({ action: 'addRate', rate });
-      setRatePct('');
-    });
-
-  const rateReady =
-    ratePct !== '' &&
-    Number(ratePct) >= 0 &&
-    Number(ratePct) <= 100 &&
-    rateFrom >= today &&
-    (rateScope !== 'miner' || rateMiner !== '') &&
-    (rateScope !== 'moon' || rateMoon !== '') &&
-    (rateScope !== 'structure' || rateRefinery !== '') &&
-    (rateScope !== 'feeder' || rateOwner !== '');
   const rates = [...settings.rates]
     .filter((r): r is Exclude<TaxRate, { scope: 'record' }> => r.scope !== 'record')
     .sort(
@@ -231,6 +294,7 @@ export function BookSettingsDialog({
     );
 
   const tabsId = useTabsId();
+  const rateHintId = useId();
   const fieldId = useId();
   // Back from EVE's page after the Automatic sync opt-in: open where its notice is shown.
   const { state: routerState } = useLocation();
@@ -258,14 +322,24 @@ export function BookSettingsDialog({
             <span role="alert" className="text-sm text-danger">
               {error}
             </span>
+          ) : rateFilled && !rateReady ? (
+            <span id={rateHintId} className="text-sm text-text-dim">
+              {t('corpTaxBook.moons.settings.rateIncomplete')}
+            </span>
           ) : (
-            <span className="text-xs text-text-dim">{t('corpTaxBook.moons.dialogs.logged')}</span>
+            <span />
           )}
           <span className="flex gap-2">
             <Button variant="ghost" onClick={onClose}>
               {t('common.close')}
             </Button>
-            <Button variant="primary" onClick={() => void save()} disabled={!canEdit || busy}>
+            <Button
+              variant="primary"
+              onClick={() => void save()}
+              disabled={!canEdit || busy}
+              aria-disabled={rateFilled && !rateReady ? true : undefined}
+              aria-describedby={rateFilled && !rateReady && !error ? rateHintId : undefined}
+            >
               {t('common.save')}
             </Button>
           </span>
@@ -435,17 +509,7 @@ export function BookSettingsDialog({
                         onChange={(e) => setRateFrom(e.target.value)}
                       />
                     </Label>
-                    <Button
-                      variant="primary"
-                      onClick={() => void addRate()}
-                      disabled={!rateReady || busy}
-                    >
-                      {t('corpTaxBook.moons.settings.addRate')}
-                    </Button>
                   </div>
-                  <p className="text-xs text-text-dim">
-                    {t('corpTaxBook.moons.settings.ratesLive')}
-                  </p>
                 </div>
               )}
             </>
@@ -489,9 +553,29 @@ export function BookSettingsDialog({
 
               <Section title={t('corpTaxBook.moons.settings.statements')}>
                 <Fields variant="form">
-                  {/* Chosen once when the Director turns the book on (D10); the server never changes it. */}
-                  <Field label={t('corpTaxBook.moons.settings.startDate')}>
-                    <span className="tabular-nums">{displayDate(settings.startDate)}</span>
+                  <Field
+                    label={t('corpTaxBook.moons.settings.startDate')}
+                    htmlFor={`${fieldId}-start`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {verdict.isDirector ? (
+                        <TextInput
+                          type="date"
+                          id={`${fieldId}-start`}
+                          max={today}
+                          value={startDate}
+                          onChange={(e) => e.target.value && setStartDate(e.target.value)}
+                        />
+                      ) : (
+                        <span className="tabular-nums">{displayDate(settings.startDate)}</span>
+                      )}
+                      <InfoTooltip
+                        label={t('common.aboutLabel', {
+                          label: t('corpTaxBook.moons.settings.startDate'),
+                        })}
+                        content={t('corpTaxBook.moons.settings.startHint')}
+                      />
+                    </span>
                   </Field>
                   <Field label={t('corpTaxBook.moons.settings.cadenceLabel')}>
                     <SegmentedControl
@@ -556,9 +640,16 @@ export function BookSettingsDialog({
                                 prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
                               )
                             }
-                            aria-label={t('corpTaxBook.moons.settings.division', { n: d })}
+                            aria-label={
+                              divisionNames.has(d)
+                                ? t('corpTaxBook.moons.settings.divisionNamed', {
+                                    n: d,
+                                    name: divisionNames.get(d),
+                                  })
+                                : t('corpTaxBook.moons.settings.division', { n: d })
+                            }
                           />
-                          {d}
+                          {divisionNames.get(d) ?? d}
                         </label>
                       ))}
                     </div>
@@ -595,12 +686,10 @@ export function BookSettingsDialog({
                       note={
                         learned
                           ? t('corpTaxBook.moons.settings.measured', {
-                              name: names.refinery(id),
                               rate: formatDecimal(learned.m3PerHour),
                               count: learned.cycles,
                             })
                           : t('corpTaxBook.moons.settings.notMeasured', {
-                              name: names.refinery(id),
                               rate: formatDecimal(
                                 chunkRateFor(undefined, settings.chunkM3PerHour ?? undefined)
                                   .m3PerHour
@@ -655,7 +744,12 @@ export function BookSettingsDialog({
 
               <ReclaimBookSection />
 
-              <DeleteBookSection />
+              <DeleteBookSection
+                onDelete={() => {
+                  onClose();
+                  onDeleteBook?.();
+                }}
+              />
             </>
           )}
         </TabPanel>

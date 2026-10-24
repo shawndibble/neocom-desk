@@ -8,8 +8,15 @@ describe('legacyCorpMembersLocation', () => {
       search: '?dark=1',
     });
     expect(legacyCorpMembersLocation('/corp/members/', '?tab=members')).toEqual({
-      pathname: '/corp/members/members',
+      pathname: '/corp/members/roster',
       search: '',
+    });
+  });
+
+  it('moves the old /members tab path to /roster', () => {
+    expect(legacyCorpMembersLocation('/corp/members/members', '?dark=1')).toEqual({
+      pathname: '/corp/members/roster',
+      search: '?dark=1',
     });
   });
 

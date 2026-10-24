@@ -139,13 +139,15 @@ export function MemberClaimsList({
     [t, timeZone, hullName, systemName, onRefile]
   );
   return (
-    <DataTable
-      label={t('srpMember.claims.label')}
-      columns={columns}
-      rows={rows}
-      rowKey={(c) => c.killmailId}
-      stackLayout="dense"
-      onRowClick={onOpen}
-    />
+    <div className="overflow-x-auto">
+      <DataTable
+        label={t('srpMember.claims.label')}
+        columns={columns}
+        rows={rows}
+        rowKey={(c) => c.killmailId}
+        stackLayout="dense"
+        onRowClick={onOpen}
+      />
+    </div>
   );
 }

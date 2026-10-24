@@ -125,13 +125,42 @@ beforeEach(() => {
 });
 
 describe('MinersTab', () => {
-  it('lists members by default and brings guests in with the Non-members filter', async () => {
+  it('lists members and non-members by default; turning Non-members off says what is hidden (CX-36)', async () => {
     renderBook(<MinersTab />);
     const table = screen.getByRole('table', { name: 'Miners' });
     expect(within(table).getByText('Pilot 1')).toBeInTheDocument();
-    expect(within(table).queryByText('Pilot 2')).not.toBeInTheDocument();
+    expect(within(table).getByText('Pilot 2')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Non-members/ }));
-    expect(await screen.findByText('Pilot 2')).toBeInTheDocument();
+    expect(within(table).queryByText('Pilot 2')).not.toBeInTheDocument();
+    expect(screen.getByText(/1 non-member hidden · .* owed/)).toBeInTheDocument();
+  });
+
+  it('the row ⋮ offers the actions the Miner page holds; Send reminder says why it is inert', async () => {
+    renderBook(<MinersTab />);
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
+    const menu = await screen.findByRole('menu');
+    for (const name of ['Record payment…', 'Dismiss tax…', 'Show info']) {
+      expect(within(menu).getByRole('menuitem', { name })).toBeInTheDocument();
+    }
+    // No Statement issued in this book: the item stays, inert.
+    expect(within(menu).getByRole('menuitem', { name: 'Send reminder' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+  });
+});
+
+describe('MinersTab row menu dialogs', () => {
+  it('Record payment… and Dismiss tax… open their dialogs from the ⋮', async () => {
+    renderBook(<MinersTab />);
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Record payment…' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Dismiss tax…' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 });
 

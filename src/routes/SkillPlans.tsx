@@ -127,7 +127,7 @@ export function SkillPlans() {
     void db.skillPlans
       .add(plan)
       .then(() => {
-        if (isSyncConfigured()) scheduleSync(activeCharacterId);
+        if (isSyncConfigured()) scheduleSync(activeCharacterId, { collections: ['plans'] });
         void navigate(`/skills/plans/${plan.id}`, {
           replace: true,
           state: { skillPlanImportText: importText } satisfies SkillPlanImportState,
@@ -174,7 +174,7 @@ export function SkillPlans() {
         return;
       }
       await db.skillPlans.add(outcome.plan);
-      if (isSyncConfigured()) scheduleSync(activeCharacterId);
+      if (isSyncConfigured()) scheduleSync(activeCharacterId, { collections: ['plans'] });
       const skill = outcome.firstRemapEntry
         ? `${scheduleInputs.catalog.engineSkills.get(outcome.firstRemapEntry.skillTypeID)?.name ?? ''} ${romanLevel(outcome.firstRemapEntry.targetLevel)}`
         : '';

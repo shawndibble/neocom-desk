@@ -91,7 +91,8 @@ function structuresNumber(
 export const structures: Builder = (feeds, { t, now }) => {
   const feed = feeds.structures;
   const raw = feed?.data ?? null;
-  const to = '/corp';
+  // No structures page exists: a plain title, not a link back to /corp.
+  const to = null;
   if (!raw) return blank(to, statusOf(feed));
   const view = structuresView(raw, now);
   const items = view.items;
@@ -190,7 +191,6 @@ export const structures: Builder = (feeds, { t, now }) => {
             at: clock.atMs,
             note: t(`overview.board.structureDeadline.${clock.kind}`, { subject: clock.subject }),
             severity: clock.severity,
-            to,
           },
         ]
       : [],
@@ -220,7 +220,7 @@ export const structures: Builder = (feeds, { t, now }) => {
 export const moonChunks: Builder = (feeds, { t, now }) => {
   const feed = feeds.moonChunks;
   const data = feed?.data ?? null;
-  const to = '/corp';
+  const to = '/corp/moons/extractions';
   if (!data) return blank(to, statusOf(feed));
   if (data.chunks === null) {
     return {
@@ -232,13 +232,16 @@ export const moonChunks: Builder = (feeds, { t, now }) => {
       summary: moonChunksSummary(t, data, now),
     };
   }
-  const chunks = [...data.chunks].sort((a, b) => a.deadlineMs - b.deadlineMs);
+  // Rows are built at load time; a clock that has passed since would sit beside a Due soon count that already dropped it.
+  const chunks = data.chunks
+    .filter((chunk) => chunk.deadlineMs > now)
+    .sort((a, b) => a.deadlineMs - b.deadlineMs);
   const ready = chunks.filter((chunk) => chunk.detail === 'decay').length;
   const nextChunk = moonChunksDeadline(data.chunks, now);
   const eventOf = (detail: string) =>
     t(`overview.widgets.moonChunks.event.${detail === 'decay' ? 'decay' : 'arrival'}`);
   const untilOf = (deadlineMs: number) => formatCountdown(Math.max(0, deadlineMs - now) / 1000);
-  const tone = moonChunksSeverity(data, now) ?? 'clear';
+  const tone = moonChunksSeverity({ ...data, chunks }, now) ?? 'clear';
 
   const table: TableModel = {
     columns: [

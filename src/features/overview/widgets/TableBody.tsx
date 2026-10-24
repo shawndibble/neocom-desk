@@ -16,11 +16,12 @@
  * phone's full-width widget drops it and a half-width one on a desktop does
  * too).
  */
-import { useLayoutEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
+  Button,
   IconButton,
   IskAmount,
   RowCaret,
@@ -375,6 +376,11 @@ export function TableBody({
   const [sort, setSort] = useState<{ columnId: string; direction: 'asc' | 'desc' } | null>(null);
   // The opened row's facts as they were on the click, so a refresh never swaps them mid-read.
   const [opened, setOpened] = useState<TableRowModel | null>(null);
+  // "+N more" opens the rest in place.
+  const [expanded, setExpanded] = useState(false);
+  // Set by the expand click so the effect below moves focus once, not on every later render.
+  const revealFocus = useRef(false);
+  const bodyRef = useRef<HTMLTableSectionElement>(null);
   // The page is remembered with the page size it was chosen under, so a size change
   // starts over on page 1 without an effect to reset it.
   const [pageState, setPageState] = useState({ page: 1, perPage: paging?.rowsPerPage });
@@ -390,6 +396,18 @@ export function TableBody({
       : table.rows;
   }, [table, activeSort]);
 
+  // The button that revealed the rows unmounts into "Show fewer"; focus would otherwise sit on
+  // nothing, so it lands on the first revealed row.
+  useEffect(() => {
+    if (!expanded || !revealFocus.current) return;
+    revealFocus.current = false;
+    const row = bodyRef.current?.rows[rowLimit];
+    if (!row) return;
+    const target = row.querySelector<HTMLElement>('a[href], button') ?? row;
+    if (target === row) row.tabIndex = -1;
+    target.focus();
+  }, [expanded, rowLimit]);
+
   // A pageable table is never cut at the size's row limit; it shows everything, a page at a time
   // once there are more rows than the smallest page.
   const pageable = table.pageable === true && paging !== undefined;
@@ -401,8 +419,11 @@ export function TableBody({
       ? pageRows(sorted, page, paging.rowsPerPage)
       : pageable
         ? sorted
-        : sorted.slice(0, rowLimit);
+        : expanded
+          ? sorted
+          : sorted.slice(0, rowLimit);
   const more = paged ? 0 : sorted.length - shown.length;
+  const cuttable = !paged && !pageable && sorted.length > rowLimit;
   if (shown.length === 0) return null;
   const hasHeader = columns.some((column) => column.label !== '');
   const growKey = columns.find((column, i) => i > 0 && column.grow)?.key;
@@ -454,7 +475,7 @@ export function TableBody({
             </tr>
           </thead>
         )}
-        <tbody>
+        <tbody ref={bodyRef}>
           {shown.map((row) => (
             <Row
               key={row.key}
@@ -479,10 +500,20 @@ export function TableBody({
           onRowsPerPage={paging.onRowsPerPage}
         />
       )}
-      {more > 0 && (
-        <p className="border-t border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
-          {t('overview.widgets.moreRows', { count: more })}
-        </p>
+      {cuttable && (
+        <div className="border-t border-line px-3 py-1">
+          <Button
+            size="sm"
+            onClick={() => {
+              revealFocus.current = !expanded;
+              setExpanded(!expanded);
+            }}
+          >
+            {expanded
+              ? t('overview.widgets.fewerRows')
+              : t('overview.widgets.moreRows', { count: more })}
+          </Button>
+        </div>
       )}
       {table.footer && (
         <p className="border-t border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">

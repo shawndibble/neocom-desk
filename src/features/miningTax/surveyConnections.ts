@@ -124,6 +124,7 @@ export async function applySurveyConnections(
           taxOwed: value.taxOwed,
           markPaid: false,
           takesGrowth: true,
+          label: slice.label,
         });
         if (result.ok) created.push(result.value);
       } catch {

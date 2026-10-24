@@ -1,5 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
@@ -31,6 +32,7 @@ vi.mock('@/lib/useRouteSnapshot', () => ({
           [2, 'Beta'],
           [3, 'Gamma'],
         ]),
+        ceoId: 3,
         fetchedAt: null,
         fromCache: false,
       },
@@ -80,5 +82,47 @@ describe('CorpRoleAudit', () => {
       </MemoryRouter>
     );
     expect(screen.getByText('2 Directors. Members with a sensitive role: 3.')).toBeInTheDocument();
+  });
+
+  it('marks the CEO in the holders table', () => {
+    render(
+      <MemoryRouter>
+        <CorpRoleAudit tabs={{ bar: null, tabsId: 't', tabId: 'x' }} />
+      </MemoryRouter>
+    );
+    const holders = screen.getByRole('table', { name: 'Members with sensitive roles' });
+    expect(
+      within(within(holders).getByText('Gamma').closest('tr')!).getByText('CEO')
+    ).toBeVisible();
+    expect(within(holders.querySelectorAll('tr')[1] as HTMLElement).queryByText('CEO')).toBeNull();
+  });
+
+  it('opens the ⋮ on a holder with the member actions', async () => {
+    render(
+      <MemoryRouter>
+        <CorpRoleAudit tabs={{ bar: null, tabsId: 't', tabId: 'x' }} />
+      </MemoryRouter>
+    );
+    const holders = screen.getByRole('table', { name: 'Members with sensitive roles' });
+    await userEvent.click(within(holders).getAllByRole('button', { name: /More actions for/ })[0]!);
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Open in EVE/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /zKillboard/ })).toBeInTheDocument();
+  });
+
+  it('opens the ⋮ on a role-change line with the member actions', async () => {
+    fixture.loadedAt = CHANGED_AT;
+    fixture.changes = [
+      { characterId: 1, issuerId: 2, changedAtMs: CHANGED_AT, granted: ['Director'], removed: [] },
+    ];
+    render(
+      <MemoryRouter>
+        <CorpRoleAudit tabs={{ bar: null, tabsId: 't', tabId: 'x' }} />
+      </MemoryRouter>
+    );
+    const history = screen.getByRole('table', { name: /role changes|history/i });
+    await userEvent.click(within(history).getAllByRole('button', { name: /More actions for/ })[0]!);
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /zKillboard/ })).toBeInTheDocument();
   });
 });

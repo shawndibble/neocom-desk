@@ -680,6 +680,13 @@ rather than narrowing it — Contract Search's Below market, one row per
 contract instead of one per item line. It acts at once and is not behind the
 funnel, for the column picker's reason; see §6c.
 
+One sanctioned reorder: `trailing` view controls after the funnel, so the
+funnel sits right beside the search box, for a row where the filters narrow
+the list and the view controls only arrange it (the
+Ship Tree ladder: view switch and search in `search`, then the funnel, then
+Expand all / Collapse all and the Legend in `trailing`). Like `actions`, they
+act at once and never move into the sheet.
+
 A **status dot** (`size-2 rounded-full bg-current`, `aria-hidden`, phone only)
 may lead a dense card's title in the row's status tone, so a scan down the list
 reads outcome at a glance. It is never the only cue: the status word stays on
@@ -955,6 +962,13 @@ link goes and _what_ a view shows is Neocom Desk's own. When this section is
 silent, follow the platform convention (WCAG 2.2, WAI-ARIA APG, Apple HIG,
 Material, Windows).
 
+**Tooltip timing.** A hover waits 400ms before a bubble opens, so a pointer
+crossing a toolbar or table doesn't drop one in its path. Once a bubble is up,
+the next trigger opens at once, and that holds for 300ms after it closes, so
+reading along a row of icons stays quick. Keyboard focus and touch never wait.
+`TooltipProvider` at the app root owns these numbers; chart readouts
+(`PointTooltip`) follow the pointer and never wait.
+
 **Deep links that name a field.** A link whose job is "set this value" (the PI "Set the rate on Plan" link, `#customs`) opens the view with the section expanded and the first field focused, so the pilot lands on the control, not a page that merely mentions it.
 
 **Wire focus (PI Map).** Hover or focus on a planet or product tile thickens its own wires and dots their two ends; every other wire steps back. Hovering or focusing a product lights its whole chain back to the planets, as a trace would. A wire that jumps a tier is dashed; a planet-to-raw wire is amber. The map's help legend names all three. All wires show at rest, so this only reinforces (touch gets it on tap focus).
@@ -1042,6 +1056,9 @@ instead (a rename) passes `keepFocus`.
 | `CaretDown` inside field chrome                                                                       | Opens a list to pick from: one value (`Select`) or several (`MultiSelect`, `CheckboxSelect`). A multi-pick opens from this select-shaped field too, never a `Button`, which means "do an action"; its text is the field name with a dim count ("Compare regions 0 / 4"), or a value that names itself ("All locations"). All three draw it from `selectTriggerClassName` + `SelectChevron`                                                                                                                                                                                                                                                                  |
 | Labelled ghost `Button` ending in `CaretDown` (`Icon.Expanded`), no field box                         | Opens a menu of actions on the view (the Community header's Manage, the Fittings header's Fittings menu). The label names the group; an item that opens a window opens it after the menu closes. A count it carries ("Manage · 2 waiting") is the one thing inside that waits on the pilot                                                                                                                                                                                                                                                                                                                                                                  |
 | Small bordered chip, label + age dot + `CaretDown`, at the tab row's right end                        | Opens a popover table of when each widget last read (the Overview's "Data updated"). A readout that is also a target, so the `sm` height tier, not a 44px button. Employment History carries the same label as plain text.                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Bordered `Button` "Legend" ending in `CaretDown` (`Icon.Expanded`), at a toolbar's right end          | Opens a read-only popover keying the view's marks (the Ship Tree ladder's Legend). Nothing inside is pressable; it stands in for an inline legend line that took toolbar room. The map, with room beside its canvas, keeps its legend inline                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `SegmentedControl` with a count in each segment, in a filter box                                      | Narrows the list by one exclusive axis whose split is worth seeing before choosing (the Ship Tree ladder's All / Can fly / Can't fly). The counts are the scope's own split and no other filter changes them; a pick away from All counts in `activeCount` like any filter                                                                                                                                                                                                                                                                                                                                                                                  |
+| Count-bearing chip dimmed (`opacity-50`) but live, in a picker bar                                    | While filters are on, that option has no matches (the Ship Tree faction bar's 0). It stays in place and pressable, so the bar never shifts; the selected chip never dims. The count beside it carries the meaning, not the dimming                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Bordered `sm` `Button`: dim label, current value, trailing `CaretRight` (`Icon.GoTo`)                 | Opens a side panel holding the controls that set that value: a right `SlideOver` (page stays live), a full-height sheet on a phone. The Fittings stats column's Pilot and Situation triggers (`StatsScopeTrigger`). The value is what every figure below is worked out under, so a non-default one (missing skills, weather, overheat) reads on the button with the panel shut; `aria-haspopup="dialog"` and `aria-expanded`. A bordered button, not a row, so it never reads as the row's "goes to another view" caret; the caret does not rotate (that is expand-in-place).                                                                               |
 | `CaretLeft` / `CaretRight` over an overflowing tab bar's faded edge                                   | More tabs lie past this edge (`Tabs`). Pointer only: hidden on touch, where the swipe and the cut-off tab already say so. Clicking pages the bar; a vertical wheel over the bar does the same. Never a tab stop (arrow keys travel the bar).                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Round count badge after a tab's label                                                                 | How many things the tab holds (`Tabs`' `count`; the Community page's Members). Part of the tab's name ("Members 12"), never a control. Neutral hairline ring, accent-dim on the selected tab; no fill, so it never reads as the alerts bell's badge. One rule for tone (`countTone`): a count is neutral unless it counts things to recover (`danger`: Corp assets' Impounded, Asset safety) or things waiting on someone else (`warning`: Corp deliveries); the number always prints, so the tint is never the only signal. Work that waits on the pilot still rides on its own control ("Manage · 2 waiting")                                             |
@@ -1419,6 +1436,14 @@ Every interactive element takes its states from one shared recipe in
   leading icon and locks the width. The button is `aria-disabled` while it
   runs, and the start and result are announced through a toast or a polite
   live region.
+- **Search still running in a picker:** when a search picker's results wait
+  on a request, the open list ends with a dim row: a small `Spinner` (its label
+  announces it) and "Searching <kind>…" text. The row is not an option and can't be
+  highlighted. The earlier results that still match stay listed above it. Enter
+  waits for the answer and doesn't fall back to the typed text. A place whose
+  name matches the typed text exactly (case and punctuation aside) leads the
+  list highlighted, and a pasted exact name is picked outright. Example: the
+  Survey location box.
 - **Selected / on:**
   - A toggle (`aria-pressed`) takes the accent tint. A `SegmentedControl`
     segment adds a 2px accent underline inside its box, so selected is not

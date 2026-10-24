@@ -5,9 +5,11 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, LoadFailedState, Panel, Spinner } from '@/components/ui';
+import { Button, EmptyState, LoadFailedState, Panel, Spinner, Toast } from '@/components/ui';
+import { usePageTab } from '@/lib/usePageTab';
 import { ActionResult, SettingsHint } from '@/features/settings/settingsFields';
 import { SrpSettingsEditor } from './SrpSettingsEditor';
+import { SRP_TABS } from './srpTabs';
 import { useSrpSettings } from './useSrpSettings';
 
 function FirstTime({ onTurnOn }: { onTurnOn: () => Promise<void> }) {
@@ -52,37 +54,51 @@ function FirstTime({ onTurnOn }: { onTurnOn: () => Promise<void> }) {
 export function SrpSettingsView() {
   const { t } = useTranslation();
   const data = useSrpSettings();
+  const [, selectTab] = usePageTab(SRP_TABS);
   const [saveFailed, setSaveFailed] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   // A half-done save reloads and remounts the form, so the failure line lives here.
   const save: typeof data.save = async (patch, enabled) => {
     setSaveFailed(false);
     try {
       await data.save(patch, enabled);
+      setToast(t('srp.settings.saved'));
     } catch {
       setSaveFailed(true);
     }
   };
+  // Turning SRP on adds the Queue tab: stay on Settings, where the percents and Hull Rules are set.
+  const turnOn = async () => {
+    selectTab('settings');
+    await data.turnOn();
+  };
   const { state } = data;
+  let body;
   switch (state.status) {
     case 'loading':
-      return <Spinner label={t('common.loading')} />;
+      body = <Spinner label={t('common.loading')} />;
+      break;
     case 'denied':
-      return (
+      body = (
         <EmptyState title={t('srp.settings.deniedTitle')} hint={t('srp.settings.deniedHint')} />
       );
+      break;
     case 'failed':
-      return <LoadFailedState title={t('srp.settings.loadFailed')} onRetry={data.reload} />;
+      body = <LoadFailedState title={t('srp.settings.loadFailed')} onRetry={data.reload} />;
+      break;
     case 'not-director':
-      return (
+      body = (
         <EmptyState
           title={t('srp.settings.directorOnlyTitle')}
           hint={t('srp.settings.directorOnlyHint')}
         />
       );
+      break;
     case 'never-on':
-      return <FirstTime onTurnOn={data.turnOn} />;
+      body = <FirstTime onTurnOn={turnOn} />;
+      break;
     case 'ready':
-      return (
+      body = (
         <SrpSettingsEditor
           // A reload hands back new settings: start the form from them.
           key={state.settings.updatedAt}
@@ -94,5 +110,12 @@ export function SrpSettingsView() {
           onReclaim={data.reclaim}
         />
       );
+      break;
   }
+  return (
+    <>
+      {body}
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+    </>
+  );
 }

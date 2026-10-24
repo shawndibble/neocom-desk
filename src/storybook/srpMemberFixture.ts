@@ -30,6 +30,8 @@ export interface SrpFixtureOptions {
   requireFleetOrFc?: boolean;
   noClaims?: boolean;
   noLosses?: boolean;
+  /** The corp checks Hurricanes against a Doctrine Fit (see `previewDoctrine`). */
+  doctrine?: boolean;
 }
 
 const claim = (
@@ -60,7 +62,13 @@ export function createSrpMemberFixture(
   now: number,
   options: SrpFixtureOptions = {}
 ): SrpMemberBackend {
-  const { enabled = true, requireFleetOrFc = false, noClaims = false, noLosses = false } = options;
+  const {
+    enabled = true,
+    requireFleetOrFc = false,
+    noClaims = false,
+    noLosses = false,
+    doctrine = false,
+  } = options;
   const status: SrpStatus = enabled
     ? {
         corporationId: SRP_FIXTURE_CORPORATION_ID,
@@ -68,7 +76,19 @@ export function createSrpMemberFixture(
         settings: {
           killmailPct: 70,
           appraisalPct: null,
-          hullRules: [{ scope: 'hull', id: CAPSULE, kind: 'not-covered' }],
+          hullRules: [
+            { scope: 'hull', id: CAPSULE, kind: 'not-covered' },
+            ...(doctrine
+              ? [
+                  {
+                    scope: 'hull' as const,
+                    id: HURRICANE,
+                    kind: 'pay-percent' as const,
+                    doctrineIds: ['d-hurricane'],
+                  },
+                ]
+              : []),
+          ],
           windowDays: 30,
           requireFleetOrFc,
         },
@@ -112,6 +132,41 @@ export function createSrpMemberFixture(
       ];
 
   return {
+    // A Hurricane is checked: `ondoctrine` in the link matches, a lost-ship tap or any other
+    // Hurricane link is off doctrine, and every other hull is not checked.
+    previewDoctrine: async (_c, _corp, killmail) => {
+      const killmailId = Number(/(?:kill|killmails)\/(\d+)/.exec(killmail)?.[1] ?? 0);
+      const hullTypeId = killmailId === 8003 ? FEROX : HURRICANE;
+      if (killmail.includes('unchecked') || hullTypeId === FEROX) {
+        return { killmailId, hullTypeId: FEROX, check: { status: 'not-checked' } };
+      }
+      if (killmail.includes('ondoctrine')) {
+        return {
+          killmailId,
+          hullTypeId,
+          check: {
+            status: 'matched',
+            doctrineId: 'd-hurricane',
+            doctrineName: 'Hurricane - artillery',
+          },
+        };
+      }
+      return {
+        killmailId,
+        hullTypeId,
+        check: {
+          status: 'off-doctrine',
+          doctrineId: 'd-hurricane',
+          doctrineName: 'Hurricane - artillery',
+          diff: {
+            missingModules: [2048],
+            extraModules: [519, 519],
+            missingRigs: [31059],
+            extraRigs: [],
+          },
+        },
+      };
+    },
     status: async () => status,
     claims: async () => claims,
     lostLosses: async () => losses,

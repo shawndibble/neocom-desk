@@ -48,6 +48,7 @@
 import { db } from '@/db';
 import { getUniverseStructure, type UniverseStructure } from '@/esi/endpoints';
 import { EsiError, isCredentialFailure } from '@/esi/client';
+import { isCachePurgePending } from '@/esi/cachePurge';
 import {
   conditionalFetch,
   loadWithCache,
@@ -290,6 +291,42 @@ export async function readCachedStructureNames(
     if (row?.value.name) names.set(id, row.value.name);
   }
   return names;
+}
+
+/** A structure whose name this device already holds. */
+export interface CachedStructure {
+  id: number;
+  name: string;
+}
+
+/**
+ * Every structure this device has named, read from the roster-wide rows with no
+ * request: a typeahead's instant matches. Refusal memos under the same prefix
+ * are skipped, as is everything while a purge is pending.
+ */
+export async function listCachedStructures(): Promise<CachedStructure[]> {
+  if (await isCachePurgePending(GLOBAL_CACHE_CHARACTER_ID)) return [];
+  // A prefix range over the compound key, as `purgeSharedStructureCache` deletes:
+  // U+FFFF is the highest UTF-16 code unit, so the bound sits above every
+  // `structure:…` key.
+  const rows = await db.esiCache
+    .where('[characterId+key]')
+    .between(
+      [GLOBAL_CACHE_CHARACTER_ID, STRUCTURE_CACHE_KEY_PREFIX],
+      [GLOBAL_CACHE_CHARACTER_ID, STRUCTURE_CACHE_KEY_PREFIX + String.fromCharCode(0xffff)],
+      true,
+      true
+    )
+    .toArray();
+  const structures: CachedStructure[] = [];
+  for (const row of rows) {
+    const id = /^structure:(\d+)$/.exec(row.key)?.[1];
+    const name = (row.value as Partial<UniverseStructure> | undefined)?.name;
+    if (id !== undefined && typeof name === 'string' && name !== '') {
+      structures.push({ id: Number(id), name });
+    }
+  }
+  return structures;
 }
 
 /**

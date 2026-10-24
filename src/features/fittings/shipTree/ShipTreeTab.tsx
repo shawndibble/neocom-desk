@@ -6,13 +6,13 @@
  * opens its Ship Info window. The page header and tab bar are the Ships
  * route's.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, SegmentedControl, Spinner } from '@/components/ui';
-import { intParam } from '@/lib/urlState';
+import { enumParam, enumSetParam, intParam } from '@/lib/urlState';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { useUrlParam } from '@/lib/useUrlState';
+import { useUrlParams } from '@/lib/useUrlState';
 import type { ShipTreeShip } from '@/sde/types';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOnline } from '@/stores/network';
@@ -20,7 +20,14 @@ import { FactionBar } from './FactionBar';
 import { ShipInfoWindow } from './ShipInfoWindow';
 import { ShipTreeLadder } from './ShipTreeLadder';
 import { ShipTreeMap } from './ShipTreeMap';
-import { DEFAULT_FACTION_ID, resolveFactionID } from './shipTreeModel';
+import {
+  DEFAULT_FACTION_ID,
+  factionMatchCounts,
+  isShipTreeFiltered,
+  MASTERY_TIERS,
+  resolveFactionID,
+  type ShipTreeFilter,
+} from './shipTreeModel';
 import {
   resolveShipTreeView,
   useShipTreeViewPreference,
@@ -31,7 +38,14 @@ import { useShipTreeData, type ShipTreeSource } from './useShipTreeData';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import './shipTree.css';
 
-const FACTION_PARAM = intParam(DEFAULT_FACTION_ID, { min: 0 });
+const MASTERY_KEYS = MASTERY_TIERS.map(String);
+// One group: a tap that switches faction from a filtered empty state writes
+// both, and two hooks writing in one tick would drop the first (ADR 0015).
+const TREE_PARAMS = {
+  faction: intParam(DEFAULT_FACTION_ID, { min: 0 }),
+  fly: enumParam(['all', 'canFly', 'cantFly'] as const, 'all'),
+  mastery: enumSetParam(MASTERY_KEYS, []),
+};
 
 export function ShipTreeTab() {
   const { t } = useTranslation();
@@ -78,8 +92,28 @@ export function ShipTreeTab() {
 
 function ShipTree({ source }: { source: ShipTreeSource }) {
   const { t } = useTranslation();
-  const [requested, setFaction] = useUrlParam('faction', FACTION_PARAM);
-  const factionID = resolveFactionID(source.data, requested);
+  const [params, setParams] = useUrlParams(TREE_PARAMS);
+  const factionID = resolveFactionID(source.data, params.faction);
+  // Until the Mastery data loads every hull reads tier 0, so a Mastery pick
+  // (from the URL) is set aside rather than emptying the ladder; it stays in
+  // the URL and applies once the data arrives.
+  const masteriesLoaded = source.masteriesStatus === 'loaded';
+  const filter = useMemo<ShipTreeFilter>(
+    () => ({
+      fly: params.fly,
+      mastery: masteriesLoaded ? new Set([...params.mastery].map(Number)) : new Set(),
+    }),
+    [params.fly, params.mastery, masteriesLoaded]
+  );
+  const setFilter = useCallback(
+    (next: ShipTreeFilter) =>
+      setParams(
+        masteriesLoaded
+          ? { fly: next.fly, mastery: new Set([...next.mastery].map(String)) }
+          : { fly: next.fly }
+      ),
+    [setParams, masteriesLoaded]
+  );
   const tree = useFactionTree(source, factionID);
   const [selected, setSelected] = useState<ShipTreeShip | null>(null);
 
@@ -101,7 +135,30 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
       onChange={(next) => void setView(next)}
     />
   );
-  const onFaction = useCallback((id: number) => setFaction(id), [setFaction]);
+  const onFaction = useCallback((id: number) => setParams({ faction: id }), [setParams]);
+  const factionMatches = useMemo(
+    () =>
+      view === 'ladder' && isShipTreeFiltered(filter)
+        ? factionMatchCounts(
+            source.data.factions.map((f) => f.id),
+            source.data.ships,
+            source.statuses,
+            filter
+          )
+        : undefined,
+    [view, filter, source.data, source.statuses]
+  );
+
+  // Above a phone's map; under the ladder's toolbar, whose filters change its counts.
+  const factionBar = (
+    <FactionBar
+      data={source.data}
+      factionID={factionID}
+      statuses={source.statuses}
+      matches={factionMatches}
+      onFaction={onFaction}
+    />
+  );
 
   return (
     <>
@@ -113,14 +170,7 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
           </Button>
         </p>
       )}
-      {(view === 'ladder' || isPhone) && (
-        <FactionBar
-          data={source.data}
-          factionID={factionID}
-          statuses={source.statuses}
-          onFaction={onFaction}
-        />
-      )}
+      {view === 'map' && isPhone && factionBar}
       {view === 'map' ? (
         <ShipTreeMap
           source={source}
@@ -135,6 +185,11 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
         <ShipTreeLadder
           source={source}
           tree={tree}
+          filter={filter}
+          onFilter={setFilter}
+          factionMatches={factionMatches}
+          factionBar={factionBar}
+          selectedTypeID={selected?.typeID ?? null}
           onFaction={onFaction}
           onOpenShip={setSelected}
           viewSwitch={viewSwitch}

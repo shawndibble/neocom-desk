@@ -38,7 +38,7 @@ import {
 import { getSyncFirestore } from './firebaseApp';
 import { handleOwnerHashChange } from './ownerHash';
 import { appendTombstones, heartbeatKey, tombstoneKey } from './localBookkeeping';
-import { createSyncScheduler } from './syncScheduler';
+import { createSyncScheduler, type SyncScope } from './syncScheduler';
 import { ensureSignedIn } from './syncAuth';
 import { isAllowedSyncedSettingKey } from './syncedSettings';
 import {
@@ -54,6 +54,8 @@ import {
   SKILL_PLANS,
   STATION_PINS,
   SYNCED_SETTINGS,
+  type EditableCollection,
+  type SyncedCollectionName,
 } from './syncedCollections';
 
 /**
@@ -77,12 +79,12 @@ export { getSyncStatus, subscribeSyncStatus, type SyncState, type SyncStatus } f
 async function recordDeletion(
   characterId: number,
   id: string,
-  tombstoneKey: string,
+  spec: EditableCollection,
   deleteRow: () => Promise<void>
 ): Promise<void> {
   await deleteRow();
-  await appendTombstones(tombstoneKey, [id]);
-  scheduleSync(characterId);
+  await appendTombstones(tombstoneKey(spec, characterId), [id]);
+  scheduleSync(characterId, { collections: [spec.remoteName] });
 }
 
 /**
@@ -96,20 +98,18 @@ async function recordDeletion(
 async function recordBulkDeletion(
   characterId: number,
   ids: string[],
-  tombstoneKey: string,
+  spec: EditableCollection,
   deleteRows: (ids: string[]) => Promise<unknown>
 ): Promise<void> {
   if (ids.length === 0) return;
   await deleteRows(ids);
-  await appendTombstones(tombstoneKey, ids);
-  scheduleSync(characterId);
+  await appendTombstones(tombstoneKey(spec, characterId), ids);
+  scheduleSync(characterId, { collections: [spec.remoteName] });
 }
 
 /** Delete a Skill Plan locally + tombstone, so the deletion propagates. */
 export async function markPlanDeleted(characterId: number, planId: string): Promise<void> {
-  await recordDeletion(characterId, planId, tombstoneKey(SKILL_PLANS, characterId), () =>
-    db.skillPlans.delete(planId)
-  );
+  await recordDeletion(characterId, planId, SKILL_PLANS, () => db.skillPlans.delete(planId));
 }
 
 /** Build Plan analogue of markPlanDeleted — same tombstone semantics. */
@@ -127,9 +127,7 @@ export async function markPlanDeleted(characterId: number, planId: string): Prom
  * Records row click.
  */
 export async function markBuildPlanDeleted(characterId: number, planId: string): Promise<void> {
-  await recordDeletion(characterId, planId, tombstoneKey(BUILD_PLANS, characterId), () =>
-    db.buildPlans.delete(planId)
-  );
+  await recordDeletion(characterId, planId, BUILD_PLANS, () => db.buildPlans.delete(planId));
 }
 
 /**
@@ -140,16 +138,14 @@ export async function markBuildPlanDeleted(characterId: number, planId: string):
  * dropping tombstones for all but the last write to land.
  */
 export async function markBuildPlansDeleted(characterId: number, planIds: string[]): Promise<void> {
-  await recordBulkDeletion(characterId, planIds, tombstoneKey(BUILD_PLANS, characterId), (ids) =>
+  await recordBulkDeletion(characterId, planIds, BUILD_PLANS, (ids) =>
     db.buildPlans.bulkDelete(ids)
   );
 }
 
 /** Fitting analogue of markPlanDeleted — same tombstone semantics (issue #1538). */
 export async function markFittingDeleted(characterId: number, fittingId: string): Promise<void> {
-  await recordDeletion(characterId, fittingId, tombstoneKey(FITTINGS, characterId), () =>
-    db.fittings.delete(fittingId)
-  );
+  await recordDeletion(characterId, fittingId, FITTINGS, () => db.fittings.delete(fittingId));
 }
 
 function stationPinId(characterId: number, locationId: number): string {
@@ -168,7 +164,7 @@ export async function setCharacterStationPin(
     scope: 'character',
     updatedAt: Date.now(),
   });
-  scheduleSync(characterId);
+  scheduleSync(characterId, { collections: [STATION_PINS.remoteName] });
 }
 
 /**
@@ -184,7 +180,7 @@ export async function setCharacterStationPin(
  * definition supersedes any Character-specific opt-in that predates it.
  */
 export async function setAccountStationPin(locationId: number): Promise<void> {
-  await fanOutAccountWide(db.stationPins, (characterId, updatedAt) => ({
+  await fanOutAccountWide(STATION_PINS, db.stationPins, (characterId, updatedAt) => ({
     id: stationPinId(characterId, locationId),
     characterId,
     locationId,
@@ -198,13 +194,14 @@ export async function setAccountStationPin(locationId: number): Promise<void> {
  * each. The shared body of every account-wide setter.
  */
 async function fanOutAccountWide<T>(
+  spec: EditableCollection,
   table: { bulkPut(rows: T[]): Promise<unknown> },
   toRow: (characterId: number, updatedAt: number) => T
 ): Promise<void> {
   const characters = await db.characters.toArray();
   const now = Date.now();
   await table.bulkPut(characters.map((c) => toRow(c.characterId, now)));
-  for (const c of characters) scheduleSync(c.characterId);
+  for (const c of characters) scheduleSync(c.characterId, { collections: [spec.remoteName] });
 }
 
 /**
@@ -220,9 +217,7 @@ export async function clearStationPin(locationId: number): Promise<void> {
   const rows = await db.stationPins.where('locationId').equals(locationId).toArray();
   await Promise.all(
     rows.map((row) =>
-      recordDeletion(row.characterId, row.id, tombstoneKey(STATION_PINS, row.characterId), () =>
-        db.stationPins.delete(row.id)
-      )
+      recordDeletion(row.characterId, row.id, STATION_PINS, () => db.stationPins.delete(row.id))
     )
   );
 }
@@ -241,7 +236,7 @@ function planetRichnessId(characterId: number, planetId: number): string {
  * for every Character — so this always writes every row.
  */
 export async function setPlanetRichness(planetId: number, order: number[]): Promise<void> {
-  await fanOutAccountWide(db.planetRichness, (characterId, updatedAt) => ({
+  await fanOutAccountWide(PLANET_RICHNESS, db.planetRichness, (characterId, updatedAt) => ({
     id: planetRichnessId(characterId, planetId),
     characterId,
     planetId,
@@ -259,7 +254,7 @@ export async function clearPlanetRichness(planetId: number): Promise<void> {
   const rows = await db.planetRichness.where('planetId').equals(planetId).toArray();
   await Promise.all(
     rows.map((row) =>
-      recordDeletion(row.characterId, row.id, tombstoneKey(PLANET_RICHNESS, row.characterId), () =>
+      recordDeletion(row.characterId, row.id, PLANET_RICHNESS, () =>
         db.planetRichness.delete(row.id)
       )
     )
@@ -291,7 +286,8 @@ export async function setSyncedSetting(key: string, value: unknown): Promise<voi
  *
  * Deliberately does NOT check the allow-list — a key removed from
  * SYNCED_SETTING_KEYS must still be deletable. Like setSyncedSetting it leaves
- * scheduling to the caller (pair it with scheduleSync(characterId)).
+ * scheduling to the caller (pair it with
+ * `scheduleSync(characterId, { collections: ['settings'] })`).
  */
 export async function deleteSyncedSetting(key: string): Promise<void> {
   if (!isSyncedSettingKey(key)) {
@@ -312,7 +308,7 @@ export async function deleteSyncedSetting(key: string): Promise<void> {
 // Sync driver — the queue lives in syncScheduler.ts; a pass is syncCharacter.
 // ---------------------------------------------------------------------------
 
-export { type SyncPriority } from './syncScheduler';
+export { type ScheduleSyncOptions, type SyncPriority, type SyncScope } from './syncScheduler';
 const { scheduleSync, triggerSync, haltSync, resetSyncHalt } = createSyncScheduler(syncCharacter);
 export { triggerSync, scheduleSync, haltSync, resetSyncHalt };
 
@@ -339,24 +335,22 @@ export async function markProductionRunDeleted(characterId: number, runId: strin
   await recordBulkDeletion(
     characterId,
     saleLinks.map((l) => l.id),
-    tombstoneKey(PRODUCTION_SALE_LINKS, characterId),
+    PRODUCTION_SALE_LINKS,
     (ids) => db.productionSaleLinks.bulkDelete(ids)
   );
   await recordBulkDeletion(
     characterId,
     orderWatches.map((w) => w.id),
-    tombstoneKey(PRODUCTION_ORDER_WATCHES, characterId),
+    PRODUCTION_ORDER_WATCHES,
     (ids) => db.productionOrderWatches.bulkDelete(ids)
   );
   await recordBulkDeletion(
     characterId,
     losses.map((l) => l.id),
-    tombstoneKey(PRODUCTION_LOSSES, characterId),
+    PRODUCTION_LOSSES,
     (ids) => db.productionLosses.bulkDelete(ids)
   );
-  await recordDeletion(characterId, runId, tombstoneKey(PRODUCTION_RUNS, characterId), () =>
-    db.productionRuns.delete(runId)
-  );
+  await recordDeletion(characterId, runId, PRODUCTION_RUNS, () => db.productionRuns.delete(runId));
 }
 
 /**
@@ -365,7 +359,7 @@ export async function markProductionRunDeleted(characterId: number, runId: strin
  * the removal yet and silently re-attribute the sale.
  */
 export async function removeProductionSaleLink(characterId: number, linkId: string): Promise<void> {
-  await recordDeletion(characterId, linkId, tombstoneKey(PRODUCTION_SALE_LINKS, characterId), () =>
+  await recordDeletion(characterId, linkId, PRODUCTION_SALE_LINKS, () =>
     db.productionSaleLinks.delete(linkId)
   );
 }
@@ -375,17 +369,14 @@ export async function removeProductionOrderWatch(
   characterId: number,
   watchId: string
 ): Promise<void> {
-  await recordDeletion(
-    characterId,
-    watchId,
-    tombstoneKey(PRODUCTION_ORDER_WATCHES, characterId),
-    () => db.productionOrderWatches.delete(watchId)
+  await recordDeletion(characterId, watchId, PRODUCTION_ORDER_WATCHES, () =>
+    db.productionOrderWatches.delete(watchId)
   );
 }
 
 /** Remove a Run Loss — same tombstone reasoning as removeProductionSaleLink. */
 export async function removeProductionLoss(characterId: number, lossId: string): Promise<void> {
-  await recordDeletion(characterId, lossId, tombstoneKey(PRODUCTION_LOSSES, characterId), () =>
+  await recordDeletion(characterId, lossId, PRODUCTION_LOSSES, () =>
     db.productionLosses.delete(lossId)
   );
 }
@@ -451,10 +442,18 @@ async function settleAllThenThrow(tasks: readonly NamedTask[], limit: number): P
   throw thrown;
 }
 
-async function syncCharacter(characterId: number): Promise<void> {
+/**
+ * One pass for one Character over `requested`: every collection, or only the
+ * named ones (syncScheduler.ts decides when narrowing is safe). Each listed
+ * collection is still pulled before it is pushed — narrowing skips whole
+ * collections, never the pull of one it writes. Resolves with the scope it ran.
+ */
+async function syncCharacter(characterId: number, requested: SyncScope): Promise<SyncScope> {
   const character = await db.characters.get(characterId);
   if (!character) throw new Error(`Unknown character ${characterId}`);
-  await handleOwnerHashChange(character);
+  // A new owner's wipe empties every collection and clears every cursor:
+  // whatever the request named, only a full pass refills them.
+  const scope: SyncScope = (await handleOwnerHashChange(character)) ? 'all' : requested;
 
   const uid = await ensureSignedIn(characterId);
   const firestore = getSyncFirestore();
@@ -464,18 +463,24 @@ async function syncCharacter(characterId: number): Promise<void> {
 
   // A failing collection no longer stops the ones after it: each collection's
   // cursor only advances on its own success, so what did apply stays applied
-  // and the failed one re-reads its window on the next pass.
+  // and the failed one re-reads its window on the next pass. A collection
+  // left out of a narrowed pass is not touched at all — its pull cursor,
+  // tombstones and rows stay exactly as the last pass left them.
+  const tasks: (NamedTask & { name: SyncedCollectionName })[] = [
+    ...EDITABLE_COLLECTIONS.map((spec) => ({
+      name: spec.remoteName,
+      run: () => syncEditableCollection(spec, ctx),
+    })),
+    { name: NOTIFICATION_FEED.remoteName, run: () => syncFeed(ctx) },
+    { name: SYNCED_SETTINGS.remoteName, run: () => syncSettings(ctx) },
+  ];
   await settleAllThenThrow(
-    [
-      ...EDITABLE_COLLECTIONS.map((spec) => ({
-        name: spec.remoteName,
-        run: () => syncEditableCollection(spec, ctx),
-      })),
-      { name: NOTIFICATION_FEED.remoteName, run: () => syncFeed(ctx) },
-      { name: SYNCED_SETTINGS.remoteName, run: () => syncSettings(ctx) },
-    ],
+    scope === 'all' ? tasks : tasks.filter((task) => scope.has(task.name)),
     COLLECTION_PULL_CONCURRENCY
   );
+  // Heartbeat below means "every collection synced", which a narrowed pass
+  // has not shown.
+  if (scope !== 'all') return scope;
 
   // Heartbeat (issue #2065): stamped only once every collection above synced,
   // so the scheduled purge of accounts idle for 90 days sees an account that
@@ -491,4 +496,5 @@ async function syncCharacter(characterId: number): Promise<void> {
     );
     await db.settings.put({ key: heartbeatKey(uid), value: now });
   }
+  return scope;
 }

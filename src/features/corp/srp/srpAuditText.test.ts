@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import i18n from '@/i18n';
 import type { SrpAuditEntry } from '../srpClaimTypes';
-import { auditText } from './srpAuditText';
+import { auditText, collapseRepeatedSaves } from './srpAuditText';
 
 const entry = (action: string, detail: Record<string, unknown>): SrpAuditEntry => ({
   id: 'x',
@@ -59,5 +59,40 @@ describe('auditText', () => {
   });
   it('never shows a raw action string', () => {
     expect(auditText(t, entry('somethingNew', {}))).toBe('Other activity');
+  });
+});
+
+describe('Doctrine Fit lines', () => {
+  it('names the fit', () => {
+    expect(auditText(t, entry('addDoctrine', { name: 'Doctrine Rifter' }))).toBe(
+      'Added Doctrine Fit Doctrine Rifter'
+    );
+    expect(auditText(t, entry('deleteDoctrine', { name: 'Old' }))).toBe('Deleted Doctrine Fit Old');
+  });
+});
+
+describe('collapseRepeatedSaves', () => {
+  const at = (id: string, action: string, ms: number, by = 2): SrpAuditEntry => ({
+    ...entry(action, {}),
+    id,
+    at: ms,
+    by,
+  });
+  it('keeps the newest of saves by one officer within a minute', () => {
+    const out = collapseRepeatedSaves([
+      at('a', 'saveSettings', 100_000),
+      at('b', 'saveSettings', 60_000),
+      at('c', 'turnOn', 50_000),
+      at('d', 'saveSettings', 40_000),
+    ]);
+    expect(out.map((e) => e.id)).toEqual(['a', 'c', 'd']);
+  });
+  it('keeps saves a minute apart or by different officers', () => {
+    const out = collapseRepeatedSaves([
+      at('a', 'saveSettings', 200_000),
+      at('b', 'saveSettings', 100_000),
+      at('c', 'saveSettings', 99_000, 3),
+    ]);
+    expect(out.map((e) => e.id)).toEqual(['a', 'b', 'c']);
   });
 });

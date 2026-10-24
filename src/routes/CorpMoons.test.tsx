@@ -70,3 +70,19 @@ describe('CorpMoons gate', () => {
     expect(screen.queryByRole('button', { name: 'Allow mining ledger access' })).toBeNull();
   });
 });
+
+describe('CorpMoons load errors', () => {
+  it('words a rejected token as a failed check, not a missing role', () => {
+    bookState = { status: 'denied', unverified: true };
+    mount({ state: 'ready' });
+    expect(screen.getByText("Couldn't verify your corp role")).toBeInTheDocument();
+    expect(screen.queryByText('Moons need the Accountant role')).toBeNull();
+  });
+
+  it('shows a plain sentence with the code on a dim line, never the SDK string', () => {
+    bookState = { status: 'failed', message: 'auth/invalid-api-key' };
+    mount({ state: 'ready' });
+    expect(screen.getByText('Try again in a moment.')).toBeInTheDocument();
+    expect(screen.getByText('auth/invalid-api-key')).toBeInTheDocument();
+  });
+});

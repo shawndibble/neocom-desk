@@ -34,6 +34,7 @@ vi.mock('@/features/corp/boardData', async (importOriginal) => ({
 }));
 vi.mock('@/features/corp/members', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/corp/members')>()),
+  loadCorporationCeoId: vi.fn(),
   loadCorporationMemberIds: vi.fn(),
   loadCorporationMemberRoles: vi.fn(),
   loadCorporationMemberTracking: vi.fn(),
@@ -161,6 +162,7 @@ beforeEach(async () => {
     cached([tracking({ character_id: 1001 })])
   );
   mocked.loadCorporationMemberRoles.mockResolvedValue(cached([]));
+  mocked.loadCorporationCeoId.mockResolvedValue(null);
   mocked.loadMemberLabels.mockResolvedValue(labels());
   mocked.readPreviousRoster.mockResolvedValue(undefined);
   mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
@@ -281,13 +283,8 @@ describe('the roster table', () => {
     expect(row).toHaveTextContent('Never');
   });
 
-  /**
-   * The reason the page exists: the longest silence is at the top before
-   * anything is clicked. Sorted on the elapsed span the cell prints, not on the
-   * date behind it — sorting on the date would lead with the people still
-   * playing (AC4's default).
-   */
-  it('opens with the longest-silent member first', async () => {
+  /** CX-13: newest first by default, so the down arrow reads like a date column. */
+  it('opens with the most recently seen member first, under a down arrow', async () => {
     mocked.loadCorporationMemberTracking.mockResolvedValue(
       cached([
         tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
@@ -299,8 +296,26 @@ describe('the roster table', () => {
       .getAllByRole('row')
       .slice(1)
       .map((row) => row.textContent);
-    expect(names[0]).toContain('Silent Ren');
-    expect(names[1]).toContain('Jita Local');
+    expect(names[0]).toContain('Jita Local');
+    expect(names[1]).toContain('Silent Ren');
+    expect(within(table).getByRole('columnheader', { name: 'Last seen' })).toHaveAttribute(
+      'aria-sort',
+      'descending'
+    );
+  });
+
+  it('marks the corporation CEO on the roster', async () => {
+    mocked.loadCorporationCeoId.mockResolvedValue(1001);
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 }), tracking({ character_id: 1002 })])
+    );
+    const table = await rosterTable();
+    expect(
+      within(within(table).getByText('Jita Local').closest('tr')!).getByText('CEO')
+    ).toBeVisible();
+    expect(
+      within(within(table).getByText('Silent Ren').closest('tr')!).queryByText('CEO')
+    ).toBeNull();
   });
 
   it('tones a member past the dark threshold and counts them', async () => {
@@ -456,16 +471,18 @@ describe('the joins/leaves summary', () => {
   });
 });
 
-describe('roster rows are read-only', () => {
-  it('has no More actions button or context menu; the name is the Show info link', async () => {
+describe('roster row menu', () => {
+  it('keeps the name as the Show info link and opens the member actions from the ⋮ or a right-click', async () => {
     const table = await rosterTable();
-    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
-
     expect(within(table).getByRole('link', { name: 'Jita Local' })).toBeInTheDocument();
 
-    fireEvent.contextMenu(within(table).getByText('Jita Local'));
-    expect(screen.queryByRole('menuitem', { name: 'Copy name' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
+    expect(
+      within(table).getByRole('button', { name: /More actions for Jita Local/ })
+    ).toBeInTheDocument();
+    fireEvent.contextMenu(within(table).getByText('Jita Local').closest('tr')!);
+    expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /zKillboard/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Open in EVE/ })).toBeInTheDocument();
   });
 });
 
@@ -832,6 +849,7 @@ describe('Roles tab (#4613)', () => {
       ],
       titlesKnown: true,
       names: NAMES,
+      ceoId: null,
       fetchedAt: new Date(NOW),
       fromCache: false,
     },
@@ -884,7 +902,7 @@ describe('Roles tab (#4613)', () => {
     mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
     renderMembers('/corp/members/roles');
     await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
-    expect(currentLocation()).toBe('/corp/members/members');
+    expect(currentLocation()).toBe('/corp/members/roster');
     expect(roleAudit.loadRoleAudit).not.toHaveBeenCalled();
   });
 });

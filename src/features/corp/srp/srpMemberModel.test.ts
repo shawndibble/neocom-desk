@@ -3,6 +3,8 @@ import type { HullRule } from '../srpTypes';
 import {
   canRefile,
   esiKillmailLink,
+  hullIsDoctrineChecked,
+  looksLikeKillmailLink,
   lostRowKind,
   GENERIC_ERROR_KEY,
   memberErrorKey,
@@ -149,5 +151,31 @@ describe('memberErrorTarget', () => {
   it('shows what no control can fix, and unknown errors, on the form itself', () => {
     expect(of('srp-off')).toBe('form');
     expect(memberErrorTarget(new Error('offline'))).toBe('form');
+  });
+});
+
+describe('looksLikeKillmailLink', () => {
+  it('accepts a zKillboard or ESI killmail link, not other text', () => {
+    expect(looksLikeKillmailLink('https://zkillboard.com/kill/131204551/')).toBe(true);
+    expect(looksLikeKillmailLink(esiKillmailLink(5, 'a'.repeat(40)))).toBe(true);
+    expect(looksLikeKillmailLink('  zkillboard.com/kill/42  ')).toBe(true);
+    expect(looksLikeKillmailLink('https://zkillboard.com/kill/')).toBe(false);
+    expect(looksLikeKillmailLink('hello')).toBe(false);
+    expect(looksLikeKillmailLink('')).toBe(false);
+  });
+});
+
+describe('hullIsDoctrineChecked', () => {
+  const rules: HullRule[] = [
+    { scope: 'hull', id: 100, kind: 'pay-percent', doctrineIds: ['a'] },
+    { scope: 'hull', id: 101, kind: 'pay-percent', doctrineIds: [] },
+    { scope: 'hull', id: 102, kind: 'pay-percent' },
+    { scope: 'class', id: 10, kind: 'pay-percent' },
+  ];
+  it('is true only for a hull rule that lists a Doctrine Fit', () => {
+    expect(hullIsDoctrineChecked(rules, 100)).toBe(true);
+    expect(hullIsDoctrineChecked(rules, 101)).toBe(false);
+    expect(hullIsDoctrineChecked(rules, 102)).toBe(false);
+    expect(hullIsDoctrineChecked(rules, 10)).toBe(false);
   });
 });

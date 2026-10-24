@@ -1,5 +1,4 @@
-import { useMemo } from 'react';
-import { caretColumn } from './caretColumn';
+import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -9,21 +8,25 @@ import {
   SearchInput,
   StatChip,
   StatChips,
+  useOpenAfterMenu,
   type DataTableColumn,
 } from '@/components/ui';
-import type { MinerRow } from '@/engine/corpTaxBook/bookView';
+import { minerDetail, type BookView, type MinerRow } from '@/engine/corpTaxBook/bookView';
 import { boolParam, textParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useBook } from './useBook';
+import { caretColumn } from './caretColumn';
 import { isk, shortDate } from './moonsFormat';
 import { minerPath } from './moonsPaths';
 import { OverdueWord, StandingWord } from './moonsParts';
 import { NeedsYouQueue } from './NeedsYouQueue';
+import { MinerRowMenu } from './MinerRowMenu';
+import { ReasonDialog, RecordPaymentDialog } from './BookDialogs';
 
 const PARAMS = {
   q: textParam(),
   members: boolParam(true),
-  guests: boolParam(false),
+  guests: boolParam(true),
 };
 
 /** A Miner is listed while it owes, is owed, or has days waiting; the rest are only counted. */
@@ -31,15 +34,35 @@ const isActive = (m: MinerRow) => m.owed > 0 || m.unbilled > 0 || m.pending > 0 
 
 export function MinersTab() {
   const { t } = useTranslation();
-  const { view, names } = useBook();
+  const { view, names, edit, canEdit } = useBook();
+  const [dialog, setDialog] = useState<{ kind: 'record' | 'dismiss'; miner: MinerRow } | null>(
+    null
+  );
+  const [notice, setNotice] = useState<string | null>(null);
+  const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const navigate = useNavigate();
+  const rowContextMenu = useCallback(
+    (m: MinerRow, tr: ReactElement) => (
+      <MinerRowMenu
+        miner={m}
+        onRecord={(miner) => run(() => setDialog({ kind: 'record', miner }))}
+        onDismiss={(miner) => run(() => setDialog({ kind: 'dismiss', miner }))}
+        onNotice={setNotice}
+        onOpenChange={(open) => open && setNotice(null)}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
+        {tr}
+      </MinerRowMenu>
+    ),
+    [run, onCloseAutoFocus]
+  );
   const [params, setParams] = useUrlParams(PARAMS);
   const nameOf = (m: MinerRow) => names.character(m.mainCharacterId);
 
   const counts = useMemo(
     () => ({
-      members: view.miners.filter((m) => m.standing !== 'guest').length,
-      guests: view.miners.filter((m) => m.standing === 'guest').length,
+      members: view.miners.filter((m) => m.standing !== 'guest' && isActive(m)).length,
+      guests: view.miners.filter((m) => m.standing === 'guest' && isActive(m)).length,
     }),
     [view.miners]
   );
@@ -55,6 +78,11 @@ export function MinersTab() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `names` identity changes as names resolve
   }, [view.miners, params, names]);
+  // What the Non-members chip being off keeps out of the table.
+  const hiddenGuests = params.guests
+    ? []
+    : view.miners.filter((m) => m.standing === 'guest' && isActive(m));
+  const hiddenGuestOwed = hiddenGuests.reduce((sum, m) => sum + m.owed, 0);
   const hidden = view.miners.length - view.miners.filter(isActive).length;
 
   const columns: DataTableColumn<MinerRow>[] = [
@@ -119,7 +147,7 @@ export function MinersTab() {
       render: (m) => (m.lastPaidAt ? shortDate(m.lastPaidAt) : '—'),
       sortValue: (m) => m.lastPaidAt ?? '',
     },
-    caretColumn<MinerRow>(),
+    caretColumn<MinerRow>(() => canEdit),
   ];
 
   return (
@@ -142,6 +170,11 @@ export function MinersTab() {
         <StatChip label={t('corpTaxBook.moons.chips.credit')} value={isk(view.totals.credit)} />
       </StatChips>
       <NeedsYouQueue />
+      {notice && (
+        <p role="status" className="text-xs text-text-dim">
+          {notice}
+        </p>
+      )}
       {view.donationsBeforeBook > 0 && (
         <p className="text-xs text-text-dim">
           {t('corpTaxBook.moons.beforeBook.donations', { count: view.donationsBeforeBook })}
@@ -169,26 +202,78 @@ export function MinersTab() {
             count={counts.guests}
           />
         </div>
-        <DataTable
-          label={t('corpTaxBook.moons.tabs.miners')}
-          columns={columns}
-          rows={rows}
-          rowKey={(m) => m.id}
-          onRowClick={(m) => navigate(minerPath(m.id))}
-          rowClassName={() => 'group'}
-          defaultSort={{ columnId: 'overdue', direction: 'desc' }}
-          mobileSort
-          stackSummary={t('corpTaxBook.moons.miners.summary', {
-            shown: rows.length,
-            total: view.miners.length,
-          })}
-        />
+        <div className="overflow-x-auto">
+          <DataTable
+            label={t('corpTaxBook.moons.tabs.miners')}
+            columns={columns}
+            rows={rows}
+            rowKey={(m) => m.id}
+            onRowClick={(m) => navigate(minerPath(m.id))}
+            rowClassName={() => 'group'}
+            rowContextMenu={rowContextMenu}
+            rowMoreActions={canEdit}
+            defaultSort={{ columnId: 'overdue', direction: 'desc' }}
+            mobileSort
+            stackSummary={t('corpTaxBook.moons.miners.summary', {
+              shown: rows.length,
+              total: view.miners.length,
+            })}
+          />
+        </div>
+        {hiddenGuests.length > 0 && (
+          <p className="border-t border-line px-3 py-2 text-xs text-text-dim">
+            {t('corpTaxBook.moons.miners.nonMembersHidden', {
+              count: hiddenGuests.length,
+              amount: isk(hiddenGuestOwed),
+            })}
+          </p>
+        )}
         {hidden > 0 && (
           <p className="border-t border-line px-3 py-2 text-xs text-text-dim">
             {t('corpTaxBook.moons.miners.hidden', { count: hidden })}
           </p>
         )}
       </Panel>
+      {dialog?.kind === 'record' && (
+        <RecordPaymentDialog
+          open
+          onClose={() => setDialog(null)}
+          miner={dialog.miner}
+          minerName={names.character(dialog.miner.mainCharacterId)}
+          defaultAmount={dialog.miner.owed}
+          statementId={openStatementId(view, dialog.miner.id)}
+        />
+      )}
+      {dialog?.kind === 'dismiss' && (
+        <ReasonDialog
+          open
+          onClose={() => setDialog(null)}
+          title={t('corpTaxBook.moons.dialogs.dismissMiner.title', {
+            name: names.character(dialog.miner.mainCharacterId),
+          })}
+          intro={t('corpTaxBook.moons.dialogs.dismissMiner.intro')}
+          reasonLabel={t('corpTaxBook.moons.dialogs.reasonShown')}
+          confirmLabel={t('corpTaxBook.moons.dialogs.dismissConfirm', {
+            amount: isk(dialog.miner.owed + dialog.miner.unbilled),
+          })}
+          run={async (reason) => {
+            await edit({
+              action: 'dismiss',
+              scope: 'miner',
+              targetId: dialog.miner.id,
+              reason,
+              amountIsk: dialog.miner.owed + dialog.miner.unbilled,
+            });
+          }}
+        />
+      )}
     </div>
   );
+}
+
+/** The Statement a payment recorded from the Miners table settles: the Miner's first unsettled one. */
+function openStatementId(view: BookView, minerId: string): string | undefined {
+  return minerDetail(view, minerId)?.statements.find(
+    (s) => !view.internals.byMiner.get(minerId)?.allocation.byStatement.get(s.id)?.settled
+  )?.id;
 }

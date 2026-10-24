@@ -101,6 +101,27 @@ function loaderSource(entry: string, preloads: readonly string[]): string {
 })(${JSON.stringify(entry)}, ${JSON.stringify(preloads)}, ${JSON.stringify(DEFERRED_ENTRY_HERO_IMAGE)});`;
 }
 
+const IMPORT_MAP = /<script type="importmap"[^>]*>/g;
+
+/**
+ * What is wrong with where the built page's chunk import map sits, or `null`.
+ * Chunks import each other by stable names that only the map resolves
+ * (`build.chunkImportMap`), so the page needs exactly one, ahead of the loader
+ * that starts the first module. Vite writes it before the first module tag it
+ * finds and, finding none, before everything, doctype included: that is why
+ * `deferEntryHtml` runs on the emitted page, after Vite placed the map.
+ */
+export function importMapProblem(html: string): string | null {
+  if (!/^<!doctype html>/i.test(html.trimStart())) return 'the page does not open with its doctype';
+  const maps = [...html.matchAll(IMPORT_MAP)];
+  if (maps.length === 0) return 'the page has no import map';
+  if (maps.length > 1) return `the page has ${maps.length} import maps`;
+  const loader = html.indexOf(`<script id="${DEFERRED_ENTRY_SCRIPT_ID}">`);
+  if (loader < 0) return 'the page has no entry loader';
+  if ((maps[0].index ?? 0) > loader) return 'the import map comes after the entry loader';
+  return null;
+}
+
 /** Swaps the built entry and module preloads for the loader, where the entry was. Throws if the page is not shaped as expected. */
 export function deferEntryHtml(html: string): string {
   const entries = [...html.matchAll(ENTRY)];

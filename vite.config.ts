@@ -14,16 +14,20 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { phosphorWeightsPlugin } from './src/components/ui/phosphorWeightsPlugin.ts';
 import { localeSplitPlugin } from './src/i18n/localeSplitPlugin.ts';
-import { deferEntryHtml } from './src/app/deferredEntry.ts';
+import { deferEntryHtml, importMapProblem } from './src/app/deferredEntry.ts';
 import { lazySdeGlobIgnores } from './src/sde/lazySdeFiles.ts';
 import {
   bootClosure,
+  chunkImportMapping,
   dropLazyFromManifest,
   entryFile,
+  entryNamesRelease,
   missingShellChunks,
   lazyChunkFiles,
   lazyChunksJson,
+  preloadGraphSignature,
   type BundleLike,
+  type RenderedChunkLike,
 } from './src/app/lazyChunks.ts';
 
 const { version, dependencies } = JSON.parse(
@@ -114,6 +118,18 @@ const DOM_TS_TESTS = 'src/**/*.dom.test.ts';
  * `filesToDeleteAfterUpload` removes them once Sentry has them — `dist/` is
  * published to GitHub Pages, so a `.map` left behind is a public one.
  */
+/**
+ * A module directly in this project's `src/components/ui` (not a subfolder,
+ * not a package's own `src/components/ui`), on either path separator.
+ */
+const UI_PRIMITIVE_MODULE = new RegExp(
+  '^' +
+    fileURLToPath(new URL('./src/components/ui/', import.meta.url))
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\\\\|\//g, '[\\\\/]') +
+    '[^\\\\/]+\\.tsx?$'
+);
+
 const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
 
 /**
@@ -127,6 +143,13 @@ const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
  * answers 404, but the body is the app, which boots and routes the path
  * client-side. An address that really matches nothing then reaches the `*`
  * route and its own NotFound screen, rather than a stock GitHub page.
+ *
+ * GitHub Pages only: production (`deploy` in .github/workflows/deploy.yml).
+ * Cloudflare Pages (dev.neocomdesk.com, `deploy-dev`) does the SPA rewrite
+ * itself, answering an unmatched path with `index.html` and a 200 — but only
+ * when the upload has no top-level `404.html`; with one it serves that file
+ * with a 404 status. So `deploy-dev` deletes the copy before uploading. Drop
+ * this plugin when production moves to Cloudflare Pages too.
  *
  * Last in `plugins` so `closeBundle` runs after VitePWA has taken its manifest
  * — otherwise the copy is precached as a second, identical `index.html`.
@@ -217,14 +240,30 @@ function landingShellTemplate() {
 
 /**
  * On the landing page, holds the app's JS until the prerendered hero has
- * painted (`src/app/deferredEntry.ts`, #3950). Build only, and `post`, so it
- * sees the entry script and module preloads Vite has injected.
+ * painted (`src/app/deferredEntry.ts`, #3950). Build only. Runs on the emitted
+ * `index.html` rather than as a `transformIndexHtml` hook: Vite writes the chunk
+ * import map after every plugin's html hook, before the first module tag it
+ * finds, and with the tags already swapped for the loader it found none and
+ * put the map ahead of the doctype. `post`, so the page is already in the
+ * bundle; VitePWA hashes and `spaFallbackHtml` copies it later, at `closeBundle`.
  */
 function deferredEntryHtml() {
   return {
     name: 'neocom-deferred-entry',
     apply: 'build' as const,
-    transformIndexHtml: { order: 'post' as const, handler: deferEntryHtml },
+    generateBundle: {
+      order: 'post' as const,
+      handler(_options: unknown, bundle: BundleLike) {
+        const page = bundle['index.html'];
+        if (page?.source === undefined) throw new Error('deferredEntryHtml: no index.html');
+        const html = deferEntryHtml(
+          typeof page.source === 'string' ? page.source : new TextDecoder().decode(page.source)
+        );
+        const problem = importMapProblem(html);
+        if (problem) throw new Error(`deferredEntryHtml: ${problem}`);
+        page.source = html;
+      },
+    },
   };
 }
 
@@ -270,13 +309,70 @@ function lazyChunksPlugin() {
           `lazyChunksPlugin: no chunk named ${missing.join(', ')}; the boot graph would lose it (src/app/lazyChunks.ts SHELL_CHUNK_NAMES)`
         );
       }
-      const files = lazyChunkFiles(bundle, bootClosure(bundle));
+      if (!entryNamesRelease(bundle, release)) {
+        throw new Error(
+          'lazyChunksPlugin: the entry chunk no longer carries the release, so its name could repeat across builds and lazy-chunks.json `entry` would match the wrong one (src/app/lazyChunks.ts entryNamesRelease)'
+        );
+      }
+      const importMap = chunkImportMapping(bundle, '/');
+      const files = lazyChunkFiles(bundle, bootClosure(bundle, importMap));
       lazyChunkState.files = new Set(files);
       this.emitFile({
         type: 'asset',
         fileName: 'lazy-chunks.json',
         source: lazyChunksJson(files, release, entryFile(bundle)),
       });
+    },
+  };
+}
+
+/**
+ * Folds what each chunk's preload lists will name into its hash
+ * (`preloadGraphSignature`), so a chunk whose lists change is renamed instead of
+ * keeping its name with new bytes. The graph is `renderChunk`'s `meta.chunks`,
+ * captured before any hash is computed; module ids are taken relative to the
+ * root so a build elsewhere signs the same.
+ */
+function preloadGraphHashPlugin() {
+  let root = '';
+  let graph: Record<string, RenderedChunkLike> | undefined;
+  let relative: Record<string, RenderedChunkLike> | undefined;
+  return {
+    name: 'neocom-preload-graph-hash',
+    apply: 'build' as const,
+    configResolved(config: { root: string }) {
+      root = `${config.root}/`;
+    },
+    renderStart() {
+      graph = undefined;
+      relative = undefined;
+    },
+    renderChunk(
+      _code: string,
+      _chunk: unknown,
+      _options: unknown,
+      meta: { chunks: Record<string, RenderedChunkLike> }
+    ) {
+      graph ??= meta.chunks;
+      return null;
+    },
+    augmentChunkHash(chunk: { fileName: string; dynamicImports: readonly string[] }) {
+      if (chunk.dynamicImports.length === 0) return;
+      if (!graph) throw new Error('preloadGraphHashPlugin: no chunk graph before hashing');
+      relative ??= Object.fromEntries(
+        Object.entries(graph).map(([file, c]) => [
+          file,
+          {
+            name: c.name,
+            imports: c.imports,
+            dynamicImports: c.dynamicImports,
+            moduleIds: c.moduleIds.map((id) => (id.startsWith(root) ? id.slice(root.length) : id)),
+          },
+        ])
+      );
+      return createHash('sha256')
+        .update(preloadGraphSignature(chunk.fileName, relative))
+        .digest('hex');
     },
   };
 }
@@ -306,7 +402,32 @@ export default defineConfig({
   base: '/',
   build: {
     sourcemap: sentryAuthToken ? 'hidden' : false,
+    // Chunks import each other by stable names an import map in `index.html`
+    // resolves to the hashed files, so a chunk's hash follows its own code and
+    // its preload lists (`preloadGraphHashPlugin`) only.
+    // Without it a changed leaf renamed every chunk that imported it, and every
+    // importer of those, and each deploy (~15 min apart) re-downloaded hundreds
+    // of unchanged chunks (docs/context/decisions/*-chunks-import-each-other-
+    // through-an-import-map*). Module workers get no import map; Vite builds
+    // them with `worker.rolldownOptions`, which leaves this off.
+    chunkImportMap: true,
     rolldownOptions: {
+      // The `src/components/ui` modules only declare components (no import-time
+      // effects), but a top-level `forwardRef(...)`/`createContext()` call reads
+      // as a side effect, so importing anything through the `@/components/ui`
+      // barrel kept every primitive — DataTable, Select, ContextMenu, the
+      // virtualizer — in the boot graph (~58 of 73 KiB unused on first load).
+      // Marked side-effect-free, each primitive goes only where it is used.
+      // The second rule keeps every other project file (CSS, `stores/network`'s
+      // listener attach, `i18n`, `instrument`) side-effectful explicitly. It
+      // skips `node_modules`, so a package's own `sideEffects` field (Radix's
+      // `false`) still decides there.
+      treeshake: {
+        moduleSideEffects: [
+          { test: UI_PRIMITIVE_MODULE, external: false, sideEffects: false },
+          { test: /^(?![\s\S]*[\\/]node_modules[\\/])/, external: false, sideEffects: true },
+        ],
+      },
       output: {
         // Routes are already split per page (`src/app/routeChunks.ts`); what
         // is left in the entry is the boot-time vendor code. Pulled into
@@ -443,6 +564,8 @@ export default defineConfig({
           '**/brand/**',
           '**/version.json',
           '**/lazy-chunks.json',
+          // Already inline in index.html; kept beside it only to compare deploys.
+          '**/importmap.json',
         ],
         // Route code is the exception: only the boot graph is precached, the rest of
         // the chunks are warmed at idle (`lazyChunksPlugin`, docs/context/decisions/
@@ -460,7 +583,12 @@ export default defineConfig({
             org: process.env.SENTRY_ORG,
             project: process.env.SENTRY_PROJECT,
             authToken: sentryAuthToken,
-            release: { name: release },
+            // `inject: false`: the plugin would prepend `SENTRY_RELEASE={id:<release>}`
+            // to every chunk, and the release carries the commit, so every chunk
+            // was renamed on every deploy whatever the import map does. Sentry
+            // already reads the release from `Sentry.init` (src/instrument.ts),
+            // and the maps match on the per-chunk debug ids, which stay.
+            release: { name: release, inject: false },
             sourcemaps: { filesToDeleteAfterUpload: ['dist/**/*.map'] },
           }),
         ]
@@ -468,6 +596,7 @@ export default defineConfig({
     spaFallbackHtml(),
     releaseFilePlugin(),
     lazyChunksPlugin(),
+    preloadGraphHashPlugin(),
   ],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },

@@ -6,6 +6,7 @@ import {
   isConnectionLive,
   parseSurveyConnections,
   planSurveyAutoAssign,
+  structureFromLocation,
   upsertSurveyConnection,
   type SurveyConnection,
 } from './surveyConnection';
@@ -146,7 +147,34 @@ describe('parseSurveyConnections', () => {
   });
 });
 
+describe('structureFromLocation', () => {
+  it("takes the structure after the system in a station's name", () => {
+    expect(structureFromLocation("Ainsan - Mav's Watering Hole")).toBe("Mav's Watering Hole");
+  });
+
+  it('keeps a structure name that has its own dash', () => {
+    expect(structureFromLocation('Ainsan - Moon - Mining Outpost')).toBe('Moon - Mining Outpost');
+  });
+
+  it('has none for a bare system or a blank name', () => {
+    expect(structureFromLocation('Ainsan')).toBeUndefined();
+    expect(structureFromLocation('  ')).toBeUndefined();
+    expect(structureFromLocation(undefined)).toBeUndefined();
+    expect(structureFromLocation('Ainsan - ')).toBeUndefined();
+  });
+});
+
 describe('planSurveyAutoAssign', () => {
+  it("hands the connection's structure on as each slice's label", () => {
+    const slices = planSurveyAutoAssign(
+      [entry([{ typeId: BITUMENS, quantity: 100 }])],
+      [],
+      [connection({ structureLabel: "Mav's Watering Hole" })],
+      NOON
+    );
+    expect(slices.map((s) => s.label)).toEqual(["Mav's Watering Hole"]);
+  });
+
   it('assigns already-mined, unassigned ore of the survey’s ore types', () => {
     const e = entry([
       { typeId: BITUMENS, quantity: 1000 },

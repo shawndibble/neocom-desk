@@ -1,12 +1,13 @@
 /** Cells the officer queue's columns and claim detail share. */
-import type { ReactNode } from 'react';
-import { Button, Checkbox, IskInput } from '@/components/ui';
+import type { ReactElement, ReactNode } from 'react';
+import { Button, Checkbox, IskInput, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Pill } from '@/components/ui/Pill';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { formatIsk } from '@/lib/isk';
 import type { SrpClaim } from '../srpClaimTypes';
-import type { ClaimColumnsContext } from './claimColumnsContext';
+import { ownClaimReason, type ClaimColumnsContext } from './claimColumnsContext';
 import { claimBasisLine } from './srpClaimText';
 import { approveAmount } from './srpQueue';
 
@@ -17,16 +18,37 @@ const STATE_TONE = {
   rejected: 'danger',
 } as const;
 
+/** A decide button with its reason in a tooltip while it is inert for this officer. */
+export function DecideTip({
+  reason,
+  children,
+}: {
+  reason: string | undefined;
+  children: ReactElement<{ className?: string }>;
+}) {
+  return reason === undefined ? children : <Tooltip content={reason}>{children}</Tooltip>;
+}
+
 /** A claim's state as a pill. */
 export function ClaimStatePill({ claim, ctx }: { claim: SrpClaim; ctx: ClaimColumnsContext }) {
   return <Pill tone={STATE_TONE[claim.state]}>{ctx.t(`srp.officer.states.${claim.state}`)}</Pill>;
 }
 
-export function Pilot({ claim }: { claim: SrpClaim }) {
+/** The queue's flag for a claim whose fit matched no Doctrine Fit; the detail has the diff. */
+export function OffDoctrineFlag({ claim, ctx }: { claim: SrpClaim; ctx: ClaimColumnsContext }) {
+  if (claim.doctrineCheck?.status !== 'off-doctrine') return null;
+  return <Pill tone="warning">{ctx.t('srp.doctrine.queueFlag')}</Pill>;
+}
+
+export function Pilot({ claim, ctx }: { claim: SrpClaim; ctx: ClaimColumnsContext }) {
   return (
     <span className="block min-w-0">
       <span className="font-semibold">{claim.characterName}</span>
-      <span className="block text-xs text-text-dim">{claim.killmailId}</span>
+      <span className="block text-xs">
+        <ExternalLink href={`https://zkillboard.com/kill/${claim.killmailId}/`}>
+          {ctx.t('srp.officer.killmailLink')}
+        </ExternalLink>
+      </span>
     </span>
   );
 }
@@ -41,17 +63,21 @@ export function SelectBox({
   show: boolean;
 }): ReactNode {
   if (!show) return null;
+  const reason = ownClaimReason(claim, ctx);
   return (
-    <label className={touchCheckboxLabelClassName}>
-      <Checkbox
-        aria-label={ctx.t('srp.officer.actions.select', {
-          pilot: claim.characterName,
-          hull: ctx.names.hull(claim.hullTypeId),
-        })}
-        checked={ctx.selected.includes(claim.killmailId)}
-        onChange={() => ctx.onToggle(claim.killmailId)}
-      />
-    </label>
+    <DecideTip reason={reason}>
+      <label className={touchCheckboxLabelClassName}>
+        <Checkbox
+          aria-label={ctx.t('srp.officer.actions.select', {
+            pilot: claim.characterName,
+            hull: ctx.names.hull(claim.hullTypeId),
+          })}
+          checked={ctx.selected.includes(claim.killmailId)}
+          aria-disabled={reason !== undefined || undefined}
+          onChange={() => reason === undefined && ctx.onToggle(claim.killmailId)}
+        />
+      </label>
+    </DecideTip>
   );
 }
 
@@ -126,26 +152,32 @@ export function ApproveReject({
   ctx: ClaimColumnsContext;
   className?: string;
 }) {
-  const blocked = ctx.busy || approveAmount(claim, ctx.typed[claim.killmailId]) === null;
+  const own = ownClaimReason(claim, ctx);
+  const blocked =
+    ctx.busy || own !== undefined || approveAmount(claim, ctx.typed[claim.killmailId]) === null;
   return (
     <>
-      <Button
-        size="sm"
-        variant="success"
-        className={className}
-        aria-disabled={blocked || undefined}
-        onClick={() => ctx.onApprove(claim)}
-      >
-        {ctx.t('srp.officer.actions.approve')}
-      </Button>
-      <Button
-        size="sm"
-        className={className}
-        aria-disabled={ctx.busy || undefined}
-        onClick={() => ctx.onReject(claim)}
-      >
-        {ctx.t('srp.officer.actions.reject')}
-      </Button>
+      <DecideTip reason={own}>
+        <Button
+          size="sm"
+          variant="success"
+          className={className}
+          aria-disabled={blocked || undefined}
+          onClick={() => ctx.onApprove(claim)}
+        >
+          {ctx.t('srp.officer.actions.approve')}
+        </Button>
+      </DecideTip>
+      <DecideTip reason={own}>
+        <Button
+          size="sm"
+          className={className}
+          aria-disabled={ctx.busy || own !== undefined || undefined}
+          onClick={() => ctx.onReject(claim)}
+        >
+          {ctx.t('srp.officer.actions.reject')}
+        </Button>
+      </DecideTip>
     </>
   );
 }

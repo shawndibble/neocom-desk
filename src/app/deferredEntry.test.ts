@@ -6,6 +6,7 @@ import {
   DEFERRED_ENTRY_SCRIPT_ID,
   DEFERRED_ENTRY_SHELL_ATTR,
   deferEntryHtml,
+  importMapProblem,
 } from './deferredEntry';
 import { LANDING_SHELL_ATTR } from './landingShell';
 import shellSnapshot from '@/features/landing/landingShell.snapshot.html?raw';
@@ -86,6 +87,51 @@ describe('deferEntryHtml', () => {
       .parseFromString(shellSnapshot, 'text/html')
       .querySelector('img[fetchpriority="high"]');
     expect(ship?.getAttribute('src')).toBe(DEFERRED_ENTRY_HERO_IMAGE);
+  });
+
+  it('leaves the chunk import map where Vite put it, ahead of the loader', () => {
+    const mapped = BUILT.replace(
+      '<script type="module"',
+      '<script type="importmap">{"imports":{}}</script>\n<script type="module"'
+    );
+    const out = deferEntryHtml(mapped);
+    expect(importMapProblem(out)).toBeNull();
+    expect(out.indexOf('type="importmap"')).toBeLessThan(out.indexOf(DEFERRED_ENTRY_SCRIPT_ID));
+  });
+});
+
+describe('importMapProblem', () => {
+  const MAP = '<script type="importmap">{"imports":{}}</script>';
+  const LOADER = `<script id="${DEFERRED_ENTRY_SCRIPT_ID}">/* loader */</script>`;
+
+  it('passes a page that opens with its doctype and maps chunks before the loader', () => {
+    expect(
+      importMapProblem(`<!doctype html>\n<html><head>${MAP}${LOADER}</head></html>`)
+    ).toBeNull();
+  });
+
+  it('flags a map written ahead of the doctype, which puts the page in quirks mode', () => {
+    expect(importMapProblem(`${MAP}\n<!doctype html><html><head>${LOADER}</head></html>`)).toMatch(
+      /doctype/
+    );
+  });
+
+  it('flags a page with no map, whose chunks would import names nothing resolves', () => {
+    expect(importMapProblem(`<!doctype html><html><head>${LOADER}</head></html>`)).toMatch(
+      /no import map/
+    );
+  });
+
+  it('flags a map after the loader, too late for the modules it starts', () => {
+    expect(importMapProblem(`<!doctype html><html><head>${LOADER}${MAP}</head></html>`)).toMatch(
+      /after/
+    );
+  });
+
+  it('flags a second map', () => {
+    expect(
+      importMapProblem(`<!doctype html><html><head>${MAP}${MAP}${LOADER}</head></html>`)
+    ).toMatch(/2 import maps/);
   });
 });
 

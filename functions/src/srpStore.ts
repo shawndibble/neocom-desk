@@ -29,10 +29,14 @@ import {
   pricingInput,
   withinWindow,
   type ClaimValues,
+  type EsiKillmail,
   type FileClaimInput,
+  type KillmailRef,
   type SrpKillmailSource,
   type ZkillRecord,
 } from './srpKillmail.js';
+import { checkDoctrine, hullRuleOf } from './srpDoctrineCheck.js';
+import { readDoctrines } from './srpDoctrineRead.js';
 import { priceSrpClaim, type SrpBasis, type SrpSuggestion } from './srpPricing.js';
 import {
   CORPS_COLLECTION,
@@ -43,9 +47,12 @@ import {
   SRP_SETTINGS_COLLECTION,
   SRP_SETTINGS_DOC,
   defaultSrpSettings,
+  type DoctrineCheckRecord,
+  type HullRule,
   type SrpSettings,
   type SrpSettingsPatch,
 } from './srpTypes.js';
+import { takeFetchSlot } from './srpThrottle.js';
 import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
 
 /**
@@ -215,6 +222,8 @@ export interface VerifySrpOfficerResult {
   isDirector: boolean;
   canManage: boolean;
   srpEnabled: boolean;
+  /** A settings doc exists (SRP was turned on once); false before that, so a client skips the read the rules refuse. */
+  settingsExist: boolean;
   expiresAt: number;
 }
 
@@ -225,13 +234,15 @@ export async function verifySrpOfficer(
   call: BookCall
 ): Promise<VerifySrpOfficerResult> {
   const access = await authorizeSrpOfficer(deps, caller, call, 'edit', { live: false });
-  const settings = (await srpSettingsRef(deps.db, call.corporationId).get()).data();
+  const snap = await srpSettingsRef(deps.db, call.corporationId).get();
+  const settings = snap.data();
   return {
     corporationId: call.corporationId,
     isCeo: access.isCeo,
     isDirector: access.isDirector,
     canManage: access.canEdit,
     srpEnabled: settings?.enabled === true,
+    settingsExist: snap.exists,
     expiresAt: access.expiresAt,
   };
 }
@@ -314,6 +325,32 @@ export async function turnOffSrp(deps: SrpDeps, caller: Caller, call: BookCall) 
   return { corporationId: call.corporationId };
 }
 
+/** Every Doctrine Fit a rule lists exists in this corp and is for the rule's own hull. */
+async function requireRuleDoctrines(
+  deps: SrpDeps,
+  corporationId: number,
+  rules: readonly HullRule[],
+  tx: Transaction
+): Promise<void> {
+  const ids = rules.flatMap((r) => r.doctrineIds ?? []);
+  if (ids.length === 0) return;
+  const found = await readDoctrines(deps.db, corporationId, ids, tx);
+  for (const rule of rules) {
+    for (const id of rule.doctrineIds ?? []) {
+      const fit = found.get(id);
+      if (!fit)
+        fail('failed-precondition', 'That Doctrine Fit no longer exists', 'unknown-doctrine');
+      if (fit.snapshot.hullTypeId !== rule.id) {
+        fail(
+          'invalid-argument',
+          'A Doctrine Fit must be for the hull its rule is for',
+          'doctrine-hull-mismatch'
+        );
+      }
+    }
+  }
+}
+
 /** A Director saves the corp's percents, Hull Rules, claim window and Fleet-or-FC requirement. */
 export async function saveSrpSettings(
   deps: SrpDeps,
@@ -326,6 +363,7 @@ export async function saveSrpSettings(
   await deps.db.runTransaction(async (tx) => {
     const current = await tx.get(ref);
     if (!current.exists) fail('not-found', 'This corporation has no SRP yet', 'no-srp');
+    if (patch.hullRules) await requireRuleDoctrines(deps, call.corporationId, patch.hullRules, tx);
     tx.update(ref, { ...patch, updatedAt: deps.now(), updatedBy: access.characterId });
     appendSrpAudit(tx, deps, call.corporationId, access, 'saveSettings', {
       fields: Object.keys(patch),
@@ -375,6 +413,8 @@ export interface FiledSrpClaim {
   /** Whole ISK, or null when an officer must type it. */
   amount: number | null;
   basis: SrpBasis | null;
+  /** The doctrine-fit result stored on the claim; 'not-checked' when the hull lists no fit. */
+  doctrineCheck: DoctrineCheckRecord;
 }
 
 const isValue = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 1;
@@ -410,6 +450,52 @@ function refileDecision(existing: Record<string, unknown> | undefined): 'new' | 
 }
 
 /**
+ * The killmail the pilot names, fetched by the server, once it is the caller's own loss while in
+ * this corporation. Shared by filing and the pre-filing doctrine preview, which share one
+ * per-pilot fetch budget.
+ */
+export async function fetchOwnLoss(
+  deps: SrpFileDeps,
+  member: SrpMember,
+  ref: KillmailRef
+): Promise<{ zkill: ZkillRecord; hash: string; km: EsiKillmail }> {
+  await takeFetchSlot(deps, member.corporationId, member.characterId);
+  const zkill = await softZkill(deps.killmails, ref.killmailId);
+  const hash = ref.hash ?? zkill.hash;
+  if (!hash) {
+    fail(
+      'unavailable',
+      'Could not look up that killmail; paste its ESI link or try again shortly',
+      'hash-unavailable'
+    );
+  }
+  const km = await deps.killmails.killmail(ref.killmailId, hash);
+  if (km.victim.characterId !== member.characterId) {
+    fail('permission-denied', 'You can only file your own losses', 'not-your-loss');
+  }
+  if (km.victim.corporationId !== member.corporationId) {
+    fail(
+      'permission-denied',
+      'You were not in this corporation for that loss',
+      'loss-in-other-corp'
+    );
+  }
+  return { zkill, hash, km };
+}
+
+/** The doctrine-fit result for a loss: the hull's own rule, the fits it lists that still exist. */
+export async function doctrineCheckOf(
+  db: Firestore,
+  settings: Pick<SrpSettings, 'hullRules'>,
+  corporationId: number,
+  victim: EsiKillmail['victim']
+): Promise<DoctrineCheckRecord> {
+  const rule = hullRuleOf(settings.hullRules, victim.shipTypeId);
+  const doctrines = await readDoctrines(db, corporationId, rule?.doctrineIds ?? []);
+  return checkDoctrine(victim, rule, doctrines);
+}
+
+/**
  * A pilot files an SRP Claim against their own killmail. The server fetches the killmail and
  * decides hull, system, time and amount; the client sends only the link and the notes.
  */
@@ -431,26 +517,7 @@ export async function fileSrpClaim(
   }
   const { killmailId } = input.ref;
   const ref = claimRef(deps.db, corporationId, killmailId);
-  const zkill = await softZkill(deps.killmails, killmailId);
-  const hash = input.ref.hash ?? zkill.hash;
-  if (!hash) {
-    fail(
-      'unavailable',
-      'Could not look up that killmail; paste its ESI link or try again shortly',
-      'hash-unavailable'
-    );
-  }
-  const km = await deps.killmails.killmail(killmailId, hash);
-  if (km.victim.characterId !== member.characterId) {
-    fail('permission-denied', 'You can only file your own losses', 'not-your-loss');
-  }
-  if (km.victim.corporationId !== corporationId) {
-    fail(
-      'permission-denied',
-      'You were not in this corporation for that loss',
-      'loss-in-other-corp'
-    );
-  }
+  const { zkill, hash, km } = await fetchOwnLoss(deps, member, input.ref);
   // Only after the victim checks: before them, `already-claimed` would tell any member whether
   // another pilot's killmail has a claim. The transaction below re-checks against a racing filing.
   const early = refileDecision((await ref.get()).data());
@@ -492,6 +559,8 @@ export async function fileSrpClaim(
   const suggested: SrpSuggestion | null =
     result.kind === 'officer' && result.suggested ? result.suggested : null;
   const rule = matchedHullRule(settings.hullRules, hullTypeId, classId);
+  // A snapshot at filing, never re-evaluated; a mismatch flags the claim, it never refuses it.
+  const doctrineCheck = await doctrineCheckOf(deps.db, settings, corporationId, km.victim);
 
   const base = {
     uid: caller.uid,
@@ -519,6 +588,7 @@ export async function fileSrpClaim(
         : values.appraisalValue !== null
           ? 'appraisal'
           : 'none',
+    doctrineCheck,
     fleetOrFc: input.fleetOrFc,
     note: input.note,
     schemaVersion: SRP_SCHEMA_VERSION,
@@ -545,8 +615,15 @@ export async function fileSrpClaim(
       corporationId,
       { characterId: member.characterId, characterName: member.characterName },
       decision === 'new' ? 'fileClaim' : 'refileClaim',
-      { killmailId, hullTypeId, amount, basis: basis?.step ?? null, valueSource: base.valueSource }
+      {
+        killmailId,
+        hullTypeId,
+        amount,
+        basis: basis?.step ?? null,
+        valueSource: base.valueSource,
+        doctrineStatus: doctrineCheck.status,
+      }
     );
   });
-  return { killmailId, state: 'pending', amount, basis };
+  return { killmailId, state: 'pending', amount, basis, doctrineCheck };
 }

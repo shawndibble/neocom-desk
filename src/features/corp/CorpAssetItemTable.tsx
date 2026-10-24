@@ -297,35 +297,35 @@ export function CorpAssetItemTable({
       {rows.length === 0 ? (
         emptyState
       ) : (
-        <DataTable
-          label={t('corp.assets.itemTableLabel')}
-          columns={columns}
-          rows={rows}
-          rowKey={(r) => r.key}
-          {...sortProps}
-          {...tableExport.tableProps}
-          density="compact"
-          responsive="stack"
-          mobileSort
-          virtualize="auto"
-          expandableRow={{
-            leadingIcon: true,
-            renderDetail: (r) => <StackList row={r} labels={labels} />,
-          }}
-          rowContextMenu={(r, tr) => (
-            <ItemContextMenu
-              typeId={r.ledger.typeId}
-              itemName={r.name}
-              // Corp assets never loads the blueprint catalog: resolve at once rather than "checking…".
-              blueprintTypeID={null}
-              hideStockTarget
-              linksKeepBrowserMenu
-            >
-              {tr}
-            </ItemContextMenu>
-          )}
-          rowMoreActions
-        />
+        <div className="overflow-x-auto">
+          <DataTable
+            label={t('corp.assets.itemTableLabel')}
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => r.key}
+            {...sortProps}
+            {...tableExport.tableProps}
+            density="compact"
+            responsive="stack"
+            mobileSort
+            virtualize="auto"
+            expandableRow={{
+              leadingIcon: true,
+              renderDetail: (r) => <StackList row={r} labels={labels} />,
+            }}
+            rowContextMenu={(r, tr) => (
+              <ItemContextMenu
+                typeId={r.ledger.typeId}
+                itemName={r.name}
+                holdingsOnly
+                linksKeepBrowserMenu
+              >
+                {tr}
+              </ItemContextMenu>
+            )}
+            rowMoreActions
+          />
+        </div>
       )}
     </>
   );

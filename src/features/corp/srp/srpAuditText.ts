@@ -41,7 +41,32 @@ export function auditText(t: TFunction, entry: SrpAuditEntry): string {
     case 'saveSettings':
     case 'reclaim':
       return t(base, { id });
+    case 'addDoctrine':
+    case 'updateDoctrine':
+    case 'deleteDoctrine':
+      return t(base, { name: text(d.name) });
     case 'retentionDelete':
       return t(base, { count: num(d.count) ?? 0 });
   }
+}
+
+/** Saves by one officer this close together read as one line. */
+const SAVE_COLLAPSE_MS = 60_000;
+
+/**
+ * Newest-first feed entries with a run of "Saved SRP settings" by the same officer, each within a
+ * minute of the one kept, collapsed into the newest. Other actions are never dropped.
+ */
+export function collapseRepeatedSaves(entries: readonly SrpAuditEntry[]): SrpAuditEntry[] {
+  const out: SrpAuditEntry[] = [];
+  for (const entry of entries) {
+    const kept = out[out.length - 1];
+    const repeat =
+      entry.action === 'saveSettings' &&
+      kept?.action === 'saveSettings' &&
+      kept.by === entry.by &&
+      kept.at - entry.at <= SAVE_COLLAPSE_MS;
+    if (!repeat) out.push(entry);
+  }
+  return out;
 }

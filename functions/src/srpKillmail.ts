@@ -70,6 +70,8 @@ export function withinWindow(killedAt: number, now: number, windowDays: number):
 
 export interface KillmailItem {
   item_type_id?: number;
+  /** ESI inventory flag: which slot (or cargo) the item sat in. Top-level victim items only. */
+  flag?: number;
   quantity_dropped?: number;
   quantity_destroyed?: number;
   items?: KillmailItem[];

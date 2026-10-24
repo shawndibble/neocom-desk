@@ -352,6 +352,21 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect(await auditCount()).toBe(before + 1);
     });
 
+    it('moves the start date and ends the member setup window, Director only', async () => {
+      await turnOn();
+      expect(
+        await reason(
+          edit(ACCOUNTANT, { action: 'updateSettings', patch: { startDate: '2026-09-20' } })
+        )
+      ).toBe('director-only');
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { startDate: '2026-09-20' } });
+      const data = (await book().get()).data()!;
+      expect(data.startDate).toBe('2026-09-20');
+      expect(data.rates[0].effectiveFrom).toBe('2026-09-20');
+      await edit(DIRECTOR, { action: 'updateSettings', patch: { showToMembers: true } });
+      expect((await book().get()).get('membersSeeFrom')).toBe(now);
+    });
+
     it('never makes a rate retroactive, and only on a day not yet on a Statement for a record rate', async () => {
       await turnOn();
       expect(

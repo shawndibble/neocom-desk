@@ -52,7 +52,7 @@ export async function saveFitting(
     updatedAt: Date.now(),
   };
   await db.fittings.put(record);
-  scheduleSync(characterId);
+  scheduleSync(characterId, { collections: ['fittings'] });
   followInCommunities((shared) => shared.followSavedFitting(characterId, record));
   return record;
 }

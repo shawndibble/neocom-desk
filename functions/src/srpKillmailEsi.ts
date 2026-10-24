@@ -47,6 +47,7 @@ function cleanItems(raw: unknown): KillmailItem[] {
     ...(asNumber(i?.item_type_id) !== null
       ? { item_type_id: asNumber(i.item_type_id) as number }
       : {}),
+    ...(asNumber(i?.flag) !== null ? { flag: asNumber(i.flag) as number } : {}),
     quantity_dropped: asNumber(i?.quantity_dropped) ?? 0,
     quantity_destroyed: asNumber(i?.quantity_destroyed) ?? 0,
     ...(Array.isArray(i?.items) ? { items: cleanItems(i.items) } : {}),

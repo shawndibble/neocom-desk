@@ -31,7 +31,12 @@ export function CorpSrp() {
         />
       </div>
     ) : gate.status === 'ready' ? (
-      <SrpPage canManageSrp srpOn={srpOn} />
+      <SrpPage
+        canManageSrp
+        srpOn={srpOn}
+        // `canReadRoleAudit` is Director alone in `corpRoles.ts`: the role Settings needs too.
+        isDirector={gate.capabilities.canReadRoleAudit}
+      />
     ) : null;
   return <CorpRolesGate gate={gate}>{content}</CorpRolesGate>;
 }

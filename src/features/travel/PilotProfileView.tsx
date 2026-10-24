@@ -58,6 +58,9 @@ export function PilotProfileView(props: PilotProfileViewProps) {
   const { history, retry: retryHistory } = usePilotKillHistory(characterId);
   const now = useNow();
   const pilotStats = stats?.kind === 'stats' ? stats.stats : null;
+  // zKillboard could not be read: an empty kill list beside that is unknown, never "no kills".
+  const zkillDown = stats?.kind === 'failed';
+  const killsUnknown = zkillDown && history.kind === 'ready' && history.kills.length === 0;
 
   // A pilot with no recent kill is "inactive" unless they lost a ship lately, so
   // their losses are read (from the list Recent kills and losses already loads).
@@ -73,7 +76,7 @@ export function PilotProfileView(props: PilotProfileViewProps) {
   // recent kill) the badge says it is checking rather than showing a level
   // that could still change.
   const threat = useMemo(() => {
-    if (history.kind !== 'ready' || lossesUnreadable) return null;
+    if (history.kind !== 'ready' || lossesUnreadable || killsUnknown) return null;
     const verdict = threatVerdict({
       kills: history.kills,
       dangerRatio: pilotStats?.dangerRatio ?? null,
@@ -84,7 +87,7 @@ export function PilotProfileView(props: PilotProfileViewProps) {
     const waitingForRatios = stats === null && needsDangerRatio(history.kills, now);
     const waitingForLosses = needsLosses && losses.kind === 'loading';
     return { verdict, pending: waitingForRatios || waitingForLosses };
-  }, [history, pilotStats, stats, losses, needsLosses, lossesUnreadable, now]);
+  }, [history, pilotStats, stats, losses, needsLosses, lossesUnreadable, killsUnknown, now]);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,6 +114,11 @@ export function PilotProfileView(props: PilotProfileViewProps) {
           nowMs={now}
         />
       )}
+      {killsUnknown && (
+        <p className="text-sm text-text-dim">
+          {t('travel.pilot.threat.label')}: {t('travel.pilot.activity.unknown')}
+        </p>
+      )}
       {lossesUnreadable && (
         <p className="text-xs text-text-dim">{t('travel.pilot.threat.lossesUnknown')}</p>
       )}
@@ -132,14 +140,14 @@ export function PilotProfileView(props: PilotProfileViewProps) {
             <ZkillRatioMeters stats={pilotStats} />
           </div>
         )}
-        <PilotKillActivityView history={history} onRetry={retryHistory} />
+        <PilotKillActivityView history={history} onRetry={retryHistory} unknown={killsUnknown} />
       </div>
       <PilotShips
         kills={history.kind === 'ready' ? history.kills : null}
         flown={pilotStats?.topShips ?? null}
       />
       <ZkillStatsSection stats={stats} onRetry={retryStats} />
-      <PilotKillmailsSection characterId={characterId} />
+      <PilotKillmailsSection characterId={characterId} unknown={zkillDown} />
     </div>
   );
 }

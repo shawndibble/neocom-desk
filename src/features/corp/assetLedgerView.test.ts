@@ -55,6 +55,44 @@ describe('placementLabel', () => {
   });
 });
 
+describe('Upwell structure names', () => {
+  const STRUCTURE = 1_040_000_000_001;
+  const withStructure = makeLedgerLabels({
+    t,
+    typeNames: new Map(),
+    locationNames: new Map([[STRUCTURE, 'Jita - Test Corp Home Fortizar']]),
+    divisionNames: new Map([[1, 'Ships']]),
+  });
+
+  it('prints the whole structure name in a chip, not just the system', () => {
+    expect(
+      placementLabel({ state: 'offices', locationId: STRUCTURE, division: 1 }, withStructure)
+    ).toBe('Jita - Test Corp Home Fortizar · Ships');
+  });
+
+  it('prefixes a Fuel bay or In space group header with the structure', () => {
+    const ledger = buildLocationLedger(
+      classifyCorpAssets([
+        input({
+          itemId: 1,
+          locationId: STRUCTURE,
+          locationType: 'other',
+          locationFlag: 'StructureFuel',
+        }),
+      ]),
+      { prices: new Map() }
+    );
+    const rows = buildLocationRows(ledger, {
+      tab: 'all',
+      locationId: null,
+      division: null,
+      labels: withStructure,
+      usage: officeUsage(ledger),
+    });
+    expect(rows[0]?.groupLabel).toBe('Jita - Test Corp Home Fortizar · corp.assets.state.fuelBay');
+  });
+});
+
 describe('placementLabels', () => {
   const two = makeLedgerLabels({
     t,

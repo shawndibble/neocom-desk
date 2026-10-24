@@ -88,7 +88,7 @@ export function CommunitySharedPlans({
     try {
       const plan = { ...newPlan(characterId, shared.name), entries: shared.entries };
       await db.skillPlans.add(plan);
-      if (isSyncConfigured()) scheduleSync(characterId);
+      if (isSyncConfigured()) scheduleSync(characterId, { collections: ['plans'] });
       // Opening the new plan is the confirmation.
       navigate(`/skills/plans/${plan.id}`);
     } catch {

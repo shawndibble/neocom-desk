@@ -172,46 +172,48 @@ export function CorpAssetLocationTable({
       {rows.length === 0 ? (
         emptyState
       ) : (
-        <DataTable
-          label={t('corp.assets.locationTableLabel')}
-          columns={columns}
-          rows={rows}
-          rowKey={(r) => r.key}
-          {...sortProps}
-          {...tableExport.tableProps}
-          density="compact"
-          responsive="stack"
-          mobileSort
-          onRowClick={onOpenRow}
-          rowClickable={(r) => r.cell.itemCount > 0}
-          groupBy={{
-            key: (r) => r.groupKey,
-            allWidths: true,
-            minSize: 1,
-            // An office the corporation keeps nothing in starts folded: its header and flag say it all.
-            defaultExpanded: (group) => !group[0].groupEmpty,
-            renderHeader: (group) => {
-              const first = group[0];
-              return (
-                <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-left">
-                  <span className="font-semibold">{first.groupLabel}</span>
-                  <span className="text-xs text-text-dim tabular-nums">
-                    {t('corp.assets.groupTotals', {
-                      count: first.groupItems,
-                      value: formatIsk(first.groupValue),
-                    })}
-                  </span>
-                  {first.groupDivisionsInUse !== null && (
+        <div className="overflow-x-auto">
+          <DataTable
+            label={t('corp.assets.locationTableLabel')}
+            columns={columns}
+            rows={rows}
+            rowKey={(r) => r.key}
+            {...sortProps}
+            {...tableExport.tableProps}
+            density="compact"
+            responsive="stack"
+            mobileSort
+            onRowClick={onOpenRow}
+            rowClickable={(r) => r.cell.itemCount > 0}
+            groupBy={{
+              key: (r) => r.groupKey,
+              allWidths: true,
+              minSize: 1,
+              // An office the corporation keeps nothing in starts folded: its header and flag say it all.
+              defaultExpanded: (group) => !group[0].groupEmpty,
+              renderHeader: (group) => {
+                const first = group[0];
+                return (
+                  <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-left">
+                    <span className="font-semibold">{first.groupLabel}</span>
                     <span className="text-xs text-text-dim tabular-nums">
-                      {t('corp.assets.divisionsInUse', { count: first.groupDivisionsInUse })}
+                      {t('corp.assets.groupTotals', {
+                        count: first.groupItems,
+                        value: formatIsk(first.groupValue),
+                      })}
                     </span>
-                  )}
-                  {first.groupEmpty && <Pill tone="warning">{t('corp.assets.emptyOffice')}</Pill>}
-                </span>
-              );
-            },
-          }}
-        />
+                    {first.groupDivisionsInUse !== null && (
+                      <span className="text-xs text-text-dim tabular-nums">
+                        {t('corp.assets.divisionsInUse', { count: first.groupDivisionsInUse })}
+                      </span>
+                    )}
+                    {first.groupEmpty && <Pill tone="warning">{t('corp.assets.emptyOffice')}</Pill>}
+                  </span>
+                );
+              },
+            }}
+          />
+        </div>
       )}
     </>
   );

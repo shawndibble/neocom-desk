@@ -14,8 +14,9 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { CharacterLink } from '@/features/entities';
 import { OpenInEveButton } from '@/features/openInEve/OpenInEveButton';
 import type { SrpAuditEntry, SrpClaim } from '../srpClaimTypes';
-import type { ClaimColumnsContext } from './claimColumnsContext';
-import { ClaimStatePill, CopyAmount, TypeAmountField } from './OfficerClaimCells';
+import { ownClaimReason, type ClaimColumnsContext } from './claimColumnsContext';
+import { DoctrineCheckView } from './DoctrineCheckView';
+import { ClaimStatePill, CopyAmount, DecideTip, TypeAmountField } from './OfficerClaimCells';
 import { SrpAuditTrail } from './SrpAuditTrail';
 import { claimBasisLine } from './srpClaimText';
 import { approveAmount } from './srpQueue';
@@ -70,7 +71,9 @@ export function SrpClaimDetail({
   const audit = useClaimAudit(claim, loadAudit);
   const at = (ms: number) => formatTimestamp(new Date(ms), ctx.zone);
   const hull = ctx.names.hull(claim.hullTypeId);
-  const blocked = ctx.busy || approveAmount(claim, ctx.typed[claim.killmailId]) === null;
+  const own = ownClaimReason(claim, ctx);
+  const blocked =
+    ctx.busy || own !== undefined || approveAmount(claim, ctx.typed[claim.killmailId]) === null;
   return (
     <SlideOver
       open
@@ -95,6 +98,11 @@ export function SrpClaimDetail({
                 />
               </span>
             </Row>
+            {claim.doctrineCheck && claim.doctrineCheck.status !== 'not-checked' && (
+              <Row label={t('srp.doctrine.detailLabel')}>
+                <DoctrineCheckView check={claim.doctrineCheck} audience="officer" />
+              </Row>
+            )}
             <Row label={t('srp.officer.detail.killmail')}>
               <ExternalLink href={`https://zkillboard.com/kill/${claim.killmailId}/`}>
                 {t('srp.officer.detail.killmailLink', { id: claim.killmailId })}
@@ -172,27 +180,36 @@ export function SrpClaimDetail({
           >
             {claim.state === 'pending' ? (
               <>
-                <Button aria-disabled={ctx.busy || undefined} onClick={() => ctx.onReject(claim)}>
-                  {t('srp.officer.actions.reject')}
-                </Button>
-                <Button
-                  variant="success"
-                  aria-disabled={blocked || undefined}
-                  onClick={() => ctx.onApprove(claim)}
-                >
-                  {t('srp.officer.actions.approve')}
-                </Button>
+                <DecideTip reason={own}>
+                  <Button
+                    aria-disabled={ctx.busy || own !== undefined || undefined}
+                    onClick={() => ctx.onReject(claim)}
+                  >
+                    {t('srp.officer.actions.reject')}
+                  </Button>
+                </DecideTip>
+                <DecideTip reason={own}>
+                  <Button
+                    variant="success"
+                    aria-disabled={blocked || undefined}
+                    onClick={() => ctx.onApprove(claim)}
+                  >
+                    {t('srp.officer.actions.approve')}
+                  </Button>
+                </DecideTip>
               </>
             ) : (
               <>
                 <CopyAmount claim={claim} ctx={ctx} />
-                <Button
-                  variant="success"
-                  aria-disabled={ctx.busy || undefined}
-                  onClick={() => ctx.onMarkPaid(claim)}
-                >
-                  {t('srp.officer.actions.markPaid')}
-                </Button>
+                <DecideTip reason={own}>
+                  <Button
+                    variant="success"
+                    aria-disabled={ctx.busy || own !== undefined || undefined}
+                    onClick={() => ctx.onMarkPaid(claim)}
+                  >
+                    {t('srp.officer.actions.markPaid')}
+                  </Button>
+                </DecideTip>
               </>
             )}
           </div>

@@ -61,6 +61,13 @@ describe('useSrpSettings', () => {
     await waitFor(() => expect(result.current.state.status).toBe('never-on'));
   });
 
+  it('does not read the settings doc when the verdict says none exists (no console permission error)', async () => {
+    client.verifySrpOfficer.mockResolvedValue(verdict({ settingsExist: false, srpEnabled: false }));
+    const { result } = renderHook(() => useSrpSettings());
+    await waitFor(() => expect(result.current.state.status).toBe('never-on'));
+    expect(client.readSrpSettings).not.toHaveBeenCalled();
+  });
+
   it('treats a refused read after verify as never-on: no settings doc means no officer record yet', async () => {
     client.readSrpSettings.mockRejectedValue({ code: 'permission-denied' });
     const { result } = renderHook(() => useSrpSettings());

@@ -126,7 +126,8 @@ export function createSyncedSetting<T>(options: SyncedSettingOptions<T>): LocalS
     try {
       await setSyncedSetting(key, value);
       const characters = await db.characters.toArray();
-      for (const character of characters) scheduleSync(character.characterId);
+      for (const character of characters)
+        scheduleSync(character.characterId, { collections: ['settings'] });
     } catch {
       // The choice is already on disk; the next successful sync pushes it.
     }

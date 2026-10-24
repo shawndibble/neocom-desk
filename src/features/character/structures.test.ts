@@ -6,6 +6,7 @@ import { onEsiAuthFailure } from '@/esi/authFailureSignal';
 import { db } from '@/db';
 import { STALE_AFTER, resetRevalidationState } from '@/esi/cache';
 import {
+  listCachedStructures,
   loadStructureName,
   loadStructureNameNoRoster,
   readCachedStructureNames,
@@ -300,6 +301,28 @@ describe('readCachedStructureNames', () => {
     });
     const names = await readCachedStructureNames([1000000000001, 1000000000002]);
     expect([...names]).toEqual([[1000000000001, 'Cached Keepstar']]);
+  });
+});
+
+describe('listCachedStructures', () => {
+  it("lists every name on the roster-wide rows, skipping refusals and one Character's own rows", async () => {
+    const fetchedAt = Date.now();
+    await db.esiCache.bulkPut([
+      {
+        characterId: 0,
+        key: 'structure:1000000000001',
+        value: { name: 'Cached Keepstar', owner_id: 1, solar_system_id: 1 },
+        fetchedAt,
+      },
+      { characterId: 0, key: 'structure:1000000000002:roster-forbidden', value: true, fetchedAt },
+      {
+        characterId: CHARACTER_ID,
+        key: 'structure:1000000000003',
+        value: { name: 'Own Row', owner_id: 1, solar_system_id: 1 },
+        fetchedAt,
+      },
+    ]);
+    expect(await listCachedStructures()).toEqual([{ id: 1000000000001, name: 'Cached Keepstar' }]);
   });
 });
 

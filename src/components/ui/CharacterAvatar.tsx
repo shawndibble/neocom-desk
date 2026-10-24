@@ -18,6 +18,12 @@ interface CharacterAvatarProps {
    * where deferring costs a visible late paint. Lists pass `lazy`.
    */
   loading?: 'eager' | 'lazy';
+  /**
+   * The page's largest image above the fold (the Character header's portrait, usually the
+   * route's LCP): fetched at high priority. Its URL is per Character, so it cannot be preloaded.
+   * Never with `loading="lazy"`.
+   */
+  priority?: boolean;
   /** For a caller that swaps in a fallback when the portrait fails. */
   onError?: () => void;
   className?: string;
@@ -34,6 +40,7 @@ export function CharacterAvatar({
   selected = false,
   alt,
   loading = 'eager',
+  priority = false,
   onError,
   className = '',
 }: CharacterAvatarProps) {
@@ -46,7 +53,8 @@ export function CharacterAvatar({
       aria-hidden={alt === undefined ? true : undefined}
       width={px}
       height={px}
-      loading={loading}
+      loading={priority ? 'eager' : loading}
+      fetchPriority={priority ? 'high' : undefined}
       decoding="async"
       onError={onError}
       className={cx(

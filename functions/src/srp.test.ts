@@ -108,4 +108,33 @@ describe('parseSrpSettingsPatch', () => {
     ).toMatch(/at most 500/);
     expect(parseSrpSettingsPatch({ hullRules: [] })).toEqual({ hullRules: [] });
   });
+
+  it('takes doctrineIds on a hull rule only; empty means none; dedupes; bounds the list', () => {
+    const rule = { scope: 'hull', id: 1, kind: 'pay-percent' };
+    expect(
+      parseSrpSettingsPatch({ hullRules: [{ ...rule, doctrineIds: ['a', 'b', 'a'] }] }).hullRules
+    ).toEqual([{ ...rule, doctrineIds: ['a', 'b'] }]);
+    expect(parseSrpSettingsPatch({ hullRules: [{ ...rule, doctrineIds: [] }] }).hullRules).toEqual([
+      rule,
+    ]);
+    expect(
+      parseSrpSettingsPatch({
+        hullRules: [{ scope: 'hull', id: 1, kind: 'pay-fixed', iskAmount: 5, doctrineIds: ['a'] }],
+      }).hullRules
+    ).toEqual([{ scope: 'hull', id: 1, kind: 'pay-fixed', iskAmount: 5, doctrineIds: ['a'] }]);
+    expect(fails({ hullRules: [{ ...rule, scope: 'class', doctrineIds: ['a'] }] })).toMatch(
+      /hull rule/
+    );
+    expect(
+      parseSrpSettingsPatch({ hullRules: [{ ...rule, scope: 'class', doctrineIds: [] }] }).hullRules
+    ).toEqual([{ ...rule, scope: 'class' }]);
+    expect(fails({ hullRules: [{ ...rule, doctrineIds: 'a' }] })).toMatch(/doctrineIds/);
+    expect(fails({ hullRules: [{ ...rule, doctrineIds: ['a/b'] }] })).toMatch(/doctrineIds/);
+    expect(fails({ hullRules: [{ ...rule, doctrineIds: [5] }] })).toMatch(/doctrineIds/);
+    expect(
+      fails({
+        hullRules: [{ ...rule, doctrineIds: Array.from({ length: 21 }, (_, i) => `d${i}`) }],
+      })
+    ).toMatch(/at most 20/);
+  });
 });

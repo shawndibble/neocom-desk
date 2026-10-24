@@ -46,7 +46,7 @@ describe('My Fittings store', () => {
       'updatedAt',
     ]);
     expect(rows[0]).toEqual(saved);
-    expect(scheduleSync).toHaveBeenCalledWith(7);
+    expect(scheduleSync).toHaveBeenCalledWith(7, { collections: ['fittings'] });
   });
 
   it('saving again with the same id updates the record instead of adding one', async () => {
@@ -85,7 +85,7 @@ describe('My Fittings store', () => {
     const noted = await setFittingNotes(saved, 'Kite the frigates.');
     expect(noted.notes).toBe('Kite the frigates.');
     expect(noted.updatedAt).toBeGreaterThanOrEqual(saved.updatedAt);
-    expect(scheduleSync).toHaveBeenCalledWith(7);
+    expect(scheduleSync).toHaveBeenCalledWith(7, { collections: ['fittings'] });
 
     const cleared = await setFittingNotes(noted, '');
     expect(cleared).not.toHaveProperty('notes');

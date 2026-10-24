@@ -195,4 +195,120 @@ describe('MemberSrp', () => {
         .some((l) => l.getAttribute('href')?.includes('stops='))
     ).toBe(true);
   });
+
+  describe('doctrine check', () => {
+    const paste = async (link: string) =>
+      userEvent.type(await screen.findByLabelText('Killmail link'), link);
+
+    it('shows Off doctrine with the diff for a checked hull, and the pilot can still file', async () => {
+      setup({ doctrine: true });
+      await paste('https://zkillboard.com/kill/123/hurricane');
+      expect(await screen.findByText('Off doctrine', undefined, { timeout: 3000 })).toBeTruthy();
+      expect(screen.getByText(/Hurricane - artillery/)).toBeTruthy();
+      expect(screen.getByText('Missing modules')).toBeTruthy();
+      expect(await screen.findByText('2× Hull 519')).toBeTruthy();
+      await userEvent.click(screen.getByRole('button', { name: 'File claim' }));
+      await waitFor(() => expect(file).toHaveBeenCalledTimes(1));
+    });
+
+    it('shows Matches <fit> when the fit is on doctrine', async () => {
+      setup({ doctrine: true });
+      await paste('https://zkillboard.com/kill/123/ondoctrine');
+      expect(
+        await screen.findByText('Matches Hurricane - artillery', undefined, { timeout: 3000 })
+      ).toBeTruthy();
+      expect(screen.queryByText('Off doctrine')).toBeNull();
+    });
+
+    it('shows nothing for a hull the corp does not check, and never asks when no hull is checked', async () => {
+      setup({ doctrine: true });
+      await paste('https://zkillboard.com/kill/8003/unchecked');
+      await waitFor(
+        () =>
+          expect(
+            screen.queryByText('Checking your fit against the corp’s Doctrine Fits…')
+          ).toBeNull(),
+        { timeout: 3000 }
+      );
+      expect(screen.queryByText('Off doctrine')).toBeNull();
+      expect(screen.queryByText(/Matches/)).toBeNull();
+      cleanup();
+      setup();
+      const preview = vi.spyOn(backend, 'previewDoctrine');
+      await paste('https://zkillboard.com/kill/123/hurricane');
+      await new Promise((r) => setTimeout(r, 600));
+      expect(preview).not.toHaveBeenCalled();
+    });
+
+    it('asks in a dialog before filing an off-doctrine lost ship, and File anyway files it with the note', async () => {
+      setup({ doctrine: true });
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'File claim for Hurricane' })
+      );
+      const dialog = await screen.findByRole('dialog', undefined, { timeout: 3000 });
+      expect(within(dialog).getByText('Off doctrine')).toBeTruthy();
+      expect(file).not.toHaveBeenCalled();
+      await userEvent.type(within(dialog).getByLabelText('Fleet or FC (optional)'), 'Kestrel');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'File anyway' }));
+      await waitFor(() =>
+        expect(file).toHaveBeenCalledWith(7, 98765432, {
+          killmail: esiKillmailLink(8001, HASH),
+          fleetOrFc: 'Kestrel',
+        })
+      );
+    });
+
+    it('blocks File anyway with the reason while a required Fleet or FC is empty, then files once a note is typed', async () => {
+      setup({ doctrine: true, requireFleetOrFc: true });
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'File claim for Hurricane' })
+      );
+      const dialog = await screen.findByRole('dialog', undefined, { timeout: 3000 });
+      const fileAnyway = within(dialog).getByRole('button', { name: 'File anyway' });
+      expect(fileAnyway).toHaveAttribute('aria-disabled', 'true');
+      expect(within(dialog).getByText('Fleet or FC is required by your corp.')).toBeTruthy();
+      await userEvent.click(fileAnyway);
+      expect(file).not.toHaveBeenCalled();
+      await userEvent.type(within(dialog).getByLabelText('Fleet or FC'), 'Kestrel');
+      expect(within(dialog).queryByText('Fleet or FC is required by your corp.')).toBeNull();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'File anyway' }));
+      await waitFor(() => expect(file).toHaveBeenCalledTimes(1));
+    });
+
+    it('files straight away when the doctrine preview fails', async () => {
+      setup({ doctrine: true });
+      vi.spyOn(backend, 'previewDoctrine').mockRejectedValue(new Error('down'));
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'File claim for Hurricane' })
+      );
+      await waitFor(() => expect(file).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('Cancel in the off-doctrine dialog files nothing', async () => {
+      setup({ doctrine: true });
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'File claim for Hurricane' })
+      );
+      const dialog = await screen.findByRole('dialog', undefined, { timeout: 3000 });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      expect(file).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('files an on-doctrine lost ship directly, with its toast', async () => {
+      setup({ doctrine: true });
+      vi.spyOn(backend, 'previewDoctrine').mockResolvedValue({
+        killmailId: 8001,
+        hullTypeId: 24702,
+        check: { status: 'matched', doctrineName: 'Hurricane - artillery' },
+      } as never);
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'File claim for Hurricane' })
+      );
+      await waitFor(() => expect(file).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect((await screen.findAllByText('Claim filed for Hurricane.')).length).toBeGreaterThan(0);
+    });
+  });
 });

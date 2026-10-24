@@ -61,10 +61,13 @@ export const corpWallet: Builder = (feeds, { t }) => {
   const { data } = ready;
   const K = `${W}.corpWallet`;
   const total = data.divisions.reduce((sum, d) => sum + d.balance, 0);
-  const named = data.divisions.map((d) => ({
+  const all = data.divisions.map((d) => ({
     ...d,
     label: d.name ?? t('corp.vitals.division', { division: d.division }),
   }));
+  // An unnamed, empty division is noise: one dim line says how many.
+  const named = all.filter((d) => d.name || d.balance !== 0);
+  const unused = all.length - named.length;
   const biggest = [...named].sort((a, b) => b.balance - a.balance)[0];
   const biggestShare = biggest ? fractionBar(biggest.balance, total) : undefined;
 
@@ -93,13 +96,14 @@ export const corpWallet: Builder = (feeds, { t }) => {
       to: `${TO}?division=${d.division}`,
       cells: [d.label, iskCell(d.balance), shareCell(d.balance, total, UNKNOWN)],
     })),
+    footer: unused > 0 ? t(`${K}.unused`, { count: unused }) : undefined,
   };
   return withFeed(
     {
-      ...blank(TO, statusOf(feeds.corpWallet, { isEmpty: data.divisions.length === 0 })),
+      ...blank(TO, statusOf(feeds.corpWallet, { isEmpty: named.length === 0 })),
       number,
       table,
-      summary: t(`${K}.summary`, { isk: formatIskCompact(total), count: named.length }),
+      summary: t(`${K}.summary`, { isk: formatIskCompact(total), count: all.length }),
       chart:
         total > 0
           ? (hbarsFromRows(
@@ -192,9 +196,14 @@ export const corpCashFlow: Builder = (feeds, { t, now, range }) => {
   const balance = data.divisions.find((d) => d.division === data.journalDivision)?.balance ?? 0;
   const runway = runwayDays(balance, dailyOutgoings(data.journal, now));
   const runwayDaysWhole = runway === null ? null : Math.floor(runway);
+  // Runway only means something while the wallet is burning.
+  const netPositive =
+    inRange(data.journal, now, VITALS_WINDOW_DAYS).reduce((sum, l) => sum + l.amount, 0) > 0;
 
+  // The sentence speaks for the vitals window, so it only sits beside a headline of that range.
+  const showNetPositive = netPositive && range === VITALS_WINDOW_DAYS;
   const notes: string[] = [];
-  if (range !== VITALS_WINDOW_DAYS) {
+  if (range !== VITALS_WINDOW_DAYS && !netPositive) {
     notes.push(t(`${K}.runwayWindow`, { count: VITALS_WINDOW_DAYS }));
   }
   const coverage = range > covered ? t(`${K}.coverage`, { count: covered }) : undefined;
@@ -236,13 +245,16 @@ export const corpCashFlow: Builder = (feeds, { t, now, range }) => {
         iskAmount: net,
         unit: t(`${K}.unit`),
         tone: 'clear',
-        secondary:
-          runwayDaysWhole === null
-            ? { text: t(`${K}.runwayUnknown`) }
-            : {
-                text: t(`${K}.runway`, { count: runwayDaysWhole }),
-                tone: runwayDaysWhole < RUNWAY_WARNING_DAYS ? 'caution' : undefined,
-              },
+        secondary: showNetPositive
+          ? { text: t(`${K}.netPositive`, { count: VITALS_WINDOW_DAYS }) }
+          : netPositive
+            ? undefined
+            : runwayDaysWhole === null
+              ? { text: t(`${K}.runwayUnknown`) }
+              : {
+                  text: t(`${K}.runway`, { count: runwayDaysWhole }),
+                  tone: runwayDaysWhole < RUNWAY_WARNING_DAYS ? 'caution' : undefined,
+                },
         notes: notes.length > 0 ? notes : undefined,
       },
       table,

@@ -87,12 +87,14 @@ export function LostShipsList({ rows, onFile, busyKillmailId = null }: LostShips
     [t, timeZone, onFile, busyKillmailId]
   );
   return (
-    <DataTable
-      label={t('srpMember.lost.label')}
-      columns={columns}
-      rows={rows}
-      rowKey={(r) => r.killmailId}
-      stackLayout="dense"
-    />
+    <div className="overflow-x-auto">
+      <DataTable
+        label={t('srpMember.lost.label')}
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.killmailId}
+        stackLayout="dense"
+      />
+    </div>
   );
 }

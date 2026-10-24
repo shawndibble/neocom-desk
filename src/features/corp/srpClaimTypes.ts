@@ -1,6 +1,6 @@
 // Client mirror of the SRP claim doc and the officer callables' shapes (ADR 0026). Mirrors `functions/src/srpOfficer.ts` and what `fileSrpClaim` writes; kept as its
 // own copy because the Cloud Functions package is built separately.
-import type { SrpClaimBasis, SrpClaimState } from './srpTypes';
+import type { DoctrineCheckRecord, SrpClaimBasis, SrpClaimState } from './srpTypes';
 
 /** `corps/{corporationId}/srpClaims/{killmailId}`: the fields the officer queue reads. */
 export interface SrpClaim {
@@ -22,6 +22,8 @@ export interface SrpClaim {
   fleetOrFc: string | null;
   note: string | null;
   refileCount: number;
+  /** The doctrine-fit result taken at filing; absent on claims filed before the check existed. */
+  doctrineCheck?: DoctrineCheckRecord;
   previousRejectionReason?: string | null;
   /** The worked-out amount, kept when an officer changed it. */
   computedAmount?: number | null;

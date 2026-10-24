@@ -6,7 +6,7 @@
  * other.
  */
 import { formatIsoDay } from '@/lib/formatDateTick';
-import { useMemo, type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
@@ -19,6 +19,7 @@ import {
   FilterField,
   IconButton,
   LiveStatus,
+  MenuItem,
   SearchInput,
   Select,
   SelectContent,
@@ -31,7 +32,8 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { UseTableExport } from '@/components/ui/useTableExport';
-import type { JournalCoverage, JournalRow } from '@/engine/journalNetting';
+import { journalRefKey, type JournalCoverage, type JournalRow } from '@/engine/journalNetting';
+import { CharacterRowMenu } from '@/features/corp/corpRowMenus';
 import { ActiveFilterRow } from '@/features/character/ActiveFilterRow';
 import { InsuranceLossHost } from '@/features/character/InsuranceLossHost';
 import { IskFlowChart } from '@/features/character/IskFlowChart';
@@ -404,6 +406,40 @@ export function JournalTable({
         : undefined,
     [grouped, openDays, t, i18n.language]
   );
+  // Corp journal only: a line with a Player offers that player's filter and actions,
+  // and its ref type's filter; a line with none has one action, so no menu.
+  const playerNames = useMemo(
+    () => new Map(playerOptions?.map((option) => [option.id, option.name])),
+    [playerOptions]
+  );
+  const rowContextMenu = useCallback(
+    (entry: JournalRow, tr: ReactElement): ReactElement => {
+      if (entry.playerId === undefined) return tr;
+      const playerId = entry.playerId;
+      const name = playerNames.get(String(playerId)) ?? null;
+      return (
+        <CharacterRowMenu
+          characterId={playerId}
+          name={name}
+          extraItems={
+            <>
+              <MenuItem onSelect={() => onFilterChange({ ...filter, player: String(playerId) })}>
+                {t('wallet.filterToPlayer')}
+              </MenuItem>
+              <MenuItem
+                onSelect={() => onFilterChange({ ...filter, refType: journalRefKey(entry) })}
+              >
+                {t('wallet.filterToType')}
+              </MenuItem>
+            </>
+          }
+        >
+          {tr}
+        </CharacterRowMenu>
+      );
+    },
+    [playerNames, filter, onFilterChange, t]
+  );
   // A filter with no criteria active still runs (it's the identity filter), so
   // "is a filter active" is asked separately here rather than read off the result.
   const filterIsActive = activeWalletJournalFilterCount(filter) > 0 || filter.text.trim() !== '';
@@ -500,6 +536,15 @@ export function JournalTable({
             // Every page of the journal, uncapped: thousands of rows for an
             // active trader.
             virtualize="auto"
+            // The corp journal's row menu (filters and the player's actions); the
+            // pinned ⋮ keeps a dense card's first line at the title's height.
+            {...(playerOptions
+              ? {
+                  className: 'dt-actions-pinned-only',
+                  rowContextMenu,
+                  rowMoreActions: true,
+                }
+              : {})}
           />
         </div>
       )}

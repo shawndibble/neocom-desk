@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { Tooltip, InfoTooltip } from './Tooltip';
+import { Tooltip, InfoTooltip, TooltipProvider, TOOLTIP_HOVER_DELAY_MS } from './Tooltip';
 import { Modal } from './Modal';
 import { MenuItem, RowActionsMenu } from './RowActions';
 import { TooltipHoldContext } from './tooltipHold';
@@ -159,6 +159,69 @@ describe('Tooltip', () => {
     );
     const trigger = screen.getByRole('button', { name: 'Trigger' });
     expect(trigger.className).toContain('w-full');
+  });
+});
+
+describe('Tooltip inside TooltipProvider', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function renderPair() {
+    render(
+      <TooltipProvider>
+        <Tooltip content="First explanation.">
+          <button type="button">First</button>
+        </Tooltip>
+        <Tooltip content="Second explanation.">
+          <button type="button">Second</button>
+        </Tooltip>
+      </TooltipProvider>
+    );
+    return {
+      first: screen.getByRole('button', { name: 'First' }),
+      second: screen.getByRole('button', { name: 'Second' }),
+    };
+  }
+
+  it('waits before revealing on hover, so a pointer passing over does not pop a bubble', () => {
+    vi.useFakeTimers();
+    const { first } = renderPair();
+
+    fireEvent.pointerMove(first);
+    act(() => vi.advanceTimersByTime(TOOLTIP_HOVER_DELAY_MS - 1));
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.getByRole('tooltip')).toHaveTextContent('First explanation.');
+  });
+
+  it('never opens when the pointer leaves before the delay ends', () => {
+    vi.useFakeTimers();
+    const { first } = renderPair();
+
+    fireEvent.pointerMove(first);
+    act(() => vi.advanceTimersByTime(TOOLTIP_HOVER_DELAY_MS / 2));
+    fireEvent.pointerLeave(first);
+    act(() => vi.advanceTimersByTime(TOOLTIP_HOVER_DELAY_MS));
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('opens the next tooltip at once while one is already showing', () => {
+    vi.useFakeTimers();
+    const { first, second } = renderPair();
+
+    fireEvent.pointerMove(first);
+    act(() => vi.advanceTimersByTime(TOOLTIP_HOVER_DELAY_MS));
+    fireEvent.pointerMove(second);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Second explanation.');
+  });
+
+  it('still reveals on keyboard focus at once', () => {
+    const { first } = renderPair();
+
+    fireEvent.focus(first);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('First explanation.');
   });
 });
 

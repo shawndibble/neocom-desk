@@ -81,6 +81,15 @@ export function esiKillmailLink(killmailId: number, hash: string): string {
   return `https://esi.evetech.net/latest/killmails/${killmailId}/${hash}/`;
 }
 
+const KILLMAIL_LINK = /(?:zkillboard\.com\/kill\/\d+|\/killmails\/\d+\/[0-9a-f]{40})/i;
+
+/** Whether pasted text is a killmail link the server can read; the doctrine check waits for one. */
+export const looksLikeKillmailLink = (text: string): boolean => KILLMAIL_LINK.test(text.trim());
+
+/** A hull is checked when its own Hull Rule lists a Doctrine Fit; a class rule never does. */
+export const hullIsDoctrineChecked = (rules: readonly HullRule[], hullTypeId: number): boolean =>
+  rules.some((r) => r.scope === 'hull' && r.id === hullTypeId && (r.doctrineIds?.length ?? 0) > 0);
+
 export type MemberErrorTarget = 'link' | 'fleet' | 'notCovered' | 'form';
 
 /**

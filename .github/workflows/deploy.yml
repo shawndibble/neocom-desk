@@ -137,6 +137,9 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_VAPID_KEY: ${{ vars.VITE_FIREBASE_VAPID_KEY }}
           VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
+      # Cloudflare Pages only does SPA rendering without a top-level 404.html;
+      # why the build writes one: `spaFallbackHtml` in vite.config.ts.
+      - run: rm -f dist/404.html
       # The Pages project already exists. If it is ever recreated (or PAGES_PROJECT
       # changes), create it once by hand first:
       #   npx wrangler@4 pages project create "$PAGES_PROJECT" --production-branch "$PAGES_BRANCH"

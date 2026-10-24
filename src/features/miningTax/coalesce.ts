@@ -114,5 +114,5 @@ export async function coalesceAssignments(
     await db.miningTaxAssignments.bulkPut([...rewritten].map((id) => working.get(id)!));
     await deleteAssignments(absorbedIds.map((id) => ({ id, characterId })));
   });
-  scheduleSync(characterId);
+  scheduleSync(characterId, { collections: ['miningTaxAssignments'] });
 }

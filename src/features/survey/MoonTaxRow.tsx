@@ -5,7 +5,7 @@
  * field and a name field, always shown like the location and notes, since a rate
  * means little without its payee. Focus leaving the pair saves it, as for the
  * other two. The name completes from the pilot's Payees (and fills in that
- * Payee's rate). Manage Taxes connects the Survey's moon to that Payee
+ * Payee's rate). Assign Taxes connects the Survey's moon to that Payee
  * (`useSurveyConnection`, issue #4684): the Payee is added if need be, ore
  * already mined there is assigned, and ore mined until the Survey's ETA is
  * assigned as it reaches the ledger, so the pilot never assigns it by hand.
@@ -54,7 +54,7 @@ export interface TaxSurvey {
   published: SurveyTaxShare | null;
 }
 
-/** "Auto-assigning moon tax until …", with the Tax tab and Stop: what a connected Survey shows in place of Manage Taxes. */
+/** "Auto-assigning moon tax until …", with the Tax tab and Stop: what a connected Survey shows in place of Assign Taxes. */
 function ConnectedNote({
   connection,
   nowMs,
@@ -106,7 +106,7 @@ function ConnectionToastView({
 }
 
 /**
- * The Survey connection behind Manage Taxes, with focus handed between Manage
+ * The Survey connection behind Assign Taxes, with focus handed between Manage
  * Taxes and Stop as they swap places (DESIGN §6c focus) and a failed Stop or
  * Undo reported through `onFailed`.
  */
@@ -133,7 +133,7 @@ function useManageTaxes(
   };
 }
 
-/** Manage Taxes (`children`) until the Survey is connected, then what it is doing, plus its Undo toast. */
+/** Assign Taxes (`children`) until the Survey is connected, then what it is doing, plus its Undo toast. */
 function MoonConnectionSlot({
   moon,
   children,
@@ -170,7 +170,7 @@ export function MoonTaxRow({
 }: {
   characterId: number;
   survey?: TaxSurvey;
-  /** The Survey as connected by Manage Taxes; without it the button only opens the Tax tab. */
+  /** The Survey as connected by Assign Taxes; without it the button only opens the Tax tab. */
   connectable?: ConnectableSurvey;
   /**
    * The draft, when the panel holds it, so a template can fill it. Without
@@ -315,7 +315,7 @@ export function MoonTaxRow({
 
 /**
  * The read-only line, for everyone but the owner (in the app or on the public
- * page): the rate and who gets it, as the owner set them, and Manage Taxes.
+ * page): the rate and who gets it, as the owner set them, and Assign Taxes.
  * Logged out it is disabled with "Log in to access" right under it, like Set
  * waypoint. Logged in, one click connects the Survey's moon to that Payee
  * (`useSurveyConnection`): a Payee of the viewer's by that name (any case) is

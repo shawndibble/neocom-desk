@@ -5,6 +5,7 @@ import { loadCurrentSystemId } from '@/features/route/currentSystem';
 import { loadJumpBasis } from '@/features/route/jumpBasis';
 import { localJumpDistances } from '@/features/route/localRoute';
 import { notificationUrlForSubject } from './notificationOptions';
+import { skyhookRaidableNearbyCopy } from './pollDomains/copy/skyhooksNearby';
 import { skyhookNearbyDomain } from './pollDomains/skyhooksNearby';
 import { DEFAULT_NOTIFICATION_PREFERENCES, useNotificationPreferences } from './preferences';
 
@@ -93,5 +94,35 @@ describe('skyhookRaidableNearby identity', () => {
     expect(notificationUrlForSubject('skyhookRaidableNearby', fire.systemId)).toContain(
       '/overview'
     );
+  });
+});
+
+describe('skyhookRaidableNearby copy', () => {
+  const fire = {
+    eventId: 'skyhookRaidableNearby' as const,
+    characterId: CHARACTER,
+    systemId: 30000144,
+    planetId: 40000001,
+    startMs: Date.now() + 3_600_000,
+    endMs: Date.now() + 7_200_000,
+    jumps: 5,
+  };
+  const body = (names: { planet?: string; system?: string }) =>
+    skyhookRaidableNearbyCopy.poll(fire, 'Pilot', names).body;
+
+  it('does not repeat the system a planet name already leads with', () => {
+    expect(body({ planet: '60M-TG I', system: '60M-TG' })).toMatch(/^60M-TG I can be raided/);
+  });
+
+  it('names the system for a planet whose name does not carry it', () => {
+    expect(body({ planet: 'Moon', system: 'Efa' })).toMatch(/^Moon in Efa can be raided/);
+  });
+
+  it('treats a planet that merely shares the system name as a prefix as a different name', () => {
+    expect(body({ planet: 'Efant I', system: 'Efa' })).toMatch(/^Efant I in Efa can be raided/);
+  });
+
+  it('falls back to a generic skyhook, not a planet id', () => {
+    expect(body({ system: 'U-HYZN' })).toMatch(/^A skyhook in U-HYZN can be raided/);
   });
 });

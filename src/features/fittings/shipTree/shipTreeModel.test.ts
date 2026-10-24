@@ -4,11 +4,21 @@ import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { ShipTreeData, ShipTreeFaction, ShipTreeShip } from '@/sde/types';
 import {
+  allSectionIds,
   DEFAULT_FACTION_ID,
+  factionMatchCounts,
   factionNameOf,
   flyableCount,
+  flyStateCounts,
+  hullMatches,
+  isShipTreeFiltered,
+  masteryCounts,
+  masteryFilterActive,
+  NO_SHIP_TREE_FILTER,
+  type ShipTreeFilter,
   inGameFactionOrder,
   ladderSections,
+  sectionPath,
   masteryTierEntries,
   ownedBlueprintSummary,
   resolveFactionID,
@@ -240,5 +250,101 @@ describe('inGameFactionOrder', () => {
     const f = (id: number) => ({ id, name: String(id), description: '' });
     const ordered = inGameFactionOrder([f(1), f(500001), f(500014), f(500003), f(500029)]);
     expect(ordered.map((x) => x.id)).toEqual([500003, 500001, 500014, 500029, 1]);
+  });
+});
+
+describe('ship tree filters', () => {
+  const flyable = (mastery: number): ShipTreeHullStatus => ({
+    canFly: true,
+    secondsToFly: 0,
+    mastery,
+  });
+  const locked: ShipTreeHullStatus = { canFly: false, secondsToFly: 3600, mastery: 0 };
+  const filter = (over: Partial<ShipTreeFilter>): ShipTreeFilter => ({
+    ...NO_SHIP_TREE_FILTER,
+    ...over,
+  });
+
+  it('matches every hull with no filter, including one with no status yet', () => {
+    expect(hullMatches(flyable(3), NO_SHIP_TREE_FILTER)).toBe(true);
+    expect(hullMatches(locked, NO_SHIP_TREE_FILTER)).toBe(true);
+    expect(hullMatches(undefined, NO_SHIP_TREE_FILTER)).toBe(true);
+    expect(isShipTreeFiltered(NO_SHIP_TREE_FILTER)).toBe(false);
+  });
+
+  it('splits by fly state; a hull with no status counts as not flyable', () => {
+    expect(hullMatches(flyable(0), filter({ fly: 'canFly' }))).toBe(true);
+    expect(hullMatches(locked, filter({ fly: 'canFly' }))).toBe(false);
+    expect(hullMatches(locked, filter({ fly: 'cantFly' }))).toBe(true);
+    expect(hullMatches(undefined, filter({ fly: 'cantFly' }))).toBe(true);
+    expect(hullMatches(flyable(5), filter({ fly: 'cantFly' }))).toBe(false);
+  });
+
+  it('keeps flyable hulls at a picked Mastery tier; None is tier 0', () => {
+    const f = filter({ mastery: new Set([0, 3]) });
+    expect(hullMatches(flyable(3), f)).toBe(true);
+    expect(hullMatches(flyable(0), f)).toBe(true);
+    expect(hullMatches(flyable(4), f)).toBe(false);
+    expect(hullMatches(locked, f)).toBe(false);
+    expect(masteryFilterActive(f)).toBe(true);
+    expect(isShipTreeFiltered(f)).toBe(true);
+  });
+
+  it("ignores the Mastery pick while Can't fly is picked", () => {
+    const f = filter({ fly: 'cantFly', mastery: new Set([3]) });
+    expect(masteryFilterActive(f)).toBe(false);
+    expect(hullMatches(locked, f)).toBe(true);
+  });
+
+  const statuses = new Map<number, ShipTreeHullStatus>([
+    [1, flyable(0)],
+    [2, flyable(3)],
+    [3, flyable(3)],
+    [4, locked],
+  ]);
+  const caldari = [1, 2, 3, 4, 5].map((typeID) => ship({ typeID }));
+
+  it("counts a faction's fly-state split; a hull with no status can't be flown", () => {
+    expect(flyStateCounts(caldari, statuses)).toEqual({ all: 5, canFly: 3, cantFly: 2 });
+  });
+
+  it('counts flyable hulls per Mastery tier, None through V', () => {
+    expect(masteryCounts(caldari, statuses)).toEqual([1, 0, 0, 2, 0, 0]);
+  });
+
+  it('counts each faction’s matches; a faction with none is 0', () => {
+    const ships = [...caldari, ship({ typeID: 6, factionID: 500003 })];
+    const counts = factionMatchCounts(
+      [500001, 500003, 500004],
+      ships,
+      statuses,
+      filter({ mastery: new Set([3]) })
+    );
+    expect([...counts]).toEqual([
+      [500001, 2],
+      [500003, 0],
+      [500004, 0],
+    ]);
+  });
+
+  it('finds the path down to a nested section', () => {
+    const def = (id: number) => ({ id }) as never;
+    const sections = [
+      { def: def(1), children: [{ def: def(2), children: [] }] },
+      { def: def(3), children: [] },
+    ];
+    expect(sectionPath(sections, 2)).toEqual([1, 2]);
+    expect(sectionPath(sections, 3)).toEqual([3]);
+    expect(sectionPath(sections, 9)).toEqual([]);
+  });
+
+  it('lists every section id, nested ones too', () => {
+    const def = (id: number) => ({ id }) as never;
+    expect(
+      allSectionIds([
+        { def: def(1), children: [{ def: def(2), children: [] }] },
+        { def: def(3), children: [] },
+      ])
+    ).toEqual([1, 2, 3]);
   });
 });

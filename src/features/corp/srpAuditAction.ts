@@ -10,6 +10,9 @@ export const SRP_AUDIT_ACTIONS = [
   'turnOff',
   'saveSettings',
   'reclaim',
+  'addDoctrine',
+  'updateDoctrine',
+  'deleteDoctrine',
   'retentionDelete',
 ] as const;
 

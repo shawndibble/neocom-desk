@@ -26,6 +26,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { Pill } from '@/components/ui/Pill';
 import { DataGate } from '@/components/DataGate';
 import { CharacterLink } from '@/features/entities';
 import { label } from '@/engine/corp/members';
@@ -36,6 +37,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { loadCorporationId } from './boardData';
+import { CharacterRowMenu } from './corpRowMenus';
 import { loadRoleAudit, type RoleAuditData } from './roleAudit';
 
 /** Days of history shown before "Show older". */
@@ -66,6 +68,7 @@ interface HolderRow {
   name: string | null;
   roles: string;
   isDirector: boolean;
+  isCeo: boolean;
   titles: string;
   lastChangeMs: number | null;
 }
@@ -143,6 +146,12 @@ function HistoryTable({ rows }: { rows: readonly HistoryRow[] }) {
       rowKey={(row) => row.key}
       label={t('corp.roles.historyLabel')}
       density="compact"
+      rowContextMenu={(row, tr) => (
+        <CharacterRowMenu characterId={row.change.characterId} name={row.member}>
+          {tr}
+        </CharacterRowMenu>
+      )}
+      rowMoreActions
     />
   );
 }
@@ -194,6 +203,7 @@ export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
         name: audit.names.get(holder.characterId) ?? null,
         roles: holder.roles.map(roleLabel).join(', '),
         isDirector: holder.roles.includes('Director'),
+        isCeo: holder.characterId === audit.ceoId,
         titles: holder.titles.join(', '),
         lastChangeMs: lastChange.get(holder.characterId) ?? null,
       }))
@@ -230,7 +240,12 @@ export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
         primary: true,
         className: 'truncate',
         render: (row) => (
-          <CharacterLink id={row.characterId}>{label(row.name, row.characterId)}</CharacterLink>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <CharacterLink id={row.characterId} className="truncate">
+              {label(row.name, row.characterId)}
+            </CharacterLink>
+            {row.isCeo && <Pill className="shrink-0">{t('corp.members.ceo')}</Pill>}
+          </span>
         ),
         sortValue: (row) => row.name ?? undefined,
       },
@@ -323,6 +338,12 @@ export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
                   rowKey={(row) => row.characterId}
                   label={t('corp.roles.tableLabel')}
                   density="compact"
+                  rowContextMenu={(row, tr) => (
+                    <CharacterRowMenu characterId={row.characterId} name={row.name}>
+                      {tr}
+                    </CharacterRowMenu>
+                  )}
+                  rowMoreActions
                 />
               )}
             </Panel>

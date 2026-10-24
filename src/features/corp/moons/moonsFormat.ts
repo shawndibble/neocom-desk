@@ -1,4 +1,5 @@
 import { formatIsk } from '@/lib/isk';
+import { verifyPeriodLabel } from '@/features/corpTaxBook/verifyPeriodLabel';
 import { MONTHS } from '@/engine/corpTaxBook/monthNames';
 
 export const isk = (value: number) => formatIsk(Math.round(value));
@@ -17,17 +18,9 @@ export function shortDateTime(value: string): string {
   return `${shortDate(value)} ${value.slice(11, 16)}`;
 }
 
-/** "Sep 2026" from a period's first day. */
-export function monthLabel(date: string): string {
-  const [y, m] = date.split('-').map(Number);
-  return `${MONTHS[m - 1]} ${y}`;
-}
-
-/** A period label for a monthly or custom cadence. */
+/** A period label: "Oct 2026" only for a whole calendar month, else the days it covers. */
 export function periodLabel(start: string, end: string): string {
-  return start.slice(0, 7) === end.slice(0, 7) && start.endsWith('-01')
-    ? monthLabel(start)
-    : `${shortDate(start)} – ${shortDate(end)}`;
+  return verifyPeriodLabel(start, end, 'en');
 }
 
 export function addDays(date: string, days: number): string {

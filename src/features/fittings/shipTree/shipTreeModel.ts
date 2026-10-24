@@ -61,6 +61,74 @@ export function flyableCount(
   return { flyable, total: ships.length };
 }
 
+/** The ladder's fly-state tabs: every hull, the ones the pilot can fly, the gaps. */
+export type FlyState = 'all' | 'canFly' | 'cantFly';
+
+/** What the ladder is narrowed to. Mastery tiers: 0 (can fly, no Mastery yet) to 5. */
+export interface ShipTreeFilter {
+  fly: FlyState;
+  mastery: ReadonlySet<number>;
+}
+
+export const NO_SHIP_TREE_FILTER: ShipTreeFilter = { fly: 'all', mastery: new Set() };
+
+export const MASTERY_TIERS = [0, 1, 2, 3, 4, 5] as const;
+
+/** Mastery is a can-fly property, so a Mastery pick means nothing under Can't fly. */
+export function masteryFilterActive(f: ShipTreeFilter): boolean {
+  return f.mastery.size > 0 && f.fly !== 'cantFly';
+}
+
+export function isShipTreeFiltered(f: ShipTreeFilter): boolean {
+  return f.fly !== 'all' || masteryFilterActive(f);
+}
+
+/** Whether a hull passes the filter. No status yet (skills unread) reads as can't fly. */
+export function hullMatches(status: ShipTreeHullStatus | undefined, f: ShipTreeFilter): boolean {
+  const canFly = status?.canFly === true;
+  if (f.fly === 'canFly' && !canFly) return false;
+  if (f.fly === 'cantFly' && canFly) return false;
+  if (masteryFilterActive(f)) return canFly && f.mastery.has(status?.mastery ?? 0);
+  return true;
+}
+
+/** A faction's own split, which no filter changes: the tabs' counts. */
+export function flyStateCounts(
+  ships: readonly ShipTreeShip[],
+  statuses: ReadonlyMap<number, ShipTreeHullStatus>
+): Record<FlyState, number> {
+  const canFly = ships.filter((s) => statuses.get(s.typeID)?.canFly).length;
+  return { all: ships.length, canFly, cantFly: ships.length - canFly };
+}
+
+/** Flyable hulls per Mastery tier, index 0 (None) to 5: what each Mastery chip would show. */
+export function masteryCounts(
+  ships: readonly ShipTreeShip[],
+  statuses: ReadonlyMap<number, ShipTreeHullStatus>
+): number[] {
+  const counts = MASTERY_TIERS.map(() => 0);
+  for (const s of ships) {
+    const status = statuses.get(s.typeID);
+    if (status?.canFly) counts[status.mastery] += 1;
+  }
+  return counts;
+}
+
+/** How many hulls of each faction pass the filter, in `factionIDs`' order. */
+export function factionMatchCounts(
+  factionIDs: readonly number[],
+  ships: readonly ShipTreeShip[],
+  statuses: ReadonlyMap<number, ShipTreeHullStatus>,
+  f: ShipTreeFilter
+): Map<number, number> {
+  const counts = new Map(factionIDs.map((id) => [id, 0]));
+  for (const s of ships) {
+    const n = counts.get(s.factionID);
+    if (n !== undefined && hullMatches(statuses.get(s.typeID), f)) counts.set(s.factionID, n + 1);
+  }
+  return counts;
+}
+
 export interface LadderSection {
   def: ShipTreeNodeDef;
   children: LadderSection[];
@@ -78,6 +146,21 @@ export function ladderSections(defs: readonly ShipTreeNodeDef[]): LadderSection[
     children: defs.filter((d) => d.parent === def.id && isNested(d)).map(build),
   });
   return defs.filter((d) => !isNested(d) || d.parent === null).map(build);
+}
+
+/** The class ids from a top-level section down to `classId`'s, or [] if it isn't there. */
+export function sectionPath(sections: readonly LadderSection[], classId: number): number[] {
+  for (const s of sections) {
+    if (s.def.id === classId) return [classId];
+    const below = sectionPath(s.children, classId);
+    if (below.length) return [s.def.id, ...below];
+  }
+  return [];
+}
+
+/** Every section's class id, nested ones too: what Expand all opens. */
+export function allSectionIds(sections: readonly LadderSection[]): number[] {
+  return sections.flatMap((s) => [s.def.id, ...allSectionIds(s.children)]);
 }
 
 function isNested(def: ShipTreeNodeDef): boolean {

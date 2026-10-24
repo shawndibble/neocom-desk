@@ -23,9 +23,9 @@ const form = (rules: SrpSettingsForm['rules']): SrpSettingsForm => ({
 describe('hullRuleRows', () => {
   it('lists hulls that carry a rule or were added, and ignores No rule and unknown ids', () => {
     const f = form({
-      [ruleKey('hull', 1)]: { kind: 'not-covered', isk: '' },
+      [ruleKey('hull', 1)]: { kind: 'not-covered', isk: '', doctrineIds: [] },
       [ruleKey('hull', 3)]: NO_RULE,
-      [ruleKey('hull', 99)]: { kind: 'officer-decides', isk: '' },
+      [ruleKey('hull', 99)]: { kind: 'officer-decides', isk: '', doctrineIds: [] },
     });
     expect([...listedHullIds(f, catalog, [2])].sort()).toEqual([1, 2]);
   });
@@ -70,10 +70,10 @@ describe('hullRuleRows', () => {
 
   it('listedClassIds takes classes with a rule plus kept ones, not No rule or unknown ids', () => {
     const f = form({
-      [ruleKey('class', 25)]: { kind: 'pay-percent', isk: '' },
+      [ruleKey('class', 25)]: { kind: 'pay-percent', isk: '', doctrineIds: [] },
       [ruleKey('class', 26)]: NO_RULE,
-      [ruleKey('class', 99)]: { kind: 'not-covered', isk: '' },
-      [ruleKey('hull', 1)]: { kind: 'not-covered', isk: '' },
+      [ruleKey('class', 99)]: { kind: 'not-covered', isk: '', doctrineIds: [] },
+      [ruleKey('hull', 1)]: { kind: 'not-covered', isk: '', doctrineIds: [] },
     });
     expect([...listedClassIds(f, catalog, [])]).toEqual([25]);
     expect([...listedClassIds(f, catalog, [26])].sort()).toEqual([25, 26]);

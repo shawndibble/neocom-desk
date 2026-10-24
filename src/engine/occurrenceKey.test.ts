@@ -681,3 +681,41 @@ describe('occurrenceKey: communityRequestPledged', () => {
     expect(occurrenceFiredAt(fire, T0)).toBe(T0);
   });
 });
+
+describe('occurrenceKey: shared-world alerts', () => {
+  const skyhook = {
+    eventId: 'skyhookRaidableNearby' as const,
+    characterId: 1,
+    systemId: 30000144,
+    planetId: 40000001,
+    startMs: 1000,
+    endMs: 2000,
+    jumps: 3,
+  };
+  const incursion = {
+    eventId: 'incursionNearby' as const,
+    characterId: 1,
+    constellationId: 20000020,
+    stagingSystemId: 30000144,
+    state: 'established' as const,
+    jumps: 3,
+  };
+
+  it('is one occurrence per skyhook window however many Characters are in range', () => {
+    expect(occurrenceKey(skyhook, T0)).toEqual(
+      occurrenceKey({ ...skyhook, characterId: 2, jumps: 7 }, T0)
+    );
+    expect(occurrenceKey(skyhook, T0)).not.toEqual(
+      occurrenceKey({ ...skyhook, startMs: 3000 }, T0)
+    );
+  });
+
+  it('is one occurrence per Incursion however many Characters are in range', () => {
+    expect(occurrenceKey(incursion, T0)).toEqual(
+      occurrenceKey({ ...incursion, characterId: 2, jumps: 7 }, T0)
+    );
+    expect(occurrenceKey(incursion, T0)).not.toEqual(
+      occurrenceKey({ ...incursion, stagingSystemId: 30000145 }, T0)
+    );
+  });
+});

@@ -44,7 +44,7 @@ export async function createPayee(characterId: number, input: PayeeInput): Promi
     updatedAt: Date.now(),
   };
   await db.payees.put(record);
-  scheduleSync(characterId);
+  scheduleSync(characterId, { collections: ['payees'] });
   return record;
 }
 
@@ -82,7 +82,7 @@ export async function updatePayee(payee: PayeeRecord, input: PayeeInput): Promis
     updated.entityKind = input.entityKind;
   }
   await db.payees.put(updated);
-  scheduleSync(payee.characterId);
+  scheduleSync(payee.characterId, { collections: ['payees'] });
   return updated;
 }
 
@@ -120,7 +120,7 @@ export async function rememberPayeeEntity(
 async function writeEntity(next: PayeeRecord): Promise<PayeeRecord> {
   const updated: PayeeRecord = { ...next, updatedAt: Date.now() };
   await db.payees.put(updated);
-  scheduleSync(updated.characterId);
+  scheduleSync(updated.characterId, { collections: ['payees'] });
   return updated;
 }
 

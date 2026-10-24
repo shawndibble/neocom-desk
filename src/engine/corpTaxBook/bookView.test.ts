@@ -164,6 +164,95 @@ describe('buildBookView', () => {
     expect(rows.find((r) => r.start === '2026-09-01')?.status).toBe('issued');
   });
 
+  it('lists every closed period with its own billed figure, not a running total (CX-38)', () => {
+    const view = buildBookView(
+      input({
+        entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 1000)],
+        now: '2026-10-05T12:00:00Z',
+        lastSyncedAt: '2026-10-05T12:00:00Z',
+      })
+    );
+    const rows = periodRows(view);
+    expect(rows.find((r) => r.start === '2026-08-01')).toMatchObject({
+      status: 'ready',
+      billed: 100_000,
+      miners: 1,
+    });
+    expect(rows.find((r) => r.start === '2026-09-01')).toMatchObject({
+      status: 'closed',
+      billed: 100_000,
+      miners: 1,
+    });
+    expect(rows.find((r) => r.start === '2026-10-01')?.status).toBe('open');
+  });
+
+  it('keeps the ready row on the Send plan and labels a below-minimum closed period as rolling over (CX-38)', () => {
+    const view = buildBookView(
+      input({
+        minimumStatement: 150_000,
+        entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 1000)],
+        now: '2026-10-05T12:00:00Z',
+        lastSyncedAt: '2026-10-05T12:00:00Z',
+      })
+    );
+    const rows = periodRows(view);
+    // Aug's own 100,000 is under the minimum: it rolls into Sep's Statement, which the ready row carries.
+    expect(rows.find((r) => r.start === '2026-08-01')?.status).toBe('rollover');
+    const plan = planStatementRun(view, nextRunPeriod(view)!);
+    expect(rows.find((r) => r.status === 'ready')).toMatchObject({
+      start: '2026-09-01',
+      miners: plan.lines.length,
+      billed: 200_000,
+    });
+  });
+
+  it('anchors a 7-day cadence at the start date, so the days before the first 1st are billed (monthly to N-day switch)', () => {
+    const view = buildBookView(
+      input({
+        startDate: '2026-09-25',
+        cadence: { kind: 'days', days: 7, anchor: '2026-09-25' },
+        entries: [entry(1, '2026-09-27', 1000), entry(1, '2026-10-03', 1000)],
+        now: '2026-10-20T12:00:00Z',
+        lastSyncedAt: '2026-10-20T12:00:00Z',
+      })
+    );
+    const rows = periodRows(view);
+    expect(rows.find((r) => r.start === '2026-09-25')).toMatchObject({
+      end: '2026-10-01',
+      billed: 100_000,
+    });
+    expect(rows.find((r) => r.start === '2026-10-02')).toMatchObject({ end: '2026-10-08' });
+  });
+
+  it('puts days before a later anchor in a stub period from the start date (start 25 Sep, anchor 1 Oct)', () => {
+    const view = buildBookView(
+      input({
+        startDate: '2026-09-25',
+        cadence: { kind: 'days', days: 7, anchor: '2026-10-01' },
+        entries: [entry(1, '2026-09-27', 1000), entry(1, '2026-10-03', 1000)],
+        now: '2026-10-20T12:00:00Z',
+        lastSyncedAt: '2026-10-20T12:00:00Z',
+      })
+    );
+    const rows = periodRows(view);
+    expect(rows.find((r) => r.start === '2026-09-25')).toMatchObject({
+      end: '2026-09-30',
+      billed: 100_000,
+    });
+    expect(rows.find((r) => r.start === '2026-10-01')).toMatchObject({ end: '2026-10-07' });
+  });
+
+  it('bills the open period for its own days only (CX-38)', () => {
+    const view = buildBookView(
+      input({
+        entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 1000)],
+        now: '2026-09-18T14:00:00Z',
+      })
+    );
+    const open = periodRows(view).find((r) => r.status === 'open');
+    expect(open).toMatchObject({ start: '2026-09-01', billed: 100_000 });
+  });
+
   it('counts a donation before the start date and lists it nowhere (#4505)', () => {
     const view = buildBookView({
       ...input({ entries: [entry(1, '2026-08-10', 1000)] }),

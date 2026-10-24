@@ -5,12 +5,12 @@
  */
 import type { DeadlineSeverity } from '@/engine/character/severity';
 
-/** One clock a widget offers the header chip: when, what it is, how loud, and where it leads. */
+/** One clock a widget offers the header chip: when, what it is, how loud, and where it leads (absent when no page owns the clock). */
 export interface BoardDeadline {
   at: number;
   note: string;
   severity: DeadlineSeverity;
-  to: string;
+  to?: string;
 }
 
 export type ChipTone = 'neutral' | 'warning' | 'danger';
@@ -35,4 +35,28 @@ export function chipTone(remainingMs: number): ChipTone {
   if (remainingMs < CHIP_DANGER_MS) return 'danger';
   if (remainingMs < CHIP_WARNING_MS) return 'warning';
   return 'neutral';
+}
+
+/**
+ * What the header drew for the Next deadline once every read was in, remembered so the next
+ * load can hold the same room on a phone (where it is a line of its own) before the clocks
+ * arrive: a button (`link`), a plain readout (`text`, no page owns the clock), or nothing.
+ */
+export type NextShape = 'none' | 'link' | 'text';
+
+export function nextShape(next: Pick<BoardDeadline, 'to'> | null): NextShape {
+  if (next === null) return 'none';
+  return next.to === undefined ? 'text' : 'link';
+}
+
+/**
+ * The phone height to hold open for a remembered shape: the `md` button's `h-11`, the
+ * `text-sm` readout's one line, or nothing. Only what this device saw last time is held:
+ * a guess on a first load that turns out wrong (no clock) drops the whole board by the
+ * line it held, which is the very shift the slot is there to prevent.
+ */
+export function reservedNextHeight(remembered: string | null): 'h-11' | 'h-5' | null {
+  if (remembered === 'link') return 'h-11';
+  if (remembered === 'text') return 'h-5';
+  return null;
 }

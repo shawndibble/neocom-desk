@@ -22,6 +22,7 @@ function row(overrides: Partial<RosterRow> = {}): RosterRow {
     startMs: 2000,
     roles: null,
     isSelf: false,
+    isCeo: false,
     ...overrides,
   };
 }

@@ -96,7 +96,7 @@ export function PlanListPane({
   const [scrollerRef, scrollerMaxHeight] = useViewportBoundedHeight(VIEWPORT_BOUNDED_BOTTOM_GAP_PX);
 
   function syncAfterEdit() {
-    if (isSyncConfigured()) scheduleSync(activeCharacterId);
+    if (isSyncConfigured()) scheduleSync(activeCharacterId, { collections: ['plans'] });
   }
 
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -135,7 +135,7 @@ export function PlanListPane({
     const source = plans?.find((p) => p.id === id);
     if (!source) return;
     await db.skillPlans.add(copyOf(source, characterId));
-    if (isSyncConfigured()) scheduleSync(characterId);
+    if (isSyncConfigured()) scheduleSync(characterId, { collections: ['plans'] });
   }
 
   async function handleDelete(id: string) {

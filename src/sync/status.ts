@@ -7,8 +7,18 @@ export type SyncState = 'idle' | 'syncing' | 'error';
 
 export interface SyncStatus {
   state: SyncState;
-  /** Epoch ms of the last successful sync this session, or null. */
+  /**
+   * Epoch ms of the last successful pass this session, or null — any pass,
+   * including one narrowed to the collections an edit touched.
+   */
   lastSyncedAt: number | null;
+  /**
+   * Epoch ms of the last successful *full* pass this session (every collection
+   * pulled), or absent before one. What "how fresh is everything from other
+   * devices" reads — the background sweep's gate (`app/backgroundSync.ts`) —
+   * since a narrowed pass pulls only what the edit touched (issue #4896).
+   */
+  lastFullSyncAt?: number;
   error: string | null;
   /**
    * The failure in `error` was recorded while the browser was offline, so it

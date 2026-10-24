@@ -105,6 +105,18 @@ describe('documentTitleFor', () => {
   });
 });
 
+describe('documentTitleFor with hidden tabs', () => {
+  it('names the page alone when its tab is left out of the nav', () => {
+    const t = (key: string) => i18n.t(key);
+    expect(documentTitleFor('/corp/moons/extractions', t)).toBe(
+      'Extractions — Moons — Neocom Desk'
+    );
+    expect(
+      documentTitleFor('/corp/moons/extractions', t, new Set(['/corp/moons/extractions']))
+    ).toBe('Moons — Neocom Desk');
+  });
+});
+
 describe('documentTitleFor Settings index', () => {
   it('titles the bare /settings list as Settings', () => {
     expect(documentTitleFor('/settings', t)).toBe('Settings — Neocom Desk');

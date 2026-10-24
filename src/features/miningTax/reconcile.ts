@@ -115,6 +115,6 @@ export async function reconcileAssignments(
 
   if (updates.length > 0) {
     await db.miningTaxAssignments.bulkPut(updates);
-    scheduleSync(characterId);
+    scheduleSync(characterId, { collections: ['miningTaxAssignments'] });
   }
 }

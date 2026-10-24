@@ -15,7 +15,7 @@
  * No view-cyclers in the header: view switching lives in the settings menu, so
  * a stray click changes nothing.
  */
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useRosterNames } from './useRosterNames';
@@ -33,6 +33,7 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { GrantBanner } from '@/app/GrantNote';
 import { ReauthCachedNote } from '@/app/ReauthCachedNote';
 import { cx } from '@/lib/cx';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { formatAge } from '@/lib/age';
 import { useTicker } from '@/lib/ticker';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -49,6 +50,12 @@ import { TableBody, type TableBodyProps } from './TableBody';
 import { useOverviewEdit } from './editContext';
 import { DEFAULT_ROWS_PER_PAGE } from './tableSortPage';
 import { TABLE_ROWS, tableOf } from './tableModel';
+import {
+  estimatedBodyHeight,
+  heightKey,
+  rememberBodyHeight,
+  rememberedBodyHeight,
+} from './skeletonHeight';
 
 interface WidgetProps {
   widget: WidgetModel;
@@ -228,11 +235,12 @@ function HeaderCharacterReadout({ characterId }: { characterId: number }) {
   return <CharacterScopeReadout scope="one" characterId={characterId} characterName={name} />;
 }
 
-function Skeleton() {
+/** `minHeight` holds the body's settled height, so the board does not jump when the data lands. */
+function Skeleton({ minHeight }: { minHeight: number }) {
   const { t } = useTranslation();
   const bar = 'block animate-pulse rounded-xs bg-line motion-reduce:animate-none';
   return (
-    <div className="grid gap-2 px-3 py-3">
+    <div className="grid content-start gap-2 px-3 py-3" style={{ minHeight }}>
       <span aria-hidden="true" className={cx(bar, 'h-6 w-[45%]')} />
       <span aria-hidden="true" className={cx(bar, 'h-3 w-[70%]')} />
       <span className="sr-only">{t('overview.widgets.loading')}</span>
@@ -266,7 +274,25 @@ function LiveWidget(props: WidgetProps) {
     kind?.hasRaidsWhere ? widget.raidsWhere : undefined,
     kind?.hasRaidsWhere ? widget.raidsRadius : undefined
   );
-  return <WidgetFrame {...props} view={view} />;
+  return <WidgetFrame {...props} view={view} rememberHeight />;
+}
+
+/**
+ * Remembers the body's settled height under `key` (see `skeletonHeight.ts`)
+ * while `active`, so the next load's skeleton stands as tall as this one ended.
+ */
+function useRememberHeight(key: string, active: boolean) {
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!active || !node || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver((entries) => {
+      const height = entries[entries.length - 1]?.borderBoxSize?.[0]?.blockSize;
+      if (height !== undefined) rememberBodyHeight(key, height);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [key, active, node]);
+  return setNode;
 }
 
 function WidgetFrame({
@@ -279,7 +305,12 @@ function WidgetFrame({
   hideHeader = false,
   inertTitle = false,
   onRemove,
-}: Omit<WidgetProps, 'previewView'> & { view: KindView }) {
+  rememberHeight = false,
+}: Omit<WidgetProps, 'previewView'> & {
+  view: KindView;
+  /** A live widget: remember its settled body height for the next load's skeleton. */
+  rememberHeight?: boolean;
+}) {
   const { t } = useTranslation();
   const kind = getKind(widget.kind);
   const { refresh } = useOverviewRefresh();
@@ -288,6 +319,14 @@ function WidgetFrame({
   const now = useTicker(OVERVIEW_TICK_MS);
   const scope = scopePresentation(widget.kind, widget.scope);
   const { state, showLastGood, reauthNote } = resolveWidget(view.status);
+  const isPhone = useIsPhone();
+  const sizeKey = heightKey(widget, characterId, isPhone);
+  // Only a settled body is worth standing the next skeleton at: a short error or permission
+  // prompt is a passing state, not this widget's height.
+  const measureRef = useRememberHeight(
+    sizeKey,
+    rememberHeight && (state === 'ok' || state === 'empty')
+  );
 
   // The grid only draws kinds it knows; a widget rendered alone without one has no title to show.
   if (!kind) return null;
@@ -295,7 +334,14 @@ function WidgetFrame({
 
   let body;
   if (state === 'loading') {
-    body = <Skeleton />;
+    body = (
+      <Skeleton
+        minHeight={
+          (rememberHeight ? rememberedBodyHeight(sizeKey) : undefined) ??
+          estimatedBodyHeight(widget.view, widget.size, isPhone, widget.rowsPerPage)
+        }
+      />
+    );
   } else if (state === 'needsPermission') {
     body = (
       <div className="grid gap-2 p-3 text-[0.8125rem]">
@@ -344,17 +390,21 @@ function WidgetFrame({
     body = (
       <div className="grid gap-2 p-3 text-[0.8125rem]">
         <b>{view.emptyMessage ?? t(kind.emptyMessageKey)}</b>
-        <span className="text-text-dim">{view.emptyHint ?? t('overview.widgets.emptyHint')}</span>
+        {!view.emptyHealthy && (
+          <span className="text-text-dim">{view.emptyHint ?? t('overview.widgets.emptyHint')}</span>
+        )}
         {view.to !== null && view.emptyLinkLabel !== undefined && (
           <Link to={view.to} className={entityLinkClassName('w-fit')}>
             {view.emptyLinkLabel}
           </Link>
         )}
-        <span>
-          <Button size="sm" onClick={() => onRemove(widget.id)}>
-            {t('overview.widgets.remove')}
-          </Button>
-        </span>
+        {!view.emptyHealthy && (
+          <span>
+            <Button size="sm" onClick={() => onRemove(widget.id)}>
+              {t('overview.widgets.remove')}
+            </Button>
+          </span>
+        )}
       </div>
     );
   } else {
@@ -452,7 +502,10 @@ function WidgetFrame({
           {menu}
         </div>
       )}
-      <div className="flex-1">{body}</div>
+      <div className="flex-1">
+        {/* Measured, not the stretched `flex-1` box: a row's tallest widget sets the others' height. */}
+        <div ref={measureRef}>{body}</div>
+      </div>
       {editControls}
       {scope.fallbackNote && state === 'ok' && characterId !== null && (
         <div className="border-t border-line px-3 py-1.5">

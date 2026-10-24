@@ -49,6 +49,12 @@ export interface ItemContextMenuProps {
   onCompareVariations?: () => void;
   /** Present only when at least one of the character's own Build Plans consumes this item as a material (issue #414); omitted when unknown or when no plan does. */
   onViewInIndustryAsMaterial?: () => void;
+  /**
+   * Only the actions a held stack needs: Show info, View in Market and Set stock
+   * target. Leaves out Quickbar, price alert, Open in EVE, Compare, Copy name,
+   * Build Plan and PI (Corp assets, DESIGN.md §6c restraint).
+   */
+  holdingsOnly?: boolean;
   /** Leaves out "Set stock target…" where the page already edits the Stock Target in place (Assets › Targets). */
   hideStockTarget?: boolean;
   /** Leaves out "Build Plan" where the page is already a Build Plan (Industry › Plans detail). */
@@ -205,6 +211,19 @@ function useItemMenuItems(
       : blueprintTypeID === null
         ? t('industry.contextMenu.noBlueprintOptions')
         : t('industry.contextMenu.buildPlan');
+
+  if (props.holdingsOnly) {
+    return (
+      <>
+        <ShowInfoMenuItem typeId={typeId} itemName={itemName} itemId={itemId} />
+        <ViewInMarketMenuItem typeId={typeId} />
+        {!props.hideStockTarget && (
+          <MenuItem onSelect={onStockTargetRequest}>{t('stockTargets.dialog.menuItem')}</MenuItem>
+        )}
+        {extraItems}
+      </>
+    );
+  }
 
   return (
     <>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chipTone, nextDeadline } from './nextDeadline';
+import { chipTone, nextDeadline, nextShape, reservedNextHeight } from './nextDeadline';
 
 const HOUR = 3_600_000;
 const MIN = 60_000;
@@ -51,5 +51,26 @@ describe('chipTone', () => {
     expect(chipTone(1)).toBe('danger');
     expect(chipTone(0)).toBe('danger');
     expect(chipTone(-5)).toBe('danger');
+  });
+});
+
+describe('nextShape', () => {
+  it('is a link when a page owns the clock, a readout when none does, else nothing', () => {
+    expect(nextShape({ to: '/skills' })).toBe('link');
+    expect(nextShape({})).toBe('text');
+    expect(nextShape(null)).toBe('none');
+  });
+});
+
+describe('reservedNextHeight', () => {
+  it("holds the room last time's shape took", () => {
+    expect(reservedNextHeight('link')).toBe('h-11');
+    expect(reservedNextHeight('text')).toBe('h-5');
+    expect(reservedNextHeight('none')).toBeNull();
+  });
+
+  it('holds nothing when nothing is remembered, so a first load never drops the board', () => {
+    expect(reservedNextHeight(null)).toBeNull();
+    expect(reservedNextHeight('junk')).toBeNull();
   });
 });

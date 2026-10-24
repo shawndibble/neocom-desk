@@ -48,13 +48,20 @@ describe('lazy sync driver', () => {
 
   it('forwards scheduleSync with its debounce override', async () => {
     scheduleSync(7, 500);
-    await vi.waitFor(() => expect(driver.scheduleSync).toHaveBeenCalledWith(7, 500, undefined));
+    await vi.waitFor(() => expect(driver.scheduleSync).toHaveBeenCalledWith(7, 500));
   });
 
   it('forwards the background priority the sweep asks for', async () => {
-    scheduleSync(7, undefined, 'background');
+    scheduleSync(7, { priority: 'background' });
     await vi.waitFor(() =>
-      expect(driver.scheduleSync).toHaveBeenCalledWith(7, undefined, 'background')
+      expect(driver.scheduleSync).toHaveBeenCalledWith(7, { priority: 'background' })
+    );
+  });
+
+  it('forwards the collections an edit touched', async () => {
+    scheduleSync(7, { collections: ['payees'] });
+    await vi.waitFor(() =>
+      expect(driver.scheduleSync).toHaveBeenCalledWith(7, { collections: ['payees'] })
     );
   });
 
