@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createFeedStore } from './feedStore';
 import { FeedStoreContext } from './feedStoreContext';
 import { FeedSourceMount } from './feedSources';
+import { useOverviewRefresh } from './refreshContext';
 import { ensureBuilders, feedsFor } from './models';
 import type { FeedId } from './types';
 
@@ -39,9 +40,11 @@ export function WidgetDataProvider({
     [kinds, always]
   );
   // A kind's lazy builder loads with the kind, not with its first read; views rebuild when it lands.
+  // A failed load shows failed (the stand-in) and retries on the next Refresh or Retry.
+  const { epoch } = useOverviewRefresh();
   useEffect(() => {
     ensureBuilders(kinds).catch(() => undefined);
-  }, [kinds]);
+  }, [kinds, epoch]);
   return (
     <FeedStoreContext.Provider value={store}>
       {feeds.map((feed) => (
