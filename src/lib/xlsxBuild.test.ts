@@ -50,6 +50,15 @@ class FakeWorker {
   terminate() {}
 }
 
+/** A worker whose writer threw: it answers with the error. */
+class FailingWorker extends FakeWorker {
+  postMessage(message: XlsxRequest) {
+    setTimeout(() =>
+      this.onmessage?.({ data: { id: message.id, error: 'disk full' } } as MessageEvent)
+    );
+  }
+}
+
 class BrokenWorker {
   constructor() {
     throw new Error('no module workers here');
@@ -92,6 +101,11 @@ describe('buildWorkbook', () => {
     vi.stubGlobal('Worker', BrokenWorker);
     const built = await (await freshBuild())(sheets());
     expect(entries(built)).toEqual(entries(toXlsxWorkbook(sheets())));
+  });
+
+  it("rejects with the worker's own build error rather than building twice", async () => {
+    vi.stubGlobal('Worker', FailingWorker);
+    await expect((await freshBuild())(sheets())).rejects.toThrow('disk full');
   });
 
   it('reads a large sheet in slices, every row in order', async () => {

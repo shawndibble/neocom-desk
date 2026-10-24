@@ -25,28 +25,37 @@ export const ROWS_PER_SLICE = 5_000;
 
 const yieldToPage = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-async function resolveInSlices(sheet: AnyXlsxSheet): Promise<PlainSheet> {
-  if (sheet.rows.length <= ROWS_PER_SLICE) return resolveSheet(sheet);
-  const resolved = resolveSheet({ ...sheet, rows: [] });
-  for (let start = 0; start < sheet.rows.length; start += ROWS_PER_SLICE) {
-    if (start > 0) await yieldToPage();
-    const slice = sheet.rows.slice(start, start + ROWS_PER_SLICE);
-    for (const row of resolveSheet({ ...sheet, rows: slice }).rows) resolved.rows.push(row);
+/** Every sheet's cells, with a yield whenever a slice's worth of rows has been read, across sheets. */
+async function resolveInSlices(sheets: readonly AnyXlsxSheet[]): Promise<PlainSheet[]> {
+  const plain: PlainSheet[] = [];
+  let sinceYield = 0;
+  for (const sheet of sheets) {
+    const resolved = resolveSheet({ ...sheet, rows: [] });
+    for (let start = 0; start < sheet.rows.length; start += ROWS_PER_SLICE) {
+      if (sinceYield >= ROWS_PER_SLICE) {
+        await yieldToPage();
+        sinceYield = 0;
+      }
+      const slice = sheet.rows.slice(start, start + ROWS_PER_SLICE);
+      for (const row of resolveSheet({ ...sheet, rows: slice }).rows) resolved.rows.push(row);
+      sinceYield += slice.length;
+    }
+    plain.push(resolved);
   }
-  return resolved;
+  return plain;
 }
 
 export async function buildWorkbook(sheets: readonly AnyXlsxSheet[]): Promise<Uint8Array> {
-  const plain: PlainSheet[] = [];
-  for (const sheet of sheets) plain.push(await resolveInSlices(sheet));
+  const plain = await resolveInSlices(sheets);
   if (client.available()) {
     try {
       return await client.send((worker, id) => {
         const request: XlsxRequest = { id, sheets: plain };
         worker.postMessage(request);
       });
-    } catch {
-      // The worker could not build it: the page does, with the same writer.
+    } catch (error) {
+      // A writer error would only fail again on the page; a lost worker is the page's to cover.
+      if (!(error instanceof XlsxWorkerUnavailable)) throw error;
     }
   }
   return writeWorkbook(plain);

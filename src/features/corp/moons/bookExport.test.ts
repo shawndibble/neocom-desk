@@ -137,6 +137,7 @@ const input: BookExportInput = {
       coveragePeriods: [{ from: '2026-02-01', to: '2026-02-28' }, { from: '2026-03-05' }],
       requestedRatePct: 8,
       agreedRatePct: 6,
+      modeChanges: [{ from: '2026-03-01', mode: 'settled-otherwise' }],
       payee: { kind: 'character', id: 9 },
       ownerRateHistory: [
         { kind: 'agreed', pct: 6, effectiveFrom: '2026-02-10', recordedAt: '2026-02-10T00:00:00Z' },
@@ -270,6 +271,9 @@ describe('bookExportSheets', () => {
     expect(at('moonOwnerId')).toBe(60);
     expect(at('status')).toBe('corpTaxBook.export.moonOwnerStatus.active');
     expect(at('mode')).toBe('corpTaxBook.export.moonOwnerMode.normal');
+    expect(at('modeChanges')).toBe(
+      '2026-03-01: corpTaxBook.export.moonOwnerMode.settled-otherwise'
+    );
     expect(at('joined')).toBe('2026-02-01T00:00:00.000Z');
     expect(at('left')).toBeNull();
     expect(at('invitedBy')).toBe('Char 7');

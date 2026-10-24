@@ -440,6 +440,17 @@ export function bookExportSheets(
         ['moonOwnerId', (f) => f.corporationId],
         ['status', (f) => t(`corpTaxBook.export.moonOwnerStatus.${f.status}`)],
         ['mode', (f) => t(`corpTaxBook.export.moonOwnerMode.${f.mode}`)],
+        [
+          'modeChanges',
+          (f) =>
+            f.modeChanges?.length
+              ? joined(
+                  f.modeChanges.map(
+                    (c) => `${c.from}: ${t(`corpTaxBook.export.moonOwnerMode.${c.mode}`)}`
+                  )
+                )
+              : null,
+        ],
         ['joined', (f) => isoTime(f.joinedAt)],
         ['left', (f) => isoTime(f.leftAt)],
         ['invitedBy', (f) => names.character(f.invitedBy)],

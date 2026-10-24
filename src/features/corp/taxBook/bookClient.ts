@@ -103,11 +103,6 @@ export async function call<In, Out>(characterId: number, name: string, data: In)
   return result;
 }
 
-/** Firestore refused the read under its rules. */
-function isPermissionDenied(error: unknown): boolean {
-  return String((error as { code?: unknown } | null)?.code ?? '').endsWith('permission-denied');
-}
-
 /**
  * A moon owner's status and pending removal, read under the officer rules right before the send
  * queue mails a removal notice (#4621). A lapsed officer record is renewed once.
@@ -129,7 +124,8 @@ export async function readFeederRemovalState(
   try {
     return await read();
   } catch (error) {
-    if (!isPermissionDenied(error)) throw error;
+    if (!String((error as { code?: unknown }).code ?? '').endsWith('permission-denied'))
+      throw error;
     await verifyOfficer(characterId, corporationId);
     return read();
   }
@@ -504,21 +500,13 @@ export interface Rebill {
   memberRebill: boolean;
 }
 
-/**
- * Every rebill in the book (`rebills`, officer-only), for the export. A read the rules refuse is
- * an empty list, so the rest of the export still goes out; any other failure throws.
- */
+/** Every rebill in the book, for the export. Officer-only: verify first. */
 export async function readRebills(characterId: number, corporationId: number): Promise<Rebill[]> {
   await ensureSignedIn(characterId);
-  try {
-    const snap = await getDocs(
-      collection(getSyncFirestore(), 'corps', String(corporationId), 'rebills')
-    );
-    return snap.docs.map((d) => ({ ...(d.data() as Omit<Rebill, 'id'>), id: d.id }));
-  } catch (error) {
-    if (isPermissionDenied(error)) return [];
-    throw error;
-  }
+  const snap = await getDocs(
+    collection(getSyncFirestore(), 'corps', String(corporationId), 'rebills')
+  );
+  return snap.docs.map((d) => ({ ...(d.data() as Omit<Rebill, 'id'>), id: d.id }));
 }
 
 /** One audit-log entry (D7): who did what, when. */
