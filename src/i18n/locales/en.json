@@ -12369,6 +12369,7 @@
         "synced": "What syncs between my devices?",
         "local": "What stays on this device?",
         "communityData": "What do Communities share?",
+        "corpRecords": "What do SRP and the Corp Tax Book store?",
         "retention": "How long is my data stored?",
         "writes": "Does Neocom Desk change anything in EVE?",
         "delete": "How do I delete my data?",
@@ -12380,7 +12381,7 @@
         "backups": "How do backups work?"
       },
       "a": {
-        "delete": "Settings › Log out & delete › Delete all data removes every Character's synced data from our server, then erases this device. Another logged-in device keeps its own copy and can sync it back. Log out of all characters clears this device only. Delete all data also offers to leave your Communities (ticked by default), which deletes what you shared there, plus your Requests and Pledges, right away; untick it to stay in them. A Community's admin can't leave, so a Community you run is skipped: hand it over or delete it, which deletes it for every Member. A Character with no sync for 90 days is removed from its Communities automatically.",
+        "delete": "Settings › Log out & delete › Delete all data removes every Character's synced data from our server, then erases this device. Another logged-in device keeps its own copy and can sync it back. Log out of all characters clears this device only. Delete all data also offers to leave your Communities (ticked by default), which deletes what you shared there, plus your Requests and Pledges, right away; untick it to stay in them. A Community's admin can't leave, so a Community you run is skipped: hand it over or delete it, which deletes it for every Member. A Character with no sync for 90 days is removed from its Communities automatically. SRP Claims and Corp Tax Book lines belong to the corporation's records and stay with it; How long is my data stored? says when they go.",
         "install": "<link>Settings › App & backup › Install this app</link> shows the steps for your browser, or an Install button if it has one. On iPhone and iPad, installing is also what makes notifications work.",
         "update": "The app updates itself in the background. For a new version now: Settings › App & backup › Update now: it checks and reloads.",
         "pushKinds": "Alerts with a known time: a skill level finishing, training stopping or a queue ending, an industry job finishing (yours or your corporation's), a courier delivery due, a contract or market order about to expire, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Alerts when closed adds EVE's own notifications, such as a structure under attack, for each Character you turn it on for. Everything else, including Community alerts, needs the app open. Quiet time (a daily no-push window, set per device) silences both kinds; the alerts still appear in your Alerts list. Turn them on in Settings › Notifications.",
@@ -12429,7 +12430,7 @@
         },
         "local": {
           "title": "Kept on this device only",
-          "description": "Everything read from EVE is cached here and is not uploaded, apart from what you choose to share with a Community or turn on for alerts.",
+          "description": "Everything read from EVE is cached here and is not uploaded, apart from what you choose to share with a Community or turn on for alerts, and your corporation's SRP Claims and Corp Tax Book (What do SRP and the Corp Tax Book store?).",
           "esi": "Your characters' EVE data: assets, wallet, contracts, mail, contacts, clones, calendar, skills, skill queue, industry jobs and colonies.",
           "corp": "Corporation data: wallet, members, structures, assets and moon extractions.",
           "market": "Market prices, order books and LP stores.",
@@ -12452,6 +12453,12 @@
           "payouts": "Fleet Payouts you open as the boss: the name, the loot value, the split, and each pilot's name and ISK with whether you marked it paid. Pilots who are not in the Community are stored by the name you typed. A Member can read only their own line; you read all of them. Deleted 30 days after posting.",
           "pledges": "Pledges you make: quantities, what you marked delivered, and the IDs of the contracts behind it. The contract IDs and delivered amounts come from your finished contracts, read on this device and uploaded while the app is open. Nothing else about the contracts is.",
           "mail": "Mail about invites and Pledges is sent from your own Character, so its text goes to EVE and not to us. Our server records only who was mailed and when, to enforce a daily limit."
+        },
+        "corp": {
+          "title": "Kept for your corporation",
+          "description": "Only if your corporation uses SRP or a Corp Tax Book. These are the corporation's records, not yours: they sit on our server (Google Firebase) under the corporation's ID, and Delete all data leaves them with it.",
+          "srp": "SRP Claims: the killmail, the Character's name and ID, the hull, system and loss value, the fleet or FC and note you gave, the Reimbursement and the claim's state. Also the corporation's SRP settings, its Doctrine Fits and a log of what each officer did. The CEO, Directors and Accountants read all of it; a pilot reads only their own claims.",
+          "corpTaxBook": "The Corp Tax Book: what each character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections, a log of who did each, and which books bill each Character. The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link."
         },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
@@ -12502,7 +12509,11 @@
           "communityRequests": "Community Requests, with their Pledges:",
           "communityRequestsKept": "30 days after posting or your last Extend, then 7 more days before they are deleted. A closed Request is deleted 7 days after it closes.",
           "shareLinks": "Share Links:",
-          "shareLinksKept": "7 days, then deleted automatically (up to a day later)."
+          "shareLinksKept": "7 days, then deleted automatically (up to a day later).",
+          "srp": "SRP Claims:",
+          "srpKept": "a Paid or Rejected claim is deleted 365 days after it closes (checked daily). A Pending or Approved claim, the SRP settings and the officer log have no expiry; Doctrine Fits stay until an officer deletes them.",
+          "corpTaxBook": "Corp Tax Book:",
+          "corpTaxBookKept": "no expiry. Its lines, Statements, payments, verify links and log stay until whoever turned the book on, or the CEO, deletes the book, which deletes everything in it."
         }
       },
       "helpPointer": "Bug, question or idea? See <help>Support</help>."

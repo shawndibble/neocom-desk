@@ -15,7 +15,7 @@ import {
   WHAT_WE_STORE_GROUPS,
 } from './whatWeStore';
 
-const QUESTIONS = 19;
+const QUESTIONS = 20;
 
 /** Renders the FAQ with every question opened, as the content tests read the answers. */
 function renderFaq(initialEntry = '/help/faq') {
@@ -136,11 +136,12 @@ describe('FaqPanel — What We Store', () => {
     ]);
   });
 
-  it('files Community data as its own third group, after the other two', () => {
+  it('files Community data, then corporation records, after the other two', () => {
     expect(WHAT_WE_STORE_GROUPS.map((group) => group.id)).toEqual([
       'synced',
       'local',
       'communities',
+      'corp',
     ]);
   });
 
@@ -217,9 +218,9 @@ describe('FaqPanel — What We Store', () => {
 
   it('has no group listing things we do not hold', () => {
     // Dropped on purpose: a list of what is *not* stored is unfalsifiable by
-    // the reader and unbounded by nature. The two groups account for what
-    // exists; absence from both is the answer.
-    expect(WHAT_WE_STORE_GROUPS).toHaveLength(3);
+    // the reader and unbounded by nature. The groups account for what
+    // exists; absence from all of them is the answer.
+    expect(WHAT_WE_STORE_GROUPS).toHaveLength(4);
     renderFaq();
     expect(screen.queryByRole('heading', { name: /never collected/i })).not.toBeInTheDocument();
   });
@@ -342,6 +343,38 @@ describe('FaqPanel: Communities', () => {
     expect(shown).toMatch(
       /90 days, then all of its synced data is deleted and the Character is removed/
     );
+  });
+});
+
+describe('FaqPanel: corporation records', () => {
+  it('names SRP Claims and the Corp Tax Book, and who reads each', () => {
+    renderFaq();
+    expect(document.getElementById('corp-records')).toBeInTheDocument();
+    expect(screen.getByText(/^SRP Claims: /)).toHaveTextContent(/a pilot reads only their own/);
+    expect(screen.getByText(/^The Corp Tax Book: /)).toHaveTextContent(
+      /a corp member reads only their own lines/
+    );
+    expect(screen.getByText(/is not uploaded, apart from/)).toHaveTextContent(
+      /your corporation's SRP Claims and Corp Tax Book/
+    );
+  });
+
+  it('says Delete all data leaves them with the corporation', () => {
+    renderFaq();
+    expect(
+      screen.getByText(/SRP Claims and Corp Tax Book lines belong to the corporation's records/)
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the SRP retention equal to the sweep that enforces it', () => {
+    const retention = readFileSync(resolve(process.cwd(), 'functions/src/srpRetention.ts'), 'utf8');
+    expect(retention).toMatch(/SRP_RETENTION_MS = 365 \* 24 \* 60 \* 60 \* 1000/);
+    const ids = RETENTION_GROUPS.find((group) => group.id === 'server')?.items.map((i) => i.id);
+    expect(ids).toEqual(expect.arrayContaining(['srp', 'corpTaxBook']));
+    renderFaq();
+    const shown = document.body.textContent ?? '';
+    expect(shown).toMatch(/Paid or Rejected claim is deleted 365 days after it closes/);
+    expect(shown).toMatch(/Corp Tax Book:\s*no expiry/);
   });
 });
 

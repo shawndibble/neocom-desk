@@ -22,6 +22,10 @@
  * against `firestore.rules`: a collection added there fails the test until it
  * is mapped to a line here.
  *
+ * A corporation's own records are the fourth: SRP Claims (ADR 0026) and the
+ * Corp Tax Book (ADR 0023) live under `corps/{id}`, belong to the corporation
+ * rather than to one Character, and so outlive Delete all data.
+ *
  * Deliberately honest about the four places where something EVE-derived, or
  * anything at all, does leave the device, because a section that overclaimed
  * would be worth less than one that did not exist: Notification Feed rows
@@ -107,9 +111,9 @@ const COMMUNITY_ITEMS: readonly (WhatWeStoreItem & { id: CommunityFaqItemId })[]
 ].map((id) => ({ id: id as CommunityFaqItemId, labelKey: `settings.faq.store.communities.${id}` }));
 
 /**
- * Three groups, in the order that answers the question a reader actually
- * arrives with: what leaves this device, what does not, and what other
- * players can read once you join a Community.
+ * Four groups, in the order that answers the question a reader actually
+ * arrives with: what leaves this device, what does not, what other players
+ * can read once you join a Community, and what your corporation keeps.
  *
  * There is deliberately no "never collected at all" group. A list of
  * things we don't hold is unfalsifiable by the reader and unbounded by
@@ -184,6 +188,15 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
     descriptionKey: 'settings.faq.store.communities.description',
     items: COMMUNITY_ITEMS,
   },
+  {
+    id: 'corp',
+    titleKey: 'settings.faq.store.corp.title',
+    descriptionKey: 'settings.faq.store.corp.description',
+    items: [
+      { id: 'srp', labelKey: 'settings.faq.store.corp.srp' },
+      { id: 'corpTaxBook', labelKey: 'settings.faq.store.corp.corpTaxBook' },
+    ],
+  },
 ];
 
 /** One line of the retention answer: what is kept, and for how long. */
@@ -206,7 +219,8 @@ export interface RetentionGroup {
  * `engine/wallet/archiveCoverage.ts`,
  * `esi/cachePrune.ts`, `features/notifications/feed.ts`, `sync/merge.ts`,
  * `functions/src/purgeStaleAccounts.ts`, `functions/src/communityRequests.ts`,
- * `features/share/shareStore.ts`),
+ * `features/share/shareStore.ts`, `functions/src/srpRetention.ts`; the Corp Tax
+ * Book has no sweep, only `deleteBook` in `functions/src/corpTaxBookStore.ts`),
  * so change one and change the other (`FaqPanel.test.tsx` reads the numbers out
  * of those functions files).
  */
@@ -241,6 +255,8 @@ export const RETENTION_GROUPS: readonly RetentionGroup[] = [
       'community',
       'communityRequests',
       'shareLinks',
+      'srp',
+      'corpTaxBook',
       'idle',
     ].map((id) => ({
       id,
