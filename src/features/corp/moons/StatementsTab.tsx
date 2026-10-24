@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataTable, InfoTooltip, Panel, type DataTableColumn } from '@/components/ui';
 import { periodRows, type PeriodRow } from '@/engine/corpTaxBook/bookView';
@@ -8,7 +9,7 @@ import { StatementRun } from './StatementRun';
 export function StatementsTab() {
   const { t } = useTranslation();
   const { view } = useBook();
-  const rows = periodRows(view);
+  const rows = useMemo(() => periodRows(view), [view]);
   const tolerance = [...view.internals.byMiner.values()].flatMap((m) => m.allocation.writeOffs);
   const late = [...view.internals.byMiner.values()].flatMap((m) => m.draft.writtenOff);
 

@@ -43,9 +43,12 @@ export function AuditFeed({
               </span>{' '}
               {who
                 ? t(
-                    `corpTaxBook.moons.activity.actionsTo.${a.action}${
-                      a.action === 'issueStatement' && who.amount === undefined ? 'Plain' : ''
-                    }`,
+                    `corpTaxBook.moons.activity.actionsTo.${
+                      // A queued mail is a Statement or a reminder; `kind` says which.
+                      a.action === 'recordMail' && a.detail.kind === 'reminder'
+                        ? 'recordReminder'
+                        : a.action
+                    }${a.action === 'issueStatement' && who.amount === undefined ? 'Plain' : ''}`,
                     { name: who.name, amount: who.amount === undefined ? '' : isk(who.amount) }
                   )
                 : t(`corpTaxBook.moons.activity.actions.${a.action}`, { defaultValue: a.action })}

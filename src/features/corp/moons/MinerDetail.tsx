@@ -105,6 +105,12 @@ export function MinerDetail({ id }: { id: string }) {
   const selectedTax = selectedDays.reduce((s, d) => s + d.tax, 0);
   const canSelect = (d: DayRow) => d.status === 'unbilled' || d.status === 'not-billable';
 
+  const remindBlock = !openStatement
+    ? t('corpTaxBook.moons.miner.remindNone')
+    : corporationName === null
+      ? t('corpTaxBook.moons.run.loadingCorporation')
+      : null;
+
   const remind = async () => {
     if (!openStatement || corporationName === null) return;
     const { enqueueReminder } = await import('@/features/corpTaxBook/mailQueue');
@@ -297,21 +303,16 @@ export function MinerDetail({ id }: { id: string }) {
               <Button size="sm" onClick={() => setDialog({ kind: 'record' })}>
                 {t('corpTaxBook.moons.miner.record')}
               </Button>
-              {openStatement ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void remind()}
-                  aria-disabled={corporationName === null || undefined}
-                >
-                  {t('corpTaxBook.moons.miner.remind')}
-                </Button>
-              ) : (
-                <Tooltip content={t('corpTaxBook.moons.miner.remindNone')}>
+              {remindBlock ? (
+                <Tooltip content={remindBlock}>
                   <Button size="sm" variant="ghost" aria-disabled="true">
                     {t('corpTaxBook.moons.miner.remind')}
                   </Button>
                 </Tooltip>
+              ) : (
+                <Button size="sm" variant="ghost" onClick={() => void remind()}>
+                  {t('corpTaxBook.moons.miner.remind')}
+                </Button>
               )}
               <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: 'dismissAll' })}>
                 {t('corpTaxBook.moons.miner.dismissAll')}

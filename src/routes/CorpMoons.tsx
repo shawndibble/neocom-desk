@@ -55,7 +55,7 @@ import { MOONS_TABS, moonsDetail } from '@/features/corp/moons/moonsPaths';
 import { StatementsTab } from '@/features/corp/moons/StatementsTab';
 import { MoonsSetup } from '@/features/corp/moons/MoonsSetup';
 import { useCorpBook } from '@/features/corp/moons/useCorpBook';
-import { useShowExtractions } from '@/features/corp/moons/useMoonOwners';
+import { useMoonOwners, useShowExtractions } from '@/features/corp/moons/useMoonOwners';
 import { setMoonsTabsHidden } from '@/features/corp/moons/moonsTabsHidden';
 
 function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -78,6 +78,8 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { pathname } = useLocation();
   const { view, canEdit, characterId, corporationId, names } = useBook();
   const showExtractions = useShowExtractions();
+  // With no moon owners the empty state carries the invite button itself.
+  const hasMoonOwners = useMoonOwners().rows.length > 0;
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
   // Back from EVE's page after the Automatic sync opt-in: show the settings it was pressed in.
@@ -117,7 +119,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             meta={meta}
             actions={
               <span className="flex items-center gap-1">
-                {tab === 'moon-owners' && canEdit && (
+                {tab === 'moon-owners' && canEdit && hasMoonOwners && (
                   <Button variant="ghost" onClick={() => setInviteOpen(true)}>
                     {t('corpTaxBook.moons.moonOwners.invite')}
                   </Button>
