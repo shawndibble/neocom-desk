@@ -6,6 +6,7 @@ import { Pill } from '@/components/ui/Pill';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
   focusRingInsetClassName,
+  inlineLinkClassName,
   rowInteractiveClassName,
   touchCheckboxLabelClassName,
 } from '@/components/ui/controlStyles';
