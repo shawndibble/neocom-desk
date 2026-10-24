@@ -83,6 +83,22 @@ describe('TrendItemsDialog', () => {
     expect(screen.getByRole('button', { name: 'Add Pyerite' })).toHaveFocus();
   });
 
+  it('hands focus to the neighbouring Remove button after a removal', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.click(screen.getByRole('button', { name: 'Remove Tritanium' }));
+    expect(screen.getByRole('button', { name: 'Remove Pyerite' })).toHaveFocus();
+  });
+
+  it('says every hit is already selected when a search finds only picked items', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.type(screen.getByRole('searchbox', { name: 'Search items' }), 'trit');
+    expect(
+      await screen.findByText('Everything in this list is already selected.')
+    ).toBeInTheDocument();
+  });
+
   it('adds minerals from the catalogue and keeps the Quickbar picks', async () => {
     const user = userEvent.setup();
     open();

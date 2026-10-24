@@ -187,20 +187,29 @@ export function TrendItemsDialog({
     .map((id) => names.get(id) ?? t('overview.menu.trendUnknownItem', { id }));
   const available = rows.filter((item) => !picked.includes(item.typeId));
   const resultsRef = useRef<HTMLUListElement>(null);
+  const selectedRef = useRef<HTMLUListElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  // The row a pick leaves would drop keyboard focus with it; hand it to the next row, else the search box.
-  const refocus = useRef(false);
+  // The row a pick leaves would drop keyboard focus with it; hand it to the row that takes its place.
+  const refocus = useRef<{ list: 'results' | 'selected'; index: number } | null>(null);
   const [justAdded, setJustAdded] = useState<number | null>(null);
   const toggle = (typeId: number, on: boolean) => {
-    refocus.current = on;
+    refocus.current = on
+      ? { list: 'results', index: available.findIndex((item) => item.typeId === typeId) }
+      : { list: 'selected', index: picked.indexOf(typeId) };
     setJustAdded(on ? typeId : null);
     setEdited(on ? [...picked, typeId] : picked.filter((id) => id !== typeId));
   };
   useEffect(() => {
-    if (!refocus.current) return;
-    refocus.current = false;
-    const next = resultsRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)');
-    (next ?? searchRef.current)?.focus();
+    const target = refocus.current;
+    if (!target) return;
+    refocus.current = null;
+    const list = target.list === 'results' ? resultsRef.current : selectedRef.current;
+    const buttons = [...(list?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])];
+    const next = buttons[Math.min(target.index, buttons.length - 1)];
+    // Without a neighbour, leave focus on the dialog rather than raise a phone's keyboard on the search box.
+    next?.focus({ preventScroll: true });
+    // The row that just landed may sit below the fold of a short dialog.
+    selectedRef.current?.querySelector('.row-pulse')?.scrollIntoView?.({ block: 'nearest' });
   }, [picked]);
 
   return (
@@ -285,7 +294,7 @@ export function TrendItemsDialog({
             </li>
           ))}
         </ul>
-        {!searching && rows.length > 0 && available.length === 0 && (
+        {rows.length > 0 && available.length === 0 && (
           <p className="text-xs text-text-dim">{t('overview.menu.trendAllPicked')}</p>
         )}
         {full && (
@@ -317,7 +326,7 @@ export function TrendItemsDialog({
           <h3 className="text-xs font-semibold" aria-live="polite">
             {t('overview.menu.trendSelected', { count: picked.length, max: TREND_MAX_SERIES })}
           </h3>
-          <ul className="grid gap-1">
+          <ul ref={selectedRef} className="grid gap-1">
             {picked.map((id) => {
               const name = names.get(id) ?? t('overview.menu.trendUnknownItem', { id });
               return (

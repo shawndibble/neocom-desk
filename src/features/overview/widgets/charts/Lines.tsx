@@ -1,5 +1,5 @@
-import { cx } from '@/lib/cx';
 import { useId, useState } from 'react';
+import { cx } from '@/lib/cx';
 import { ChartHover } from './ChartHover';
 import { linesRuns, runFills } from './geometry';
 import { CHART_COLOR } from './palette';
@@ -86,7 +86,7 @@ export function Lines({ model, height }: { model: LinesChartModel; height: numbe
         </div>
       )}
       {!single && (
-        <ul className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-x-3 gap-y-0.5 text-[0.6875rem] text-text-dim">
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(10rem,100%),1fr))] gap-x-3 gap-y-0.5 text-[0.6875rem] text-text-dim">
           {model.series.map((s) => {
             const on = picked && s.key === active;
             return (
