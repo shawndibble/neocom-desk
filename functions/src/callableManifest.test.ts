@@ -3,7 +3,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CALLABLE_ACTIONS, groupOf, type CallableGroup } from './callableManifest.js';
+import {
+  CALLABLE_ACTIONS,
+  ROUTER_FUNCTIONS,
+  groupOf,
+  type CallableGroup,
+} from './callableManifest.js';
 
 // Frozen: deployed clients send these names. Add a line for a new action; never edit or delete one.
 const WIRE_NAMES = [
@@ -135,5 +140,11 @@ describe('callable manifest', () => {
       ),
     ];
     expect(loose.map((m) => m[1])).toEqual([]);
+  });
+
+  it('ROUTER_FUNCTIONS names the deployed router exports of index.ts, one per group', () => {
+    const routers = [...index.matchAll(/^export const (\w+Call) = onCall/gm)].map((m) => m[1]);
+    expect(Object.keys(ROUTER_FUNCTIONS).sort()).toEqual(Object.keys(CALLABLE_ACTIONS).sort());
+    expect(routers.sort()).toEqual(Object.values(ROUTER_FUNCTIONS).sort());
   });
 });
