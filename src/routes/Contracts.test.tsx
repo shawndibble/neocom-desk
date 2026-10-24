@@ -1100,6 +1100,6 @@ describe('Issued / Expires date-only cells (issue #3105)', () => {
     render(<App />);
     await screen.findByText('Rifter fit');
     await user.hover(screen.getByRole('button', { name: 'Rifter fit' }));
-    expect((await screen.findAllByText('Rifter fit')).length).toBeGreaterThan(1);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Rifter fit');
   });
 });
