@@ -16,6 +16,7 @@ import {
   type SrpKillmailSource,
   type ZkillRecord,
 } from './srpKillmail.js';
+import { FETCH_LIMIT, FETCH_WINDOW_MS } from './srpThrottle.js';
 import { fileSrpClaim, saveSrpSettings, turnOnSrp, type SrpFileDeps } from './srpStore.js';
 
 const CORP = 98000001;
@@ -286,6 +287,19 @@ suite('SRP doctrine-fit (emulator)', () => {
       await setRules({ hullRules: [{ scope: 'hull', id: HULL, kind: 'pay-percent' }] });
       await save({ ...fit({}, 999), id });
       expect((await doctrines())[0].snapshot.hullTypeId).toBe(999);
+    });
+  });
+
+  describe('killmail fetch throttle', () => {
+    it('refuses a pilot past the limit, spares others, and recovers after the window', async () => {
+      loss(1001, MATCHING);
+      for (let i = 0; i < FETCH_LIMIT; i++) await preview(1001);
+      expect(await reason(preview(1001))).toBe('rate-limited');
+      expect(await reason(file(1001))).toBe('rate-limited'); // filing shares the budget
+      loss(1002, MATCHING, OTHER_PILOT);
+      await preview(1002, OTHER_PILOT);
+      now += FETCH_WINDOW_MS;
+      await preview(1001);
     });
   });
 
