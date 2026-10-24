@@ -53,6 +53,7 @@ import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
 import {
   assertOwnToken,
+  requireLiveRoles,
   signedInCharacter,
   verifyAccessToken,
   fail,
@@ -198,18 +199,18 @@ export async function saveCorpSyncGrant(
     fail('permission-denied', 'Refresh token belongs to another Character', 'token-mismatch');
   }
 
-  const identity = await deps.readIdentity(claims.characterId, refreshed.accessToken);
-  if (identity.corporationId !== input.corporationId) {
-    fail('permission-denied', 'Not a member of this corporation', 'wrong-corp');
-  }
-  const roles = decideRoles(identity.roles, identity.ceoId === claims.characterId);
-  if (!roles.canEdit) {
-    fail(
-      'permission-denied',
-      'Only a CEO, Director or Accountant can turn this on',
-      'not-an-editor'
-    );
-  }
+  await requireLiveRoles(
+    deps,
+    { characterId: claims.characterId, claims, accessToken: refreshed.accessToken },
+    {
+      corporationId: input.corporationId,
+      need: 'canEdit',
+      denied: {
+        message: 'Only a CEO, Director or Accountant can turn this on',
+        reason: 'not-an-editor',
+      },
+    }
+  );
   const book = await bookRef(deps.db, input.corporationId).get();
   if (!book.exists || book.get('active') !== true) {
     fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');

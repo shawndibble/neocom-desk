@@ -31,7 +31,6 @@ import {
   FEEDER_PREVIOUS_COLLECTION,
   OBSERVED,
   REMOVAL_LINKS_COLLECTION,
-  decideRoles,
   pctField,
   utcDate,
 } from './corpTaxBook.js';
@@ -58,6 +57,7 @@ import {
 } from './corpTaxBookStore.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import {
+  requireLiveRoles,
   requireRolesScope,
   signedInCharacter,
   verifyAccessToken,
@@ -593,16 +593,22 @@ export async function authorizeFeederCaller(
       callerId === grant?.grantedBy);
   // Membership is always read live: a holder who left the corporation (or the signed-in
   // player who handed over an alt's grant from outside it) has no standing here.
-  const identity = await deps.readIdentity(callerId, input.accessToken);
-  if (identity.corporationId !== input.corporationId) {
-    fail('permission-denied', 'Not a member of this corporation', 'not-your-feeder');
-  }
-  if (!isHolder) {
-    const roles = decideRoles(identity.roles, identity.ceoId === callerId);
-    const allowed =
-      standing === 'leave' ? roles.isDirector : standing === 'read' ? roles.canView : roles.canEdit;
-    if (!allowed) fail('permission-denied', 'Not allowed for this corporation', 'not-your-feeder');
-  }
+  await requireLiveRoles(
+    deps,
+    { characterId: callerId, claims, accessToken: input.accessToken },
+    {
+      corporationId: input.corporationId,
+      wrongCorp: 'not-your-feeder',
+      need: (roles) =>
+        isHolder ||
+        (standing === 'leave'
+          ? roles.isDirector
+          : standing === 'read'
+            ? roles.canView
+            : roles.canEdit),
+      denied: { message: 'Not allowed for this corporation', reason: 'not-your-feeder' },
+    }
+  );
   return { callerId, collectorCorporationId: collector, record: feeder, grant };
 }
 

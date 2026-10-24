@@ -295,6 +295,33 @@ describe('requireLiveRoles', () => {
       'missing-scope',
     ]);
   });
+  it('wrong-corp keeps its message and takes the caller reason when overridden', async () => {
+    const onDenied = vi.fn<(reason: string) => Promise<void>>(async () => undefined);
+    const e = await caught(
+      requireLiveRoles({ readIdentity: async () => identity() }, actor, {
+        corporationId: 5,
+        need: 'canView',
+        denied,
+        wrongCorp: 'not-your-feeder',
+        onDenied,
+      })
+    );
+    expect(e.code).toBe('permission-denied');
+    expect(e.message).toBe('Not a member of this corporation');
+    expect(reasonOf(e)).toBe('not-your-feeder');
+    expect(onDenied).toHaveBeenCalledWith('not-your-feeder');
+  });
+  it('a role predicate stands in for canView / canEdit', async () => {
+    const readIdentity = async () => identity({ roles: [] });
+    const e = await caught(
+      requireLiveRoles({ readIdentity }, actor, { need: (r) => r.isDirector, denied })
+    );
+    expect(e.message).toBe('no role');
+    expect(reasonOf(e)).toBe('not-an-officer');
+    await expect(
+      requireLiveRoles({ readIdentity }, actor, { need: () => true, denied })
+    ).resolves.toBeDefined();
+  });
   it('lets a readIdentity failure through untouched', async () => {
     const boom = new HttpsError('unavailable', 'esi', { reason: 'esi-error' });
     const e = await caught(
