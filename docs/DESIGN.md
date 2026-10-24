@@ -680,6 +680,14 @@ rather than narrowing it — Contract Search's Below market, one row per
 contract instead of one per item line. It acts at once and is not behind the
 funnel, for the column picker's reason; see §6c.
 
+One sanctioned filter in `actions`: an exclusive axis the reader flips often,
+as a `SegmentedControl` with each segment's count (the Ship Tree ladder's All /
+Can fly / Can't fly). The counts answer the question before any tap, which a
+funnel would hide. It is not counted in `activeCount`, and below `md` it takes
+its own full-width row under the bar. The same ladder puts its view switch in
+the `search` slot before the box, and its Legend at the end of `actions`, so the
+row stays one full-width `FilterBar` and the funnel's box opens under all of it.
+
 A **status dot** (`size-2 rounded-full bg-current`, `aria-hidden`, phone only)
 may lead a dense card's title in the row's status tone, so a scan down the list
 reads outcome at a glance. It is never the only cue: the status word stays on

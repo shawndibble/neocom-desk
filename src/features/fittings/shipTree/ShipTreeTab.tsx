@@ -94,14 +94,25 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
   const { t } = useTranslation();
   const [params, setParams] = useUrlParams(TREE_PARAMS);
   const factionID = resolveFactionID(source.data, params.faction);
+  // Until the Mastery data loads every hull reads tier 0, so a Mastery pick
+  // (from the URL) is set aside rather than emptying the ladder; it stays in
+  // the URL and applies once the data arrives.
+  const masteriesLoaded = source.masteriesStatus === 'loaded';
   const filter = useMemo<ShipTreeFilter>(
-    () => ({ fly: params.fly, mastery: new Set([...params.mastery].map(Number)) }),
-    [params.fly, params.mastery]
+    () => ({
+      fly: params.fly,
+      mastery: masteriesLoaded ? new Set([...params.mastery].map(Number)) : new Set(),
+    }),
+    [params.fly, params.mastery, masteriesLoaded]
   );
   const setFilter = useCallback(
     (next: ShipTreeFilter) =>
-      setParams({ fly: next.fly, mastery: new Set([...next.mastery].map(String)) }),
-    [setParams]
+      setParams(
+        masteriesLoaded
+          ? { fly: next.fly, mastery: new Set([...next.mastery].map(String)) }
+          : { fly: next.fly }
+      ),
+    [setParams, masteriesLoaded]
   );
   const tree = useFactionTree(source, factionID);
   const [selected, setSelected] = useState<ShipTreeShip | null>(null);

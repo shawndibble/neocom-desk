@@ -40,10 +40,12 @@ import { ExternalLink, ExternalMark } from '@/components/ui/ExternalLink';
 import { HintText } from '@/components/ui/HintText';
 import {
   activeOptionClassName,
+  controlHeightClassName,
   focusRingClassName,
   focusRingInsetClassName,
   inlineLinkClassName,
   rowInteractiveClassName,
+  toggleChipStateClassName,
 } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { CharacterLink, SkillLink, SystemLink } from '@/features/entities';
@@ -138,6 +140,7 @@ export function InteractionGrammar() {
   const k = (key: string) => t(`interactionGrammar.${key}`);
   const [expanded, setExpanded] = useState(false);
   const [selected, setSelected] = useState<number | null>(2);
+  const [fly, setFly] = useState('all');
 
   return (
     <div className="space-y-6">
@@ -334,6 +337,40 @@ export function InteractionGrammar() {
               {k('rules.legendPopover')}
             </PopoverContent>
           </Popover>
+        </Cue>
+        <Cue rule={k('rules.countedSegments')}>
+          <SegmentedControl
+            label={k('rules.countedSegments')}
+            options={[
+              { value: 'all', label: k('samples.flyAll') },
+              { value: 'canFly', label: k('samples.flyCanFly') },
+              { value: 'cantFly', label: k('samples.flyCantFly') },
+            ]}
+            value={fly}
+            onChange={setFly}
+          />
+        </Cue>
+        <Cue rule={k('rules.dimmedZeroChip')}>
+          {[
+            { name: k('samples.factionAmarr'), count: 3 },
+            { name: k('samples.factionGallente'), count: 0 },
+          ].map((f) => (
+            <button
+              key={f.name}
+              type="button"
+              aria-pressed={false}
+              className={cx(
+                controlHeightClassName.md,
+                focusRingClassName,
+                'flex items-center rounded-xs border px-2 text-xs',
+                toggleChipStateClassName(false),
+                f.count === 0 && 'opacity-50'
+              )}
+            >
+              <span className="font-semibold">{f.name}</span>
+              <span className="ml-1.5 tabular-nums opacity-80">{f.count}</span>
+            </button>
+          ))}
         </Cue>
       </Group>
 

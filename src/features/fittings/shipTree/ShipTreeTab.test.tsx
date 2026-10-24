@@ -483,6 +483,42 @@ describe('ShipTreeTab — ladder', () => {
     );
   });
 
+  it('reopens every section when the filter changes from the URL (Back)', async () => {
+    const user = userEvent.setup();
+    const { container } = renderTab('/ships/tree?fly=cantFly');
+    await screen.findByRole('button', { name: /Crow/ });
+    await user.click(screen.getByRole('button', { name: 'Collapse all' }));
+    const interceptor = () =>
+      container.querySelector<HTMLDetailsElement>('details[data-class="10"]')!;
+    expect(interceptor().open).toBe(false);
+    await user.click(
+      within(screen.getByRole('group', { name: 'Fly state' })).getByRole('button', {
+        name: 'All 5',
+      })
+    );
+    await user.click(
+      within(screen.getByRole('group', { name: 'Fly state' })).getByRole('button', {
+        name: "Can't fly 1",
+      })
+    );
+    await waitFor(() => expect(interceptor().open).toBe(true));
+  });
+
+  it('sets a Mastery pick aside while the Mastery data is missing', async () => {
+    vi.mocked(loadMasteries).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const user = userEvent.setup();
+    renderTab('/ships/tree?mastery=4');
+    expect(await screen.findByText(/Mastery badges need data/)).toBeVisible();
+    // Not an empty ladder: every hull would read None until the data loads.
+    expect(screen.getByRole('button', { name: /Merlin/ })).toBeVisible();
+    expect(screen.getByTestId('location')).toHaveTextContent('mastery=4');
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    for (const chip of within(screen.getByRole('group', { name: 'Mastery' })).getAllByRole(
+      'button'
+    ))
+      expect(chip).toHaveAttribute('aria-disabled', 'true');
+  });
+
   it('shows the legend in a popover', async () => {
     const user = userEvent.setup();
     renderTab();
@@ -497,16 +533,16 @@ describe('ShipTreeTab — ladder', () => {
     renderTab('/ships/tree?faction=500010&fly=cantFly');
     expect(await screen.findByText('No Guristas Pirates hulls match these filters')).toBeVisible();
     const factions = screen.getByRole('group', { name: 'Factions' });
-    expect(within(factions).getByRole('button', { name: /Caldari State/ })).toHaveTextContent(
-      /Caldari State\s*1$/
-    );
+    expect(
+      within(factions).getByRole('button', { name: /^Caldari State\s*1 matching hull$/ })
+    ).toBeVisible();
     // A faction with no matches dims but keeps its place; the current one never dims.
     expect(within(factions).getByRole('button', { name: /Gallente/ })).toHaveClass('opacity-50');
     expect(within(factions).getByRole('button', { name: /Guristas/ })).not.toHaveClass(
       'opacity-50'
     );
     const suggestion = screen
-      .getAllByRole('button', { name: /^Caldari State\s*1$/ })
+      .getAllByRole('button', { name: /^Caldari State\s*1 matching hull$/ })
       .find((b) => !factions.contains(b))!;
     await user.click(suggestion);
     // Caldari is the default, so the URL drops the key.

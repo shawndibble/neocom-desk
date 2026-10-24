@@ -66,8 +66,7 @@ describe('FactionBar', () => {
         onFaction={vi.fn()}
       />
     );
-    const caldari = screen.getByRole('button', { name: /Caldari State/ });
-    expect(caldari).toHaveTextContent(/Caldari State\s*2$/);
+    const caldari = screen.getByRole('button', { name: /^Caldari State\s*2 matching hulls$/ });
     expect(caldari).not.toHaveClass('opacity-50');
     expect(screen.getByRole('button', { name: /Guristas Pirates/ })).toHaveClass('opacity-50');
     expect(screen.getByRole('button', { name: /Gallente Federation/ })).not.toHaveClass(

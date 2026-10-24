@@ -118,23 +118,20 @@ export function ShipTreeLadder({
   const flyCounts = flyStateCounts(factionShips, statuses);
   const tierCounts = masteryCounts(factionShips, statuses);
 
-  // The reader's open sections, per faction. Top level starts open — every
-  // section while filtered, so a match in a sub-class can't hide. A search
-  // opens everything over this; clearing it puts their choice back.
-  const [openState, setOpenState] = useState<{
-    factionID: number;
-    ids: ReadonlySet<number>;
-  } | null>(null);
-  const userOpen =
-    openState?.factionID === tree.factionID
-      ? openState.ids
-      : new Set(filtered ? sectionIds : sections.map((s) => s.def.id));
-  const setUserOpen = (ids: ReadonlySet<number>) =>
-    setOpenState({ factionID: tree.factionID, ids });
-  const setFilter = (next: ShipTreeFilter) => {
-    onFilter(next);
-    setUserOpen(new Set(sectionIds));
-  };
+  // The reader's open sections, for this faction and filter. Each new pair
+  // starts over: top level open, or every section while filtered so a match
+  // in a sub-class can't hide — however the filter changed, Back included.
+  // A search opens everything over this; clearing it puts their choice back.
+  const openKey = `${tree.factionID}|${filter.fly}|${[...filter.mastery].sort().join(',')}`;
+  const startOpen = (): ReadonlySet<number> =>
+    new Set(filtered ? sectionIds : sections.map((s) => s.def.id));
+  const [openState, setOpenState] = useState(() => ({ key: openKey, ids: startOpen() }));
+  // Reset during render (React's "adjust state on a prop change"), so going
+  // back to an earlier filter starts open again rather than restoring it.
+  if (openState.key !== openKey) setOpenState({ key: openKey, ids: startOpen() });
+  const userOpen: ReadonlySet<number> = openState.key === openKey ? openState.ids : startOpen();
+  const setUserOpen = (ids: ReadonlySet<number>) => setOpenState({ key: openKey, ids });
+  const setFilter = onFilter;
 
   const visible = (s: ShipTreeShip) =>
     (!q || s.name.toLowerCase().includes(q)) && hullMatches(statuses.get(s.typeID), filter);
@@ -159,13 +156,13 @@ export function ShipTreeLadder({
       {/* `md`, not `sm`: these share the search box's line (Skills does the same). */}
       <IconButton
         icon={<Icon.ExpandAll />}
-        label={t('skills.expandAll')}
+        label={t('ships.tree.expandAll')}
         onClick={() => setUserOpen(new Set(sectionIds))}
         disabled={q !== ''}
       />
       <IconButton
         icon={<Icon.CollapseAll />}
-        label={t('skills.collapseAll')}
+        label={t('ships.tree.collapseAll')}
         onClick={() => setUserOpen(new Set())}
         disabled={q !== ''}
       />
@@ -239,11 +236,7 @@ export function ShipTreeLadder({
                 onFaction(s.factionID);
                 onOpenShip(s);
               }}
-              className={cx(
-                'flex min-h-7 items-center gap-1 rounded-xs border border-line px-1.5 py-0.5 hover:border-line-bright hover:bg-panel-2 active:bg-panel',
-                interactiveClassName,
-                focusRingClassName
-              )}
+              className={jumpChipClassName}
             >
               <FlyDot status={statuses.get(s.typeID)} />
               {statuses.get(s.typeID) && (
@@ -276,10 +269,10 @@ export function ShipTreeLadder({
         ) : filtered && !q ? (
           <NoFilterMatches
             factionName={factionNameOf(data.factions, tree.factionID)}
-            others={inGameFactionOrder(data.factions).filter(
-              (f) => f.id !== tree.factionID && (factionMatches?.get(f.id) ?? 0) > 0
-            )}
-            factionMatches={factionMatches}
+            others={inGameFactionOrder(data.factions).flatMap((f) => {
+              const count = factionMatches?.get(f.id) ?? 0;
+              return f.id !== tree.factionID && count > 0 ? [{ ...f, count }] : [];
+            })}
             onFaction={onFaction}
             onClear={() => setFilter(NO_SHIP_TREE_FILTER)}
           />
@@ -349,7 +342,7 @@ function MasteryField({
             size="md"
             label={tier === 0 ? t('ships.tree.mastery.none') : romanLevel(tier)}
             count={counts[tier]}
-            countLabel={t('ships.tree.mastery.count', { n: counts[tier] })}
+            countLabel={t('ships.tree.mastery.count', { count: counts[tier] })}
             selected={draft.mastery.has(tier)}
             onToggle={() => toggle(tier)}
             disabled={reason !== undefined}
@@ -361,16 +354,21 @@ function MasteryField({
   );
 }
 
+/** A chip that jumps elsewhere (another faction's hull or tree): a plain button, not a toggle. */
+const jumpChipClassName = cx(
+  'flex min-h-7 items-center gap-1 rounded-xs border border-line px-1.5 py-0.5 text-xs hover:border-line-bright hover:bg-panel-2 active:bg-panel',
+  interactiveClassName,
+  focusRingClassName
+);
+
 function NoFilterMatches({
   factionName,
   others,
-  factionMatches,
   onFaction,
   onClear,
 }: {
   factionName: string;
-  others: readonly { id: number; name: string }[];
-  factionMatches: ReadonlyMap<number, number> | undefined;
+  others: readonly { id: number; name: string; count: number }[];
   onFaction: (factionID: number) => void;
   onClear: () => void;
 }) {
@@ -382,14 +380,18 @@ function NoFilterMatches({
       action={
         <div className="flex flex-wrap items-center justify-center gap-1">
           {others.map((f) => (
-            <FilterChip
+            <button
               key={f.id}
-              size="md"
-              label={f.name}
-              count={factionMatches?.get(f.id) ?? 0}
-              selected={false}
-              onToggle={() => onFaction(f.id)}
-            />
+              type="button"
+              onClick={() => onFaction(f.id)}
+              className={cx(jumpChipClassName, 'min-h-11 px-2 md:min-h-9')}
+            >
+              {f.name}
+              <span className="tabular-nums opacity-80" aria-hidden="true">
+                {f.count}
+              </span>
+              <span className="sr-only">{t('ships.tree.matchCount', { count: f.count })}</span>
+            </button>
           ))}
           <Button onClick={onClear}>{t('ships.tree.clearFilters')}</Button>
         </div>

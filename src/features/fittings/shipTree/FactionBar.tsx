@@ -85,7 +85,16 @@ export function FactionBar({
               )}
               <span className="font-semibold">{f.name}</span>
               <span className="ml-1.5 tabular-nums opacity-80">
-                {matched ?? `${c.flyable}/${c.total}`}
+                {matched === undefined ? (
+                  `${c.flyable}/${c.total}`
+                ) : (
+                  <>
+                    <span aria-hidden="true">{matched}</span>
+                    <span className="sr-only">
+                      {t('ships.tree.matchCount', { count: matched })}
+                    </span>
+                  </>
+                )}
               </span>
             </button>
           </Tooltip>
