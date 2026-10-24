@@ -7,6 +7,7 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { onReconnect, useOnline } from '@/stores/network';
 import { readPersisted, requestPersistence } from '@/lib/persistStorage';
 import { formatBytes } from './offlinePacks';
+import { markStorageProtected, useStorageAtRisk } from './storageAtRisk';
 import { SettingsHint } from '@/features/settings/settingsFields';
 import {
   cancelDownload,
@@ -47,6 +48,7 @@ export function OfflineDataPanel() {
   const [persisted, setPersisted] = useState<boolean | null>(null);
   const [persistDenied, setPersistDenied] = useState(false);
   const [persisting, setPersisting] = useState(false);
+  const atRisk = useStorageAtRisk((s) => s.atRisk);
   const [run, setRun] = useState<Run>({ phase: 'idle' });
   const [result, setResult] = useState<Result>(null);
   const [announcement, setAnnouncement] = useState('');
@@ -71,6 +73,7 @@ export function OfflineDataPanel() {
     setStatus(nextStatus);
     setEstimate(nextEstimate);
     setPersisted(nextPersisted);
+    if (nextPersisted) markStorageProtected();
     return nextStatus;
   }, []);
 
@@ -138,6 +141,7 @@ export function OfflineDataPanel() {
       // The Protect button leaves once storage is persisted: focus its wrapper, not `<body>`.
       if (outcome === 'granted') focusAfterCommit(persistRef);
       setPersisted(outcome === 'granted' ? true : now);
+      if (outcome === 'granted') markStorageProtected();
       setPersistDenied(outcome !== 'granted');
       announce(
         t(
@@ -200,7 +204,12 @@ export function OfflineDataPanel() {
                   : t(persisted ? 'settings.offline.persistedYes' : 'settings.offline.persistedNo')}
               </SettingsHint>
               {persisted === false && (
-                <Button size="sm" loading={persisting} onClick={() => void protect()}>
+                <Button
+                  size="sm"
+                  variant={atRisk ? 'accent' : 'ghost'}
+                  loading={persisting}
+                  onClick={() => void protect()}
+                >
                   {t('settings.offline.persistAction')}
                 </Button>
               )}

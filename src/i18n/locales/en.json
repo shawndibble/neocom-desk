@@ -12335,6 +12335,7 @@
       "persistAction": "Protect this data",
       "persistDenied": "The browser declined. It tends to agree once the app is installed.",
       "persistGranted": "Storage is now protected.",
+      "atRisk": "Data not protected",
       "downloadLabel": "Download everything",
       "downloadHint": "Fetches every file above now, even on mobile data or Data Saver.",
       "downloadAction": "Download everything for offline",
