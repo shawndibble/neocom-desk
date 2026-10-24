@@ -3,7 +3,7 @@
  * claim tables with their per-row and bulk actions, the claim detail and the activity feed. Pure
  * view of what `useSrpQueue` loaded; every change goes through its callables and reloads.
  */
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GrantNote } from '@/app/GrantNote';
 import { SEND_MAIL_ENDPOINTS } from '@/esi/registry';
@@ -63,6 +63,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
   const { t } = useTranslation();
   const phone = useIsPhone();
   const tabsId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
   const zone = useTimeZone();
   const names = useSrpClaimNames();
   const { copied, flash } = useCopyFeedback<number>(COPIED_MS);
@@ -86,7 +87,11 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
     [history]
   );
   const rows = tab === 'pending' ? split.pending : tab === 'owed' ? split.owed : closed;
-  const selectable = tab === 'pending' ? rows.filter(canBulkApprove) : tab === 'owed' ? rows : [];
+  // An officer's own claims are decided by another officer, so bulk skips them.
+  const isOwn = (c: SrpClaim) => selfCharacterId != null && c.characterId === selfCharacterId;
+  const selectable = (
+    tab === 'pending' ? rows.filter(canBulkApprove) : tab === 'owed' ? rows : []
+  ).filter((c) => !isOwn(c));
   // Ticks belong to the rows they were made on: a claim another officer closed drops off.
   const ticked = pruneSelection(selection, selectable);
   const owed = sumAmounts(split.owed);
@@ -302,7 +307,7 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
         />
       )}
       <Panel title={t(`srp.officer.title.${tab}`)} padded={false}>
-        <div className="grid gap-3">
+        <div ref={panelRef} tabIndex={-1} className="grid gap-3 outline-none">
           {tab !== 'history' && (
             <SrpBulkBar
               selected={ticked.length}
@@ -410,6 +415,9 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           if (paying) await markPaid(paying);
         }}
         onClose={() => setPaying(null)}
+        returnFocusFallback={() =>
+          document.querySelector<HTMLElement>('[data-tab-id="owed"]') ?? panelRef.current
+        }
       />
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>

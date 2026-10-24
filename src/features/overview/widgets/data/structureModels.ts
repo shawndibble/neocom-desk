@@ -241,7 +241,7 @@ export const moonChunks: Builder = (feeds, { t, now }) => {
   const eventOf = (detail: string) =>
     t(`overview.widgets.moonChunks.event.${detail === 'decay' ? 'decay' : 'arrival'}`);
   const untilOf = (deadlineMs: number) => formatCountdown(Math.max(0, deadlineMs - now) / 1000);
-  const tone = moonChunksSeverity(data, now) ?? 'clear';
+  const tone = moonChunksSeverity({ ...data, chunks }, now) ?? 'clear';
 
   const table: TableModel = {
     columns: [

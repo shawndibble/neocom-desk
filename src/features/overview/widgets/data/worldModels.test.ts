@@ -366,6 +366,12 @@ describe('moonChunks', () => {
     expect(view.rows).toHaveLength(1);
     expect(view.number.secondary?.text).not.toContain('queued');
   });
+
+  it('keeps no warning tone when every chunk has lapsed and no row is left', () => {
+    const view = buildView('moonChunks', feeds([chunk('gone', 'decay', NOW - 1000)]), ctx());
+    expect(view.table!.rows).toHaveLength(0);
+    expect(view.number.tone).toBe('clear');
+  });
 });
 
 describe('incursions', () => {
