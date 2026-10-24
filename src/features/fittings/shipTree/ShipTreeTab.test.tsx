@@ -387,9 +387,10 @@ describe('ShipTreeTab — ladder', () => {
     expect(chips.sort()).toEqual(layout.omegas.map((o) => o.classId).sort());
   });
 
-  it("searches every faction's hulls; a pick switches the tree and opens the hull", async () => {
+  it("searches every faction's hulls; a pick goes to the hull and opens its window", async () => {
+    const scrolled = vi.spyOn(Element.prototype, 'scrollIntoView');
     const user = userEvent.setup();
-    renderTab();
+    const { container } = renderTab();
     await user.type(
       await screen.findByRole('searchbox', { name: 'Search hulls in every faction' }),
       'worm'
@@ -401,9 +402,35 @@ describe('ShipTreeTab — ladder', () => {
     );
     expect(screen.getByTestId('location')).toHaveTextContent('faction=500010');
     expect(await screen.findByRole('dialog', { name: 'Worm' })).toBeVisible();
+    const row = container.querySelector<HTMLElement>(`button[data-ship="${WORM}"]`)!;
+    expect(row).toHaveAttribute('aria-current', 'true');
+    await waitFor(() => expect(scrolled).toHaveBeenCalled());
+    expect(scrolled.mock.contexts.at(-1)).toBe(row);
+  });
+
+  it('keeps the open hull in the list even when the filters would hide it', async () => {
+    const user = userEvent.setup();
+    const { container } = renderTab('/ships/tree?fly=cantFly');
+    await screen.findByRole('button', { name: /Crow/ });
+    expect(container.querySelector(`button[data-ship="${MERLIN}"]`)).toBeNull();
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search hulls in every faction' }),
+      'merlin'
+    );
+    await user.click(
+      within(screen.getByRole('list', { name: 'Matching hulls' })).getByRole('button', {
+        name: /Merlin/,
+      })
+    );
+    expect(await screen.findByRole('dialog', { name: 'Merlin' })).toBeVisible();
+    expect(container.querySelector(`button[data-ship="${MERLIN}"]`)).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
   });
 
   it("opens a picked hull's section when it's in this faction", async () => {
+    const scrolled = vi.spyOn(Element.prototype, 'scrollIntoView');
     const user = userEvent.setup();
     const { container } = renderTab();
     await screen.findByRole('button', { name: /Merlin/ });
@@ -420,6 +447,11 @@ describe('ShipTreeTab — ladder', () => {
     );
     expect(await screen.findByRole('dialog', { name: 'Crow' })).toBeVisible();
     expect(interceptor.open).toBe(true);
+    await waitFor(() =>
+      expect(scrolled.mock.contexts.at(-1)).toBe(
+        container.querySelector(`button[data-ship="${CROW}"]`)
+      )
+    );
   });
 
   it('puts the faction bar under the toolbar, whose filters change its counts', async () => {

@@ -189,6 +189,7 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
           onFilter={setFilter}
           factionMatches={factionMatches}
           factionBar={factionBar}
+          selectedTypeID={selected?.typeID ?? null}
           onFaction={onFaction}
           onOpenShip={setSelected}
           viewSwitch={viewSwitch}

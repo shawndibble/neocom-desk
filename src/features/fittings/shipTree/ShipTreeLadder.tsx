@@ -35,11 +35,13 @@ import {
   focusRingInsetClassName,
   interactiveClassName,
   rowInteractiveClassName,
+  selectedRowClassName,
 } from '@/components/ui/controlStyles';
 import { romanLevel } from '@/engine/projection';
 import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
+import { useIsPhone } from '@/lib/useIsPhone';
 import type { ShipTreeShip } from '@/sde/types';
 import { IsisThumb } from './IsisTile';
 import { Legend } from './Legend';
@@ -78,6 +80,8 @@ interface LadderProps {
   factionMatches: ReadonlyMap<number, number> | undefined;
   /** The faction picker, placed under the toolbar. */
   factionBar: ReactNode;
+  /** The hull whose Ship Info window is open: marked, and shown even if filtered out. */
+  selectedTypeID: number | null;
   onFaction: (factionID: number) => void;
   onOpenShip: (ship: ShipTreeShip) => void;
   viewSwitch: ReactNode;
@@ -90,6 +94,7 @@ export function ShipTreeLadder({
   onFilter,
   factionMatches,
   factionBar,
+  selectedTypeID,
   onFaction,
   onOpenShip,
   viewSwitch,
@@ -97,6 +102,8 @@ export function ShipTreeLadder({
   const { t } = useTranslation();
   const { data, statuses } = source;
   const narrow = useIsNarrow();
+  // The Ship Info window's own test for a bottom sheet rather than a side panel.
+  const sheetWindow = useIsPhone();
   const filtered = isShipTreeFiltered(filter);
 
   const sections = useMemo(() => ladderSections(tree.defs), [tree.defs]);
@@ -125,14 +132,39 @@ export function ShipTreeLadder({
   const userOpen: ReadonlySet<number> = openState.key === openKey ? openState.ids : startOpen();
   const setUserOpen = (ids: ReadonlySet<number>) => setOpenState({ key: openKey, ids });
 
-  const visible = (s: ShipTreeShip) => hullMatches(statuses.get(s.typeID), filter);
+  const visible = (s: ShipTreeShip) =>
+    s.typeID === selectedTypeID || hullMatches(statuses.get(s.typeID), filter);
   const shown = sections.filter((section) => hasVisible(section, tree, visible));
 
-  // Another faction's hull switches the tree to it; one of this faction's
-  // opens its section (and those above it) so it's there behind the window.
+  // A search pick goes to the hull: its faction's tree, its section and the
+  // ones above it opened, its row scrolled to — then its window opens beside.
+  const [goTo, setGoTo] = useState<ShipTreeShip | null>(null);
+  const goToHere = goTo !== null && goTo.factionID === tree.factionID;
+  const goToPath = goToHere ? sectionPath(sections, goTo.treeGroupID) : [];
+  // Opened during render (after any faction-switch reset above), so the row
+  // exists by the time its ref below scrolls to it.
+  if (goToPath.some((id) => !userOpen.has(id)))
+    setOpenState({ key: openKey, ids: new Set([...userOpen, ...goToPath]) });
+  // A jump lives only while its hull's window is open, and a hull the ladder
+  // has no row for has nowhere to go: either way, drop it.
+  if (
+    goTo &&
+    (goTo.typeID !== selectedTypeID ||
+      (goToHere &&
+        (goToPath.length === 0 ||
+          !(tree.hulls.get(goTo.treeGroupID) ?? []).some((s) => s.typeID === goTo.typeID))))
+  )
+    setGoTo(null);
+  const scrollToTypeID = goToHere && goToPath.every((id) => userOpen.has(id)) ? goTo.typeID : null;
+  const scrollToRow = (row: HTMLElement | null) => {
+    if (!row) return;
+    // A phone's window is a bottom sheet, so the row goes to the top, above it.
+    row.scrollIntoView({ block: sheetWindow ? 'start' : 'center' });
+    setGoTo(null);
+  };
   const pick = (ship: ShipTreeShip) => {
+    setGoTo(ship);
     if (ship.factionID !== tree.factionID) onFaction(ship.factionID);
-    else setUserOpen(new Set([...userOpen, ...sectionPath(sections, ship.treeGroupID)]));
     onOpenShip(ship);
   };
   const search = (
@@ -216,6 +248,9 @@ export function ShipTreeLadder({
               userOpen={userOpen}
               setUserOpen={setUserOpen}
               filter={filter}
+              selectedTypeID={selectedTypeID}
+              scrollToTypeID={scrollToTypeID}
+              scrollToRow={scrollToRow}
               visible={visible}
               omegaChips={omegaChips}
               source={source}
@@ -402,6 +437,9 @@ function LadderClass({
   userOpen,
   setUserOpen,
   filter,
+  selectedTypeID,
+  scrollToTypeID,
+  scrollToRow,
   visible,
   omegaChips,
   source,
@@ -414,6 +452,10 @@ function LadderClass({
   userOpen: ReadonlySet<number>;
   setUserOpen: (ids: ReadonlySet<number>) => void;
   filter: ShipTreeFilter;
+  selectedTypeID: number | null;
+  /** The row a search pick is going to, and the ref that scrolls to it. */
+  scrollToTypeID: number | null;
+  scrollToRow: (row: HTMLElement | null) => void;
   visible: (s: ShipTreeShip) => boolean;
   omegaChips: ReadonlySet<number>;
   source: ShipTreeSource;
@@ -537,11 +579,15 @@ function LadderClass({
               <button
                 type="button"
                 data-ship={s.typeID}
+                ref={s.typeID === scrollToTypeID ? scrollToRow : undefined}
+                aria-current={s.typeID === selectedTypeID ? 'true' : undefined}
                 onClick={() => onOpenShip(s)}
                 className={cx(
-                  'group flex w-full items-center gap-2 px-1 py-1 text-left text-sm',
+                  // A transparent border, so the selected row's accent one doesn't shift it.
+                  'group flex w-full scroll-mt-4 items-center gap-2 border-l-2 border-l-transparent px-1 py-1 text-left text-sm',
                   rowInteractiveClassName,
-                  focusRingInsetClassName
+                  focusRingInsetClassName,
+                  s.typeID === selectedTypeID && selectedRowClassName
                 )}
               >
                 <IsisThumb ship={s} status={status} />
@@ -570,6 +616,9 @@ function LadderClass({
           userOpen={userOpen}
           setUserOpen={setUserOpen}
           filter={filter}
+          selectedTypeID={selectedTypeID}
+          scrollToTypeID={scrollToTypeID}
+          scrollToRow={scrollToRow}
           visible={visible}
           omegaChips={omegaChips}
           source={source}
