@@ -1,3 +1,4 @@
+import type { XlsxSheet } from './xlsx';
 import { toCsv, csvFilename, exportFilename, slugifyForFilename, type CsvColumn } from './csv';
 import { downloadBlob, downloadTextFile } from './download';
 import { writeToClipboard } from './clipboard';
@@ -75,7 +76,10 @@ export type CsvSurface =
   | 'data-age'
   | 'skill-compare'
   | 'wallet-balances'
-  | 'loyalty-points';
+  | 'loyalty-points'
+  // Whole-dataset workbooks, a sheet per record type (#4946), not one table.
+  | 'corp-tax-book'
+  | 'corp-srp';
 
 /** Every surface exports in every format; the name reads better at the menu. */
 export type ExportSurface = CsvSurface;
@@ -153,4 +157,34 @@ export async function exportRows<T>(
       return;
     }
   }
+}
+
+/** What a workbook download wrote: the file's name, its sheet count and the records across them. */
+export interface WorkbookDownload {
+  filename: string;
+  sheets: number;
+  rows: number;
+}
+
+/**
+ * Several record types in one .xlsx, a sheet each (a corp data export, #4946). Named like every
+ * other export; the writer is loaded on demand, as for a table's xlsx.
+ */
+export async function downloadWorkbook(
+  surface: ExportSurface,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each sheet has its own row type
+  sheets: readonly XlsxSheet<any>[],
+  { now = new Date(), qualifier }: Pick<ExportOptions, 'now' | 'qualifier'> = {}
+): Promise<WorkbookDownload> {
+  const { toXlsxWorkbook } = await import('./xlsx');
+  const filename = exportFilename(exportBase(surface, qualifier), now, 'xlsx');
+  downloadBlob(
+    filename,
+    new Blob([toXlsxWorkbook(sheets) as Uint8Array<ArrayBuffer>], { type: XLSX_MIME })
+  );
+  return {
+    filename,
+    sheets: sheets.length,
+    rows: sheets.reduce((sum, sheet) => sum + sheet.rows.length, 0),
+  };
 }

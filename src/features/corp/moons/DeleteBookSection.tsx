@@ -5,6 +5,7 @@ import { Button, TextInput } from '@/components/ui';
 import { getCorporationPublicInfo } from '@/esi/endpoints/corp';
 import { deleteBook } from '../taxBook/bookClient';
 import { DialogShell, Label } from './BookDialogs';
+import { ExportFirst } from './ExportBook';
 import { useBook } from './useBook';
 
 /** Whoever turned the book on (a Director) or the CEO may delete it. The callable stays the gate. */
@@ -88,6 +89,7 @@ export function DeleteBookDialog({ onClose }: { onClose: () => void }) {
       run={remove}
     >
       <p>{t('corpTaxBook.moons.settings.delete.body')}</p>
+      <ExportFirst />
       <Label
         text={
           isId

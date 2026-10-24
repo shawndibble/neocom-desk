@@ -514,6 +514,18 @@ export async function readAudit(
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AuditEntry, 'id'>) }));
 }
 
+/** The whole audit log, oldest first: the Activity log sheet of the book export (#4946). Officer-only. */
+export async function readFullAudit(
+  characterId: number,
+  corporationId: number
+): Promise<AuditEntry[]> {
+  await ensureSignedIn(characterId);
+  const snap = await getDocs(
+    query(collection(getSyncFirestore(), 'corps', String(corporationId), 'audit'), orderBy('at'))
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AuditEntry, 'id'>) }));
+}
+
 /** Turns the book on (a Director's act, D10): the start date and the corp default rate. */
 export async function turnOnBook(
   characterId: number,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { downloadCsv } from './downloadCsv';
+import { downloadCsv, downloadWorkbook } from './downloadCsv';
 import * as download from './download';
 
 interface Row {
@@ -60,5 +60,28 @@ describe('downloadCsv', () => {
     const spy = vi.spyOn(download, 'downloadTextFile').mockImplementation(() => {});
     downloadCsv('corp-wallet-journal', [{ name: 'Tritanium' }], columns, new Date(2026, 7, 5));
     expect(spy.mock.calls[0][0]).toBe('neocom-corp-wallet-journal-2026-08-05.csv');
+  });
+});
+
+describe('downloadWorkbook', () => {
+  it('names the file like every export and reports its sheets and records', async () => {
+    const spy = vi.spyOn(download, 'downloadBlob').mockImplementation(() => {});
+    const result = await downloadWorkbook(
+      'corp-tax-book',
+      [
+        { name: 'One', rows: [{ name: 'a' }, { name: 'b' }], columns },
+        { name: 'Two', rows: [{ name: 'c' }], columns },
+      ],
+      { now: new Date(2026, 9, 24), qualifier: 'ASHF' }
+    );
+    expect(result).toEqual({
+      filename: 'neocom-corp-tax-book-ashf-2026-10-24.xlsx',
+      sheets: 2,
+      rows: 3,
+    });
+    expect(spy.mock.calls[0][0]).toBe('neocom-corp-tax-book-ashf-2026-10-24.xlsx');
+    expect(spy.mock.calls[0][1].type).toBe(
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
   });
 });

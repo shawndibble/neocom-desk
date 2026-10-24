@@ -13386,6 +13386,14 @@
       "cellEdit": "Stock target for {{name}}: {{count}}. Edit",
       "invalid": "Enter a whole number of at least 1, or leave it empty to remove the target.",
       "typeFallback": "Type {{id}}"
+    },
+    "dataExport": {
+      "done": "Downloaded {{file}} · {{sheets}}, {{rows}}",
+      "sheets_one": "{{count, number}} sheet",
+      "sheets_other": "{{count, number}} sheets",
+      "rows_one": "{{count, number}} row",
+      "rows_other": "{{count, number}} rows",
+      "failed": "Couldn't build the file. Try again."
     }
   },
   "publicInfo": {
@@ -16135,6 +16143,119 @@
         "title": "Couldn't verify your corp role",
         "hint": "Try again or log in again."
       }
+    },
+    "export": {
+      "title": "Export the book",
+      "hint": "One Excel workbook with every record the book holds, a sheet per kind. A copy to keep or work in: it can't be imported back.",
+      "firstTitle": "Export first",
+      "firstHint": "Keep a copy: one Excel workbook with every record the book holds, a sheet per kind. SRP isn't part of the book and is kept.",
+      "action": "Download the book (.xlsx)",
+      "sheetList": "Sheets: Mining lines, Statements, Payments, Adjustments, Write-offs, Dismissals, Miners, Settings, Activity log.",
+      "yes": "Yes",
+      "no": "No",
+      "sheets": {
+        "miningLines": "Mining lines",
+        "statements": "Statements",
+        "payments": "Payments",
+        "adjustments": "Adjustments",
+        "writeOffs": "Write-offs",
+        "dismissals": "Dismissals",
+        "miners": "Miners",
+        "settings": "Settings",
+        "activity": "Activity log"
+      },
+      "cols": {
+        "date": "Date",
+        "character": "Character",
+        "characterId": "Character ID",
+        "miner": "Miner",
+        "minerId": "Miner ID",
+        "corporationId": "Corporation ID",
+        "refinery": "Refinery",
+        "refineryId": "Refinery ID",
+        "moon": "Moon",
+        "moonId": "Moon ID",
+        "systemId": "System ID",
+        "ore": "Ore",
+        "typeId": "Type ID",
+        "quantity": "Quantity",
+        "moonOwnerId": "Moon owner ID",
+        "readAt": "Read at",
+        "statementId": "Statement ID",
+        "code": "Payment code",
+        "periodStart": "Period start",
+        "periodEnd": "Period end",
+        "coversFrom": "Covers from",
+        "coversThrough": "Covers through",
+        "issued": "Issued",
+        "hub": "Trade hub",
+        "oreForm": "Ore Form",
+        "lines": "Lines",
+        "amount": "Amount (ISK)",
+        "settled": "Settled",
+        "paymentId": "Payment ID",
+        "time": "Time (UTC)",
+        "notTax": "Not tax (ISK)",
+        "source": "Source",
+        "adjustmentId": "Adjustment ID",
+        "reason": "Reason",
+        "by": "Officer",
+        "byId": "Officer ID",
+        "writeOffId": "Write-off ID",
+        "dismissalId": "Dismissal ID",
+        "scope": "Scope",
+        "target": "Target",
+        "reversedBy": "Reversed by",
+        "reversedAt": "Reversed at",
+        "mainCharacter": "Main character",
+        "mainCharacterId": "Main character ID",
+        "characters": "Characters",
+        "characterIds": "Character IDs",
+        "closed": "Closed",
+        "finalStatementId": "Final Statement ID",
+        "setting": "Setting",
+        "value": "Value",
+        "via": "Via",
+        "action": "Action",
+        "detail": "Detail"
+      },
+      "paymentSource": {
+        "donation": "Wallet donation",
+        "manual": "Recorded by an officer"
+      },
+      "dismissalScope": {
+        "record": "One entry",
+        "miner": "Miner",
+        "moon": "Moon",
+        "extraction": "Extraction"
+      },
+      "setting": {
+        "active": "Active",
+        "startDate": "Start date",
+        "hub": "Trade hub",
+        "oreForm": "Ore Form",
+        "cadence": "Statement period",
+        "cadenceMonthly": "Monthly",
+        "cadenceDays": "Every {{days}} days from {{anchor}}",
+        "graceHours": "Grace period (hours)",
+        "minimumStatement": "Smallest Statement (ISK)",
+        "overdueDays": "Overdue after (days)",
+        "divisions": "Wallet divisions",
+        "approvalLimit": "Dismissals above this need a Director (ISK)",
+        "chunkM3PerHour": "Moon chunk (m³ per hour)",
+        "owner": "Owner",
+        "createdBy": "Turned on by",
+        "lastSync": "Last sync",
+        "rate": {
+          "corp": "Tax rate (%): corporation, from {{from}}",
+          "guest": "Tax rate (%): guests, from {{from}}",
+          "feeder": "Tax rate (%): moon owner {{target}}, from {{from}}",
+          "miner": "Tax rate (%): Miner {{target}}, from {{from}}",
+          "moon": "Tax rate (%): {{target}}, from {{from}}",
+          "structure": "Tax rate (%): refinery {{target}}, from {{from}}",
+          "record": "Tax rate (%): one entry, {{target}}"
+        }
+      }
     }
   },
   "srpMember": {
@@ -16771,6 +16892,106 @@
       "pilotNote": "You can still file. An officer decides, and a note under Fleet or FC helps.",
       "queueFlag": "Off doctrine",
       "detailLabel": "Doctrine"
+    },
+    "export": {
+      "title": "Export",
+      "label": "SRP data",
+      "hint": "One Excel workbook, a sheet per kind. A copy to keep or work in: it can't be imported back.",
+      "sheetList": "Sheets: Settings, SRP Claims (every state), SRP log, Doctrine Fits.",
+      "action": "Download SRP data (.xlsx)",
+      "yes": "Yes",
+      "no": "No",
+      "never": "Never turned on",
+      "sheets": {
+        "settings": "Settings",
+        "claims": "SRP Claims",
+        "log": "SRP log",
+        "doctrines": "Doctrine Fits"
+      },
+      "cols": {
+        "killmailId": "Killmail ID",
+        "state": "State",
+        "pilot": "Pilot",
+        "pilotId": "Pilot ID",
+        "hull": "Hull",
+        "hullId": "Hull type ID",
+        "system": "System",
+        "systemId": "System ID",
+        "killed": "Lost at",
+        "filed": "Filed",
+        "amount": "Amount (ISK)",
+        "basis": "Priced by",
+        "computedAmount": "Worked-out amount (ISK)",
+        "suggested": "Suggested (ISK)",
+        "fleetOrFc": "Fleet or FC",
+        "note": "Note",
+        "refiled": "Times refiled",
+        "doctrineCheck": "Doctrine check",
+        "doctrineFit": "Doctrine Fit",
+        "overrideReason": "Amount changed because",
+        "overrideBy": "Amount changed by",
+        "decided": "Decided",
+        "decidedBy": "Decided by",
+        "rejectionReason": "Rejection reason",
+        "paid": "Paid",
+        "paidBy": "Paid by",
+        "closed": "Closed",
+        "time": "Time (UTC)",
+        "by": "Officer",
+        "byId": "Officer ID",
+        "action": "Action",
+        "summary": "Summary",
+        "detail": "Detail",
+        "doctrineId": "Doctrine Fit ID",
+        "name": "Name",
+        "modules": "Modules",
+        "rigs": "Rigs",
+        "createdById": "Created by ID",
+        "created": "Created",
+        "setting": "Setting",
+        "value": "Value"
+      },
+      "state": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "paid": "Paid",
+        "rejected": "Rejected"
+      },
+      "basis": {
+        "hull-fixed": "Hull Rule: fixed amount",
+        "class-fixed": "Class rule: fixed amount",
+        "killmail-percent": "{{percent}}% of the killmail value",
+        "appraisal-percent": "{{percent}}% of the Jita Appraisal"
+      },
+      "doctrine": {
+        "not-checked": "Not checked",
+        "matched": "Matched",
+        "off-doctrine": "Off doctrine"
+      },
+      "setting": {
+        "enabled": "SRP on",
+        "killmailPct": "Killmail value (%)",
+        "appraisalPct": "Jita Appraisal (%)",
+        "windowDays": "Claim window (days)",
+        "requireFleetOrFc": "Fleet or FC required",
+        "ownerId": "Owner ID",
+        "createdById": "Turned on by ID",
+        "createdAt": "Turned on",
+        "updatedById": "Last changed by ID",
+        "updatedAt": "Last changed",
+        "hullRule": "Hull Rule: {{target}}",
+        "hullRuleDoctrines": "Hull Rule: {{target}}, Doctrine Fits"
+      },
+      "ruleTarget": {
+        "hull": "{{name}}",
+        "class": "ship group {{id}}"
+      },
+      "rule": {
+        "pay-fixed": "Pays {{isk, number}} ISK",
+        "pay-percent": "Pays the corporation's percent",
+        "not-covered": "Not covered",
+        "officer-decides": "An officer decides"
+      }
     }
   }
 }
