@@ -24,7 +24,7 @@ export { LiveStatus } from './LiveStatus';
 export { EveSsoButton } from './EveSsoButton';
 export { Spinner } from './Spinner';
 export type { SpinnerSize } from './Spinner';
-export { Tooltip, InfoTooltip } from './Tooltip';
+export { Tooltip, InfoTooltip, TooltipProvider } from './Tooltip';
 export { IconButton } from './IconButton';
 export { textActionClassName } from './textActionClassName';
 export { plainTextActionClassName } from './plainTextActionClassName';
