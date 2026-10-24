@@ -17,7 +17,6 @@ import { boundedString, newInviteCode, record } from './communities.js';
 import {
   FEEDER_INVITES_COLLECTION,
   FEEDER_OF_COLLECTION,
-  decideRoles,
   parseBookCall,
   pctField,
   utcDate,
@@ -30,7 +29,6 @@ import {
   type OwnerRateEntry,
   type Removal,
 } from './corpTaxBookEngine.js';
-import { ROLES_SCOPE } from './corpTaxBookEsi.js';
 import { appendAgreedRate } from './corpTaxBookFeederOwnerCalls.js';
 import { refreshMemberCoverage } from './corpTaxBookFeederView.js';
 import {
@@ -42,7 +40,7 @@ import {
   type BookDeps,
   type Caller,
 } from './corpTaxBookStore.js';
-import { characterIdForUid } from './verifyEveToken.js';
+import { requireLiveRoles, signedInCharacter, verifyCallerToken } from './actorAuth.js';
 
 export type FeederStatus = 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
 
@@ -305,8 +303,7 @@ export async function previewFeederInvite(
   caller: Caller,
   input: { code: string }
 ): Promise<FeederInvitePreview> {
-  if (characterIdForUid(caller.uid) === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  signedInCharacter(caller);
   const invite = (await inviteRef(deps.db, hashInviteCode(input.code)).get()).data() as
     FeederInviteDoc | undefined;
   const book =
@@ -344,26 +341,12 @@ export async function acceptFeederInvite(
   caller: Caller,
   input: AcceptFeederInviteInput
 ): Promise<AcceptFeederInviteResult> {
-  const characterId = characterIdForUid(caller.uid);
-  if (characterId === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
-  let claims;
-  try {
-    claims = await deps.verifyToken(input.accessToken);
-  } catch {
-    throw new HttpsError('unauthenticated', 'EVE access token rejected');
-  }
-  if (claims.characterId !== characterId || claims.ownerHash !== caller.ownerHash) {
-    fail('permission-denied', 'The access token is for a different Character', 'token-mismatch');
-  }
-  if (!claims.scopes.includes(ROLES_SCOPE)) {
-    fail('failed-precondition', 'Grant the corporation roles scope first', 'missing-scope');
-  }
-  const identity = await deps.readIdentity(characterId, input.accessToken);
-  const roles = decideRoles(identity.roles, identity.ceoId === characterId);
-  if (!roles.canEdit) {
-    fail('permission-denied', 'Only a CEO, Director or Accountant can accept', 'not-an-editor');
-  }
+  const actor = await verifyCallerToken(deps, caller, input.accessToken);
+  const { characterId, claims } = actor;
+  const { identity } = await requireLiveRoles(deps, actor, {
+    need: 'canEdit',
+    denied: { message: 'Only a CEO, Director or Accountant can accept', reason: 'not-an-editor' },
+  });
   const accepted = await acceptInviteCore(deps, {
     code: input.code,
     characterId,

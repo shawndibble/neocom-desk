@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { strFromU8, unzipSync } from 'fflate';
-import { toXlsx } from './xlsx';
+import { toXlsx, toXlsxWorkbook } from './xlsx';
 
 interface Row {
   name: string;
@@ -72,6 +72,12 @@ describe('toXlsx', () => {
     expect(xml).toContain('A &amp; &lt;B&gt; &quot;C&quot;</t>');
   });
 
+  it("cuts text at Excel's per-cell limit so the file opens without a repair prompt", () => {
+    const xml = sheetXml(toXlsx([{ name: 'x'.repeat(40_000), qty: 1 }], columns, 'Sheet'));
+    expect(xml).toContain(`>${'x'.repeat(32_767)}</t>`);
+    expect(xml).not.toContain('x'.repeat(32_768));
+  });
+
   it('never turns formula-looking text into a formula', () => {
     const xml = sheetXml(toXlsx([{ name: '=SUM(A1)', qty: 1 }], columns, 'Sheet'));
     expect(xml).not.toContain('<f>');
@@ -87,5 +93,61 @@ describe('toXlsx', () => {
   it('sanitizes the sheet name to what Excel accepts', () => {
     const files = unzipSync(toXlsx([], columns, 'Orders: open/history [all]?*'));
     expect(strFromU8(files['xl/workbook.xml'])).toContain('name="Orders open history all"');
+  });
+});
+
+describe('toXlsxWorkbook', () => {
+  const people = [{ header: 'Who', value: (r: { who: string }) => r.who }];
+  const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+
+  it('writes one worksheet part per sheet, each declared, related and named in order', () => {
+    const files = unzipSync(
+      toXlsxWorkbook([
+        { name: 'Orders', rows: [{ name: 'a', qty: 1 }], columns },
+        { name: 'People', rows: [{ who: 'Ana' }, { who: 'Bo' }], columns: people },
+      ])
+    );
+    expect(Object.keys(files)).toEqual(
+      expect.arrayContaining(['xl/worksheets/sheet1.xml', 'xl/worksheets/sheet2.xml'])
+    );
+    const types = strFromU8(files['[Content_Types].xml']);
+    expect(types).toContain('PartName="/xl/worksheets/sheet1.xml"');
+    expect(types).toContain('PartName="/xl/worksheets/sheet2.xml"');
+    const rels = strFromU8(files['xl/_rels/workbook.xml.rels']);
+    expect(rels).toContain(`Id="rId1" Type="${REL}/worksheet" Target="worksheets/sheet1.xml"`);
+    expect(rels).toContain(`Id="rId2" Type="${REL}/worksheet" Target="worksheets/sheet2.xml"`);
+    expect(rels).toContain(`Id="rId3" Type="${REL}/styles" Target="styles.xml"`);
+    expect(strFromU8(files['xl/workbook.xml'])).toContain(
+      '<sheet name="Orders" sheetId="1" r:id="rId1"/><sheet name="People" sheetId="2" r:id="rId2"/>'
+    );
+    expect(strFromU8(files['xl/worksheets/sheet2.xml'])).toContain(
+      '<c r="A3" t="inlineStr"><is><t xml:space="preserve">Bo</t></is></c>'
+    );
+  });
+
+  it('keeps sheet names unique after sanitizing, ignoring case, within 31 characters', () => {
+    const long = 'A sheet name well past the limit';
+    const workbook = strFromU8(
+      unzipSync(
+        toXlsxWorkbook([
+          { name: 'Log', rows: [], columns: people },
+          { name: 'log', rows: [], columns: people },
+          { name: long, rows: [], columns: people },
+          { name: long, rows: [], columns: people },
+        ])
+      )['xl/workbook.xml']
+    );
+    const names = [...workbook.matchAll(/name="([^"]*)"/g)].map((m) => m[1]);
+    expect(names).toEqual([
+      'Log',
+      'log (2)',
+      long.slice(0, 31),
+      `${long.slice(0, 27).trimEnd()} (2)`,
+    ]);
+  });
+
+  it('writes a header-only sheet for a kind with no records', () => {
+    const files = unzipSync(toXlsxWorkbook([{ name: 'Empty', rows: [], columns: people }]));
+    expect(strFromU8(files['xl/worksheets/sheet1.xml'])).toContain('<row r="1">');
   });
 });

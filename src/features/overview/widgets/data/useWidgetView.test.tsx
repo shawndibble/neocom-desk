@@ -5,7 +5,8 @@ import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { CORP_DEFS } from './corpModels';
 import { createFeedStore } from './feedStore';
 import { FeedStoreContext } from './feedStoreContext';
-import { registerKindDefs } from './models';
+import { blank } from './builderKit';
+import { ensureBuilders, registerKindDefs } from './models';
 import { useKindViews, type ViewRequest } from './useWidgetView';
 
 registerKindDefs(CORP_DEFS);
@@ -29,6 +30,37 @@ function setup() {
 }
 
 describe('useKindViews', () => {
+  it('rebuilds a view once its lazy builder lands', async () => {
+    const stub = (summary: string) => () => ({
+      ...blank(null, {
+        loading: false,
+        needsPermission: false,
+        error: false,
+        hasData: true,
+        isEmpty: true,
+      }),
+      summary,
+    });
+    registerKindDefs({
+      lazyProbe: {
+        feeds: [],
+        scope: 'character',
+        build: stub('pending'),
+        loadBuild: () => Promise.resolve(stub('real')),
+      },
+    });
+    const store = createFeedStore();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <FeedStoreContext.Provider value={store}>{children}</FeedStoreContext.Provider>
+    );
+    const requests: ViewRequest[] = [{ kind: 'lazyProbe', scopeAll: false }];
+    const hook = renderHook(() => useKindViews(requests), { wrapper });
+    const summary = () => [...hook.result.current.values()][0]?.summary;
+    expect(summary()).toBe('pending');
+    await act(() => ensureBuilders(['lazyProbe']));
+    expect(summary()).toBe('real');
+  });
+
   it('keeps the same views when a feed the kind does not read updates', () => {
     const { store, hook, renders } = setup();
     const before = hook.result.current;

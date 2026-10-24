@@ -1,13 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { db } from '@/db';
 import i18n from '@/i18n';
 import {
   buildSrpResultMail,
   groupByPilot,
   mailSummary,
-  sendSrpResultMails,
+  queueSrpResultMails,
   withMailSummary,
   type SrpMailPilot,
 } from './srpResultMail';
+
+const send = vi.hoisted(() => vi.fn());
+vi.mock('@/features/character/mail', () => ({ sendMail: send }));
 
 const t = i18n.t.bind(i18n);
 const pilot = (id: number, name: string): SrpMailPilot => ({
@@ -75,72 +79,124 @@ describe('groupByPilot', () => {
   });
 });
 
-describe('sendSrpResultMails', () => {
-  const input = (pilots: SrpMailPilot[]) => ({
+describe('queueSrpResultMails', () => {
+  const MAIL = 'esi-mail.send_mail.v1';
+  const input = (pilots: SrpMailPilot[], over = {}) => ({
     kind: 'approved' as const,
     corpName: 'Acme',
     pilots,
+    senderCharacterId: 9,
+    corporationId: 3,
+    ...over,
   });
-
-  it('sends one mail per pilot, in order', async () => {
-    const send = vi.fn().mockResolvedValue(1);
-    const run = await sendSrpResultMails(t, input([pilot(1, 'A'), pilot(2, 'B')]), {
-      hasScope: true,
-      send,
+  const grant = (scopes: string[]) =>
+    db.tokens.put({
+      characterId: 9,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: 1,
+      scopes,
     });
-    expect(run).toEqual({ sent: ['A', 'B'], failed: [], missingScope: false });
-    expect(send.mock.calls.map((c) => c[0])).toEqual([1, 2]);
+  beforeEach(async () => {
+    send.mockClear();
+    await db.corpMailQueue.clear();
+    await db.tokens.clear();
   });
 
-  it('a failure is recorded and the rest still go', async () => {
-    const send = vi.fn().mockRejectedValueOnce(new Error('x')).mockResolvedValue(1);
-    const run = await sendSrpResultMails(t, input([pilot(1, 'A'), pilot(2, 'B')]), {
-      hasScope: true,
-      send,
+  it('queues one paced mail per pilot, and sends none directly', async () => {
+    await grant([MAIL]);
+    const pilots = Array.from({ length: 8 }, (_, i) => pilot(i + 1, `P${i + 1}`));
+    const run = await queueSrpResultMails(t, input(pilots));
+    expect(run).toEqual({
+      queued: pilots.map((p) => p.characterName),
+      failed: [],
+      missingScope: false,
     });
-    expect(run).toEqual({ sent: ['B'], failed: ['A'], missingScope: false });
-  });
-
-  it('stops trying after ESI throttles', async () => {
-    const send = vi.fn().mockRejectedValue(Object.assign(new Error('slow'), { status: 420 }));
-    const run = await sendSrpResultMails(t, input([pilot(1, 'A'), pilot(2, 'B')]), {
-      hasScope: true,
-      send,
-    });
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(run.failed).toEqual(['A', 'B']);
-  });
-
-  it('without the mail scope sends nothing', async () => {
-    const send = vi.fn();
-    const run = await sendSrpResultMails(t, input([pilot(1, 'A')]), { hasScope: false, send });
+    const rows = await db.corpMailQueue.toArray();
+    expect(rows).toHaveLength(8);
     expect(send).not.toHaveBeenCalled();
+    for (const r of rows) {
+      expect(r).toMatchObject({
+        kind: 'srp-result',
+        senderCharacterId: 9,
+        corporationId: 3,
+        status: 'waiting',
+      });
+      expect(r.body).toContain(`Hi ${r.recipientName},`);
+      expect(r.subject).toBe('SRP approved: Drake');
+    }
+    expect(new Set(rows.map((r) => r.order)).size).toBe(8);
+  });
+
+  it('without the mail scope queues nothing and says so', async () => {
+    await grant(['esi-skills.read_skills.v1']);
+    const run = await queueSrpResultMails(t, input([pilot(1, 'A')]));
     expect(run.missingScope).toBe(true);
+    expect(await db.corpMailQueue.count()).toBe(0);
   });
 
   it('nothing to mail is not a missing scope', async () => {
-    const run = await sendSrpResultMails(t, input([]), { hasScope: false, send: vi.fn() });
-    expect(run.missingScope).toBe(false);
+    const run = await queueSrpResultMails(t, input([]));
+    expect(run).toEqual({ queued: [], failed: [], missingScope: false });
+  });
+
+  it('an unknown corporation still mails (the queue row is not tied to a corp)', async () => {
+    await grant([MAIL]);
+    const run = await queueSrpResultMails(t, input([pilot(1, 'A')], { corporationId: null }));
+    expect(run).toEqual({ queued: ['A'], failed: [], missingScope: false });
+    expect(await db.corpMailQueue.count()).toBe(1);
+  });
+
+  it('an unknown corporation without the mail scope says permission missing', async () => {
+    await grant(['esi-skills.read_skills.v1']);
+    const run = await queueSrpResultMails(t, input([pilot(1, 'A')], { corporationId: null }));
+    expect(run.missingScope).toBe(true);
+    expect(run.failed).toEqual([]);
+  });
+
+  it('a queue that throws fails the mail without throwing', async () => {
+    await grant([MAIL]);
+    const spy = vi.spyOn(db.corpMailQueue, 'bulkPut').mockRejectedValue(new Error('quota'));
+    try {
+      const run = await queueSrpResultMails(t, input([pilot(1, 'A'), pilot(2, 'B')]));
+      expect(run).toEqual({ queued: [], failed: ['A', 'B'], missingScope: false });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('reports only the mails really queued; a repeat of one decision queues none', async () => {
+    await grant([MAIL]);
+    const pilots = [pilot(1, 'A'), pilot(2, 'B')];
+    await queueSrpResultMails(t, input(pilots));
+    const again = await queueSrpResultMails(t, input(pilots));
+    expect(again).toEqual({ queued: [], failed: [], missingScope: false });
+    expect(await db.corpMailQueue.count()).toBe(2);
   });
 });
 
 describe('summary', () => {
   it('reads like the batch toast', () => {
-    const run = { sent: ['A', 'B'], failed: ['Tamsin Vell'], missingScope: false };
+    const run = { queued: ['A', 'B'], failed: ['Tamsin Vell'], missingScope: false };
     expect(withMailSummary(t, 'Approved 3 of 3', run)).toBe(
-      'Approved 3 of 3. Mail sent to 2 pilots. Mail failed for Tamsin Vell, status still saved.'
+      'Approved 3 of 3. Mail queued for 2 pilots, sent about 5 a minute. Mail failed for Tamsin Vell, status still saved.'
     );
   });
   it('single pilot, and permission missing', () => {
-    expect(mailSummary(t, { sent: ['A'], failed: [], missingScope: false })).toBe(
-      'Mail sent to 1 pilot.'
+    expect(mailSummary(t, { queued: ['A'], failed: [], missingScope: false })).toBe(
+      'Mail queued for 1 pilot.'
     );
-    expect(mailSummary(t, { sent: [], failed: [], missingScope: true })).toBe(
+    expect(mailSummary(t, { queued: [], failed: [], missingScope: true })).toBe(
       'No mail sent: mail permission missing.'
     );
   });
+  it('plural count from the real number queued', () => {
+    expect(mailSummary(t, { queued: ['A', 'B', 'C'], failed: [], missingScope: false })).toBe(
+      'Mail queued for 3 pilots, sent about 5 a minute.'
+    );
+  });
   it('adds nothing when nothing was mailed', () => {
-    expect(withMailSummary(t, 'Approved', { sent: [], failed: [], missingScope: false })).toBe(
+    expect(withMailSummary(t, 'Approved', { queued: [], failed: [], missingScope: false })).toBe(
       'Approved'
     );
   });

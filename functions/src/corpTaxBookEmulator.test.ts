@@ -36,6 +36,7 @@ let db: Firestore;
 let now = T0;
 const identities = new Map<number, CorpIdentity>();
 let identityCalls = 0;
+const droppedScope = new Set<number>();
 
 const deps = (): BookDeps => ({
   db,
@@ -47,7 +48,7 @@ const deps = (): BookDeps => ({
       characterId: id,
       ownerHash: `h${id}`,
       name: `Pilot ${id}`,
-      scopes: [ROLES_SCOPE],
+      scopes: droppedScope.has(id) ? [] : [ROLES_SCOPE],
       clientId: 'c',
     };
   },
@@ -141,6 +142,7 @@ suite('Corp Tax Book callables (emulator)', () => {
     now = T0;
     identityCalls = 0;
     identities.clear();
+    droppedScope.clear();
     identities.set(DIRECTOR, as(['Director']));
     identities.set(ACCOUNTANT, as(['Accountant', 'Station_Manager']));
     identities.set(JUNIOR, as(['Junior_Accountant']));
@@ -187,6 +189,16 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect(
         await reason(verifyOfficer(deps(), who(JUNIOR), parseBookCall(withToken(JUNIOR))))
       ).toBe('not-an-officer');
+      expect((await book().collection('officers').doc(`char:${JUNIOR}`).get()).exists).toBe(false);
+    });
+
+    it('revokes the held access when the roles scope is dropped', async () => {
+      await turnOn();
+      now = T0 + 11 * 60_000;
+      droppedScope.add(JUNIOR);
+      expect(
+        await reason(verifyOfficer(deps(), who(JUNIOR), parseBookCall(withToken(JUNIOR))))
+      ).toBe('missing-scope');
       expect((await book().collection('officers').doc(`char:${JUNIOR}`).get()).exists).toBe(false);
     });
 

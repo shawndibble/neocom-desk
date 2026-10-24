@@ -3,6 +3,10 @@
  * step is naming a system: Route Safety's destination, before any route
  * exists. The same local snapshot and ranking as `SolarSystemPicker`, with the
  * results listed under the field rather than in a popover behind a button.
+ *
+ * With `places`, stations and known structures join the systems in one list
+ * (issue #4964), each result marked as a system, station or structure. Picking
+ * a station answers with its system and the station beside it.
  */
 import { useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,26 +16,30 @@ import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
-import { rankedSearch } from '@/lib/rankedSearch';
-import type { SolarSystemEntry } from '@/sde/marketTypes';
+import type { PickedStation } from '@/features/places/placeSearch';
+import { buildPickerOptions, pickedStationOf, type PickerOption } from './pickerOptions';
+import { useKnownPlaces } from '@/features/places/useKnownPlaces';
 import { useSolarSystemList } from './useSolarSystems';
 
 const MATCH_LIMIT = 8;
 const NAV_KEYS: readonly string[] = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
-
 export function SolarSystemSearchField({
   onChange,
   ariaLabel,
   exclude,
   autoFocus = false,
   className,
+  places = false,
 }: {
-  onChange: (systemId: number) => void;
+  /** `station` is set when a station or structure was picked: `systemId` is its system. */
+  onChange: (systemId: number, station?: PickedStation) => void;
   ariaLabel: string;
   /** Systems left out of the results, such as the trip's start. */
   exclude?: ReadonlySet<number>;
   autoFocus?: boolean;
   className?: string;
+  /** Also search stations and known structures, not only systems. */
+  places?: boolean;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -43,22 +51,20 @@ export function SolarSystemSearchField({
     systemsFailed ? 'failed' : systems === null ? 'busy' : 'ok',
     'systems'
   );
+  const trimmed = query.trim();
+  const placeHits = useKnownPlaces(query, places, MATCH_LIMIT);
   const matches = useMemo(
     () =>
-      systems && query.trim() !== ''
-        ? rankedSearch(
-            exclude?.size ? systems.filter((system) => !exclude.has(system.id)) : systems,
-            query,
-            { primary: (system) => system.name, limit: MATCH_LIMIT }
-          )
+      systems && trimmed !== ''
+        ? buildPickerOptions(systems, query, exclude, placeHits, MATCH_LIMIT)
         : [],
-    [systems, query, exclude]
+    [systems, query, trimmed, exclude, placeHits]
   );
 
-  function choose(system: SolarSystemEntry) {
+  function choose(option: PickerOption) {
     setQuery('');
     setHighlight(null);
-    onChange(system.id);
+    onChange(option.systemId, pickedStationOf(option));
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -114,9 +120,9 @@ export function SolarSystemSearchField({
           aria-label={ariaLabel}
           className="absolute inset-x-0 top-full z-20 mt-1 flex flex-col rounded-xs border border-line-bright bg-panel p-1 shadow-lg"
         >
-          {matches.map((system, index) => (
+          {matches.map((option, index) => (
             <li
-              key={system.id}
+              key={option.key}
               id={`${listId}-${index}`}
               role="option"
               aria-selected={index === highlight}
@@ -125,10 +131,17 @@ export function SolarSystemSearchField({
                 index === highlight && `bg-panel-2 ${activeOptionClassName}`
               )}
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => choose(system)}
+              onClick={() => choose(option)}
             >
-              {system.name}
-              <SecurityStatus security={system.security} className="ml-1" />
+              {option.name}
+              {option.security !== null && (
+                <SecurityStatus security={option.security} className="ml-1" />
+              )}
+              {places && (
+                <span className="ml-2 text-xs text-text-dim">
+                  {t(`travel.stops.kind.${option.kind}`)}
+                </span>
+              )}
             </li>
           ))}
         </ul>

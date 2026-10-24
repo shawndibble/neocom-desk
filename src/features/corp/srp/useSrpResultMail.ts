@@ -1,17 +1,14 @@
 /**
- * Mails the pilot a claim's result from the active officer's Character. Never
+ * Mails the pilot a claim's result from the active officer's Character, by the paced Officer mail queue. Never
  * throws: whatever goes wrong comes back as a `MailRun` the result line reports.
  */
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { db } from '@/db';
-import { sendMail } from '@/features/character/mail';
-import { requiredScopesForEndpoints, SEND_MAIL_ENDPOINTS } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useActiveCorporationId } from '../owner';
 import {
   groupByPilot,
-  sendSrpResultMails,
+  queueSrpResultMails,
   type MailRun,
   type SrpMailClaim,
   type SrpMailKind,
@@ -42,32 +39,20 @@ export function useSrpResultMail(): (
   return useCallback(
     async (kind, decided) => {
       const pilots = groupByPilot(decided);
-      if (officerId === null) return { sent: [], failed: [], missingScope: pilots.length > 0 };
+      if (officerId === null) return { queued: [], failed: [], missingScope: pilots.length > 0 };
       try {
-        // Read at send time, so a grant made a moment ago counts. Only `scopes` is taken from the token.
-        const scopes = (await db.tokens.get(officerId))?.scopes ?? [];
-        const hasScope = requiredScopesForEndpoints(SEND_MAIL_ENDPOINTS).every((scope) =>
-          scopes.includes(scope)
-        );
         const corpName =
           (corporationId === null ? null : await corporationName(corporationId)) ??
           t('srp.officer.mail.corpFallback');
-        return await sendSrpResultMails(
-          t,
-          { kind, corpName, pilots },
-          {
-            hasScope,
-            send: (recipientId, subject, body) =>
-              sendMail(
-                officerId,
-                [{ recipient_id: recipientId, recipient_type: 'character' }],
-                subject,
-                body
-              ),
-          }
-        );
+        return await queueSrpResultMails(t, {
+          kind,
+          corpName,
+          pilots,
+          senderCharacterId: officerId,
+          corporationId,
+        });
       } catch {
-        return { sent: [], failed: pilots.map((p) => p.characterName), missingScope: false };
+        return { queued: [], failed: pilots.map((p) => p.characterName), missingScope: false };
       }
     },
     [officerId, corporationId, t]

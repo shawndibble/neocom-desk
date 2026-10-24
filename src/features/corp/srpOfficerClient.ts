@@ -6,6 +6,7 @@
  * sent. Refusals carry a `details.reason`: claim-not-found, illegal-transition, reason-required,
  * amount-required, amount-unchanged, amount-changed (the amount moved since the officer looked), not-an-officer, wrong-corp, role-required.
  */
+import type { CallableAction } from '../../../functions/src/callableManifest';
 import {
   collection,
   getDocs,
@@ -72,19 +73,34 @@ export async function readSrpHistory(
   return snap.docs.map((d) => d.data() as SrpClaim);
 }
 
-/** The newest entries of the corporation's audit log, newest first. */
+/** The newest entries of the corporation's audit log, newest first; `count` null reads it whole. */
 export async function readSrpActivity(
   characterId: number,
   corporationId: number,
-  count = 100
+  count: number | null = 100
 ): Promise<SrpAuditEntry[]> {
   const stand = srpOfficerBackendOverride();
   if (stand) return stand.activity();
   await ensureSignedIn(characterId);
+  const log = corpDoc(corporationId, 'srpAudit');
   const snap = await getDocs(
-    query(corpDoc(corporationId, 'srpAudit'), orderBy('at', 'desc'), limitTo(count))
+    count === null
+      ? query(log, orderBy('at', 'desc'))
+      : query(log, orderBy('at', 'desc'), limitTo(count))
   );
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<SrpAuditEntry, 'id'>) }));
+}
+
+/** Every claim, any state. Retention bounds the closed ones. */
+export async function readAllSrpClaims(
+  characterId: number,
+  corporationId: number
+): Promise<SrpClaim[]> {
+  const stand = srpOfficerBackendOverride();
+  if (stand) return stand.claims();
+  await ensureSignedIn(characterId);
+  const snap = await getDocs(corpDoc(corporationId, 'srpClaims'));
+  return snap.docs.map((d) => d.data() as SrpClaim);
 }
 
 /** Every audit entry about one claim, oldest first. */
@@ -116,7 +132,7 @@ const DOUBTED_REASONS: ReadonlySet<string> = new Set([
 async function officerCall<Out>(
   characterId: number,
   corporationId: number,
-  name: string,
+  name: CallableAction,
   data: Record<string, unknown>
 ): Promise<Out> {
   const accessToken = await getValidAccessToken(characterId);

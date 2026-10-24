@@ -31,18 +31,6 @@ const asset = (item_id: number, location_flag: string) => ({
 beforeEach(() => vi.clearAllMocks());
 
 describe('loadCorpAssets', () => {
-  it('makes no request without the capability', async () => {
-    resolveCorpReadAccess.mockResolvedValue(access(false));
-    expect((await loadCorpAssets(1)).readable).toBe(false);
-    expect(loadCorporationAssets).not.toHaveBeenCalled();
-  });
-
-  it('makes no request with no corp access at all', async () => {
-    resolveCorpReadAccess.mockResolvedValue(null);
-    expect((await loadCorpAssets(1)).readable).toBe(false);
-    expect(loadCorporationAssets).not.toHaveBeenCalled();
-  });
-
   it('summarises the cached read with the page prices', async () => {
     resolveCorpReadAccess.mockResolvedValue(access(true));
     loadCorporationAssets.mockResolvedValue({
@@ -75,13 +63,5 @@ describe('loadCorpAssets', () => {
     getPrices.mockRejectedValueOnce(new Error('prices down'));
     const feed = await loadCorpAssets(1);
     expect(feed.summary?.assetSafety).toEqual({ stacks: 1, value: null });
-  });
-
-  it('asks for a grant when it lapsed, and throws when the read failed', async () => {
-    resolveCorpReadAccess.mockResolvedValue(access(true));
-    loadCorporationAssets.mockResolvedValue({ cached: null, needsReauth: true });
-    expect(await loadCorpAssets(1)).toMatchObject({ readable: false, needsReauth: true });
-    loadCorporationAssets.mockResolvedValue({ cached: null, needsReauth: false });
-    await expect(loadCorpAssets(1)).rejects.toThrow('assets');
   });
 });

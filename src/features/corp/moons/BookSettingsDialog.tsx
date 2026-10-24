@@ -34,6 +34,7 @@ import { Label } from './BookDialogs';
 import { isk } from './moonsFormat';
 import { AutomaticSyncSection } from './AutomaticSyncSection';
 import { DeleteBookSection } from './DeleteBookSection';
+import { ExportBookSection } from './ExportBook';
 import { ReclaimBookSection } from './ReclaimBookSection';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { useCorpAccess } from '../useCorpAccess';
@@ -743,6 +744,8 @@ export function BookSettingsDialog({
               <AutomaticSyncSection />
 
               <ReclaimBookSection />
+
+              <ExportBookSection />
 
               <DeleteBookSection
                 onDelete={() => {

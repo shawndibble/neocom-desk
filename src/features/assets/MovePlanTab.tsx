@@ -6,7 +6,12 @@ import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, LiveStatus, Spinner } from '@/components/ui';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
 import type { PilotProfile } from '@/engine/fittings/types';
-import { planMove, type MoveHull, type PackHold } from '@/engine/assets/movePlan';
+import {
+  planMove,
+  type HaulerOverride,
+  type MoveHull,
+  type PackHold,
+} from '@/engine/assets/movePlan';
 import {
   loadOtherCharactersAssetsDetailed,
   type SkippedCharacterAssets,
@@ -147,6 +152,12 @@ function MovePlanTabBody({
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [destSystem, setDestSystem] = useState<number | null>(null);
   const [destStation, setDestStation] = useState<number | null>(null);
+  /** A station found by search that holds none of the pilot's assets: its name and system came with the pick. */
+  const [searchedStation, setSearchedStation] = useState<{
+    id: number;
+    name: string;
+    systemId: number;
+  } | null>(null);
   const [working, setWorking] = useState(false);
   const [result, setResult] = useState<PlanState | null>(null);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -167,7 +178,12 @@ function MovePlanTabBody({
   /** Ships (itemID) the plan hauls packaged instead of flying. */
   const [packed, setPacked] = useState<ReadonlySet<number>>(new Set());
   /** What the shown plan was worked out from, so packing a ship can re-plan it. */
-  const planBase = useRef<Omit<Parameters<typeof planMove>[0], 'packedShipIds'> | null>(null);
+  const planBase = useRef<Omit<
+    Parameters<typeof planMove>[0],
+    'packedShipIds' | 'haulerOverride'
+  > | null>(null);
+  /** The pilot's hauler pick for the shown plan only; never saved, reset with each plan. */
+  const [haulerOverride, setHaulerOverride] = useState<HaulerOverride | undefined>();
   /** Bumped on every reset so a plan still being worked out for an old session is dropped. */
   const session = useRef(0);
   const hullSource = useRef<HullSourceData>({
@@ -246,9 +262,14 @@ function MovePlanTabBody({
     });
 
   /** Ticks at the destination are kept but ignored, so changing it back restores them. */
-  function chooseDestination(system: number | null, station: number | null) {
+  function chooseDestination(
+    system: number | null,
+    station: number | null,
+    searched: { id: number; name: string; systemId: number } | null = null
+  ) {
     setDestSystem(system);
     setDestStation(station);
+    setSearchedStation(searched);
   }
 
   /**
@@ -313,17 +334,19 @@ function MovePlanTabBody({
     const mine = session.current;
     try {
       const destinationSystem =
-        destStation !== null
-          ? await resolvePlace(
-              { locationId: destStation, characterId: null, kind: 'station' },
-              undefined,
-              {
-                name: false,
-              }
-            )
-              .then((place) => place.systemId)
-              .catch(() => null)
-          : destSystem;
+        searchedStation !== null
+          ? searchedStation.systemId
+          : destStation !== null
+            ? await resolvePlace(
+                { locationId: destStation, characterId: null, kind: 'station' },
+                undefined,
+                {
+                  name: false,
+                }
+              )
+                .then((place) => place.systemId)
+                .catch(() => null)
+            : destSystem;
       const { hulls, sizing } = await loadHulls();
       const base = {
         destinationLocationIds: atDestination,
@@ -336,11 +359,14 @@ function MovePlanTabBody({
       if (mine === session.current) {
         planBase.current = base;
         setPacked(new Set());
+        setHaulerOverride(undefined);
         setResult({
           plan,
           destinationSystem,
           destinationStation:
-            destStation !== null ? (loaded.places.get(destStation) ?? null) : null,
+            destStation !== null
+              ? (loaded.places.get(destStation) ?? searchedStation?.name ?? null)
+              : null,
           pickupSystems: loaded.systems,
           haulerSizing: sizing,
         });
@@ -353,23 +379,30 @@ function MovePlanTabBody({
     }
   }
 
-  /** Hauls this ship packaged instead of flying it, and re-plans around its volume. */
-  function packShip(itemId: number) {
+  /** Works the shown plan out again for a changed ship choice or hauler. */
+  function replan(nextPacked: ReadonlySet<number>, nextOverride: HaulerOverride | undefined) {
     const base = planBase.current;
     if (!base) return;
-    const next = new Set(packed).add(itemId);
-    setPacked(next);
-    setResult((r) => (r ? { ...r, plan: planMove({ ...base, packedShipIds: next }) } : r));
+    setPacked(nextPacked);
+    setHaulerOverride(nextOverride);
+    setResult((r) =>
+      r
+        ? {
+            ...r,
+            plan: planMove({ ...base, packedShipIds: nextPacked, haulerOverride: nextOverride }),
+          }
+        : r
+    );
   }
+
+  /** Hauls this ship packaged instead of flying it, and re-plans around its volume. */
+  const packShip = (itemId: number) => replan(new Set(packed).add(itemId), haulerOverride);
 
   /** Flies this packed ship after all, and re-plans without its volume. */
   function unpackShip(itemId: number) {
-    const base = planBase.current;
-    if (!base) return;
     const next = new Set(packed);
     next.delete(itemId);
-    setPacked(next);
-    setResult((r) => (r ? { ...r, plan: planMove({ ...base, packedShipIds: next }) } : r));
+    replan(next, haulerOverride);
   }
 
   // Who the read left out is the header picker's to say (its dot and "Not included" note).
@@ -404,6 +437,8 @@ function MovePlanTabBody({
             state={result}
             compareOpen={compareOpen}
             onToggleCompare={() => setCompareOpen((v) => !v)}
+            haulerOverride={haulerOverride}
+            onPickHauler={(next) => replan(packed, next)}
             headingRef={planHeadingRef}
             onBack={() => {
               setResult(null);
@@ -435,12 +470,22 @@ function MovePlanTabBody({
                 </h3>
                 <SolarSystemPicker
                   value={destSystem}
-                  onChange={(id) => chooseDestination(id, null)}
+                  places
+                  onChange={(id, station) =>
+                    station
+                      ? chooseDestination(null, station.id, {
+                          id: station.id,
+                          name: station.name,
+                          systemId: id,
+                        })
+                      : chooseDestination(id, null)
+                  }
                   ariaLabel={t('assets.movePlan.destinationSystem')}
                   placeholder={t('assets.movePlan.destinationSystem')}
                   triggerLabel={
                     destStation !== null
                       ? (stationLabels[ownStations.findIndex(([id]) => id === destStation)] ??
+                        searchedStation?.name ??
                         placeLabel(destStation))
                       : undefined
                   }

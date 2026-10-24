@@ -6,6 +6,7 @@
  * membership index, because `communities` itself cannot be listed. Firestore
  * here is the `lite` build (no listeners), so callers refetch after a change.
  */
+import type { CallableAction } from '../../../functions/src/callableManifest';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
 import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
 import type { SharedBlueprint } from '@/engine/communities/sharedLibrary';
@@ -213,7 +214,7 @@ function libraryAsOf(data: Record<string, unknown>): number | null {
 
 export async function callCommunity<In, Out>(
   characterId: number,
-  name: string,
+  name: CallableAction,
   data: In
 ): Promise<Out> {
   const override = communityBackendOverride();

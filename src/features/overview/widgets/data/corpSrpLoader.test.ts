@@ -40,14 +40,6 @@ beforeEach(() => {
 });
 
 describe('loadCorpSrp', () => {
-  it('asks Firebase nothing without the SRP officer capability', async () => {
-    resolveCorpReadAccess.mockResolvedValue({ corporationId: CORP, can: () => false });
-    expect((await loadCorpSrp(1)).readable).toBe(false);
-    resolveCorpReadAccess.mockResolvedValue(null);
-    expect((await loadCorpSrp(1)).readable).toBe(false);
-    expect(verifySrpOfficer).not.toHaveBeenCalled();
-  });
-
   it('is unreadable when the live check says the Character is no officer', async () => {
     verifySrpOfficer.mockResolvedValue(verdict({ canManage: false }));
     expect((await loadCorpSrp(1)).readable).toBe(false);

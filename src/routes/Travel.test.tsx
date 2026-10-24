@@ -73,6 +73,7 @@ vi.mock('@/sde/loadMarketSde', async (importOriginal) => ({
   loadSolarSystems: async () => SYSTEMS,
   loadMarketRegions: async () => [{ id: 10000002, name: 'The Forge' }],
   loadMarketGroups: async () => [],
+  loadNpcStations: async () => NPC_STATIONS,
 }));
 
 // Hauling's scan reads every hub's order books; the tab's own tests live with
@@ -117,6 +118,13 @@ const SYSTEMS = [
   { id: NIYABAINEN, name: 'Niyabainen', security: 0.71, regionId: 10000002 },
   { id: MUVOLAILEN, name: 'Muvolailen', security: 0.62, regionId: 10000002 },
   { id: SOBASEKI, name: 'Sobaseki', security: 0.84, regionId: 10000002 },
+];
+
+const UEDAMA_STATION = 60099001;
+const SOBASEKI_STATION = 60099002;
+const NPC_STATIONS = [
+  { id: UEDAMA_STATION, name: 'Nova Depot', systemId: UEDAMA },
+  { id: SOBASEKI_STATION, name: 'Crown Exchange', systemId: SOBASEKI },
 ];
 
 const JUMPS = {
@@ -702,6 +710,41 @@ describe('Travel › Route Safety › Stops', () => {
     expect(stopsInLink()).toBe(`${UEDAMA},${SOBASEKI}`);
     expect(new URLSearchParams(window.location.search).get('to')).toBeNull();
     expect(await screen.findByRole('list', { name: 'Itinerary by leg' })).toBeInTheDocument();
+  });
+
+  it('adds a station as a stop, tagging it in the link and marking it in the list', async () => {
+    const user = userEvent.setup();
+    visit(`?from=${JITA}&to=${UEDAMA}`);
+
+    await screen.findByRole('table', { name: 'Systems on the route' });
+    await user.click(screen.getByRole('button', { name: /^add stop/i }));
+    await user.type(await systemPickerInput(), 'Crown Ex');
+    await user.click(await screen.findByRole('option', { name: /Crown Exchange/ }));
+
+    expect(stopsInLink()).toBe(`${UEDAMA},${SOBASEKI}:${SOBASEKI_STATION}`);
+    const stops = await screen.findByRole('list', { name: 'Stops, in the order typed' });
+    expect(within(stops).getByText('Crown Exchange')).toBeInTheDocument();
+  });
+
+  it('shows a link’s station stop by name in the stop list and the leg list', async () => {
+    visit(`?from=${JITA}&stops=${UEDAMA}:${UEDAMA_STATION},${SOBASEKI}`);
+
+    const legs = await screen.findByRole('list', { name: 'Itinerary by leg' });
+    expect((await within(legs).findAllByText(/Nova Depot/)).length).toBeGreaterThan(0);
+    expect(
+      within(screen.getByRole('list', { name: 'Stops, in the order typed' })).getByText(
+        'Nova Depot'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('opens a link with a station tag the pilot cannot name as its plain system', async () => {
+    visit(`?from=${JITA}&stops=${UEDAMA}:60000999`);
+
+    await screen.findByRole('table', { name: 'Systems on the route' });
+    expect(
+      within(screen.getByRole('list', { name: 'Stops, in the order typed' })).getByText('Uedama')
+    ).toBeInTheDocument();
   });
 
   it('removes a stop with its row button, and reorders only by the drag handle', async () => {
