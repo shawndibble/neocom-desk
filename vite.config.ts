@@ -497,7 +497,13 @@ export default defineConfig({
             org: process.env.SENTRY_ORG,
             project: process.env.SENTRY_PROJECT,
             authToken: sentryAuthToken,
-            release: { name: release },
+            // `inject: false`: the plugin would prepend `SENTRY_RELEASE={id:<release>}`
+            // to every chunk, and the release carries the commit, so every chunk
+            // was renamed on every deploy whatever the import map does. Sentry
+            // already reads the release from `Sentry.init` (src/instrument.ts),
+            // and the maps match on the per-chunk debug ids, which stay.
+            // TEMP(measure): NEOCOM_SENTRY_INJECT=1 restores today's injection for the count.
+            release: { name: release, inject: process.env.NEOCOM_SENTRY_INJECT === '1' },
             sourcemaps: { filesToDeleteAfterUpload: ['dist/**/*.map'] },
           }),
         ]

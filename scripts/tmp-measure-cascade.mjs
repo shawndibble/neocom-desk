@@ -6,7 +6,10 @@
 //   B0 nothing else changed (a deploy whose only change is the release),
 //   B1 a top-level line appended to src/lib/isk.ts (a leaf ~200 files import),
 //   B2 the same in src/routes/Skills.tsx (one route page),
-//   B3 one string in en.json's lazy `fittings` section.
+//   B3 one string in en.json's lazy `fittings` section (fittings.export.eft).
+// `today` is production as it ships: no map, Sentry injecting the release.
+// The `+sentry` modes run the Sentry plugin as the production deploy does (a
+// fake token aimed at a closed port: the upload fails, the injection is real).
 import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { posix, join } from 'node:path';
@@ -18,11 +21,31 @@ const OUT = process.env.RUNNER_TEMP ?? '/tmp';
 const SHA_A = 'aaaaaaaaaaaa';
 const SHA_B = 'bbbbbbbbbbbb';
 
-function build(label, sha, mapOn) {
-  execFileSync('npx', ['vite', 'build', '--logLevel', 'error'], {
-    stdio: 'inherit',
-    env: { ...process.env, GITHUB_SHA: sha, NEOCOM_CHUNK_IMPORT_MAP: mapOn ? '1' : '0' },
-  });
+const SENTRY = {
+  SENTRY_AUTH_TOKEN: 'sntrys_fake',
+  SENTRY_ORG: 'x',
+  SENTRY_PROJECT: 'y',
+  SENTRY_URL: 'http://127.0.0.1:9/',
+};
+
+function build(label, sha, mapOn, sentry, inject = false) {
+  rmSync('dist', { recursive: true, force: true });
+  try {
+    execFileSync('npx', ['vite', 'build', '--logLevel', 'error'], {
+      stdio: 'inherit',
+      timeout: 300_000,
+      env: {
+        ...process.env,
+        ...(sentry ? SENTRY : {}),
+        GITHUB_SHA: sha,
+        NEOCOM_SENTRY_INJECT: inject ? '1' : '0',
+        NEOCOM_CHUNK_IMPORT_MAP: mapOn ? '1' : '0',
+      },
+    });
+  } catch (error) {
+    if (!sentry || !existsSync('dist/lazy-chunks.json')) throw error;
+    console.log(`(${label}: build exited ${error.status} after writing dist, the fake upload)`);
+  }
   const dir = join(OUT, label);
   rmSync(dir, { recursive: true, force: true });
   cpSync('dist', dir, { recursive: true });
@@ -43,7 +66,7 @@ function report(mode, a, b) {
   const gz = changed.reduce((n, f) => n + gzipSync(b.assets[f]).length, 0);
   const lazyChanged = changed.filter((f) => b.lazy.has(f)).length;
   console.log(
-    `${mode.padEnd(4)} ${b.label.padEnd(24)} changed ${String(changed.length).padStart(4)} of ${Object.keys(b.assets).length}` +
+    `${mode.padEnd(10)} ${b.label.padEnd(24)} changed ${String(changed.length).padStart(4)} of ${Object.keys(b.assets).length}` +
       ` (lazy ${lazyChanged} of ${b.lazy.size}, boot ${changed.length - lazyChanged}) ${kb(raw)} raw / ${kb(gz)} gzip`
   );
   return changed.length;
@@ -119,37 +142,34 @@ function append(file) {
 function editLocale() {
   const file = 'src/i18n/locales/en.json';
   const en = JSON.parse(readFileSync(file, 'utf8'));
-  const visit = (node) => {
-    for (const k of Object.keys(node)) {
-      if (typeof node[k] === 'string') {
-        node[k] += ' (probe)';
-        return true;
-      }
-      if (node[k] && typeof node[k] === 'object' && visit(node[k])) return true;
-    }
-    return false;
-  };
-  visit(en.fittings);
+  en.fittings.export.eft += ' (probe)';
   writeFileSync(file, `${JSON.stringify(en, null, 2)}\n`);
 }
 const restore = () => execFileSync('git', ['checkout', '--', 'src'], { stdio: 'inherit' });
 
 let failures = 0;
 const summary = [];
-for (const mapOn of [false, true]) {
-  const mode = mapOn ? 'on' : 'off';
+const modes = [
+  ['today', false, true, true],
+  ['off', false, false],
+  ['on', true, false],
+  ['off+sentry', false, true],
+  ['on+sentry', true, true],
+];
+for (const [mode, mapOn, sentry, inject] of modes) {
   restore();
-  const a = build(`${mode}-A`, SHA_A, mapOn);
+  const a = build(`${mode}-A`, SHA_A, mapOn, sentry, inject);
   if (mapOn) failures += checkImportMapBuild(a);
-  for (const [label, edit] of edits) {
+  for (const [label, edit] of sentry ? edits.slice(0, 2) : edits) {
     restore();
     edit();
-    const b = build(`${mode}-${label.replace(/\W+/g, '-')}`, SHA_B, mapOn);
+    const b = build(`${mode}-${label.replace(/\W+/g, '-')}`, SHA_B, mapOn, sentry, inject);
     b.label = label;
     summary.push([mode, label, report(mode, a, b)]);
   }
 }
 restore();
 console.log('\nsummary (changed chunk files vs build A):');
-for (const [mode, label, n] of summary) console.log(`  ${mode.padEnd(4)} ${label.padEnd(26)} ${n}`);
+for (const [mode, label, n] of summary)
+  console.log(`  ${mode.padEnd(10)} ${label.padEnd(26)} ${n}`);
 process.exit(failures > 0 ? 1 : 0);
