@@ -3843,7 +3843,7 @@
       "corp": {
         "tab": "Corporation",
         "board": "The Corp Board is a board of widgets you pick and size: deadlines, structure fuel, moon chunks, jobs, wallet, members and more.",
-        "pages": "Corp Members, Corp Wallet and Corp Assets each have their own page, with role audits and Stock Targets.",
+        "pages": "Members, Corp Wallet and Corp Assets each have their own page, with role audits and Stock Targets.",
         "moons": "Moons keeps the Corp Tax Book: what each corp member mined at your refineries, their Statements, and what is paid.",
         "access": "SRP lets a pilot file a claim from their own killmail. Officer pages appear only with a Corp Role, and corporation data is a separate grant."
       },
