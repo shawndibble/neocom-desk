@@ -104,7 +104,6 @@ describe('PlanResult', () => {
           haulerOverride={undefined}
           onPickHauler={vi.fn()}
           onBack={vi.fn()}
-          onDone={vi.fn()}
           onPackShip={vi.fn()}
           onUnpackShip={vi.fn()}
           rigsOf={() => 0}
@@ -145,7 +144,6 @@ describe('PlanResult', () => {
           haulerOverride={undefined}
           onPickHauler={vi.fn()}
           onBack={vi.fn()}
-          onDone={vi.fn()}
           onPackShip={vi.fn()}
           onUnpackShip={vi.fn()}
           rigsOf={() => 0}
@@ -209,7 +207,6 @@ describe('PlanResult', () => {
           haulerOverride={undefined}
           onPickHauler={vi.fn()}
           onBack={vi.fn()}
-          onDone={vi.fn()}
           onPackShip={vi.fn()}
           onUnpackShip={vi.fn()}
           rigsOf={() => 0}
@@ -257,7 +254,6 @@ describe('PlanResult', () => {
           haulerOverride={undefined}
           onPickHauler={vi.fn()}
           onBack={vi.fn()}
-          onDone={vi.fn()}
           onPackShip={vi.fn()}
           onUnpackShip={vi.fn()}
           rigsOf={() => 0}
@@ -315,7 +311,6 @@ describe('PlanResult', () => {
           haulerOverride={undefined}
           onPickHauler={vi.fn()}
           onBack={vi.fn()}
-          onDone={vi.fn()}
           onPackShip={vi.fn()}
           onUnpackShip={onUnpackShip}
           rigsOf={() => 0}
@@ -354,7 +349,6 @@ describe('PlanResult', () => {
             haulerOverride={undefined}
             onPickHauler={vi.fn()}
             onBack={vi.fn()}
-            onDone={vi.fn()}
             onPackShip={onPackShip}
             onUnpackShip={vi.fn()}
             rigsOf={() => rigs}
@@ -461,7 +455,6 @@ describe('PlanResult', () => {
             haulerOverride={undefined}
             onPickHauler={vi.fn()}
             onBack={vi.fn()}
-            onDone={vi.fn()}
             onPackShip={vi.fn()}
             onUnpackShip={vi.fn()}
             rigsOf={() => 0}
@@ -526,7 +519,6 @@ describe('PlanResult', () => {
             haulerOverride={undefined}
             onPickHauler={vi.fn()}
             onBack={vi.fn()}
-            onDone={vi.fn()}
             onPackShip={() => setPacked(true)}
             onUnpackShip={() => setPacked(false)}
             rigsOf={() => rigs}
@@ -578,7 +570,6 @@ describe('PlanResult', () => {
           haulerOverride={undefined}
           onPickHauler={vi.fn()}
           onBack={vi.fn()}
-          onDone={vi.fn()}
           onShowRoute={onShowRoute}
           onPackShip={vi.fn()}
           onUnpackShip={vi.fn()}

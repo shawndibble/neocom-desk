@@ -7334,7 +7334,6 @@
       "packAnyway": "Pack anyway",
       "dontRemind": "Don't remind me again",
       "back": "Back",
-      "done": "Done",
       "nothingToMove": "Nothing to move",
       "nothingToMoveHint": "Everything you picked is already at the destination.",
       "haulHeading": "Haul {{n}} of {{total}}",

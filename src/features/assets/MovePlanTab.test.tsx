@@ -157,7 +157,7 @@ describe('MovePlanTab', () => {
     await user.click(screen.getByRole('button', { name: 'Pick a system' }));
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
 
-    expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: /^Route Safety/ })).toBeNull();
   });
 
@@ -167,6 +167,51 @@ describe('MovePlanTab', () => {
     await user.click(screen.getByRole('button', { name: 'Pick a system' }));
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
   }
+
+  function openAt(entry: string) {
+    render(
+      <MemoryRouter initialEntries={[entry]}>
+        <MovePlanTab onClose={() => {}} characterIds={[1]} activeCharacterId={1} />
+      </MemoryRouter>
+    );
+  }
+
+  it('rebuilds the plan from a link that names it', async () => {
+    openAt(`/?mv=${encodeURIComponent('1:60003760:34:loose')}&mvd=s30002187`);
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /Jita 4-4/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Show plan' })).toBeNull();
+  });
+
+  it.each([
+    [
+      'a stack this pilot does not hold',
+      `mv=${encodeURIComponent('1:999:34:loose')}&mvd=s30002187`,
+    ],
+    ['an unreadable selection', 'mv=nonsense&mvd=s30002187'],
+    ['no destination', `mv=${encodeURIComponent('1:60003760:34:loose')}`],
+  ])('opens the empty planner for a link with %s', async (_, query) => {
+    openAt(`/?${query}`);
+    expect(await screen.findByRole('button', { name: 'Show plan' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+  });
+
+  it('returns to the picker, ticks kept, when Back leaves the plan', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MovePlanTab onClose={() => {}} characterIds={[1]} activeCharacterId={1} />
+      </MemoryRouter>
+    );
+    await screen.findByText('Alice');
+    await user.click(screen.getByRole('checkbox', { name: /select everything at amarr viii/i }));
+    await user.click(screen.getByRole('button', { name: 'Pick a system' }));
+    await user.click(screen.getByRole('button', { name: 'Show plan' }));
+    await user.click(await screen.findByRole('button', { name: 'Back' }));
+
+    expect(await screen.findByRole('button', { name: 'Show plan' })).toBeTruthy();
+    expect(screen.getByText(/^2 stacks · /)).toBeTruthy();
+  });
 
   it('blames the missing hauler data, not the pilot, when the catalogue could not be loaded', async () => {
     hullData.catalogueFailed = true;
@@ -198,7 +243,7 @@ describe('MovePlanTab', () => {
     await user.click(screen.getByRole('button', { name: 'Pick a system' }));
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
 
-    expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Amarr VIII/ })).toBeTruthy();
   });
 
@@ -208,12 +253,12 @@ describe('MovePlanTab', () => {
     await user.click(screen.getByRole('button', { name: 'Pick a system' }));
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
 
-    expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
     expect(screen.queryByText('Edit items or destination')).toBeNull();
     expect(screen.getAllByRole('button', { name: 'Back' })).toHaveLength(1);
     expect(screen.queryByRole('link', { name: /^Route Safety/ })).toBeNull();
     expect(screen.getByRole('heading', { name: /Amarr VIII/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
   });
 
   it('marks stacks at the destination, unticks them and keeps them out of the plan', async () => {
@@ -241,7 +286,7 @@ describe('MovePlanTab', () => {
     expect(amarr.getAttribute('aria-pressed')).toBe('true');
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
 
-    expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
     expect(screen.getByText('Deliver everything here')).toBeTruthy();
   });
 
