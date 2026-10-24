@@ -339,37 +339,64 @@ describe('preloadGraphSignature', () => {
 });
 
 describe('shellChunkGroups', () => {
-  // main → app; Layout → nav → [app, card]; Overview → widget → card;
-  // SharedLink → card.
+  // Static: main → app; Layout → nav → [app, card]; Overview → widget →
+  // [card, chart, badge]; SharedLink → card; ShareView → chart;
+  // InfoModal → badge; Market → widget.
+  // import(): main → [Layout, Overview, Market, InfoModal]; SharedLink → ShareView.
   const graph: Record<string, string[]> = {
     main: ['app'],
     app: [],
     Layout: ['nav'],
     nav: ['app', 'card'],
     Overview: ['widget'],
-    widget: ['card', 'chart'],
+    widget: ['card', 'chart', 'badge'],
     card: ['format'],
     format: [],
     chart: [],
+    badge: [],
     SharedLink: ['card'],
+    ShareView: ['chart'],
+    InfoModal: ['badge'],
+    Market: ['widget'],
   };
-  const groups = (publicRoots: string[] = ['SharedLink']) =>
+  const dynamicGraph: Record<string, string[]> = {
+    main: ['Layout', 'Overview', 'Market', 'InfoModal'],
+    SharedLink: ['ShareView'],
+  };
+  const groups = (publicRoots: string[] = ['SharedLink'], dynamic = dynamicGraph) =>
     shellChunkGroups({
       entries: ['main'],
       shellRoots: ['Layout', 'Overview'],
       publicRoots,
+      routeModules: ['Layout', 'Overview', 'Market'],
       importedIds: (id) => graph[id],
+      dynamicallyImportedIds: (id) => dynamic[id],
     });
 
   it("is the shell's static closure, less what the entry already reaches and the shell modules themselves", () => {
-    const { shell } = groups([]);
-    expect([...shell].sort()).toEqual(['card', 'chart', 'format', 'nav', 'widget']);
+    const { shell, publicShared, entryLazy } = groups([], {});
+    expect([...shell].sort()).toEqual(['badge', 'card', 'chart', 'format', 'nav', 'widget']);
+    expect(publicShared.size + entryLazy.size).toBe(0);
   });
 
   it('moves what a public route shares with the shell into its own group, so the route never loads the shell chunk', () => {
-    const { shell, publicShared } = groups();
+    const { shell, publicShared } = groups(['SharedLink'], {});
     expect([...publicShared].sort()).toEqual(['card', 'format']);
-    expect([...shell].sort()).toEqual(['chart', 'nav', 'widget']);
+    expect([...shell].sort()).toEqual(['badge', 'chart', 'nav', 'widget']);
+  });
+
+  it("counts what a public route loads by import() as the route's too", () => {
+    const { shell, publicShared } = groups(['SharedLink'], { SharedLink: ['ShareView'] });
+    expect([...publicShared].sort()).toEqual(['card', 'chart', 'format']);
+    expect([...shell].sort()).toEqual(['badge', 'nav', 'widget']);
+  });
+
+  it('keeps what the entry reaches by import() apart, short of the signed-in routes, so an info modal on /login never loads the shell', () => {
+    const { shell, publicShared, entryLazy } = groups(['SharedLink'], dynamicGraph);
+    // badge: InfoModal's. Not widget: only Market (a signed-in route) and Overview reach it.
+    expect([...entryLazy]).toEqual(['badge']);
+    expect([...publicShared].sort()).toEqual(['card', 'chart', 'format']);
+    expect([...shell].sort()).toEqual(['nav', 'widget']);
   });
 
   it('treats a module the bundler does not know as importing nothing', () => {
@@ -377,7 +404,9 @@ describe('shellChunkGroups', () => {
       entries: ['main'],
       shellRoots: ['Layout'],
       publicRoots: [],
+      routeModules: [],
       importedIds: (id) => (id === 'Layout' ? ['ghost'] : undefined),
+      dynamicallyImportedIds: () => undefined,
     });
     expect([...shell]).toEqual(['ghost']);
   });
@@ -391,6 +420,7 @@ describe('throughBarrel', () => {
     '/src/routes/Odd.tsx': [barrel],
     '/src/routes/Star.tsx': [barrel],
     '/src/routes/Relative.tsx': [barrel],
+    '/src/routes/Typed.tsx': [barrel],
   };
   const code: Record<string, string> = {
     [barrel]:
@@ -400,12 +430,16 @@ describe('throughBarrel', () => {
     '/src/routes/Odd.tsx': 'import { Missing } from "@/components/ui";\n',
     '/src/routes/Star.tsx': 'import * as UI from "@/components/ui";\n',
     '/src/routes/Relative.tsx': 'import { Button } from "../components/ui";\n',
+    '/src/routes/Typed.tsx':
+      'import type { Props } from "@/components/ui";\nimport { type Variant, DataTable } from "@/components/ui";\n',
   };
+  const fellBack: string[] = [];
   const precise = throughBarrel({
     barrel,
     specifier: '@/components/ui',
     importedIds: (id) => ids[id],
     code: (id) => code[id],
+    onFallback: (id) => fellBack.push(id),
   });
 
   it('replaces the barrel with the modules that declare the names imported through it', () => {
@@ -419,6 +453,15 @@ describe('throughBarrel', () => {
     expect(precise('/src/routes/Odd.tsx')).toEqual([barrel]);
     expect(precise('/src/routes/Star.tsx')).toEqual([barrel]);
     expect(precise('/src/routes/Relative.tsx')).toEqual([barrel]);
+    expect(fellBack).toEqual([
+      '/src/routes/Odd.tsx',
+      '/src/routes/Star.tsx',
+      '/src/routes/Relative.tsx',
+    ]);
+  });
+
+  it('skips type-only imports, which load no module', () => {
+    expect(precise('/src/routes/Typed.tsx')).toEqual(['/src/components/ui/DataTable.tsx']);
   });
 
   it('passes every other module through', () => {
@@ -433,20 +476,32 @@ describe('PUBLIC_ROUTE_SUFFIXES', () => {
   it('names every lazy route App.tsx renders outside the signed-in shell, so none loads the shell chunk', () => {
     const app = source('src/app/App.tsx');
     const chunks = source('src/app/routeChunks.ts');
-    const modules = [...app.matchAll(/<Route\s+path="[^"]+"\s+element=\{<(\w+)\s*\/>\}/g)]
-      .map(
-        ([, element]) =>
-          app.match(new RegExp(`const ${element} = lazy\\(routeChunks\\.(\\w+)\\)`))?.[1]
-      )
-      .filter((loader): loader is string => loader !== undefined)
-      .map((loader) => {
-        const target = chunks.match(
-          new RegExp(`export const ${loader} = named\\(\\s*\\(\\) => import\\('@/([^']+)'\\)`)
-        )?.[1];
-        if (!target) throw new Error(`no import() for routeChunks.${loader}`);
-        return `/src/${target}.tsx`;
-      });
-    expect(modules.length).toBeGreaterThan(0);
+    // Every literal-path <Route> is outside the shell (the shell's are
+    // `path={…}`). Each must parse, and its element must be either in the
+    // entry (a static import or a function here) or a routeChunks loader:
+    // a shape this cannot read fails rather than dropping out of the check.
+    const literal = app.match(/<Route\s+path="/g)?.length ?? 0;
+    const parsed = [...app.matchAll(/<Route\s+path="[^"]+"\s+element=\{<(\w+)\s*\/>\}\s*\/>/g)];
+    expect(literal).toBeGreaterThan(0);
+    expect(parsed.length, 'a literal-path <Route> this test cannot read').toBe(literal);
+    const modules = parsed.flatMap(([, element]) => {
+      const loader = app.match(
+        new RegExp(`const ${element} = lazy\\(routeChunks\\.(\\w+)\\)`)
+      )?.[1];
+      if (!loader) {
+        const inEntry =
+          new RegExp(`^import \\{[^}]*\\b${element}\\b[^}]*\\} from`, 'm').test(app) ||
+          new RegExp(`^function ${element}\\(`, 'm').test(app);
+        if (!inEntry)
+          throw new Error(`${element} is neither a routeChunks loader nor in the entry`);
+        return [];
+      }
+      const target = chunks.match(
+        new RegExp(`export const ${loader} = named\\(\\s*\\(\\) => import\\('@/([^']+)'\\)`)
+      )?.[1];
+      if (!target) throw new Error(`no import() for routeChunks.${loader}`);
+      return [`/src/${target}.tsx`];
+    });
     expect([...new Set(modules)].sort()).toEqual([...PUBLIC_ROUTE_SUFFIXES].sort());
   });
 });
