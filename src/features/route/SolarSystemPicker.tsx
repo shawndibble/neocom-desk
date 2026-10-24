@@ -20,9 +20,10 @@ import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
-import { rankedSearch } from '@/lib/rankedSearch';
-import type { SolarSystemEntry } from '@/sde/marketTypes';
-import { useSolarSystemList, useSystemName } from './useSolarSystems';
+import type { PickedStation } from '@/features/places/placeSearch';
+import { useKnownPlaces } from '@/features/places/useKnownPlaces';
+import { buildPickerOptions, pickedStationOf, type PickerOption } from './pickerOptions';
+import { useSolarSystemIndex, useSolarSystemList, useSystemName } from './useSolarSystems';
 
 const MATCH_LIMIT = 8;
 
@@ -30,7 +31,8 @@ const NAV_KEYS: readonly string[] = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
 
 export interface SolarSystemPickerProps {
   value: number | null;
-  onChange: (systemId: number) => void;
+  /** `station` is set when a station or structure was picked: `systemId` is its system. */
+  onChange: (systemId: number, station?: PickedStation) => void;
   /** The trigger's accessible name. */
   ariaLabel: string;
   /** What the trigger shows; defaults to the picked system's name, or `placeholder`. */
@@ -48,6 +50,8 @@ export interface SolarSystemPickerProps {
   showSecurity?: boolean;
   /** The trigger button, for a caller handing focus to it. */
   triggerRef?: Ref<HTMLButtonElement>;
+  /** Also search stations and known structures, not only systems (issue #4964). */
+  places?: boolean;
 }
 
 export function SolarSystemPicker({
@@ -62,6 +66,7 @@ export function SolarSystemPicker({
   exclude,
   showSecurity = false,
   triggerRef,
+  places = false,
 }: SolarSystemPickerProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -76,15 +81,21 @@ export function SolarSystemPicker({
   );
   const valueName = useSystemName(triggerLabel === undefined ? value : null);
 
+  const systemIndex = useSolarSystemIndex();
+  const placeHits = useKnownPlaces(query, places && open, MATCH_LIMIT);
   const matches = useMemo(
     () =>
       systems
-        ? rankedSearch(exclude?.size ? systems.filter((s) => !exclude.has(s.id)) : systems, query, {
-            primary: (s) => s.name,
-            limit: MATCH_LIMIT,
-          })
+        ? buildPickerOptions(
+            systems,
+            query,
+            exclude,
+            placeHits,
+            (id) => systemIndex?.get(id)?.security ?? null,
+            MATCH_LIMIT
+          )
         : [],
-    [systems, query, exclude]
+    [systems, query, exclude, placeHits, systemIndex]
   );
 
   function close() {
@@ -93,8 +104,8 @@ export function SolarSystemPicker({
     setHighlight(null);
   }
 
-  function choose(system: SolarSystemEntry) {
-    onChange(system.id);
+  function choose(option: PickerOption) {
+    onChange(option.systemId, pickedStationOf(option));
     close();
   }
 
@@ -161,9 +172,9 @@ export function SolarSystemPicker({
           )}
           {matches.length > 0 && (
             <ul id={listId} role="listbox" className="flex flex-col">
-              {matches.map((system, index) => (
+              {matches.map((option, index) => (
                 <li
-                  key={system.id}
+                  key={option.key}
                   id={`${listId}-${index}`}
                   role="option"
                   aria-selected={index === highlight}
@@ -172,10 +183,17 @@ export function SolarSystemPicker({
                     index === highlight && `bg-panel-2 ${activeOptionClassName}`
                   )}
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => choose(system)}
+                  onClick={() => choose(option)}
                 >
-                  {system.name}
-                  {showSecurity && <SecurityStatus security={system.security} className="ml-1" />}
+                  {option.name}
+                  {showSecurity && option.security !== null && (
+                    <SecurityStatus security={option.security} className="ml-1" />
+                  )}
+                  {places && (
+                    <span className="ml-2 text-xs text-text-dim">
+                      {t(`travel.stops.kind.${option.kind}`)}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>

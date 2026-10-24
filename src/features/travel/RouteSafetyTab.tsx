@@ -72,6 +72,7 @@ import {
 } from '@/components/ui';
 import type { RouteSafetyRow, RouteSafetySummary } from '@/engine/route/routeSafety';
 import type { TheraConnection } from '@/engine/route/theraConnections';
+import { parseStopRefs, serializeStopRefs, type StopRef } from '@/engine/route/stopRef';
 import { MAX_STOPS } from '@/engine/route/tripPlan';
 import { useAvoidedSystems } from '@/features/route/avoidedSystems';
 import { useCurrentSystem } from '@/features/route/currentSystem';
@@ -110,6 +111,7 @@ import { pinFirstLeg, ROUTE_PARAMS } from '@/features/route/routeSafetyLink';
 import { routeSystemName } from './routeSystemName';
 import { SetWaypoints } from './SetWaypoints';
 import { StopsPanel, type StopOrderSettings } from './StopsPanel';
+import { useStationLabels } from './useStationLabels';
 import { TripLegs } from './TripLegs';
 import { useRouteHoles, type RouteHolesState } from '@/features/route/useRouteHoles';
 import { sameSavedRoute, useSavedRoute } from './savedRoute';
@@ -129,10 +131,17 @@ const HOLE_PARAM = {
 
 const NO_HOLES: readonly TheraConnection[] = [];
 
-/** The stops a link names: `stops`, else a legacy `to`, each once, at most `MAX_STOPS`. */
-function stopsFromLink(stops: readonly number[], to: number | null): number[] {
-  const named = stops.length > 0 ? stops : to === null ? [] : [to];
-  return [...new Set(named)].slice(0, MAX_STOPS);
+/** The stops a link names: `stops`, else a legacy `to`, each system once (its first station), at most `MAX_STOPS`. */
+function stopsFromLink(stops: readonly StopRef[], to: number | null): StopRef[] {
+  const named = stops.length > 0 ? stops : to === null ? [] : [{ systemId: to, stationId: null }];
+  const seen = new Set<number>();
+  const unique: StopRef[] = [];
+  for (const stop of named) {
+    if (seen.has(stop.systemId)) continue;
+    seen.add(stop.systemId);
+    unique.push(stop);
+  }
+  return unique.slice(0, MAX_STOPS);
 }
 
 /**
@@ -245,8 +254,16 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
   const fromIsCurrent = params.from === null && current.systemId !== null;
   const fromName = useSystemName(fromId);
   const systems = useSolarSystemIndex();
-  const stopsKey = stopsFromLink(params.stops, params.to).join(',');
+  const refsKey = serializeStopRefs(stopsFromLink(params.stops, params.to)) ?? '';
+  const stopRefs = useMemo(() => parseStopRefs(refsKey), [refsKey]);
+  // Routing sees systems only: a station is a label on its stop.
+  const stopsKey = stopRefs.map((stop) => stop.systemId).join(',');
   const stops = useMemo(() => (stopsKey === '' ? [] : stopsKey.split(',').map(Number)), [stopsKey]);
+  const stationIds = useMemo(
+    () => stopRefs.flatMap((stop) => (stop.stationId === null ? [] : [stop.stationId])),
+    [stopRefs]
+  );
+  const { labels: stationLabels, remember: rememberStation } = useStationLabels(stationIds);
   const settings: StopOrderSettings = {
     optimize: params.opt,
     returnToStart: params.ret,
@@ -351,7 +368,11 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
   const routeToIncursion = (systemId: number) => {
     if (incursionRouteAction(systemId) !== 'add') return;
     setParams(
-      { stops: [...stops, systemId], to: null, ...(stops.length > 0 ? { pin: [] } : {}) },
+      {
+        stops: [...stopRefs, { systemId, stationId: null }],
+        to: null,
+        ...(stops.length > 0 ? { pin: [] } : {}),
+      },
       { push: true }
     );
     focusStopsOnChange.current = true;
@@ -373,8 +394,12 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
       : fromIsCurrent
         ? t('travel.currentSystem', { system: fromName ?? '…' })
         : (fromName ?? '…');
-  const nameOf = (systemId: number) =>
-    systems?.get(systemId)?.name ?? t('travel.stops.unnamed', { id: systemId });
+  const stationOf = new Map(stopRefs.map((stop) => [stop.systemId, stop.stationId]));
+  const nameOf = (systemId: number) => {
+    const stationId = stationOf.get(systemId);
+    const station = stationId == null ? undefined : stationLabels.get(stationId);
+    return station ?? systems?.get(systemId)?.name ?? t('travel.stops.unnamed', { id: systemId });
+  };
   const orderNote =
     state.kind === 'route' && state.reordered
       ? t('travel.stops.orderChanged', {
@@ -403,8 +428,9 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
             fromTrigger={fromTrigger}
             // A new start is a new first leg: its pin no longer applies.
             onFromChange={(systemId) => setParams({ from: systemId, pin: [] }, { push: true })}
-            stops={stops}
-            onStopsChange={(next) => {
+            stops={stopRefs}
+            onStopsChange={(next, picked) => {
+              if (picked) rememberStation(picked.id, picked.name);
               setParams(
                 // Pins belong to legs by position: a new stop list drops them,
                 // but the first stop keeps the pin a hole's Use in route made for it.
@@ -431,7 +457,7 @@ export function RouteSafetyTab({ tabBar, tabsId }: TravelTabProps) {
                 current={current}
                 taken={takenSystems}
                 onPick={(systemId) => {
-                  setParams({ stops: [systemId], to: null }, { push: true });
+                  setParams({ stops: [{ systemId, stationId: null }], to: null }, { push: true });
                   focusStopsOnChange.current = true;
                 }}
               />
