@@ -85,13 +85,10 @@ export function BuildStrategySelect({
 // growing it into the responsive scale it was never a target on.
 // `HintText` draws the dotted underline + `cursor-help` (DESIGN.md §6c); the
 // chip stays a neutral tone because accent text would read as clickable.
-const ACTIVE_CLASSES =
-  'inline-flex h-7 shrink-0 items-center rounded-xs bg-accent/15 px-2 text-[0.6875rem] font-semibold tracking-widest text-text uppercase';
-// No `opacity-*`: it read as inactive well enough already (grey border + dim
-// text vs. the accent chip beside it) without also taking the text below
-// AA (issue #1491 — the faded chip was 3.2:1, `text-dim` alone is 6.6:1).
-const RESERVED_CLASSES =
-  'inline-flex h-7 shrink-0 items-center rounded-xs bg-panel-2 px-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
+// Plain dim text, not a chip (DESIGN.md §6c, one meaning per cue): a filled
+// uppercase pill beside the strategy select read as a toggle, and clicking it
+// did nothing. The dotted underline is the only cue it needs: it has a tooltip.
+const SCOPE_TEXT_CLASSES = 'shrink-0 text-xs text-text-dim';
 
 interface CraftScopeChipsProps {
   /**
@@ -132,9 +129,11 @@ export function CraftScopeChips({ scope }: CraftScopeChipsProps) {
             ? t('industry.craftScopeReactionsEnabledHint')
             : t('industry.craftScopeReactionsDisabledHint')
         }
-        className={reactionsEligible ? ACTIVE_CLASSES : RESERVED_CLASSES}
+        className={SCOPE_TEXT_CLASSES}
       >
-        {t('industry.craftScopeReactions')}
+        {reactionsEligible
+          ? t('industry.craftScopeReactionsIncluded')
+          : t('industry.craftScopeReactionsExcluded')}
       </HintText>
     </span>
   );

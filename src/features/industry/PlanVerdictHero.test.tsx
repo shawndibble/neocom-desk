@@ -7,6 +7,7 @@ import '@/i18n';
 import type { BuildResult } from '@/engine/industry/types';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { PlanVerdictHero } from './PlanVerdictHero';
+import { profitOnBasis } from '@/engine/industry/profitBasis';
 import type { BreakdownContext } from './CalculationBreakdown';
 import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
 import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
@@ -48,6 +49,18 @@ const RESULT: BuildResult = {
   recommendation: 'build',
 };
 
+/** The plan's own figures (owned materials free), as the page computes them. */
+function figuresFor(result: BuildResult, unitPrice: number | null = 100) {
+  return profitOnBasis('free', {
+    result,
+    ownedSellNet: null,
+    productQuantity: 10,
+    productUnitPrice: unitPrice,
+    accountingLevel: 0,
+    brokerRelationsLevel: 0,
+  });
+}
+
 type HeroOverrides = Partial<
   Omit<Parameters<typeof PlanVerdictHero>[0], 'breakdownOpen' | 'onBreakdownOpenChange'>
 >;
@@ -63,13 +76,15 @@ function Harness({
   ...overrides
 }: HeroOverrides & { openBreakdown?: boolean } = {}) {
   const [breakdownOpen, setBreakdownOpen] = useState(openBreakdown);
+  const result = overrides.result ?? RESULT;
   return (
     <PlanVerdictHero
-      result={RESULT}
+      result={result}
+      figures={figuresFor(result)}
+      basis={null}
       pricesReady={true}
       pricesLoading={false}
       productName="Rifter"
-      runs={10}
       breakdown={BREAKDOWN}
       onLogProduction={vi.fn()}
       {...overrides}
@@ -109,28 +124,29 @@ function itemActionsFor(typeId: number) {
   );
 }
 
-describe('PlanVerdictHero: verdict labels and prose', () => {
-  it('labels the Acquisition Verdict and Sale Profitability statements separately', () => {
+describe('PlanVerdictHero: one verdict, one figure', () => {
+  it('states the verdict as a labelled pill and the profit as the one large figure', () => {
     renderHero();
-    expect(screen.getByText('Acquisition Verdict')).toBeInTheDocument();
-    expect(screen.getByText('Sale Profitability')).toBeInTheDocument();
+    expect(screen.getByText('Verdict')).toHaveClass('sr-only');
+    expect(screen.getByText('Build')).toBeInTheDocument();
+    expect(screen.getByText('Profit')).toHaveClass('sr-only');
+    // Shorthand on the face, the exact figure in the accessible name.
+    expect(screen.getByText('435 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
-  it('states Sale Profitability as the one large figure, distinct from the Acquisition Verdict', () => {
-    renderHero();
-    expect(screen.getByText('BUILD saves 435 ISK')).toBeInTheDocument();
-    // The figure is the statement; no pill restates it.
-    expect(screen.getByText('Sale Profitability').parentElement).toHaveTextContent('435 ISK');
-    expect(screen.queryByText(/Selling profits/)).not.toBeInTheDocument();
+  it('calls a profit with little room under the market price a close call', () => {
+    renderHero({ figures: { ...figuresFor(RESULT), verdict: 'closeCall', headroomPct: 2.5 } });
+    expect(screen.getByText('Build — close call')).toBeInTheDocument();
+    expect(screen.getByText('2.5% under market')).toHaveClass('text-warning');
   });
 
-  it('keeps the figure signed when profit is negative, independent of the Acquisition Verdict', () => {
-    renderHero({ result: { ...RESULT, profit: -50, grossProfit: 460 } });
-    expect(screen.getByText('BUILD saves 435 ISK')).toBeInTheDocument();
-    expect(screen.getByText('Sale Profitability').parentElement).toHaveTextContent('-50 ISK');
+  it('keeps the figure signed and says it loses money when profit is negative', () => {
+    renderHero({ result: { ...RESULT, profit: -50 } });
+    expect(screen.getByText('Loses money')).toBeInTheDocument();
+    expect(screen.getByText('Profit').parentElement).toHaveTextContent('-50 ISK');
   });
 
-  it('shows Sale Profitability and Acquisition Verdict unknown states independently when unpriced', () => {
+  it('has no verdict and says so when unpriced', () => {
     renderHero({
       result: {
         ...RESULT,
@@ -149,15 +165,40 @@ describe('PlanVerdictHero: verdict labels and prose', () => {
         unpriceable: true,
         recommendation: 'unknown',
       },
-      pricesReady: true,
     });
-
-    expect(
-      screen.getByText('Not enough price data for a build-vs-buy verdict.')
-    ).toBeInTheDocument();
-    // The figure has nothing to state, so the qualifier line says so instead.
+    expect(screen.queryByText('Verdict')).not.toBeInTheDocument();
     expect(screen.getByText('No price data yet')).toBeInTheDocument();
-    expect(screen.queryByText(/sale profitability\./)).not.toBeInTheDocument();
+  });
+
+  it('states margin, ISK/hour and break-even beside the figure', () => {
+    renderHero();
+    expect(screen.getByText('Margin').nextElementSibling).toHaveTextContent('77.0%');
+    expect(screen.getByText('ISK/hour')).toBeInTheDocument();
+    expect(screen.getByText('Break-even')).toBeInTheDocument();
+    expect(screen.getByText('7.5% under market')).toBeInTheDocument();
+  });
+});
+
+describe('PlanVerdictHero: how owned materials are counted', () => {
+  it('says only "profit after fees" when the plan uses no owned materials', () => {
+    renderHero();
+    expect(screen.getByText('profit after fees')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'sell value' })).not.toBeInTheDocument();
+  });
+
+  it('names the comparison and flips the basis in place', async () => {
+    const onBasisChange = vi.fn();
+    renderHero({ basis: 'sellValue', onBasisChange });
+    expect(screen.getByText(/more than selling your materials, counted at/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'sell value' }));
+    expect(onBasisChange).toHaveBeenCalledWith('free');
+  });
+
+  it('flips back from free', async () => {
+    const onBasisChange = vi.fn();
+    renderHero({ basis: 'free', onBasisChange });
+    await userEvent.click(screen.getByRole('button', { name: 'free' }));
+    expect(onBasisChange).toHaveBeenCalledWith('sellValue');
   });
 });
 
@@ -169,16 +210,11 @@ describe('PlanVerdictHero: unreachable price source', () => {
   });
 });
 
-describe('PlanVerdictHero: the big profit figure and qualifier line', () => {
-  it('shows net profit as the big figure', () => {
-    renderHero();
-    // Shorthand on the face, the exact figure in the accessible name.
-    expect(screen.getByText('435 ISK', { selector: '.sr-only' })).toBeInTheDocument();
-  });
-
-  it('states the margin in the qualifier line', () => {
-    renderHero();
-    expect(screen.getByText(/77\.0% margin/)).toBeInTheDocument();
+describe('PlanVerdictHero: runs and setup', () => {
+  it('renders the runs control in the title row and the setup strip as its footer', () => {
+    renderHero({ runsControl: <input aria-label="Runs" />, footer: <span>Setup line</span> });
+    expect(screen.getByRole('textbox', { name: 'Runs' })).toBeInTheDocument();
+    expect(screen.getByText('Setup line')).toBeInTheDocument();
   });
 });
 
@@ -349,7 +385,7 @@ describe('PlanVerdictHero reaction location warning (issue #2908)', () => {
   it('replaces BUILD with the warning, strikes the profit, keeps Log production enabled', () => {
     renderHero({ locationBlock: block(null) });
     expect(screen.getByText("Can't run as planned")).toBeInTheDocument();
-    expect(screen.queryByText(/^BUILD saves/)).toBeNull();
+    expect(screen.queryByText('Build')).toBeNull();
     expect(screen.getByRole('button', { name: /log production/i })).toBeEnabled();
     expect(screen.getByRole('status')).toHaveTextContent(/highsec/);
   });
@@ -376,7 +412,7 @@ describe('PlanVerdictHero reaction location warning (issue #2908)', () => {
 });
 
 describe('PlanVerdictHero 90-day median note', () => {
-  it('ends the qualifier line with an amber note when the sell price is 20% or more above its median', () => {
+  it('adds an amber note under the figure when the sell price is 20% or more above its median', () => {
     renderHero({ vs90dPct: 35.2 });
     expect(screen.getByText('Sell price is 35% above its 90-day median')).toHaveClass(
       'text-warning'

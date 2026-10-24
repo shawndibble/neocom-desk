@@ -123,6 +123,18 @@ export function usePlanEdits(
   }
 
   /**
+   * Marks several materials as produced here in one write, for the To buy
+   * heading's "build all cheaper parts" link. One `update`, not a loop of
+   * `toggleBuildHere`: each toggle rewrites the list from the same render's
+   * `plan.buildHere`, so a second toggle in the same tick would drop the first.
+   */
+  function buildHereAll(typeIDs: readonly number[]) {
+    const current = plan.buildHere ?? [];
+    const added = typeIDs.filter((id) => !current.includes(id));
+    if (added.length > 0) update({ buildHere: [...current, ...added] });
+  }
+
+  /**
    * Include Reactions (issue #698). Turning it on for the first time — no
    * Reaction Location configured yet — pre-fills the whole Reaction Location
    * from the remembered reaction default (`reactionFacilityDefaults.ts`), the
@@ -174,6 +186,7 @@ export function usePlanEdits(
     changeSourcing,
     changeOneSourcing,
     toggleBuildHere,
+    buildHereAll,
     toggleIncludeReactions,
   };
 }

@@ -106,6 +106,16 @@ interface MaterialsTableProps {
   /** Turns one material's sub-build on or off. Omitted alongside `canBuildHere`. */
   onToggleBuildHere?: (typeID: number) => void;
   /**
+   * Switches several bought materials to built at once — the To buy
+   * heading's link when two or more rows would be cheaper to build.
+   */
+  onBuildAll?: (typeIDs: readonly number[]) => void;
+  /**
+   * What the owned units this job consumes would net if sold, after fees;
+   * shown on the folded owned section's heading. Omitted when unknown.
+   */
+  ownedSellNet?: number | null;
+  /**
    * Opens the "Build it" modal for a material being built here — the runs and
    * ingredient list the Building row's Recipe link opens. Omitted
    * where the caller has no modal to open, which simply drops the link.
@@ -198,6 +208,8 @@ export function MaterialsTable({
   makeOrBuy,
   canBuildHere,
   onToggleBuildHere,
+  onBuildAll,
+  ownedSellNet,
   onShowRecipe,
   onOpenAcquisitionPicker,
   skillGates,
@@ -691,6 +703,16 @@ export function MaterialsTable({
         : null;
     const saved =
       errand === 'building' ? rows.reduce((sum, row) => sum + (buildSavings(row) ?? 0), 0) : 0;
+    // Bought rows that would be cheaper built: one link for all of them, so the
+    // suggestion is a line of the heading rather than a banner competing with
+    // the verdict. One row keeps only its own Build instead.
+    const cheaperBuilt =
+      errand === 'toBuy' && onBuildAll
+        ? rows.filter(
+            (row) => !isBuilt(row) && buildSavings(row) !== null && buildChoice(row).toggleable
+          )
+        : [];
+    const cheaperSaves = cheaperBuilt.reduce((sum, row) => sum + (buildSavings(row) ?? 0), 0);
     const title = (
       <span className="inline-flex items-center gap-1.5">
         {Glyph && <Glyph size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
@@ -733,6 +755,25 @@ export function MaterialsTable({
           )}
         </h3>
         {extra}
+        {cheaperBuilt.length >= 2 && onBuildAll && (
+          <button
+            type="button"
+            className={textActionClassName(
+              'min-w-0 normal-case tracking-normal text-xs font-normal'
+            )}
+            onClick={() => onBuildAll(cheaperBuilt.map((row) => row.typeID))}
+          >
+            {t('industry.errands.buildCheaper', {
+              count: cheaperBuilt.length,
+              amount: formatIskCompact(cheaperSaves),
+            })}
+          </button>
+        )}
+        {errand === 'have' && ownedSellNet != null && ownedSellNet > 0 && (
+          <span className="ml-auto text-[0.6875rem] text-text-dim tabular-nums">
+            {t('industry.errands.haveSellsFor', { amount: formatIskCompact(ownedSellNet) })}
+          </span>
+        )}
         {saved > 0 && (
           <span className="text-[0.6875rem] font-semibold text-success tabular-nums">
             {t('industry.errands.saves', { amount: formatIskCompact(saved) })}

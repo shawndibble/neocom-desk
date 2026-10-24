@@ -23,7 +23,8 @@ here — they go one per file in `docs/context/decisions/`.
   skill points.
 - **Acquisition Verdict**: Whether a Build Plan's product costs less to build
   than to buy outright at the trade hub. A personal-use comparison — no
-  sales tax or broker fee applies, because nothing is being sold.
+  sales tax or broker fee applies, because nothing is being sold. Stated in
+  Costs & revenue as "Buying <product> instead", not in the **Verdict Hero**.
 - **Agreed rate**: What the **Collector** set as a **Feeder**'s **Owner rate**. When one exists it wins over the **Requested rate**. Player-facing: "your rate" or "their rate".
 - **Alert**: One fired Notification Event as it appears in the Notification
   Feed and in the bell panel, grouped by _type_ (the EVE notification type, or
@@ -480,7 +481,8 @@ here — they go one per file in `docs/context/decisions/`.
   of their own, yet each order still points at an ordinary station. So a global
   market is a routing quirk, not a separate kind of place.
 - **Gross Profit** / **Net Profit**: Sale Profitability before vs after sales
-  tax and broker fee are subtracted. **Break-even Price** — the sell price
+  tax and broker fee are subtracted. A Build Plan's own page shows Net only.
+  **Break-even Price** — the sell price
   at which profit is exactly zero — is always a Net figure, since it answers
   "at what price do I stop losing ISK," which only holds net of the fees an
   actual sale pays.
@@ -732,8 +734,9 @@ here — they go one per file in `docs/context/decisions/`.
 - **Unattributed**: Ore in a corp member's personal Moon Mining Tax ledger on a **Billable** day that no **Corp Tax Book** claims and that the member gave to no **Payee**. Owed to no one. Several books in one system on one day split the entry by the quantity each observed; what none observed stays Unattributed.
 - **Undercut Scope**: Station, system or region: the nested scopes a rival's cheaper order can sit in. A row shows one severity, the tightest scope containing a rival. A scope absent from the result was never checked; a checked scope with no rival is recorded as clean, not absent.
 - **Unmatched**: A donation into the corporation's wallet that a **Corp Tax Book** could not link to a **Miner**: it came from a character no Miner has, with no pay code. It credits no one until the player claims it from their own lines or an officer assigns it to a Miner.
-- **Use-or-Sell Check**: A Build Plan's third read, alongside the **Acquisition Verdict** and **Sale Profitability**, stated in the Costs panel rather than the **Verdict Hero**: is the stock the player already owns worth more sold than consumed? Compares the plan's profit (which counts owned units as free) against what those units would net if liquidated, on a chosen **Liquidation Basis**.
-- **Verdict Hero**: The first panel of a Build Plan: net profit as one large figure, the margin / ISK-hour / duration / break-even line under it, and the **Acquisition Verdict** as a labelled pill. **Sale Profitability** is the big figure itself; the **Use-or-Sell Check** is not in the hero.
+- **Use-or-Sell Check**: Whether the stock the player already owns is worth more sold than consumed. On a Build Plan it is the **Profit Basis** `sellValue`: the **Verdict Hero**'s profit is net of what those units would fetch on the chosen **Liquidation Basis**, and the Costs & revenue ledger lists that forgone sale as a line.
+- **Verdict Hero**: The first panel of a Build Plan: one verdict pill (Build, Build — close call, Loses money, or Sell your materials instead), **Sale Profitability** as the one large figure on the current **Profit Basis**, margin / ISK-hour / break-even beside it, the runs field and schedule in its title row, and the setup summary as its footer. The **Acquisition Verdict** is in Costs & revenue, not the hero.
+- **Profit Basis**: How a Build Plan's hero counts the materials it takes from the player's own hangars: `sellValue` (charged at what they would net if sold — the default whenever the plan uses owned stock) or `free` (owned units cost 0, the plan's own figure). Switched in place from the line under the hero's figure.
 - **Liquidation Basis**: How owned materials would be turned into ISK in the **Use-or-Sell Check**: `instant` (fill the hub's standing buy orders, sales tax only) or `order` (list your own stack at the hub's sell price, sales tax plus broker fee). Independent of a plan's material price basis, which is about buying.
 - **vs 90d**: How far a product's latest full day's region daily average sits from the median of its daily averages over the last 90 days, as a signed whole percent. Amber from +20% (a profit that rests on a spike); blank when the item traded on too few of those days. Shown on Build Opportunities, the **Verdict Hero** (as a note, only when amber) and the Price watch widget.
 - **Variations**: The selected item's Tech I/II/Faction/Storyline/Officer variation group, shown on its own item tab as a price comparison grouped by tier; falls back to its Market Group siblings when it has no variation data.

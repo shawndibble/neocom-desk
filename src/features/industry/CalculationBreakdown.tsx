@@ -246,7 +246,6 @@ export function CalculationBreakdown({
 
         <Section title={t('industry.breakdown.profitTitle')}>
           <p>{t('industry.breakdown.profitNet')}</p>
-          <p>{t('industry.breakdown.profitGross')}</p>
           <p>
             {t('industry.breakdown.profitIskPerHour', {
               time: formatDuration(result.seconds),

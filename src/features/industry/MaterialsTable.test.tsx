@@ -1295,6 +1295,63 @@ describe('MaterialsTable build-here control', () => {
     expect(within(heading.parentElement!).getByText('saves 100 ISK')).toHaveClass('text-success');
   });
 
+  it('offers one link on the To buy heading to build every cheaper part at once', () => {
+    const cheaper = (savings: number): MakeOrBuy => ({
+      method: 'manufacturing',
+      verdict: 'build',
+      makeUnitPrice: 1,
+      buyUnitPrice: 2,
+      savings,
+      me: 0,
+      blueprintCost: 0,
+    });
+    const onBuildAll = vi.fn();
+    renderTable({
+      canBuildHere: () => true,
+      onToggleBuildHere: vi.fn(),
+      onBuildAll,
+      makeOrBuy: new Map([
+        [34, cheaper(2_000_000)],
+        [9840, cheaper(2_500_000)],
+      ]),
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Build 2 cheaper parts · save 4.5M' }));
+    expect(onBuildAll).toHaveBeenCalledWith([34, 9840]);
+  });
+
+  it('leaves a single cheaper part to its own Build instead', () => {
+    renderTable({
+      canBuildHere: () => true,
+      onToggleBuildHere: vi.fn(),
+      onBuildAll: vi.fn(),
+      makeOrBuy: new Map([
+        [
+          9840,
+          {
+            method: 'manufacturing',
+            verdict: 'build',
+            makeUnitPrice: 1,
+            buyUnitPrice: 2,
+            savings: 100,
+            me: 0,
+            blueprintCost: 0,
+          },
+        ],
+      ]),
+    });
+    expect(screen.queryByRole('button', { name: /cheaper parts/ })).not.toBeInTheDocument();
+  });
+
+  it('says what the owned materials would sell for on the folded owned heading', () => {
+    renderTable({
+      materials: asRows(
+        materialCostLines(MENU_MATERIALS, { 34: 10 }, { 34: { ownedQuantity: 100 } })
+      ),
+      ownedSellNet: 925,
+    });
+    expect(screen.getByText('sells for 925 after fees')).toBeInTheDocument();
+  });
+
   it('turns Build instead green, with what it saves, only when building is cheaper', () => {
     const cheaper: MakeOrBuy = {
       method: 'manufacturing',
