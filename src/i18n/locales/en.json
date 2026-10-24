@@ -7323,6 +7323,8 @@
         "carryLoadsOnArrival": "Loads {{volume}} m³ at {{place}} on arrival.",
         "carryDrops": "Drops {{volume}} m³ at {{place}}.",
         "cargoLine": "{{place}}: {{volume}} m³",
+        "itemLine": "{{quantity}} × {{name}}",
+        "itemsMore": "and {{count}} more types",
         "holdFill": "{{percent}}% of the hold",
         "cargoShow": "Show cargo for leg {{n}}",
         "cargoHide": "Hide cargo for leg {{n}}",

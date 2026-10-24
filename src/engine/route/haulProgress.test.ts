@@ -185,6 +185,21 @@ describe('replanInputs', () => {
     ]);
   });
 
+  it('merges the stacks of a split pickup, by type', () => {
+    const trit = { typeId: 34, name: 'Tritanium', unitM3: 1 };
+    const split: HaulSection = {
+      ...section,
+      legs: [
+        leg(0, 'pickup', jita, amarr, { m3: 60, stacks: [{ ...trit, quantity: 60 }] }),
+        leg(1, 'delivery', amarr, jita, { m3: 60 }),
+        leg(2, 'pickup', jita, amarr, { trip: 2, m3: 40, stacks: [{ ...trit, quantity: 40 }] }),
+        leg(3, 'delivery', amarr, jita, { trip: 2, m3: 40 }),
+      ],
+    };
+    const { characters } = replanInputs({ ...plan, sections: [split] }, []);
+    expect(characters[0]?.pickups[0]?.stacks).toEqual([{ ...trit, quantity: 100 }]);
+  });
+
   it('reports a Character whose hold is loaded and not yet delivered', () => {
     const { characters, loaded } = replanInputs(plan, [0]);
     expect(loaded).toEqual(['Alice']);

@@ -16,6 +16,7 @@ import type {
   HaulPlan,
   HaulSection,
 } from './haulPlan';
+import { mergeStacks } from './haulLeg';
 
 const sorted = (ids: Iterable<number>): number[] => [...new Set(ids)].sort((a, b) => a - b);
 
@@ -119,8 +120,17 @@ export function replanInputs(plan: HaulPlan, done: readonly number[]): ReplanInp
     for (const l of left) {
       if (l.kind !== 'pickup' || l.locationId === null) continue;
       const seen = stock.get(l.locationId);
-      if (seen) seen.m3 += l.m3;
-      else stock.set(l.locationId, { ...l.to, locationId: l.locationId, m3: l.m3 });
+      if (seen) {
+        seen.m3 += l.m3;
+        if (l.stacks) seen.stacks = mergeStacks([...(seen.stacks ?? []), ...l.stacks]);
+      } else {
+        stock.set(l.locationId, {
+          ...l.to,
+          locationId: l.locationId,
+          m3: l.m3,
+          ...(l.stacks ? { stacks: mergeStacks(l.stacks) } : {}),
+        });
+      }
     }
     characters.push({
       characterId: section.characterId,

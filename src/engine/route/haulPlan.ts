@@ -25,10 +25,21 @@ export interface HaulPlace {
   name: string;
 }
 
+/** One item type in a load: what the pilot sees in the cargo list. */
+export interface HaulStack {
+  typeId: number;
+  name: string;
+  quantity: number;
+  /** m³ of one unit as hauled. */
+  unitM3: number;
+}
+
 export interface HaulPickupInput extends HaulPlace {
   locationId: number;
   /** Volume to carry from here, in m³. */
   m3: number;
+  /** What `m3` is made of; absent when the caller has no item list. */
+  stacks?: readonly HaulStack[];
 }
 
 export interface HaulCharacterInput {
@@ -68,6 +79,8 @@ export interface HaulLeg {
   m3: number;
   /** The pickup location a `pickup` leg loads at. */
   locationId: number | null;
+  /** The items a `pickup` leg loads; absent on a delivery and on a haul saved before items. */
+  stacks?: HaulStack[];
 }
 
 export interface HaulSection {
@@ -121,7 +134,7 @@ export function planHaul(input: HaulInput): HaulPlan {
   for (const c of characters) {
     if (c.flown.length > 0)
       flown.push({ characterId: c.characterId, name: c.name, ships: [...c.flown] });
-    const left: { pickup: HaulPickupInput; m3: number }[] = [];
+    const left: { pickup: HaulPickupInput; m3: number; stacks: HaulStack[] | null }[] = [];
     for (const pickup of c.pickups) {
       if (!(pickup.m3 > EPS)) continue;
       if (capacityM3 <= 0) {
@@ -129,7 +142,7 @@ export function planHaul(input: HaulInput): HaulPlan {
       } else if (pickup.systemId === null) {
         leftOut.push(leftOutOf(c, pickup, pickup.m3, 'unplaced'));
       } else {
-        left.push({ pickup, m3: pickup.m3 });
+        left.push({ pickup, m3: pickup.m3, stacks: pickup.stacks?.map((s) => ({ ...s })) ?? null });
       }
     }
     if (left.length === 0) continue;
@@ -144,7 +157,8 @@ export function planHaul(input: HaulInput): HaulPlan {
       from: HaulPlace | null,
       to: HaulPlace,
       m3: number,
-      locationId: number | null
+      locationId: number | null,
+      stacks?: HaulStack[]
     ) =>
       legs.push({
         id: nextId++,
@@ -156,6 +170,7 @@ export function planHaul(input: HaulInput): HaulPlan {
         jumps: from === null ? null : jumpsBetween(from.systemId, to.systemId),
         m3,
         locationId,
+        ...(stacks ? { stacks } : {}),
       });
 
     let start: HaulPlace | null = c.start;
@@ -173,7 +188,9 @@ export function planHaul(input: HaulInput): HaulPlan {
         }
         const next = nearest(open, here, jumpsBetween);
         const take = Math.min(next.m3, capacityM3 - hold);
-        leg(trips, 'pickup', here, next.pickup, take, next.pickup.locationId);
+        const last = next.m3 - take <= EPS;
+        const stacks = next.stacks ? takeStacks(next.stacks, take, last) : undefined;
+        leg(trips, 'pickup', here, next.pickup, take, next.pickup.locationId, stacks);
         next.m3 -= take;
         hold += take;
         visits += 1;
@@ -203,6 +220,26 @@ export function planHaul(input: HaulInput): HaulPlan {
       m3: all.filter((l) => l.kind === 'pickup').reduce((sum, l) => sum + l.m3, 0),
     },
   };
+}
+
+/**
+ * Takes `m3` worth of units off `stacks` (in place, in order) and returns them.
+ * Whole units only, so a leg may sit a fraction of a unit under its m³; the
+ * `last` take of a pickup gets whatever is left, so no unit is lost.
+ */
+function takeStacks(stacks: HaulStack[], m3: number, last: boolean): HaulStack[] {
+  const taken: HaulStack[] = [];
+  let room = m3;
+  for (const s of stacks) {
+    if (s.quantity <= 0) continue;
+    const fit = s.unitM3 > 0 ? Math.floor((room + EPS) / s.unitM3) : s.quantity;
+    const n = last ? s.quantity : Math.min(s.quantity, fit);
+    if (n <= 0) continue;
+    taken.push({ ...s, quantity: n });
+    s.quantity -= n;
+    room -= n * s.unitM3;
+  }
+  return taken;
 }
 
 function leftOutOf(
