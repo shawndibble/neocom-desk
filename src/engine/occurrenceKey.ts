@@ -1,7 +1,7 @@
 /**
  * The Occurrence Key (GLOSSARY.md round 44, issue #348): the deterministic
- * identity of one notification occurrence, derived from the Character, the
- * Notification Event and the natural id of the thing that happened. Two
+ * identity of one notification occurrence, derived from the Character (not
+ * for world-scoped events, below), the Notification Event and the natural id of the thing that happened. Two
  * devices' Foreground Pollers and the Scheduled Push backend, each
  * independently observing the same character-state change, compute the
  * identical key — which is what makes cross-party de-duplication possible.
