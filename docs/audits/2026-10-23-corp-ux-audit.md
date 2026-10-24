@@ -359,3 +359,21 @@ Severity: **High** blocks or misleads a new officer; **Medium** costs time or tr
 ## Reproducing the walkthrough
 
 The harness lives in `.audit/corp-ux/harness/` (uncommitted): `world.mjs` is the fixture corporation and ESI router, `driver.mjs` starts the mock upstream server (ESI, EVE JWKS, zKillboard, Fuzzwork, Open Prices) on :5299, a headless Chromium with SSO/ESI interception, and a JSON command API on :5298; `c` is a shell helper; `sweep.sh` is the width sweep. Functions emulator env: `EVE_CLIENT_ID=e2e-fake-client EVE_JWKS_URL=http://127.0.0.1:5299/jwks AUDIT_ESI_BASE=http://127.0.0.1:5299/latest AUDIT_ZKILL_API=http://127.0.0.1:5299/zkill AUDIT_FUZZWORK_AGGREGATES=http://127.0.0.1:5299/fuzzwork/`; the two `AUDIT_*` reads in `functions/src/esiNotifications.ts` and `functions/src/srpKillmailEsi.ts` are a local-only patch and are not committed. `.env.local` needs `VITE_FIREBASE_EMULATORS=1` and `VITE_EVE_CLIENT_ID=e2e-fake-client`.
+
+## Verification, 2026-10-24
+
+Fixes landed on `develop` in PRs #4897 (Assets), #4899 (Corp Board + permission tooltips), #4900 (Members + Wallet), #4904 (Moons setup/settings), #4906 + #4911 (Moons ledger), #4910 (SRP), #4912 (review follow-ups), #4909 (CI flake). Each PR had a read-only review; its follow-ups went into #4912 and a second polish PR. Re-walked on `develop` with the same harness and personas.
+
+| Finding | Result |
+| --- | --- |
+| CX-01, CX-03 | Not done by decision: corp access stays opt-in; the character switcher and Settings › Permissions are the way in. |
+| CX-02, CX-04..CX-13, CX-15, CX-16, CX-18..CX-21 | Verified in browser. Due soon lists only upcoming items, widget links fixed, CEO pill, `/corp/members/roster`, EVE-time days, structure names in Where and Location groups, Fuel bay tab, trimmed row menu, no page-level overflow at 768px on any corp page. |
+| CX-14 | Code-reviewed only (zKillboard failure path not reproducible with the mock). |
+| CX-23..CX-28, CX-31..CX-39, CX-40, CX-42..CX-47 | Verified in browser. Start date labelled EVE time, defaults to the 1st, editable later; Back link; first sync runs on creation; plain health status; "Show to members now"; tabs hidden before setup; single Save with toast; division names; per-period Statement rows; verify page reads "Statement 1–7 Oct 2026", "weekly", "price saved on the day"; Activity names the Miner and ISK. |
+| CX-29, CX-30, CX-41 | Code-reviewed only (401 path, raw SDK error and the disabled-reminder reason were not reachable in the re-walk). |
+| CX-48 | Covered by "Show to members now" (CX-27) instead of a preview mode. |
+| CX-49..CX-57 | Verified in browser. Turn on lands on Settings; off-doctrine filing opens a dialog with File anyway; Approve/Reject disabled with a reason on the officer's own claim; Mark paid confirms and toasts; Activity reads "Added Doctrine Fit …"; Killmail link replaces the raw id; Accountant sees no Settings tab. |
+
+New in the re-walk:
+
+- R1 · Medium · Statements "All periods": after switching cadence from Monthly to Every 7 days, the Ready to send row is labelled "Oct 2026" while the Closed and Open rows read "8 Oct – 14 Oct" and so on. The verify page for the same Statement correctly reads "1–7 Oct 2026". The table label must follow the period actually covered. Evidence: `v43-statements.png`.
