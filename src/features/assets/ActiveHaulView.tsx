@@ -3,7 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, Caret } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { inlineLinkClassName, rowInteractiveClassName } from '@/components/ui/controlStyles';
+import {
+  inlineLinkClassName,
+  focusRingInsetClassName,
+  rowInteractiveClassName,
+} from '@/components/ui/controlStyles';
 import type { HaulLeg, HaulSection } from '@/engine/route/haulPlan';
 import { cx } from '@/lib/cx';
 import { formatCubicMetres } from '@/lib/volume';
@@ -197,7 +201,8 @@ function LegRow({
         onClick={onToggle}
         className={cx(
           'flex min-h-11 w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm md:min-h-9',
-          rowInteractiveClassName
+          rowInteractiveClassName,
+          focusRingInsetClassName
         )}
       >
         <Caret expanded={expanded} />

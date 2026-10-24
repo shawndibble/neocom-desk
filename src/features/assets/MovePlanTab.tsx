@@ -135,8 +135,8 @@ interface MovePlanTabProps {
  * Plan a move: tick what to carry, say where to, see the work list per
  * Character and pickup with a suggested hauler. The Assets page's Move tab
  * mounts it, so its state lasts while the tab is open and starts fresh on re-entry.
- * Volumes and trips are an estimate from hull class; the Route Safety link
- * answers the safety question.
+ * Volumes and trips are an estimate from hull class; Show my route
+ * opens the leg list, and Route Safety answers the safety question.
  */
 export function MovePlanTab(props: MovePlanTabProps) {
   return <MovePlanTabBody key={idSetKey(props.characterIds)} {...props} />;
