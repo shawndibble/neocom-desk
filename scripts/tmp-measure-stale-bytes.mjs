@@ -47,7 +47,10 @@ for (const mapOn of [false, true]) {
     if (depsChanged) {
       const before = new Set(deps(a[f]).match(/"[^"]+"/g) ?? []);
       const added = (deps(b[f]).match(/"[^"]+"/g) ?? []).filter((d) => !before.has(d));
+      const after = new Set(deps(b[f]).match(/"[^"]+"/g) ?? []);
+      const removed = [...before].filter((d) => !after.has(d));
       console.log(`    added: ${added.join(' ')}`);
+      console.log(`    removed: ${removed.join(' ')}`);
     }
   }
 }

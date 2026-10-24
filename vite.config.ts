@@ -25,7 +25,9 @@ import {
   missingShellChunks,
   lazyChunkFiles,
   lazyChunksJson,
+  preloadGraphSignature,
   type BundleLike,
+  type RenderedChunkLike,
 } from './src/app/lazyChunks.ts';
 
 const { version, dependencies } = JSON.parse(
@@ -308,6 +310,57 @@ function lazyChunksPlugin() {
 }
 
 /**
+ * Folds what each chunk's preload lists will name into its hash
+ * (`preloadGraphSignature`), so a chunk whose lists change is renamed instead of
+ * keeping its name with new bytes. The graph is `renderChunk`'s `meta.chunks`,
+ * captured before any hash is computed; module ids are taken relative to the
+ * root so a build elsewhere signs the same.
+ */
+function preloadGraphHashPlugin() {
+  let root = '';
+  let graph: Record<string, RenderedChunkLike> | undefined;
+  let relative: Record<string, RenderedChunkLike> | undefined;
+  return {
+    name: 'neocom-preload-graph-hash',
+    apply: 'build' as const,
+    configResolved(config: { root: string }) {
+      root = `${config.root}/`;
+    },
+    renderStart() {
+      graph = undefined;
+      relative = undefined;
+    },
+    renderChunk(
+      _code: string,
+      _chunk: unknown,
+      _options: unknown,
+      meta: { chunks: Record<string, RenderedChunkLike> }
+    ) {
+      graph ??= meta.chunks;
+      return null;
+    },
+    augmentChunkHash(chunk: { fileName: string; dynamicImports: readonly string[] }) {
+      if (chunk.dynamicImports.length === 0) return;
+      if (!graph) throw new Error('preloadGraphHashPlugin: no chunk graph before hashing');
+      relative ??= Object.fromEntries(
+        Object.entries(graph).map(([file, c]) => [
+          file,
+          {
+            name: c.name,
+            imports: c.imports,
+            dynamicImports: c.dynamicImports,
+            moduleIds: c.moduleIds.map((id) => (id.startsWith(root) ? id.slice(root.length) : id)),
+          },
+        ])
+      );
+      return createHash('sha256')
+        .update(preloadGraphSignature(chunk.fileName, relative))
+        .digest('hex');
+    },
+  };
+}
+
+/**
  * Emits `version.json` (`{ release }`) beside `index.html`: the running app
  * compares it with its own `__APP_RELEASE__` to learn of a new build in one
  * small request (src/app/latestRelease.ts), instead of waiting on the service
@@ -510,6 +563,7 @@ export default defineConfig({
     spaFallbackHtml(),
     releaseFilePlugin(),
     lazyChunksPlugin(),
+    preloadGraphHashPlugin(),
   ],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },

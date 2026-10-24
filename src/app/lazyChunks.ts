@@ -177,3 +177,50 @@ export function parseLazyChunksJson(body: unknown): string[] {
     ? files.filter((file): file is string => typeof file === 'string')
     : [];
 }
+
+/** The slice of a Rolldown `RenderedChunk` (`renderChunk`'s `meta.chunks`) `preloadGraphSignature` reads. */
+export interface RenderedChunkLike {
+  name: string;
+  moduleIds: readonly string[];
+  imports: readonly string[];
+  dynamicImports: readonly string[];
+}
+
+/**
+ * What a chunk's preload lists will name, as a string for `augmentChunkHash`.
+ * Vite writes each `import()`'s preload list (`__vite__mapDeps`: the target and
+ * everything it statically imports, css included) after the hash is fixed. With
+ * the import map a chunk's hash covers only its own code, so a chunk whose list
+ * changed kept its name with new bytes, and the precache (`revision: null`) and
+ * the `lazy-chunks` route kept the old bytes for good. Signing each chunk the
+ * import pulls in by name and modules (never the preliminary file name, whose
+ * placeholders are positional) renames it exactly when its lists can change.
+ * Empty without a dynamic import.
+ */
+export function preloadGraphSignature(
+  fileName: string,
+  chunks: Readonly<Record<string, RenderedChunkLike>>
+): string {
+  const get = (file: string) => {
+    const chunk = chunks[file];
+    if (!chunk)
+      throw new Error(`preloadGraphSignature: ${fileName} reaches ${file}, not in the graph`);
+    return chunk;
+  };
+  const identity = (chunk: RenderedChunkLike) =>
+    `${chunk.name}(${[...chunk.moduleIds].sort().join(',')})`;
+  const closure = (file: string) => {
+    const seen = new Set<string>();
+    const visit = (f: string) => {
+      if (seen.has(f)) return;
+      seen.add(f);
+      for (const imported of get(f).imports) visit(imported);
+    };
+    visit(file);
+    return [...seen].map((f) => identity(get(f))).sort();
+  };
+  return get(fileName)
+    .dynamicImports.map((target) => `${identity(get(target))}>${closure(target).join(';')}`)
+    .sort()
+    .join('\n');
+}
