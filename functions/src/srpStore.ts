@@ -13,13 +13,8 @@
 import { randomBytes } from 'node:crypto';
 import { type Firestore, type Transaction } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
-import {
-  isCacheFresh,
-  satisfies,
-  type BookCall,
-  type Need,
-  type OfficerAccess,
-} from './corpTaxBook.js';
+import { cacheOfficer, readOfficerCache, revokeOfficer } from './officerCache.js';
+import { satisfies, type BookCall, type Need, type OfficerAccess } from './corpTaxBook.js';
 import type { CorporationLookup } from './corpTaxBookEsi.js';
 import { type BookDeps } from './corpTaxBookStore.js';
 import {
@@ -119,26 +114,18 @@ export async function authorizeSrpOfficer(
   const actor = await verifyCallerToken(deps, caller, call.accessToken);
   const now = deps.now();
   const officerRef = officersOf(deps.db, call.corporationId).doc(caller.uid);
-  const held = (await officerRef.get()).data() as OfficerAccess | undefined;
-  const heldUsable =
-    held !== undefined &&
-    held.ownerHash === caller.ownerHash &&
-    held.corporationId === call.corporationId &&
-    held.expiresAt > now &&
-    isCacheFresh(held.checkedAt, now);
+  const { held, usable } = await readOfficerCache(officerRef, caller, call.corporationId, now);
 
   let access: OfficerAccess;
-  if (!options.live && heldUsable) {
-    access = held;
+  if (!options.live && usable) {
+    access = usable;
   } else {
     const { identity, roles } = await requireLiveRoles(deps, actor, {
       corporationId: call.corporationId,
       need: 'canEdit',
       denied: { message: 'No SRP officer role in this corporation', reason: 'not-an-officer' },
       // A failed renewal revokes the read access the old check granted.
-      onDenied: async () => {
-        if (held) await officerRef.delete();
-      },
+      onDenied: () => revokeOfficer(officerRef, held),
     });
     access = {
       ...roles,
@@ -151,7 +138,7 @@ export async function authorizeSrpOfficer(
       expiresAt: now + SRP_OFFICER_TTL_MS,
     };
     if ((await srpSettingsRef(deps.db, call.corporationId).get()).exists) {
-      await officerRef.set(access);
+      await cacheOfficer(officerRef, access);
     }
   }
   if (!satisfies(access, need)) {
