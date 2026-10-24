@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Field, Modal, TextInput } from '@/components/ui';
+import { Button, Field, FieldError, Modal, TextInput } from '@/components/ui';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { DoctrineCheckRecord } from '../srpTypes';
 import { DoctrineCheckView } from './DoctrineCheckView';
@@ -32,6 +32,7 @@ export function OffDoctrineFileDialog({
   const { t } = useTranslation();
   const phone = useIsPhone();
   const fleetId = useId();
+  const fleetErr = `${fleetId}-err`;
   const blocked = fleetRequired && fleet.trim() === '';
   return (
     <Modal
@@ -60,6 +61,11 @@ export function OffDoctrineFileDialog({
         <Field
           label={fleetRequired ? t('srpMember.file.fleet') : t('srpMember.file.fleetOptional')}
           htmlFor={fleetId}
+          note={
+            blocked ? (
+              <FieldError id={fleetErr}>{t('srpMember.errors.fleetOrFcRequired')}</FieldError>
+            ) : undefined
+          }
         >
           <TextInput
             id={fleetId}
@@ -69,6 +75,8 @@ export function OffDoctrineFileDialog({
             className="w-full"
             autoComplete="off"
             aria-required={fleetRequired || undefined}
+            aria-invalid={blocked || undefined}
+            aria-describedby={blocked ? fleetErr : undefined}
           />
         </Field>
       </div>

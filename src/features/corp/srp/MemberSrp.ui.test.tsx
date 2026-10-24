@@ -258,6 +258,33 @@ describe('MemberSrp', () => {
       );
     });
 
+    it('blocks File anyway with the reason while a required Fleet or FC is empty, then files once a note is typed', async () => {
+      setup({ doctrine: true, requireFleetOrFc: true });
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'File claim for Hurricane' })
+      );
+      const dialog = await screen.findByRole('dialog', undefined, { timeout: 3000 });
+      const fileAnyway = within(dialog).getByRole('button', { name: 'File anyway' });
+      expect(fileAnyway).toHaveAttribute('aria-disabled', 'true');
+      expect(within(dialog).getByText('Fleet or FC is required by your corp.')).toBeTruthy();
+      await userEvent.click(fileAnyway);
+      expect(file).not.toHaveBeenCalled();
+      await userEvent.type(within(dialog).getByLabelText('Fleet or FC'), 'Kestrel');
+      expect(within(dialog).queryByText('Fleet or FC is required by your corp.')).toBeNull();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'File anyway' }));
+      await waitFor(() => expect(file).toHaveBeenCalledTimes(1));
+    });
+
+    it('files straight away when the doctrine preview fails', async () => {
+      setup({ doctrine: true });
+      vi.spyOn(backend, 'previewDoctrine').mockRejectedValue(new Error('down'));
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'File claim for Hurricane' })
+      );
+      await waitFor(() => expect(file).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
     it('Cancel in the off-doctrine dialog files nothing', async () => {
       setup({ doctrine: true });
       await userEvent.click(

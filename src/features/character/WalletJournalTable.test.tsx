@@ -40,7 +40,9 @@ function Harness({
   highlightRowKey = null,
   onFilterChange = () => {},
   sort = { columnId: 'date', direction: 'desc' },
+  playerOptions,
 }: {
+  playerOptions?: { id: string; name: string }[];
   sort?: { columnId: string; direction: 'asc' | 'desc' };
   filter?: WalletJournalFilter;
   rows?: JournalRow[];
@@ -67,6 +69,7 @@ function Harness({
         filter={filter}
         onFilterChange={onFilterChange}
         refTypeOptions={['bounty_prize', 'market_escrow']}
+        playerOptions={playerOptions}
         filteredJournal={rows}
         breakdownJournal={rows}
         chartJournal={rows}
@@ -107,6 +110,34 @@ describe('JournalTable', () => {
     );
     const list = await screen.findByRole('table', { name: 'Where the ISK went' });
     expect(within(list).getByText('Bounty prize')).toBeInTheDocument();
+  });
+
+  it('gives a corp journal line with a Player a ⋮ with filters and the player actions; the personal journal has none', async () => {
+    const onFilterChange = vi.fn();
+    const rows: JournalRow[] = [{ ...journal[0]!, playerId: 42 }, journal[1]!];
+    render(
+      <Harness
+        netted={false}
+        rows={rows}
+        playerOptions={[{ id: '42', name: 'Pilot Forty-Two' }]}
+        onFilterChange={onFilterChange}
+      />
+    );
+    // Only the line with a Player has a menu.
+    expect(screen.getAllByRole('button', { name: /More actions for/ })).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: /More actions for Pilot Forty-Two/ }));
+    expect(
+      await screen.findByRole('menuitem', { name: 'Filter to this type' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Open in EVE/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Filter to this player' }));
+    expect(onFilterChange).toHaveBeenCalledWith(expect.objectContaining({ player: '42' }));
+  });
+
+  it('has no row menu on the personal journal', () => {
+    render(<Harness />);
+    expect(screen.queryByRole('button', { name: /More actions for/ })).not.toBeInTheDocument();
   });
 
   it('says the scope and the date range in the panel subtitle', () => {

@@ -37,6 +37,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { loadCorporationId } from './boardData';
+import { CharacterRowMenu } from './corpRowMenus';
 import { loadRoleAudit, type RoleAuditData } from './roleAudit';
 
 /** Days of history shown before "Show older". */
@@ -145,6 +146,12 @@ function HistoryTable({ rows }: { rows: readonly HistoryRow[] }) {
       rowKey={(row) => row.key}
       label={t('corp.roles.historyLabel')}
       density="compact"
+      rowContextMenu={(row, tr) => (
+        <CharacterRowMenu characterId={row.change.characterId} name={row.member}>
+          {tr}
+        </CharacterRowMenu>
+      )}
+      rowMoreActions
     />
   );
 }
@@ -331,6 +338,12 @@ export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
                   rowKey={(row) => row.characterId}
                   label={t('corp.roles.tableLabel')}
                   density="compact"
+                  rowContextMenu={(row, tr) => (
+                    <CharacterRowMenu characterId={row.characterId} name={row.name}>
+                      {tr}
+                    </CharacterRowMenu>
+                  )}
+                  rowMoreActions
                 />
               )}
             </Panel>

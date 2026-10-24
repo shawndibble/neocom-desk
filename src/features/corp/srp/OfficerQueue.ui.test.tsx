@@ -270,6 +270,25 @@ describe('OfficerQueue detail and change amount', () => {
   });
 });
 
+describe('OfficerQueue row menu', () => {
+  it('opens the ⋮ with the detail-only actions, and Change amount opens its dialog', async () => {
+    setup(pendingSet());
+    const more = screen.getAllByRole('button', { name: /More actions/ });
+    // Claim 3 has no figure to change, so it has no menu; the paid claim is not in Pending.
+    expect(more.length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /More actions.*Pilot3/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /More actions.*Pilot1/ }));
+    expect(await screen.findByRole('menuitem', { name: 'Change amount…' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Open in EVE/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /zKillboard/ })).toBeInTheDocument();
+    // Approve and Reject are the row's own buttons: not repeated in the menu.
+    expect(screen.queryByRole('menuitem', { name: 'Approve' })).toBeNull();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Change amount…' }));
+    expect(await screen.findByRole('dialog', { name: /Change amount/ })).toBeInTheDocument();
+  });
+});
+
 describe('OfficerQueue detail entity links', () => {
   it('links the pilot in the detail, and nowhere in the clickable row', async () => {
     setup(pendingSet());
@@ -300,6 +319,21 @@ describe('OfficerQueue own claim', () => {
     expect(screen.getAllByRole('button', { name: 'Approve' })[1]).not.toHaveAttribute(
       'aria-disabled'
     );
+  });
+});
+
+describe('OfficerQueue own claim in bulk', () => {
+  it("skips the officer's own claim in Select all and disables its tick", async () => {
+    useActiveCharacter.setState({ activeCharacterId: 5001 });
+    const data = setup(pendingSet());
+    const boxes = screen.getAllByRole('checkbox');
+    expect(boxes[0]).toHaveAttribute('aria-disabled', 'true');
+    expect(boxes[1]).not.toHaveAttribute('aria-disabled');
+    await userEvent.click(boxes[0]!);
+    expect(boxes[0]).not.toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Select all (1)' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Approve (1)' }));
+    expect(data.approveMany).toHaveBeenCalledWith([{ killmailId: 2, expectedAmount: 1_000_000 }]);
   });
 });
 

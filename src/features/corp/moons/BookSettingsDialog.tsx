@@ -224,6 +224,14 @@ export function BookSettingsDialog({
   // One save model: Save commits the settings and a rate left in the form.
   const rateFilled = ratePct !== '';
 
+  // The N-day anchor is the start date being saved, unless the officer kept a custom one:
+  // a stored anchor that is not the old start date stays.
+  const cadenceAnchor = () => {
+    const stored = settings.cadence.kind === 'days' ? settings.cadence.anchor : undefined;
+    const newStart = verdict.isDirector ? startDate : settings.startDate;
+    return stored !== undefined && stored !== settings.startDate ? stored : newStart;
+  };
+
   const save = () =>
     run(async () => {
       let rateAdded = false;
@@ -253,7 +261,7 @@ export function BookSettingsDialog({
         cadence:
           cadence === 'monthly'
             ? { kind: 'monthly' }
-            : { kind: 'days', days: Number(cadenceDays), anchor: settings.startDate },
+            : { kind: 'days', days: Number(cadenceDays), anchor: cadenceAnchor() },
         structureExpiryHours: Object.fromEntries(
           Object.entries(expiry)
             .filter(([, v]) => v !== '' && Number(v) > 0)
@@ -286,6 +294,7 @@ export function BookSettingsDialog({
     );
 
   const tabsId = useTabsId();
+  const rateHintId = useId();
   const fieldId = useId();
   // Back from EVE's page after the Automatic sync opt-in: open where its notice is shown.
   const { state: routerState } = useLocation();
@@ -314,7 +323,7 @@ export function BookSettingsDialog({
               {error}
             </span>
           ) : rateFilled && !rateReady ? (
-            <span className="text-sm text-text-dim">
+            <span id={rateHintId} className="text-sm text-text-dim">
               {t('corpTaxBook.moons.settings.rateIncomplete')}
             </span>
           ) : (
@@ -329,6 +338,7 @@ export function BookSettingsDialog({
               onClick={() => void save()}
               disabled={!canEdit || busy}
               aria-disabled={rateFilled && !rateReady ? true : undefined}
+              aria-describedby={rateFilled && !rateReady && !error ? rateHintId : undefined}
             >
               {t('common.save')}
             </Button>
