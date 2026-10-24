@@ -5052,6 +5052,7 @@
       },
       "moreRows_one": "+{{count}} more",
       "moreRows_other": "+{{count}} more",
+      "fewerRows": "Show fewer",
       "table": {
         "sortBy": "Sort by {{column}}",
         "sortedAsc": "{{column}}, sorted ascending",
@@ -15746,7 +15747,8 @@
           "confirmTitle": "Delete the book?",
           "body": "Every mining entry, payment, Statement and the activity log is erased, the automatic sync stops, and Statement verify links stop working. Members' Mining Tax pages stop showing this corporation's book. This can't be undone.",
           "confirm": "Delete the book",
-          "typeTicker": "Type {{ticker}} to confirm"
+          "typeTicker": "Type {{ticker}} to confirm",
+          "typeCorpId": "Type the corporation ID {{id}} to confirm"
         },
         "tabs": {
           "rates": "Rates",
@@ -15760,6 +15762,8 @@
         "sections": "Settings sections",
         "startHint": "Mining before this day owes nothing. Earlier is always allowed; later only while no Statement covers the days in between.",
         "saved": "Settings saved",
+        "rateIncomplete": "Finish the rate in the form, or clear its percent, to save.",
+        "rateAddedSettingsFailed": "Rate added, but the other settings were not saved.",
         "divisionNamed": "Division {{n}}, {{name}}"
       },
       "grouping": {

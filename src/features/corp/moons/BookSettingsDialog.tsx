@@ -226,6 +226,7 @@ export function BookSettingsDialog({
 
   const save = () =>
     run(async () => {
+      let rateAdded = false;
       if (rateFilled) {
         const base = { pct: Number(ratePct), effectiveFrom: rateFrom };
         const rate =
@@ -239,6 +240,7 @@ export function BookSettingsDialog({
                   ? { scope: 'feeder', feederId: Number(rateOwner), ...base }
                   : { scope: rateScope, ...base };
         await edit({ action: 'addRate', rate });
+        rateAdded = true;
         setRatePct('');
       }
       const patch: Record<string, unknown> = {
@@ -263,7 +265,16 @@ export function BookSettingsDialog({
         patch.dismissApprovalAboveIsk = approval === '' ? null : Number(approval);
         if (startDate !== settings.startDate) patch.startDate = startDate;
       }
-      await edit({ action: 'updateSettings', patch });
+      try {
+        await edit({ action: 'updateSettings', patch });
+      } catch (e) {
+        if (!rateAdded) throw e;
+        // The rate is already committed and its form cleared: say so, so a retry is not read as a redo.
+        setError(
+          `${t('corpTaxBook.moons.settings.rateAddedSettingsFailed')} ${callableErrorText(t, e, 'corpTaxBook.moons.dialogs.failed')}`
+        );
+        return;
+      }
       onSaved?.();
       onClose();
     });
@@ -302,6 +313,10 @@ export function BookSettingsDialog({
             <span role="alert" className="text-sm text-danger">
               {error}
             </span>
+          ) : rateFilled && !rateReady ? (
+            <span className="text-sm text-text-dim">
+              {t('corpTaxBook.moons.settings.rateIncomplete')}
+            </span>
           ) : (
             <span />
           )}
@@ -312,7 +327,8 @@ export function BookSettingsDialog({
             <Button
               variant="primary"
               onClick={() => void save()}
-              disabled={!canEdit || busy || (rateFilled && !rateReady)}
+              disabled={!canEdit || busy}
+              aria-disabled={rateFilled && !rateReady ? true : undefined}
             >
               {t('common.save')}
             </Button>

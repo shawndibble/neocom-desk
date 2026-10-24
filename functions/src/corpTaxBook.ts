@@ -395,6 +395,30 @@ export function startDateMoveReason(
   return null;
 }
 
+export const rateKey = (r: StoredRate): string =>
+  r.scope === 'record'
+    ? `record:${r.recordKey}`
+    : `${r.scope}:${'minerId' in r ? r.minerId : ''}:${'moonId' in r ? r.moonId : ''}:${r.effectiveFrom}` +
+      (r.scope === 'structure' ? `:${r.structureId}` : '') +
+      (r.scope === 'feeder' ? `:${r.feederId}` : '');
+
+/**
+ * The rates after the start date moves earlier: the corp-default rate dated at the old start is
+ * re-dated to the new one. A rate already at the new date (same `rateKey`) is replaced, never
+ * doubled, as `addRate` does.
+ */
+export function moveStartRate(
+  rates: readonly StoredRate[],
+  oldStart: string,
+  newStart: string
+): StoredRate[] {
+  const moved = rates.map((r) =>
+    r.scope === 'corp' && r.effectiveFrom === oldStart ? { ...r, effectiveFrom: newStart } : r
+  );
+  const last = new Map(moved.map((r, i) => [rateKey(r), i]));
+  return moved.filter((r, i) => last.get(rateKey(r)) === i);
+}
+
 export type EditAction =
   | { action: 'addRate'; rate: ReturnType<typeof parseDatedRate> }
   | { action: 'setRecordRate'; recordKey: string; pct: number; reason: string }

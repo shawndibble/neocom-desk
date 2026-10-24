@@ -216,11 +216,11 @@ async function loadAssetsSnapshot(
   // The corporation's own structures list names every hangar's structure with
   // no per-id lookup; a role gap or failed read falls back to
   // `/universe/structures/{id}` after first paint.
-  const structureNames = canReadStructures
-    ? await loadCorporationStructures(characterId, corporationId)
+  const structureNames: Promise<Map<number, string>> = canReadStructures
+    ? loadCorporationStructures(characterId, corporationId)
         .then((result) => structureNameMap(result.cached?.data))
         .catch(() => new Map<number, string>())
-    : new Map<number, string>();
+    : Promise.resolve(new Map<number, string>());
   const [labels, volumeByTypeId, categoryByTypeId, copyValueByItemId] = await Promise.all([
     assets === null
       ? EMPTY_CORP_ASSET_LABELS

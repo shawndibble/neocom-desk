@@ -69,7 +69,7 @@ export function OverviewCachedNotice({ summary }: { summary: OverviewSummary }) 
 
 /**
  * The Next deadline: a link to the page that owns the clock, drawn as a plain
- * button (absent with no deadline). It is a child of `CharacterHeader`'s flex
+ * button (a plain readout when no page owns it; absent with no deadline). It is a child of `CharacterHeader`'s flex
  * row: left of Customize and the bell from `md`, on its own full-width line
  * under them on a phone.
  */
@@ -77,28 +77,34 @@ export function OverviewNext({ summary }: { summary: OverviewSummary }) {
   const { t } = useTranslation();
   const { next, remaining, tone } = summary;
   if (!next) return null;
+  const content = (
+    <>
+      <span className="text-text-dim">{t('overview.header.next')}</span>
+      {tone !== 'neutral' && <SeverityIcon severity={tone === 'danger' ? 'critical' : 'warning'} />}
+      <b className={cx('font-semibold tabular-nums', CHIP_TEXT[tone])}>
+        {formatCountdown(remaining / 1000)}
+      </b>
+      <span className="min-w-0 truncate text-text-dim normal-case md:max-w-40">{next.note}</span>
+    </>
+  );
   return (
     <div className="order-last min-w-0 basis-full md:order-none md:basis-auto">
-      <Tooltip content={t('overview.header.nextGoTo', { note: next.note })}>
-        <Link
-          to={next.to}
-          className={buttonClassName({
-            size: 'md',
-            className: 'w-full min-w-0 whitespace-nowrap md:w-auto',
-          })}
-        >
-          <span className="text-text-dim">{t('overview.header.next')}</span>
-          {tone !== 'neutral' && (
-            <SeverityIcon severity={tone === 'danger' ? 'critical' : 'warning'} />
-          )}
-          <b className={cx('font-semibold tabular-nums', CHIP_TEXT[tone])}>
-            {formatCountdown(remaining / 1000)}
-          </b>
-          <span className="min-w-0 truncate text-text-dim normal-case md:max-w-40">
-            {next.note}
-          </span>
-        </Link>
-      </Tooltip>
+      {next.to === undefined ? (
+        // No page owns this clock: a plain readout, not a button that goes nowhere.
+        <span className="flex min-w-0 items-center gap-2 whitespace-nowrap text-sm">{content}</span>
+      ) : (
+        <Tooltip content={t('overview.header.nextGoTo', { note: next.note })}>
+          <Link
+            to={next.to}
+            className={buttonClassName({
+              size: 'md',
+              className: 'w-full min-w-0 whitespace-nowrap md:w-auto',
+            })}
+          >
+            {content}
+          </Link>
+        </Tooltip>
+      )}
     </div>
   );
 }

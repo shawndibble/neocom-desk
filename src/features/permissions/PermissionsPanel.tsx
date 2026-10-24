@@ -156,6 +156,7 @@ export function PermissionsPanel() {
             {UNLOCKS_TOOLTIP[group] && (
               <InfoTooltip
                 label={t('common.aboutLabel', { label })}
+                glyph="info"
                 content={t(UNLOCKS_TOOLTIP[group])}
               />
             )}

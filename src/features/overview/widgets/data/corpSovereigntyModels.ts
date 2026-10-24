@@ -260,7 +260,6 @@ export const corpSovereignty: Builder = (feeds, { t, now }) => {
       at: nextWindow.windowStartMs,
       note: t(`${W}.deadline`, { subject: nameOf(data, nextWindow) }),
       severity: tone(nextWindow, now),
-      to: '/corp',
     });
   }
   if (nextRunOut !== undefined) {
@@ -268,7 +267,6 @@ export const corpSovereignty: Builder = (feeds, { t, now }) => {
       at: nextRunOut.runsOutMs,
       note: t(`${W}.hubDeadline`, { subject: nextRunOut.name }),
       severity: severityForRemaining(nextRunOut.runsOutMs - now),
-      to: '/corp',
     });
   }
 

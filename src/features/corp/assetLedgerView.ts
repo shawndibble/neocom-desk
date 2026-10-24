@@ -32,7 +32,7 @@ const STATE_KEY: Readonly<Record<LedgerState, string>> = {
 
 export interface LedgerLabels {
   typeName(typeId: number): string;
-  /** The full name of an office, structure or system, else "Location #id". */
+  /** The full name of an office, structure or system, else "Unknown location" (no id) or "Location #id". */
   placeName(locationId: number | null): string;
   /** The name's first segment ("Efa" of "Efa - Hangar Keep"), for a chip; the whole name for an Upwell structure; null when unresolved. */
   shortPlaceName(locationId: number | null): string | null;

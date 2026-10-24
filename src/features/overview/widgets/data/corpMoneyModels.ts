@@ -100,7 +100,7 @@ export const corpWallet: Builder = (feeds, { t }) => {
   };
   return withFeed(
     {
-      ...blank(TO, statusOf(feeds.corpWallet, { isEmpty: data.divisions.length === 0 })),
+      ...blank(TO, statusOf(feeds.corpWallet, { isEmpty: named.length === 0 })),
       number,
       table,
       summary: t(`${K}.summary`, { isk: formatIskCompact(total), count: all.length }),
@@ -200,8 +200,10 @@ export const corpCashFlow: Builder = (feeds, { t, now, range }) => {
   const netPositive =
     inRange(data.journal, now, VITALS_WINDOW_DAYS).reduce((sum, l) => sum + l.amount, 0) > 0;
 
+  // The sentence speaks for the vitals window, so it only sits beside a headline of that range.
+  const showNetPositive = netPositive && range === VITALS_WINDOW_DAYS;
   const notes: string[] = [];
-  if (range !== VITALS_WINDOW_DAYS) {
+  if (range !== VITALS_WINDOW_DAYS && !netPositive) {
     notes.push(t(`${K}.runwayWindow`, { count: VITALS_WINDOW_DAYS }));
   }
   const coverage = range > covered ? t(`${K}.coverage`, { count: covered }) : undefined;
@@ -243,14 +245,16 @@ export const corpCashFlow: Builder = (feeds, { t, now, range }) => {
         iskAmount: net,
         unit: t(`${K}.unit`),
         tone: 'clear',
-        secondary: netPositive
+        secondary: showNetPositive
           ? { text: t(`${K}.netPositive`, { count: VITALS_WINDOW_DAYS }) }
-          : runwayDaysWhole === null
-            ? { text: t(`${K}.runwayUnknown`) }
-            : {
-                text: t(`${K}.runway`, { count: runwayDaysWhole }),
-                tone: runwayDaysWhole < RUNWAY_WARNING_DAYS ? 'caution' : undefined,
-              },
+          : netPositive
+            ? undefined
+            : runwayDaysWhole === null
+              ? { text: t(`${K}.runwayUnknown`) }
+              : {
+                  text: t(`${K}.runway`, { count: runwayDaysWhole }),
+                  tone: runwayDaysWhole < RUNWAY_WARNING_DAYS ? 'caution' : undefined,
+                },
         notes: notes.length > 0 ? notes : undefined,
       },
       table,

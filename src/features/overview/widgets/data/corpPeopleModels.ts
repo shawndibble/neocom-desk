@@ -176,7 +176,7 @@ export const corpInactive: Builder = (feeds, { t }) => {
 
   return {
     ...blank(to, statusOf(feed, { isEmpty: inactive.length === 0 })),
-    emptyHealthy: true,
+    emptyHealthy: inactive.length === 0,
     fetchedAt: data.fetchedAt,
     fromCache: data.fromCache,
     number: {

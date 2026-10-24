@@ -16,7 +16,7 @@ export function legacyCorpMembersLocation(
   search: string
 ): { pathname: string; search: string } | null {
   const path = pathname.replace(/\/$/, '');
-  /** The roster tab was `members` until #4895's audit (CX-12). */
+  /** The roster tab was `members` until the audit in docs/audits/2026-10-23-corp-ux-audit.md (CX-12). */
   if (path === '/corp/members/members') return { pathname: '/corp/members/roster', search };
   if (path !== '/corp/members') return null;
   const params = new URLSearchParams(search);

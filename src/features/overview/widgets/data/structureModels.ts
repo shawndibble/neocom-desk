@@ -93,7 +93,6 @@ export const structures: Builder = (feeds, { t, now }) => {
   const raw = feed?.data ?? null;
   // No structures page exists: a plain title, not a link back to /corp.
   const to = null;
-  const deadlineTo = '/corp';
   if (!raw) return blank(to, statusOf(feed));
   const view = structuresView(raw, now);
   const items = view.items;
@@ -192,7 +191,6 @@ export const structures: Builder = (feeds, { t, now }) => {
             at: clock.atMs,
             note: t(`overview.board.structureDeadline.${clock.kind}`, { subject: clock.subject }),
             severity: clock.severity,
-            to: deadlineTo,
           },
         ]
       : [],
@@ -234,7 +232,10 @@ export const moonChunks: Builder = (feeds, { t, now }) => {
       summary: moonChunksSummary(t, data, now),
     };
   }
-  const chunks = [...data.chunks].sort((a, b) => a.deadlineMs - b.deadlineMs);
+  // Rows are built at load time; a clock that has passed since would sit beside a Due soon count that already dropped it.
+  const chunks = data.chunks
+    .filter((chunk) => chunk.deadlineMs > now)
+    .sort((a, b) => a.deadlineMs - b.deadlineMs);
   const ready = chunks.filter((chunk) => chunk.detail === 'decay').length;
   const nextChunk = moonChunksDeadline(data.chunks, now);
   const eventOf = (detail: string) =>

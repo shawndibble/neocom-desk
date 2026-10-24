@@ -215,11 +215,11 @@ function useItemMenuItems(
   if (props.holdingsOnly) {
     return (
       <>
+        <ShowInfoMenuItem typeId={typeId} itemName={itemName} itemId={itemId} />
+        <ViewInMarketMenuItem typeId={typeId} />
         {!props.hideStockTarget && (
           <MenuItem onSelect={onStockTargetRequest}>{t('stockTargets.dialog.menuItem')}</MenuItem>
         )}
-        <ShowInfoMenuItem typeId={typeId} itemName={itemName} itemId={itemId} />
-        <ViewInMarketMenuItem typeId={typeId} />
         {extraItems}
       </>
     );

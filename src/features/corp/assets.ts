@@ -197,11 +197,12 @@ export const EMPTY_CORP_ASSET_LABELS: CorpAssetLabels = {
 export async function loadCorpAssetLabels(
   assets: readonly CorporationAsset[],
   placeIds: readonly number[] = assetPlaceIds(assets),
-  structureNames: ReadonlyMap<number, string> = new Map()
+  structureNames: ReadonlyMap<number, string> | Promise<ReadonlyMap<number, string>> = new Map()
 ): Promise<CorpAssetLabels> {
-  const [types, locations] = await Promise.all([
+  const [types, locations, structures] = await Promise.all([
     loadTypeNames(assets.map((asset) => asset.type_id)),
     cachedAssetLocationNames(placeIds),
+    structureNames,
   ]);
-  return { types, locations: new Map([...locations, ...structureNames]) };
+  return { types, locations: new Map([...locations, ...structures]) };
 }
