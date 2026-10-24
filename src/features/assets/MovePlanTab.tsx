@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { lookupSolarSystem } from '@/sde/solarSystems';
 import { ActiveHaulView } from './ActiveHaulView';
-import { buildActiveHaul, useActiveHaul } from './activeHaul';
+import { buildActiveHaul, replanActiveHaul, useActiveHaul } from './activeHaul';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
 import type { PilotProfile } from '@/engine/fittings/types';
 import {
@@ -30,6 +30,7 @@ import {
   type FittingCatalogue,
 } from '@/features/fittings/useFittingCatalogue';
 import { hullPackHolds } from '@/features/market/haulingCargo';
+import { useCurrentSystem } from '@/features/route/currentSystem';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
@@ -191,6 +192,7 @@ function MovePlanTabBody({
   const [haulerOverride, setHaulerOverride] = useState<HaulerOverride | undefined>();
   const savedHaul = useActiveHaul((st) => st.value);
   const setSavedHaul = useActiveHaul((st) => st.setValue);
+  const currentSystem = useCurrentSystem();
   useHydratedStore(useActiveHaul);
   /** The active haul fills the tab instead of the picker or the plan. */
   const [showingHaul, setShowingHaul] = useState(false);
@@ -496,6 +498,13 @@ function MovePlanTabBody({
           <ActiveHaulView
             haul={savedHaul}
             onBack={() => setShowingHaul(false)}
+            currentSystemId={currentSystem.systemId}
+            onProgress={(doneLegIds) => setSavedHaul({ ...savedHaul, doneLegIds })}
+            onReplan={async () => {
+              const result = await replanActiveHaul(savedHaul);
+              if (result.status === 'replanned') await setSavedHaul(result.haul);
+              return result;
+            }}
             onClear={async () => {
               await setSavedHaul(null);
               setShowingHaul(false);
