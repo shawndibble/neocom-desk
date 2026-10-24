@@ -268,7 +268,12 @@ function PresetItem({
         {justAdded && <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
         {justAdded ? t('overview.gallery.added') : ''}
       </span>
-      {showPreview && <Preview kind={kind} sample="marketTrendSingle" />}
+      {showPreview && (
+        <Preview
+          kind={kind}
+          sample={preset.id === 'plex' ? 'marketTrendPlex' : 'marketTrendInjector'}
+        />
+      )}
     </li>
   );
 }

@@ -1,8 +1,9 @@
 /**
- * The Gallery's Item prices presets: each adds an ordinary Market Trend widget
- * that already names its items (minerals, ore and the rest come from the Items menu) (`trendItems`), a title and a view. Nothing
- * ties the widget to its preset afterwards, so instances stay independent and
- * the pilot can edit the items, title and view like any other widget.
+ * The Gallery's Item prices presets: each adds an ordinary Item prices widget
+ * (kind `marketTrend`) that already names its items (`trendItems`), a title and
+ * a view. Minerals, ores and the rest come from the Items menu, so they have no
+ * preset. Nothing ties the widget to its preset afterwards, so instances stay
+ * independent and the pilot can edit the items, title and view like any other.
  */
 import type { WidgetView } from './layout';
 
