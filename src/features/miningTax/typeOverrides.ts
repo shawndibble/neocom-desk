@@ -66,7 +66,8 @@ async function writeTypeIdList(key: string, value: number[]): Promise<void> {
   try {
     await setSyncedSetting(key, value);
     const characters = await db.characters.toArray();
-    for (const character of characters) scheduleSync(character.characterId);
+    for (const character of characters)
+      scheduleSync(character.characterId, { collections: ['settings'] });
   } catch {
     // The tag is already on disk; the next successful sync pushes it.
   }

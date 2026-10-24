@@ -175,7 +175,7 @@ export function ProductionRunsPanel({
       updatedAt: now,
       ...(defaults?.sourceJobId !== undefined && { sourceJobId: defaults.sourceJobId }),
     });
-    scheduleSync(characterId);
+    scheduleSync(characterId, { collections: ['productionRuns'] });
     closeLogProduction();
   }
 
@@ -193,7 +193,7 @@ export function ProductionRunsPanel({
       totalCost: materialCost + jobFee,
       updatedAt: Date.now(),
     });
-    scheduleSync(characterId);
+    scheduleSync(characterId, { collections: ['productionRuns'] });
     setEditingRunId(null);
   }
 

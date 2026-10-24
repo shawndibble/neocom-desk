@@ -337,8 +337,13 @@ sentinel, not `loadWithCache` itself.
 
 **Skill plan edit → sync**
 UI mutates `db.skillPlans`/`db.buildPlans`/`setSyncedSetting` directly, then
-calls `scheduleSync(characterId)` (2s debounce) or `triggerSync` for
-immediate. Deletes MUST go through `markPlanDeleted`/`markBuildPlanDeleted`
+calls `scheduleSync(characterId, { collections: ['plans'] })` (2s debounce)
+or `triggerSync` for immediate. `collections` names the synced collections
+the edit wrote: a pass within `PARTIAL_PASS_WINDOW_MS` of a full one pulls
+and pushes only those, and coalesced requests union them (issue #4896,
+`sync/syncScheduler.ts`). Omit it when unsure — that is a full pass, as are
+boot, Character switch, reconnect, the background sweep and `triggerSync`.
+Deletes MUST go through `markPlanDeleted`/`markBuildPlanDeleted`
 /`deleteSyncedSetting` (each records a tombstone) — a plain Dexie delete
 resurrects from the remote copy. `setSyncedSetting` also enforces the
 `SYNCED_SETTING_KEYS` allow-list (`src/sync/syncedSettings.ts`); adding a

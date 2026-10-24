@@ -160,7 +160,7 @@ function GoalPlanner({
           : withCustomsOverride(current, systemId, percent / 100);
       setCustomsEdits(next);
       void setSyncedSetting(SYNCED_PI_CUSTOMS_KEY, next)
-        .then(() => scheduleSync(characterId))
+        .then(() => scheduleSync(characterId, { collections: ['settings'] }))
         .catch(() => {});
     },
     [characterId, customsEdits, snapshot]

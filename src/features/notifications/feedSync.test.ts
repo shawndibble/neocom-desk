@@ -36,7 +36,9 @@ describe('dismissFeedEntriesAndSync', () => {
     await dismissFeedEntriesAndSync([row('a', CHAR_A)]);
 
     expect((await readFeed())[0]?.dismissedAt).toBeGreaterThan(0);
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A, {
+      collections: ['notificationFeed'],
+    });
   });
 
   it('schedules nothing for an empty dismissal', async () => {
@@ -49,7 +51,10 @@ describe('dismissFeedEntriesAndSync', () => {
 
     await dismissFeedEntriesAndSync([row('a', CHAR_A), row('b', CHAR_B), row('c', CHAR_A)]);
 
-    expect(syncMock.scheduleSync.mock.calls).toEqual([[CHAR_A], [CHAR_B]]);
+    expect(syncMock.scheduleSync.mock.calls).toEqual([
+      [CHAR_A, { collections: ['notificationFeed'] }],
+      [CHAR_B, { collections: ['notificationFeed'] }],
+    ]);
   });
 
   it('leaves rows it was not given alone', async () => {
@@ -69,7 +74,10 @@ describe('dismissFeedKeysAndSync', () => {
     await dismissFeedKeysAndSync([CHAR_A, CHAR_B], ['a', 'b']);
 
     expect((await readFeed()).every((entry) => (entry.dismissedAt ?? 0) > 0)).toBe(true);
-    expect(syncMock.scheduleSync.mock.calls).toEqual([[CHAR_A], [CHAR_B]]);
+    expect(syncMock.scheduleSync.mock.calls).toEqual([
+      [CHAR_A, { collections: ['notificationFeed'] }],
+      [CHAR_B, { collections: ['notificationFeed'] }],
+    ]);
   });
 
   it('pushes once per character when one retraction names a character twice', async () => {
@@ -77,7 +85,9 @@ describe('dismissFeedKeysAndSync', () => {
 
     await dismissFeedKeysAndSync([CHAR_A, CHAR_A], ['a', 'b']);
 
-    expect(syncMock.scheduleSync.mock.calls).toEqual([[CHAR_A]]);
+    expect(syncMock.scheduleSync.mock.calls).toEqual([
+      [CHAR_A, { collections: ['notificationFeed'] }],
+    ]);
   });
 });
 
@@ -86,6 +96,8 @@ describe('recordFeedEntryAndSync', () => {
     await recordFeedEntryAndSync(row('a', CHAR_A));
 
     expect(await readFeed()).toHaveLength(1);
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A, {
+      collections: ['notificationFeed'],
+    });
   });
 });
