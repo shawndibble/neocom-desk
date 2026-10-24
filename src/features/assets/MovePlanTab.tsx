@@ -3,9 +3,11 @@ import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useReportSkipped } from './useReportSkipped';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Button, FilterChip, LiveStatus, Spinner } from '@/components/ui';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useUrlParams } from '@/lib/useUrlState';
 import { lookupSolarSystem } from '@/sde/solarSystems';
 import { ActiveHaulView } from './ActiveHaulView';
 import { buildActiveHaul, replanActiveHaul, useActiveHaul } from './activeHaul';
@@ -38,6 +40,13 @@ import { formatCubicMetres } from '@/lib/volume';
 import { loadGroupCategories, loadShipTree, loadTypes } from '@/sde/loadSde';
 import { PickerList } from './MovePlanPicker';
 import { PlanResult, type PlanState } from './MovePlanResult';
+import {
+  MOVE_PLAN_URL_SCHEMA,
+  NO_MOVE_PLAN,
+  movePlanKey,
+  planFromUrl,
+  type MovePlanUrlValues,
+} from './movePlanUrl';
 import {
   fittedRigCounts,
   pickerStacks,
@@ -123,7 +132,7 @@ async function load(characterIds: readonly number[]): Promise<Loaded> {
 }
 
 interface MovePlanTabProps {
-  /** Leaves the plan: Cancel, and Done on the result. The page returns to its Items tab. */
+  /** Leaves the plan: Cancel. The page returns to its Items tab. */
   onClose: () => void;
   /** The Characters the page's filter names. */
   characterIds: readonly number[];
@@ -135,7 +144,8 @@ interface MovePlanTabProps {
 /**
  * Plan a move: tick what to carry, say where to, see the work list per
  * Character and pickup with a suggested hauler. The Assets page's Move tab
- * mounts it, so its state lasts while the tab is open and starts fresh on re-entry.
+ * mounts it. A shown plan lives in the URL (`movePlanUrl.ts`), so Back from Route
+ * Safety and a pasted link rebuild it; the picker's own ticks are state.
  * Volumes and trips are an estimate from hull class; Show my route
  * opens the leg list, and Route Safety answers the safety question.
  */
@@ -194,8 +204,28 @@ function MovePlanTabBody({
   const setSavedHaul = useActiveHaul((st) => st.setValue);
   const currentSystem = useCurrentSystem();
   useHydratedStore(useActiveHaul);
+  const [urlValues, setUrlValues] = useUrlParams(MOVE_PLAN_URL_SCHEMA);
+  const urlPlan = planFromUrl(urlValues);
+  const urlKey = movePlanKey(urlValues);
+  const navigate = useNavigate();
+  /** The plan the screen shows, as the URL names it: tells a URL change this tab made from one the pilot made (Back, a link). */
+  const [shownKey, setShownKey] = useState<string | null>(null);
+  const [seenUrlKey, setSeenUrlKey] = useState<string | null>(null);
+  /** The URL plan being rebuilt, so one link is worked out once. */
+  const restoring = useRef<string | null>(null);
+  // The URL dropped the plan (Back): close it. Adjusted while rendering, so no frame shows the old plan.
+  if (urlKey !== seenUrlKey) {
+    setSeenUrlKey(urlKey);
+    if (urlKey === null && shownKey !== null) {
+      setShownKey(null);
+      setResult(null);
+    }
+  }
+  /** This mount pushed the plan's history entry, so Back can step out of it. */
+  const pushedPlan = useRef(false);
   /** The active haul fills the tab instead of the picker or the plan. */
-  const [showingHaul, setShowingHaul] = useState(false);
+  const showingHaul = urlValues.mvr && savedHaul !== null;
+  const setShowingHaul = (open: boolean) => setUrlValues({ mvr: open });
   const [routing, setRouting] = useState(false);
   const [routeFailed, setRouteFailed] = useState(false);
   const [replacing, setReplacing] = useState(false);
@@ -342,49 +372,77 @@ function MovePlanTabBody({
     return { hulls, sizing: sizingFailures > 0 && hulls.length === 0 ? 'unavailable' : undefined };
   }
 
+  /** Works a plan out from the given picks, for a fresh plan and for one rebuilt from the URL. */
+  async function computePlan(
+    inputs: PlanInputs,
+    packedIds: ReadonlySet<number>,
+    override: HaulerOverride | undefined
+  ) {
+    if (!loaded) throw new Error('assets not loaded');
+    const { searched, destStation: station, destSystem: system } = inputs;
+    const atPlace = coveredLocations(loaded.systems, system, station);
+    const destinationSystem =
+      searched !== null
+        ? searched.systemId
+        : station !== null
+          ? await resolvePlace(
+              { locationId: station, characterId: null, kind: 'station' },
+              undefined,
+              {
+                name: false,
+              }
+            )
+              .then((place) => place.systemId)
+              .catch(() => null)
+          : system;
+    const { hulls, sizing } = await loadHulls();
+    const base = {
+      destinationLocationIds: atPlace,
+      characters: selectedPlanCharacters(loaded.sources, loaded.shipTypeIds, inputs.selected),
+      unitM3: loaded.unitM3,
+      shipTypeIds: loaded.shipTypeIds,
+      hulls,
+    };
+    const plan = planMove({ ...base, packedShipIds: packedIds, haulerOverride: override });
+    const state: PlanState = {
+      plan,
+      destinationSystem,
+      destinationStation:
+        station !== null ? (loaded.places.get(station) ?? searched?.name ?? null) : null,
+      pickupSystems: loaded.systems,
+      haulerSizing: sizing,
+    };
+    return { base, state };
+  }
+
   async function showPlan() {
     if (!loaded || !hasDestination) return;
     setWorking(true);
     setPlanFailed(false);
     const mine = session.current;
     try {
-      const destinationSystem =
-        searchedStation !== null
-          ? searchedStation.systemId
-          : destStation !== null
-            ? await resolvePlace(
-                { locationId: destStation, characterId: null, kind: 'station' },
-                undefined,
-                {
-                  name: false,
-                }
-              )
-                .then((place) => place.systemId)
-                .catch(() => null)
-            : destSystem;
-      const { hulls, sizing } = await loadHulls();
-      const base = {
-        destinationLocationIds: atDestination,
-        characters: selectedPlanCharacters(loaded.sources, loaded.shipTypeIds, selected),
-        unitM3: loaded.unitM3,
-        shipTypeIds: loaded.shipTypeIds,
-        hulls,
-      };
-      const plan = planMove(base);
+      const { base, state } = await computePlan(
+        { selected, destSystem, destStation, searched: searchedStation },
+        new Set(),
+        undefined
+      );
       if (mine === session.current) {
         planBase.current = base;
         setPacked(new Set());
         setHaulerOverride(undefined);
-        setResult({
-          plan,
-          destinationSystem,
-          destinationStation:
+        setResult(state);
+        const values: MovePlanUrlValues = {
+          ...NO_MOVE_PLAN,
+          mv: [...selected],
+          mvd:
             destStation !== null
-              ? (loaded.places.get(destStation) ?? searchedStation?.name ?? null)
-              : null,
-          pickupSystems: loaded.systems,
-          haulerSizing: sizing,
-        });
+              ? { kind: 'station', id: destStation }
+              : { kind: 'system', id: destSystem! },
+        };
+        setShownKey(movePlanKey(values));
+        pushedPlan.current = true;
+        // A history entry: Back returns to the picker.
+        setUrlValues(values, { push: true });
         focusAfterCommit(planHeadingRef);
       }
     } catch {
@@ -394,12 +452,75 @@ function MovePlanTabBody({
     }
   }
 
+  /** The picks a URL's plan names, dropping what these assets no longer hold; `null` when nothing is left to plan. */
+  async function inputsFromUrl(plan: MovePlanUrlValues): Promise<PlanInputs | null> {
+    if (!loaded || !plan.mvd) return null;
+    const known = new Set(loaded.stacks.map((st) => st.key));
+    const picked = new Set(plan.mv.filter((key) => known.has(key)));
+    if (picked.size === 0) return null;
+    const { kind, id } = plan.mvd;
+    if (kind === 'system') {
+      return { selected: picked, destSystem: id, destStation: null, searched: null };
+    }
+    if (loaded.places.has(id)) {
+      return { selected: picked, destSystem: null, destStation: id, searched: null };
+    }
+    const place = await resolvePlace({ locationId: id, characterId: null, kind: 'station' }).catch(
+      () => null
+    );
+    if (!place || place.systemId === null) return null;
+    return {
+      selected: picked,
+      destSystem: null,
+      destStation: id,
+      searched: { id, name: place.name ?? String(id), systemId: place.systemId },
+    };
+  }
+
+  // The URL leads: a plan it names that the screen does not show is rebuilt (a pasted link, Route
+  // Safety's Back, Forward). A plan this tab built itself already set `shownKey`, so it is not worked out twice.
+  useEffect(() => {
+    if (urlKey === null) {
+      restoring.current = null;
+      return;
+    }
+    if (urlKey === shownKey || urlKey === restoring.current || !loaded || !urlPlan) return;
+    restoring.current = urlKey;
+    const mine = session.current;
+    void (async () => {
+      try {
+        const inputs = await inputsFromUrl(urlPlan);
+        if (!inputs) throw new Error('stale plan link');
+        const nextPacked = new Set(urlPlan.mvp);
+        const override = urlPlan.mvh ?? undefined;
+        const { base, state } = await computePlan(inputs, nextPacked, override);
+        if (mine !== session.current) return;
+        planBase.current = base;
+        setSelected(inputs.selected);
+        chooseDestination(inputs.destSystem, inputs.destStation, inputs.searched);
+        setPacked(nextPacked);
+        setHaulerOverride(override);
+        setResult(state);
+        setShownKey(urlKey);
+      } catch {
+        // A stale or hand-edited link: the empty planner, no error screen.
+        if (mine !== session.current) return;
+        restoring.current = null;
+        setUrlValues(NO_MOVE_PLAN);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the URL's plan or the loaded assets change; the helpers close over `loaded`
+  }, [urlKey, loaded, shownKey]);
+
   /** Works the shown plan out again for a changed ship choice or hauler. */
   function replan(nextPacked: ReadonlySet<number>, nextOverride: HaulerOverride | undefined) {
     const base = planBase.current;
     if (!base) return;
     setPacked(nextPacked);
     setHaulerOverride(nextOverride);
+    const patch = { mvp: [...nextPacked], mvh: nextOverride ?? null };
+    setShownKey(movePlanKey({ ...urlValues, ...patch }));
+    setUrlValues(patch);
     setResult((r) =>
       r
         ? {
@@ -517,7 +638,7 @@ function MovePlanTabBody({
           />
         ) : failed ? (
           <p className="text-text-dim">{t('assets.movePlan.failed')}</p>
-        ) : !loaded ? (
+        ) : !loaded || (urlKey !== null && !result) ? (
           <Spinner size="sm" label={t('assets.movePlan.loading')} />
         ) : result ? (
           <PlanResult
@@ -528,10 +649,13 @@ function MovePlanTabBody({
             onPickHauler={(next) => replan(packed, next)}
             headingRef={planHeadingRef}
             onBack={() => {
-              setResult(null);
+              // The URL closes the plan (see the effect above): step out of the entry this tab pushed, else drop the plan from the one it is on.
+              if (pushedPlan.current) {
+                pushedPlan.current = false;
+                navigate(-1);
+              } else setUrlValues(NO_MOVE_PLAN);
               focusAfterCommit(deliverHeadingRef);
             }}
-            onDone={onClose}
             onShowRoute={showRoute}
             routing={routing}
             routeFailed={routeFailed}
@@ -712,6 +836,14 @@ function coveredLocations(
   if (station !== null) ids.add(station);
   else if (system !== null) for (const [id, sys] of systems ?? []) if (sys === system) ids.add(id);
   return ids;
+}
+
+/** What a plan is worked out from: the picker's ticks and destination. */
+interface PlanInputs {
+  selected: ReadonlySet<string>;
+  destSystem: number | null;
+  destStation: number | null;
+  searched: { id: number; name: string; systemId: number } | null;
 }
 
 interface HullSourceData {

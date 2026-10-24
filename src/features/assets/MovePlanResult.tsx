@@ -52,7 +52,6 @@ interface PlanResultProps {
   /** The plan's screen-reader heading, where focus lands once the plan shows. */
   headingRef: Ref<HTMLHeadingElement>;
   onBack: () => void;
-  onDone: () => void;
   /** Works out and shows the active haul; absent where no route can be planned. */
   onShowRoute?: () => void;
   /** The route is being worked out. */
@@ -85,7 +84,6 @@ export function PlanResult({
   onPickHauler,
   headingRef,
   onBack,
-  onDone,
   onShowRoute,
   routing = false,
   routeFailed = false,
@@ -416,9 +414,6 @@ export function PlanResult({
             {t('assets.movePlan.showRoute')}
           </Button>
         )}
-        <Button variant="primary" onClick={onDone}>
-          {t('assets.movePlan.done')}
-        </Button>
       </div>
       <Modal
         open={asking !== null}
