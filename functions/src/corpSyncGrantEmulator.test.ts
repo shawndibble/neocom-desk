@@ -2,6 +2,7 @@
 // emulator (issue #4068, ADR 0025). Runs only under `npm run test:rules` at the
 // repo root (which starts the emulator and sets FIRESTORE_EMULATOR_HOST); a plain
 // `npm test` skips it.
+import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
@@ -21,7 +22,7 @@ import {
   type CorpSyncGrantDoc,
   type ScheduledSyncStatus,
 } from './corpSyncGrant.js';
-import { turnOnBook, verifyOfficer, type BookDeps, type Caller } from './corpTaxBookStore.js';
+import { turnOnBook, verifyOfficer, type BookDeps } from './corpTaxBookStore.js';
 import type { EsiRead, SyncEsi } from './corpTaxBookSyncEsi.js';
 
 const CORP = 98000001;

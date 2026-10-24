@@ -4,9 +4,9 @@
 // audit entry in the same transaction. Rules and shapes: srpOfficer.ts.
 // Returns what the result mail needs (pilot, amount, reason); sends nothing.
 
+import type { Caller } from './actorAuth.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import type { BookCall } from './corpTaxBook.js';
-import type { Caller } from './corpTaxBookStore.js';
 import {
   decideApprove,
   decideChangeAmount,

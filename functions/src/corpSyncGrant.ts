@@ -30,11 +30,9 @@ import {
   appendAudit,
   authorizeOfficer,
   bookRef,
-  fail,
   feederRef,
   type Actor,
   type BookDeps,
-  type Caller,
   type OpenPricesReader,
   mergeObservedInto,
 } from './corpTaxBookStore.js';
@@ -53,7 +51,13 @@ import type { FeederRecord } from './corpTaxBookFeeders.js';
 import { runBookSync, type BookSyncResult, type StopReason } from './corpTaxBookScheduledSync.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
-import { assertOwnToken, signedInCharacter, verifyAccessToken } from './actorAuth.js';
+import {
+  assertOwnToken,
+  signedInCharacter,
+  verifyAccessToken,
+  fail,
+  type Caller,
+} from './actorAuth.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
 
 export const CORP_SYNC_GRANTS_COLLECTION = 'corpTaxBookSyncGrants';

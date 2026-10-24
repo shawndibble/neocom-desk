@@ -8,10 +8,10 @@
 // `closedAt` is set when a claim becomes paid or rejected (the retention sweep keys on it).
 // The app never moves ISK: an officer pays in game, then marks the claim paid.
 
+import { fail } from './actorAuth.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
 import { int } from './corpTaxBook.js';
-import { fail } from './corpTaxBookStore.js';
 import type { SrpClaimState } from './srpTypes.js';
 
 /** The most claims one batch call touches. */

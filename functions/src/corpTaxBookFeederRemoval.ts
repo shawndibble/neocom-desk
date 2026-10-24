@@ -36,13 +36,11 @@ import { hashInviteCode, type FeederRecord } from './corpTaxBookFeeders.js';
 import {
   appendAudit,
   authorizeOfficer,
-  fail,
   feederRef,
   liveOfficerIds,
   type BookDeps,
-  type Caller,
 } from './corpTaxBookStore.js';
-import { signedInCharacter } from './actorAuth.js';
+import { signedInCharacter, fail, type Caller } from './actorAuth.js';
 
 /** Slack on the link past the wait, for a mail read late. */
 const LINK_SLACK_MS = 24 * 3_600_000;

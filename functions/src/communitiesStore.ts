@@ -10,6 +10,7 @@
 //   communities/{id}/fittings/{uid~key}           one shared Fitting (issue #3605), written by the Member
 //   characters/{uid}/communities/{id}             the Character's membership index
 
+import type { Caller } from './actorAuth.js';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
@@ -43,12 +44,6 @@ const LIBRARY_COLLECTION = 'library';
 const REQUESTS_COLLECTION = 'requests';
 const FITTINGS_COLLECTION = 'fittings';
 const SKILL_PLANS_COLLECTION = 'skillPlans';
-
-/** Who is calling: the Firebase uid `char:{id}` and the ownerHash claim. */
-export interface CallerCharacter {
-  uid: string;
-  ownerHash: string;
-}
 
 export const communityRef = (db: Firestore, communityId: string) =>
   db.collection(COMMUNITIES_COLLECTION).doc(communityId);
@@ -106,12 +101,12 @@ export async function loadCommunity(db: Firestore, communityId: string) {
  * with: a sold Character keeps its uid but gets a new ownerHash, and must not
  * act on, or be told it holds, the previous owner's membership.
  */
-export async function isCurrentMember(db: Firestore, communityId: string, caller: CallerCharacter) {
+export async function isCurrentMember(db: Firestore, communityId: string, caller: Caller) {
   const member = await memberRef(db, communityId, caller.uid).get();
   return member.exists && member.get('ownerHash') === caller.ownerHash;
 }
 
-export async function requireAdmin(db: Firestore, communityId: string, caller: CallerCharacter) {
+export async function requireAdmin(db: Firestore, communityId: string, caller: Caller) {
   const snap = await loadCommunity(db, communityId);
   if (snap.get('adminUid') !== caller.uid || !(await isCurrentMember(db, communityId, caller))) {
     fail('not-admin');
@@ -160,7 +155,7 @@ export async function previewCommunity(db: Firestore, inviteCode: string): Promi
 
 export async function createCommunity(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   input: CreateCommunityInput
 ): Promise<{ communityId: string; inviteCode: string }> {
   await pruneDanglingIndex(db, caller.uid);
@@ -196,7 +191,7 @@ export async function createCommunity(
 
 export async function joinCommunity(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   input: JoinCommunityInput
 ): Promise<{ communityId: string; alreadyMember: boolean; pending?: boolean }> {
   const found = await db
@@ -311,7 +306,7 @@ function admit(
 /** The admin turns "approve new Members" on or off. Requests already waiting stay until decided. */
 export async function setRequireApproval(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   requireApproval: boolean
 ): Promise<void> {
@@ -327,7 +322,7 @@ export async function setRequireApproval(
  */
 export async function decideJoinRequest(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   requestUid: string,
   accept: boolean
@@ -463,7 +458,7 @@ export async function removeMemberData(
 
 export async function leaveCommunity(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string
 ): Promise<void> {
   const community = await loadCommunity(db, communityId);
@@ -478,7 +473,7 @@ export async function leaveCommunity(
 
 export async function removeMember(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   memberUid: string
 ): Promise<void> {
@@ -496,7 +491,7 @@ export async function removeMember(
 
 export async function transferAdmin(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   newAdminUid: string
 ): Promise<void> {
@@ -554,7 +549,7 @@ export interface MailInviteReservation {
 // refund and retake rules in step; they were not merged to leave the invite path untouched.
 export async function reserveMailInvite(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   targetCharacterId: number,
   targetName: string,
@@ -618,7 +613,7 @@ export async function reserveMailInvite(
 /** The mail went out: stamp the time the admin's "Sent" list shows. */
 export async function confirmMailInvite(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   targetCharacterId: number,
   now = Date.now()
@@ -636,7 +631,7 @@ export async function confirmMailInvite(
  */
 export async function releaseMailInvite(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   targetCharacterId: number,
   now = Date.now()
@@ -672,7 +667,7 @@ export async function releaseMailInvite(
 /** Revoking leaves no working link until the admin regenerates one. */
 export async function revokeInvite(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string
 ): Promise<void> {
   const community = await requireAdmin(db, communityId, caller);
@@ -681,7 +676,7 @@ export async function revokeInvite(
 
 export async function regenerateInvite(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string
 ): Promise<{ inviteCode: string }> {
   const community = await requireAdmin(db, communityId, caller);
@@ -717,7 +712,7 @@ export async function deleteCommunityData(
 
 export async function deleteCommunity(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string
 ): Promise<void> {
   await requireAdmin(db, communityId, caller);

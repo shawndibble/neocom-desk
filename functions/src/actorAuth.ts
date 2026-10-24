@@ -33,6 +33,19 @@ export function signedInCharacter(caller: Caller): number {
   return characterId;
 }
 
+/** The signed-in Character behind a callable's `request.auth`, or `not-signed-in`. */
+export function callerFromAuth(
+  auth: { uid: string; token: Record<string, unknown> } | undefined
+): Caller {
+  const ownerHash = auth?.token.ownerHash;
+  if (!auth || typeof ownerHash !== 'string') {
+    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  }
+  const caller = { uid: auth.uid, ownerHash };
+  signedInCharacter(caller);
+  return caller;
+}
+
 export interface VerifyOptions {
   /** Sees the real cause for logging; it never reaches the client. */
   onReject?: (err: unknown) => void;
