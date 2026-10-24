@@ -181,6 +181,14 @@ const SPECS = {
     size: 'M',
     endpoints: [],
   },
+  marketTrend: {
+    category: 'trade',
+    views: NCT,
+    view: 'chart',
+    size: 'M',
+    range: true,
+    endpoints: [],
+  },
   stock: {
     category: 'trade',
     views: NCT,

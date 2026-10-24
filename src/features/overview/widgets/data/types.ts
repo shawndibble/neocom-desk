@@ -58,6 +58,7 @@ import type {
   ProfitWidgetData,
   RouteSafetyWidgetData,
   KillsWidgetData,
+  MarketTrendWidgetData,
   OmegaWidgetData,
   TradingProfitWidgetData,
   SovRaidsWidgetData,
@@ -317,6 +318,7 @@ export interface FeedMap {
   routeSafety: RouteSafetyWidgetData;
   kills: KillsWidgetData;
   omega: OmegaWidgetData;
+  marketTrend: MarketTrendWidgetData;
   tradingProfit: TradingProfitWidgetData;
   corpWallet: CorpWalletFeed;
   corpJobs: CorpJobsFeed;

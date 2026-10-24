@@ -3,6 +3,7 @@ import {
   areaPoints,
   barHeights,
   areaCoords,
+  linesRuns,
   donutSegments,
   hbarPercent,
   sharesOfMax,
@@ -145,5 +146,28 @@ describe('areaCoords', () => {
 
   it('gives nothing for fewer than two values', () => {
     expect(areaCoords([3], 70)).toEqual([]);
+  });
+});
+
+describe('linesRuns', () => {
+  it('scales every line on one shared range', () => {
+    const [a, b] = linesRuns(
+      [
+        [0, 10],
+        [5, 5],
+      ],
+      20
+    );
+    expect(a).toEqual(['0.0,16.0 100.0,6.0']);
+    expect(b).toEqual(['0.0,11.0 100.0,11.0']);
+  });
+
+  it('breaks a line at a gap and drops a one-day run', () => {
+    const [a] = linesRuns([[1, 2, null, 3, null, 4, 5]], 20);
+    expect(a).toHaveLength(2);
+  });
+
+  it('draws nothing for an all-gap series', () => {
+    expect(linesRuns([[null, null]], 20)).toEqual([[]]);
   });
 });

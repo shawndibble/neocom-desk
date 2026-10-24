@@ -28,6 +28,7 @@ import {
   type Builder,
   type KindDef,
 } from './builderKit';
+import { marketTrend } from './marketTrendModel';
 import { omega } from './omegaModel';
 import { tradingProfit } from './tradingProfitModel';
 import { hbarsFromRows } from './chartBuilders';
@@ -908,6 +909,7 @@ export const KIND_DEFS: Readonly<Record<string, KindDef>> = {
   jumpTimers: { feeds: ['jumpTimers'], scope: 'character', build: jumpTimers },
   routeSafety: { feeds: ['routeSafety'], scope: 'account', build: routeSafety },
   kills: { feeds: ['kills'], scope: 'account', build: kills },
+  marketTrend: { feeds: ['marketTrend'], scope: 'character', build: marketTrend },
   omega: { feeds: ['omega'], scope: 'account', build: omega },
   tradingProfit: { feeds: ['tradingProfit'], scope: 'account', build: tradingProfit },
 };

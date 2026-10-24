@@ -4472,6 +4472,13 @@
             "history": "History",
             "partial": "Partial"
           }
+        },
+        "marketTrend": {
+          "summary_one": "Price trend of {{count}} Quickbar item at {{hub}} over {{days}} days.",
+          "summary_other": "Price trend of {{count}} Quickbar items at {{hub}} over {{days}} days.",
+          "summaryLine": "{{item}} {{change}}.",
+          "note": "Change in the daily average since the start of the range, at {{hub}}",
+          "range": "{{days}} days"
         }
       },
       "data": {
@@ -4571,6 +4578,13 @@
           "item": "{{item}} + {{count}} more",
           "summary_one": "{{count}} public contract worth more than it asks at the trade hub, from the last time you opened Below market on Item search.",
           "summary_other": "{{count}} public contracts worth more than they ask at the trade hub, from the last time you opened Below market on Item search."
+        },
+        "marketTrend": {
+          "unit": "{{item}} · {{days}} days",
+          "footer": "Daily average at {{hub}}",
+          "omitted_one": "{{count}} more Quickbar item isn't shown.",
+          "omitted_other": "{{count}} more Quickbar items aren't shown.",
+          "noHistory": "No price history yet"
         }
       },
       "training": {
@@ -5550,6 +5564,18 @@
         "setUp": "Set up SRP",
         "summary_one": "{{count}} open SRP claim, {{owed}} owed.",
         "summary_other": "{{count}} open SRP claims, {{owed}} owed."
+      },
+      "marketTrend": {
+        "title": "Market trend",
+        "description": "How the prices of your Quickbar items are moving",
+        "empty": "Your Quickbar is empty.",
+        "emptyHint": "Add items to your Quickbar from the Market, then their price trend shows here.",
+        "col": {
+          "item": "Item",
+          "now": "Now",
+          "d7": "7 days",
+          "d30": "30 days"
+        }
       }
     },
     "header": {
@@ -5814,6 +5840,9 @@
         },
         "belowMarket": {
           "note": "From your last Below market view"
+        },
+        "marketTrend": {
+          "note": "Daily average at Jita"
         }
       }
     },

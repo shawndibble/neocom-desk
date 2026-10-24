@@ -53,6 +53,7 @@ import {
   loadMercenaryDensWidget,
   loadRouteSafetyWidget,
   loadKillsWidget,
+  loadMarketTrendWidget,
   loadOmegaWidget,
   loadTradingProfitWidget,
   loadSurveyWidget,
@@ -215,6 +216,7 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   location: snapshot(loadLocationWidget, 'overview:location'),
   routeSafety: snapshot(loadRouteSafetyWidget, 'overview:route-safety'),
   kills: snapshot(loadKillsWidget, 'overview:kills'),
+  marketTrend: snapshot(loadMarketTrendWidget, 'overview:market-trend'),
   omega: snapshot(loadOmegaWidget, 'overview:omega', { accountWide: true }),
   tradingProfit: snapshot(loadTradingProfitWidget, 'overview:trading-profit', {
     accountWide: true,
