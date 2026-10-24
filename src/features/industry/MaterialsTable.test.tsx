@@ -148,9 +148,9 @@ const queryRevertButton = (material: string) =>
   screen.queryByRole('button', { name: `Reset ${material} to the market price` });
 const valueOf = (input: HTMLElement) => (input as HTMLInputElement).value;
 
-/** The row's To buy figure — Need less Have, which used to be a "Need:" caption under the quantity. */
+/** The row's Buy figure — Need less Have, which used to be a "Need:" caption under the quantity. */
 function toBuyOf(material: string): string {
-  const cell = row(material).querySelector('[data-label="To buy"]');
+  const cell = row(material).querySelector('[data-label="Buy"]');
   if (!cell) throw new Error(`no To buy cell for ${material}`);
   return cell.textContent ?? '';
 }
@@ -414,14 +414,14 @@ describe('MaterialsTable errand sections', () => {
     expect(within(table).getByText('Pyerite')).toBeTruthy();
   });
 
-  it('reads Need, Have, To buy left to right', () => {
+  it('reads Need, Have, Buy left to right', () => {
     render(<Harness />);
     const headers = within(screen.getByRole('table', { name: 'Materials: To buy' }))
       .getAllByRole('columnheader')
       .map((th) => th.textContent);
     expect(headers.indexOf('Need')).toBeGreaterThanOrEqual(0);
     expect(headers.indexOf('Need')).toBeLessThan(headers.indexOf('Have'));
-    expect(headers.indexOf('Have')).toBeLessThan(headers.indexOf('To buy'));
+    expect(headers.indexOf('Have')).toBeLessThan(headers.indexOf('Buy'));
   });
 
   it('folds fully owned materials under Already have, naming them while folded', () => {

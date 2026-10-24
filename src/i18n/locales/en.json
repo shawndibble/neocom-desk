@@ -3559,7 +3559,7 @@
       "tableLabel": "Materials: {{section}}",
       "need": "Need",
       "haveColumn": "Have",
-      "toBuyColumn": "To buy",
+      "toBuyColumn": "Buy",
       "total": "Total",
       "unpricedCount_one": "+{{count}} unpriced",
       "unpricedCount_other": "+{{count}} unpriced",
