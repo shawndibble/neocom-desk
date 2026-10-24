@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   bootClosure,
@@ -13,6 +15,9 @@ import {
   missingShellChunks,
   parseLazyChunksJson,
   preloadGraphSignature,
+  PUBLIC_ROUTE_SUFFIXES,
+  shellChunkGroups,
+  throughBarrel,
   type BundleLike,
 } from './lazyChunks';
 
@@ -330,5 +335,115 @@ describe('preloadGraphSignature', () => {
     const broken = graph();
     broken['assets/Skills-!~{2}~.js'].imports.push('assets/gone-!~{5}~.js');
     expect(() => preloadGraphSignature('assets/routes-!~{1}~.js', broken)).toThrow(/gone/);
+  });
+});
+
+describe('shellChunkGroups', () => {
+  // main → app; Layout → nav → [app, card]; Overview → widget → card;
+  // SharedLink → card.
+  const graph: Record<string, string[]> = {
+    main: ['app'],
+    app: [],
+    Layout: ['nav'],
+    nav: ['app', 'card'],
+    Overview: ['widget'],
+    widget: ['card', 'chart'],
+    card: ['format'],
+    format: [],
+    chart: [],
+    SharedLink: ['card'],
+  };
+  const groups = (publicRoots: string[] = ['SharedLink']) =>
+    shellChunkGroups({
+      entries: ['main'],
+      shellRoots: ['Layout', 'Overview'],
+      publicRoots,
+      importedIds: (id) => graph[id],
+    });
+
+  it("is the shell's static closure, less what the entry already reaches and the shell modules themselves", () => {
+    const { shell } = groups([]);
+    expect([...shell].sort()).toEqual(['card', 'chart', 'format', 'nav', 'widget']);
+  });
+
+  it('moves what a public route shares with the shell into its own group, so the route never loads the shell chunk', () => {
+    const { shell, publicShared } = groups();
+    expect([...publicShared].sort()).toEqual(['card', 'format']);
+    expect([...shell].sort()).toEqual(['chart', 'nav', 'widget']);
+  });
+
+  it('treats a module the bundler does not know as importing nothing', () => {
+    const { shell } = shellChunkGroups({
+      entries: ['main'],
+      shellRoots: ['Layout'],
+      publicRoots: [],
+      importedIds: (id) => (id === 'Layout' ? ['ghost'] : undefined),
+    });
+    expect([...shell]).toEqual(['ghost']);
+  });
+});
+
+describe('throughBarrel', () => {
+  const barrel = '/src/components/ui/index.ts';
+  const ids: Record<string, string[]> = {
+    [barrel]: ['/src/components/ui/Button.tsx', '/src/components/ui/DataTable.tsx'],
+    '/src/app/Layout.tsx': [barrel, '/src/lib/format.ts'],
+    '/src/routes/Odd.tsx': [barrel],
+    '/src/routes/Star.tsx': [barrel],
+  };
+  const code: Record<string, string> = {
+    [barrel]:
+      'export { Button, ButtonGroup as Group } from "./Button";\nexport {\n  DataTable,\n  dataTableSort\n} from "./DataTable";\n',
+    '/src/app/Layout.tsx':
+      'import { Button as B, Group } from "@/components/ui";\nimport { x } from "@/lib/format";\n',
+    '/src/routes/Odd.tsx': 'import { Missing } from "@/components/ui";\n',
+    '/src/routes/Star.tsx': 'import * as UI from "@/components/ui";\n',
+  };
+  const precise = throughBarrel({
+    barrel,
+    specifier: '@/components/ui',
+    importedIds: (id) => ids[id],
+    code: (id) => code[id],
+  });
+
+  it('replaces the barrel with the modules that declare the names imported through it', () => {
+    expect(precise('/src/app/Layout.tsx')).toEqual([
+      '/src/components/ui/Button.tsx',
+      '/src/lib/format.ts',
+    ]);
+  });
+
+  it('keeps the whole barrel when an import cannot be traced', () => {
+    expect(precise('/src/routes/Odd.tsx')).toEqual([barrel]);
+    expect(precise('/src/routes/Star.tsx')).toEqual([barrel]);
+  });
+
+  it('passes every other module through', () => {
+    expect(precise(barrel)).toEqual(ids[barrel]);
+    expect(precise('/nowhere')).toBeUndefined();
+  });
+});
+
+describe('PUBLIC_ROUTE_SUFFIXES', () => {
+  const source = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
+
+  it('names every lazy route App.tsx renders outside the signed-in shell, so none loads the shell chunk', () => {
+    const app = source('src/app/App.tsx');
+    const chunks = source('src/app/routeChunks.ts');
+    const modules = [...app.matchAll(/<Route\s+path="[^"]+"\s+element=\{<(\w+)\s*\/>\}/g)]
+      .map(
+        ([, element]) =>
+          app.match(new RegExp(`const ${element} = lazy\\(routeChunks\\.(\\w+)\\)`))?.[1]
+      )
+      .filter((loader): loader is string => loader !== undefined)
+      .map((loader) => {
+        const target = chunks.match(
+          new RegExp(`export const ${loader} = named\\(\\s*\\(\\) => import\\('@/([^']+)'\\)`)
+        )?.[1];
+        if (!target) throw new Error(`no import() for routeChunks.${loader}`);
+        return `/src/${target}.tsx`;
+      });
+    expect(modules.length).toBeGreaterThan(0);
+    expect([...new Set(modules)].sort()).toEqual([...PUBLIC_ROUTE_SUFFIXES].sort());
   });
 });
