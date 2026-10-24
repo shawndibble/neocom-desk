@@ -108,21 +108,30 @@ export function CharacterHeader({
           </h1>
           {aside}
         </div>
-        <p className="truncate text-xs text-text-dim">
+        {/*
+          Each name truncates in its own box: truncating the line instead clipped the text but not
+          the links, whose boxes ran on under Customize and the bell (overlapping targets on a
+          phone, WCAG 2.5.8).
+        */}
+        <p className="flex min-w-0 text-xs whitespace-nowrap text-text-dim">
           {publicInfo?.corporationName && publicInfo.corporationId !== undefined ? (
-            <CorporationLink id={publicInfo.corporationId}>
+            <CorporationLink id={publicInfo.corporationId} className="min-w-0 truncate">
               {publicInfo.corporationName}
             </CorporationLink>
           ) : (
-            (publicInfo?.corporationName ?? t('common.unknown'))
+            <span className="min-w-0 truncate">
+              {publicInfo?.corporationName ?? t('common.unknown')}
+            </span>
           )}
           {publicInfo?.allianceName && (
             <>
-              {' / '}
+              <span className="shrink-0 whitespace-pre">{' / '}</span>
               {publicInfo.allianceId !== undefined ? (
-                <AllianceLink id={publicInfo.allianceId}>{publicInfo.allianceName}</AllianceLink>
+                <AllianceLink id={publicInfo.allianceId} className="min-w-0 truncate">
+                  {publicInfo.allianceName}
+                </AllianceLink>
               ) : (
-                publicInfo.allianceName
+                <span className="min-w-0 truncate">{publicInfo.allianceName}</span>
               )}
             </>
           )}

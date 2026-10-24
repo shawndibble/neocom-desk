@@ -83,7 +83,8 @@ function cachedView(
   ];
   const hit = cache.get(id);
   if (hit && sameItems(hit.deps, deps)) return hit.view;
-  const view = buildView(request.kind, store.get(), {
+  const feeds = store.get();
+  const built = buildView(request.kind, feeds, {
     ...ctx,
     scopeAll: request.scopeAll,
     range: request.range ?? DEFAULT_RANGE,
@@ -92,6 +93,8 @@ function cachedView(
     raidsWhere: request.raidsWhere === 'near' ? 'near' : 'alliance',
     raidsRadius: request.raidsRadius ?? DEFAULT_RAIDS_RADIUS,
   });
+  const settling = feedIds.some((feedId) => feeds[feedId]?.loading === true);
+  const view = settling ? { ...built, settling } : built;
   cache.set(id, { deps, view });
   return view;
 }

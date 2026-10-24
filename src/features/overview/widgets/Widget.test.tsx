@@ -120,6 +120,60 @@ describe('remembered skeleton height', () => {
   });
 });
 
+describe('a view still settling', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    resetRememberedHeights();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(private readonly callback: ResizeObserverCallback) {}
+        observe() {
+          this.callback(
+            [{ borderBoxSize: [{ blockSize: 50, inlineSize: 300 }] } as never],
+            this as never
+          );
+        }
+        disconnect() {}
+        unobserve() {}
+      }
+    );
+    return () => vi.unstubAllGlobals();
+  });
+
+  const wallet = model({ kind: 'wallet', view: 'chart', size: 'S' });
+  const balance = {
+    data: {
+      result: { data: 5_000_000, fetchedAt: new Date(NOW), fromCache: false, truncated: false },
+      needsReauth: false,
+    },
+    error: false,
+    loading: false,
+  };
+  const body = () =>
+    screen.getByRole('region', { name: 'Wallet' }).querySelector<HTMLElement>(':scope > .flex-1')!;
+  const key = () => heightKey(wallet, useActiveCharacter.getState().activeCharacterId, false);
+
+  it('holds the reserved height while a secondary read is out, and does not remember the partial body', () => {
+    renderWidget(wallet, (store) => {
+      store.set('wallet', balance);
+      store.set('journal', { data: null, error: false, loading: true });
+    });
+    expect(screen.getByRole('region', { name: 'Wallet' })).toHaveAttribute('aria-busy', 'false');
+    expect(body().style.minHeight).toBe('148px');
+    expect(rememberedBodyHeight(key())).toBeUndefined();
+  });
+
+  it('lets go of the reserve once every read is in', () => {
+    renderWidget(wallet, (store) => {
+      store.set('wallet', balance);
+      store.set('journal', { data: null, error: true, loading: false });
+    });
+    expect(body().style.minHeight).toBe('');
+    expect(rememberedBodyHeight(key())).toBe(50);
+  });
+});
+
 describe('Widget states', () => {
   it('shows a busy skeleton with hidden text while the first read is in flight', () => {
     renderWidget(model(), (store) =>

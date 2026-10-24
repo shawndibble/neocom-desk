@@ -261,6 +261,12 @@ export interface KindView {
    * to the Number.
    */
   chart?: ChartModel;
+  /**
+   * One of the kind's reads is still out although the view already draws (a secondary read,
+   * such as the Wallet's journal under its balance): the body is not at its settled height yet.
+   * Set by `useKindViews`, never by a builder.
+   */
+  settling?: boolean;
 }
 
 /** One read's state, as `useRouteSnapshot` reports it. */

@@ -10,7 +10,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { overviewLayoutSetting, signInAndGoto, type SeededWidget } from './support/authSeed';
-import { CHARACTER_ID, SCOPES } from './support/fixtureData';
+import { ALLIANCE_ID, CHARACTER_ID, CORPORATION_ID, SCOPES } from './support/fixtureData';
 import type { MarketOrder } from '../src/esi/endpoints';
 
 const PHONE = { width: 390, height: 844 };
@@ -233,6 +233,65 @@ for (const viewport of [{ width: 1280, height: 900 }, PHONE]) {
     expect(await hasHorizontalOverflow(page)).toBe(false);
   });
 }
+
+test('a long corporation / alliance line ends before Customize at 390px (no overlapping targets)', async ({
+  page,
+}) => {
+  const corp = 'Bureau of Unified Harvesting';
+  const alliance = 'Plenitude Alliance';
+  const json = (body: unknown) => ({ contentType: 'application/json', body: JSON.stringify(body) });
+  await page.route(new RegExp(`esi\\.evetech\\.net/corporations/${CORPORATION_ID}/?$`), (route) =>
+    route.fulfill(
+      json({
+        name: corp,
+        ticker: 'BUH',
+        ceo_id: 1,
+        creator_id: 1,
+        member_count: 5,
+        tax_rate: 0.1,
+        alliance_id: ALLIANCE_ID,
+      })
+    )
+  );
+  await page.route(new RegExp(`esi\\.evetech\\.net/alliances/${ALLIANCE_ID}/?$`), (route) =>
+    route.fulfill(
+      json({
+        name: alliance,
+        ticker: 'PLNT',
+        creator_corporation_id: CORPORATION_ID,
+        creator_id: 1,
+        date_founded: '2019-01-01T00:00:00Z',
+      })
+    )
+  );
+  await page.route(/esi\.evetech\.net\/universe\/names/, (route) => {
+    const ids = route.request().postDataJSON() as number[];
+    return route.fulfill(
+      json(
+        ids.map((id) =>
+          id === CORPORATION_ID
+            ? { id, name: corp, category: 'corporation' }
+            : id === ALLIANCE_ID
+              ? { id, name: alliance, category: 'alliance' }
+              : { id, name: `Unknown ${id}`, category: 'character' }
+        )
+      )
+    );
+  });
+  await page.setViewportSize(PHONE);
+  await signInAndGoto(page, './overview', SCOPES, [
+    overviewLayoutSetting([{ kind: 'training', size: 'S' }]),
+  ]);
+  const header = page.locator('main header');
+  const allianceLink = header.getByRole('link', { name: alliance });
+  await expect(allianceLink).toBeVisible({ timeout: FIRST_LOAD_MS });
+  const customize = (await header.getByRole('button', { name: 'Customize' }).boundingBox())!;
+  for (const link of [allianceLink, header.getByRole('link', { name: corp })]) {
+    const box = (await link.boundingBox())!;
+    // The name truncates inside its own box, which ends before Customize's (the row's gap apart).
+    expect(box.x + box.width).toBeLessThanOrEqual(customize.x - 8);
+  }
+});
 
 /** Six sell orders, issued and expiring at different times so the Expires sort reorders them. */
 function openOrderFixtures(): MarketOrder[] {
