@@ -453,7 +453,14 @@ function HeroStat({
 }) {
   return (
     <div className="min-w-0">
-      <dt className={cx(eyebrowClassName, 'flex items-center gap-1')}>
+      {/* One fixed-height, non-wrapping label row, so a stat whose label
+          carries an ⓘ or "?" lines up with one that carries none. */}
+      <dt
+        className={cx(
+          eyebrowClassName,
+          'flex h-5 items-center gap-1 whitespace-nowrap [&>*]:-my-2'
+        )}
+      >
         {label}
         {accessory}
       </dt>

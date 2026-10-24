@@ -2702,7 +2702,7 @@
     },
     "reactionLocationNotSet": "No reaction location set",
     "ownedStockScopeLabel": "Owned Material Source",
-    "groupOwnedDiffers": "Group total differs: {{group}} counts {{groupQty}} {{material}} owned, this plan {{planQty}}.",
+    "groupOwnedDiffers": "{{group}} keeps its own count of your {{material}}: {{groupQty}}, where this plan counts {{planQty}}. Its plans share that stock.",
     "openTheGroup": "Open the group",
     "ownedStockScopeEverywhere": "Everywhere",
     "ownedStockScopeSelected": "Selected locations",
@@ -3612,7 +3612,7 @@
       "verdictLoss": "Loses money",
       "profitLabel": "Profit",
       "leadPlain": "profit after fees",
-      "leadSellValue": "more than selling your materials, counted at",
+      "leadSellValue": "compared with selling your materials, counted at",
       "leadFree": "profit after fees, your materials counted as",
       "basisSellValue": "sell value",
       "basisFree": "free",
@@ -3634,8 +3634,8 @@
       },
       "sale": "{{name}} sale",
       "costIndexIn": "Cost index · {{system}}",
-      "ownedNotSold": "Your materials, not sold",
-      "ownedNotSoldHint": "What the owned materials this job uses would net if sold instead. A cost while the profit counts them at sell value.",
+      "ownedNotSold": "Your materials",
+      "ownedNotSoldHint": "What the owned materials this job uses would net if sold instead — not sold, so a cost while the profit counts them at sell value.",
       "iskToSpend": "ISK to spend",
       "buyInstead": "Buying {{name}} instead",
       "buyCostsMore": "+{{amount}} more",
@@ -3647,7 +3647,8 @@
       "quantityTimesPrice": "{{quantity}} × {{price}}",
       "productSellsAt": "{{name}} priced at",
       "hubLowestSell": "{{hub}} lowest sell",
-      "wholePlanTime": "Whole plan, on free slots"
+      "wholePlanTime": "Whole plan, on free slots",
+      "buildThere": "Build there"
     },
     "ownedControl": {
       "label": "Owned materials",

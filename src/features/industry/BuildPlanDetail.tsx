@@ -50,6 +50,7 @@ import {
   type LiquidationBasis,
 } from '@/engine/industry/ownedStockSale';
 import { profitOnBasis, type ProfitBasis } from '@/engine/industry/profitBasis';
+import { securityBand } from '@/engine/securityStatus';
 import type { FacilityKind, MaterialPriceBasis, RigKind } from '@/engine/industry/types';
 import { rigKindLabelKey } from './rigFitLabels';
 import { RigMatchHelper } from './RigMatchHelper';
@@ -1145,14 +1146,32 @@ export function BuildPlanDetail({
   const cheapest = cheaperSystems[0];
   const currentIndex = snapshot?.systemCostIndex ?? null;
   const cheaperNearbyLine =
-    cheapest && result && currentIndex !== null && currentIndex > 0
-      ? t('industry.ledger.cheaperNearby', {
+    cheapest && result && currentIndex !== null && currentIndex > 0 ? (
+      <>
+        {t('industry.ledger.cheaperNearby', {
           system: cheapest.name,
           count: cheapest.jumps,
           index: formatCostIndex(cheapest.index),
           amount: formatIsk(result.jobFee.grossCost * (1 - cheapest.index / currentIndex)),
-        })
-      : null;
+        })}{' '}
+        {/* The same move the build-system field makes: the band follows the
+            system, and a picked structure is cleared since it was elsewhere. */}
+        <button
+          type="button"
+          className={textActionClassName('inline-flex')}
+          onClick={() =>
+            movePlan({
+              buildSystemId: cheapest.id,
+              buildSystemName: cheapest.name,
+              ...clearedBuildLocation,
+              security: securityBand(cheapest.security),
+            })
+          }
+        >
+          {t('industry.ledger.buildThere')}
+        </button>
+      </>
+    ) : null;
 
   const setupStrip = (
     <>
@@ -1206,6 +1225,14 @@ export function BuildPlanDetail({
         onCommit={(runs) => update({ runs })}
       />
       <span aria-hidden="true">{t('industry.hero.runsUnit', { count: plan.runs })}</span>
+      {/* The plan's time, priced or not: it is a fact of the recipe, so it
+          stays when prices are unreachable and the ledger is an empty state. */}
+      {result && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span className="tabular-nums">{formatDuration(planSeconds ?? result.seconds)}</span>
+        </>
+      )}
       {pricesReady && result?.profit != null && result.profit < 0 && (
         <Button size="sm" onClick={applyBreakEvenRuns}>
           {t('industry.breakEvenRuns')}

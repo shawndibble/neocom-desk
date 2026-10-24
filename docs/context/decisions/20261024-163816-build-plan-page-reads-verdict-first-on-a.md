@@ -41,13 +41,19 @@ Acquisition Verdict._
   cheaper to build get one "Build N cheaper parts · save X" link on the To buy
   heading; one row keeps only its own Build instead.
 - **What was removed, not folded.** 20260906-091110 promised nothing would be
-  removed; this redesign removes three things on purpose. The Gross/Net toggle
+  removed; this redesign removes two things on purpose. The Gross/Net toggle
   (above). The Use-or-Sell per-material table and its CSV export: each fully
   owned row now says what it sells for in its Total cell, the owned heading
   gives the total, and the ledger carries it as one line, so a second table of
-  the same figures earned no place. The plan-duration figure in the hero and the
-  Materials header: the schedule line says when the plan is done, and Costs &
-  revenue states the main job's time and, when it differs, the whole plan's.
+  the same figures earned no place. The plan's time moved, not removed: from
+  the Materials header to the hero's title row beside runs, where it shows even
+  when prices are unreachable.
+- **Have and Price are edited in place on every width.** The value with a faint
+  pencil (§6c), the field only while it is being edited; typing a digit on a
+  focused value opens the field with it, so Tab-and-type down a column still
+  works. Two boxes on every row made the table read as a form. Phone cards read
+  as the errand — "Buy 317,000 @ 4 ISK", then "Need · Have" — so no section
+  needs a column header, and sorting is one control above the list.
 - **Known gap.** The sell-value basis counts owned units the top-level job
   consumes; owned stock eaten inside a sub-build is not yet charged, as the
   Use-or-Sell Check never charged it either.

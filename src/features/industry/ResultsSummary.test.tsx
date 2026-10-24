@@ -232,20 +232,20 @@ describe('ResultsSummary: owned materials', () => {
   it('says nothing about selling when nothing is owned', () => {
     renderSummary();
     expect(screen.queryByText('Your materials sell via')).not.toBeInTheDocument();
-    expect(screen.queryByText('Your materials, not sold')).not.toBeInTheDocument();
+    expect(screen.queryByText('Your materials')).not.toBeInTheDocument();
   });
 
   it('charges the forgone sale as a line on the sell-value basis', () => {
     renderSummary({ ownedSale: OWNED_SALE, profitBasis: 'sellValue', profit: 435 - 92_500 });
     // Sell now: 100 x 1,000 gross, less 7.5% sales tax, no broker fee.
-    expect(
-      screen.getByText('Your materials, not sold').closest('div')?.parentElement
-    ).toHaveTextContent('-92,500');
+    expect(screen.getByText('Your materials').closest('div')?.parentElement).toHaveTextContent(
+      '-92,500'
+    );
   });
 
   it('leaves the forgone sale out when owned materials count as free', () => {
     renderSummary({ ownedSale: OWNED_SALE, profitBasis: 'free' });
-    expect(screen.queryByText('Your materials, not sold')).not.toBeInTheDocument();
+    expect(screen.queryByText('Your materials')).not.toBeInTheDocument();
   });
 
   it('flips how the materials would be sold in place', async () => {

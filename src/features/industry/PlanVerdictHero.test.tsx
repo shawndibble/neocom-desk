@@ -204,7 +204,9 @@ describe('PlanVerdictHero: how owned materials are counted', () => {
   it('names the comparison and flips the basis in place', async () => {
     const onBasisChange = vi.fn();
     renderHero({ basis: 'sellValue', onBasisChange });
-    expect(screen.getByText(/more than selling your materials, counted at/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/compared with selling your materials, counted at/)
+    ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'sell value' }));
     expect(onBasisChange).toHaveBeenCalledWith('free');
   });
