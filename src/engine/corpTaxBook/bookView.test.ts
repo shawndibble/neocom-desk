@@ -206,6 +206,24 @@ describe('buildBookView', () => {
     });
   });
 
+  it('anchors a 7-day cadence at the start date, so the days before the first 1st are billed (monthly to N-day switch)', () => {
+    const view = buildBookView(
+      input({
+        startDate: '2026-09-25',
+        cadence: { kind: 'days', days: 7, anchor: '2026-09-25' },
+        entries: [entry(1, '2026-09-27', 1000), entry(1, '2026-10-03', 1000)],
+        now: '2026-10-20T12:00:00Z',
+        lastSyncedAt: '2026-10-20T12:00:00Z',
+      })
+    );
+    const rows = periodRows(view);
+    expect(rows.find((r) => r.start === '2026-09-25')).toMatchObject({
+      end: '2026-10-01',
+      billed: 100_000,
+    });
+    expect(rows.find((r) => r.start === '2026-10-02')).toMatchObject({ end: '2026-10-08' });
+  });
+
   it('bills the open period for its own days only (CX-38)', () => {
     const view = buildBookView(
       input({
