@@ -12511,9 +12511,9 @@
           "shareLinks": "Share Links:",
           "shareLinksKept": "7 days, then deleted automatically (up to a day later).",
           "srp": "SRP Claims:",
-          "srpKept": "a Paid or Rejected claim is deleted 365 days after it closes (checked daily). A Pending or Approved claim, the SRP settings and the SRP log have no expiry, so a deleted claim's filing stays in the log; Doctrine Fits stay until a Director or the CEO deletes them.",
+          "srpKept": "a Paid or Rejected claim is deleted 365 days after it closes (checked daily), and its lines in the SRP log (the filing and each officer action on it) go with it. A Pending or Approved claim, the SRP settings and the log's other lines have no expiry; Doctrine Fits stay until a Director or the CEO deletes them.",
           "corpTaxBook": "Corp Tax Book:",
-          "corpTaxBookKept": "no expiry. Its lines, Statements, payments, verify links and log stay until whoever turned the book on, or the CEO, deletes the book, which deletes everything in it. Which books bill a Character is kept apart and has no expiry."
+          "corpTaxBookKept": "no expiry. Its lines, Statements, payments, verify links and log stay until whoever turned the book on, or the CEO, deletes the book, which deletes everything in it, including its place in the record of which books bill each Character."
         }
       },
       "helpPointer": "Bug, question or idea? See <help>Support</help>."

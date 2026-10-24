@@ -1,6 +1,6 @@
 // SRP Doctrine Fits: the admin-SDK half. A Director saves or deletes a corp's
 // Doctrine Fit snapshot (re-checked live, CEO included, like Hull Rules); each change appends to
-// the immutable audit log in the same transaction. Any member may preview the fit check of their
+// the audit log in the same transaction. Any member may preview the fit check of their
 // own loss; that writes nothing. Parsing: srpDoctrineInput.ts; the match: srpDoctrineCheck.ts.
 
 import { randomBytes } from 'node:crypto';

@@ -6,7 +6,8 @@
 //   corps/{corporationId}/srpClaims/{killmailId} one SRP Claim per killmail; the id IS the killmail
 //                                               id, so a second claim is a create conflict. Written by
 //                                               the file-claim callable; carries `uid`.
-//   corps/{corporationId}/srpAudit/{at~rand}    immutable audit log
+//   corps/{corporationId}/srpAudit/{at~rand}    audit log; entries are never edited, and the
+//                                               retention sweep deletes a deleted claim's (#4942)
 //   corps/{corporationId}/srpDoctrines/{id}      the corp's Doctrine Fit snapshots (DoctrineFit)
 //   corps/{corporationId}/srpOfficers/{uid}     officer access record (1h) written by verifySrpOfficer
 //   corps/{corporationId}/srpThrottle/{charId}  per-Character killmail fetch counter (srpThrottle.ts)

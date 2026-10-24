@@ -51,7 +51,7 @@ suite('SRP retention sweep (emulator)', () => {
   afterAll(clearEmulator);
   beforeEach(clearEmulator);
 
-  it('deletes Paid and Rejected claims at one year, keeps the rest, one audit entry per corp', async () => {
+  it('deletes Paid and Rejected claims at one year, keeps the rest, one count-only audit entry per corp', async () => {
     await put(CORP_A, 1, 'paid', OLD);
     await put(CORP_A, 2, 'rejected', OLD);
     await put(CORP_A, 3, 'paid', OLD + 1); // 1 ms short
@@ -72,7 +72,7 @@ suite('SRP retention sweep (emulator)', () => {
       by: null,
       byName: 'retention sweep',
       action: 'retentionDelete',
-      detail: { count: 2, claimIds: ['1', '2'] },
+      detail: { count: 2 },
     });
     expect(JSON.stringify(entries)).not.toMatch(/char:|characterId|Must Not Leak/);
     expect(JSON.stringify(await audit(CORP_B))).not.toContain('Must Not Leak');
@@ -100,17 +100,59 @@ suite('SRP retention sweep (emulator)', () => {
     expect((await audit(CORP_A)).length + (await audit(CORP_B)).length).toBe(3);
   });
 
-  it('splits a corp with more than 200 deleted claims into several entries, ids only', async () => {
-    const writes = [];
-    for (let id = 1; id <= 450; id += 1) writes.push(put(CORP_A, id, 'paid', OLD - id));
-    await Promise.all(writes);
-    expect(await sweepSrpClaims(db, NOW, { maxDeletes: 500 })).toEqual({
-      deleted: 450,
-      failed: 0,
-      truncated: false,
+  it("deletes a deleted claim's whole SRP log trail and nothing else (#4942)", async () => {
+    const log = (corp: number, id: string, data: Record<string, unknown>) =>
+      db.collection('corps').doc(String(corp)).collection('srpAudit').doc(id).set(data);
+    const pilot = { by: 501, byName: 'Must Not Leak' };
+    const officer = { by: 900, byName: 'Officer' };
+    await put(CORP_A, 1, 'paid', OLD);
+    await put(CORP_A, 2, 'paid', OLD + DAY); // newer: kept, with its trail
+    await log(CORP_A, 'a', { ...pilot, action: 'fileClaim', detail: { killmailId: 1 } });
+    await log(CORP_A, 'b', {
+      ...officer,
+      action: 'rejectClaim',
+      detail: { killmailId: 1, pilotCharacterId: 501 },
     });
-    const entries = await audit(CORP_A);
-    expect(entries.map((e) => e.detail.count).sort((a, b) => a - b)).toEqual([50, 200, 200]);
-    expect(entries.flatMap((e) => e.detail.claimIds)).toHaveLength(450);
+    await log(CORP_A, 'c', { ...pilot, action: 'refileClaim', detail: { killmailId: 1 } });
+    await log(CORP_A, 'd', {
+      ...officer,
+      action: 'approveClaim',
+      detail: { killmailId: 1, pilotCharacterId: 501 },
+    });
+    await log(CORP_A, 'e', {
+      ...officer,
+      action: 'markClaimPaid',
+      detail: { killmailId: 1, pilotCharacterId: 501 },
+    });
+    await log(CORP_A, 'f', { ...pilot, action: 'fileClaim', detail: { killmailId: 2 } });
+    await log(CORP_A, 'g', {
+      ...officer,
+      action: 'markClaimPaid',
+      detail: { killmailId: 2, pilotCharacterId: 501 },
+    });
+    await log(CORP_A, 'h', { ...officer, action: 'turnOn', detail: { reenabled: false } });
+    await log(CORP_A, 'i', { ...officer, action: 'saveSettings', detail: {} });
+    await log(CORP_A, 'j', { ...officer, action: 'addDoctrine', detail: { name: 'Fit' } });
+    // Another corp's log about the same killmail id is its own claim.
+    await log(CORP_B, 'k', { ...pilot, action: 'fileClaim', detail: { killmailId: 1 } });
+
+    expect(await sweepSrpClaims(db, NOW)).toEqual({ deleted: 1, failed: 0, truncated: false });
+
+    expect(await claimIds(CORP_A)).toEqual(['2']);
+    const left = await db.collection('corps').doc(String(CORP_A)).collection('srpAudit').get();
+    const kept = left.docs.filter((d) => d.get('action') !== 'retentionDelete').map((d) => d.id);
+    expect(kept.sort()).toEqual(['f', 'g', 'h', 'i', 'j']);
+    const sweep = left.docs.find((d) => d.get('action') === 'retentionDelete')?.data();
+    expect(sweep?.detail).toEqual({ count: 1 });
+    expect(JSON.stringify(sweep)).not.toMatch(/killmail|claimIds|501|Must Not Leak/);
+    expect((await audit(CORP_B)).map((e) => e.action)).toEqual(['fileClaim']);
+  });
+
+  it('writes one count-only entry for a corp however many claims it deletes', async () => {
+    const writes = [];
+    for (let id = 1; id <= 250; id += 1) writes.push(put(CORP_A, id, 'paid', OLD - id));
+    await Promise.all(writes);
+    expect(await sweepSrpClaims(db, NOW)).toEqual({ deleted: 250, failed: 0, truncated: false });
+    expect((await audit(CORP_A)).map((e) => e.detail)).toEqual([{ count: 250 }]);
   });
 });

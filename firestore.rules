@@ -423,7 +423,7 @@ service cloud.firestore {
     // `srpOfficers`) sit beside it under the next `corps/{id}` block; none of
     // their names is in the officer-only list below. Nothing here is writable
     // by a client: every write is a callable (functions/src/corpTaxBookStore.ts)
-    // that appends to the immutable audit log.
+    // that appends to the audit log.
     //
     // Reads:
     //  - an officer (CEO, Director, Accountant, Junior_Accountant) reads the

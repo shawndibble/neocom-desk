@@ -7,6 +7,7 @@
 
 import { randomBytes } from 'node:crypto';
 import {
+  FieldPath,
   FieldValue,
   type DocumentSnapshot,
   type DocumentReference,
@@ -304,6 +305,8 @@ export async function turnOnBook(deps: BookDeps, caller: Caller, input: TurnOnIn
   if (input.startDate > utcDate(now))
     fail('invalid-argument', 'The start date cannot be in the future', 'start-in-future');
   const ref = bookRef(deps.db, input.corporationId);
+  // A pointer a past delete missed (it failed, or a late sync) must not grant this book's reads.
+  if (!(await ref.get()).exists) await deleteBilledByPointers(deps, input.corporationId);
   await deps.db.runTransaction(async (tx) => {
     if ((await tx.get(ref)).exists)
       fail('already-exists', 'This corporation already has a Corp Tax Book', 'book-exists');
@@ -377,9 +380,33 @@ async function deleteBookContents(ref: DocumentReference): Promise<void> {
 }
 
 /**
+ * Takes the book out of every Character's billed-by pointer (#4942), deleting a pointer it
+ * leaves empty. Each pointer in its own transaction, so another book's sync merging into the
+ * same pointer meanwhile keeps its entry.
+ */
+async function deleteBilledByPointers(deps: BookDeps, corporationId: number): Promise<void> {
+  const key = String(corporationId);
+  const field = new FieldPath('books', key);
+  const pointers = await deps.db.collection(BILLED_BY_COLLECTION).where(field, '>=', 0).get();
+  for (let i = 0; i < pointers.docs.length; i += CHUNK) {
+    await Promise.all(
+      pointers.docs.slice(i, i + CHUNK).map((pointer) =>
+        deps.db.runTransaction(async (tx) => {
+          const books = (await tx.get(pointer.ref)).get('books') as
+            Record<string, unknown> | undefined;
+          if (!books || !(key in books)) return;
+          if (Object.keys(books).length === 1) tx.delete(pointer.ref);
+          else tx.update(pointer.ref, field, FieldValue.delete());
+        })
+      )
+    );
+  }
+}
+
+/**
  * The player who turned the book on (or the CEO) deletes it outright: the book,
- * everything under it and its Statement verify links. The corporation's SRP data
- * under the same `corps/{id}` document stays. `beforeDelete` lets the
+ * everything under it, its Statement verify links and billed-by pointers. The
+ * corporation's SRP data under the same `corps/{id}` document stays. `beforeDelete` lets the
  * caller drop what lives outside the book first (the scheduled-sync grant), so a
  * failure there leaves the book standing. Turning the book on again starts clean.
  */
@@ -418,6 +445,8 @@ export async function deleteBook(
   await deleteBookContents(ref);
   // A scheduled sync that loaded its grant before it was dropped may still have been writing.
   await deleteBookContents(ref);
+  // Last, so a late sync has the narrowest window to write one back (can't close it).
+  await deleteBilledByPointers(deps, call.corporationId);
   return { deleted: true };
 }
 

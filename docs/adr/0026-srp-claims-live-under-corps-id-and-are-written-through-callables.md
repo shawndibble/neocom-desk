@@ -67,7 +67,10 @@ Three facts shape the design:
 - **Reads are keyed by verified character id.** A pilot reads only their own
   claims. Officers read all of the corp's. Other members read none.
 - **Retention.** A scheduled sweep deletes Paid and Rejected claims one year
-  after they close and keeps a one-line audit record.
+  after they close and keeps a one-line audit record. Amended (issue #4942): it
+  also deletes every `srpAudit` entry about the claim (filing, re-filing, officer
+  decisions; matched by killmail id) in the same transaction, rather than
+  anonymising them, and its own line holds the count only, no killmail ids.
 - **Corp scopes and capability.** The officer side adds a corp capability, added
   to `ADDITIVE_CORP_CAPABILITIES` and `CorpCapabilities` so pilots who already
   granted the corp group are not demoted to `roles-without-grant`. The member

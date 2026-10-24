@@ -53,7 +53,7 @@ describe('auditText', () => {
     );
   });
   it('words the retention sweep with its count', () => {
-    expect(auditText(t, entry('retentionDelete', { count: 3, claimIds: [1, 2, 3] }))).toBe(
+    expect(auditText(t, entry('retentionDelete', { count: 3 }))).toBe(
       'Retention sweep removed 3 closed claims'
     );
   });

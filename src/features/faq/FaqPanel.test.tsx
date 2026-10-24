@@ -399,6 +399,21 @@ describe('FaqPanel: corporation records', () => {
     expect(shown).toMatch(/Paid or Rejected claim is deleted 365 days after it closes/);
     expect(shown).toMatch(/Corp Tax Book:\s*no expiry/);
   });
+
+  it('keeps the SRP log and billed-by retention equal to the code that deletes them (#4942)', () => {
+    // The sweep deletes a claim's SRP log entries with it; deleteBook clears its pointers.
+    expect(functionsFile('srpCleanup.ts')).toMatch(/isSrpAuditForClaim/);
+    expect(functionsFile('corpTaxBookStore.ts')).toMatch(
+      /await deleteBilledByPointers\(deps, call\.corporationId\)/
+    );
+    renderFaq();
+    const shown = document.body.textContent ?? '';
+    expect(shown).toMatch(
+      /its lines in the SRP log \(the filing and each officer action on it\) go with it/
+    );
+    expect(shown).toMatch(/including its place in the record of which books bill each Character/);
+    expect(shown).not.toMatch(/filing stays in the log|bill a Character is kept apart/);
+  });
 });
 
 describe('FaqPanel: Using Neocom Desk', () => {
