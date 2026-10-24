@@ -1,7 +1,6 @@
-// SRP retention sweep (ADR 0026): the scheduled sweep that deletes Paid and
-// Rejected SRP Claims one year after they close, with every srpAudit entry about them
-// (#4942), leaving one count-only srpAudit entry per corporation per run. Timing is the pure
-// `decideSrpClaimSweep` in srpRetention.ts; which entries go is `isSrpAuditForClaim`.
+// SRP retention sweep (ADR 0026): deletes Paid and Rejected SRP Claims a year after they
+// close. Timing: `decideSrpClaimSweep` (srpRetention.ts); which log entries go with a claim:
+// `isSrpAuditForClaim`.
 
 import type {
   DocumentReference,
@@ -42,10 +41,7 @@ async function* pages(
   }
 }
 
-/**
- * One audit entry per corporation per run: the count only. A claim's killmail id leads back to
- * its pilot through public killmail data, so the entry names none (#4942).
- */
+/** One count-only entry per corporation per run: a killmail id leads back to its pilot (#4942). */
 async function writeSweepAudit(corp: DocumentReference, now: number, count: number): Promise<void> {
   if (count === 0) return;
   await corp
@@ -61,11 +57,9 @@ async function writeSweepAudit(corp: DocumentReference, now: number, count: numb
 }
 
 /**
- * Deletes every Paid or Rejected claim closed a year ago, with its filing, re-filing and
- * officer entries in the SRP log, then writes one count-only audit entry per corporation. Each
- * claim is decided again inside the transaction that deletes it, so a claim re-filed meanwhile
- * is kept with its log, and a claim and its entries go together or not at all. Bounded per run, idempotent (a deleted
- * claim is gone), and one failing claim does not stop the rest.
+ * Deletes every Paid or Rejected claim closed a year ago with its SRP log entries, one
+ * transaction per claim. Each claim is decided again inside it, so one re-filed meanwhile is
+ * kept with its log. Bounded per run, idempotent, and one failing claim does not stop the rest.
  */
 export async function sweepSrpClaims(
   db: Firestore,
@@ -94,7 +88,7 @@ export async function sweepSrpClaims(
               if (!fresh.exists || decideSrpClaimSweep(fresh.data() ?? {}, now) !== 'delete') {
                 return false;
               }
-              // The claim's id is its killmail id; every entry about it names that killmail.
+              // Claim id = killmail id.
               const killmailId = Number(fresh.id);
               const trail = Number.isSafeInteger(killmailId)
                 ? (

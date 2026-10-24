@@ -405,8 +405,8 @@ async function deleteBilledByPointers(deps: BookDeps, corporationId: number): Pr
 
 /**
  * The player who turned the book on (or the CEO) deletes it outright: the book,
- * everything under it, its Statement verify links and its billed-by pointers. The corporation's SRP data
- * under the same `corps/{id}` document stays. `beforeDelete` lets the
+ * everything under it, its Statement verify links and billed-by pointers. The
+ * corporation's SRP data under the same `corps/{id}` document stays. `beforeDelete` lets the
  * caller drop what lives outside the book first (the scheduled-sync grant), so a
  * failure there leaves the book standing. Turning the book on again starts clean.
  */
@@ -445,7 +445,7 @@ export async function deleteBook(
   await deleteBookContents(ref);
   // A scheduled sync that loaded its grant before it was dropped may still have been writing.
   await deleteBookContents(ref);
-  // After the last pass, like it: narrows (can't close) the window for that sync to write one back.
+  // Last, so a late sync has the narrowest window to write one back (can't close it).
   await deleteBilledByPointers(deps, call.corporationId);
   return { deleted: true };
 }

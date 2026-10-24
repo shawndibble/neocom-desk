@@ -1110,8 +1110,7 @@ export const corpTaxBookCall = onCall<unknown>(
  * - sweepCommunityFleetPayouts (issue #4779): deletes Fleet Payouts expired a week ago, with
  *   their Shares. Bounded to 500 deletes a run.
  * - sweepSrpClaims (ADR 0026): deletes Paid and Rejected SRP Claims a year after
- *   they close, with their srpAudit entries, leaving a count-only srpAudit line. Bounded to
- *   500 deletes a run.
+ *   they close, with their SRP log entries. Bounded to 500 deletes a run.
  */
 export const dailyHousekeeping = onSchedule(
   { schedule: 'every 24 hours', secrets: [ALERTS_TOKEN_KEY], timeoutSeconds: 540 },
