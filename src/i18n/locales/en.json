@@ -5231,7 +5231,9 @@
         "summary_one": "{{isk}} ISK in {{count}} wallet division.",
         "summary_other": "{{isk}} ISK across {{count}} wallet divisions.",
         "biggest": "{{name}} holds {{share}}% of it",
-        "chartNote": "Share of the corporation's ISK by division"
+        "chartNote": "Share of the corporation's ISK by division",
+        "unused_one": "{{count}} unused division",
+        "unused_other": "{{count}} unused divisions"
       },
       "corpCashFlow": {
         "title": "Cash flow",
@@ -5247,6 +5249,7 @@
         "runway_one": "Runway {{count}} day at current spending",
         "runway_other": "Runway {{count}} days at current spending",
         "runwayUnknown": "Runway unknown",
+        "netPositive": "Net positive over {{count}} days",
         "runwayWindow": "Runway uses the last {{count}} days of spending.",
         "unavailable": "The master wallet journal couldn't load, so net and runway are unknown.",
         "coverage_one": "The journal reaches back {{count}} day.",
@@ -12858,7 +12861,12 @@
       "selectNone": "Select none",
       "grantSelected": "Grant selected ({{count}})",
       "corpRoles": "Roles: {{roles}}",
-      "corpRolesUnknown": "Corporation roles show once granted."
+      "corpRolesUnknown": "Corporation roles show once granted.",
+      "unlocks": {
+        "corp": "Unlocks Corp Board, Members, Corp Wallet, Corp Assets, Moons, SRP officer view",
+        "corpProjects": "Unlocks Corp projects in Build Opportunities",
+        "killmails": "Unlocks the SRP lost-ship list"
+      }
     }
   },
   "commandPalette": {
@@ -13124,6 +13132,8 @@
     "wallet": {
       "title": "Corp Wallet",
       "divisionsTitle": "Divisions",
+      "unusedDivisions_one": "{{count}} unused division",
+      "unusedDivisions_other": "{{count}} unused divisions",
       "divisionsShow": "Show all divisions",
       "divisionsHide": "Hide divisions",
       "viewLabel": "Wallet view",

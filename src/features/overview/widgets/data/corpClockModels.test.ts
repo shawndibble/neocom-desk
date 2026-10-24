@@ -122,16 +122,38 @@ describe('corpDeadlines', () => {
       corpJobs: jobsFeed([job({ status: 'ready', end_date: new Date(NOW - HOUR).toISOString() })]),
     };
     const view = corpDeadlines(feeds, ctx);
-    // fuel in 5h, moon in 8h, finished job (overdue)
-    expect(view.number.value).toBe('3');
+    // fuel in 5h, moon in 8h; a finished job is "Ready to deliver", not a deadline
+    expect(view.number.value).toBe('2');
     expect(view.number.unit).toBe('corp.standing.dueSoon');
-    expect(view.number.tone).toBe('critical');
-    expect(view.number.secondary?.text).toContain('Rifter');
-    expect(view.number.notes).toEqual(['corp.standing.dueSoonOverdue{"count":1}']);
-    expect(view.table?.rows).toHaveLength(4);
-    expect(view.table?.rows[0]?.cells[0]).toBe('Rifter');
+    expect(view.number.secondary?.text).toContain('Helios');
+    expect(view.number.notes).toEqual(['corp.standing.dueSoonNoneLate']);
+    expect(view.table?.rows).toHaveLength(3);
+    expect(view.table?.rows[0]?.cells[0]).toContain('Helios');
     expect(view.status.isEmpty).toBe(false);
     expect(view.to).toBeNull();
+  });
+
+  it('names the soonest future item as Next, and leaves a decayed chunk out', () => {
+    const view = corpDeadlines(
+      {
+        structures: structuresFeed([
+          structure({ name: 'Dry - Athanor', fuelExpiresMs: null }),
+          structure({ structureId: 2, name: 'Efa - Second', fuelExpiresMs: NOW + 5 * HOUR }),
+        ]),
+        moonChunks: moonFeed([
+          {
+            structureId: 3,
+            subject: 'Efa - Moon 2',
+            chunkArrivalMs: NOW - 4 * DAY,
+            naturalDecayMs: NOW - 3 * DAY,
+          },
+        ]),
+        corpJobs: jobsFeed([]),
+      },
+      ctx
+    );
+    expect(view.number.secondary?.text).toContain('Second');
+    expect(view.table?.rows.map((row) => row.cells[0])).not.toContain('Moon 2');
   });
 
   it('adds the starbase fuel and reinforcement clocks, and waits for them while they load', () => {
@@ -199,10 +221,15 @@ describe('corpDeadlines', () => {
     const view = corpDeadlines(
       {
         structures: failed as Feeds['structures'],
-        moonChunks: moonFeed([]),
-        corpJobs: jobsFeed([
-          job({ status: 'ready', end_date: new Date(NOW - HOUR).toISOString() }),
+        moonChunks: moonFeed([
+          {
+            structureId: 3,
+            subject: 'Efa - Moon Drill',
+            chunkArrivalMs: NOW + 3 * HOUR,
+            naturalDecayMs: NOW + 6 * HOUR,
+          },
         ]),
+        corpJobs: jobsFeed([]),
       },
       ctx
     );

@@ -177,4 +177,15 @@ describe('TableBody paging', () => {
     expect(bodyRows()).toHaveLength(3);
     expect(screen.getByText('+9 more')).toBeInTheDocument();
   });
+
+  it('opens the hidden rows in place from "+N more"', async () => {
+    render(
+      <MemoryRouter>
+        <TableBody table={model(12)} columnsFor="L" rowLimit={3} />
+      </MemoryRouter>
+    );
+    await userEvent.setup().click(screen.getByRole('button', { name: '+9 more' }));
+    expect(bodyRows()).toHaveLength(12);
+    expect(screen.queryByText('+9 more')).toBeNull();
+  });
 });

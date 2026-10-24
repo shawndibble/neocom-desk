@@ -192,15 +192,17 @@ export function toMoonChunkSources(
   extractions: readonly BoardExtractionSource[],
   nowMs: number
 ): BoardClockSource[] {
-  return extractions.map((extraction) => {
-    const arrived = nowMs >= extraction.chunkArrivalMs;
-    return {
-      id: String(extraction.structureId),
-      subject: extraction.subject,
-      detail: arrived ? 'decay' : 'arrival',
-      deadlineMs: arrived ? extraction.naturalDecayMs : extraction.chunkArrivalMs,
-    };
-  });
+  return extractions
+    .filter((extraction) => nowMs < extraction.naturalDecayMs)
+    .map((extraction) => {
+      const arrived = nowMs >= extraction.chunkArrivalMs;
+      return {
+        id: String(extraction.structureId),
+        subject: extraction.subject,
+        detail: arrived ? 'decay' : 'arrival',
+        deadlineMs: arrived ? extraction.naturalDecayMs : extraction.chunkArrivalMs,
+      };
+    });
 }
 
 /**

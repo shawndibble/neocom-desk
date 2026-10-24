@@ -128,7 +128,7 @@ describe('PermissionsPanel — every Permission', () => {
     renderPanel();
     const shown = screen
       .getAllByRole('listitem')
-      .map((li) => li.querySelector('div > div')?.textContent);
+      .map((li) => li.querySelector('div > div')?.firstChild?.textContent);
     const catalogue = SCOPE_GROUPS.map((group) => i18n.t(PERMISSIONS[group].labelKey)).filter(
       (label) => shown.includes(label)
     );
@@ -141,10 +141,24 @@ describe('PermissionsPanel — every Permission', () => {
     expect(screen.getAllByRole('button', { name: /^grant /i })).toHaveLength(SCOPE_GROUPS.length);
   });
 
+  it('explains in a tooltip what the Corporation, Corporation projects and Killmails rows unlock', () => {
+    mockedGrantedScopes.mockReturnValue([...CORE_GRANT]);
+    renderPanel();
+    expect(
+      within(row('Killmails')).getByRole('button', { name: 'About Killmails' })
+    ).toBeInTheDocument();
+    expect(
+      within(row('Corporation projects')).getByRole('button', {
+        name: 'About Corporation projects',
+      })
+    ).toBeInTheDocument();
+    expect(within(row('Wallet')).queryByRole('button', { name: /^About/ })).toBeNull();
+  });
+
   it('shows checking, not missing, while the grant is still unknown', () => {
     mockedGrantedScopes.mockReturnValue(undefined);
     renderPanel();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^grant/i })).not.toBeInTheDocument();
     expect(within(row('Wallet')).getByText('Checking…')).toBeInTheDocument();
   });
 
@@ -283,7 +297,9 @@ describe('PermissionsPanel — the Corporation row', () => {
     mockedLoadRoles.mockReturnValue(new Promise(() => {}));
     renderPanel();
     expect(within(row('Corporation')).getByText('Checking…')).toBeInTheDocument();
-    expect(within(row('Corporation')).queryByRole('button')).not.toBeInTheDocument();
+    expect(
+      within(row('Corporation')).queryByRole('button', { name: /Grant/ })
+    ).not.toBeInTheDocument();
   });
 
   it('ready: granted, nothing left to ask for', async () => {
@@ -293,7 +309,9 @@ describe('PermissionsPanel — the Corporation row', () => {
     await waitFor(() =>
       expect(within(row('Corporation')).getByText('Granted')).toBeInTheDocument()
     );
-    expect(within(row('Corporation')).queryByRole('button')).not.toBeInTheDocument();
+    expect(
+      within(row('Corporation')).queryByRole('button', { name: /Grant/ })
+    ).not.toBeInTheDocument();
   });
 });
 

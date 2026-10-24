@@ -150,7 +150,7 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
     return corpUnreadable(null, feeds.structures, needsReauth, t);
   }
 
-  const items = buildCorpBoard({
+  const board = buildCorpBoard({
     nowMs: now,
     staleWindowMs: CORP_CACHE_WINDOW_MS,
     structures,
@@ -160,6 +160,8 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
     sovereignty: raidsData ? toBoardSovereignty(raidsData) : undefined,
     hubFuel: raidsData ? toBoardHubFuel(raidsData) : undefined,
   });
+  // A finished job is "Ready to deliver" on Corp industry jobs, not a deadline.
+  const items = board.filter((item) => item.kind !== 'jobDelivery');
   // The board is already soonest-first; an offline service has no clock, so it is no deadline.
   const timed = items.filter((item) => item.timing !== 'untimed');
   const due = dueSoon(items, now);
@@ -172,7 +174,8 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
       .map((item) => item.severity)
   );
 
-  const next = timed[0];
+  // Next is the soonest item still ahead; a dry or overdue one is listed, not "next".
+  const next = timed.find((item) => item.timing === 'timed' && (item.deadlineMs ?? 0) > now);
   const secondary: NumberSecondary | undefined = next
     ? {
         text: t('overview.widgets.corpDeadlines.next', {
