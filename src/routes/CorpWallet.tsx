@@ -245,7 +245,6 @@ function CorpDivisionsPanel({
   return (
     <CollapsiblePanel
       title={t('corp.wallet.divisionsTitle')}
-      actions={walletsResult ? <DataAgeBadge date={walletsResult.fetchedAt} /> : undefined}
       expanded={expanded}
       onToggle={() => setExpanded((open) => !open)}
       toggleRef={toggleRef}

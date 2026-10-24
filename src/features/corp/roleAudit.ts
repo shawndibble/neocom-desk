@@ -25,7 +25,7 @@ import {
   loadCorpPaginatedWithCacheStatus,
   loadCorpWithCacheStatus,
 } from './corpRead';
-import { loadCorporationMemberRoles, toMemberRoles } from './members';
+import { loadCorporationCeoId, loadCorporationMemberRoles, toMemberRoles } from './members';
 
 const KEYS = {
   history: 'roleHistory',
@@ -102,6 +102,8 @@ export interface RoleAuditData {
   /** Whether the titles reads landed (a hidden titles column otherwise). */
   titlesKnown: boolean;
   names: ReadonlyMap<number, string>;
+  /** The corporation's CEO; null when its public record could not be read. */
+  ceoId: number | null;
   fetchedAt: Date | null;
   fromCache: boolean;
 }
@@ -118,11 +120,12 @@ export async function loadRoleAudit(
   corporationId: number,
   { withTitles }: { withTitles: boolean }
 ): Promise<RoleAuditResult> {
-  const [roles, history, titles, memberTitles] = await Promise.all([
+  const [roles, history, titles, memberTitles, ceoId] = await Promise.all([
     loadCorporationMemberRoles(characterId, corporationId),
     loadCorporationRoleHistory(characterId, corporationId),
     withTitles ? loadCorporationTitles(characterId, corporationId) : null,
     withTitles ? loadCorporationMemberTitles(characterId, corporationId) : null,
+    loadCorporationCeoId(corporationId),
   ]);
   if (roles.cached === null) {
     if (roles.needsReauth) return { needsReauth: true };
@@ -155,6 +158,7 @@ export async function loadRoleAudit(
       changes,
       titlesKnown,
       names,
+      ceoId,
       fetchedAt: reads.map((c) => c.fetchedAt).reduce((a, b) => (a < b ? a : b)),
       fromCache: reads.some((c) => c.fromCache),
     },

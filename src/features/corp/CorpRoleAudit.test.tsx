@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
@@ -31,6 +31,7 @@ vi.mock('@/lib/useRouteSnapshot', () => ({
           [2, 'Beta'],
           [3, 'Gamma'],
         ]),
+        ceoId: 3,
         fetchedAt: null,
         fromCache: false,
       },
@@ -80,5 +81,18 @@ describe('CorpRoleAudit', () => {
       </MemoryRouter>
     );
     expect(screen.getByText('2 Directors. Members with a sensitive role: 3.')).toBeInTheDocument();
+  });
+
+  it('marks the CEO in the holders table', () => {
+    render(
+      <MemoryRouter>
+        <CorpRoleAudit tabs={{ bar: null, tabsId: 't', tabId: 'x' }} />
+      </MemoryRouter>
+    );
+    const holders = screen.getByRole('table', { name: 'Members with sensitive roles' });
+    expect(
+      within(within(holders).getByText('Gamma').closest('tr')!).getByText('CEO')
+    ).toBeVisible();
+    expect(within(holders.querySelectorAll('tr')[1] as HTMLElement).queryByText('CEO')).toBeNull();
   });
 });

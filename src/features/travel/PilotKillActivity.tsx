@@ -52,9 +52,12 @@ export function PilotKillActivity({ characterId }: { characterId: number }) {
 export function PilotKillActivityView({
   history,
   onRetry,
+  unknown = false,
 }: {
   history: PilotKillHistoryState;
   onRetry: () => void;
+  /** zKillboard's other reads failed: an empty list here is unknown, not "no kills". */
+  unknown?: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -119,7 +122,9 @@ export function PilotKillActivityView({
     return (
       <section ref={resultRef} tabIndex={-1} className="space-y-2 outline-none">
         {heading}
-        <p className="text-sm text-text-dim">{t('travel.pilot.activity.empty')}</p>
+        <p className="text-sm text-text-dim">
+          {unknown ? t('travel.pilot.activity.unknown') : t('travel.pilot.activity.empty')}
+        </p>
       </section>
     );
   }

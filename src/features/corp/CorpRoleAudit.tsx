@@ -26,6 +26,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { Pill } from '@/components/ui/Pill';
 import { DataGate } from '@/components/DataGate';
 import { CharacterLink } from '@/features/entities';
 import { label } from '@/engine/corp/members';
@@ -66,6 +67,7 @@ interface HolderRow {
   name: string | null;
   roles: string;
   isDirector: boolean;
+  isCeo: boolean;
   titles: string;
   lastChangeMs: number | null;
 }
@@ -194,6 +196,7 @@ export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
         name: audit.names.get(holder.characterId) ?? null,
         roles: holder.roles.map(roleLabel).join(', '),
         isDirector: holder.roles.includes('Director'),
+        isCeo: holder.characterId === audit.ceoId,
         titles: holder.titles.join(', '),
         lastChangeMs: lastChange.get(holder.characterId) ?? null,
       }))
@@ -230,7 +233,12 @@ export function CorpRoleAudit({ tabs }: { tabs: MembersTabsSlot }) {
         primary: true,
         className: 'truncate',
         render: (row) => (
-          <CharacterLink id={row.characterId}>{label(row.name, row.characterId)}</CharacterLink>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <CharacterLink id={row.characterId} className="truncate">
+              {label(row.name, row.characterId)}
+            </CharacterLink>
+            {row.isCeo && <Pill className="shrink-0">{t('corp.members.ceo')}</Pill>}
+          </span>
         ),
         sortValue: (row) => row.name ?? undefined,
       },

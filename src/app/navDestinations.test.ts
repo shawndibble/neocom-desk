@@ -366,11 +366,7 @@ describe('listNavDestinations', () => {
       })
         .filter((entry) => entry.pagePath === '/corp/members')
         .map((entry) => entry.path);
-    expect(members(true)).toEqual([
-      '/corp/members',
-      '/corp/members/members',
-      '/corp/members/roles',
-    ]);
+    expect(members(true)).toEqual(['/corp/members', '/corp/members/roster', '/corp/members/roles']);
     expect(members(false)).toEqual(['/corp/members']);
   });
 
