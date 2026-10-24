@@ -12,8 +12,8 @@ import { entryKey } from './types';
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 
 /**
- * How long after the last growth an entry may still grow — ESI's longest
- * ledger lag. Also how long after its EVE day ends an entry may still grow.
+ * ESI's longest ledger lag: how long after its EVE day ends an entry may
+ * still grow.
  */
 export const ARRIVAL_WINDOW_MS = HOUR_MS;
 
