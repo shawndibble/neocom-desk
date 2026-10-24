@@ -32,10 +32,14 @@ function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
 }
 
-/** The billing period `date` falls in. */
+/**
+ * The billing period `date` falls in. A day before an N-day anchor, from the book's `startDate`,
+ * falls in a stub period that runs from the start date to the day before the anchor.
+ */
 export function statementPeriod(
   date: string,
-  cadence: StatementCadence = { kind: 'monthly' }
+  cadence: StatementCadence = { kind: 'monthly' },
+  startDate?: string
 ): StatementPeriod {
   if (cadence.kind === 'monthly') {
     const start = `${date.slice(0, 7)}-01`;
@@ -43,6 +47,8 @@ export function statementPeriod(
     const end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
     return { start, end };
   }
+  if (startDate !== undefined && startDate < cadence.anchor && date < cadence.anchor)
+    return { start: startDate, end: shiftDate(cadence.anchor, -1) };
   const offset = Math.floor(daysBetween(cadence.anchor, date) / cadence.days) * cadence.days;
   const start = shiftDate(cadence.anchor, offset);
   return { start, end: shiftDate(start, cadence.days - 1) };

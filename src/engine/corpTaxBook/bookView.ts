@@ -770,7 +770,7 @@ export function nextRunPeriod(view: BookView): StatementPeriod | undefined {
   const dates = [...view.charges.map((c) => c.date)].sort();
   const seen = new Set<string>();
   for (const date of dates) {
-    const period = statementPeriod(date, view.input.cadence);
+    const period = statementPeriod(date, view.input.cadence, view.input.startDate);
     if (seen.has(period.start)) continue;
     seen.add(period.start);
     if (period.end > view.billableThrough) continue;
@@ -934,7 +934,11 @@ export function periodRows(view: BookView): PeriodRow[] {
     });
   }
   const ready = nextRunPeriod(view);
-  const today = statementPeriod(view.input.now.slice(0, 10), view.input.cadence);
+  const today = statementPeriod(
+    view.input.now.slice(0, 10),
+    view.input.cadence,
+    view.input.startDate
+  );
   const chargesByMiner = new Map<string, BookView['charges']>();
   for (const c of view.charges) {
     chargesByMiner.set(c.minerId, [...(chargesByMiner.get(c.minerId) ?? []), c]);
@@ -974,7 +978,7 @@ export function periodRows(view: BookView): PeriodRow[] {
   // covers every day since the last, so only the earliest closed one is sendable.
   const seen = new Set<string>();
   for (const date of view.charges.map((c) => c.date).sort()) {
-    const period = statementPeriod(date, view.input.cadence);
+    const period = statementPeriod(date, view.input.cadence, view.input.startDate);
     if (seen.has(period.start)) continue;
     seen.add(period.start);
     if (period.start === ready?.start) add(period, 'ready');
