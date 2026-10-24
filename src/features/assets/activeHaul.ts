@@ -161,3 +161,11 @@ export function legRouteHref(leg: HaulLeg): string | null {
     { systemId: leg.to.systemId, stationId: leg.to.stationId },
   ]);
 }
+
+/** Route Safety through every stop of one Character's legs, in order: the whole route in one trip. */
+export function sectionRouteHref(legs: readonly HaulLeg[]): string | null {
+  const stops = legs.flatMap((leg) =>
+    leg.to.systemId === null ? [] : [{ systemId: leg.to.systemId, stationId: leg.to.stationId }]
+  );
+  return stops.length === 0 ? null : routeStopsHref(legs[0]?.from?.systemId ?? null, stops);
+}

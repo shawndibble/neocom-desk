@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Button, Caret } from '@/components/ui';
+import { Pill } from '@/components/ui/Pill';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
   inlineLinkClassName,
@@ -9,9 +10,20 @@ import {
   rowInteractiveClassName,
 } from '@/components/ui/controlStyles';
 import type { HaulLeg, HaulSection } from '@/engine/route/haulPlan';
+import {
+  legCarry,
+  legCondition,
+  legWaypointIds,
+  sectionWaypointIds,
+  splitPlaceName,
+  type LegCondition,
+} from '@/engine/route/haulLeg';
 import { cx } from '@/lib/cx';
 import { formatCubicMetres } from '@/lib/volume';
-import { legRouteHref, type ActiveHaul } from './activeHaul';
+import { legRouteHref, sectionRouteHref, type ActiveHaul } from './activeHaul';
+import { HaulStrip } from './HaulStrip';
+import { HaulWaypointButton } from './HaulWaypointButton';
+import { useHaulLegRows, type LegRows } from './useHaulLegRows';
 
 interface ActiveHaulViewProps {
   haul: ActiveHaul;
@@ -19,19 +31,18 @@ interface ActiveHaulViewProps {
   onClear: () => Promise<void>;
 }
 
-/** The Leg a pilot flies next. No progress is tracked yet (#4968), so it is the first one. */
-const NEXT_LEG_ID = 0;
-
 /**
- * The active haul: a slim ordered checklist of Legs, one section per Character.
- * A node-and-line strip shows the route's shape, a summary line gives its size,
- * and the next Leg is open while later ones fold. Route Safety is the analyser;
- * each Leg only links there, so nothing here judges a route.
+ * The active haul as a timeline, one section per Character: stops down a rail
+ * and a block per Leg between them, with its distance, the security it flies
+ * through (a strip with per-system kills), waypoint and Route Safety actions,
+ * and its cargo folded away. Route Safety is the analyser; a Leg states the
+ * condition it flies through and links there, so nothing here judges a route.
  */
 export function ActiveHaulView({ haul, onBack, onClear }: ActiveHaulViewProps) {
   const { t } = useTranslation();
   const { plan, destination } = haul;
-  const [open, setOpen] = useState<ReadonlySet<number>>(new Set([NEXT_LEG_ID]));
+  const legRows = useHaulLegRows(plan.sections.flatMap((s) => s.legs));
+  const [open, setOpen] = useState<ReadonlySet<number>>(new Set());
   const [clearing, setClearing] = useState(false);
   const toggle = (id: number) =>
     setOpen((prev) => {
@@ -61,6 +72,8 @@ export function ActiveHaulView({ haul, onBack, onClear }: ActiveHaulViewProps) {
           section={section}
           open={open}
           onToggle={toggle}
+          legRows={legRows}
+          capacityM3={haul.capacityM3}
           many={plan.sections.length > 1}
         />
       ))}
@@ -118,115 +131,186 @@ export function ActiveHaulView({ haul, onBack, onClear }: ActiveHaulViewProps) {
   );
 }
 
+const TONE: Record<LegCondition['kind'], 'neutral' | 'success' | 'warning' | 'danger'> = {
+  highsec: 'success',
+  lowsec: 'warning',
+  nullsec: 'danger',
+  unknown: 'neutral',
+};
+
 function Section({
   section,
   open,
   onToggle,
   many,
+  legRows,
+  capacityM3,
 }: {
   section: HaulSection;
   open: ReadonlySet<number>;
   onToggle: (id: number) => void;
   many: boolean;
+  legRows: ReadonlyMap<number, LegRows>;
+  capacityM3: number;
 }) {
   const { t } = useTranslation();
   const { legs } = section;
-  // The route's places in order: where it starts, then every Leg's end.
-  const nodes = [
-    ...(legs[0]?.from ? [{ key: 'start', delivery: false }] : []),
-    ...legs.map((l) => ({ key: String(l.id), delivery: l.kind === 'delivery' })),
-  ];
+  const first = legs[0];
+  const routeHref = sectionRouteHref(legs);
   return (
     <section
       aria-label={many ? section.name : t('assets.movePlan.haul.legsLabel')}
-      className="flex flex-col gap-2"
+      className="flex flex-col gap-3"
     >
-      {many && (
-        <h4 className="m-0 flex flex-wrap items-baseline gap-x-3 text-sm font-semibold">
-          {section.name}
-          <span className="text-xs font-normal text-text-dim">
-            {t('assets.movePlan.haul.tripCount', { count: section.trips })}
-          </span>
-        </h4>
-      )}
-      <div className="flex items-center overflow-x-auto py-1" aria-hidden="true">
-        {nodes.map((node, index) => (
-          <span key={node.key} className="flex items-center">
-            {index > 0 && <i className="block h-0.5 w-5 shrink-0 bg-line-bright/55" />}
-            <i
-              className={cx(
-                'block size-3 shrink-0 rounded-full border-2',
-                node.delivery ? 'border-accent bg-accent' : 'border-line-bright bg-panel',
-                index === (legs[0]?.from ? 1 : 0) && 'ring-2 ring-accent/60'
-              )}
-            />
-          </span>
-        ))}
-      </div>
-      <ol className="m-0 flex list-none flex-col gap-1.5 p-0">
-        {legs.map((leg, index) => (
-          <LegRow
-            key={leg.id}
-            leg={leg}
-            n={index + 1}
-            expanded={open.has(leg.id)}
-            onToggle={() => onToggle(leg.id)}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        {many ? (
+          <h4 className="m-0 flex flex-wrap items-baseline gap-x-3 text-sm font-semibold">
+            {section.name}
+            <span className="text-xs font-normal text-text-dim">
+              {t('assets.movePlan.haul.tripCount', { count: section.trips })}
+            </span>
+          </h4>
+        ) : (
+          <span />
+        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <HaulWaypointButton
+            characterId={section.characterId}
+            ids={sectionWaypointIds(legs)}
+            label={t('assets.movePlan.haul.waypointAll')}
+            doneLabel={t('assets.movePlan.haul.waypointAllDone')}
+            variant={many ? 'ghost' : 'primary'}
           />
-        ))}
-      </ol>
+          {routeHref && (
+            <Link className={`${inlineLinkClassName} text-sm whitespace-nowrap`} to={routeHref}>
+              {t('assets.movePlan.haul.routeSafetyAll')}
+            </Link>
+          )}
+        </div>
+      </div>
+      <div className="ml-2 border-l-2 border-line-bright/55">
+        {first && <Stop name={first.from?.name ?? t('assets.movePlan.haul.startUnknown')} start />}
+        <ol className="m-0 flex list-none flex-col p-0">
+          {legs.map((leg, index) => (
+            <li key={leg.id} data-leg-id={leg.id}>
+              <LegBlock
+                leg={leg}
+                n={index + 1}
+                expanded={open.has(leg.id)}
+                onToggle={() => onToggle(leg.id)}
+                rows={legRows.get(leg.id)}
+                capacityM3={capacityM3}
+              />
+              <Stop name={leg.to.name} leg={leg} last={index === legs.length - 1} />
+            </li>
+          ))}
+        </ol>
+      </div>
     </section>
   );
 }
 
-function LegRow({
+/** A place on the rail: the system in full, the station and moon on a dim second line. */
+function Stop({
+  name,
+  leg,
+  start,
+  last,
+}: {
+  name: string;
+  leg?: HaulLeg;
+  start?: boolean;
+  last?: boolean;
+}) {
+  const { t } = useTranslation();
+  const { system, detail } = splitPlaceName(name);
+  return (
+    <div className="relative py-1.5 pl-5">
+      <i
+        aria-hidden="true"
+        className={cx(
+          'absolute top-2.5 -left-2 block size-3.5 rounded-full border-2 bg-panel',
+          start ? 'border-line-bright' : 'border-accent',
+          last && 'bg-accent'
+        )}
+      />
+      <div className="text-sm font-semibold">{system}</div>
+      {detail && <div className="text-xs text-text-dim [overflow-wrap:anywhere]">{detail}</div>}
+      {leg && (
+        <span
+          className={cx(
+            'mt-1 inline-block rounded-xs border px-2 py-0.5 text-xs tabular-nums',
+            leg.kind === 'pickup' ? 'border-accent text-accent' : 'border-warning text-warning'
+          )}
+        >
+          {t(leg.kind === 'pickup' ? 'assets.movePlan.haul.load' : 'assets.movePlan.haul.drop', {
+            volume: formatCubicMetres(leg.m3),
+            place: system,
+          })}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function LegBlock({
   leg,
   n,
   expanded,
   onToggle,
+  rows,
+  capacityM3,
 }: {
   leg: HaulLeg;
   n: number;
   expanded: boolean;
   onToggle: () => void;
+  rows: LegRows | undefined;
+  capacityM3: number;
 }) {
   const { t } = useTranslation();
   const href = legRouteHref(leg);
-  const from = leg.from?.name ?? t('assets.movePlan.haul.startUnknown');
+  const condition = rows?.status === 'ready' ? legCondition(rows.rows) : null;
   const volume = formatCubicMetres(leg.m3);
+  const carry = legCarry(leg);
+  const place = splitPlaceName(leg.to.name).system;
   return (
-    <li data-leg-id={leg.id} className="rounded-xs border border-line bg-panel-2">
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={onToggle}
-        className={cx(
-          'flex min-h-11 w-full items-center gap-2 px-2.5 py-1.5 text-left text-sm md:min-h-9',
-          rowInteractiveClassName,
-          focusRingInsetClassName
-        )}
-      >
-        <Caret expanded={expanded} />
-        <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-          <span className="tabular-nums">{n}. </span>
-          {t('assets.movePlan.haul.legTitle', { from, to: leg.to.name })}
-        </span>
-        <span className="shrink-0 text-xs text-text-dim tabular-nums">
-          {leg.jumps === null
-            ? t('assets.movePlan.haul.noGateRoute')
-            : t('assets.movePlan.haul.jumpCount', { count: leg.jumps })}
-        </span>
-      </button>
-      {expanded && (
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-line px-2.5 py-2 text-sm">
-          <span className="tabular-nums">
-            {t(leg.kind === 'pickup' ? 'assets.movePlan.haul.load' : 'assets.movePlan.haul.drop', {
-              volume,
-              place: leg.to.name,
-            })}
+    <div className="my-1 ml-5 flex flex-col gap-2.5 rounded-xs border border-line bg-panel-2 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-xl leading-none font-semibold tabular-nums">
+            {leg.jumps === null ? (
+              <span className="text-sm font-normal text-text-dim">
+                {t('assets.movePlan.haul.noGateRoute')}
+              </span>
+            ) : (
+              <>
+                {leg.jumps}
+                <span className="ml-1 text-xs font-normal text-text-dim">
+                  {t('assets.movePlan.haul.jumpUnit', { count: leg.jumps })}
+                </span>
+              </>
+            )}
           </span>
+          {condition && (
+            <Pill tone={TONE[condition.kind]}>
+              {t(`assets.movePlan.haul.condition_${condition.kind}`, {
+                count: 'count' in condition ? condition.count : 0,
+              })}
+            </Pill>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <HaulWaypointButton
+            characterId={leg.characterId}
+            ids={legWaypointIds(leg)}
+            label={t('assets.movePlan.haul.waypoint')}
+            doneLabel={t('assets.movePlan.haul.waypointDone')}
+            ariaLabel={t('assets.movePlan.haul.waypointAria', { n })}
+          />
           {href && (
             <Link
-              className={`${inlineLinkClassName} whitespace-nowrap`}
+              className={`${inlineLinkClassName} text-sm whitespace-nowrap`}
               aria-label={t('assets.movePlan.haul.showInRouteSafetyAria', { n })}
               to={href}
             >
@@ -234,7 +318,42 @@ function LegRow({
             </Link>
           )}
         </div>
+      </div>
+      {rows?.status === 'ready' && <HaulStrip rows={rows.rows} />}
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-label={t(
+          expanded ? 'assets.movePlan.haul.cargoHide' : 'assets.movePlan.haul.cargoShow',
+          { n }
+        )}
+        onClick={onToggle}
+        className={cx(
+          'flex min-h-9 items-center gap-2 border-t border-dashed border-line pt-2 text-left text-sm text-text-dim',
+          rowInteractiveClassName,
+          focusRingInsetClassName
+        )}
+      >
+        <Caret expanded={expanded} />
+        {carry === 'loaded'
+          ? t('assets.movePlan.haul.carryLoaded', { volume })
+          : t('assets.movePlan.haul.carryEmpty')}
+      </button>
+      {expanded && (
+        <p className="m-0 text-sm tabular-nums">
+          {carry === 'loaded'
+            ? t('assets.movePlan.haul.carryDrops', { volume, place })
+            : t('assets.movePlan.haul.carryLoadsOnArrival', { volume, place })}
+          {capacityM3 > 0 && (
+            <span className="text-text-dim">
+              {' · '}
+              {t('assets.movePlan.haul.holdFill', {
+                percent: Math.round((leg.m3 / capacityM3) * 100),
+              })}
+            </span>
+          )}
+        </p>
       )}
-    </li>
+    </div>
   );
 }
