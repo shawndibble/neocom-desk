@@ -354,7 +354,6 @@ function buildSamples(t: TFunction): Record<string, Sample> {
     marketTrend: {
       value: '+8.4%',
       unit: t('overview.widgets.data.marketTrend.unit', { item: 'Tritanium', days: 7 }),
-      note: t('overview.gallery.samples.marketTrend.note'),
       rows: [
         ['Tritanium', '', '+8.4%'],
         ['PLEX', '', '-2.1%'],
