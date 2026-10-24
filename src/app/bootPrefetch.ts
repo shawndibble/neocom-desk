@@ -8,6 +8,7 @@
  * route's own. Both waits are cheap — a warm-up only has to land before the
  * user opens a *second* page.
  */
+import { scheduleIdle } from '@/lib/scheduleIdle';
 import type { PrefetchSignal } from './prefetch';
 
 /** Upper bound on the wait for an idle slot (and the timer fallback's delay). */
@@ -32,14 +33,7 @@ export function scheduleBootPrefetch(characterId: number): () => void {
       .catch(() => {});
   };
 
-  let cancelWait: () => void;
-  if (typeof globalThis.requestIdleCallback === 'function') {
-    const handle = requestIdleCallback(start, { timeout: BOOT_PREFETCH_IDLE_TIMEOUT_MS });
-    cancelWait = () => cancelIdleCallback(handle);
-  } else {
-    const handle = setTimeout(start, BOOT_PREFETCH_IDLE_TIMEOUT_MS);
-    cancelWait = () => clearTimeout(handle);
-  }
+  const cancelWait = scheduleIdle(start, BOOT_PREFETCH_IDLE_TIMEOUT_MS);
 
   return () => {
     signal.cancelled = true;
@@ -73,13 +67,11 @@ export function scheduleCachePrune(): () => void {
   };
 
   const delay = setTimeout(() => {
-    if (typeof globalThis.requestIdleCallback === 'function') {
-      const handle = requestIdleCallback(start, { timeout: BOOT_PREFETCH_IDLE_TIMEOUT_MS * 5 });
-      cancelWait = () => cancelIdleCallback(handle);
-    } else {
-      const handle = setTimeout(start, BOOT_PREFETCH_IDLE_TIMEOUT_MS);
-      cancelWait = () => clearTimeout(handle);
-    }
+    cancelWait = scheduleIdle(
+      start,
+      BOOT_PREFETCH_IDLE_TIMEOUT_MS * 5,
+      BOOT_PREFETCH_IDLE_TIMEOUT_MS
+    );
   }, CACHE_PRUNE_DELAY_MS);
 
   return () => {
@@ -112,13 +104,11 @@ export function scheduleLazySdeWarm(delayMs: number = LAZY_SDE_WARM_DELAY_MS): (
   };
 
   const delay = setTimeout(() => {
-    if (typeof globalThis.requestIdleCallback === 'function') {
-      const handle = requestIdleCallback(start, { timeout: BOOT_PREFETCH_IDLE_TIMEOUT_MS * 5 });
-      cancelWait = () => cancelIdleCallback(handle);
-    } else {
-      const handle = setTimeout(start, BOOT_PREFETCH_IDLE_TIMEOUT_MS);
-      cancelWait = () => clearTimeout(handle);
-    }
+    cancelWait = scheduleIdle(
+      start,
+      BOOT_PREFETCH_IDLE_TIMEOUT_MS * 5,
+      BOOT_PREFETCH_IDLE_TIMEOUT_MS
+    );
   }, delayMs);
 
   return () => {
