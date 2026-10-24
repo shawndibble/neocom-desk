@@ -6,7 +6,7 @@
 import { definePageTabs } from '@/lib/pageTabs';
 
 export const CORP_MEMBERS_TABS = definePageTabs('/corp/members', [
-  { id: 'members', labelKey: 'corp.members.rosterTab' },
+  { id: 'roster', labelKey: 'corp.members.rosterTab' },
   { id: 'roles', labelKey: 'corp.roles.tab' },
 ]);
 
@@ -15,11 +15,17 @@ export function legacyCorpMembersLocation(
   pathname: string,
   search: string
 ): { pathname: string; search: string } | null {
-  if (pathname.replace(/\/$/, '') !== '/corp/members') return null;
+  const path = pathname.replace(/\/$/, '');
+  /** The roster tab was `members` until #4895's audit (CX-12). */
+  if (path === '/corp/members/members') return { pathname: '/corp/members/roster', search };
+  if (path !== '/corp/members') return null;
   const params = new URLSearchParams(search);
   const tab = params.get('tab');
   if (tab !== 'roles' && tab !== 'members') return null;
   params.delete('tab');
   const rest = params.toString();
-  return { pathname: `/corp/members/${tab}`, search: rest ? `?${rest}` : '' };
+  return {
+    pathname: `/corp/members/${tab === 'members' ? 'roster' : tab}`,
+    search: rest ? `?${rest}` : '',
+  };
 }

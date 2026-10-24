@@ -447,7 +447,7 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     expect(spy.mock.calls[1][0]).toMatch(/^neocom-corp-wallet-journal-srp-\d{4}-\d{2}-\d{2}\.csv$/);
   });
 
-  it('dates the balances by their own cached fetch time', async () => {
+  it('keeps one freshness readout: the divisions panel draws none (CX-16)', async () => {
     const corpFetchedAt = Date.now() - 5 * 60_000;
     await db.esiCache.put({
       characterId: CHAR_ID,
@@ -464,9 +464,7 @@ describe('Corp Wallet: divisions and the journal (AC 2, AC 3)', () => {
     const { container } = render(<App />);
     await findDivisions();
 
-    expect(container.querySelector('section header time')?.getAttribute('dateTime')).toBe(
-      new Date(corpFetchedAt).toISOString()
-    );
+    expect(container.querySelector('section header time')).toBeNull();
   });
 
   it('shows a distinct failed-load state for the journal, not the "no entries" empty state (issue #413)', async () => {
