@@ -6,6 +6,7 @@
  * Price History's "average" choice draws. Pure, like every builder.
  */
 import { indexToStart, alignTrendSeries, percentChange } from '@/engine/market/priceTrend';
+import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIskCompact } from '@/lib/isk';
 import type { ChartColor, ChartModel } from '../charts/types';
 import { blank, statusOf, UNKNOWN, type Builder } from './builderKit';
@@ -99,6 +100,7 @@ export const marketTrend: Builder = (feeds, { t, range }) => {
   const plotted = indexed.flatMap((v, i) => (v.some((x) => x !== null) ? [i] : []));
   if (axis.dates.length < 2 || plotted.length === 0) return base;
 
+  const volumes = data.items.map((i) => new Map(i.points.map((p) => [p.date, p.volume])));
   const rel = (v: number) => v / 100 - 1;
   const all = plotted.flatMap((i) => indexed[i]!.filter((v): v is number => v !== null));
   const lastOf = (values: (number | null)[]) => values.filter((v) => v !== null).at(-1) ?? null;
@@ -138,7 +140,11 @@ export const marketTrend: Builder = (feeds, { t, range }) => {
         return [
           {
             label: data.items[i]!.name,
-            value: `${trendText(change)} · ${formatIskCompact(price)}`,
+            value: t(`${C}.tip`, {
+              change: trendText(change),
+              price: formatIskCompact(price),
+              volume: formatCompactNumber(volumes[i]!.get(date) ?? 0),
+            }),
             tone: signTone(change),
           },
         ];

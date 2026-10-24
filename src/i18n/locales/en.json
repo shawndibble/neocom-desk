@@ -4478,7 +4478,8 @@
           "summary_other": "Price trend of {{count}} Quickbar items at {{hub}} over {{days}} days.",
           "summaryLine": "{{item}} {{change}}.",
           "note": "Change in the daily average since the start of the range, at {{hub}}",
-          "range": "{{days}} days"
+          "range": "{{days}} days",
+          "tip": "{{change}} · {{price}} ISK · {{volume}} sold"
         }
       },
       "data": {

@@ -4,7 +4,7 @@ import { CHART_COLOR } from './palette';
 import type { LinesChartModel } from './types';
 
 /** Colour alone never separates two lines: a slot's dash pattern (and the legend's label and figure) does too. */
-const DASH = ['', '4 2', '1.5 2.5', '', '4 2', '1.5 2.5'];
+const DASH = ['', '4 2', '1.5 2.5', '6 2 1.5 2', '2 1', '9 3'];
 
 /** Several lines on one scale, a legend naming each with where it ends, and a hover that reads every line for the day. Drawn aria-hidden; the summary carries the meaning. */
 export function Lines({ model, height }: { model: LinesChartModel; height: number }) {
