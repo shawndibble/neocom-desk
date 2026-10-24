@@ -34,6 +34,8 @@ import {
   setCalendarEvents,
   setRaidsRadius,
   setRaidsWhere,
+  setTrendHubs,
+  setTrendItems,
   setScope,
   setShowOnPhone,
   setView,
@@ -162,8 +164,8 @@ export function OverviewEditProvider({
         setToast(null);
         if (before !== null) commit(restoreLayout(before));
       },
-      add: (kind) => {
-        const result = addWidgetUndoable(layoutRef.current, kind, makeWidgetId);
+      add: (kind, init) => {
+        const result = addWidgetUndoable(layoutRef.current, kind, makeWidgetId, init);
         if (commitUndoable(result)) {
           const added = result?.layout.widgets.at(-1);
           if (added) flash(added.id);
@@ -210,6 +212,8 @@ export function OverviewEditProvider({
       setCalendarEvents: (id, choice) => commit(setCalendarEvents(layoutRef.current, id, choice)),
       setRaidsWhere: (id, where) => commit(setRaidsWhere(layoutRef.current, id, where)),
       setRaidsRadius: (id, radius) => commit(setRaidsRadius(layoutRef.current, id, radius)),
+      setTrendItems: (id, items) => commit(setTrendItems(layoutRef.current, id, items)),
+      setTrendHubs: (id, hubs) => commit(setTrendHubs(layoutRef.current, id, hubs)),
       rename: (id, title) => commit(renameWidget(layoutRef.current, id, title)),
       setShowOnPhone: (id, show) => commit(setShowOnPhone(layoutRef.current, id, show)),
     };

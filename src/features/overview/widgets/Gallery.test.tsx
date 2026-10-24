@@ -156,6 +156,27 @@ describe('Gallery', () => {
     expect(screen.getByRole('dialog', { name: 'Add a widget' })).toBeInTheDocument();
   });
 
+  it('lists the Market Trend presets beside the plain card and adds one', async () => {
+    const { user, dialog } = await openGallery();
+    for (const name of [
+      'PLEX price',
+      'Large Skill Injector price',
+      'Mineral prices',
+      'Ore prices',
+    ]) {
+      expect(within(dialog).getByRole('button', { name: `Add ${name}` })).toBeInTheDocument();
+    }
+    await user.click(within(dialog).getByRole('button', { name: 'Add PLEX price' }));
+    expect(within(itemOf(dialog, 'PLEX price')).getByRole('status')).toHaveTextContent('Added');
+    // The plain card counts the widget (it is a Market trend) but can still add a plain one.
+    const plain = itemOf(dialog, 'Market trend');
+    expect(
+      within(plain).getByRole('button', { name: 'Add another Market trend' })
+    ).toBeInTheDocument();
+    // A second add of the same preset is allowed.
+    await user.click(within(dialog).getByRole('button', { name: 'Add PLEX price' }));
+  });
+
   it('says a kind is on the Overview, with Add another and no second primary', async () => {
     const { dialog } = await openGallery();
     const item = itemOf(dialog, 'Mail');
@@ -296,17 +317,21 @@ describe('Gallery Browse all', () => {
     expect(within(dialog).queryByTestId('gallery-preview')).toBeNull();
   });
 
-  it('says so when every widget is already on the board', async () => {
-    const all = {
-      version: 1 as const,
-      widgets: OVERVIEW_KINDS.map((k, i) => w(`w${i}`, k.id)),
-    };
-    const { user, dialog } = await browse({ initial: all });
+  it('keeps Market Trend and its presets listed once one is on the board', async () => {
+    const { dialog } = await browse({
+      initial: { version: 1 as const, widgets: [w('a', 'marketTrend')] },
+    });
+    expect(within(dialog).getByRole('button', { name: 'Add PLEX price' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Add Mineral prices' })).toBeInTheDocument();
+  });
+
+  it('shows only the matching preset when a search names one', async () => {
+    const { user, dialog } = await browse({});
+    await user.type(within(dialog).getByRole('searchbox'), 'injector');
     expect(
-      within(dialog).getByText('Every widget here is already on your board')
+      within(dialog).getByRole('button', { name: 'Add Large Skill Injector price' })
     ).toBeInTheDocument();
-    await user.click(within(dialog).getByRole('button', { name: 'Show all widgets' }));
-    expect(within(dialog).getAllByRole('listitem').length).toBeGreaterThan(0);
+    expect(within(dialog).queryByRole('button', { name: 'Add PLEX price' })).toBeNull();
   });
 
   it('offers no Browse all on a phone', async () => {

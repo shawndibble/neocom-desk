@@ -15,6 +15,7 @@ import type {
   RaidsWhere,
   OverviewLayout,
   WidgetRange,
+  WidgetInit,
   WidgetScope,
   WidgetSize,
   WidgetView,
@@ -23,7 +24,7 @@ import type { RowsPerPage } from './tableSortPage';
 
 export interface OverviewEditActions {
   /** Add one widget of `kind` at the end, scroll to it and flash it. */
-  add: (kind: string) => void;
+  add: (kind: string, init?: WidgetInit) => void;
   remove: (id: string) => void;
   resize: (id: string, size: WidgetSize) => void;
   duplicate: (id: string) => void;
@@ -43,6 +44,8 @@ export interface OverviewEditActions {
   setCalendarEvents: (id: string, choice: CalendarEventsChoice) => void;
   setRaidsWhere: (id: string, where: RaidsWhere) => void;
   setRaidsRadius: (id: string, radius: number) => void;
+  setTrendItems: (id: string, items: number[]) => void;
+  setTrendHubs: (id: string, hubs: string[]) => void;
   rename: (id: string, title: string) => void;
   setShowOnPhone: (id: string, show: boolean) => void;
 }
@@ -85,6 +88,8 @@ export const OverviewEditContext = createContext<OverviewEdit>({
   setCalendarEvents: none,
   setRaidsWhere: none,
   setRaidsRadius: none,
+  setTrendItems: none,
+  setTrendHubs: none,
   rename: none,
   setShowOnPhone: none,
 });

@@ -24,6 +24,10 @@ export interface ViewSettings {
   /** Skyhook raids: 'near' lists any holder's space within `raidsRadius` jumps; left out, My alliance. */
   raidsWhere?: 'near';
   raidsRadius?: number;
+  /** Market Trend: the items it draws; left out, the Quickbar's first. */
+  trendItems?: number[];
+  /** Market Trend: the Trade Hubs it prices at; left out, the pilot's Market hub. */
+  trendHubs?: string[];
 }
 
 /** What a kind is asked to build: which kind, which Characters, and its own settings. */
@@ -36,7 +40,13 @@ export interface ViewRequest extends ViewSettings {
 /** The `BuildContext` fields the settings fill in. */
 export type SettingsContext = Pick<
   BuildContext,
-  'range' | 'plexPer30Days' | 'calendarEvents' | 'raidsWhere' | 'raidsRadius'
+  | 'range'
+  | 'plexPer30Days'
+  | 'calendarEvents'
+  | 'raidsWhere'
+  | 'raidsRadius'
+  | 'trendItems'
+  | 'trendHubs'
 >;
 
 interface SettingSpec {
@@ -72,6 +82,12 @@ export const VIEW_SETTINGS = {
       s.raidsWhere === 'near'
         ? { raidsWhere: 'near', raidsRadius: s.raidsRadius ?? DEFAULT_RAIDS_RADIUS }
         : { raidsWhere: 'alliance', raidsRadius: DEFAULT_RAIDS_RADIUS },
+  },
+  trend: {
+    enabledFor: (k) => k.hasTrendSources,
+    fields: ['trendItems', 'trendHubs'],
+    // Left out means "follow the Quickbar / the Market hub", which is not the same as any list.
+    resolve: (s) => ({ trendItems: s.trendItems, trendHubs: s.trendHubs }),
   },
 } satisfies Record<string, SettingSpec>;
 

@@ -18,6 +18,7 @@ import { Sparklines } from './Sparklines';
 import { StackBar } from './StackBar';
 import { StackedArea } from './StackedArea';
 import { StackRows } from './StackRows';
+import { Lines } from './Lines';
 import { OmegaCoverage } from './OmegaCoverage';
 import { SurveyVolume } from './SurveyVolume';
 import { donutSize, ganttRows, hbarRows, sparkRows } from './sizing';
@@ -50,6 +51,8 @@ function Drawing({ model, size }: { model: ChartModel; size: WidgetSize }) {
       return <Sparklines model={model} maxRows={sparkRows(size)} />;
     case 'omega':
       return <OmegaCoverage model={model} size={size} />;
+    case 'lines':
+      return <Lines model={model} height={height} />;
     case 'survey':
       return <SurveyVolume summary={model.data} size={size} />;
   }

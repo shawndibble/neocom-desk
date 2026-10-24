@@ -351,6 +351,38 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         xEnd: t('overview.widgets.chart.thisWeek'),
       },
     },
+    marketTrend: {
+      value: '+8.4%',
+      unit: t('overview.widgets.data.marketTrend.unit', { item: 'Tritanium', days: 7 }),
+      note: t('overview.gallery.samples.marketTrend.note'),
+      rows: [
+        ['Tritanium', '', '+8.4%'],
+        ['PLEX', '', '-2.1%'],
+        ['Large Skill Injector', '', '+0.6%'],
+      ],
+      chart: {
+        kind: 'lines',
+        summary: '',
+        low: '-3%',
+        high: '+9%',
+        series: [
+          {
+            key: 'a',
+            label: 'Tritanium',
+            color: 'accent',
+            end: '+8.4%',
+            values: [0, 2, 1, 5, 9, 8.4],
+          },
+          {
+            key: 'b',
+            label: 'PLEX',
+            color: 's1',
+            end: '-2.1%',
+            values: [0, -1, -3, -2, -2.5, -2.1],
+          },
+        ],
+      },
+    },
     tradingProfit: {
       value: '+132M',
       isk: 132_000_000,

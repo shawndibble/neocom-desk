@@ -17,11 +17,13 @@
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { getKind } from './kinds';
 import {
+  cleanTrendHubs,
+  cleanTrendItems,
   DEFAULT_RANGE,
   DEFAULT_RAIDS_RADIUS,
   isPlexPlan,
   isRaidsRadius,
-  WIDGET_RANGES,
+  rangesOf,
   type OverviewLayout,
   type Widget,
   type WidgetRange,
@@ -48,7 +50,7 @@ function parseWidget(raw: unknown): Widget | null {
   if (raw.scope !== 'header' && raw.scope !== 'all') out.scope = 'header';
   if (typeof raw.showOnPhone !== 'boolean') out.showOnPhone = true;
   if (typeof raw.title !== 'string') delete out.title;
-  if (WIDGET_RANGES.includes(raw.range as WidgetRange)) {
+  if (rangesOf(def.id).includes(raw.range as WidgetRange)) {
     // valid; kept
   } else if (def.hasRange) {
     out.range = DEFAULT_RANGE;
@@ -66,6 +68,12 @@ function parseWidget(raw: unknown): Widget | null {
     delete out.raidsRadius;
   }
   if (!def.hasPlexPlan || !isPlexPlan(raw.plexPer30Days)) delete out.plexPer30Days;
+  const items = cleanTrendItems(raw.trendItems);
+  if (!def.hasTrendSources || items.length === 0) delete out.trendItems;
+  else out.trendItems = items;
+  const hubs = cleanTrendHubs(raw.trendHubs);
+  if (!def.hasTrendSources || hubs.length === 0) delete out.trendHubs;
+  else out.trendHubs = hubs;
   return out as unknown as Widget;
 }
 

@@ -73,6 +73,7 @@ import {
   loadCorpOrdersFeed,
   loadCorpWalletFeed,
 } from './corpFeeds';
+import { MarketTrendSource } from './marketTrendSource';
 import { useOverviewRefresh } from './refreshContext';
 import type { FeedId, FeedMap } from './types';
 
@@ -215,6 +216,7 @@ export const FEED_SOURCES: { readonly [K in FeedId]: FeedSource<K> } = {
   location: snapshot(loadLocationWidget, 'overview:location'),
   routeSafety: snapshot(loadRouteSafetyWidget, 'overview:route-safety'),
   kills: snapshot(loadKillsWidget, 'overview:kills'),
+  marketTrend: { type: 'hook', Component: MarketTrendSource },
   omega: snapshot(loadOmegaWidget, 'overview:omega', { accountWide: true }),
   tradingProfit: snapshot(loadTradingProfitWidget, 'overview:trading-profit', {
     accountWide: true,
