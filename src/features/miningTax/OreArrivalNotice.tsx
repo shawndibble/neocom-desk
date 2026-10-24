@@ -17,8 +17,8 @@ interface OreArrivalNoticeProps {
 
 /**
  * Settle up's one line about ore that may still be on its way (scope decision
- * 20261004 "settle up waits for ore still arriving"): a yellow "wait" while a
- * ticked entry grew within the hour, small print while one could still grow,
+ * 20261004 "settle up waits for ore still arriving"): a yellow "wait" for up to
+ * 50 minutes after a ticked entry grew, small print while one could still grow,
  * nothing once none can. Skimmable on purpose — a longer note gets ignored.
  */
 export function OreArrivalNotice({ entries, checking, pullStartedAt }: OreArrivalNoticeProps) {
