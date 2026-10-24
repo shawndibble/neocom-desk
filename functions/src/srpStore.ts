@@ -21,7 +21,7 @@ import {
   type OfficerAccess,
 } from './corpTaxBook.js';
 import type { CorporationLookup } from './corpTaxBookEsi.js';
-import { fail, type BookDeps, type Caller } from './corpTaxBookStore.js';
+import { type BookDeps } from './corpTaxBookStore.js';
 import {
   appraisalItems,
   matchedHullRule,
@@ -52,7 +52,7 @@ import {
   type SrpSettingsPatch,
 } from './srpTypes.js';
 import { takeFetchSlot } from './srpThrottle.js';
-import { requireLiveRoles, verifyCallerToken } from './actorAuth.js';
+import { requireLiveRoles, verifyCallerToken, fail, type Caller } from './actorAuth.js';
 
 /**
  * How long an officer record lets rules show the queue, claims, audit and settings. Short on

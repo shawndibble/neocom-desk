@@ -24,16 +24,14 @@ import { FEEDER_VIEW_REFINERIES, feederViewRef } from './corpTaxBookFeederView.j
 import { ENDED } from './corpTaxBookFeederOwnerCalls.js';
 import { feederBookDeps } from './corpTaxBookFeederViewCalls.js';
 import type { FeederRecord, RefineryLabelDoc } from './corpTaxBookFeeders.js';
-import { signedInCharacter } from './actorAuth.js';
+import { signedInCharacter, fail, type Caller } from './actorAuth.js';
 import {
   appendAudit,
   authorizeOfficer,
   bookRef,
-  fail,
   feederRef,
   type Actor,
   type BookDeps,
-  type Caller,
 } from './corpTaxBookStore.js';
 
 export const MAX_REFINERY_LABEL = 100;

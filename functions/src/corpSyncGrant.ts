@@ -30,11 +30,9 @@ import {
   appendAudit,
   authorizeOfficer,
   bookRef,
-  fail,
   feederRef,
   type Actor,
   type BookDeps,
-  type Caller,
   type OpenPricesReader,
   mergeObservedInto,
 } from './corpTaxBookStore.js';
@@ -58,6 +56,8 @@ import {
   requireLiveRoles,
   signedInCharacter,
   verifyAccessToken,
+  fail,
+  type Caller,
 } from './actorAuth.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
 

@@ -1,5 +1,6 @@
 // Moon owner onboarding against the Firestore emulator (issue #4511, spec #4504).
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
+import type { Caller } from './actorAuth.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
@@ -16,7 +17,7 @@ import {
   type FeederGrantDeps,
 } from './corpTaxBookFeederGrant.js';
 import { createFeederInvite, hashInviteCode, type FeederRecord } from './corpTaxBookFeeders.js';
-import { turnOnBook, type BookDeps, type Caller } from './corpTaxBookStore.js';
+import { turnOnBook, type BookDeps } from './corpTaxBookStore.js';
 import type { EsiRead, SyncEsi } from './corpTaxBookSyncEsi.js';
 
 const COLLECTOR = 98000001;

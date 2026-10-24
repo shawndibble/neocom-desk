@@ -3,6 +3,7 @@
 // check as creating an invite. Either side sets the payee (#4653): see corpTaxBookPayee.ts.
 // Failures carry a stable `reason`; no player-facing text lives here.
 
+import { fail, type Caller } from './actorAuth.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
@@ -21,14 +22,7 @@ import {
   tryRebuildFeederView,
 } from './corpTaxBookFeederView.js';
 import type { FeederInviteDoc, FeederRecord } from './corpTaxBookFeeders.js';
-import {
-  appendAudit,
-  authorizeOfficer,
-  fail,
-  feederRef,
-  type BookDeps,
-  type Caller,
-} from './corpTaxBookStore.js';
+import { appendAudit, authorizeOfficer, feederRef, type BookDeps } from './corpTaxBookStore.js';
 
 const MAX_NOTE = 500;
 

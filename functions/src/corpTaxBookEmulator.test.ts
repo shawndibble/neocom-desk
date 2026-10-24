@@ -1,6 +1,7 @@
 // Corp Tax Book callables against the Firestore emulator (issue #4061). Runs
 // only under `npm run test:rules` at the repo root (which starts the emulator
 // and sets FIRESTORE_EMULATOR_HOST); a plain `npm test` skips it.
+import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
@@ -22,7 +23,6 @@ import {
   turnOnBook,
   verifyOfficer,
   type BookDeps,
-  type Caller,
 } from './corpTaxBookStore.js';
 import { SRP_CLAIMS, SRP_COLLECTIONS } from './srpTypes.js';
 

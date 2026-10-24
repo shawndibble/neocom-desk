@@ -35,12 +35,16 @@ import {
   appendAudit,
   authorizeOfficer,
   bookRef,
-  fail,
   feederRef,
   type BookDeps,
-  type Caller,
 } from './corpTaxBookStore.js';
-import { requireLiveRoles, signedInCharacter, verifyCallerToken } from './actorAuth.js';
+import {
+  requireLiveRoles,
+  signedInCharacter,
+  verifyCallerToken,
+  fail,
+  type Caller,
+} from './actorAuth.js';
 
 export type FeederStatus = 'active' | 'pending-removal' | 'removed' | 'left' | 'disconnected';
 
