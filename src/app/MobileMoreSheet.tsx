@@ -33,6 +33,7 @@ const ALL_CORP_VIEWS = {
   canReadMiningLedger: true,
   canReadRoleAudit: true,
   canManageSrp: true,
+  canConfigureSrp: true,
 };
 
 const TILE_GRID = 'grid grid-cols-4 gap-1.5';
