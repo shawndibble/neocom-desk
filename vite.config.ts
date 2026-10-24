@@ -241,9 +241,7 @@ function deferredEntryHtml() {
           typeof page.source === 'string' ? page.source : new TextDecoder().decode(page.source)
         );
         const problem = importMapProblem(html);
-        // TEMP(measure): the map-off count build has no map.
-        if (problem && process.env.NEOCOM_CHUNK_IMPORT_MAP !== '0')
-          throw new Error(`deferredEntryHtml: ${problem}`);
+        if (problem) throw new Error(`deferredEntryHtml: ${problem}`);
         page.source = html;
       },
     },
@@ -386,14 +384,14 @@ export default defineConfig({
   build: {
     sourcemap: sentryAuthToken ? 'hidden' : false,
     // Chunks import each other by stable names an import map in `index.html`
-    // resolves to the hashed files, so a chunk's hash follows its own code only.
+    // resolves to the hashed files, so a chunk's hash follows its own code and
+    // its preload lists (`preloadGraphHashPlugin`) only.
     // Without it a changed leaf renamed every chunk that imported it, and every
     // importer of those, and each deploy (~15 min apart) re-downloaded hundreds
     // of unchanged chunks (docs/context/decisions/*-chunks-import-each-other-
     // through-an-import-map*). Module workers get no import map; Vite builds
     // them with `worker.rolldownOptions`, which leaves this off.
-    // TEMP(measure): NEOCOM_CHUNK_IMPORT_MAP=0 turns it off for the CI count.
-    chunkImportMap: process.env.NEOCOM_CHUNK_IMPORT_MAP !== '0',
+    chunkImportMap: true,
     rolldownOptions: {
       output: {
         // Routes are already split per page (`src/app/routeChunks.ts`); what
