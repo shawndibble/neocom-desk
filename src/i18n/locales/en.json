@@ -16065,6 +16065,10 @@
       "filedFor": "Claim filed for {{hull}}.",
       "doctrineChecking": "Checking your fit against the corp's Doctrine Fits…"
     },
+    "offDoctrine": {
+      "title": "File {{hull}} off doctrine?",
+      "fileAnyway": "File anyway"
+    },
     "lost": {
       "title": "Or pick a lost ship",
       "phoneTitle": "Your recent losses",
@@ -16385,6 +16389,11 @@
         "effect": "{{from}} → {{to}} ISK. The computed amount stays visible on the claim.",
         "confirm": "Save amount"
       },
+      "killmailLink": "Killmail",
+      "markPaid": {
+        "title": "Mark as paid",
+        "body": "Mark {{isk}} ISK to {{pilot}} as paid?"
+      },
       "logged": "Logged with your name and reason. Your role is checked again when you confirm.",
       "detail": {
         "title": "{{pilot}} · {{hull}}",
@@ -16429,6 +16438,9 @@
         "turnOff": "Turned SRP off",
         "saveSettings": "Saved SRP settings",
         "reclaim": "Reclaimed SRP",
+        "addDoctrine": "Added Doctrine Fit {{name}}",
+        "updateDoctrine": "Updated Doctrine Fit {{name}}",
+        "deleteDoctrine": "Deleted Doctrine Fit {{name}}",
         "retentionDelete_one": "Retention sweep removed {{count}} closed claim",
         "retentionDelete_other": "Retention sweep removed {{count}} closed claims",
         "other": "Other activity"
@@ -16530,6 +16542,7 @@
       "fleetNote": "Pilots must name the fleet or FC when they file.",
       "fleetValue": "Required on every claim",
       "unsaved": "Unsaved changes",
+      "saved": "Saved",
       "problems_one": "{{count}} problem to fix before saving",
       "problems_other": "{{count}} problems to fix before saving",
       "discard": "Discard",
@@ -16585,6 +16598,8 @@
       "doctrines": {
         "title": "Doctrine Fits",
         "meta": "A claim is checked against the Doctrine Fits attached to its hull rule below.",
+        "added": "Doctrine Fit {{name}} added",
+        "deleted": "Doctrine Fit {{name}} deleted",
         "empty": "No Doctrine Fits yet. Add one, then attach it to its hull in Hull Rules.",
         "loadFailed": "Couldn't load Doctrine Fits",
         "fromFitting": "Add from my Fittings…",

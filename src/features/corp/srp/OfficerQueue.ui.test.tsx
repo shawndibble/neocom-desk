@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { SrpClaim, SrpClaimOutcome } from '../srpClaimTypes';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 
 vi.mock('./useSrpClaimNames', () => ({
   useSrpClaimNames: () => ({
@@ -88,6 +89,7 @@ const pendingSet = () => [
   claim(5, { state: 'paid', closedAt: 9, paidAt: 9, paidByName: 'Boss' }),
 ];
 
+afterEach(() => useActiveCharacter.setState({ activeCharacterId: null }));
 beforeEach(() => {
   vi.clearAllMocks();
   mailResult.mockResolvedValue({ sent: [], failed: [], missingScope: false });
@@ -278,12 +280,42 @@ describe('OfficerQueue detail entity links', () => {
   });
 });
 
+describe('OfficerQueue own claim', () => {
+  it("disables Approve, Reject and Mark paid on the officer's own claim, with the reason", async () => {
+    useActiveCharacter.setState({ activeCharacterId: 5001 });
+    const data = setup([...pendingSet(), claim(6, { state: 'approved', characterId: 5001 })]);
+    const approve = screen.getAllByRole('button', { name: 'Approve' })[0]!;
+    expect(approve).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getAllByRole('button', { name: 'Reject…' })[0]).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    await userEvent.click(approve);
+    expect(data.approve).not.toHaveBeenCalled();
+    await userEvent.hover(approve);
+    expect(
+      (await screen.findAllByText('You cannot decide your own claim. Another officer must.')).length
+    ).toBeGreaterThan(0);
+    // Another officer's claim stays live.
+    expect(screen.getAllByRole('button', { name: 'Approve' })[1]).not.toHaveAttribute(
+      'aria-disabled'
+    );
+  });
+});
+
 describe('OfficerQueue owed and history', () => {
   it('marks a claim paid and bulk marks the ticked ones', async () => {
     const data = setup([...pendingSet(), claim(6, { state: 'approved', decidedAt: 6 })]);
     await userEvent.click(screen.getByRole('tab', { name: /Owed/ }));
     await userEvent.click(screen.getAllByRole('button', { name: 'Mark paid' })[0]!);
-    expect(data.markPaid).toHaveBeenCalledWith({ killmailId: 4, expectedAmount: 1_000_000 });
+    expect(data.markPaid).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Mark 1,000,000 ISK to Pilot4 as paid?')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Mark paid' }));
+    await waitFor(() =>
+      expect(data.markPaid).toHaveBeenCalledWith({ killmailId: 4, expectedAmount: 1_000_000 })
+    );
+    expect(await findLine(/Marked Pilot4 paid/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
     await userEvent.click(screen.getByRole('button', { name: 'Mark paid (2)' }));
     expect(data.markPaidMany).toHaveBeenCalledWith([

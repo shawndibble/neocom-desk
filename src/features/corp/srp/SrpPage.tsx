@@ -11,11 +11,19 @@ import { SRP_VIEWS } from './srpViews';
  * segment). A tab the pilot has no view for (a stale link, or Queue where SRP is off) falls back
  * to the first they have.
  */
-export function SrpPage({ canManageSrp, srpOn }: { canManageSrp: boolean; srpOn: boolean }) {
+export function SrpPage({
+  canManageSrp,
+  srpOn,
+  isDirector,
+}: {
+  canManageSrp: boolean;
+  srpOn: boolean;
+  isDirector: boolean;
+}) {
   const { t } = useTranslation();
   const tabsId = useTabsId();
   const [tab, selectTab] = usePageTab(SRP_TABS);
-  const views = SRP_VIEWS.filter((v) => v.visible({ canManageSrp, srpOn }));
+  const views = SRP_VIEWS.filter((v) => v.visible({ canManageSrp, srpOn, isDirector }));
   const view = views.find((v) => v.id === tab) ?? views[0];
   if (!view) return null;
   const View = view.component;

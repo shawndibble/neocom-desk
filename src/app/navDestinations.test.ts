@@ -278,11 +278,11 @@ describe('listNavDestinations', () => {
   });
 
   it('lists only the officer SRP tabs this pilot can see, never all of them', () => {
-    const tabs = (srpVisible: boolean, canManageSrp: boolean) =>
+    const tabs = (srpVisible: boolean, canManageSrp: boolean, director = true) =>
       listNavDestinations({
         locked: NO_LOCKS,
         corpVisible: true,
-        corpCapabilities: { ...NO_CORP_VIEWS, canManageSrp },
+        corpCapabilities: { ...NO_CORP_VIEWS, canManageSrp, canReadRoleAudit: director },
         srpVisible,
         t,
       })
@@ -292,6 +292,8 @@ describe('listNavDestinations', () => {
     // SRP off: Settings alone, so no tab bar and nothing listed under the page.
     expect(tabs(false, true)).toEqual([]);
     expect(tabs(true, false)).toEqual([]);
+    // An Accountant (no Director role): Settings is hidden, so the Queue alone draws no tab bar.
+    expect(tabs(true, true, false)).toEqual([]);
   });
 
   it('lists the SRP sub-view of Overview only while the corporation has SRP on, never locked', () => {
