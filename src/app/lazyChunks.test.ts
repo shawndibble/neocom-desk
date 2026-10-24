@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   bootClosure,
+  chunkImportMapping,
   chunkKey,
+  entryNamesRelease,
   chunksToDelete,
   dropLazyFromManifest,
   lazyChunkFiles,
@@ -83,6 +85,55 @@ describe('bootClosure', () => {
 
   it('throws when the bundle has no entry, so a broken build cannot precache nothing quietly', () => {
     expect(() => bootClosure(bundleOf(chunk('assets/a.js')))).toThrow(/entry/i);
+  });
+
+  it('follows an import named by its import-map key to the hashed file it maps to', () => {
+    const bundle = bundleOf(
+      chunk('assets/index-H1.js', ['assets/react-S.js'], { isEntry: true }),
+      chunk('assets/react-H2.js', ['assets/scheduler-S.js']),
+      chunk('assets/scheduler-H3.js')
+    );
+    const map = {
+      'assets/react-S.js': 'assets/react-H2.js',
+      'assets/scheduler-S.js': 'assets/scheduler-H3.js',
+    };
+    expect(bootClosure(bundle, map)).toEqual(
+      new Set(['assets/index-H1.js', 'assets/react-H2.js', 'assets/scheduler-H3.js'])
+    );
+  });
+
+  it('throws on an import that names no file, so the boot graph never shrinks quietly', () => {
+    const bundle = bundleOf(chunk('assets/index.js', ['assets/react-S.js'], { isEntry: true }));
+    expect(() => bootClosure(bundle)).toThrow(/assets\/react-S\.js/);
+  });
+});
+
+describe('chunkImportMapping', () => {
+  const asset = (source: string) => ({
+    type: 'asset' as const,
+    fileName: 'importmap.json',
+    source,
+  });
+
+  it("maps each chunk's stable name to its hashed file, both under the base", () => {
+    const bundle = {
+      'importmap.json': asset(
+        JSON.stringify({ imports: { '/assets/react-S.js': '/assets/react-H2.js' } })
+      ),
+    };
+    expect(chunkImportMapping(bundle, '/')).toEqual({ 'assets/react-S.js': 'assets/react-H2.js' });
+  });
+
+  it('is empty without an import map', () => {
+    expect(chunkImportMapping({}, '/')).toEqual({});
+  });
+});
+
+describe('entryNamesRelease', () => {
+  it('is true when the entry chunk carries the release, so its file name is per-build', () => {
+    const entry = { ...chunk('assets/index-1.js', [], { isEntry: true }), code: 'x="app@1+abc"' };
+    expect(entryNamesRelease(bundleOf(entry), 'app@1+abc')).toBe(true);
+    expect(entryNamesRelease(bundleOf(entry), 'app@1+def')).toBe(false);
   });
 });
 

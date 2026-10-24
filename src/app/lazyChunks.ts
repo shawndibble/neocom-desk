@@ -21,6 +21,9 @@ export interface BundleItemLike {
   isEntry?: boolean;
   imports?: string[];
   viteMetadata?: { importedCss?: Set<string> };
+  /** A chunk's code; an asset's content (`importmap.json`). */
+  code?: string;
+  source?: string | Uint8Array;
 }
 export type BundleLike = Record<string, BundleItemLike>;
 
@@ -48,8 +51,43 @@ export function missingShellChunks(bundle: BundleLike): string[] {
   return [...SHELL_CHUNK_NAMES].filter((name) => !names.has(name));
 }
 
-/** Every file the app needs to boot: static imports (and their css) of the entry and the shell chunks. */
-export function bootClosure(bundle: BundleLike): Set<string> {
+/**
+ * Rolldown's chunk import map (`build.chunkImportMap`) as stable name → hashed
+ * file, both under the base (`assets/x-STABLE.js` → `assets/x-HASH.js`). A chunk
+ * imports its neighbours by the stable name, so its own hash no longer changes
+ * when theirs do. Empty when the bundle has none.
+ */
+export function chunkImportMapping(bundle: BundleLike, base: string): Record<string, string> {
+  const source = bundle['importmap.json']?.source;
+  if (source === undefined) return {};
+  const text = typeof source === 'string' ? source : new TextDecoder().decode(source);
+  const { imports } = JSON.parse(text) as { imports: Record<string, string> };
+  return Object.fromEntries(
+    Object.entries(imports).map(([key, file]) => [key.slice(base.length), file.slice(base.length)])
+  );
+}
+
+/**
+ * Whether the entry chunk's code carries the release. With the import map a
+ * chunk's hash follows its own code only, and `lazy-chunks.json`'s `entry`
+ * (`listMatchesBuild`) must still name exactly one build: `instrument.ts`
+ * hands Sentry the release from the entry, so the entry changes every deploy.
+ */
+export function entryNamesRelease(bundle: BundleLike, release: string): boolean {
+  const entry = bundle[entryFile(bundle)];
+  return entry.code?.includes(release) ?? false;
+}
+
+/**
+ * Every file the app needs to boot: static imports (and their css) of the entry
+ * and the shell chunks. An import may name the chunk by its import-map key
+ * (`chunkImportMapping`); one that names no file throws, since a boot chunk
+ * missing here would quietly drop out of the precache.
+ */
+export function bootClosure(
+  bundle: BundleLike,
+  importMap: Readonly<Record<string, string>> = {}
+): Set<string> {
   const items = Object.values(bundle);
   const roots = items.filter(
     (item) =>
@@ -63,9 +101,13 @@ export function bootClosure(bundle: BundleLike): Set<string> {
     if (boot.has(fileName)) return;
     boot.add(fileName);
     const item = bundle[fileName];
-    if (!item) return;
     for (const css of item.viteMetadata?.importedCss ?? []) boot.add(css);
-    for (const imported of item.imports ?? []) visit(imported);
+    for (const imported of item.imports ?? []) {
+      const file = importMap[imported] ?? imported;
+      if (!bundle[file])
+        throw new Error(`bootClosure: ${fileName} imports ${imported}, no such file`);
+      visit(file);
+    }
   };
   for (const root of roots) visit(root.fileName);
   return boot;

@@ -14,12 +14,14 @@ import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { phosphorWeightsPlugin } from './src/components/ui/phosphorWeightsPlugin.ts';
 import { localeSplitPlugin } from './src/i18n/localeSplitPlugin.ts';
-import { deferEntryHtml } from './src/app/deferredEntry.ts';
+import { deferEntryHtml, importMapProblem } from './src/app/deferredEntry.ts';
 import { lazySdeGlobIgnores } from './src/sde/lazySdeFiles.ts';
 import {
   bootClosure,
+  chunkImportMapping,
   dropLazyFromManifest,
   entryFile,
+  entryNamesRelease,
   missingShellChunks,
   lazyChunkFiles,
   lazyChunksJson,
@@ -217,14 +219,32 @@ function landingShellTemplate() {
 
 /**
  * On the landing page, holds the app's JS until the prerendered hero has
- * painted (`src/app/deferredEntry.ts`, #3950). Build only, and `post`, so it
- * sees the entry script and module preloads Vite has injected.
+ * painted (`src/app/deferredEntry.ts`, #3950). Build only. Runs on the emitted
+ * `index.html` rather than as a `transformIndexHtml` hook: Vite writes the chunk
+ * import map after every plugin's html hook, before the first module tag it
+ * finds, and with the tags already swapped for the loader it found none and
+ * put the map ahead of the doctype. `post`, so the page is already in the
+ * bundle; VitePWA hashes and `spaFallbackHtml` copies it later, at `closeBundle`.
  */
 function deferredEntryHtml() {
   return {
     name: 'neocom-deferred-entry',
     apply: 'build' as const,
-    transformIndexHtml: { order: 'post' as const, handler: deferEntryHtml },
+    generateBundle: {
+      order: 'post' as const,
+      handler(_options: unknown, bundle: BundleLike) {
+        const page = bundle['index.html'];
+        if (page?.source === undefined) throw new Error('deferredEntryHtml: no index.html');
+        const html = deferEntryHtml(
+          typeof page.source === 'string' ? page.source : new TextDecoder().decode(page.source)
+        );
+        const problem = importMapProblem(html);
+        // TEMP(measure): the import-map-off count build has no map to place.
+        if (problem && process.env.NEOCOM_CHUNK_IMPORT_MAP !== '0')
+          throw new Error(`deferredEntryHtml: ${problem}`);
+        page.source = html;
+      },
+    },
   };
 }
 
@@ -270,7 +290,13 @@ function lazyChunksPlugin() {
           `lazyChunksPlugin: no chunk named ${missing.join(', ')}; the boot graph would lose it (src/app/lazyChunks.ts SHELL_CHUNK_NAMES)`
         );
       }
-      const files = lazyChunkFiles(bundle, bootClosure(bundle));
+      if (!entryNamesRelease(bundle, release)) {
+        throw new Error(
+          'lazyChunksPlugin: the entry chunk no longer carries the release, so its name could repeat across builds and lazy-chunks.json `entry` would match the wrong one (src/app/lazyChunks.ts entryNamesRelease)'
+        );
+      }
+      const importMap = chunkImportMapping(bundle, '/');
+      const files = lazyChunkFiles(bundle, bootClosure(bundle, importMap));
       lazyChunkState.files = new Set(files);
       this.emitFile({
         type: 'asset',
@@ -306,6 +332,15 @@ export default defineConfig({
   base: '/',
   build: {
     sourcemap: sentryAuthToken ? 'hidden' : false,
+    // Chunks import each other by stable names an import map in `index.html`
+    // resolves to the hashed files, so a chunk's hash follows its own code only.
+    // Without it a changed leaf renamed every chunk that imported it, and every
+    // importer of those, and each deploy (~15 min apart) re-downloaded hundreds
+    // of unchanged chunks (docs/context/decisions/*-chunks-import-each-other-
+    // through-an-import-map*). Module workers get no import map; Vite builds
+    // them with `worker.rolldownOptions`, which leaves this off.
+    // TEMP(measure): NEOCOM_CHUNK_IMPORT_MAP=0 turns it off for the CI cascade count.
+    chunkImportMap: process.env.NEOCOM_CHUNK_IMPORT_MAP !== '0',
     rolldownOptions: {
       output: {
         // Routes are already split per page (`src/app/routeChunks.ts`); what
@@ -443,6 +478,8 @@ export default defineConfig({
           '**/brand/**',
           '**/version.json',
           '**/lazy-chunks.json',
+          // Already inline in index.html; kept beside it only to compare deploys.
+          '**/importmap.json',
         ],
         // Route code is the exception: only the boot graph is precached, the rest of
         // the chunks are warmed at idle (`lazyChunksPlugin`, docs/context/decisions/
