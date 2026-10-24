@@ -50,6 +50,7 @@ import {
   moveStartRate,
   rateKey,
   startDateMoveReason,
+  reanchorCadence,
   satisfies,
   utcDate,
   type BookCall,
@@ -812,6 +813,13 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         );
         if (reason) fail('failed-precondition', 'The start date cannot move there', reason);
         update.startDate = startDate;
+        // An N-day cadence anchored on the old start follows it, so no day sits before the anchor.
+        const cadence = reanchorCadence(
+          (rest.cadence ?? c.book.cadence) as Data | undefined,
+          oldStart,
+          startDate
+        );
+        if (cadence) update.cadence = cadence;
         // The start-date rate is dated at the start itself: it moves with it.
         if (oldStart && startDate < oldStart) {
           update.rates = moveStartRate(rates, oldStart, startDate);

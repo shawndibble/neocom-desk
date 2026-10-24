@@ -403,6 +403,20 @@ export const rateKey = (r: StoredRate): string =>
       (r.scope === 'feeder' ? `:${r.feederId}` : '');
 
 /**
+ * An N-day cadence anchored on the old start date moves with the start date; a custom anchor,
+ * a monthly cadence or no cadence is returned as is.
+ */
+export function reanchorCadence<T extends { kind?: unknown; anchor?: unknown } | undefined>(
+  cadence: T,
+  oldStart: string | undefined,
+  newStart: string
+): T {
+  if (!cadence || cadence.kind !== 'days' || !oldStart || cadence.anchor !== oldStart)
+    return cadence;
+  return { ...cadence, anchor: newStart };
+}
+
+/**
  * The rates after the start date moves earlier: the corp-default rate dated at the old start is
  * re-dated to the new one. A rate already at the new date (same `rateKey`) is replaced, never
  * doubled, as `addRate` does.

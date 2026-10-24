@@ -224,6 +224,24 @@ describe('buildBookView', () => {
     expect(rows.find((r) => r.start === '2026-10-02')).toMatchObject({ end: '2026-10-08' });
   });
 
+  it('puts days before a later anchor in a stub period from the start date (start 25 Sep, anchor 1 Oct)', () => {
+    const view = buildBookView(
+      input({
+        startDate: '2026-09-25',
+        cadence: { kind: 'days', days: 7, anchor: '2026-10-01' },
+        entries: [entry(1, '2026-09-27', 1000), entry(1, '2026-10-03', 1000)],
+        now: '2026-10-20T12:00:00Z',
+        lastSyncedAt: '2026-10-20T12:00:00Z',
+      })
+    );
+    const rows = periodRows(view);
+    expect(rows.find((r) => r.start === '2026-09-25')).toMatchObject({
+      end: '2026-09-30',
+      billed: 100_000,
+    });
+    expect(rows.find((r) => r.start === '2026-10-01')).toMatchObject({ end: '2026-10-07' });
+  });
+
   it('bills the open period for its own days only (CX-38)', () => {
     const view = buildBookView(
       input({
