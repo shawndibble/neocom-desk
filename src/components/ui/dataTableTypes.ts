@@ -114,7 +114,7 @@ export interface DataTableColumn<T> {
    * from a custom render rather than the table's own `rowMoreActions` column,
    * because the row needs per-row props `rowMoreActions` can't take), not a
    * decorative one. Reuses `rowMoreActions`'s own `dt-actions` CSS rather
-   * than `cardCorner`'s `dt-corner` — the button keeps its 44px touch target
+   * than `cardCorner`'s `dt-corner` — the button keeps its 36px touch-tier target
    * and the title-collision padding that CSS carries, which `dt-corner`
    * doesn't. Exactly one of `cardCorner`/`cardActions` per table; at most one
    * `cardActions` column, later ones ignored.
