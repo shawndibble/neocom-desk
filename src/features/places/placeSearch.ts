@@ -19,7 +19,7 @@ import { loadStationSummary } from '@/features/character/stations';
 import {
   listCachedStructures,
   loadStructureSummary,
-  loadStructureSystemId,
+  loadVisibleStructure,
   type CachedStructure,
 } from '@/features/character/structures';
 import { rankedSearch } from '@/lib/rankedSearch';
@@ -115,10 +115,11 @@ export async function searchKnownPlaces(
   const hits = rankKnownPlaces(query, stations, structures, limit);
   const placed = await Promise.all(
     hits.map(async (hit) => {
-      const systemId =
-        hit.systemId ??
-        (characterId === null ? null : await loadStructureSystemId(characterId, hit.id));
-      return systemId === null ? null : { ...hit, systemId };
+      if (hit.systemId !== null) return { ...hit, systemId: hit.systemId };
+      // The shared cache lists structures any Character on this device has seen:
+      // only this Character's own ACL decides whether one is offered.
+      const visible = characterId === null ? null : await loadVisibleStructure(characterId, hit.id);
+      return visible === null ? null : { ...hit, name: visible.name, systemId: visible.systemId };
     })
   );
   return placed.filter((place) => place !== null);

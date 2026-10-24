@@ -16,22 +16,13 @@ import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
-import { rankedSearch } from '@/lib/rankedSearch';
 import type { PickedStation } from '@/features/places/placeSearch';
+import { buildPickerOptions, pickedStationOf, type PickerOption } from './pickerOptions';
 import { useKnownPlaces } from '@/features/places/useKnownPlaces';
 import { useSolarSystemIndex, useSolarSystemList } from './useSolarSystems';
 
 const MATCH_LIMIT = 8;
 const NAV_KEYS: readonly string[] = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
-interface Option {
-  key: string;
-  kind: 'system' | 'station' | 'structure';
-  name: string;
-  systemId: number;
-  security: number | null;
-  stationId: number | null;
-}
-
 export function SolarSystemSearchField({
   onChange,
   ariaLabel,
@@ -63,40 +54,25 @@ export function SolarSystemSearchField({
   const systemIndex = useSolarSystemIndex();
   const trimmed = query.trim();
   const placeHits = useKnownPlaces(query, places, MATCH_LIMIT);
-  const matches = useMemo<Option[]>(() => {
-    if (!systems || trimmed === '') return [];
-    const systemOptions = rankedSearch(
-      exclude?.size ? systems.filter((system) => !exclude.has(system.id)) : systems,
-      query,
-      { primary: (system) => system.name, limit: MATCH_LIMIT }
-    ).map((system): Option => ({
-      key: `system:${system.id}`,
-      kind: 'system',
-      name: system.name,
-      systemId: system.id,
-      security: system.security,
-      stationId: null,
-    }));
-    const stationOptions = placeHits
-      .filter((place) => !exclude?.has(place.systemId))
-      .map((place): Option => ({
-        key: `${place.kind}:${place.id}`,
-        kind: place.kind,
-        name: place.name,
-        systemId: place.systemId,
-        security: systemIndex?.get(place.systemId)?.security ?? null,
-        stationId: place.id,
-      }));
-    return [...systemOptions, ...stationOptions];
-  }, [systems, query, trimmed, exclude, placeHits, systemIndex]);
+  const matches = useMemo(
+    () =>
+      systems && trimmed !== ''
+        ? buildPickerOptions(
+            systems,
+            query,
+            exclude,
+            placeHits,
+            (id) => systemIndex?.get(id)?.security ?? null,
+            MATCH_LIMIT
+          )
+        : [],
+    [systems, query, trimmed, exclude, placeHits, systemIndex]
+  );
 
-  function choose(option: Option) {
+  function choose(option: PickerOption) {
     setQuery('');
     setHighlight(null);
-    onChange(
-      option.systemId,
-      option.stationId === null ? undefined : { id: option.stationId, name: option.name }
-    );
+    onChange(option.systemId, pickedStationOf(option));
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {

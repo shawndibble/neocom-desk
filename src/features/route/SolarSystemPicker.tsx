@@ -20,9 +20,9 @@ import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
-import { rankedSearch } from '@/lib/rankedSearch';
 import type { PickedStation } from '@/features/places/placeSearch';
 import { useKnownPlaces } from '@/features/places/useKnownPlaces';
+import { buildPickerOptions, pickedStationOf, type PickerOption } from './pickerOptions';
 import { useSolarSystemIndex, useSolarSystemList, useSystemName } from './useSolarSystems';
 
 const MATCH_LIMIT = 8;
@@ -54,15 +54,6 @@ export interface SolarSystemPickerProps {
   places?: boolean;
 }
 
-interface Option {
-  key: string;
-  kind: 'system' | 'station' | 'structure';
-  name: string;
-  systemId: number;
-  security: number | null;
-  stationId: number | null;
-}
-
 export function SolarSystemPicker({
   value,
   onChange,
@@ -92,32 +83,20 @@ export function SolarSystemPicker({
 
   const systemIndex = useSolarSystemIndex();
   const placeHits = useKnownPlaces(query, places && open, MATCH_LIMIT);
-  const matches = useMemo<Option[]>(() => {
-    if (!systems) return [];
-    const systemOptions = rankedSearch(
-      exclude?.size ? systems.filter((s) => !exclude.has(s.id)) : systems,
-      query,
-      { primary: (s) => s.name, limit: MATCH_LIMIT }
-    ).map((system): Option => ({
-      key: `system:${system.id}`,
-      kind: 'system',
-      name: system.name,
-      systemId: system.id,
-      security: system.security,
-      stationId: null,
-    }));
-    const stationOptions = placeHits
-      .filter((place) => !exclude?.has(place.systemId))
-      .map((place): Option => ({
-        key: `${place.kind}:${place.id}`,
-        kind: place.kind,
-        name: place.name,
-        systemId: place.systemId,
-        security: systemIndex?.get(place.systemId)?.security ?? null,
-        stationId: place.id,
-      }));
-    return [...systemOptions, ...stationOptions];
-  }, [systems, query, exclude, placeHits, systemIndex]);
+  const matches = useMemo(
+    () =>
+      systems
+        ? buildPickerOptions(
+            systems,
+            query,
+            exclude,
+            placeHits,
+            (id) => systemIndex?.get(id)?.security ?? null,
+            MATCH_LIMIT
+          )
+        : [],
+    [systems, query, exclude, placeHits, systemIndex]
+  );
 
   function close() {
     setOpen(false);
@@ -125,11 +104,8 @@ export function SolarSystemPicker({
     setHighlight(null);
   }
 
-  function choose(option: Option) {
-    onChange(
-      option.systemId,
-      option.stationId === null ? undefined : { id: option.stationId, name: option.name }
-    );
+  function choose(option: PickerOption) {
+    onChange(option.systemId, pickedStationOf(option));
     close();
   }
 

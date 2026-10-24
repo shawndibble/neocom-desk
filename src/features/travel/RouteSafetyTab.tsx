@@ -135,9 +135,13 @@ const NO_HOLES: readonly TheraConnection[] = [];
 function stopsFromLink(stops: readonly StopRef[], to: number | null): StopRef[] {
   const named = stops.length > 0 ? stops : to === null ? [] : [{ systemId: to, stationId: null }];
   const seen = new Set<number>();
-  return named
-    .filter((stop) => !seen.has(stop.systemId) && seen.add(stop.systemId))
-    .slice(0, MAX_STOPS);
+  const unique: StopRef[] = [];
+  for (const stop of named) {
+    if (seen.has(stop.systemId)) continue;
+    seen.add(stop.systemId);
+    unique.push(stop);
+  }
+  return unique.slice(0, MAX_STOPS);
 }
 
 /**

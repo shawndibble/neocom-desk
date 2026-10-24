@@ -7,7 +7,7 @@
  * there on the same render the stop is.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { loadStructureNameNoRoster } from '@/features/character/structures';
+import { loadVisibleStructure } from '@/features/character/structures';
 import { lookupNpcStation } from '@/sde/npcStations';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
@@ -15,15 +15,26 @@ async function stationName(characterId: number | null, id: number): Promise<stri
   const station = await lookupNpcStation(id);
   if (station) return station.name;
   if (station === undefined || characterId === null) return null;
-  return loadStructureNameNoRoster(characterId, id).catch(() => null);
+  const visible = await loadVisibleStructure(characterId, id).catch(() => null);
+  return visible?.name ?? null;
 }
+
+const EMPTY: ReadonlyMap<number, string> = new Map();
 
 export function useStationLabels(stationIds: readonly number[]): {
   labels: ReadonlyMap<number, string>;
   remember: (id: number, name: string) => void;
 } {
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
-  const [labels, setLabels] = useState<ReadonlyMap<number, string>>(new Map());
+  const [named, setNamed] = useState<{
+    characterId: number | null;
+    labels: ReadonlyMap<number, string>;
+  }>({
+    characterId,
+    labels: new Map(),
+  });
+  // A name resolved under another Character is that Character's to see.
+  const labels = named.characterId === characterId ? named.labels : EMPTY;
   const key = stationIds.join(',');
   useEffect(() => {
     const wanted = key === '' ? [] : key.split(',').map(Number);
@@ -33,9 +44,12 @@ export function useStationLabels(stationIds: readonly number[]): {
         .filter((id) => !labels.has(id))
         .map(async (id) => [id, await stationName(characterId, id)] as const)
     ).then((found) => {
-      const named = found.filter((pair): pair is readonly [number, string] => pair[1] !== null);
-      if (cancelled || named.length === 0) return;
-      setLabels((prev) => new Map([...prev, ...named]));
+      const pairs = found.filter((pair): pair is readonly [number, string] => pair[1] !== null);
+      if (cancelled || pairs.length === 0) return;
+      setNamed((prev) => ({
+        characterId,
+        labels: new Map([...(prev.characterId === characterId ? prev.labels : []), ...pairs]),
+      }));
     });
     return () => {
       cancelled = true;
@@ -44,8 +58,12 @@ export function useStationLabels(stationIds: readonly number[]): {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, characterId]);
   const remember = useCallback(
-    (id: number, name: string) => setLabels((prev) => new Map(prev).set(id, name)),
-    []
+    (id: number, name: string) =>
+      setNamed((prev) => ({
+        characterId,
+        labels: new Map([...(prev.characterId === characterId ? prev.labels : []), [id, name]]),
+      })),
+    [characterId]
   );
   return { labels, remember };
 }
