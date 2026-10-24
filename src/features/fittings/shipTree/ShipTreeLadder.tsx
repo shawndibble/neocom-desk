@@ -41,6 +41,7 @@ import { romanLevel } from '@/engine/projection';
 import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
+import { useIsPhone } from '@/lib/useIsPhone';
 import type { ShipTreeShip } from '@/sde/types';
 import { IsisThumb } from './IsisTile';
 import { Legend } from './Legend';
@@ -101,6 +102,8 @@ export function ShipTreeLadder({
   const { t } = useTranslation();
   const { data, statuses } = source;
   const narrow = useIsNarrow();
+  // The Ship Info window's own test for a bottom sheet rather than a side panel.
+  const sheetWindow = useIsPhone();
   const filtered = isShipTreeFiltered(filter);
 
   const sections = useMemo(() => ladderSections(tree.defs), [tree.defs]);
@@ -142,13 +145,21 @@ export function ShipTreeLadder({
   // exists by the time its ref below scrolls to it.
   if (goToPath.some((id) => !userOpen.has(id)))
     setOpenState({ key: openKey, ids: new Set([...userOpen, ...goToPath]) });
-  // A class the ladder lacks has no row to go to.
-  if (goToHere && goToPath.length === 0) setGoTo(null);
+  // A jump lives only while its hull's window is open, and a hull the ladder
+  // has no row for has nowhere to go: either way, drop it.
+  if (
+    goTo &&
+    (goTo.typeID !== selectedTypeID ||
+      (goToHere &&
+        (goToPath.length === 0 ||
+          !(tree.hulls.get(goTo.treeGroupID) ?? []).some((s) => s.typeID === goTo.typeID))))
+  )
+    setGoTo(null);
   const scrollToTypeID = goToHere && goToPath.every((id) => userOpen.has(id)) ? goTo.typeID : null;
   const scrollToRow = (row: HTMLElement | null) => {
     if (!row) return;
     // A phone's window is a bottom sheet, so the row goes to the top, above it.
-    row.scrollIntoView?.({ block: narrow ? 'start' : 'center' });
+    row.scrollIntoView({ block: sheetWindow ? 'start' : 'center' });
     setGoTo(null);
   };
   const pick = (ship: ShipTreeShip) => {
@@ -572,7 +583,8 @@ function LadderClass({
                 aria-current={s.typeID === selectedTypeID ? 'true' : undefined}
                 onClick={() => onOpenShip(s)}
                 className={cx(
-                  'group flex w-full scroll-mt-4 items-center gap-2 px-1 py-1 text-left text-sm',
+                  // A transparent border, so the selected row's accent one doesn't shift it.
+                  'group flex w-full scroll-mt-4 items-center gap-2 border-l-2 border-l-transparent px-1 py-1 text-left text-sm',
                   rowInteractiveClassName,
                   focusRingInsetClassName,
                   s.typeID === selectedTypeID && selectedRowClassName
