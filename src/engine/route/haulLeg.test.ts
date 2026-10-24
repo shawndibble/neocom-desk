@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { HaulLeg } from './haulPlan';
 import type { RouteSafetyRow } from './routeSafety';
 import {
+  heldItems,
   legCondition,
   legHold,
   legWaypointIds,
@@ -96,6 +97,43 @@ describe('legHold', () => {
       loadsOnArrival: { place: 'P2', m3: 50 },
     });
   });
+  it('lists the items aboard and loading, merged by type, where the legs carry stacks', () => {
+    const trit = { typeId: 34, name: 'Tritanium', unitM3: 1 };
+    const pye = { typeId: 35, name: 'Pyerite', unitM3: 2 };
+    const stacked = [
+      leg({
+        id: 0,
+        trip: 1,
+        kind: 'pickup',
+        to: at(1),
+        m3: 30,
+        stacks: [{ ...trit, quantity: 30 }],
+      }),
+      leg({
+        id: 1,
+        trip: 1,
+        kind: 'pickup',
+        to: at(2),
+        m3: 50,
+        stacks: [
+          { ...trit, quantity: 10 },
+          { ...pye, quantity: 20 },
+        ],
+      }),
+      leg({ id: 2, trip: 1, kind: 'delivery', to: at(9), m3: 80 }),
+    ];
+    expect(legHold(stacked, stacked[1]).aboard[0].stacks).toEqual([{ ...trit, quantity: 30 }]);
+    expect(legHold(stacked, stacked[1]).loadsOnArrival?.stacks).toHaveLength(2);
+    expect(heldItems(legHold(stacked, stacked[2]).aboard)).toEqual([
+      { ...trit, quantity: 40 },
+      { ...pye, quantity: 20 },
+    ]);
+  });
+
+  it('has no item list when a saved haul predates stacks', () => {
+    expect(heldItems(legHold(legs, legs[2]).aboard)).toBeNull();
+  });
+
   it('carries every pickup of the trip to the delivery, and not the next trip', () => {
     expect(legHold(legs, legs[2])).toEqual({
       aboard: [

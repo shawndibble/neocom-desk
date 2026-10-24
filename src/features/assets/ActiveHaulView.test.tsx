@@ -161,6 +161,33 @@ describe('ActiveHaulView', () => {
     expect(screen.getByText('Dodixie IX: 80 m³')).toBeTruthy();
   });
 
+  it('lists the items aboard and loading where the haul has them, and folds a long tail', async () => {
+    const stack = (typeId: number, quantity: number) => ({
+      typeId,
+      name: `Item ${typeId}`,
+      quantity,
+      unitM3: 1,
+    });
+    const stacked: HaulLeg[] = [
+      { ...legs[0], stacks: [stack(34, 3200000)] },
+      { ...legs[1] },
+      {
+        ...legs[2],
+        stacks: [1, 2, 3, 4, 5, 6, 7, 8].map((id) => stack(id, 10 + id)),
+      },
+    ];
+    renderView(undefined, {
+      haul: {
+        ...haul,
+        plan: { ...haul.plan, sections: [{ ...haul.plan.sections[0], legs: stacked }] },
+      },
+    });
+    expect(screen.getByText('3,200,000 × Item 34')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Show cargo for leg 3' }));
+    await userEvent.click(screen.getByRole('button', { name: 'and 2 more types' }));
+    expect(screen.getByText('11 × Item 1')).toBeTruthy();
+  });
+
   it("sets one leg's stop, or every stop of the route, as waypoints", async () => {
     renderView();
     await userEvent.click(screen.getByRole('button', { name: 'Set waypoint, leg 1' }));

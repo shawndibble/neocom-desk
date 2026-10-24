@@ -3,7 +3,7 @@
  * security condition it flies through, the waypoint ids it sets, and whether
  * the hold is full. Conditions only, never a verdict (decision 20260912-172628).
  */
-import type { HaulLeg } from './haulPlan';
+import { mergeStacks, type HaulLeg, type HaulStack } from './haulPlan';
 import type { RouteSafetyRow } from './routeSafety';
 
 export type LegCondition =
@@ -35,6 +35,14 @@ export function sectionWaypointIds(legs: readonly HaulLeg[]): number[] {
 export interface HeldLoad {
   place: string;
   m3: number;
+  /** What the load is made of; absent for a haul saved before items. */
+  stacks?: HaulStack[];
+}
+
+/** The items across `loads`, merged by type; `null` when no load has an item list. */
+export function heldItems(loads: readonly HeldLoad[]): HaulStack[] | null {
+  const listed = loads.flatMap((l) => l.stacks ?? []);
+  return listed.length === 0 ? null : mergeStacks(listed);
 }
 
 /**
@@ -50,10 +58,11 @@ export function legHold(
   const at = legs.indexOf(leg);
   const aboard = legs
     .filter((l, i) => l.trip === leg.trip && l.kind === 'pickup' && i < at)
-    .map((l) => ({ place: l.to.name, m3: l.m3 }));
+    .map((l) => ({ place: l.to.name, m3: l.m3, stacks: l.stacks }));
   return {
     aboard,
-    loadsOnArrival: leg.kind === 'pickup' ? { place: leg.to.name, m3: leg.m3 } : null,
+    loadsOnArrival:
+      leg.kind === 'pickup' ? { place: leg.to.name, m3: leg.m3, stacks: leg.stacks } : null,
   };
 }
 

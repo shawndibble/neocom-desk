@@ -10,6 +10,7 @@ import {
   touchCheckboxLabelClassName,
 } from '@/components/ui/controlStyles';
 import {
+  heldItems,
   legHold,
   legCondition,
   legWaypointIds,
@@ -17,7 +18,7 @@ import {
   splitPlaceName,
   type LegCondition,
 } from '@/engine/route/haulLeg';
-import type { HaulLeg, HaulSection } from '@/engine/route/haulPlan';
+import type { HaulLeg, HaulSection, HaulStack } from '@/engine/route/haulPlan';
 import {
   currentLeg,
   legAtSystem,
@@ -28,6 +29,7 @@ import {
   untickLeg,
 } from '@/engine/route/haulProgress';
 import { cx } from '@/lib/cx';
+import { formatCount } from '@/lib/formatCount';
 import { formatCubicMetres } from '@/lib/volume';
 import { legRouteHref, sectionRouteHref, type ActiveHaul, type ReplanResult } from './activeHaul';
 import { HaulStrip } from './HaulStrip';
@@ -421,6 +423,8 @@ function LegBlock({
   const volume = formatCubicMetres(leg.m3);
   const hold = legHold(legs, leg);
   const carried = hold.aboard.reduce((sum, l) => sum + l.m3, 0);
+  const aboardItems = heldItems(hold.aboard);
+  const loadingItems = hold.loadsOnArrival?.stacks?.length ? hold.loadsOnArrival.stacks : null;
   return (
     <div
       className={cx(
@@ -513,6 +517,7 @@ function LegBlock({
               ))}
             </ul>
           )}
+          {aboardItems && <ItemList items={aboardItems} />}
           {hold.loadsOnArrival ? (
             <p className="m-0 text-text-dim">
               {t('assets.movePlan.haul.carryLoadsOnArrival', {
@@ -528,6 +533,7 @@ function LegBlock({
               })}
             </p>
           )}
+          {loadingItems && <ItemList items={loadingItems} />}
           {carried > 0 && capacityM3 > 0 && (
             <p className="m-0 text-text-dim">
               {t('assets.movePlan.haul.holdFill', {
@@ -538,5 +544,39 @@ function LegBlock({
         </div>
       )}
     </div>
+  );
+}
+
+/** Items shown before the rest fold into a count: a freighter's hold can hold hundreds of types. */
+const ITEMS_SHOWN = 6;
+
+/** What a load is made of, biggest by volume first. */
+function ItemList({ items }: { items: readonly HaulStack[] }) {
+  const { t } = useTranslation();
+  const [all, setAll] = useState(false);
+  const sorted = [...items].sort((a, b) => b.quantity * b.unitM3 - a.quantity * a.unitM3);
+  const more = sorted.length - ITEMS_SHOWN;
+  return (
+    <ul className="m-0 ml-4 flex list-none flex-col gap-0.5 border-l border-line p-0 pl-3 text-text-dim">
+      {(all ? sorted : sorted.slice(0, ITEMS_SHOWN)).map((s) => (
+        <li key={s.typeId}>
+          {t('assets.movePlan.haul.itemLine', { quantity: formatCount(s.quantity), name: s.name })}
+        </li>
+      ))}
+      {more > 0 && (
+        <li>
+          <button
+            type="button"
+            aria-expanded={all}
+            onClick={() => setAll(!all)}
+            className={cx(inlineLinkClassName, focusRingInsetClassName)}
+          >
+            {all
+              ? t('assets.movePlan.haul.itemsFewer')
+              : t('assets.movePlan.haul.itemsMore', { count: more })}
+          </button>
+        </li>
+      )}
+    </ul>
   );
 }

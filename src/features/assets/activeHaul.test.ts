@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { db } from '@/db';
 import type { HaulLeg } from '@/engine/route/haulPlan';
-import { legRouteHref, sectionRouteHref, useActiveHaul, type ActiveHaul } from './activeHaul';
+import type { MovePlan } from '@/engine/assets/movePlan';
+import {
+  carriableStacks,
+  legRouteHref,
+  sectionRouteHref,
+  useActiveHaul,
+  type ActiveHaul,
+} from './activeHaul';
 
 const place = { systemId: 30000142, stationId: 60003760, name: 'Jita 4-4' };
 const haul: ActiveHaul = {
@@ -66,6 +73,41 @@ describe('useActiveHaul', () => {
 });
 
 describe('useActiveHaul parse', () => {
+  const pickupLeg = {
+    id: 0,
+    characterId: 1,
+    trip: 1,
+    kind: 'pickup' as const,
+    from: null,
+    to: place,
+    jumps: 1,
+    m3: 5,
+    locationId: 7,
+  };
+  const withLeg = (extra: object): ActiveHaul => ({
+    ...haul,
+    plan: {
+      ...haul.plan,
+      sections: [{ characterId: 1, name: 'Alice', trips: 1, legs: [{ ...pickupLeg, ...extra }] }],
+    },
+  });
+
+  it('reads a haul saved before item stacks', async () => {
+    await db.settings.put({ key: 'activeHaul', value: withLeg({}) });
+    useActiveHaul.setState({ value: null, hydrated: false });
+    await useActiveHaul.getState().hydrate();
+    expect(useActiveHaul.getState().value?.plan.sections[0].legs[0].stacks).toBeUndefined();
+    await db.settings.delete('activeHaul');
+  });
+
+  it('ignores a haul whose stacks are malformed', async () => {
+    await db.settings.put({ key: 'activeHaul', value: withLeg({ stacks: [{ typeId: 'x' }] }) });
+    useActiveHaul.setState({ value: null, hydrated: false });
+    await useActiveHaul.getState().hydrate();
+    expect(useActiveHaul.getState().value).toBeNull();
+    await db.settings.delete('activeHaul');
+  });
+
   it('ignores a stored value that is not a haul', async () => {
     await db.settings.put({ key: 'activeHaul', value: { id: 1 } });
     useActiveHaul.setState({ value: null, hydrated: false });
@@ -80,6 +122,43 @@ describe('useActiveHaul parse', () => {
     await useActiveHaul.getState().hydrate();
     expect(useActiveHaul.getState().value).toBeNull();
     await db.settings.delete('activeHaul');
+  });
+});
+
+describe('carriableStacks', () => {
+  const lines = [
+    { typeId: 34, quantity: 1000, m3: 10 },
+    { typeId: 648, quantity: 2, m3: 2000 },
+    { typeId: 99, quantity: 3, m3: 30 },
+    { typeId: 5, quantity: 1, m3: null },
+  ];
+  const plan = {
+    perCharacter: [{ characterId: 1, pickups: [{ locationId: 7, lines }] }],
+    active: {
+      pickups: [
+        {
+          characterId: 1,
+          locationId: 7,
+          hauls: [],
+          unfit: [{ typeId: 648, quantity: 2, unitM3: 1000 }],
+          tooBigShips: [{ typeId: 99, quantity: 1, unitM3: 10 }],
+        },
+      ],
+    },
+  } as unknown as MovePlan;
+  const name = (id: number) => `T${id}`;
+
+  it('lists what the hauler carries: unfit stacks and too-big ships come out, unknown volumes stay out', () => {
+    expect(carriableStacks(plan, 1, 7, lines, name)).toEqual([
+      { typeId: 34, name: 'T34', quantity: 1000, unitM3: 0.01 },
+      { typeId: 99, name: 'T99', quantity: 2, unitM3: 10 },
+    ]);
+  });
+
+  it('lists every known stack when no hauler is chosen', () => {
+    expect(
+      carriableStacks({ ...plan, active: null }, 1, 7, lines, name).map((s) => s.typeId)
+    ).toEqual([34, 648, 99]);
   });
 });
 

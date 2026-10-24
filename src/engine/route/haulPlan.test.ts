@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { planHaul, type HaulCharacterInput, type HaulPickupInput } from './haulPlan';
+import {
+  planHaul,
+  type HaulCharacterInput,
+  type HaulPickupInput,
+  type HaulStack,
+} from './haulPlan';
 import type { JumpGraph } from './jumpRoute';
 import { MAX_STOPS } from './tripPlan';
 
@@ -171,5 +176,36 @@ describe('planHaul', () => {
   it('skips pickups with no volume', () => {
     const plan = run([character([pickup(10, P1, 0)])]);
     expect(plan.sections).toEqual([]);
+  });
+
+  describe('item stacks', () => {
+    const trit: HaulStack = { typeId: 34, name: 'Tritanium', quantity: 100, unitM3: 0.5 };
+    const pye: HaulStack = { typeId: 35, name: 'Pyerite', quantity: 100, unitM3: 0.5 };
+    const withStacks = (stacks: HaulStack[]): HaulPickupInput => ({
+      ...pickup(10, P1, 100),
+      stacks,
+    });
+
+    it("puts a pickup leg's stacks on the leg and leaves them off when none were given", () => {
+      const plan = run([character([withStacks([trit, pye])]), character([pickup(20, P2, 10)])]);
+      expect(plan.sections[0].legs[0].stacks).toEqual([trit, pye]);
+      expect(plan.sections[1].legs[0].stacks).toBeUndefined();
+    });
+
+    it("splits a pickup's stacks across trips in step with its m³, never losing a unit", () => {
+      const plan = run([character([withStacks([trit, pye])])], 60);
+      const pickups = plan.sections[0].legs.filter((l) => l.kind === 'pickup');
+      expect(pickups.map((l) => l.m3)).toEqual([60, 40]);
+      expect(pickups[0].stacks).toEqual([
+        { ...trit, quantity: 100 },
+        { ...pye, quantity: 20 },
+      ]);
+      expect(pickups[1].stacks).toEqual([{ ...pye, quantity: 80 }]);
+    });
+
+    it("does not mutate the caller's stacks", () => {
+      run([character([withStacks([trit])])], 30);
+      expect(trit.quantity).toBe(100);
+    });
   });
 });

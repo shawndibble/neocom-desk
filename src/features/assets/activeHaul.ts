@@ -4,6 +4,7 @@
  * recomputed from the plan afterwards, so re-planning the move cannot move a
  * Leg under a pilot who is already underway. Device-local, never synced.
  */
+import type { ConsolidationLine } from '@/engine/assets/consolidation';
 import type { MovePlan } from '@/engine/assets/movePlan';
 import type {
   HaulCharacterInput,
@@ -11,6 +12,7 @@ import type {
   HaulPlace,
   HaulPlan,
   HaulPickupInput,
+  HaulStack,
 } from '@/engine/route/haulPlan';
 import { replanInputs } from '@/engine/route/haulProgress';
 import { loadCurrentSystemId } from '@/features/route/currentSystem';
@@ -38,9 +40,21 @@ function isArrayOfObjects(raw: unknown): raw is Record<string, unknown>[] {
   return Array.isArray(raw) && raw.every((x) => typeof x === 'object' && x !== null);
 }
 
+function isStack(raw: unknown): boolean {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const s = raw as Record<string, unknown>;
+  return (
+    typeof s.typeId === 'number' &&
+    typeof s.name === 'string' &&
+    typeof s.quantity === 'number' &&
+    typeof s.unitM3 === 'number'
+  );
+}
+
 function isLeg(leg: Record<string, unknown>): boolean {
   const to = leg.to as Record<string, unknown> | null;
   return (
+    (leg.stacks === undefined || (Array.isArray(leg.stacks) && leg.stacks.every(isStack))) &&
     typeof leg.id === 'number' &&
     typeof leg.m3 === 'number' &&
     (leg.kind === 'pickup' || leg.kind === 'delivery') &&
@@ -95,6 +109,39 @@ function carriableM3(plan: MovePlan, characterId: number, locationId: number, to
   return Math.max(0, totalM3 - lost);
 }
 
+/**
+ * The item stacks of one pickup the hauler carries, by the same rule as
+ * `carriableM3`: unfit stacks and too-big ships come out; a stack with no known
+ * volume was never in the pickup's m³. Quantities are what is left after those.
+ */
+export function carriableStacks(
+  plan: MovePlan,
+  characterId: number,
+  locationId: number,
+  lines: readonly ConsolidationLine[],
+  name: (typeId: number) => string
+): HaulStack[] {
+  const hauled = plan.active?.pickups.find(
+    (h) => h.characterId === characterId && h.locationId === locationId
+  );
+  const lost = new Map<number, number>();
+  for (const l of [...(hauled?.unfit ?? []), ...(hauled?.tooBigShips ?? [])])
+    lost.set(l.typeId, (lost.get(l.typeId) ?? 0) + l.quantity);
+  const stacks: HaulStack[] = [];
+  for (const line of lines) {
+    if (line.m3 === null || line.quantity <= 0) continue;
+    const quantity = line.quantity - (lost.get(line.typeId) ?? 0);
+    if (quantity > 0)
+      stacks.push({
+        typeId: line.typeId,
+        name: name(line.typeId),
+        quantity,
+        unitM3: line.m3 / line.quantity,
+      });
+  }
+  return stacks;
+}
+
 export interface BuildHaulArgs {
   plan: MovePlan;
   destination: HaulPlace;
@@ -133,6 +180,7 @@ export async function buildActiveHaul(args: BuildHaulArgs): Promise<ActiveHaul |
         stationId: stationIds.get(p.locationId) ?? null,
         name: places.get(p.locationId) ?? String(p.locationId),
         m3: carriableM3(plan, c.characterId, p.locationId, p.totalM3),
+        stacks: carriableStacks(plan, c.characterId, p.locationId, p.lines, name),
       }));
       const flown = c.pickups.flatMap((p) => [
         ...p.ships.map((s) => name(s.typeId)),
