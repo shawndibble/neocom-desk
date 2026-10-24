@@ -100,6 +100,8 @@ for (const [label, viewport] of [
       await shot(page, `${label}-no-colonies`);
 
       const how = page.getByRole('button', { name: /^Show me/ }).first();
+      // boundingBox() doesn't wait and returns null for an element not yet rendered.
+      await expect(how).toBeVisible();
       if (label === 'phone') {
         expect((await how.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       }
@@ -113,6 +115,7 @@ for (const [label, viewport] of [
       if (label === 'phone') {
         for (const name of ['Close', 'Highsec only']) {
           const target = panel.getByRole(name === 'Close' ? 'button' : 'checkbox', { name });
+          await expect(target).toBeVisible();
           const box = (await target.boundingBox())!;
           // The checkbox's label row carries the 44px target, not the 16px box.
           const height =
