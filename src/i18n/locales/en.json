@@ -3715,19 +3715,29 @@
       "fitting": {
         "eyebrow": "Fitting",
         "question": "Will this fit hold up?",
-        "answer": "Build a fit on the ring and see its DPS against a target profile."
+        "answer": "Build a fit on the ring and see its damage, drones and tank: resists, EHP and local tank."
       },
       "survey": {
         "eyebrow": "Mining",
         "question": "When is this belt mined out?",
         "answer": "Survey tracks a belt’s scans: how much is mined, a chart of it, and when it will finish."
+      },
+      "courier": {
+        "eyebrow": "Contracts",
+        "question": "Which haul pays best per jump?",
+        "answer": "The Courier board ranks every public courier contract by ISK per jump on your own route preference, and flags any that pays far above the going rate."
+      },
+      "assets": {
+        "eyebrow": "Assets",
+        "question": "Where did I leave that ship?",
+        "answer": "Assets lists every ship across your characters, nearest first, with where it sits, even one packed in a container."
       }
     },
     "screenshotEnlarge": "Enlarge: {{alt}}",
     "screenshots": {
       "orderDetail": {
-        "alt": "An open sell order: who is cheaper at the station, system and region, and whether there is a better exit.",
-        "caption": "Every order explains what it is losing to"
+        "alt": "An open sell order: undercut to a price that still pays, its rank and how fast it sells, and every other way out (hold, undercut, dump to a buy order, reprocess, haul to another hub) with what each nets a unit after fees.",
+        "caption": "Every order says what to do, and what each exit nets"
       },
       "buildPlan": {
         "alt": "A Build Plan for an Orca: profit after fees, materials with sub-builds, and costs and revenue.",
@@ -3738,8 +3748,8 @@
         "caption": "Mining surveys that tell you when the belt is gone"
       },
       "fitting": {
-        "alt": "A ship fitting on the ring: modules around a Caracal, with offense, applied DPS against a target profile, powergrid and CPU.",
-        "caption": "Fittings with DPS against a target"
+        "alt": "A ship fitting on the ring: modules, rigs and drones around a Caracal, with its missile and drone DPS, shield, armor and hull resists and EHP, local tank, calibration, powergrid and CPU.",
+        "caption": "Fittings with damage and tank"
       },
       "shipTree": {
         "alt": "The Ship Tree map for Caldari State with the Caracal selected and its Skills & Mastery panel open: the skills the hull needs, its Mastery tiers, and the training time still missing for each.",
@@ -3750,7 +3760,7 @@
         "caption": "A journal that links to what each line was"
       },
       "phoneMarketJumps": {
-        "alt": "The market order book on a phone, limited to stations within 15 jumps of a chosen system, with jump counts per order.",
+        "alt": "The market order book on a phone, limited to stations within 15 jumps of Jita, with the jump count and security of each order.",
         "caption": "Market within 15 jumps"
       },
       "phoneRouteSafety": {
@@ -3770,8 +3780,8 @@
         "caption": "Alerts for everything that needs you"
       },
       "corporation": {
-        "alt": "The Corp Board: standing and runway, deadlines per day for the next 14 days, and fuel and moon chunk lists that put what runs out soonest first.",
-        "caption": "One deadline-ranked board for the corp"
+        "alt": "The Corp Board as widgets: deadlines due soon, structure fuel, moon extractions, raidable skyhooks, the corp wallet by division, 30-day cash flow, corp industry jobs and open SRP claims.",
+        "caption": "A corp board of the widgets you choose"
       },
       "industryJobs": {
         "alt": "The Industry page: a table of running and finished jobs with progress and time left, above a list of Build Plans ranked by profit, margin and a build or buy verdict.",
@@ -3782,12 +3792,20 @@
         "caption": "A live order book with jumps from you"
       },
       "skills": {
-        "alt": "The Skills page: the skill in training with its time left, the queue grouped by this week and the next three weeks, and the character’s attributes.",
+        "alt": "The Skills page: the skill in training with its time left, the queue grouped by month, the active Skill Plan with its finish date, and the character’s attributes with Optimize queue.",
         "caption": "A training queue you can read at a glance"
       },
       "mail": {
         "alt": "Mail in two panes: the inbox on the left with unread mail in bold, the open mail on the right with reply and forward buttons.",
         "caption": "A two-pane mail client"
+      },
+      "courier": {
+        "alt": "The Courier board: public courier contracts between trade hubs ranked by ISK per jump, each with reward, collateral, jumps, ISK per m³ and its multiple of the going rate, the top one flagged over rate.",
+        "caption": "Courier contracts ranked by ISK per jump"
+      },
+      "assets": {
+        "alt": "Assets › Ships across two characters: each ship with its owner, station, security and jumps from you, nearest first, two of them packed in a station container.",
+        "caption": "Every character’s assets, down to the container"
       }
     },
     "featuresHeading": "Everything outside the client",
@@ -3824,10 +3842,10 @@
       },
       "corp": {
         "tab": "Corporation",
-        "board": "The Corp Board merges fuel, structure timers, moon extractions, finished jobs and offline services into one deadline-ranked board.",
-        "deadlines": "A strip shows the deadlines per day for the next 14 days, beside the fuel list, soonest first.",
-        "tables": "Members, Wallet and Assets are the tables behind it.",
-        "access": "It appears only when a character holds a Corp Role in game, and corporation data is a separate grant, requested only when you open those pages."
+        "board": "The Corp Board is a board of widgets you pick and size: deadlines, structure fuel, moon chunks, jobs, wallet, members and more.",
+        "pages": "Corp Members, Corp Wallet and Corp Assets each have their own page, with role audits and Stock Targets.",
+        "moons": "Moons keeps the Corp Tax Book: what each corp member mined at your refineries, their Statements, and what is paid.",
+        "access": "SRP lets a pilot file a claim from their own killmail. Officer pages appear only with a Corp Role, and corporation data is a separate grant."
       },
       "comms": {
         "tab": "Mail",
@@ -3895,6 +3913,15 @@
       },
       "contacts": {
         "name": "Contacts & Standings"
+      },
+      "corpTaxBook": {
+        "name": "Corp Tax Book"
+      },
+      "srp": {
+        "name": "SRP"
+      },
+      "communities": {
+        "name": "Communities"
       }
     },
     "trustHeading": "It reads. It writes only when you act.",
@@ -3951,11 +3978,11 @@
       },
       "stores": {
         "q": "What does it store, and where?",
-        "a": "What it reads from EVE stays on this device. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. The exceptions: alerts you have seen, push and Alerts when closed if you turn them on (your login token stays on this device, apart from Alerts when closed and a Corp Tax Book's Automatic sync), anything you choose to share with a Community, and Share Links you create (readable by anyone with the link, for 7 days)."
+        "a": "What it reads from EVE stays on this device. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. The exceptions: alerts you have seen, push and Alerts when closed if you turn them on (your login token stays on this device, apart from Alerts when closed and a Corp Tax Book's Automatic sync), anything you choose to share with a Community, Share Links you create (readable by anyone with the link, for 7 days), and your corporation's own records: SRP Claims and its Corp Tax Book, which its officers can read."
       },
       "delete": {
         "q": "Can I leave and delete my data?",
-        "a": "Yes. Settings › Log out & delete › Delete all data deletes every character's synced data from our server, then erases everything on this device. Anything you shared with a Community is removed by leaving that Community."
+        "a": "Yes. Settings › Log out & delete › Delete all data deletes every character's synced data from our server, then erases everything on this device. Anything you shared with a Community is removed by leaving that Community. SRP Claims and Corp Tax Book lines belong to the corporation's records and stay with it."
       },
       "phone": {
         "q": "Does it work on a phone?",
@@ -3963,7 +3990,7 @@
       },
       "community": {
         "q": "What is a Community?",
-        "a": "A named group of Characters under one admin. You create one or join with an invite link, and share only what you pick: blueprints, Fittings and Skill Plans. Every Member can read what is shared, and it is stored on our server. Members can also post Requests for items and Pledge to fill each other's."
+        "a": "A named group of Characters under one admin. You create one or join with an invite link, and share only what you pick: blueprints, Fittings and Skill Plans. Every Member can read what is shared, and it is stored on our server. Members can also post Requests for items and Pledge to fill each other's, and split fleet loot with a Fleet Payout."
       }
     },
     "bottomCtaHeading": "Undock into your dashboard.",

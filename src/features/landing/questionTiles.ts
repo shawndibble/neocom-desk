@@ -47,6 +47,16 @@ export const QUESTION_TILES: Tile[] = [
     span: 'md:col-span-2 lg:col-span-4',
     wide: true,
   },
+  {
+    key: 'courier',
+    shot: { file: 'desktop-courier', key: 'courier', size: DESKTOP_SIZE },
+    span: 'lg:col-span-3',
+  },
+  {
+    key: 'assets',
+    shot: { file: 'desktop-assets', key: 'assets', size: DESKTOP_SIZE },
+    span: 'lg:col-span-3',
+  },
 ];
 
 /** The phone band: three tall captures, staggered beside their questions. */

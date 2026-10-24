@@ -26,7 +26,7 @@ describe('FeatureShowcase', () => {
       'src',
       '/screenshots/desktop-corporation.webp'
     );
-    expect(panel.getByText(/merges fuel, structure timers/i)).toBeInTheDocument();
+    expect(panel.getByText(/a board of widgets you pick and size/i)).toBeInTheDocument();
     expect(panel.queryByRole('img', { name: /running and finished jobs/i })).toBeNull();
     expect(panel.queryByText(/costs materials, job cost and taxes/i)).toBeNull();
   });

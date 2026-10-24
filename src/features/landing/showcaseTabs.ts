@@ -8,6 +8,9 @@ import {
   MailInbox,
   Market,
   MoonMining,
+  NavCommunities,
+  NavCorpMoons,
+  NavCorpSrp,
   NavTravel,
   Notifications,
   Orders,
@@ -84,8 +87,12 @@ export const SHOWCASE_TABS: ShowcaseTab[] = [
   {
     id: 'corp',
     shot: desktop('desktop-corporation', 'corporation'),
-    bullets: ['board', 'deadlines', 'tables', 'access'],
-    features: [{ icon: Corporation, key: 'corp' }],
+    bullets: ['board', 'pages', 'moons', 'access'],
+    features: [
+      { icon: Corporation, key: 'corp' },
+      { icon: NavCorpMoons, key: 'corpTaxBook' },
+      { icon: NavCorpSrp, key: 'srp' },
+    ],
   },
   {
     id: 'comms',
@@ -95,6 +102,7 @@ export const SHOWCASE_TABS: ShowcaseTab[] = [
       { icon: MailInbox, key: 'social' },
       { icon: Contracts, key: 'contracts' },
       { icon: Social, key: 'contacts' },
+      { icon: NavCommunities, key: 'communities' },
     ],
   },
   {
