@@ -25,29 +25,30 @@ export const TOOLTIP_HOVER_DELAY_MS = 400;
 /** After a bubble closes, the window in which the next trigger opens with no wait (moving along a toolbar). */
 const TOOLTIP_SKIP_DELAY_MS = 300;
 
-const SharedTooltipProvider = createContext(false);
+const InsideTooltipProvider = createContext(false);
 
 /**
  * App-root timing for every `Tooltip` under it (§6c): hover waits, and one
  * shared Radix provider lets a neighbouring trigger open at once. A `Tooltip`
- * outside it (a test, a story) opens on hover immediately.
+ * outside it (a test, a story) opens on hover immediately. A bubble that
+ * unmounts while open never tells Radix, so the next hover skips the wait once.
  */
 export function TooltipProvider({ children }: { children: ReactNode }) {
   return (
-    <SharedTooltipProvider.Provider value={true}>
+    <InsideTooltipProvider.Provider value={true}>
       <TooltipPrimitive.Provider
         delayDuration={TOOLTIP_HOVER_DELAY_MS}
         skipDelayDuration={TOOLTIP_SKIP_DELAY_MS}
       >
         {children}
       </TooltipPrimitive.Provider>
-    </SharedTooltipProvider.Provider>
+    </InsideTooltipProvider.Provider>
   );
 }
 
 /** Radix needs a provider; a `Tooltip` with no `TooltipProvider` above brings its own, with no wait. */
 function ProviderUnlessShared({ children }: { children: ReactNode }) {
-  if (useContext(SharedTooltipProvider)) return children;
+  if (useContext(InsideTooltipProvider)) return children;
   return <TooltipPrimitive.Provider delayDuration={0}>{children}</TooltipPrimitive.Provider>;
 }
 
