@@ -3,10 +3,22 @@ import { useAsyncLoad } from '@/lib/useAsyncLoad';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useReportSkipped } from './useReportSkipped';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Button, FilterChip, LiveStatus, Spinner } from '@/components/ui';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useHydratedStore } from '@/lib/useHydratedStore';
+import { useUrlParams } from '@/lib/useUrlState';
+import { lookupSolarSystem } from '@/sde/solarSystems';
+import { ActiveHaulView } from './ActiveHaulView';
+import { buildActiveHaul, replanActiveHaul, useActiveHaul } from './activeHaul';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
 import type { PilotProfile } from '@/engine/fittings/types';
-import { planMove, type MoveHull, type PackHold } from '@/engine/assets/movePlan';
+import {
+  planMove,
+  type HaulerOverride,
+  type MoveHull,
+  type PackHold,
+} from '@/engine/assets/movePlan';
 import {
   loadOtherCharactersAssetsDetailed,
   type SkippedCharacterAssets,
@@ -20,6 +32,7 @@ import {
   type FittingCatalogue,
 } from '@/features/fittings/useFittingCatalogue';
 import { hullPackHolds } from '@/features/market/haulingCargo';
+import { useCurrentSystem } from '@/features/route/currentSystem';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
@@ -27,6 +40,13 @@ import { formatCubicMetres } from '@/lib/volume';
 import { loadGroupCategories, loadShipTree, loadTypes } from '@/sde/loadSde';
 import { PickerList } from './MovePlanPicker';
 import { PlanResult, type PlanState } from './MovePlanResult';
+import {
+  MOVE_PLAN_URL_SCHEMA,
+  NO_MOVE_PLAN,
+  movePlanKey,
+  planFromUrl,
+  type MovePlanUrlValues,
+} from './movePlanUrl';
 import {
   fittedRigCounts,
   pickerStacks,
@@ -112,7 +132,7 @@ async function load(characterIds: readonly number[]): Promise<Loaded> {
 }
 
 interface MovePlanTabProps {
-  /** Leaves the plan: Cancel, and Done on the result. The page returns to its Items tab. */
+  /** Leaves the plan: Cancel. The page returns to its Items tab. */
   onClose: () => void;
   /** The Characters the page's filter names. */
   characterIds: readonly number[];
@@ -124,9 +144,10 @@ interface MovePlanTabProps {
 /**
  * Plan a move: tick what to carry, say where to, see the work list per
  * Character and pickup with a suggested hauler. The Assets page's Move tab
- * mounts it, so its state lasts while the tab is open and starts fresh on re-entry.
- * Volumes and trips are an estimate from hull class; the Route Safety link
- * answers the safety question.
+ * mounts it. A shown plan lives in the URL (`movePlanUrl.ts`), so Back from Route
+ * Safety and a pasted link rebuild it; the picker's own ticks are state.
+ * Volumes and trips are an estimate from hull class; Show my route
+ * opens the leg list, and Route Safety answers the safety question.
  */
 export function MovePlanTab(props: MovePlanTabProps) {
   return <MovePlanTabBody key={idSetKey(props.characterIds)} {...props} />;
@@ -147,6 +168,12 @@ function MovePlanTabBody({
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [destSystem, setDestSystem] = useState<number | null>(null);
   const [destStation, setDestStation] = useState<number | null>(null);
+  /** A station found by search that holds none of the pilot's assets: its name and system came with the pick. */
+  const [searchedStation, setSearchedStation] = useState<{
+    id: number;
+    name: string;
+    systemId: number;
+  } | null>(null);
   const [working, setWorking] = useState(false);
   const [result, setResult] = useState<PlanState | null>(null);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -167,7 +194,41 @@ function MovePlanTabBody({
   /** Ships (itemID) the plan hauls packaged instead of flying. */
   const [packed, setPacked] = useState<ReadonlySet<number>>(new Set());
   /** What the shown plan was worked out from, so packing a ship can re-plan it. */
-  const planBase = useRef<Omit<Parameters<typeof planMove>[0], 'packedShipIds'> | null>(null);
+  const planBase = useRef<Omit<
+    Parameters<typeof planMove>[0],
+    'packedShipIds' | 'haulerOverride'
+  > | null>(null);
+  /** The pilot's hauler pick for the shown plan only; never saved, reset with each plan. */
+  const [haulerOverride, setHaulerOverride] = useState<HaulerOverride | undefined>();
+  const savedHaul = useActiveHaul((st) => st.value);
+  const setSavedHaul = useActiveHaul((st) => st.setValue);
+  const currentSystem = useCurrentSystem();
+  useHydratedStore(useActiveHaul);
+  const [urlValues, setUrlValues] = useUrlParams(MOVE_PLAN_URL_SCHEMA);
+  const urlPlan = planFromUrl(urlValues);
+  const urlKey = movePlanKey(urlValues);
+  const navigate = useNavigate();
+  /** The plan the screen shows, as the URL names it: tells a URL change this tab made from one the pilot made (Back, a link). */
+  const [shownKey, setShownKey] = useState<string | null>(null);
+  const [seenUrlKey, setSeenUrlKey] = useState<string | null>(null);
+  /** The URL plan being rebuilt, so one link is worked out once. */
+  const restoring = useRef<string | null>(null);
+  // The URL dropped the plan (Back): close it. Adjusted while rendering, so no frame shows the old plan.
+  if (urlKey !== seenUrlKey) {
+    setSeenUrlKey(urlKey);
+    if (urlKey === null && shownKey !== null) {
+      setShownKey(null);
+      setResult(null);
+    }
+  }
+  /** Key of the plan this mount pushed a history entry for, so Back steps out of it only while that plan shows. */
+  const pushedPlan = useRef<string | null>(null);
+  /** The active haul fills the tab instead of the picker or the plan. */
+  const showingHaul = urlValues.mvr && savedHaul !== null;
+  const setShowingHaul = (open: boolean) => setUrlValues({ mvr: open });
+  const [routing, setRouting] = useState(false);
+  const [routeFailed, setRouteFailed] = useState(false);
+  const [replacing, setReplacing] = useState(false);
   /** Bumped on every reset so a plan still being worked out for an old session is dropped. */
   const session = useRef(0);
   const hullSource = useRef<HullSourceData>({
@@ -246,9 +307,14 @@ function MovePlanTabBody({
     });
 
   /** Ticks at the destination are kept but ignored, so changing it back restores them. */
-  function chooseDestination(system: number | null, station: number | null) {
+  function chooseDestination(
+    system: number | null,
+    station: number | null,
+    searched: { id: number; name: string; systemId: number } | null = null
+  ) {
     setDestSystem(system);
     setDestStation(station);
+    setSearchedStation(searched);
   }
 
   /**
@@ -306,16 +372,21 @@ function MovePlanTabBody({
     return { hulls, sizing: sizingFailures > 0 && hulls.length === 0 ? 'unavailable' : undefined };
   }
 
-  async function showPlan() {
-    if (!loaded || !hasDestination) return;
-    setWorking(true);
-    setPlanFailed(false);
-    const mine = session.current;
-    try {
-      const destinationSystem =
-        destStation !== null
+  /** Works a plan out from the given picks, for a fresh plan and for one rebuilt from the URL. */
+  async function computePlan(
+    inputs: PlanInputs,
+    packedIds: ReadonlySet<number>,
+    override: HaulerOverride | undefined
+  ) {
+    if (!loaded) throw new Error('assets not loaded');
+    const { searched, destStation: station, destSystem: system } = inputs;
+    const atPlace = coveredLocations(loaded.systems, system, station);
+    const destinationSystem =
+      searched !== null
+        ? searched.systemId
+        : station !== null
           ? await resolvePlace(
-              { locationId: destStation, characterId: null, kind: 'station' },
+              { locationId: station, characterId: null, kind: 'station' },
               undefined,
               {
                 name: false,
@@ -323,27 +394,55 @@ function MovePlanTabBody({
             )
               .then((place) => place.systemId)
               .catch(() => null)
-          : destSystem;
-      const { hulls, sizing } = await loadHulls();
-      const base = {
-        destinationLocationIds: atDestination,
-        characters: selectedPlanCharacters(loaded.sources, loaded.shipTypeIds, selected),
-        unitM3: loaded.unitM3,
-        shipTypeIds: loaded.shipTypeIds,
-        hulls,
-      };
-      const plan = planMove(base);
+          : system;
+    const { hulls, sizing } = await loadHulls();
+    const base = {
+      destinationLocationIds: atPlace,
+      characters: selectedPlanCharacters(loaded.sources, loaded.shipTypeIds, inputs.selected),
+      unitM3: loaded.unitM3,
+      shipTypeIds: loaded.shipTypeIds,
+      hulls,
+    };
+    const plan = planMove({ ...base, packedShipIds: packedIds, haulerOverride: override });
+    const state: PlanState = {
+      plan,
+      destinationSystem,
+      destinationStation:
+        station !== null ? (loaded.places.get(station) ?? searched?.name ?? null) : null,
+      pickupSystems: loaded.systems,
+      haulerSizing: sizing,
+    };
+    return { base, state };
+  }
+
+  async function showPlan() {
+    if (!loaded || !hasDestination) return;
+    setWorking(true);
+    setPlanFailed(false);
+    const mine = session.current;
+    try {
+      const { base, state } = await computePlan(
+        { selected, destSystem, destStation, searched: searchedStation },
+        new Set(),
+        undefined
+      );
       if (mine === session.current) {
         planBase.current = base;
         setPacked(new Set());
-        setResult({
-          plan,
-          destinationSystem,
-          destinationStation:
-            destStation !== null ? (loaded.places.get(destStation) ?? null) : null,
-          pickupSystems: loaded.systems,
-          haulerSizing: sizing,
-        });
+        setHaulerOverride(undefined);
+        setResult(state);
+        const values: MovePlanUrlValues = {
+          ...NO_MOVE_PLAN,
+          mv: [...selected],
+          mvd:
+            destStation !== null
+              ? { kind: 'station', id: destStation }
+              : { kind: 'system', id: destSystem! },
+        };
+        setShownKey(movePlanKey(values));
+        pushedPlan.current = movePlanKey(values);
+        // A history entry: Back returns to the picker.
+        setUrlValues(values, { push: true });
         focusAfterCommit(planHeadingRef);
       }
     } catch {
@@ -353,23 +452,138 @@ function MovePlanTabBody({
     }
   }
 
-  /** Hauls this ship packaged instead of flying it, and re-plans around its volume. */
-  function packShip(itemId: number) {
+  /** The picks a URL's plan names, dropping what these assets no longer hold; `null` when nothing is left to plan. */
+  async function inputsFromUrl(plan: MovePlanUrlValues): Promise<PlanInputs | null> {
+    if (!loaded || !plan.mvd) return null;
+    const known = new Set(loaded.stacks.map((st) => st.key));
+    const picked = new Set(plan.mv.filter((key) => known.has(key)));
+    if (picked.size === 0) return null;
+    const { kind, id } = plan.mvd;
+    if (kind === 'system') {
+      return { selected: picked, destSystem: id, destStation: null, searched: null };
+    }
+    if (loaded.places.has(id)) {
+      return { selected: picked, destSystem: null, destStation: id, searched: null };
+    }
+    const place = await resolvePlace({ locationId: id, characterId: null, kind: 'station' }).catch(
+      () => null
+    );
+    if (!place || place.systemId === null) return null;
+    return {
+      selected: picked,
+      destSystem: null,
+      destStation: id,
+      searched: { id, name: place.name ?? String(id), systemId: place.systemId },
+    };
+  }
+
+  // The URL leads: a plan it names that the screen does not show is rebuilt (a pasted link, Route
+  // Safety's Back, Forward). A plan this tab built itself already set `shownKey`, so it is not worked out twice.
+  useEffect(() => {
+    if (urlKey === null) {
+      restoring.current = null;
+      return;
+    }
+    if (urlKey === shownKey || urlKey === restoring.current || !loaded || !urlPlan) return;
+    restoring.current = urlKey;
+    const mine = session.current;
+    void (async () => {
+      try {
+        const inputs = await inputsFromUrl(urlPlan);
+        if (!inputs) throw new Error('stale plan link');
+        const nextPacked = new Set(urlPlan.mvp);
+        const override = urlPlan.mvh ?? undefined;
+        const { base, state } = await computePlan(inputs, nextPacked, override);
+        // The URL moved on while this was worked out (Back): drop it.
+        if (mine !== session.current || restoring.current !== urlKey) return;
+        planBase.current = base;
+        setSelected(inputs.selected);
+        chooseDestination(inputs.destSystem, inputs.destStation, inputs.searched);
+        setPacked(nextPacked);
+        setHaulerOverride(override);
+        setResult(state);
+        setShownKey(urlKey);
+      } catch {
+        // A stale or hand-edited link: the empty planner, no error screen.
+        if (mine !== session.current) return;
+        restoring.current = null;
+        setUrlValues(NO_MOVE_PLAN);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the URL's plan or the loaded assets change; the helpers close over `loaded`
+  }, [urlKey, loaded, shownKey]);
+
+  /** Works the shown plan out again for a changed ship choice or hauler. */
+  function replan(nextPacked: ReadonlySet<number>, nextOverride: HaulerOverride | undefined) {
     const base = planBase.current;
     if (!base) return;
-    const next = new Set(packed).add(itemId);
-    setPacked(next);
-    setResult((r) => (r ? { ...r, plan: planMove({ ...base, packedShipIds: next }) } : r));
+    setPacked(nextPacked);
+    setHaulerOverride(nextOverride);
+    const patch = { mvp: [...nextPacked], mvh: nextOverride ?? null };
+    setShownKey(movePlanKey({ ...urlValues, ...patch }));
+    setUrlValues(patch);
+    setResult((r) =>
+      r
+        ? {
+            ...r,
+            plan: planMove({ ...base, packedShipIds: nextPacked, haulerOverride: nextOverride }),
+          }
+        : r
+    );
   }
+
+  /** Hauls this ship packaged instead of flying it, and re-plans around its volume. */
+  const packShip = (itemId: number) => replan(new Set(packed).add(itemId), haulerOverride);
 
   /** Flies this packed ship after all, and re-plans without its volume. */
   function unpackShip(itemId: number) {
-    const base = planBase.current;
-    if (!base) return;
     const next = new Set(packed);
     next.delete(itemId);
-    setPacked(next);
-    setResult((r) => (r ? { ...r, plan: planMove({ ...base, packedShipIds: next }) } : r));
+    replan(next, haulerOverride);
+  }
+
+  /** Saves the shown plan's route as the active haul and opens it. */
+  async function commitRoute() {
+    if (!loaded || !result) return;
+    setRouting(true);
+    setRouteFailed(false);
+    const mine = session.current;
+    try {
+      const systemId = result.destinationSystem;
+      const stationId = destStation ?? searchedStation?.id ?? null;
+      const destinationName =
+        result.destinationStation ??
+        (systemId === null ? null : (await lookupSolarSystem(systemId).catch(() => null))?.name) ??
+        '';
+      const stationIds = new Map<number, number>();
+      for (const st of loaded.stacks)
+        if (st.locationType === 'station') stationIds.set(st.locationId, st.locationId);
+      const haul = await buildActiveHaul({
+        plan: result.plan,
+        destination: { systemId, stationId, name: destinationName },
+        places: loaded.places,
+        systems: loaded.systems,
+        stationIds,
+        name: (typeId) => loaded.typeNames.get(typeId) ?? `#${typeId}`,
+      });
+      if (mine !== session.current) return;
+      if (!haul) {
+        setRouteFailed(true);
+        return;
+      }
+      await setSavedHaul(haul);
+      if (mine === session.current) setShowingHaul(true);
+    } catch {
+      if (mine === session.current) setRouteFailed(true);
+    } finally {
+      if (mine === session.current) setRouting(false);
+    }
+  }
+
+  /** Show my route: asks first when a haul is already saved, since this replaces it. */
+  function showRoute() {
+    if (savedHaul) setReplacing(true);
+    else void commitRoute();
   }
 
   // Who the read left out is the header picker's to say (its dot and "Not included" note).
@@ -395,21 +609,57 @@ function MovePlanTabBody({
         <LiveStatus>
           {failed ? t('assets.movePlan.failed') : planFailed ? t('assets.movePlan.planFailed') : ''}
         </LiveStatus>
-        {failed ? (
+        {savedHaul && !showingHaul && (
+          <div>
+            <Button size="sm" onClick={() => setShowingHaul(true)}>
+              {t('assets.movePlan.resumeHaul')}
+            </Button>
+          </div>
+        )}
+        {showingHaul && savedHaul ? (
+          <ActiveHaulView
+            haul={savedHaul}
+            onBack={() => setShowingHaul(false)}
+            currentSystemId={currentSystem.systemId}
+            onProgress={(doneLegIds) => setSavedHaul({ ...savedHaul, doneLegIds })}
+            onReplan={async () => {
+              const result = await replanActiveHaul(savedHaul);
+              // A tick made while the route was being worked out wins: the new plan is stale.
+              const now = useActiveHaul.getState().value;
+              const unchanged =
+                now?.id === savedHaul.id &&
+                (now.doneLegIds ?? []).join() === (savedHaul.doneLegIds ?? []).join();
+              if (result.status === 'replanned' && unchanged) await setSavedHaul(result.haul);
+              return result;
+            }}
+            onClear={async () => {
+              await setSavedHaul(null);
+              setShowingHaul(false);
+            }}
+          />
+        ) : failed ? (
           <p className="text-text-dim">{t('assets.movePlan.failed')}</p>
-        ) : !loaded ? (
+        ) : !loaded || (urlKey !== null && !result) ? (
           <Spinner size="sm" label={t('assets.movePlan.loading')} />
         ) : result ? (
           <PlanResult
             state={result}
             compareOpen={compareOpen}
             onToggleCompare={() => setCompareOpen((v) => !v)}
+            haulerOverride={haulerOverride}
+            onPickHauler={(next) => replan(packed, next)}
             headingRef={planHeadingRef}
             onBack={() => {
-              setResult(null);
+              // The URL closes the plan (see the effect above): step out of the entry this tab pushed, else drop the plan from the one it is on.
+              if (pushedPlan.current === movePlanKey({ ...urlValues, mvp: [], mvh: null })) {
+                pushedPlan.current = null;
+                navigate(-1);
+              } else setUrlValues(NO_MOVE_PLAN);
               focusAfterCommit(deliverHeadingRef);
             }}
-            onDone={onClose}
+            onShowRoute={showRoute}
+            routing={routing}
+            routeFailed={routeFailed}
             onPackShip={packShip}
             onUnpackShip={unpackShip}
             rigsOf={(itemId) => loaded.rigs.get(itemId) ?? 0}
@@ -435,12 +685,22 @@ function MovePlanTabBody({
                 </h3>
                 <SolarSystemPicker
                   value={destSystem}
-                  onChange={(id) => chooseDestination(id, null)}
+                  places
+                  onChange={(id, station) =>
+                    station
+                      ? chooseDestination(null, station.id, {
+                          id: station.id,
+                          name: station.name,
+                          systemId: id,
+                        })
+                      : chooseDestination(id, null)
+                  }
                   ariaLabel={t('assets.movePlan.destinationSystem')}
                   placeholder={t('assets.movePlan.destinationSystem')}
                   triggerLabel={
                     destStation !== null
                       ? (stationLabels[ownStations.findIndex(([id]) => id === destStation)] ??
+                        searchedStation?.name ??
                         placeLabel(destStation))
                       : undefined
                   }
@@ -551,6 +811,18 @@ function MovePlanTabBody({
           </>
         )}
       </div>
+      <ConfirmDialog
+        open={replacing}
+        title={t('assets.movePlan.replaceHaulTitle')}
+        body={t('assets.movePlan.replaceHaulBody')}
+        actionLabel={t('assets.movePlan.replaceHaul')}
+        cancelLabel={t('assets.movePlan.cancel')}
+        onConfirm={async () => {
+          setReplacing(false);
+          await commitRoute();
+        }}
+        onClose={() => setReplacing(false)}
+      />
     </section>
   );
 }
@@ -565,6 +837,14 @@ function coveredLocations(
   if (station !== null) ids.add(station);
   else if (system !== null) for (const [id, sys] of systems ?? []) if (sys === system) ids.add(id);
   return ids;
+}
+
+/** What a plan is worked out from: the picker's ticks and destination. */
+interface PlanInputs {
+  selected: ReadonlySet<string>;
+  destSystem: number | null;
+  destStation: number | null;
+  searched: { id: number; name: string; systemId: number } | null;
 }
 
 interface HullSourceData {

@@ -29,12 +29,7 @@ import { editBook } from '../taxBook/bookClient';
 import { editErrorMessage, useBook } from './useBook';
 import { isk, periodLabel, shortDate } from './moonsFormat';
 import { TRADE_HUBS } from '@/market/hubs';
-import {
-  mailTarget,
-  mailsSent,
-  statementRefineryNames,
-  useCorporationName,
-} from './statementMailing';
+import { mailTarget, statementRefineryNames, useCorporationName } from './statementMailing';
 
 type Step = 'check' | 'send' | 'done';
 
@@ -110,7 +105,7 @@ export function StatementRun() {
         const miner = view.input.miners.find((m) => m.id === s.minerId);
         return (
           !settled &&
-          mailsSent(s) === 0 &&
+          (s.mailsSent ?? 0) === 0 &&
           mailableAfterClose(miner, s) &&
           !queue.some((q) => q.statementId === s.id)
         );

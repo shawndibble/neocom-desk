@@ -62,7 +62,7 @@ export function BpcFilterBar({
 
   const compositeValue = { ...filter, sources, spaceKinds, jumps };
 
-  /** Widened past `UiFilter` so Source/Space/Distance buffer and commit through the same draft/Apply/Cancel as the other fields (matching Contracts.tsx and Market's FilterBar usage) instead of applying instantly. Space is a Dexie-backed preference, written here and nowhere else, so Cancel never leaves a store write to roll back. */
+  /** Widened past `UiFilter` so Source/Space/Distance commit through the same `FilterBar` value as the other fields (matching Contracts.tsx and Market's FilterBar usage). Space is a Dexie-backed preference, written here and nowhere else. */
   function handleCompositeChange(next: typeof compositeValue) {
     const {
       sources: nextSources,

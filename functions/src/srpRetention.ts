@@ -21,3 +21,17 @@ export function decideSrpClaimSweep(
   if (typeof closedAt !== 'number' || !Number.isFinite(closedAt) || closedAt <= 0) return 'keep';
   return now - closedAt >= SRP_RETENTION_MS ? 'delete' : 'keep';
 }
+
+/**
+ * An SRP log entry about one claim: its filing, a re-filing, or an officer's decision on it,
+ * each naming the claim's killmail in `detail.killmailId` (#4942). Deleted with the claim;
+ * corp-level entries and the sweep's own count name no killmail and stay.
+ */
+export function isSrpAuditForClaim(entry: Record<string, unknown>, killmailId: number): boolean {
+  const { detail } = entry;
+  return (
+    typeof detail === 'object' &&
+    detail !== null &&
+    (detail as { killmailId?: unknown }).killmailId === killmailId
+  );
+}

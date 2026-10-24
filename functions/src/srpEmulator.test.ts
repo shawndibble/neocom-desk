@@ -1,13 +1,13 @@
 // SRP callables against the Firestore emulator (issue #4848, ADR 0026). Runs
 // only under `npm run test:rules` at the repo root (which starts the emulator
 // and sets FIRESTORE_EMULATOR_HOST); a plain `npm test` skips it.
+import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { parseBookCall } from './corpTaxBook.js';
 import { ROLES_SCOPE, type CorpIdentity } from './corpTaxBookEsi.js';
-import type { Caller } from './corpTaxBookStore.js';
 import { parseSrpSettingsPatch } from './srp.js';
 import {
   getSrpStatus,

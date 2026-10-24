@@ -954,8 +954,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
           }
         >
           {(draft, setDraft) => {
-            // Read off the draft, not the committed mode: switching to
-            // instant in the sheet drops the listing-only fields before Apply.
+            // Read off the value FilterBar hands in: switching to instant
+            // hides the listing-only fields at once.
             const draftInstant = draft.mode === 'instant';
             return (
               <>

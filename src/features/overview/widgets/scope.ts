@@ -7,7 +7,7 @@
  * out); every other kind falls back to the active Character and says so on
  * the widget, so a pilot never reads one Character's figure as the account's.
  */
-import { KIND_FEEDS, kindSumsAcrossCharacters } from './data/models';
+import { feedsOf, kindSumsAcrossCharacters } from './data/models';
 import type { WidgetScope } from './layout';
 
 export interface ScopePresentation {
@@ -23,5 +23,5 @@ export function scopePresentation(kind: string, widgetScope: WidgetScope): Scope
   if (widgetScope !== 'all') return { scopeAll: false, chip: false, fallbackNote: false };
   if (kindSumsAcrossCharacters(kind)) return { scopeAll: true, chip: true, fallbackNote: false };
   // A kind with no data yet has nothing to be a fallback of.
-  return { scopeAll: false, chip: false, fallbackNote: KIND_FEEDS[kind] !== undefined };
+  return { scopeAll: false, chip: false, fallbackNote: feedsOf(kind) !== undefined };
 }

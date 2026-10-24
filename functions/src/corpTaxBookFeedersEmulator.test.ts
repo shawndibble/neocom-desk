@@ -1,5 +1,6 @@
 // Collector books: feeder invites against the Firestore emulator (issues #4507, #4616).
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
+import type { Caller } from './actorAuth.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
@@ -25,7 +26,7 @@ import {
 import { dropBookGrants } from './corpTaxBookFeederGrant.js';
 import { recordFeederRead } from './corpTaxBookFeederSync.js';
 import { listFeederInvites, setFeederMode, setFeederRate } from './corpTaxBookFeederOwnerCalls.js';
-import { deleteBook, turnOnBook, type BookDeps, type Caller } from './corpTaxBookStore.js';
+import { deleteBook, turnOnBook, type BookDeps } from './corpTaxBookStore.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 
 const COLLECTOR = 98000001;

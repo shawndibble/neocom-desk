@@ -194,6 +194,11 @@ export function FaqPanel() {
       answer: <p>{t('settings.faq.a.characters')}</p>,
     },
     {
+      id: 'row-menus',
+      questionKey: 'settings.faq.q.rowMenus',
+      answer: <p>{t('settings.faq.a.rowMenus')}</p>,
+    },
+    {
       id: 'phone',
       questionKey: 'settings.faq.q.phone',
       answer: <p>{t('settings.faq.a.phone')}</p>,
@@ -253,6 +258,11 @@ export function FaqPanel() {
       id: 'community-data',
       questionKey: 'settings.faq.q.communityData',
       answer: <StoreGroup group={storeGroup('communities')} />,
+    },
+    {
+      id: 'corp-records',
+      questionKey: 'settings.faq.q.corpRecords',
+      answer: <StoreGroup group={storeGroup('corpRecords')} />,
     },
     {
       id: 'share-links',

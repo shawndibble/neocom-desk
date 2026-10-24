@@ -5,6 +5,7 @@
 // (communitiesStore.deleteMemberShares). The timing decision is the pure
 // `decideRequestSweep` in communityRequests.ts.
 
+import type { Caller } from './actorAuth.js';
 import type { Firestore, Query, QueryDocumentSnapshot } from 'firebase-admin/firestore';
 import { COMMUNITIES_COLLECTION } from './communities.js';
 import {
@@ -14,7 +15,7 @@ import {
   REQUESTS_COLLECTION,
   decideRequestSweep,
 } from './communityRequests.js';
-import { communityRef, requireAdmin, type CallerCharacter } from './communitiesStore.js';
+import { communityRef, requireAdmin } from './communitiesStore.js';
 
 /** Requests read per query page. */
 export const SWEEP_PAGE_SIZE = 100;
@@ -108,7 +109,7 @@ export async function sweepRequests(
 /** The admin removes any Request, with all its Pledges. Removing one already gone is not an error. */
 export async function removeRequest(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   requestId: string
 ): Promise<void> {
@@ -121,7 +122,7 @@ export async function removeRequest(
 /** The admin removes one Member's Pledge on a Request; the Request and the other Pledges stay. */
 export async function removePledge(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   requestId: string,
   pledgeUid: string

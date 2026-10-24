@@ -20,7 +20,8 @@ import { OwnerStaleBanner } from './OwnerStaleBanner';
 import { RefineryNamesBanner } from './RefineryNamesBanner';
 import { OwnerStatusStrip } from './OwnerStatusStrip';
 import { shortDate } from './moonsFormat';
-import { canMail, mailPayeeChange } from './payeeChangeMail';
+import { enqueuePayeeChangeMail } from '@/features/corpTaxBook/mailQueue';
+import { canSendMail, queueOfficerMail } from '@/features/corpTaxBook/officerMail';
 import { useFeederView } from './useFeederView';
 
 type Owner = Extract<FeederSetupStatus, { status: 'feeder' }>;
@@ -100,21 +101,27 @@ export function MoonOwnerPanel({
             characterId,
             corporationId,
             payee,
-            canMail(grantedScopes)
+            canSendMail(grantedScopes)
           );
           // After the save, and never awaited: the change does not wait on the mail.
           if (out.changed && out.at !== undefined) {
             const ownName = load.nameOf?.(corporationId) ?? `#${corporationId}`;
-            void mailPayeeChange({
+            const at = out.at;
+            void queueOfficerMail({
+              senderCharacterId: characterId,
               grantedScopes,
-              characterId,
-              corporationId,
-              feederCorporationId: corporationId,
               recipients: out.recipients ?? [],
-              changedByName: ownName,
-              moonOwnerName: ownName,
-              payeeName,
-              at: out.at,
+              enqueue: (recipients) =>
+                enqueuePayeeChangeMail({
+                  corporationId,
+                  senderCharacterId: characterId,
+                  feederCorporationId: corporationId,
+                  at,
+                  changedByName: ownName,
+                  moonOwnerName: ownName,
+                  payeeName,
+                  recipients,
+                }),
             });
           }
           reload();

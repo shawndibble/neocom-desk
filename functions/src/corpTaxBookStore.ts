@@ -7,6 +7,7 @@
 
 import { randomBytes } from 'node:crypto';
 import {
+  FieldPath,
   FieldValue,
   type DocumentSnapshot,
   type DocumentReference,
@@ -14,7 +15,8 @@ import {
   type QueryDocumentSnapshot,
   type Transaction,
 } from 'firebase-admin/firestore';
-import { HttpsError, type FunctionsErrorCode } from 'firebase-functions/v2/https';
+import { HttpsError } from 'firebase-functions/v2/https';
+import { cacheOfficer, readOfficerCache, revokeOfficer } from './officerCache.js';
 import {
   ACCESS_TTL_MS,
   ADJUSTMENTS,
@@ -40,11 +42,9 @@ import {
   STATEMENT_LINKS,
   TOKENS_COLLECTION,
   WRITE_OFFS,
-  decideRoles,
   needsLiveCheck,
   dismissalNeedsDirector,
   defaultSettings,
-  isCacheFresh,
   parseRecordKey,
   parseStatement,
   moveStartRate,
@@ -80,8 +80,16 @@ import {
   type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
-import { ROLES_SCOPE, type IdentityReader } from './corpTaxBookEsi.js';
-import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
+import type { IdentityReader } from './corpTaxBookEsi.js';
+import { SRP_COLLECTIONS } from './srpTypes.js';
+import {
+  fail,
+  requireLiveRoles,
+  signedInCharacter,
+  verifyCallerToken,
+  type Caller,
+} from './actorAuth.js';
+import type { EveTokenClaims } from './verifyEveToken.js';
 
 /** One type's parsed R2 `open-prices/<typeId>.json` object, or null when R2 has none. Throws on a failed read. */
 export type OpenPricesReader = (typeId: number) => Promise<unknown | null>;
@@ -95,12 +103,6 @@ export interface BookDeps {
   openPrices?: OpenPricesReader;
   /** A corporation's CEO (public ESI); the removal (#4520) and payee (#4653) callables need it. */
   corporationCeo?: (corporationId: number) => Promise<number | undefined>;
-}
-
-/** Who is calling: the Firebase uid `char:{id}` and the ownerHash claim. */
-export interface Caller {
-  uid: string;
-  ownerHash: string;
 }
 
 type Data = Record<string, unknown>;
@@ -130,11 +132,6 @@ export async function liveOfficerIds(
 
 const rand = (bytes = 6) => randomBytes(bytes).toString('base64url');
 
-/** Throws an HttpsError carrying a stable `reason` for the UI to map. */
-export function fail(code: FunctionsErrorCode, message: string, reason: string): never {
-  throw new HttpsError(code, message, { reason });
-}
-
 // --- Officer verification --------------------------------------------------
 
 export interface AuthOptions {
@@ -156,22 +153,14 @@ export async function authorizeOfficer(
   need: Need,
   options: AuthOptions
 ): Promise<OfficerAccess> {
-  const characterId = characterIdForUid(caller.uid);
-  if (characterId === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const characterId = signedInCharacter(caller);
   const now = deps.now();
   const officerRef = sub(deps.db, call.corporationId, OFFICERS).doc(caller.uid);
-  const held = (await officerRef.get()).data() as OfficerAccess | undefined;
-  const heldUsable =
-    held !== undefined &&
-    held.ownerHash === caller.ownerHash &&
-    held.corporationId === call.corporationId &&
-    held.expiresAt > now &&
-    isCacheFresh(held.checkedAt, now);
+  const { held, usable } = await readOfficerCache(officerRef, caller, call.corporationId, now);
 
   let access: OfficerAccess;
   if (call.accessToken === undefined) {
-    if (!heldUsable) {
+    if (!usable) {
       fail(
         held ? 'failed-precondition' : 'permission-denied',
         'Verify as an officer first',
@@ -180,35 +169,20 @@ export async function authorizeOfficer(
     }
     if (options.live)
       fail('failed-precondition', 'This needs a fresh role check', 'live-check-required');
-    access = held;
+    access = usable;
   } else {
-    let claims: EveTokenClaims;
-    try {
-      claims = await deps.verifyToken(call.accessToken);
-    } catch {
-      // Opaque on purpose; mintFirebaseToken logs the cause.
-      throw new HttpsError('unauthenticated', 'EVE access token rejected');
-    }
-    if (claims.characterId !== characterId || claims.ownerHash !== caller.ownerHash) {
-      fail('permission-denied', 'The access token is for a different Character', 'token-mismatch');
-    }
-    if (!options.live && heldUsable) {
-      access = held;
+    const actor = await verifyCallerToken(deps, caller, call.accessToken);
+    const { claims } = actor;
+    if (!options.live && usable) {
+      access = usable;
     } else {
-      if (!claims.scopes.includes(ROLES_SCOPE)) {
-        fail('failed-precondition', 'Grant the corporation roles scope first', 'missing-scope');
-      }
-      const identity = await deps.readIdentity(characterId, call.accessToken);
-      if (identity.corporationId !== call.corporationId) {
-        if (held) await officerRef.delete();
-        fail('permission-denied', 'Not a member of this corporation', 'wrong-corp');
-      }
-      const roles = decideRoles(identity.roles, identity.ceoId === characterId);
-      if (!roles.canView) {
+      const { identity, roles } = await requireLiveRoles(deps, actor, {
+        corporationId: call.corporationId,
+        need: 'canView',
+        denied: { message: 'No officer role in this corporation', reason: 'not-an-officer' },
         // A failed renewal revokes the read access the old check granted.
-        if (held) await officerRef.delete();
-        fail('permission-denied', 'No officer role in this corporation', 'not-an-officer');
-      }
+        onDenied: () => revokeOfficer(officerRef, held),
+      });
       access = {
         ...roles,
         characterId,
@@ -219,7 +193,8 @@ export async function authorizeOfficer(
         checkedAt: now,
         expiresAt: now + ACCESS_TTL_MS,
       };
-      if ((await bookRef(deps.db, call.corporationId).get()).exists) await officerRef.set(access);
+      if ((await bookRef(deps.db, call.corporationId).get()).exists)
+        await cacheOfficer(officerRef, access);
     }
   }
   if (!satisfies(access, need)) {
@@ -303,6 +278,8 @@ export async function turnOnBook(deps: BookDeps, caller: Caller, input: TurnOnIn
   if (input.startDate > utcDate(now))
     fail('invalid-argument', 'The start date cannot be in the future', 'start-in-future');
   const ref = bookRef(deps.db, input.corporationId);
+  // A pointer a past delete missed (it failed, or a late sync) must not grant this book's reads.
+  if (!(await ref.get()).exists) await deleteBilledByPointers(deps, input.corporationId);
   await deps.db.runTransaction(async (tx) => {
     if ((await tx.get(ref)).exists)
       fail('already-exists', 'This corporation already has a Corp Tax Book', 'book-exists');
@@ -363,8 +340,46 @@ export async function ownBookFloor(
 }
 
 /**
+ * The book's half of `corps/{id}`: the document and every subcollection except SRP's,
+ * which shares the document (#4939). Found at run time, so a book collection added
+ * later still goes. SRP never reads the parent document, and Firestore keeps a deleted
+ * document's other subcollections.
+ */
+async function deleteBookContents(ref: DocumentReference): Promise<void> {
+  for (const sub of await ref.listCollections()) {
+    if (!SRP_COLLECTIONS.includes(sub.id)) await ref.firestore.recursiveDelete(sub);
+  }
+  await ref.delete();
+}
+
+/**
+ * Takes the book out of every Character's billed-by pointer (#4942), deleting a pointer it
+ * leaves empty. Each pointer in its own transaction, so another book's sync merging into the
+ * same pointer meanwhile keeps its entry.
+ */
+async function deleteBilledByPointers(deps: BookDeps, corporationId: number): Promise<void> {
+  const key = String(corporationId);
+  const field = new FieldPath('books', key);
+  const pointers = await deps.db.collection(BILLED_BY_COLLECTION).where(field, '>=', 0).get();
+  for (let i = 0; i < pointers.docs.length; i += CHUNK) {
+    await Promise.all(
+      pointers.docs.slice(i, i + CHUNK).map((pointer) =>
+        deps.db.runTransaction(async (tx) => {
+          const books = (await tx.get(pointer.ref)).get('books') as
+            Record<string, unknown> | undefined;
+          if (!books || !(key in books)) return;
+          if (Object.keys(books).length === 1) tx.delete(pointer.ref);
+          else tx.update(pointer.ref, field, FieldValue.delete());
+        })
+      )
+    );
+  }
+}
+
+/**
  * The player who turned the book on (or the CEO) deletes it outright: the book,
- * everything under it and its Statement verify links. `beforeDelete` lets the
+ * everything under it, its Statement verify links and billed-by pointers. The
+ * corporation's SRP data under the same `corps/{id}` document stays. `beforeDelete` lets the
  * caller drop what lives outside the book first (the scheduled-sync grant), so a
  * failure there leaves the book standing. Turning the book on again starts clean.
  */
@@ -400,9 +415,11 @@ export async function deleteBook(
       .get();
     await Promise.all(stray.docs.map((d) => d.ref.delete()));
   }
-  await deps.db.recursiveDelete(ref);
+  await deleteBookContents(ref);
   // A scheduled sync that loaded its grant before it was dropped may still have been writing.
-  await deps.db.recursiveDelete(ref);
+  await deleteBookContents(ref);
+  // Last, so a late sync has the narrowest window to write one back (can't close it).
+  await deleteBilledByPointers(deps, call.corporationId);
   return { deleted: true };
 }
 
@@ -1474,9 +1491,7 @@ export async function confirmGrouping(
   corporationId: number,
   minerId: string
 ) {
-  const characterId = characterIdForUid(caller.uid);
-  if (characterId === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const characterId = signedInCharacter(caller);
   const ref = sub(deps.db, corporationId, MINERS).doc(minerId);
   await deps.db.runTransaction(async (tx) => {
     const miner = (await tx.get(ref)).data();
@@ -1531,9 +1546,7 @@ export async function declineGrouping(
   corporationId: number,
   minerId: string
 ) {
-  const characterId = characterIdForUid(caller.uid);
-  if (characterId === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const characterId = signedInCharacter(caller);
   await declinePending(deps, corporationId, minerId, characterId, { characterId, name: '' });
 }
 
@@ -1559,9 +1572,7 @@ export async function declineGroupingByToken(deps: BookDeps, token: string, char
  * recognise the request, nothing of the other characters or any lines.
  */
 export async function listPendingGroupings(deps: BookDeps, caller: Caller) {
-  const characterId = characterIdForUid(caller.uid);
-  if (characterId === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const characterId = signedInCharacter(caller);
   const snap = await deps.db
     .collectionGroup(MINERS)
     .where('pendingConfirmation', 'array-contains', characterId)
@@ -1601,9 +1612,7 @@ export async function claimPayment(
   corporationId: number,
   paymentId: string
 ) {
-  const characterId = characterIdForUid(caller.uid);
-  if (characterId === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const characterId = signedInCharacter(caller);
   const paymentRef = sub(deps.db, corporationId, PAYMENTS).doc(paymentId);
   return deps.db.runTransaction(async (tx) => {
     const book = await tx.get(bookRef(deps.db, corporationId));

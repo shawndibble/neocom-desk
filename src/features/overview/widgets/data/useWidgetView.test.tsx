@@ -5,7 +5,8 @@ import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
 import { CORP_DEFS } from './corpModels';
 import { createFeedStore } from './feedStore';
 import { FeedStoreContext } from './feedStoreContext';
-import { registerKindDefs } from './models';
+import { blank } from './builderKit';
+import { ensureBuilders, registerKindDefs } from './models';
 import { useKindViews, type ViewRequest } from './useWidgetView';
 
 registerKindDefs(CORP_DEFS);
@@ -29,6 +30,37 @@ function setup() {
 }
 
 describe('useKindViews', () => {
+  it('rebuilds a view once its lazy builder lands', async () => {
+    const stub = (summary: string) => () => ({
+      ...blank(null, {
+        loading: false,
+        needsPermission: false,
+        error: false,
+        hasData: true,
+        isEmpty: true,
+      }),
+      summary,
+    });
+    registerKindDefs({
+      lazyProbe: {
+        feeds: [],
+        scope: 'character',
+        build: stub('pending'),
+        loadBuild: () => Promise.resolve(stub('real')),
+      },
+    });
+    const store = createFeedStore();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <FeedStoreContext.Provider value={store}>{children}</FeedStoreContext.Provider>
+    );
+    const requests: ViewRequest[] = [{ kind: 'lazyProbe', scopeAll: false }];
+    const hook = renderHook(() => useKindViews(requests), { wrapper });
+    const summary = () => [...hook.result.current.values()][0]?.summary;
+    expect(summary()).toBe('pending');
+    await act(() => ensureBuilders(['lazyProbe']));
+    expect(summary()).toBe('real');
+  });
+
   it('keeps the same views when a feed the kind does not read updates', () => {
     const { store, hook, renders } = setup();
     const before = hook.result.current;
@@ -43,6 +75,47 @@ describe('useKindViews', () => {
     const before = hook.result.current;
     act(() => store.set('mail', { data: null, error: true, loading: false }));
     expect(hook.result.current).not.toBe(before);
+  });
+
+  describe('settling', () => {
+    const wallet: ViewRequest[] = [{ kind: 'wallet', scopeAll: false }];
+    const balance = {
+      data: {
+        result: { data: 5_000_000, fetchedAt: new Date(), fromCache: false, truncated: false },
+        needsReauth: false,
+      },
+      error: false,
+      loading: false,
+    };
+    const journal = {
+      result: { data: [], fetchedAt: new Date(), fromCache: false, truncated: false },
+      needsReauth: false,
+    } as never;
+    function walletView(setupStore: (store: ReturnType<typeof createFeedStore>) => void) {
+      const store = createFeedStore();
+      setupStore(store);
+      const wrapper = ({ children }: { children: ReactNode }) => (
+        <FeedStoreContext.Provider value={store}>{children}</FeedStoreContext.Provider>
+      );
+      const hook = renderHook(() => useKindViews(wallet), { wrapper });
+      return [...hook.result.current.values()][0]!;
+    }
+
+    it('marks a view settling while a first read is still out', () => {
+      const view = walletView((store) => {
+        store.set('wallet', balance);
+        store.set('journal', { data: null, error: false, loading: true });
+      });
+      expect(view.settling).toBe(true);
+    });
+
+    it('does not mark a refresh over data already on screen', () => {
+      const view = walletView((store) => {
+        store.set('wallet', { ...balance, loading: true });
+        store.set('journal', { data: journal, error: false, loading: true });
+      });
+      expect(view.settling).toBeFalsy();
+    });
   });
 
   describe('on the Time format clock', () => {

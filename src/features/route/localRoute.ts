@@ -26,6 +26,7 @@ import {
   routeSweepFrom,
 } from '@/engine/route/jumpRoute';
 import { jumpCountsForRoutes, type RouteEnds } from '@/engine/route/jumpCounts';
+import { planHaul, type HaulInput, type HaulPlan } from '@/engine/route/haulPlan';
 import { planTrip, type TripOptions, type TripPlan } from '@/engine/route/tripPlan';
 import { loadJumpGraph } from '@/sde/jumpGraph';
 import type { RouteRules } from './routeRules';
@@ -254,5 +255,23 @@ export async function planLocalTrip(
     plan: planTrip(graph, start, stops, options, tripOptions),
     graph,
     options,
+  };
+}
+
+/**
+ * A haul route (issue #4965) for a Move plan's pickups, counted on the same
+ * graph and rules as every other jump. `unknown` is a stargate snapshot that
+ * could not be read.
+ */
+export async function planLocalHaul(
+  input: Omit<HaulInput, 'graph' | 'options'>,
+  rules: LocalRouteRules = {},
+  extras: RouteGraphExtras = {}
+): Promise<{ kind: 'haul'; plan: HaulPlan } | { kind: 'unknown' }> {
+  const [graph, securityOf] = await loadSearchContext(rules);
+  if (!graph) return { kind: 'unknown' };
+  return {
+    kind: 'haul',
+    plan: planHaul({ ...input, graph, options: engineOptions(rules, securityOf, extras) }),
   };
 }

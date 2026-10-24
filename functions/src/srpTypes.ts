@@ -6,9 +6,11 @@
 //   corps/{corporationId}/srpClaims/{killmailId} one SRP Claim per killmail; the id IS the killmail
 //                                               id, so a second claim is a create conflict. Written by
 //                                               the file-claim callable; carries `uid`.
-//   corps/{corporationId}/srpAudit/{at~rand}    immutable audit log
+//   corps/{corporationId}/srpAudit/{at~rand}    audit log; entries are never edited, and the
+//                                               retention sweep deletes a deleted claim's (#4942)
 //   corps/{corporationId}/srpDoctrines/{id}      the corp's Doctrine Fit snapshots (DoctrineFit)
 //   corps/{corporationId}/srpOfficers/{uid}     officer access record (1h) written by verifySrpOfficer
+//   corps/{corporationId}/srpThrottle/{charId}  per-Character killmail fetch counter (srpThrottle.ts)
 import type { DoctrineCheck, DoctrineFitSnapshot } from './srpDoctrine.js';
 
 export const CORPS_COLLECTION = 'corps';
@@ -18,6 +20,21 @@ export const SRP_CLAIMS = 'srpClaims';
 export const SRP_AUDIT = 'srpAudit';
 export const SRP_OFFICERS = 'srpOfficers';
 export const SRP_DOCTRINES = 'srpDoctrines';
+export const SRP_THROTTLE = 'srpThrottle';
+
+/**
+ * Every SRP subcollection of `corps/{id}`. The Corp Tax Book shares that document, and
+ * deleting the book deletes every subcollection except these (issue #4939); a new SRP
+ * collection goes here, or the book's delete wipes it (srpTypes.test.ts guards this).
+ */
+export const SRP_COLLECTIONS: readonly string[] = [
+  SRP_SETTINGS_COLLECTION,
+  SRP_CLAIMS,
+  SRP_AUDIT,
+  SRP_OFFICERS,
+  SRP_DOCTRINES,
+  SRP_THROTTLE,
+];
 
 export const SRP_SCHEMA_VERSION = 1;
 /** A claim's window, in days from the loss: corp default and the range a Director may set. */

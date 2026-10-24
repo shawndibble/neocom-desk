@@ -7,36 +7,20 @@ import {
 } from '@/features/notifications/preferences';
 import { useTicker } from '@/lib/ticker';
 import { useTimeZone } from '@/lib/timeFormat';
-import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
-import {
-  DEFAULT_RAIDS_RADIUS,
-  DEFAULT_RANGE,
-  type CalendarEventsChoice,
-  type WidgetRange,
-} from '../layout';
 import type { FeedStore } from './feedStore';
 import { useFeedStore } from './feedStoreContext';
-import { buildView, KIND_FEEDS } from './models';
+import { buildView, builderEpoch, feedsOf, subscribeBuilders } from './models';
 import { OVERVIEW_TICK_MS } from './tick';
 import type { BuildContext, FeedId, KindView } from './types';
+import {
+  settingsContext,
+  viewKey,
+  type SettingsContext,
+  type ViewRequest,
+  type ViewSettings,
+} from './viewSettings';
 
-export interface ViewRequest {
-  kind: string;
-  /** This widget reads across Characters, and its kind can sum them. */
-  scopeAll: boolean;
-  /** The widget's time window; left out, the default. Two widgets of one kind with different ranges get their own view. */
-  range?: WidgetRange;
-  /** The widget's Omega plan (PLEX per 30 days); left out, the default. */
-  plexPer30Days?: number;
-  /** Which calendar events the widget lists; left out, accepted and tentative. */
-  calendarEvents?: CalendarEventsChoice;
-  /** Skyhook raids: 'near' lists any holder's space within `raidsRadius` jumps; left out, My alliance. */
-  raidsWhere?: 'near';
-  raidsRadius?: number;
-}
-
-export const viewKey = (request: ViewRequest): string =>
-  `${request.kind}:${request.scopeAll ? 1 : 0}:${request.range ?? DEFAULT_RANGE}:${request.plexPer30Days ?? DEFAULT_PLEX_PER_30_DAYS}:${request.calendarEvents === 'all' ? 1 : 0}:${request.raidsWhere === 'near' ? (request.raidsRadius ?? DEFAULT_RAIDS_RADIUS) : 0}`;
+export { viewKey, type ViewRequest };
 
 const NO_FEEDS: readonly FeedId[] = [];
 
@@ -65,10 +49,8 @@ function cachedView(
   store: FeedStore,
   request: ViewRequest,
   feedIds: readonly FeedId[],
-  ctx: Omit<
-    BuildContext,
-    'scopeAll' | 'range' | 'plexPer30Days' | 'calendarEvents' | 'raidsWhere' | 'raidsRadius'
-  >
+  ctx: Omit<BuildContext, 'scopeAll' | keyof SettingsContext>,
+  builders: number
 ): KindView {
   let cache = viewCaches.get(store);
   if (!cache) viewCaches.set(store, (cache = new Map()));
@@ -80,18 +62,23 @@ function cachedView(
     ctx.activeCharacterId,
     ctx.notTrainingAlert,
     ctx.zone,
+    builders,
   ];
   const hit = cache.get(id);
   if (hit && sameItems(hit.deps, deps)) return hit.view;
-  const view = buildView(request.kind, store.get(), {
+  const feeds = store.get();
+  const built = buildView(request.kind, feeds, {
     ...ctx,
     scopeAll: request.scopeAll,
-    range: request.range ?? DEFAULT_RANGE,
-    plexPer30Days: request.plexPer30Days ?? DEFAULT_PLEX_PER_30_DAYS,
-    calendarEvents: request.calendarEvents === 'all' ? 'all' : 'committed',
-    raidsWhere: request.raidsWhere === 'near' ? 'near' : 'alliance',
-    raidsRadius: request.raidsRadius ?? DEFAULT_RAIDS_RADIUS,
+    ...settingsContext(request.kind, request),
   });
+  // Only a first read still out counts: a refresh also reports `loading`, but over data that is
+  // already on screen, so the body is at its height.
+  const settling = feedIds.some((feedId) => {
+    const feed = feeds[feedId];
+    return feed?.loading === true && feed.data === null;
+  });
+  const view = settling ? { ...built, settling } : built;
   cache.set(id, { deps, view });
   return view;
 }
@@ -103,6 +90,8 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const zone = useTimeZone();
+  // A lazy builder landing (`ensureBuilders`) makes every view built before it stale.
+  const builders = useSyncExternalStore(subscribeBuilders, builderEpoch);
   const prefs = useNotificationPreferences((state) => state.value);
   const notTrainingAlert =
     activeCharacterId !== null && isNotTrainingAlertEnabledFor(prefs, activeCharacterId);
@@ -116,8 +105,7 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
   }
   const feedIds = useMemo(() => {
     const ids = new Set<FeedId>();
-    for (const request of stable)
-      for (const id of KIND_FEEDS[request.kind] ?? NO_FEEDS) ids.add(id);
+    for (const request of stable) for (const id of feedsOf(request.kind) ?? NO_FEEDS) ids.add(id);
     return [...ids];
   }, [stable]);
   // Re-render only when a feed these kinds read changes, not on any feed's update.
@@ -134,31 +122,30 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
     for (const request of stable) {
       views.set(
         viewKey(request),
-        cachedView(store, request, KIND_FEEDS[request.kind] ?? NO_FEEDS, {
-          t,
-          now,
-          activeCharacterId,
-          notTrainingAlert,
-          zone,
-        })
+        cachedView(
+          store,
+          request,
+          feedsOf(request.kind) ?? NO_FEEDS,
+          {
+            t,
+            now,
+            activeCharacterId,
+            notTrainingAlert,
+            zone,
+          },
+          builders
+        )
       );
     }
     return views;
     // `slice` is the signal that an own feed changed; the store read inside is current.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stable, store, slice, now, t, activeCharacterId, notTrainingAlert, zone]);
+  }, [stable, store, slice, now, t, activeCharacterId, notTrainingAlert, zone, builders]);
 }
 
 /** The view for one widget. */
-export function useWidgetView(
-  kind: string,
-  scopeAll: boolean,
-  range?: WidgetRange,
-  plexPer30Days?: number,
-  calendarEvents?: CalendarEventsChoice,
-  raidsWhere?: 'near',
-  raidsRadius?: number
-): KindView {
+export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSettings): KindView {
+  const { range, plexPer30Days, calendarEvents, raidsWhere, raidsRadius } = settings;
   const request = useMemo<ViewRequest>(
     () => ({ kind, scopeAll, range, plexPer30Days, calendarEvents, raidsWhere, raidsRadius }),
     [kind, scopeAll, range, plexPer30Days, calendarEvents, raidsWhere, raidsRadius]

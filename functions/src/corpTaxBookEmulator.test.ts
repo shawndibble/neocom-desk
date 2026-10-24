@@ -1,6 +1,7 @@
 // Corp Tax Book callables against the Firestore emulator (issue #4061). Runs
 // only under `npm run test:rules` at the repo root (which starts the emulator
 // and sets FIRESTORE_EMULATOR_HOST); a plain `npm test` skips it.
+import type { Caller } from './actorAuth.js';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
@@ -22,8 +23,8 @@ import {
   turnOnBook,
   verifyOfficer,
   type BookDeps,
-  type Caller,
 } from './corpTaxBookStore.js';
+import { SRP_CLAIMS, SRP_COLLECTIONS } from './srpTypes.js';
 
 const CORP = 98000001;
 const T0 = Date.parse('2026-10-18T12:00:00Z');
@@ -35,6 +36,7 @@ let db: Firestore;
 let now = T0;
 const identities = new Map<number, CorpIdentity>();
 let identityCalls = 0;
+const droppedScope = new Set<number>();
 
 const deps = (): BookDeps => ({
   db,
@@ -46,7 +48,7 @@ const deps = (): BookDeps => ({
       characterId: id,
       ownerHash: `h${id}`,
       name: `Pilot ${id}`,
-      scopes: [ROLES_SCOPE],
+      scopes: droppedScope.has(id) ? [] : [ROLES_SCOPE],
       clientId: 'c',
     };
   },
@@ -140,6 +142,7 @@ suite('Corp Tax Book callables (emulator)', () => {
     now = T0;
     identityCalls = 0;
     identities.clear();
+    droppedScope.clear();
     identities.set(DIRECTOR, as(['Director']));
     identities.set(ACCOUNTANT, as(['Accountant', 'Station_Manager']));
     identities.set(JUNIOR, as(['Junior_Accountant']));
@@ -186,6 +189,16 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect(
         await reason(verifyOfficer(deps(), who(JUNIOR), parseBookCall(withToken(JUNIOR))))
       ).toBe('not-an-officer');
+      expect((await book().collection('officers').doc(`char:${JUNIOR}`).get()).exists).toBe(false);
+    });
+
+    it('revokes the held access when the roles scope is dropped', async () => {
+      await turnOn();
+      now = T0 + 11 * 60_000;
+      droppedScope.add(JUNIOR);
+      expect(
+        await reason(verifyOfficer(deps(), who(JUNIOR), parseBookCall(withToken(JUNIOR))))
+      ).toBe('missing-scope');
       expect((await book().collection('officers').doc(`char:${JUNIOR}`).get()).exists).toBe(false);
     });
 
@@ -1176,6 +1189,58 @@ suite('Corp Tax Book callables (emulator)', () => {
 
       await turnOn();
       expect((await book().collection('statements').get()).empty).toBe(true);
+    });
+
+    it("deletes every book collection but leaves the corporation's SRP data untouched", async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') });
+      // A nested book collection, and one the delete has never heard of.
+      const payouts = () => book().collection('feeders').doc('98000002').collection('payouts');
+      await payouts().doc('p1').set({ a: 1 });
+      await book().collection('futureBookThing').doc('x').set({ a: 1 });
+      for (const name of SRP_COLLECTIONS) {
+        await book().collection(name).doc('kept').set({ name });
+      }
+
+      await deleteBook(deps(), who(DIRECTOR), withToken(DIRECTOR));
+
+      expect((await book().get()).exists).toBe(false);
+      const left = (await book().listCollections()).map((c) => c.id).sort();
+      expect(left).toEqual([...SRP_COLLECTIONS].sort());
+      for (const name of SRP_COLLECTIONS) {
+        expect((await book().collection(name).doc('kept').get()).data()).toEqual({ name });
+      }
+      expect((await payouts().get()).empty).toBe(true);
+      // The SRP retention sweep walks `corps` with listDocuments(): the corp must still show up.
+      expect((await db.collection('corps').listDocuments()).map((d) => d.id)).toContain(
+        String(CORP)
+      );
+
+      await turnOn();
+      expect((await book().get()).exists).toBe(true);
+      expect((await book().collection(SRP_CLAIMS).doc('kept').get()).exists).toBe(true);
+    });
+
+    it("removes the book from every Character's billed-by pointer (#4942)", async () => {
+      await turnOn();
+      const pointer = (id: number) => db.collection('corpTaxBookBilledBy').doc(`char:${id}`);
+      const OTHER = '98000777';
+      await pointer(501).set({ books: { [String(CORP)]: T0 } });
+      await pointer(502).set({ books: { [String(CORP)]: T0, [OTHER]: T0 } });
+      await pointer(503).set({ books: { [OTHER]: T0 } });
+
+      await deleteBook(deps(), who(DIRECTOR), withToken(DIRECTOR));
+
+      expect((await pointer(501).get()).exists).toBe(false);
+      expect((await pointer(502).get()).data()).toEqual({ books: { [OTHER]: T0 } });
+      expect((await pointer(503).get()).data()).toEqual({ books: { [OTHER]: T0 } });
+    });
+
+    it('clears a pointer a past delete left behind when the book is turned on again', async () => {
+      const stray = db.collection('corpTaxBookBilledBy').doc('char:504');
+      await stray.set({ books: { [String(CORP)]: T0 } });
+      await turnOn();
+      expect((await stray.get()).exists).toBe(false);
     });
   });
 

@@ -59,7 +59,7 @@ interface BrowserFilterFieldsProps {
 
 /**
  * The order book's filter fields, written once for both bars and both
- * surfaces (the pointer-width box and the phone sheet's draft).
+ * surfaces (the pointer-width box and the phone sheet).
  */
 function BrowserFilterFields({
   draft,

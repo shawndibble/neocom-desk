@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Field, Fields, Panel, TextInput } from '@/components/ui';
 import { importBackup, type ImportSummary } from '@/backup/io';
+import { requestPersistence } from '@/lib/persistStorage';
 import { ActionResult, SettingsHint } from '@/features/settings/settingsFields';
 
 /**
@@ -33,6 +34,13 @@ export function ImportPanel() {
       // on disk but not in the zustand store that read it at boot — same gap
       // `ResetViewPreferences` above hits, and the same fix: reload once the
       // pilot has had a moment to read the summary below.
+      // Restored Characters are only worth having if the browser keeps them: a
+      // device set up by import never signs in "first", so this is its ask
+      // (`@/lib/persistStorage`). On the pilot's own press, so not the
+      // once-only flag. Not awaited: a prompt must not hold the summary.
+      if (result.addedCharacterIds.length > 0) {
+        void requestPersistence().catch(() => undefined);
+      }
       if (result.addedCharacterIds.length > 0 || result.addedSettingKeys.length > 0) {
         setTimeout(() => window.location.reload(), 2000);
       }

@@ -24,16 +24,14 @@ import { FEEDER_VIEW_REFINERIES, feederViewRef } from './corpTaxBookFeederView.j
 import { ENDED } from './corpTaxBookFeederOwnerCalls.js';
 import { feederBookDeps } from './corpTaxBookFeederViewCalls.js';
 import type { FeederRecord, RefineryLabelDoc } from './corpTaxBookFeeders.js';
-import { characterIdForUid } from './verifyEveToken.js';
+import { signedInCharacter, fail, type Caller } from './actorAuth.js';
 import {
   appendAudit,
   authorizeOfficer,
   bookRef,
-  fail,
   feederRef,
   type Actor,
   type BookDeps,
-  type Caller,
 } from './corpTaxBookStore.js';
 
 export const MAX_REFINERY_LABEL = 100;
@@ -206,10 +204,7 @@ export async function learnRefinerySystems(
   caller: Caller,
   input: LearnRefinerySystemsInput
 ): Promise<{ ok: true }> {
-  const characterId = characterIdForUid(caller.uid);
-  if (characterId === undefined) {
-    fail('unauthenticated', 'Log in with a Character first', 'not-signed-in');
-  }
+  const characterId = signedInCharacter(caller);
   const book = bookRef(deps.db, input.corporationId);
   const ids = Object.keys(input.systems);
   const own = await Promise.all(

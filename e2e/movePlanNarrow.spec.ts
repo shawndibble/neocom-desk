@@ -59,7 +59,7 @@ test('Move tab fits a phone and keeps its actions reachable', async ({ page }) =
 });
 
 // Issue #3240: a pickup card's heading gave the station name the sliver left
-// beside the m³ total and the Route Safety link, so it broke one word a line.
+// beside the m³ total, so it broke one word a line.
 test('pickup heading gives the name a row on a phone and stays one row on desktop', async ({
   page,
 }) => {
@@ -95,15 +95,12 @@ test('pickup heading gives the name a row on a phone and stays one row on deskto
   const heading = dialog.getByRole('heading', { name: /Caldari Navy Assembly Plant/ });
   const name = heading.locator('span').first();
   const total = heading.locator('span').nth(1);
-  const link = dialog.getByRole('link', { name: /^Route Safety from/ });
   const card = heading.locator('xpath=ancestor::section[1]');
-  await expect(link).toBeVisible();
 
   const box = async (l: typeof name) => (await l.boundingBox())!;
-  const [n, t, k, c] = [await box(name), await box(total), await box(link), await box(card)];
+  const [n, t, c] = [await box(name), await box(total), await box(card)];
   expect(n.width).toBeGreaterThanOrEqual(c.width * 0.6);
   expect(t.y).toBeGreaterThanOrEqual(n.y + n.height - 1);
-  expect(k.y).toBeGreaterThanOrEqual(n.y + n.height - 1);
   const lineHeight = await name.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
   expect(n.height).toBeLessThanOrEqual(lineHeight * 2 + 1);
   expect(
@@ -113,8 +110,7 @@ test('pickup heading gives the name a row on a phone and stays one row on deskto
   ).toBe(true);
 
   await page.setViewportSize({ width: 1024, height: 800 });
-  const [dn, dt, dk] = [await box(name), await box(total), await box(link)];
-  // Same vertical band: each one's top sits inside the name's row.
+  const [dn, dt] = [await box(name), await box(total)];
+  // Same vertical band: the total's top sits inside the name's row.
   expect(dt.y).toBeLessThan(dn.y + dn.height);
-  expect(dk.y).toBeLessThan(dn.y + dn.height);
 });

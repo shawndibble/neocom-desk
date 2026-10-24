@@ -8,6 +8,7 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
+import type { CallableAction } from '../../../../functions/src/callableManifest';
 import type { PayeeSetBy } from '@/engine/corpTaxBook/payeeChange';
 import {
   collection,
@@ -97,7 +98,11 @@ export interface SyncReceipt {
 }
 
 /** One Corp Tax Book callable, signed in as `characterId`; the other taxBook clients share it. */
-export async function call<In, Out>(characterId: number, name: string, data: In): Promise<Out> {
+export async function call<In, Out>(
+  characterId: number,
+  name: CallableAction,
+  data: In
+): Promise<Out> {
   await ensureSignedIn(characterId);
   const result = await callRouted<In, Out>(name, data);
   return result;
@@ -404,7 +409,7 @@ export interface BookData {
   settings: BookSettings;
   state: BookState;
   observed: ObservedRow[];
-  declarations: Declaration[];
+  declarations: BookDeclaration[];
   adjustments: Adjustment[];
   /** Each feeder's last good ledger read (#4509); a feeder's days are Billable only after one. */
   feeders?: BookFeeder[];
@@ -448,7 +453,7 @@ export async function readBookData(
     list<SyncExtraction>('extractions'),
     getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'paid')),
     list<ObservedRow>('observed'),
-    list<Declaration>('declarations'),
+    list<BookDeclaration>('declarations'),
     list<Adjustment>('adjustments'),
     getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'groupingAnswers')),
     getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'scheduledSync')),
@@ -486,6 +491,35 @@ export async function readBookData(
   };
 }
 
+/** A declaration as stored: who recorded it, and who resolved it. */
+export type BookDeclaration = Declaration & {
+  recordedBy?: number;
+  resolution?: NonNullable<Declaration['resolution']> & { by?: number };
+};
+
+/** An officer's "rebill from date" (D22), server-written. */
+export interface Rebill {
+  id: string;
+  minerId: string;
+  /** First UTC day rebilled. */
+  fromDate: string;
+  reason: string;
+  by: number | null;
+  /** ISO instant. */
+  at: string;
+  /** It touched a corp member's days, which needs a Director. */
+  memberRebill: boolean;
+}
+
+/** Every rebill in the book, for the export. Officer-only. */
+export async function readRebills(characterId: number, corporationId: number): Promise<Rebill[]> {
+  await ensureSignedIn(characterId);
+  const snap = await getDocs(
+    collection(getSyncFirestore(), 'corps', String(corporationId), 'rebills')
+  );
+  return snap.docs.map((d) => ({ ...(d.data() as Omit<Rebill, 'id'>), id: d.id }));
+}
+
 /** One audit-log entry (D7): who did what, when. */
 export interface AuditEntry {
   id: string;
@@ -497,19 +531,18 @@ export interface AuditEntry {
   detail: Record<string, unknown>;
 }
 
-/** The newest entries of the immutable audit log; its ids sort by time. */
+/** The newest entries of the immutable audit log, newest first; `count` null reads it whole. */
 export async function readAudit(
   characterId: number,
   corporationId: number,
-  count = 100
+  count: number | null = 100
 ): Promise<AuditEntry[]> {
   await ensureSignedIn(characterId);
+  const log = collection(getSyncFirestore(), 'corps', String(corporationId), 'audit');
   const snap = await getDocs(
-    query(
-      collection(getSyncFirestore(), 'corps', String(corporationId), 'audit'),
-      orderBy('at', 'desc'),
-      limitTo(count)
-    )
+    count === null
+      ? query(log, orderBy('at', 'desc'))
+      : query(log, orderBy('at', 'desc'), limitTo(count))
   );
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AuditEntry, 'id'>) }));
 }

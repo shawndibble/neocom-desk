@@ -23,7 +23,6 @@ const asset = (item_id: number, type_id: number, location_id: number, quantity =
 
 const JITA = 60003760;
 const AMARR = 60008494;
-const SYSTEM_JITA = 30000142;
 
 const skippedCharacters = vi.hoisted(() => ({
   list: [] as { characterId: number; name: string }[],
@@ -151,15 +150,15 @@ describe('MovePlanTab', () => {
     expect(screen.queryByText('No loose stock or ships to move.')).not.toBeInTheDocument();
   });
 
-  it('keeps the pickup system and its Route Safety link when the name read fails', async () => {
+  it('plans without a per-pickup Route Safety link when the name read fails', async () => {
     failing.name = true;
     const user = await open();
     await user.click(screen.getByRole('checkbox', { name: /select everything at 60008494/i }));
     await user.click(screen.getByRole('button', { name: 'Pick a system' }));
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
 
-    expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
-    expect(screen.getAllByRole('link', { name: /^Route Safety/ })).toHaveLength(1);
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /^Route Safety/ })).toBeNull();
   });
 
   async function planAmarr() {
@@ -168,6 +167,51 @@ describe('MovePlanTab', () => {
     await user.click(screen.getByRole('button', { name: 'Pick a system' }));
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
   }
+
+  function openAt(entry: string) {
+    render(
+      <MemoryRouter initialEntries={[entry]}>
+        <MovePlanTab onClose={() => {}} characterIds={[1]} activeCharacterId={1} />
+      </MemoryRouter>
+    );
+  }
+
+  it('rebuilds the plan from a link that names it', async () => {
+    openAt(`/?mv=${encodeURIComponent('1:60003760:34:loose')}&mvd=s30002187`);
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /Jita 4-4/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Show plan' })).toBeNull();
+  });
+
+  it.each([
+    [
+      'a stack this pilot does not hold',
+      `mv=${encodeURIComponent('1:999:34:loose')}&mvd=s30002187`,
+    ],
+    ['an unreadable selection', 'mv=nonsense&mvd=s30002187'],
+    ['no destination', `mv=${encodeURIComponent('1:60003760:34:loose')}`],
+  ])('opens the empty planner for a link with %s', async (_, query) => {
+    openAt(`/?${query}`);
+    expect(await screen.findByRole('button', { name: 'Show plan' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+  });
+
+  it('returns to the picker, ticks kept, when Back leaves the plan', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MovePlanTab onClose={() => {}} characterIds={[1]} activeCharacterId={1} />
+      </MemoryRouter>
+    );
+    await screen.findByText('Alice');
+    await user.click(screen.getByRole('checkbox', { name: /select everything at amarr viii/i }));
+    await user.click(screen.getByRole('button', { name: 'Pick a system' }));
+    await user.click(screen.getByRole('button', { name: 'Show plan' }));
+    await user.click(await screen.findByRole('button', { name: 'Back' }));
+
+    expect(await screen.findByRole('button', { name: 'Show plan' })).toBeTruthy();
+    expect(screen.getByText(/^2 stacks · /)).toBeTruthy();
+  });
 
   it('blames the missing hauler data, not the pilot, when the catalogue could not be loaded', async () => {
     hullData.catalogueFailed = true;
@@ -199,25 +243,22 @@ describe('MovePlanTab', () => {
     await user.click(screen.getByRole('button', { name: 'Pick a system' }));
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
 
-    expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Amarr VIII/ })).toBeTruthy();
   });
 
-  it('plans a move from the picker to the destination system with a Route Safety link per pickup', async () => {
+  it('plans a move from the picker to the destination system', async () => {
     const user = await open();
     await user.click(screen.getByRole('checkbox', { name: /select everything at amarr viii/i }));
     await user.click(screen.getByRole('button', { name: 'Pick a system' }));
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
 
-    expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
     expect(screen.queryByText('Edit items or destination')).toBeNull();
     expect(screen.getAllByRole('button', { name: 'Back' })).toHaveLength(1);
-    const links = screen.getAllByRole('link', { name: /^Route Safety/ });
-    expect(links).toHaveLength(1);
-    expect(links[0].getAttribute('href')).toContain(String(SYSTEM_JITA));
+    expect(screen.queryByRole('link', { name: /^Route Safety/ })).toBeNull();
     expect(screen.getByRole('heading', { name: /Amarr VIII/ })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Route Safety from Amarr VIII' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
   });
 
   it('marks stacks at the destination, unticks them and keeps them out of the plan', async () => {
@@ -245,7 +286,7 @@ describe('MovePlanTab', () => {
     expect(amarr.getAttribute('aria-pressed')).toBe('true');
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
 
-    expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
     expect(screen.getByText('Deliver everything here')).toBeTruthy();
   });
 

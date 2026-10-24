@@ -41,6 +41,9 @@ export function statusOf(
   };
 }
 
+/** Kinds whose lazy builder failed to load and has not landed since; `models.ts` owns it. */
+export const failedBuilders = new Set<string>();
+
 export const NEUTRAL_NUMBER: NumberModel = { value: UNKNOWN, tone: 'clear' };
 
 /** A view with nothing in it yet; every builder starts from this and fills what it has. */
@@ -83,8 +86,28 @@ export const count = (n: number): string => String(n);
 
 export type Builder = (feeds: Feeds, ctx: BuildContext) => KindView;
 
-/** One widget kind: the feeds it reads and the builder that turns them into a view. */
+/**
+ * Whether a kind's read covers every Character. `account` kinds can draw a widget
+ * scoped to All characters (the builder narrows to the header Character when the
+ * widget is not); a `character` kind cannot, and says so on the widget.
+ */
+export type KindScope = 'character' | 'account';
+
+/**
+ * One widget kind, declared once: the feeds it reads, whether it sums across
+ * Characters, and the builder that turns the feeds into a view. Which per-widget
+ * settings change its view comes from the catalogue (`viewSettings.ts`), and its
+ * Gallery preview and Role membership are checked against this table by
+ * `kindRegistry.test.ts`.
+ */
 export interface KindDef {
   feeds: readonly FeedId[];
+  scope: KindScope;
+  /**
+   * The builder. With `loadBuild` it is the stand-in drawn until the real one lands
+   * (loading, so no copy it would need is loaded yet).
+   */
   build: Builder;
+  /** The real builder, behind `import()` to keep its copy off the startup graph; `ensureBuilders` loads it. */
+  loadBuild?: () => Promise<Builder>;
 }

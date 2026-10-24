@@ -43,6 +43,182 @@ export function entryFile(bundle: BundleLike): string {
 }
 
 /**
+ * The shell chunks' source modules, as path suffixes of their module ids
+ * (`shellChunkGroups`' `shellRoots`).
+ */
+export const SHELL_MODULE_SUFFIXES = ['/src/app/Layout.tsx', '/src/routes/Overview.tsx'];
+
+/**
+ * The routes `App.tsx` renders lazily outside the signed-in shell, as path
+ * suffixes of their module ids (`shellChunkGroups`' `publicRoots`). A visitor
+ * with no Character opens them, so they must not load the shell chunk.
+ * `lazyChunks.test.ts` checks the list against `App.tsx`.
+ */
+export const PUBLIC_ROUTE_SUFFIXES = [
+  '/src/routes/FittingShared.tsx',
+  '/src/routes/SharedLink.tsx',
+  '/src/routes/CommunityJoin.tsx',
+  '/src/routes/CorpTaxBookVerify.tsx',
+  '/src/routes/CorpTaxBookRemoveNow.tsx',
+  '/src/routes/ErrorProbe.tsx',
+];
+
+/** The module graph `shellChunkGroups` reads, by module id. */
+export interface ShellGraph {
+  /** The build's entry modules (`index.html`). */
+  entries: readonly string[];
+  shellRoots: readonly string[];
+  publicRoots: readonly string[];
+  /**
+   * The route modules `routeChunks.ts` loads by `import()`. A walk of what a
+   * signed-out visitor can load follows dynamic imports but stops here: past
+   * this line is the signed-in app, not the page they are on.
+   */
+  routeModules: readonly string[];
+  /** The bundler's static imports of a module; `undefined` (unknown) is none. */
+  importedIds: (id: string) => readonly string[] | undefined;
+  /** The bundler's `import()` targets of a module; `undefined` (unknown) is none. */
+  dynamicallyImportedIds: (id: string) => readonly string[] | undefined;
+}
+
+/**
+ * The modules of the three code-splitting groups (`vite.config.ts`) that make
+ * the signed-in shell a handful of chunks. Rolldown otherwise gives every set
+ * of routes sharing a module a chunk of its own: boot → Overview was ~220 shell
+ * files, most under 2 KiB, each a request before first paint.
+ *
+ * Each takes the shell's static closure (less what the entry statically
+ * reaches, which is the `boot` group's: in a shell chunk it would make the
+ * entry import it, so /login would download it; and less the shell modules
+ * themselves, so their chunks keep their names for `missingShellChunks`):
+ * - `publicShared`: the part a public route reaches, `import()`s included (a
+ *   Share Link's lazy share views).
+ * - `entryLazy`: the part the entry reaches only by `import()` (the info
+ *   modals `App` mounts on every route, the prefetchers), short of the
+ *   signed-in routes (`routeModules`). Kept apart from `publicShared` because
+ *   most of it never loads signed out, and a Share Link visitor would
+ *   otherwise download it all.
+ * - `shell`: the rest, which only the signed-in app loads.
+ *
+ * Each set is closed under static imports into itself, the sets before it and
+ * the entry's, so `publicShared` never imports the others and `entryLazy`
+ * never imports `shell`: a signed-out page never loads the `shell` chunk.
+ */
+export function shellChunkGroups(graph: ShellGraph): {
+  shell: Set<string>;
+  publicShared: Set<string>;
+  entryLazy: Set<string>;
+} {
+  const stop = new Set(graph.routeModules);
+  const closure = (roots: readonly string[], dynamic: boolean) => {
+    const seen = new Set<string>();
+    const visit = (id: string) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      for (const imported of graph.importedIds(id) ?? []) visit(imported);
+      if (!dynamic) return;
+      for (const imported of graph.dynamicallyImportedIds(id) ?? []) {
+        if (!stop.has(imported)) visit(imported);
+      }
+    };
+    for (const id of roots) visit(id);
+    return seen;
+  };
+  const boot = closure(graph.entries, false);
+  const publicReach = closure(graph.publicRoots, true);
+  const entryReach = closure(graph.entries, true);
+  const shell = new Set<string>();
+  const publicShared = new Set<string>();
+  const entryLazy = new Set<string>();
+  const excluded = new Set([...graph.shellRoots, ...graph.publicRoots]);
+  for (const id of closure(graph.shellRoots, false)) {
+    if (boot.has(id) || excluded.has(id)) continue;
+    if (publicReach.has(id)) publicShared.add(id);
+    else if (entryReach.has(id)) entryLazy.add(id);
+    else shell.add(id);
+  }
+  return { shell, publicShared, entryLazy };
+}
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * The value names in an `{ a, b as c, type T }` clause, by their exported
+ * (left-hand) name. Inline `type` names are dropped: they import no module.
+ */
+const clauseNames = (clause: string) =>
+  clause
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0 && !/^type\s/.test(part))
+    .map((part) => part.split(/\s+as\s+/)[0]);
+
+/**
+ * A module's static imports with a re-export barrel replaced by the modules
+ * that declare the names it imports from it. `@/components/ui` is
+ * side-effect-free, so the bundle keeps only the primitives a module uses, but
+ * the import graph names the barrel, which re-exports every one of them: a
+ * closure walked through it held DataTable, Select and the virtualizer, and the
+ * shell group dragged them onto the boot path. Reads the module's `code` as
+ * the bundler holds it (Rolldown's is after the TypeScript transform, so type
+ * imports are already gone; `import type` and inline `type` names are skipped
+ * anyway). Where the import is not a plain `{ … }` list, or a name is not a
+ * re-export, the barrel stays, and `onFallback` hears of it: too much is safe,
+ * too little is not.
+ */
+export function throughBarrel(options: {
+  barrel: string;
+  /** How importers name the barrel, as written in their code. */
+  specifier: string;
+  importedIds: (id: string) => readonly string[] | undefined;
+  code: (id: string) => string | null | undefined;
+  /** Called with each importer whose barrel import could not be traced. */
+  onFallback?: (id: string) => void;
+}): (id: string) => readonly string[] | undefined {
+  const { barrel, specifier, importedIds, code, onFallback } = options;
+  const declaredBy = new Map<string, string>();
+  const barrelDeps = importedIds(barrel) ?? [];
+  for (const match of (code(barrel) ?? '').matchAll(
+    /export\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g
+  )) {
+    const target = match[2].replace(/^\.\//, '/');
+    const id = barrelDeps.find((dep) => dep.replace(/\.[cm]?[jt]sx?$/, '').endsWith(target));
+    if (!id) continue;
+    for (const part of match[1].split(',')) {
+      const exported = part
+        .trim()
+        .split(/\s+as\s+/)
+        .pop();
+      if (exported) declaredBy.set(exported, id);
+    }
+  }
+  const quoted = `["']${escapeRegExp(specifier)}["']`;
+  const namedImports = (source: string): string[] | null => {
+    const mentions = source.match(new RegExp(quoted, 'g'))?.length ?? 0;
+    const lists = [
+      ...source.matchAll(
+        new RegExp(`import\\s*(type\\s+)?\\{([^}]*)\\}\\s*from\\s*${quoted}`, 'g')
+      ),
+    ];
+    return mentions > 0 && lists.length === mentions
+      ? lists.flatMap((list) => (list[1] ? [] : clauseNames(list[2])))
+      : null;
+  };
+
+  return (id) => {
+    const deps = importedIds(id);
+    if (!deps?.includes(barrel) || id === barrel) return deps;
+    const names = namedImports(code(id) ?? '');
+    const targets = names?.map((name) => declaredBy.get(name));
+    if (!targets || targets.some((target) => target === undefined)) {
+      onFallback?.(id);
+      return deps;
+    }
+    return [...new Set(deps.flatMap((dep) => (dep === barrel ? (targets as string[]) : [dep])))];
+  };
+}
+
+/**
  * The shell chunks the bundle no longer has under their expected `name`
  * (a rename, or a name collision like `Overview2`, would quietly drop them from
  * the boot graph). The build fails on a non-empty result.

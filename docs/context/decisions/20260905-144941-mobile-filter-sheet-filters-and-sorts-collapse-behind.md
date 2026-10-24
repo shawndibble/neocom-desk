@@ -1,6 +1,7 @@
 # Scope decisions — mobile filter sheet: filters and sorts collapse behind one trigger
 
-_Recorded 2026-09-05._
+_Recorded 2026-09-05._ The draft / Apply / Cancel points are superseded by
+`20261024-082719` (the sheet now commits each pick).
 
 - **Below `md`, a page's filters and sorts move into a bottom sheet opened from
   a funnel icon beside the search box; the search box itself never moves.** A

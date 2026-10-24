@@ -3,6 +3,7 @@
 // caller is the moon owner's own officer (CEO, Director or Accountant, read live from ESI); the view itself is in
 // corpTaxBookFeederView.ts. Failures carry a stable `reason`; no player-facing text lives here.
 
+import { fail, type Caller } from './actorAuth.js';
 import { record } from './communities.js';
 import { ACCESS_TTL_MS, pctField } from './corpTaxBook.js';
 import { type CorpSyncDeps } from './corpSyncGrant.js';
@@ -20,7 +21,7 @@ import {
   type FeederViewerAccess,
 } from './corpTaxBookFeederView.js';
 import type { FeederRecord } from './corpTaxBookFeeders.js';
-import { appendAudit, fail, feederRef, type BookDeps, type Caller } from './corpTaxBookStore.js';
+import { appendAudit, feederRef, type BookDeps } from './corpTaxBookStore.js';
 
 export { parseFeederCall };
 

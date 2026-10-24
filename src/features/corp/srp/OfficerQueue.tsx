@@ -39,6 +39,7 @@ import {
 import { ChangeAmountDialog, RejectClaimDialog } from './OfficerDialogs';
 import { SrpActivityFeed } from './SrpActivityFeed';
 import { SrpBulkBar } from './SrpBulkBar';
+import { SrpExportButton } from './SrpExportControls';
 import { SrpClaimDetail } from './SrpClaimDetail';
 import { OfficerRowMenu } from './OfficerRowMenu';
 import { groupByPilot, withMailSummary, type SrpMailClaim } from './srpResultMail';
@@ -276,17 +277,20 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           actionLabel={t('srp.officer.mail.grantAction')}
         />
       )}
-      <p className="text-sm tabular-nums" aria-live="polite">
-        <span className="font-semibold">
-          {t('srp.officer.summary.pending', { count: counts.pending })}
-        </span>
-        <span className="text-text-dim"> · </span>
-        <span className="font-semibold">
-          {t('srp.officer.summary.owed', {
-            isk: phone ? formatIskCompact(owed) : formatIsk(owed),
-          })}
-        </span>
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <p className="text-sm tabular-nums" aria-live="polite">
+          <span className="font-semibold">
+            {t('srp.officer.summary.pending', { count: counts.pending })}
+          </span>
+          <span className="text-text-dim"> · </span>
+          <span className="font-semibold">
+            {t('srp.officer.summary.owed', {
+              isk: phone ? formatIskCompact(owed) : formatIsk(owed),
+            })}
+          </span>
+        </p>
+        <SrpExportButton className="max-sm:w-full sm:justify-items-end" />
+      </div>
       {phone ? (
         <SegmentedControl
           label={t('srp.officer.tabsLabel')}

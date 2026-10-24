@@ -1538,7 +1538,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
     }
   });
 
-  it('applies a Source deselected in the sheet only once Apply is pressed, not before', async () => {
+  it('applies a Source deselected in the sheet at once', async () => {
     const restore = useNarrowViewport();
     try {
       loadPublicBpcContracts.mockResolvedValue(
@@ -1556,11 +1556,6 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       const dialog = screen.getByRole('dialog', { name: 'Filters' });
       await toggleFilterOption(user, 'Owned', within(dialog));
 
-      // Still applied against the row behind the modal — the sheet's edit is a draft.
-      expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
-
-      await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
-
       expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
       expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
     } finally {
@@ -1568,7 +1563,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
     }
   });
 
-  it('applies a Distance and a Source changed together in the sheet, both at once', async () => {
+  it('applies a Distance and a Source changed in the sheet as each is picked', async () => {
     const restore = useNarrowViewport();
     try {
       loadPublicBpcContracts.mockResolvedValue(
@@ -1586,9 +1581,6 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       await user.click(within(dialog).getByRole('combobox', { name: 'Distance' }));
       await user.click(await screen.findByRole('option', { name: 'Within 3 jumps' }));
       await toggleFilterOption(user, 'Owned', within(dialog));
-      expect(window.location.search).not.toContain('sourcing.jumps');
-
-      await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
 
       expect(new URLSearchParams(window.location.search).get('sourcing.jumps')).toBe('3');
       expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
@@ -1613,14 +1605,14 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       await user.click(screen.getByRole('button', { name: /^Filters/ }));
       let dialog = screen.getByRole('dialog', { name: 'Filters' });
       await toggleFilterOption(user, 'Owned', within(dialog));
-      await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+      await user.keyboard('{Escape}');
 
       expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: /^Filters/ }));
       dialog = screen.getByRole('dialog', { name: 'Filters' });
       await toggleFilterOption(user, 'Wormhole', within(dialog));
-      await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+      await user.keyboard('{Escape}');
 
       expect(screen.getByRole('button', { name: 'Filters (2 active)' })).toBeInTheDocument();
     } finally {

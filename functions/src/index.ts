@@ -3,8 +3,10 @@
 // the client sends only its short-lived access token, which is verified
 // against EVE's published JWKS before any Firebase credential is minted.
 
+import { callerFromAuth, signedInCharacter, verifyAccessToken, type Caller } from './actorAuth.js';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { createActionGroup, type CallableHandler } from './callableRouter.js';
+import type { CallableAction } from './callableManifest.js';
 import { runDailyHousekeeping } from './dailyHousekeeping.js';
 import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
@@ -25,13 +27,7 @@ import {
   runSyncPublicContractOffers,
   runSyncWorkbenchFits,
 } from './snapshotJobs.js';
-import {
-  verifyEveAccessToken,
-  verifyOptionsFromEnv,
-  uidForCharacter,
-  characterIdForUid,
-  type EveTokenClaims,
-} from './verifyEveToken.js';
+import { verifyEveAccessToken, verifyOptionsFromEnv, uidForCharacter } from './verifyEveToken.js';
 import {
   AlertGrantError,
   deleteAlertGrant as deleteAlertGrantFor,
@@ -194,7 +190,6 @@ import {
   revokeInvite,
   setRequireApproval,
   transferAdmin,
-  type CallerCharacter,
 } from './communitiesStore.js';
 import {
   parseEditRequestInput,
@@ -268,16 +263,18 @@ export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
       throw new HttpsError('invalid-argument', 'accessToken (string) is required');
     }
 
-    let claims: EveTokenClaims;
-    try {
-      claims = await verifyEveAccessToken(accessToken, verifyOptions);
-    } catch (err) {
-      // Client response stays opaque (don't leak which validation step
-      // failed), but the real cause still needs to be diagnosable from Cloud
-      // Logging — the previous bare `catch {}` discarded it entirely.
-      logError('EVE access token rejected', { error: err instanceof Error ? err.message : err });
-      throw new HttpsError('unauthenticated', 'EVE access token rejected');
-    }
+    // Client response stays opaque (don't leak which validation step failed),
+    // but the real cause still needs to be diagnosable from Cloud Logging.
+    const claims = await verifyAccessToken(
+      (token) => verifyEveAccessToken(token, verifyOptions),
+      accessToken,
+      {
+        onReject: (err) =>
+          logError('EVE access token rejected', {
+            error: err instanceof Error ? err.message : err,
+          }),
+      }
+    );
 
     const uid = uidForCharacter(claims.characterId);
     // ownerHash rides along as a custom claim; Firestore rules compare it to the
@@ -296,7 +293,7 @@ export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
 // makes re-registering after an FCM token rotation replace the entry instead
 // of accumulating one per token.
 const alertsActions = createActionGroup();
-const alertsAction = (name: string, handler: CallableHandler): void => {
+const alertsAction = (name: CallableAction<'alerts'>, handler: CallableHandler): void => {
   alertsActions.register(name, handler);
 };
 
@@ -385,9 +382,9 @@ alertsAction('saveAlertGrant', async (request) => {
 // Deleting needs the Character's own signed-in session, so one Character
 // cannot drop another's grant.
 alertsAction('deleteAlertGrant', async (request) => {
-  const { uid } = callerOf(request);
+  const characterId = signedInCharacter(callerOf(request));
   try {
-    return await deleteAlertGrantFor(alertGrantDeps(), characterIdForUid(uid)!);
+    return await deleteAlertGrantFor(alertGrantDeps(), characterId);
   } catch (err) {
     return alertGrantHttpsError(err);
   }
@@ -456,20 +453,13 @@ export const pollEveNotifications = onSchedule(
 // client only writes a Member's own library chunks, directly, under the rules.
 
 /** The signed-in Character behind a callable: uid `char:{id}` + ownerHash claim. */
-function callerOf(request: {
-  auth?: { uid: string; token: Record<string, unknown> };
-}): CallerCharacter {
-  const uid = request.auth?.uid;
-  const ownerHash = request.auth?.token.ownerHash;
-  if (!uid || !uid.startsWith('char:') || typeof ownerHash !== 'string') {
-    throw new HttpsError('unauthenticated', 'Sign in with a Character first');
-  }
-  return { uid, ownerHash };
+function callerOf(request: { auth?: { uid: string; token: Record<string, unknown> } }): Caller {
+  return callerFromAuth(request.auth);
 }
 
 // One deployed function per group instead of one per callable (see callableRouter.ts).
 const communityActions = createActionGroup();
-const communityAction = (name: string, handler: CallableHandler): void => {
+const communityAction = (name: CallableAction<'community'>, handler: CallableHandler): void => {
   communityActions.register(name, handler);
 };
 export const communityCall = onCall<unknown>({ maxInstances: 10 }, communityActions.route);
@@ -639,7 +629,7 @@ const corpTaxBookDeps = (): BookDeps => ({
 
 const corpTaxBookActions = createActionGroup();
 /** A Corp Tax Book router action: no deployed function of its own. New callables use this. */
-const corpTaxBookAction = (name: string, handler: CallableHandler): void => {
+const corpTaxBookAction = (name: CallableAction<'corpTaxBook'>, handler: CallableHandler): void => {
   corpTaxBookActions.register(name, handler);
 };
 
@@ -1110,7 +1100,7 @@ export const corpTaxBookCall = onCall<unknown>(
  * - sweepCommunityFleetPayouts (issue #4779): deletes Fleet Payouts expired a week ago, with
  *   their Shares. Bounded to 500 deletes a run.
  * - sweepSrpClaims (ADR 0026): deletes Paid and Rejected SRP Claims a year after
- *   they close, leaving an srpAudit line. Bounded to 500 deletes a run.
+ *   they close, with their SRP log entries. Bounded to 500 deletes a run.
  */
 export const dailyHousekeeping = onSchedule(
   { schedule: 'every 24 hours', secrets: [ALERTS_TOKEN_KEY], timeoutSeconds: 540 },

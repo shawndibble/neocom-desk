@@ -1,7 +1,7 @@
 /**
  * The Corp Board's widget kinds: the feeds each reads and its builder.
- * Same contract as `models.ts` (pure, derived at render time); joins its
- * `KINDS` table through `registerKindDefs` when the Corp route loads.
+ * Same contract as `models.ts` (pure, derived at render time); joins the
+ * registry (`models.ts`) through `registerKindDefs` when the Corp route loads.
  * Structures and Moon extractions are the Overview's own kinds, reused as they are.
  */
 import type { KindDef } from './builderKit';
@@ -21,23 +21,24 @@ import { corpInactive, corpMembers, corpMining } from './corpPeopleModels';
 export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
   corpDeadlines: {
     feeds: ['structures', 'moonChunks', 'corpJobs', 'corpStarbases', 'corpSovereignty'],
+    scope: 'character',
     build: corpDeadlines,
   },
-  corpServices: { feeds: ['structures'], build: corpServices },
-  corpStarbases: { feeds: ['corpStarbases'], build: corpStarbases },
-  corpSovereignty: { feeds: ['corpSovereignty'], build: corpSovereignty },
-  corpJobs: { feeds: ['corpJobs'], build: corpJobs },
-  corpCustomsOffices: { feeds: ['corpCustoms'], build: corpCustomsOffices },
-  corpRoleAudit: { feeds: ['corpRoleAudit'], build: corpRoleAudit },
-  corpWallet: { feeds: ['corpWallet'], build: corpWallet },
-  corpCashFlow: { feeds: ['corpWallet'], build: corpCashFlow },
-  corpIncome: { feeds: ['corpWallet'], build: corpIncome },
-  corpMembers: { feeds: ['corpMembers'], build: corpMembers },
-  corpInactive: { feeds: ['corpMembers'], build: corpInactive },
-  corpMining: { feeds: ['corpMining'], build: corpMining },
-  corpOrders: { feeds: ['corpOrders'], build: corpOrders },
-  corpContracts: { feeds: ['corpContracts'], build: corpContracts },
-  corpAssets: { feeds: ['corpAssets', 'corpStockTargets'], build: corpAssets },
-  corpKills: { feeds: ['corpKills'], build: corpKills },
-  corpSrp: { feeds: ['corpSrp'], build: corpSrp },
+  corpServices: { feeds: ['structures'], scope: 'character', build: corpServices },
+  corpStarbases: { feeds: ['corpStarbases'], scope: 'character', build: corpStarbases },
+  corpSovereignty: { feeds: ['corpSovereignty'], scope: 'character', build: corpSovereignty },
+  corpJobs: { feeds: ['corpJobs'], scope: 'character', build: corpJobs },
+  corpCustomsOffices: { feeds: ['corpCustoms'], scope: 'character', build: corpCustomsOffices },
+  corpRoleAudit: { feeds: ['corpRoleAudit'], scope: 'character', build: corpRoleAudit },
+  corpWallet: { feeds: ['corpWallet'], scope: 'character', build: corpWallet },
+  corpCashFlow: { feeds: ['corpWallet'], scope: 'character', build: corpCashFlow },
+  corpIncome: { feeds: ['corpWallet'], scope: 'character', build: corpIncome },
+  corpMembers: { feeds: ['corpMembers'], scope: 'character', build: corpMembers },
+  corpInactive: { feeds: ['corpMembers'], scope: 'character', build: corpInactive },
+  corpMining: { feeds: ['corpMining'], scope: 'character', build: corpMining },
+  corpOrders: { feeds: ['corpOrders'], scope: 'character', build: corpOrders },
+  corpContracts: { feeds: ['corpContracts'], scope: 'character', build: corpContracts },
+  corpAssets: { feeds: ['corpAssets', 'corpStockTargets'], scope: 'character', build: corpAssets },
+  corpKills: { feeds: ['corpKills'], scope: 'character', build: corpKills },
+  corpSrp: { feeds: ['corpSrp'], scope: 'character', build: corpSrp },
 };

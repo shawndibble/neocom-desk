@@ -52,9 +52,9 @@ type HeldIsk = 'none' | 'partial' | { amount: number | null };
 /**
  * An ISK cap in the filters — Max price per item, Max spend. Blank is no
  * limit. Only a whole, positive figure commits: the URL holds whole ISK.
- * Inline it commits on blur or Enter, not per keystroke: `250m` passes
- * through 2 ISK, which would hide every row and drop the selection. The
- * sheet's draft takes each keystroke; its Apply is the commit.
+ * It commits on blur or Enter, not per keystroke, in the box and the sheet
+ * alike: `250m` passes through 2 ISK, which would hide every row and drop the
+ * selection.
  */
 export function IskCapField({
   label,
@@ -76,7 +76,7 @@ export function IskCapField({
   // change and reset the typed text. The URL lands in a transition, so `value` lags.
   const [typedText, setTypedText] = useState<string | null>(null);
   // What the typed text says, not yet committed: a whole figure (or null, no
-  // limit) waiting for blur/Enter inline, or a fraction that can't commit.
+  // limit) waiting for blur/Enter, or a fraction that can't commit.
   const [held, setHeld] = useState<HeldIsk>('none');
   const [lastSent, setLastSent] = useState<number | null>(value);
   const [prevValue, setPrevValue] = useState(value);
@@ -121,7 +121,6 @@ export function IskCapField({
             whole === null ||
             (Math.abs(amount - whole) < 0.001 && Number.isSafeInteger(whole) && whole > 0);
           if (!usable) setHeld('partial');
-          else if (inSheet) commit(whole);
           else setHeld({ amount: whole });
         }}
         onBlur={settle}

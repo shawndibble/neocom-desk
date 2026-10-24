@@ -241,6 +241,22 @@ async function resolveViaRoster(
   return null;
 }
 
+/**
+ * A structure this Character is on the ACL of, by its own lookup alone: the
+ * device-wide shared row and the roster fallback are skipped, since either can
+ * answer from another Character's access. `null` for one it cannot see, or one
+ * it has lost access to (a refusal memo's stale name is not visibility).
+ */
+export async function loadVisibleStructure(
+  characterId: number,
+  structureId: number
+): Promise<{ name: string; systemId: number } | null> {
+  const { structure, forbidden } = await loadOwnStructure(characterId, structureId);
+  return structure && !forbidden
+    ? { name: structure.name, systemId: structure.solar_system_id }
+    : null;
+}
+
 async function loadStructure(
   characterId: number,
   structureId: number

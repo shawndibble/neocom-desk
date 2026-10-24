@@ -1,8 +1,7 @@
 /**
  * BPC Sourcing's active filters as removable chips — what a phone shows under
  * the search box, where every filter otherwise hides behind the funnel's
- * sheet and only a count badge admits any is on. The Open Orders pattern
- * (`openOrdersFilter.ts`'s `activeFilterChips`): ids, values and a `clear`
+ * sheet and only a count badge admits any is on. Ids, values and a `clear`
  * here; labels are the panel's, which owns translation and region names.
  */
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';

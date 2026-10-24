@@ -64,4 +64,44 @@ test.describe('Ship Tree — narrow', () => {
     });
     await expectNoPageOverflow(page);
   });
+
+  test('a filter picked in the sheet applies at once and never widens the page', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await signInAndGoto(page, './ships/tree');
+    await expect(page.getByRole('group', { name: 'Ship tree view' })).toBeVisible({
+      timeout: 30_000,
+    });
+
+    await page.getByRole('button', { name: /^Filters/ }).click();
+    const sheet = page.getByRole('dialog', { name: 'Ship filters' });
+    await sheet.getByRole('button', { name: /^Can fly/ }).click();
+    // No Apply step: the funnel behind the open sheet already counts it.
+    await expect(page.getByRole('button', { name: 'Filters (1 active)' })).toBeAttached();
+    await expect(sheet).toBeVisible();
+    // The faction bar's hidden match counts once escaped its scroller here; a
+    // phone zoomed out to fit, cropping the sheet and losing the tab bar.
+    await expectNoPageOverflow(page);
+
+    await sheet.getByRole('button', { name: 'Close' }).click();
+    await expect(sheet).toBeHidden();
+    await expect(page.getByRole('navigation', { name: 'Mobile navigation' })).toBeInViewport();
+  });
+
+  test('Back closes the filter sheet and keeps what was picked', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await signInAndGoto(page, './ships/tree');
+    await expect(page.getByRole('group', { name: 'Ship tree view' })).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.getByRole('button', { name: /^Filters/ }).click();
+    const sheet = page.getByRole('dialog', { name: 'Ship filters' });
+    await sheet.getByRole('button', { name: /^Can fly/ }).click();
+
+    await page.goBack();
+    await expect(sheet).toBeHidden();
+    await expect(page).toHaveURL(/fly=canFly/);
+    await expect(page.getByRole('button', { name: 'Filters (1 active)' })).toBeVisible();
+  });
 });

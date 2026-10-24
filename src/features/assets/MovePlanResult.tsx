@@ -2,18 +2,21 @@ import { formatCount } from '@/lib/formatCount';
 import { useRef, useState, type ReactNode, type Ref } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 import { Button, Checkbox, Disclosure, Modal } from '@/components/ui';
-import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
-import type { MovePlan } from '@/engine/assets/movePlan';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import {
+  CUSTOM_HAULER_TYPE_ID,
+  type HaulerOverride,
+  type MovePlan,
+} from '@/engine/assets/movePlan';
 import { useSystemName } from '@/features/route/useSolarSystems';
-import { routeToHref } from '@/features/route/routeSafetyLink';
 import { firstConnected, useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { formatCubicMetres } from '@/lib/volume';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { Rail, RailHeading, RailStop } from './MovePlanRail';
 import { PlanLine } from './MovePlanLine';
 import { PickupHaulList } from './MovePlanHauls';
+import { HaulerPicker } from './MovePlanHaulerPicker';
 
 /** Alternatives shown beside the suggested hauler; the rest sit under "All haulers". */
 const INLINE_ALTERNATIVES = 3;
@@ -29,7 +32,7 @@ export interface PlanState {
   destinationSystem: number | null;
   /** The destination station's name, when one was picked. */
   destinationStation: string | null;
-  /** System of each pickup location, for the Route Safety link's start. */
+  /** System of each pickup location. */
   pickupSystems: ReadonlyMap<number, number | null>;
   /**
    * The haulers could not be sized, so "no hauler" says nothing about the
@@ -43,10 +46,18 @@ interface PlanResultProps {
   state: PlanState;
   compareOpen: boolean;
   onToggleCompare: () => void;
+  /** The per-plan hauler pick; undefined is the suggestion. */
+  haulerOverride: HaulerOverride | undefined;
+  onPickHauler: (override: HaulerOverride | undefined) => void;
   /** The plan's screen-reader heading, where focus lands once the plan shows. */
   headingRef: Ref<HTMLHeadingElement>;
   onBack: () => void;
-  onDone: () => void;
+  /** Works out and shows the active haul; absent where no route can be planned. */
+  onShowRoute?: () => void;
+  /** The route is being worked out. */
+  routing?: boolean;
+  /** The route could not be worked out. */
+  routeFailed?: boolean;
   /** Haul this ship (itemID) packaged instead of flying it. */
   onPackShip: (itemId: number) => void;
   /** Fly a packed ship (itemID) after all. */
@@ -69,9 +80,13 @@ export function PlanResult({
   state,
   compareOpen,
   onToggleCompare,
+  haulerOverride,
+  onPickHauler,
   headingRef,
   onBack,
-  onDone,
+  onShowRoute,
+  routing = false,
+  routeFailed = false,
   onPackShip,
   onUnpackShip,
   rigsOf,
@@ -88,7 +103,7 @@ export function PlanResult({
     null
   );
   const [dontRemind, setDontRemind] = useState(false);
-  const focusAfterCommit = useFocusAfterCommit();
+  const focusAfterCommit = useFocusAfterCommit({ preventScroll: true });
   /** Pickup the ship being packed sits in; its heading takes focus once the Pack button is gone. */
   const packFrom = useRef<string | null>(null);
   const pickupHeading = () =>
@@ -104,7 +119,7 @@ export function PlanResult({
       setAsking({ itemId, typeId, rigs });
     }
   };
-  const { plan, destinationSystem, destinationStation, pickupSystems } = state;
+  const { plan, destinationSystem, destinationStation } = state;
   const systemName = useSystemName(destinationSystem);
   if (plan.perCharacter.length === 0) {
     return (
@@ -125,15 +140,29 @@ export function PlanResult({
   const { totals } = plan;
   const destinationLabel = destinationStation ?? systemName ?? '';
   const pickups = plan.perCharacter.flatMap((c) => c.pickups);
-  const capacity = plan.suggested?.hull.capacityM3 ?? 0;
+  const active = plan.active;
+  const capacity = active?.hull.capacityM3 ?? 0;
+  const haulerName = (hull: { typeId: number; name: string; capacityM3: number }) =>
+    hull.typeId === CUSTOM_HAULER_TYPE_ID
+      ? t('assets.movePlan.customHold', { volume: formatCubicMetres(hull.capacityM3) })
+      : hull.name;
   /** Ships flown out: each is a flight of its own, outside the hauler's trips. */
   const flown = pickups.flatMap((p) => p.ships);
+  /** Flown hulls by name, in first-seen order, so duplicates read "Badger ×2". */
+  const flownGroups = [
+    ...flown
+      .reduce((groups, s) => {
+        const ship = name(s.typeId);
+        return groups.set(ship, (groups.get(ship) ?? 0) + 1);
+      }, new Map<string, number>())
+      .entries(),
+  ];
   /** Every flown ship is a trip of its own on top of the hauls. */
   const withShips = (hauls: number, tooBig = 0) => hauls + totals.shipsToFly + tooBig;
-  /** Packed ships the suggested hauler cannot carry: flown, so each is a flight. */
-  const tooBig = plan.suggested?.tooBigCount ?? 0;
+  /** Packed ships the active hauler cannot carry: flown, so each is a flight. */
+  const tooBig = active?.tooBigCount ?? 0;
   const leavesBehind = (count: number) => t('assets.movePlan.leavesBehind', { count });
-  const alternatives = plan.comparison.filter((o) => o.hull.typeId !== plan.suggested?.hull.typeId);
+  const alternatives = plan.comparison.filter((o) => o.hull.typeId !== active?.hull.typeId);
 
   return (
     <div className="flex flex-1 flex-col gap-3">
@@ -141,24 +170,24 @@ export function PlanResult({
       <h3 ref={headingRef} tabIndex={-1} className="sr-only focus:outline-none">
         {t('assets.movePlan.title')}
       </h3>
-      {plan.suggested ? (
+      {active ? (
         <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-4 gap-y-1 rounded-xs border border-accent-dim bg-accent/10 px-3.5 py-3">
           <div className="row-span-2 min-w-14 text-center text-4xl leading-none font-bold text-accent tabular-nums">
-            {withShips(plan.suggested.trips, tooBig)}
+            {withShips(active.trips, tooBig)}
             <small className="mt-0.5 block text-xs font-semibold tracking-wide uppercase">
-              {t('assets.movePlan.tripsLabel', { count: withShips(plan.suggested.trips, tooBig) })}
+              {t('assets.movePlan.tripsLabel', { count: withShips(active.trips, tooBig) })}
             </small>
           </div>
           <p className="m-0 flex flex-wrap items-center gap-2 font-bold">
-            {plan.suggested.hull.name}
-            {plan.suggested.hull.owned && (
+            {haulerName(active.hull)}
+            {active.hull.owned && (
               <span className="text-xs font-semibold text-success">
                 {t('assets.movePlan.youOwnOne')}
               </span>
             )}
             <span className="text-xs font-normal text-text-dim tabular-nums">
               {[
-                t('assets.movePlan.haulCount', { count: plan.suggested.trips }),
+                t('assets.movePlan.haulCount', { count: active.trips }),
                 totals.shipsToFly + tooBig > 0 &&
                   t('assets.movePlan.shipFlightCount', { count: totals.shipsToFly + tooBig }),
               ]
@@ -170,7 +199,7 @@ export function PlanResult({
             <ul className="m-0 flex list-none flex-wrap gap-x-3.5 gap-y-1 p-0 text-xs text-text-dim">
               {alternatives.slice(0, INLINE_ALTERNATIVES).map((o) => (
                 <li key={o.hull.typeId}>
-                  <b className="font-semibold text-text">{o.hull.name}</b>{' '}
+                  <b className="font-semibold text-text">{haulerName(o.hull)}</b>{' '}
                   {t('assets.movePlan.tripCount', { count: withShips(o.trips, o.tooBigCount) })}
                   {o.unfitCount > 0 && ` · ${leavesBehind(o.unfitCount)}`}
                 </li>
@@ -206,6 +235,9 @@ export function PlanResult({
           )}
         </>
       )}
+      {totals.totalM3 > 0 && (
+        <HaulerPicker plan={plan} override={haulerOverride} onPick={onPickHauler} />
+      )}
       {alternatives.length > INLINE_ALTERNATIVES && (
         <Disclosure
           label={t('assets.movePlan.allHaulers')}
@@ -223,29 +255,31 @@ export function PlanResult({
           </ul>
         </Disclosure>
       )}
-      {plan.suggested && tooBig > 0 && (
+      {active && tooBig > 0 && (
         <p className="m-0 text-sm font-semibold text-warning">
-          {t('assets.movePlan.tooBigWarning', { hull: plan.suggested.hull.name, count: tooBig })}
+          {t('assets.movePlan.tooBigWarning', { hull: haulerName(active.hull), count: tooBig })}
         </p>
       )}
-      {plan.suggested && plan.suggested.unfitCount > 0 && (
+      {active && active.unfitCount > 0 && (
         <p className="m-0 text-sm font-semibold text-warning">
           {t('assets.movePlan.unfitWarning', {
-            hull: plan.suggested.hull.name,
-            count: plan.suggested.unfitCount,
+            hull: haulerName(active.hull),
+            count: active.unfitCount,
           })}
         </p>
       )}
-      {flown.length > 0 && (
-        <div className="flex flex-col gap-1.5">
-          <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-xs text-text-dim">
-            {flown.map((s) => (
-              <li key={s.itemId} className="font-semibold text-text">
-                {t('assets.movePlan.flyShip', { ship: name(s.typeId) })}
-              </li>
-            ))}
-          </ul>
-        </div>
+      {flownGroups.length > 0 && (
+        <section className="flex flex-col gap-0.5">
+          <p className="m-0 text-sm [overflow-wrap:anywhere]">
+            <b className="font-bold">{t('assets.movePlan.flyingHeading')}:</b>{' '}
+            {flownGroups
+              .map(([ship, count]) =>
+                count > 1 ? t('assets.movePlan.flyingGrouped', { ship, count }) : ship
+              )
+              .join(', ')}
+          </p>
+          <p className="m-0 text-xs text-text-dim">{t('assets.movePlan.flyingHint')}</p>
+        </section>
       )}
       <dl className="m-0 flex flex-wrap gap-x-6 gap-y-1.5">
         <Stat
@@ -271,7 +305,7 @@ export function PlanResult({
             name={c.name}
           >
             {c.pickups.map((p) => {
-              const hauled = plan.suggested?.pickups.find(
+              const hauled = active?.pickups.find(
                 (h) => h.characterId === c.characterId && h.locationId === p.locationId
               );
               return (
@@ -290,20 +324,6 @@ export function PlanResult({
                           {formatCubicMetres(p.totalM3)} m³
                         </span>
                       </h3>
-                      {destinationSystem !== null && (
-                        <Link
-                          className={`${inlineLinkClassName} text-sm whitespace-nowrap`}
-                          aria-label={t('assets.movePlan.routeSafetyFrom', {
-                            place: placeLabel(p.locationId),
-                          })}
-                          to={routeToHref(
-                            destinationSystem,
-                            pickupSystems.get(p.locationId) ?? null
-                          )}
-                        >
-                          {t('assets.movePlan.routeSafety')}
-                        </Link>
-                      )}
                     </div>
                     {totals.totalM3 > 0 && capacity > 0 && (
                       <p className="m-0 pt-1.5 text-xs text-text-dim tabular-nums">
@@ -395,13 +415,16 @@ export function PlanResult({
           </RailStop>
         )}
       </Rail>
+      {routeFailed && <p className="m-0 text-text-dim">{t('assets.movePlan.routeFailed')}</p>}
       <div className="sticky -bottom-3 mt-auto -mx-3 -mb-3 flex justify-end gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
         <Button variant="ghost" onClick={onBack}>
           {t('assets.movePlan.back')}
         </Button>
-        <Button variant="primary" onClick={onDone}>
-          {t('assets.movePlan.done')}
-        </Button>
+        {onShowRoute && active && destinationSystem !== null && (
+          <Button loading={routing} onClick={onShowRoute}>
+            {t('assets.movePlan.showRoute')}
+          </Button>
+        )}
       </div>
       <Modal
         open={asking !== null}
@@ -425,6 +448,7 @@ export function PlanResult({
                 if (asking) {
                   if (dontRemind) void setSkipRigWarning(true);
                   onPackShip(asking.itemId);
+                  focusAfterCommit(pickupHeading);
                 }
                 setAsking(null);
               }}

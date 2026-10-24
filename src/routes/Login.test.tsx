@@ -172,8 +172,8 @@ describe('Login', () => {
     const images = grid.getAllByRole('img');
     // One capture per tile, and one tile per heading.
     expect(images).toHaveLength(grid.getAllByRole('heading', { level: 3 }).length);
-    expect(images).toHaveLength(9);
-    expect(new Set(images.map((image) => image.getAttribute('src'))).size).toBe(9);
+    expect(images).toHaveLength(11);
+    expect(new Set(images.map((image) => image.getAttribute('src'))).size).toBe(11);
     for (const image of images) {
       expect(image.getAttribute('alt')).toBeTruthy();
       expect(image).toHaveAttribute('loading', 'lazy');
@@ -220,8 +220,8 @@ describe('Login', () => {
       'Market & orders': ['Market', 'Open Orders', 'Wallet', 'Assets'],
       Skills: ['Ships', 'Clones', 'Travel'],
       'Planetary & mining': ['Planetary Industry', 'Mining'],
-      Corporation: [],
-      Mail: ['Mail & Calendar', 'Contracts', 'Contacts & Standings'],
+      Corporation: ['Corp Tax Book', 'SRP'],
+      Mail: ['Mail & Calendar', 'Contracts', 'Contacts & Standings', 'Communities'],
       Alerts: ['Notifications'],
     };
     const seen: string[] = [];
@@ -238,8 +238,8 @@ describe('Login', () => {
       expect(panel.queryByRole('listitem', { name: tab })).toBeNull();
       seen.push(tab);
     }
-    // 13 chips; the other 4 catalog rows (Industry, Corporation, Alerts, Skills) are named by their tab.
-    expect(seen.filter((name) => !(name in covered))).toHaveLength(13);
+    // 16 chips; the other 4 catalog rows (Industry, Corporation, Alerts, Skills) are named by their tab.
+    expect(seen.filter((name) => !(name in covered))).toHaveLength(16);
     for (const row of ['Industry', 'Corporation', 'Alerts', 'Skills']) expect(seen).toContain(row);
   });
 

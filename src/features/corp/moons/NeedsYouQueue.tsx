@@ -14,12 +14,7 @@ import {
 } from './BookDialogs';
 import { isk, shortDate } from './moonsFormat';
 import { minerPath } from './moonsPaths';
-import {
-  manualRemindersSent,
-  mailTarget,
-  remindersStopped,
-  useCorporationName,
-} from './statementMailing';
+import { mailTarget, useCorporationName } from './statementMailing';
 
 function QueueCard({
   tone,
@@ -83,8 +78,8 @@ export function NeedsYouQueue() {
       senderCharacterId: characterId,
       refineryName: (id) => names.refinery(id),
       statement: mailTarget(ctx, statement, miner, { amountDue: miner.owed, carried: 0 }),
-      remindersStopped: remindersStopped(statement),
-      manualRemindersSent: manualRemindersSent(statement),
+      remindersStopped: statement.remindersStopped === true,
+      manualRemindersSent: statement.manualRemindersSent ?? 0,
     });
     setNotice(
       result.ok

@@ -64,8 +64,12 @@ const plan = {
     trips: 2,
   },
   suggested: hauledBy([cargoHaul(100), cargoHaul(50)]),
+  active: null,
   comparison: [hauledBy([cargoHaul(100), cargoHaul(50)])],
 } as MovePlan;
+
+/** Fixtures set `suggested`; with no override the active hauler is that. */
+const withActive = (p: MovePlan): MovePlan => ({ ...p, active: p.suggested });
 
 const shipPlan = {
   ...plan,
@@ -89,7 +93,7 @@ describe('PlanResult', () => {
       <MemoryRouter>
         <PlanResult
           state={{
-            plan,
+            plan: withActive(plan),
             destinationSystem: null,
             destinationStation: 'Amarr VIII',
             pickupSystems: new Map(),
@@ -97,8 +101,9 @@ describe('PlanResult', () => {
           compareOpen={false}
           headingRef={{ current: null }}
           onToggleCompare={vi.fn()}
+          haulerOverride={undefined}
+          onPickHauler={vi.fn()}
           onBack={vi.fn()}
-          onDone={vi.fn()}
           onPackShip={vi.fn()}
           onUnpackShip={vi.fn()}
           rigsOf={() => 0}
@@ -128,7 +133,7 @@ describe('PlanResult', () => {
       <MemoryRouter>
         <PlanResult
           state={{
-            plan: big,
+            plan: withActive(big),
             destinationSystem: null,
             destinationStation: 'Amarr VIII',
             pickupSystems: new Map(),
@@ -136,8 +141,9 @@ describe('PlanResult', () => {
           compareOpen={false}
           headingRef={{ current: null }}
           onToggleCompare={vi.fn()}
+          haulerOverride={undefined}
+          onPickHauler={vi.fn()}
           onBack={vi.fn()}
-          onDone={vi.fn()}
           onPackShip={vi.fn()}
           onUnpackShip={vi.fn()}
           rigsOf={() => 0}
@@ -190,7 +196,7 @@ describe('PlanResult', () => {
       <MemoryRouter>
         <PlanResult
           state={{
-            plan: withUnfit,
+            plan: withActive(withUnfit),
             destinationSystem: null,
             destinationStation: 'Amarr VIII',
             pickupSystems: new Map(),
@@ -198,8 +204,9 @@ describe('PlanResult', () => {
           compareOpen={false}
           headingRef={{ current: null }}
           onToggleCompare={vi.fn()}
+          haulerOverride={undefined}
+          onPickHauler={vi.fn()}
           onBack={vi.fn()}
-          onDone={vi.fn()}
           onPackShip={vi.fn()}
           onUnpackShip={vi.fn()}
           rigsOf={() => 0}
@@ -236,7 +243,7 @@ describe('PlanResult', () => {
       <MemoryRouter>
         <PlanResult
           state={{
-            plan: many,
+            plan: withActive(many),
             destinationSystem: null,
             destinationStation: 'Amarr VIII',
             pickupSystems: new Map(),
@@ -244,8 +251,9 @@ describe('PlanResult', () => {
           compareOpen={false}
           headingRef={{ current: null }}
           onToggleCompare={vi.fn()}
+          haulerOverride={undefined}
+          onPickHauler={vi.fn()}
           onBack={vi.fn()}
-          onDone={vi.fn()}
           onPackShip={vi.fn()}
           onUnpackShip={vi.fn()}
           rigsOf={() => 0}
@@ -292,7 +300,7 @@ describe('PlanResult', () => {
       <MemoryRouter>
         <PlanResult
           state={{
-            plan: tooBigPlan,
+            plan: withActive(tooBigPlan),
             destinationSystem: null,
             destinationStation: 'Amarr VIII',
             pickupSystems: new Map(),
@@ -300,8 +308,9 @@ describe('PlanResult', () => {
           compareOpen={false}
           headingRef={{ current: null }}
           onToggleCompare={vi.fn()}
+          haulerOverride={undefined}
+          onPickHauler={vi.fn()}
           onBack={vi.fn()}
-          onDone={vi.fn()}
           onPackShip={vi.fn()}
           onUnpackShip={onUnpackShip}
           rigsOf={() => 0}
@@ -329,7 +338,7 @@ describe('PlanResult', () => {
         <MemoryRouter>
           <PlanResult
             state={{
-              plan: shipPlan,
+              plan: withActive(shipPlan),
               destinationSystem: null,
               destinationStation: 'Amarr VIII',
               pickupSystems: new Map(),
@@ -337,8 +346,9 @@ describe('PlanResult', () => {
             compareOpen={false}
             headingRef={{ current: null }}
             onToggleCompare={vi.fn()}
+            haulerOverride={undefined}
+            onPickHauler={vi.fn()}
             onBack={vi.fn()}
-            onDone={vi.fn()}
             onPackShip={onPackShip}
             onUnpackShip={vi.fn()}
             rigsOf={() => rigs}
@@ -358,9 +368,60 @@ describe('PlanResult', () => {
       expect(screen.getByText('trips').parentElement?.textContent).toBe('3trips');
     });
 
-    it('names each ship being flown beside the cargo trips', () => {
+    it('names each ship being flown under one labelled section', () => {
       setup(0);
-      expect(screen.getByText('Fly Badger')).toBeTruthy();
+      expect(screen.getByText('Flying instead of packing:').parentElement?.textContent).toContain(
+        'Badger'
+      );
+      expect(screen.queryByText('Fly Badger')).toBeNull();
+    });
+
+    it('groups duplicate hulls with a count', () => {
+      const two = {
+        ...shipPlan,
+        perCharacter: [
+          {
+            ...shipPlan.perCharacter[0],
+            pickups: [
+              {
+                ...shipPlan.perCharacter[0].pickups[0],
+                ships: [
+                  ...shipPlan.perCharacter[0].pickups[0].ships,
+                  { ...shipPlan.perCharacter[0].pickups[0].ships[0], itemId: 501 },
+                ],
+              },
+            ],
+          },
+        ],
+      } as MovePlan;
+      render(
+        <MemoryRouter>
+          <PlanResult
+            state={{
+              plan: withActive(two),
+              destinationSystem: null,
+              destinationStation: 'Amarr VIII',
+              pickupSystems: new Map(),
+            }}
+            compareOpen={false}
+            headingRef={{ current: null }}
+            onToggleCompare={vi.fn()}
+            haulerOverride={undefined}
+            onPickHauler={vi.fn()}
+            onBack={vi.fn()}
+            onPackShip={vi.fn()}
+            onUnpackShip={vi.fn()}
+            rigsOf={() => 0}
+            canPack={() => true}
+            name={() => 'Badger'}
+            placeLabel={() => 'Jita 4-4'}
+            hueOf={() => 0}
+          />
+        </MemoryRouter>
+      );
+      expect(screen.getByText('Flying instead of packing:').parentElement?.textContent).toContain(
+        'Badger ×2'
+      );
     });
 
     it('still names the ship when nothing is hauled', () => {
@@ -382,7 +443,7 @@ describe('PlanResult', () => {
         <MemoryRouter>
           <PlanResult
             state={{
-              plan: none,
+              plan: withActive(none),
               destinationSystem: null,
               destinationStation: 'Amarr VIII',
               pickupSystems: new Map(),
@@ -390,8 +451,9 @@ describe('PlanResult', () => {
             compareOpen={false}
             headingRef={{ current: null }}
             onToggleCompare={vi.fn()}
+            haulerOverride={undefined}
+            onPickHauler={vi.fn()}
             onBack={vi.fn()}
-            onDone={vi.fn()}
             onPackShip={vi.fn()}
             onUnpackShip={vi.fn()}
             rigsOf={() => 0}
@@ -402,7 +464,9 @@ describe('PlanResult', () => {
           />
         </MemoryRouter>
       );
-      expect(screen.getByText('Fly Badger')).toBeTruthy();
+      expect(screen.getByText('Flying instead of packing:').parentElement?.textContent).toContain(
+        'Badger'
+      );
       expect(screen.getByText('1 ship')).toBeTruthy();
     });
 
@@ -443,7 +507,7 @@ describe('PlanResult', () => {
         <MemoryRouter>
           <PlanResult
             state={{
-              plan: next,
+              plan: withActive(next),
               destinationSystem: null,
               destinationStation: 'Amarr VIII',
               pickupSystems: new Map(),
@@ -451,8 +515,9 @@ describe('PlanResult', () => {
             compareOpen={false}
             headingRef={{ current: null }}
             onToggleCompare={vi.fn()}
+            haulerOverride={undefined}
+            onPickHauler={vi.fn()}
             onBack={vi.fn()}
-            onDone={vi.fn()}
             onPackShip={() => setPacked(true)}
             onUnpackShip={() => setPacked(false)}
             rigsOf={() => rigs}
@@ -482,5 +547,50 @@ describe('PlanResult', () => {
         expect(document.activeElement).toBe(screen.getByRole('heading', { name: /Jita 4-4/ }))
       );
     });
+  });
+
+  const renderWith = (
+    p: MovePlan,
+    onShowRoute: (() => void) | undefined,
+    destinationSystem: number | null
+  ) =>
+    render(
+      <MemoryRouter>
+        <PlanResult
+          state={{
+            plan: p,
+            destinationSystem,
+            destinationStation: 'Amarr VIII',
+            pickupSystems: new Map(),
+          }}
+          compareOpen={false}
+          headingRef={{ current: null }}
+          onToggleCompare={vi.fn()}
+          haulerOverride={undefined}
+          onPickHauler={vi.fn()}
+          onBack={vi.fn()}
+          onShowRoute={onShowRoute}
+          onPackShip={vi.fn()}
+          onUnpackShip={vi.fn()}
+          rigsOf={() => 0}
+          canPack={() => true}
+          name={() => 'Tritanium'}
+          placeLabel={() => 'Jita 4-4'}
+          hueOf={() => 0}
+        />
+      </MemoryRouter>
+    );
+
+  it('offers one Show my route for the plan, and no Route Safety link per pickup', async () => {
+    const onShowRoute = vi.fn();
+    renderWith(withActive(plan), onShowRoute, 30000142);
+    await userEvent.click(screen.getByRole('button', { name: 'Show my route' }));
+    expect(onShowRoute).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('link', { name: /Route Safety/ })).toBeNull();
+  });
+
+  it('has no Show my route without a hauler', () => {
+    renderWith(plan, vi.fn(), 30000142);
+    expect(screen.queryByRole('button', { name: 'Show my route' })).toBeNull();
   });
 });

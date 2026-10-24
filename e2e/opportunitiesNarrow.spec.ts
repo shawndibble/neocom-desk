@@ -157,9 +157,7 @@ test.describe('Opportunities — ranked phone list', () => {
     });
   }
 
-  test("the What's profitable filter sheet shows Apply without scrolling at 390x844", async ({
-    page,
-  }) => {
+  test("the What's profitable filter sheet fits the screen at 390x844", async ({ page }) => {
     await page.setViewportSize(PHONE);
     await page.goto('./industry/opportunities');
 
@@ -167,11 +165,11 @@ test.describe('Opportunities — ranked phone list', () => {
       has: page.getByRole('heading', { name: "What's profitable" }),
     });
     await panel.getByRole('button', { name: /^Filters/ }).click();
-    const apply = page.getByRole('dialog').getByRole('button', { name: 'Apply' });
-    await expect(apply).toBeVisible();
+    const sheet = page.getByRole('dialog');
+    await expect(sheet).toBeVisible();
     await expect
       .poll(async () => {
-        const box = await apply.boundingBox();
+        const box = await sheet.boundingBox();
         return box ? box.y + box.height : Infinity;
       })
       .toBeLessThanOrEqual(PHONE.height);

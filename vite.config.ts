@@ -26,6 +26,10 @@ import {
   lazyChunkFiles,
   lazyChunksJson,
   preloadGraphSignature,
+  PUBLIC_ROUTE_SUFFIXES,
+  SHELL_MODULE_SUFFIXES,
+  shellChunkGroups,
+  throughBarrel,
   type BundleLike,
   type RenderedChunkLike,
 } from './src/app/lazyChunks.ts';
@@ -289,6 +293,86 @@ function spaFallbackHtml() {
 const lazyChunkState = { files: new Set<string>() };
 
 /**
+ * The modules the `shell`, `shell-public` and `shell-lazy` groups capture
+ * (`shellChunkGroups`). Filled at `buildEnd`, once the module graph is
+ * complete; Rolldown calls the groups' `test` after that, while it splits.
+ */
+const shellGroupState = {
+  shell: new Set<string>(),
+  publicShared: new Set<string>(),
+  entryLazy: new Set<string>(),
+};
+
+function shellGroupsPlugin() {
+  return {
+    name: 'neocom-shell-groups',
+    apply: 'build' as const,
+    buildEnd(
+      this: {
+        getModuleIds: () => Iterable<string>;
+        getModuleInfo: (id: string) => {
+          importedIds: readonly string[];
+          dynamicallyImportedIds: readonly string[];
+          isEntry: boolean;
+          code: string | null;
+        } | null;
+        warn: (message: string) => void;
+      },
+      error?: Error
+    ) {
+      // The build has already failed; its graph may be partial.
+      if (error) return;
+      const ids = [...this.getModuleIds()];
+      const matching = (suffixes: readonly string[]) => {
+        const found = ids.filter((id) =>
+          suffixes.some((suffix) => id.replaceAll('\\', '/').endsWith(suffix))
+        );
+        if (found.length !== suffixes.length) {
+          throw new Error(
+            `shellGroupsPlugin: found ${found.length} of ${suffixes.join(', ')} (src/app/lazyChunks.ts)`
+          );
+        }
+        return found;
+      };
+      const untraced = new Set<string>();
+      const shellRoots = matching(SHELL_MODULE_SUFFIXES);
+      const [routeChunks] = matching(['/src/app/routeChunks.ts']);
+      Object.assign(
+        shellGroupState,
+        shellChunkGroups({
+          entries: ids.filter((id) => this.getModuleInfo(id)?.isEntry),
+          shellRoots,
+          publicRoots: matching(PUBLIC_ROUTE_SUFFIXES),
+          routeModules: this.getModuleInfo(routeChunks)?.dynamicallyImportedIds ?? [],
+          importedIds: throughBarrel({
+            barrel: matching(['/src/components/ui/index.ts'])[0],
+            specifier: '@/components/ui',
+            importedIds: (id) => this.getModuleInfo(id)?.importedIds,
+            code: (id) => this.getModuleInfo(id)?.code,
+            onFallback: (id) => untraced.add(id),
+          }),
+          dynamicallyImportedIds: (id) => this.getModuleInfo(id)?.dynamicallyImportedIds,
+        })
+      );
+      // An untraced barrel import in the shell puts every primitive in the
+      // shell's closure: the boot path grows, and nothing else would say so.
+      const inShell = (id: string) =>
+        shellRoots.includes(id) ||
+        shellGroupState.shell.has(id) ||
+        shellGroupState.publicShared.has(id) ||
+        shellGroupState.entryLazy.has(id);
+      for (const id of untraced) {
+        if (inShell(id)) {
+          this.warn(
+            `${id} imports @/components/ui in a way throughBarrel cannot trace (src/app/lazyChunks.ts), so every UI primitive counts as the shell's`
+          );
+        }
+      }
+    },
+  };
+}
+
+/**
  * Splits the bundle into the boot graph (precached) and every other chunk (left
  * to the idle warm and `sw.ts`'s cache-first route), and emits
  * `lazy-chunks.json` naming the second set for the warm, the Offline data panel
@@ -454,6 +538,21 @@ export default defineConfig({
               test: /node_modules[\\/](i18next|react-i18next|html-parse-stringify|void-elements)[\\/]/,
             },
             { name: 'vendor-zustand', test: /node_modules[\\/]zustand[\\/]/ },
+            // The app's own boot code. Rolldown otherwise splits every module the
+            // entry shares with any route into a chunk per set of sharers: 64
+            // files before first paint, most under 2 KiB. Rolldown folds this
+            // group back into the entry chunk, in source order, so the entry a
+            // deploy always renames is bigger (docs/context/decisions/
+            // *-boot-path-ships-as-a-handful-of-chunks*).
+            { name: 'boot', tags: ['$initial'] },
+            // Same for the signed-in shell boot preloads (`bootShellPreload.ts`):
+            // ~220 more files in three. What a public route can load, and what
+            // the entry loads by import() (the info modals), get chunks of their
+            // own, so a signed-out page never loads `shell` (`shellChunkGroups`,
+            // src/app/lazyChunks.ts).
+            { name: 'shell-public', test: (id) => shellGroupState.publicShared.has(id) },
+            { name: 'shell-lazy', test: (id) => shellGroupState.entryLazy.has(id) },
+            { name: 'shell', test: (id) => shellGroupState.shell.has(id) },
           ],
         },
       },
@@ -595,6 +694,7 @@ export default defineConfig({
       : []),
     spaFallbackHtml(),
     releaseFilePlugin(),
+    shellGroupsPlugin(),
     lazyChunksPlugin(),
     preloadGraphHashPlugin(),
   ],

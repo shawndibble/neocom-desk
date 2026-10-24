@@ -68,6 +68,7 @@
     "more": "More",
     "mobileLabel": "Mobile navigation",
     "alerts": "Alerts",
+    "needsAttention": "{{label}}, needs attention",
     "alertsWithCount_one": "Alerts, {{count}} waiting",
     "alertsWithCount_other": "Alerts, {{count}} waiting",
     "railLabel": "Main navigation",
@@ -3715,19 +3716,29 @@
       "fitting": {
         "eyebrow": "Fitting",
         "question": "Will this fit hold up?",
-        "answer": "Build a fit on the ring and see its DPS against a target profile."
+        "answer": "Build a fit on the ring and see its damage, drones and tank: resists, EHP and local tank."
       },
       "survey": {
         "eyebrow": "Mining",
         "question": "When is this belt mined out?",
         "answer": "Survey tracks a belt’s scans: how much is mined, a chart of it, and when it will finish."
+      },
+      "courier": {
+        "eyebrow": "Contracts",
+        "question": "Which haul pays best per jump?",
+        "answer": "The Courier board ranks every public courier contract by ISK per jump on your own route preference, and flags any that pays far above the going rate."
+      },
+      "assets": {
+        "eyebrow": "Assets",
+        "question": "Where did I leave that ship?",
+        "answer": "Assets lists every ship across your characters, nearest first, with where it sits, even one packed in a container."
       }
     },
     "screenshotEnlarge": "Enlarge: {{alt}}",
     "screenshots": {
       "orderDetail": {
-        "alt": "An open sell order: who is cheaper at the station, system and region, and whether there is a better exit.",
-        "caption": "Every order explains what it is losing to"
+        "alt": "An open sell order: undercut to a price that still pays, its rank and how fast it sells, and every other way out (hold, undercut, dump to a buy order, reprocess, haul to another hub) with what each nets a unit after fees.",
+        "caption": "Every order says what to do, and what each exit nets"
       },
       "buildPlan": {
         "alt": "A Build Plan for an Orca: profit after fees, materials with sub-builds, and costs and revenue.",
@@ -3738,8 +3749,8 @@
         "caption": "Mining surveys that tell you when the belt is gone"
       },
       "fitting": {
-        "alt": "A ship fitting on the ring: modules around a Caracal, with offense, applied DPS against a target profile, powergrid and CPU.",
-        "caption": "Fittings with DPS against a target"
+        "alt": "A ship fitting on the ring: modules, rigs and drones around a Caracal, with its missile and drone DPS, shield, armor and hull resists and EHP, local tank, calibration, powergrid and CPU.",
+        "caption": "Fittings with damage and tank"
       },
       "shipTree": {
         "alt": "The Ship Tree map for Caldari State with the Caracal selected and its Skills & Mastery panel open: the skills the hull needs, its Mastery tiers, and the training time still missing for each.",
@@ -3750,7 +3761,7 @@
         "caption": "A journal that links to what each line was"
       },
       "phoneMarketJumps": {
-        "alt": "The market order book on a phone, limited to stations within 15 jumps of a chosen system, with jump counts per order.",
+        "alt": "The market order book on a phone, limited to stations within 15 jumps of Jita, with the jump count and security of each order.",
         "caption": "Market within 15 jumps"
       },
       "phoneRouteSafety": {
@@ -3770,8 +3781,8 @@
         "caption": "Alerts for everything that needs you"
       },
       "corporation": {
-        "alt": "The Corp Board: standing and runway, deadlines per day for the next 14 days, and fuel and moon chunk lists that put what runs out soonest first.",
-        "caption": "One deadline-ranked board for the corp"
+        "alt": "The Corp Board as widgets: deadlines due soon, structure fuel, moon extractions, raidable skyhooks, the corp wallet by division, 30-day cash flow, corp industry jobs and open SRP claims.",
+        "caption": "A corp board of the widgets you choose"
       },
       "industryJobs": {
         "alt": "The Industry page: a table of running and finished jobs with progress and time left, above a list of Build Plans ranked by profit, margin and a build or buy verdict.",
@@ -3782,12 +3793,20 @@
         "caption": "A live order book with jumps from you"
       },
       "skills": {
-        "alt": "The Skills page: the skill in training with its time left, the queue grouped by this week and the next three weeks, and the character’s attributes.",
+        "alt": "The Skills page: the skill in training with its time left, the queue grouped by month, the active Skill Plan with its finish date, and the character’s attributes with Optimize queue.",
         "caption": "A training queue you can read at a glance"
       },
       "mail": {
         "alt": "Mail in two panes: the inbox on the left with unread mail in bold, the open mail on the right with reply and forward buttons.",
         "caption": "A two-pane mail client"
+      },
+      "courier": {
+        "alt": "The Courier board: public courier contracts between trade hubs ranked by ISK per jump, each with reward, collateral, jumps, ISK per m³ and its multiple of the going rate, the top one flagged over rate.",
+        "caption": "Courier contracts ranked by ISK per jump"
+      },
+      "assets": {
+        "alt": "Assets › Ships across two characters: each ship with its owner, station, security and jumps from you, nearest first, two of them packed in a station container.",
+        "caption": "Every character’s assets, down to the container"
       }
     },
     "featuresHeading": "Everything outside the client",
@@ -3824,10 +3843,10 @@
       },
       "corp": {
         "tab": "Corporation",
-        "board": "The Corp Board merges fuel, structure timers, moon extractions, finished jobs and offline services into one deadline-ranked board.",
-        "deadlines": "A strip shows the deadlines per day for the next 14 days, beside the fuel list, soonest first.",
-        "tables": "Members, Wallet and Assets are the tables behind it.",
-        "access": "It appears only when a character holds a Corp Role in game, and corporation data is a separate grant, requested only when you open those pages."
+        "board": "The Corp Board is a board of widgets you pick and size: deadlines, structure fuel, moon chunks, jobs, wallet, members and more.",
+        "pages": "Members, Corp Wallet and Corp Assets each have their own page, with role audits and Stock Targets.",
+        "moons": "Moons keeps the Corp Tax Book: what each corp member mined at your refineries, their Statements, and what is paid.",
+        "access": "SRP lets a pilot file a claim from their own killmail. Officer pages appear only with a Corp Role, and corporation data is a separate grant."
       },
       "comms": {
         "tab": "Mail",
@@ -3895,6 +3914,15 @@
       },
       "contacts": {
         "name": "Contacts & Standings"
+      },
+      "corpTaxBook": {
+        "name": "Corp Tax Book"
+      },
+      "srp": {
+        "name": "SRP"
+      },
+      "communities": {
+        "name": "Communities"
       }
     },
     "trustHeading": "It reads. It writes only when you act.",
@@ -3951,11 +3979,11 @@
       },
       "stores": {
         "q": "What does it store, and where?",
-        "a": "What it reads from EVE stays on this device. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. The exceptions: alerts you have seen, push and Alerts when closed if you turn them on (your login token stays on this device, apart from Alerts when closed and a Corp Tax Book's Automatic sync), anything you choose to share with a Community, and Share Links you create (readable by anyone with the link, for 7 days)."
+        "a": "What it reads from EVE stays on this device. What you make in the app, such as Skill Plans and Build Plans, syncs between your devices filed under your character's EVE ID, never a name or an email address. The exceptions: alerts you have seen, push and Alerts when closed if you turn them on (your login token stays on this device, apart from Alerts when closed and a Corp Tax Book's Automatic sync), anything you choose to share with a Community, Share Links you create (readable by anyone with the link, for 7 days), and your corporation's own records: SRP Claims and its Corp Tax Book, which its officers can read."
       },
       "delete": {
         "q": "Can I leave and delete my data?",
-        "a": "Yes. Settings › Log out & delete › Delete all data deletes every character's synced data from our server, then erases everything on this device. Anything you shared with a Community is removed by leaving that Community."
+        "a": "Yes. Settings › Log out & delete › Delete all data deletes every character's synced data from our server, then erases everything on this device. Anything you shared with a Community is removed by leaving that Community. SRP Claims and Corp Tax Book lines belong to the corporation's records and stay with it."
       },
       "phone": {
         "q": "Does it work on a phone?",
@@ -3963,7 +3991,7 @@
       },
       "community": {
         "q": "What is a Community?",
-        "a": "A named group of Characters under one admin. You create one or join with an invite link, and share only what you pick: blueprints, Fittings and Skill Plans. Every Member can read what is shared, and it is stored on our server. Members can also post Requests for items and Pledge to fill each other's."
+        "a": "A named group of Characters under one admin. You create one or join with an invite link, and share only what you pick: blueprints, Fittings and Skill Plans. Every Member can read what is shared, and it is stored on our server. Members can also post Requests for items and Pledge to fill each other's, and split fleet loot with a Fleet Payout."
       }
     },
     "bottomCtaHeading": "Undock into your dashboard.",
@@ -6424,7 +6452,7 @@
       "assigned_one": "Assigned {{count}} mining entry to {{name}}.",
       "assigned_other": "Assigned {{count}} mining entries to {{name}}.",
       "willAssign": "Your ore from this moon will be assigned to {{name}} at {{pct}}% as it reaches your mining ledger.",
-      "connected": "Auto-assigning moon tax until {{time}}",
+      "connected": "Auto-assigned until {{time}}",
       "connectedNoLocation": "Auto-assigning moon tax once the survey has a location",
       "openTax": "Mining Tax",
       "stop": "Stop",
@@ -7216,15 +7244,24 @@
       "haulCount_other": "{{count}} hauls",
       "shipFlightCount_one": "{{count}} ship",
       "shipFlightCount_other": "{{count}} ships",
-      "flyShip": "Fly {{ship}}",
+      "flyingHeading": "Flying instead of packing",
+      "flyingGrouped": "{{ship}} ×{{count}}",
+      "flyingHint": "You fly these yourself. They are not in the packaged volume or the hauler's cargo.",
       "shareOfLoad": "{{percent}}% of the load",
       "deliverAll": "Deliver everything here",
       "pickupSummary_one": "{{count}} pickup · {{volume}} m³",
       "pickupSummary_other": "{{count}} pickups · {{volume}} m³",
-      "routeSafetyFrom": "Route Safety from {{place}}",
       "groupToggleHere": "{{character}}, {{place}}, already at the destination",
       "pickDestination": "Choose where to deliver",
       "allHaulers": "All haulers",
+      "haulerLabel": "Hauler",
+      "haulerSuggestedOption": "{{hull}} (suggested)",
+      "noHaulerOption": "No hauler sized",
+      "customOption": "Custom m³…",
+      "customAria": "Cargo space in m³",
+      "customHold": "Custom {{volume}} m³ hold",
+      "customInvalid": "Enter a number above 0.",
+      "customTooSmall": "Too small for this load. Use at least {{min}} m³.",
       "whereTo": "Where to",
       "destinationSystem": "Pick a system",
       "destinationStation": "Or one of your stations",
@@ -7245,7 +7282,81 @@
       "noHauler": "No hauler you can fly could be sized for this load.",
       "haulerSizingLoading": "Hauler data is still loading. Show the plan again in a moment.",
       "haulerSizingUnavailable": "Hauler sizing needs data that isn't downloaded yet, or your skills couldn't be read. Connect once, then plan again.",
-      "routeSafety": "Route Safety",
+      "showRoute": "Show my route",
+      "routeFailed": "Could not work out the route. Try again.",
+      "replaceHaulTitle": "Replace the haul in progress?",
+      "replaceHaulBody": "You have a haul saved already. Showing this route replaces it, and its legs are lost.",
+      "replaceHaul": "Replace haul",
+      "resumeHaul": "Haul in progress — resume",
+      "haul": {
+        "title": "Haul in progress",
+        "summary": "{{legs}} · {{jumps}} · {{volume}} m³ to {{destination}}",
+        "legCount_one": "{{count}} leg",
+        "legCount_other": "{{count}} legs",
+        "jumpCount_one": "{{count}} jump",
+        "jumpCount_other": "{{count}} jumps",
+        "jumpUnit_one": "jump",
+        "jumpUnit_other": "jumps",
+        "tripCount_one": "{{count}} trip",
+        "tripCount_other": "{{count}} trips",
+        "legsLabel": "Legs",
+        "legTitle": "{{from}} → {{to}}",
+        "startUnknown": "Start",
+        "noGateRoute": "no gate route",
+        "load": "Load {{volume}} m³ at {{place}}",
+        "drop": "Drop {{volume}} m³ at {{place}}",
+        "waypoint": "Set waypoint",
+        "waypointAria": "Set waypoint, leg {{n}}",
+        "waypointSending": "Setting…",
+        "waypointDone": "Waypoint set",
+        "waypointAll": "Set All Waypoints",
+        "waypointAllDone": "Set All Waypoints",
+        "routeSafetyAll": "Route Safety, Whole",
+        "condition_highsec": "Highsec only",
+        "condition_lowsec_one": "{{count}} lowsec system",
+        "condition_lowsec_other": "{{count}} lowsec systems",
+        "condition_nullsec_one": "{{count}} nullsec system",
+        "condition_nullsec_other": "{{count}} nullsec systems",
+        "condition_unknown": "Not rated",
+        "carryLoaded": "Carrying {{volume}} m³",
+        "carryEmpty": "Flying empty",
+        "carryLoadsOnArrival": "Loads {{volume}} m³ at {{place}} on arrival.",
+        "carryDrops": "Drops {{volume}} m³ at {{place}}.",
+        "cargoLine": "{{place}}: {{volume}} m³",
+        "itemLine": "{{quantity}} × {{name}}",
+        "itemsFewer": "Show fewer",
+        "itemsMore_one": "and {{count}} more type",
+        "itemsMore_other": "and {{count}} more types",
+        "holdFill": "{{percent}}% of the hold",
+        "cargoShow": "Show cargo for leg {{n}}",
+        "cargoHide": "Hide cargo for leg {{n}}",
+        "strip": {
+          "label": "{{count}} systems, lowest security {{lowest}}. Ship kills in the last hour: {{ships}}. Pod kills: {{pods}}.",
+          "tip": "{{name}}\nSecurity {{security}}\nShip kills, last hour: {{ships}}\nPod kills, last hour: {{pods}}",
+          "unknown": "unknown"
+        },
+        "showInRouteSafety": "Route Safety",
+        "showInRouteSafetyAria": "Show in Route Safety, leg {{n}}",
+        "noLegs": "Nothing in this route needs a trip.",
+        "leftOutTitle": "Left out of this route",
+        "leftOut_cap": "{{place}} ({{name}}): {{volume}} m³ is past the ten-stop limit. Plan another haul for it.",
+        "leftOut_unplaced": "{{place}} ({{name}}): {{volume}} m³ is somewhere with no solar system to route to.",
+        "leftOut_noCapacity": "{{place}} ({{name}}): {{volume}} m³ has no hold to carry it in.",
+        "flown": "{{name}} flies out: {{ships}}. Not part of this route.",
+        "markDoneAria": "Leg {{n}} done",
+        "marked": "Marked leg {{n}} done",
+        "undo": "Undo",
+        "hereAsk": "Your Current System is where leg {{n}} ends ({{place}}). Mark it done?",
+        "hereMark": "Mark done",
+        "finished": "Every leg is done. ESI caches assets for about an hour, so the Move plan may show the old stock until ESI refreshes.",
+        "replan": "Replan from here",
+        "replanLoaded": "{{names}} still carries a load. Deliver it and tick that leg first, then replan.",
+        "replanFailed": "Could not replan the route. Try again later.",
+        "resetProgress": "Reset progress",
+        "clear": "Clear haul",
+        "clearTitle": "Clear the haul in progress?",
+        "clearBody": "The saved route and its legs are removed. The Move plan is not affected."
+      },
       "volumeUnknown": "volume unknown",
       "flyIt": "Fly it",
       "packInstead": "Pack instead",
@@ -7255,7 +7366,6 @@
       "packAnyway": "Pack anyway",
       "dontRemind": "Don't remind me again",
       "back": "Back",
-      "done": "Done",
       "nothingToMove": "Nothing to move",
       "nothingToMoveHint": "Everything you picked is already at the destination.",
       "haulHeading": "Haul {{n}} of {{total}}",
@@ -11828,9 +11938,6 @@
       "orderSoFarNotBuilt": "What this order has sold so far is not tracked yet.",
       "structureMarketUnavailable": "The market inside a player structure can't be read yet, so only the region check applies here",
       "filter": {
-        "text": "Item or character",
-        "side": "Buy or sell",
-        "character": "Character",
         "location": "Location",
         "allLocations": "All locations",
         "selectedLocationsCount_one": "{{count}} location",
@@ -11838,9 +11945,7 @@
         "locationSearchPlaceholder": "Search locations…",
         "locationNoResults": "No locations match your search.",
         "unknownLocation": "Unknown structure #{{id}}",
-        "problem": "Problem",
         "expiringWithin": "Expires within",
-        "costBasis": "Cost basis",
         "costBasisLinked": "Cost known",
         "costBasisMissing": "No cost basis",
         "minIskTiedUp": "ISK tied up over",
@@ -11849,7 +11954,6 @@
         "minIskTiedUpOption": "{{amount}} ISK",
         "show": "Filters",
         "hide": "Hide filters",
-        "clearAll": "Clear all",
         "anyExpiry": "Any expiry",
         "anySize": "Any size",
         "sort": "Sort",
@@ -12308,6 +12412,7 @@
       "persistAction": "Protect this data",
       "persistDenied": "The browser declined. It tends to agree once the app is installed.",
       "persistGranted": "Storage is now protected.",
+      "atRisk": "Data not protected",
       "downloadLabel": "Download everything",
       "downloadHint": "Fetches every file above now, even on mobile data or Data Saver.",
       "downloadAction": "Download everything for offline",
@@ -12363,12 +12468,14 @@
         "dataLag": "Why do my numbers differ from, or lag behind, the game?",
         "alerts": "What are Alerts, and how do I get them when the app is closed?",
         "characters": "Can I use several Characters?",
+        "rowMenus": "Where are the extra actions for a row?",
         "phone": "Does it work on a phone?",
         "communities": "What is a Community, and what do Members see?",
         "trainSkills": "How do I find skills to train?",
         "synced": "What syncs between my devices?",
         "local": "What stays on this device?",
         "communityData": "What do Communities share?",
+        "corpRecords": "What do SRP and the Corp Tax Book store?",
         "retention": "How long is my data stored?",
         "writes": "Does Neocom Desk change anything in EVE?",
         "delete": "How do I delete my data?",
@@ -12380,7 +12487,7 @@
         "backups": "How do backups work?"
       },
       "a": {
-        "delete": "Settings › Log out & delete › Delete all data removes every Character's synced data from our server, then erases this device. Another logged-in device keeps its own copy and can sync it back. Log out of all characters clears this device only. Delete all data also offers to leave your Communities (ticked by default), which deletes what you shared there, plus your Requests and Pledges, right away; untick it to stay in them. A Community's admin can't leave, so a Community you run is skipped: hand it over or delete it, which deletes it for every Member. A Character with no sync for 90 days is removed from its Communities automatically.",
+        "delete": "Settings › Log out & delete › Delete all data removes every Character's synced data from our server, then erases this device. Another logged-in device keeps its own copy and can sync it back. Log out of all characters clears this device only. Delete all data also offers to leave your Communities (ticked by default), which deletes what you shared there, plus your Requests and Pledges, right away; untick it to stay in them. A Community's admin can't leave, so a Community you run is skipped: hand it over or delete it, which deletes it for every Member. A Character with no sync for 90 days is removed from its Communities automatically. SRP Claims and Corp Tax Book lines belong to the corporation's records and stay with it; How long is my data stored? says when they go.",
         "install": "<link>Settings › App & backup › Install this app</link> shows the steps for your browser, or an Install button if it has one. On iPhone and iPad, installing is also what makes notifications work.",
         "update": "The app updates itself in the background. For a new version now: Settings › App & backup › Update now: it checks and reloads.",
         "pushKinds": "Alerts with a known time: a skill level finishing, training stopping or a queue ending, an industry job finishing (yours or your corporation's), a courier delivery due, a contract or market order about to expire, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Alerts when closed adds EVE's own notifications, such as a structure under attack, for each Character you turn it on for. Everything else, including Community alerts, needs the app open. Quiet time (a daily no-push window, set per device) silences both kinds; the alerts still appear in your Alerts list. Turn them on in Settings › Notifications.",
@@ -12388,6 +12495,7 @@
         "dataLag": "Neocom Desk reads EVE's ESI, which is not live. A Character's own data is reused for 10 minutes (a day for game constants such as item names), or until EVE says it may change, if later, so moving between pages doesn't ask again. EVE also caches some data for minutes and corporation data for about an hour, so a short timer may already have happened. The age badge by a page's title shows data age: amber after an hour, red after a day. It's hidden on narrow screens; <data>Settings › Cached data</data> lists every source. A Refresh button asks EVE again right away.",
         "alerts": "Alerts are the bell panel (press A). With the app open, it checks each Character and raises Alerts for the events you enabled in Settings › Notifications. With it closed, known-time alerts such as a skill finishing are scheduled up to 72 hours ahead and pushed to devices with notifications on. Alerts when closed is off until you enable it per Character: you authorize that Character a second time, notifications only, and our server checks EVE's notifications about every 15 minutes and pushes the types you chose, with their text, via Google's push service. It doesn't keep them, and turning it off deletes that token. Quiet time, set per device, pauses pushes for a daily window (you can let attacks through); its times and time zone are stored with the device registration. On iPhone and iPad, install the app first.",
         "characters": "Yes. Each Character logs in on its own: Characters › Add character (press C). Switch between them in the switcher; sort or group them on the Characters page. Alerts, Alerts when closed and Community membership are per Character. Some pages, such as Contacts, can show all Characters together.",
+        "rowMenus": "Tables with several actions per row show a ⋮ (More actions) button at the end. Right-click the row, or touch and hold on a phone, for the same menu. Overview widgets and fitting tiles have menus too. No ⋮: the row has one action, so just click it.",
         "phone": "Yes. A phone browser or home-screen install gets a narrower layout with bottom navigation. It's designed desktop-first, beside the game, so dense tables and editors are easier on a big screen. The age badge is hidden on a phone. On iPhone and iPad, notifications need the installed app.",
         "trainSkills": "Every Add button puts the skill in your target Skill Plan. Ways to start:",
         "trainSkillsQueue": "Copy your in-game queue: Skills › Plans › a plan › Import › From skill queue.",
@@ -12429,7 +12537,7 @@
         },
         "local": {
           "title": "Kept on this device only",
-          "description": "Everything read from EVE is cached here and is not uploaded, apart from what you choose to share with a Community or turn on for alerts.",
+          "description": "Everything read from EVE is cached here and is not uploaded, apart from what you choose to share with a Community or turn on for alerts, and your corporation's SRP Claims and Corp Tax Book (What do SRP and the Corp Tax Book store?).",
           "esi": "Your characters' EVE data: assets, wallet, contracts, mail, contacts, clones, calendar, skills, skill queue, industry jobs and colonies.",
           "corp": "Corporation data: wallet, members, structures, assets and moon extractions.",
           "market": "Market prices, order books and LP stores.",
@@ -12452,6 +12560,12 @@
           "payouts": "Fleet Payouts you open as the boss: the name, the loot value, the split, and each pilot's name and ISK with whether you marked it paid. Pilots who are not in the Community are stored by the name you typed. A Member can read only their own line; you read all of them. Deleted 30 days after posting.",
           "pledges": "Pledges you make: quantities, what you marked delivered, and the IDs of the contracts behind it. The contract IDs and delivered amounts come from your finished contracts, read on this device and uploaded while the app is open. Nothing else about the contracts is.",
           "mail": "Mail about invites and Pledges is sent from your own Character, so its text goes to EVE and not to us. Our server records only who was mailed and when, to enforce a daily limit."
+        },
+        "corp": {
+          "title": "Kept for your corporation",
+          "description": "Only if your corporation uses SRP or a Corp Tax Book. These are the corporation's records, not yours: they sit on our server (Google Firebase) under the corporation's ID, and Delete all data leaves them with it.",
+          "srp": "SRP Claims: the killmail, the Character's name and ID, the hull, system and loss value, the fleet or FC and note you gave, the Reimbursement and the claim's state. Also the corporation's SRP settings, its Doctrine Fits and its SRP log: each filing (with the pilot's name, killmail, hull and amount) and each officer action. The CEO, Directors and Accountants read all of it; a pilot reads only their own claims.",
+          "corpTaxBook": "The Corp Tax Book: what each Character mined at the refineries it covers (corp members, Guests, and miners at a moon owner's refineries it collects for), the Statements sent, the payments that settle them, write-offs and corrections, a log of who did each, and which books bill each Character (kept under that Character's ID). The CEO, Directors, Accountants and Junior Accountants read the whole book; a corp member reads only their own lines; a moon owner reads only its own mined volume, rate, amount due and payouts, never what each miner owes. A Statement's verify link, sent by mail, shows that Statement to whoever has the link."
         },
         "notes": {
           "push": "Push notifications, if on: this device's token, its character IDs, and the next 72 hours of alert text, so alerts arrive while the app is closed. The EVE token used to verify each character is discarded right after.",
@@ -12502,7 +12616,11 @@
           "communityRequests": "Community Requests, with their Pledges:",
           "communityRequestsKept": "30 days after posting or your last Extend, then 7 more days before they are deleted. A closed Request is deleted 7 days after it closes.",
           "shareLinks": "Share Links:",
-          "shareLinksKept": "7 days, then deleted automatically (up to a day later)."
+          "shareLinksKept": "7 days, then deleted automatically (up to a day later).",
+          "srp": "SRP Claims:",
+          "srpKept": "a Paid or Rejected claim is deleted 365 days after it closes (checked daily), and its lines in the SRP log (the filing and each officer action on it) go with it. A Pending or Approved claim, the SRP settings and the log's other lines have no expiry; Doctrine Fits stay until a Director or the CEO deletes them.",
+          "corpTaxBook": "Corp Tax Book:",
+          "corpTaxBookKept": "no expiry. Its lines, Statements, payments, verify links and log stay until whoever turned the book on, or the CEO, deletes the book, which deletes everything in it, including its place in the record of which books bill each Character."
         }
       },
       "helpPointer": "Bug, question or idea? See <help>Support</help>."
@@ -13354,6 +13472,14 @@
       "cellEdit": "Stock target for {{name}}: {{count}}. Edit",
       "invalid": "Enter a whole number of at least 1, or leave it empty to remove the target.",
       "typeFallback": "Type {{id}}"
+    },
+    "dataExport": {
+      "done": "Downloaded {{file}} · {{sheets}}, {{rows}}",
+      "sheets_one": "{{count, number}} sheet",
+      "sheets_other": "{{count, number}} sheets",
+      "rows_one": "{{count, number}} row",
+      "rows_other": "{{count, number}} rows",
+      "failed": "Couldn't build the file. Try again."
     }
   },
   "publicInfo": {
@@ -13408,11 +13534,7 @@
     "open": "Filters",
     "openWithCount": "Filters ({{count}} active)",
     "apply": "Apply",
-    "cancel": "Cancel",
-    "discardTitle": "Discard filter changes?",
-    "discardBody": "The filters you changed have not been applied.",
-    "discard": "Discard",
-    "keepEditing": "Keep editing"
+    "cancel": "Cancel"
   },
   "contractSearch": {
     "title": "Contract Search",
@@ -14255,8 +14377,13 @@
       "stopLabel": "Stop {{number}}: {{name}}",
       "unnamed": "System {{id}}",
       "add": "+ Add stop",
-      "addLabel": "Add stop, search solar systems",
-      "destinationLabel": "Destination, search solar systems",
+      "addLabel": "Add stop, search systems and stations",
+      "destinationLabel": "Destination, search systems and stations",
+      "kind": {
+        "system": "System",
+        "station": "Station",
+        "structure": "Structure"
+      },
       "full_one": "Up to {{count}} stop.",
       "full_other": "Up to {{count}} stops.",
       "remove": "Remove {{name}}",
@@ -15007,6 +15134,7 @@
         "reminder": "Reminder",
         "rate-change": "Rate change",
         "payee-change": "Who gets paid changed",
+        "srp-result": "SRP result",
         "removal": "Moon owner removal",
         "removalCancelled": "Removal cancelled"
       },
@@ -16107,6 +16235,209 @@
         "title": "Couldn't verify your corp role",
         "hint": "Try again or log in again."
       }
+    },
+    "export": {
+      "title": "Export the book",
+      "hint": "One Excel workbook with every record the book holds, a sheet per kind. A copy to keep or work in: it can't be imported back.",
+      "firstTitle": "Export first",
+      "firstHint": "Keep a copy: one Excel workbook with every record the book holds, a sheet per kind. SRP isn't part of the book and is kept.",
+      "action": "Download the book (.xlsx)",
+      "sheetList": "Sheets: Mining lines, Statements, Payments, Adjustments, Write-offs, Dismissals, Declarations, Rebills, Miners, Grouping answers, Extractions, Moon owners, Moon owner payments, Moon owner rates, Settings, Activity log.",
+      "yes": "Yes",
+      "no": "No",
+      "sheets": {
+        "miningLines": "Mining lines",
+        "statements": "Statements",
+        "payments": "Payments",
+        "adjustments": "Adjustments",
+        "writeOffs": "Write-offs",
+        "dismissals": "Dismissals",
+        "declarations": "Declarations",
+        "rebills": "Rebills",
+        "miners": "Miners",
+        "groupingAnswers": "Grouping answers",
+        "extractions": "Extractions",
+        "moonOwners": "Moon owners",
+        "moonOwnerPayments": "Moon owner payments",
+        "moonOwnerRates": "Moon owner rates",
+        "settings": "Settings",
+        "activity": "Activity log"
+      },
+      "cols": {
+        "date": "Date",
+        "character": "Character",
+        "characterId": "Character ID",
+        "miner": "Miner",
+        "minerId": "Miner ID",
+        "corporationId": "Corporation ID",
+        "refinery": "Refinery",
+        "refineryId": "Refinery ID",
+        "moon": "Moon",
+        "moonId": "Moon ID",
+        "systemId": "System ID",
+        "ore": "Ore",
+        "typeId": "Type ID",
+        "quantity": "Quantity",
+        "moonOwnerId": "Moon owner ID",
+        "readAt": "Read at",
+        "statementId": "Statement ID",
+        "code": "Payment code",
+        "periodStart": "Period start",
+        "periodEnd": "Period end",
+        "coversFrom": "Covers from",
+        "coversThrough": "Covers through",
+        "issued": "Issued",
+        "hub": "Trade hub",
+        "oreForm": "Ore Form",
+        "lines": "Lines",
+        "amount": "Amount (ISK)",
+        "settled": "Settled",
+        "paymentId": "Payment ID",
+        "time": "Time (UTC)",
+        "notTax": "Not tax (ISK)",
+        "source": "Source",
+        "adjustmentId": "Adjustment ID",
+        "reason": "Reason",
+        "by": "Officer",
+        "byId": "Officer ID",
+        "writeOffId": "Write-off ID",
+        "dismissalId": "Dismissal ID",
+        "scope": "Scope",
+        "target": "Target",
+        "reversedBy": "Reversed by",
+        "reversedAt": "Reversed at",
+        "mainCharacter": "Main character",
+        "mainCharacterId": "Main character ID",
+        "characters": "Characters",
+        "characterIds": "Character IDs",
+        "closed": "Closed",
+        "finalStatementId": "Final Statement ID",
+        "setting": "Setting",
+        "value": "Value",
+        "via": "Via",
+        "action": "Action",
+        "detail": "Detail",
+        "declarationId": "Declaration ID",
+        "kind": "Kind",
+        "note": "Note",
+        "recordedBy": "Recorded by",
+        "recordedById": "Recorded by ID",
+        "resolution": "Resolution",
+        "resolvedAt": "Resolved at",
+        "resolvedBy": "Resolved by",
+        "resolvedById": "Resolved by ID",
+        "resolutionReason": "Resolution reason",
+        "rebillId": "Rebill ID",
+        "fromDate": "Rebilled from",
+        "memberRebill": "Touches a corp member",
+        "answer": "Answer",
+        "started": "Started",
+        "chunkArrival": "Chunk arrival",
+        "naturalDecay": "Natural decay",
+        "laserFired": "Laser fired",
+        "cancelled": "Cancelled",
+        "surveyId": "Moon Ore Survey",
+        "moonOwner": "Moon owner",
+        "status": "Status",
+        "mode": "Mode",
+        "modeChanges": "Mode changes",
+        "joined": "Joined",
+        "left": "Left",
+        "invitedBy": "Invited by",
+        "invitedById": "Invited by ID",
+        "payee": "Paid to",
+        "payeeId": "Paid to ID",
+        "requestedRate": "Requested rate (%)",
+        "agreedRate": "Agreed rate (%)",
+        "offeredRate": "Offered rate (%)",
+        "coverage": "Coverage periods",
+        "lastReadWell": "Last good ledger read",
+        "staleSince": "Ledger unreadable since",
+        "disconnected": "Disconnected",
+        "removalStarted": "Removal started",
+        "removalStartedBy": "Removal started by",
+        "removalEffective": "Removal effective",
+        "method": "Method",
+        "journalRef": "Wallet journal ref",
+        "notAPayout": "Not a payout",
+        "ratePct": "Rate (%)",
+        "effectiveFrom": "Effective from"
+      },
+      "moonOwnerStatus": {
+        "active": "Active",
+        "pending-removal": "Removal pending",
+        "removed": "Removed",
+        "left": "Left",
+        "disconnected": "Disconnected"
+      },
+      "moonOwnerMode": {
+        "normal": "Paid out through the book",
+        "settled-otherwise": "Settled otherwise"
+      },
+      "rateKind": {
+        "requested": "Requested",
+        "agreed": "Agreed"
+      },
+      "declarationKind": {
+        "contract": "Paid by contract",
+        "other-division": "Paid to another division",
+        "wrong-corp": "Paid to the wrong corporation"
+      },
+      "resolution": {
+        "confirmed": "Confirmed",
+        "rejected": "Rejected"
+      },
+      "groupingAnswer": {
+        "confirmed": "Confirmed",
+        "declined": "Declined"
+      },
+      "answerVia": {
+        "character": "The character",
+        "verify-link": "The Miner's verify link"
+      },
+      "paymentSource": {
+        "donation": "Wallet donation",
+        "manual": "Recorded by an officer"
+      },
+      "dismissalScope": {
+        "record": "One entry",
+        "miner": "Miner",
+        "moon": "Moon",
+        "extraction": "Extraction"
+      },
+      "setting": {
+        "active": "Active",
+        "startDate": "Start date",
+        "hub": "Trade hub",
+        "oreForm": "Ore Form",
+        "cadence": "Statement period",
+        "cadenceMonthly": "Monthly",
+        "cadenceDays": "Every {{days}} days from {{anchor}}",
+        "graceHours": "Grace period (hours)",
+        "minimumStatement": "Smallest Statement (ISK)",
+        "overdueDays": "Overdue after (days)",
+        "divisions": "Wallet divisions",
+        "approvalLimit": "Dismissals above this need a Director (ISK)",
+        "chunkM3PerHour": "Moon chunk (m³ per hour)",
+        "owner": "Owner",
+        "createdBy": "Turned on by",
+        "lastSync": "Last sync",
+        "membersSeeFrom": "Members see the book from",
+        "automaticSync": "Automatic sync",
+        "automaticSyncOn": "On, held by {{name}}",
+        "automaticSyncStopped": "Stopped (was held by {{name}})",
+        "automaticSyncOff": "Off",
+        "declinedAutoGroup": "Characters left out of automatic grouping",
+        "rate": {
+          "corp": "Tax rate (%): corporation, from {{from}}",
+          "guest": "Tax rate (%): guests, from {{from}}",
+          "feeder": "Tax rate (%): moon owner {{target}}, from {{from}}",
+          "miner": "Tax rate (%): Miner {{target}}, from {{from}}",
+          "moon": "Tax rate (%): {{target}}, from {{from}}",
+          "structure": "Tax rate (%): refinery {{target}}, from {{from}}",
+          "record": "Tax rate (%): one entry, {{target}}"
+        }
+      }
     }
   },
   "srpMember": {
@@ -16553,8 +16884,8 @@
         "approvedOutro": "It will be paid in game by an officer of {{corp}}. You will get a separate payment.",
         "rejectedOutro_one": "You can re-file it once from the SRP page.",
         "rejectedOutro_other": "You can re-file each once from the SRP page.",
-        "sentTo_one": "Mail sent to {{count}} pilot.",
-        "sentTo_other": "Mail sent to {{count}} pilots.",
+        "queuedFor_one": "Mail queued for {{count}} pilot.",
+        "queuedFor_other": "Mail queued for {{count}} pilots, sent about 5 a minute.",
         "failedFor": "Mail failed for {{names}}, status still saved.",
         "noScope": "No mail sent: mail permission missing.",
         "corpFallback": "your corporation",
@@ -16743,6 +17074,106 @@
       "pilotNote": "You can still file. An officer decides, and a note under Fleet or FC helps.",
       "queueFlag": "Off doctrine",
       "detailLabel": "Doctrine"
+    },
+    "export": {
+      "title": "Export",
+      "label": "SRP data",
+      "hint": "One Excel workbook, a sheet per kind. A copy to keep or work in: it can't be imported back.",
+      "sheetList": "Sheets: Settings, SRP Claims (every state), SRP log, Doctrine Fits.",
+      "action": "Download SRP data (.xlsx)",
+      "yes": "Yes",
+      "no": "No",
+      "never": "Never turned on",
+      "sheets": {
+        "settings": "Settings",
+        "claims": "SRP Claims",
+        "log": "SRP log",
+        "doctrines": "Doctrine Fits"
+      },
+      "cols": {
+        "killmailId": "Killmail ID",
+        "state": "State",
+        "pilot": "Pilot",
+        "pilotId": "Pilot ID",
+        "hull": "Hull",
+        "hullId": "Hull type ID",
+        "system": "System",
+        "systemId": "System ID",
+        "killed": "Lost at",
+        "filed": "Filed",
+        "amount": "Amount (ISK)",
+        "basis": "Priced by",
+        "computedAmount": "Worked-out amount (ISK)",
+        "suggested": "Suggested (ISK)",
+        "fleetOrFc": "Fleet or FC",
+        "note": "Note",
+        "refiled": "Times refiled",
+        "doctrineCheck": "Doctrine check",
+        "doctrineFit": "Doctrine Fit",
+        "overrideReason": "Amount changed because",
+        "overrideBy": "Amount changed by",
+        "decided": "Decided",
+        "decidedBy": "Decided by",
+        "rejectionReason": "Rejection reason",
+        "paid": "Paid",
+        "paidBy": "Paid by",
+        "closed": "Closed",
+        "time": "Time (UTC)",
+        "by": "Officer",
+        "byId": "Officer ID",
+        "action": "Action",
+        "summary": "Summary",
+        "detail": "Detail",
+        "doctrineId": "Doctrine Fit ID",
+        "name": "Name",
+        "modules": "Modules",
+        "rigs": "Rigs",
+        "createdById": "Created by ID",
+        "created": "Created",
+        "setting": "Setting",
+        "value": "Value"
+      },
+      "state": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "paid": "Paid",
+        "rejected": "Rejected"
+      },
+      "basis": {
+        "hull-fixed": "Hull Rule: fixed amount",
+        "class-fixed": "Class rule: fixed amount",
+        "killmail-percent": "{{percent}}% of the killmail value",
+        "appraisal-percent": "{{percent}}% of the Jita Appraisal"
+      },
+      "doctrine": {
+        "not-checked": "Not checked",
+        "matched": "Matched",
+        "off-doctrine": "Off doctrine"
+      },
+      "setting": {
+        "enabled": "SRP on",
+        "killmailPct": "Killmail value (%)",
+        "appraisalPct": "Jita Appraisal (%)",
+        "windowDays": "Claim window (days)",
+        "requireFleetOrFc": "Fleet or FC required",
+        "ownerId": "Owner ID",
+        "createdById": "Turned on by ID",
+        "createdAt": "Turned on",
+        "updatedById": "Last changed by ID",
+        "updatedAt": "Last changed",
+        "hullRule": "Hull Rule: {{target}}",
+        "hullRuleDoctrines": "Hull Rule: {{target}}, Doctrine Fits"
+      },
+      "ruleTarget": {
+        "hull": "{{name}}",
+        "class": "ship group {{id}}"
+      },
+      "rule": {
+        "pay-fixed": "Pays {{isk, number}} ISK",
+        "pay-percent": "Pays the corporation's percent",
+        "not-covered": "Not covered",
+        "officer-decides": "An officer decides"
+      }
     }
   }
 }

@@ -25,6 +25,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { ActionResult, SettingsHint } from '@/features/settings/settingsFields';
 import type { SrpOfficerVerdict, SrpSettings } from '../srpTypes';
 import { DoctrineFitsPanel } from './DoctrineFitsPanel';
+import { SrpExportPanel } from './SrpExportControls';
 import { HullRulesEditor } from './HullRulesEditor';
 import {
   formFromSettings,
@@ -319,6 +320,8 @@ export function SrpSettingsEditor({
           </Field>
         </Fields>
       </Panel>
+
+      <SrpExportPanel />
 
       {(dirty || problems.count > 0) && (
         <UnsavedChangesBar

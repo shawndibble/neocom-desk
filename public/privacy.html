@@ -49,7 +49,7 @@
   <body>
     <main>
       <h1>Privacy Policy — Neocom Desk</h1>
-      <p class="updated">Last updated: October 15, 2026</p>
+      <p class="updated">Last updated: October 24, 2026</p>
 
       <p>
         Neocom Desk is an independent, unofficial companion tool for the game
@@ -196,6 +196,36 @@
         you delete it or hand it to another Member.
       </p>
 
+      <h2 id="corp-records">SRP and the Corp Tax Book (corporation records)</h2>
+      <p>
+        If your corporation uses SRP or a Corp Tax Book, the app keeps that corporation's records on
+        Google Firebase under the corporation's ID. They belong to the corporation, not to one
+        character, so <strong>Delete all data</strong> does not remove them.
+      </p>
+      <ul>
+        <li>
+          <strong>SRP Claims:</strong> for each claim, the killmail, the claiming character's name
+          and EVE character ID, the hull, solar system and loss value, the fleet or FC and note the
+          pilot gave, the Reimbursement and the claim's state (Pending, Approved, Paid or Rejected).
+          Also the corporation's SRP settings, its Doctrine Fits and its SRP log: each filing (with
+          the pilot's name, killmail, hull and amount) and each officer action (with the officer's
+          name). The corporation's CEO, Directors and Accountants can read all of it; a pilot can
+          read only their own claims.
+        </li>
+        <li>
+          <strong>Corp Tax Book:</strong> what each character mined at the refineries the book
+          covers (corp members, Guests who mined there from another corporation, and miners at a
+          moon owner's refineries the book collects tax for), the Statements sent, the payments that
+          settle them, write-offs and corrections, a log of which officer did each, and which books
+          bill each character (kept under that character's ID rather than the corporation's). The
+          CEO, Directors, Accountants and Junior Accountants can read the whole book; a corp member
+          can read only their own lines; a moon owner can read only its own mined volume, rate,
+          amount due and payouts, never what each miner owes. A Statement's verify link, sent by
+          in-game mail, shows that Statement to whoever has the link, without logging in.
+        </li>
+      </ul>
+      <p>How long each is kept is under <a href="#retention">How long it is kept</a>.</p>
+
       <h2 id="share-links">Share Links</h2>
       <p>
         The app can turn an appraisal, a Fitting, a D-Scan or a mining Survey into a short Share
@@ -252,8 +282,8 @@
           (<code>images.evetech.net</code>, for portraits and item icons).
         </li>
         <li>
-          <strong>Google</strong> (Firebase) — sync and Community storage, Share Links, login for
-          sync, our server functions, push delivery and Analytics.
+          <strong>Google</strong> (Firebase) — sync and Community storage, SRP Claims and Corp Tax
+          Books, Share Links, login for sync, our server functions, push delivery and Analytics.
         </li>
         <li><strong>Sentry</strong> — crash and error reporting.</li>
         <li>
@@ -281,12 +311,12 @@
 
       <p>
         <strong>Where it is stored.</strong> What the app keeps on Google Firebase (synced data,
-        Communities, Share Links and push registrations) is stored in the United States, in
-        Firestore's <code>nam5</code> multi-region, and the server functions run in the United
-        States too. Crash reports go to Sentry's US region, and the public contract snapshots on
-        Cloudflare are stored in Western North America. If you use the app from elsewhere, that data
-        is sent to and stored in the United States. Google Analytics processes its data wherever
-        Google does.
+        Communities, SRP Claims, Corp Tax Books, Share Links and push registrations) is stored in
+        the United States, in Firestore's <code>nam5</code> multi-region, and the server functions
+        run in the United States too. Crash reports go to Sentry's US region, and the public
+        contract snapshots on Cloudflare are stored in Western North America. If you use the app
+        from elsewhere, that data is sent to and stored in the United States. Google Analytics
+        processes its data wherever Google does.
       </p>
 
       <h2 id="retention">How long it is kept</h2>
@@ -306,6 +336,18 @@
           leave, are removed, or the Community is deleted.
         </li>
         <li>Share Links: 7 days.</li>
+        <li>
+          SRP Claims: a Paid or Rejected claim is deleted 365 days after it closes (the clean-up
+          runs daily), and its entries in the SRP log (the filing and each officer action on it) are
+          deleted with it. Pending and Approved claims, SRP settings and the log's other entries: no
+          expiry. Doctrine Fits: until a Director or the CEO deletes them.
+        </li>
+        <li>
+          Corp Tax Book: no expiry. Its lines, Statements, payments, verify links and log stay until
+          the officer who turned the book on, or the corporation's CEO, deletes the book, which
+          deletes everything in it, and removes the book from the record of which books bill each
+          character.
+        </li>
         <li>
           Alerts when closed token: until you turn it off, remove the character, log out or delete
           everything, or the 90-day idle clean-up above.
