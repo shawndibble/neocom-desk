@@ -12,6 +12,11 @@ function shiftDay(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
 }
 
+/** A day whose average is a real price: a row of 0 (or garbage) is a day nothing priced, not a crash. */
+export function isPricedDay(point: MarketHistoryPoint): boolean {
+  return Number.isFinite(point.average) && point.average > 0;
+}
+
 /**
  * Fractional change of the daily average from the last day on or before
  * `days` earlier to the newest day (0.2 = +20%). Anchored on the newest row,
@@ -19,21 +24,22 @@ function shiftDay(date: string, days: number): string {
  * history does not reach back that far or the base is not positive.
  */
 export function percentChange(points: readonly MarketHistoryPoint[], days: number): number | null {
-  const sorted = sortPriceHistory(points);
+  const sorted = sortPriceHistory(points).filter(isPricedDay);
   const latest = sorted[sorted.length - 1];
   if (!latest) return null;
   const cutoff = shiftDay(latest.date, -days);
   let base: MarketHistoryPoint | undefined;
   for (const p of sorted) if (p.date <= cutoff) base = p;
-  if (!base || !(base.average > 0)) return null;
+  if (!base) return null;
   return latest.average / base.average - 1;
 }
 
 /** Scales a series to 100 at its first known value; gaps stay gaps. All gaps when that value is not positive. */
 export function indexToStart(values: readonly (number | null)[]): (number | null)[] {
-  const first = values.find((v): v is number => v !== null);
-  if (first === undefined || !(first > 0)) return values.map(() => null);
-  return values.map((v) => (v === null ? null : (v / first) * 100));
+  const usable = (v: number | null): v is number => v !== null && Number.isFinite(v) && v > 0;
+  const first = values.find(usable);
+  if (first === undefined) return values.map(() => null);
+  return values.map((v) => (usable(v) ? (v / first) * 100 : null));
 }
 
 export interface TrendAxis {
@@ -48,9 +54,10 @@ export interface TrendAxis {
  * limited to the `days` calendar days ending at the newest day any has.
  */
 export function alignTrendSeries(
-  series: readonly (readonly MarketHistoryPoint[])[],
+  rawSeries: readonly (readonly MarketHistoryPoint[])[],
   days: number
 ): TrendAxis {
+  const series = rawSeries.map((s) => s.filter(isPricedDay));
   const newest = series
     .flatMap((s) => s.map((p) => p.date))
     .reduce<string | null>((max, d) => (max === null || d > max ? d : max), null);
@@ -66,4 +73,28 @@ export function alignTrendSeries(
       return dates.map((d) => byDate.get(d) ?? null);
     }),
   };
+}
+
+/**
+ * Trailing moving average: each value is the mean of the known values among
+ * the last `window` entries (itself included), so a gap day gets a value from
+ * its neighbours and nothing plots until one value exists. Smooths daily noise
+ * on long ranges. Pure.
+ */
+export function trailingAverage(
+  values: readonly (number | null)[],
+  window: number
+): (number | null)[] {
+  return values.map((_, i) => {
+    let sum = 0;
+    let count = 0;
+    for (let j = Math.max(0, i - window + 1); j <= i; j++) {
+      const v = values[j];
+      if (v !== null && v !== undefined) {
+        sum += v;
+        count++;
+      }
+    }
+    return count === 0 ? null : sum / count;
+  });
 }

@@ -82,7 +82,44 @@ describe('TrendItemsDialog', () => {
   it('stops at six picks', async () => {
     open(widget({ trendItems: [1, 2, 3, 4, 5, 6] }));
     expect(screen.getByRole('checkbox', { name: 'Tritanium' })).toBeDisabled();
-    expect(screen.getByText(/6 of 6 chosen/)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Tritanium' })).toHaveAccessibleDescription(
+      /Remove one to add another/
+    );
+    expect(screen.getByText('Selected (6 of 6)')).toBeInTheDocument();
+    expect(screen.getByText(/Remove one to add another/)).toBeInTheDocument();
+  });
+
+  it('searches every list at once and shows which list each hit is from', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.type(screen.getByRole('searchbox', { name: 'Search items' }), 'mex');
+    expect(await screen.findByRole('checkbox', { name: /Mexallon/ })).toBeInTheDocument();
+    expect(screen.getByText('Minerals')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: /Mexallon/ }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(setTrendItems).toHaveBeenCalledWith('a', [34, 35, 36]);
+  });
+
+  it('says so when nothing matches, and clearing the search brings the list back', async () => {
+    const user = userEvent.setup();
+    open();
+    const box = screen.getByRole('searchbox', { name: 'Search items' });
+    await user.type(box, 'zzz');
+    expect(await screen.findByText('No item matches that name.')).toBeInTheDocument();
+    await user.clear(box);
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Tritanium' })).toBeInTheDocument();
+  });
+
+  it('removes a pick from the selected list whatever list is showing', async () => {
+    const user = userEvent.setup();
+    open();
+    expect(screen.getByText('Selected (2 of 6)')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Remove Pyerite' }));
+    expect(screen.getByText('Selected (1 of 6)')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(setTrendItems).toHaveBeenCalledWith('a', [34]);
   });
 
   it('lists every ore source in the dropdown', async () => {

@@ -201,9 +201,9 @@ export interface LinesChartModel extends ChartBase {
     end: string;
     values: (number | null)[];
   }[];
-  /** The scale's two ends, already formatted. */
-  low: string;
-  high: string;
+  /** The scale's two ends, already formatted; omitted when the title and tooltips carry them. */
+  low?: string;
+  high?: string;
   rangeLabel?: string;
   /** One readout per day, listing every line. */
   tips?: ChartTip[];

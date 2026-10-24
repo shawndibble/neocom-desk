@@ -111,3 +111,33 @@ export function trendCatalogue(
     { id: 'plex', items: plex },
   ];
 }
+
+export interface TrendSearchHit extends TrendSourceItem {
+  sourceId: TrendSourceId | 'quickbar';
+}
+
+/**
+ * Items whose name contains the query, across every list at once, each named
+ * once under the first list that holds it. Names that start with the query
+ * come before ones that merely contain it; ties keep list order.
+ */
+export function searchTrendItems(
+  lists: readonly { id: TrendSearchHit['sourceId']; items: readonly TrendSourceItem[] }[],
+  query: string
+): TrendSearchHit[] {
+  const needle = query.trim().toLowerCase();
+  if (needle === '') return [];
+  const seen = new Set<number>();
+  const starts: TrendSearchHit[] = [];
+  const contains: TrendSearchHit[] = [];
+  for (const list of lists) {
+    for (const { typeId, name } of list.items) {
+      if (seen.has(typeId)) continue;
+      const at = name.toLowerCase().indexOf(needle);
+      if (at < 0) continue;
+      seen.add(typeId);
+      (at === 0 ? starts : contains).push({ typeId, name, sourceId: list.id });
+    }
+  }
+  return [...starts, ...contains];
+}

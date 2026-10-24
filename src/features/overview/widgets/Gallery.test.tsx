@@ -47,6 +47,7 @@ function Host({ initial, board }: { initial: OverviewLayout; board?: WidgetBoard
   );
   return (
     <MemoryRouter>
+      <output data-testid="layout">{JSON.stringify(layout)}</output>
       <FeedStoreContext.Provider value={store}>
         {board ? (
           <WidgetBoardContext.Provider value={board}>{body}</WidgetBoardContext.Provider>
@@ -175,6 +176,19 @@ describe('Gallery', () => {
     ).toBeInTheDocument();
     // A second add of the same preset is allowed.
     await user.click(within(dialog).getByRole('button', { name: 'Add PLEX price' }));
+  });
+
+  it('adds Mineral prices with three items at Jita', async () => {
+    const { user, dialog } = await openGallery();
+    await user.click(within(dialog).getByRole('button', { name: 'Add Mineral prices' }));
+    const added = (
+      JSON.parse(screen.getByTestId('layout').textContent!) as OverviewLayout
+    ).widgets.find((x) => x.kind === 'marketTrend');
+    expect(added).toMatchObject({
+      title: 'Mineral prices',
+      trendItems: [34, 35, 36],
+      trendHubs: ['jita'],
+    });
   });
 
   it('says a kind is on the Overview, with Add another and no second primary', async () => {

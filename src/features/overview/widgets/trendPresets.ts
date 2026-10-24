@@ -12,16 +12,18 @@ export interface TrendPreset {
   id: TrendPresetId;
   /** Type ids (at most TREND_MAX_SERIES). */
   items: readonly number[];
+  /** Trade Hub ids; absent means the pilot's Market hub (or global, for PLEX). */
+  trendHubs?: readonly string[];
   view: WidgetView;
 }
 
 export const TREND_PRESETS: readonly TrendPreset[] = [
   { id: 'plex', items: [44992], view: 'chart' },
   { id: 'injector', items: [40520], view: 'chart' },
-  // Tritanium .. Zydrine; Megacyte and Morphite do not fit under the six-line cap.
-  { id: 'minerals', items: [34, 35, 36, 37, 38, 39], view: 'chart' },
-  // Veldspar, Scordite, Pyroxeres, Plagioclase, Omber, Kernite.
-  { id: 'ore', items: [1230, 1228, 1224, 18, 1227, 20], view: 'chart' },
+  // Tritanium, Pyerite, Mexallon at Jita; the Items dialog adds more.
+  { id: 'minerals', items: [34, 35, 36], trendHubs: ['jita'], view: 'chart' },
+  // Veldspar, Scordite, Pyroxeres at Jita.
+  { id: 'ore', items: [1230, 1228, 1224], trendHubs: ['jita'], view: 'chart' },
 ];
 
 export function trendPreset(id: string): TrendPreset | undefined {

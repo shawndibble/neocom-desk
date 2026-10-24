@@ -203,6 +203,27 @@ describe('a year of range', () => {
   });
 });
 
+describe('addWidget trendHubs init', () => {
+  const empty = layoutOf();
+
+  it('applies cleaned hubs to a kind with trend sources, copied not aliased', () => {
+    const hubs = ['jita', 'nowhere', 'jita'];
+    const next = addWidget(empty, 'marketTrend', counter(), { trendHubs: hubs });
+    expect(next.widgets[0].trendHubs).toEqual(['jita']);
+    next.widgets[0].trendHubs!.push('amarr');
+    expect(hubs).toEqual(['jita', 'nowhere', 'jita']);
+  });
+
+  it('leaves no trendHubs when none are valid, and ignores them on other kinds', () => {
+    expect(
+      addWidget(empty, 'marketTrend', counter(), { trendHubs: ['x'] }).widgets[0]
+    ).not.toHaveProperty('trendHubs');
+    expect(
+      addWidget(empty, 'wallet', counter(), { trendHubs: ['jita'] }).widgets[0]
+    ).not.toHaveProperty('trendHubs');
+  });
+});
+
 describe('setTrendItems and setTrendHubs', () => {
   const l = layoutOf(w('a', 'marketTrend'), w('b', 'wallet'));
 
