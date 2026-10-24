@@ -19,7 +19,13 @@
 
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, docId, record } from './communities.js';
-import { BOOK_DEFAULTS, type ForfeitBasis } from './corpTaxBookEngine.js';
+import {
+  BOOK_DEFAULTS,
+  shiftDate,
+  statementDays,
+  type ForfeitBasis,
+  type StatementDays,
+} from './corpTaxBookEngine.js';
 
 /** The Tax Book lives under the `corps/{id}` umbrella (issue #4858, ADR 0026). */
 export const BOOKS_COLLECTION = 'corps';
@@ -297,6 +303,10 @@ export interface SettingsPatch {
   chunkM3PerHour?: number;
   structureExpiryHours?: Record<string, number>;
   dismissApprovalAboveIsk?: number | null;
+  /** Move the book's start (Director): earlier freely, later only over unbilled days. */
+  startDate?: string;
+  /** End the member setup window now (Director): `membersSeeFrom` becomes the call time. */
+  showToMembers?: true;
 }
 
 const HUBS = ['jita', 'amarr', 'dodixie', 'rens', 'hek'] as const;
@@ -352,9 +362,37 @@ export function parseSettingsPatch(data: unknown): SettingsPatch {
         ? null
         : num(d.dismissApprovalAboveIsk, 'dismissApprovalAboveIsk', 0, 1e13);
   }
+  if (d.startDate !== undefined) patch.startDate = dateString(d.startDate, 'startDate');
+  if (d.showToMembers !== undefined) {
+    if (d.showToMembers !== true)
+      throw new HttpsError('invalid-argument', 'showToMembers must be true');
+    patch.showToMembers = true;
+  }
   if (Object.keys(patch).length === 0)
     throw new HttpsError('invalid-argument', 'no settings given');
   return patch;
+}
+
+/**
+ * Why a book's start date cannot move from `oldStart` to `newStart`, else null. Never the
+ * future, never before a former moon owner's leave day (`floor`); moving later is allowed
+ * only while no issued Statement covers a day in the gap, so billed days stay billed.
+ */
+export function startDateMoveReason(
+  oldStart: string,
+  newStart: string,
+  today: string,
+  floor: string | null,
+  statements: readonly StatementDays[]
+): 'start-in-future' | 'start-before-leave' | 'start-over-billed' | null {
+  if (newStart > today) return 'start-in-future';
+  if (floor !== null && newStart < floor) return 'start-before-leave';
+  if (newStart > oldStart) {
+    const billed = new Set(statements.flatMap((s) => [...statementDays(s)]));
+    for (let d = oldStart; d < newStart; d = shiftDate(d, 1))
+      if (billed.has(d)) return 'start-over-billed';
+  }
+  return null;
 }
 
 export type EditAction =

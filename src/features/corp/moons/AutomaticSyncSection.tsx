@@ -7,6 +7,7 @@ import { beginCorpSyncLogin } from '@/app/loginFlow';
 import { formatAge } from '@/lib/age';
 import type { ScheduledSyncRun } from '@/engine/corpTaxBook/scheduledSync';
 import { turnOffScheduledSync, type CorpSyncCallbackState } from '../taxBook/syncGrant';
+import { useCharacterNames } from '@/features/character/useCharacters';
 import { useBook } from './useBook';
 
 type Notice = { tone: 'info' | 'warning'; text: string } | null;
@@ -24,6 +25,7 @@ export function AutomaticSyncSection() {
   const location = useLocation();
   const navigate = useNavigate();
   const { characterId, corporationId, data, verdict, canEdit, names, reload } = useBook();
+  const localNames = useCharacterNames();
   const scheduled = data.scheduledSync ?? null;
   const [busy, setBusy] = useState(false);
 
@@ -130,7 +132,7 @@ export function AutomaticSyncSection() {
                   active || scheduled?.status === 'stopped'
                     ? 'corpTaxBook.moons.autoSync.turnOnAgain'
                     : 'corpTaxBook.moons.autoSync.turnOn',
-                  { name: names.character(characterId) }
+                  { name: localNames.get(characterId) ?? names.character(characterId) }
                 )}
               </Button>
             </NeedsConnection>

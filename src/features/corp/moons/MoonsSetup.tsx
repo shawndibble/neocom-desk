@@ -32,11 +32,14 @@ export function MoonsSetup({
   corporationId,
   verdict,
   onDone,
+  onTurnedOn,
 }: {
   characterId: number;
   corporationId: number;
   verdict: OfficerVerdict;
   onDone: () => void;
+  /** Their own book was just turned on: the page runs its first sync. */
+  onTurnedOn?: () => void;
 }) {
   const { t } = useTranslation();
   const location = useLocation();
@@ -132,6 +135,8 @@ export function MoonsSetup({
         corporationId={corporationId}
         verdict={verdict}
         onDone={onDone}
+        onTurnedOn={onTurnedOn}
+        onBack={() => setStep('choices')}
       />
     );
   if (step === 'collect')
@@ -143,6 +148,7 @@ export function MoonsSetup({
         corporationId={corporationId}
         verdict={verdict}
         onDone={onDone}
+        onBack={() => setStep('choices')}
       />
     );
   const code = parseInviteInput(paste);

@@ -42,6 +42,8 @@ interface ShellProps {
   run: () => Promise<void>;
   /** A destructive confirm (§6c): the confirm button is `danger`, not `primary`. */
   danger?: boolean;
+  /** The "logged under your name" footer note; off where no reason is asked. */
+  showLogged?: boolean;
   children: ReactNode;
 }
 
@@ -54,6 +56,7 @@ export function DialogShell({
   canConfirm,
   run,
   danger = false,
+  showLogged = true,
   children,
 }: ShellProps) {
   const { t } = useTranslation();
@@ -100,7 +103,9 @@ export function DialogShell({
             {error}
           </p>
         )}
-        <p className="text-xs text-text-dim">{t('corpTaxBook.moons.dialogs.logged')}</p>
+        {showLogged && (
+          <p className="text-xs text-text-dim">{t('corpTaxBook.moons.dialogs.logged')}</p>
+        )}
       </div>
     </Modal>
   );

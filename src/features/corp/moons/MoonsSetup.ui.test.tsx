@@ -72,7 +72,7 @@ beforeEach(() => {
 describe('MoonsSetup', () => {
   it('offers the three choices side by side and never the dev terms', async () => {
     renderSetup();
-    expect(await screen.findByText('Run our own book')).toBeInTheDocument();
+    expect(await screen.findByText("Run your corporation's book")).toBeInTheDocument();
     expect(screen.getByText('Let an accounting corporation handle it')).toBeInTheDocument();
     expect(screen.getByText('Collect tax for other corporations')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/feeder|collector/i);
@@ -80,8 +80,8 @@ describe('MoonsSetup', () => {
 
   it('disables the book choices for a non-Director', async () => {
     renderSetup(undefined, '', { ...verdict, isDirector: false });
-    await screen.findByText('Run our own book');
-    expect(screen.getByRole('button', { name: 'Turn on our own book' })).toBeDisabled();
+    await screen.findByText("Run your corporation's book");
+    expect(screen.getByRole('button', { name: "Turn on your corporation's book" })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Start collecting' })).toBeDisabled();
   });
 
@@ -144,8 +144,10 @@ describe('MoonsSetup', () => {
     getFeederStatus.mockResolvedValue({ status: 'none', ownBookFrom: '2026-10-12' });
     renderSetup();
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Turn on our own book' }));
-    const date = screen.getByLabelText('Start date');
+    await user.click(
+      await screen.findByRole('button', { name: "Turn on your corporation's book" })
+    );
+    const date = screen.getByLabelText('Start date (EVE time)');
     expect(date).toHaveValue('2026-10-12');
     expect(date).toHaveAttribute('min', '2026-10-12');
   });
@@ -163,7 +165,7 @@ describe('MoonsSetup', () => {
     });
     renderSetup();
     expect(await screen.findByText(/handles the tax on your moons/)).toBeInTheDocument();
-    expect(screen.queryByText('Run our own book')).not.toBeInTheDocument();
+    expect(screen.queryByText("Run your corporation's book")).not.toBeInTheDocument();
   });
 
   it('after leaving: previously handled above the choices, history below', async () => {
@@ -175,7 +177,7 @@ describe('MoonsSetup', () => {
     expect(
       await screen.findByText('Previously handled by Brass Meridian Logistics')
     ).toBeInTheDocument();
-    expect(screen.getByText('Run our own book')).toBeInTheDocument();
+    expect(screen.getByText("Run your corporation's book")).toBeInTheDocument();
     expect(screen.getByText('Mined while they handled it')).toBeInTheDocument();
   });
 
@@ -185,7 +187,7 @@ describe('MoonsSetup', () => {
       view: fixtureView({ status: 'left', dismissedAt: 1 }),
     });
     renderSetup();
-    expect(await screen.findByText('Run our own book')).toBeInTheDocument();
+    expect(await screen.findByText("Run your corporation's book")).toBeInTheDocument();
     expect(screen.queryByText(/Previously handled/)).not.toBeInTheDocument();
   });
 
@@ -201,7 +203,7 @@ describe('MoonsSetup', () => {
     expect(screen.getByText(/keeps 2,500,000 ISK for you/)).toBeInTheDocument();
     await user.click(screen.getAllByRole('button', { name: 'Leave' }).at(-1)!);
     await waitFor(() => expect(leaveFeeder).toHaveBeenCalledWith(7, 98));
-    expect(await screen.findByText('Run our own book')).toBeInTheDocument();
+    expect(await screen.findByText("Run your corporation's book")).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent(/You have left/);
   });
 });

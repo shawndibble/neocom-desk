@@ -5,7 +5,7 @@
  * its tab's label; a nested route adds its section's.
  */
 import { matchPath } from 'react-router-dom';
-import { tabFromPathname } from '@/lib/pageTabs';
+import { tabFromPathname, tabPath } from '@/lib/pageTabs';
 import { tabbedPageFor } from './pageTabs';
 import type { AppRoutePath } from './routeScopes';
 
@@ -87,12 +87,14 @@ const OTHER_ROUTE_TITLE_KEYS: Record<string, readonly string[]> = {
 
 const ROUTE_PATTERNS = Object.entries({ ...OTHER_ROUTE_TITLE_KEYS, ...ROUTE_TITLE_KEYS });
 
-function namesFor(pathname: string, t: Translate): string[] {
+function namesFor(pathname: string, t: Translate, hiddenTabPaths?: ReadonlySet<string>): string[] {
   const page = tabbedPageFor(pathname);
   if (page !== null) {
     const pageTitle = t(ROUTE_TITLE_KEYS[page.base as keyof typeof ROUTE_TITLE_KEYS][0]);
     const tabId = tabFromPathname(page, pathname);
     const tab = page.tabs.find((candidate) => candidate.id === tabId);
+    // A tab the nav leaves out is not named either: the page's own title stands alone.
+    if (tab && hiddenTabPaths?.has(tabPath(page, tab.id))) return [pageTitle];
     return tab ? [pageTitle, t(tab.labelKey)] : [pageTitle];
   }
   const match = ROUTE_PATTERNS.find(([pattern]) => matchPath(pattern, pathname));
@@ -104,8 +106,12 @@ export function pageTitleFor(path: AppRoutePath, t: Translate): string {
   return t(ROUTE_TITLE_KEYS[path][0]);
 }
 
-export function documentTitleFor(pathname: string, t: Translate): string {
-  const names = namesFor(pathname, t);
+export function documentTitleFor(
+  pathname: string,
+  t: Translate,
+  hiddenTabPaths?: ReadonlySet<string>
+): string {
+  const names = namesFor(pathname, t, hiddenTabPaths);
   // Market's Browser tab is labelled "Market"; say it once.
   const distinct = names.filter((name, index) => names.indexOf(name) === index);
   return [...distinct.reverse(), t('app.name')].join(SEPARATOR);
