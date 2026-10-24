@@ -23,7 +23,7 @@ import { cx } from '@/lib/cx';
 import type { PickedStation } from '@/features/places/placeSearch';
 import { useKnownPlaces } from '@/features/places/useKnownPlaces';
 import { buildPickerOptions, pickedStationOf, type PickerOption } from './pickerOptions';
-import { useSolarSystemIndex, useSolarSystemList, useSystemName } from './useSolarSystems';
+import { useSolarSystemList, useSystemName } from './useSolarSystems';
 
 const MATCH_LIMIT = 8;
 
@@ -81,21 +81,10 @@ export function SolarSystemPicker({
   );
   const valueName = useSystemName(triggerLabel === undefined ? value : null);
 
-  const systemIndex = useSolarSystemIndex();
   const placeHits = useKnownPlaces(query, places && open, MATCH_LIMIT);
   const matches = useMemo(
-    () =>
-      systems
-        ? buildPickerOptions(
-            systems,
-            query,
-            exclude,
-            placeHits,
-            (id) => systemIndex?.get(id)?.security ?? null,
-            MATCH_LIMIT
-          )
-        : [],
-    [systems, query, exclude, placeHits, systemIndex]
+    () => (systems ? buildPickerOptions(systems, query, exclude, placeHits, MATCH_LIMIT) : []),
+    [systems, query, exclude, placeHits]
   );
 
   function close() {
