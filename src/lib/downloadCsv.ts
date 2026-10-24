@@ -161,21 +161,19 @@ export interface WorkbookDownload {
   rows: number;
 }
 
-/** Every .xlsx download: one sheet for a table, or a sheet per record type for a dataset. */
+/** Every .xlsx download: one sheet for a table, or a sheet per record type for a dataset. Built off the main thread where a Worker can run. */
 export async function downloadWorkbook(
   surface: ExportSurface | WorkbookSurface,
   sheets: readonly AnyXlsxSheet[],
   { now = new Date(), truncated = false, qualifier }: ExportOptions = {}
 ): Promise<WorkbookDownload> {
   // Loaded on demand: the zip writer has no business in the main bundle.
-  const { toXlsxWorkbook } = await import('./xlsx');
+  const { buildWorkbook } = await import('./xlsxBuild');
   const filename = exportFilename(exportBase(surface, qualifier), now, 'xlsx', {
     partial: truncated,
   });
-  downloadBlob(
-    filename,
-    new Blob([toXlsxWorkbook(sheets) as Uint8Array<ArrayBuffer>], { type: XLSX_MIME })
-  );
+  const bytes = await buildWorkbook(sheets);
+  downloadBlob(filename, new Blob([bytes as Uint8Array<ArrayBuffer>], { type: XLSX_MIME }));
   return {
     filename,
     sheets: sheets.length,

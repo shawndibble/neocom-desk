@@ -16153,7 +16153,7 @@
       "firstTitle": "Export first",
       "firstHint": "Keep a copy: one Excel workbook with every record the book holds, a sheet per kind. SRP isn't part of the book and is kept.",
       "action": "Download the book (.xlsx)",
-      "sheetList": "Sheets: Mining lines, Statements, Payments, Adjustments, Write-offs, Dismissals, Miners, Settings, Activity log.",
+      "sheetList": "Sheets: Mining lines, Statements, Payments, Adjustments, Write-offs, Dismissals, Declarations, Rebills, Miners, Grouping answers, Extractions, Moon owners, Moon owner payments, Moon owner rates, Settings, Activity log.",
       "yes": "Yes",
       "no": "No",
       "sheets": {
@@ -16163,7 +16163,14 @@
         "adjustments": "Adjustments",
         "writeOffs": "Write-offs",
         "dismissals": "Dismissals",
+        "declarations": "Declarations",
+        "rebills": "Rebills",
         "miners": "Miners",
+        "groupingAnswers": "Grouping answers",
+        "extractions": "Extractions",
+        "moonOwners": "Moon owners",
+        "moonOwnerPayments": "Moon owner payments",
+        "moonOwnerRates": "Moon owner rates",
         "settings": "Settings",
         "activity": "Activity log"
       },
@@ -16220,7 +16227,92 @@
         "value": "Value",
         "via": "Via",
         "action": "Action",
-        "detail": "Detail"
+        "detail": "Detail",
+        "declarationId": "Declaration ID",
+        "kind": "Kind",
+        "note": "Note",
+        "recordedBy": "Recorded by",
+        "recordedById": "Recorded by ID",
+        "resolution": "Resolution",
+        "resolvedAt": "Resolved at",
+        "resolvedBy": "Resolved by",
+        "resolvedById": "Resolved by ID",
+        "resolutionReason": "Resolution reason",
+        "rebillId": "Rebill ID",
+        "fromDate": "Rebilled from",
+        "memberRebill": "Touches a corp member",
+        "answer": "Answer",
+        "started": "Started",
+        "chunkArrival": "Chunk arrival",
+        "naturalDecay": "Natural decay",
+        "laserFired": "Laser fired",
+        "cancelled": "Cancelled",
+        "surveyId": "Moon Ore Survey",
+        "moonOwner": "Moon owner",
+        "status": "Status",
+        "mode": "Mode",
+        "joined": "Joined",
+        "left": "Left",
+        "invitedBy": "Invited by",
+        "invitedById": "Invited by ID",
+        "payee": "Payee",
+        "payeeId": "Payee ID",
+        "requestedRate": "Requested rate (%)",
+        "agreedRate": "Agreed rate (%)",
+        "offeredRate": "Offered rate (%)",
+        "coverage": "Coverage periods",
+        "lastReadWell": "Last good ledger read",
+        "staleSince": "Ledger unreadable since",
+        "disconnected": "Disconnected",
+        "removalStarted": "Removal started",
+        "removalStartedBy": "Removal started by",
+        "removalEffective": "Removal effective",
+        "method": "Method",
+        "journalRef": "Wallet journal ref",
+        "notAPayout": "Not a payout",
+        "ratePct": "Rate (%)",
+        "effectiveFrom": "Effective from"
+      },
+      "moonOwnerStatus": {
+        "active": "Active",
+        "pending-removal": "Removal pending",
+        "removed": "Removed",
+        "left": "Left",
+        "disconnected": "Disconnected"
+      },
+      "moonOwnerMode": {
+        "normal": "Paid out through the book",
+        "settled-otherwise": "Settled otherwise"
+      },
+      "payoutMethod": {
+        "donation": "Donation",
+        "other": "Other"
+      },
+      "payoutStatus": {
+        "recorded": "Recorded",
+        "waiting-for-journal": "Waiting for the wallet journal",
+        "matched": "Matched in the wallet journal"
+      },
+      "rateKind": {
+        "requested": "Requested",
+        "agreed": "Agreed"
+      },
+      "declarationKind": {
+        "contract": "Paid by contract",
+        "other-division": "Paid to another division",
+        "wrong-corp": "Paid to the wrong corporation"
+      },
+      "resolution": {
+        "confirmed": "Confirmed",
+        "rejected": "Rejected"
+      },
+      "groupingAnswer": {
+        "confirmed": "Confirmed",
+        "declined": "Declined"
+      },
+      "answerVia": {
+        "character": "The character",
+        "verify-link": "The Miner's verify link"
       },
       "paymentSource": {
         "donation": "Wallet donation",
@@ -16254,6 +16346,7 @@
         "automaticSyncOn": "On, held by {{name}}",
         "automaticSyncStopped": "Stopped (was held by {{name}})",
         "automaticSyncOff": "Off",
+        "declinedAutoGroup": "Characters left out of automatic grouping",
         "rate": {
           "corp": "Tax rate (%): corporation, from {{from}}",
           "guest": "Tax rate (%): guests, from {{from}}",

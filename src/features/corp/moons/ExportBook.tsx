@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { downloadWorkbook, type WorkbookDownload } from '@/lib/downloadCsv';
 import { corpTickerOrId } from '../corpTicker';
-import { readAudit, readBookData } from '../taxBook/bookClient';
+import { readAudit, readBookData, readDeclinedAutoGroup, readRebills } from '../taxBook/bookClient';
 import { WorkbookDownloadButton } from '../WorkbookDownloadButton';
 import { bookExportSheets } from './bookExport';
 import { useBook } from './useBook';
@@ -17,9 +17,11 @@ function useExportBook(): () => Promise<WorkbookDownload> {
   const { t } = useTranslation();
   const { characterId, corporationId, names } = useBook();
   return useCallback(async () => {
-    const [data, audit, ticker] = await Promise.all([
+    const [data, audit, rebills, declinedAutoGroup, ticker] = await Promise.all([
       readBookData(characterId, corporationId),
       readAudit(characterId, corporationId, null),
+      readRebills(characterId, corporationId),
+      readDeclinedAutoGroup(characterId, corporationId),
       corpTickerOrId(corporationId),
     ]);
     if (!data) throw new Error('The corporation has no Corp Tax Book.');
@@ -35,6 +37,12 @@ function useExportBook(): () => Promise<WorkbookDownload> {
         adjustments: data.adjustments,
         writeOffs: state.writeOffs ?? [],
         dismissals: state.dismissals,
+        declarations: data.declarations,
+        rebills,
+        groupingAnswers: data.groupingAnswers ?? [],
+        declinedAutoGroup: [...declinedAutoGroup],
+        extractions: state.extractions,
+        feeders: data.feeders ?? [],
         audit,
         scheduledSync: data.scheduledSync,
       },

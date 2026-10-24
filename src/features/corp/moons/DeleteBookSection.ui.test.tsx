@@ -17,6 +17,8 @@ vi.mock('../taxBook/bookClient', () => ({
   deleteBook: (...a: unknown[]) => deleteBook(...a),
   readBookData: (...a: unknown[]) => readBookData(...a),
   readAudit: () => Promise.resolve([]),
+  readRebills: () => Promise.resolve([]),
+  readDeclinedAutoGroup: () => Promise.resolve(new Set<number>()),
   editBook: vi.fn(),
 }));
 

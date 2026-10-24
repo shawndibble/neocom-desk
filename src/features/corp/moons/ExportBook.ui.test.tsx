@@ -15,6 +15,8 @@ vi.mock('@/esi/endpoints/corp', () => ({
 vi.mock('../taxBook/bookClient', () => ({
   readBookData: (...a: unknown[]) => readBookData(...a),
   readAudit: (...a: unknown[]) => readAudit(...a),
+  readRebills: () => Promise.resolve([]),
+  readDeclinedAutoGroup: () => Promise.resolve(new Set<number>()),
   editBook: vi.fn(),
 }));
 
@@ -109,9 +111,9 @@ describe('ExportBookSection', () => {
     expect(readBookData).toHaveBeenCalledWith(ME, CORP);
     expect(readAudit).toHaveBeenCalledWith(ME, CORP, null);
     expect(save.mock.calls[0][0]).toMatch(/^neocom-corp-tax-book-test-\d{4}-\d{2}-\d{2}\.xlsx$/);
-    // 2 mining lines + 16 settings rows + 1 log entry.
+    // 2 mining lines + 17 settings rows + 1 log entry.
     expect(done).toHaveTextContent(
-      /^Downloaded neocom-corp-tax-book-test-.*\.xlsx · 9 sheets, 19 rows$/
+      /^Downloaded neocom-corp-tax-book-test-.*\.xlsx · 16 sheets, 20 rows$/
     );
   });
 

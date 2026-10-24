@@ -11,7 +11,10 @@ import { toCell, type ExportCell, type ExportValue } from './exportCells';
  * header row. Text is always an inline string, never a formula, so no
  * formula-injection guard is needed here.
  *
- * Kept out of the main bundle: callers reach it through a dynamic import.
+ * Two halves: `resolveSheet` reads each cell off its row (the column `value` functions are
+ * closures, so this runs where the rows live), and `writeWorkbook` turns that plain data into
+ * the file, in `xlsx.worker.ts` or, without a worker, on the page. Kept out of the main bundle:
+ * callers reach it through a dynamic import.
  */
 
 const XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
@@ -111,27 +114,40 @@ export interface XlsxSheet<T> {
   columns: readonly CsvColumn<T>[];
 }
 
-function worksheetXml<T>({ rows, columns }: XlsxSheet<T>): string {
-  const widths = columns.map((c) => c.header.length);
-  const letters = columns.map((_, i) => columnName(i));
+/** A sheet with every cell already read off its row: plain data a worker can be posted. */
+export interface PlainSheet {
+  name: string;
+  headers: string[];
+  rows: ExportValue[][];
+}
+
+export function resolveSheet<T>({ name, rows, columns }: XlsxSheet<T>): PlainSheet {
+  return {
+    name,
+    headers: columns.map((c) => c.header),
+    rows: rows.map((row) => columns.map((c) => c.value(row))),
+  };
+}
+
+function worksheetXml({ headers, rows }: PlainSheet): string {
+  const widths = headers.map((h) => h.length);
+  const letters = headers.map((_, i) => columnName(i));
   const rowXml: string[] = [];
 
-  const headerCells = columns.map((c, i) =>
-    cellXml(`${letters[i]}1`, toCell(c.header), STYLE_HEADER)
-  );
+  const headerCells = headers.map((h, i) => cellXml(`${letters[i]}1`, toCell(h), STYLE_HEADER));
   rowXml.push(`<row r="1">${headerCells.join('')}</row>`);
 
-  rows.forEach((row, r) => {
+  rows.forEach((values, r) => {
     const rowNumber = r + 2;
-    const cells = columns.map((c, i) => {
-      const cell = toCell(c.value(row) as ExportValue);
+    const cells = headers.map((_, i) => {
+      const cell = toCell(values[i]);
       widths[i] = Math.max(widths[i], displayWidth(cell));
       return cellXml(`${letters[i]}${rowNumber}`, cell);
     });
     rowXml.push(`<row r="${rowNumber}">${cells.join('')}</row>`);
   });
 
-  const cols = columns.length
+  const cols = headers.length
     ? `<cols>${widths
         .map(
           (w, i) =>
@@ -146,14 +162,19 @@ function worksheetXml<T>({ rows, columns }: XlsxSheet<T>): string {
 const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const SHEET_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml';
 
-/**
- * A workbook with a sheet per entry, in order. Sheet `i` is `sheet{i+1}.xml` on
- * relationship `rId{i+1}`; styles take the id after the last sheet.
- */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the row type is invariant per sheet
 export type AnyXlsxSheet = XlsxSheet<any>;
 
+/** A workbook with a sheet per entry, in order, built in one go on the calling thread. */
 export function toXlsxWorkbook(sheets: readonly AnyXlsxSheet[]): Uint8Array {
+  return writeWorkbook(sheets.map(resolveSheet));
+}
+
+/**
+ * The file for sheets already resolved; pure, so the worker and the page write the same file.
+ * Sheet `i` is `sheet{i+1}.xml` on relationship `rId{i+1}`; styles take the id after the last.
+ */
+export function writeWorkbook(sheets: readonly PlainSheet[]): Uint8Array {
   const names = uniqueSheetNames(sheets.map((s) => s.name));
   const n = sheets.length;
   const overrides = sheets
