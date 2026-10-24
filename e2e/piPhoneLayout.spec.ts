@@ -26,7 +26,10 @@ async function shot(page: Page, name: string): Promise<void> {
   if (dir) await page.screenshot({ path: `${dir}/${name}.png`, fullPage: true });
 }
 
+// `boundingBox()` is null until the element has rendered; waiting for it to be visible first
+// retries instead of throwing on a slow CI shard.
 async function box(locator: Locator) {
+  await expect(locator).toBeVisible({ timeout: 20_000 });
   const b = await locator.boundingBox();
   if (!b) throw new Error('no box');
   return b;
