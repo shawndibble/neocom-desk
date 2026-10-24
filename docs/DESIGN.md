@@ -1419,6 +1419,14 @@ Every interactive element takes its states from one shared recipe in
   leading icon and locks the width. The button is `aria-disabled` while it
   runs, and the start and result are announced through a toast or a polite
   live region.
+- **Search still running in a picker:** when a search picker's results wait
+  on a request, the open list ends with a dim row: a small `Spinner` (its label
+  announces it) and "Searching …" text. The row is not an option and can't be
+  highlighted. The earlier results that still match stay listed above it. Enter
+  waits for the answer and doesn't fall back to the typed text. A place whose
+  name matches the typed text exactly (case and punctuation aside) leads the
+  list highlighted, and a pasted exact name is picked outright. Example: the
+  Survey location box.
 - **Selected / on:**
   - A toggle (`aria-pressed`) takes the accent tint. A `SegmentedControl`
     segment adds a 2px accent underline inside its box, so selected is not
