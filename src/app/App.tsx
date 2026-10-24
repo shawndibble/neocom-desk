@@ -18,6 +18,7 @@ import { db } from '@/db';
 import { isSyncConfigured } from './syncStatus';
 import { useBackgroundSync } from './backgroundSync';
 import { scheduleBootPrefetch, scheduleCachePrune, scheduleLazySdeWarm } from './bootPrefetch';
+import { scheduleBootSync } from './bootSync';
 import { startReconnectRecovery } from './reconnectRecovery';
 import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
@@ -343,11 +344,14 @@ function AppEffects() {
   useEffect(() => startReconnectRecovery(), []);
 
   // Fire-and-forget, on app start (once hydration resolves an active character)
-  // and every character switch. Errors (offline, no Firebase config) are
-  // swallowed — surfaced instead via subscribeSyncStatus.
+  // and every character switch, in the first idle slot so it does not compete
+  // with the first route's render (`bootSync.ts`). Errors (offline, no Firebase
+  // config) are swallowed — surfaced instead via subscribeSyncStatus.
   useEffect(() => {
     if (activeCharacterId === null || !isSyncConfigured()) return;
-    void triggerSync(activeCharacterId).catch(() => {});
+    return scheduleBootSync(activeCharacterId, (id) => {
+      void triggerSync(id).catch(() => {});
+    });
   }, [activeCharacterId]);
 
   // The above covers the active Character at boot. This covers the rest of

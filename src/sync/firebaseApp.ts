@@ -14,7 +14,14 @@
 // Fourth: `market/mutamarket.ts` calls the `mutamarketEstimate` function for
 // abyssal module estimates (MutaMarket has no CORS), on any Character's session.
 
-import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  browserSessionPersistence,
+  connectAuthEmulator,
+  indexedDBLocalPersistence,
+  initializeAuth,
+  type Auth,
+} from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore/lite';
 import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
 import { emulatorsOn, getFirebaseApp } from './firebaseCore';
@@ -31,8 +38,19 @@ let authConnected = false;
 let firestoreConnected = false;
 let functionsConnected = false;
 
+let syncAuth: Auth | undefined;
+
+/**
+ * Auth as `getAuth` builds it (same persistence, so a session saved before this
+ * change still restores) minus `browserPopupRedirectResolver`: that resolver
+ * loads Google's gapi iframe (`apis.google.com`, third-party cookies) as soon
+ * as Auth starts, and the app only ever signs in with a custom token.
+ */
 export function getSyncAuth(): Auth {
-  const auth = getAuth(getFirebaseApp());
+  syncAuth ??= initializeAuth(getFirebaseApp(), {
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
+  });
+  const auth = syncAuth;
   if (emulatorsOn() && !authConnected) {
     authConnected = true;
     connectAuthEmulator(auth, `http://${EMULATOR_HOST}:9099`, { disableWarnings: true });

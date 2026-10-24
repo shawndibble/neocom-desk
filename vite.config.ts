@@ -400,6 +400,21 @@ export default defineConfig({
     // them with `worker.rolldownOptions`, which leaves this off.
     chunkImportMap: true,
     rolldownOptions: {
+      // The `src/components/ui` modules only declare components (no import-time
+      // effects), but a top-level `forwardRef(...)`/`createContext()` call reads
+      // as a side effect, so importing anything through the `@/components/ui`
+      // barrel kept every primitive — DataTable, Select, ContextMenu, the
+      // virtualizer — in the boot graph (~58 of 73 KiB unused on first load).
+      // Marked side-effect-free, each primitive goes only where it is used.
+      treeshake: {
+        moduleSideEffects: [
+          {
+            test: /[\\/]src[\\/]components[\\/]ui[\\/][^\\/]+\.tsx?$/,
+            external: false,
+            sideEffects: false,
+          },
+        ],
+      },
       output: {
         // Routes are already split per page (`src/app/routeChunks.ts`); what
         // is left in the entry is the boot-time vendor code. Pulled into
