@@ -49,7 +49,7 @@ export interface InfoSurvey extends TaxSurvey {
   info: SurveyInfoShare | null;
 }
 
-/** What Manage Taxes connects, less the location (each panel knows its own). */
+/** What Assign Taxes connects, less the location (each panel knows its own). */
 export type SurveyToConnect = Omit<ConnectableSurvey, 'locationId'>;
 
 export function SurveyInfoEditor({

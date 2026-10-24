@@ -1,5 +1,5 @@
 /**
- * A Survey connection (issue #4684): "Manage Taxes" on a moon Survey ties
+ * A Survey connection (issue #4684): "Assign Taxes" on a moon Survey ties
  * that moon's mining to the Survey's Payee and rate, so the pilot never
  * assigns it by hand. While the Survey is being mined — from its first scan's
  * UTC date until its ETA, plus a grace period for the ledger's lag — every

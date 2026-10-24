@@ -138,7 +138,7 @@
 // bite it. See features/character/cloneNicknames.ts.
 //
 // sync.miningTaxSurveyConnections (issue #4684): the moon Surveys the pilot
-// connected with "Manage Taxes", as {surveyId, characterId, payeeId,
+// connected with "Assign Taxes", as {surveyId, characterId, payeeId,
 // payeeName, taxPct, systemId, typeIds, fromDate, untilMs, expiresAt,
 // connectedAt} entries, so a second device keeps assigning that moon's ore to
 // its Payee. Each lives only until its Survey's ETA (plus an hour), and every
