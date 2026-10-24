@@ -65,10 +65,12 @@ const haulerParam: UrlParamCodec<HaulerOverride | null> = {
     pick === null ? null : 'hullTypeId' in pick ? `h${pick.hullTypeId}` : `c${pick.customM3}`,
 };
 
+const packedShipsParam = idListParam();
+
 export const MOVE_PLAN_URL_SCHEMA = {
   mv: stackKeysParam,
   mvd: destinationParam,
-  mvp: idListParam(),
+  mvp: packedShipsParam,
   mvh: haulerParam,
   mvr: boolParam(),
 };
@@ -94,7 +96,7 @@ export function movePlanKey(values: MovePlanUrlValues): string | null {
   return [
     stackKeysParam.serialize(plan.mv),
     destinationParam.serialize(plan.mvd),
-    idListParam().serialize(plan.mvp),
+    packedShipsParam.serialize(plan.mvp),
     haulerParam.serialize(plan.mvh),
   ].join('|');
 }

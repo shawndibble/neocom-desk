@@ -221,8 +221,8 @@ function MovePlanTabBody({
       setResult(null);
     }
   }
-  /** This mount pushed the plan's history entry, so Back can step out of it. */
-  const pushedPlan = useRef(false);
+  /** Key of the plan this mount pushed a history entry for, so Back steps out of it only while that plan shows. */
+  const pushedPlan = useRef<string | null>(null);
   /** The active haul fills the tab instead of the picker or the plan. */
   const showingHaul = urlValues.mvr && savedHaul !== null;
   const setShowingHaul = (open: boolean) => setUrlValues({ mvr: open });
@@ -440,7 +440,7 @@ function MovePlanTabBody({
               : { kind: 'system', id: destSystem! },
         };
         setShownKey(movePlanKey(values));
-        pushedPlan.current = true;
+        pushedPlan.current = movePlanKey(values);
         // A history entry: Back returns to the picker.
         setUrlValues(values, { push: true });
         focusAfterCommit(planHeadingRef);
@@ -494,7 +494,8 @@ function MovePlanTabBody({
         const nextPacked = new Set(urlPlan.mvp);
         const override = urlPlan.mvh ?? undefined;
         const { base, state } = await computePlan(inputs, nextPacked, override);
-        if (mine !== session.current) return;
+        // The URL moved on while this was worked out (Back): drop it.
+        if (mine !== session.current || restoring.current !== urlKey) return;
         planBase.current = base;
         setSelected(inputs.selected);
         chooseDestination(inputs.destSystem, inputs.destStation, inputs.searched);
@@ -650,8 +651,8 @@ function MovePlanTabBody({
             headingRef={planHeadingRef}
             onBack={() => {
               // The URL closes the plan (see the effect above): step out of the entry this tab pushed, else drop the plan from the one it is on.
-              if (pushedPlan.current) {
-                pushedPlan.current = false;
+              if (pushedPlan.current === movePlanKey({ ...urlValues, mvp: [], mvh: null })) {
+                pushedPlan.current = null;
                 navigate(-1);
               } else setUrlValues(NO_MOVE_PLAN);
               focusAfterCommit(deliverHeadingRef);
