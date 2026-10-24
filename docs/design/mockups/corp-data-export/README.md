@@ -2,6 +2,8 @@
 
 Stories: `src/mockups/CorpDataExport.stories.tsx` (`mockups/CorpDataExport`). Sample data; the ticket text wins over the picture.
 
+**Chosen (maintainer, 2026-10-24):** Delete dialog variant **A** (Download the book in the dialog, Delete stays usable; B is not built). Format: **one .xlsx**, a sheet per record type. SRP: the same Download SRP data button also goes in the **Queue tab header** (not mocked), so an Accountant who works the Queue can export; the Settings panel stays for Directors.
+
 New components (dashed, labelled): `ExportFirst` (Delete dialog), `ExportBookSection` (book settings › Access), `SrpExportPanel` (SRP Settings). Each is a heading, a hint, one `Button` with `Icon.Download` and a dim line listing the sheets. Everything else is the real `Modal`, `Tabs`, `AutomaticSyncSection`, `DeleteBookSection` and the real `/corp/srp` Settings page.
 
 ## Delete the book?
