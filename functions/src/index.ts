@@ -3,7 +3,7 @@
 // the client sends only its short-lived access token, which is verified
 // against EVE's published JWKS before any Firebase credential is minted.
 
-import { onCall, HttpsError, type CallableOptions } from 'firebase-functions/v2/https';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { createActionGroup, type CallableHandler } from './callableRouter.js';
 import { runDailyHousekeeping } from './dailyHousekeeping.js';
 import { defineSecret } from 'firebase-functions/params';
@@ -294,60 +294,57 @@ export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
 // makes re-registering after an FCM token rotation replace the entry instead
 // of accumulating one per token.
 const alertsActions = createActionGroup();
-const alertsCallable = (name: string, options: CallableOptions, handler: CallableHandler) =>
-  onCall<unknown>(options, alertsActions.register(name, handler));
+const alertsAction = (name: string, handler: CallableHandler): void => {
+  alertsActions.register(name, handler);
+};
 
-export const registerDevice = alertsCallable(
-  'registerDevice',
-  { maxInstances: 5 },
-  async (request) => {
-    let input;
-    try {
-      input = parseRegisterDeviceInput(request.data);
-    } catch (err) {
-      throw new HttpsError(
-        'invalid-argument',
-        err instanceof Error ? err.message : 'Invalid request body'
-      );
-    }
-
-    const { registration, rejected, projections, eveTypesByCharacter } =
-      await buildDeviceRegistration(input, verifyOptions, logError);
-
-    if (registration.characterIds.length === 0) {
-      throw new HttpsError('unauthenticated', 'No character access token could be verified');
-    }
-
-    await writeDeviceRegistration(firestore(), {
-      deviceId: input.deviceId,
-      fcmToken: registration.fcmToken,
-      characterIds: registration.characterIds,
-      projections,
-      eveTypesByCharacter,
-      quietHours: input.quietHours,
-    });
-
-    // The types the server has seen for each Character (alertGrants, ADR 0020),
-    // so the client can offer a toggle for them. Only `seenTypes` is read out.
-    const { store } = alertGrantDeps();
-    const seenTypes: Record<string, string[]> = {};
-    await Promise.all(
-      registration.characterIds.map(async (characterId) => {
-        try {
-          seenTypes[String(characterId)] = (await store.get(characterId))?.seenTypes ?? [];
-        } catch (err) {
-          // The registration already landed; a failed read only delays new toggles.
-          logError('Device registration: seenTypes read failed', {
-            characterId,
-            error: String(err),
-          });
-        }
-      })
+alertsAction('registerDevice', async (request) => {
+  let input;
+  try {
+    input = parseRegisterDeviceInput(request.data);
+  } catch (err) {
+    throw new HttpsError(
+      'invalid-argument',
+      err instanceof Error ? err.message : 'Invalid request body'
     );
-
-    return { deviceId: input.deviceId, registered: registration.characterIds, rejected, seenTypes };
   }
-);
+
+  const { registration, rejected, projections, eveTypesByCharacter } =
+    await buildDeviceRegistration(input, verifyOptions, logError);
+
+  if (registration.characterIds.length === 0) {
+    throw new HttpsError('unauthenticated', 'No character access token could be verified');
+  }
+
+  await writeDeviceRegistration(firestore(), {
+    deviceId: input.deviceId,
+    fcmToken: registration.fcmToken,
+    characterIds: registration.characterIds,
+    projections,
+    eveTypesByCharacter,
+    quietHours: input.quietHours,
+  });
+
+  // The types the server has seen for each Character (alertGrants, ADR 0020),
+  // so the client can offer a toggle for them. Only `seenTypes` is read out.
+  const { store } = alertGrantDeps();
+  const seenTypes: Record<string, string[]> = {};
+  await Promise.all(
+    registration.characterIds.map(async (characterId) => {
+      try {
+        seenTypes[String(characterId)] = (await store.get(characterId))?.seenTypes ?? [];
+      } catch (err) {
+        // The registration already landed; a failed read only delays new toggles.
+        logError('Device registration: seenTypes read failed', {
+          characterId,
+          error: String(err),
+        });
+      }
+    })
+  );
+
+  return { deviceId: input.deviceId, registered: registration.characterIds, rejected, seenTypes };
+});
 
 // Alerts Grant custody (issue #3753, ADR 0020). `ALERTS_TOKEN_KEY` is a Firebase
 // secret (base64, 32 bytes): `firebase functions:secrets:set ALERTS_TOKEN_KEY`.
@@ -375,35 +372,26 @@ function alertGrantHttpsError(err: unknown): never {
 
 // The device's full-scope session is not involved: the callable's proof is the
 // notifications-only access token itself, verified like registerDevice does.
-export const saveAlertGrant = alertsCallable(
-  'saveAlertGrant',
-  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
-  async (request) => {
-    try {
-      return await saveAlertGrantFor(alertGrantDeps(), parseSaveAlertGrantInput(request.data));
-    } catch (err) {
-      return alertGrantHttpsError(err);
-    }
+alertsAction('saveAlertGrant', async (request) => {
+  try {
+    return await saveAlertGrantFor(alertGrantDeps(), parseSaveAlertGrantInput(request.data));
+  } catch (err) {
+    return alertGrantHttpsError(err);
   }
-);
+});
 
 // Deleting needs the Character's own signed-in session, so one Character
 // cannot drop another's grant.
-export const deleteAlertGrant = alertsCallable(
-  'deleteAlertGrant',
-  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
-  async (request) => {
-    const { uid } = callerOf(request);
-    try {
-      return await deleteAlertGrantFor(alertGrantDeps(), characterIdForUid(uid)!);
-    } catch (err) {
-      return alertGrantHttpsError(err);
-    }
+alertsAction('deleteAlertGrant', async (request) => {
+  const { uid } = callerOf(request);
+  try {
+    return await deleteAlertGrantFor(alertGrantDeps(), characterIdForUid(uid)!);
+  } catch (err) {
+    return alertGrantHttpsError(err);
   }
-);
+});
 
-// The device and Alerts Grant router (see callableRouter.ts). Clients call this; the per-name exports
-// above go once none do. The secret is only used by the grant actions.
+// The device and Alerts Grant router (see callableRouter.ts). Clients call this. The secret is only used by the grant actions.
 export const alertsCall = onCall<unknown>(
   { maxInstances: 10, secrets: [ALERTS_TOKEN_KEY] },
   alertsActions.route
@@ -477,261 +465,163 @@ function callerOf(request: {
   return { uid, ownerHash };
 }
 
-const COMMUNITY_CALLABLE_OPTIONS = { maxInstances: 5 };
-
-// One deployed function per group instead of one per callable (see callableRouter.ts). The
-// per-name exports below stay until every client calls `communityCall`.
+// One deployed function per group instead of one per callable (see callableRouter.ts).
 const communityActions = createActionGroup();
-const communityCallable = (name: string, options: CallableOptions, handler: CallableHandler) =>
-  onCall<unknown>(options, communityActions.register(name, handler));
+const communityAction = (name: string, handler: CallableHandler): void => {
+  communityActions.register(name, handler);
+};
 export const communityCall = onCall<unknown>({ maxInstances: 10 }, communityActions.route);
 
-export const createCommunityCallable = communityCallable(
-  'createCommunityCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  (request) => createCommunity(firestore(), callerOf(request), parseCreateInput(request.data))
+communityAction('createCommunityCallable', (request) =>
+  createCommunity(firestore(), callerOf(request), parseCreateInput(request.data))
 );
 
 // Callable with no session on purpose: the invite page shows what the link is
 // for before a visitor signs in. Returns three public facts, see previewCommunity.
-export const previewCommunityCallable = communityCallable(
-  'previewCommunityCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  (request) => previewCommunity(firestore(), parsePreviewInput(request.data).inviteCode)
+communityAction('previewCommunityCallable', (request) =>
+  previewCommunity(firestore(), parsePreviewInput(request.data).inviteCode)
 );
 
-export const joinCommunityCallable = communityCallable(
-  'joinCommunityCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  (request) => joinCommunity(firestore(), callerOf(request), parseJoinInput(request.data))
+communityAction('joinCommunityCallable', (request) =>
+  joinCommunity(firestore(), callerOf(request), parseJoinInput(request.data))
 );
 
-export const setCommunityApprovalCallable = communityCallable(
-  'setCommunityApprovalCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    const { communityId, requireApproval } = parseRequireApprovalInput(request.data);
-    await setRequireApproval(firestore(), callerOf(request), communityId, requireApproval);
-  }
-);
+communityAction('setCommunityApprovalCallable', async (request) => {
+  const { communityId, requireApproval } = parseRequireApprovalInput(request.data);
+  await setRequireApproval(firestore(), callerOf(request), communityId, requireApproval);
+});
 
-export const decideCommunityJoinRequestCallable = communityCallable(
-  'decideCommunityJoinRequestCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    const { communityId, memberUid, accept } = parseJoinRequestDecisionInput(request.data);
-    await decideJoinRequest(firestore(), callerOf(request), communityId, memberUid, accept);
-  }
-);
+communityAction('decideCommunityJoinRequestCallable', async (request) => {
+  const { communityId, memberUid, accept } = parseJoinRequestDecisionInput(request.data);
+  await decideJoinRequest(firestore(), callerOf(request), communityId, memberUid, accept);
+});
 
-export const leaveCommunityCallable = communityCallable(
-  'leaveCommunityCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    await leaveCommunity(
-      firestore(),
-      callerOf(request),
-      parseCommunityIdInput(request.data).communityId
-    );
-  }
-);
+communityAction('leaveCommunityCallable', async (request) => {
+  await leaveCommunity(
+    firestore(),
+    callerOf(request),
+    parseCommunityIdInput(request.data).communityId
+  );
+});
 
-export const removeCommunityMemberCallable = communityCallable(
-  'removeCommunityMemberCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    const { communityId, memberUid } = parseRemoveMemberInput(request.data);
-    await removeMember(firestore(), callerOf(request), communityId, memberUid);
-  }
-);
+communityAction('removeCommunityMemberCallable', async (request) => {
+  const { communityId, memberUid } = parseRemoveMemberInput(request.data);
+  await removeMember(firestore(), callerOf(request), communityId, memberUid);
+});
 
-export const transferCommunityAdminCallable = communityCallable(
-  'transferCommunityAdminCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    const { communityId, memberUid } = parseTransferAdminInput(request.data);
-    await transferAdmin(firestore(), callerOf(request), communityId, memberUid);
-  }
-);
+communityAction('transferCommunityAdminCallable', async (request) => {
+  const { communityId, memberUid } = parseTransferAdminInput(request.data);
+  await transferAdmin(firestore(), callerOf(request), communityId, memberUid);
+});
 
 // Mail invites (issue #3604): the client sends the EVE mail with its own token,
 // so the cap, the one-per-target rule and the "Sent" stamp live in these three.
-export const reserveCommunityMailInviteCallable = communityCallable(
-  'reserveCommunityMailInviteCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  (request) => {
-    const { communityId, targetCharacterId, targetName } = parseMailInviteInput(request.data);
-    return reserveMailInvite(
-      firestore(),
-      callerOf(request),
-      communityId,
-      targetCharacterId,
-      targetName
-    );
-  }
+communityAction('reserveCommunityMailInviteCallable', (request) => {
+  const { communityId, targetCharacterId, targetName } = parseMailInviteInput(request.data);
+  return reserveMailInvite(
+    firestore(),
+    callerOf(request),
+    communityId,
+    targetCharacterId,
+    targetName
+  );
+});
+
+communityAction('confirmCommunityMailInviteCallable', async (request) => {
+  const { communityId, targetCharacterId } = parseMailInviteInput(request.data);
+  await confirmMailInvite(firestore(), callerOf(request), communityId, targetCharacterId);
+});
+
+communityAction('releaseCommunityMailInviteCallable', async (request) => {
+  const { communityId, targetCharacterId } = parseMailInviteInput(request.data);
+  await releaseMailInvite(firestore(), callerOf(request), communityId, targetCharacterId);
+});
+
+communityAction('revokeCommunityInviteCallable', async (request) => {
+  await revokeInvite(
+    firestore(),
+    callerOf(request),
+    parseCommunityIdInput(request.data).communityId
+  );
+});
+
+communityAction('regenerateCommunityInviteCallable', (request) =>
+  regenerateInvite(firestore(), callerOf(request), parseCommunityIdInput(request.data).communityId)
 );
 
-export const confirmCommunityMailInviteCallable = communityCallable(
-  'confirmCommunityMailInviteCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    const { communityId, targetCharacterId } = parseMailInviteInput(request.data);
-    await confirmMailInvite(firestore(), callerOf(request), communityId, targetCharacterId);
-  }
-);
-
-export const releaseCommunityMailInviteCallable = communityCallable(
-  'releaseCommunityMailInviteCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    const { communityId, targetCharacterId } = parseMailInviteInput(request.data);
-    await releaseMailInvite(firestore(), callerOf(request), communityId, targetCharacterId);
-  }
-);
-
-export const revokeCommunityInviteCallable = communityCallable(
-  'revokeCommunityInviteCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    await revokeInvite(
-      firestore(),
-      callerOf(request),
-      parseCommunityIdInput(request.data).communityId
-    );
-  }
-);
-
-export const regenerateCommunityInviteCallable = communityCallable(
-  'regenerateCommunityInviteCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  (request) =>
-    regenerateInvite(
-      firestore(),
-      callerOf(request),
-      parseCommunityIdInput(request.data).communityId
-    )
-);
-
-export const deleteCommunityCallable = communityCallable(
-  'deleteCommunityCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    await deleteCommunity(
-      firestore(),
-      callerOf(request),
-      parseCommunityIdInput(request.data).communityId
-    );
-  }
-);
+communityAction('deleteCommunityCallable', async (request) => {
+  await deleteCommunity(
+    firestore(),
+    callerOf(request),
+    parseCommunityIdInput(request.data).communityId
+  );
+});
 
 // Community Requests (issue #3807, ADR 0021): posting counts the caller's open
 // Requests, so it is a callable; extend and close/reopen are the requester's own.
-export const postCommunityRequestCallable = communityCallable(
-  'postCommunityRequestCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  (request) => postRequest(firestore(), callerOf(request), parsePostRequestInput(request.data))
+communityAction('postCommunityRequestCallable', (request) =>
+  postRequest(firestore(), callerOf(request), parsePostRequestInput(request.data))
 );
 
-export const editCommunityRequestCallable = communityCallable(
-  'editCommunityRequestCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  (request) => editRequest(firestore(), callerOf(request), parseEditRequestInput(request.data))
+communityAction('editCommunityRequestCallable', (request) =>
+  editRequest(firestore(), callerOf(request), parseEditRequestInput(request.data))
 );
 
-export const extendCommunityRequestCallable = communityCallable(
-  'extendCommunityRequestCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  (request) => {
-    const { communityId, requestId } = parseRequestIdInput(request.data);
-    return extendRequest(firestore(), callerOf(request), communityId, requestId);
-  }
-);
+communityAction('extendCommunityRequestCallable', (request) => {
+  const { communityId, requestId } = parseRequestIdInput(request.data);
+  return extendRequest(firestore(), callerOf(request), communityId, requestId);
+});
 
-export const setCommunityRequestClosedCallable = communityCallable(
-  'setCommunityRequestClosedCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    const { communityId, requestId, closed } = parseSetClosedInput(request.data);
-    await setRequestClosed(firestore(), callerOf(request), communityId, requestId, closed);
-  }
-);
+communityAction('setCommunityRequestClosedCallable', async (request) => {
+  const { communityId, requestId, closed } = parseSetClosedInput(request.data);
+  await setRequestClosed(firestore(), callerOf(request), communityId, requestId, closed);
+});
 
 // Pledge mail: the Pledger's client sends the EVE mail with its own token; the
 // 100-a-day cap and the once-per-Pledger-per-Request rule live in these three.
 // The recipient is the Request's owner, read server-side, never sent by a client.
-export const reserveCommunityPledgeMailCallable = communityCallable(
-  'reserveCommunityPledgeMailCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  (request) => {
-    const { communityId, requestId } = parseRequestIdInput(request.data);
-    return reservePledgeMail(firestore(), callerOf(request), communityId, requestId);
-  }
-);
+communityAction('reserveCommunityPledgeMailCallable', (request) => {
+  const { communityId, requestId } = parseRequestIdInput(request.data);
+  return reservePledgeMail(firestore(), callerOf(request), communityId, requestId);
+});
 
-export const confirmCommunityPledgeMailCallable = communityCallable(
-  'confirmCommunityPledgeMailCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    const { communityId, requestId } = parseRequestIdInput(request.data);
-    await confirmPledgeMail(firestore(), callerOf(request), communityId, requestId);
-  }
-);
+communityAction('confirmCommunityPledgeMailCallable', async (request) => {
+  const { communityId, requestId } = parseRequestIdInput(request.data);
+  await confirmPledgeMail(firestore(), callerOf(request), communityId, requestId);
+});
 
-export const releaseCommunityPledgeMailCallable = communityCallable(
-  'releaseCommunityPledgeMailCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    const { communityId, requestId } = parseRequestIdInput(request.data);
-    await releasePledgeMail(firestore(), callerOf(request), communityId, requestId);
-  }
-);
+communityAction('releaseCommunityPledgeMailCallable', async (request) => {
+  const { communityId, requestId } = parseRequestIdInput(request.data);
+  await releasePledgeMail(firestore(), callerOf(request), communityId, requestId);
+});
 
 // The admin removes any Request or Pledge (issue #3812): no per-Community
 // switch, so the callables only check the caller is the Community's admin.
-export const removeCommunityRequestCallable = communityCallable(
-  'removeCommunityRequestCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    const { communityId, requestId } = parseRequestIdInput(request.data);
-    await removeRequest(firestore(), callerOf(request), communityId, requestId);
-  }
-);
+communityAction('removeCommunityRequestCallable', async (request) => {
+  const { communityId, requestId } = parseRequestIdInput(request.data);
+  await removeRequest(firestore(), callerOf(request), communityId, requestId);
+});
 
 // Fleet Payouts (issue #4779): creating counts the caller's open ones and links
 // Members, so it is a callable; set-paid is the boss's own; remove is the boss or admin.
-export const createCommunityFleetPayoutCallable = communityCallable(
-  'createCommunityFleetPayoutCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  (request) =>
-    createFleetPayout(firestore(), callerOf(request), parseCreateFleetPayoutInput(request.data))
+communityAction('createCommunityFleetPayoutCallable', (request) =>
+  createFleetPayout(firestore(), callerOf(request), parseCreateFleetPayoutInput(request.data))
 );
 
-export const setCommunityFleetShareDoneCallable = communityCallable(
-  'setCommunityFleetShareDoneCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    const { communityId, payoutId, shareId, paid } = parseSetFleetShareDoneInput(request.data);
-    await setFleetShareDone(firestore(), callerOf(request), communityId, payoutId, shareId, paid);
-  }
-);
+communityAction('setCommunityFleetShareDoneCallable', async (request) => {
+  const { communityId, payoutId, shareId, paid } = parseSetFleetShareDoneInput(request.data);
+  await setFleetShareDone(firestore(), callerOf(request), communityId, payoutId, shareId, paid);
+});
 
-export const removeCommunityFleetPayoutCallable = communityCallable(
-  'removeCommunityFleetPayoutCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    const { communityId, payoutId } = parseFleetPayoutIdInput(request.data);
-    await removeFleetPayout(firestore(), callerOf(request), communityId, payoutId);
-  }
-);
+communityAction('removeCommunityFleetPayoutCallable', async (request) => {
+  const { communityId, payoutId } = parseFleetPayoutIdInput(request.data);
+  await removeFleetPayout(firestore(), callerOf(request), communityId, payoutId);
+});
 
-export const removeCommunityPledgeCallable = communityCallable(
-  'removeCommunityPledgeCallable',
-  COMMUNITY_CALLABLE_OPTIONS,
-  async (request) => {
-    const { communityId, requestId, pledgeUid } = parseRemovePledgeInput(request.data);
-    await removePledge(firestore(), callerOf(request), communityId, requestId, pledgeUid);
-  }
-);
+communityAction('removeCommunityPledgeCallable', async (request) => {
+  const { communityId, requestId, pledgeUid } = parseRemovePledgeInput(request.data);
+  await removePledge(firestore(), callerOf(request), communityId, requestId, pledgeUid);
+});
 
 // Corp Tax Book (issue #4061, ADR 0023). Every write to a corporation's book
 // goes through these callables (corpTaxBookStore.ts) and lands in its audit
@@ -745,56 +635,44 @@ const corpTaxBookDeps = (): BookDeps => ({
   readIdentity: esiIdentityReader(),
 });
 
-const CORP_TAX_BOOK_OPTIONS = { maxInstances: 5 };
-
 const corpTaxBookActions = createActionGroup();
-const corpTaxBookCallable = (name: string, options: CallableOptions, handler: CallableHandler) =>
-  onCall<unknown>(options, corpTaxBookActions.register(name, handler));
+/** A Corp Tax Book router action: no deployed function of its own. New callables use this. */
+const corpTaxBookAction = (name: string, handler: CallableHandler): void => {
+  corpTaxBookActions.register(name, handler);
+};
 
 // Collector books (issue #4507): invite links for a feeder corporation. Codes only; the UI maps them later.
-export const createCorpTaxBookFeederInviteCallable = corpTaxBookCallable(
-  'createCorpTaxBookFeederInviteCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    createFeederInvite(
-      corpTaxBookDeps(),
-      callerOf(request),
-      parseCreateFeederInviteInput(request.data)
-    )
+corpTaxBookAction('createCorpTaxBookFeederInviteCallable', (request) =>
+  createFeederInvite(
+    corpTaxBookDeps(),
+    callerOf(request),
+    parseCreateFeederInviteInput(request.data)
+  )
 );
 
-export const revokeCorpTaxBookFeederInviteCallable = corpTaxBookCallable(
-  'revokeCorpTaxBookFeederInviteCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    revokeFeederInvite(
-      corpTaxBookDeps(),
-      callerOf(request),
-      parseRevokeFeederInviteInput(request.data)
-    )
+corpTaxBookAction('revokeCorpTaxBookFeederInviteCallable', (request) =>
+  revokeFeederInvite(
+    corpTaxBookDeps(),
+    callerOf(request),
+    parseRevokeFeederInviteInput(request.data)
+  )
 );
 
 // The consent screen's preview of a link: the accounting corporation and the offered rate.
-export const previewCorpTaxBookFeederInviteCallable = corpTaxBookCallable(
-  'previewCorpTaxBookFeederInviteCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    previewFeederInvite(
-      corpTaxBookDeps(),
-      callerOf(request),
-      parsePreviewFeederInviteInput(request.data)
-    )
+corpTaxBookAction('previewCorpTaxBookFeederInviteCallable', (request) =>
+  previewFeederInvite(
+    corpTaxBookDeps(),
+    callerOf(request),
+    parsePreviewFeederInviteInput(request.data)
+  )
 );
 
-export const acceptCorpTaxBookFeederInviteCallable = corpTaxBookCallable(
-  'acceptCorpTaxBookFeederInviteCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    acceptFeederInvite(
-      corpTaxBookDeps(),
-      callerOf(request),
-      parseAcceptFeederInviteInput(request.data)
-    )
+corpTaxBookAction('acceptCorpTaxBookFeederInviteCallable', (request) =>
+  acceptFeederInvite(
+    corpTaxBookDeps(),
+    callerOf(request),
+    parseAcceptFeederInviteInput(request.data)
+  )
 );
 
 // Scheduled Corp Tax Book sync (issue #4068, ADR 0025). The second server-held EVE
@@ -826,123 +704,85 @@ const FEEDER_VIEW_SECRETS = [ALERTS_TOKEN_KEY, R2_ACCESS_KEY_ID, R2_SECRET_ACCES
 
 // Proven by the signed-in Character AND the grant's own access token, which must be
 // for that same Character; the corporation and its roles are read with the grant.
-export const saveCorpTaxBookSyncGrantCallable = corpTaxBookCallable(
-  'saveCorpTaxBookSyncGrantCallable',
-  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
-  (request) =>
-    saveCorpSyncGrant(corpSyncDeps(), callerOf(request), parseSaveCorpSyncGrantInput(request.data))
+corpTaxBookAction('saveCorpTaxBookSyncGrantCallable', (request) =>
+  saveCorpSyncGrant(corpSyncDeps(), callerOf(request), parseSaveCorpSyncGrantInput(request.data))
 );
 
 // Collector books (issue #4511): the moon owner's side. The grant is a separate SSO login by
 // the Accountant alt (mining scope only); the first ledger pull is the role check.
-export const saveCorpTaxBookFeederGrantCallable = corpTaxBookCallable(
-  'saveCorpTaxBookFeederGrantCallable',
-  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
-  (request) =>
-    saveFeederGrant(
-      { ...corpSyncDeps(), esi: esiSyncReader(), lookupCorporation: esiCorporationLookup() },
-      callerOf(request),
-      parseSaveFeederGrantInput(request.data)
-    )
+corpTaxBookAction('saveCorpTaxBookFeederGrantCallable', (request) =>
+  saveFeederGrant(
+    { ...corpSyncDeps(), esi: esiSyncReader(), lookupCorporation: esiCorporationLookup() },
+    callerOf(request),
+    parseSaveFeederGrantInput(request.data)
+  )
 );
 
-export const leaveCorpTaxBookFeederCallable = corpTaxBookCallable(
-  'leaveCorpTaxBookFeederCallable',
-  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
-  (request) => leaveFeeder(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
+corpTaxBookAction('leaveCorpTaxBookFeederCallable', (request) =>
+  leaveFeeder(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
 );
 
-export const getCorpTaxBookFeederStatusCallable = corpTaxBookCallable(
-  'getCorpTaxBookFeederStatusCallable',
-  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
-  (request) => getFeederStatus(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
+corpTaxBookAction('getCorpTaxBookFeederStatusCallable', (request) =>
+  getFeederStatus(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
 );
 
 // The moon owner's view (issue #4512): its officers (CEO, Director, Accountant; live role check)
 // get a 24h access record the rules read, may ask for a rate, and dismiss the after-leaving view.
-export const getCorpTaxBookFeederViewAccessCallable = corpTaxBookCallable(
-  'getCorpTaxBookFeederViewAccessCallable',
-  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
-  (request) => getFeederViewAccess(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
+corpTaxBookAction('getCorpTaxBookFeederViewAccessCallable', (request) =>
+  getFeederViewAccess(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
 );
 
-export const requestCorpTaxBookFeederRateCallable = corpTaxBookCallable(
-  'requestCorpTaxBookFeederRateCallable',
-  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
-  (request) =>
-    requestFeederRate(corpSyncDeps(), callerOf(request), parseRequestFeederRateInput(request.data))
+corpTaxBookAction('requestCorpTaxBookFeederRateCallable', (request) =>
+  requestFeederRate(corpSyncDeps(), callerOf(request), parseRequestFeederRateInput(request.data))
 );
 
 // The moon owner names its payee: its own CEO, Directors and Accountants. The accounting
 // corporation's officers set it too (#4653), through `setCorpTaxBookFeederPayeeFromBookCallable`.
-export const setCorpTaxBookFeederPayeeCallable = corpTaxBookCallable(
-  'setCorpTaxBookFeederPayeeCallable',
-  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
-  (request) =>
-    setFeederPayee(
-      corpSyncDeps(),
-      callerOf(request),
-      parseSetFeederPayeeInput(request.data),
-      esiIdCategoryLookup()
-    )
+corpTaxBookAction('setCorpTaxBookFeederPayeeCallable', (request) =>
+  setFeederPayee(
+    corpSyncDeps(),
+    callerOf(request),
+    parseSetFeederPayeeInput(request.data),
+    esiIdCategoryLookup()
+  )
 );
 
-export const dismissCorpTaxBookFeederHistoryCallable = corpTaxBookCallable(
-  'dismissCorpTaxBookFeederHistoryCallable',
-  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
-  (request) =>
-    dismissFeederHistory(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
+corpTaxBookAction('dismissCorpTaxBookFeederHistoryCallable', (request) =>
+  dismissFeederHistory(corpSyncDeps(), callerOf(request), parseFeederCall(request.data))
 );
 
 // The accounting corporation's side of a moon owner (issue #4586): officers agree a rate, settle
 // otherwise and list open invite links. The view rebuild prices ore from R2, so these carry its secrets.
 const feederOwnerDeps = (): BookDeps => ({ ...corpTaxBookDeps(), openPrices: r2OpenPrices });
-const FEEDER_OWNER_OPTIONS = { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS };
-
-export const setCorpTaxBookFeederRateCallable = corpTaxBookCallable(
-  'setCorpTaxBookFeederRateCallable',
-  FEEDER_OWNER_OPTIONS,
-  (request) =>
-    setFeederRate(feederOwnerDeps(), callerOf(request), parseSetFeederRateInput(request.data))
+corpTaxBookAction('setCorpTaxBookFeederRateCallable', (request) =>
+  setFeederRate(feederOwnerDeps(), callerOf(request), parseSetFeederRateInput(request.data))
 );
 
-export const setCorpTaxBookFeederModeCallable = corpTaxBookCallable(
-  'setCorpTaxBookFeederModeCallable',
-  FEEDER_OWNER_OPTIONS,
-  (request) =>
-    setFeederMode(feederOwnerDeps(), callerOf(request), parseSetFeederModeInput(request.data))
+corpTaxBookAction('setCorpTaxBookFeederModeCallable', (request) =>
+  setFeederMode(feederOwnerDeps(), callerOf(request), parseSetFeederModeInput(request.data))
 );
 
 // Refinery labels (issue #4640): the accounting side passes `feederCorporationId`; the moon owner's
 // own officers do not.
-export const setCorpTaxBookRefineryLabelCallable = corpTaxBookCallable(
-  'setCorpTaxBookRefineryLabelCallable',
-  FEEDER_OWNER_OPTIONS,
-  (request) =>
-    setRefineryLabel(feederOwnerDeps(), callerOf(request), parseSetRefineryLabelInput(request.data))
+corpTaxBookAction('setCorpTaxBookRefineryLabelCallable', (request) =>
+  setRefineryLabel(feederOwnerDeps(), callerOf(request), parseSetRefineryLabelInput(request.data))
 );
 
-export const setCorpTaxBookOwnRefineryLabelCallable = corpTaxBookCallable(
-  'setCorpTaxBookOwnRefineryLabelCallable',
-  FEEDER_OWNER_OPTIONS,
-  (request) =>
-    setOwnRefineryLabel(
-      corpSyncDeps(),
-      callerOf(request),
-      parseSetOwnRefineryLabelInput(request.data)
-    )
+corpTaxBookAction('setCorpTaxBookOwnRefineryLabelCallable', (request) =>
+  setOwnRefineryLabel(
+    corpSyncDeps(),
+    callerOf(request),
+    parseSetOwnRefineryLabelInput(request.data)
+  )
 );
 
 // A refinery's system (issue #4650): a miner's client reports what its own ledger placed it in.
-export const learnCorpTaxBookRefinerySystemsCallable = corpTaxBookCallable(
-  'learnCorpTaxBookRefinerySystemsCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    learnRefinerySystems(
-      corpTaxBookDeps(),
-      callerOf(request),
-      parseLearnRefinerySystemsInput(request.data)
-    )
+corpTaxBookAction('learnCorpTaxBookRefinerySystemsCallable', (request) =>
+  learnRefinerySystems(
+    corpTaxBookDeps(),
+    callerOf(request),
+    parseLearnRefinerySystemsInput(request.data)
+  )
 );
 
 // Removing a moon owner (issue #4520): start, notice sent, cancel (officers), the payee's link.
@@ -953,53 +793,38 @@ const removalDeps = (): BookDeps => ({
 
 // Either side sets a moon owner's payee (#4653): this is the accounting corporation's officers'
 // side (Accountant or higher, live role check). The CEO lookup names whom the change is mailed to.
-export const setCorpTaxBookFeederPayeeFromBookCallable = corpTaxBookCallable(
-  'setCorpTaxBookFeederPayeeFromBookCallable',
-  FEEDER_OWNER_OPTIONS,
-  (request) =>
-    setBookFeederPayee(
-      removalDeps(),
-      callerOf(request),
-      parseSetBookFeederPayeeInput(request.data),
-      esiIdCategoryLookup()
-    )
+corpTaxBookAction('setCorpTaxBookFeederPayeeFromBookCallable', (request) =>
+  setBookFeederPayee(
+    removalDeps(),
+    callerOf(request),
+    parseSetBookFeederPayeeInput(request.data),
+    esiIdCategoryLookup()
+  )
 );
 
-export const startCorpTaxBookFeederRemovalCallable = corpTaxBookCallable(
-  'startCorpTaxBookFeederRemovalCallable',
-  FEEDER_OWNER_OPTIONS,
-  (request) => startFeederRemoval(removalDeps(), callerOf(request), parseRemovalCall(request.data))
+corpTaxBookAction('startCorpTaxBookFeederRemovalCallable', (request) =>
+  startFeederRemoval(removalDeps(), callerOf(request), parseRemovalCall(request.data))
 );
 
-export const recordCorpTaxBookFeederRemovalSentCallable = corpTaxBookCallable(
-  'recordCorpTaxBookFeederRemovalSentCallable',
-  FEEDER_OWNER_OPTIONS,
-  (request) =>
-    recordRemovalSent(removalDeps(), callerOf(request), parseRemovalNoticeCall(request.data))
+corpTaxBookAction('recordCorpTaxBookFeederRemovalSentCallable', (request) =>
+  recordRemovalSent(removalDeps(), callerOf(request), parseRemovalNoticeCall(request.data))
 );
 
-export const cancelCorpTaxBookFeederRemovalCallable = corpTaxBookCallable(
-  'cancelCorpTaxBookFeederRemovalCallable',
-  FEEDER_OWNER_OPTIONS,
-  (request) => cancelFeederRemoval(removalDeps(), callerOf(request), parseRemovalCall(request.data))
+corpTaxBookAction('cancelCorpTaxBookFeederRemovalCallable', (request) =>
+  cancelFeederRemoval(removalDeps(), callerOf(request), parseRemovalCall(request.data))
 );
 
-export const getCorpTaxBookRemovalLinkCallable = corpTaxBookCallable(
-  'getCorpTaxBookRemovalLinkCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => getRemovalLink(removalDeps(), callerOf(request), parseRemovalLinkCall(request.data))
+corpTaxBookAction('getCorpTaxBookRemovalLinkCallable', (request) =>
+  getRemovalLink(removalDeps(), callerOf(request), parseRemovalLinkCall(request.data))
 );
 
-export const forceCorpTaxBookRemovalCallable = corpTaxBookCallable(
-  'forceCorpTaxBookRemovalCallable',
-  { maxInstances: 5, secrets: FEEDER_VIEW_SECRETS },
-  (request) =>
-    forceRemovalNow(
-      corpSyncDeps(),
-      callerOf(request),
-      parseRemovalLinkCall(request.data),
-      esiCorporationCeoLookup()
-    )
+corpTaxBookAction('forceCorpTaxBookRemovalCallable', (request) =>
+  forceRemovalNow(
+    corpSyncDeps(),
+    callerOf(request),
+    parseRemovalLinkCall(request.data),
+    esiCorporationCeoLookup()
+  )
 );
 
 /** Ends every removal whose 24 hours are up. Deploy is manual, like the other schedules. */
@@ -1013,42 +838,29 @@ export const finalizeCorpTaxBookRemovals = onSchedule(
 
 // Paying a moon owner (issue #4514): record a payout, mark a journal row not a payout, and attach
 // the wallet journal's outgoing donations to the records. Each rebuilds the moon owner's view.
-export const recordCorpTaxBookFeederPayoutCallable = corpTaxBookCallable(
-  'recordCorpTaxBookFeederPayoutCallable',
-  FEEDER_OWNER_OPTIONS,
-  (request) =>
-    recordFeederPayout(feederOwnerDeps(), callerOf(request), parseRecordPayoutInput(request.data))
+corpTaxBookAction('recordCorpTaxBookFeederPayoutCallable', (request) =>
+  recordFeederPayout(feederOwnerDeps(), callerOf(request), parseRecordPayoutInput(request.data))
 );
 
-export const markCorpTaxBookFeederPayoutCallable = corpTaxBookCallable(
-  'markCorpTaxBookFeederPayoutCallable',
-  FEEDER_OWNER_OPTIONS,
-  (request) =>
-    markFeederPayout(feederOwnerDeps(), callerOf(request), parseMarkPayoutInput(request.data))
+corpTaxBookAction('markCorpTaxBookFeederPayoutCallable', (request) =>
+  markFeederPayout(feederOwnerDeps(), callerOf(request), parseMarkPayoutInput(request.data))
 );
 
-export const reconcileCorpTaxBookFeederPayoutsCallable = corpTaxBookCallable(
-  'reconcileCorpTaxBookFeederPayoutsCallable',
-  FEEDER_OWNER_OPTIONS,
-  (request) =>
-    reconcileFeederPayoutsCall(
-      { ...feederOwnerDeps(), esi: esiSyncReader() },
-      callerOf(request),
-      parseReconcilePayoutsInput(request.data)
-    )
+corpTaxBookAction('reconcileCorpTaxBookFeederPayoutsCallable', (request) =>
+  reconcileFeederPayoutsCall(
+    { ...feederOwnerDeps(), esi: esiSyncReader() },
+    callerOf(request),
+    parseReconcilePayoutsInput(request.data)
+  )
 );
 
-export const listCorpTaxBookFeederInvitesCallable = corpTaxBookCallable(
-  'listCorpTaxBookFeederInvitesCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => listFeederInvites(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+corpTaxBookAction('listCorpTaxBookFeederInvitesCallable', (request) =>
+  listFeederInvites(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 // The holder revokes their own; the CEO revokes anyone's (live role check, so it carries an access token).
-export const revokeCorpTaxBookSyncGrantCallable = corpTaxBookCallable(
-  'revokeCorpTaxBookSyncGrantCallable',
-  { maxInstances: 5, secrets: [ALERTS_TOKEN_KEY] },
-  (request) => revokeCorpSyncGrant(corpSyncDeps(), callerOf(request), parseBookCall(request.data))
+corpTaxBookAction('revokeCorpTaxBookSyncGrantCallable', (request) =>
+  revokeCorpSyncGrant(corpSyncDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 /**
@@ -1070,56 +882,42 @@ export const syncCorpTaxBooks = onSchedule(
   }
 );
 
-export const verifyCorpOfficerCallable = corpTaxBookCallable(
-  'verifyCorpOfficerCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => verifyOfficer(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+corpTaxBookAction('verifyCorpOfficerCallable', (request) =>
+  verifyOfficer(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
 );
 
-export const turnOnCorpTaxBookCallable = corpTaxBookCallable(
-  'turnOnCorpTaxBookCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => turnOnBook(corpTaxBookDeps(), callerOf(request), parseTurnOnInput(request.data))
+corpTaxBookAction('turnOnCorpTaxBookCallable', (request) =>
+  turnOnBook(corpTaxBookDeps(), callerOf(request), parseTurnOnInput(request.data))
 );
 
 // Whoever turned the book on (or the CEO) deletes it; the scheduled-sync grant is revoked with it.
-export const deleteCorpTaxBookCallable = corpTaxBookCallable(
-  'deleteCorpTaxBookCallable',
-  { ...CORP_TAX_BOOK_OPTIONS, secrets: [ALERTS_TOKEN_KEY] },
-  (request) =>
-    deleteBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data), (corporationId) =>
-      dropBookGrants(corpSyncDeps(), corporationId)
-    )
+corpTaxBookAction('deleteCorpTaxBookCallable', (request) =>
+  deleteBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data), (corporationId) =>
+    dropBookGrants(corpSyncDeps(), corporationId)
+  )
 );
 
-export const reclaimCorpTaxBookCallable = corpTaxBookCallable(
-  'reclaimCorpTaxBookCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => reclaimBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
+corpTaxBookAction('reclaimCorpTaxBookCallable', (request) =>
+  reclaimBook(corpTaxBookDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 // A sync is many small transactions (up to 2000 observer rows), so give it room.
-export const syncCorpTaxBookCallable = corpTaxBookCallable(
-  'syncCorpTaxBookCallable',
-  { ...CORP_TAX_BOOK_OPTIONS, timeoutSeconds: 120 },
-  (request) =>
-    syncBook(corpTaxBookDeps(), callerOf(request), parseSyncInput(request.data, Date.now()))
+corpTaxBookAction('syncCorpTaxBookCallable', (request) =>
+  syncBook(corpTaxBookDeps(), callerOf(request), parseSyncInput(request.data, Date.now()))
 );
 
-export const editCorpTaxBookCallable = corpTaxBookCallable(
-  'editCorpTaxBookCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    editBook(
-      corpTaxBookDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseEditAction(request.data)
-    )
+corpTaxBookAction('editCorpTaxBookCallable', (request) =>
+  editBook(
+    corpTaxBookDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseEditAction(request.data)
+  )
 );
 
-// SRP (ADR 0026): data under corps/{id}, written only by these callables. Served by
-// the Corp Tax Book router (one more deployed function would add a quota hit for nothing).
+// SRP (ADR 0026): data under corps/{id}, written only by these callables. Router-only: each is
+// an action of `corpTaxBookCall`, never its own deployed function (a deploy has a per-minute
+// mutation quota). Clients call it through `callRouted`.
 const srpDeps = (): SrpDeps => ({
   ...corpTaxBookDeps(),
   lookupCorporation: esiCorporationLookup(),
@@ -1127,198 +925,140 @@ const srpDeps = (): SrpDeps => ({
 
 const srpFileDeps = (): SrpFileDeps => ({ ...srpDeps(), killmails: srpKillmailSource() });
 
-export const verifySrpOfficerCallable = corpTaxBookCallable(
-  'verifySrpOfficerCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => verifySrpOfficer(srpDeps(), callerOf(request), parseBookCall(request.data))
+corpTaxBookAction('verifySrpOfficerCallable', (request) =>
+  verifySrpOfficer(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 // A member (no corp role, no corp scope): is SRP on for my corporation, and what are its rules.
-export const getSrpStatusCallable = corpTaxBookCallable(
-  'getSrpStatusCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => getSrpStatus(srpDeps(), callerOf(request), parseBookCall(request.data))
+corpTaxBookAction('getSrpStatusCallable', (request) =>
+  getSrpStatus(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 // A member files an SRP Claim against their own killmail: the server verifies the loss and prices it.
-export const fileSrpClaimCallable = corpTaxBookCallable(
-  'fileSrpClaimCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    fileSrpClaim(
-      srpFileDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseFileClaimInput(request.data)
-    )
+corpTaxBookAction('fileSrpClaimCallable', (request) =>
+  fileSrpClaim(
+    srpFileDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseFileClaimInput(request.data)
+  )
 );
 
-export const turnOnSrpCallable = corpTaxBookCallable(
-  'turnOnSrpCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => turnOnSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
+corpTaxBookAction('turnOnSrpCallable', (request) =>
+  turnOnSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
-export const turnOffSrpCallable = corpTaxBookCallable(
-  'turnOffSrpCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => turnOffSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
+corpTaxBookAction('turnOffSrpCallable', (request) =>
+  turnOffSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
-export const saveSrpSettingsCallable = corpTaxBookCallable(
-  'saveSrpSettingsCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    saveSrpSettings(
-      srpDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseSrpSettingsPatch((request.data as { settings?: unknown } | null)?.settings)
-    )
+corpTaxBookAction('saveSrpSettingsCallable', (request) =>
+  saveSrpSettings(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseSrpSettingsPatch((request.data as { settings?: unknown } | null)?.settings)
+  )
 );
 
 // Officer queue: each re-checks Director/Accountant live and guards the state change in a transaction.
-export const approveSrpClaimCallable = corpTaxBookCallable(
-  'approveSrpClaimCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    approveSrpClaim(
-      srpDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseApproveItem(request.data)
-    )
+corpTaxBookAction('approveSrpClaimCallable', (request) =>
+  approveSrpClaim(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseApproveItem(request.data)
+  )
 );
 
-export const approveSrpClaimsCallable = corpTaxBookCallable(
-  'approveSrpClaimsCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    approveSrpClaims(
-      srpDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseApproveBatch(request.data)
-    )
+corpTaxBookAction('approveSrpClaimsCallable', (request) =>
+  approveSrpClaims(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseApproveBatch(request.data)
+  )
 );
 
-export const rejectSrpClaimCallable = corpTaxBookCallable(
-  'rejectSrpClaimCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    rejectSrpClaim(
-      srpDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseReject(request.data)
-    )
+corpTaxBookAction('rejectSrpClaimCallable', (request) =>
+  rejectSrpClaim(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseReject(request.data)
+  )
 );
 
-export const changeSrpClaimAmountCallable = corpTaxBookCallable(
-  'changeSrpClaimAmountCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    changeSrpClaimAmount(
-      srpDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseChangeAmount(request.data)
-    )
+corpTaxBookAction('changeSrpClaimAmountCallable', (request) =>
+  changeSrpClaimAmount(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseChangeAmount(request.data)
+  )
 );
 
-export const markSrpClaimPaidCallable = corpTaxBookCallable(
-  'markSrpClaimPaidCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    markSrpClaimPaid(
-      srpDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseMarkPaidItem(request.data)
-    )
+corpTaxBookAction('markSrpClaimPaidCallable', (request) =>
+  markSrpClaimPaid(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseMarkPaidItem(request.data)
+  )
 );
 
-export const markSrpClaimsPaidCallable = corpTaxBookCallable(
-  'markSrpClaimsPaidCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) =>
-    markSrpClaimsPaid(
-      srpDeps(),
-      callerOf(request),
-      parseBookCall(request.data),
-      parseMarkPaidBatch(request.data)
-    )
+corpTaxBookAction('markSrpClaimsPaidCallable', (request) =>
+  markSrpClaimsPaid(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseMarkPaidBatch(request.data)
+  )
 );
 
-export const reclaimSrpCallable = corpTaxBookCallable(
-  'reclaimSrpCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => reclaimSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
+corpTaxBookAction('reclaimSrpCallable', (request) =>
+  reclaimSrp(srpDeps(), callerOf(request), parseBookCall(request.data))
 );
 
 // A player claims their own Unmatched donation (D5): uid-authorised, no officer role.
-export const claimCorpTaxBookPaymentCallable = corpTaxBookCallable(
-  'claimCorpTaxBookPaymentCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => {
-    const { corporationId, paymentId } = parseClaimPaymentInput(request.data);
-    return claimPayment(corpTaxBookDeps(), callerOf(request), corporationId, paymentId);
-  }
-);
+corpTaxBookAction('claimCorpTaxBookPaymentCallable', (request) => {
+  const { corporationId, paymentId } = parseClaimPaymentInput(request.data);
+  return claimPayment(corpTaxBookDeps(), callerOf(request), corporationId, paymentId);
+});
 
-export const confirmCorpTaxBookGroupingCallable = corpTaxBookCallable(
-  'confirmCorpTaxBookGroupingCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => {
-    const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
-    return confirmGrouping(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
-  }
-);
+corpTaxBookAction('confirmCorpTaxBookGroupingCallable', (request) => {
+  const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
+  return confirmGrouping(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
+});
 
-export const declineCorpTaxBookGroupingCallable = corpTaxBookCallable(
-  'declineCorpTaxBookGroupingCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => {
-    const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
-    return declineGrouping(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
-  }
-);
+corpTaxBookAction('declineCorpTaxBookGroupingCallable', (request) => {
+  const { corporationId, minerId } = parseConfirmGroupingInput(request.data);
+  return declineGrouping(corpTaxBookDeps(), callerOf(request), corporationId, minerId);
+});
 
-export const listPendingCorpTaxBookGroupingsCallable = corpTaxBookCallable(
-  'listPendingCorpTaxBookGroupingsCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => listPendingGroupings(corpTaxBookDeps(), callerOf(request))
+corpTaxBookAction('listPendingCorpTaxBookGroupingsCallable', (request) =>
+  listPendingGroupings(corpTaxBookDeps(), callerOf(request))
 );
 
 // No session on purpose: the verify link is the credential (D27), so a miner
 // without an EVE login can read their Statement and stop reminders.
-export const readCorpTaxBookStatementCallable = corpTaxBookCallable(
-  'readCorpTaxBookStatementCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => readStatementByToken(corpTaxBookDeps(), parseToken(request.data))
+corpTaxBookAction('readCorpTaxBookStatementCallable', (request) =>
+  readStatementByToken(corpTaxBookDeps(), parseToken(request.data))
 );
 
 // A decline needs only the link; a confirm never does (it needs the character's own sign-in).
-export const declineCorpTaxBookGroupingByTokenCallable = corpTaxBookCallable(
-  'declineCorpTaxBookGroupingByTokenCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => {
-    const { token, characterId } = parseDeclineByTokenInput(request.data);
-    return declineGroupingByToken(corpTaxBookDeps(), token, characterId);
-  }
-);
+corpTaxBookAction('declineCorpTaxBookGroupingByTokenCallable', (request) => {
+  const { token, characterId } = parseDeclineByTokenInput(request.data);
+  return declineGroupingByToken(corpTaxBookDeps(), token, characterId);
+});
 
-export const stopCorpTaxBookRemindersCallable = corpTaxBookCallable(
-  'stopCorpTaxBookRemindersCallable',
-  CORP_TAX_BOOK_OPTIONS,
-  (request) => {
-    const { token, stopped } = parseStopReminders(request.data);
-    return setRemindersByToken(corpTaxBookDeps(), token, stopped);
-  }
-);
+corpTaxBookAction('stopCorpTaxBookRemindersCallable', (request) => {
+  const { token, stopped } = parseStopReminders(request.data);
+  return setRemindersByToken(corpTaxBookDeps(), token, stopped);
+});
 
 // The Corp Tax Book router: the union of its callables' secrets and the longest timeout (a sync is many
-// small transactions). Clients call this; the per-name exports above go once none do.
+// small transactions). Clients call this.
 export const corpTaxBookCall = onCall<unknown>(
   { maxInstances: 10, secrets: FEEDER_VIEW_SECRETS, timeoutSeconds: 120 },
   corpTaxBookActions.route
