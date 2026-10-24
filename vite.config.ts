@@ -118,6 +118,18 @@ const DOM_TS_TESTS = 'src/**/*.dom.test.ts';
  * `filesToDeleteAfterUpload` removes them once Sentry has them — `dist/` is
  * published to GitHub Pages, so a `.map` left behind is a public one.
  */
+/**
+ * A module directly in this project's `src/components/ui` (not a subfolder,
+ * not a package's own `src/components/ui`), on either path separator.
+ */
+const UI_PRIMITIVE_MODULE = new RegExp(
+  '^' +
+    fileURLToPath(new URL('./src/components/ui/', import.meta.url))
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\\\\|\//g, '[\\\\/]') +
+    '[^\\\\/]+\\.tsx?$'
+);
+
 const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
 
 /**
@@ -406,13 +418,14 @@ export default defineConfig({
       // barrel kept every primitive — DataTable, Select, ContextMenu, the
       // virtualizer — in the boot graph (~58 of 73 KiB unused on first load).
       // Marked side-effect-free, each primitive goes only where it is used.
+      // The second rule keeps every other project file (CSS, `stores/network`'s
+      // listener attach, `i18n`, `instrument`) side-effectful explicitly. It
+      // skips `node_modules`, so a package's own `sideEffects` field (Radix's
+      // `false`) still decides there.
       treeshake: {
         moduleSideEffects: [
-          {
-            test: /[\\/]src[\\/]components[\\/]ui[\\/][^\\/]+\.tsx?$/,
-            external: false,
-            sideEffects: false,
-          },
+          { test: UI_PRIMITIVE_MODULE, external: false, sideEffects: false },
+          { test: /^(?![\s\S]*[\\/]node_modules[\\/])/, external: false, sideEffects: true },
         ],
       },
       output: {

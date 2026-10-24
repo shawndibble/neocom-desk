@@ -10,8 +10,11 @@
  * queries whenever the pass finishes.
  */
 
-/** Upper bound on the wait for an idle slot (and the timer fallback's delay). */
-export const BOOT_SYNC_IDLE_TIMEOUT_MS = 2000;
+// Not imported from ./bootPrefetch: route tests mock that module wholesale.
+import { BOOT_IDLE_TIMEOUT_MS, scheduleIdle } from '@/lib/scheduleIdle';
+
+/** Upper bound on the wait for an idle slot: the boot prefetch's. */
+export const BOOT_SYNC_IDLE_TIMEOUT_MS = BOOT_IDLE_TIMEOUT_MS;
 
 /** Schedules `sync(characterId)` and returns its cancel (call it on Character switch). */
 export function scheduleBootSync(
@@ -22,14 +25,7 @@ export function scheduleBootSync(
   const start = () => {
     if (!cancelled) sync(characterId);
   };
-  let cancelWait: () => void;
-  if (typeof globalThis.requestIdleCallback === 'function') {
-    const handle = requestIdleCallback(start, { timeout: BOOT_SYNC_IDLE_TIMEOUT_MS });
-    cancelWait = () => cancelIdleCallback(handle);
-  } else {
-    const handle = setTimeout(start, BOOT_SYNC_IDLE_TIMEOUT_MS);
-    cancelWait = () => clearTimeout(handle);
-  }
+  const cancelWait = scheduleIdle(start, BOOT_SYNC_IDLE_TIMEOUT_MS);
   return () => {
     cancelled = true;
     cancelWait();
