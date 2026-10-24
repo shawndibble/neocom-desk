@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { firstConnected, useFocusAfterCommit } from './useFocusAfterCommit';
 
 const row = (id: string) => () => document.querySelector<HTMLElement>(`[data-row="${id}"]`);
@@ -69,6 +69,29 @@ describe('useFocusAfterCommit', () => {
     const heading = screen.getByTestId('h');
     expect(heading.tabIndex).toBe(-1);
     expect(document.activeElement).toBe(heading);
+  });
+
+  it('focuses without scrolling only when preventScroll is asked for', async () => {
+    const user = userEvent.setup();
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    function ScrollHarness({ prevent }: { prevent?: boolean }) {
+      const focusAfterCommit = useFocusAfterCommit(prevent ? { preventScroll: true } : undefined);
+      return (
+        <>
+          <h2 data-testid="h">Title</h2>
+          <button onClick={() => focusAfterCommit(() => document.querySelector('h2'))}>go</button>
+        </>
+      );
+    }
+    const first = render(<ScrollHarness prevent />);
+    await user.click(screen.getByText('go'));
+    expect(focus).toHaveBeenLastCalledWith({ preventScroll: true });
+    first.unmount();
+    focus.mockClear();
+    render(<ScrollHarness />);
+    await user.click(screen.getByText('go'));
+    expect(focus).toHaveBeenLastCalledWith();
+    focus.mockRestore();
   });
 
   it('does nothing, without throwing, when no candidate is connected', async () => {
