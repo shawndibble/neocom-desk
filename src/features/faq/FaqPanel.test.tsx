@@ -16,6 +16,7 @@ import {
   WHAT_WE_STORE_GROUPS,
 } from './whatWeStore';
 
+const rules = readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8');
 const functionsFile = (file: string) =>
   readFileSync(resolve(process.cwd(), 'functions/src', file), 'utf8');
 /** The day count of a `NAME = <days> * 24 ...` constant in a functions file. */
@@ -272,7 +273,6 @@ describe('FaqPanel — What We Store', () => {
 });
 
 describe('FaqPanel: Communities', () => {
-  const rules = readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8');
   const COMMUNITY_MATCH = 'match /communities/{communityId} {';
   // Everything between the shared Community block and the collection-group
   // read rule that follows it (the per-Character `communities` index is in
@@ -329,10 +329,9 @@ describe('FaqPanel: Communities', () => {
 
   it('keeps the Community retention numbers equal to the code that enforces them', () => {
     const requests = functionsFile('communityRequests.ts');
-    const days = (name: string) => daysIn(requests, name);
-    expect(days('REQUEST_LIFETIME_MS')).toBe(30);
-    expect(days('CLOSED_RETENTION_MS')).toBe(7);
-    expect(days('EXPIRED_RETENTION_MS')).toBe(7);
+    expect(daysIn(requests, 'REQUEST_LIFETIME_MS')).toBe(30);
+    expect(daysIn(requests, 'CLOSED_RETENTION_MS')).toBe(7);
+    expect(daysIn(requests, 'EXPIRED_RETENTION_MS')).toBe(7);
     expect(functionsFile('purgeStaleAccounts.ts')).toMatch(/ACCOUNT_INACTIVITY_DAYS = 90/);
     const server = RETENTION_GROUPS.find((group) => group.id === 'server');
     const text = (id: string) => {
@@ -371,7 +370,6 @@ describe('FaqPanel: corporation records', () => {
   });
 
   it('maps every collection the rules keep under corps/{id} to a line the pilot is told', () => {
-    const rules = readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8');
     const corpBlocks = rules.slice(
       rules.indexOf('match /corps/{corporationId} {'),
       rules.indexOf('match /corpTaxBookTokens/')
