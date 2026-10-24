@@ -22,6 +22,11 @@
  * against `firestore.rules`: a collection added there fails the test until it
  * is mapped to a line here.
  *
+ * Corporation records are a further group: SRP Claims (ADR 0026) and the
+ * Corp Tax Book (ADR 0023) live under `corps/{id}`, belong to the corporation
+ * rather than to one Character, and so outlive Delete all data. Same typed-map
+ * guard ({@link CORP_COLLECTION_FAQ_ITEM}), checked against the `corps` rules.
+ *
  * Deliberately honest about the four places where something EVE-derived, or
  * anything at all, does leave the device, because a section that overclaimed
  * would be worth less than one that did not exist: Notification Feed rows
@@ -94,6 +99,38 @@ export const COMMUNITY_COLLECTION_FAQ_ITEM = {
   requestMailQuota: 'mail',
 } as const satisfies Record<string, CommunityFaqItemId>;
 
+/** A line in the corporation records group. */
+export type CorpFaqItemId = 'srp' | 'corpTaxBook';
+
+/**
+ * Every collection under `corps/{id}` in `firestore.rules`, and the line that
+ * discloses it. Exhaustive on purpose, like the Community map.
+ */
+export const CORP_COLLECTION_FAQ_ITEM = {
+  officers: 'corpTaxBook',
+  observed: 'corpTaxBook',
+  payments: 'corpTaxBook',
+  statementLinks: 'corpTaxBook',
+  statements: 'corpTaxBook',
+  dismissals: 'corpTaxBook',
+  miners: 'corpTaxBook',
+  feeders: 'corpTaxBook',
+  feederViews: 'corpTaxBook',
+  adjustments: 'corpTaxBook',
+  writeOffs: 'corpTaxBook',
+  feederCoverage: 'corpTaxBook',
+  extractions: 'corpTaxBook',
+  declarations: 'corpTaxBook',
+  rebills: 'corpTaxBook',
+  meta: 'corpTaxBook',
+  audit: 'corpTaxBook',
+  srp: 'srp',
+  srpClaims: 'srp',
+  srpDoctrines: 'srp',
+  srpAudit: 'srp',
+  srpOfficers: 'srp',
+} as const satisfies Record<string, CorpFaqItemId>;
+
 /** The Community lines, as the panel lists them. */
 const COMMUNITY_ITEMS: readonly (WhatWeStoreItem & { id: CommunityFaqItemId })[] = [
   'membership',
@@ -107,9 +144,9 @@ const COMMUNITY_ITEMS: readonly (WhatWeStoreItem & { id: CommunityFaqItemId })[]
 ].map((id) => ({ id: id as CommunityFaqItemId, labelKey: `settings.faq.store.communities.${id}` }));
 
 /**
- * Three groups, in the order that answers the question a reader actually
- * arrives with: what leaves this device, what does not, and what other
- * players can read once you join a Community.
+ * Four groups, in the order that answers the question a reader actually
+ * arrives with: what leaves this device, what does not, what other players
+ * can read once you join a Community, and what your corporation keeps.
  *
  * There is deliberately no "never collected at all" group. A list of
  * things we don't hold is unfalsifiable by the reader and unbounded by
@@ -184,6 +221,15 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
     descriptionKey: 'settings.faq.store.communities.description',
     items: COMMUNITY_ITEMS,
   },
+  {
+    id: 'corpRecords',
+    titleKey: 'settings.faq.store.corp.title',
+    descriptionKey: 'settings.faq.store.corp.description',
+    items: (['srp', 'corpTaxBook'] satisfies CorpFaqItemId[]).map((id) => ({
+      id,
+      labelKey: `settings.faq.store.corp.${id}`,
+    })),
+  },
 ];
 
 /** One line of the retention answer: what is kept, and for how long. */
@@ -206,7 +252,8 @@ export interface RetentionGroup {
  * `engine/wallet/archiveCoverage.ts`,
  * `esi/cachePrune.ts`, `features/notifications/feed.ts`, `sync/merge.ts`,
  * `functions/src/purgeStaleAccounts.ts`, `functions/src/communityRequests.ts`,
- * `features/share/shareStore.ts`),
+ * `features/share/shareStore.ts`, `functions/src/srpRetention.ts`; the Corp Tax
+ * Book has no sweep, only `deleteBook` in `functions/src/corpTaxBookStore.ts`),
  * so change one and change the other (`FaqPanel.test.tsx` reads the numbers out
  * of those functions files).
  */
@@ -241,6 +288,8 @@ export const RETENTION_GROUPS: readonly RetentionGroup[] = [
       'community',
       'communityRequests',
       'shareLinks',
+      'srp',
+      'corpTaxBook',
       'idle',
     ].map((id) => ({
       id,

@@ -11,11 +11,19 @@ import { SYNCED_SETTING_KEYS } from '@/sync/syncedSettings';
 import { FaqPanel } from './FaqPanel';
 import {
   COMMUNITY_COLLECTION_FAQ_ITEM,
+  CORP_COLLECTION_FAQ_ITEM,
   RETENTION_GROUPS,
   WHAT_WE_STORE_GROUPS,
 } from './whatWeStore';
 
-const QUESTIONS = 19;
+const rules = readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8');
+const functionsFile = (file: string) =>
+  readFileSync(resolve(process.cwd(), 'functions/src', file), 'utf8');
+/** The day count of a `NAME = <days> * 24 ...` constant in a functions file. */
+const daysIn = (source: string, name: string) =>
+  Number(new RegExp(`${name} = (\\d+) \\* 24`).exec(source)?.[1]);
+
+const QUESTIONS = 20;
 
 /** Renders the FAQ with every question opened, as the content tests read the answers. */
 function renderFaq(initialEntry = '/help/faq') {
@@ -136,11 +144,12 @@ describe('FaqPanel — What We Store', () => {
     ]);
   });
 
-  it('files Community data as its own third group, after the other two', () => {
+  it('files Community data, then corporation records, after the other two', () => {
     expect(WHAT_WE_STORE_GROUPS.map((group) => group.id)).toEqual([
       'synced',
       'local',
       'communities',
+      'corpRecords',
     ]);
   });
 
@@ -217,9 +226,9 @@ describe('FaqPanel — What We Store', () => {
 
   it('has no group listing things we do not hold', () => {
     // Dropped on purpose: a list of what is *not* stored is unfalsifiable by
-    // the reader and unbounded by nature. The two groups account for what
-    // exists; absence from both is the answer.
-    expect(WHAT_WE_STORE_GROUPS).toHaveLength(3);
+    // the reader and unbounded by nature. The groups account for what
+    // exists; absence from all of them is the answer.
+    expect(WHAT_WE_STORE_GROUPS).toHaveLength(4);
     renderFaq();
     expect(screen.queryByRole('heading', { name: /never collected/i })).not.toBeInTheDocument();
   });
@@ -264,7 +273,6 @@ describe('FaqPanel — What We Store', () => {
 });
 
 describe('FaqPanel: Communities', () => {
-  const rules = readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8');
   const COMMUNITY_MATCH = 'match /communities/{communityId} {';
   // Everything between the shared Community block and the collection-group
   // read rule that follows it (the per-Character `communities` index is in
@@ -320,15 +328,11 @@ describe('FaqPanel: Communities', () => {
   });
 
   it('keeps the Community retention numbers equal to the code that enforces them', () => {
-    const functions = (file: string) =>
-      readFileSync(resolve(process.cwd(), 'functions/src', file), 'utf8');
-    const requests = functions('communityRequests.ts');
-    const days = (name: string) =>
-      Number(new RegExp(`${name} = (\\d+) \\* 24`).exec(requests)?.[1]);
-    expect(days('REQUEST_LIFETIME_MS')).toBe(30);
-    expect(days('CLOSED_RETENTION_MS')).toBe(7);
-    expect(days('EXPIRED_RETENTION_MS')).toBe(7);
-    expect(functions('purgeStaleAccounts.ts')).toMatch(/ACCOUNT_INACTIVITY_DAYS = 90/);
+    const requests = functionsFile('communityRequests.ts');
+    expect(daysIn(requests, 'REQUEST_LIFETIME_MS')).toBe(30);
+    expect(daysIn(requests, 'CLOSED_RETENTION_MS')).toBe(7);
+    expect(daysIn(requests, 'EXPIRED_RETENTION_MS')).toBe(7);
+    expect(functionsFile('purgeStaleAccounts.ts')).toMatch(/ACCOUNT_INACTIVITY_DAYS = 90/);
     const server = RETENTION_GROUPS.find((group) => group.id === 'server');
     const text = (id: string) => {
       const item = server?.items.find((candidate) => candidate.id === id);
@@ -342,6 +346,58 @@ describe('FaqPanel: Communities', () => {
     expect(shown).toMatch(
       /90 days, then all of its synced data is deleted and the Character is removed/
     );
+  });
+});
+
+describe('FaqPanel: corporation records', () => {
+  it('names SRP Claims and the Corp Tax Book, and who reads each', () => {
+    renderFaq();
+    expect(document.getElementById('corp-records')).toBeInTheDocument();
+    expect(screen.getByText(/^SRP Claims: /)).toHaveTextContent(/a pilot reads only their own/);
+    expect(screen.getByText(/^The Corp Tax Book: /)).toHaveTextContent(
+      /a corp member reads only their own lines/
+    );
+    expect(screen.getByText(/is not uploaded, apart from/)).toHaveTextContent(
+      /your corporation's SRP Claims and Corp Tax Book/
+    );
+  });
+
+  it('says Delete all data leaves them with the corporation', () => {
+    renderFaq();
+    expect(
+      screen.getByText(/SRP Claims and Corp Tax Book lines belong to the corporation's records/)
+    ).toBeInTheDocument();
+  });
+
+  it('maps every collection the rules keep under corps/{id} to a line the pilot is told', () => {
+    const corpBlocks = rules.slice(
+      rules.indexOf('match /corps/{corporationId} {'),
+      rules.indexOf('match /corpTaxBookTokens/')
+    );
+    const names = [...corpBlocks.matchAll(/match \/(\w+)\/\{\w+\}/g)]
+      .map((match) => match[1])
+      .filter((name) => name !== 'corps');
+    const officerOnly = /officerOnly in \[([^\]]+)\]/.exec(corpBlocks)?.[1] ?? '';
+    names.push(...[...officerOnly.matchAll(/'(\w+)'/g)].map((match) => match[1]));
+    expect(names).toEqual(expect.arrayContaining(['srpClaims', 'statements', 'audit']));
+    for (const name of names) {
+      expect(
+        CORP_COLLECTION_FAQ_ITEM,
+        `"${name}" is a corps collection in firestore.rules with no line in the FAQ`
+      ).toHaveProperty(name);
+    }
+    const group = WHAT_WE_STORE_GROUPS.find((g) => g.id === 'corpRecords');
+    expect(new Set(group?.items.map((item) => item.id))).toEqual(
+      new Set<string>(Object.values(CORP_COLLECTION_FAQ_ITEM))
+    );
+  });
+
+  it('keeps the SRP retention equal to the sweep that enforces it', () => {
+    expect(daysIn(functionsFile('srpRetention.ts'), 'SRP_RETENTION_MS')).toBe(365);
+    renderFaq();
+    const shown = document.body.textContent ?? '';
+    expect(shown).toMatch(/Paid or Rejected claim is deleted 365 days after it closes/);
+    expect(shown).toMatch(/Corp Tax Book:\s*no expiry/);
   });
 });
 
