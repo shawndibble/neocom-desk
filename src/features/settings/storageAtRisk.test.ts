@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
-import { checkStorageAtRisk, useStorageAtRisk } from './storageAtRisk';
+import { checkStorageAtRisk, clearStorageAttention, useStorageAtRisk } from './storageAtRisk';
 
 function storage(persisted: boolean) {
   return { persisted: vi.fn(async () => persisted), persist: vi.fn(async () => true) };
@@ -43,6 +43,25 @@ describe('checkStorageAtRisk', () => {
       persist: vi.fn(async () => true),
     };
     await checkStorageAtRisk(true, throwing);
+    expect(useStorageAtRisk.getState().atRisk).toBe(false);
+  });
+
+  it('lets a slow, older read never undo a newer answer', async () => {
+    let answerOld: (persisted: boolean) => void = () => {};
+    const slow = {
+      persisted: vi.fn(
+        () =>
+          new Promise<boolean>((resolve) => {
+            answerOld = resolve;
+          })
+      ),
+      persist: vi.fn(async () => true),
+    };
+    const stale = checkStorageAtRisk(true, slow);
+    clearStorageAttention();
+    await checkStorageAtRisk(true, storage(true));
+    answerOld(false);
+    await stale;
     expect(useStorageAtRisk.getState().atRisk).toBe(false);
   });
 });

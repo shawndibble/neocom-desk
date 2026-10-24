@@ -11,13 +11,18 @@ import { readPersisted, type PersistableStorage } from '@/lib/persistStorage';
  */
 export const useStorageAtRisk = create<{ atRisk: boolean }>(() => ({ atRisk: false }));
 
+// Settings' mount check can start while the boot ask is still in flight, and
+// finish after it: only the newest check, or a later clear, may write.
+let generation = 0;
+
 export async function checkStorageAtRisk(
   installed: boolean = isInstalledApp(),
   storage?: PersistableStorage
 ): Promise<void> {
+  const mine = ++generation;
   const persisted = installed ? await readPersisted(storage) : null;
   const atRisk = persisted === false && (await db.characters.count().catch(() => 0)) > 0;
-  useStorageAtRisk.setState({ atRisk });
+  if (mine === generation) useStorageAtRisk.setState({ atRisk });
 }
 
 /**
@@ -25,5 +30,6 @@ export async function checkStorageAtRisk(
  * way. A decline leaves nothing more to press, so the dot must not stay lit.
  */
 export function clearStorageAttention(): void {
+  generation++;
   useStorageAtRisk.setState({ atRisk: false });
 }
