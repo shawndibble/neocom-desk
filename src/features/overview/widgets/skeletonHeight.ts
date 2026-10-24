@@ -19,8 +19,8 @@
  * rearranged for years does not grow the entry without bound.
  */
 import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
-import type { WidgetSize, WidgetView } from './kinds';
-import type { RowsPerPage } from './tableSortPage';
+import type { DefinedKindId, WidgetSize, WidgetView } from './kinds';
+import { DEFAULT_ROWS_PER_PAGE, type RowsPerPage } from './tableSortPage';
 import { chartHeight } from './sizes';
 import { hbarRows } from './charts/sizing';
 import { TABLE_ROWS } from './tableModel';
@@ -35,6 +35,11 @@ const FIGURE = 50;
 const SECONDARY_LINE = 23.5;
 /** A plot's axis-label line (`text-[0.6875rem]`) and the `gap-1` above it. */
 const AXIS = 20.5;
+/**
+ * The second line a wrapped axis takes: a Small tile on a phone is too narrow for its labels on
+ * one line, and the wrap adds the line without a second gap.
+ */
+const AXIS_WRAP = AXIS - 4;
 /** A chart's caption line and the `gap-1.5` above it. */
 const CAPTION = 22.5;
 /** The chart block's bottom padding (`pb-2.5`). */
@@ -46,9 +51,13 @@ const HEADER_ROW = 25;
 /** A header row of sort buttons, which stand 44px tall on a phone (the touch floor). */
 const SORTABLE_HEADER_DESK = 29.3;
 const SORTABLE_HEADER_PHONE = 52.5;
-/** A table row: `md:h-7` on a desktop, a plain row's `h-8` on a phone. */
+/**
+ * A table row: `md:h-7` on a desktop; on a phone a plain row is `h-8` and one that links or
+ * opens a detail is `h-11` (the touch floor).
+ */
 const ROW_DESK = 28;
 const ROW_PHONE = 32;
+const ROW_PHONE_LINKED = 44;
 /** The "+N more" line under a table cut at the size's rows: an `sm` button and its padding. */
 const MORE_DESK = 37;
 const MORE_PHONE = 45;
@@ -71,8 +80,13 @@ const STACK_BAR = 36;
 interface KindShape {
   /** Table view: the header is sort buttons. */
   sortable?: boolean;
-  /** Table view: a pageable table, so a list that fills the size's rows also draws the pager. */
+  /**
+   * Table view: pageable, so it shows a page (the chosen page size, else the default) and the
+   * pager, never the size's row cut.
+   */
   paged?: boolean;
+  /** Table view: every row links or opens a detail, so on a phone each stands at the touch floor. */
+  linkedRows?: boolean;
   /** Table view: a footer line under the table. */
   footer?: boolean;
   /** Table view: the list is nearly always longer than the size's rows, so "+N more" draws. */
@@ -88,10 +102,18 @@ interface KindShape {
   hbars?: number;
 }
 
-const KIND_SHAPES: Readonly<Record<string, KindShape>> = {
+const KIND_SHAPES = {
   // Open orders: sortable columns, paged, and the order-slots footer once skills are read.
   orders: { sortable: true, paged: true, footer: true },
-  sovRaids: { sortable: true },
+  // Rows that link to their page or open a detail: the touch floor on a phone.
+  sovRaids: { sortable: true, linkedRows: true },
+  incursions: { linkedRows: true },
+  stock: { linkedRows: true },
+  mercenaryDens: { linkedRows: true },
+  corpSovereignty: { linkedRows: true },
+  corpWallet: { linkedRows: true },
+  corpAssets: { linkedRows: true },
+  corpSrp: { linkedRows: true },
   // A mailbox's newest 50 headers are always more than a widget's rows.
   mail: { overflows: true },
   // A handful of corporations' LP, with the caption.
@@ -99,7 +121,10 @@ const KIND_SHAPES: Readonly<Record<string, KindShape>> = {
   // A device's first load has one day of snapshots: the single stacked bar and its "as of" caption.
   netWorth: { chart: 'stack', caption: true },
   profit: { chart: 'bars', caption: true },
-};
+} satisfies Partial<Record<DefinedKindId, KindShape>>;
+
+const shapeOf = (kind: string): KindShape =>
+  (KIND_SHAPES as Readonly<Record<string, KindShape>>)[kind] ?? {};
 
 function chartDrawing(shape: KindShape, size: WidgetSize, phone: boolean): number {
   const caption = shape.caption ? CAPTION : 0;
@@ -109,8 +134,7 @@ function chartDrawing(shape: KindShape, size: WidgetSize, phone: boolean): numbe
   }
   if (shape.chart === 'stack') return STACK_BAR + caption;
   if (shape.chart === 'bars') return chartHeight[size] + AXIS + caption;
-  // A Small tile on a phone is too narrow for the axis labels on one line.
-  const axis = phone && size === 'S' ? 2 * AXIS - 4 : AXIS;
+  const axis = phone && size === 'S' ? AXIS + AXIS_WRAP : AXIS;
   return chartHeight[size] + axis + caption;
 }
 
@@ -125,18 +149,19 @@ function tableHeight(
       ? SORTABLE_HEADER_PHONE
       : SORTABLE_HEADER_DESK
     : HEADER_ROW;
-  const row = phone ? ROW_PHONE : ROW_DESK;
+  const row = phone ? (shape.linkedRows ? ROW_PHONE_LINKED : ROW_PHONE) : ROW_DESK;
   const pager = phone ? PAGER_PHONE : PAGER_DESK;
   let rows: number;
   let below = 0;
-  if (rowsPerPage !== undefined) {
-    rows = rowsPerPage;
+  if (shape.paged || rowsPerPage !== undefined) {
+    // A paged table shows a page (the chosen size, else the default) whatever the widget's size,
+    // and the pager once the list passes the smallest page (`ROWS_PER_PAGE_OPTIONS[0]`): a full
+    // list, which is what this estimates, always does.
+    rows = rowsPerPage ?? DEFAULT_ROWS_PER_PAGE;
     below += pager;
   } else {
     rows = TABLE_ROWS[size];
-    // A paged table only draws its pager past the smallest page (five rows).
-    if (shape.paged && rows > 5) below += pager;
-    if (shape.overflows && !shape.paged) below += phone ? MORE_PHONE : MORE_DESK;
+    if (shape.overflows) below += phone ? MORE_PHONE : MORE_DESK;
   }
   if (shape.footer) below += FOOTER;
   return TABLE_BORDER + header + rows * row + below;
@@ -145,14 +170,14 @@ function tableHeight(
 /**
  * The body height a widget settles at with a full set of data, for its first load on a device.
  * `rowsPerPage` is the widget's chosen page size, set only once the pilot has picked one (which
- * only a paged table offers): such a table shows that many rows and a pager.
+ * only a paged table offers); a paged table without one shows the default page.
  */
 export function estimatedBodyHeight(
   widget: { kind: string; view: WidgetView; size: WidgetSize; rowsPerPage?: RowsPerPage },
   phone: boolean
 ): number {
   const { view, size } = widget;
-  const shape = KIND_SHAPES[widget.kind] ?? {};
+  const shape = shapeOf(widget.kind);
   const headline = FIGURE + SECONDARY_LINE;
   if (view === 'number') return Math.round(headline);
   if (view === 'chart') return Math.round(headline + chartDrawing(shape, size, phone) + CHART_PAD);

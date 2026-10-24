@@ -45,6 +45,47 @@ describe('useKindViews', () => {
     expect(hook.result.current).not.toBe(before);
   });
 
+  describe('settling', () => {
+    const wallet: ViewRequest[] = [{ kind: 'wallet', scopeAll: false }];
+    const balance = {
+      data: {
+        result: { data: 5_000_000, fetchedAt: new Date(), fromCache: false, truncated: false },
+        needsReauth: false,
+      },
+      error: false,
+      loading: false,
+    };
+    const journal = {
+      result: { data: [], fetchedAt: new Date(), fromCache: false, truncated: false },
+      needsReauth: false,
+    } as never;
+    function walletView(setupStore: (store: ReturnType<typeof createFeedStore>) => void) {
+      const store = createFeedStore();
+      setupStore(store);
+      const wrapper = ({ children }: { children: ReactNode }) => (
+        <FeedStoreContext.Provider value={store}>{children}</FeedStoreContext.Provider>
+      );
+      const hook = renderHook(() => useKindViews(wallet), { wrapper });
+      return [...hook.result.current.values()][0]!;
+    }
+
+    it('marks a view settling while a first read is still out', () => {
+      const view = walletView((store) => {
+        store.set('wallet', balance);
+        store.set('journal', { data: null, error: false, loading: true });
+      });
+      expect(view.settling).toBe(true);
+    });
+
+    it('does not mark a refresh over data already on screen', () => {
+      const view = walletView((store) => {
+        store.set('wallet', { ...balance, loading: true });
+        store.set('journal', { data: journal, error: false, loading: true });
+      });
+      expect(view.settling).toBeFalsy();
+    });
+  });
+
   describe('on the Time format clock', () => {
     const originalTz = process.env.TZ;
     afterEach(() => {

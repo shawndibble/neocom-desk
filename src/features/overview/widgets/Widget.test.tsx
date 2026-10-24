@@ -164,6 +164,18 @@ describe('a view still settling', () => {
     expect(rememberedBodyHeight(key())).toBeUndefined();
   });
 
+  it('treats an empty view the same while a read is still out', () => {
+    const sample = sampleView('wallet', i18n.t.bind(i18n))!;
+    vi.mocked(widgetView.useWidgetView).mockReturnValueOnce({
+      ...sample,
+      status: { ...sample.status, isEmpty: true },
+      settling: true,
+    });
+    renderWidget(wallet, () => undefined);
+    expect(body().style.minHeight).toBe('148px');
+    expect(rememberedBodyHeight(key())).toBeUndefined();
+  });
+
   it('lets go of the reserve once every read is in', () => {
     renderWidget(wallet, (store) => {
       store.set('wallet', balance);

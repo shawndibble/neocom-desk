@@ -321,15 +321,14 @@ function WidgetFrame({
   const { state, showLastGood, reauthNote } = resolveWidget(view.status);
   const isPhone = useIsPhone();
   const sizeKey = heightKey(widget, characterId, isPhone);
-  // A view that draws while one of its reads is still out (the Wallet's balance before its
-  // journal) is not at its height yet: it keeps the skeleton's reserve until the read lands.
-  const settling = rememberHeight && state === 'ok' && view.settling === true;
+  const drawn = state === 'ok' || state === 'empty';
+  // A view that draws (or reads empty) while one of its first reads is still out (the Wallet's
+  // balance before its journal) is not at its height yet: it keeps the skeleton's reserve until
+  // the read lands.
+  const settling = rememberHeight && drawn && view.settling === true;
   // Only a settled body is worth standing the next skeleton at: a short error or permission
   // prompt is a passing state, not this widget's height.
-  const measureRef = useRememberHeight(
-    sizeKey,
-    rememberHeight && (state === 'ok' || state === 'empty') && !settling
-  );
+  const measureRef = useRememberHeight(sizeKey, rememberHeight && drawn && !settling);
   const reserved = () =>
     (rememberHeight ? rememberedBodyHeight(sizeKey) : undefined) ??
     estimatedBodyHeight(widget, isPhone);

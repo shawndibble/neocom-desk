@@ -93,7 +93,12 @@ function cachedView(
     raidsWhere: request.raidsWhere === 'near' ? 'near' : 'alliance',
     raidsRadius: request.raidsRadius ?? DEFAULT_RAIDS_RADIUS,
   });
-  const settling = feedIds.some((feedId) => feeds[feedId]?.loading === true);
+  // Only a first read still out counts: a refresh also reports `loading`, but over data that is
+  // already on screen, so the body is at its height.
+  const settling = feedIds.some((feedId) => {
+    const feed = feeds[feedId];
+    return feed?.loading === true && feed.data === null;
+  });
   const view = settling ? { ...built, settling } : built;
   cache.set(id, { deps, view });
   return view;

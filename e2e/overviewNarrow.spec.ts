@@ -234,11 +234,14 @@ for (const viewport of [{ width: 1280, height: 900 }, PHONE]) {
   });
 }
 
-test('a long corporation / alliance line ends before Customize at 390px (no overlapping targets)', async ({
-  page,
-}) => {
-  const corp = 'Bureau of Unified Harvesting';
-  const alliance = 'Plenitude Alliance';
+const LONG_CORP = 'Bureau of Unified Harvesting';
+const LONG_ALLIANCE = 'Plenitude Alliance';
+/** The header row's `gap-x-3` (12px) between the name block and Customize, less sub-pixel slack. */
+const HEADER_GAP_MIN = 8;
+
+async function mockLongAffiliation(page: Page) {
+  const corp = LONG_CORP;
+  const alliance = LONG_ALLIANCE;
   const json = (body: unknown) => ({ contentType: 'application/json', body: JSON.stringify(body) });
   await page.route(new RegExp(`esi\\.evetech\\.net/corporations/${CORPORATION_ID}/?$`), (route) =>
     route.fulfill(
@@ -278,20 +281,60 @@ test('a long corporation / alliance line ends before Customize at 390px (no over
       )
     );
   });
-  await page.setViewportSize(PHONE);
-  await signInAndGoto(page, './overview', SCOPES, [
-    overviewLayoutSetting([{ kind: 'training', size: 'S' }]),
-  ]);
-  const header = page.locator('main header');
-  const allianceLink = header.getByRole('link', { name: alliance });
-  await expect(allianceLink).toBeVisible({ timeout: FIRST_LOAD_MS });
-  const customize = (await header.getByRole('button', { name: 'Customize' }).boundingBox())!;
-  for (const link of [allianceLink, header.getByRole('link', { name: corp })]) {
-    const box = (await link.boundingBox())!;
-    // The name truncates inside its own box, which ends before Customize's (the row's gap apart).
-    expect(box.x + box.width).toBeLessThanOrEqual(customize.x - 8);
-  }
-});
+}
+
+function boxesOverlap(a: Box, b: Box): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+for (const viewport of [
+  PHONE,
+  { width: 768, height: 900 },
+  { width: 1024, height: 900 },
+  { width: 1280, height: 900 },
+]) {
+  test(`a long corporation / alliance line ends before Customize, on one header row, at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await mockLongAffiliation(page);
+    await page.setViewportSize(viewport);
+    await signInAndGoto(page, './overview', SCOPES, [
+      overviewLayoutSetting([{ kind: 'training', size: 'S' }]),
+    ]);
+    const header = page.locator('main header');
+    const allianceLink = header.getByRole('link', { name: LONG_ALLIANCE });
+    await expect(allianceLink).toBeVisible({ timeout: FIRST_LOAD_MS });
+    const customize = (await header.getByRole('button', { name: 'Customize' }).boundingBox())!;
+    const bell = (await header.getByRole('button', { name: /^Alerts/ }).boundingBox())!;
+    const name = (await header
+      .getByRole('heading', { level: 1 })
+      .locator('..')
+      .locator('..')
+      .boundingBox())!;
+    for (const link of [allianceLink, header.getByRole('link', { name: LONG_CORP })]) {
+      const box = (await link.boundingBox())!;
+      // The name truncates inside its own box, which ends before Customize's (the row's gap apart).
+      expect(box.x + box.width).toBeLessThanOrEqual(customize.x - HEADER_GAP_MIN);
+    }
+    // One row: the name block, Customize and the bell share a band; nothing wrapped under.
+    for (const control of [customize, bell]) {
+      expect(control.y).toBeLessThan(name.y + name.height);
+      expect(name.y).toBeLessThan(control.y + control.height);
+    }
+    // No target in the header overlaps another.
+    const targets = header.locator('a:visible, button:visible');
+    const boxes: Box[] = [];
+    for (let i = 0; i < (await targets.count()); i += 1)
+      boxes.push((await targets.nth(i).boundingBox())!);
+    for (let i = 0; i < boxes.length; i += 1) {
+      for (let j = i + 1; j < boxes.length; j += 1) {
+        expect(boxesOverlap(boxes[i]!, boxes[j]!), `header targets ${i} and ${j} overlap`).toBe(
+          false
+        );
+      }
+    }
+  });
+}
 
 /** Six sell orders, issued and expiring at different times so the Expires sort reorders them. */
 function openOrderFixtures(): MarketOrder[] {

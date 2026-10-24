@@ -262,8 +262,9 @@ export interface KindView {
    */
   chart?: ChartModel;
   /**
-   * One of the kind's reads is still out although the view already draws (a secondary read,
-   * such as the Wallet's journal under its balance): the body is not at its settled height yet.
+   * One of the kind's reads has not answered yet (no data, still loading) although the view
+   * already draws (a secondary read, such as the Wallet's journal under its balance): the body
+   * is not at its settled height yet. A refresh over data on screen is not settling.
    * Set by `useKindViews`, never by a builder.
    */
   settling?: boolean;

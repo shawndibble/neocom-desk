@@ -102,7 +102,7 @@ interface Spec {
   endpoints: readonly EsiEndpointId[];
 }
 
-const SPECS: Record<string, Spec> = {
+const SPECS = {
   training: {
     category: 'character',
     views: NCT,
@@ -515,9 +515,14 @@ const SPECS: Record<string, Spec> = {
     size: 'M',
     endpoints: [],
   },
-};
+} satisfies Record<string, Spec>;
 
-export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(SPECS).map(([id, s]) => ({
+/** The id of every kind this file defines, for tables keyed by kind that must follow a rename. */
+export type DefinedKindId = keyof typeof SPECS;
+
+export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(
+  SPECS as Record<string, Spec>
+).map(([id, s]) => ({
   id,
   titleKey: `overview.widgets.${id}.title`,
   descKey: `overview.widgets.${id}.description`,

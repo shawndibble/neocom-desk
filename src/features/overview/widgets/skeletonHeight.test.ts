@@ -46,16 +46,30 @@ describe('estimatedBodyHeight', () => {
     expectNear(est('mail', 'table', 'M', true), 281);
   });
 
-  it("reserves Open orders' sortable header, pager and slots footer", () => {
-    expectNear(est('orders', 'table', 'L', false), 374.8);
-    expectNear(est('orders', 'table', 'L', true), 438);
+  it("reserves Open orders' sortable header, its default page of ten, the pager and slots footer", () => {
+    // Measured with twelve orders: ten rows on the first page.
+    expectNear(est('orders', 'table', 'L', false), 430.8);
+    expectNear(est('orders', 'table', 'L', true), 502);
   });
 
-  it("reserves a paged table's chosen page and its pager instead of the size's cut", () => {
-    const cut = est('orders', 'table', 'M', false);
-    expect(est('orders', 'table', 'M', false, 25)).toBeGreaterThan(cut + 20 * 28);
-    expect(est('orders', 'table', 'M', false, 5)).toBeGreaterThan(cut);
+  it("pages a paged table at any size, not at the size's row cut", () => {
+    expect(est('orders', 'table', 'M', false)).toBe(est('orders', 'table', 'L', false));
+    expect(est('orders', 'table', 'S', true)).toBe(est('orders', 'table', 'F', true));
+  });
+
+  it("reserves a paged table's chosen page and its pager", () => {
+    const page10 = est('orders', 'table', 'M', false);
+    expect(est('orders', 'table', 'M', false, 10)).toBe(page10);
+    expect(est('orders', 'table', 'M', false, 25)).toBe(page10 + 15 * 28);
+    expect(est('orders', 'table', 'M', false, 5)).toBe(page10 - 5 * 28);
     expect(est('orders', 'number', 'M', false, 25)).toBe(est('orders', 'number', 'M', false));
+  });
+
+  it('stands a linked row at the touch floor on a phone, and at the plain height on a desktop', () => {
+    expect(est('incursions', 'table', 'M', true) - est('comingUp', 'table', 'M', true)).toBe(
+      5 * (44 - 32)
+    );
+    expect(est('incursions', 'table', 'M', false)).toBe(est('comingUp', 'table', 'M', false));
   });
 
   it("reserves the headline, the size's plot and its axis line for the Chart view", () => {
