@@ -153,6 +153,8 @@ import {
   type BookDeps,
 } from './corpTaxBookStore.js';
 import { parseSrpSettingsPatch } from './srp.js';
+import { deleteSrpDoctrine, previewSrpDoctrineCheck, saveSrpDoctrine } from './srpDoctrineStore.js';
+import { parseDeleteDoctrine, parseSaveDoctrine } from './srpDoctrineInput.js';
 import { parseFileClaimInput } from './srpKillmail.js';
 import { srpKillmailSource } from './srpKillmailEsi.js';
 import {
@@ -941,6 +943,35 @@ corpTaxBookAction('fileSrpClaimCallable', (request) =>
     callerOf(request),
     parseBookCall(request.data),
     parseFileClaimInput(request.data)
+  )
+);
+
+// A member sees the doctrine-fit result of their own loss before filing; nothing is written.
+corpTaxBookAction('previewSrpDoctrineCheckCallable', (request) =>
+  previewSrpDoctrineCheck(
+    srpFileDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseFileClaimInput(request.data).ref
+  )
+);
+
+// A Director adds or replaces a Doctrine Fit snapshot (the client builds it from pasted EFT or a Fitting).
+corpTaxBookAction('saveSrpDoctrineCallable', (request) =>
+  saveSrpDoctrine(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseSaveDoctrine(request.data)
+  )
+);
+
+corpTaxBookAction('deleteSrpDoctrineCallable', (request) =>
+  deleteSrpDoctrine(
+    srpDeps(),
+    callerOf(request),
+    parseBookCall(request.data),
+    parseDeleteDoctrine(request.data)
   )
 );
 

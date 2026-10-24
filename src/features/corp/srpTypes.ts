@@ -1,5 +1,6 @@
 // Client mirror of `functions/src/srpTypes.ts` (ADR 0026; layout and field docs live there).
 // A copy, not an import: Functions builds separately; kept in step by hand.
+import type { DoctrineCheck, DoctrineFitSnapshot } from '@/engine/srpDoctrine';
 
 /** A claim's window, in days from the loss: corp default and the range a Director may set. */
 export const DEFAULT_CLAIM_WINDOW_DAYS = 30;
@@ -18,10 +19,47 @@ export const HULL_RULE_KINDS: readonly HullRuleKind[] = [
 /** `hull` keys on an SDE type id, `class` on a ship group id. A hull rule wins over its class's. */
 export type HullRuleScope = 'hull' | 'class';
 
-export type HullRule =
+export type HullRule = (
   | { scope: HullRuleScope; id: number; kind: 'pay-fixed'; iskAmount: number }
   | { scope: HullRuleScope; id: number; kind: 'pay-percent' }
-  | { scope: HullRuleScope; id: number; kind: 'not-covered' | 'officer-decides' };
+  | { scope: HullRuleScope; id: number; kind: 'not-covered' | 'officer-decides' }
+) & {
+  /** Doctrine Fits a claim on this hull must match; absent or empty: the hull is not checked. */
+  doctrineIds?: string[];
+};
+
+/**
+ * A corp's Doctrine Fit (GLOSSARY.md): a snapshot of a Director's pasted or picked fit, so
+ * later edits to a source Fitting never change it. `corps/{corporationId}/srpDoctrines/{id}`.
+ */
+export interface DoctrineFit {
+  id: string;
+  name: string;
+  snapshot: DoctrineFitSnapshot;
+  createdBy: number;
+  createdAt: number;
+}
+
+/**
+ * The doctrine-fit result stored on a claim at filing (never re-evaluated). `doctrineName` is
+ * the matched or nearest fit's name then, so it stays readable after the fit is edited or deleted.
+ * Absent on claims filed before doctrine-fit existed: read as 'not-checked'.
+ */
+export type DoctrineCheckRecord = DoctrineCheck & { doctrineName?: string };
+
+/** What `saveSrpDoctrineCallable` takes: `id` absent creates, present replaces that fit. */
+export interface SaveDoctrineInput {
+  id?: string;
+  name: string;
+  snapshot: DoctrineFitSnapshot;
+}
+
+/** `previewSrpDoctrineCheckCallable`'s answer: the check a filing now would store. */
+export interface DoctrinePreview {
+  killmailId: number;
+  hullTypeId: number;
+  check: DoctrineCheckRecord;
+}
 
 /** `corps/{corporationId}/srp/settings`. */
 export interface SrpSettings {

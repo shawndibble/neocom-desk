@@ -19,6 +19,18 @@ describe('parseEsiKillmail', () => {
       victim: { characterId: 1, corporationId: 2, shipTypeId: 587, items: [] },
     });
   });
+  it('keeps each top-level item flag for the doctrine check', () => {
+    const km = parseEsiKillmail(5, {
+      killmail_time: '2026-10-21T12:00:00Z',
+      solar_system_id: 1,
+      victim: {
+        ship_type_id: 587,
+        items: [{ item_type_id: 405, flag: 27, quantity_destroyed: 1 }, { item_type_id: 34 }],
+      },
+    });
+    expect(km.victim.items[0]).toMatchObject({ item_type_id: 405, flag: 27 });
+    expect(km.victim.items[1]).not.toHaveProperty('flag');
+  });
   it('refuses a killmail it cannot read', () => {
     expect(() => parseEsiKillmail(5, { victim: {} })).toThrow(HttpsError);
   });

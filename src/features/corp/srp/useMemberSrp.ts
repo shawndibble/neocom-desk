@@ -8,7 +8,7 @@ import { DAY_MS } from '@/lib/age';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
-import type { FileSrpClaimInput, FiledSrpClaim, SrpStatus } from '../srpTypes';
+import type { DoctrinePreview, FileSrpClaimInput, FiledSrpClaim, SrpStatus } from '../srpTypes';
 import { recordSrpProbe } from './srpNavProbe';
 import { srpMemberBackend } from './srpMemberBackend';
 import { lostRowKind, type LostLoss, type LostRowKind, type MemberClaim } from './srpMemberModel';
@@ -30,6 +30,8 @@ export interface MemberSrp {
   names: { hull: (typeId: number) => string; system: (systemId: number) => string };
   retry: () => void;
   file: (input: FileSrpClaimInput) => Promise<FiledSrpClaim>;
+  /** The doctrine check a filing of this killmail would store; nothing is written. */
+  previewDoctrine: (killmail: string) => Promise<DoctrinePreview>;
 }
 
 export const KILLMAIL_ENDPOINTS = ['getCharacterKillmailsRecent'] as const;
@@ -155,11 +157,17 @@ export function useMemberSrp(characterId: number, corporationId: number): Member
     [characterId, corporationId, reloadClaims]
   );
 
+  const previewDoctrine = useCallback(
+    (killmail: string) => backend.previewDoctrine(characterId, corporationId, killmail),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [characterId, corporationId]
+  );
+
   const retry = useCallback(() => {
     reloadStatus();
     reloadClaims();
     reloadLosses();
   }, [reloadStatus, reloadClaims, reloadLosses]);
 
-  return { status, claims, losses: lossesState, names, retry, file };
+  return { status, claims, losses: lossesState, names, retry, file, previewDoctrine };
 }

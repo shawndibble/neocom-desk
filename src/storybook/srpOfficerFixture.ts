@@ -38,7 +38,22 @@ export type SrpOfficerScenario = 'queue' | 'empty';
 
 function sampleClaims(): SrpClaim[] {
   return [
-    base(131204551, { characterName: 'Varro Kestane', fleetOrFc: 'Roam, FC Dax Orlenn' }),
+    // Off doctrine: a Gila with a gyrostabilizer pair where the doctrine has a damage control, and a rig short.
+    base(131204551, {
+      characterName: 'Varro Kestane',
+      fleetOrFc: 'Roam, FC Dax Orlenn',
+      doctrineCheck: {
+        status: 'off-doctrine',
+        doctrineId: 'd-gila',
+        doctrineName: 'Gila - armour brawl',
+        diff: {
+          missingModules: [2048],
+          extraModules: [519, 519],
+          missingRigs: [31059],
+          extraRigs: [],
+        },
+      },
+    }),
     base(131207880, {
       characterName: 'Lysa Kestane',
       hullTypeId: 33157,
@@ -47,6 +62,11 @@ function sampleClaims(): SrpClaim[] {
       filedAt: at(23, 0, 15),
       amount: 65_975_000,
       basis: { step: 'killmail-percent', percent: 70 },
+      doctrineCheck: {
+        status: 'matched',
+        doctrineId: 'd-hfi',
+        doctrineName: 'Hurricane Fleet Issue - shield',
+      },
     }),
     base(131212063, {
       characterName: 'Tamsin Vell',
@@ -57,6 +77,7 @@ function sampleClaims(): SrpClaim[] {
       fleetOrFc: 'Home defence, FC Mira Sol',
       amount: 367_440_000,
       basis: { step: 'appraisal-percent', percent: 60 },
+      doctrineCheck: { status: 'not-checked' },
     }),
     base(131213902, {
       characterName: 'Orrin Tace',

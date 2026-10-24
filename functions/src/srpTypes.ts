@@ -7,7 +7,9 @@
 //                                               id, so a second claim is a create conflict. Written by
 //                                               the file-claim callable; carries `uid`.
 //   corps/{corporationId}/srpAudit/{at~rand}    immutable audit log
+//   corps/{corporationId}/srpDoctrines/{id}      the corp's Doctrine Fit snapshots (DoctrineFit)
 //   corps/{corporationId}/srpOfficers/{uid}     officer access record (1h) written by verifySrpOfficer
+import type { DoctrineCheck, DoctrineFitSnapshot } from './srpDoctrine.js';
 
 export const CORPS_COLLECTION = 'corps';
 export const SRP_SETTINGS_COLLECTION = 'srp';
@@ -15,12 +17,16 @@ export const SRP_SETTINGS_DOC = 'settings';
 export const SRP_CLAIMS = 'srpClaims';
 export const SRP_AUDIT = 'srpAudit';
 export const SRP_OFFICERS = 'srpOfficers';
+export const SRP_DOCTRINES = 'srpDoctrines';
 
 export const SRP_SCHEMA_VERSION = 1;
 /** A claim's window, in days from the loss: corp default and the range a Director may set. */
 export const DEFAULT_CLAIM_WINDOW_DAYS = 30;
 export const MAX_CLAIM_WINDOW_DAYS = 365;
 export const MAX_HULL_RULES = 500;
+/** Doctrine Fits a corp may keep, and the most one Hull Rule may list. */
+export const MAX_DOCTRINES = 100;
+export const MAX_RULE_DOCTRINES = 20;
 
 /** What a Hull Rule does for its hull or class (GLOSSARY.md "Hull Rule"). */
 export type HullRuleKind = 'pay-fixed' | 'pay-percent' | 'not-covered' | 'officer-decides';
@@ -34,10 +40,47 @@ export const HULL_RULE_KINDS: readonly HullRuleKind[] = [
 /** `hull` keys on an SDE type id, `class` on a ship group id. A hull rule wins over its class's. */
 export type HullRuleScope = 'hull' | 'class';
 
-export type HullRule =
+export type HullRule = (
   | { scope: HullRuleScope; id: number; kind: 'pay-fixed'; iskAmount: number }
   | { scope: HullRuleScope; id: number; kind: 'pay-percent' }
-  | { scope: HullRuleScope; id: number; kind: 'not-covered' | 'officer-decides' };
+  | { scope: HullRuleScope; id: number; kind: 'not-covered' | 'officer-decides' }
+) & {
+  /** Doctrine Fits a claim on this hull must match; absent or empty: the hull is not checked. */
+  doctrineIds?: string[];
+};
+
+/**
+ * A corp's Doctrine Fit (GLOSSARY.md): a snapshot of a Director's pasted or picked fit, so
+ * later edits to a source Fitting never change it. `corps/{corporationId}/srpDoctrines/{id}`.
+ */
+export interface DoctrineFit {
+  id: string;
+  name: string;
+  snapshot: DoctrineFitSnapshot;
+  createdBy: number;
+  createdAt: number;
+}
+
+/**
+ * The doctrine-fit result stored on a claim at filing (never re-evaluated). `doctrineName` is the
+ * matched or nearest fit's name then, so it stays readable after the fit is edited or deleted.
+ * Absent on claims filed before doctrine-fit existed: read as 'not-checked'.
+ */
+export type DoctrineCheckRecord = DoctrineCheck & { doctrineName?: string };
+
+/** What `saveSrpDoctrineCallable` takes: `id` absent creates, present replaces that fit. */
+export interface SaveDoctrineInput {
+  id?: string;
+  name: string;
+  snapshot: DoctrineFitSnapshot;
+}
+
+/** `previewSrpDoctrineCheckCallable` result: the check a filing now would store. */
+export interface DoctrinePreview {
+  killmailId: number;
+  hullTypeId: number;
+  check: DoctrineCheckRecord;
+}
 
 /** `corps/{corporationId}/srp/settings`. */
 export interface SrpSettings {

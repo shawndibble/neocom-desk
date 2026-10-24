@@ -167,3 +167,48 @@ export const ClaimDetail: Story = {
 };
 /** @summary The claim detail sheet, phone. */
 export const ClaimDetailPhone: Story = { ...ClaimDetail, globals: phone };
+
+const pasteLink =
+  (link: string) =>
+  async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(await canvas.findByLabelText('Killmail link'), link);
+  };
+
+/** @summary A pasted Hurricane link the corp checks, off doctrine: the diff against the nearest Doctrine Fit, and the pilot can still file. */
+export const OffDoctrine: Story = {
+  parameters: { srp: { doctrine: true } },
+  play: async (ctx) => {
+    await pasteLink('https://zkillboard.com/kill/123/hurricane')(ctx);
+    await within(ctx.canvasElement).findByText('Off doctrine');
+  },
+};
+/** @summary The Off doctrine check, phone. */
+export const OffDoctrinePhone: Story = { ...OffDoctrine, globals: phone };
+
+/** @summary A pasted Hurricane link that matches a Doctrine Fit: "Matches <fit>". */
+export const OnDoctrine: Story = {
+  parameters: { srp: { doctrine: true } },
+  play: async (ctx) => {
+    await pasteLink('https://zkillboard.com/kill/123/ondoctrine')(ctx);
+    await within(ctx.canvasElement).findByText('Matches Hurricane - artillery');
+  },
+};
+
+/** @summary A pasted link for a hull the corp does not check: no doctrine line at all. */
+export const DoctrineNotChecked: Story = {
+  parameters: { srp: { doctrine: true } },
+  play: pasteLink('https://zkillboard.com/kill/8003/unchecked'),
+};
+
+/** @summary One-tap File on a checked hull (Hurricane) opens the form with the check shown, so the pilot sees it before filing. */
+export const DoctrineFromLostShip: Story = {
+  parameters: { ...granted, srp: { doctrine: true } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole('button', { name: /File claim for Hurricane/ }));
+    await canvas.findByText('Off doctrine');
+  },
+};
+/** @summary The same from the lost-ship cards, phone. */
+export const DoctrineFromLostShipPhone: Story = { ...DoctrineFromLostShip, globals: phone };

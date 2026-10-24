@@ -143,8 +143,14 @@ export const Empty: Story = { decorators: [withQueue('director', 'empty')] };
 /** @summary Nothing waiting, phone shell. */
 export const EmptyPhone: Story = { ...Empty, globals: phone };
 
-/** @summary A pending claim's detail: facts, killmail link, audit trail, Reject… and Approve. */
+/** @summary A pending claim's detail: facts, the Off doctrine diff against the nearest Doctrine Fit, killmail link, audit trail, Reject… and Approve. The Pending queue flags the same claim Off doctrine. */
 export const DetailPending: Story = { ...Queue, play: openClaim('Varro Kestane') };
+
+/** @summary A pending claim whose fit matched a Doctrine Fit: the detail names it; the queue row carries no flag. */
+export const DetailOnDoctrine: Story = { ...Queue, play: openClaim('Lysa Kestane') };
+
+/** @summary The matched detail on a phone. */
+export const DetailOnDoctrinePhone: Story = { ...DetailOnDoctrine, globals: phone };
 
 /** @summary The detail on a phone: Reject… and Approve pinned at the bottom. */
 export const DetailPendingPhone: Story = { ...DetailPending, globals: phone };

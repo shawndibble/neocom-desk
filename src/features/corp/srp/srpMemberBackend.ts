@@ -5,8 +5,15 @@ import { db as localDb } from '@/db';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
+import { previewSrpDoctrineCheck } from '../srpDoctrineClient';
 import { fileSrpClaim, getSrpStatus } from '../srpClient';
-import type { FileSrpClaimInput, FiledSrpClaim, SrpClaimState, SrpStatus } from '../srpTypes';
+import type {
+  DoctrinePreview,
+  FileSrpClaimInput,
+  FiledSrpClaim,
+  SrpClaimState,
+  SrpStatus,
+} from '../srpTypes';
 import { loadLostLosses } from './lostLosses';
 import type { LostLoss, MemberClaim } from './srpMemberModel';
 
@@ -19,6 +26,12 @@ export interface SrpMemberBackend {
     input: FileSrpClaimInput
   ) => Promise<FiledSrpClaim>;
   lostLosses: (characterId: number, corporationId: number) => Promise<LostLoss[]>;
+  /** The doctrine check a filing of this killmail would store; nothing is written. */
+  previewDoctrine: (
+    characterId: number,
+    corporationId: number,
+    killmail: string
+  ) => Promise<DoctrinePreview>;
 }
 
 let override: SrpMemberBackend | null = null;
@@ -90,6 +103,7 @@ const real: SrpMemberBackend = {
   claims: readMyClaims,
   file: fileSrpClaim,
   lostLosses: loadLostLosses,
+  previewDoctrine: previewSrpDoctrineCheck,
 };
 
 export const srpMemberBackend = (): SrpMemberBackend => override ?? real;

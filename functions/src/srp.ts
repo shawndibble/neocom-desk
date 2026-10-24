@@ -3,12 +3,13 @@
 // are in srpTypes.ts.
 
 import { HttpsError } from 'firebase-functions/v2/https';
-import { record } from './communities.js';
+import { docId, record } from './communities.js';
 import { int } from './corpTaxBook.js';
 import {
   HULL_RULE_KINDS,
   MAX_CLAIM_WINDOW_DAYS,
   MAX_HULL_RULES,
+  MAX_RULE_DOCTRINES,
   type HullRule,
   type HullRuleKind,
   type HullRuleScope,
@@ -22,11 +23,33 @@ function oneOf<T extends string>(value: unknown, field: string, allowed: readonl
   return value as T;
 }
 
+/**
+ * A hull rule's Doctrine Fits. Hull scope only: a fit is for one hull, and a class rule has no
+ * single hull to compare. Empty or absent means the hull is not checked (old rules read the same).
+ */
+function parseDoctrineIds(raw: unknown, scope: HullRuleScope): string[] | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (!Array.isArray(raw)) {
+    throw new HttpsError('invalid-argument', 'doctrineIds must be a list');
+  }
+  if (raw.length > MAX_RULE_DOCTRINES) {
+    throw new HttpsError('invalid-argument', `doctrineIds must have at most ${MAX_RULE_DOCTRINES}`);
+  }
+  const ids = [...new Set(raw.map((v) => docId(v, 'doctrineIds')))];
+  if (ids.length === 0) return undefined;
+  if (scope !== 'hull') {
+    throw new HttpsError('invalid-argument', 'Doctrine Fits need a hull rule, not a class rule');
+  }
+  return ids;
+}
+
 function parseHullRule(raw: unknown): HullRule {
   const d = record(raw);
   const scope: HullRuleScope = oneOf(d.scope, 'scope', ['hull', 'class'] as const);
   const id = int(d.id, 'id', 1, 2_147_483_647);
   const kind: HullRuleKind = oneOf(d.kind, 'kind', HULL_RULE_KINDS);
+  const doctrineIds = parseDoctrineIds(d.doctrineIds, scope);
+  const extra = doctrineIds ? { doctrineIds } : {};
   if (kind === 'pay-fixed') {
     if (typeof d.iskAmount !== 'number' || !Number.isFinite(d.iskAmount)) {
       throw new HttpsError('invalid-argument', 'iskAmount must be a number');
@@ -35,10 +58,10 @@ function parseHullRule(raw: unknown): HullRule {
     if (d.iskAmount < 1 || d.iskAmount > 1e13) {
       throw new HttpsError('invalid-argument', 'iskAmount must be 1 to 1e13');
     }
-    return { scope, id, kind, iskAmount: d.iskAmount };
+    return { scope, id, kind, iskAmount: d.iskAmount, ...extra };
   }
   // Pay: corp percent follows the corp's own chain; a stored legacy `pct` is ignored.
-  return { scope, id, kind };
+  return { scope, id, kind, ...extra };
 }
 
 function parseHullRules(raw: unknown): HullRule[] {

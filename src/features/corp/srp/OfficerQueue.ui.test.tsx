@@ -12,6 +12,10 @@ vi.mock('./useSrpClaimNames', () => ({
   }),
 }));
 
+vi.mock('@/features/character/typeNames', () => ({
+  loadTypeNames: async (ids: number[]) => new Map(ids.map((id) => [id, `Item${id}`])),
+}));
+
 vi.mock('@/app/GrantNote', () => ({ GrantNote: ({ title }: { title: string }) => <p>{title}</p> }));
 
 const mailResult = vi.hoisted(() => vi.fn());
@@ -318,5 +322,50 @@ describe('OfficerQueue owed and history', () => {
     setup([claim(1)]);
     await userEvent.click(screen.getByRole('tab', { name: /Owed/ }));
     expect(screen.getByText('Nothing owed')).toBeInTheDocument();
+  });
+});
+
+describe('OfficerQueue doctrine check', () => {
+  const off = claim(1, {
+    doctrineCheck: {
+      status: 'off-doctrine',
+      doctrineId: 'd1',
+      doctrineName: 'Gila - armour',
+      diff: { missingModules: [2048], extraModules: [519, 519], missingRigs: [], extraRigs: [] },
+    },
+  });
+  const matched = claim(2, {
+    doctrineCheck: { status: 'matched', doctrineId: 'd2', doctrineName: 'Hurricane - artillery' },
+  });
+
+  it('flags an off-doctrine claim in the queue, and only that one', () => {
+    setup([off, matched, claim(3)]);
+    expect(screen.getAllByText('Off doctrine')).toHaveLength(1);
+  });
+
+  it('shows the stored diff and nearest fit in the detail, and the officer can still approve', async () => {
+    const data = setup([off]);
+    await userEvent.click(screen.getAllByText('Pilot1')[0]!);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Gila - armour/)).toBeInTheDocument();
+    expect(within(dialog).getByText('Missing modules')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Item2048')).toBeInTheDocument();
+    expect(within(dialog).getByText('2× Item519')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Approve' }));
+    expect(data.approve).toHaveBeenCalled();
+  });
+
+  it('names the matched fit in the detail, and shows nothing for old or unchecked claims', async () => {
+    setup([matched, claim(3), claim(4, { doctrineCheck: { status: 'not-checked' } })]);
+    await userEvent.click(screen.getAllByText('Pilot2')[0]!);
+    expect(await screen.findByText('Matches Hurricane - artillery')).toBeInTheDocument();
+    expect(screen.queryByText('Off doctrine')).toBeNull();
+  });
+
+  it('an old claim without doctrineCheck has no Doctrine row', async () => {
+    setup([claim(3)]);
+    await userEvent.click(screen.getAllByText('Pilot3')[0]!);
+    await screen.findByRole('dialog');
+    expect(screen.queryByText('Doctrine')).toBeNull();
   });
 });

@@ -16046,7 +16046,8 @@
       "filing": "Filing…",
       "hint": "Hull, system, time and amount are filled in from the killmail.",
       "filed": "Claim filed.",
-      "filedFor": "Claim filed for {{hull}}."
+      "filedFor": "Claim filed for {{hull}}.",
+      "doctrineChecking": "Checking your fit against the corp's Doctrine Fits…"
     },
     "lost": {
       "title": "Or pick a lost ship",
@@ -16564,7 +16565,74 @@
         "followsClass": "Follows {{name}}",
         "officerTypes": "Officer types it",
         "notCoveredNote": "Pilots cannot file it"
+      },
+      "doctrines": {
+        "title": "Doctrine Fits",
+        "meta": "A claim is checked against the Doctrine Fits attached to its hull rule below.",
+        "empty": "No Doctrine Fits yet. Add one, then attach it to its hull in Hull Rules.",
+        "loadFailed": "Couldn't load Doctrine Fits",
+        "fromFitting": "Add from my Fittings…",
+        "fromEft": "Paste EFT…",
+        "tableLabel": "Doctrine Fits",
+        "name": "Name",
+        "hull": "Hull",
+        "contents": "Fit",
+        "contentsValue": "{{modules}} modules, {{rigs}} rigs",
+        "delete": "Delete…",
+        "deleteLabel": "Delete {{name}}…",
+        "deleteTitle": "Delete {{name}}?",
+        "deleteBody": "Hulls stop being checked against it. Claims already filed keep the result they were checked with.",
+        "deleteAction": "Delete Doctrine Fit",
+        "deleteFailed": "Couldn't delete the Doctrine Fit. Try again.",
+        "dialog": {
+          "fittingTitle": "Add from my Fittings",
+          "fittingLabel": "Fitting",
+          "fittingNone": "You have no saved Fittings. Save one on the Fittings page, or paste EFT instead.",
+          "fittingPick": "Pick a Fitting",
+          "fittingNote": "The corp keeps its own copy. Editing the Fitting later changes nothing here.",
+          "eftTitle": "Paste EFT",
+          "eftLabel": "EFT text",
+          "eftPlaceholder": "[Hurricane, Doctrine]\nDamage Control II\n…",
+          "eftNoHull": "No ship found. Paste the whole fit, starting with its [Hull, Name] line.",
+          "eftNote": "Modules, rigs and subsystems count. Charges, drones and cargo are ignored.",
+          "unresolvedTitle_one": "{{count}} line not recognised",
+          "unresolvedTitle_other": "{{count}} lines not recognised",
+          "unresolvedNote": "These are not part of the Doctrine Fit. Fix them and paste again, or add it as it is.",
+          "unresolvedLine": "Line {{line}}: {{text}}",
+          "nameLabel": "Doctrine Fit name",
+          "preview": "{{hull}}: {{modules}} modules, {{rigs}} rigs",
+          "add": "Add Doctrine Fit",
+          "adding": "Adding…",
+          "addFailed": "Couldn't add the Doctrine Fit. Try again.",
+          "cancel": "Cancel",
+          "loadFailed": "Couldn't read that Fitting."
+        },
+        "attach": {
+          "legend": "Doctrine Fits for {{name}}",
+          "hint": "Claims must match one. None ticked: not checked.",
+          "needsRule": "Pick this hull's own rule first."
+        }
       }
+    },
+    "doctrine": {
+      "unnamed": "a Doctrine Fit",
+      "onDoctrine": "On doctrine",
+      "offDoctrine": "Off doctrine",
+      "matches": "Matches {{name}}",
+      "nearest": {
+        "pilot": "Your fit differs from {{name}}, the nearest Doctrine Fit.",
+        "officer": "Differs from {{name}}, the nearest Doctrine Fit."
+      },
+      "diff": {
+        "missingModules": "Missing modules",
+        "extraModules": "Extra modules",
+        "missingRigs": "Missing rigs",
+        "extraRigs": "Extra rigs",
+        "line": "{{count}}× {{name}}"
+      },
+      "pilotNote": "You can still file. An officer decides, and a note under Fleet or FC helps.",
+      "queueFlag": "Off doctrine",
+      "detailLabel": "Doctrine"
     }
   }
 }

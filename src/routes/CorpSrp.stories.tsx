@@ -7,7 +7,12 @@ import { setSrpBackendOverride } from '@/features/corp/srpBackendOverride';
 import { setSrpMemberBackendOverride } from '@/features/corp/srp/srpMemberBackend';
 import type { FixtureRoute } from '@/storybook/fixtureFetch';
 import { SAMPLE_CHARACTERS } from '@/storybook/sampleData';
-import { createSrpFixture, type SrpFixtureRole } from '@/storybook/srpFixture';
+import { setSrpDoctrineBackendOverride } from '@/features/corp/srpDoctrineBackendOverride';
+import {
+  createDoctrineFixture,
+  createSrpFixture,
+  type SrpFixtureRole,
+} from '@/storybook/srpFixture';
 import {
   createSrpMemberFixture,
   SRP_FIXTURE_CORPORATION_ID,
@@ -103,6 +108,8 @@ const SCOPES = [...new Set(Object.values(CORP_SCOPES_FOR_CAPABILITY).flat())];
 interface SettingsStart {
   role: SrpFixtureRole;
   start: 'never-on' | 'configured';
+  /** The corp's Doctrine Fits: the sample three (default) or none. */
+  doctrines?: 'sample' | 'empty';
 }
 
 /**
@@ -123,9 +130,13 @@ function SampleSrp({
     if (settings) role = settings.role;
     setSrpMemberBackendOverride(createSrpMemberFixture(Date.now(), member));
     setSrpBackendOverride(settings ? createSrpFixture(settings.role, settings.start) : null);
+    setSrpDoctrineBackendOverride(
+      settings ? createDoctrineFixture(settings.doctrines ?? 'sample') : null
+    );
     return () => {
       setSrpMemberBackendOverride(null);
       setSrpBackendOverride(null);
+      setSrpDoctrineBackendOverride(null);
     };
   }, [member, settings]);
   return children;
@@ -138,8 +149,12 @@ const withSampleSrp: Decorator = (Story, context) => (
 );
 
 /** An officer story: the Settings tab, with every corp scope so the Director is `ready`. */
-const settingsParams = (mode: SrpFixtureRole, start: SettingsStart['start']) => ({
-  srpSettings: { role: mode, start },
+const settingsParams = (
+  mode: SrpFixtureRole,
+  start: SettingsStart['start'],
+  doctrines?: SettingsStart['doctrines']
+) => ({
+  srpSettings: { role: mode, start, doctrines },
   shell: { path: '/corp/srp/settings', routes, scopes: SCOPES, seed: seedCorporation },
 });
 
@@ -202,6 +217,51 @@ export const Validation: Story = {
     const win = await body.findByLabelText('Claim window');
     await userEvent.clear(win);
     await userEvent.type(win, '0');
+  },
+};
+
+/** @summary Doctrine Fits panel and the Hurricane hull rule with its fit ticked: Add from my Fittings…, Paste EFT…, one Delete… per row. */
+export const DoctrineFits: Story = {
+  ...Configured,
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement);
+    await userEvent.click(await body.findByRole('button', { name: /Combat Battlecruiser/ }));
+    await body.findByRole('group', { name: 'Doctrine Fits for Hurricane' });
+  },
+};
+
+/** @summary The Doctrine Fits panel and hull-rule ticks in the phone shell. */
+export const DoctrineFitsPhone: Story = { ...DoctrineFits, globals: phone };
+
+/** @summary No Doctrine Fits yet: the empty line and the two add buttons. */
+export const DoctrineFitsEmpty: Story = {
+  parameters: settingsParams('director', 'configured', 'empty'),
+};
+
+/** @summary Paste EFT with a line the catalog does not know: it is listed as not part of the fit, and the fit can still be added. */
+export const PasteEftUnresolved: Story = {
+  ...Configured,
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement);
+    await userEvent.click(await body.findByRole('button', { name: 'Paste EFT…' }));
+    const dialog = within(canvasElement.ownerDocument.body);
+    await userEvent.click(await dialog.findByLabelText('EFT text'));
+    await userEvent.paste(
+      '[Hurricane, Test fit]\nDamage Control II\n720mm Howitzer Artillery II\nNot A Real Module\n\nMedium Trimark Armor Pump II'
+    );
+    await dialog.findByText('1 line not recognised');
+  },
+};
+
+/** @summary Paste EFT in the phone shell. */
+export const PasteEftUnresolvedPhone: Story = { ...PasteEftUnresolved, globals: phone };
+
+/** @summary Delete a Doctrine Fit: the confirm says filed claims keep their result. */
+export const DeleteDoctrineFit: Story = {
+  ...Configured,
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement);
+    await userEvent.click(await body.findByRole('button', { name: 'Delete Cerberus - shield…' }));
   },
 };
 

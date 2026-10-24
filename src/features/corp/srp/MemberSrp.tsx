@@ -4,13 +4,15 @@ import { useTranslation } from 'react-i18next';
 import { Disclosure, EmptyState, LoadFailedState, Panel, Spinner, Toast } from '@/components/ui';
 import { GrantBanner } from '@/app/GrantNote';
 import { useIsPhone } from '@/lib/useIsPhone';
-import type { FileSrpClaimInput } from '../srpTypes';
+import type { FileSrpClaimInput, HullRule } from '../srpTypes';
 import { ClaimDetailDialog, RefileDialog } from './MemberClaimDialogs';
 import { MemberClaimsList } from './MemberClaimsList';
 import { MemberFileForm, type FileFormErrors } from './MemberFileForm';
 import { LostShipsList } from './LostShipsList';
+import { useDoctrinePreview } from './useDoctrinePreview';
 import {
   esiKillmailLink,
+  hullIsDoctrineChecked,
   memberErrorKey,
   memberErrorTarget,
   type MemberClaim,
@@ -48,13 +50,14 @@ export function MemberSrp({ characterId, corporationId }: MemberSrpProps) {
       </Panel>
     );
   } else {
-    const { windowDays, requireFleetOrFc } = status.value.settings;
+    const { windowDays, requireFleetOrFc, hullRules } = status.value.settings;
     body = (
       <MemberSrpBody
         characterId={characterId}
         data={data}
         windowDays={windowDays}
         fleetRequired={requireFleetOrFc}
+        hullRules={hullRules}
       />
     );
   }
@@ -66,9 +69,10 @@ interface BodyProps {
   data: MemberData;
   windowDays: number;
   fleetRequired: boolean;
+  hullRules: HullRule[];
 }
 
-function MemberSrpBody({ characterId, data, windowDays, fleetRequired }: BodyProps) {
+function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules }: BodyProps) {
   const { t } = useTranslation();
   const phone = useIsPhone();
   const [link, setLink] = useState('');
@@ -90,6 +94,10 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired }: BodyPro
     focusFleetRef.current = false;
     fleetRef.current.focus();
   });
+
+  // The check is read only where the corp checks some hull; a hull it does not check answers none.
+  const anyChecked = hullRules.some((r) => (r.doctrineIds?.length ?? 0) > 0);
+  const doctrine = useDoctrinePreview(link, data.previewDoctrine, anyChecked);
 
   const claims = data.claims.state === 'ready' ? data.claims.value : [];
   // By id, so the dialog follows a reload (a re-file) instead of holding the claim as it was.
@@ -139,6 +147,15 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired }: BodyPro
       focusFleetRef.current = true;
       return;
     }
+    if (hullIsDoctrineChecked(hullRules, row.hullTypeId)) {
+      // The pilot sees the doctrine check before filing: the form shows it, File claim then files.
+      setLink(esiKillmailLink(row.killmailId, row.killmailHash));
+      setErrors({});
+      setListError(null);
+      setPasteOpen(true);
+      focusFleetRef.current = true;
+      return;
+    }
     void submit(esiKillmailLink(row.killmailId, row.killmailHash), row);
   }
 
@@ -169,6 +186,7 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired }: BodyPro
       fleetRequired={fleetRequired}
       windowDays={windowDays}
       errors={errors}
+      doctrine={anyChecked ? doctrine : undefined}
       busy={filing === 'form'}
       onSubmit={() => void submit(link.trim(), 'form')}
       fullWidth={phone}
