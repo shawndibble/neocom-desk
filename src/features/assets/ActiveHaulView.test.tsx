@@ -131,7 +131,7 @@ describe('ActiveHaulView', () => {
   it('shows every leg with its own Route Safety link, plus one for the whole route', () => {
     renderView();
     expect(screen.getAllByRole('link', { name: /Show in Route Safety, leg/ })).toHaveLength(3);
-    expect(screen.getByRole('link', { name: 'Route Safety, whole route' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Route Safety, Whole' })).toBeTruthy();
   });
 
   it('states the condition a leg flies through, not a verdict', () => {
@@ -165,7 +165,7 @@ describe('ActiveHaulView', () => {
     renderView();
     await userEvent.click(screen.getByRole('button', { name: 'Set waypoint, leg 1' }));
     expect(sent).toHaveBeenLastCalledWith(1, [60008494]);
-    await userEvent.click(screen.getByRole('button', { name: 'Set all waypoints' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Set All Waypoints' }));
     expect(sent).toHaveBeenLastCalledWith(1, [60008494, 60003760, 60008494]);
   });
 
