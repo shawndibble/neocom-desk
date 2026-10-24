@@ -32,6 +32,18 @@ function isArrayOfObjects(raw: unknown): raw is Record<string, unknown>[] {
   return Array.isArray(raw) && raw.every((x) => typeof x === 'object' && x !== null);
 }
 
+function isLeg(leg: Record<string, unknown>): boolean {
+  const to = leg.to as Record<string, unknown> | null;
+  return (
+    typeof leg.id === 'number' &&
+    typeof leg.m3 === 'number' &&
+    (leg.kind === 'pickup' || leg.kind === 'delivery') &&
+    typeof to === 'object' &&
+    to !== null &&
+    typeof to.name === 'string'
+  );
+}
+
 function parseActiveHaul(raw: unknown): ActiveHaul | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const r = raw as Record<string, unknown>;
@@ -45,7 +57,7 @@ function parseActiveHaul(raw: unknown): ActiveHaul | null {
     typeof plan !== 'object' ||
     plan === null ||
     !isArrayOfObjects(plan.sections) ||
-    !plan.sections.every((s) => isArrayOfObjects(s.legs)) ||
+    !plan.sections.every((s) => isArrayOfObjects(s.legs) && s.legs.every(isLeg)) ||
     !isArrayOfObjects(plan.leftOut) ||
     !Array.isArray(plan.flown) ||
     typeof plan.totals !== 'object' ||

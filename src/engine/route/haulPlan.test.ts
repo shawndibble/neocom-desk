@@ -87,6 +87,16 @@ describe('planHaul', () => {
     expect(plan.leftOut).toEqual([]);
   });
 
+  it('starts every later trip from the destination', () => {
+    const legs = run([character([pickup(10, P1, 150)])]).sections[0].legs;
+    expect(legs.map((l) => [l.kind, l.from?.systemId, l.jumps])).toEqual([
+      ['pickup', HOME, 1],
+      ['delivery', P1, 3],
+      ['pickup', DEST, 3],
+      ['delivery', P1, 3],
+    ]);
+  });
+
   it('lets the leftover of a split pickup ride with the next pickup', () => {
     const plan = run([character([pickup(10, P1, 70), pickup(20, P2, 70)])]);
     const trips = plan.sections[0].legs.map((l) => `${l.trip}:${l.kind}:${l.to.systemId}:${l.m3}`);

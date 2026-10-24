@@ -158,10 +158,11 @@ export function planHaul(input: HaulInput): HaulPlan {
         locationId,
       });
 
+    let start: HaulPlace | null = c.start;
     while (!capped && left.some((l) => l.m3 > EPS)) {
       trips += 1;
       let hold = 0;
-      let here: HaulPlace | null = c.start;
+      let here: HaulPlace | null = start;
       let loaded = false;
       while (hold < capacityM3 - EPS) {
         const open = left.filter((l) => l.m3 > EPS);
@@ -184,6 +185,7 @@ export function planHaul(input: HaulInput): HaulPlan {
         break;
       }
       leg(trips, 'delivery', here, destination, hold, null);
+      start = destination;
     }
 
     for (const l of left) if (l.m3 > EPS) leftOut.push(leftOutOf(c, l.pickup, l.m3, 'cap'));
