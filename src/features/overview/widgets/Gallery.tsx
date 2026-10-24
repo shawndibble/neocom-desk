@@ -316,7 +316,9 @@ function GalleryBody({
   });
   // "Not on your board" only narrows the wide layout: the drawer keeps listing everything.
   const hidingUsed = browse && unusedOnly;
-  const shown = hidingUsed ? notOnBoard(matching, counts, addedHere) : matching;
+  // Market Trend stays listed: its presets add a second widget, which is the point of a preset.
+  const kept = new Set([...addedHere, PRESET_KIND]);
+  const shown = hidingUsed ? notOnBoard(matching, counts, kept) : matching;
   const catCounts = categoryCounts(shown, board);
   const items = shown.filter((kind) => category === 'all' || categoryOn(board, kind) === category);
 
@@ -339,6 +341,17 @@ function GalleryBody({
     timer.current = setTimeout(() => setJustAdded(null), ADDED_MS);
   };
 
+  // A search that names a preset shows that preset; one that matches the kind itself shows them all.
+  const presetsFor = (kind: WidgetKindDef) => {
+    const needle = query.trim().toLowerCase();
+    if (!needle || `${t(kind.titleKey)} ${t(kind.descKey)}`.toLowerCase().includes(needle)) {
+      return TREND_PRESETS;
+    }
+    return TREND_PRESETS.filter((p) =>
+      t(`overview.gallery.presets.${p.id}.title`).toLowerCase().includes(needle)
+    );
+  };
+
   const withPreview = !isPhone && !(browse && density === 'list');
   const renderItem = (kind: WidgetKindDef) => [
     <GalleryItem
@@ -353,7 +366,7 @@ function GalleryBody({
       onAdd={(id) => add(id)}
     />,
     ...(kind.id === PRESET_KIND
-      ? TREND_PRESETS.map((preset) => (
+      ? presetsFor(kind).map((preset) => (
           <PresetItem
             key={`${kind.id}:${preset.id}`}
             preset={preset}

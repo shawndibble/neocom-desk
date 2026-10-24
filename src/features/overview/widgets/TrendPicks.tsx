@@ -16,6 +16,8 @@ import {
   Modal,
   NativeSelect,
 } from '@/components/ui';
+import { cx } from '@/lib/cx';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { useMarketHub } from '@/features/market/hub';
 import { TRADE_HUBS } from '@/market/hubs';
@@ -156,7 +158,10 @@ export function TrendItemsDialog({
         onSubmit={(event) => {
           event.preventDefault();
           // Untouched picks on a widget that follows the Quickbar: saving would detach it for nothing.
-          if (edited === null && !widget.trendItems?.length) {
+          const followed = quickbar.slice(0, TREND_MAX_SERIES).map((item) => item.typeId);
+          const unchanged =
+            picked.length === followed.length && picked.every((id, i) => id === followed[i]);
+          if (!widget.trendItems?.length && (edited === null || unchanged)) {
             onClose();
             return;
           }
@@ -186,7 +191,7 @@ export function TrendItemsDialog({
             const on = picked.includes(item.typeId);
             return (
               <li key={item.typeId}>
-                <label className="flex min-h-9 items-center gap-2 text-sm">
+                <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
                   <Checkbox
                     checked={on}
                     disabled={!on && full}
