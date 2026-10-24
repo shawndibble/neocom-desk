@@ -19,6 +19,9 @@ import {
   MenuItem,
   Modal,
   Panel,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   RowActionsMenu,
   RowCaret,
   SegmentedControl,
@@ -318,6 +321,19 @@ export function InteractionGrammar() {
         <Cue rule={k('rules.dialogOpener')} note={k('notes.dialogOpener')}>
           <Button>{k('samples.renameDialog')}</Button>
           <Button>{k('samples.showWindow')}</Button>
+        </Cue>
+        <Cue rule={k('rules.legendPopover')}>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button>
+                {k('samples.legend')}
+                <Icon.Expanded />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="p-3 text-xs text-text-dim">
+              {k('rules.legendPopover')}
+            </PopoverContent>
+          </Popover>
         </Cue>
       </Group>
 

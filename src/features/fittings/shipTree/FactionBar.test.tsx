@@ -49,4 +49,29 @@ describe('FactionBar', () => {
     const caldariButton = screen.getByRole('button', { name: /Caldari State/ });
     expect(caldariButton).not.toHaveAttribute('title');
   });
+
+  it('shows filtered match counts, dimming a faction with none but the current one', () => {
+    render(
+      <FactionBar
+        data={SHIP_TREE}
+        factionID={GALLENTE}
+        statuses={new Map()}
+        matches={
+          new Map([
+            [CALDARI, 2],
+            [GALLENTE, 0],
+            [500010, 0],
+          ])
+        }
+        onFaction={vi.fn()}
+      />
+    );
+    const caldari = screen.getByRole('button', { name: /Caldari State/ });
+    expect(caldari).toHaveTextContent(/Caldari State\s*2$/);
+    expect(caldari).not.toHaveClass('opacity-50');
+    expect(screen.getByRole('button', { name: /Guristas Pirates/ })).toHaveClass('opacity-50');
+    expect(screen.getByRole('button', { name: /Gallente Federation/ })).not.toHaveClass(
+      'opacity-50'
+    );
+  });
 });

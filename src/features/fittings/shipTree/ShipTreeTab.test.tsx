@@ -355,7 +355,9 @@ describe('ShipTreeTab — ladder', () => {
     const merlin = container.querySelector<HTMLElement>(`button[data-ship="${MERLIN}"]`)!;
     expect(merlin.querySelector('[data-tone]')).toHaveAttribute('data-tone', 'elite');
     expect(merlin.querySelector('.ring')?.textContent).toBe('V');
-    expect(merlin).toHaveTextContent('Can fly');
+    expect(merlin).toHaveTextContent('Mastery V');
+    const ibis = container.querySelector<HTMLElement>(`button[data-ship="${IBIS}"]`)!;
+    expect(ibis).toHaveTextContent('Can fly');
   });
 
   it("chips exactly the classes the map's layout puts an Ω before", async () => {
@@ -409,13 +411,116 @@ describe('ShipTreeTab — ladder', () => {
     expect(frigate.querySelector('details[data-class="10"]')).not.toBeNull();
   });
 
-  it('filters to the hulls the pilot can fly', async () => {
+  it('splits the faction by fly state, counting each tab, and keeps it in the URL', async () => {
+    const user = userEvent.setup();
+    const { container } = renderTab();
+    await screen.findByRole('button', { name: /Crow/ });
+    const tabs = screen.getByRole('group', { name: 'Fly state' });
+    expect(within(tabs).getByRole('button', { name: 'All 5' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+
+    await user.click(within(tabs).getByRole('button', { name: "Can't fly 1" }));
+    expect(screen.getByTestId('location')).toHaveTextContent('fly=cantFly');
+    expect(screen.getByRole('button', { name: /Crow/ })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Merlin/ })).not.toBeInTheDocument();
+    const interceptor = container.querySelector('details[data-class="10"] summary')!;
+    expect(interceptor).toHaveTextContent('1 of 1');
+
+    await user.click(within(tabs).getByRole('button', { name: 'Can fly 4' }));
+    expect(screen.queryByRole('button', { name: /Crow/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Merlin/ })).toBeVisible();
+  });
+
+  it("narrows to picked Mastery tiers, off under Can't fly", async () => {
     const user = userEvent.setup();
     renderTab();
-    await screen.findByRole('button', { name: /Crow/ });
-    await user.click(screen.getByRole('checkbox', { name: 'Only ones I can fly' }));
-    expect(screen.queryByRole('button', { name: /Crow/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Merlin/ })).toBeInTheDocument();
+    await screen.findByRole('button', { name: /Merlin/ });
+    await waitFor(() => expect(screen.queryByText(/Mastery badges need data/)).toBeNull());
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    const tiers = screen.getByRole('group', { name: 'Mastery' });
+    await user.click(within(tiers).getByRole('button', { name: /^V/ }));
+    expect(screen.getByTestId('location')).toHaveTextContent('mastery=5');
+    expect(screen.getByRole('button', { name: /Merlin/ })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Ibis/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Filters \(1/ })).toBeInTheDocument();
+
+    await user.click(
+      within(screen.getByRole('group', { name: 'Fly state' })).getByRole('button', {
+        name: "Can't fly 1",
+      })
+    );
+    for (const chip of within(tiers).getAllByRole('button'))
+      expect(chip).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('opens every section on a filter change; Expand all and Collapse all drive them', async () => {
+    const user = userEvent.setup();
+    const { container } = renderTab();
+    await screen.findByRole('button', { name: /Merlin/ });
+    const interceptor = container.querySelector<HTMLDetailsElement>('details[data-class="10"]')!;
+    expect(interceptor.open).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: 'Expand all' }));
+    expect(interceptor.open).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Collapse all' }));
+    expect(interceptor.open).toBe(false);
+    expect(container.querySelector<HTMLDetailsElement>('details[data-class="8"]')!.open).toBe(
+      false
+    );
+
+    await user.click(
+      within(screen.getByRole('group', { name: 'Fly state' })).getByRole('button', {
+        name: "Can't fly 1",
+      })
+    );
+    await waitFor(() =>
+      expect(container.querySelector<HTMLDetailsElement>('details[data-class="10"]')!.open).toBe(
+        true
+      )
+    );
+  });
+
+  it('shows the legend in a popover', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    await screen.findByRole('button', { name: /Merlin/ });
+    expect(screen.queryByText('needs Omega')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Legend' }));
+    expect(await screen.findByText('needs Omega')).toBeVisible();
+  });
+
+  it('counts matches per faction and points to the ones that have some', async () => {
+    const user = userEvent.setup();
+    renderTab('/ships/tree?faction=500010&fly=cantFly');
+    expect(await screen.findByText('No Guristas Pirates hulls match these filters')).toBeVisible();
+    const factions = screen.getByRole('group', { name: 'Factions' });
+    expect(within(factions).getByRole('button', { name: /Caldari State/ })).toHaveTextContent(
+      /Caldari State\s*1$/
+    );
+    // A faction with no matches dims but keeps its place; the current one never dims.
+    expect(within(factions).getByRole('button', { name: /Gallente/ })).toHaveClass('opacity-50');
+    expect(within(factions).getByRole('button', { name: /Guristas/ })).not.toHaveClass(
+      'opacity-50'
+    );
+    const suggestion = screen
+      .getAllByRole('button', { name: /^Caldari State\s*1$/ })
+      .find((b) => !factions.contains(b))!;
+    await user.click(suggestion);
+    // Caldari is the default, so the URL drops the key.
+    expect(screen.getByTestId('location')).not.toHaveTextContent('faction=');
+    expect(screen.getByTestId('location')).toHaveTextContent('fly=cantFly');
+    expect(await screen.findByRole('button', { name: /Crow/ })).toBeVisible();
+  });
+
+  it('clears the filters from the empty state, leaving a clean URL', async () => {
+    const user = userEvent.setup();
+    renderTab('/ships/tree?mastery=4');
+    await user.click(await screen.findByRole('button', { name: 'Clear filters' }));
+    expect(screen.getByTestId('location')).not.toHaveTextContent(/mastery|fly=/);
+    expect(await screen.findByRole('button', { name: /Merlin/ })).toBeVisible();
   });
 
   it('offers other factions as chips while searching, switching on a tap', async () => {
