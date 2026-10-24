@@ -9,7 +9,7 @@ keep it near ~150 lines. Delete run metadata on sight.
 
 Gap-analysed at least once; dedup before spending a slot.
 
-Adam4EVE, Ravworks/Slipway, EVE Tycoon, Janice, EVE Appraisal, Iron Whales
+eve-exchange.com (live; Dashboard of six market-price widgets, Trade Finder, Market Browser, Contracts, Appraisal — widgets surfaced #5002, the rest is class 3/Appraisal), Adam4EVE, Ravworks/Slipway, EVE Tycoon, Janice, EVE Appraisal, Iron Whales
 Appraiser (every piece gated — see Killed), EVE Blue Desk, SolCore Dynamics, EvE
 Blueprint, EVE Courier, Fuzzwork, EVE Ref, EVE Retroindustry, ISK.GG, EVE Miner
 Hub, EQM, EveLens, EVE Horizon, EVE Forge, EVE-Industry-Scanner-Tool, EVE-HUB,
@@ -371,6 +371,8 @@ reward on manufacture rows; no alerts, no contributors list, no mining compare.
 reads dot/space/apostrophe-grouped quantities and flags unreadable ones instead
 of pricing them as 1 (Janice #34/#28/#22).
 
+#5002 NARROW — Overview: Market Trend widget, fixed basket (minerals, PLEX, Large Skill Injector) with 7d/30d change (eve-exchange dashboard).
+
 ## Killed / dropped candidates (never filed)
 
 Grouped by the test that killed them; the reason is what stops a re-pitch.
@@ -515,3 +517,4 @@ invention-planning.md`, #2848 not planned — only the Market-Wide label
   Production-Run-linked, station scope, feed-only — after the cost-basis work.
 
 - **EVE Market Tool** (evemarkettool.com, live, paid tiers — gating is not copied): profit ledger by source (trade/build/contract/gathered), FIFO warehouse, pending-cost bucket, plus PI throughput and calendar, margin and industry calculators. Mostly covered (Market History FIFO, Open Orders, PI Advisor, Calendar). Killed: **Gathered Items "mined vs sold"** — "unsold" is mined-minus-sold over fungible ore (reprocessed, taxed, compressed, 30-day ledger vs sale-day axis) and a sold-ore total is a Transactions type filter; **hand-entered cost on pending sales** — settled killed (hand-entered cost basis); **extractor-end ICS subscription feed** — needs a server holding colony data, app is local-first and already pushes extractor ends; **HyperNet calculator** and **abyssal roll scanner** — EQM HyperNet is a standing kill, abyssal crafters are a niche (abyssal pricing already ships).
+- **eve-exchange dashboard leftovers:** PLEX-only price chart (subset of Price History + #5002), ISK traded in PLEX (market-wide vanity metric, low reach), per-hub Large Skill Injector widget (InjectorFacts and the extraction-net decision cover it), free-form item picker and indexed-to-100 chart (scope creep until #5002 shows demand).
