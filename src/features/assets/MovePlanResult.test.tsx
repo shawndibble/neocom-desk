@@ -503,4 +503,50 @@ describe('PlanResult', () => {
       );
     });
   });
+
+  const renderWith = (
+    p: MovePlan,
+    onShowRoute: (() => void) | undefined,
+    destinationSystem: number | null
+  ) =>
+    render(
+      <MemoryRouter>
+        <PlanResult
+          state={{
+            plan: p,
+            destinationSystem,
+            destinationStation: 'Amarr VIII',
+            pickupSystems: new Map(),
+          }}
+          compareOpen={false}
+          headingRef={{ current: null }}
+          onToggleCompare={vi.fn()}
+          haulerOverride={undefined}
+          onPickHauler={vi.fn()}
+          onBack={vi.fn()}
+          onDone={vi.fn()}
+          onShowRoute={onShowRoute}
+          onPackShip={vi.fn()}
+          onUnpackShip={vi.fn()}
+          rigsOf={() => 0}
+          canPack={() => true}
+          name={() => 'Tritanium'}
+          placeLabel={() => 'Jita 4-4'}
+          hueOf={() => 0}
+        />
+      </MemoryRouter>
+    );
+
+  it('offers one Show my route for the plan, and no Route Safety link per pickup', async () => {
+    const onShowRoute = vi.fn();
+    renderWith(withActive(plan), onShowRoute, 30000142);
+    await userEvent.click(screen.getByRole('button', { name: 'Show my route' }));
+    expect(onShowRoute).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('link', { name: /Route Safety/ })).toBeNull();
+  });
+
+  it('has no Show my route without a hauler', () => {
+    renderWith(plan, vi.fn(), 30000142);
+    expect(screen.queryByRole('button', { name: 'Show my route' })).toBeNull();
+  });
 });

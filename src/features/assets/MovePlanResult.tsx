@@ -2,16 +2,14 @@ import { formatCount } from '@/lib/formatCount';
 import { useRef, useState, type ReactNode, type Ref } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 import { Button, Checkbox, Disclosure, Modal } from '@/components/ui';
-import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import {
   CUSTOM_HAULER_TYPE_ID,
   type HaulerOverride,
   type MovePlan,
 } from '@/engine/assets/movePlan';
 import { useSystemName } from '@/features/route/useSolarSystems';
-import { routeToHref } from '@/features/route/routeSafetyLink';
 import { firstConnected, useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { formatCubicMetres } from '@/lib/volume';
 import { createLocalSetting } from '@/lib/useLocalSetting';
@@ -34,7 +32,7 @@ export interface PlanState {
   destinationSystem: number | null;
   /** The destination station's name, when one was picked. */
   destinationStation: string | null;
-  /** System of each pickup location, for the Route Safety link's start. */
+  /** System of each pickup location. */
   pickupSystems: ReadonlyMap<number, number | null>;
   /**
    * The haulers could not be sized, so "no hauler" says nothing about the
@@ -55,6 +53,12 @@ interface PlanResultProps {
   headingRef: Ref<HTMLHeadingElement>;
   onBack: () => void;
   onDone: () => void;
+  /** Works out and shows the active haul; absent where no route can be planned. */
+  onShowRoute?: () => void;
+  /** The route is being worked out. */
+  routing?: boolean;
+  /** The route could not be worked out. */
+  routeFailed?: boolean;
   /** Haul this ship (itemID) packaged instead of flying it. */
   onPackShip: (itemId: number) => void;
   /** Fly a packed ship (itemID) after all. */
@@ -82,6 +86,9 @@ export function PlanResult({
   headingRef,
   onBack,
   onDone,
+  onShowRoute,
+  routing = false,
+  routeFailed = false,
   onPackShip,
   onUnpackShip,
   rigsOf,
@@ -114,7 +121,7 @@ export function PlanResult({
       setAsking({ itemId, typeId, rigs });
     }
   };
-  const { plan, destinationSystem, destinationStation, pickupSystems } = state;
+  const { plan, destinationSystem, destinationStation } = state;
   const systemName = useSystemName(destinationSystem);
   if (plan.perCharacter.length === 0) {
     return (
@@ -308,20 +315,6 @@ export function PlanResult({
                           {formatCubicMetres(p.totalM3)} m³
                         </span>
                       </h3>
-                      {destinationSystem !== null && (
-                        <Link
-                          className={`${inlineLinkClassName} text-sm whitespace-nowrap`}
-                          aria-label={t('assets.movePlan.routeSafetyFrom', {
-                            place: placeLabel(p.locationId),
-                          })}
-                          to={routeToHref(
-                            destinationSystem,
-                            pickupSystems.get(p.locationId) ?? null
-                          )}
-                        >
-                          {t('assets.movePlan.routeSafety')}
-                        </Link>
-                      )}
                     </div>
                     {totals.totalM3 > 0 && capacity > 0 && (
                       <p className="m-0 pt-1.5 text-xs text-text-dim tabular-nums">
@@ -413,10 +406,16 @@ export function PlanResult({
           </RailStop>
         )}
       </Rail>
+      {routeFailed && <p className="m-0 text-text-dim">{t('assets.movePlan.routeFailed')}</p>}
       <div className="sticky -bottom-3 mt-auto -mx-3 -mb-3 flex justify-end gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
         <Button variant="ghost" onClick={onBack}>
           {t('assets.movePlan.back')}
         </Button>
+        {onShowRoute && active && destinationSystem !== null && (
+          <Button loading={routing} onClick={onShowRoute}>
+            {t('assets.movePlan.showRoute')}
+          </Button>
+        )}
         <Button variant="primary" onClick={onDone}>
           {t('assets.movePlan.done')}
         </Button>
