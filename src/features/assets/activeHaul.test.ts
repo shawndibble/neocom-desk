@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { db } from '@/db';
 import type { HaulLeg } from '@/engine/route/haulPlan';
-import { legRouteHref, useActiveHaul, type ActiveHaul } from './activeHaul';
+import { legRouteHref, sectionRouteHref, useActiveHaul, type ActiveHaul } from './activeHaul';
 
 const place = { systemId: 30000142, stationId: 60003760, name: 'Jita 4-4' };
 const haul: ActiveHaul = {
@@ -80,5 +80,38 @@ describe('useActiveHaul parse', () => {
     await useActiveHaul.getState().hydrate();
     expect(useActiveHaul.getState().value).toBeNull();
     await db.settings.delete('activeHaul');
+  });
+});
+
+describe('sectionRouteHref', () => {
+  const stop = (systemId: number | null, stationId: number | null) => ({
+    systemId,
+    stationId,
+    name: 'X',
+  });
+  const leg = (to: HaulLeg['to']): HaulLeg => ({
+    id: 0,
+    characterId: 1,
+    trip: 1,
+    kind: 'pickup',
+    from: null,
+    to,
+    jumps: 1,
+    m3: 1,
+    locationId: null,
+  });
+
+  it('chains every stop in order from where the route starts', () => {
+    const href = sectionRouteHref(
+      [leg(stop(2, 22)), leg(stop(null, null)), leg(stop(3, null))],
+      stop(1, null)
+    )!;
+    const params = new URL(href, 'http://x').searchParams;
+    expect(params.get('from')).toBe('1');
+    expect(params.get('stops')).toBe('2:22,3');
+  });
+
+  it('has no link when no stop has a system', () => {
+    expect(sectionRouteHref([leg(stop(null, null))], null)).toBeNull();
   });
 });

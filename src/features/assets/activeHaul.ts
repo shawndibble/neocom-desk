@@ -204,3 +204,11 @@ export function legRouteHref(leg: HaulLeg): string | null {
     { systemId: leg.to.systemId, stationId: leg.to.stationId },
   ]);
 }
+
+/** Route Safety through every stop of `legs` in order, from `from`: a Character's whole route in one trip. */
+export function sectionRouteHref(legs: readonly HaulLeg[], from: HaulPlace | null): string | null {
+  const stops = legs.flatMap((leg) =>
+    leg.to.systemId === null ? [] : [{ systemId: leg.to.systemId, stationId: leg.to.stationId }]
+  );
+  return stops.length === 0 ? null : routeStopsHref(from?.systemId ?? null, stops);
+}

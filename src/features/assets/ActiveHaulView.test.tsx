@@ -5,8 +5,37 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { HaulLeg } from '@/engine/route/haulPlan';
+import type { RouteSafetyRow } from '@/engine/route/routeSafety';
 import type { ActiveHaul } from './activeHaul';
 import { ActiveHaulView } from './ActiveHaulView';
+
+const sent = vi.hoisted(() => vi.fn().mockResolvedValue({ ok: true, set: 1 }));
+vi.mock('@/features/travel/sendWaypoints', () => ({ setWaypointsInGame: sent }));
+vi.mock('@/app/useGrantedScopes', () => ({ useCharacterLacksEndpoints: () => false }));
+vi.mock('@/stores/network', () => ({ useOnline: () => true }));
+
+const cell = (systemId: number, name: string, security: number, ships: number, pods: number) =>
+  ({
+    systemId,
+    name,
+    security,
+    band: security >= 0.5 ? 'highsec' : security > 0 ? 'lowsec' : 'nullsec',
+    regionId: null,
+    regionName: null,
+    jumps: null,
+    shipKills: ships,
+    podKills: pods,
+    npcKills: 0,
+    chokepoint: false,
+  }) satisfies RouteSafetyRow;
+const legOneRows = [
+  cell(1, 'Amarr', 1, 0, 0),
+  cell(2, 'Ashab', 0.4, 3, 2),
+  cell(3, 'Dodixie', 0.9, 0, 0),
+];
+vi.mock('./useHaulLegRows', () => ({
+  useHaulLegRows: () => new Map([[0, { status: 'ready', rows: legOneRows }]]),
+}));
 
 const station = { systemId: 30000142, stationId: 60003760, name: 'Jita 4-4' };
 const pickup = (systemId: number, stationId: number | null, name: string) => ({
@@ -99,12 +128,45 @@ describe('ActiveHaulView', () => {
     ).toHaveLength(3);
   });
 
-  it('opens the next leg and folds the later ones', async () => {
+  it('shows every leg with its own Route Safety link, plus one for the whole route', () => {
     renderView();
-    const buttons = screen.getAllByRole('button', { expanded: false });
-    expect(screen.getAllByRole('link', { name: /Show in Route Safety/ })).toHaveLength(1);
-    await userEvent.click(buttons[0]);
-    expect(screen.getAllByRole('link', { name: /Show in Route Safety/ })).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: /Show in Route Safety, leg/ })).toHaveLength(3);
+    expect(screen.getByRole('link', { name: 'Route Safety, whole route' })).toBeTruthy();
+  });
+
+  it('states the condition a leg flies through, not a verdict', () => {
+    renderView();
+    expect(screen.getByText('1 lowsec system')).toBeTruthy();
+  });
+
+  it('names each strip cell in a tooltip with last-hour ship and pod kills', async () => {
+    renderView();
+    const cells = screen.getAllByTestId('haul-strip-cell');
+    expect(cells).toHaveLength(3);
+    expect(
+      screen.getByRole('img', { name: /3 systems, lowest security 0\.4.*kills.*3.*Pod kills: 2/ })
+    ).toBeTruthy();
+    await userEvent.hover(cells[1]);
+    expect((await screen.findAllByText(/Pod kills, last hour: 2/)).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Ship kills, last hour: 3/).length).toBeGreaterThan(0);
+  });
+
+  it("opens the next leg's cargo and folds the others until asked", async () => {
+    renderView();
+    expect(screen.getByText(/Loads 80 m³ at Dodixie IX on arrival/)).toBeTruthy();
+    expect(screen.queryByText(/Drops 80 m³ at Jita 4-4\./)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Show cargo for leg 2' }));
+    expect(screen.getByText(/Drops 80 m³ at Jita 4-4\./)).toBeTruthy();
+    expect(screen.getByText('Carrying 80 m³')).toBeTruthy();
+    expect(screen.getByText('Dodixie IX: 80 m³')).toBeTruthy();
+  });
+
+  it("sets one leg's stop, or every stop of the route, as waypoints", async () => {
+    renderView();
+    await userEvent.click(screen.getByRole('button', { name: 'Set waypoint, leg 1' }));
+    expect(sent).toHaveBeenLastCalledWith(1, [60008494]);
+    await userEvent.click(screen.getByRole('button', { name: 'Set all waypoints' }));
+    expect(sent).toHaveBeenLastCalledWith(1, [60008494, 60003760, 60008494]);
   });
 
   it('links the first leg to Route Safety with its station-tagged stop', () => {
@@ -147,14 +209,14 @@ describe('ActiveHaulView', () => {
     expect(view.onProgress).toHaveBeenCalledWith([0]);
   });
 
-  it('keeps done legs in the list and opens the next one', () => {
+  it('keeps done legs in the list and opens the next one’s cargo', () => {
     renderView(undefined, {}, [0]);
     const rows = screen.getAllByRole('listitem').filter((li) => li.hasAttribute('data-leg-id'));
     expect(rows).toHaveLength(3);
     expect(rows[0].hasAttribute('data-done')).toBe(true);
     expect(rows[1].hasAttribute('data-done')).toBe(false);
-    expect(screen.getAllByRole('link', { name: /Show in Route Safety/ })).toHaveLength(1);
-    expect(screen.getByRole('link', { name: 'Show in Route Safety, leg 2' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Hide cargo for leg 2' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Show cargo for leg 1' })).toBeTruthy();
     expect(screen.getByText('2 legs · 12 jumps · 20 m³ to Jita 4-4')).toBeTruthy();
   });
 
