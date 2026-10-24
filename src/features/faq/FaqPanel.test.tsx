@@ -23,7 +23,7 @@ const functionsFile = (file: string) =>
 const daysIn = (source: string, name: string) =>
   Number(new RegExp(`${name} = (\\d+) \\* 24`).exec(source)?.[1]);
 
-const QUESTIONS = 20;
+const QUESTIONS = 21;
 
 /** Renders the FAQ with every question opened, as the content tests read the answers. */
 function renderFaq(initialEntry = '/help/faq') {
@@ -424,6 +424,7 @@ describe('FaqPanel: Using Neocom Desk', () => {
       'data-lag',
       'alerts',
       'characters',
+      'row-menus',
       'phone',
       'install',
       'update',
