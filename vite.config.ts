@@ -132,6 +132,13 @@ const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
  * client-side. An address that really matches nothing then reaches the `*`
  * route and its own NotFound screen, rather than a stock GitHub page.
  *
+ * GitHub Pages only: production (`deploy` in .github/workflows/deploy.yml).
+ * Cloudflare Pages (dev.neocomdesk.com, `deploy-dev`) does the SPA rewrite
+ * itself, answering an unmatched path with `index.html` and a 200 — but only
+ * when the upload has no top-level `404.html`; with one it serves that file
+ * with a 404 status. So `deploy-dev` deletes the copy before uploading. Drop
+ * this plugin when production moves to Cloudflare Pages too.
+ *
  * Last in `plugins` so `closeBundle` runs after VitePWA has taken its manifest
  * — otherwise the copy is precached as a second, identical `index.html`.
  */

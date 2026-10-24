@@ -137,6 +137,12 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_VAPID_KEY: ${{ vars.VITE_FIREBASE_VAPID_KEY }}
           VITE_FIREBASE_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_MEASUREMENT_ID }}
+      # Cloudflare Pages rewrites unmatched paths to index.html with a 200 (SPA
+      # rendering), but only when there is no top-level 404.html; with one, every
+      # deep link answers 404. That copy is a GitHub Pages workaround
+      # (`spaFallbackHtml` in vite.config.ts), so drop it from this upload. It was
+      # never precached (written after VitePWA's manifest), so nothing else moves.
+      - run: rm -f dist/404.html
       # The Pages project already exists. If it is ever recreated (or PAGES_PROJECT
       # changes), create it once by hand first:
       #   npx wrangler@4 pages project create "$PAGES_PROJECT" --production-branch "$PAGES_BRANCH"
