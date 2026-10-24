@@ -14,6 +14,7 @@ import {
 import { useInstallApp, promptInstallApp } from './installApp';
 import { useOnboardingBannerSlot } from './onboardingBannerSlot';
 import { useStickyClearance } from '@/lib/useStickyClearance';
+import { isInstalledApp } from '@/lib/installedApp';
 
 const INSTRUCTION_KEYS = {
   'ios-safari': 'pwa.installIosSafariCta',
@@ -68,9 +69,7 @@ export function InstallPrompt() {
     hydrated && visitsHydrated
       ? selectInstallPromptVariant({
           seen,
-          isStandalone:
-            window.matchMedia('(display-mode: standalone)').matches ||
-            (navigator as { standalone?: boolean }).standalone === true,
+          isStandalone: isInstalledApp(),
           deferredPromptAvailable: deferredPrompt !== null,
           platform: detectInstallPlatform(navigator.userAgent, navigator.maxTouchPoints ?? 0),
           pageVisits,

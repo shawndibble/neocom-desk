@@ -11,6 +11,7 @@ import { DevicePanel } from '@/features/settings/DevicePanel';
 import { OfflineDataPanel } from '@/features/settings/OfflineDataPanel';
 import { UpdatePanel } from '@/features/settings/UpdatePanel';
 import { checkForUpdate } from '@/app/updateAvailable';
+import { checkStorageAtRisk } from '@/features/settings/storageAtRisk';
 import { InstallAppPanel } from '@/features/settings/InstallAppPanel';
 import { TravelSettingsPanel } from '@/features/settings/TravelSettingsPanel';
 import { CheckboxField, ChipRow, SettingsScopeHint } from '@/features/settings/settingsFields';
@@ -100,8 +101,10 @@ export function Settings() {
   // One bounded check per visit to Settings, whatever the URL, so the index row,
   // the rail dot and the App & backup line are settled before they are read.
   // Moving between sections keeps this component mounted and checks nothing.
+  // The Offline data dot is read the same way.
   useEffect(() => {
     void checkForUpdate();
+    void checkStorageAtRisk();
   }, []);
 
   useEffect(() => {

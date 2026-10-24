@@ -3,6 +3,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { OfflineDataPanel } from './OfflineDataPanel';
+import { useStorageAtRisk } from './storageAtRisk';
 import type { DownloadOutcome, OfflineStatus, StorageEstimate } from './offlineStatus';
 
 const mocks = vi.hoisted(() => ({
@@ -48,6 +49,7 @@ function setOnline(online: boolean) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useStorageAtRisk.setState({ atRisk: false });
   setOnline(true);
   mocks.readOfflineStatus.mockResolvedValue(PARTIAL);
   mocks.readStorageEstimate.mockResolvedValue({ usage: 5 * 1024 ** 2, quota: 2 * 1024 ** 3 });
@@ -105,6 +107,18 @@ describe('OfflineDataPanel persistent storage', () => {
     await user.click(await screen.findByRole('button', { name: 'Protect this data' }));
     await waitFor(() => expect(screen.getAllByText(/The browser declined/)).toHaveLength(2)); // note + live region
     expect(screen.getByRole('button', { name: 'Protect this data' })).toBeInTheDocument();
+  });
+
+  it('clears the Settings attention dot once the browser answers', async () => {
+    useStorageAtRisk.setState({ atRisk: true });
+    mocks.requestPersistence.mockImplementation(async () => {
+      mocks.readPersisted.mockResolvedValue(true);
+      return 'granted';
+    });
+    const user = userEvent.setup();
+    render(<OfflineDataPanel />);
+    await user.click(await screen.findByRole('button', { name: 'Protect this data' }));
+    await waitFor(() => expect(useStorageAtRisk.getState().atRisk).toBe(false));
   });
 
   it('shows no button when already protected', async () => {

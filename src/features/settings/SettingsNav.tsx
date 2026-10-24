@@ -14,6 +14,7 @@ import * as Icon from '@/components/ui/icons';
 import { Button, LiveStatus } from '@/components/ui';
 import { ActionResult } from './settingsFields';
 import { useApplyUpdate, useUpdateStatusLine } from './useUpdateState';
+import { useStorageAtRisk } from './storageAtRisk';
 import type { SettingsGroup, SettingsSectionId } from './sections';
 
 const LABEL_KEYS = new Map<string, string>(SETTINGS_TABS.tabs.map((tab) => [tab.id, tab.labelKey]));
@@ -32,6 +33,7 @@ interface SettingsNavProps {
 export function SettingsNav({ groups, value }: SettingsNavProps) {
   const { t } = useTranslation();
   const updateAvailable = useUpdateStatusLine().status === 'available';
+  const storageAtRisk = useStorageAtRisk((s) => s.atRisk);
 
   return (
     <nav
@@ -65,11 +67,10 @@ export function SettingsNav({ groups, value }: SettingsNavProps) {
                   >
                     {t(LABEL_KEYS.get(id) ?? id)}
                     {id === 'app' && updateAvailable && (
-                      <span
-                        role="img"
-                        aria-label={t('settings.update.available')}
-                        className="ml-1.5 inline-block size-1.5 rounded-full bg-accent align-middle"
-                      />
+                      <AttentionDot label={t('settings.update.available')} />
+                    )}
+                    {id === 'offline' && storageAtRisk && (
+                      <AttentionDot label={t('settings.offline.atRisk')} />
                     )}
                   </Link>
                 </li>
@@ -79,6 +80,17 @@ export function SettingsNav({ groups, value }: SettingsNavProps) {
         </div>
       ))}
     </nav>
+  );
+}
+
+/** §6c: something inside this section needs attention now; clears when handled. */
+function AttentionDot({ label }: { label: string }) {
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      className="ml-1.5 inline-block size-1.5 rounded-full bg-accent align-middle"
+    />
   );
 }
 
@@ -97,6 +109,7 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
   const { t } = useTranslation();
   const { status, line } = useUpdateStatusLine();
   const { updating, failed, update } = useApplyUpdate();
+  const storageAtRisk = useStorageAtRisk((s) => s.atRisk);
 
   return (
     <nav aria-label={t('settings.navLabel')} className="space-y-4">
@@ -126,7 +139,12 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
                       )}
                     >
                       <span className="min-w-0">
-                        <span className="block text-text">{t(LABEL_KEYS.get(id) ?? id)}</span>
+                        <span className="block text-text">
+                          {t(LABEL_KEYS.get(id) ?? id)}
+                          {id === 'offline' && storageAtRisk && (
+                            <AttentionDot label={t('settings.offline.atRisk')} />
+                          )}
+                        </span>
                         {(summary || isApp) && (
                           <span
                             className={cx(

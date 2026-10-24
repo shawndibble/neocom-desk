@@ -5,11 +5,21 @@
  *
  * Asked once automatically after the first Character is added
  * (`features/character/addCharacter.ts`) and never again on its own — a browser that prompts
- * (Firefox) must not be nagged. The Offline data panel's button asks on demand.
+ * (Firefox) must not be nagged. Importing a backup asks too, on the pilot's own
+ * press (`features/settings/ImportPanel.tsx`): a device set up by import never
+ * signs in "first", so it was never protected, and an Android phone lost every
+ * Character to eviction.
+ *
+ * One more automatic ask, under its own flag, on the first installed launch:
+ * Chrome declines a plain tab but grants an installed app without a prompt,
+ * so a decline from before the install says nothing about now. The Offline
+ * data panel's button asks on demand.
  */
 import { db } from '@/db';
+import { isInstalledApp } from './installedApp';
 
 export const PERSIST_ASKED_KEY = 'storagePersistAsked';
+export const PERSIST_ASKED_INSTALLED_KEY = 'storagePersistAskedInstalled';
 
 /** The slice of `StorageManager` this uses; `undefined` where the API is missing. */
 export interface PersistableStorage {
@@ -56,14 +66,15 @@ export async function requestPersistence(
  * asking, so a crash or a hung prompt cannot lead to a second one.
  */
 export async function requestPersistenceOnce(
-  storage: PersistableStorage | undefined = currentStorage()
+  storage: PersistableStorage | undefined = currentStorage(),
+  askedKey: string = PERSIST_ASKED_KEY
 ): Promise<PersistResult> {
   if (!storage) return 'unsupported';
   try {
     // One transaction, so two callers (two tabs) cannot both see "not asked yet".
     const alreadyAsked = await db.transaction('rw', db.settings, async () => {
-      if ((await db.settings.get(PERSIST_ASKED_KEY))?.value === true) return true;
-      await db.settings.put({ key: PERSIST_ASKED_KEY, value: true });
+      if ((await db.settings.get(askedKey))?.value === true) return true;
+      await db.settings.put({ key: askedKey, value: true });
       return false;
     });
     if (alreadyAsked) return 'skipped';
@@ -72,4 +83,25 @@ export async function requestPersistenceOnce(
     return 'skipped';
   }
   return requestPersistence(storage);
+}
+
+/**
+ * The installed-launch ask (see the module comment). Only with Characters on
+ * the device — before that, the sign-in or import ask covers it — and only
+ * while storage is not yet persisted, so a protected device records nothing.
+ */
+export async function requestPersistenceWhenInstalled(
+  installed: boolean = isInstalledApp(),
+  storage: PersistableStorage | undefined = currentStorage()
+): Promise<PersistResult> {
+  if (!installed) return 'skipped';
+  const persisted = await readPersisted(storage);
+  if (persisted === null) return 'unsupported';
+  if (persisted) return 'skipped';
+  try {
+    if ((await db.characters.count()) === 0) return 'skipped';
+  } catch {
+    return 'skipped';
+  }
+  return requestPersistenceOnce(storage, PERSIST_ASKED_INSTALLED_KEY);
 }

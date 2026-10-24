@@ -1,4 +1,5 @@
 import { useNavBadges } from './navBadges';
+import { useSettingsNeedsAttention } from './settingsAttention';
 import { UnreadAlertsContext } from '@/components/ui/unreadAlertsContext';
 import { memo, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
@@ -352,6 +353,7 @@ export const Layout = memo(function Layout() {
   // New Requests on the Communities item, read while the app is open (issue #3810).
   useRequestBadgePoll();
   const navBadge = useNavBadges();
+  const settingsAttention = useSettingsNeedsAttention();
   const tabs = barTabs(useMobileTabs((state) => state.value));
   const moreButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -405,7 +407,13 @@ export const Layout = memo(function Layout() {
             that read as scroll, not overlap. */}
             <div className="flex shrink-0 flex-col gap-0.5 border-t border-b border-line p-2">
               {FOOTER_PAGES.map((page) => (
-                <NavItem key={page.path} to={page.path} label={t(page.labelKey)} locked={false} />
+                <NavItem
+                  key={page.path}
+                  to={page.path}
+                  label={t(page.labelKey)}
+                  locked={false}
+                  attention={page.path === '/settings' && settingsAttention}
+                />
               ))}
             </div>
             <div className="flex shrink-0 items-center pr-2">
@@ -454,9 +462,20 @@ export const Layout = memo(function Layout() {
               aria-controls={MORE_SHEET_ID}
               onClick={() => setMoreOpen((open) => !open)}
               className={`${MOBILE_NAV_ITEM} ${moreOpen ? MOBILE_NAV_ACTIVE : MOBILE_NAV_IDLE}`}
+              // Settings lives in the sheet, so its dot rides here too (§6c).
+              aria-label={
+                settingsAttention ? t('nav.needsAttention', { label: t('nav.more') }) : undefined
+              }
             >
               <Icon.NavMore aria-hidden="true" size={Icon.ICON_SIZE.md} />
               <span className="truncate">{t('nav.more')}</span>
+              {settingsAttention && (
+                <span
+                  aria-hidden="true"
+                  data-attention-dot
+                  className="absolute top-1.5 left-1/2 ml-3 size-1.5 rounded-full bg-accent"
+                />
+              )}
             </button>
           </nav>
 
