@@ -26,7 +26,9 @@ async function shot(page: Page, name: string): Promise<void> {
   if (dir) await page.screenshot({ path: `${dir}/${name}.png`, fullPage: true });
 }
 
+/** `boundingBox` doesn't wait, so wait for the element to render before measuring it. */
 async function box(locator: Locator) {
+  await expect(locator).toBeVisible({ timeout: 20_000 });
   const b = await locator.boundingBox();
   if (!b) throw new Error('no box');
   return b;
