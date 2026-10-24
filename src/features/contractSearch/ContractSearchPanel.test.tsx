@@ -1497,8 +1497,7 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
   /**
    * Opens the funnel, which every `FilterBar` hides its controls behind. At
    * pointer width — which is what jsdom reports — that shows the controls on
-   * a line below the search box and each one commits as it is touched; the
-   * Apply/Cancel pair belongs to the narrow-width sheet.
+   * a line below the search box and each one commits as it is touched.
    */
   async function openFilters(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: 'Filters' }));

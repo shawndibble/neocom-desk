@@ -140,7 +140,7 @@ export function useOverlayHistory(open: boolean, onClose: () => void, enabled = 
       if (ownerOf(window.history.state) === id) return;
       popped = true;
       onCloseRef.current();
-      // `onClose` may decline (a sheet asking "discard changes?" stays open).
+      // `onClose` may decline (the parent keeps `open` true).
       // Then the user is still looking at the overlay with its entry gone, so
       // put it back — unless another overlay has pushed its own on top.
       setTimeout(() => {

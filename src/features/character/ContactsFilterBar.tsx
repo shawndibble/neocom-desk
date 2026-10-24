@@ -24,10 +24,9 @@ const STANDING_FILTER_KEY: Record<StandingCategory, string> = {
 };
 
 /**
- * `ContactsFilter` plus the Across tab's own criterion, so the sheet's draft
+ * `ContactsFilter` plus the Across tab's own criterion, so `FilterBar`'s value
  * (issue #1282) can hold "Only disagreements" the same way it holds every
- * other chip — committed on Apply below `md`, immediately in the pointer-width
- * box. Local to this bar: `ContactsFilter` itself stays the Character tab's
+ * other chip. Local to this bar: `ContactsFilter` itself stays the Character tab's
  * type, with no across-only field grafted on for one consumer.
  */
 type ContactsBarValue = ContactsFilter & { disagreementsOnly: boolean };

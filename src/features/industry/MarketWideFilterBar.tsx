@@ -45,7 +45,7 @@ export function MarketWideFilterBar({ filter, onChange, gatedCount }: MarketWide
       pointerSurface="popover"
     >
       {(draft, setDraft) => (
-        // Two controls per row in the phone sheet so Apply stays in view; the
+        // Two controls per row in the phone sheet so it stays short; the
         // chips sit together on the last row. `lg:contents` leaves the popover as it was.
         <div className="grid w-full grid-cols-2 gap-3 lg:contents">
           <FilterField label={t('industry.marketOpportunitiesFilters.maxBuildCost')}>

@@ -52,7 +52,11 @@ export function FactionBar({
     <div
       role="group"
       aria-label={t('ships.tree.factions')}
-      className="flex gap-1 overflow-x-auto pb-1"
+      // `relative`: the buttons' `sr-only` match counts are absolutely
+      // positioned, and without a positioned ancestor here they escape the
+      // scroller's clip and widen the page — a phone then zooms out to fit,
+      // pushing the tab bar off screen and cropping every bottom sheet.
+      className="relative flex gap-1 overflow-x-auto pb-1"
     >
       {inGameFactionOrder(data.factions).map((f) => {
         const c = counts.get(f.id) ?? { total: 0, flyable: 0 };

@@ -65,9 +65,8 @@ const REGION_NAMES = new Map([
 ]);
 
 /**
- * Phone width, where `FilterBar` swaps the inline row for a sheet whose edits
- * are a draft committed with Apply — a different commit path for `onPick` than
- * the pointer-width row, which writes straight through.
+ * Phone width, where `FilterBar` swaps the inline row for a sheet — a modal
+ * that unmounts on close, unlike the pointer-width row.
  */
 function stubNarrowViewport() {
   const real = window.matchMedia;
@@ -274,7 +273,7 @@ describe('CourierResults "From my region" shortcut', () => {
     expect(loadCharacterRegionId).toHaveBeenLastCalledWith(CHARACTER_ID + 1);
   });
 
-  it('survives Apply on the narrow sheet surface', async () => {
+  it('survives closing the narrow sheet surface', async () => {
     const restore = stubNarrowViewport();
     try {
       loadCharacterRegionId.mockResolvedValue(THE_FORGE);
@@ -284,7 +283,7 @@ describe('CourierResults "From my region" shortcut', () => {
 
       await user.click(myRegionButton());
       await waitFor(() => expect(loadCharacterRegionId).toHaveBeenCalledTimes(1));
-      await user.click(screen.getByRole('button', { name: 'Apply' }));
+      await user.keyboard('{Escape}');
 
       await openFilters(user);
       expect(screen.getByRole('combobox', { name: 'From region' })).toHaveTextContent('The Forge');

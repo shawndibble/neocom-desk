@@ -18,8 +18,8 @@ import {
 import { useBrowserFilterSetting } from '@/features/market/browserFilterSetting';
 
 /**
- * The order book's filter bar as one `useUrlParams` group, so the narrow
- * sheet's Apply lands every changed field in one write rather than four
+ * The order book's filter bar as one `useUrlParams` group, so an edit that
+ * touches several fields lands in one write rather than four
  * writers racing in one tick (see `navigateTo` in `useMarketBrowser.ts`). Each
  * field's stored default (`browserFilterSetting.ts`) sits behind the URL via
  * `useRememberedUrlParams`, so a filter set once survives a reload or a
