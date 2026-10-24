@@ -464,8 +464,7 @@ test.describe('Tax ledger — phone sort picker', () => {
  * bar's one primary, decision-committing action for the whole checked
  * selection rendered at `size="sm"` (36px) like its four ordinary secondary
  * siblings (Select All, Clear, Combine, Dismiss) — under this app's `md`
- * touch tier (44px), the accepted size for a page's sole primary control
- * (`FilterBar`'s sheet Apply/Cancel precedent). Only Settle Up moves; the
+ * touch tier (44px), the accepted size for a page's sole primary control. Only Settle Up moves; the
  * other four stay `sm` at every width, since widening them too would grow
  * four already-conventional secondary actions on desktop pointer for no
  * phone-specific reason (RUBRIC.md's "the desktop layout is the control").

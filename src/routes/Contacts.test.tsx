@@ -86,7 +86,7 @@ function openFilters() {
 
 let restoreMatchMedia: (() => void) | undefined;
 
-/** Below `md`, `FilterBar` opens a sheet whose edits are a draft until Apply. */
+/** Below `md`, `FilterBar` opens its filters in a bottom sheet. */
 function useNarrowViewport(): void {
   const real = window.matchMedia;
   window.matchMedia = (media: string) =>
@@ -412,7 +412,7 @@ describe('Contacts', () => {
       expect(table.getAllByText('1 of 2').length).toBe(4);
     });
 
-    it('leaves "Only disagreements" undone when the narrow-viewport sheet is cancelled', async () => {
+    it('applies "Only disagreements" from the narrow-viewport sheet as it is picked', async () => {
       useNarrowViewport();
       await addSecondCharacter();
       await cacheSecondCharacterContacts([contactsPayload[0]]);
@@ -424,14 +424,11 @@ describe('Contacts', () => {
       fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
       const sheet = await screen.findByRole('dialog');
       fireEvent.click(within(sheet).getByRole('button', { name: /Only disagreements/ }));
-      fireEvent.click(within(sheet).getByRole('button', { name: 'Cancel' }));
 
-      // Cancelled: this is a draft like every other control in the sheet
-      // (issue #1282), so the URL never saw the toggle and every contact
-      // still shows, disagreement or not.
-      expect(window.location.search).not.toContain('across.disagree');
+      // No Apply step: the toggle is in the URL while the sheet is still open.
+      expect(window.location.search).toContain('across.disagree');
       const table = within(screen.getByRole('table', { name: /across/i }));
-      expect(table.getAllByText('2 of 2').length).toBe(1);
+      expect(table.queryByText('2 of 2')).not.toBeInTheDocument();
     });
 
     it('shows every standing a contact was given, not one of them', async () => {

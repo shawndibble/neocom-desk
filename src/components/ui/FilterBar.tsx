@@ -49,8 +49,9 @@ export function FilterField({ label, children, stretch = true, className = '' }:
   // `aria-label` is what a screen reader gets; this caption is for the eye.
   // `[&>*]:w-full` because the control carries the width it needs *in the row*
   // — `w-44` on Wallet's ref-type trigger, `w-36` on its date fields. Stacked
-  // in the sheet those read as half-empty fields in a column. The child selector outspecifies the utility on the control itself, so
-  // no call site has to hold two widths.
+  // in the sheet those read as half-empty fields in a column. The child
+  // selector outspecifies the utility on the control itself, so no call site
+  // has to hold two widths.
   return (
     <div
       className={cx('flex flex-col items-start gap-1', stretch && 'w-full [&>*]:w-full', className)}
@@ -87,7 +88,7 @@ interface FilterBarProps<T> {
    * The controls, written once. Called with `value` and `onChange` straight
    * through — every surface commits each edit as it is made.
    */
-  children: (draft: T, setDraft: (next: T) => void) => ReactNode;
+  children: (value: T, onChange: (next: T) => void) => ReactNode;
   /**
    * View controls — a table's column picker, say — that sit between the search
    * box and the filter trigger, on the same line at every width. Not part of

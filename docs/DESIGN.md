@@ -642,9 +642,8 @@ Three things about it are deliberate:
 
 - **Every edit commits as it is made, on both surfaces.** In the box the list
   is right below the control; the sheet stops short of the screen top, so the
-  list re-filters above it as each chip is picked. The sheet used to hold an
-  Apply / Cancel draft; it was dropped (2026-10-24) because a pick should
-  take effect without a second tap and a "Discard changes?" prompt. The one
+  list re-filters above it as each chip is picked (scope decision
+  `20261024-082719`). The one
   exception is an ISK amount (`IskInput`, shorthand like `250m`), which
   commits on blur or Enter so a half-typed figure never filters the list
   (Hauling's Max price / Max spend). A route with a persisted preference in

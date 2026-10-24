@@ -75,7 +75,6 @@ describe('FilterBar sheet dismissal', () => {
     await user.click(screen.getByRole('button', { name: 'Unread only' }));
     await user.click(dialog);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(screen.getByText('unread:true')).toBeInTheDocument();
   });
 

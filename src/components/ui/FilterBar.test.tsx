@@ -215,7 +215,7 @@ describe('FilterBar', () => {
     await user.click(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     const popover = screen.getByRole('dialog');
-    // Uncaptioned and live, like the box under the row — not the sheet's draft.
+    // Uncaptioned, like the box under the row — captions are the sheet's.
     expect(screen.queryByText('From')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Unread only' }));
     expect(popover).toContainElement(screen.getByRole('button', { name: 'Unread only' }));
