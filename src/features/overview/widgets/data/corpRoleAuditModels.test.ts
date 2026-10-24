@@ -34,6 +34,7 @@ const audit = (over: Partial<RoleAuditData> = {}): RoleAuditData => ({
     },
   ],
   titlesKnown: false,
+  ceoId: null,
   names: new Map([
     [1, 'Aria'],
     [2, 'Bex'],

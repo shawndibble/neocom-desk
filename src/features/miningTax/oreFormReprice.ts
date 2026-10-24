@@ -69,5 +69,5 @@ export async function repriceForOreForm(characterId: number): Promise<void> {
       wrote = true;
     }
   });
-  if (wrote) scheduleSync(characterId);
+  if (wrote) scheduleSync(characterId, { collections: ['miningTaxAssignments'] });
 }

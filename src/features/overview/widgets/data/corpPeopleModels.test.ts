@@ -145,6 +145,7 @@ describe('corpInactive', () => {
     expect(corpInactive(membersFeed({ members, darkAfterDays: 7 }), ctx()).number.value).toBe('1');
     const view = corpInactive(membersFeed({ members }), ctx());
     expect(view.status.isEmpty).toBe(true);
+    expect(view.emptyHealthy).toBe(true);
     expect(view.number.tone).toBe('clear');
   });
 });

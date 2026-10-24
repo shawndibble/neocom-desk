@@ -226,6 +226,11 @@ function CorpDivisionsPanel({
   const toggleRef = useRef<HTMLButtonElement>(null);
   const walletsResult = balances?.walletsResult.cached ?? null;
   const selectedEntry = divisions.find((entry) => entry.division === selected) ?? divisions[0];
+  // An unnamed, empty division is noise: one dim line says how many (the selected one stays).
+  const shownDivisions = divisions.filter(
+    (entry) => entry.name !== null || entry.balance !== 0 || entry === selectedEntry
+  );
+  const unused = divisions.length - shownDivisions.length;
   // Seven full-width cards push the journal below the fold on a phone: fold to
   // the selected division there. Loading, empty and one-division panels have
   // nothing worth folding.
@@ -240,7 +245,6 @@ function CorpDivisionsPanel({
   return (
     <CollapsiblePanel
       title={t('corp.wallet.divisionsTitle')}
-      actions={walletsResult ? <DataAgeBadge date={walletsResult.fetchedAt} /> : undefined}
       expanded={expanded}
       onToggle={() => setExpanded((open) => !open)}
       toggleRef={toggleRef}
@@ -277,7 +281,7 @@ function CorpDivisionsPanel({
             aria-label={t('wallet.corpDivisionLabel')}
             className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4"
           >
-            {divisions.map((entry) => {
+            {shownDivisions.map((entry) => {
               const isSelected = entry.division === selected;
               return (
                 <button
@@ -310,6 +314,11 @@ function CorpDivisionsPanel({
               );
             })}
           </div>
+          {unused > 0 && (
+            <p className="mt-2 text-xs text-text-dim">
+              {t('corp.wallet.unusedDivisions', { count: unused })}
+            </p>
+          )}
           {offlineNote}
         </>
       )}

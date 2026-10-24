@@ -7,6 +7,20 @@ export interface SkyhookNames {
   readonly system?: string;
 }
 
+/**
+ * A planet's name already leads with its system ("60M-TG I"), so naming the
+ * system again reads twice; an unresolved planet is a generic skyhook, not an id.
+ */
+function whereLabel(names: SkyhookNames, systemId: number): string {
+  const system = names.system ?? `#${systemId}`;
+  if (names.planet === undefined) {
+    return fired('skyhookRaidableNearby', 'whereUnnamed', { system });
+  }
+  if (names.system !== undefined && names.planet.startsWith(`${names.system} `))
+    return names.planet;
+  return fired('skyhookRaidableNearby', 'whereNamed', { planet: names.planet, system });
+}
+
 export const skyhookRaidableNearbyCopy: DomainCopy<SkyhookRaidableNearbyFire, SkyhookNames> = {
   poll: (fire, _character, names) => {
     const now = Date.now();
@@ -15,8 +29,7 @@ export const skyhookRaidableNearbyCopy: DomainCopy<SkyhookRaidableNearbyFire, Sk
     return {
       title: fired('skyhookRaidableNearby', 'title', { count: fire.jumps }),
       body: fired('skyhookRaidableNearby', 'body', {
-        planet: names.planet ?? `#${fire.planetId}`,
-        system: names.system ?? `#${fire.systemId}`,
+        where: whereLabel(names, fire.systemId),
         window: fired('skyhookRaidableNearby', open ? 'windowOpen' : 'windowIn', { duration }),
         count: fire.jumps,
       }),

@@ -7,6 +7,7 @@ import { db } from '@/db';
 import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import {
   KEYS,
+  loadCorporationCeoId,
   loadCorporationMemberIds,
   loadCorporationMemberRoles,
   loadCorporationMemberTracking,
@@ -314,5 +315,25 @@ describe('loadMemberLabels (AC3)', () => {
 
     expect(batched).toEqual([4004]);
     expect(labels.characters.get(4004)).toBe('Name 4004');
+  });
+});
+
+describe('loadCorporationCeoId', () => {
+  it('reads ceo_id off the public corporation record', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/corporations/${CORP_ID}`, () =>
+        HttpResponse.json({ name: 'Test Corp', ticker: 'TC', ceo_id: 1001, creator_id: 1002 })
+      )
+    );
+    expect(await loadCorporationCeoId(CORP_ID)).toBe(1001);
+  });
+
+  it('is null, not a throw, when the record cannot be read', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/corporations/${CORP_ID}`, () =>
+        HttpResponse.json({ error: 'down' }, { status: 500 })
+      )
+    );
+    expect(await loadCorporationCeoId(CORP_ID)).toBeNull();
   });
 });

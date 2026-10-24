@@ -185,7 +185,7 @@ export function useRunLoss(characterId: number, losses: readonly ProductionLossR
     };
     try {
       await db.productionLosses.put(record);
-      scheduleSync(characterId);
+      scheduleSync(characterId, { collections: ['productionLosses'] });
     } catch {
       // A concurrent write of the same payout from another device; the list
       // refreshes on the next live query.

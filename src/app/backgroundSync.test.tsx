@@ -9,11 +9,17 @@ import {
   idsToSweep,
   useBackgroundSync,
 } from './backgroundSync';
+import { PARTIAL_PASS_WINDOW_MS } from '@/sync/syncScheduler';
 
 const syncMock = vi.hoisted(() => ({
   scheduleSync: vi.fn(),
   getSyncStatus: vi.fn<
-    (characterId: number) => { state: string; lastSyncedAt: number | null; error: null }
+    (characterId: number) => {
+      state: string;
+      lastSyncedAt: number | null;
+      lastFullSyncAt?: number;
+      error: null;
+    }
   >(() => ({ state: 'idle', lastSyncedAt: null, error: null })),
 }));
 vi.mock('@/sync', () => syncMock);
@@ -132,16 +138,18 @@ describe('useBackgroundSync', () => {
 
   it('queues the sweep at background priority, so an edit overtakes it', () => {
     mountPastBoot([1, 2]);
-    expect(syncMock.scheduleSync.mock.calls.map(([, , priority]) => priority)).toEqual([
-      'background',
-      'background',
-    ]);
+    expect(
+      syncMock.scheduleSync.mock.calls.map(
+        ([, options]) => (options as { priority?: string }).priority
+      )
+    ).toEqual(['background', 'background']);
   });
 
   it('ends the sweep on the active Character even when the boot sync just covered it', () => {
     syncMock.getSyncStatus.mockImplementation((id: number) => ({
       state: 'idle',
       lastSyncedAt: id === 1 ? NOW : null,
+      ...(id === 1 ? { lastFullSyncAt: NOW } : {}),
       error: null,
     }));
     mountPastBoot([1, 2], 1);
@@ -173,11 +181,29 @@ describe('useBackgroundSync', () => {
     syncMock.getSyncStatus.mockImplementation((id: number) => ({
       state: 'idle',
       lastSyncedAt: id === 1 ? NOW : null,
+      ...(id === 1 ? { lastFullSyncAt: NOW } : {}),
       error: null,
     }));
     // Character 2 is the active one here, so nothing else forces a re-sweep of 1.
     mountPastBoot([1, 2], 2);
     expect(swept()).toEqual([2]);
+  });
+
+  it('still sweeps a Character whose only recent pass was narrowed to an edit', () => {
+    // An edit's pass pulled only the collections it touched (issue #4896):
+    // the rest are as old as the last full pass, so the sweep is still due.
+    syncMock.getSyncStatus.mockImplementation((id: number) => ({
+      state: 'idle',
+      lastSyncedAt: id === 1 ? NOW : null,
+      error: null,
+    }));
+    mountPastBoot([1, 2], 2);
+    expect(swept()).toEqual([1, 2]);
+  });
+
+  it('keeps the narrowed-pass window inside the active Character sweep gap', () => {
+    // Otherwise an edit could leave untouched collections staler than an idle tab.
+    expect(PARTIAL_PASS_WINDOW_MS).toBeLessThanOrEqual(BACKGROUND_SYNC_MIN_GAP_MS);
   });
 
   it('never runs the delayed first sweep once unmounted', () => {

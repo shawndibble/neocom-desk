@@ -231,6 +231,13 @@ suite('SRP callables (emulator)', () => {
     });
   });
 
+  describe('verifying an officer before SRP was ever turned on', () => {
+    it('says no settings exist, so the client does not read the doc the rules refuse', async () => {
+      const verdict = await verifySrpOfficer(deps(), who(DIRECTOR), call(DIRECTOR));
+      expect(verdict).toMatchObject({ srpEnabled: false, settingsExist: false });
+    });
+  });
+
   describe('verifying an officer', () => {
     beforeEach(async () => {
       await turnOnSrp(deps(), who(DIRECTOR), call(DIRECTOR));
@@ -238,7 +245,12 @@ suite('SRP callables (emulator)', () => {
 
     it('records Director and Accountant access for 1h and stores no token', async () => {
       const verdict = await verifySrpOfficer(deps(), who(ACCOUNTANT), call(ACCOUNTANT));
-      expect(verdict).toMatchObject({ canManage: true, isDirector: false, srpEnabled: true });
+      expect(verdict).toMatchObject({
+        canManage: true,
+        isDirector: false,
+        srpEnabled: true,
+        settingsExist: true,
+      });
       const record = (await officerDoc(ACCOUNTANT)).data();
       expect(record).toMatchObject({ canEdit: true, checkedAt: T0, expiresAt: T0 + 3_600_000 });
       expect(JSON.stringify(record)).not.toContain('tok-');

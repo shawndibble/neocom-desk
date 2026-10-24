@@ -4,7 +4,8 @@
  * The one question no other view in the app can answer. Every other page is
  * about what a Character owns; this one is about people, and about the people
  * who have stopped showing up in particular — which is why the table opens
- * sorted by the longest silence rather than alphabetically.
+ * sorted by Last seen, newest first (the silent ones sort to the end and
+ * the Inactive filter and dark tone find them), not alphabetically.
  *
  * **Director-only, and the whole page rather than a panel.** `membertracking`
  * declares `Director` in ESI's `x-required-roles` and nothing else, so
@@ -65,6 +66,7 @@ import { loadCorporationId } from '@/features/corp/boardData';
 import {
   EMPTY_MEMBER_LABELS,
   loadCorporationMemberIds,
+  loadCorporationCeoId,
   loadCorporationMemberRoles,
   loadCorporationMemberTracking,
   loadMemberLabels,
@@ -137,6 +139,8 @@ function rosterOptions(
 
 interface MembersSnapshot {
   corporationId: number | null;
+  /** The corporation's CEO; null when unreadable. */
+  ceoId: number | null;
   /**
    * `null` when the tracking read produced nothing (offline, ESI down): that is
    * "couldn't load", not the empty roster `[]` of a corporation EVE reported no
@@ -161,6 +165,7 @@ interface MembersSnapshot {
 
 const EMPTY_SNAPSHOT: MembersSnapshot = {
   corporationId: null,
+  ceoId: null,
   members: null,
   roles: new Map(),
   labels: EMPTY_MEMBER_LABELS,
@@ -184,10 +189,11 @@ async function loadMembersSnapshot(
 
   // Roles only fill a column that is off by default, so a failed read costs
   // that column its contents — an empty map, a dash per cell — and nothing else.
-  const [roster, tracking, memberRoles] = await Promise.all([
+  const [roster, tracking, memberRoles, ceoId] = await Promise.all([
     loadCorporationMemberIds(characterId, corporationId),
     loadCorporationMemberTracking(characterId, corporationId),
     loadCorporationMemberRoles(characterId, corporationId),
+    loadCorporationCeoId(corporationId),
   ]);
 
   const memberIds = roster.cached?.data ?? null;
@@ -226,7 +232,7 @@ async function loadMembersSnapshot(
 
   const fromCache = [roster, tracking].some((result) => result.cached?.fromCache);
 
-  return { corporationId, members, roles, labels, diff, fetchedAt, fromCache, loadedAt };
+  return { corporationId, ceoId, members, roles, labels, diff, fetchedAt, fromCache, loadedAt };
 }
 
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
@@ -260,6 +266,7 @@ function CorpMembersView({ tabs }: { tabs: MembersTabsSlot | null }) {
       startMs: member.startMs,
       roles: data.roles.get(member.characterId) ?? null,
       isSelf: member.characterId === activeCharacterId,
+      isCeo: member.characterId === data.ceoId,
     }));
   }, [data, darkAfterDays, activeCharacterId]);
 
@@ -477,7 +484,7 @@ function CorpMembersTabs({ canReadRoleAudit }: { canReadRoleAudit: boolean }) {
       return (
         <Navigate
           replace
-          to={{ pathname: tabPath(CORP_MEMBERS_TABS, 'members'), search: location.search }}
+          to={{ pathname: tabPath(CORP_MEMBERS_TABS, 'roster'), search: location.search }}
         />
       );
     }
@@ -493,7 +500,7 @@ function CorpMembersTabs({ canReadRoleAudit }: { canReadRoleAudit: boolean }) {
         value={tab}
         onChange={(id) => selectTab(id as typeof tab)}
         tabs={[
-          { id: 'members', label: t('corp.members.rosterTab') },
+          { id: 'roster', label: t('corp.members.rosterTab') },
           { id: 'roles', label: t('corp.roles.tab') },
         ]}
       />

@@ -355,6 +355,17 @@ describe('moonChunks', () => {
     expect(view.number.secondary?.text).toContain('overview.widgets.moonChunks.queued');
     expect(view.number.secondary?.text).toContain('"count":2');
   });
+
+  it('drops a chunk whose clock has passed so rows and Due soon agree', () => {
+    const view = buildView(
+      'moonChunks',
+      feeds([chunk('gone', 'arrival', NOW - 1000), chunk('a', 'arrival', NOW + DAY)]),
+      ctx()
+    );
+    expect(view.table!.rows).toHaveLength(1);
+    expect(view.rows).toHaveLength(1);
+    expect(view.number.secondary?.text).not.toContain('queued');
+  });
 });
 
 describe('incursions', () => {

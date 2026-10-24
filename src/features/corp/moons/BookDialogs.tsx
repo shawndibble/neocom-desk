@@ -42,6 +42,8 @@ interface ShellProps {
   run: () => Promise<void>;
   /** A destructive confirm (§6c): the confirm button is `danger`, not `primary`. */
   danger?: boolean;
+  /** The "logged under your name" footer note; off where no reason is asked. */
+  showLogged?: boolean;
   children: ReactNode;
 }
 
@@ -54,6 +56,7 @@ export function DialogShell({
   canConfirm,
   run,
   danger = false,
+  showLogged = true,
   children,
 }: ShellProps) {
   const { t } = useTranslation();
@@ -100,7 +103,9 @@ export function DialogShell({
             {error}
           </p>
         )}
-        <p className="text-xs text-text-dim">{t('corpTaxBook.moons.dialogs.logged')}</p>
+        {showLogged && (
+          <p className="text-xs text-text-dim">{t('corpTaxBook.moons.dialogs.logged')}</p>
+        )}
       </div>
     </Modal>
   );
@@ -270,7 +275,10 @@ export function MarkNotTaxDialog({
           at: payment.at.slice(0, 16).replace('T', ' '),
         })}
       </p>
-      <Label text={t('corpTaxBook.moons.dialogs.notTax.how')}>
+      <div className="space-y-1">
+        <span aria-hidden="true" className="block text-xs text-text-dim">
+          {t('corpTaxBook.moons.dialogs.notTax.how')}
+        </span>
         <SegmentedControl
           label={t('corpTaxBook.moons.dialogs.notTax.how')}
           value={mode}
@@ -278,13 +286,13 @@ export function MarkNotTaxDialog({
           options={[
             {
               value: 'all',
-              label: t('corpTaxBook.moons.dialogs.notTax.all', { amount: isk(payment.amount) }),
+              label: t('corpTaxBook.moons.dialogs.notTax.all'),
             },
             { value: 'part', label: t('corpTaxBook.moons.dialogs.notTax.part') },
           ]}
           uppercase={false}
         />
-      </Label>
+      </div>
       {mode === 'part' && (
         <Label text={t('corpTaxBook.moons.dialogs.notTax.amount')}>
           <IskInput

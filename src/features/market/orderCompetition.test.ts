@@ -8,8 +8,10 @@ import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import type { RegionOrder } from '@/esi/endpoints';
 import { db } from '@/db';
 import { clearOrderBookCache } from './orderBook';
+import { clearMarketPriceCache } from '@/market/prices';
 import {
   loadStationBestPrices,
+  invalidateStationBestPrices,
   loadRegionCompetition,
   loadStructureCompetition,
 } from './orderCompetition';
@@ -20,6 +22,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => {
   server.resetHandlers();
   clearOrderBookCache();
+  clearMarketPriceCache();
 });
 afterAll(() => server.close());
 
@@ -141,6 +144,38 @@ describe('loadStationBestPrices', () => {
 
     expect(result.has(`${STATION_A}:${TYPE_A}`)).toBe(true);
     expect(result.has(`${STATION_B}:${TYPE_A}`)).toBe(false);
+  });
+
+  it('answers a repeat load from the price cache instead of re-asking Fuzzwork', async () => {
+    let requests = 0;
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, () => {
+        requests += 1;
+        return HttpResponse.json(aggregateBody(TYPE_A));
+      })
+    );
+
+    const first = await loadStationBestPrices([{ stationId: STATION_A, typeIds: [TYPE_A] }]);
+    const second = await loadStationBestPrices([{ stationId: STATION_A, typeIds: [TYPE_A] }]);
+
+    expect(requests).toBe(1);
+    expect(second.get(`${STATION_A}:${TYPE_A}`)).toEqual(first.get(`${STATION_A}:${TYPE_A}`));
+  });
+
+  it('re-asks Fuzzwork after invalidateStationBestPrices (manual refresh)', async () => {
+    let requests = 0;
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, () => {
+        requests += 1;
+        return HttpResponse.json(aggregateBody(TYPE_A));
+      })
+    );
+
+    const loaded = await loadStationBestPrices([{ stationId: STATION_A, typeIds: [TYPE_A] }]);
+    invalidateStationBestPrices(loaded);
+    await loadStationBestPrices([{ stationId: STATION_A, typeIds: [TYPE_A] }]);
+
+    expect(requests).toBe(2);
   });
 });
 

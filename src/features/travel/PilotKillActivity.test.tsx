@@ -109,3 +109,15 @@ describe('PilotKillActivityView retry focus', () => {
     expect(active?.closest('section')).not.toBeNull();
   });
 });
+
+describe('PilotKillActivityView unknown', () => {
+  it('reads Unknown, not the empty line, when zKillboard failed elsewhere', () => {
+    render(
+      <MemoryRouter>
+        <PilotKillActivityView history={{ kind: 'ready', kills: [] }} onRetry={vi.fn()} unknown />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
+    expect(screen.queryByText(/lists no kills/)).toBeNull();
+  });
+});

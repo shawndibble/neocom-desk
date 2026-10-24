@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, InfoTooltip } from '@/components/ui';
 import { formatAge } from '@/lib/age';
 import { AttentionStrip, type AttentionItem } from '@/features/miningTax/AttentionStrip';
 import { useBook } from './useBook';
@@ -14,11 +14,13 @@ import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
  */
 export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
   const { t } = useTranslation();
-  const { view, names, canEdit, data, settings } = useBook();
+  const { view, names, canEdit, data, settings, verdict, edit } = useBook();
   const [openedAt] = useState(() => Date.now());
   const { status } = sync;
   const items: AttentionItem[] = [];
   const syncing = sync.run.phase === 'syncing';
+  const [showing, setShowing] = useState(false);
+  const [shown, setShown] = useState(false);
 
   if (status.kind !== 'never') {
     for (const gap of status.gaps) {
@@ -57,6 +59,17 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
       detail: <p>{t('corpTaxBook.moons.health.unratedDetail')}</p>,
     });
   }
+  const billable = (
+    <p className="flex items-center gap-1.5">
+      {view.billableThrough
+        ? t('corpTaxBook.moons.health.billableThrough', { date: shortDate(view.billableThrough) })
+        : t('corpTaxBook.moons.health.noBillable')}
+      <InfoTooltip
+        label={t('common.aboutLabel', { label: t('corpTaxBook.moons.health.billableLabel') })}
+        content={t('corpTaxBook.moons.health.billableHint', { hours: view.input.graceHours })}
+      />
+    </p>
+  );
   const syncAction = canEdit ? (
     <Button size="sm" onClick={() => void sync.sync()} disabled={syncing}>
       {syncing ? t('corpTaxBook.moons.syncing') : t('corpTaxBook.moons.syncNow')}
@@ -100,16 +113,7 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
             : status.byName,
         }
       ),
-      detail: (
-        <p>
-          {view.billableThrough
-            ? t('corpTaxBook.moons.health.billableThrough', {
-                date: shortDate(view.billableThrough),
-                hours: view.input.graceHours,
-              })
-            : t('corpTaxBook.moons.health.noBillable')}
-        </p>
-      ),
+      detail: billable,
       action: syncAction,
     });
   }
@@ -149,17 +153,56 @@ export function BookHealthStrip({ sync }: { sync: CorpTaxBookSync }) {
   }
   // The member hold of a new book (72 hours): officers see when members start to see it.
   const seeFrom = settings?.membersSeeFrom;
-  const held = seeFrom !== undefined && openedAt < seeFrom;
+  const held = !shown && seeFrom !== undefined && openedAt < seeFrom;
+  const showToMembers = async () => {
+    setShowing(true);
+    try {
+      await edit({ action: 'updateSettings', patch: { showToMembers: true } });
+      setShown(true);
+    } finally {
+      setShowing(false);
+    }
+  };
+  // Amber and "needs attention" only when a check fails; otherwise a plain status line.
+  const plain = items.every((item) => item.tone === 'info');
   return (
     <>
       {held && (
-        <p className="text-xs text-text-dim" role="note">
+        <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-text-dim" role="note">
           {t('corpTaxBook.moons.health.hiddenFromMembers', {
             date: shortDateTime(new Date(seeFrom).toISOString()),
           })}
+          <InfoTooltip
+            label={t('common.aboutLabel', {
+              label: t('corpTaxBook.moons.health.hiddenLabel'),
+            })}
+            content={t('corpTaxBook.moons.health.hiddenHint')}
+          />
+          {verdict.isDirector && canEdit && (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={showing}
+              onClick={() => void showToMembers()}
+            >
+              {t('corpTaxBook.moons.health.showToMembers')}
+            </Button>
+          )}
         </p>
       )}
-      <AttentionStrip items={items} />
+      {plain ? (
+        <div className="space-y-1 text-xs text-text-dim" role="status">
+          {items.map((item) => (
+            <div key={item.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>{item.title}</span>
+              {item.detail}
+              {item.action}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <AttentionStrip items={items} />
+      )}
     </>
   );
 }

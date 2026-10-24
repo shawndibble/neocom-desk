@@ -65,11 +65,40 @@ describe('corpWallet', () => {
     expect(view.chart).toMatchObject({ kind: 'hbars' });
   });
 
+  it('folds unnamed zero-balance divisions into one dim footer line', () => {
+    const view = corpWallet(
+      feed({
+        divisions: [
+          { division: 1, name: 'Master', balance: 750 },
+          { division: 2, name: 'Ops', balance: 0 },
+          { division: 4, name: null, balance: 0 },
+          { division: 6, name: null, balance: 0 },
+        ],
+      }),
+      ctx()
+    );
+    expect(view.table!.rows.map((r) => r.key)).toEqual(['1', '2']);
+    expect(view.table!.footer).toBe('overview.widgets.corpWallet.unused{"count":2}');
+  });
+
   it('is empty with no divisions and unreadable without the role', () => {
     expect(corpWallet(feed({ divisions: [] }), ctx()).status.isEmpty).toBe(true);
     const view = corpWallet(feed({ readable: false, needsReauth: true, divisions: [] }), ctx());
     expect(view.status.needsPermission).toBe(true);
     expect(view.emptyMessage).toBe('overview.board.corpUnreadable');
+  });
+
+  it('is empty, not row-less, when every division is unnamed and zero', () => {
+    const view = corpWallet(
+      feed({
+        divisions: [
+          { division: 1, name: null, balance: 0 },
+          { division: 2, name: null, balance: 0 },
+        ],
+      }),
+      ctx()
+    );
+    expect(view.status.isEmpty).toBe(true);
   });
 
   it('is blank while the feed is missing', () => {
@@ -80,17 +109,37 @@ describe('corpWallet', () => {
 describe('corpCashFlow', () => {
   it('nets the range, signs it, and states the runway from the vitals window', () => {
     const view = corpCashFlow(
-      feed({ journal: [line(1, 500), line(2, -300), line(40, 9999), line(3, -100)] }),
+      feed({ journal: [line(1, 100), line(2, -300), line(40, 9999), line(3, -200)] }),
       ctx(7)
     );
-    expect(view.number.iskAmount).toBe(100);
-    expect(view.number.value).toBe('+100');
-    // Spending 400 in 30 days: 400/30 per day; balance 750 -> 56 days.
-    expect(view.number.secondary?.text).toBe('overview.widgets.corpCashFlow.runway{"count":56}');
+    expect(view.number.iskAmount).toBe(-400);
+    // Spending 500 in 30 days: 500/30 per day; balance 750 -> 45 days.
+    expect(view.number.secondary?.text).toBe('overview.widgets.corpCashFlow.runway{"count":45}');
     const rows = view.table!.rows;
     expect(rows).toHaveLength(7);
     expect(rows[0]!.cells[3]).toBe('0');
     expect(view.chart).toMatchObject({ kind: 'bars', gains: true });
+  });
+
+  it('says net positive instead of a runway when the vitals window nets above zero', () => {
+    const view = corpCashFlow(
+      feed({ journal: [line(1, 500), line(2, -300), line(40, -9999)] }),
+      ctx()
+    );
+    expect(view.number.secondary?.text).toBe(
+      'overview.widgets.corpCashFlow.netPositive{"count":30}'
+    );
+    expect(view.number.secondary?.tone).toBeUndefined();
+    // No runway line is shown, so no note explaining its window either.
+    expect(view.number.notes).toBeUndefined();
+  });
+
+  it('keeps the 30-day net-positive sentence off a range it does not describe', () => {
+    // 7 days: net -400 though the 30-day window nets +200.
+    const view = corpCashFlow(feed({ journal: [line(1, -400), line(20, 600)] }), ctx(7));
+    expect(view.number.iskAmount).toBe(-400);
+    expect(view.number.secondary).toBeUndefined();
+    expect(view.number.notes).toBeUndefined();
   });
 
   it('is unknown, never zero, when the journal could not load', () => {

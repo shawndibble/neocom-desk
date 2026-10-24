@@ -52,6 +52,7 @@ import {
   type SrpSettings,
   type SrpSettingsPatch,
 } from './srpTypes.js';
+import { takeFetchSlot } from './srpThrottle.js';
 import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
 
 /**
@@ -221,6 +222,8 @@ export interface VerifySrpOfficerResult {
   isDirector: boolean;
   canManage: boolean;
   srpEnabled: boolean;
+  /** A settings doc exists (SRP was turned on once); false before that, so a client skips the read the rules refuse. */
+  settingsExist: boolean;
   expiresAt: number;
 }
 
@@ -231,13 +234,15 @@ export async function verifySrpOfficer(
   call: BookCall
 ): Promise<VerifySrpOfficerResult> {
   const access = await authorizeSrpOfficer(deps, caller, call, 'edit', { live: false });
-  const settings = (await srpSettingsRef(deps.db, call.corporationId).get()).data();
+  const snap = await srpSettingsRef(deps.db, call.corporationId).get();
+  const settings = snap.data();
   return {
     corporationId: call.corporationId,
     isCeo: access.isCeo,
     isDirector: access.isDirector,
     canManage: access.canEdit,
     srpEnabled: settings?.enabled === true,
+    settingsExist: snap.exists,
     expiresAt: access.expiresAt,
   };
 }
@@ -446,13 +451,15 @@ function refileDecision(existing: Record<string, unknown> | undefined): 'new' | 
 
 /**
  * The killmail the pilot names, fetched by the server, once it is the caller's own loss while in
- * this corporation. Shared by filing and the pre-filing doctrine preview.
+ * this corporation. Shared by filing and the pre-filing doctrine preview, which share one
+ * per-pilot fetch budget.
  */
 export async function fetchOwnLoss(
   deps: SrpFileDeps,
   member: SrpMember,
   ref: KillmailRef
 ): Promise<{ zkill: ZkillRecord; hash: string; km: EsiKillmail }> {
+  await takeFetchSlot(deps, member.corporationId, member.characterId);
   const zkill = await softZkill(deps.killmails, ref.killmailId);
   const hash = ref.hash ?? zkill.hash;
   if (!hash) {

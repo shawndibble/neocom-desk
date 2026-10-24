@@ -40,7 +40,14 @@ function nameIds(detail: KillmailDetail | null): number[] {
   return ids;
 }
 
-export function PilotKillmailsSection({ characterId }: { characterId: number }) {
+export function PilotKillmailsSection({
+  characterId,
+  unknown = false,
+}: {
+  characterId: number;
+  /** zKillboard's other reads failed: an empty list here is unknown, not "no kills". */
+  unknown?: boolean;
+}) {
   const { t } = useTranslation();
   const [result, setResult] = useState<PilotKillmailsResult | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -146,7 +153,9 @@ export function PilotKillmailsSection({ characterId }: { characterId: number }) 
           </Button>
         </div>
       ) : entries.length === 0 ? (
-        <p className="text-xs text-text-dim">{t('travel.pilot.recent.empty')}</p>
+        <p className="text-xs text-text-dim">
+          {unknown ? t('travel.pilot.activity.unknown') : t('travel.pilot.recent.empty')}
+        </p>
       ) : (
         <ul aria-labelledby={headingId} className="divide-y divide-line border border-line">
           {entries.map((entry) => (

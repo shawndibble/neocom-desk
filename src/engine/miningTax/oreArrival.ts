@@ -9,13 +9,23 @@
  * Pure: the caller persists the log and supplies every timestamp.
  */
 import { entryKey } from './types';
-import { DAY_MS, HOUR_MS } from '@/lib/age';
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/lib/age';
 
 /**
- * How long after the last growth an entry may still grow — ESI's longest
- * ledger lag. Also how long after its EVE day ends an entry may still grow.
+ * ESI's longest ledger lag: how long after its EVE day ends an entry may
+ * still grow.
  */
 export const ARRIVAL_WINDOW_MS = HOUR_MS;
+
+/** ESI's shortest ledger lag: ore that showed up was mined at least this long before. */
+const MIN_LEDGER_LAG_MS = 10 * MINUTE_MS;
+
+/**
+ * How long after the fetch that saw an entry grow more ore can still turn up:
+ * the ore just seen was mined at least `MIN_LEDGER_LAG_MS` earlier, so the
+ * rest of ESI's longest lag is all that's left.
+ */
+export const GROWTH_WAIT_MS = ARRIVAL_WINDOW_MS - MIN_LEDGER_LAG_MS;
 
 /** One ledger entry's last known moon-ore total, and when the app first saw it grow. */
 export interface EntryArrival {
@@ -101,10 +111,10 @@ export function recordLedgerFetch(
 export type ArrivalNotice =
   /** No entry being settled can still grow. */
   | { kind: 'none' }
-  /** Some can, but none has grown in the last hour (or the app can't tell yet). */
+  /** Some can, but none has grown within `GROWTH_WAIT_MS` (or the app can't tell yet). */
   | { kind: 'quiet' }
   /**
-   * `arriving` of the `of` entries that can still grow did so within the hour;
+   * `arriving` of the `of` entries that can still grow did so within `GROWTH_WAIT_MS`;
    * wait `waitMs` for the last. Counted per Mining Ledger Entry, however many
    * Assignments it is settled as.
    */
@@ -126,9 +136,9 @@ export function arrivalNotice(
   let waitMs = 0;
   for (const key of inWindow) {
     const grewAt = log.entries[key]?.grewAt;
-    if (grewAt == null || nowMs - grewAt >= ARRIVAL_WINDOW_MS) continue;
+    if (grewAt == null || nowMs - grewAt >= GROWTH_WAIT_MS) continue;
     arriving += 1;
-    waitMs = Math.max(waitMs, grewAt + ARRIVAL_WINDOW_MS - nowMs);
+    waitMs = Math.max(waitMs, grewAt + GROWTH_WAIT_MS - nowMs);
   }
   if (arriving === 0) return { kind: 'quiet' };
   return { kind: 'arriving', arriving, of: inWindow.size, waitMs };

@@ -120,7 +120,7 @@ export async function reviseContractFeedRow(
           delete r.syncedAt;
         });
     });
-    if (changed > 0) scheduleSync(character.characterId);
+    if (changed > 0) scheduleSync(character.characterId, { collections: ['notificationFeed'] });
   } catch {
     // The wallet fire is already dropped and the baseline advanced; a failed
     // revision costs the amount on one row, not the poll.

@@ -130,7 +130,9 @@ describe('continueSession', () => {
     expect(created).toMatchObject({ payeeId: 'p1', taxPct: 10, date: '2026-09-05' });
     expect(created.estimatedValue).toBe(500);
     expect(syncMock.scheduleSync).toHaveBeenCalledTimes(1);
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, {
+      collections: ['miningTaxAssignments', 'payees'],
+    });
   });
 
   it('reports already-assigned, writing nothing, when the next day was claimed meanwhile', async () => {
@@ -301,7 +303,9 @@ describe('uncombine', () => {
     const records = await stored();
     expect(records).toHaveLength(2);
     expect(records.every((r) => r.groupId === undefined && r.payeeId === 'p1')).toBe(true);
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, {
+      collections: ['miningTaxAssignments', 'payees'],
+    });
   });
 });
 
@@ -314,8 +318,12 @@ describe('every action', () => {
     await settle([mine, theirs]);
 
     expect(syncMock.scheduleSync).toHaveBeenCalledTimes(2);
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR);
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(2);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, {
+      collections: ['miningTaxAssignments', 'payees'],
+    });
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(2, {
+      collections: ['miningTaxAssignments', 'payees'],
+    });
   });
 
   it('writes and syncs nothing for an empty selection', async () => {
@@ -405,7 +413,9 @@ describe('deletePayee', () => {
     expect(await db.payees.get('p1')).toBeUndefined();
     expect((await readTombstones(tombstoneKey(PAYEES, CHAR))).map((t) => t.id)).toEqual(['p1']);
     expect(syncMock.scheduleSync).toHaveBeenCalledTimes(1);
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, {
+      collections: ['miningTaxAssignments', 'payees'],
+    });
 
     await coalesceAssignments(CHAR);
     expect((await stored()).every((a) => a.groupId === 'g')).toBe(true);
@@ -444,7 +454,9 @@ describe('deletePayee', () => {
 
     expect((await stored())[0].payeeId).toBe('p1');
     expect(await db.payees.get('p1')).toBeUndefined();
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR, {
+      collections: ['miningTaxAssignments', 'payees'],
+    });
   });
 
   it('counts what a move takes: owed days plus the rest of their Combined Entries', () => {

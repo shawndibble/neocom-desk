@@ -406,7 +406,9 @@ function sovereigntyItems(
 function extractionItem(
   extraction: BoardExtractionSource,
   clock: Pick<CorpBoardSources, 'nowMs' | 'staleWindowMs'>
-): CorpBoardItem {
+): CorpBoardItem | null {
+  // Past natural decay the chunk is gone: history, not a deadline.
+  if (clock.nowMs >= extraction.naturalDecayMs) return null;
   // Two clocks, one after the other. Before arrival the deadline is the op
   // itself; after it, the chunk is fracturable and what matters is the moment
   // it breaks up on its own. Keeping the arrival date past arrival would show
@@ -491,7 +493,10 @@ export function buildCorpBoard(sources: CorpBoardSources): CorpBoardItem[] {
       )
     );
   }
-  for (const extraction of sources.extractions ?? []) items.push(extractionItem(extraction, clock));
+  for (const extraction of sources.extractions ?? []) {
+    const item = extractionItem(extraction, clock);
+    if (item) items.push(item);
+  }
   for (const job of sources.jobs ?? []) {
     // ESI often leaves a finished job's status at `active` past its end
     // time, so a job counts as ready once its clock has run out too, not

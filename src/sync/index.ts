@@ -12,8 +12,12 @@ import { setStatus } from './status';
 import { isOnline } from '@/stores/network';
 import { redactSecrets } from '@/observability/scrub';
 import { reportFailure } from '@/observability/reportFailure';
+import type { ScheduleSyncOptions } from './syncScheduler';
 
 export { getSyncStatus, subscribeSyncStatus, type SyncState, type SyncStatus } from './status';
+// Types only, so neither module's runtime joins the entry chunk.
+export type { ScheduleSyncOptions } from './syncScheduler';
+export type { SyncedCollectionName } from './syncedCollections';
 export { uidForCharacter } from './uid';
 export { TOMBSTONE_TTL_MS } from './merge';
 export { clearCharacterSyncBookkeeping } from './localBookkeeping';
@@ -52,15 +56,16 @@ export async function haltSync(): Promise<void> {
  * Debounced sync — call after each edit. Fire-and-forget: a failed driver load
  * leaves no sync, so it is reported (unless offline before the chunk is
  * precached) and shown as sync status "error" rather than swallowed.
- * `priority: 'background'` is for the sweep only (planSync.ts `SyncPriority`).
+ *
+ * Name the synced collections the edit wrote — `{ collections: ['payees'] }`
+ * — and a pass shortly after a full one pulls and pushes only those
+ * (syncScheduler.ts, issue #4896). Leave them out when unsure: that is a full
+ * pass, always safe. A bare number is `debounceMs`; `priority: 'background'`
+ * is for the sweep only.
  */
-export function scheduleSync(
-  characterId: number,
-  debounceMs?: number,
-  priority?: 'foreground' | 'background'
-): void {
+export function scheduleSync(characterId: number, options?: number | ScheduleSyncOptions): void {
   void import('./planSync')
-    .then((m) => m.scheduleSync(characterId, debounceMs, priority))
+    .then((m) => m.scheduleSync(characterId, options))
     .catch((error: unknown) => {
       reportFailure('sync', error);
       setStatus(characterId, {

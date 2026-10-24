@@ -6,15 +6,14 @@
  * precisely what this page is for. The board avoided a table because its five
  * item kinds share almost no fields; a roster is the opposite case.
  *
- * The default sort is the whole point of the view. `Last seen` prints an
- * *elapsed* span rather than a date, and sorts on that span descending — so the
- * longest silence is at the top and the member who logged off an hour ago is at
- * the bottom. Sorting on the date instead would put the people still playing
- * first, which answers a question nobody opened this page to ask.
+ * `Last seen` prints an *elapsed* span, and sorts on its negation descending:
+ * most recently seen first under a down arrow, like any date column. The
+ * silent members are the amber ones and the "dark only" filter, not the order.
  */
 import { Fragment, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
+import { Pill } from '@/components/ui/Pill';
 import { CharacterLink, SystemLink } from '@/features/entities';
 import { ItemInfoLink } from '@/features/entities';
 import { useHighlightParam } from '@/lib/useHighlightParam';
@@ -63,6 +62,8 @@ export interface RosterRow {
   roles: readonly string[] | null;
   /** The active Character's own row (issue #1766). */
   isSelf: boolean;
+  /** The corporation's CEO (its `ceo_id`). */
+  isCeo: boolean;
 }
 
 export function CorpRosterSummary({
@@ -141,7 +142,7 @@ function rolesText(roles: readonly string[] | null): string | null {
 /** Solar system ids sit in 30,000,000-32,000,000; stations and structures do not. */
 const isSolarSystemId = (id: number) => id >= 30_000_000 && id < 32_000_000;
 
-/** Longest silence first — the view's whole point (see the module note). */
+/** Most recently seen first, under a down arrow (see the module note). */
 const ROSTER_SORT = { columnId: 'lastSeen', direction: 'desc' } as const;
 
 /** Every roster column, hidden or not — the table and its column picker both read it. */
@@ -168,6 +169,7 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
                 {t('corp.members.you')}
               </span>
             )}
+            {row.isCeo && <Pill className="shrink-0">{t('corp.members.ceo')}</Pill>}
           </span>
         ),
         sortValue: (row) => row.name ?? undefined,
@@ -203,7 +205,7 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
         // Sorted on the span, matching what the cell prints — see the module
         // note. `undefined` for a member with no date at all sinks them to the
         // end in either direction, which is right: nothing is known about them.
-        sortValue: (row) => row.standing.darkForMs ?? undefined,
+        sortValue: (row) => (row.standing.darkForMs === null ? undefined : -row.standing.darkForMs),
       },
       {
         id: 'ship',

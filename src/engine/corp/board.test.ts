@@ -232,14 +232,13 @@ describe('moon extractions', () => {
     expect(item.severity).toBe('warning');
   });
 
-  it('is critical once even the decay time has passed', () => {
-    const [item] = board({
+  it('drops a chunk past its natural decay: history, not a deadline', () => {
+    const items = board({
       nowMs: NOW,
       staleWindowMs: STALE_WINDOW,
       extractions: [extraction({ chunkArrivalMs: at(-9 * DAY), naturalDecayMs: at(-2 * DAY) })],
     });
-    expect(item.severity).toBe('critical');
-    expect(item.remainingMs).toBe(-2 * DAY);
+    expect(items).toEqual([]);
   });
 });
 

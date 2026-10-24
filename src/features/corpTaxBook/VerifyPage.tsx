@@ -21,6 +21,7 @@ import { formatIsk } from '@/lib/isk';
 
 import { TRADE_HUBS } from '@/market/hubs';
 import { GroupingQuestions } from './GroupingQuestions';
+import { verifyPeriodLabel as periodLabel } from './verifyPeriodLabel';
 import { readVerifyStatement, setVerifyRemindersStopped } from './verifyApi';
 
 const isk = (value: number, decimals = 0) => `${formatIsk(value, decimals)} ISK`;
@@ -42,12 +43,20 @@ function shortDate(value: string, locale?: string): string {
   });
 }
 
-function periodLabel(start: string, locale?: string): string {
-  return new Date(`${start}T00:00:00Z`).toLocaleDateString(locale, {
-    month: 'short',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
+/** The cadence word for "Your weekly Statement still comes": from the book's setting, else the period's length. */
+function cadenceKey(
+  cadence: VerifyPayload['terms']['cadence'],
+  start: string,
+  end: string
+): 'monthly' | 'weekly' | 'fortnightly' | 'regular' {
+  if (cadence?.kind === 'monthly') return 'monthly';
+  const days =
+    cadence?.kind === 'days'
+      ? cadence.days
+      : Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 864e5) + 1;
+  if (days === 7) return 'weekly';
+  if (days === 14) return 'fortnightly';
+  return days >= 28 && days <= 31 ? 'monthly' : 'regular';
 }
 
 /**
@@ -192,7 +201,7 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
         <p className="text-xs tracking-widest text-text-dim uppercase">
           {t('corpTaxBook.verify.eyebrow', {
             corp,
-            period: periodLabel(statement.periodStart, locale),
+            period: periodLabel(statement.periodStart, statement.periodEnd, locale),
             issued: shortDate(statement.issuedAt, locale),
           })}
         </p>
@@ -362,7 +371,11 @@ function VerifyStatement({ token, payload }: { token: string; payload: VerifyPay
           </dl>
         </Panel>
         <div className="order-4 md:order-none md:col-start-2 md:row-start-3">
-          <StopReminders token={token} initial={payload.remindersStopped} />
+          <StopReminders
+            token={token}
+            initial={payload.remindersStopped}
+            cadence={cadenceKey(terms.cadence, statement.periodStart, statement.periodEnd)}
+          />
         </div>
       </div>
     </>
@@ -435,7 +448,10 @@ function MinedDay({
               <span className="col-span-2 text-xs text-text-dim md:col-span-1 md:text-right">
                 {metaSegments([
                   shortDate(r.date, locale),
-                  o.source && t(`miningTax.detail.breakdown.source.${o.source}`),
+                  o.source &&
+                    (o.source === 'saved'
+                      ? t('corpTaxBook.verify.priceSaved')
+                      : t(`miningTax.detail.breakdown.source.${o.source}`)),
                 ]).join(' · ')}
               </span>
             </li>
@@ -455,8 +471,16 @@ function Term({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
-/** The one thing a miner can change here: the monthly Statement still comes either way. */
-function StopReminders({ token, initial }: { token: string; initial: boolean }) {
+/** The one thing a miner can change here: the next Statement still comes either way. */
+function StopReminders({
+  token,
+  initial,
+  cadence,
+}: {
+  token: string;
+  initial: boolean;
+  cadence: ReturnType<typeof cadenceKey>;
+}) {
   const { t } = useTranslation();
   const [stopped, setStopped] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -490,7 +514,11 @@ function StopReminders({ token, initial }: { token: string; initial: boolean }) 
         />
         <span className="text-sm">
           {t('corpTaxBook.verify.stop.label')}
-          <span className="block text-xs text-text-dim">{t('corpTaxBook.verify.stop.hint')}</span>
+          <span className="block text-xs text-text-dim">
+            {t('corpTaxBook.verify.stop.hint', {
+              cadence: t(`corpTaxBook.verify.cadence.${cadence}`),
+            })}
+          </span>
         </span>
       </label>
       {failed && (

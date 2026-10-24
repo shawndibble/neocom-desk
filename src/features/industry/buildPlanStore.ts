@@ -67,7 +67,8 @@ function withPatch(
 }
 
 function syncOwnersOf(plans: readonly BuildPlanRecord[]): void {
-  for (const characterId of new Set(plans.map((p) => p.characterId))) scheduleSync(characterId);
+  for (const characterId of new Set(plans.map((p) => p.characterId)))
+    scheduleSync(characterId, { collections: ['buildPlans'] });
 }
 
 /** Adds new plans in one write. One sync per owning Character, not one per plan. */

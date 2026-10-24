@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
@@ -9,6 +10,7 @@ import type { BookContextValue } from './bookContextValue';
 import type { CorpTaxBookSync } from '../taxBook/useCorpTaxBook';
 
 vi.mock('../taxBook/bookClient', () => ({ editBook: vi.fn(), readAudit: vi.fn() }));
+const { editBook } = await import('../taxBook/bookClient');
 
 const sync = {
   status: { kind: 'fresh', ageMs: 3_600_000, byName: 'Pilot 9', scheduled: true, gaps: [] },
@@ -111,5 +113,51 @@ describe('BookHealthStrip, member hold', () => {
   it('says nothing once the hold has run out', () => {
     renderStrip(null, sync, [], { membersSeeFrom: Date.now() - 1000 });
     expect(screen.queryByText(/Hidden from members/)).toBeNull();
+  });
+});
+
+describe('BookHealthStrip, plain status', () => {
+  it('is a plain line, not an attention strip, while every check passes', () => {
+    renderStrip(null);
+    expect(screen.getByText(/Last synced/)).toBeInTheDocument();
+    expect(screen.queryByText(/need attention|needs attention/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('stays an amber attention strip when a check fails', () => {
+    renderStrip(null, {
+      ...sync,
+      status: { kind: 'never', gaps: [] },
+    } as unknown as CorpTaxBookSync);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('lets a Director end the member hold now', async () => {
+    render(
+      <MemoryRouter>
+        <BookProvider
+          value={
+            {
+              characterId: 7,
+              corporationId: 98000001,
+              view: { unrated: [], billableThrough: null, input: { graceHours: 6 } },
+              names: { refinery: () => 'x' },
+              data: { scheduledSync: null, feeders: [] },
+              settings: { membersSeeFrom: Date.now() + 3_600_000 },
+              verdict: { canEdit: true, isDirector: true },
+              reload: vi.fn(),
+            } as unknown as BookContextValue
+          }
+        >
+          <BookHealthStrip sync={sync} />
+        </BookProvider>
+      </MemoryRouter>
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Show to members now' }));
+    expect(editBook).toHaveBeenCalledWith(7, 98000001, {
+      action: 'updateSettings',
+      patch: { showToMembers: true },
+    });
+    await waitFor(() => expect(screen.queryByText(/Hidden from members/)).toBeNull());
   });
 });

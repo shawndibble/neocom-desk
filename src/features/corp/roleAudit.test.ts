@@ -5,6 +5,7 @@ const history = vi.fn();
 const titles = vi.fn();
 const memberTitles = vi.fn();
 vi.mock('./members', () => ({
+  loadCorporationCeoId: async () => 1,
   loadCorporationMemberRoles: (...a: unknown[]) => roles(...a),
   toMemberRoles: (rows: { character_id: number; roles?: string[] }[]) =>
     new Map(rows.map((r) => [r.character_id, r.roles ?? []])),
@@ -61,6 +62,7 @@ describe('loadRoleAudit', () => {
     const result = await loadRoleAudit(7, 98, { withTitles: true });
     if (!('data' in result)) throw new Error('expected data');
     expect(result.data.holders).toEqual([{ characterId: 1, roles: ['Director'], titles: ['CEO'] }]);
+    expect(result.data.ceoId).toBe(1);
     expect(result.data.titlesKnown).toBe(true);
     expect(result.data.changes).toHaveLength(1);
     expect(result.data.names.get(9)).toBe('n9');

@@ -5,7 +5,7 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useIsPhone } from '@/lib/useIsPhone';
 import type { SrpAuditEntry } from '../srpClaimTypes';
-import { auditText } from './srpAuditText';
+import { auditText, collapseRepeatedSaves } from './srpAuditText';
 
 function ActivityList({ entries }: { entries: readonly SrpAuditEntry[] }) {
   const { t } = useTranslation();
@@ -15,7 +15,7 @@ function ActivityList({ entries }: { entries: readonly SrpAuditEntry[] }) {
   }
   return (
     <ol className="space-y-2 text-sm">
-      {entries.map((entry) => (
+      {collapseRepeatedSaves(entries).map((entry) => (
         <li key={entry.id} className="grid items-baseline gap-x-3 sm:grid-cols-[7.5rem_9rem_1fr]">
           <span className="text-xs text-text-dim tabular-nums">
             {formatTimestamp(new Date(entry.at), zone)}

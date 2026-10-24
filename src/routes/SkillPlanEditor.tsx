@@ -115,7 +115,7 @@ export function SkillPlanEditor() {
       if (!loadedPlan) return;
       await db.skillPlans.put({ ...loadedPlan, ...patch, updatedAt: Date.now() });
       if (loadedPlan.characterId !== null && isSyncConfigured()) {
-        scheduleSync(loadedPlan.characterId);
+        scheduleSync(loadedPlan.characterId, { collections: ['plans'] });
       }
     },
     [loadedPlan]

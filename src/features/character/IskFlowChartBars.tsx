@@ -90,6 +90,11 @@ export default function IskFlowChartBars({
     ],
     [t]
   );
+  // The table skips the empty days before the first one with flow; the chart keeps its even axis.
+  const tableDays = useMemo(() => {
+    const first = days.findIndex((d) => d.in > 0 || d.out > 0);
+    return first < 0 ? days : days.slice(first);
+  }, [days]);
   const opacity = (day: string) => (selectedDay && selectedDay !== day ? 0.35 : 1);
   const tickEvery = Math.max(0, Math.ceil(data.length / 5) - 1);
   return (
@@ -152,7 +157,7 @@ export default function IskFlowChartBars({
       <div className="sr-only">
         <DataTable
           columns={columns}
-          rows={days}
+          rows={tableDays}
           rowKey={(d) => d.day}
           label={t('wallet.journalFlowChartLabel')}
         />

@@ -6,6 +6,7 @@ import {
   dismissalNeedsDirector,
   defaultSettings,
   isCacheFresh,
+  moveStartRate,
   parseClaimPaymentInput,
   needsLiveCheck,
   parseEditAction,
@@ -15,6 +16,7 @@ import {
   parseToken,
   parseTurnOnInput,
   satisfies,
+  startDateMoveReason,
 } from './corpTaxBook.js';
 
 describe('decideRoles (D8)', () => {
@@ -387,5 +389,72 @@ describe('per-moon-owner miner rate', () => {
         rate: { scope: 'feeder', pct: 9, effectiveFrom: '2026-10-21' },
       })
     ).toThrow();
+  });
+});
+
+describe('moveStartRate', () => {
+  it('re-dates the corp-default rate dated at the old start', () => {
+    expect(
+      moveStartRate(
+        [
+          { scope: 'corp', pct: 10, effectiveFrom: '2026-10-10' },
+          { scope: 'corp', pct: 12, effectiveFrom: '2026-10-20' },
+        ],
+        '2026-10-10',
+        '2026-10-01'
+      )
+    ).toEqual([
+      { scope: 'corp', pct: 10, effectiveFrom: '2026-10-01' },
+      { scope: 'corp', pct: 12, effectiveFrom: '2026-10-20' },
+    ]);
+  });
+
+  it('keeps one rate when another already sits at the new start', () => {
+    const out = moveStartRate(
+      [
+        { scope: 'corp', pct: 8, effectiveFrom: '2026-10-01' },
+        { scope: 'corp', pct: 10, effectiveFrom: '2026-10-10' },
+      ],
+      '2026-10-10',
+      '2026-10-01'
+    );
+    expect(out).toEqual([{ scope: 'corp', pct: 10, effectiveFrom: '2026-10-01' }]);
+  });
+});
+
+describe('startDateMoveReason (CX-23)', () => {
+  const st = (coversFrom: string, coversThrough: string) => ({
+    id: 's',
+    coversFrom,
+    coversThrough,
+    lines: [],
+  });
+  const today = '2026-10-23';
+  it('allows moving earlier, never into the future or before the leave day', () => {
+    expect(startDateMoveReason('2026-10-10', '2026-10-01', today, null, [])).toBeNull();
+    expect(startDateMoveReason('2026-10-10', '2026-10-24', today, null, [])).toBe(
+      'start-in-future'
+    );
+    expect(startDateMoveReason('2026-10-10', '2026-10-01', today, '2026-10-05', [])).toBe(
+      'start-before-leave'
+    );
+  });
+  it('allows moving later only when no Statement covers the gap', () => {
+    expect(startDateMoveReason('2026-10-01', '2026-10-10', today, null, [])).toBeNull();
+    expect(
+      startDateMoveReason('2026-10-01', '2026-10-10', today, null, [st('2026-10-10', '2026-10-15')])
+    ).toBeNull();
+    expect(
+      startDateMoveReason('2026-10-01', '2026-10-10', today, null, [st('2026-10-05', '2026-10-12')])
+    ).toBe('start-over-billed');
+  });
+});
+
+describe('settings patch: start date and member visibility', () => {
+  it('parses a start date and the show-to-members flag', () => {
+    expect(parseSettingsPatch({ startDate: '2026-10-01' })).toEqual({ startDate: '2026-10-01' });
+    expect(parseSettingsPatch({ showToMembers: true })).toEqual({ showToMembers: true });
+    expect(() => parseSettingsPatch({ startDate: 'x' })).toThrow();
+    expect(() => parseSettingsPatch({ showToMembers: false })).toThrow();
   });
 });

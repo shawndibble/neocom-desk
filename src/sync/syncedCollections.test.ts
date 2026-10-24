@@ -9,6 +9,7 @@ import {
   REMOTE_COLLECTION_NAMES,
   REMOTE_COLLECTIONS,
   SYNCED_SETTINGS,
+  type SyncedCollectionName,
 } from './syncedCollections';
 
 /**
@@ -18,6 +19,28 @@ import {
  * read off the code as it stood before the registry existed (issue #2043).
  */
 describe('synced collection registry — persisted names', () => {
+  it('spells out every declared name in SyncedCollectionName, and nothing more', () => {
+    // A Record over the union fails to compile if a member is missing here.
+    const named: Record<SyncedCollectionName, true> = {
+      plans: true,
+      buildPlans: true,
+      quickbars: true,
+      stationPins: true,
+      planetRichness: true,
+      productionRuns: true,
+      productionSaleLinks: true,
+      productionOrderWatches: true,
+      productionLosses: true,
+      netWorthSnapshots: true,
+      payees: true,
+      fittings: true,
+      miningTaxAssignments: true,
+      notificationFeed: true,
+      settings: true,
+    };
+    expect(Object.keys(named).sort()).toEqual([...REMOTE_COLLECTION_NAMES].sort());
+  });
+
   it('declares exactly the remote collections already in Firestore', () => {
     expect([...REMOTE_COLLECTION_NAMES].sort()).toEqual([
       'buildPlans',

@@ -47,7 +47,7 @@ describe('createBuildPlans', () => {
     await createBuildPlans([plan({ id: 'a' }), plan({ id: 'b' })]);
     expect(await db.buildPlans.count()).toBe(2);
     expect(syncCalls).toHaveBeenCalledTimes(1);
-    expect(syncCalls).toHaveBeenCalledWith(1);
+    expect(syncCalls).toHaveBeenCalledWith(1, { collections: ['buildPlans'] });
   });
 
   it('writes and syncs nothing for an empty batch', async () => {
@@ -80,7 +80,7 @@ describe('applyBuildPlanChange', () => {
     expect(stored).toMatchObject({ runs: 10, name: 'Rifter', buildLocationId: 5 });
     expect(stored!.updatedAt).toBeGreaterThan(1);
     expect(syncCalls).toHaveBeenCalledTimes(1);
-    expect(syncCalls).toHaveBeenCalledWith(1);
+    expect(syncCalls).toHaveBeenCalledWith(1, { collections: ['buildPlans'] });
   });
 
   it('a derived fix persists without bumping updatedAt', async () => {

@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { caretColumn } from './caretColumn';
 import { useTranslation } from 'react-i18next';
 import { DataTable, Panel, StatChip, StatChips, type DataTableColumn } from '@/components/ui';
 import type { ExtractionRow } from '@/engine/corpTaxBook/bookView';
 import { useBook } from './useBook';
+import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { ExtractionTimeline } from './ExtractionTimeline';
 import { isk, shortDate, shortDateTime } from './moonsFormat';
 import { extractionPath } from './moonsPaths';
@@ -11,7 +13,8 @@ import { MinedBar, OreLine, StateWord } from './moonsParts';
 
 export function ExtractionsTab() {
   const { t } = useTranslation();
-  const { view, names } = useBook();
+  const { view, names, canEdit } = useBook();
+  const [linkingId, setLinkingId] = useState<string | null>(null);
   const navigate = useNavigate();
   const rows = view.extractions;
   const count = (state: ExtractionRow['state']) => rows.filter((r) => r.state === state).length;
@@ -50,7 +53,13 @@ export function ExtractionsTab() {
       ),
       sortValue: (row) => row.chunkArrivalAt,
     },
-    { id: 'ore', header: t('corpTaxBook.moons.cols.ore'), render: (row) => <OreLine row={row} /> },
+    {
+      id: 'ore',
+      header: t('corpTaxBook.moons.cols.ore'),
+      render: (row) => (
+        <OreLine row={row} {...(canEdit ? { onLink: () => setLinkingId(row.id) } : {})} />
+      ),
+    },
     {
       id: 'isk',
       header: t('corpTaxBook.moons.cols.estValue'),
@@ -99,19 +108,24 @@ export function ExtractionsTab() {
         <ExtractionTimeline rows={rows} />
       </Panel>
       <Panel title={t('corpTaxBook.moons.tabs.extractions')} padded={false}>
-        <DataTable
-          label={t('corpTaxBook.moons.tabs.extractions')}
-          columns={columns}
-          rows={rows}
-          rowKey={(row) => row.id}
-          onRowClick={(row) => navigate(extractionPath(row.id))}
-          rowClassName={() => 'group'}
-          defaultSort={{ columnId: 'when', direction: 'desc' }}
-          mobileSort
-          stackColumns={2}
-          stackSummary={t('corpTaxBook.moons.extractionsSummary', { count: rows.length })}
-        />
+        <div className="overflow-x-auto">
+          <DataTable
+            label={t('corpTaxBook.moons.tabs.extractions')}
+            columns={columns}
+            rows={rows}
+            rowKey={(row) => row.id}
+            onRowClick={(row) => navigate(extractionPath(row.id))}
+            rowClassName={() => 'group'}
+            defaultSort={{ columnId: 'when', direction: 'desc' }}
+            mobileSort
+            stackColumns={2}
+            stackSummary={t('corpTaxBook.moons.extractionsSummary', { count: rows.length })}
+          />
+        </div>
       </Panel>
+      {linkingId && (
+        <LinkSurveyDialog open onClose={() => setLinkingId(null)} extractionId={linkingId} />
+      )}
     </div>
   );
 }

@@ -37,6 +37,7 @@ import {
 } from '@/esi/endpoints';
 import type { StatusResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
+import { loadPublicCorporationRecord } from '@/features/character/publicInfoData';
 import { loadStructureName } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { MemberActivity } from '@/engine/corp/members';
@@ -200,4 +201,17 @@ export async function loadMemberLabels(
     resolveLocationNames(characterId, locationIds),
   ]);
   return { characters, ships, locations };
+}
+
+/**
+ * The corporation's CEO, from its public record (`ceo_id`). ESI role lists
+ * call the CEO a Director; this is the only place the CEO is named. Null when
+ * the record is unreadable: the CEO pill is then absent, never wrong.
+ */
+export async function loadCorporationCeoId(corporationId: number): Promise<number | null> {
+  try {
+    return (await loadPublicCorporationRecord(corporationId))?.ceo_id ?? null;
+  } catch {
+    return null;
+  }
 }

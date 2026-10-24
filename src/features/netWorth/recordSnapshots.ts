@@ -120,7 +120,7 @@ async function recordOne(
   const row = buildSnapshotRow({ ...fetched, characterId, now });
   if (!row) return 'skipped';
   await db.netWorthSnapshots.put(row);
-  scheduleSync(characterId);
+  scheduleSync(characterId, { collections: ['netWorthSnapshots'] });
   return held ? 'upgraded' : 'written';
 }
 

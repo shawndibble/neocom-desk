@@ -5,9 +5,10 @@
  * Only the boot graph is precached: the entry's static imports (what
  * `index.html` modulepreloads), the css they pull in, and the signed-in shell
  * that boot preloads. Every other hashed chunk is a route a pilot may never
- * open, and each deploy rewrites hundreds of them (a changed leaf rewrites the
- * hashed filename inside every importer), so precaching them made every
- * install re-download most of the app whatever the connection.
+ * open; precaching them made every install download most of the app whatever
+ * the connection. Chunks import each other through an import map
+ * (`chunkImportMapping`), so a deploy renames only the chunks whose own code
+ * changed.
  *
  * Pure and import-free: `vite.config.ts` loads this file at config time, and
  * `sw.ts` uses `chunkKey`/`chunksToDelete`.
@@ -21,6 +22,9 @@ export interface BundleItemLike {
   isEntry?: boolean;
   imports?: string[];
   viteMetadata?: { importedCss?: Set<string> };
+  /** A chunk's code; an asset's content (`importmap.json`). */
+  code?: string;
+  source?: string | Uint8Array;
 }
 export type BundleLike = Record<string, BundleItemLike>;
 
@@ -48,8 +52,43 @@ export function missingShellChunks(bundle: BundleLike): string[] {
   return [...SHELL_CHUNK_NAMES].filter((name) => !names.has(name));
 }
 
-/** Every file the app needs to boot: static imports (and their css) of the entry and the shell chunks. */
-export function bootClosure(bundle: BundleLike): Set<string> {
+/**
+ * Rolldown's chunk import map (`build.chunkImportMap`) as stable name → hashed
+ * file, both under the base (`assets/x-STABLE.js` → `assets/x-HASH.js`). A chunk
+ * imports its neighbours by the stable name, so its own hash no longer changes
+ * when theirs do. Empty when the bundle has none.
+ */
+export function chunkImportMapping(bundle: BundleLike, base: string): Record<string, string> {
+  const source = bundle['importmap.json']?.source;
+  if (source === undefined) return {};
+  const text = typeof source === 'string' ? source : new TextDecoder().decode(source);
+  const { imports } = JSON.parse(text) as { imports: Record<string, string> };
+  return Object.fromEntries(
+    Object.entries(imports).map(([key, file]) => [key.slice(base.length), file.slice(base.length)])
+  );
+}
+
+/**
+ * Whether the entry chunk's code carries the release. With the import map a
+ * chunk's hash follows its own code only, and `lazy-chunks.json`'s `entry`
+ * (`listMatchesBuild`) must still name exactly one build: `instrument.ts`
+ * hands Sentry the release from the entry, so the entry changes every deploy.
+ */
+export function entryNamesRelease(bundle: BundleLike, release: string): boolean {
+  const entry = bundle[entryFile(bundle)];
+  return entry.code?.includes(release) ?? false;
+}
+
+/**
+ * Every file the app needs to boot: static imports (and their css) of the entry
+ * and the shell chunks. An import may name the chunk by its import-map key
+ * (`chunkImportMapping`); one that names no file throws, since a boot chunk
+ * missing here would quietly drop out of the precache.
+ */
+export function bootClosure(
+  bundle: BundleLike,
+  importMap: Readonly<Record<string, string>> = {}
+): Set<string> {
   const items = Object.values(bundle);
   const roots = items.filter(
     (item) =>
@@ -63,9 +102,13 @@ export function bootClosure(bundle: BundleLike): Set<string> {
     if (boot.has(fileName)) return;
     boot.add(fileName);
     const item = bundle[fileName];
-    if (!item) return;
     for (const css of item.viteMetadata?.importedCss ?? []) boot.add(css);
-    for (const imported of item.imports ?? []) visit(imported);
+    for (const imported of item.imports ?? []) {
+      const file = importMap[imported] ?? imported;
+      if (!bundle[file])
+        throw new Error(`bootClosure: ${fileName} imports ${imported}, no such file`);
+      visit(file);
+    }
   };
   for (const root of roots) visit(root.fileName);
   return boot;
@@ -133,4 +176,51 @@ export function parseLazyChunksJson(body: unknown): string[] {
   return Array.isArray(files)
     ? files.filter((file): file is string => typeof file === 'string')
     : [];
+}
+
+/** The slice of a Rolldown `RenderedChunk` (`renderChunk`'s `meta.chunks`) `preloadGraphSignature` reads. */
+export interface RenderedChunkLike {
+  name: string;
+  moduleIds: readonly string[];
+  imports: readonly string[];
+  dynamicImports: readonly string[];
+}
+
+/**
+ * What a chunk's preload lists will name, as a string for `augmentChunkHash`.
+ * Vite writes each `import()`'s preload list (`__vite__mapDeps`: the target and
+ * everything it statically imports, css included) after the hash is fixed. With
+ * the import map a chunk's hash covers only its own code, so a chunk whose list
+ * changed kept its name with new bytes, and the precache (`revision: null`) and
+ * the `lazy-chunks` route kept the old bytes for good. Signing each chunk the
+ * import pulls in by name and modules (never the preliminary file name, whose
+ * placeholders are positional) renames it exactly when its lists can change.
+ * Empty without a dynamic import.
+ */
+export function preloadGraphSignature(
+  fileName: string,
+  chunks: Readonly<Record<string, RenderedChunkLike>>
+): string {
+  const get = (file: string) => {
+    const chunk = chunks[file];
+    if (!chunk)
+      throw new Error(`preloadGraphSignature: ${fileName} reaches ${file}, not in the graph`);
+    return chunk;
+  };
+  const identity = (chunk: RenderedChunkLike) =>
+    `${chunk.name}(${[...chunk.moduleIds].sort().join(',')})`;
+  const closure = (file: string) => {
+    const seen = new Set<string>();
+    const visit = (f: string) => {
+      if (seen.has(f)) return;
+      seen.add(f);
+      for (const imported of get(f).imports) visit(imported);
+    };
+    visit(file);
+    return [...seen].map((f) => identity(get(f))).sort();
+  };
+  return get(fileName)
+    .dynamicImports.map((target) => `${identity(get(target))}>${closure(target).join(';')}`)
+    .sort()
+    .join('\n');
 }

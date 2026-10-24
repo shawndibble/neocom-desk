@@ -12,6 +12,7 @@ import {
   StatChip,
   StatChips,
   textActionClassName,
+  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
@@ -104,6 +105,12 @@ export function MinerDetail({ id }: { id: string }) {
   const selectedTax = selectedDays.reduce((s, d) => s + d.tax, 0);
   const canSelect = (d: DayRow) => d.status === 'unbilled' || d.status === 'not-billable';
 
+  const remindBlock = !openStatement
+    ? t('corpTaxBook.moons.miner.remindNone')
+    : corporationName === null
+      ? t('corpTaxBook.moons.run.loadingCorporation')
+      : null;
+
   const remind = async () => {
     if (!openStatement || corporationName === null) return;
     const { enqueueReminder } = await import('@/features/corpTaxBook/mailQueue');
@@ -159,14 +166,19 @@ export function MinerDetail({ id }: { id: string }) {
     {
       id: 'where',
       header: t('corpTaxBook.moons.cols.refinery'),
-      render: (d) => (
-        <span className="block min-w-0">
-          {names.refinery(d.structureId)}
-          {d.moonId !== undefined && (
-            <span className="block text-xs text-text-dim">{names.moon(d.moonId)}</span>
-          )}
-        </span>
-      ),
+      render: (d) => {
+        const refinery = names.refinery(d.structureId);
+        // Structure names usually already carry their moon ("Jita IV - Moon 2 - ...").
+        const moon = d.moonId === undefined ? '' : names.moon(d.moonId);
+        return (
+          <span className="block min-w-0">
+            {refinery}
+            {moon !== '' && !refinery.includes(moon) && (
+              <span className="block text-xs text-text-dim">{moon}</span>
+            )}
+          </span>
+        );
+      },
     },
     {
       id: 'character',
@@ -291,14 +303,17 @@ export function MinerDetail({ id }: { id: string }) {
               <Button size="sm" onClick={() => setDialog({ kind: 'record' })}>
                 {t('corpTaxBook.moons.miner.record')}
               </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => void remind()}
-                disabled={!openStatement || corporationName === null}
-              >
-                {t('corpTaxBook.moons.miner.remind')}
-              </Button>
+              {remindBlock ? (
+                <Tooltip content={remindBlock}>
+                  <Button size="sm" variant="ghost" aria-disabled="true">
+                    {t('corpTaxBook.moons.miner.remind')}
+                  </Button>
+                </Tooltip>
+              ) : (
+                <Button size="sm" variant="ghost" onClick={() => void remind()}>
+                  {t('corpTaxBook.moons.miner.remind')}
+                </Button>
+              )}
               <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: 'dismissAll' })}>
                 {t('corpTaxBook.moons.miner.dismissAll')}
               </Button>

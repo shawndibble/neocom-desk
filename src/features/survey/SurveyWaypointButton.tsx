@@ -1,7 +1,7 @@
 /**
  * "Set waypoint" for the Survey's location: sends it to the viewer's own EVE
  * client as their autopilot destination (`useSetDestination`, shared with the
- * order book). The button is the same one the Moon tax row's "Manage Taxes"
+ * order book). The button is the same one the Moon tax row's "Assign Taxes"
  * uses, on its right on a wide screen and wrapping under the location on a
  * phone. Without a Character, or without the waypoint scope, it is disabled
  * with the reason right under it, aligned to it, rather than a click that

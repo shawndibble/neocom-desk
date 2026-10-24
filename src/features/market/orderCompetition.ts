@@ -35,7 +35,7 @@
  * see docs/ARCHITECTURE.md §7 step 3.
  */
 import type { HubAggregate } from '@/market/fuzzwork';
-import { fetchAggregatesWithFallback } from '@/market/priceFallback';
+import { getStationPricesWithStatus, invalidateHubPrices } from '@/market/prices';
 import { getOrderBook } from './orderBook';
 import { getStructureMarketOrders, type StructureMarketOrder } from '@/esi/endpoints';
 import { conditionalPagedFetch, loadPaginatedWithCache } from '@/esi/cache';
@@ -53,6 +53,9 @@ import type { StructureCompetitor } from './openOrdersModel';
  * `ESI_FANOUT_CONCURRENCY` at a time (`mapWithConcurrencyLimit`) rather than
  * an unbounded `Promise.all` — this tier runs on every page load, not behind
  * a click, so a roster with many stations must not fire them all at once.
+ *
+ * Served through `market/prices.ts`'s 15-minute cache; a manual refresh bypasses it via
+ * `invalidateHubPrices`.
  *
  * One station's request failing (Fuzzwork down, a bad response) does not
  * drop the others: `fetchAggregates` throws on a non-ok response, so each
@@ -73,14 +76,21 @@ export async function loadStationBestPrices(
       if (uniqueTypeIds.length === 0) return;
 
       try {
-        const { prices: aggregates, stale } = await fetchAggregatesWithFallback(
+        // The shared price cache (memory + Dexie, 15 min, in-flight dedupe), not a
+        // bare Fuzzwork call: this runs on every snapshot reload, and an Overview
+        // boot reloads many times. `allowStale: false` keeps yesterday's close out.
+        const { prices, unreachable } = await getStationPricesWithStatus(
           stationId,
-          uniqueTypeIds
+          uniqueTypeIds,
+          Date.now,
+          { allowStale: false }
         );
-        // Compared with a live order: yesterday's close would read as a false undercut.
-        if (stale.size > 0) return;
+        // Unreachable or stale: the cache serves null aggregates for those, which
+        // would read as "no orders". Compared with a live order that is a false
+        // undercut, so the station contributes nothing.
+        if (unreachable) return;
         for (const typeId of uniqueTypeIds) {
-          const aggregate = aggregates.get(typeId);
+          const aggregate = prices.get(typeId);
           if (aggregate) result.set(stationPriceKey(stationId, typeId), aggregate);
         }
       } catch {
@@ -90,6 +100,23 @@ export async function loadStationBestPrices(
   );
 
   return result;
+}
+
+/**
+ * Drops the cached prices behind a `loadStationBestPrices` result, so the next
+ * load re-asks Fuzzwork. For the Orders page's manual refresh, which must not
+ * be answered from the 15-minute cache. Stations that failed are not in the
+ * result and were never cached.
+ */
+export function invalidateStationBestPrices(loaded: ReadonlyMap<string, HubAggregate>): void {
+  const typesByStation = new Map<number, number[]>();
+  for (const key of loaded.keys()) {
+    const [stationId, typeId] = key.split(':').map(Number);
+    const ids = typesByStation.get(stationId) ?? [];
+    ids.push(typeId);
+    typesByStation.set(stationId, ids);
+  }
+  for (const [stationId, ids] of typesByStation) invalidateHubPrices(stationId, ids);
 }
 
 export interface RegionCompetition {

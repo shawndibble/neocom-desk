@@ -136,7 +136,7 @@ export function useSaleLinking(
       linkedAt: now,
       updatedAt: now,
     });
-    scheduleSync(characterId);
+    scheduleSync(characterId, { collections: ['productionSaleLinks'] });
     setManualSale(null);
   }
 
@@ -153,7 +153,7 @@ export function useSaleLinking(
         linkedAt: now,
         updatedAt: now,
       });
-      scheduleSync(characterId);
+      scheduleSync(characterId, { collections: ['productionSaleLinks'] });
     } catch {
       // Already linked (Dexie's primary-key constraint on the deterministic
       // id) — the picker list should already exclude it, but a concurrent
@@ -177,7 +177,7 @@ export function useSaleLinking(
         watchedAt: now,
         updatedAt: now,
       });
-      scheduleSync(characterId);
+      scheduleSync(characterId, { collections: ['productionOrderWatches'] });
     } catch {
       // Already watched — see linkPastSale's catch.
     }
@@ -219,7 +219,7 @@ export function useSaleLinking(
           };
         })
       );
-      scheduleSync(characterId);
+      scheduleSync(characterId, { collections: ['productionOrderWatches'] });
     } finally {
       setRefreshingRunId(null);
     }

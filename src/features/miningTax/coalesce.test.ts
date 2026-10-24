@@ -87,7 +87,9 @@ describe('coalesceAssignments', () => {
     expect(stored[0].taxOwed).toBe(2_848_465);
     // Still a real group: the fused day plus the next one.
     expect(stored[0].groupId).toBe('g1');
-    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A, {
+      collections: ['miningTaxAssignments'],
+    });
   });
 
   it('keeps a genuine split to a second Payee apart', async () => {

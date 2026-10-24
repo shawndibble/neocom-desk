@@ -4,9 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { Disclosure, EmptyState, LoadFailedState, Panel, Spinner, Toast } from '@/components/ui';
 import { GrantBanner } from '@/app/GrantNote';
 import { useIsPhone } from '@/lib/useIsPhone';
-import type { FileSrpClaimInput, HullRule } from '../srpTypes';
+import type { DoctrineCheckRecord, FileSrpClaimInput, HullRule } from '../srpTypes';
 import { ClaimDetailDialog, RefileDialog } from './MemberClaimDialogs';
 import { MemberClaimsList } from './MemberClaimsList';
+import { OffDoctrineFileDialog } from './OffDoctrineFileDialog';
 import { MemberFileForm, type FileFormErrors } from './MemberFileForm';
 import { LostShipsList } from './LostShipsList';
 import { useDoctrinePreview } from './useDoctrinePreview';
@@ -82,6 +83,10 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
   const [filing, setFiling] = useState<number | 'form' | null>(null);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [offDoctrine, setOffDoctrine] = useState<{
+    row: LostRow;
+    check: DoctrineCheckRecord;
+  } | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [refiling, setRefiling] = useState<{ claim: MemberClaim; error?: string } | null>(null);
   const [refileBusy, setRefileBusy] = useState(false);
@@ -138,19 +143,30 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
   }
 
   function fileFromList(row: LostRow) {
+    if (hullIsDoctrineChecked(hullRules, row.hullTypeId)) void fileChecked(row);
+    else fileUnchecked(row);
+  }
+
+  /** A hull the corp checks: read the check first. Off doctrine asks in a dialog; anything else files as an unchecked hull would. */
+  async function fileChecked(row: LostRow) {
+    setFiling(row.killmailId);
+    setListError(null);
+    let check: DoctrineCheckRecord | undefined;
+    try {
+      check = (await data.previewDoctrine(esiKillmailLink(row.killmailId, row.killmailHash))).check;
+    } catch {
+      // Filing reports its own errors; an unreadable check is no reason to stop it.
+    }
+    setFiling(null);
+    if (check?.status === 'off-doctrine') setOffDoctrine({ row, check });
+    else fileUnchecked(row);
+  }
+
+  function fileUnchecked(row: LostRow) {
     if (fleetRequired && fleet.trim() === '') {
       // The corp wants a Fleet or FC on every claim: fill the form in rather than file without one.
       setLink(esiKillmailLink(row.killmailId, row.killmailHash));
       setErrors({ fleet: t('srpMember.errors.fleetOrFcRequired') });
-      setListError(null);
-      setPasteOpen(true);
-      focusFleetRef.current = true;
-      return;
-    }
-    if (hullIsDoctrineChecked(hullRules, row.hullTypeId)) {
-      // The pilot sees the doctrine check before filing: the form shows it, File claim then files.
-      setLink(esiKillmailLink(row.killmailId, row.killmailHash));
-      setErrors({});
       setListError(null);
       setPasteOpen(true);
       focusFleetRef.current = true;
@@ -298,6 +314,21 @@ function MemberSrpBody({ characterId, data, windowDays, fleetRequired, hullRules
             setRefiling({ claim: detail });
             setDetailId(null);
           }}
+        />
+      ) : null}
+      {offDoctrine ? (
+        <OffDoctrineFileDialog
+          hullName={offDoctrine.row.hullName}
+          check={offDoctrine.check}
+          fleet={fleet}
+          onFleet={setFleet}
+          fleetRequired={fleetRequired}
+          onFileAnyway={() => {
+            const { row } = offDoctrine;
+            setOffDoctrine(null);
+            void submit(esiKillmailLink(row.killmailId, row.killmailHash), row);
+          }}
+          onClose={() => setOffDoctrine(null)}
         />
       ) : null}
       {refiling ? (

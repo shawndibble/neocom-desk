@@ -47,6 +47,7 @@ import {
   type LiveChannels,
 } from './foregroundPoller/pollCharacter';
 import { dispatchFires } from './foregroundPoller/dispatchFire';
+import { keepOneSharedFire } from './foregroundPoller/sharedWorldFires';
 
 export type { AnyNotificationFire } from './pollDomains';
 export { reviseContractFeedRow };
@@ -253,7 +254,7 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
   await Promise.all([...touchedRuns].map((run) => run.state.save(run.next)));
 
   const charactersById = new Map(characters.map((c) => [c.characterId, c]));
-  for (const update of updates) {
+  for (const update of keepOneSharedFire(updates, channels)) {
     const character = charactersById.get(update.characterId);
     if (character) await dispatchFires(deps, channels, character, update);
   }

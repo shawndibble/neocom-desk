@@ -5,12 +5,12 @@
  */
 import type { DeadlineSeverity } from '@/engine/character/severity';
 
-/** One clock a widget offers the header chip: when, what it is, how loud, and where it leads. */
+/** One clock a widget offers the header chip: when, what it is, how loud, and where it leads (absent when no page owns the clock). */
 export interface BoardDeadline {
   at: number;
   note: string;
   severity: DeadlineSeverity;
-  to: string;
+  to?: string;
 }
 
 export type ChipTone = 'neutral' | 'warning' | 'danger';

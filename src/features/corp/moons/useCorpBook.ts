@@ -74,7 +74,7 @@ const EMPTY_NAMES = {
 
 type Fetched =
   | { status: 'loading' }
-  | { status: 'denied'; message?: string }
+  | { status: 'denied'; message?: string; unverified?: boolean }
   | { status: 'failed'; message: string }
   | { status: 'off'; verdict: OfficerVerdict }
   | {
@@ -87,8 +87,12 @@ type Fetched =
 
 export type CorpBookState =
   | { status: 'loading' }
-  /** No corporation, or the Character's roles cannot open the book. */
-  | { status: 'denied'; message?: string }
+  /**
+   * No corporation, or the Character's roles cannot open the book. `unverified`: the server
+   * could not check the token, which says nothing about the roles.
+   */
+  | { status: 'denied'; message?: string; unverified?: boolean }
+  /** `message` is a dim details line (an error code), never a sentence to read. */
   | { status: 'failed'; message: string }
   /** The corporation has no active book yet. */
   | { status: 'off'; verdict: OfficerVerdict }
@@ -182,9 +186,14 @@ export function useCorpBook(sync: CorpTaxBookSync): CorpBook {
         if (cancelled) return;
         const code = (error as { code?: string }).code ?? '';
         setFetched(
-          code.endsWith('permission-denied') || code.endsWith('unauthenticated')
-            ? { status: 'denied', message: (error as Error).message }
-            : { status: 'failed', message: error instanceof Error ? error.message : String(error) }
+          code.endsWith('unauthenticated')
+            ? { status: 'denied', unverified: true }
+            : code.endsWith('permission-denied')
+              ? { status: 'denied', message: (error as Error).message }
+              : {
+                  status: 'failed',
+                  message: code || (error instanceof Error ? error.message : String(error)),
+                }
         );
       }
     })();

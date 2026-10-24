@@ -240,20 +240,48 @@ describe('MemberSrp', () => {
       expect(preview).not.toHaveBeenCalled();
     });
 
-    it('opens the form with the check instead of filing a checked lost ship in one tap', async () => {
+    it('asks in a dialog before filing an off-doctrine lost ship, and File anyway files it with the note', async () => {
       setup({ doctrine: true });
       await userEvent.click(
         await screen.findByRole('button', { name: 'File claim for Hurricane' })
       );
+      const dialog = await screen.findByRole('dialog', undefined, { timeout: 3000 });
+      expect(within(dialog).getByText('Off doctrine')).toBeTruthy();
       expect(file).not.toHaveBeenCalled();
-      expect((screen.getByLabelText('Killmail link') as HTMLInputElement).value).toBe(
-        esiKillmailLink(8001, HASH)
-      );
-      expect(await screen.findByText('Off doctrine', undefined, { timeout: 3000 })).toBeTruthy();
-      await userEvent.click(screen.getByRole('button', { name: 'File claim' }));
+      await userEvent.type(within(dialog).getByLabelText('Fleet or FC (optional)'), 'Kestrel');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'File anyway' }));
       await waitFor(() =>
-        expect(file).toHaveBeenCalledWith(7, 98765432, { killmail: esiKillmailLink(8001, HASH) })
+        expect(file).toHaveBeenCalledWith(7, 98765432, {
+          killmail: esiKillmailLink(8001, HASH),
+          fleetOrFc: 'Kestrel',
+        })
       );
+    });
+
+    it('Cancel in the off-doctrine dialog files nothing', async () => {
+      setup({ doctrine: true });
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'File claim for Hurricane' })
+      );
+      const dialog = await screen.findByRole('dialog', undefined, { timeout: 3000 });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+      expect(file).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('files an on-doctrine lost ship directly, with its toast', async () => {
+      setup({ doctrine: true });
+      vi.spyOn(backend, 'previewDoctrine').mockResolvedValue({
+        killmailId: 8001,
+        hullTypeId: 24702,
+        check: { status: 'matched', doctrineName: 'Hurricane - artillery' },
+      } as never);
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'File claim for Hurricane' })
+      );
+      await waitFor(() => expect(file).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect((await screen.findAllByText('Claim filed for Hurricane.')).length).toBeGreaterThan(0);
     });
   });
 });

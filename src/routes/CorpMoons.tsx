@@ -13,7 +13,7 @@
  * is read through the officer rules, so the Character is verified first
  * (`useCorpBook`), and a corporation with no book shows the Director's turn-on.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { canViewCorpTaxBook } from '@/engine/corpRoles';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +26,7 @@ import {
   SlideOver,
   Spinner,
   Tabs,
+  Toast,
   useTabsId,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -36,10 +37,12 @@ import { CorpDenied } from '@/features/corp/CorpDenied';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { useCorpTaxBook } from '@/features/corp/taxBook/useCorpTaxBook';
 import { AuditFeed } from '@/features/corp/moons/AuditFeed';
+import { useAuditSubject } from '@/features/corp/moons/useAuditSubject';
 import { useBookAudit } from '@/features/corp/moons/useBookAudit';
 import { BookProvider } from '@/features/corp/moons/BookContext';
 import { useBook } from '@/features/corp/moons/useBook';
 import { BookHealthStrip } from '@/features/corp/moons/BookHealthStrip';
+import { DeleteBookDialog } from '@/features/corp/moons/DeleteBookSection';
 import { BookSettingsDialog } from '@/features/corp/moons/BookSettingsDialog';
 import { ExtractionsTab } from '@/features/corp/moons/ExtractionsTab';
 import { InviteMoonOwnerDialog } from '@/features/corp/moons/InviteMoonOwnerDialog';
@@ -52,17 +55,19 @@ import { MOONS_TABS, moonsDetail } from '@/features/corp/moons/moonsPaths';
 import { StatementsTab } from '@/features/corp/moons/StatementsTab';
 import { MoonsSetup } from '@/features/corp/moons/MoonsSetup';
 import { useCorpBook } from '@/features/corp/moons/useCorpBook';
-import { useShowExtractions } from '@/features/corp/moons/useMoonOwners';
+import { useMoonOwners, useShowExtractions } from '@/features/corp/moons/useMoonOwners';
+import { setMoonsTabsHidden } from '@/features/corp/moons/moonsTabsHidden';
 
 function ActivityPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const audit = useBookAudit(200);
+  const subject = useAuditSubject();
   return (
     <SlideOver open={open} onClose={onClose} title={t('corpTaxBook.moons.activity.title')} wide>
       {audit.loading ? (
         <Spinner label={t('common.loading')} />
       ) : (
-        <AuditFeed entries={audit.entries} />
+        <AuditFeed entries={audit.entries} subject={subject} />
       )}
     </SlideOver>
   );
@@ -73,6 +78,8 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const { pathname } = useLocation();
   const { view, canEdit, characterId, corporationId, names } = useBook();
   const showExtractions = useShowExtractions();
+  // With no moon owners the empty state carries the invite button itself.
+  const hasMoonOwners = useMoonOwners().rows.length > 0;
   const [tab, selectTab] = usePageTab(MOONS_TABS);
   const tabsId = useTabsId();
   // Back from EVE's page after the Automatic sync opt-in: show the settings it was pressed in.
@@ -80,6 +87,8 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
   const [settingsOpen, setSettingsOpen] = useState(
     () => (routerState as { corpSyncGrant?: unknown } | null)?.corpSyncGrant !== undefined
   );
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const detail = moonsDetail(pathname);
@@ -110,7 +119,7 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
             meta={meta}
             actions={
               <span className="flex items-center gap-1">
-                {tab === 'moon-owners' && canEdit && (
+                {tab === 'moon-owners' && canEdit && hasMoonOwners && (
                   <Button variant="ghost" onClick={() => setInviteOpen(true)}>
                     {t('corpTaxBook.moons.moonOwners.invite')}
                   </Button>
@@ -151,13 +160,24 @@ function ReadyBook({ sync }: { sync: ReturnType<typeof useCorpTaxBook> }) {
           {tab === 'extractions' && <ExtractionsTab />}
           {tab === 'miners' && <MinersTab />}
           {tab === 'statements' && <StatementsTab />}
-          {tab === 'moon-owners' && <MoonOwnersTab />}
+          {tab === 'moon-owners' && <MoonOwnersTab onInvite={() => setInviteOpen(true)} />}
         </>
       )}
       {detail?.kind === 'extraction' && <MoonDetail id={detail.id} />}
       {detail?.kind === 'miner' && <MinerDetail id={detail.id} />}
       {detail?.kind === 'moonOwner' && <MoonOwnerDetail id={detail.id} />}
-      {view && settingsOpen && <BookSettingsDialog open onClose={() => setSettingsOpen(false)} />}
+      {view && settingsOpen && (
+        <BookSettingsDialog
+          open
+          onClose={() => setSettingsOpen(false)}
+          onSaved={() => setSaved(true)}
+          onDeleteBook={() => setDeleteOpen(true)}
+        />
+      )}
+      {deleteOpen && <DeleteBookDialog onClose={() => setDeleteOpen(false)} />}
+      {saved && (
+        <Toast message={t('corpTaxBook.moons.settings.saved')} onClose={() => setSaved(false)} />
+      )}
       {inviteOpen && (
         <InviteMoonOwnerDialog
           characterId={characterId}
@@ -176,6 +196,13 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   const sync = useCorpTaxBook();
   const book = useCorpBook(sync);
   const { state } = book;
+  // The rail and the page title list Moons' tabs only once a book mode is chosen.
+  const unchosen = state.status === 'off';
+  const decided = state.status === 'off' || state.status === 'ready';
+  useEffect(() => {
+    if (decided) setMoonsTabsHidden(unchosen);
+    return () => setMoonsTabsHidden(false);
+  }, [decided, unchosen]);
 
   if (state.status === 'loading') {
     return (
@@ -189,7 +216,20 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
       <div className="mx-auto max-w-6xl p-4">
         <LoadFailedState
           title={t('corpTaxBook.moons.failed')}
-          hint={state.message}
+          hint={t('corpTaxBook.moons.failedHint')}
+          onRetry={book.reload}
+        />
+        <p className="text-center text-xs text-text-dim">{state.message}</p>
+      </div>
+    );
+  }
+  if (state.status === 'denied' && state.unverified) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-4 p-4">
+        <PageHeader title={t('corp.moons.title')} />
+        <LoadFailedState
+          title={t('corpTaxBook.moons.unverified.title')}
+          hint={t('corpTaxBook.moons.unverified.hint')}
           onRetry={book.reload}
         />
       </div>
@@ -215,6 +255,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
           corporationId={book.corporationId}
           verdict={state.verdict}
           onDone={book.reload}
+          onTurnedOn={() => void sync.sync()}
         />
       </div>
     );

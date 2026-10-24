@@ -548,8 +548,12 @@ describe('row actions', () => {
     await ledger();
     await screen.findByText('Pyerite');
     await user.click(screen.getByRole('button', { name: 'More actions for Pyerite' }));
-    expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'No blueprint options' })).toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Set stock target/ })).toBeInTheDocument();
+    for (const name of ['Copy name', 'Add to Quickbar', 'Add to Compare', 'No blueprint options']) {
+      expect(screen.queryByRole('menuitem', { name })).not.toBeInTheDocument();
+    }
   });
 
   it('adds every selected item but a Mutated module to the Quickbar', async () => {

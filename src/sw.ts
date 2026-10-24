@@ -120,7 +120,7 @@ registerRoute(
   })
 );
 
-// A deploy renames hundreds of chunks, so the previous build's would pile up.
+// A deploy renames the chunks whose code changed, so the previous build's would pile up.
 // When a build's worker takes over, drop the cached ones its list no longer
 // names. An unreadable list deletes nothing (`chunksToDelete`).
 async function dropStaleChunks(): Promise<void> {

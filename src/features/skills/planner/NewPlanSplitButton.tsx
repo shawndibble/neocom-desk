@@ -53,7 +53,7 @@ export function NewPlanSplitButton({
   const copyingFromCommunity = useRef(false);
 
   function syncAfterEdit() {
-    if (isSyncConfigured()) scheduleSync(activeCharacterId);
+    if (isSyncConfigured()) scheduleSync(activeCharacterId, { collections: ['plans'] });
   }
 
   function closeCommunity() {

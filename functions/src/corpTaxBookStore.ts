@@ -47,6 +47,9 @@ import {
   isCacheFresh,
   parseRecordKey,
   parseStatement,
+  moveStartRate,
+  rateKey,
+  startDateMoveReason,
   satisfies,
   utcDate,
   type BookCall,
@@ -618,13 +621,6 @@ async function minerUids(c: EditCtx, minerId: string): Promise<string[]> {
   return minerCharacters(minerId, miner).map((id) => `char:${id}`);
 }
 
-const rateKey = (r: StoredRate): string =>
-  r.scope === 'record'
-    ? `record:${r.recordKey}`
-    : `${r.scope}:${'minerId' in r ? r.minerId : ''}:${'moonId' in r ? r.moonId : ''}:${r.effectiveFrom}` +
-      (r.scope === 'structure' ? `:${r.structureId}` : '') +
-      (r.scope === 'feeder' ? `:${r.feederId}` : '');
-
 /** The characters an officer unlinked: automatic grouping (D26) leaves them alone. */
 const DECLINED_DOC = 'declinedAutoGroup';
 
@@ -795,8 +791,32 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
           reason: 'director-approval',
         });
       }
-      const { structureExpiryHours, dismissApprovalAboveIsk, ...rest } = action.patch;
+      const { structureExpiryHours, dismissApprovalAboveIsk, showToMembers, startDate, ...rest } =
+        action.patch;
+      if ((startDate !== undefined || showToMembers) && !c.access.isDirector) {
+        throw new HttpsError('permission-denied', 'Only a Director sets this', {
+          reason: 'director-only',
+        });
+      }
       const update: Data = { ...rest };
+      if (showToMembers) update.membersSeeFrom = now;
+      const oldStart = c.book.startDate as string | undefined;
+      if (startDate !== undefined && startDate !== oldStart) {
+        const statements = await tx.get(col(c, STATEMENTS));
+        const reason = startDateMoveReason(
+          oldStart ?? startDate,
+          startDate,
+          utcDate(now),
+          await ownBookFloor((r) => tx.get(r), c.deps.db, c.corporationId),
+          statements.docs.map((d) => d.data() as never)
+        );
+        if (reason) fail('failed-precondition', 'The start date cannot move there', reason);
+        update.startDate = startDate;
+        // The start-date rate is dated at the start itself: it moves with it.
+        if (oldStart && startDate < oldStart) {
+          update.rates = moveStartRate(rates, oldStart, startDate);
+        }
+      }
       if (structureExpiryHours) {
         update.structureExpiryHours = {
           ...(c.book.structureExpiryHours as Data | undefined),
@@ -1707,6 +1727,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
       overdueDays: b.overdueDays,
       minimumStatement: b.minimumStatement,
       divisions: b.divisions,
+      cadence: b.cadence,
     },
     payments: here
       .map((c) => {

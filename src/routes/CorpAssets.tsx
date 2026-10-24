@@ -55,12 +55,13 @@ import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { CorpRolesGate } from '@/features/corp/CorpRolesGate';
 import { CorpDenied } from '@/features/corp/CorpDenied';
-import { loadCorporationId } from '@/features/corp/boardData';
+import { loadCorporationId, loadCorporationStructures } from '@/features/corp/boardData';
 import {
   EMPTY_CORP_ASSET_LABELS,
   assetPlaceIds,
   loadCorporationAssets,
   loadCorpAssetLabels,
+  structureNameMap,
   resolveMissingLocationNames,
   toCorpAssetInputs,
   type CorpAssetLabels,
@@ -134,6 +135,7 @@ const TAB_LABEL_KEY: Readonly<Record<CorpAssetTab, string>> = {
   offices: 'corp.assets.tab.offices',
   deliveries: 'corp.assets.tab.deliveries',
   inSpace: 'corp.assets.tab.inSpace',
+  fuelBay: 'corp.assets.tab.fuelBay',
   impounded: 'corp.assets.tab.impounded',
   assetSafety: 'corp.assets.tab.assetSafety',
   lockdown: 'corp.assets.tab.lockdown',
@@ -190,7 +192,8 @@ const EMPTY_SNAPSHOT: AssetsSnapshot = {
 async function loadAssetsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal,
-  canReadBlueprints: boolean
+  canReadBlueprints: boolean,
+  canReadStructures: boolean
 ): Promise<AssetsSnapshot> {
   const corporationId = await loadCorporationId(characterId);
   if (corporationId === null || signal.cancelled) return { ...EMPTY_SNAPSHOT, corporationId };
@@ -210,8 +213,18 @@ async function loadAssetsSnapshot(
   const inputs = assets === null ? null : toCorpAssetInputs(assets);
   const typeIds = inputs === null ? [] : [...new Set(inputs.map((i) => i.typeId))];
   const placeIds = assets === null ? [] : assetPlaceIds(assets);
+  // The corporation's own structures list names every hangar's structure with
+  // no per-id lookup; a role gap or failed read falls back to
+  // `/universe/structures/{id}` after first paint.
+  const structureNames: Promise<Map<number, string>> = canReadStructures
+    ? loadCorporationStructures(characterId, corporationId)
+        .then((result) => structureNameMap(result.cached?.data))
+        .catch(() => new Map<number, string>())
+    : Promise.resolve(new Map<number, string>());
   const [labels, volumeByTypeId, categoryByTypeId, copyValueByItemId] = await Promise.all([
-    assets === null ? EMPTY_CORP_ASSET_LABELS : loadCorpAssetLabels(assets, placeIds),
+    assets === null
+      ? EMPTY_CORP_ASSET_LABELS
+      : loadCorpAssetLabels(assets, placeIds, structureNames),
     loadTypeVolumes(typeIds),
     loadTypeCategories(typeIds),
     // Director-only endpoint: without the role a copy still prices, at ME0/TE0.
@@ -263,9 +276,11 @@ interface PlaceFilter {
 function CorpAssetsView({
   tab,
   canReadBlueprints,
+  canReadStructures,
 }: {
   tab: CorpAssetTab;
   canReadBlueprints: boolean;
+  canReadStructures: boolean;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -276,8 +291,8 @@ function CorpAssetsView({
   // view (`key`) when `canReadBlueprints` flips instead.
   const loadSnapshot = useCallback(
     (characterId: number, signal: RouteSnapshotSignal) =>
-      loadAssetsSnapshot(characterId, signal, canReadBlueprints),
-    [canReadBlueprints]
+      loadAssetsSnapshot(characterId, signal, canReadBlueprints, canReadStructures),
+    [canReadBlueprints, canReadStructures]
   );
   const snapshot = useRouteSnapshot<AssetsSnapshot>(loadSnapshot, undefined, {
     // Keeps the asset list on screen during a manual refresh (issue #418).
@@ -878,12 +893,24 @@ function CorpAssetsView({
 }
 
 /** Reads the tab off the path; an unknown path (an old tree link) goes to `/corp/assets`, keeping the query. */
-function CorpAssetsRoute({ canReadBlueprints }: { canReadBlueprints: boolean }) {
+function CorpAssetsRoute({
+  canReadBlueprints,
+  canReadStructures,
+}: {
+  canReadBlueprints: boolean;
+  canReadStructures: boolean;
+}) {
   const wildcard = useParams()['*'] ?? '';
   const { search } = useLocation();
   const tab = corpAssetTabFromPath(wildcard);
   if (tab === null) return <Navigate replace to={{ pathname: '/corp/assets', search }} />;
-  return <CorpAssetsView tab={tab} canReadBlueprints={canReadBlueprints} />;
+  return (
+    <CorpAssetsView
+      tab={tab}
+      canReadBlueprints={canReadBlueprints}
+      canReadStructures={canReadStructures}
+    />
+  );
 }
 
 export function CorpAssets() {
@@ -902,8 +929,9 @@ export function CorpAssets() {
       </div>
     ) : gate.status === 'ready' ? (
       <CorpAssetsRoute
-        key={String(gate.capabilities.canReadBlueprints)}
+        key={`${gate.capabilities.canReadBlueprints}:${gate.capabilities.canReadStructures}`}
         canReadBlueprints={gate.capabilities.canReadBlueprints}
+        canReadStructures={gate.capabilities.canReadStructures}
       />
     ) : null;
 

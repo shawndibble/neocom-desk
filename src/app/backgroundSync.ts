@@ -30,6 +30,7 @@ import { readLocal, writeLocal } from '@/lib/safeLocalStorage';
  * Smallest gap between two sweeps *of the active Character*. Five minutes is
  * well inside "fresh enough to read" and well outside "every time the mouse
  * leaves the window", which is what a `visibilitychange` gate has to survive.
+ * `sync/syncScheduler.ts`'s `PARTIAL_PASS_WINDOW_MS` must not exceed it.
  */
 export const BACKGROUND_SYNC_MIN_GAP_MS = 5 * 60 * 1000;
 
@@ -170,8 +171,10 @@ export function useBackgroundSync(
       const now = Date.now();
       mergeSharedStamps(lastSweptAt.current);
       for (const characterId of idsRef.current) {
-        const synced = getSyncStatus(characterId).lastSyncedAt;
-        if (synced !== null && synced > (lastSweptAt.current.get(characterId) ?? -Infinity)) {
+        // A *full* pass only: one narrowed to what an edit touched pulled
+        // nothing else, so it must not hold the sweep off (issue #4896).
+        const synced = getSyncStatus(characterId).lastFullSyncAt;
+        if (synced !== undefined && synced > (lastSweptAt.current.get(characterId) ?? -Infinity)) {
           lastSweptAt.current.set(characterId, synced);
         }
       }
@@ -182,7 +185,7 @@ export function useBackgroundSync(
         // signs the session in as each Character in turn, re-mint its token.
         if (getSyncStatus(characterId).state === 'syncing') continue;
         lastSweptAt.current.set(characterId, now);
-        scheduleSync(characterId, undefined, 'background');
+        scheduleSync(characterId, { priority: 'background' });
       }
       writeSharedStamps(lastSweptAt.current);
     };
