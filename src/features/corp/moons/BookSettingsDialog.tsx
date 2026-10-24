@@ -286,6 +286,7 @@ export function BookSettingsDialog({
     );
 
   const tabsId = useTabsId();
+  const rateHintId = useId();
   const fieldId = useId();
   // Back from EVE's page after the Automatic sync opt-in: open where its notice is shown.
   const { state: routerState } = useLocation();
@@ -314,7 +315,7 @@ export function BookSettingsDialog({
               {error}
             </span>
           ) : rateFilled && !rateReady ? (
-            <span className="text-sm text-text-dim">
+            <span id={rateHintId} className="text-sm text-text-dim">
               {t('corpTaxBook.moons.settings.rateIncomplete')}
             </span>
           ) : (
@@ -329,6 +330,7 @@ export function BookSettingsDialog({
               onClick={() => void save()}
               disabled={!canEdit || busy}
               aria-disabled={rateFilled && !rateReady ? true : undefined}
+              aria-describedby={rateFilled && !rateReady && !error ? rateHintId : undefined}
             >
               {t('common.save')}
             </Button>

@@ -303,6 +303,21 @@ describe('OfficerQueue own claim', () => {
   });
 });
 
+describe('OfficerQueue own claim in bulk', () => {
+  it("skips the officer's own claim in Select all and disables its tick", async () => {
+    useActiveCharacter.setState({ activeCharacterId: 5001 });
+    const data = setup(pendingSet());
+    const boxes = screen.getAllByRole('checkbox');
+    expect(boxes[0]).toHaveAttribute('aria-disabled', 'true');
+    expect(boxes[1]).not.toHaveAttribute('aria-disabled');
+    await userEvent.click(boxes[0]!);
+    expect(boxes[0]).not.toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Select all (1)' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Approve (1)' }));
+    expect(data.approveMany).toHaveBeenCalledWith([{ killmailId: 2, expectedAmount: 1_000_000 }]);
+  });
+});
+
 describe('OfficerQueue owed and history', () => {
   it('marks a claim paid and bulk marks the ticked ones', async () => {
     const data = setup([...pendingSet(), claim(6, { state: 'approved', decidedAt: 6 })]);

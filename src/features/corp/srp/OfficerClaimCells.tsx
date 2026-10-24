@@ -63,17 +63,21 @@ export function SelectBox({
   show: boolean;
 }): ReactNode {
   if (!show) return null;
+  const reason = ownClaimReason(claim, ctx);
   return (
-    <label className={touchCheckboxLabelClassName}>
-      <Checkbox
-        aria-label={ctx.t('srp.officer.actions.select', {
-          pilot: claim.characterName,
-          hull: ctx.names.hull(claim.hullTypeId),
-        })}
-        checked={ctx.selected.includes(claim.killmailId)}
-        onChange={() => ctx.onToggle(claim.killmailId)}
-      />
-    </label>
+    <DecideTip reason={reason}>
+      <label className={touchCheckboxLabelClassName}>
+        <Checkbox
+          aria-label={ctx.t('srp.officer.actions.select', {
+            pilot: claim.characterName,
+            hull: ctx.names.hull(claim.hullTypeId),
+          })}
+          checked={ctx.selected.includes(claim.killmailId)}
+          aria-disabled={reason !== undefined || undefined}
+          onChange={() => reason === undefined && ctx.onToggle(claim.killmailId)}
+        />
+      </label>
+    </DecideTip>
   );
 }
 
