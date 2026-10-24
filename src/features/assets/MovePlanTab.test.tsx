@@ -23,7 +23,6 @@ const asset = (item_id: number, type_id: number, location_id: number, quantity =
 
 const JITA = 60003760;
 const AMARR = 60008494;
-const SYSTEM_JITA = 30000142;
 
 const skippedCharacters = vi.hoisted(() => ({
   list: [] as { characterId: number; name: string }[],
@@ -151,7 +150,7 @@ describe('MovePlanTab', () => {
     expect(screen.queryByText('No loose stock or ships to move.')).not.toBeInTheDocument();
   });
 
-  it('keeps the pickup system and its Route Safety link when the name read fails', async () => {
+  it('plans without a per-pickup Route Safety link when the name read fails', async () => {
     failing.name = true;
     const user = await open();
     await user.click(screen.getByRole('checkbox', { name: /select everything at 60008494/i }));
@@ -159,7 +158,7 @@ describe('MovePlanTab', () => {
     await user.click(screen.getByRole('button', { name: 'Show plan' }));
 
     expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
-    expect(screen.getAllByRole('link', { name: /^Route Safety/ })).toHaveLength(1);
+    expect(screen.queryByRole('link', { name: /^Route Safety/ })).toBeNull();
   });
 
   async function planAmarr() {
@@ -203,7 +202,7 @@ describe('MovePlanTab', () => {
     expect(screen.getByRole('heading', { name: /Amarr VIII/ })).toBeTruthy();
   });
 
-  it('plans a move from the picker to the destination system with a Route Safety link per pickup', async () => {
+  it('plans a move from the picker to the destination system', async () => {
     const user = await open();
     await user.click(screen.getByRole('checkbox', { name: /select everything at amarr viii/i }));
     await user.click(screen.getByRole('button', { name: 'Pick a system' }));
@@ -212,11 +211,8 @@ describe('MovePlanTab', () => {
     expect(await screen.findByRole('button', { name: 'Done' })).toBeTruthy();
     expect(screen.queryByText('Edit items or destination')).toBeNull();
     expect(screen.getAllByRole('button', { name: 'Back' })).toHaveLength(1);
-    const links = screen.getAllByRole('link', { name: /^Route Safety/ });
-    expect(links).toHaveLength(1);
-    expect(links[0].getAttribute('href')).toContain(String(SYSTEM_JITA));
+    expect(screen.queryByRole('link', { name: /^Route Safety/ })).toBeNull();
     expect(screen.getByRole('heading', { name: /Amarr VIII/ })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Route Safety from Amarr VIII' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Done' })).toBeTruthy();
   });
 

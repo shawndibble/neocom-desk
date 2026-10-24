@@ -4,6 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useReportSkipped } from './useReportSkipped';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, LiveStatus, Spinner } from '@/components/ui';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useHydratedStore } from '@/lib/useHydratedStore';
+import { lookupSolarSystem } from '@/sde/solarSystems';
+import { ActiveHaulView } from './ActiveHaulView';
+import { buildActiveHaul, useActiveHaul } from './activeHaul';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
 import type { PilotProfile } from '@/engine/fittings/types';
 import {
@@ -184,6 +189,14 @@ function MovePlanTabBody({
   > | null>(null);
   /** The pilot's hauler pick for the shown plan only; never saved, reset with each plan. */
   const [haulerOverride, setHaulerOverride] = useState<HaulerOverride | undefined>();
+  const savedHaul = useActiveHaul((st) => st.value);
+  const setSavedHaul = useActiveHaul((st) => st.setValue);
+  useHydratedStore(useActiveHaul);
+  /** The active haul fills the tab instead of the picker or the plan. */
+  const [showingHaul, setShowingHaul] = useState(false);
+  const [routing, setRouting] = useState(false);
+  const [routeFailed, setRouteFailed] = useState(false);
+  const [replacing, setReplacing] = useState(false);
   /** Bumped on every reset so a plan still being worked out for an old session is dropped. */
   const session = useRef(0);
   const hullSource = useRef<HullSourceData>({
@@ -405,6 +418,50 @@ function MovePlanTabBody({
     replan(next, haulerOverride);
   }
 
+  /** Saves the shown plan's route as the active haul and opens it. */
+  async function commitRoute() {
+    if (!loaded || !result) return;
+    setRouting(true);
+    setRouteFailed(false);
+    const mine = session.current;
+    try {
+      const systemId = result.destinationSystem;
+      const stationId = destStation ?? searchedStation?.id ?? null;
+      const destinationName =
+        result.destinationStation ??
+        (systemId === null ? null : (await lookupSolarSystem(systemId).catch(() => null))?.name) ??
+        '';
+      const stationIds = new Map<number, number>();
+      for (const st of loaded.stacks)
+        if (st.locationType === 'station') stationIds.set(st.locationId, st.locationId);
+      const haul = await buildActiveHaul({
+        plan: result.plan,
+        destination: { systemId, stationId, name: destinationName },
+        places: loaded.places,
+        systems: loaded.systems,
+        stationIds,
+        name: (typeId) => loaded.typeNames.get(typeId) ?? `#${typeId}`,
+      });
+      if (mine !== session.current) return;
+      if (!haul) {
+        setRouteFailed(true);
+        return;
+      }
+      await setSavedHaul(haul);
+      if (mine === session.current) setShowingHaul(true);
+    } catch {
+      if (mine === session.current) setRouteFailed(true);
+    } finally {
+      if (mine === session.current) setRouting(false);
+    }
+  }
+
+  /** Show my route: asks first when a haul is already saved, since this replaces it. */
+  function showRoute() {
+    if (savedHaul) setReplacing(true);
+    else void commitRoute();
+  }
+
   // Who the read left out is the header picker's to say (its dot and "Not included" note).
   useReportSkipped(loaded ? loaded.skipped.map((c) => c.name) : undefined, onSkippedChange);
   const name = (typeId: number) => loaded?.typeNames.get(typeId) ?? `#${typeId}`;
@@ -428,7 +485,23 @@ function MovePlanTabBody({
         <LiveStatus>
           {failed ? t('assets.movePlan.failed') : planFailed ? t('assets.movePlan.planFailed') : ''}
         </LiveStatus>
-        {failed ? (
+        {savedHaul && !showingHaul && (
+          <div>
+            <Button size="sm" onClick={() => setShowingHaul(true)}>
+              {t('assets.movePlan.resumeHaul')}
+            </Button>
+          </div>
+        )}
+        {showingHaul && savedHaul ? (
+          <ActiveHaulView
+            haul={savedHaul}
+            onBack={() => setShowingHaul(false)}
+            onClear={async () => {
+              await setSavedHaul(null);
+              setShowingHaul(false);
+            }}
+          />
+        ) : failed ? (
           <p className="text-text-dim">{t('assets.movePlan.failed')}</p>
         ) : !loaded ? (
           <Spinner size="sm" label={t('assets.movePlan.loading')} />
@@ -445,6 +518,9 @@ function MovePlanTabBody({
               focusAfterCommit(deliverHeadingRef);
             }}
             onDone={onClose}
+            onShowRoute={showRoute}
+            routing={routing}
+            routeFailed={routeFailed}
             onPackShip={packShip}
             onUnpackShip={unpackShip}
             rigsOf={(itemId) => loaded.rigs.get(itemId) ?? 0}
@@ -596,6 +672,18 @@ function MovePlanTabBody({
           </>
         )}
       </div>
+      <ConfirmDialog
+        open={replacing}
+        title={t('assets.movePlan.replaceHaulTitle')}
+        body={t('assets.movePlan.replaceHaulBody')}
+        actionLabel={t('assets.movePlan.replaceHaul')}
+        cancelLabel={t('assets.movePlan.cancel')}
+        onConfirm={async () => {
+          setReplacing(false);
+          await commitRoute();
+        }}
+        onClose={() => setReplacing(false)}
+      />
     </section>
   );
 }
