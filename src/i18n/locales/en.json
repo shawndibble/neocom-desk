@@ -68,6 +68,7 @@
     "more": "More",
     "mobileLabel": "Mobile navigation",
     "alerts": "Alerts",
+    "needsAttention": "{{label}}, needs attention",
     "alertsWithCount_one": "Alerts, {{count}} waiting",
     "alertsWithCount_other": "Alerts, {{count}} waiting",
     "railLabel": "Main navigation",
