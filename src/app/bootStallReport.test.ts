@@ -1,21 +1,36 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { captureMessage } = vi.hoisted(() => ({ captureMessage: vi.fn() }));
 vi.mock('@sentry/react', () => ({ captureMessage }));
 
 beforeEach(() => {
   vi.resetModules();
+  vi.stubGlobal('document', { visibilityState: 'visible' });
   captureMessage.mockClear();
 });
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('reportBootStallOnce', () => {
+  it('records that the stall happened in a background tab', async () => {
+    vi.stubGlobal('document', { visibilityState: 'hidden' });
+    const { reportBootStallOnce } = await import('./bootStallReport');
+    reportBootStallOnce(10_000, 'root');
+    expect(captureMessage).toHaveBeenCalledWith(
+      'Boot stalled on BootScreen',
+      expect.objectContaining({ extra: expect.objectContaining({ visibility: 'hidden' }) })
+    );
+  });
+
   it('reports the stall with the tag that pairs it with the blocked-upgrade report', async () => {
     const { reportBootStallOnce } = await import('./bootStallReport');
     reportBootStallOnce(10_000, 'require-character');
     expect(captureMessage).toHaveBeenCalledWith('Boot stalled on BootScreen', {
       level: 'warning',
       tags: { subsystem: 'boot' },
-      extra: { afterMs: 10_000, gate: 'require-character' },
+      extra: { afterMs: 10_000, gate: 'require-character', visibility: 'visible' },
     });
   });
 
@@ -46,7 +61,7 @@ describe('reportBootStallResolved', () => {
     expect(captureMessage).toHaveBeenCalledWith('Boot stall resolved', {
       level: 'info',
       tags: { subsystem: 'boot' },
-      extra: { resolvedAfterMs: 1_500, recoveryTapped: false },
+      extra: { resolvedAfterMs: 1_500, recoveryTapped: false, visibility: 'visible' },
     });
     vi.useRealTimers();
   });
