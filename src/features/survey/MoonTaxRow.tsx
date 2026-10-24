@@ -54,7 +54,7 @@ export interface TaxSurvey {
   published: SurveyTaxShare | null;
 }
 
-/** "Auto-assigning moon tax until …", with the Tax tab and Stop: what a connected Survey shows in place of Assign Taxes. */
+/** "Auto-assigned until …", with the Tax tab and Stop: what a connected Survey shows in place of Assign Taxes. */
 function ConnectedNote({
   connection,
   nowMs,
