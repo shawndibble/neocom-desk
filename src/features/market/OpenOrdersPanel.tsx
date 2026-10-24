@@ -10,14 +10,12 @@ import {
   CachedNotice,
   EmptyState,
   FilterBar,
-  FilterChip,
   IconButton,
   MenuItem,
   LiveStatus,
   SearchInput,
   SegmentedControl,
   Spinner,
-  textActionClassName,
   type DataTableSort,
   sortRows,
 } from '@/components/ui';
@@ -54,14 +52,13 @@ import { ItemContextMenu } from './ItemContextMenu';
 import { OpenOrdersList } from './OpenOrdersList';
 import { loadOpenOrdersSnapshot } from './openOrdersPageSnapshot';
 import { invalidateStationBestPrices } from './orderCompetition';
-import { loadCorpOpenOrdersSnapshot } from './corpOpenOrders';
+import { loadCorpOpenOrdersSnapshot, loadCorpOrdersGrantSnapshot } from './corpOpenOrders';
 import { recordOrderProblemSamples, sampleableCharacterIds } from './orderProblemSamples';
 import { sampledProblem } from '@/engine/market/orderProblemHistory';
 import { buildOpenOrderRows, openOrderProblemCounts, type OpenOrderRow } from './openOrdersModel';
 import {
-  EMPTY_OPEN_ORDERS_FILTER,
   locationFilterOptions,
-  activeFilterChips,
+  activeFilterCount,
   type OpenOrdersFilter,
 } from './openOrdersFilter';
 import { buildOpenOrdersView, shownView } from './openOrdersView';
@@ -83,14 +80,10 @@ import {
   useVisibleOpenOrderColumns,
 } from './openOrdersColumns';
 import { useOpenOrderTableColumns } from './openOrdersTableColumns';
-import { chipLabel } from './openOrdersChipLabel';
 import { OpenOrdersFilterFields } from './OpenOrdersFilterFields';
 import { useOpenOrdersFilterState } from './useOpenOrdersFilterState';
 import { useOpenOrdersWorkThrough } from './useOpenOrdersWorkThrough';
 import { FixListSummary, HealthyFold, ListNotes } from './OpenOrdersFixListParts';
-
-/** A bare visit opens on Needs you, every funnel field clear. */
-const DEFAULT_FILTER: OpenOrdersFilter = EMPTY_OPEN_ORDERS_FILTER;
 
 const TABLE_LABEL_KEY: Record<OpenOrdersView, string> = {
   act: 'market.orders.fixList.tableAct',
@@ -98,16 +91,12 @@ const TABLE_LABEL_KEY: Record<OpenOrdersView, string> = {
   all: 'market.orders.fixList.tableAll',
 };
 
-interface ActiveChipDisplay {
-  id: string;
-  label: string;
-  clear: () => void;
-}
-
 interface OpenOrdersPanelProps {
   headerSlots: PageHeaderSlots;
   /** Corporation is the data source: the corp's orders in the same page, the same look. */
   corporation?: boolean;
+  /** Corporation source only: the role reads corp orders but the grant lacks the scope, so ask for it. */
+  corporationNeedsGrant?: boolean;
   /** Set when the Character can read corp orders: adds "Corporation" to the Character picker. */
   onChooseCorporation?: () => void;
   /** Corporation source only: the picker went straight to This character or All characters. */
@@ -122,6 +111,7 @@ interface OpenOrdersPanelProps {
 export function OpenOrdersPanel({
   headerSlots,
   corporation = false,
+  corporationNeedsGrant = false,
   onChooseCorporation,
   onLeaveCorporation,
 }: OpenOrdersPanelProps) {
@@ -131,7 +121,11 @@ export function OpenOrdersPanel({
   const viewedCharacterId = corporation ? undefined : viewedFromUrl;
   // The source is fixed for a mount (the caller keys the panel by it).
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
-    corporation ? loadCorpOpenOrdersSnapshot : loadOpenOrdersSnapshot,
+    corporation
+      ? corporationNeedsGrant
+        ? loadCorpOrdersGrantSnapshot
+        : loadCorpOpenOrdersSnapshot
+      : loadOpenOrdersSnapshot,
     undefined,
     { cacheKey: corporation ? 'market:corp-orders' : 'market:open-orders' }
   );
@@ -328,10 +322,6 @@ export function OpenOrdersPanel({
         t('market.orders.filter.unknownLocation', { id: locationId })
       ),
     [allRows, t]
-  );
-  const locationNamesById = useMemo(
-    () => new Map(locationOptions.map((option) => [option.locationId, option.label])),
-    [locationOptions]
   );
   const showLocationFilter = locationOptions.length > 1;
 
@@ -537,11 +527,7 @@ export function OpenOrdersPanel({
     );
   }
 
-  const visibleChips: ActiveChipDisplay[] = activeFilterChips(filter).map((chip) => ({
-    id: chip.id,
-    label: chipLabel(chip, characterNamesById, locationNamesById, t),
-    clear: () => setFilter(chip.clear(filter)),
-  }));
+  const activeCount = activeFilterCount(filter);
 
   const notShared = snapshot.openOrders.skipped;
   const pickerNamesMissing = showCharacterStrip && !corporation && characterFilterValue === 'all';
@@ -587,6 +573,8 @@ export function OpenOrdersPanel({
 
   const tableLabel = t(TABLE_LABEL_KEY[view]);
   const noOrders = reauthEntries.length === 0 && !corpReauth && allRows.length === 0;
+  // The grant banner alone says why the corporation's list is empty; no list chrome under it.
+  const corpGrantOnly = corpReauth && allRows.length === 0;
 
   return (
     <>
@@ -642,7 +630,7 @@ export function OpenOrdersPanel({
 
           {fromCacheAny && <CachedNotice fetchedAt={oldestFetchedAt} />}
 
-          {noOrders ? (
+          {corpGrantOnly ? null : noOrders ? (
             // Every Character skipped: the "hasn't shared" note below already says why.
             notShared.length > 0 && snapshot.openOrders.entries.length === 0 ? null : (
               <CachedEmptyState
@@ -692,9 +680,7 @@ export function OpenOrdersPanel({
                   className="min-w-0 flex-1"
                   value={filter}
                   onChange={setFilter}
-                  // The active chips stay outside the funnel box, where they can
-                  // be seen and dropped.
-                  activeCount={visibleChips.length}
+                  activeCount={activeCount}
                   actions={
                     // The phone cards ignore column choices, so the picker
                     // would have nothing to act on there.
@@ -733,21 +719,6 @@ export function OpenOrdersPanel({
                 </FilterBar>
               </div>
 
-              {visibleChips.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2">
-                  {visibleChips.map((chip) => (
-                    <FilterChip key={chip.id} label={chip.label} selected onToggle={chip.clear} />
-                  ))}
-                  <button
-                    type="button"
-                    className={textActionClassName()}
-                    onClick={() => setFilter({ ...DEFAULT_FILTER, view: filter.view })}
-                  >
-                    {t('market.orders.filter.clearAll')}
-                  </button>
-                </div>
-              )}
-
               {/*
                 Only a funnel filter narrows: a segment hiding the rest is not
                 a failed match (issue #2032), and its count is on its button.
@@ -755,7 +726,7 @@ export function OpenOrdersPanel({
               <LiveStatus>
                 {fixList.matching.length === 0
                   ? t('orders.noResults')
-                  : visibleChips.length > 0 &&
+                  : activeCount > 0 &&
                     t('market.orders.filter.matchCount', {
                       count: fixList.matching.length,
                       total: allRows.length,

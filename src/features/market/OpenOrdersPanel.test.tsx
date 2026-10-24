@@ -937,15 +937,12 @@ describe('OpenOrdersPanel', () => {
       expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
     });
 
-    it('keeps the filter it applied removable, rather than silently narrowing', async () => {
-      const user = userEvent.setup();
+    it('says a filter is narrowing on the funnel', async () => {
       renderMixedFixture('/market/orders?orders.problems=expiringOrStale');
       await findMatchCount('1 of 3 orders match');
 
-      // The chip row is the only thing telling the reader why they are seeing
-      // one order out of three, and the only way back to all of them.
-      await user.click(screen.getByRole('button', { name: /^Problem: Expiring or stale$/i }));
-      expect(await screen.findByRole('button', { name: 'Needs you (2)' })).toBeInTheDocument();
+      // The funnel's count is what tells the reader why they see one order of three.
+      expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
     });
 
     it('opens on the segment the link names, and says when it is empty', async () => {
@@ -1034,7 +1031,9 @@ describe('OpenOrdersPanel — Corporation source', () => {
     issuerNames: new Map(issuers),
   });
 
-  function renderCorp(callbacks: { onLeaveCorporation?: () => void } = {}) {
+  function renderCorp(
+    callbacks: { onLeaveCorporation?: () => void; corporationNeedsGrant?: boolean } = {}
+  ) {
     return render(
       <MemoryRouter initialEntries={['/market/orders?scope=corp']}>
         <CurrentSearch />
@@ -1078,6 +1077,15 @@ describe('OpenOrdersPanel — Corporation source', () => {
     expect(screen.getByRole('searchbox')).toBeInTheDocument();
     // Undercut advice rests on market prices alone, so it reads the same.
     expect(within(table).getByRole('row', { name: /Tritanium/ })).toHaveTextContent(/undercut/i);
+  });
+
+  it('asks for the corp orders grant without reading, and shows no list under it', async () => {
+    renderCorp({ corporationNeedsGrant: true });
+    expect(await screen.findByText(/Corp orders need a new grant/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant access' })).toBeInTheDocument();
+    expect(screen.queryByText('No orders match your filters.')).not.toBeInTheDocument();
+    expect(loadCorpOrdersFeed).not.toHaveBeenCalled();
+    expect(mockedLoadAll).not.toHaveBeenCalled();
   });
 
   it('names the issuer where the Character source names the Character', async () => {

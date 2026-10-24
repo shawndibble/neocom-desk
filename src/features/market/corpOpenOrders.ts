@@ -77,3 +77,25 @@ export async function loadCorpOpenOrdersSnapshot(
   if (!feed.readable && !feed.needsReauth) throw new Error('Corporation orders are not readable');
   return corpOrdersSnapshot(feed, Date.now());
 }
+
+/**
+ * The Corporation source for a Character whose role reads corp orders but
+ * whose grant predates the scope: no read (it would only 403), just the
+ * page's corp grant banner over an empty list.
+ */
+export async function loadCorpOrdersGrantSnapshot(): Promise<OpenOrdersPageSnapshot> {
+  return corpOrdersSnapshot(
+    {
+      readable: false,
+      needsReauth: true,
+      fetchedAt: null,
+      fromCache: false,
+      orders: [],
+      typeNames: new Map(),
+      stationNames: new Map(),
+      stationPrices: new Map(),
+      issuerNames: new Map(),
+    },
+    Date.now()
+  );
+}
