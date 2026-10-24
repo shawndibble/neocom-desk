@@ -409,7 +409,7 @@ export interface BookData {
   settings: BookSettings;
   state: BookState;
   observed: ObservedRow[];
-  declarations: Declaration[];
+  declarations: BookDeclaration[];
   adjustments: Adjustment[];
   /** Each feeder's last good ledger read (#4509); a feeder's days are Billable only after one. */
   feeders?: BookFeeder[];
@@ -453,7 +453,7 @@ export async function readBookData(
     list<SyncExtraction>('extractions'),
     getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'paid')),
     list<ObservedRow>('observed'),
-    list<Declaration>('declarations'),
+    list<BookDeclaration>('declarations'),
     list<Adjustment>('adjustments'),
     getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'groupingAnswers')),
     getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'scheduledSync')),
@@ -489,6 +489,35 @@ export async function readBookData(
     groupingAnswers: groupingAnswersFrom(answers.data()),
     scheduledSync: scheduledSyncFrom(scheduled.data()),
   };
+}
+
+/** A declaration as stored: who recorded it, and who resolved it. */
+export type BookDeclaration = Declaration & {
+  recordedBy?: number;
+  resolution?: NonNullable<Declaration['resolution']> & { by?: number };
+};
+
+/** An officer's "rebill from date" (D22), server-written. */
+export interface Rebill {
+  id: string;
+  minerId: string;
+  /** First UTC day rebilled. */
+  fromDate: string;
+  reason: string;
+  by: number | null;
+  /** ISO instant. */
+  at: string;
+  /** It touched a corp member's days, which needs a Director. */
+  memberRebill: boolean;
+}
+
+/** Every rebill in the book, for the export. Officer-only. */
+export async function readRebills(characterId: number, corporationId: number): Promise<Rebill[]> {
+  await ensureSignedIn(characterId);
+  const snap = await getDocs(
+    collection(getSyncFirestore(), 'corps', String(corporationId), 'rebills')
+  );
+  return snap.docs.map((d) => ({ ...(d.data() as Omit<Rebill, 'id'>), id: d.id }));
 }
 
 /** One audit-log entry (D7): who did what, when. */

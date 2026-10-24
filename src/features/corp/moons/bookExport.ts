@@ -1,15 +1,18 @@
 /**
- * The Corp Tax Book as one workbook (#4946): a sheet per record type, every record the officer
- * can read, names beside ids so the file reads for a person and still joins for a script.
+ * The Corp Tax Book as one workbook (#4946, #4959): a sheet per record type, every record the
+ * officer can read, names beside ids so the file reads for a person and still joins for a script.
+ * Left out on purpose: the Statement verify links (credentials, editors only), the moon owners'
+ * own view (only they can read it) and the miners' coverage copy (the Moon owners sheet has it).
  * Pure: the caller reads the book and hands the sheets to `downloadWorkbook`.
  */
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
+import { deriveModeChanges, deriveOwnerRateHistory } from '@/engine/corpTaxBook/feederAccrual';
 import type { ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
-import type { SettlePayment } from '@/engine/corpTaxBook/sync';
+import type { SettlePayment, SyncExtraction } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import type { CsvTranslate } from '@/lib/csv';
 import {
@@ -23,7 +26,14 @@ import {
   type SheetColumns,
 } from '@/lib/exportSheets';
 import type { AnyXlsxSheet } from '@/lib/xlsx';
-import type { AuditEntry, BookSettings } from '../taxBook/bookClient';
+import type {
+  AuditEntry,
+  BookDeclaration,
+  BookFeeder,
+  BookSettings,
+  GroupingAnswer,
+  Rebill,
+} from '../taxBook/bookClient';
 import type { BookNames } from './useCorpBook';
 
 export interface BookExportInput {
@@ -36,6 +46,14 @@ export interface BookExportInput {
   adjustments: readonly Adjustment[];
   writeOffs: readonly RecordedWriteOff[];
   dismissals: readonly Dismissal[];
+  declarations: readonly BookDeclaration[];
+  rebills: readonly Rebill[];
+  groupingAnswers: readonly GroupingAnswer[];
+  /** Characters an officer unlinked, which automatic grouping leaves alone. */
+  declinedAutoGroup: readonly number[];
+  extractions: readonly SyncExtraction[];
+  /** The moon owners (Feeders), each with its payouts. */
+  feeders: readonly BookFeeder[];
   audit: readonly AuditEntry[];
   /** The Automatic sync's status; null when it was never turned on or was revoked. */
   scheduledSync?: ScheduledSyncStatus | null;
@@ -49,6 +67,8 @@ export type BookExportNames = Pick<
 type MinerName = (minerId: string | undefined) => string | null;
 
 const PREFIX = 'corpTaxBook.export';
+/** The Moon owners page's own payout labels, so the file and the page never disagree. */
+const PAYOUT_LABELS = 'corpTaxBook.moons.moonOwners.page.payouts';
 
 const sheet = <T>(t: CsvTranslate, name: string, rows: readonly T[], columns: SheetColumns<T>) =>
   sheetFrom(t, PREFIX, name, rows, columns);
@@ -72,12 +92,13 @@ function rateTarget(rate: TaxRate, names: BookExportNames, minerName: MinerName)
 }
 
 function settingsRows(
-  s: BookSettings,
-  scheduled: ScheduledSyncStatus | null,
+  input: BookExportInput,
   names: BookExportNames,
   minerName: MinerName,
   t: CsvTranslate
 ): SettingRow[] {
+  const s = input.settings;
+  const scheduled = input.scheduledSync ?? null;
   const yes = t('corpTaxBook.export.yes');
   const no = t('corpTaxBook.export.no');
   const label = (key: string, options?: Record<string, unknown>) =>
@@ -110,6 +131,7 @@ function settingsRows(
           })
         : label('automaticSyncOff'),
     ],
+    [label('declinedAutoGroup'), joined(input.declinedAutoGroup.map(names.character))],
     ...s.rates.map((rate): SettingRow => [
       label(`rate.${rate.scope}`, {
         target: rateTarget(rate, names, minerName),
@@ -140,6 +162,19 @@ export function bookExportSheets(
   const minerOf = (characterId: number) => minerIdOf.get(characterId) ?? `solo:${characterId}`;
   const character = (id: number | null | undefined) =>
     typeof id === 'number' ? names.character(id) : null;
+  const statementMiner = new Map(input.statements.map((s) => [s.id, s.minerId]));
+  const payouts = input.feeders.flatMap((f) =>
+    f.payouts.map((payout) => ({ feeder: f.corporationId, payout }))
+  );
+  const ownerRates = input.feeders.flatMap((f) =>
+    deriveOwnerRateHistory(f).map((entry) => ({ feeder: f.corporationId, entry }))
+  );
+  const payee = (f: BookFeeder) =>
+    !f.payee
+      ? null
+      : f.payee.kind === 'corporation'
+        ? names.corporation(f.payee.id)
+        : names.character(f.payee.id);
 
   return [
     sheet(
@@ -283,6 +318,56 @@ export function bookExportSheets(
     ),
     sheet(
       t,
+      'declarations',
+      [...input.declarations].sort(
+        byKey(
+          (d) => d.at,
+          (d) => d.id
+        )
+      ),
+      [
+        ['declarationId', (d) => d.id],
+        ['statementId', (d) => d.statementId],
+        ['miner', (d) => minerName(statementMiner.get(d.statementId))],
+        ['minerId', (d) => statementMiner.get(d.statementId)],
+        ['kind', (d) => t(`corpTaxBook.export.declarationKind.${d.kind}`)],
+        ['time', (d) => d.at],
+        ['note', (d) => d.note],
+        ['recordedBy', (d) => character(d.recordedBy)],
+        ['recordedById', (d) => d.recordedBy],
+        [
+          'resolution',
+          (d) => (d.resolution ? t(`corpTaxBook.export.resolution.${d.resolution.kind}`) : null),
+        ],
+        ['resolvedAt', (d) => d.resolution?.at],
+        ['resolvedBy', (d) => character(d.resolution?.by)],
+        ['resolvedById', (d) => d.resolution?.by],
+        ['resolutionReason', (d) => d.resolution?.reason],
+      ]
+    ),
+    sheet(
+      t,
+      'rebills',
+      [...input.rebills].sort(
+        byKey(
+          (r) => r.at,
+          (r) => r.id
+        )
+      ),
+      [
+        ['rebillId', (r) => r.id],
+        ['miner', (r) => minerName(r.minerId)],
+        ['minerId', (r) => r.minerId],
+        ['fromDate', (r) => r.fromDate],
+        ['reason', (r) => r.reason],
+        ['memberRebill', (r) => (r.memberRebill ? yes : no)],
+        ['by', (r) => character(r.by)],
+        ['byId', (r) => r.by],
+        ['time', (r) => r.at],
+      ]
+    ),
+    sheet(
+      t,
       'miners',
       [...input.miners].sort(byKey((m) => names.character(m.mainCharacterId).toLowerCase())),
       [
@@ -295,11 +380,132 @@ export function bookExportSheets(
         ['finalStatementId', (m) => m.finalStatementId],
       ]
     ),
-    settingsSheet(
+    sheet(
       t,
-      PREFIX,
-      settingsRows(input.settings, input.scheduledSync ?? null, names, minerName, t)
+      'groupingAnswers',
+      [...input.groupingAnswers].sort(
+        byKey(
+          (a) => a.at,
+          (a) => a.characterId
+        )
+      ),
+      [
+        ['character', (a) => names.character(a.characterId)],
+        ['characterId', (a) => a.characterId],
+        ['miner', (a) => minerName(a.minerId)],
+        ['minerId', (a) => a.minerId],
+        ['answer', (a) => t(`corpTaxBook.export.groupingAnswer.${a.answer}`)],
+        ['via', (a) => t(`corpTaxBook.export.answerVia.${a.via}`)],
+        ['time', (a) => a.at],
+      ]
     ),
+    sheet(
+      t,
+      'extractions',
+      [...input.extractions].sort(
+        byKey(
+          (x) => x.extractionStartTime,
+          (x) => x.structureId
+        )
+      ),
+      [
+        ['refinery', (x) => names.refinery(x.structureId)],
+        ['refineryId', (x) => x.structureId],
+        ['moon', (x) => names.moon(x.moonId)],
+        ['moonId', (x) => x.moonId],
+        ['started', (x) => x.extractionStartTime],
+        ['chunkArrival', (x) => x.chunkArrivalTime],
+        ['naturalDecay', (x) => x.naturalDecayTime],
+        ['laserFired', (x) => x.laserFiredAt],
+        ['cancelled', (x) => x.cancelledAt],
+        [
+          'ore',
+          (x) => joined((x.oreLines ?? []).map((l) => `${names.ore(l.typeId)} × ${l.quantity}`)),
+        ],
+        ['surveyId', (x) => x.surveyId],
+      ]
+    ),
+    sheet(
+      t,
+      'moonOwners',
+      [...input.feeders].sort(byKey((f) => names.corporation(f.corporationId).toLowerCase())),
+      [
+        ['moonOwner', (f) => names.corporation(f.corporationId)],
+        ['moonOwnerId', (f) => f.corporationId],
+        ['status', (f) => t(`corpTaxBook.export.moonOwnerStatus.${f.status}`)],
+        ['mode', (f) => t(`corpTaxBook.export.moonOwnerMode.${f.mode}`)],
+        [
+          'modeChanges',
+          (f) =>
+            joined(
+              deriveModeChanges(f).map(
+                (c) => `${c.from}: ${t(`corpTaxBook.export.moonOwnerMode.${c.mode}`)}`
+              )
+            ),
+        ],
+        ['joined', (f) => isoTime(f.joinedAt)],
+        ['left', (f) => isoTime(f.leftAt)],
+        ['invitedBy', (f) => names.character(f.invitedBy)],
+        ['invitedById', (f) => f.invitedBy],
+        ['payee', payee],
+        ['payeeId', (f) => f.payee?.id],
+        ['requestedRate', (f) => f.requestedRatePct],
+        ['agreedRate', (f) => f.agreedRatePct],
+        ['offeredRate', (f) => f.offeredOwnerRatePct],
+        [
+          'coverage',
+          (f) => joined(f.coveragePeriods.map((p) => `${p.from} – ${p.to ?? ''}`.trimEnd())),
+        ],
+        ['lastReadWell', (f) => f.lastReadWellAt],
+        ['staleSince', (f) => isoTime(f.staleSince)],
+        ['disconnected', (f) => isoTime(f.disconnectedAt)],
+        ['removalStarted', (f) => isoTime(f.removal?.startedAt)],
+        ['removalStartedBy', (f) => f.removal?.startedByName],
+        ['removalEffective', (f) => isoTime(f.removal?.effectiveAt)],
+        ['note', (f) => f.note],
+      ]
+    ),
+    sheet(
+      t,
+      'moonOwnerPayments',
+      [...payouts].sort(
+        byKey(
+          (p) => p.payout.date,
+          (p) => p.payout.id
+        )
+      ),
+      [
+        ['paymentId', (p) => p.payout.id],
+        ['moonOwner', (p) => names.corporation(p.feeder)],
+        ['moonOwnerId', (p) => p.feeder],
+        ['date', (p) => p.payout.date],
+        ['amount', (p) => p.payout.amount],
+        ['method', (p) => t(`${PAYOUT_LABELS}.method.${p.payout.method}`)],
+        ['status', (p) => t(`${PAYOUT_LABELS}.state.${p.payout.status}`)],
+        ['journalRef', (p) => p.payout.journalRef],
+        ['notAPayout', (p) => (p.payout.notAPayout ? yes : no)],
+      ]
+    ),
+    sheet(
+      t,
+      'moonOwnerRates',
+      [...ownerRates].sort(
+        byKey(
+          (r) => r.entry.effectiveFrom,
+          (r) => r.entry.recordedAt,
+          (r) => r.feeder
+        )
+      ),
+      [
+        ['moonOwner', (r) => names.corporation(r.feeder)],
+        ['moonOwnerId', (r) => r.feeder],
+        ['kind', (r) => t(`corpTaxBook.export.rateKind.${r.entry.kind}`)],
+        ['ratePct', (r) => r.entry.pct],
+        ['effectiveFrom', (r) => r.entry.effectiveFrom],
+        ['time', (r) => r.entry.recordedAt],
+      ]
+    ),
+    settingsSheet(t, PREFIX, settingsRows(input, names, minerName, t)),
     sheet(
       t,
       'activity',
