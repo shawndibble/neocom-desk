@@ -84,6 +84,7 @@ import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
 import {
   fail,
+  DENY_REASON,
   requireLiveRoles,
   signedInCharacter,
   verifyCallerToken,
@@ -186,13 +187,13 @@ export async function authorizeOfficer(
     if (!options.live && heldUsable) {
       access = held;
     } else {
-      const { identity, roles } = await requireLiveRoles(deps, actor, call.accessToken, {
+      const { identity, roles } = await requireLiveRoles(deps, actor, {
         corporationId: call.corporationId,
         need: 'canView',
         denied: { message: 'No officer role in this corporation', reason: 'not-an-officer' },
         // A failed renewal revokes the read access the old check granted.
         onDenied: async (reason) => {
-          if (reason !== 'missing-scope' && held) await officerRef.delete();
+          if (reason !== DENY_REASON.missingScope && held) await officerRef.delete();
         },
       });
       access = {
