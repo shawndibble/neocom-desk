@@ -69,8 +69,8 @@ describe('reservedNextHeight', () => {
     expect(reservedNextHeight('none')).toBeNull();
   });
 
-  it("holds the button's room when nothing is remembered", () => {
-    expect(reservedNextHeight(null)).toBe('h-11');
-    expect(reservedNextHeight('junk')).toBe('h-11');
+  it('holds nothing when nothing is remembered, so a first load never drops the board', () => {
+    expect(reservedNextHeight(null)).toBeNull();
+    expect(reservedNextHeight('junk')).toBeNull();
   });
 });
