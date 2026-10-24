@@ -275,4 +275,27 @@ describe('countActive', () => {
   it('counts the truthy controls, so 0, empty and false do not count', () => {
     expect(countActive(['jita', 0, '', false, null, undefined, true, 5])).toBe(3);
   });
+
+  it('puts trailing view controls after the funnel, beside the search box', () => {
+    render(
+      <FilterBar<Filter>
+        value={EMPTY}
+        onChange={() => {}}
+        search={<SearchInput aria-label="Search" />}
+        actions={<button type="button">Columns</button>}
+        trailing={<button type="button">Expand all</button>}
+      >
+        {() => null}
+      </FilterBar>
+    );
+    const order = ['Columns', 'Filters', 'Expand all'].map((name) =>
+      screen.getByRole('button', { name })
+    );
+    expect(
+      order[0].compareDocumentPosition(order[1]) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      order[1].compareDocumentPosition(order[2]) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
 });

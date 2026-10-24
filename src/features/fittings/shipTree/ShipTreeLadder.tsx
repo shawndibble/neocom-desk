@@ -5,9 +5,11 @@
  * Ω, tech corners, tone, Mastery badge — at list size. A tap on a hull
  * opens the Ship Info window (the caller's).
  *
- * Filtered for picking what to train: fly-state tabs with the faction's own
- * split, and a Mastery pick behind the funnel. The filter is the caller's
- * (it lives in the URL and also feeds the faction bar's counts).
+ * The toolbar: view switch, the tree's search over every faction (the map's),
+ * and beside it the funnel holding the filters for picking what to train —
+ * fly state and Mastery. The filter is the caller's (it lives in the URL and
+ * also feeds the faction bar's counts), and the faction bar sits under the
+ * toolbar because those filters change its counts.
  */
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,7 +26,6 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  SearchInput,
   SegmentedControl,
   Tooltip,
 } from '@/components/ui';
@@ -39,11 +40,10 @@ import { romanLevel } from '@/engine/projection';
 import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
-import { useMediaQuery } from '@/lib/useMediaQuery';
 import type { ShipTreeShip } from '@/sde/types';
-import { FlyDot } from './FlyDot';
 import { IsisThumb } from './IsisTile';
 import { Legend } from './Legend';
+import { MapSearch } from './MapSearch';
 import { SkillBlocks } from './SkillBlocks';
 import { classSkillTitle } from './classSkillTitle';
 import { flyLabel } from './flyLabel';
@@ -61,7 +61,6 @@ import {
   masteryCounts,
   masteryFilterActive,
   NO_SHIP_TREE_FILTER,
-  searchHulls,
   type FlyState,
   type LadderSection,
   type ShipTreeFilter,
@@ -76,6 +75,8 @@ interface LadderProps {
   onFilter: (next: ShipTreeFilter) => void;
   /** Hulls per faction that pass `filter`; absent when nothing is filtered. */
   factionMatches: ReadonlyMap<number, number> | undefined;
+  /** The faction picker, placed under the toolbar. */
+  factionBar: ReactNode;
   onFaction: (factionID: number) => void;
   onOpenShip: (ship: ShipTreeShip) => void;
   viewSwitch: ReactNode;
@@ -87,6 +88,7 @@ export function ShipTreeLadder({
   filter,
   onFilter,
   factionMatches,
+  factionBar,
   onFaction,
   onOpenShip,
   viewSwitch,
@@ -94,12 +96,6 @@ export function ShipTreeLadder({
   const { t } = useTranslation();
   const { data, statuses } = source;
   const narrow = useIsNarrow();
-  // Below `xl` (with the rail) the fly tabs don't fit beside the search, so
-  // they take a row of their own under the bar. Max-width, like useIsNarrow,
-  // so the never-matching test stub reads as the wide row.
-  const tabsOwnRow = useMediaQuery('(max-width: 79.999rem)');
-  const [query, setQuery] = useState('');
-  const q = query.trim().toLowerCase();
   const filtered = isShipTreeFiltered(filter);
 
   const sections = useMemo(() => ladderSections(tree.defs), [tree.defs]);
@@ -107,14 +103,6 @@ export function ShipTreeLadder({
   const omegaChips = useMemo(
     () => new Set(tree.layout.omegas.map((o) => o.classId)),
     [tree.layout]
-  );
-  const elsewhere = useMemo(
-    () =>
-      searchHulls(
-        data.ships.filter((s) => s.factionID !== tree.factionID),
-        q
-      ),
-    [data, q, tree.factionID]
   );
   const factionShips = useMemo(
     () => data.ships.filter((s) => s.factionID === tree.factionID),
@@ -126,7 +114,6 @@ export function ShipTreeLadder({
   // The reader's open sections, for this faction and filter. Each new pair
   // starts over: top level open, or every section while filtered so a match
   // in a sub-class can't hide — however the filter changed, Back included.
-  // A search opens everything over this; clearing it puts their choice back.
   const openKey = `${tree.factionID}|${filter.fly}|${[...filter.mastery].sort().join(',')}`;
   const startOpen = (): ReadonlySet<number> =>
     new Set(filtered ? sectionIds : sections.map((s) => s.def.id));
@@ -136,24 +123,21 @@ export function ShipTreeLadder({
   if (openState.key !== openKey) setOpenState({ key: openKey, ids: startOpen() });
   const userOpen: ReadonlySet<number> = openState.key === openKey ? openState.ids : startOpen();
   const setUserOpen = (ids: ReadonlySet<number>) => setOpenState({ key: openKey, ids });
-  const setFilter = onFilter;
 
-  const visible = (s: ShipTreeShip) =>
-    (!q || s.name.toLowerCase().includes(q)) && hullMatches(statuses.get(s.typeID), filter);
+  const visible = (s: ShipTreeShip) => hullMatches(statuses.get(s.typeID), filter);
   const shown = sections.filter((section) => hasVisible(section, tree, visible));
 
-  const flyTabs = (
-    <SegmentedControl<FlyState>
-      size="md"
-      fill={narrow}
-      label={t('ships.tree.fly.label')}
-      options={[
-        { value: 'all', label: t('ships.tree.fly.all', { n: flyCounts.all }) },
-        { value: 'canFly', label: t('ships.tree.fly.canFly', { n: flyCounts.canFly }) },
-        { value: 'cantFly', label: t('ships.tree.fly.cantFly', { n: flyCounts.cantFly }) },
-      ]}
-      value={filter.fly}
-      onChange={(fly) => setFilter({ ...filter, fly })}
+  // Another faction's hull switches the tree to it, then opens its window.
+  const pick = (ship: ShipTreeShip) => {
+    if (ship.factionID !== tree.factionID) onFaction(ship.factionID);
+    onOpenShip(ship);
+  };
+  const search = (
+    <MapSearch
+      data={data}
+      statuses={statuses}
+      onPick={pick}
+      className={narrow ? 'min-w-0 flex-1' : 'w-72'}
     />
   );
   const expandCollapse = (
@@ -163,24 +147,13 @@ export function ShipTreeLadder({
         icon={<Icon.ExpandAll />}
         label={t('ships.tree.expandAll')}
         onClick={() => setUserOpen(new Set(sectionIds))}
-        disabled={q !== ''}
       />
       <IconButton
         icon={<Icon.CollapseAll />}
         label={t('ships.tree.collapseAll')}
         onClick={() => setUserOpen(new Set())}
-        disabled={q !== ''}
       />
     </>
-  );
-  const search = (
-    <SearchInput
-      className={narrow ? 'min-w-0 flex-1' : 'w-72'}
-      value={query}
-      onChange={(e) => setQuery(e.target.value)}
-      placeholder={t('ships.tree.filterPlaceholder')}
-      aria-label={t('ships.tree.filterLabel')}
-    />
   );
 
   return (
@@ -194,8 +167,8 @@ export function ShipTreeLadder({
       )}
       <FilterBar<ShipTreeFilter>
         value={filter}
-        onChange={setFilter}
-        activeCount={masteryFilterActive(filter) ? 1 : 0}
+        onChange={onFilter}
+        activeCount={(filter.fly !== 'all' ? 1 : 0) + (masteryFilterActive(filter) ? 1 : 0)}
         title={t('ships.tree.filtersTitle')}
         search={
           narrow ? (
@@ -207,12 +180,11 @@ export function ShipTreeLadder({
             </>
           )
         }
-        actions={
+        trailing={
           narrow ? (
             expandCollapse
           ) : (
             <>
-              {!tabsOwnRow && flyTabs}
               {expandCollapse}
               <span className="flex-1" />
               <LegendPopover />
@@ -221,37 +193,16 @@ export function ShipTreeLadder({
         }
       >
         {(draft, setDraft) => (
-          <MasteryField
+          <TreeFilterFields
             draft={draft}
             setDraft={setDraft}
-            counts={tierCounts}
-            unavailable={source.masteriesStatus !== 'loaded'}
+            flyCounts={flyCounts}
+            tierCounts={tierCounts}
+            masteriesUnavailable={source.masteriesStatus !== 'loaded'}
           />
         )}
       </FilterBar>
-      {(narrow || tabsOwnRow) && flyTabs}
-      {elsewhere.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1 text-xs">
-          <span className="text-text-dim">{t('ships.tree.otherFactions')}</span>
-          {elsewhere.map((s) => (
-            <button
-              key={s.typeID}
-              type="button"
-              onClick={() => {
-                onFaction(s.factionID);
-                onOpenShip(s);
-              }}
-              className={jumpChipClassName}
-            >
-              <FlyDot status={statuses.get(s.typeID)} />
-              {statuses.get(s.typeID) && (
-                <span className="sr-only">{flyLabel(t, statuses.get(s.typeID))}</span>
-              )}
-              {s.name}
-            </button>
-          ))}
-        </div>
-      )}
+      {factionBar}
       <div className="space-y-1 rounded-xs border border-line bg-panel p-3">
         {shown.length > 0 ? (
           shown.map((section) => (
@@ -259,7 +210,6 @@ export function ShipTreeLadder({
               key={section.def.id}
               section={section}
               depth={0}
-              searching={q !== ''}
               userOpen={userOpen}
               setUserOpen={setUserOpen}
               filter={filter}
@@ -271,7 +221,7 @@ export function ShipTreeLadder({
               onOpenShip={onOpenShip}
             />
           ))
-        ) : filtered && !q ? (
+        ) : filtered ? (
           <NoFilterMatches
             factionName={factionNameOf(data.factions, tree.factionID)}
             others={inGameFactionOrder(data.factions).flatMap((f) => {
@@ -279,7 +229,7 @@ export function ShipTreeLadder({
               return f.id !== tree.factionID && count > 0 ? [{ ...f, count }] : [];
             })}
             onFaction={onFaction}
-            onClear={() => setFilter(NO_SHIP_TREE_FILTER)}
+            onClear={() => onFilter(NO_SHIP_TREE_FILTER)}
           />
         ) : (
           <p className="py-4 text-center text-sm text-text-dim">{t('ships.tree.noMatches')}</p>
@@ -308,20 +258,24 @@ function LegendPopover() {
 }
 
 /**
- * Mastery None–V, any number at once, each with how many of this faction's
- * hulls it would show. Off under Can't fly (Mastery is a can-fly property)
- * and while the Mastery data hasn't loaded (every tier would read None).
+ * The funnel's controls. Fly state: every hull, the flyable ones, the gaps,
+ * each with the faction's own count. Mastery None–V, any number at once, each
+ * with how many of this faction's hulls it would show; off under Can't fly
+ * (Mastery is a can-fly property) and while the Mastery data hasn't loaded
+ * (every tier would read None).
  */
-function MasteryField({
+function TreeFilterFields({
   draft,
   setDraft,
-  counts,
-  unavailable,
+  flyCounts,
+  tierCounts: counts,
+  masteriesUnavailable: unavailable,
 }: {
   draft: ShipTreeFilter;
   setDraft: (next: ShipTreeFilter) => void;
-  counts: readonly number[];
-  unavailable: boolean;
+  flyCounts: Record<FlyState, number>;
+  tierCounts: readonly number[];
+  masteriesUnavailable: boolean;
 }) {
   const { t } = useTranslation();
   const reason = unavailable
@@ -335,31 +289,45 @@ function MasteryField({
     setDraft({ ...draft, mastery: next });
   };
   return (
-    <FilterField label={t('ships.tree.mastery.label')} stretch={false}>
-      <div
-        role="group"
-        aria-label={t('ships.tree.mastery.label')}
-        className="flex flex-wrap items-center gap-1"
-      >
-        {MASTERY_TIERS.map((tier) => (
-          <FilterChip
-            key={tier}
-            size="md"
-            label={tier === 0 ? t('ships.tree.mastery.none') : romanLevel(tier)}
-            count={counts[tier]}
-            countLabel={t('ships.tree.mastery.count', { count: counts[tier] })}
-            selected={draft.mastery.has(tier)}
-            onToggle={() => toggle(tier)}
-            disabled={reason !== undefined}
-            tooltip={reason}
-          />
-        ))}
-      </div>
-    </FilterField>
+    <>
+      <FilterField label={t('ships.tree.fly.label')} stretch={false}>
+        <SegmentedControl<FlyState>
+          label={t('ships.tree.fly.label')}
+          options={[
+            { value: 'all', label: t('ships.tree.fly.all', { n: flyCounts.all }) },
+            { value: 'canFly', label: t('ships.tree.fly.canFly', { n: flyCounts.canFly }) },
+            { value: 'cantFly', label: t('ships.tree.fly.cantFly', { n: flyCounts.cantFly }) },
+          ]}
+          value={draft.fly}
+          onChange={(fly) => setDraft({ ...draft, fly })}
+        />
+      </FilterField>
+      <FilterField label={t('ships.tree.mastery.label')} stretch={false}>
+        <div
+          role="group"
+          aria-label={t('ships.tree.mastery.label')}
+          className="flex flex-wrap items-center gap-1"
+        >
+          {MASTERY_TIERS.map((tier) => (
+            <FilterChip
+              key={tier}
+              size="md"
+              label={tier === 0 ? t('ships.tree.mastery.none') : romanLevel(tier)}
+              count={counts[tier]}
+              countLabel={t('ships.tree.mastery.count', { count: counts[tier] })}
+              selected={draft.mastery.has(tier)}
+              onToggle={() => toggle(tier)}
+              disabled={reason !== undefined}
+              tooltip={reason}
+            />
+          ))}
+        </div>
+      </FilterField>
+    </>
   );
 }
 
-/** A chip that jumps elsewhere (another faction's hull or tree): a plain button, not a toggle. */
+/** A chip that jumps to another faction's tree: a plain button, not a toggle. */
 const jumpChipClassName = cx(
   'flex min-h-7 items-center gap-1 rounded-xs border border-line px-1.5 py-0.5 text-xs hover:border-line-bright hover:bg-panel-2 active:bg-panel',
   interactiveClassName,
@@ -426,7 +394,6 @@ function rowLabel(t: TFunction, status: ShipTreeHullStatus | undefined): string 
 function LadderClass({
   section,
   depth,
-  searching,
   userOpen,
   setUserOpen,
   filter,
@@ -439,7 +406,6 @@ function LadderClass({
 }: {
   section: LadderSection;
   depth: number;
-  searching: boolean;
   userOpen: ReadonlySet<number>;
   setUserOpen: (ids: ReadonlySet<number>) => void;
   filter: ShipTreeFilter;
@@ -463,16 +429,16 @@ function LadderClass({
   const skills = (group?.prereqsByFaction[String(tree.factionID)] ?? []).filter((p) => p.display);
   const empires = [...tree.parentEmpires(id)].reverse();
   const name = group?.name ?? '';
-  const isOpen = searching || userOpen.has(id);
+  const isOpen = userOpen.has(id);
 
   return (
     <details
-      // Controlled, so a section the reader collapsed still opens for a search
-      // or Expand all — React only writes the attribute when the prop changes.
+      // Controlled, so Expand all and a filter change reach a section the
+      // reader collapsed — React only writes the attribute when the prop changes.
       open={isOpen}
       onToggle={(e) => {
         const open = e.currentTarget.open;
-        if (searching || open === userOpen.has(id)) return;
+        if (open === userOpen.has(id)) return;
         const next = new Set(userOpen);
         if (open) next.add(id);
         else next.delete(id);
@@ -596,7 +562,6 @@ function LadderClass({
           key={child.def.id}
           section={child}
           depth={depth + 1}
-          searching={searching}
           userOpen={userOpen}
           setUserOpen={setUserOpen}
           filter={filter}
