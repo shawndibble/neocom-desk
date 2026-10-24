@@ -59,10 +59,15 @@ function CostRow({
     <div
       className={cx(
         'flex items-center justify-between gap-2 px-2.5 py-1.5 text-[0.6875rem]',
-        indented && 'pl-7'
+        // Under the job cost's own label: padding, caret slot, swatch, gaps.
+        indented && 'pl-12'
       )}
     >
       <span className="flex min-w-0 items-center gap-1.5 font-semibold tracking-widest text-text-dim uppercase">
+        {/* An empty slot the width of the job cost row's caret, so every
+            swatch sits in one column and every label starts at one edge; the
+            caret stays leading, where §6c puts "expands in place". */}
+        {!indented && <span aria-hidden="true" className="size-4 shrink-0" />}
         {swatch && (
           <span
             aria-hidden="true"
@@ -257,7 +262,11 @@ export function ResultsSummary({
         </div>
       )}
 
-      <div className="divide-y divide-line rounded-xs border border-line">
+      {/* Divider lines only, no box: the panel is already the frame. `-mx-2.5`
+          pulls the rows' own padding out so their text lines up with the bar
+          above and the facts below. Profit's rule is the brighter one — the
+          line the rest adds up to. */}
+      <div className="-mx-2.5 divide-y divide-line [&>*:last-child]:border-line-bright">
         {revenue !== null && (
           <CostRow
             label={
@@ -364,7 +373,7 @@ export function ResultsSummary({
             value={formatIsk(result.jobFee.facilityTax)}
             indented
           />
-          {cheaperNearby && <div className="py-1.5 pr-2.5 pl-7 text-xs">{cheaperNearby}</div>}
+          {cheaperNearby && <div className="py-1.5 pr-2.5 pl-12 text-xs">{cheaperNearby}</div>}
         </Disclosure>
 
         {forgone !== null && (
@@ -386,7 +395,9 @@ export function ResultsSummary({
         )}
       </div>
 
-      <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 text-xs">
+      {/* A separate group — facts about the plan, not lines of the sum — so a
+          gap and a rule set it apart from the profit it would otherwise sit on. */}
+      <dl className="mt-5! grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 border-t border-line pt-4 text-xs">
         {revenue !== null && (
           <>
             <dt className="text-text-dim">
