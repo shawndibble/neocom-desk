@@ -50,7 +50,7 @@ export interface InfoSurvey extends TaxSurvey {
 }
 
 /** What Assign Taxes connects, less the location (each panel knows its own). */
-export type SurveyToConnect = Omit<ConnectableSurvey, 'locationId'>;
+export type SurveyToConnect = Omit<ConnectableSurvey, 'locationId' | 'locationName'>;
 
 export function SurveyInfoEditor({
   characterId,
@@ -178,7 +178,13 @@ export function SurveyInfoEditor({
           <MoonTaxRow
             characterId={characterId}
             survey={survey}
-            connectable={connect && { ...connect, locationId: location?.id ?? null }}
+            connectable={
+              connect && {
+                ...connect,
+                locationId: location?.id ?? null,
+                locationName: location?.name,
+              }
+            }
             draft={tax}
             onDraftChange={setTax}
           />
@@ -248,7 +254,13 @@ export function SurveyInfoReadout({
         {tax !== null && (
           <MoonTaxReadout
             tax={tax}
-            connectable={connect && { ...connect, locationId: location?.id ?? null }}
+            connectable={
+              connect && {
+                ...connect,
+                locationId: location?.id ?? null,
+                locationName: location?.name,
+              }
+            }
           />
         )}
         {notes !== '' && (
