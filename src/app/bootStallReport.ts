@@ -20,6 +20,10 @@ export type BootGate = 'root' | 'require-character' | 'login' | 'fitting-shared'
  * `require-character`, but only `require-character` shares the page with the
  * boot-time ESI prefetch burst (`prefetch.ts`) — the two waiting on the
  * *same* read is what tells slow Dexie contention apart from a wedged one.
+ *
+ * `visibility` tells a stall the user watched from one in a background tab,
+ * where the browser throttles timers and defers IndexedDB — a "stall" that
+ * resolves the moment the tab is foregrounded is not a wedged database.
  */
 let reported = false;
 let reportedAt: number | undefined;
@@ -31,7 +35,7 @@ export function reportBootStallOnce(afterMs: number, gate: BootGate): void {
   captureMessage('Boot stalled on BootScreen', {
     level: 'warning',
     tags: { subsystem: 'boot' },
-    extra: { afterMs, gate },
+    extra: { afterMs, gate, visibility: document.visibilityState },
   });
 }
 
@@ -60,6 +64,6 @@ export function reportBootStallResolved(recoveryTapped: boolean): void {
   captureMessage('Boot stall resolved', {
     level: 'info',
     tags: { subsystem: 'boot' },
-    extra: { resolvedAfterMs, recoveryTapped },
+    extra: { resolvedAfterMs, recoveryTapped, visibility: document.visibilityState },
   });
 }

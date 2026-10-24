@@ -78,8 +78,14 @@ export function guarded<M>(importer: () => Promise<M | undefined>): Promise<M> {
   });
 }
 
+// A chunk `main.tsx` declined to recover (offline, purged this minute) rejects
+// with the browser's own TypeError, not `RouteChunkUnavailableError`; each
+// engine words it differently.
+const DYNAMIC_IMPORT_FAILURE = /dynamically imported module|importing a module script failed/i;
+
 export function isRouteChunkFailure(error: unknown): boolean {
-  return error instanceof RouteChunkUnavailableError;
+  if (error instanceof RouteChunkUnavailableError) return true;
+  return error instanceof TypeError && DYNAMIC_IMPORT_FAILURE.test(error.message);
 }
 
 /** A loader that also hands back its component synchronously once loaded. */

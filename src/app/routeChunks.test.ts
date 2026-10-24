@@ -108,4 +108,16 @@ describe('isRouteChunkFailure', () => {
     expect(isRouteChunkFailure(new Error('boom'))).toBe(false);
     expect(isRouteChunkFailure('Route chunk unavailable')).toBe(false);
   });
+
+  it("recognises the browser's own dynamic-import rejection, which reaches the boundary raw", () => {
+    // Chrome, Firefox and Safari word the same failure three ways.
+    for (const message of [
+      'Failed to fetch dynamically imported module: https://example.test/assets/DemoBoard-2uIGzk2r.js',
+      'error loading dynamically imported module: https://example.test/assets/x.js',
+      'Importing a module script failed.',
+    ]) {
+      expect(isRouteChunkFailure(new TypeError(message))).toBe(true);
+    }
+    expect(isRouteChunkFailure(new TypeError('Failed to fetch'))).toBe(false);
+  });
 });
