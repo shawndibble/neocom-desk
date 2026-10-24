@@ -105,7 +105,7 @@ export function PlanResult({
     null
   );
   const [dontRemind, setDontRemind] = useState(false);
-  const focusAfterCommit = useFocusAfterCommit();
+  const focusAfterCommit = useFocusAfterCommit({ preventScroll: true });
   /** Pickup the ship being packed sits in; its heading takes focus once the Pack button is gone. */
   const packFrom = useRef<string | null>(null);
   const pickupHeading = () =>
@@ -442,6 +442,7 @@ export function PlanResult({
                 if (asking) {
                   if (dontRemind) void setSkipRigWarning(true);
                   onPackShip(asking.itemId);
+                  focusAfterCommit(pickupHeading);
                 }
                 setAsking(null);
               }}
