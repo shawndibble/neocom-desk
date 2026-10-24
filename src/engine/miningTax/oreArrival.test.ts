@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ARRIVAL_WINDOW_MS,
+  GROWTH_WAIT_MS,
   EMPTY_ORE_ARRIVAL_LOG,
   arrivalNotice,
   isInArrivalWindow,
@@ -57,7 +57,7 @@ describe('recordLedgerFetch', () => {
       kind: 'arriving',
       arriving: 1,
       of: 1,
-      waitMs: 48 * MIN,
+      waitMs: 38 * MIN,
     });
   });
 
@@ -71,7 +71,7 @@ describe('recordLedgerFetch', () => {
     log = recordLedgerFetch(log, CHAR, fetchOf(150), at('2026-10-04T12:10:00Z'));
     log = recordLedgerFetch(log, CHAR, fetchOf(150), at('2026-10-04T12:20:00Z'));
     const notice = arrivalNotice(settled(), log, at('2026-10-04T12:30:00Z'));
-    expect(notice).toMatchObject({ kind: 'arriving', waitMs: 40 * MIN });
+    expect(notice).toMatchObject({ kind: 'arriving', waitMs: 30 * MIN });
   });
 
   it('counts an entry that first appears in a later fetch of the same day as growth', () => {
@@ -135,8 +135,20 @@ describe('arrivalNotice', () => {
     });
   });
 
-  it('drops to quiet an hour after the last growth', () => {
-    expect(arrivalNotice(settled(), growing(), at('2026-10-04T13:10:00Z'))).toEqual({
+  it("never waits more than 50 minutes: grown ore was mined at least ESI's 10-minute minimum lag ago", () => {
+    expect(GROWTH_WAIT_MS).toBe(50 * MIN);
+    expect(arrivalNotice(settled(), growing(), at('2026-10-04T12:10:00Z'))).toMatchObject({
+      kind: 'arriving',
+      waitMs: 50 * MIN,
+    });
+  });
+
+  it('drops to quiet 50 minutes after the last growth', () => {
+    expect(arrivalNotice(settled(), growing(), at('2026-10-04T12:59:00Z'))).toMatchObject({
+      kind: 'arriving',
+      waitMs: MIN,
+    });
+    expect(arrivalNotice(settled(), growing(), at('2026-10-04T13:00:00Z'))).toEqual({
       kind: 'quiet',
     });
   });
@@ -173,7 +185,7 @@ describe('arrivalNotice', () => {
         log,
         at('2026-10-04T12:20:00Z')
       )
-    ).toEqual({ kind: 'arriving', arriving: 1, of: 2, waitMs: ARRIVAL_WINDOW_MS - 10 * MIN });
+    ).toEqual({ kind: 'arriving', arriving: 1, of: 2, waitMs: GROWTH_WAIT_MS - 10 * MIN });
   });
 });
 

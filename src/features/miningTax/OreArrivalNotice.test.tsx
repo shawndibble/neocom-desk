@@ -37,10 +37,10 @@ beforeEach(async () => {
 afterEach(() => vi.useRealTimers());
 
 describe('OreArrivalNotice', () => {
-  it('warns to wait while a ticked entry grew within the hour', () => {
+  it('warns to wait while a ticked entry grew within the last 50 minutes', () => {
     seedLog(true);
     render(<OreArrivalNotice entries={[today]} checking={false} pullStartedAt={null} />);
-    expect(screen.getByRole('status')).toHaveTextContent('Ore still arriving · wait ~48 min');
+    expect(screen.getByRole('status')).toHaveTextContent('Ore still arriving · wait ~38 min');
   });
 
   it('names how many when only some ticked entries are still growing', () => {
@@ -49,7 +49,7 @@ describe('OreArrivalNotice', () => {
       <OreArrivalNotice entries={[today, otherToday]} checking={false} pullStartedAt={null} />
     );
     expect(screen.getByRole('status')).toHaveTextContent(
-      '1 entry still receiving ore · wait ~48 min'
+      '1 entry still receiving ore · wait ~38 min'
     );
   });
 
