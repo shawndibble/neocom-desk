@@ -20,6 +20,7 @@ import {
 import { canHide, FOOTER_PAGES, recentNavFor, viewPathFor } from './navRail';
 import { useHiddenNav, useRecentNav } from './navPreferences';
 import { NavHideToggle, NavItem } from './NavItem';
+import { useSettingsNeedsAttention } from './settingsAttention';
 
 export const MORE_SHEET_ID = 'mobile-more-sheet';
 
@@ -73,6 +74,7 @@ export function MobileMoreSheet({
   renderCharacterLink,
 }: MobileMoreSheetProps) {
   const { t } = useTranslation();
+  const settingsAttention = useSettingsNeedsAttention();
   const { pathname, search } = useLocation();
   const corpVisible = useCorpNavVisible();
   const corpCapabilities = useCorpViewCapabilities();
@@ -250,6 +252,7 @@ export function MobileMoreSheet({
                 to={page.path}
                 label={t(page.labelKey)}
                 locked={false}
+                attention={page.path === '/settings' && settingsAttention}
                 onClick={onClose}
               />
             ))}

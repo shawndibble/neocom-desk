@@ -71,6 +71,12 @@ export interface NavItemProps {
   /** The i18n key naming the count in the link's accessible name; defaults to the alerts wording. */
   badgeLabelKey?: string;
   /**
+   * Something inside this destination needs attention now: a small accent dot
+   * (DESIGN.md §6c), named in the link's accessible name like the badge. A
+   * dot, not a count: it is one thing to go and handle, and clears when handled.
+   */
+  attention?: boolean;
+  /**
    * `rail` (default) is the desktop rail's full-width row; `tab` the phone tab
    * bar's equal share of the viewport; `tile` a More-sheet tile; `bar` a More-sheet
    * row for the headless group. One component for all four so the lock marker, the badge and the accessible name cannot
@@ -95,6 +101,7 @@ export function NavItem({
   locked,
   badge,
   badgeLabelKey,
+  attention = false,
   presentation = 'rail',
   className,
   onClick,
@@ -151,7 +158,13 @@ export function NavItem({
       onPointerDown={warm}
       className={cx(linkClass({ isActive }), className)}
       data-locked={locked ? 'true' : undefined}
-      aria-label={counted ? t(badgeLabelKey ?? 'nav.alertsWithCount', { count: badge }) : undefined}
+      aria-label={
+        counted
+          ? t(badgeLabelKey ?? 'nav.alertsWithCount', { count: badge })
+          : attention
+            ? t('nav.needsAttention', { label })
+            : undefined
+      }
     >
       {Glyph && (
         <Glyph
@@ -161,6 +174,16 @@ export function NavItem({
         />
       )}
       <span className="min-w-0 truncate">{label}</span>
+      {attention && (
+        <span
+          aria-hidden="true"
+          data-attention-dot
+          className={cx(
+            'size-1.5 shrink-0 rounded-full bg-accent',
+            tab || tile ? 'absolute top-1.5 left-1/2 ml-3' : '-ml-1'
+          )}
+        />
+      )}
       {counted && (
         <span
           aria-hidden="true"

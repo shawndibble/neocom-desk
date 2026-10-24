@@ -32,7 +32,6 @@ function renderPanel() {
       characterIds={[1]}
       characterNames={new Map([[1, 'Pilot']])}
       systemNames={new Map([[30000142, 'Jita']])}
-      typeNames={new Map([[45492, 'Bitumens']])}
       nowMs={NOW}
     />
   );
@@ -53,11 +52,12 @@ describe('SurveyConnectionsPanel', () => {
     expect(container.textContent).toBe('');
   });
 
-  it('names the payee, system and ore, and Stop removes it', async () => {
+  it('names the payee and system, hides ore, and Stop removes it', async () => {
     useSurveyConnections.setState({ value: [connection()] });
     renderPanel();
     expect(screen.getByText('Moon Corp at 10%')).toBeTruthy();
-    expect(screen.getByText(/Jita · Bitumens/)).toBeTruthy();
+    expect(screen.getByText(/Jita/)).toBeTruthy();
+    expect(screen.queryByText(/Bitumens/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
     await waitFor(() => expect(useSurveyConnections.getState().value).toEqual([]));
   });

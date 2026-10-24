@@ -56,6 +56,8 @@ import { useFontScale } from '@/lib/fontScale';
 import { decimalMarkFor, useNumberFormat } from '@/lib/numberFormat';
 import { useTimeFormat } from '@/lib/timeFormat';
 import { useMobileTabs } from '@/lib/mobileTabs';
+import { requestPersistenceWhenInstalled } from '@/lib/persistStorage';
+import { checkStorageAtRisk } from '@/features/settings/storageAtRisk';
 import { useCharacterCountOrLoading } from '@/features/character/useCharacters';
 
 // Wire authenticated ESI calls to stored tokens once, at module load. Wrapped
@@ -340,6 +342,13 @@ function AppEffects() {
   useEffect(() => reloadOnDatabaseWipe(), []);
   useEffect(() => scheduleCachePrune(), []);
   useEffect(() => scheduleLazySdeWarm(), []);
+  // An installed app is where the browser agrees to keep the data; a device
+  // set up in a tab, or by import, may never have asked since (persistStorage.ts).
+  useEffect(() => {
+    void requestPersistenceWhenInstalled()
+      .then(() => checkStorageAtRisk())
+      .catch(() => undefined);
+  }, []);
   // Back online: drop held failures, re-read, sync, warm what was skipped.
   useEffect(() => startReconnectRecovery(), []);
 

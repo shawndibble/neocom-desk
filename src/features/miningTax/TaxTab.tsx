@@ -1136,7 +1136,6 @@ export function TaxTab({ tabBar, tabsId }: TaxTabProps) {
               characterIds={characterIds}
               characterNames={characterNames}
               systemNames={systemNames}
-              typeNames={data?.typeNames ?? NO_NAMES}
             />
 
             {/* Until a Payee exists there is nothing to assign an entry to, so
