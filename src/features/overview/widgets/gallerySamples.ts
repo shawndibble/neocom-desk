@@ -381,6 +381,25 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ],
       },
     },
+    // The PLEX and Large Skill Injector preset cards: one line, so the area fill shows.
+    marketTrendSingle: {
+      value: '+1.7%',
+      unit: t('overview.widgets.data.marketTrend.unit', { item: 'PLEX', days: 7 }),
+      rows: [['PLEX', '', '+1.7%']],
+      chart: {
+        kind: 'lines',
+        summary: '',
+        series: [
+          {
+            key: 'a',
+            label: 'PLEX',
+            color: 'accent',
+            end: '+1.7%',
+            values: [0, -1, -0.5, 0.4, 1.2, 0.8, 1.7],
+          },
+        ],
+      },
+    },
     tradingProfit: {
       value: '+132M',
       isk: 132_000_000,

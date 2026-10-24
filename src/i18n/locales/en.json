@@ -5592,7 +5592,7 @@
         "summary_other": "{{count}} open SRP claims, {{owed}} owed."
       },
       "marketTrend": {
-        "title": "Market trend",
+        "title": "Item prices",
         "description": "How the prices of the items you pick are moving, at the trade hubs you pick",
         "empty": "Your Quickbar is empty.",
         "emptyHint": "Add items to your Quickbar from the Market, then their price trend shows here.",
@@ -5707,19 +5707,11 @@
       "presets": {
         "plex": {
           "title": "PLEX price",
-          "desc": "Market trend of PLEX, ready to go"
+          "desc": "PLEX over time, on the global market"
         },
         "injector": {
           "title": "Large Skill Injector price",
-          "desc": "Market trend of the Large Skill Injector, ready to go"
-        },
-        "minerals": {
-          "title": "Mineral prices",
-          "desc": "Tritanium, Pyerite and Mexallon at Jita; the Items menu adds more"
-        },
-        "ore": {
-          "title": "Ore prices",
-          "desc": "Veldspar, Scordite and Pyroxeres at Jita; the Items menu adds more"
+          "desc": "The Large Skill Injector over time, at your trade hub"
         }
       },
       "noMatchHint": "Try another word, or clear the search to see every widget.",
