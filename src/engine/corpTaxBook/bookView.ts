@@ -844,12 +844,39 @@ export interface PeriodRow {
   start: string;
   end: string;
   /** issued: on a Statement but not (all) mailed yet; sent: mailed; overdue: one of its Statements is past due; paid: settled. */
-  status: 'issued' | 'sent' | 'overdue' | 'paid' | 'ready' | 'open';
+  status: 'issued' | 'sent' | 'overdue' | 'paid' | 'ready' | 'closed' | 'open';
   miners: number;
   billed: number;
   paid: number;
   outstanding: number;
   issuedAt: string | null;
+}
+
+/**
+ * What a period's own days bill: its mined days not already on a Statement, not
+ * the run-to-date total a Statement for it would carry.
+ */
+function ownPeriodBilling(view: BookView, period: StatementPeriod) {
+  let miners = 0;
+  let billed = 0;
+  for (const m of view.miners) {
+    const draft = draftStatement({
+      minerId: m.id,
+      startDate: view.input.startDate > period.start ? view.input.startDate : period.start,
+      period,
+      charges: view.charges.filter((c) => c.minerId === m.id),
+      adjustments: view.input.adjustments.filter((a) => a.date >= period.start),
+      issued: view.internals.byMiner.get(m.id)!.statements,
+      paidStatementIds: view.input.paidStatementIds,
+      dismissals: view.input.dismissals,
+      billableThrough: view.billableThrough,
+      minimumAmount: 0,
+    });
+    if (draft.kind !== 'statement') continue;
+    miners += 1;
+    billed += draft.amount;
+  }
+  return { miners, billed };
 }
 
 export function periodRows(view: BookView): PeriodRow[] {
@@ -893,21 +920,33 @@ export function periodRows(view: BookView): PeriodRow[] {
   }
   const ready = nextRunPeriod(view);
   const today = statementPeriod(view.input.now.slice(0, 10), view.input.cadence);
-  const add = (period: StatementPeriod, status: 'ready' | 'open') => {
+  const add = (period: StatementPeriod, status: PeriodRow['status']) => {
     if (rows.some((r) => r.start === period.start)) return;
-    const plan = planStatementRun(view, period);
+    const own = ownPeriodBilling(view, period);
+    if (status === 'closed' && own.miners === 0) return;
     rows.push({
       start: period.start,
       end: period.end,
       status,
-      miners: plan.lines.length,
-      billed: plan.lines.reduce((s, l) => s + l.draft.amount, 0),
+      miners: own.miners,
+      billed: own.billed,
       paid: 0,
       outstanding: 0,
       issuedAt: null,
     });
   };
-  if (ready) add(ready, 'ready');
+  // Every period with unbilled days, not only the next one; a Statement still
+  // covers every day since the last, so only the earliest closed one is sendable.
+  const seen = new Set<string>();
+  for (const date of view.charges.map((c) => c.date).sort()) {
+    const period = statementPeriod(date, view.input.cadence);
+    if (seen.has(period.start)) continue;
+    seen.add(period.start);
+    if (period.start === ready?.start) add(period, 'ready');
+    else if (view.billableThrough !== undefined && period.end <= view.billableThrough)
+      add(period, 'closed');
+    else add(period, 'open');
+  }
   add(today, 'open');
   return rows.sort((a, b) => b.start.localeCompare(a.start));
 }

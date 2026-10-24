@@ -1707,6 +1707,7 @@ export async function readStatementByToken(deps: BookDeps, token: string) {
       overdueDays: b.overdueDays,
       minimumStatement: b.minimumStatement,
       divisions: b.divisions,
+      cadence: b.cadence,
     },
     payments: here
       .map((c) => {

@@ -14867,6 +14867,13 @@
       "theCorp": "the corporation",
       "refinery": "Refinery {{id}}",
       "eyebrow": "{{corp}} · Statement {{period}} · issued {{issued}}",
+      "priceSaved": "price saved on the day",
+      "cadence": {
+        "monthly": "monthly",
+        "weekly": "weekly",
+        "fortnightly": "fortnightly",
+        "regular": "next"
+      },
       "closed": "This account is closed. {{corp}} sent a final Statement and will not mail you again.",
       "mined": "What you mined",
       "minedMeta": "{{hub}} buy, {{form}} ore, priced on the day mined",
@@ -14923,7 +14930,7 @@
       },
       "stop": {
         "label": "Stop reminders",
-        "hint": "Your monthly Statement still comes. Officers can send you at most one reminder per Statement.",
+        "hint": "Your {{cadence}} Statement still comes. Officers can send you at most one reminder per Statement.",
         "failed": "Couldn't save that. Try again."
       }
     },
@@ -15030,7 +15037,9 @@
       "overdueDays_other": "Overdue {{count}} days",
       "moreCharacters_one": "+{{count}} character",
       "moreCharacters_other": "+{{count}} characters",
-      "oreUnknown": "Ore unknown — link a survey",
+      "oreUnknown": "Ore unknown",
+      "oreUnknownLabel": "Why the ore is unknown",
+      "oreUnknownWhy": "No extraction notification gave this chunk's ore. A Survey can stand in for it.",
       "minedVsLeft": "{{mined}}% mined · {{left}}% left",
       "startedOn": "started {{date}}",
       "extractionsSummary_one": "{{count}} Extraction",
@@ -15061,6 +15070,7 @@
         "overdue": "Overdue",
         "paid": "Paid",
         "ready": "Ready to send",
+        "closed": "Closed",
         "open": "Open"
       },
       "payment": {
@@ -15135,6 +15145,7 @@
         "notFound": "This extraction is not in the book",
         "thisExtraction": "This extraction",
         "dismiss": "Dismiss tax for this extraction…",
+        "dismissNone": "No tax recorded yet",
         "started": "Started",
         "arrived": "Chunk arrived",
         "fractured": "Fractured",
@@ -15153,7 +15164,7 @@
           "default": "Estimated at the default {{rate}} m³/h"
         },
         "link": {
-          "open": "Link a survey…",
+          "open": "Link a Survey…",
           "change": "Change survey…",
           "title": "Link a Survey to this chunk",
           "intro": "No extraction notification gave this chunk's ore. A Moon Ore Survey scanned before the chunk was mined can stand in for it.",
@@ -15175,6 +15186,8 @@
         "members": "Members",
         "nonMembers": "Non-members",
         "summary": "{{shown}} of {{total}} Miners",
+        "nonMembersHidden_one": "{{count}} non-member hidden · {{amount}} owed",
+        "nonMembersHidden_other": "{{count}} non-members hidden · {{amount}} owed",
         "hidden_one": "{{count}} other Miner owes nothing and has no credit.",
         "hidden_other": "{{count}} other Miners owe nothing and have no credit."
       },
@@ -15200,7 +15213,7 @@
         },
         "unmatched": {
           "title": "Unmatched donation · {{amount}} from {{name}}",
-          "body": "{{date}}. Not a character any Miner has; the player can claim it, or you can assign it.",
+          "body": "{{date}}. {{name}} has not mined at your refineries, so there is no Miner to credit.",
           "bodyInMiner": "{{date}}. {{name}} is in a Miner now; the next sync assigns it, or you can assign it.",
           "assign": "Assign to a Miner…",
           "notTax": "Not tax…"
@@ -15221,6 +15234,7 @@
         "notFound": "This Miner is not in the book",
         "record": "Record payment…",
         "remind": "Send reminder",
+        "remindNone": "No Statement issued yet",
         "dismissAll": "Dismiss tax…",
         "closeAccount": "Close account…",
         "closedNote": "Account closed on {{date}}. Statement mail has stopped; the final Statement and any earlier ones still go out.",
@@ -15288,6 +15302,12 @@
           "recordReminder": "sent a reminder",
           "recordMail": "mailed a Statement",
           "stopReminders": "stopped reminders"
+        },
+        "actionsTo": {
+          "issueStatement": "issued a Statement to {{name}}, {{amount}} ISK",
+          "issueStatementPlain": "issued a Statement to {{name}}",
+          "recordMail": "mailed a Statement to {{name}}",
+          "recordReminder": "sent a reminder to {{name}}"
         }
       },
       "health": {
@@ -15361,7 +15381,11 @@
       "periods": {
         "title": "All periods",
         "meta": "{{cadence}} · minimum {{minimum}}",
-        "writeOffs": "Written off: {{tolerance}} left over by {{toleranceCount}} payments within tolerance (logged), and {{lateCount}} lines recorded after payment, never billed. Both are on each Miner's page."
+        "writeOffsTolerance": "{{tolerance}} left over by {{count}} payments within tolerance, written off.",
+        "writeOffsLate_one": "{{count}} line recorded after payment, never billed.",
+        "writeOffsLate_other": "{{count}} lines recorded after payment, never billed.",
+        "writeOffsLabel": "About write-offs",
+        "writeOffsTip": "Both are logged and shown on each Miner's page."
       },
       "scope": {
         "title": "Allow the refinery ledger",
@@ -15820,7 +15844,7 @@
           "confirm": "Mark {{amount}} not tax",
           "intro": "Donation from {{name}}, {{at}} EVE time, {{amount}}.",
           "how": "How much of it is not tax",
-          "all": "All {{amount}}",
+          "all": "All",
           "part": "Part",
           "amount": "Amount not tax",
           "reason": "Reason (required)",

@@ -23,7 +23,7 @@ import { NeedsYouQueue } from './NeedsYouQueue';
 const PARAMS = {
   q: textParam(),
   members: boolParam(true),
-  guests: boolParam(false),
+  guests: boolParam(true),
 };
 
 /** A Miner is listed while it owes, is owed, or has days waiting; the rest are only counted. */
@@ -38,8 +38,8 @@ export function MinersTab() {
 
   const counts = useMemo(
     () => ({
-      members: view.miners.filter((m) => m.standing !== 'guest').length,
-      guests: view.miners.filter((m) => m.standing === 'guest').length,
+      members: view.miners.filter((m) => m.standing !== 'guest' && isActive(m)).length,
+      guests: view.miners.filter((m) => m.standing === 'guest' && isActive(m)).length,
     }),
     [view.miners]
   );
@@ -55,6 +55,11 @@ export function MinersTab() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `names` identity changes as names resolve
   }, [view.miners, params, names]);
+  // What the Non-members chip being off keeps out of the table.
+  const hiddenGuests = params.guests
+    ? []
+    : view.miners.filter((m) => m.standing === 'guest' && isActive(m));
+  const hiddenGuestOwed = hiddenGuests.reduce((sum, m) => sum + m.owed, 0);
   const hidden = view.miners.length - view.miners.filter(isActive).length;
 
   const columns: DataTableColumn<MinerRow>[] = [
@@ -183,6 +188,14 @@ export function MinersTab() {
             total: view.miners.length,
           })}
         />
+        {hiddenGuests.length > 0 && (
+          <p className="border-t border-line px-3 py-2 text-xs text-text-dim">
+            {t('corpTaxBook.moons.miners.nonMembersHidden', {
+              count: hiddenGuests.length,
+              amount: isk(hiddenGuestOwed),
+            })}
+          </p>
+        )}
         {hidden > 0 && (
           <p className="border-t border-line px-3 py-2 text-xs text-text-dim">
             {t('corpTaxBook.moons.miners.hidden', { count: hidden })}

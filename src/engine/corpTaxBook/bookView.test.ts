@@ -164,6 +164,39 @@ describe('buildBookView', () => {
     expect(rows.find((r) => r.start === '2026-09-01')?.status).toBe('issued');
   });
 
+  it('lists every closed period with its own billed figure, not a running total (CX-38)', () => {
+    const view = buildBookView(
+      input({
+        entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 1000)],
+        now: '2026-10-05T12:00:00Z',
+        lastSyncedAt: '2026-10-05T12:00:00Z',
+      })
+    );
+    const rows = periodRows(view);
+    expect(rows.find((r) => r.start === '2026-08-01')).toMatchObject({
+      status: 'ready',
+      billed: 100_000,
+      miners: 1,
+    });
+    expect(rows.find((r) => r.start === '2026-09-01')).toMatchObject({
+      status: 'closed',
+      billed: 100_000,
+      miners: 1,
+    });
+    expect(rows.find((r) => r.start === '2026-10-01')?.status).toBe('open');
+  });
+
+  it('bills the open period for its own days only (CX-38)', () => {
+    const view = buildBookView(
+      input({
+        entries: [entry(1, '2026-08-10', 1000), entry(1, '2026-09-10', 1000)],
+        now: '2026-09-18T14:00:00Z',
+      })
+    );
+    const open = periodRows(view).find((r) => r.status === 'open');
+    expect(open).toMatchObject({ start: '2026-09-01', billed: 100_000 });
+  });
+
   it('counts a donation before the start date and lists it nowhere (#4505)', () => {
     const view = buildBookView({
       ...input({ entries: [entry(1, '2026-08-10', 1000)] }),
