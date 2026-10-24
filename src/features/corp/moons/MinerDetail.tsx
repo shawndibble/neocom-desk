@@ -28,12 +28,7 @@ import { isk, shortDate, shortDateTime } from './moonsFormat';
 import { Crumb, StandingWord } from './moonsParts';
 import { MinerCharacters } from './MinerCharacters';
 import { MinerCorrections } from './MinerCorrections';
-import {
-  manualRemindersSent,
-  mailTarget,
-  remindersStopped,
-  useCorporationName,
-} from './statementMailing';
+import { useMinerReminder } from './statementMailing';
 
 const STATUS_TONE: Record<DayStatus, string> = {
   paid: 'text-success',
@@ -50,8 +45,7 @@ type Payment = NonNullable<ReturnType<typeof minerDetail>>['payments'][number];
 export function MinerDetail({ id }: { id: string }) {
   const { t } = useTranslation();
   const ctx = useBook();
-  const { view, names, edit, canEdit, corporationId, characterId } = ctx;
-  const corporationName = useCorporationName();
+  const { view, names, edit, canEdit, corporationId } = ctx;
   const detail = minerDetail(view, id);
   const audit = useBookAudit();
   const queue = useLiveQuery(() => listQueue(corporationId), [corporationId], []);
@@ -66,6 +60,7 @@ export function MinerDetail({ id }: { id: string }) {
     | null
   >(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const reminder = useMinerReminder(id, setNotice);
 
   const statementIds = useMemo(() => new Set(detail?.statements.map((s) => s.id)), [detail]);
   const paymentIds = useMemo(() => new Set(detail?.payments.map((p) => p.id)), [detail]);
@@ -104,32 +99,6 @@ export function MinerDetail({ id }: { id: string }) {
   const selectedDays = detail.days.filter((d) => selected.has(d.key));
   const selectedTax = selectedDays.reduce((s, d) => s + d.tax, 0);
   const canSelect = (d: DayRow) => d.status === 'unbilled' || d.status === 'not-billable';
-
-  const remindBlock = !openStatement
-    ? t('corpTaxBook.moons.miner.remindNone')
-    : corporationName === null
-      ? t('corpTaxBook.moons.run.loadingCorporation')
-      : null;
-
-  const remind = async () => {
-    if (!openStatement || corporationName === null) return;
-    const { enqueueReminder } = await import('@/features/corpTaxBook/mailQueue');
-    const result = await enqueueReminder({
-      corporationId,
-      corporationName,
-      senderCharacterId: characterId,
-      refineryName: (sid) => names.refinery(sid),
-      statement: mailTarget(ctx, openStatement, row, { amountDue: row.owed, carried: 0 }),
-      remindersStopped: remindersStopped(openStatement),
-      manualRemindersSent: manualRemindersSent(openStatement),
-    });
-    setNotice(
-      result.ok
-        ? t('corpTaxBook.moons.needs.reminderQueued', { name })
-        : t(`corpTaxBook.moons.needs.reminderRefused.${result.reason}`)
-    );
-    ctx.reload();
-  };
 
   const dayColumns: DataTableColumn<DayRow>[] = [
     ...(canEdit
@@ -303,14 +272,14 @@ export function MinerDetail({ id }: { id: string }) {
               <Button size="sm" onClick={() => setDialog({ kind: 'record' })}>
                 {t('corpTaxBook.moons.miner.record')}
               </Button>
-              {remindBlock ? (
-                <Tooltip content={remindBlock}>
+              {reminder.block ? (
+                <Tooltip content={reminder.block}>
                   <Button size="sm" variant="ghost" aria-disabled="true">
                     {t('corpTaxBook.moons.miner.remind')}
                   </Button>
                 </Tooltip>
               ) : (
-                <Button size="sm" variant="ghost" onClick={() => void remind()}>
+                <Button size="sm" variant="ghost" onClick={() => void reminder.send()}>
                   {t('corpTaxBook.moons.miner.remind')}
                 </Button>
               )}

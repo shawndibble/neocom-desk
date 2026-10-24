@@ -4,7 +4,8 @@
  * queue itself (pacing, 520 waits, the chip) is #4064's; nothing here
  * duplicates it.
  */
-import type { MinerRow } from '@/engine/corpTaxBook/bookView';
+import { useTranslation } from 'react-i18next';
+import { minerDetail, type MinerRow } from '@/engine/corpTaxBook/bookView';
 import type { Statement } from '@/engine/corpTaxBook/statements';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useEntityName } from '@/features/character/useEntityName';
@@ -77,4 +78,51 @@ export function useCorporationName(): string | null {
   const known = info?.corporationId === corporationId ? info.corporationName : null;
   const resolved = useEntityName(known ? undefined : corporationId);
   return known || resolved || null;
+}
+
+/**
+ * "Send reminder" for one Miner, as the Miner's page and the Miners row menu both offer it:
+ * `block` is why it cannot be sent (null when it can) and `send` queues the mail for the Miner's
+ * oldest unsettled Statement, then reports the outcome through `onNotice` and reloads the book.
+ */
+export function useMinerReminder(minerId: string, onNotice: (text: string) => void) {
+  const { t } = useTranslation();
+  const ctx = useBook();
+  const { view, names, corporationId, characterId } = ctx;
+  const corporationName = useCorporationName();
+  const detail = minerDetail(view, minerId);
+  const openStatement = detail?.statements.find(
+    (s) => !view.internals.byMiner.get(minerId)?.allocation.byStatement.get(s.id)?.settled
+  );
+  const block = !openStatement
+    ? t('corpTaxBook.moons.miner.remindNone')
+    : corporationName === null
+      ? t('corpTaxBook.moons.run.loadingCorporation')
+      : null;
+
+  const send = async () => {
+    if (!detail || !openStatement || corporationName === null) return;
+    const { enqueueReminder } = await import('@/features/corpTaxBook/mailQueue');
+    const result = await enqueueReminder({
+      corporationId,
+      corporationName,
+      senderCharacterId: characterId,
+      refineryName: (sid) => names.refinery(sid),
+      statement: mailTarget(ctx, openStatement, detail.row, {
+        amountDue: detail.row.owed,
+        carried: 0,
+      }),
+      remindersStopped: remindersStopped(openStatement),
+      manualRemindersSent: manualRemindersSent(openStatement),
+    });
+    onNotice(
+      result.ok
+        ? t('corpTaxBook.moons.needs.reminderQueued', {
+            name: names.character(detail.row.mainCharacterId),
+          })
+        : t(`corpTaxBook.moons.needs.reminderRefused.${result.reason}`)
+    );
+    ctx.reload();
+  };
+  return { block, send };
 }

@@ -15255,7 +15255,6 @@
         "record": "Record payment…",
         "remind": "Send reminder",
         "remindNone": "No Statement issued yet",
-        "remindNoCorporation": "The corporation name is still loading",
         "dismissAll": "Dismiss tax…",
         "closeAccount": "Close account…",
         "closedNote": "Account closed on {{date}}. Statement mail has stopped; the final Statement and any earlier ones still go out.",

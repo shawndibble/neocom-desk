@@ -150,6 +150,20 @@ describe('MinersTab', () => {
   });
 });
 
+describe('MinersTab row menu dialogs', () => {
+  it('Record payment… and Dismiss tax… open their dialogs from the ⋮', async () => {
+    renderBook(<MinersTab />);
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Record payment…' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pilot 1' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Dismiss tax…' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+});
+
 describe('StatementRun', () => {
   it('keeps Send disabled until the corporation name resolves, then previews with it', async () => {
     corpName.value = null;

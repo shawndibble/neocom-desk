@@ -7,75 +7,26 @@
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DisabledMenuItem, MenuItem, RowActionsMenu } from '@/components/ui';
-import { minerDetail, type MinerRow } from '@/engine/corpTaxBook/bookView';
+import type { MinerRow } from '@/engine/corpTaxBook/bookView';
 import { EntityShowInfoMenuItem } from '../corpRowMenus';
 import { useBook } from './useBook';
-import {
-  manualRemindersSent,
-  mailTarget,
-  remindersStopped,
-  useCorporationName,
-} from './statementMailing';
+import { useMinerReminder } from './statementMailing';
 
-/** "Send reminder": queues the same mail the Miner's page does, for the Miner's open Statement. */
+/** "Send reminder": the same mail the Miner's page queues; inert with its reason when it cannot go. */
 function RemindMenuItem({
-  miner,
+  minerId,
   onNotice,
 }: {
-  miner: MinerRow;
+  minerId: string;
   onNotice: (text: string) => void;
 }) {
   const { t } = useTranslation();
-  const ctx = useBook();
-  const { view, names, corporationId, characterId } = ctx;
-  const corporationName = useCorporationName();
-  const detail = minerDetail(view, miner.id);
-  const openStatement = detail?.statements.find(
-    (s) => !view.internals.byMiner.get(miner.id)?.allocation.byStatement.get(s.id)?.settled
-  );
+  const { block, send } = useMinerReminder(minerId, onNotice);
   const label = t('corpTaxBook.moons.miner.remind');
-  if (!openStatement) {
-    return (
-      <DisabledMenuItem reason={t('corpTaxBook.moons.miner.remindNone')}>{label}</DisabledMenuItem>
-    );
-  }
-  if (corporationName === null) {
-    return (
-      <DisabledMenuItem reason={t('corpTaxBook.moons.miner.remindNoCorporation')}>
-        {label}
-      </DisabledMenuItem>
-    );
-  }
-  return (
-    <MenuItem
-      onSelect={() => {
-        void (async () => {
-          const { enqueueReminder } = await import('@/features/corpTaxBook/mailQueue');
-          const result = await enqueueReminder({
-            corporationId,
-            corporationName,
-            senderCharacterId: characterId,
-            refineryName: (sid) => names.refinery(sid),
-            statement: mailTarget(ctx, openStatement, miner, {
-              amountDue: miner.owed,
-              carried: 0,
-            }),
-            remindersStopped: remindersStopped(openStatement),
-            manualRemindersSent: manualRemindersSent(openStatement),
-          });
-          onNotice(
-            result.ok
-              ? t('corpTaxBook.moons.needs.reminderQueued', {
-                  name: names.character(miner.mainCharacterId),
-                })
-              : t(`corpTaxBook.moons.needs.reminderRefused.${result.reason}`)
-          );
-          ctx.reload();
-        })();
-      }}
-    >
-      {label}
-    </MenuItem>
+  return block ? (
+    <DisabledMenuItem reason={block}>{label}</DisabledMenuItem>
+  ) : (
+    <MenuItem onSelect={() => void send()}>{label}</MenuItem>
   );
 }
 
@@ -85,6 +36,7 @@ export function MinerRowMenu({
   onDismiss,
   onNotice,
   onCloseAutoFocus,
+  onOpenChange,
   children,
 }: {
   miner: MinerRow;
@@ -93,6 +45,7 @@ export function MinerRowMenu({
   onDismiss: (miner: MinerRow) => void;
   onNotice: (text: string) => void;
   onCloseAutoFocus: (event: Event) => void;
+  onOpenChange?: (open: boolean) => void;
   children: ReactElement;
 }) {
   const { t } = useTranslation();
@@ -103,12 +56,13 @@ export function MinerRowMenu({
     <RowActionsMenu
       name={name}
       onCloseAutoFocus={onCloseAutoFocus}
+      onOpenChange={onOpenChange}
       items={
         <>
           <MenuItem onSelect={() => onRecord(miner)}>
             {t('corpTaxBook.moons.miner.record')}
           </MenuItem>
-          <RemindMenuItem miner={miner} onNotice={onNotice} />
+          <RemindMenuItem minerId={miner.id} onNotice={onNotice} />
           <MenuItem onSelect={() => onDismiss(miner)}>
             {t('corpTaxBook.moons.miner.dismissAll')}
           </MenuItem>

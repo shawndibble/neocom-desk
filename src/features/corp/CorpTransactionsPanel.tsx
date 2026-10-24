@@ -17,7 +17,7 @@
  * character view answers a much smaller list.
  */
 import { formatCount } from '@/lib/formatCount';
-import { useMemo, type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
 import { COL_DATETIME, COL_ISK, COL_QUANTITY } from '@/components/ui/dataTableWidths';
 import { useTranslation } from 'react-i18next';
 import {
@@ -264,6 +264,25 @@ export function CorpTransactionsPanel({
     [columns, isVisible]
   );
 
+  const rowContextMenu = useCallback(
+    (txn: CorporationWalletTransaction, tr: ReactElement) => (
+      <ItemContextMenu
+        typeId={txn.type_id}
+        itemName={nameFor(txn.type_id)}
+        hideStockTarget
+        linksKeepBrowserMenu
+        extraItems={
+          <MenuItem onSelect={() => onFilterChange({ ...filter, text: nameFor(txn.type_id) })}>
+            {t('wallet.filterToItem')}
+          </MenuItem>
+        }
+      >
+        {tr}
+      </ItemContextMenu>
+    ),
+    [nameFor, filter, onFilterChange, t]
+  );
+
   const csvColumns = useMemo(() => walletTransactionsCsvColumns(t, nameFor), [t, nameFor]);
   const tableExport = useTableExport({
     surface: 'corp-wallet-transactions',
@@ -363,23 +382,7 @@ export function CorpTransactionsPanel({
                 sort={sort}
                 onSortChange={onSortChange}
                 responsive="table"
-                rowContextMenu={(txn, tr) => (
-                  <ItemContextMenu
-                    typeId={txn.type_id}
-                    itemName={nameFor(txn.type_id)}
-                    hideStockTarget
-                    linksKeepBrowserMenu
-                    extraItems={
-                      <MenuItem
-                        onSelect={() => onFilterChange({ ...filter, text: nameFor(txn.type_id) })}
-                      >
-                        {t('wallet.filterToItem')}
-                      </MenuItem>
-                    }
-                  >
-                    {tr}
-                  </ItemContextMenu>
-                )}
+                rowContextMenu={rowContextMenu}
                 rowMoreActions
               />
             </div>
