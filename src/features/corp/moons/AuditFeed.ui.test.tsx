@@ -12,6 +12,14 @@ describe('AuditFeed subject (CX-47)', () => {
         entries={[
           { id: 'a1', at, by: 1, byName: 'Pilot', action: 'issueStatement', detail: {} },
           { id: 'a2', at, by: 1, byName: 'Pilot', action: 'recordMail', detail: {} },
+          {
+            id: 'a4',
+            at,
+            by: 1,
+            byName: 'Pilot',
+            action: 'recordMail',
+            detail: { kind: 'reminder' },
+          },
           { id: 'a3', at, by: 1, byName: 'Pilot', action: 'stopReminders', detail: {} },
         ]}
         subject={(e) =>
@@ -27,6 +35,7 @@ describe('AuditFeed subject (CX-47)', () => {
       screen.getByText(/issued a Statement to Dax Ferrin, 28,390,765 ISK/)
     ).toBeInTheDocument();
     expect(screen.getByText(/mailed a Statement to Dax Ferrin/)).toBeInTheDocument();
+    expect(screen.getByText(/sent a reminder to Dax Ferrin/)).toBeInTheDocument();
     expect(screen.getByText(/stopped reminders/)).toBeInTheDocument();
   });
 });

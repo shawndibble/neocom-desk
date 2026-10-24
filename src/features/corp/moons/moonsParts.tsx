@@ -80,15 +80,7 @@ export function OreLine({
           />
         </span>
         {onLink && (
-          <button
-            type="button"
-            className={textActionClassName()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onLink();
-            }}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
+          <button type="button" className={textActionClassName()} onClick={onLink}>
             {t('corpTaxBook.moons.moon.link.open')}
           </button>
         )}

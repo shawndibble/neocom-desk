@@ -15086,6 +15086,7 @@
         "paid": "Paid",
         "ready": "Ready to send",
         "closed": "Closed",
+        "rollover": "Rolls over",
         "open": "Open"
       },
       "payment": {
@@ -15401,7 +15402,8 @@
       "periods": {
         "title": "All periods",
         "meta": "{{cadence}} · minimum {{minimum}}",
-        "writeOffsTolerance": "{{tolerance}} left over by {{count}} payments within tolerance, written off.",
+        "writeOffsTolerance_one": "{{tolerance}} left over by {{count}} payment within tolerance, written off.",
+        "writeOffsTolerance_other": "{{tolerance}} left over by {{count}} payments within tolerance, written off.",
         "writeOffsLate_one": "{{count}} line recorded after payment, never billed.",
         "writeOffsLate_other": "{{count}} lines recorded after payment, never billed.",
         "writeOffsLabel": "About write-offs",

@@ -844,7 +844,7 @@ export interface PeriodRow {
   start: string;
   end: string;
   /** issued: on a Statement but not (all) mailed yet; sent: mailed; overdue: one of its Statements is past due; paid: settled. */
-  status: 'issued' | 'sent' | 'overdue' | 'paid' | 'ready' | 'closed' | 'open';
+  status: 'issued' | 'sent' | 'overdue' | 'paid' | 'ready' | 'closed' | 'rollover' | 'open';
   miners: number;
   billed: number;
   paid: number;
@@ -854,29 +854,44 @@ export interface PeriodRow {
 
 /**
  * What a period's own days bill: its mined days not already on a Statement, not
- * the run-to-date total a Statement for it would carry.
+ * the run-to-date total a Statement for it would carry. `minimum` applies the
+ * book's minimum Statement; below it a Miner's amount rolls into a later one.
  */
-function ownPeriodBilling(view: BookView, period: StatementPeriod) {
+function ownPeriodBilling(
+  view: BookView,
+  chargesByMiner: ReadonlyMap<string, BookView['charges']>,
+  period: StatementPeriod,
+  minimum: number
+) {
   let miners = 0;
   let billed = 0;
+  let rolled = 0;
+  let rolledAmount = 0;
+  const closed = new Set(view.input.miners.filter((m) => m.closedAt).map((m) => m.id));
+  const adjustments = view.input.adjustments.filter((a) => a.date >= period.start);
   for (const m of view.miners) {
+    if (closed.has(m.id)) continue;
     const draft = draftStatement({
       minerId: m.id,
       startDate: view.input.startDate > period.start ? view.input.startDate : period.start,
       period,
-      charges: view.charges.filter((c) => c.minerId === m.id),
-      adjustments: view.input.adjustments.filter((a) => a.date >= period.start),
+      charges: chargesByMiner.get(m.id) ?? [],
+      adjustments,
       issued: view.internals.byMiner.get(m.id)!.statements,
       paidStatementIds: view.input.paidStatementIds,
       dismissals: view.input.dismissals,
       billableThrough: view.billableThrough,
-      minimumAmount: 0,
+      minimumAmount: minimum,
     });
+    if (draft.kind === 'rolled-over') {
+      rolled += 1;
+      rolledAmount += draft.amount;
+    }
     if (draft.kind !== 'statement') continue;
     miners += 1;
     billed += draft.amount;
   }
-  return { miners, billed };
+  return { miners, billed, rolled, rolledAmount };
 }
 
 export function periodRows(view: BookView): PeriodRow[] {
@@ -920,16 +935,36 @@ export function periodRows(view: BookView): PeriodRow[] {
   }
   const ready = nextRunPeriod(view);
   const today = statementPeriod(view.input.now.slice(0, 10), view.input.cadence);
+  const chargesByMiner = new Map<string, BookView['charges']>();
+  for (const c of view.charges) {
+    chargesByMiner.set(c.minerId, [...(chargesByMiner.get(c.minerId) ?? []), c]);
+  }
   const add = (period: StatementPeriod, status: PeriodRow['status']) => {
     if (rows.some((r) => r.start === period.start)) return;
-    const own = ownPeriodBilling(view, period);
-    if (status === 'closed' && own.miners === 0) return;
+    let row: Pick<PeriodRow, 'status' | 'miners' | 'billed'>;
+    if (status === 'ready') {
+      // The Send plan itself, so the row matches what Send will do.
+      const plan = planStatementRun(view, period);
+      row = {
+        status,
+        miners: plan.lines.length,
+        billed: plan.lines.reduce((s, l) => s + l.draft.amount, 0),
+      };
+    } else if (status === 'closed') {
+      const own = ownPeriodBilling(view, chargesByMiner, period, view.input.minimumStatement);
+      if (own.miners === 0 && own.rolled === 0) return;
+      row =
+        own.miners > 0
+          ? { status, miners: own.miners, billed: own.billed }
+          : { status: 'rollover', miners: own.rolled, billed: own.rolledAmount };
+    } else {
+      const own = ownPeriodBilling(view, chargesByMiner, period, 0);
+      row = { status, miners: own.miners, billed: own.billed };
+    }
     rows.push({
       start: period.start,
       end: period.end,
-      status,
-      miners: own.miners,
-      billed: own.billed,
+      ...row,
       paid: 0,
       outstanding: 0,
       issuedAt: null,

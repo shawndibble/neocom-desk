@@ -21,6 +21,7 @@ import { formatIsk } from '@/lib/isk';
 
 import { TRADE_HUBS } from '@/market/hubs';
 import { GroupingQuestions } from './GroupingQuestions';
+import { verifyPeriodLabel as periodLabel } from './verifyPeriodLabel';
 import { readVerifyStatement, setVerifyRemindersStopped } from './verifyApi';
 
 const isk = (value: number, decimals = 0) => `${formatIsk(value, decimals)} ISK`;
@@ -40,28 +41,6 @@ function shortDate(value: string, locale?: string): string {
     year: 'numeric',
     timeZone: 'UTC',
   });
-}
-
-function periodLabel(start: string, end: string, locale?: string): string {
-  const from = new Date(`${start}T00:00:00Z`);
-  const to = new Date(`${end}T00:00:00Z`);
-  const fmt = (d: Date, opts: Intl.DateTimeFormatOptions) =>
-    d.toLocaleDateString(locale, { ...opts, timeZone: 'UTC' });
-  const sameMonth = start.slice(0, 7) === end.slice(0, 7);
-  // A whole calendar month reads as "Oct 2026"; any other period as "2–8 Oct 2026".
-  if (sameMonth && start.endsWith('-01') && to.getUTCDate() === daysInMonth(to))
-    return fmt(from, { month: 'short', year: 'numeric' });
-  if (sameMonth)
-    return `${from.getUTCDate()}–${fmt(to, { day: 'numeric', month: 'short', year: 'numeric' })}`;
-  return `${fmt(from, { day: 'numeric', month: 'short' })} – ${fmt(to, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })}`;
-}
-
-function daysInMonth(d: Date): number {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
 }
 
 /** The cadence word for "Your weekly Statement still comes": from the book's setting, else the period's length. */
