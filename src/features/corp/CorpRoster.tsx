@@ -39,6 +39,7 @@ import {
   type RosterDiff,
 } from '@/engine/corp/members';
 import { useDarkThreshold } from './darkThreshold';
+import { CharacterRowMenu } from './corpRowMenus';
 import { corpRoleLabel } from './roles';
 import {
   CORP_ROSTER_COLUMN_IDS,
@@ -347,6 +348,12 @@ export function CorpRosterTable({
         virtualize="auto"
         label={t('corp.members.tableLabel')}
         density="compact"
+        rowContextMenu={(row, tr) => (
+          <CharacterRowMenu characterId={row.characterId} name={row.name}>
+            {tr}
+          </CharacterRowMenu>
+        )}
+        rowMoreActions
         {...sortProps}
       />
     </div>

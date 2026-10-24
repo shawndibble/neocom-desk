@@ -62,16 +62,22 @@ function renderPanel(overrides: Partial<Parameters<typeof CorpTransactionsPanel>
   return { actions };
 }
 
-describe('CorpTransactionsPanel — a read-only ledger row', () => {
-  it('has no More actions button or context menu; the item name links to Show info', async () => {
-    renderPanel();
+describe('CorpTransactionsPanel — row menu', () => {
+  it('opens the ⋮ with the item actions and a filter to this item; the name still links to Show info', async () => {
+    const onFilterChange = vi.fn();
+    renderPanel({ onFilterChange });
 
-    const row = await screen.findByRole('row', { name: /Damage Control II/ });
+    await screen.findByRole('row', { name: /Damage Control II/ });
     expect(screen.getByRole('link', { name: 'Damage Control II' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
-    fireEvent.contextMenu(row);
-    expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'View in Market' })).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: /More actions for Damage Control II/ })
+    );
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Filter to this item' }));
+    expect(onFilterChange).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'Damage Control II' })
+    );
   });
 });
 

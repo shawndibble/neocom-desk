@@ -471,16 +471,18 @@ describe('the joins/leaves summary', () => {
   });
 });
 
-describe('roster rows are read-only', () => {
-  it('has no More actions button or context menu; the name is the Show info link', async () => {
+describe('roster row menu', () => {
+  it('keeps the name as the Show info link and opens the member actions from the ⋮ or a right-click', async () => {
     const table = await rosterTable();
-    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
-
     expect(within(table).getByRole('link', { name: 'Jita Local' })).toBeInTheDocument();
 
-    fireEvent.contextMenu(within(table).getByText('Jita Local'));
-    expect(screen.queryByRole('menuitem', { name: 'Copy name' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
+    expect(
+      within(table).getByRole('button', { name: /More actions for Jita Local/ })
+    ).toBeInTheDocument();
+    fireEvent.contextMenu(within(table).getByText('Jita Local').closest('tr')!);
+    expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /zKillboard/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Open in EVE/ })).toBeInTheDocument();
   });
 });
 

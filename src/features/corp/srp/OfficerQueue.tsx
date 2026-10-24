@@ -40,6 +40,7 @@ import { ChangeAmountDialog, RejectClaimDialog } from './OfficerDialogs';
 import { SrpActivityFeed } from './SrpActivityFeed';
 import { SrpBulkBar } from './SrpBulkBar';
 import { SrpClaimDetail } from './SrpClaimDetail';
+import { OfficerRowMenu } from './OfficerRowMenu';
 import { groupByPilot, withMailSummary, type SrpMailClaim } from './srpResultMail';
 import { failureText } from './srpClaimText';
 import {
@@ -58,6 +59,11 @@ type Ready = Extract<SrpQueueState, { status: 'ready' }>;
 
 const COPIED_MS = 2500;
 const QUEUE_TABS: readonly QueueTab[] = ['pending', 'owed', 'history'];
+
+/** Whether the row earns a menu: the detail's Change amount exists only for a claim with a figure. */
+function claimRowHasMenu(claim: SrpClaim): boolean {
+  return (claim.state === 'pending' || claim.state === 'approved') && claim.amount !== null;
+}
 
 export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready }) {
   const { t } = useTranslation();
@@ -343,6 +349,21 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
                 onRowClick={(row) => setOpenId(row.killmailId)}
                 selectedRowKey={openId}
                 stackLayout={phone ? 'dense' : 'labelled'}
+                // Phone: tick box, title, amount and ⋮ share line one (Hauling's card).
+                className="dt-dense-tight"
+                rowContextMenu={
+                  tab === 'history'
+                    ? undefined
+                    : (row, tr) =>
+                        claimRowHasMenu(row) ? (
+                          <OfficerRowMenu claim={row} onChangeAmount={setChanging}>
+                            {tr}
+                          </OfficerRowMenu>
+                        ) : (
+                          tr
+                        )
+                }
+                rowMoreActions={tab !== 'history'}
               />
             </div>
           )}
