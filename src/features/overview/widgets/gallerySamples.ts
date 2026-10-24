@@ -363,8 +363,6 @@ function buildSamples(t: TFunction): Record<string, Sample> {
       chart: {
         kind: 'lines',
         summary: '',
-        low: '-3%',
-        high: '+9%',
         series: [
           {
             key: 'a',

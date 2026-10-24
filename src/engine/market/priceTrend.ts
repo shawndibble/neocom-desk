@@ -19,7 +19,7 @@ export function isPricedDay(point: MarketHistoryPoint): boolean {
 
 /**
  * Fractional change of the daily average from the last day on or before
- * `days` earlier to the newest day (0.2 = +20%). Anchored on the newest row,
+ * `days` earlier to the newest day (0.2 = +20%). Anchored on the newest priced row (a zero average is a day with no price),
  * not the clock, because ESI history lags a day. `null` — never 0 — when the
  * history does not reach back that far or the base is not positive.
  */
@@ -34,7 +34,7 @@ export function percentChange(points: readonly MarketHistoryPoint[], days: numbe
   return latest.average / base.average - 1;
 }
 
-/** Scales a series to 100 at its first known value; gaps stay gaps. All gaps when that value is not positive. */
+/** Scales a series to 100 at its first known value; gaps stay gaps. A non-positive value is a gap too, so the base is the first positive value. */
 export function indexToStart(values: readonly (number | null)[]): (number | null)[] {
   const usable = (v: number | null): v is number => v !== null && Number.isFinite(v) && v > 0;
   const first = values.find(usable);

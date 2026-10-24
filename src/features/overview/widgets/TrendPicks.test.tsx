@@ -112,6 +112,27 @@ describe('TrendItemsDialog', () => {
     expect(screen.getByRole('checkbox', { name: 'Tritanium' })).toBeInTheDocument();
   });
 
+  it('does not save and close when Enter is pressed in the search box', async () => {
+    const user = userEvent.setup();
+    render(
+      <TrendItemsDialog widget={widget()} title="Market Trend" open onClose={() => undefined} />
+    );
+    await user.type(screen.getByRole('searchbox'), 'mex{Enter}');
+    expect(setTrendItems).not.toHaveBeenCalled();
+  });
+
+  it('names a stored pick that is not in the Quickbar as soon as it opens', async () => {
+    render(
+      <TrendItemsDialog
+        widget={widget({ trendItems: [36] })}
+        title="Market Trend"
+        open
+        onClose={() => undefined}
+      />
+    );
+    expect(await screen.findByRole('button', { name: 'Remove Mexallon' })).toBeInTheDocument();
+  });
+
   it('removes a pick from the selected list whatever list is showing', async () => {
     const user = userEvent.setup();
     open();

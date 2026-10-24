@@ -106,7 +106,11 @@ export function TrendItemsDialog({
   const [edited, setEdited] = useState<number[] | null>(null);
   const picked =
     edited ?? widget.trendItems ?? quickbar.slice(0, TREND_MAX_SERIES).map((item) => item.typeId);
-  const [catalogue, setCatalogue] = useState<Catalogue>({ status: 'idle' });
+  // A widget's stored picks may not be in the Quickbar (the presets); their names come from the catalogue, so it loads on open.
+  const needsNames = (widget.trendItems ?? []).some((id) => !quickbar.some((q) => q.typeId === id));
+  const [catalogue, setCatalogue] = useState<Catalogue>({
+    status: needsNames ? 'loading' : 'idle',
+  });
 
   // The market catalogue is a lazy download; only choosing a source that needs it fetches it, once.
   const requested = useRef(false);
@@ -117,10 +121,8 @@ export function TrendItemsDialog({
       mounted.current = false;
     };
   }, []);
-  const loadCatalogue = () => {
-    if (requested.current) return;
+  const fetchCatalogue = () => {
     requested.current = true;
-    setCatalogue({ status: 'loading' });
     void import('@/sde/loadMarketSde')
       .then(async ({ loadMarketGroups, loadMarketTypes }) =>
         trendCatalogue(await loadMarketGroups(), await loadMarketTypes())
@@ -132,6 +134,16 @@ export function TrendItemsDialog({
           if (mounted.current) setCatalogue({ status: 'failed' });
         }
       );
+  };
+  useEffect(() => {
+    if (needsNames && !requested.current) fetchCatalogue();
+    // Once, on open: the initial state above already shows loading.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const loadCatalogue = () => {
+    if (requested.current) return;
+    setCatalogue({ status: 'loading' });
+    fetchCatalogue();
   };
   const choose = (next: SourceChoice) => {
     setSource(next);
@@ -194,7 +206,12 @@ export function TrendItemsDialog({
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
-            if (event.target.value.trim() !== '') loadCatalogue();
+            // A failed load is retried with the Retry button, not on every keystroke.
+            if (event.target.value.trim() !== '' && catalogue.status === 'idle') loadCatalogue();
+          }}
+          onKeyDown={(event) => {
+            // Enter searches; it must not submit the dialog's form.
+            if (event.key === 'Enter') event.preventDefault();
           }}
           placeholder={t('overview.menu.trendSearchPlaceholder')}
           aria-label={t('overview.menu.trendSearch')}

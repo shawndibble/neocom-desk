@@ -188,8 +188,12 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
   // Percent change per day; a long range draws its trailing average so the tooltip (raw) keeps the real day.
   const lineValues = (values: (number | null)[]) => {
     const pct = values.map((v) => (v === null ? null : rel(v) * 100));
-    return smoothed ? trailingAverage(pct, SMOOTH_WINDOW) : pct;
+    if (!smoothed) return pct;
+    // The average bridges nothing: a day with no price stays a gap, and a line stops where its data does.
+    return trailingAverage(pct, SMOOTH_WINDOW).map((v, k) => (pct[k] === null ? null : v));
   };
+  // What each line ends on as drawn, so the legend and summary agree with the picture.
+  const drawn = indexed.map(lineValues);
   const chart: ChartModel = {
     kind: 'lines',
     summary: [
@@ -198,19 +202,19 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
       ...plotted.map((i) =>
         t(`${C}.summaryLine`, {
           item: data.items[i]!.label,
-          change: trendText(lastOf(indexed[i]!) === null ? null : rel(lastOf(indexed[i]!)!)),
+          change: trendText(lastOf(drawn[i]!) === null ? null : lastOf(drawn[i]!)! / 100),
         })
       ),
     ].join(' '),
     ...(notes.length > 0 ? { note: notes.join(' ') } : {}),
     series: plotted.map((i, n) => {
-      const end = lastOf(indexed[i]!);
+      const end = lastOf(drawn[i]!);
       return {
         key: data.items[i]!.key,
         label: data.items[i]!.label,
         color: COLORS[n % COLORS.length]!,
-        end: trendText(end === null ? null : rel(end)),
-        values: lineValues(indexed[i]!),
+        end: trendText(end === null ? null : end / 100),
+        values: drawn[i]!,
       };
     }),
     tips: axis.dates.map((date, d) => ({

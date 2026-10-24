@@ -31,10 +31,10 @@ describe('Lines chart', () => {
     expect(container.querySelector('polygon')).toBeNull();
   });
 
-  it('brings a focused legend entry to full weight and dims the other lines', () => {
+  it('brings a hovered legend entry to full weight and dims the other lines', () => {
     const { container } = render(<Chart model={model} size="M" />);
     const entry = screen.getByText('PLEX').closest('li')!;
-    fireEvent.focus(entry);
+    fireEvent.pointerEnter(entry);
     const [a, b] = lines(container);
     expect(a!.getAttribute('opacity')).toBe('0.25');
     expect(b!.getAttribute('opacity')).toBe('1');
@@ -42,16 +42,13 @@ describe('Lines chart', () => {
       Number(a!.getAttribute('stroke-width'))
     );
     expect(entry).toHaveAttribute('data-active', 'true');
-    fireEvent.blur(entry);
+    fireEvent.pointerLeave(entry);
     expect(lines(container).every((p) => p.getAttribute('opacity') === '1')).toBe(true);
   });
 
-  it('highlights on pointer hover too, and the legend is reachable by keyboard', () => {
-    const { container } = render(<Chart model={model} size="M" />);
-    const entry = screen.getByText('Tritanium').closest('li')!;
-    expect(entry).toHaveAttribute('tabindex', '0');
-    fireEvent.pointerEnter(entry);
-    expect(lines(container)[1]!.getAttribute('opacity')).toBe('0.25');
+  it('adds no tab stops: the legend only emphasises, it does nothing on activation', () => {
+    render(<Chart model={model} size="M" />);
+    expect(screen.getByText('Tritanium').closest('li')).not.toHaveAttribute('tabindex');
   });
 
   it('fills a single line with a gradient and drops the legend and low/high row', () => {

@@ -184,6 +184,24 @@ describe('marketTrend builder', () => {
     expect(long.chart.tips!.at(-1)!.rows[0]!.value).toContain('"price":"100"');
   });
 
+  it('keeps a smoothed line to the days it has data for, and ends the legend where the line ends', () => {
+    const steady = line(
+      34,
+      'Steady',
+      Array.from({ length: 31 }, (_, i) => 100 + i)
+    );
+    const early: MarketTrendSeries = {
+      ...line(35, 'Early', []),
+      points: Array.from({ length: 12 }, (_, i) => pt(day(9 + i), 50 + i)),
+    };
+    const view = marketTrend(data([steady, early]), ctx(30));
+    if (view.chart?.kind !== 'lines') throw new Error('lines');
+    const [s, e] = view.chart.series;
+    expect(e!.values.slice(-3)).toEqual([null, null, null]);
+    const last = s!.values.at(-1)!;
+    expect(s!.end).toBe(`+${last.toFixed(1)}%`);
+  });
+
   it('keeps the hub names for a mix of global and hub lines', () => {
     const view = marketTrend(data([rising, short]), ctx());
     expect(view.table!.footer).toContain('whereHub');

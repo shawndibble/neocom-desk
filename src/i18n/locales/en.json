@@ -5951,7 +5951,7 @@
       "trendSearch": "Search items",
       "trendSearchPlaceholder": "Search all items…",
       "trendNoMatch": "No item matches that name.",
-      "trendFull": "{{max}} items are picked, the most a chart draws. Remove one to add another.",
+      "trendFull": "{{max}} items are picked, the most you can chart. Remove one to add another.",
       "trendSelectedLabel": "Selected items",
       "trendSelected": "Selected ({{count}} of {{max}})",
       "trendRemove": "Remove {{name}}",

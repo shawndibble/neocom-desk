@@ -91,13 +91,10 @@ export function Lines({ model, height }: { model: LinesChartModel; height: numbe
             return (
               <li
                 key={s.key}
-                tabIndex={0}
                 data-active={on || undefined}
-                className="flex items-center gap-1 rounded-xs tabular-nums focus-visible:outline-2 focus-visible:outline-accent"
+                className="flex items-center gap-1 rounded-xs tabular-nums"
                 onPointerEnter={() => setActive(s.key)}
                 onPointerLeave={() => setActive(null)}
-                onFocus={() => setActive(s.key)}
-                onBlur={() => setActive(null)}
               >
                 <svg aria-hidden="true" viewBox="0 0 12 4" className="h-1 w-3 shrink-0">
                   <line
