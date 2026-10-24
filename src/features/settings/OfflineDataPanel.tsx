@@ -7,7 +7,7 @@ import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { onReconnect, useOnline } from '@/stores/network';
 import { readPersisted, requestPersistence } from '@/lib/persistStorage';
 import { formatBytes } from './offlinePacks';
-import { markStorageProtected, useStorageAtRisk } from './storageAtRisk';
+import { clearStorageAttention, useStorageAtRisk } from './storageAtRisk';
 import { SettingsHint } from '@/features/settings/settingsFields';
 import {
   cancelDownload,
@@ -73,7 +73,7 @@ export function OfflineDataPanel() {
     setStatus(nextStatus);
     setEstimate(nextEstimate);
     setPersisted(nextPersisted);
-    if (nextPersisted) markStorageProtected();
+    if (nextPersisted) clearStorageAttention();
     return nextStatus;
   }, []);
 
@@ -141,7 +141,7 @@ export function OfflineDataPanel() {
       // The Protect button leaves once storage is persisted: focus its wrapper, not `<body>`.
       if (outcome === 'granted') focusAfterCommit(persistRef);
       setPersisted(outcome === 'granted' ? true : now);
-      if (outcome === 'granted') markStorageProtected();
+      clearStorageAttention();
       setPersistDenied(outcome !== 'granted');
       announce(
         t(

@@ -5,7 +5,6 @@
 import type { Table } from 'dexie';
 import { db } from '@/db';
 import { downloadTextFile } from '@/lib/download';
-import { requestPersistenceOnce, type PersistableStorage } from '@/lib/persistStorage';
 import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
 import { isAllowedSyncedSettingKey } from '@/sync/syncedSettings';
 import { encryptExportPayload, decryptExportPayload, type BackupFile } from './crypto';
@@ -90,11 +89,7 @@ function isBackupFile(value: unknown): value is BackupFile {
  * policy — see `payload.partitionImport`), and writes only the new rows.
  * Import never touches an existing Character's token or Editable Data.
  */
-export async function importBackup(
-  fileContents: string,
-  password: string,
-  storage?: PersistableStorage
-): Promise<ImportSummary> {
+export async function importBackup(fileContents: string, password: string): Promise<ImportSummary> {
   const parsed: unknown = JSON.parse(fileContents);
   if (!isBackupFile(parsed)) {
     throw new Error('Not a Neocom Desk backup file');
@@ -108,7 +103,7 @@ export async function importBackup(
   // (a bulkAdd rejection, quota, etc.) must not leave a character's row
   // written with its token missing, or any other partial import — this
   // feature exists to recover credentials, not to lose them halfway.
-  const summary = await db.transaction(
+  return db.transaction(
     'rw',
     [db.characters, db.tokens, db.settings, ...EDITABLE_TABLES.map(editableTable)],
     async () => {
@@ -138,12 +133,4 @@ export async function importBackup(
       };
     }
   );
-  // The restored Characters are only worth having if the browser will not
-  // evict them (`@/lib/persistStorage`). A device set up this way never signs
-  // in "first", so this is its only automatic ask. Not awaited: a prompt that
-  // never answers must not hold the import summary.
-  if (summary.addedCharacterIds.length) {
-    void requestPersistenceOnce(storage).catch(() => undefined);
-  }
-  return summary;
 }

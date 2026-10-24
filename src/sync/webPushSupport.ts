@@ -11,19 +11,12 @@
  * (`app/bootImportGraph.test.ts`).
  */
 
+import { isInstalledApp } from '@/lib/installedApp';
+
 export type WebPushSupport = 'unsupported' | 'requires-install' | 'supported';
 
 function isIos(): boolean {
   return /iP(hone|ad|od)/.test(navigator.userAgent);
-}
-
-/** True once launched as an installed PWA (Android/desktop `display-mode`, or iOS's own flag). */
-function isStandalone(): boolean {
-  const standaloneMedia =
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(display-mode: standalone)').matches;
-  const iosStandalone = (navigator as { standalone?: boolean }).standalone === true;
-  return standaloneMedia || iosStandalone;
 }
 
 /**
@@ -38,7 +31,7 @@ export function webPushSupport(): WebPushSupport {
   // non-installed iOS Safari has no `Notification` global at all, so that
   // check alone would misreport 'unsupported' and this branch would never
   // be reached on the one platform it exists for.
-  if (isIos() && !isStandalone()) return 'requires-install';
+  if (isIos() && !isInstalledApp()) return 'requires-install';
   if (typeof Notification === 'undefined' || !navigator.serviceWorker) return 'unsupported';
   return 'supported';
 }

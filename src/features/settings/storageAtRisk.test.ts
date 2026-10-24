@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { db } from '@/db';
 import { checkStorageAtRisk, useStorageAtRisk } from './storageAtRisk';
 
 function storage(persisted: boolean) {
   return { persisted: vi.fn(async () => persisted), persist: vi.fn(async () => true) };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   useStorageAtRisk.setState({ atRisk: false });
+  await db.characters.clear();
+  await db.characters.put({ characterId: 1, name: 'Pilot', ownerHash: 'h', addedAt: 0 });
 });
 
 describe('checkStorageAtRisk', () => {
@@ -26,8 +29,20 @@ describe('checkStorageAtRisk', () => {
     expect(useStorageAtRisk.getState().atRisk).toBe(false);
   });
 
+  it('never flags a device with no Characters to lose', async () => {
+    await db.characters.clear();
+    await checkStorageAtRisk(true, storage(false));
+    expect(useStorageAtRisk.getState().atRisk).toBe(false);
+  });
+
   it('never flags a browser that cannot say', async () => {
-    await checkStorageAtRisk(true, undefined);
+    const throwing = {
+      persisted: vi.fn(async () => {
+        throw new Error('SecurityError');
+      }),
+      persist: vi.fn(async () => true),
+    };
+    await checkStorageAtRisk(true, throwing);
     expect(useStorageAtRisk.getState().atRisk).toBe(false);
   });
 });

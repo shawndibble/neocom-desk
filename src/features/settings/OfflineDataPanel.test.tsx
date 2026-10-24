@@ -49,6 +49,7 @@ function setOnline(online: boolean) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useStorageAtRisk.setState({ atRisk: false });
   setOnline(true);
   mocks.readOfflineStatus.mockResolvedValue(PARTIAL);
   mocks.readStorageEstimate.mockResolvedValue({ usage: 5 * 1024 ** 2, quota: 2 * 1024 ** 3 });
@@ -108,7 +109,7 @@ describe('OfflineDataPanel persistent storage', () => {
     expect(screen.getByRole('button', { name: 'Protect this data' })).toBeInTheDocument();
   });
 
-  it('clears the Settings attention dot once the browser grants it', async () => {
+  it('clears the Settings attention dot once the browser answers', async () => {
     useStorageAtRisk.setState({ atRisk: true });
     mocks.requestPersistence.mockImplementation(async () => {
       mocks.readPersisted.mockResolvedValue(true);

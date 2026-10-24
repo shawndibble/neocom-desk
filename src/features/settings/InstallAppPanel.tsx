@@ -3,6 +3,7 @@ import { Button, Panel } from '@/components/ui';
 import { promptInstallApp, useInstallApp } from '@/app/installApp';
 import { detectInstallPlatform, selectInstallAppVariant } from '@/app/installPromptRules';
 import { SettingsHint } from '@/features/settings/settingsFields';
+import { isInstalledApp } from '@/lib/installedApp';
 
 const STEPS_KEYS = {
   'ios-safari': 'pwa.installIosSafariCta',
@@ -21,9 +22,7 @@ export function InstallAppPanel() {
   const { t } = useTranslation();
   const deferredPrompt = useInstallApp((s) => s.deferredPrompt);
   const variant = selectInstallAppVariant({
-    isStandalone:
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (navigator as { standalone?: boolean }).standalone === true,
+    isStandalone: isInstalledApp(),
     deferredPromptAvailable: deferredPrompt !== null,
     platform: detectInstallPlatform(navigator.userAgent, navigator.maxTouchPoints ?? 0),
   });

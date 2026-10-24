@@ -3,12 +3,12 @@
  * may evict this origin's data (the downloaded SDE files, the Dexie database)
  * under storage pressure, which would take the offline copy with it.
  *
- * Asked once automatically when a device first gets Characters, by signing in
- * (`features/character/addCharacter.ts`) or by importing a backup
- * (`backup/io.ts`), and never again on its own — a browser that prompts
- * (Firefox) must not be nagged. A device set up by import never signs in
- * "first", so before the import ask it was never protected at all, and an
- * Android phone lost every Character to eviction.
+ * Asked once automatically after the first Character is added
+ * (`features/character/addCharacter.ts`) and never again on its own — a browser that prompts
+ * (Firefox) must not be nagged. Importing a backup asks too, on the pilot's own
+ * press (`features/settings/ImportPanel.tsx`): a device set up by import never
+ * signs in "first", so it was never protected, and an Android phone lost every
+ * Character to eviction.
  *
  * One more automatic ask, under its own flag, on the first installed launch:
  * Chrome declines a plain tab but grants an installed app without a prompt,
@@ -16,6 +16,7 @@
  * data panel's button asks on demand.
  */
 import { db } from '@/db';
+import { isInstalledApp } from './installedApp';
 
 export const PERSIST_ASKED_KEY = 'storagePersistAsked';
 export const PERSIST_ASKED_INSTALLED_KEY = 'storagePersistAskedInstalled';
@@ -84,15 +85,6 @@ export async function requestPersistenceOnce(
   return requestPersistence(storage);
 }
 
-/** Whether this page runs as the installed app (standalone display; iOS's flag). */
-export function isInstalledApp(): boolean {
-  if (typeof window === 'undefined') return false;
-  return (
-    window.matchMedia?.('(display-mode: standalone)').matches === true ||
-    (navigator as { standalone?: boolean }).standalone === true
-  );
-}
-
 /**
  * The installed-launch ask (see the module comment). Only with Characters on
  * the device — before that, the sign-in or import ask covers it — and only
@@ -105,7 +97,7 @@ export async function requestPersistenceWhenInstalled(
   if (!installed) return 'skipped';
   const persisted = await readPersisted(storage);
   if (persisted === null) return 'unsupported';
-  if (persisted) return 'granted';
+  if (persisted) return 'skipped';
   try {
     if ((await db.characters.count()) === 0) return 'skipped';
   } catch {

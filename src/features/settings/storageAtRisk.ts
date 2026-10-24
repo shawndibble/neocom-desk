@@ -1,11 +1,13 @@
 import { create } from 'zustand';
-import { isInstalledApp, readPersisted, type PersistableStorage } from '@/lib/persistStorage';
+import { db } from '@/db';
+import { isInstalledApp } from '@/lib/installedApp';
+import { readPersisted, type PersistableStorage } from '@/lib/persistStorage';
 
 /**
  * Whether Settings › Offline data needs attention: the app runs installed,
- * where the browser grants persistence, and storage is still not protected —
- * so one press keeps the Characters from being evicted. A browser tab is never
- * flagged: there the browser usually declines, and the dot would not clear.
+ * where the browser grants persistence, has Characters to lose, and storage is
+ * still not protected. A browser tab is never flagged: there the browser
+ * usually declines, and the dot would not clear.
  */
 export const useStorageAtRisk = create<{ atRisk: boolean }>(() => ({ atRisk: false }));
 
@@ -14,10 +16,14 @@ export async function checkStorageAtRisk(
   storage?: PersistableStorage
 ): Promise<void> {
   const persisted = installed ? await readPersisted(storage) : null;
-  useStorageAtRisk.setState({ atRisk: persisted === false });
+  const atRisk = persisted === false && (await db.characters.count().catch(() => 0)) > 0;
+  useStorageAtRisk.setState({ atRisk });
 }
 
-/** Storage is protected now (the Offline data panel read or granted it). */
-export function markStorageProtected(): void {
+/**
+ * The pilot has pressed Protect, or storage reads protected: handled either
+ * way. A decline leaves nothing more to press, so the dot must not stay lit.
+ */
+export function clearStorageAttention(): void {
   useStorageAtRisk.setState({ atRisk: false });
 }

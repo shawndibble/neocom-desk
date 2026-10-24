@@ -1,9 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { db, type MiningTaxAssignmentRecord } from '@/db';
 import { FULL_RECORDS } from '@/sync/syncedCollectionFixtures';
 import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
-import { PERSIST_ASKED_KEY } from '@/lib/persistStorage';
 import { exportBackup, importBackup } from './io';
 
 const PASSWORD = 'correct horse battery staple';
@@ -65,29 +64,6 @@ describe('exportBackup / importBackup', () => {
     expect(token2?.refreshToken).toBe('r2');
     const plans2 = await db.skillPlans.where('characterId').equals(2).toArray();
     expect(plans2).toHaveLength(1);
-  });
-
-  it('asks the browser to keep the data once an import adds a Character', async () => {
-    await db.characters.add({ characterId: 2, name: 'Traveling', ownerHash: 'h2', addedAt: 0 });
-    const { contents } = await exportBackup(PASSWORD);
-    await db.characters.clear();
-    const storage = { persisted: vi.fn(async () => false), persist: vi.fn(async () => true) };
-
-    await importBackup(contents, PASSWORD, storage);
-
-    await vi.waitFor(() => expect(storage.persist).toHaveBeenCalledOnce());
-    expect((await db.settings.get(PERSIST_ASKED_KEY))?.value).toBe(true);
-  });
-
-  it('does not ask when the import adds no Character', async () => {
-    const { contents } = await exportBackup(PASSWORD);
-    const storage = { persisted: vi.fn(async () => false), persist: vi.fn(async () => true) };
-
-    await importBackup(contents, PASSWORD, storage);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(storage.persisted).not.toHaveBeenCalled();
-    expect(storage.persist).not.toHaveBeenCalled();
   });
 
   it('rejects the wrong password without writing anything', async () => {

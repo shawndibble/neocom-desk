@@ -121,7 +121,7 @@ describe('requestPersistenceWhenInstalled', () => {
   it('does not ask when storage is already persisted', async () => {
     await seedCharacter();
     const s = storage(true);
-    await expect(requestPersistenceWhenInstalled(true, s)).resolves.toBe('granted');
+    await expect(requestPersistenceWhenInstalled(true, s)).resolves.toBe('skipped');
     expect(s.persist).not.toHaveBeenCalled();
   });
 });
