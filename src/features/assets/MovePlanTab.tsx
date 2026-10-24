@@ -6,7 +6,12 @@ import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, LiveStatus, Spinner } from '@/components/ui';
 import { buildHullCatalogue } from '@/engine/fittings/hullCatalogue';
 import type { PilotProfile } from '@/engine/fittings/types';
-import { planMove, type MoveHull, type PackHold } from '@/engine/assets/movePlan';
+import {
+  planMove,
+  type HaulerOverride,
+  type MoveHull,
+  type PackHold,
+} from '@/engine/assets/movePlan';
 import {
   loadOtherCharactersAssetsDetailed,
   type SkippedCharacterAssets,
@@ -167,7 +172,12 @@ function MovePlanTabBody({
   /** Ships (itemID) the plan hauls packaged instead of flying. */
   const [packed, setPacked] = useState<ReadonlySet<number>>(new Set());
   /** What the shown plan was worked out from, so packing a ship can re-plan it. */
-  const planBase = useRef<Omit<Parameters<typeof planMove>[0], 'packedShipIds'> | null>(null);
+  const planBase = useRef<Omit<
+    Parameters<typeof planMove>[0],
+    'packedShipIds' | 'haulerOverride'
+  > | null>(null);
+  /** The pilot's hauler pick for the shown plan only; never saved, reset with each plan. */
+  const [haulerOverride, setHaulerOverride] = useState<HaulerOverride | undefined>();
   /** Bumped on every reset so a plan still being worked out for an old session is dropped. */
   const session = useRef(0);
   const hullSource = useRef<HullSourceData>({
@@ -336,6 +346,7 @@ function MovePlanTabBody({
       if (mine === session.current) {
         planBase.current = base;
         setPacked(new Set());
+        setHaulerOverride(undefined);
         setResult({
           plan,
           destinationSystem,
@@ -353,23 +364,30 @@ function MovePlanTabBody({
     }
   }
 
-  /** Hauls this ship packaged instead of flying it, and re-plans around its volume. */
-  function packShip(itemId: number) {
+  /** Works the shown plan out again for a changed ship choice or hauler. */
+  function replan(nextPacked: ReadonlySet<number>, nextOverride: HaulerOverride | undefined) {
     const base = planBase.current;
     if (!base) return;
-    const next = new Set(packed).add(itemId);
-    setPacked(next);
-    setResult((r) => (r ? { ...r, plan: planMove({ ...base, packedShipIds: next }) } : r));
+    setPacked(nextPacked);
+    setHaulerOverride(nextOverride);
+    setResult((r) =>
+      r
+        ? {
+            ...r,
+            plan: planMove({ ...base, packedShipIds: nextPacked, haulerOverride: nextOverride }),
+          }
+        : r
+    );
   }
+
+  /** Hauls this ship packaged instead of flying it, and re-plans around its volume. */
+  const packShip = (itemId: number) => replan(new Set(packed).add(itemId), haulerOverride);
 
   /** Flies this packed ship after all, and re-plans without its volume. */
   function unpackShip(itemId: number) {
-    const base = planBase.current;
-    if (!base) return;
     const next = new Set(packed);
     next.delete(itemId);
-    setPacked(next);
-    setResult((r) => (r ? { ...r, plan: planMove({ ...base, packedShipIds: next }) } : r));
+    replan(next, haulerOverride);
   }
 
   // Who the read left out is the header picker's to say (its dot and "Not included" note).
@@ -404,6 +422,8 @@ function MovePlanTabBody({
             state={result}
             compareOpen={compareOpen}
             onToggleCompare={() => setCompareOpen((v) => !v)}
+            haulerOverride={haulerOverride}
+            onPickHauler={(next) => replan(packed, next)}
             headingRef={planHeadingRef}
             onBack={() => {
               setResult(null);

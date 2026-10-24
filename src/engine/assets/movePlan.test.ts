@@ -283,3 +283,68 @@ describe('planMove', () => {
     });
   });
 });
+
+describe('planMove hauler override', () => {
+  const stock = [asset({ itemId: 1, typeId: 35, quantity: 600 })]; // 1200 m3
+  const withOverride = (haulerOverride: Parameters<typeof planMove>[0]['haulerOverride']) =>
+    planMove({
+      destinationLocationIds: new Set([DEST]),
+      characters: [{ characterId: 1, name: 'Alice', assets: stock }],
+      unitM3: new Map([[35, 2]]),
+      shipTypeIds: new Set([SHIP]),
+      hulls: HULLS,
+      haulerOverride,
+    });
+
+  it('without an override, active is the suggestion', () => {
+    const result = withOverride(undefined);
+    expect(result.active).toBe(result.suggested);
+  });
+
+  it('a picked hull replaces the suggestion in active and in the trip total', () => {
+    const result = withOverride({ hullTypeId: 4 });
+    expect(result.suggested?.hull.typeId).toBe(1);
+    expect(result.active?.hull.typeId).toBe(4);
+    expect(result.active?.trips).toBe(3);
+    expect(result.totals.trips).toBe(3);
+  });
+
+  it('a typed m³ is one general hold', () => {
+    const result = withOverride({ customM3: 300 });
+    expect(result.active?.hull.holds).toEqual([{ kind: 'cargo', capacityM3: 300 }]);
+    expect(result.active?.hull.capacityM3).toBe(300);
+    expect(result.active?.trips).toBe(4);
+    expect(result.totals.trips).toBe(4);
+  });
+
+  it('a typed m³ smaller than one unit leaves that stack behind', () => {
+    const result = withOverride({ customM3: 1 });
+    expect(result.active?.unfitCount).toBe(1);
+  });
+
+  it.each([0, -5, Number.NaN, Number.POSITIVE_INFINITY])(
+    'a typed %s is ignored, never unlimited',
+    (customM3) => {
+      const result = withOverride({ customM3 });
+      expect(result.active).toBe(result.suggested);
+    }
+  );
+
+  it('an unknown hull falls back to the suggestion', () => {
+    const result = withOverride({ hullTypeId: 999 });
+    expect(result.active).toBe(result.suggested);
+  });
+
+  it('a typed m³ still plans when no hull is flyable', () => {
+    const result = planMove({
+      destinationLocationIds: new Set([DEST]),
+      characters: [{ characterId: 1, name: 'Alice', assets: stock }],
+      unitM3: new Map([[35, 2]]),
+      shipTypeIds: new Set([SHIP]),
+      hulls: [],
+      haulerOverride: { customM3: 600 },
+    });
+    expect(result.suggested).toBeNull();
+    expect(result.active?.trips).toBe(2);
+  });
+});

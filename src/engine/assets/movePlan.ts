@@ -75,6 +75,12 @@ export interface HaulerOption {
   tooBigCount: number;
 }
 
+/** typeId of the typed-m³ pseudo hull; no real hull has it. */
+export const CUSTOM_HAULER_TYPE_ID = 0;
+
+/** Per-plan choice of hauler: a listed hull, or one general hold of a typed size. */
+export type HaulerOverride = { hullTypeId: number } | { customM3: number };
+
 export interface MovePlan {
   perCharacter: MoveCharacterPlan[];
   totals: {
@@ -86,11 +92,13 @@ export interface MovePlan {
     shipsToFly: number;
     /** Stacks left out for want of a packaged volume. */
     unknownVolumeCount: number;
-    /** Trips with the suggested hauler; null without a suggestion. */
+    /** Trips with the active hauler; null without one. */
     trips: number | null;
   };
   /** Fewest left-behind stacks, then fewest hauls plus forced flights, then smallest hull; null with nothing to haul or no hulls. */
   suggested: HaulerOption | null;
+  /** The hauler the plan is worked out for: the override when valid, else `suggested`. */
+  active: HaulerOption | null;
   /** Every hull, best first, for the "Compare haulers" disclosure. */
   comparison: HaulerOption[];
 }
@@ -113,6 +121,8 @@ export function planMove(input: {
   /** Assembled ships (by itemID) to haul packaged instead of flying. */
   packedShipIds?: ReadonlySet<number>;
   hulls: readonly MoveHull[];
+  /** The pilot's own pick; an unknown hull or a typed size that is not a positive number is ignored. */
+  haulerOverride?: HaulerOverride;
 }): MovePlan {
   const perCharacter: MoveCharacterPlan[] = [];
 
@@ -169,50 +179,54 @@ export function planMove(input: {
   const pickups = perCharacter.flatMap((c) => c.pickups);
   const totalM3 = perCharacter.reduce((sum, c) => sum + c.totalM3, 0);
 
+  const optionFor = (hull: MoveHull): HaulerOption => {
+    const packed = perCharacter.flatMap((c) =>
+      c.pickups.map((p): PickupHauls => {
+        // A zero-volume line takes no room, so it never makes a haul of its own.
+        const lines: PackLine[] = p.lines
+          .filter((l) => l.m3 !== null && l.m3 > 0)
+          .map((l) => ({
+            typeId: l.typeId,
+            quantity: l.quantity,
+            unitM3: l.m3! / l.quantity,
+          }));
+        const { hauls, unfit } = packHauls(lines, hull.holds);
+        // A packed ship that fits no hold is flown instead; loose packaged stock cannot be.
+        const tooBigShips: PackLine[] = [];
+        const stillUnfit: PackLine[] = [];
+        for (const u of unfit) {
+          const packedHere = p.packed.filter((s) => s.typeId === u.typeId).length;
+          const flown = Math.min(u.quantity, packedHere);
+          if (flown > 0) tooBigShips.push({ ...u, quantity: flown });
+          if (u.quantity > flown) stillUnfit.push({ ...u, quantity: u.quantity - flown });
+        }
+        return {
+          characterId: c.characterId,
+          locationId: p.locationId,
+          hauls,
+          unfit: stillUnfit,
+          tooBigShips,
+        };
+      })
+    );
+    return {
+      hull,
+      pickups: packed.filter(
+        (p) => p.hauls.length > 0 || p.unfit.length > 0 || p.tooBigShips.length > 0
+      ),
+      trips: packed.reduce((sum, p) => sum + p.hauls.length, 0),
+      unfitCount: packed.reduce((sum, p) => sum + p.unfit.length, 0),
+      tooBigCount: packed.reduce(
+        (sum, p) => sum + p.tooBigShips.reduce((n, u) => n + u.quantity, 0),
+        0
+      ),
+    };
+  };
+
   const comparison: HaulerOption[] = [];
   if (totalM3 > 0) {
     for (const hull of input.hulls.filter((h) => h.canFly && h.holds.length > 0)) {
-      const packed = perCharacter.flatMap((c) =>
-        c.pickups.map((p): PickupHauls => {
-          // A zero-volume line takes no room, so it never makes a haul of its own.
-          const lines: PackLine[] = p.lines
-            .filter((l) => l.m3 !== null && l.m3 > 0)
-            .map((l) => ({
-              typeId: l.typeId,
-              quantity: l.quantity,
-              unitM3: l.m3! / l.quantity,
-            }));
-          const { hauls, unfit } = packHauls(lines, hull.holds);
-          // A packed ship that fits no hold is flown instead; loose packaged stock cannot be.
-          const tooBigShips: PackLine[] = [];
-          const stillUnfit: PackLine[] = [];
-          for (const u of unfit) {
-            const packedHere = p.packed.filter((s) => s.typeId === u.typeId).length;
-            const flown = Math.min(u.quantity, packedHere);
-            if (flown > 0) tooBigShips.push({ ...u, quantity: flown });
-            if (u.quantity > flown) stillUnfit.push({ ...u, quantity: u.quantity - flown });
-          }
-          return {
-            characterId: c.characterId,
-            locationId: p.locationId,
-            hauls,
-            unfit: stillUnfit,
-            tooBigShips,
-          };
-        })
-      );
-      comparison.push({
-        hull,
-        pickups: packed.filter(
-          (p) => p.hauls.length > 0 || p.unfit.length > 0 || p.tooBigShips.length > 0
-        ),
-        trips: packed.reduce((sum, p) => sum + p.hauls.length, 0),
-        unfitCount: packed.reduce((sum, p) => sum + p.unfit.length, 0),
-        tooBigCount: packed.reduce(
-          (sum, p) => sum + p.tooBigShips.reduce((n, u) => n + u.quantity, 0),
-          0
-        ),
-      });
+      comparison.push(optionFor(hull));
     }
   }
   comparison.sort(
@@ -224,6 +238,26 @@ export function planMove(input: {
   );
   const suggested = comparison[0] ?? null;
 
+  const override = input.haulerOverride;
+  let active = suggested;
+  if (override && totalM3 > 0) {
+    if ('customM3' in override) {
+      const m3 = override.customM3;
+      if (Number.isFinite(m3) && m3 > 0)
+        active = optionFor({
+          typeId: CUSTOM_HAULER_TYPE_ID,
+          name: '',
+          hullClass: '',
+          capacityM3: m3,
+          holds: [{ kind: 'cargo', capacityM3: m3 }],
+          owned: false,
+          canFly: true,
+        });
+    } else {
+      active = comparison.find((o) => o.hull.typeId === override.hullTypeId) ?? suggested;
+    }
+  }
+
   return {
     perCharacter,
     totals: {
@@ -232,9 +266,10 @@ export function planMove(input: {
       characters: perCharacter.length,
       shipsToFly: pickups.reduce((sum, p) => sum + p.ships.length, 0),
       unknownVolumeCount: pickups.reduce((sum, p) => sum + p.unknownVolume.length, 0),
-      trips: suggested?.trips ?? null,
+      trips: active?.trips ?? null,
     },
     suggested,
+    active,
     comparison,
   };
 }
