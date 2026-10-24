@@ -1,18 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import type { MarketHistoryPoint } from '@/engine/market/priceHistory';
 import { marketTrend, trendText } from './marketTrendModel';
-import type { MarketTrendItem, MarketTrendWidgetData } from './kindLoaders';
+import type { MarketTrendFeed, MarketTrendSeries } from './marketTrendLoader';
 import type { BuildContext, FeedState } from './types';
 
 const t = (key: string, options?: Record<string, unknown>) =>
   options ? `${key}${JSON.stringify(options)}` : key;
-const ctx = (range: 7 | 30 | 90 = 30): BuildContext => ({
+const ctx = (
+  range: 7 | 30 | 90 | 365 = 30,
+  picks: Pick<BuildContext, 'trendItems' | 'trendHubs'> = {}
+): BuildContext => ({
   t,
   now: Date.parse('2026-10-24T12:00:00Z'),
   activeCharacterId: 91,
   scopeAll: false,
   notTrainingAlert: false,
   range,
+  ...picks,
 });
 const ok = <T>(data: T): FeedState<T> => ({ data, error: false, loading: false });
 
@@ -25,18 +29,30 @@ const pt = (date: string, average: number): MarketHistoryPoint => ({
   volume: 1,
   orderCount: 1,
 });
-const item = (typeId: number, name: string, averages: number[]): MarketTrendItem => ({
+const line = (
+  typeId: number,
+  name: string,
+  averages: number[],
+  hubId: string | null = 'jita'
+): MarketTrendSeries => ({
+  key: `${typeId}@${hubId ?? 'global'}`,
   typeId,
+  hubId,
   name,
   points: averages.map((a, i) => pt(day(24 - averages.length + 1 + i), a)),
-  to: `/market/browser?type=${typeId}&hub=jita`,
+  to: `/market/browser?type=${typeId}&hub=${hubId}`,
   fromCache: false,
 });
-const data = (items: MarketTrendItem[], patch: Partial<MarketTrendWidgetData> = {}) => ({
-  marketTrend: ok<MarketTrendWidgetData>({
-    hubName: 'Jita',
-    items,
-    omitted: 0,
+const data = (
+  lines: MarketTrendSeries[],
+  patch: Partial<MarketTrendFeed> = {},
+  quickbar = lines.map(({ typeId, name }) => ({ typeId, name }))
+) => ({
+  marketTrend: ok<MarketTrendFeed>({
+    quickbar,
+    defaultHubId: 'jita',
+    globalTypeIds: [44992],
+    series: Object.fromEntries(lines.map((l) => [l.key, l])),
     fetchedAt: new Date('2026-10-24T11:00:00Z'),
     ...patch,
   }),
@@ -52,12 +68,12 @@ describe('trendText', () => {
 });
 
 describe('marketTrend builder', () => {
-  const rising = item(
+  const rising = line(
     34,
     'Tritanium',
     Array.from({ length: 31 }, (_, i) => 100 + i)
   );
-  const short = item(44992, 'PLEX', [5_000_000, 5_100_000]);
+  const short = line(44992, 'PLEX', [5_000_000, 5_100_000], null);
 
   it('is blank until the feed lands, and empty for an empty Quickbar', () => {
     expect(marketTrend({}, ctx()).status.hasData).toBe(false);
@@ -89,7 +105,7 @@ describe('marketTrend builder', () => {
   });
 
   it('omits an item with no history from the chart but keeps its row', () => {
-    const none = { ...item(9, 'Nothing', []), points: [] };
+    const none = line(9, 'Nothing', []);
     const view = marketTrend(data([rising, none]), ctx());
     expect(view.table!.rows).toHaveLength(2);
     expect(view.table!.rows[1]!.cells[1]).toBe('—');
@@ -97,8 +113,62 @@ describe('marketTrend builder', () => {
   });
 
   it('puts the biggest 7 day mover in the Number view and flags the age-out', () => {
-    const view = marketTrend(data([rising], { omitted: 2 }), ctx());
+    const many = Array.from({ length: 8 }, (_, i) => line(100 + i, `Item ${i}`, [1, 2]));
+    const view = marketTrend(data([rising, ...many]), ctx());
     expect(view.number.value).toBe('+5.7%');
-    expect(view.number.notes).toEqual(['overview.widgets.data.marketTrend.omitted{"count":2}']);
+    expect(view.number.notes).toEqual(['overview.widgets.data.marketTrend.omitted{"count":3}']);
+  });
+
+  describe('a widget with its own picks', () => {
+    const jitaTri = rising;
+    const amarrTri = line(
+      34,
+      'Tritanium',
+      Array.from({ length: 31 }, (_, i) => 90 + i * 2),
+      'amarr'
+    );
+    const injector = line(40520, 'Large Skill Injector', [8e8, 9e8]);
+    const all = data([jitaTri, amarrTri, injector, short], {}, [{ typeId: 34, name: 'Tritanium' }]);
+
+    it('draws only the items it names, whatever the Quickbar holds', () => {
+      const view = marketTrend(all, ctx(30, { trendItems: [40520] }));
+      expect(view.table!.rows.map((r) => r.key)).toEqual(['40520@jita']);
+    });
+
+    it('draws one line per hub for an item, labelled by hub', () => {
+      const view = marketTrend(all, ctx(30, { trendItems: [34], trendHubs: ['jita', 'amarr'] }));
+      expect(view.table!.rows.map((r) => r.cells[0])).toEqual([
+        'Tritanium · Jita',
+        'Tritanium · Amarr',
+      ]);
+      expect(view.table!.footer).toBe(
+        'overview.widgets.data.marketTrend.footer{"hub":"Jita, Amarr"}'
+      );
+    });
+
+    it('draws a global-market item once however many hubs', () => {
+      const view = marketTrend(all, ctx(30, { trendItems: [44992], trendHubs: ['jita', 'amarr'] }));
+      expect(view.table!.rows).toHaveLength(1);
+      expect(view.table!.rows[0]!.cells[0]).toBe('PLEX');
+    });
+
+    it('waits, rather than draw part of the lines, for a pick the feed has not read', () => {
+      const view = marketTrend(all, ctx(30, { trendItems: [34, 99] }));
+      expect(view.status.loading).toBe(true);
+      expect(view.table).toBeUndefined();
+    });
+
+    it('shows an error, not a spinner, when a reload failed before the new picks arrived', () => {
+      const failed = { marketTrend: { ...all.marketTrend, error: true } };
+      const view = marketTrend(failed, ctx(30, { trendItems: [34, 99] }));
+      expect(view.status.error).toBe(true);
+      expect(view.status.loading).toBe(false);
+    });
+
+    it('spans a year', () => {
+      const view = marketTrend(all, ctx(365, { trendItems: [34] }));
+      if (view.chart?.kind !== 'lines') throw new Error('expected a lines chart');
+      expect(view.chart.series).toHaveLength(1);
+    });
   });
 });

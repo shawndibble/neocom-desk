@@ -1,19 +1,22 @@
 /**
- * The Market Trend widget's builder: the Quickbar's first items as a table of
- * latest daily average with 7 and 30 day change, and as lines indexed to 0%
- * at the start of the widget's range so a 5 ISK mineral and a 5M ISK PLEX
- * share one scale. Daily averages only (ESI's `average`), the same series
+ * The Market Trend widget's builder: the widget's items (its own picks, else
+ * the Quickbar's first) at its Trade Hubs (its own picks, else the pilot's
+ * Market hub) as a table of latest daily average with 7 and 30 day change, and
+ * as lines indexed to 0% at the start of the widget's range so a 5 ISK mineral
+ * and a 5M ISK PLEX share one scale. Daily averages only (ESI's `average`), the same series
  * Price History's "average" choice draws. Pure, like every builder.
  */
 import { indexToStart, alignTrendSeries, percentChange } from '@/engine/market/priceTrend';
+import { planTrendSeries } from '@/engine/market/trendSeries';
+import { getTradeHub } from '@/market/hubs';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIskCompact } from '@/lib/isk';
 import type { ChartColor, ChartModel } from '../charts/types';
 import { blank, statusOf, UNKNOWN, type Builder } from './builderKit';
 import { signedCell } from './cellKit';
 import { dayTitle, signTone } from './chartTips';
-import type { MarketTrendItem } from './kindLoaders';
-import type { KindView, TableRowModel } from './types';
+import type { MarketTrendFeed, MarketTrendSeries } from './marketTrendLoader';
+import type { BuildContext, FeedState, KindView, TableRowModel } from './types';
 
 const D = 'overview.widgets.data.marketTrend';
 const C = 'overview.widgets.chart.marketTrend';
@@ -28,15 +31,59 @@ export function trendText(change: number | null): string {
   return `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
 }
 
-const latestAverage = (item: MarketTrendItem): number | null =>
+/** A line as drawn: the read, labelled with its hub when the widget compares several. */
+type TrendLine = MarketTrendSeries & { label: string };
+
+interface ResolvedTrend {
+  hubName: string;
+  lines: TrendLine[];
+  omitted: number;
+  /** A pick the feed has not read yet, so the view waits rather than draw a part. */
+  pending: boolean;
+}
+
+function resolveTrend(
+  feed: MarketTrendFeed,
+  { trendItems, trendHubs }: Pick<BuildContext, 'trendItems' | 'trendHubs'>
+): ResolvedTrend {
+  const typeIds = trendItems ?? feed.quickbar.map((item) => item.typeId);
+  const hubIds = trendHubs ?? [feed.defaultHubId];
+  const global = new Set(feed.globalTypeIds);
+  const plan = planTrendSeries(typeIds, hubIds, (id) => global.has(id));
+  const hubName = (id: string) => getTradeHub(id)?.systemName ?? id;
+  const several = hubIds.length > 1;
+  const lines: TrendLine[] = [];
+  for (const ref of plan.refs) {
+    const series = feed.series[ref.key];
+    if (series === undefined) continue;
+    lines.push({
+      ...series,
+      label: several && ref.hubId !== null ? `${series.name} · ${hubName(ref.hubId)}` : series.name,
+    });
+  }
+  return {
+    hubName: hubIds.map(hubName).join(', '),
+    lines,
+    omitted: plan.omitted,
+    pending: lines.length < plan.refs.length,
+  };
+}
+
+const latestAverage = (item: MarketTrendSeries): number | null =>
   item.points.length === 0
     ? null
     : [...item.points].sort((a, b) => a.date.localeCompare(b.date)).at(-1)!.average;
 
-export const marketTrend: Builder = (feeds, { t, range }) => {
-  const feed = feeds.marketTrend;
-  const data = feed?.data ?? null;
-  if (!data) return blank(MARKET_PATH, statusOf(feed));
+export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs }) => {
+  const feed: FeedState<MarketTrendFeed> | undefined = feeds.marketTrend;
+  const raw = feed?.data ?? null;
+  if (!raw) return blank(MARKET_PATH, statusOf(feed));
+  const resolved = resolveTrend(raw, { trendItems, trendHubs });
+  // A failed reload leaves the old read without the new picks: that is an error, not a spinner.
+  if (resolved.pending) {
+    return blank(MARKET_PATH, statusOf(feed, { loading: !feed?.error, hasData: false }));
+  }
+  const data = { ...resolved, items: resolved.lines, fetchedAt: raw.fetchedAt };
   if (data.items.length === 0) {
     return {
       ...blank(MARKET_PATH, statusOf(feed, { isEmpty: true })),
@@ -51,15 +98,15 @@ export const marketTrend: Builder = (feeds, { t, range }) => {
     now: latestAverage(item),
   }));
   const rows: TableRowModel[] = changes.map(({ item, d7, d30, now }) => ({
-    key: String(item.typeId),
+    key: item.key,
     to: item.to,
     cells: [
-      item.name,
+      item.label,
       now === null ? UNKNOWN : { text: formatIskCompact(now), iskAmount: now },
       d7 === null ? UNKNOWN : signedCell(trendText(d7), d7),
       d30 === null ? UNKNOWN : signedCell(trendText(d30), d30),
     ],
-    sort: [item.name, now ?? undefined, d7 ?? undefined, d30 ?? undefined],
+    sort: [item.label, now ?? undefined, d7 ?? undefined, d30 ?? undefined],
   }));
   const table = {
     columns: [
@@ -82,7 +129,7 @@ export const marketTrend: Builder = (feeds, { t, range }) => {
     number: mover
       ? {
           value: trendText(mover.d7),
-          unit: t(`${D}.unit`, { item: mover.item.name, days: 7 }),
+          unit: t(`${D}.unit`, { item: mover.item.label, days: 7 }),
           secondary: { text: t(`${D}.footer`, { hub: data.hubName }) },
           notes: data.omitted > 0 ? [t(`${D}.omitted`, { count: data.omitted })] : [],
           tone: 'clear',
@@ -110,7 +157,7 @@ export const marketTrend: Builder = (feeds, { t, range }) => {
       t(`${C}.summary`, { count: plotted.length, days: range, hub: data.hubName }),
       ...plotted.map((i) =>
         t(`${C}.summaryLine`, {
-          item: data.items[i]!.name,
+          item: data.items[i]!.label,
           change: trendText(lastOf(indexed[i]!) === null ? null : rel(lastOf(indexed[i]!)!)),
         })
       ),
@@ -122,8 +169,8 @@ export const marketTrend: Builder = (feeds, { t, range }) => {
     series: plotted.map((i, n) => {
       const end = lastOf(indexed[i]!);
       return {
-        key: String(data.items[i]!.typeId),
-        label: data.items[i]!.name,
+        key: data.items[i]!.key,
+        label: data.items[i]!.label,
         color: COLORS[n % COLORS.length]!,
         end: trendText(end === null ? null : rel(end)),
         values: indexed[i]!.map((v) => (v === null ? null : rel(v) * 100)),
@@ -139,7 +186,7 @@ export const marketTrend: Builder = (feeds, { t, range }) => {
         const change = rel(index);
         return [
           {
-            label: data.items[i]!.name,
+            label: data.items[i]!.label,
             value: t(`${C}.tip`, {
               change: trendText(change),
               price: formatIskCompact(price),

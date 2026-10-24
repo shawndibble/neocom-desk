@@ -34,6 +34,8 @@ import {
   setCalendarEvents,
   setRaidsRadius,
   setRaidsWhere,
+  setTrendHubs,
+  setTrendItems,
   setScope,
   setShowOnPhone,
   setView,
@@ -210,6 +212,8 @@ export function OverviewEditProvider({
       setCalendarEvents: (id, choice) => commit(setCalendarEvents(layoutRef.current, id, choice)),
       setRaidsWhere: (id, where) => commit(setRaidsWhere(layoutRef.current, id, where)),
       setRaidsRadius: (id, radius) => commit(setRaidsRadius(layoutRef.current, id, radius)),
+      setTrendItems: (id, items) => commit(setTrendItems(layoutRef.current, id, items)),
+      setTrendHubs: (id, hubs) => commit(setTrendHubs(layoutRef.current, id, hubs)),
       rename: (id, title) => commit(renameWidget(layoutRef.current, id, title)),
       setShowOnPhone: (id, show) => commit(setShowOnPhone(layoutRef.current, id, show)),
     };

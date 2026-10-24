@@ -9,6 +9,8 @@
  * No React, Dexie or fetch here: the store lives in `layoutStore.ts`.
  */
 import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
+import { TREND_MAX_SERIES } from '@/engine/market/trendSeries';
+import { getTradeHub } from '@/market/hubs';
 import { isRowsPerPage, DEFAULT_ROWS_PER_PAGE, type RowsPerPage } from './tableSortPage';
 import { getKind, isAddable, type WidgetKindId, type WidgetSize, type WidgetView } from './kinds';
 
@@ -27,9 +29,21 @@ export const DEFAULT_RAIDS_RADIUS = 8;
 export const isRaidsRadius = (value: unknown): value is number =>
   typeof value === 'number' && RAIDS_RADII.includes(value);
 
-export type WidgetRange = 7 | 30 | 90;
+export type WidgetRange = 7 | 30 | 90 | 365;
 export const WIDGET_RANGES: readonly WidgetRange[] = [7, 30, 90];
+/** What a price-history kind offers: ESI keeps about 13 months of market history. */
+export const LONG_WIDGET_RANGES: readonly WidgetRange[] = [7, 30, 90, 365];
 export const DEFAULT_RANGE: WidgetRange = 30;
+
+/** The windows a kind offers, or none for a kind with no time window. */
+export function rangesOf(kind: WidgetKindId): readonly WidgetRange[] {
+  const def = getKind(kind);
+  if (!def?.hasRange) return [];
+  return def.hasLongRange ? LONG_WIDGET_RANGES : WIDGET_RANGES;
+}
+
+/** Most Trade Hubs one Market Trend widget compares. */
+export const MAX_TREND_HUBS = 3;
 
 /** The most PLEX per 30 days a plan can be set to. */
 export const MAX_PLEX_PLAN = 5000;
@@ -58,6 +72,10 @@ export interface Widget {
   raidsWhere?: 'near';
   /** Skyhook raids only: jumps for Near me. Absent means the default (8). */
   raidsRadius?: number;
+  /** Market Trend only: the items it draws, newest pick last. Absent means the Quickbar's first items. */
+  trendItems?: number[];
+  /** Market Trend only: the Trade Hubs it prices at. Absent means the pilot's Market hub. */
+  trendHubs?: string[];
   showOnPhone: boolean;
 }
 
@@ -175,7 +193,7 @@ export function setScope(layout: OverviewLayout, id: string, scope: WidgetScope)
 
 export function setRange(layout: OverviewLayout, id: string, range: WidgetRange): OverviewLayout {
   return update(layout, id, (w) => {
-    if (w.range === range || !getKind(w.kind)?.hasRange) return null;
+    if (w.range === range || !rangesOf(w.kind).includes(range)) return null;
     return { ...w, range };
   });
 }
@@ -399,4 +417,49 @@ export function moveToWidget(layout: OverviewLayout, id: string, overId: string)
   const to = layout.widgets.findIndex((w) => w.id === overId);
   if (to < 0 || id === overId) return layout;
   return moveWidget(layout, id, to);
+}
+
+/** Whole positive type ids, each once, at most the most lines a widget draws; the rest is dropped. */
+export function cleanTrendItems(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
+  const ids = raw.filter((v): v is number => Number.isInteger(v) && v > 0);
+  return [...new Set(ids)].slice(0, TREND_MAX_SERIES);
+}
+
+/** Known Trade Hub ids, each once, at most `MAX_TREND_HUBS`. */
+export function cleanTrendHubs(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const ids = raw.filter((v): v is string => typeof v === 'string' && getTradeHub(v) !== undefined);
+  return [...new Set(ids)].slice(0, MAX_TREND_HUBS);
+}
+
+const sameList = (a: readonly unknown[] | undefined, b: readonly unknown[]) =>
+  (a ?? []).length === b.length && b.every((v, i) => a![i] === v);
+
+/** An empty list clears the setting, so the widget follows the Quickbar again. */
+export function setTrendItems(layout: OverviewLayout, id: string, items: unknown): OverviewLayout {
+  const next = cleanTrendItems(items);
+  return update(layout, id, (w) => {
+    if (!getKind(w.kind)?.hasTrendSources || sameList(w.trendItems, next)) return null;
+    if (next.length === 0) {
+      const { trendItems: _dropped, ...rest } = w;
+      void _dropped;
+      return rest;
+    }
+    return { ...w, trendItems: next };
+  });
+}
+
+/** An empty list clears the setting, so the widget prices at the pilot's Market hub again. */
+export function setTrendHubs(layout: OverviewLayout, id: string, hubs: unknown): OverviewLayout {
+  const next = cleanTrendHubs(hubs);
+  return update(layout, id, (w) => {
+    if (!getKind(w.kind)?.hasTrendSources || sameList(w.trendHubs, next)) return null;
+    if (next.length === 0) {
+      const { trendHubs: _dropped, ...rest } = w;
+      void _dropped;
+      return rest;
+    }
+    return { ...w, trendHubs: next };
+  });
 }

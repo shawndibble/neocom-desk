@@ -4474,8 +4474,8 @@
           }
         },
         "marketTrend": {
-          "summary_one": "Price trend of {{count}} Quickbar item at {{hub}} over {{days}} days.",
-          "summary_other": "Price trend of {{count}} Quickbar items at {{hub}} over {{days}} days.",
+          "summary_one": "Price trend of {{count}} item at {{hub}} over {{days}} days.",
+          "summary_other": "Price trend of {{count}} items at {{hub}} over {{days}} days.",
           "summaryLine": "{{item}} {{change}}.",
           "note": "Change in the daily average since the start of the range, at {{hub}}",
           "range": "{{days}} days",
@@ -4583,8 +4583,8 @@
         "marketTrend": {
           "unit": "{{item}} · {{days}} days",
           "footer": "Daily average at {{hub}}",
-          "omitted_one": "{{count}} more Quickbar item isn't shown.",
-          "omitted_other": "{{count}} more Quickbar items aren't shown.",
+          "omitted_one": "{{count}} more line isn't shown.",
+          "omitted_other": "{{count}} more lines aren't shown.",
           "noHistory": "No price history yet"
         }
       },
@@ -5568,7 +5568,7 @@
       },
       "marketTrend": {
         "title": "Market trend",
-        "description": "How the prices of your Quickbar items are moving",
+        "description": "How the prices of the items you pick are moving, at the trade hubs you pick",
         "empty": "Your Quickbar is empty.",
         "emptyHint": "Add items to your Quickbar from the Market, then their price trend shows here.",
         "col": {
@@ -5878,6 +5878,27 @@
       "nameOnly": "This widget shows the header Character only.",
       "range": "Range",
       "rangeDays": "{{days}}d",
+      "rangeYear": "1y",
+      "trendHubs": "Trade hubs",
+      "trendItems": "Items…",
+      "trendItemsTitle": "{{title}}: items",
+      "trendSource": "Pick from",
+      "trendList": "Items",
+      "trendSources": {
+        "quickbar": "Your Quickbar",
+        "minerals": "Minerals",
+        "ice": "Ice products",
+        "ore": "Ore",
+        "plex": "PLEX and skill injectors"
+      },
+      "trendQuickbarEmpty": "Your Quickbar is empty. Pin items in the Market browser, or pick from another list.",
+      "trendLoading": "Loading the market catalogue…",
+      "trendLoadFailed": "Could not load the market catalogue. Try again later.",
+      "trendPicked": "{{count}} of {{max}} chosen.",
+      "trendHint": "Each item is drawn at each trade hub you tick, up to six lines. PLEX trades in one region, so it is drawn once.",
+      "trendFollowQuickbar": "Follow my Quickbar",
+      "trendCancel": "Cancel",
+      "trendSave": "Save",
       "events": "Events",
       "eventsChoice": {
         "committed": "Accepted and tentative",

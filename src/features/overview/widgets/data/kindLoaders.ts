@@ -10,7 +10,6 @@
  * `@/sync`, Firebase or recharts from here.
  */
 import { db } from '@/db';
-import type { MarketHistoryPoint } from '@/engine/market/priceHistory';
 import { characterIdsWithScopes } from '@/app/characterIdsWithScopes';
 import { ESI_REGISTRY, requiredScopesForEndpoints } from '@/esi/registry';
 import { layerValues, type LayerValues } from '@/engine/netWorth/series';
@@ -873,101 +872,4 @@ export async function loadTradingProfitWidget(): Promise<TradingProfitWidgetData
 export async function loadSovRaidsWidget(characterId: number): Promise<SovRaidsWidgetData> {
   const { loadSovRaids } = await import('./sovRaidsLoader');
   return loadSovRaids(characterId);
-}
-
-// --- Market Trend ------------------------------------------------------------------
-
-/** Most lines the chart draws; the Quickbar's first items fill them. */
-export const MARKET_TREND_MAX_ITEMS = 6;
-
-export interface MarketTrendItem {
-  typeId: number;
-  name: string;
-  /** Every daily row ESI has, oldest first; empty for a type with no market or a failed read. */
-  points: MarketHistoryPoint[];
-  /** Where the item's Price History opens: the pilot's hub, or the region of a global market such as PLEX. */
-  to: string;
-  fromCache: boolean;
-}
-
-export interface MarketTrendWidgetData {
-  hubName: string;
-  items: MarketTrendItem[];
-  /** Quickbar items past the cap, not drawn. */
-  omitted: number;
-  fetchedAt: Date | null;
-}
-
-/** Rows kept per item: the longest chart range (90 days) plus the base row a 30-day change needs. */
-const MARKET_TREND_KEEP_DAYS = 125;
-
-/** The first Quickbar items' daily history at the pilot's Market hub (a global-market item at its own region). */
-export async function loadMarketTrendWidget(characterId: number): Promise<MarketTrendWidgetData> {
-  const [
-    { loadPriceHistory },
-    { loadGlobalMarketOverrides },
-    { MARKET_HUB_SETTING_KEY, LEGACY_MARKET_HUB_SETTING_KEY, parseMarketHub },
-    { buildMarketParams },
-    { EsiError },
-    hubs,
-  ] = await Promise.all([
-    import('@/features/market/priceHistory'),
-    import('@/features/market/orderBookView'),
-    import('@/features/market/hub'),
-    import('@/engine/market/urlState'),
-    import('@/esi/errors'),
-    import('@/market/hubs'),
-  ]);
-  const hubId =
-    parseMarketHub((await db.settings.get(MARKET_HUB_SETTING_KEY))?.value) ??
-    parseMarketHub((await db.settings.get(LEGACY_MARKET_HUB_SETTING_KEY))?.value) ??
-    hubs.DEFAULT_TRADE_HUB.id;
-  const hub = hubs.getTradeHub(hubId) ?? hubs.DEFAULT_TRADE_HUB;
-  const bar = (await db.quickbars.get(String(characterId)))?.items ?? [];
-  const picked = bar.slice(0, MARKET_TREND_MAX_ITEMS);
-  const overrides = await loadGlobalMarketOverrides();
-  let failures = 0;
-  const reads = await Promise.all(
-    picked.map(async (item) => {
-      const global = overrides.get(item.typeId);
-      const params = buildMarketParams(
-        item.typeId,
-        global ? { mode: 'region', regionId: global.regionId } : { mode: 'hub', hubId: hub.id }
-      );
-      // A type with no market (ESI 400) is a row of unknowns; any other failure is counted.
-      const result = await loadPriceHistory(global?.regionId ?? hub.regionId, item.typeId).catch(
-        (err: unknown) => {
-          if (!(err instanceof EsiError && err.status === 400)) failures += 1;
-          return null;
-        }
-      );
-      const points = result?.points ?? [];
-      const newest = points.at(-1)?.date;
-      const cutoff =
-        newest === undefined
-          ? ''
-          : new Date(Date.parse(`${newest}T00:00:00Z`) - MARKET_TREND_KEEP_DAYS * 86_400_000)
-              .toISOString()
-              .slice(0, 10);
-      return {
-        fetchedAt: result ? new Date(result.fetchedAt) : null,
-        item: {
-          typeId: item.typeId,
-          name: item.name,
-          points: points.filter((p) => p.date >= cutoff),
-          to: `/market/browser?${new URLSearchParams(params)}`,
-          fromCache: result?.fromCache ?? false,
-        } satisfies MarketTrendItem,
-      };
-    })
-  );
-  // Every read failing is a failed widget, not a quiet "no history".
-  if (picked.length > 0 && failures === picked.length)
-    throw new Error('Market history unavailable');
-  return {
-    hubName: hub.systemName,
-    items: reads.map((r) => r.item),
-    omitted: Math.max(0, bar.length - picked.length),
-    fetchedAt: oldestOf(...reads.map((r) => r.fetchedAt)),
-  };
 }

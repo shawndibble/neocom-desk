@@ -58,11 +58,11 @@ import type {
   ProfitWidgetData,
   RouteSafetyWidgetData,
   KillsWidgetData,
-  MarketTrendWidgetData,
   OmegaWidgetData,
   TradingProfitWidgetData,
   SovRaidsWidgetData,
 } from './kindLoaders';
+import type { MarketTrendFeed } from './marketTrendLoader';
 
 /** The narrow slice of i18next's `t` the adapters need. */
 export type Translate = (key: string, options?: Record<string, unknown>) => string;
@@ -318,7 +318,7 @@ export interface FeedMap {
   routeSafety: RouteSafetyWidgetData;
   kills: KillsWidgetData;
   omega: OmegaWidgetData;
-  marketTrend: MarketTrendWidgetData;
+  marketTrend: MarketTrendFeed;
   tradingProfit: TradingProfitWidgetData;
   corpWallet: CorpWalletFeed;
   corpJobs: CorpJobsFeed;
@@ -360,6 +360,10 @@ export interface BuildContext {
   raidsWhere?: RaidsWhere;
   /** Skyhook raids Near me: the jumps radius; left out, the default. */
   raidsRadius?: number;
+  /** Market Trend: the items it draws; left out, the Quickbar's first. */
+  trendItems?: number[];
+  /** Market Trend: the Trade Hubs it prices at; left out, the pilot's Market hub. */
+  trendHubs?: string[];
   /** The Time format clock days are cut on (`useTimeZone`); left out, the machine's own. */
   zone?: DayZone;
 }
