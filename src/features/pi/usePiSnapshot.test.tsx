@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GoalPlannerSnapshot } from './goalPlannerSnapshot';
 import { PiSnapshotProvider, usePiSnapshot } from './usePiSnapshot';
+import { lineageOf } from './snapshotLineage';
 import type { ReactNode } from 'react';
 
 const load = vi.fn();
@@ -64,6 +65,23 @@ describe('usePiSnapshot', () => {
     rerender({ key: 1 });
     expect(result.current.snapshot).toBe(first);
     await waitFor(() => expect(result.current.snapshot).toBe(second));
+  });
+
+  it('marks a re-read as the same pilot read again, and another Character as not', async () => {
+    const first = snap('a');
+    const reRead = snap('b');
+    const other = snap('c');
+    load.mockResolvedValueOnce(first).mockResolvedValueOnce(reRead).mockResolvedValueOnce(other);
+    const { result, rerender } = renderHook(({ id, key }) => usePiSnapshot(id, key), {
+      initialProps: { id: 1, key: 0 },
+    });
+    await waitFor(() => expect(result.current.snapshot).toBe(first));
+    rerender({ id: 1, key: 1 });
+    await waitFor(() => expect(result.current.snapshot).toBe(reRead));
+    expect(lineageOf(reRead)).toBe(lineageOf(first));
+    rerender({ id: 2, key: 1 });
+    await waitFor(() => expect(result.current.snapshot).toBe(other));
+    expect(lineageOf(other)).not.toBe(lineageOf(first));
   });
 
   it('retrying holds from the click until a fresh snapshot lands', async () => {

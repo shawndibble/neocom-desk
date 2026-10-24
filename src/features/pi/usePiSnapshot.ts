@@ -3,11 +3,14 @@ import {
   createElement,
   useCallback,
   useContext,
+  useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
 import { loadGoalPlannerSnapshot, type GoalPlannerSnapshot } from './goalPlannerSnapshot';
+import { markReRead } from './snapshotLineage';
 
 export interface PiSnapshotState {
   /** The Character's colony reads; null while loading, idle or after a failure. */
@@ -58,14 +61,25 @@ export function usePiSnapshot(characterId: number | null, reloadKey = 0): PiSnap
 }
 
 function useLoadedPiSnapshot(characterId: number | null, reloadKey: number): PiSnapshotState {
+  // The snapshot on screen, so a re-read for the same Character is marked as one
+  // (`snapshotLineage`) and the advice built from it holds until the new one lands.
+  const shown = useRef<{ characterId: number; snapshot: GoalPlannerSnapshot } | null>(null);
   const loader = useCallback(
-    () => loadGoalPlannerSnapshot(characterId as number),
+    () =>
+      loadGoalPlannerSnapshot(characterId as number).then((next) => {
+        const previous = shown.current;
+        if (previous?.characterId === characterId) markReRead(next, previous.snapshot);
+        return next;
+      }),
     // `reloadKey` is the caller's "read again" signal: a new loader re-runs the load.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [characterId, reloadKey]
   );
   const { status, data, retry: reload } = useKeyedLoad(characterId?.toString() ?? null, loader);
   const snapshot = data ?? null;
+  useEffect(() => {
+    shown.current = snapshot && characterId !== null ? { characterId, snapshot } : null;
+  }, [characterId, snapshot]);
   // Derived, not stored with an effect: retrying lasts until a different snapshot object lands.
   const [retryFrom, setRetryFrom] = useState<GoalPlannerSnapshot | null>(null);
   const retrying = snapshot !== null && snapshot === retryFrom;

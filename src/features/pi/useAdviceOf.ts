@@ -6,8 +6,9 @@
  * An answer already in hand (a tab switch back) is returned on the first
  * render. While a new input's answer is on its way, the previous answer stays
  * if it was built from the same colonies (a preference, market or route
- * change), so the board does not blank; for any other input it is `pending`,
- * never another pilot's figures.
+ * change) or the same pilot's colonies read again (`snapshotLineage`: a page
+ * refresh), so the board does not blank and lose its place; for any other
+ * input it is `pending`, never another pilot's figures.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { buildSharedPlanAdvice } from './planAdviceModel';
@@ -18,6 +19,7 @@ import {
   planAdviceWorkerAvailable,
   PlanAdviceWorkerUnavailable,
 } from './planAdviceService';
+import { lineageOf } from './snapshotLineage';
 
 export type AdviceOf =
   { status: 'pending' } | { status: 'error' } | { status: 'ready'; advice: PlanAdvice };
@@ -25,7 +27,7 @@ export type AdviceOf =
 const PENDING: AdviceOf = { status: 'pending' };
 const FAILED: AdviceOf = { status: 'error' };
 
-/** The newest ready answer per colony snapshot: what a pending input falls back to. */
+/** The newest ready answer per snapshot lineage: what a pending input falls back to. */
 const lastReadyOf = new WeakMap<object, AdviceOf>();
 
 /** One result object per advice, so a caller's memo keyed on it holds across renders. */
@@ -83,8 +85,8 @@ export function useAdviceOf(input: PlanAdviceInput | null): AdviceOf {
 
   if (!input) return PENDING;
   if (result) {
-    if (result.status === 'ready') lastReadyOf.set(input.snapshot, result);
+    if (result.status === 'ready') lastReadyOf.set(lineageOf(input.snapshot), result);
     return result;
   }
-  return lastReadyOf.get(input.snapshot) ?? PENDING;
+  return lastReadyOf.get(lineageOf(input.snapshot)) ?? PENDING;
 }
