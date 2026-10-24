@@ -100,7 +100,8 @@ export type CorpViewCapability =
   | 'canReadAssets'
   | 'canReadMiningLedger'
   | 'canReadRoleAudit'
-  | 'canManageSrp';
+  | 'canManageSrp'
+  | 'canConfigureSrp';
 
 export interface NavSubView {
   readonly path: AppRoutePath;
@@ -207,8 +208,8 @@ export const NAV_PAGES = [
     corpCapability: 'canManageSrp',
     // The Queue needs SRP on; without it Settings is the only tab and none are listed (`srpViews.ts`).
     conditionalTabs: { queue: 'srp' },
-    // Settings is for Directors; `canReadRoleAudit` is Director alone, the same role (`srpViews.ts`).
-    corpTabCapabilities: { settings: 'canReadRoleAudit' },
+    // Settings is for Directors (`srpViews.ts`).
+    corpTabCapabilities: { settings: 'canConfigureSrp' },
   },
   {
     path: '/skills',

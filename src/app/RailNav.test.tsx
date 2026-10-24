@@ -194,7 +194,7 @@ describe('the rail', () => {
   it('lists only the SRP tabs an officer can see under Corp SRP', async () => {
     vi.mocked(useCorpAccess).mockReturnValue({
       state: 'ready',
-      capabilities: { ...NO_CORP_CAPABILITIES, canManageSrp: true, canReadRoleAudit: true },
+      capabilities: { ...NO_CORP_CAPABILITIES, canManageSrp: true, canConfigureSrp: true },
       missingScopes: [],
       roles: ['Director'],
       readFailed: false,
