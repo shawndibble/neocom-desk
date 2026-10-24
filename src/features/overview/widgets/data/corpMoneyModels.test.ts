@@ -88,6 +88,19 @@ describe('corpWallet', () => {
     expect(view.emptyMessage).toBe('overview.board.corpUnreadable');
   });
 
+  it('is empty, not row-less, when every division is unnamed and zero', () => {
+    const view = corpWallet(
+      feed({
+        divisions: [
+          { division: 1, name: null, balance: 0 },
+          { division: 2, name: null, balance: 0 },
+        ],
+      }),
+      ctx()
+    );
+    expect(view.status.isEmpty).toBe(true);
+  });
+
   it('is blank while the feed is missing', () => {
     expect(corpWallet({}, ctx()).status.hasData).toBe(false);
   });
@@ -111,12 +124,22 @@ describe('corpCashFlow', () => {
   it('says net positive instead of a runway when the vitals window nets above zero', () => {
     const view = corpCashFlow(
       feed({ journal: [line(1, 500), line(2, -300), line(40, -9999)] }),
-      ctx(7)
+      ctx()
     );
     expect(view.number.secondary?.text).toBe(
       'overview.widgets.corpCashFlow.netPositive{"count":30}'
     );
     expect(view.number.secondary?.tone).toBeUndefined();
+    // No runway line is shown, so no note explaining its window either.
+    expect(view.number.notes).toBeUndefined();
+  });
+
+  it('keeps the 30-day net-positive sentence off a range it does not describe', () => {
+    // 7 days: net -400 though the 30-day window nets +200.
+    const view = corpCashFlow(feed({ journal: [line(1, -400), line(20, 600)] }), ctx(7));
+    expect(view.number.iskAmount).toBe(-400);
+    expect(view.number.secondary).toBeUndefined();
+    expect(view.number.notes).toBeUndefined();
   });
 
   it('is unknown, never zero, when the journal could not load', () => {

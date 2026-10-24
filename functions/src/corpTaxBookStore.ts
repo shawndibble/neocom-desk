@@ -47,6 +47,8 @@ import {
   isCacheFresh,
   parseRecordKey,
   parseStatement,
+  moveStartRate,
+  rateKey,
   startDateMoveReason,
   satisfies,
   utcDate,
@@ -619,13 +621,6 @@ async function minerUids(c: EditCtx, minerId: string): Promise<string[]> {
   return minerCharacters(minerId, miner).map((id) => `char:${id}`);
 }
 
-const rateKey = (r: StoredRate): string =>
-  r.scope === 'record'
-    ? `record:${r.recordKey}`
-    : `${r.scope}:${'minerId' in r ? r.minerId : ''}:${'moonId' in r ? r.moonId : ''}:${r.effectiveFrom}` +
-      (r.scope === 'structure' ? `:${r.structureId}` : '') +
-      (r.scope === 'feeder' ? `:${r.feederId}` : '');
-
 /** The characters an officer unlinked: automatic grouping (D26) leaves them alone. */
 const DECLINED_DOC = 'declinedAutoGroup';
 
@@ -819,11 +814,7 @@ async function applyEdit(c: EditCtx, action: EditAction): Promise<EditOutcome> {
         update.startDate = startDate;
         // The start-date rate is dated at the start itself: it moves with it.
         if (oldStart && startDate < oldStart) {
-          update.rates = rates.map((r) =>
-            r.scope === 'corp' && r.effectiveFrom === oldStart
-              ? { ...r, effectiveFrom: startDate }
-              : r
-          );
+          update.rates = moveStartRate(rates, oldStart, startDate);
         }
       }
       if (structureExpiryHours) {

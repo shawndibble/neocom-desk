@@ -4,7 +4,8 @@
  * The one question no other view in the app can answer. Every other page is
  * about what a Character owns; this one is about people, and about the people
  * who have stopped showing up in particular — which is why the table opens
- * sorted by the longest silence rather than alphabetically.
+ * sorted by Last seen, newest first (the silent ones sort to the end and
+ * the Inactive filter and dark tone find them), not alphabetically.
  *
  * **Director-only, and the whole page rather than a panel.** `membertracking`
  * declares `Director` in ESI's `x-required-roles` and nothing else, so

@@ -199,6 +199,7 @@ function CorpMoonsView({ needsScope }: { needsScope: boolean }) {
   const decided = state.status === 'off' || state.status === 'ready';
   useEffect(() => {
     if (decided) setMoonsTabsHidden(unchosen);
+    return () => setMoonsTabsHidden(false);
   }, [decided, unchosen]);
 
   if (state.status === 'loading') {

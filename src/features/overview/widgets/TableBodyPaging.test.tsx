@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -187,5 +187,24 @@ describe('TableBody paging', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: '+9 more' }));
     expect(bodyRows()).toHaveLength(12);
     expect(screen.queryByText('+9 more')).toBeNull();
+  });
+
+  it('moves focus to the first revealed row and collapses again from the keyboard', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <TableBody table={model(12)} columnsFor="L" rowLimit={3} />
+      </MemoryRouter>
+    );
+    act(() => screen.getByRole('button', { name: '+9 more' }).focus());
+    await user.keyboard('{Enter}');
+    expect(bodyRows()).toHaveLength(12);
+    expect(bodyRows()[3]).toHaveFocus();
+    // Tab onward reaches the toggle, which now says how to put the rows back.
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Show fewer' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(bodyRows()).toHaveLength(3);
+    expect(screen.getByRole('button', { name: '+9 more' })).toBeInTheDocument();
   });
 });

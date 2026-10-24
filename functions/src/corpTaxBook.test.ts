@@ -6,6 +6,7 @@ import {
   dismissalNeedsDirector,
   defaultSettings,
   isCacheFresh,
+  moveStartRate,
   parseClaimPaymentInput,
   needsLiveCheck,
   parseEditAction,
@@ -388,6 +389,36 @@ describe('per-moon-owner miner rate', () => {
         rate: { scope: 'feeder', pct: 9, effectiveFrom: '2026-10-21' },
       })
     ).toThrow();
+  });
+});
+
+describe('moveStartRate', () => {
+  it('re-dates the corp-default rate dated at the old start', () => {
+    expect(
+      moveStartRate(
+        [
+          { scope: 'corp', pct: 10, effectiveFrom: '2026-10-10' },
+          { scope: 'corp', pct: 12, effectiveFrom: '2026-10-20' },
+        ],
+        '2026-10-10',
+        '2026-10-01'
+      )
+    ).toEqual([
+      { scope: 'corp', pct: 10, effectiveFrom: '2026-10-01' },
+      { scope: 'corp', pct: 12, effectiveFrom: '2026-10-20' },
+    ]);
+  });
+
+  it('keeps one rate when another already sits at the new start', () => {
+    const out = moveStartRate(
+      [
+        { scope: 'corp', pct: 8, effectiveFrom: '2026-10-01' },
+        { scope: 'corp', pct: 10, effectiveFrom: '2026-10-10' },
+      ],
+      '2026-10-10',
+      '2026-10-01'
+    );
+    expect(out).toEqual([{ scope: 'corp', pct: 10, effectiveFrom: '2026-10-01' }]);
   });
 });
 

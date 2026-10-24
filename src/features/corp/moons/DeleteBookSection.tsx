@@ -46,14 +46,20 @@ export function DeleteBookDialog({ onClose }: { onClose: () => void }) {
   const { characterId, corporationId, reload } = useBook();
   const [expected, setExpected] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
+  // The id stands in when the ticker is unreadable: the label then names it as the id.
+  const [isId, setIsId] = useState(false);
   useEffect(() => {
     let cancelled = false;
     getCorporationPublicInfo(corporationId).then(
       (r) => {
-        if (!cancelled) setExpected(r.data?.ticker || String(corporationId));
+        if (cancelled) return;
+        setIsId(!r.data?.ticker);
+        setExpected(r.data?.ticker || String(corporationId));
       },
       () => {
-        if (!cancelled) setExpected(String(corporationId));
+        if (cancelled) return;
+        setIsId(true);
+        setExpected(String(corporationId));
       }
     );
     return () => {
@@ -82,7 +88,13 @@ export function DeleteBookDialog({ onClose }: { onClose: () => void }) {
       run={remove}
     >
       <p>{t('corpTaxBook.moons.settings.delete.body')}</p>
-      <Label text={t('corpTaxBook.moons.settings.delete.typeTicker', { ticker: expected ?? '…' })}>
+      <Label
+        text={
+          isId
+            ? t('corpTaxBook.moons.settings.delete.typeCorpId', { id: expected })
+            : t('corpTaxBook.moons.settings.delete.typeTicker', { ticker: expected ?? '…' })
+        }
+      >
         <TextInput
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
