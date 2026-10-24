@@ -5,6 +5,7 @@ import { Button, TextInput } from '@/components/ui';
 import { getCorporationPublicInfo } from '@/esi/endpoints/corp';
 import { deleteBook } from '../taxBook/bookClient';
 import { DialogShell, Label } from './BookDialogs';
+import { ExportFirst } from './ExportBook';
 import { useBook } from './useBook';
 
 /** Whoever turned the book on (a Director) or the CEO may delete it. The callable stays the gate. */
@@ -46,6 +47,7 @@ export function DeleteBookDialog({ onClose }: { onClose: () => void }) {
   const { characterId, corporationId, reload } = useBook();
   const [expected, setExpected] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
+  const [exporting, setExporting] = useState(false);
   // The id stands in when the ticker is unreadable: the label then names it as the id.
   const [isId, setIsId] = useState(false);
   useEffect(() => {
@@ -82,12 +84,15 @@ export function DeleteBookDialog({ onClose }: { onClose: () => void }) {
       onClose={onClose}
       title={t('corpTaxBook.moons.settings.delete.confirmTitle')}
       confirmLabel={t('corpTaxBook.moons.settings.delete.confirm')}
-      canConfirm={expected !== null && typed.trim().toUpperCase() === expected.toUpperCase()}
+      canConfirm={
+        !exporting && expected !== null && typed.trim().toUpperCase() === expected.toUpperCase()
+      }
       danger
       showLogged={false}
       run={remove}
     >
       <p>{t('corpTaxBook.moons.settings.delete.body')}</p>
+      <ExportFirst onBusyChange={setExporting} />
       <Label
         text={
           isId

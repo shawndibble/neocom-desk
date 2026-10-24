@@ -3,10 +3,11 @@ import type { CsvColumn } from './csv';
 import { toCell, type ExportCell, type ExportValue } from './exportCells';
 
 /**
- * A minimal single-sheet .xlsx (Office Open XML) writer. An xlsx opens
+ * A minimal .xlsx (Office Open XML) writer: one sheet for a table export, or
+ * a sheet per record type for a whole-dataset export. An xlsx opens
  * identically in Excel, LibreOffice/OpenOffice and Google Sheets with no
  * import dialog to get wrong — the failure mode CSV can't rule out. Only
- * what a table export needs: inline strings, numbers, dates, a bold frozen
+ * what an export needs: inline strings, numbers, dates, a bold frozen
  * header row. Text is always an inline string, never a formula, so no
  * formula-injection guard is needed here.
  *
@@ -21,11 +22,7 @@ const STYLE_DATE = 2;
 
 const STYLES_XML = `${XML_HEADER}<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy-mm-dd hh:mm:ss"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
 
-const CONTENT_TYPES_XML = `${XML_HEADER}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`;
-
 const ROOT_RELS_XML = `${XML_HEADER}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
-
-const WORKBOOK_RELS_XML = `${XML_HEADER}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
 
 /** Excel's day 0 is 1899-12-30 (the 1900 leap-year bug baked in); Unix epoch is serial 25569. */
 const UNIX_EPOCH_SERIAL = 25569;
@@ -62,6 +59,24 @@ function sheetName(name: string): string {
   return clean || 'Sheet1';
 }
 
+/** Excel refuses a workbook whose sheet names repeat, case aside: later ones get " (2)", " (3)". */
+function uniqueSheetNames(names: readonly string[]): string[] {
+  const taken = new Set<string>();
+  return names.map((raw) => {
+    const base = sheetName(raw);
+    let name = base;
+    for (let n = 2; taken.has(name.toLowerCase()); n++) {
+      const suffix = ` (${n})`;
+      name = base.slice(0, 31 - suffix.length).trimEnd() + suffix;
+    }
+    taken.add(name.toLowerCase());
+    return name;
+  });
+}
+
+/** Excel's limit for one cell's text; past it the file opens only through a repair prompt. */
+const MAX_CELL_TEXT = 32_767;
+
 function cellXml(ref: string, cell: ExportCell, style?: number): string {
   const s = style ? ` s="${style}"` : '';
   switch (cell.kind) {
@@ -72,7 +87,7 @@ function cellXml(ref: string, cell: ExportCell, style?: number): string {
     case 'date':
       return `<c r="${ref}" s="${STYLE_DATE}"><v>${cell.value.getTime() / MS_PER_DAY + UNIX_EPOCH_SERIAL}</v></c>`;
     case 'text':
-      return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${escapeXml(cell.value)}</t></is></c>`;
+      return `<c r="${ref}"${s} t="inlineStr"><is><t xml:space="preserve">${escapeXml(cell.value.slice(0, MAX_CELL_TEXT))}</t></is></c>`;
   }
 }
 
@@ -90,16 +105,19 @@ function displayWidth(cell: ExportCell): number {
   }
 }
 
-export function toXlsx<T>(
-  rows: readonly T[],
-  columns: readonly CsvColumn<T>[],
-  name: string
-): Uint8Array {
+export interface XlsxSheet<T> {
+  name: string;
+  rows: readonly T[];
+  columns: readonly CsvColumn<T>[];
+}
+
+function worksheetXml<T>({ rows, columns }: XlsxSheet<T>): string {
   const widths = columns.map((c) => c.header.length);
+  const letters = columns.map((_, i) => columnName(i));
   const rowXml: string[] = [];
 
   const headerCells = columns.map((c, i) =>
-    cellXml(`${columnName(i)}1`, toCell(c.header), STYLE_HEADER)
+    cellXml(`${letters[i]}1`, toCell(c.header), STYLE_HEADER)
   );
   rowXml.push(`<row r="1">${headerCells.join('')}</row>`);
 
@@ -108,7 +126,7 @@ export function toXlsx<T>(
     const cells = columns.map((c, i) => {
       const cell = toCell(c.value(row) as ExportValue);
       widths[i] = Math.max(widths[i], displayWidth(cell));
-      return cellXml(`${columnName(i)}${rowNumber}`, cell);
+      return cellXml(`${letters[i]}${rowNumber}`, cell);
     });
     rowXml.push(`<row r="${rowNumber}">${cells.join('')}</row>`);
   });
@@ -122,16 +140,59 @@ export function toXlsx<T>(
         .join('')}</cols>`
     : '';
 
-  const sheetXml = `${XML_HEADER}<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>${cols}<sheetData>${rowXml.join('')}</sheetData></worksheet>`;
+  return `${XML_HEADER}<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>${cols}<sheetData>${rowXml.join('')}</sheetData></worksheet>`;
+}
 
-  const workbookXml = `${XML_HEADER}<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${escapeXml(sheetName(name))}" sheetId="1" r:id="rId1"/></sheets></workbook>`;
+const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const SHEET_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml';
 
-  return zipSync({
-    '[Content_Types].xml': strToU8(CONTENT_TYPES_XML),
+/**
+ * A workbook with a sheet per entry, in order. Sheet `i` is `sheet{i+1}.xml` on
+ * relationship `rId{i+1}`; styles take the id after the last sheet.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the row type is invariant per sheet
+export type AnyXlsxSheet = XlsxSheet<any>;
+
+export function toXlsxWorkbook(sheets: readonly AnyXlsxSheet[]): Uint8Array {
+  const names = uniqueSheetNames(sheets.map((s) => s.name));
+  const n = sheets.length;
+  const overrides = sheets
+    .map(
+      (_, i) =>
+        `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="${SHEET_TYPE}"/>`
+    )
+    .join('');
+  const contentTypes = `${XML_HEADER}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${overrides}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`;
+  const sheetRels = sheets
+    .map(
+      (_, i) =>
+        `<Relationship Id="rId${i + 1}" Type="${REL}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`
+    )
+    .join('');
+  const workbookRels = `${XML_HEADER}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheetRels}<Relationship Id="rId${n + 1}" Type="${REL}/styles" Target="styles.xml"/></Relationships>`;
+  const sheetEntries = names
+    .map((name, i) => `<sheet name="${escapeXml(name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
+    .join('');
+  const workbookXml = `${XML_HEADER}<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="${REL}"><sheets>${sheetEntries}</sheets></workbook>`;
+
+  const files: Record<string, Uint8Array> = {
+    '[Content_Types].xml': strToU8(contentTypes),
     '_rels/.rels': strToU8(ROOT_RELS_XML),
     'xl/workbook.xml': strToU8(workbookXml),
-    'xl/_rels/workbook.xml.rels': strToU8(WORKBOOK_RELS_XML),
+    'xl/_rels/workbook.xml.rels': strToU8(workbookRels),
     'xl/styles.xml': strToU8(STYLES_XML),
-    'xl/worksheets/sheet1.xml': strToU8(sheetXml),
+  };
+  sheets.forEach((sheet, i) => {
+    files[`xl/worksheets/sheet${i + 1}.xml`] = strToU8(worksheetXml(sheet));
   });
+  return zipSync(files);
+}
+
+/** A one-sheet workbook: what a table export writes. */
+export function toXlsx<T>(
+  rows: readonly T[],
+  columns: readonly CsvColumn<T>[],
+  name: string
+): Uint8Array {
+  return toXlsxWorkbook([{ name, rows, columns }]);
 }

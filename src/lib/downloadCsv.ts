@@ -1,3 +1,4 @@
+import type { AnyXlsxSheet } from './xlsx';
 import { toCsv, csvFilename, exportFilename, slugifyForFilename, type CsvColumn } from './csv';
 import { downloadBlob, downloadTextFile } from './download';
 import { writeToClipboard } from './clipboard';
@@ -122,7 +123,10 @@ export interface ExportOptions {
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
-function exportBase(surface: ExportSurface, qualifier?: string): string {
+/** Whole-dataset workbooks, a sheet per record type: .xlsx only, never a table's menu. */
+export type WorkbookSurface = 'corp-tax-book' | 'corp-srp';
+
+function exportBase(surface: ExportSurface | WorkbookSurface, qualifier?: string): string {
   return qualifier ? `${surface}-${slugifyForFilename(qualifier)}` : surface;
 }
 
@@ -141,16 +145,40 @@ export async function exportRows<T>(
     case 'clipboard':
       await writeToClipboard(toTsv(rows, columns));
       return;
-    case 'xlsx': {
-      // Loaded on demand: the zip writer has no business in the main bundle.
-      const { toXlsx } = await import('./xlsx');
-      const base = exportBase(surface, qualifier);
-      const bytes = toXlsx(rows, columns, base);
-      downloadBlob(
-        exportFilename(base, now, 'xlsx', { partial: truncated }),
-        new Blob([bytes as Uint8Array<ArrayBuffer>], { type: XLSX_MIME })
-      );
+    case 'xlsx':
+      await downloadWorkbook(surface, [{ name: exportBase(surface, qualifier), rows, columns }], {
+        now,
+        truncated,
+        qualifier,
+      });
       return;
-    }
   }
+}
+
+export interface WorkbookDownload {
+  filename: string;
+  sheets: number;
+  rows: number;
+}
+
+/** Every .xlsx download: one sheet for a table, or a sheet per record type for a dataset. */
+export async function downloadWorkbook(
+  surface: ExportSurface | WorkbookSurface,
+  sheets: readonly AnyXlsxSheet[],
+  { now = new Date(), truncated = false, qualifier }: ExportOptions = {}
+): Promise<WorkbookDownload> {
+  // Loaded on demand: the zip writer has no business in the main bundle.
+  const { toXlsxWorkbook } = await import('./xlsx');
+  const filename = exportFilename(exportBase(surface, qualifier), now, 'xlsx', {
+    partial: truncated,
+  });
+  downloadBlob(
+    filename,
+    new Blob([toXlsxWorkbook(sheets) as Uint8Array<ArrayBuffer>], { type: XLSX_MIME })
+  );
+  return {
+    filename,
+    sheets: sheets.length,
+    rows: sheets.reduce((sum, sheet) => sum + sheet.rows.length, 0),
+  };
 }
