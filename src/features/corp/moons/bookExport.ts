@@ -8,7 +8,7 @@
 import type { Miner } from '@/engine/corpTaxBook/charges';
 import type { RecordedWriteOff } from '@/engine/corpTaxBook/allocation';
 import type { Dismissal } from '@/engine/corpTaxBook/dismissals';
-import type { Declaration } from '@/engine/corpTaxBook/overdue';
+import { deriveModeChanges, deriveOwnerRateHistory } from '@/engine/corpTaxBook/feederAccrual';
 import type { ScheduledSyncStatus } from '@/engine/corpTaxBook/scheduledSync';
 import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
@@ -28,6 +28,7 @@ import {
 import type { AnyXlsxSheet } from '@/lib/xlsx';
 import type {
   AuditEntry,
+  BookDeclaration,
   BookFeeder,
   BookSettings,
   GroupingAnswer,
@@ -58,12 +59,6 @@ export interface BookExportInput {
   scheduledSync?: ScheduledSyncStatus | null;
 }
 
-/** A declaration as stored: who recorded it, and who resolved it. */
-export type BookDeclaration = Declaration & {
-  recordedBy?: number;
-  resolution?: NonNullable<Declaration['resolution']> & { by?: number };
-};
-
 export type BookExportNames = Pick<
   BookNames,
   'character' | 'corporation' | 'refinery' | 'moon' | 'ore'
@@ -72,6 +67,8 @@ export type BookExportNames = Pick<
 type MinerName = (minerId: string | undefined) => string | null;
 
 const PREFIX = 'corpTaxBook.export';
+/** The Moon owners page's own payout labels, so the file and the page never disagree. */
+const PAYOUT_LABELS = 'corpTaxBook.moons.moonOwners.page.payouts';
 
 const sheet = <T>(t: CsvTranslate, name: string, rows: readonly T[], columns: SheetColumns<T>) =>
   sheetFrom(t, PREFIX, name, rows, columns);
@@ -95,13 +92,13 @@ function rateTarget(rate: TaxRate, names: BookExportNames, minerName: MinerName)
 }
 
 function settingsRows(
-  s: BookSettings,
-  scheduled: ScheduledSyncStatus | null,
-  declinedAutoGroup: readonly number[],
+  input: BookExportInput,
   names: BookExportNames,
   minerName: MinerName,
   t: CsvTranslate
 ): SettingRow[] {
+  const s = input.settings;
+  const scheduled = input.scheduledSync ?? null;
   const yes = t('corpTaxBook.export.yes');
   const no = t('corpTaxBook.export.no');
   const label = (key: string, options?: Record<string, unknown>) =>
@@ -134,7 +131,7 @@ function settingsRows(
           })
         : label('automaticSyncOff'),
     ],
-    [label('declinedAutoGroup'), joined(declinedAutoGroup.map(names.character))],
+    [label('declinedAutoGroup'), joined(input.declinedAutoGroup.map(names.character))],
     ...s.rates.map((rate): SettingRow => [
       label(`rate.${rate.scope}`, {
         target: rateTarget(rate, names, minerName),
@@ -170,7 +167,7 @@ export function bookExportSheets(
     f.payouts.map((payout) => ({ feeder: f.corporationId, payout }))
   );
   const ownerRates = input.feeders.flatMap((f) =>
-    (f.ownerRateHistory ?? []).map((entry) => ({ feeder: f.corporationId, entry }))
+    deriveOwnerRateHistory(f).map((entry) => ({ feeder: f.corporationId, entry }))
   );
   const payee = (f: BookFeeder) =>
     !f.payee
@@ -423,10 +420,7 @@ export function bookExportSheets(
         ['cancelled', (x) => x.cancelledAt],
         [
           'ore',
-          (x) =>
-            x.oreLines?.length
-              ? joined(x.oreLines.map((l) => `${names.ore(l.typeId)} × ${l.quantity}`))
-              : null,
+          (x) => joined((x.oreLines ?? []).map((l) => `${names.ore(l.typeId)} × ${l.quantity}`)),
         ],
         ['surveyId', (x) => x.surveyId],
       ]
@@ -443,13 +437,11 @@ export function bookExportSheets(
         [
           'modeChanges',
           (f) =>
-            f.modeChanges?.length
-              ? joined(
-                  f.modeChanges.map(
-                    (c) => `${c.from}: ${t(`corpTaxBook.export.moonOwnerMode.${c.mode}`)}`
-                  )
-                )
-              : null,
+            joined(
+              deriveModeChanges(f).map(
+                (c) => `${c.from}: ${t(`corpTaxBook.export.moonOwnerMode.${c.mode}`)}`
+              )
+            ),
         ],
         ['joined', (f) => isoTime(f.joinedAt)],
         ['left', (f) => isoTime(f.leftAt)],
@@ -488,8 +480,8 @@ export function bookExportSheets(
         ['moonOwnerId', (p) => p.feeder],
         ['date', (p) => p.payout.date],
         ['amount', (p) => p.payout.amount],
-        ['method', (p) => t(`corpTaxBook.export.payoutMethod.${p.payout.method}`)],
-        ['status', (p) => t(`corpTaxBook.export.payoutStatus.${p.payout.status}`)],
+        ['method', (p) => t(`${PAYOUT_LABELS}.method.${p.payout.method}`)],
+        ['status', (p) => t(`${PAYOUT_LABELS}.state.${p.payout.status}`)],
         ['journalRef', (p) => p.payout.journalRef],
         ['notAPayout', (p) => (p.payout.notAPayout ? yes : no)],
       ]
@@ -513,18 +505,7 @@ export function bookExportSheets(
         ['time', (r) => r.entry.recordedAt],
       ]
     ),
-    settingsSheet(
-      t,
-      PREFIX,
-      settingsRows(
-        input.settings,
-        input.scheduledSync ?? null,
-        input.declinedAutoGroup,
-        names,
-        minerName,
-        t
-      )
-    ),
+    settingsSheet(t, PREFIX, settingsRows(input, names, minerName, t)),
     sheet(
       t,
       'activity',

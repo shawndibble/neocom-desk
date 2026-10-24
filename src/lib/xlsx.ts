@@ -11,10 +11,8 @@ import { toCell, type ExportCell, type ExportValue } from './exportCells';
  * header row. Text is always an inline string, never a formula, so no
  * formula-injection guard is needed here.
  *
- * Two halves: `resolveSheet` reads each cell off its row (the column `value` functions are
- * closures, so this runs where the rows live), and `writeWorkbook` turns that plain data into
- * the file, in `xlsx.worker.ts` or, without a worker, on the page. Kept out of the main bundle:
- * callers reach it through a dynamic import.
+ * `resolveSheet` reads cells off the rows; `writeWorkbook` turns plain cells into the file
+ * (`xlsxBuild` runs it in a worker). Kept out of the main bundle: dynamic import only.
  */
 
 const XML_HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';

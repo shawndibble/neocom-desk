@@ -16285,15 +16285,6 @@
         "normal": "Paid out through the book",
         "settled-otherwise": "Settled otherwise"
       },
-      "payoutMethod": {
-        "donation": "Donation",
-        "other": "Other"
-      },
-      "payoutStatus": {
-        "recorded": "Recorded",
-        "waiting-for-journal": "Waiting for the wallet journal",
-        "matched": "Matched in the wallet journal"
-      },
       "rateKind": {
         "requested": "Requested",
         "agreed": "Agreed"

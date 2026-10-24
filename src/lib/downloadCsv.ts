@@ -161,7 +161,7 @@ export interface WorkbookDownload {
   rows: number;
 }
 
-/** Every .xlsx download: one sheet for a table, or a sheet per record type for a dataset. Built off the main thread where a Worker can run. */
+/** Every .xlsx download: one sheet for a table, or a sheet per record type for a dataset. */
 export async function downloadWorkbook(
   surface: ExportSurface | WorkbookSurface,
   sheets: readonly AnyXlsxSheet[],

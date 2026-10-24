@@ -1,9 +1,5 @@
 /// <reference lib="webworker" />
-/**
- * `writeWorkbook` off the main thread (`xlsxBuild`): the sheet XML and the zip for a large
- * export take seconds. The page posts sheets already resolved to plain cells; the file comes
- * back with its buffer transferred, not copied.
- */
+/** `writeWorkbook` off the main thread for `xlsxBuild`: a big export's XML and zip take seconds. */
 import { writeWorkbook, type PlainSheet } from './xlsx';
 
 export interface XlsxRequest {

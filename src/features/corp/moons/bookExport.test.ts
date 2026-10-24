@@ -187,8 +187,8 @@ function table(sheet: XlsxSheet<unknown>): unknown[][] {
   return [cols.map((c) => c.header), ...sheet.rows.map((r) => cols.map((c) => c.value(r)))];
 }
 
-const sheet = (name: string) => {
-  const found = bookExportSheets(input, names, t).find((s) => s.name === name);
+const sheet = (name: string, from: BookExportInput = input) => {
+  const found = bookExportSheets(from, names, t).find((s) => s.name === name);
   if (!found) throw new Error(`no sheet ${name}`);
   return table(found);
 };
@@ -294,10 +294,10 @@ describe('bookExportSheets', () => {
     expect(at(first, 'moonOwner')).toBe('Corp 60');
     expect(at(first, 'moonOwnerId')).toBe(60);
     expect(at(first, 'date')).toBe('2026-03-01');
-    expect(at(first, 'method')).toBe('corpTaxBook.export.payoutMethod.other');
+    expect(at(first, 'method')).toBe('corpTaxBook.moons.moonOwners.page.payouts.method.other');
     expect(at(first, 'notAPayout')).toBe('corpTaxBook.export.yes');
     expect(at(second, 'amount')).toBe(500);
-    expect(at(second, 'status')).toBe('corpTaxBook.export.payoutStatus.matched');
+    expect(at(second, 'status')).toBe('corpTaxBook.moons.moonOwners.page.payouts.state.matched');
     expect(at(second, 'journalRef')).toBe(123);
     expect(at(second, 'notAPayout')).toBe('corpTaxBook.export.no');
   });
@@ -312,6 +312,25 @@ describe('bookExportSheets', () => {
     expect(at(first, 'effectiveFrom')).toBe('2026-02-01');
     expect(at(second, 'kind')).toBe('corpTaxBook.export.rateKind.agreed');
     expect(at(second, 'time')).toBe('2026-02-10T00:00:00Z');
+  });
+
+  it('derives the rates and mode of a moon owner recorded before their histories were kept', () => {
+    const legacy = {
+      ...input.feeders[0],
+      mode: 'settled-otherwise' as const,
+      ownerRateHistory: undefined,
+      modeChanges: undefined,
+    };
+    const from = { ...input, feeders: [legacy] };
+    const rates = sheet('corpTaxBook.export.sheets.moonOwnerRates', from);
+    expect(rates.slice(1).map((r) => [r[2], r[3], r[4]])).toEqual([
+      ['corpTaxBook.export.rateKind.requested', 8, '2026-02-01'],
+      ['corpTaxBook.export.rateKind.agreed', 6, '2026-02-01'],
+    ]);
+    const owners = sheet('corpTaxBook.export.sheets.moonOwners', from);
+    expect(owners[1][owners[0].indexOf('corpTaxBook.export.cols.modeChanges')]).toBe(
+      '2026-02-01: corpTaxBook.export.moonOwnerMode.settled-otherwise'
+    );
   });
 
   it('writes an extraction with the refinery, moon and ore named beside their ids', () => {
