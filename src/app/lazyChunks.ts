@@ -43,6 +43,142 @@ export function entryFile(bundle: BundleLike): string {
 }
 
 /**
+ * The shell chunks' source modules, as path suffixes of their module ids
+ * (`shellChunkGroups`' `shellRoots`).
+ */
+export const SHELL_MODULE_SUFFIXES = ['/src/app/Layout.tsx', '/src/routes/Overview.tsx'];
+
+/**
+ * The routes `App.tsx` renders lazily outside the signed-in shell, as path
+ * suffixes of their module ids (`shellChunkGroups`' `publicRoots`). A visitor
+ * with no Character opens them, so they must not load the shell chunk.
+ * `lazyChunks.test.ts` checks the list against `App.tsx`.
+ */
+export const PUBLIC_ROUTE_SUFFIXES = [
+  '/src/routes/FittingShared.tsx',
+  '/src/routes/SharedLink.tsx',
+  '/src/routes/CommunityJoin.tsx',
+  '/src/routes/CorpTaxBookVerify.tsx',
+  '/src/routes/CorpTaxBookRemoveNow.tsx',
+  '/src/routes/ErrorProbe.tsx',
+];
+
+/** The module graph `shellChunkGroups` reads, by module id. */
+export interface ShellGraph {
+  /** The build's entry modules (`index.html`). */
+  entries: readonly string[];
+  shellRoots: readonly string[];
+  publicRoots: readonly string[];
+  /** The bundler's static imports of a module; `undefined` (unknown) is none. */
+  importedIds: (id: string) => readonly string[] | undefined;
+}
+
+/**
+ * The modules of the two code-splitting groups (`vite.config.ts`) that make the
+ * signed-in shell a handful of chunks. Rolldown otherwise gives every set of
+ * routes sharing a module a chunk of its own: boot → Overview was ~220 shell
+ * files, most under 2 KiB, each a request before first paint.
+ *
+ * - `shell`: everything statically reachable from the shell modules that the
+ *   entry does not reach (that is the `boot` group's, and in the shell chunk it
+ *   would make the entry import the shell, so /login would download it), the
+ *   shell modules themselves excluded so their chunks keep their names
+ *   (`missingShellChunks`).
+ * - `publicShared`: the part of that a public route also reaches. A closure
+ *   intersected with a closure is closed, so this group never imports `shell`
+ *   and a public route never loads it.
+ */
+export function shellChunkGroups(graph: ShellGraph): {
+  shell: Set<string>;
+  publicShared: Set<string>;
+} {
+  const closure = (roots: readonly string[]) => {
+    const seen = new Set<string>();
+    const visit = (id: string) => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      for (const imported of graph.importedIds(id) ?? []) visit(imported);
+    };
+    for (const id of roots) visit(id);
+    return seen;
+  };
+  const boot = closure(graph.entries);
+  const publicReach = closure(graph.publicRoots);
+  const shell = new Set<string>();
+  const publicShared = new Set<string>();
+  const excluded = new Set([...graph.shellRoots, ...graph.publicRoots]);
+  for (const id of closure(graph.shellRoots)) {
+    if (boot.has(id) || excluded.has(id)) continue;
+    (publicReach.has(id) ? publicShared : shell).add(id);
+  }
+  return { shell, publicShared };
+}
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** The names in an `{ a, b as c }` clause, by their exported (left-hand) name. */
+const clauseNames = (clause: string) =>
+  clause
+    .split(',')
+    .map((part) => part.trim().split(/\s+as\s+/)[0])
+    .filter((name) => name.length > 0);
+
+/**
+ * A module's static imports with a re-export barrel replaced by the modules
+ * that declare the names it imports from it. `@/components/ui` is
+ * side-effect-free, so the bundle keeps only the primitives a module uses, but
+ * the import graph names the barrel, which re-exports every one of them: a
+ * closure walked through it held DataTable, Select and the virtualizer, and the
+ * shell group dragged them onto the boot path. Reads the transformed `code`
+ * (types already stripped). Where the import is not a plain `{ … }` list, or a
+ * name is not a re-export, the barrel stays: too much is safe, too little is not.
+ */
+export function throughBarrel(options: {
+  barrel: string;
+  /** How importers name the barrel, as written in their code. */
+  specifier: string;
+  importedIds: (id: string) => readonly string[] | undefined;
+  code: (id: string) => string | null | undefined;
+}): (id: string) => readonly string[] | undefined {
+  const { barrel, specifier, importedIds, code } = options;
+  const declaredBy = new Map<string, string>();
+  const barrelDeps = importedIds(barrel) ?? [];
+  for (const match of (code(barrel) ?? '').matchAll(
+    /export\s*\{([^}]*)\}\s*from\s*["']([^"']+)["']/g
+  )) {
+    const target = match[2].replace(/^\.\//, '/');
+    const id = barrelDeps.find((dep) => dep.replace(/\.[cm]?[jt]sx?$/, '').endsWith(target));
+    if (!id) continue;
+    for (const part of match[1].split(',')) {
+      const exported = part
+        .trim()
+        .split(/\s+as\s+/)
+        .pop();
+      if (exported) declaredBy.set(exported, id);
+    }
+  }
+  const quoted = `["']${escapeRegExp(specifier)}["']`;
+  const namedImports = (source: string): string[] | null => {
+    const mentions = source.match(new RegExp(quoted, 'g'))?.length ?? 0;
+    const lists = [
+      ...source.matchAll(new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*${quoted}`, 'g')),
+    ];
+    return mentions > 0 && lists.length === mentions
+      ? lists.flatMap((list) => clauseNames(list[1]))
+      : null;
+  };
+
+  return (id) => {
+    const deps = importedIds(id);
+    if (!deps?.includes(barrel) || id === barrel) return deps;
+    const names = namedImports(code(id) ?? '');
+    const targets = names?.map((name) => declaredBy.get(name));
+    if (!targets || targets.some((target) => target === undefined)) return deps;
+    return [...new Set(deps.flatMap((dep) => (dep === barrel ? (targets as string[]) : [dep])))];
+  };
+}
+
+/**
  * The shell chunks the bundle no longer has under their expected `name`
  * (a rename, or a name collision like `Overview2`, would quietly drop them from
  * the boot graph). The build fails on a non-empty result.
