@@ -67,7 +67,7 @@ describe('usePiSnapshot', () => {
     await waitFor(() => expect(result.current.snapshot).toBe(second));
   });
 
-  it('marks a re-read as the same pilot read again, and another Character as not', async () => {
+  it('marks a re-read as the same Character read again, and another Character as not', async () => {
     const first = snap('a');
     const reRead = snap('b');
     const other = snap('c');

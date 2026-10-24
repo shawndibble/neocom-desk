@@ -123,7 +123,7 @@ describe('useAdviceOf with a worker', () => {
     expect(result.current).toEqual({ status: 'pending' });
   });
 
-  it('keeps the last answer while the same pilot’s re-read colonies are pending', async () => {
+  it('keeps the last answer while the same Character’s re-read colonies are pending', async () => {
     const a = adviceInput('lean');
     const reRead = { ...a, snapshot: { ...a.snapshot } };
     const advice = buildPlanAdvice(a);
@@ -140,5 +140,23 @@ describe('useAdviceOf with a worker', () => {
     await waitFor(() => expect(result.current.status).toBe('ready'));
     rerender({ input: reRead });
     expect(result.current).toEqual({ status: 'ready', advice });
+  });
+
+  it('replaces the held answer with the error when a recompute fails', async () => {
+    const a = adviceInput('lean');
+    const reRead = { ...a, snapshot: { ...a.snapshot } };
+    const advice = buildPlanAdvice(a);
+    let calls = 0;
+    const { useAdviceOf } = await withService(() =>
+      ++calls === 1 ? Promise.resolve(advice) : Promise.reject(new Error('boom'))
+    );
+    const { markReRead } = await import('./snapshotLineage');
+    markReRead(reRead.snapshot, a.snapshot);
+    const { result, rerender } = renderHook(({ input }) => useAdviceOf(input), {
+      initialProps: { input: a },
+    });
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    rerender({ input: reRead });
+    await waitFor(() => expect(result.current).toEqual({ status: 'error' }));
   });
 });

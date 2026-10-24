@@ -6,9 +6,9 @@
  * An answer already in hand (a tab switch back) is returned on the first
  * render. While a new input's answer is on its way, the previous answer stays
  * if it was built from the same colonies (a preference, market or route
- * change) or the same pilot's colonies read again (`snapshotLineage`: a page
+ * change) or the same Character's colonies read again (`snapshotLineage`: a page
  * refresh), so the board does not blank and lose its place; for any other
- * input it is `pending`, never another pilot's figures.
+ * input it is `pending`, never another Character's figures.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { buildSharedPlanAdvice } from './planAdviceModel';
