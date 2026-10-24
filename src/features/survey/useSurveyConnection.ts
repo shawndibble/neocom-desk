@@ -1,5 +1,5 @@
 /**
- * "Manage Taxes" on a moon Survey, in one click (issue #4684): finds or adds
+ * "Assign Taxes" on a moon Survey, in one click (issue #4684): finds or adds
  * the Payee, connects the Survey's moon to it (`surveyConnections.ts`) and
  * assigns whatever of that moon's ore is already in the Mining Ledger. While
  * the Survey is open and connected it re-reads the ledger on opening and then

@@ -1,6 +1,6 @@
 /**
  * A row-end button with its disabled reason right under it (Set waypoint,
- * Manage Taxes): on the right of a wide row, left under the content on a
+ * Assign Taxes): on the right of a wide row, left under the content on a
  * phone, and narrow enough that a long reason stays a short block under the
  * button. The row aligns items to the baseline, so the button stays level
  * with the text beside it whether or not the reason shows.

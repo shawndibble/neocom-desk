@@ -6388,8 +6388,8 @@
       "payee": "Who gets the tax",
       "payeePlaceholder": "Corporation or pilot",
       "rate": "Tax rate, percent",
-      "open": "Manage Taxes",
-      "manage": "Manage Taxes",
+      "open": "Assign Taxes",
+      "manage": "Assign Taxes",
       "needLogin": "Log in to access",
       "failed": "Couldn't connect this moon to that Payee. Try again.",
       "addedPayee": "Added {{name}} as a Payee at {{pct}}%.",
@@ -12391,7 +12391,7 @@
             "market": "Market: appraisal price %, ISK-per-LP value, courier collateral warning, item contract flag multiple, and the structure broker fees you typed.",
             "skills": "Skills: Alpha/Omega per character, the target skill plan, and SP Extraction monitoring and its threshold. Clones: the names you gave your jump clones.",
             "fittings": "Fittings: your damage and target profiles, and which ones are active.",
-            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, how the Assign form edits ore values, and the moon surveys you connected to a payee with Manage Taxes. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
+            "pi": "PI and mining tax: customs rate overrides, ore types you tagged, whether ore is valued as compressed ore, how the Assign form edits ore values, and the moon surveys you connected to a payee with Assign Taxes. Assets: the refining rate you type for your own structure. Market: the markets you stock, with their stock targets. Mining Survey: the survey links you created or opened, the names you gave them, and your survey info templates.",
             "layout": "Layout: your Overview layout (the widgets you chose, with their sizes, views, order and Omega plan), your Corp Board layout, the stock targets you set on corporation assets, hidden and reordered Overview cards from before the widget grid, pages hidden from the navigation, and whether you answered the rail question.",
             "travel": "Travel: route preference, security penalty, avoided systems (and whether the list is on), and avoiding EDENCOM, Triglavian and recent pod-kill systems (with your threshold). Route Safety: whether it routes through Thera / Turnur, your ship size, minimum hole life and which hubs. The notes you wrote on solar systems (up to 500 characters each, so don't put anything private in them)."
           }
