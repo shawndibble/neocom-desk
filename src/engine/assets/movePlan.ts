@@ -78,6 +78,15 @@ export interface HaulerOption {
 /** typeId of the typed-m³ pseudo hull; no real hull has it. */
 export const CUSTOM_HAULER_TYPE_ID = 0;
 
+/** A typed hold needing more hauls than this is refused: packing it would take minutes. */
+export const MAX_CUSTOM_HAULS = 10_000;
+
+/** Why a typed hold cannot be planned with, or null when it can. */
+export function customM3Problem(m3: number, totalM3: number): 'invalid' | 'tooSmall' | null {
+  if (!Number.isFinite(m3) || m3 <= 0) return 'invalid';
+  return totalM3 / m3 > MAX_CUSTOM_HAULS ? 'tooSmall' : null;
+}
+
 /** Per-plan choice of hauler: a listed hull, or one general hold of a typed size. */
 export type HaulerOverride = { hullTypeId: number } | { customM3: number };
 
@@ -243,7 +252,7 @@ export function planMove(input: {
   if (override && totalM3 > 0) {
     if ('customM3' in override) {
       const m3 = override.customM3;
-      if (Number.isFinite(m3) && m3 > 0)
+      if (customM3Problem(m3, totalM3) === null)
         active = optionFor({
           typeId: CUSTOM_HAULER_TYPE_ID,
           name: '',

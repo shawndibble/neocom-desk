@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ConsolidationAsset } from './consolidation';
-import { planMove, type MoveHull } from './movePlan';
+import { customM3Problem, planMove, type MoveHull } from './movePlan';
 
 const DEST = 60003760;
 const A = 60008494;
@@ -329,6 +329,14 @@ describe('planMove hauler override', () => {
       expect(result.active).toBe(result.suggested);
     }
   );
+
+  it('a typed m³ that would need over 10,000 hauls is ignored', () => {
+    const result = withOverride({ customM3: 0.1 });
+    expect(result.active).toBe(result.suggested);
+    expect(customM3Problem(0.1, 1200)).toBe('tooSmall');
+    expect(customM3Problem(0, 1200)).toBe('invalid');
+    expect(customM3Problem(0.12, 1200)).toBeNull();
+  });
 
   it('an unknown hull falls back to the suggestion', () => {
     const result = withOverride({ hullTypeId: 999 });

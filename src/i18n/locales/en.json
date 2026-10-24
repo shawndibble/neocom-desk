@@ -7260,6 +7260,7 @@
       "customAria": "Cargo space in m³",
       "customHold": "Custom {{volume}} m³ hold",
       "customInvalid": "Enter a number above 0.",
+      "customTooSmall": "Too small for this load. Use at least {{min}} m³.",
       "whereTo": "Where to",
       "destinationSystem": "Pick a system",
       "destinationStation": "Or one of your stations",

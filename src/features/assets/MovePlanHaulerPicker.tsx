@@ -1,8 +1,17 @@
 import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FieldError, NativeSelect, TextInput } from '@/components/ui';
 import {
-  CUSTOM_HAULER_TYPE_ID,
+  FieldError,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  TextInput,
+} from '@/components/ui';
+import {
+  customM3Problem,
+  MAX_CUSTOM_HAULS,
   type HaulerOverride,
   type MovePlan,
 } from '@/engine/assets/movePlan';
@@ -28,18 +37,23 @@ export function HaulerPicker({ plan, override, onPick }: HaulerPickerProps) {
   const [text, setText] = useState(
     override && 'customM3' in override ? maskNumber(override.customM3) : ''
   );
-  const typed = unmaskNumber(text);
-  const invalid = customMode && !(typed !== undefined && typed > 0 && Number.isFinite(typed));
+  const { totalM3 } = plan.totals;
+  /** Why the typed size cannot be used; blank and garbage read as not a number. */
+  const problem = (raw: string) => {
+    const value = unmaskNumber(raw);
+    return value === undefined ? 'invalid' : customM3Problem(value, totalM3);
+  };
+  const shown = customMode ? problem(text) : null;
   const suggestedId = plan.suggested?.hull.typeId;
   const activeId = plan.active?.hull.typeId;
 
   function choose(value: string) {
     if (value === CUSTOM) {
       setCustomMode(true);
-      const start = plan.active?.hull.capacityM3 ?? 0;
-      const seed = start > 0 ? maskNumber(Math.round(start)) : '';
-      setText(seed);
-      if (seed) onPick({ customM3: Math.round(start) });
+      const start = Math.round(plan.active?.hull.capacityM3 ?? 0);
+      const seed = start > 0 && customM3Problem(start, totalM3) === null ? start : null;
+      setText(seed === null ? '' : maskNumber(seed));
+      if (seed !== null) onPick({ customM3: seed });
       return;
     }
     setCustomMode(false);
@@ -47,40 +61,36 @@ export function HaulerPicker({ plan, override, onPick }: HaulerPickerProps) {
     onPick(hullTypeId === suggestedId ? undefined : { hullTypeId });
   }
 
-  function type(raw: string) {
+  function onType(raw: string) {
     setText(raw);
-    const value = unmaskNumber(raw);
     // A bad entry keeps the last good plan on screen; it is never read as unlimited.
-    if (value !== undefined && value > 0 && Number.isFinite(value)) onPick({ customM3: value });
+    if (problem(raw) === null) onPick({ customM3: unmaskNumber(raw)! });
   }
 
   return (
     <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
       <label className="flex flex-wrap items-center gap-2">
-        <span className="text-xs tracking-wide text-text-dim uppercase">
+        <span aria-hidden className="text-xs tracking-wide text-text-dim uppercase">
           {t('assets.movePlan.haulerLabel')}
         </span>
-        <NativeSelect
-          size="sm"
+        <Select
           value={customMode ? CUSTOM : activeId === undefined ? '' : String(activeId)}
-          onChange={(e) => choose(e.target.value)}
+          onValueChange={choose}
         >
-          {activeId === undefined && !customMode && (
-            <option value="" disabled>
-              {t('assets.movePlan.noHaulerOption')}
-            </option>
-          )}
-          {plan.comparison
-            .filter((o) => o.hull.typeId !== CUSTOM_HAULER_TYPE_ID)
-            .map((o) => (
-              <option key={o.hull.typeId} value={o.hull.typeId}>
+          <SelectTrigger size="sm" aria-label={t('assets.movePlan.haulerLabel')}>
+            <SelectValue placeholder={t('assets.movePlan.noHaulerOption')} />
+          </SelectTrigger>
+          <SelectContent>
+            {plan.comparison.map((o) => (
+              <SelectItem key={o.hull.typeId} value={String(o.hull.typeId)}>
                 {o.hull.typeId === suggestedId
                   ? t('assets.movePlan.haulerSuggestedOption', { hull: o.hull.name })
                   : o.hull.name}
-              </option>
+              </SelectItem>
             ))}
-          <option value={CUSTOM}>{t('assets.movePlan.customOption')}</option>
-        </NativeSelect>
+            <SelectItem value={CUSTOM}>{t('assets.movePlan.customOption')}</SelectItem>
+          </SelectContent>
+        </Select>
       </label>
       {customMode && (
         <div className="flex flex-col gap-1">
@@ -91,15 +101,19 @@ export function HaulerPicker({ plan, override, onPick }: HaulerPickerProps) {
               inputMode="decimal"
               className="w-32"
               value={text}
-              aria-invalid={invalid || undefined}
-              aria-describedby={invalid ? errorId : undefined}
-              onChange={(e) => type(e.target.value)}
+              aria-invalid={shown !== null || undefined}
+              aria-describedby={shown !== null ? errorId : undefined}
+              onChange={(e) => onType(e.target.value)}
             />
             <span className="text-sm text-text-dim">m³</span>
           </div>
-          {invalid && (
+          {shown && (
             <FieldError id={errorId} className="text-xs">
-              {t('assets.movePlan.customInvalid')}
+              {shown === 'tooSmall'
+                ? t('assets.movePlan.customTooSmall', {
+                    min: maskNumber(Math.ceil(totalM3 / MAX_CUSTOM_HAULS)),
+                  })
+                : t('assets.movePlan.customInvalid')}
             </FieldError>
           )}
         </div>
