@@ -45,6 +45,9 @@ export interface SurveyConnection {
   connectedAt: number;
 }
 
+/** How long a connection assigns when the Survey has one scan, so no pace and no ETA: the next 12 hours. */
+export const NO_ETA_WINDOW_MS = 12 * 60 * 60 * 1000;
+
 /** The summary fields a connection's window is read from (`SurveySummary`, engine/survey/series.ts). */
 export interface ConnectionWindowInput {
   firstAt: number;
@@ -61,16 +64,20 @@ function utcDate(ms: number): string {
 
 /**
  * From the first scan's UTC date until the field runs out: the ETA while it is
- * being mined, the time it was found empty once finished, and the link's
- * expiry while there is no ETA yet (one scan, no pace). Never past the expiry.
+ * being mined, the time it was found empty once finished, and 12 hours from
+ * `connectedAt` while there is no ETA yet (one scan, no pace). Never past the
+ * expiry.
  */
-export function connectionWindow(input: ConnectionWindowInput): {
+export function connectionWindow(
+  input: ConnectionWindowInput,
+  connectedAt: number
+): {
   fromDate: string;
   untilMs: number;
 } {
   const end = input.finished
     ? (input.finishedAt ?? input.lastAt)
-    : (input.etaAt ?? input.expiresAt);
+    : (input.etaAt ?? connectedAt + NO_ETA_WINDOW_MS);
   return { fromDate: utcDate(input.firstAt), untilMs: Math.min(end, input.expiresAt) };
 }
 

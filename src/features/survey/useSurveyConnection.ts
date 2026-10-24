@@ -126,7 +126,10 @@ export function useSurveyConnection({
   }
 
   // Follow the Survey: a moving ETA, a location set later, a new moon ore.
-  const span = survey ? connectionWindow({ ...survey.summary, expiresAt: survey.expiresAt }) : null;
+  const span =
+    survey && connection
+      ? connectionWindow({ ...survey.summary, expiresAt: survey.expiresAt }, connection.connectedAt)
+      : null;
   const oreKey = survey?.summary.oreNames.join('\n') ?? '';
   const locationId = survey?.locationId ?? null;
   const structureLabel = structureFromLocation(survey?.locationName);
@@ -215,7 +218,7 @@ export function useSurveyConnection({
       systemId,
       ...(structureLabel ? { structureLabel } : {}),
       typeIds,
-      ...connectionWindow({ ...survey.summary, expiresAt: survey.expiresAt }),
+      ...connectionWindow({ ...survey.summary, expiresAt: survey.expiresAt }, connectedAt),
       expiresAt: survey.expiresAt,
       connectedAt,
     });
