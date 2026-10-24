@@ -46,6 +46,18 @@ describe('Lines chart', () => {
     expect(lines(container).every((p) => p.getAttribute('opacity') === '1')).toBe(true);
   });
 
+  it('keeps a long legend name to one line', () => {
+    const long: LinesChartModel = {
+      ...model,
+      series: model.series.map((s, i) =>
+        i === 0 ? { ...s, label: "Poteque 'Prospector' Environmental Analysis EY-1005" } : s
+      ),
+    };
+    render(<Chart model={long} size="S" />);
+    const name = screen.getByText("Poteque 'Prospector' Environmental Analysis EY-1005");
+    expect(name.className).toContain('truncate');
+  });
+
   it('adds no tab stops: the legend only emphasises, it does nothing on activation', () => {
     render(<Chart model={model} size="M" />);
     expect(screen.getByText('Tritanium').closest('li')).not.toHaveAttribute('tabindex');

@@ -61,42 +61,71 @@ describe('TrendItemsDialog', () => {
   const open = (w = widget()) =>
     render(<TrendItemsDialog widget={w} title="Market Trend" open onClose={() => undefined} />);
 
-  it('starts from the Quickbar the widget currently follows and saves the picks', async () => {
+  it('lists a pick only under Selected, and a removed pick returns to its list', async () => {
     const user = userEvent.setup();
     open();
-    expect(screen.getByRole('checkbox', { name: 'Tritanium' })).toBeChecked();
-    await user.click(screen.getByRole('checkbox', { name: 'Pyerite' }));
+    expect(screen.queryByRole('button', { name: 'Add Tritanium' })).not.toBeInTheDocument();
+    expect(screen.getByText('Selected (2 of 6)')).toBeInTheDocument();
+    expect(screen.getByText('Everything in this list is already selected.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Remove Pyerite' }));
+    expect(screen.getByRole('button', { name: 'Add Pyerite' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(setTrendItems).toHaveBeenCalledWith('a', [34]);
+  });
+
+  it('moves an added item from its list to Selected, with a highlight, and keeps focus in the list', async () => {
+    const user = userEvent.setup();
+    open(widget({ trendItems: [] }));
+    await user.click(screen.getByRole('button', { name: 'Add Tritanium' }));
+    expect(screen.queryByRole('button', { name: 'Add Tritanium' })).not.toBeInTheDocument();
+    const added = screen.getByRole('button', { name: 'Remove Tritanium' }).closest('li')!;
+    expect(added.className).toContain('row-pulse');
+    expect(screen.getByRole('button', { name: 'Add Pyerite' })).toHaveFocus();
+  });
+
+  it('hands focus to the neighbouring Remove button after a removal', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.click(screen.getByRole('button', { name: 'Remove Tritanium' }));
+    expect(screen.getByRole('button', { name: 'Remove Pyerite' })).toHaveFocus();
+  });
+
+  it('says every hit is already selected when a search finds only picked items', async () => {
+    const user = userEvent.setup();
+    open();
+    await user.type(screen.getByRole('searchbox', { name: 'Search items' }), 'trit');
+    expect(
+      await screen.findByText('Everything in this list is already selected.')
+    ).toBeInTheDocument();
   });
 
   it('adds minerals from the catalogue and keeps the Quickbar picks', async () => {
     const user = userEvent.setup();
     open();
     await user.selectOptions(screen.getByRole('combobox'), 'minerals');
-    await user.click(await screen.findByRole('checkbox', { name: 'Mexallon' }));
+    await user.click(await screen.findByRole('button', { name: 'Add Mexallon' }));
+    expect(screen.queryByRole('button', { name: 'Add Mexallon' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(setTrendItems).toHaveBeenCalledWith('a', [34, 35, 36]);
   });
 
   it('stops at six picks', async () => {
     open(widget({ trendItems: [1, 2, 3, 4, 5, 6] }));
-    expect(screen.getByRole('checkbox', { name: 'Tritanium' })).toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: 'Tritanium' })).toHaveAccessibleDescription(
+    expect(screen.getByRole('button', { name: 'Add Tritanium' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add Tritanium' })).toHaveAccessibleDescription(
       /Remove one to add another/
     );
     expect(screen.getByText('Selected (6 of 6)')).toBeInTheDocument();
-    expect(screen.getByText(/Remove one to add another/)).toBeInTheDocument();
   });
 
   it('searches every list at once and shows which list each hit is from', async () => {
     const user = userEvent.setup();
     open();
     await user.type(screen.getByRole('searchbox', { name: 'Search items' }), 'mex');
-    expect(await screen.findByRole('checkbox', { name: /Mexallon/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Add Mexallon/ })).toBeInTheDocument();
     expect(screen.getByText('Minerals')).toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('checkbox', { name: /Mexallon/ }));
+    await user.click(screen.getByRole('button', { name: /Add Mexallon/ }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(setTrendItems).toHaveBeenCalledWith('a', [34, 35, 36]);
   });
@@ -109,7 +138,6 @@ describe('TrendItemsDialog', () => {
     expect(await screen.findByText('No item matches that name.')).toBeInTheDocument();
     await user.clear(box);
     expect(screen.getByRole('combobox')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Tritanium' })).toBeInTheDocument();
   });
 
   it('does not save and close when Enter is pressed in the search box', async () => {
@@ -176,7 +204,7 @@ describe('TrendItemsDialog', () => {
     open();
     await user.selectOptions(screen.getByRole('combobox'), 'minerals');
     await user.click(await screen.findByRole('button', { name: 'Retry' }));
-    expect(await screen.findByRole('checkbox', { name: 'Mexallon' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Add Mexallon' })).toBeInTheDocument();
   });
 
   it('goes back to following the Quickbar', async () => {
