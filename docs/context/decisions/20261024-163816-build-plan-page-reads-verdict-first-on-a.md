@@ -24,11 +24,14 @@ Acquisition Verdict._
 - **No Gross/Net toggle on the plan page.** Gross ignores the fees every sale
   pays; the page shows Net only. Rules out re-adding a toggle without a reason
   a pilot would choose Gross on this page.
-- **Costs & revenue is the working, not a second hero.** A bar of where the
-  sale goes and a ledger from the sale down to profit; margin, ISK/hour,
-  break-even and market price are not repeated there. ISK to spend, buying
-  instead, job time and volume sit under the ledger. The cheapest nearby
-  system with a lower cost index is one line inside the job cost breakdown.
+- **Costs & revenue is the working, not a second hero.** A ledger in divider
+  lines (no box inside the panel) from the sale down to profit; margin,
+  ISK/hour, break-even and market price are not repeated there. No chart or
+  colour swatches: a coloured where-the-sale-goes bar was tried and read as out
+  of place against the rest of the page. ISK to spend, buying instead, job time
+  and volume sit under the ledger, set apart by a gap and a rule. The cheapest
+  nearby system with a lower cost index is one line inside the job cost
+  breakdown, with Build there.
 - **Setup is one line at the foot of the hero.** Runs moved to the hero's title
   row (with Break Even); the rest reads as one line with Edit setup, which
   opens the unchanged form below the hero.

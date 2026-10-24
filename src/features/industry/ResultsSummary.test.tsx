@@ -130,20 +130,6 @@ describe('ResultsSummary: the ledger', () => {
     expect(screen.getByText('Profit').closest('div')?.parentElement).toHaveTextContent('435');
   });
 
-  it('splits the sale into a bar of where it goes', () => {
-    renderSummary();
-    expect(
-      screen.getByRole('img', {
-        name: 'Where the sale goes: fees 2%, materials 50%, job cost 7%, profit 44%',
-      })
-    ).toBeInTheDocument();
-  });
-
-  it('draws no bar for a loss', () => {
-    renderSummary({ profit: -50 });
-    expect(screen.queryByRole('img', { name: /Where the sale goes/ })).not.toBeInTheDocument();
-  });
-
   it('states ISK to spend, the price of buying instead, job time and volume', () => {
     renderSummary();
     expect(screen.getByText('ISK to spend').nextElementSibling).toHaveTextContent('565');

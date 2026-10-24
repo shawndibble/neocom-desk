@@ -16,20 +16,6 @@ import { cx } from '@/lib/cx';
 import { CostIndexTrend } from './CostIndexTrend';
 import { formatCostIndex, formatVolume } from './format';
 
-/**
- * One slice of the "where the sale goes" bar and the matching ledger row's
- * swatch. Categories, not statuses, so they borrow the `kind-*` nominal palette
- * (DESIGN.md §1) rather than warning/success tones a slice could be misread as.
- */
-const SEGMENT = {
-  fees: 'bg-kind-contract-expiry',
-  materials: 'bg-kind-moon-chunk',
-  job: 'bg-kind-calendar-event',
-  owned: 'bg-kind-skill-training',
-  profit: 'bg-kind-planet-extraction',
-} as const;
-type Segment = keyof typeof SEGMENT;
-
 interface CostRowProps {
   label: ReactNode;
   value: ReactNode;
@@ -38,8 +24,6 @@ interface CostRowProps {
   indented?: boolean;
   /** `'negative'`/`'positive'` render the value in the `isk-neg`/`isk-pos` tone. */
   tone?: 'negative' | 'positive';
-  /** The bar slice this row is, so the bar needs no separate legend. */
-  swatch?: Segment;
 }
 
 /** One ledger row: label (+ optional tooltip) left, value right. */
@@ -50,7 +34,6 @@ function CostRow({
   emphasized = false,
   indented = false,
   tone,
-  swatch,
 }: CostRowProps) {
   const { t } = useTranslation();
   const toneClass =
@@ -59,21 +42,15 @@ function CostRow({
     <div
       className={cx(
         'flex items-center justify-between gap-2 px-2.5 py-1.5 text-[0.6875rem]',
-        // Under the job cost's own label: padding, caret slot, swatch, gaps.
-        indented && 'pl-12'
+        // Under the job cost's own label: padding, caret slot and its gap.
+        indented && 'pl-8'
       )}
     >
       <span className="flex min-w-0 items-center gap-1.5 font-semibold tracking-widest text-text-dim uppercase">
         {/* An empty slot the width of the job cost row's caret, so every
-            swatch sits in one column and every label starts at one edge; the
-            caret stays leading, where §6c puts "expands in place". */}
+            label starts at one edge; the caret stays leading, where §6c puts
+            "expands in place". */}
         {!indented && <span aria-hidden="true" className="size-4 shrink-0" />}
-        {swatch && (
-          <span
-            aria-hidden="true"
-            className={cx('size-2.5 shrink-0 rounded-xs', SEGMENT[swatch])}
-          />
-        )}
         {label}
         {tooltip && typeof label === 'string' && (
           <InfoTooltip label={t('common.aboutLabel', { label })} content={tooltip} />
@@ -143,9 +120,9 @@ interface ResultsSummaryProps {
 const COST_INDEX_ROUNDING_STEP = 0.00005;
 
 /**
- * Where the sale goes: a bar of the product's revenue split into fees,
- * materials, job cost, (on the sell-value basis) the owned materials not
- * sold, and profit, then the ledger that adds up to the hero's figure. The
+ * The ledger from the product's sale down to profit: fees, materials, job
+ * cost, (on the sell-value basis) the owned materials not sold, then the
+ * figure the hero states. The
  * hero states margin, ISK/hour and break-even; this panel carries the working
  * and the plan facts that are not a verdict (ISK to spend, buying instead,
  * job time, volume).
@@ -204,21 +181,7 @@ export function ResultsSummary({
 
   const owned = ownedSale && ownedSale.instant.ownedUnits > 0 ? ownedSale[saleBasis] : null;
   const forgone = profitBasis === 'sellValue' && owned ? owned.net : null;
-  const fees =
-    result.salesTax !== null && result.brokerFee !== null
-      ? result.salesTax + result.brokerFee
-      : null;
   const revenue = result.revenue;
-
-  const slices: { key: Segment; value: number }[] = [
-    { key: 'fees' as const, value: fees ?? 0 },
-    { key: 'materials' as const, value: result.materialCost },
-    { key: 'job' as const, value: result.jobFee.total },
-    { key: 'owned' as const, value: forgone ?? 0 },
-    { key: 'profit' as const, value: Math.max(0, profit ?? 0) },
-  ].filter((slice) => slice.value > 0);
-  // A loss has no honest split of the sale: the costs are bigger than it.
-  const showBar = revenue !== null && revenue > 0 && profit !== null && profit >= 0;
 
   return (
     <div className="space-y-3">
@@ -236,30 +199,6 @@ export function ResultsSummary({
               t('industry.productUnpriced', { name: productName })
             ))}
         </p>
-      )}
-
-      {showBar && (
-        <div
-          role="img"
-          aria-label={t('industry.ledger.barLabel', {
-            parts: slices
-              .map((slice) =>
-                t(`industry.ledger.slice.${slice.key}`, {
-                  pct: Math.round((slice.value / revenue) * 100),
-                })
-              )
-              .join(', '),
-          })}
-          className="flex h-4 gap-0.5 overflow-hidden rounded-xs"
-        >
-          {slices.map((slice) => (
-            <div
-              key={slice.key}
-              className={SEGMENT[slice.key]}
-              style={{ width: `${(slice.value / revenue) * 100}%` }}
-            />
-          ))}
-        </div>
       )}
 
       {/* Divider lines only, no box: the panel is already the frame. `-mx-2.5`
@@ -290,7 +229,6 @@ export function ResultsSummary({
             label={t('industry.salesTax')}
             value={formatIsk(-result.salesTax)}
             tone="negative"
-            swatch="fees"
           />
         )}
         {result.brokerFee !== null && (
@@ -298,22 +236,12 @@ export function ResultsSummary({
             label={t('industry.brokerFee')}
             value={formatIsk(-result.brokerFee)}
             tone="negative"
-            swatch="fees"
           />
         )}
-        <CostRow
-          label={t('industry.materialCost')}
-          value={formatIsk(-result.materialCost)}
-          swatch="materials"
-        />
+        <CostRow label={t('industry.materialCost')} value={formatIsk(-result.materialCost)} />
 
         <Disclosure
-          label={
-            <span className="flex items-center gap-1.5">
-              <span aria-hidden="true" className={cx('size-2.5 rounded-xs', SEGMENT.job)} />
-              {t('industry.jobFee')}
-            </span>
-          }
+          label={t('industry.jobFee')}
           labelAccessory={
             <InfoTooltip
               label={t('common.aboutLabel', { label: t('industry.jobFee') })}
@@ -373,7 +301,7 @@ export function ResultsSummary({
             value={formatIsk(result.jobFee.facilityTax)}
             indented
           />
-          {cheaperNearby && <div className="py-1.5 pr-2.5 pl-12 text-xs">{cheaperNearby}</div>}
+          {cheaperNearby && <div className="py-1.5 pr-2.5 pl-8 text-xs">{cheaperNearby}</div>}
         </Disclosure>
 
         {forgone !== null && (
@@ -381,7 +309,6 @@ export function ResultsSummary({
             label={t('industry.ledger.ownedNotSold')}
             value={formatIsk(-forgone)}
             tooltip={t('industry.ledger.ownedNotSoldHint')}
-            swatch="owned"
           />
         )}
         {profit !== null && (
@@ -390,14 +317,15 @@ export function ResultsSummary({
             value={formatIsk(profit)}
             emphasized
             tone={profit >= 0 ? 'positive' : 'negative'}
-            swatch="profit"
           />
         )}
       </div>
 
       {/* A separate group — facts about the plan, not lines of the sum — so a
-          gap and a rule set it apart from the profit it would otherwise sit on. */}
-      <dl className="mt-5! grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 border-t border-line pt-4 text-xs">
+          gap and a rule set it apart from the profit it would otherwise sit on.
+          `pl-5.5` is the ledger's caret slot plus its gap, so every label in
+          the panel starts at one edge. */}
+      <dl className="mt-5! grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 border-t border-line pt-4 pl-5.5 text-xs">
         {revenue !== null && (
           <>
             <dt className="text-text-dim">

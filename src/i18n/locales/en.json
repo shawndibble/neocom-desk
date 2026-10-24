@@ -3624,14 +3624,6 @@
       "runsUnit_other": "runs"
     },
     "ledger": {
-      "barLabel": "Where the sale goes: {{parts}}",
-      "slice": {
-        "fees": "fees {{pct}}%",
-        "materials": "materials {{pct}}%",
-        "job": "job cost {{pct}}%",
-        "owned": "your materials {{pct}}%",
-        "profit": "profit {{pct}}%"
-      },
       "sale": "{{name}} sale",
       "costIndexIn": "Cost index · {{system}}",
       "ownedNotSold": "Your materials",
