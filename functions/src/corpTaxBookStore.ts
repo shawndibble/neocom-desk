@@ -191,8 +191,8 @@ export async function authorizeOfficer(
         need: 'canView',
         denied: { message: 'No officer role in this corporation', reason: 'not-an-officer' },
         // A failed renewal revokes the read access the old check granted.
-        onDenied: async (reason) => {
-          if (reason !== 'missing-scope' && held) await officerRef.delete();
+        onDenied: async () => {
+          if (held) await officerRef.delete();
         },
       });
       access = {
