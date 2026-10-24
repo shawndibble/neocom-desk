@@ -260,6 +260,10 @@ describe('toMoonChunkSources', () => {
     expect(source.deadlineMs).toBe(DECAYS);
   });
 
+  it('drops a chunk past its natural decay', () => {
+    expect(toMoonChunkSources([drill()], DECAYS)).toEqual([]);
+  });
+
   it('keeps drills on different refineries distinct', () => {
     const sources = toMoonChunkSources([drill(), drill({ structureId: 1002 })], ARRIVES - 1);
     expect(sources.map((source) => source.id)).toEqual(['1001', '1002']);

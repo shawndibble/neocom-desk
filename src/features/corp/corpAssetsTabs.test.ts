@@ -6,6 +6,7 @@ describe('corp assets tabs', () => {
     expect(corpAssetTabFromPath('')).toBe('all');
     expect(corpAssetTabFromPath('offices')).toBe('offices');
     expect(corpAssetTabFromPath('in-space/')).toBe('inSpace');
+    expect(corpAssetTabFromPath('fuel-bay')).toBe('fuelBay');
     expect(corpAssetTabFromPath('safety')).toBe('assetSafety');
     expect(corpAssetTabFromPath('capsuleer-deliveries')).toBe('capsuleerDeliveries');
   });
@@ -22,6 +23,7 @@ describe('corp assets tabs', () => {
       'offices',
       'deliveries',
       'inSpace',
+      'fuelBay',
       'impounded',
       'assetSafety',
       'lockdown',

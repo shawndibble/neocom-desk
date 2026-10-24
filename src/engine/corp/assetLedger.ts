@@ -23,6 +23,7 @@ export type LedgerState =
   | 'offices'
   | 'deliveries'
   | 'inSpace'
+  | 'fuelBay'
   | 'impounded'
   | 'assetSafety'
   | 'lockdown'
@@ -33,6 +34,7 @@ export const LEDGER_STATES: readonly LedgerState[] = [
   'offices',
   'deliveries',
   'inSpace',
+  'fuelBay',
   'impounded',
   'assetSafety',
   'lockdown',
@@ -73,11 +75,11 @@ export interface ClassifiedCorpAssets {
 }
 
 const HANGAR_FLAG = /^CorpSAG([1-7])$/;
-const IN_SPACE_FLAG =
-  /^(StructureFuel|ServiceSlot\d+|QuantumCoreRoom|StructureDeedBay|MoonMaterialBay)$/;
+const IN_SPACE_FLAG = /^(ServiceSlot\d+|QuantumCoreRoom|StructureDeedBay|MoonMaterialBay)$/;
 
 const STATE_BY_FLAG: Readonly<Record<string, LedgerState>> = {
   CorpDeliveries: 'deliveries',
+  StructureFuel: 'fuelBay',
   Impounded: 'impounded',
   AssetSafety: 'assetSafety',
   Locked: 'lockdown',

@@ -21,6 +21,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
+  Button,
   IconButton,
   IskAmount,
   RowCaret,
@@ -375,6 +376,8 @@ export function TableBody({
   const [sort, setSort] = useState<{ columnId: string; direction: 'asc' | 'desc' } | null>(null);
   // The opened row's facts as they were on the click, so a refresh never swaps them mid-read.
   const [opened, setOpened] = useState<TableRowModel | null>(null);
+  // "+N more" opens the rest in place.
+  const [expanded, setExpanded] = useState(false);
   // The page is remembered with the page size it was chosen under, so a size change
   // starts over on page 1 without an effect to reset it.
   const [pageState, setPageState] = useState({ page: 1, perPage: paging?.rowsPerPage });
@@ -401,7 +404,9 @@ export function TableBody({
       ? pageRows(sorted, page, paging.rowsPerPage)
       : pageable
         ? sorted
-        : sorted.slice(0, rowLimit);
+        : expanded
+          ? sorted
+          : sorted.slice(0, rowLimit);
   const more = paged ? 0 : sorted.length - shown.length;
   if (shown.length === 0) return null;
   const hasHeader = columns.some((column) => column.label !== '');
@@ -480,9 +485,11 @@ export function TableBody({
         />
       )}
       {more > 0 && (
-        <p className="border-t border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">
-          {t('overview.widgets.moreRows', { count: more })}
-        </p>
+        <div className="border-t border-line px-3 py-1">
+          <Button size="sm" onClick={() => setExpanded(true)}>
+            {t('overview.widgets.moreRows', { count: more })}
+          </Button>
+        </div>
       )}
       {table.footer && (
         <p className="border-t border-line px-3 py-1.5 text-[0.6875rem] text-text-dim">

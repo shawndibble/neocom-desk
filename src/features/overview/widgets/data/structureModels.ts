@@ -91,7 +91,9 @@ function structuresNumber(
 export const structures: Builder = (feeds, { t, now }) => {
   const feed = feeds.structures;
   const raw = feed?.data ?? null;
-  const to = '/corp';
+  // No structures page exists: a plain title, not a link back to /corp.
+  const to = null;
+  const deadlineTo = '/corp';
   if (!raw) return blank(to, statusOf(feed));
   const view = structuresView(raw, now);
   const items = view.items;
@@ -190,7 +192,7 @@ export const structures: Builder = (feeds, { t, now }) => {
             at: clock.atMs,
             note: t(`overview.board.structureDeadline.${clock.kind}`, { subject: clock.subject }),
             severity: clock.severity,
-            to,
+            to: deadlineTo,
           },
         ]
       : [],
@@ -220,7 +222,7 @@ export const structures: Builder = (feeds, { t, now }) => {
 export const moonChunks: Builder = (feeds, { t, now }) => {
   const feed = feeds.moonChunks;
   const data = feed?.data ?? null;
-  const to = '/corp';
+  const to = '/corp/moons/extractions';
   if (!data) return blank(to, statusOf(feed));
   if (data.chunks === null) {
     return {
