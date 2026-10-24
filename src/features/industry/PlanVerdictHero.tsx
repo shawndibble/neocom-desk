@@ -2,7 +2,15 @@ import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, IskAmount, Panel, Spinner, Tooltip } from '@/components/ui';
+import {
+  Button,
+  IconButton,
+  InfoTooltip,
+  IskAmount,
+  Panel,
+  Spinner,
+  Tooltip,
+} from '@/components/ui';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import { focusRingClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
@@ -159,7 +167,7 @@ export interface ReactionLocationBlock {
  * one big profit figure, the sentence that says what it is measured against,
  * then margin, ISK/hour and break-even. Status first, detail after: every
  * number here is also in the Costs & revenue ledger, which carries the
- * working (docs/adr/0006, as amended by the redesign decision).
+ * working (docs/context/decisions/20261024-163816-build-plan-page-reads-verdict-first-on-a.md).
  */
 export function PlanVerdictHero({
   result,
@@ -210,7 +218,11 @@ export function PlanVerdictHero({
     </VerdictPill>
   ) : figures.verdict === 'loss' ? (
     <VerdictPill label={t('industry.hero.verdictLabel')} tone="warning">
-      {basis === 'sellValue' ? t('industry.hero.verdictSell') : t('industry.hero.verdictLoss')}
+      {/* Only when the build itself pays: a plan that loses money even with its
+          own stock counted free is a loss, not a reason to sell the stock. */}
+      {basis === 'sellValue' && result.profit !== null && result.profit >= 0
+        ? t('industry.hero.verdictSell')
+        : t('industry.hero.verdictLoss')}
     </VerdictPill>
   ) : null;
 
@@ -355,11 +367,31 @@ export function PlanVerdictHero({
               <HeroStat label={t('industry.margin')}>
                 {figures.marginPct === null ? '—' : formatPercent(figures.marginPct)}
               </HeroStat>
-              <HeroStat label={t('industry.iskPerHour')}>
+              <HeroStat
+                label={t('industry.iskPerHour')}
+                accessory={
+                  <InfoTooltip
+                    label={t('common.aboutLabel', { label: t('industry.iskPerHour') })}
+                    content={t('industry.iskPerHourTooltip')}
+                  />
+                }
+              >
                 {figures.iskPerHour === null ? '—' : <IskAmount value={figures.iskPerHour} />}
               </HeroStat>
               <HeroStat
                 label={t('industry.hero.breakEven')}
+                accessory={
+                  // An ⓘ, not a "?": it opens the calculation (§6c).
+                  <IconButton
+                    size="sm"
+                    variant="plain"
+                    icon={<Icon.Info size={Icon.ICON_SIZE.sm} />}
+                    label={t('common.aboutLabel', { label: t('industry.hero.breakEven') })}
+                    tooltip={t('industry.breakEvenPriceTooltip')}
+                    onClick={() => onBreakdownOpenChange(true)}
+                    aria-haspopup="dialog"
+                  />
+                }
                 note={
                   figures.headroomPct === null ? null : (
                     <span
@@ -409,16 +441,22 @@ export function PlanVerdictHero({
 
 function HeroStat({
   label,
+  accessory,
   note,
   children,
 }: {
   label: string;
+  /** A tooltip or ⓘ beside the label. */
+  accessory?: ReactNode;
   note?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="min-w-0">
-      <dt className={eyebrowClassName}>{label}</dt>
+      <dt className={cx(eyebrowClassName, 'flex items-center gap-1')}>
+        {label}
+        {accessory}
+      </dt>
       <dd className="text-lg font-semibold tabular-nums">{children}</dd>
       {note && <dd className="text-xs text-text-dim">{note}</dd>}
     </div>

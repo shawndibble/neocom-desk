@@ -115,6 +115,8 @@ interface MaterialsTableProps {
    * shown on the folded owned section's heading. Omitted when unknown.
    */
   ownedSellNet?: number | null;
+  /** What one material's owned units would net if sold; shown in a fully owned row's Total cell. */
+  sellValueFor?: (typeID: number) => number | undefined;
   /**
    * Opens the "Build it" modal for a material being built here — the runs and
    * ingredient list the Building row's Recipe link opens. Omitted
@@ -210,6 +212,7 @@ export function MaterialsTable({
   onToggleBuildHere,
   onBuildAll,
   ownedSellNet,
+  sellValueFor,
   onShowRecipe,
   onOpenAcquisitionPicker,
   skillGates,
@@ -645,6 +648,16 @@ export function MaterialsTable({
     if (material.subBuilds.length > 0) {
       const runs = buildRecipe(material)?.runs ?? 0;
       return <span>{t('industry.subBuildRuns', { runs: formatCount(runs) })}</span>;
+    }
+    const sellValue =
+      material.remainingQuantity === 0 ? sellValueFor?.(material.typeID) : undefined;
+    if (sellValue !== undefined) {
+      // A fully owned row costs nothing; what it would fetch is the number worth reading.
+      return (
+        <span className="text-text-dim">
+          {t('industry.errands.rowSellsFor', { amount: formatIskCompact(sellValue) })}
+        </span>
+      );
     }
     const state = materialRowState(material, sourcing, pricesReady);
     return (

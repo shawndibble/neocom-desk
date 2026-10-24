@@ -73,6 +73,7 @@ function renderSummary(overrides: Partial<Parameters<typeof ResultsSummary>[0]> 
               profitBasis={null}
               profit={RESULT.profit}
               totalVolume={{ volume: 1234.5, anyUnknown: false }}
+              hubName="Jita"
               {...overrides}
             />
           }
@@ -150,6 +151,16 @@ describe('ResultsSummary: the ledger', () => {
       '+435 more'
     );
     expect(screen.getByText('Main job time').nextElementSibling).toHaveTextContent('1h');
+  });
+
+  it("says where the product is priced, and the whole plan's time when it differs", () => {
+    renderSummary({ planSeconds: 7200 });
+    expect(screen.getByText('Rifter priced at').nextElementSibling).toHaveTextContent(
+      'Jita lowest sell'
+    );
+    expect(screen.getByText('Whole plan, on free slots').nextElementSibling).toHaveTextContent(
+      '2h'
+    );
   });
 
   it('has no Net/Gross toggle and no repeated margin or break-even rows', () => {

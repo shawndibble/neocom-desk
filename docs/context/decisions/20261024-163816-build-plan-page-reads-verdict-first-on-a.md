@@ -1,7 +1,9 @@
 # Scope decisions — Build Plan page reads verdict first, on a profit basis
 
 _Recorded 2026-10-24. Amends 20260906-091110 (Industry page reads verdict first)
-and supersedes ADR 0006's gross/net toggle and its hero-level Acquisition Verdict._
+and 20260906-072659 (owned units cost 0 ISK, which is now the `free` basis rather
+than the default), and supersedes ADR 0006's gross/net toggle and its hero-level
+Acquisition Verdict._
 
 - **One verdict, one figure.** The Verdict Hero states a single verdict pill
   (Build, Build — close call, Loses money, Sell your materials instead) and
@@ -38,3 +40,14 @@ and supersedes ADR 0006's gross/net toggle and its hero-level Acquisition Verdic
 - **Cheaper parts are a line, not a banner.** Two or more bought rows that are
   cheaper to build get one "Build N cheaper parts · save X" link on the To buy
   heading; one row keeps only its own Build instead.
+- **What was removed, not folded.** 20260906-091110 promised nothing would be
+  removed; this redesign removes three things on purpose. The Gross/Net toggle
+  (above). The Use-or-Sell per-material table and its CSV export: each fully
+  owned row now says what it sells for in its Total cell, the owned heading
+  gives the total, and the ledger carries it as one line, so a second table of
+  the same figures earned no place. The plan-duration figure in the hero and the
+  Materials header: the schedule line says when the plan is done, and Costs &
+  revenue states the main job's time and, when it differs, the whole plan's.
+- **Known gap.** The sell-value basis counts owned units the top-level job
+  consumes; owned stock eaten inside a sub-build is not yet charged, as the
+  Use-or-Sell Check never charged it either.

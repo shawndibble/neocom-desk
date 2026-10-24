@@ -881,7 +881,7 @@ describe('BuildPlanDetail Auto Build (issue #695)', () => {
 
     await applyBuildStrategy(user, 'Build');
 
-    expect(toastStatus()).toHaveTextContent('Build strategy applied: 2 more parts built.');
+    expect(toastStatus()).toHaveTextContent('Build strategy applied: 2 parts built here.');
     await user.click(screen.getByRole('button', { name: 'Undo' }));
     expect(onUpdate).toHaveBeenLastCalledWith({ buildHere: [] });
   });
@@ -1537,7 +1537,7 @@ describe('BuildPlanDetail Corp Assets (issue #798)', () => {
   // Corp Assets lives in the Owned materials popover.
   const corpAssetsToggle = () => screen.getByRole('button', { name: 'Corp Assets' });
   async function openOwned() {
-    fireEvent.click(await screen.findByRole('button', { name: /^(Everywhere|Selected)/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Owned materials/ }));
   }
 
   it("renders as a toggle button, not a checkbox — matches the app's other toggles", async () => {
@@ -1665,7 +1665,7 @@ describe('BuildPlanDetail Use all / Use none', () => {
       />
     );
 
-    await user.click(await screen.findByRole('button', { name: /^(Everywhere|Selected)/ }));
+    await user.click(await screen.findByRole('button', { name: /^Owned materials/ }));
     await user.click(await screen.findByRole('button', { name: 'Use all' }));
 
     expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 100 } }]);
@@ -1697,7 +1697,7 @@ describe('BuildPlanDetail Use all / Use none', () => {
       />
     );
 
-    await user.click(await screen.findByRole('button', { name: /^(Everywhere|Selected)/ }));
+    await user.click(await screen.findByRole('button', { name: /^Owned materials/ }));
     await user.click(await screen.findByRole('button', { name: 'Use all' }));
 
     expect(onSourcing).toHaveBeenLastCalledWith([{ typeID: 34, patch: { ownedQuantity: 100 } }]);
@@ -1713,7 +1713,7 @@ describe('BuildPlanDetail Use all / Use none', () => {
       />
     );
 
-    await user.click(await screen.findByRole('button', { name: /^(Everywhere|Selected)/ }));
+    await user.click(await screen.findByRole('button', { name: /^Owned materials/ }));
     await user.click(await screen.findByRole('button', { name: 'Use none' }));
 
     expect(onSourcing).toHaveBeenLastCalledWith([
@@ -1726,7 +1726,7 @@ describe('BuildPlanDetail Use all / Use none', () => {
     const onSourcing = vi.fn();
     render(<Harness plan={{ runs: 1 }} onSourcing={onSourcing} />);
 
-    await user.click(await screen.findByRole('button', { name: /^(Everywhere|Selected)/ }));
+    await user.click(await screen.findByRole('button', { name: /^Owned materials/ }));
     await user.click(await screen.findByRole('button', { name: 'Use all' }));
 
     expect(onSourcing).not.toHaveBeenCalled();

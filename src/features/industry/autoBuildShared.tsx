@@ -76,15 +76,6 @@ export function BuildStrategySelect({
   );
 }
 
-// `h-7`, not the responsive `controlHeightClassName` scale: this chip is a
-// non-interactive readout (never clickable — `aria-disabled`, an explanatory
-// `Tooltip`, nothing else), the same category `StatChip`/`DataAgeBadge` are
-// carved out for in DESIGN.md §3. Its own `py-0.5`-only rule left it shorter
-// than the `sm` `Select`/`Button`/`IconButton` it sits beside in this row at
-// every width — a `StatChip`-style flat height fixes that instead of
-// growing it into the responsive scale it was never a target on.
-// `HintText` draws the dotted underline + `cursor-help` (DESIGN.md §6c); the
-// chip stays a neutral tone because accent text would read as clickable.
 // Plain dim text, not a chip (DESIGN.md §6c, one meaning per cue): a filled
 // uppercase pill beside the strategy select read as a toggle, and clicking it
 // did nothing. The dotted underline is the only cue it needs: it has a tooltip.

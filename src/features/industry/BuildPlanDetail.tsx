@@ -1,6 +1,11 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
-import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import {
+  fieldBaseClassName,
+  fieldSizeClassName,
+  tappableRowClassName,
+  touchCheckboxLabelClassName,
+} from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
@@ -379,10 +384,11 @@ export function BuildPlanDetail({
   const { copied: copyState, flash: flashCopy } = useCopyFeedback<'copied' | 'failed'>(2000);
   /** Blueprint Acquisition rows (issue #838) `shoppingListText` just left out of a successful copy. */
   const [blueprintsLeftOut, setBlueprintsLeftOut] = useState(0);
-  // Verdict-first layout: the inputs fold behind a chip summary, the ledger
-  // follows the viewport (open where there is room beside the materials,
-  // folded on a phone until asked), and the one Calculation Breakdown is
-  // owned here so the hero's button and the ledger's "?"s open the same modal.
+  // Verdict-first layout: the setup folds to one line at the hero's foot, the
+  // ledger follows the viewport (open where there is room beside the
+  // materials, folded on a phone until asked), and the one Calculation
+  // Breakdown is owned here so the hero's break-even ⓘ and the ledger
+  // header's ⓘ open the same modal.
   const [setupOpen, setSetupOpen] = useState(false);
   // How the hero counts owned materials, and how they would be sold. Page
   // state, not plan state: a way of reading the plan, like a sort.
@@ -1060,10 +1066,7 @@ export function BuildPlanDetail({
     });
     const previous = plan.buildHere ?? [];
     update({ buildHere: [...picked] });
-    setStrategyUndo({
-      previous: [...previous],
-      built: [...picked].filter((id) => !previous.includes(id)).length,
-    });
+    setStrategyUndo({ previous: [...previous], built: picked.size });
   }
 
   const { itemMenuFor, itemActionsFor } = buildItemMenuProps(catalog);
@@ -1182,6 +1185,13 @@ export function BuildPlanDetail({
     </>
   );
 
+  const ownedLabelId = `${plan.id}-owned-label`;
+  const ownedValueId = `${plan.id}-owned-value`;
+  const ownedScopeLabel =
+    plan.ownedStockScope?.mode === 'selected'
+      ? t('industry.ownedStockScopeSelected')
+      : t('industry.ownedStockScopeEverywhere');
+
   const runsControl = (
     <span className="flex flex-wrap items-center gap-2 text-sm text-text-dim">
       <SourcingInput
@@ -1229,7 +1239,13 @@ export function BuildPlanDetail({
           bpcCoverage={bpcCoverage}
           blueprintName={nameForType(catalog, plan.blueprintTypeID)}
           onSetRuns={(runs) => update({ runs })}
-          breakdown={breakdownContext}
+          breakdown={{
+            ...breakdownContext,
+            sellValue:
+              heroBasis === 'sellValue' && ownedForSale
+                ? { forgone: ownedForSale.net, breakEvenPrice: heroFigures.breakEvenPrice }
+                : null,
+          }}
           breakdownOpen={breakdownOpen}
           onBreakdownOpenChange={setBreakdownOpen}
           onLogProduction={() => setLogRequest((n) => n + 1)}
@@ -1244,6 +1260,7 @@ export function BuildPlanDetail({
       ) : (
         <Panel title={t('industry.setup')}>
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+            {runsControl}
             {setupStrip}
           </div>
         </Panel>
@@ -1702,12 +1719,10 @@ export function BuildPlanDetail({
         <Panel
           title={t('industry.materials')}
           actions={
-            // `flex-wrap` because this is the one converted toolbar that needs a
-            // saved build plan to reach, so it is the one I could not screenshot
-            // at 390px. Five items — badge, three controls, duration — beside the
-            // panel title, since the shopping-list copy joined the row; if they
-            // ever do run out of room, wrapping inside the (min-height, not
-            // fixed) header beats clipping.
+            // `flex-wrap`: four items — data age, the shopping-list copy (its
+            // label hidden below `md`), export and refresh — beside the panel
+            // title; if they ever run out of room, wrapping inside the
+            // (min-height, not fixed) header beats clipping.
             <span className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-text-dim">
               {fetchedAt && <DataAgeBadge date={fetchedAt} />}
               {/*
@@ -1736,11 +1751,23 @@ export function BuildPlanDetail({
                 ) : (
                   <Icon.CopyToClipboard size={Icon.ICON_SIZE.sm} aria-hidden="true" />
                 )}
-                {copyState === 'copied'
-                  ? t('industry.copyShoppingListDone')
-                  : copyState === 'failed'
-                    ? t('industry.copyShoppingListFailed')
-                    : t('industry.copyShoppingList')}
+                {/* A short visible label from `md` up, icon-only below it so the
+                    header keeps its title on a phone; the full words stay the
+                    button's accessible name either way. */}
+                <span aria-hidden="true" className="max-md:hidden">
+                  {copyState === 'copied'
+                    ? t('industry.copyShoppingListDone')
+                    : copyState === 'failed'
+                      ? t('industry.copyShoppingListFailed')
+                      : t('industry.copyShoppingListShort')}
+                </span>
+                <span className="sr-only">
+                  {copyState === 'copied'
+                    ? t('industry.copyShoppingListDone')
+                    : copyState === 'failed'
+                      ? t('industry.copyShoppingListFailed')
+                      : t('industry.copyShoppingList')}
+                </span>
               </Button>
               {!error && result && visibleMaterials.length > 0 && (
                 <TableActionsMenu name={t('industry.materials')} tableExport={materialsExport} />
@@ -1783,16 +1810,28 @@ export function BuildPlanDetail({
                     onApply={applyAutoBuild}
                   />
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="whitespace-nowrap">{t('industry.ownedControl.label')}</span>
+                    <span id={ownedLabelId} className="whitespace-nowrap">
+                      {t('industry.ownedControl.label')}
+                    </span>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button size="sm" aria-haspopup="dialog">
-                          {plan.ownedStockScope?.mode === 'selected'
-                            ? t('industry.ownedStockScopeSelected')
-                            : t('industry.ownedStockScopeEverywhere')}
-                          {plan.includeCorpAssets && ` + ${t('industry.includeCorpAssets')}`}
+                        {/* §6c: a trigger that opens a popover is field chrome with a trailing caret. */}
+                        <button
+                          type="button"
+                          aria-labelledby={`${ownedLabelId} ${ownedValueId}`}
+                          className={cx(
+                            fieldBaseClassName,
+                            fieldSizeClassName.sm,
+                            'inline-flex items-center gap-2'
+                          )}
+                        >
+                          <span id={ownedValueId}>
+                            {plan.includeCorpAssets
+                              ? t('industry.ownedControl.withCorp', { scope: ownedScopeLabel })
+                              : ownedScopeLabel}
+                          </span>
                           <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                        </Button>
+                        </button>
                       </PopoverTrigger>
                       <PopoverContent
                         align="start"
@@ -1868,6 +1907,9 @@ export function BuildPlanDetail({
                 onToggleBuildHere={toggleBuildHere}
                 onBuildAll={buildHereAll}
                 ownedSellNet={ownedForSale?.net ?? null}
+                sellValueFor={(typeID) =>
+                  ownedForSale?.lines.find((line) => line.typeID === typeID)?.net
+                }
                 onShowRecipe={setRecipeTypeId}
                 onOpenAcquisitionPicker={setAcquisitionPickerTypeId}
                 skillGates={skillGates}
@@ -1984,7 +2026,7 @@ export function BuildPlanDetail({
                         (docs/DESIGN.md §7).
                       */}
                       <dt className="border-t border-line pt-1 text-text-dim">
-                        {t('industry.netProfit')}
+                        {t('industry.profit')}
                       </dt>
                       <dd
                         className={cx(
@@ -2032,6 +2074,8 @@ export function BuildPlanDetail({
               profitBasis={heroBasis}
               profit={heroFigures?.profit ?? null}
               cheaperNearby={cheaperNearbyLine}
+              hubName={hub.systemName}
+              planSeconds={planSeconds}
               totalVolume={materialVolume}
             />
           </CollapsiblePanel>

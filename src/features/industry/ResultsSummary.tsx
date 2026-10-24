@@ -16,13 +16,17 @@ import { cx } from '@/lib/cx';
 import { CostIndexTrend } from './CostIndexTrend';
 import { formatCostIndex, formatVolume } from './format';
 
-/** One slice of the "where the sale goes" bar and the matching ledger row's swatch. */
+/**
+ * One slice of the "where the sale goes" bar and the matching ledger row's
+ * swatch. Categories, not statuses, so they borrow the `kind-*` nominal palette
+ * (DESIGN.md §1) rather than warning/success tones a slice could be misread as.
+ */
 const SEGMENT = {
-  fees: 'bg-warning/70',
-  materials: 'bg-text-dim/60',
-  job: 'bg-line-bright',
-  owned: 'bg-accent-dim',
-  profit: 'bg-isk-pos',
+  fees: 'bg-kind-contract-expiry',
+  materials: 'bg-kind-moon-chunk',
+  job: 'bg-kind-calendar-event',
+  owned: 'bg-kind-skill-training',
+  profit: 'bg-kind-planet-extraction',
 } as const;
 type Segment = keyof typeof SEGMENT;
 
@@ -120,6 +124,10 @@ interface ResultsSummaryProps {
   profit: number | null;
   /** Grand total m3 across the materials table, for hauling-trip planning (issue #874). */
   totalVolume: MaterialVolumeTotals;
+  /** The plan's trade hub, where the product is priced at its lowest sell. */
+  hubName: string;
+  /** The whole tree's wall-clock on free slots, when it differs from the main job's time. */
+  planSeconds?: number;
 }
 
 /**
@@ -160,6 +168,8 @@ export function ResultsSummary({
   profitBasis,
   profit,
   totalVolume,
+  hubName,
+  planSeconds,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
@@ -255,7 +265,10 @@ export function ResultsSummary({
                 {t('industry.ledger.sale', { name: productName })}
                 {productQuantity !== null && productUnitPrice !== null && (
                   <span className="font-normal tracking-normal normal-case tabular-nums">
-                    {formatCount(productQuantity)} × {formatIsk(productUnitPrice)}
+                    {t('industry.ledger.quantityTimesPrice', {
+                      quantity: formatCount(productQuantity),
+                      price: formatIsk(productUnitPrice),
+                    })}
                   </span>
                 )}
               </span>
@@ -321,6 +334,12 @@ export function ResultsSummary({
               ) : (
                 <span className="flex items-center gap-1.5">
                   {t('industry.ledger.costIndexIn', { system: costIndexSystemName })}
+                  <InfoTooltip
+                    label={t('common.aboutLabel', { label: t('industry.costIndexFee') })}
+                    content={
+                      <Trans i18nKey="industry.costIndexTooltip" components={{ b: <strong /> }} />
+                    }
+                  />
                   <CostIndexTrend
                     value={formatCostIndex(systemCostIndex)}
                     systemId={costIndexSystemId}
@@ -368,6 +387,14 @@ export function ResultsSummary({
       </div>
 
       <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 text-xs">
+        {revenue !== null && (
+          <>
+            <dt className="text-text-dim">
+              {t('industry.ledger.productSellsAt', { name: productName })}
+            </dt>
+            <dd className="text-right">{t('industry.ledger.hubLowestSell', { hub: hubName })}</dd>
+          </>
+        )}
         <dt className="text-text-dim">{t('industry.ledger.iskToSpend')}</dt>
         <dd className="text-right tabular-nums">{formatIsk(result.totalCost)}</dd>
         {result.buyCost !== null && (
@@ -388,6 +415,12 @@ export function ResultsSummary({
         )}
         <dt className="text-text-dim">{t('industry.jobTime')}</dt>
         <dd className="text-right tabular-nums">{formatDuration(result.seconds)}</dd>
+        {planSeconds !== undefined && Math.round(planSeconds) !== Math.round(result.seconds) && (
+          <>
+            <dt className="text-text-dim">{t('industry.ledger.wholePlanTime')}</dt>
+            <dd className="text-right tabular-nums">{formatDuration(planSeconds)}</dd>
+          </>
+        )}
         <dt className="text-text-dim">{t('industry.totalVolume')}</dt>
         <dd className="text-right tabular-nums">
           {totalVolume.anyUnknown

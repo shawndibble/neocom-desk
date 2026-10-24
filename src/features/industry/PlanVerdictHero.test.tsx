@@ -180,6 +180,21 @@ describe('PlanVerdictHero: one verdict, one figure', () => {
 });
 
 describe('PlanVerdictHero: how owned materials are counted', () => {
+  it('says to sell the materials only when the build pays with them counted free', () => {
+    const loss = { ...figuresFor(RESULT), profit: -100, verdict: 'loss' as const };
+    const { unmount } = renderHero({ basis: 'sellValue', figures: loss });
+    expect(screen.getByText('Sell your materials instead')).toBeInTheDocument();
+    unmount();
+    renderHero({ basis: 'sellValue', figures: loss, result: { ...RESULT, profit: -50 } });
+    expect(screen.getByText('Loses money')).toBeInTheDocument();
+  });
+
+  it('opens the calculation breakdown from the break-even ⓘ', async () => {
+    renderHero();
+    await userEvent.click(screen.getByRole('button', { name: 'About Break-even' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
   it('says only "profit after fees" when the plan uses no owned materials', () => {
     renderHero();
     expect(screen.getByText('profit after fees')).toBeInTheDocument();

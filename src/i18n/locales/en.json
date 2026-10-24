@@ -2933,9 +2933,6 @@
     "verdictBuy": "BUY is cheaper by {{amount}} ISK",
     "verdictBuildCheaper": "BUILD is cheaper by {{amount}} ISK",
     "verdictUnknown": "Not enough price data for a build-vs-buy verdict.",
-    "saleProfitabilityProfit": "Selling profits {{amount}} ISK",
-    "saleProfitabilityLoss": "Selling loses {{amount}} ISK",
-    "saleProfitabilityUnknown": "Not enough price data to judge sale profitability.",
     "breakEvenPrice": "Break-even price",
     "productionRuns": "Production Runs",
     "productionRunsEmptyTitle": "No production runs logged yet",
@@ -3259,7 +3256,7 @@
       "fees": "From your skills: Accounting {{accounting}} sets sales tax, Broker Relations {{broker}} sets broker fee. Standings toward the station owner: {{factionStanding}} faction, {{corpStanding}} corp.",
       "feesFormula": "Sales tax {{taxPct}} = {{tax}} · broker fee {{brokerPct}} = {{broker}}",
       "profitTitle": "Profit",
-      "profitNet": "Net = revenue − sales tax − broker fee − total cost. The default.",
+      "profitNet": "Net = revenue − sales tax − broker fee − total cost.",
       "profitIskPerHour": "ISK/hour = profit ÷ the plan's own job time ({{time}}): what one slot earns. Slot time, not time to sell.",
       "profitPlanTime": "Plan time ({{time}}) is different on purpose: the wall-clock until the whole tree is done if started now, sub-jobs running side by side on the free slots.",
       "breakEvenTitle": "Break-even price",
@@ -3270,10 +3267,11 @@
       "verdictAcquisition": "Acquisition: is building {{product}} cheaper than buying it? Nothing is sold, so no tax and no broker fee.",
       "verdictSale": "Sale profitability: does building then selling make money? That one pays both fees. Same hub price, different question.",
       "useOrSellTitle": "Use or sell your materials",
-      "useOrSellBody": "Owned units cost the plan nothing, so the profit above is what you make on top of stock you already hold. Build if that beats what the materials would fetch, sell if it does not.",
+      "useOrSellBody": "By default the profit above counts your own materials at what they would net if sold, so it is what building earns over just selling them; switch it to free to see the plan's profit with owned units at 0 ISK.",
       "useOrSellBases": "Sell now: fills standing buy orders — paid at once, sales tax only. Sell order: lists at the hub's sell price — more ISK, but broker fee (100 ISK minimum) and you wait.",
       "useOrSellUnpriced": "No order on the chosen side means no verdict, rather than a total that quietly drops it.",
-      "useOrSellScope": "Only the owned units this job eats are valued. Surplus is out of scope, and a material set to Built counts as itself, not as the stock behind its recipe."
+      "useOrSellScope": "Only the owned units this job eats are valued. Surplus is out of scope, and a material set to Built counts as itself, not as the stock behind its recipe.",
+      "breakEvenSellValue": "On sell value, the {{forgone}} ISK your own materials would net if sold is added to the cost: break-even {{breakEven}} per unit."
     },
     "useOrSell": {
       "basisInstant": "Sell now",
@@ -3597,7 +3595,8 @@
       "isk": "ISK",
       "atPrice": "@ {{price}} ISK",
       "buildCheaper": "Build {{count}} cheaper parts · save {{amount}}",
-      "haveSellsFor": "sells for {{amount}} after fees"
+      "haveSellsFor": "sells for {{amount}} after fees",
+      "rowSellsFor": "sells for {{amount}}"
     },
     "useAllDone_one": "Filled Have on {{count}} material from your assets",
     "useAllDone_other": "Filled Have on {{count}} materials from your assets",
@@ -3644,16 +3643,25 @@
       "ownedSellVia": "Your materials sell via",
       "ownedSellViaHint": "Switch between selling now to buy orders and listing sell orders",
       "cheaperNearby_one": "{{system}} ({{count}} jump) is {{index}}: about {{amount}} ISK less.",
-      "cheaperNearby_other": "{{system}} ({{count}} jumps) is {{index}}: about {{amount}} ISK less."
+      "cheaperNearby_other": "{{system}} ({{count}} jumps) is {{index}}: about {{amount}} ISK less.",
+      "quantityTimesPrice": "{{quantity}} × {{price}}",
+      "productSellsAt": "{{name}} priced at",
+      "hubLowestSell": "{{hub}} lowest sell",
+      "wholePlanTime": "Whole plan, on free slots"
     },
     "ownedControl": {
       "label": "Owned materials",
-      "fill": "Fill the Have column"
+      "fill": "Fill the Have column",
+      "withCorp": "{{scope}} + Corp Assets"
     },
-    "strategyApplied_one": "Build strategy applied: {{count}} more part built.",
-    "strategyApplied_other": "Build strategy applied: {{count}} more parts built.",
+    "strategyApplied_one": "Build strategy applied: {{count}} part built here.",
+    "strategyApplied_other": "Build strategy applied: {{count}} parts built here.",
     "craftScopeReactionsIncluded": "incl. reactions",
-    "craftScopeReactionsExcluded": "no reactions"
+    "craftScopeReactionsExcluded": "no reactions",
+    "copyShoppingListShort": "Copy shopping list",
+    "iskPerHourTooltip": "Profit divided by the main job's time (job-slot occupancy, not wall-clock wait), on the basis the figure above uses — an hourly rate to compare builds by.",
+    "breakEvenPriceTooltip": "The price you must list one unit at for the sale to cover the whole job, once sales tax and broker fee are paid — and, on sell value, what your own materials would have fetched. Click for the full breakdown.",
+    "costIndexTooltip": "<b>Can be slightly off:</b> ESI rounds it to 4 decimals. The build system's manufacturing activity level, which drives the job's cost-index fee. Read live from ESI for the build system named here — the trade hub sets material and product prices, never this."
   },
   "login": {
     "button": "Log in with EVE Online",
