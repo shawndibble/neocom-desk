@@ -1,7 +1,7 @@
 // SRP (ADR 0026): the admin-SDK half of the callables. Parsing is
 // in srp.ts, the layout and shapes in srpTypes.ts. Every write to a
-// corporation's SRP data goes through here and appends to the immutable audit
-// log in the same transaction; clients have no write path (firestore.rules).
+// corporation's SRP data goes through here and appends to the audit log in
+// the same transaction; clients have no write path (firestore.rules).
 // The caller's EVE access token is verified and used for ESI reads, then
 // dropped: it is never written to Firestore or to the audit log.
 //

@@ -110,24 +110,24 @@ suite('SRP retention sweep (emulator)', () => {
     await log(CORP_A, 'a', { ...pilot, action: 'fileClaim', detail: { killmailId: 1 } });
     await log(CORP_A, 'b', {
       ...officer,
-      action: 'reject',
+      action: 'rejectClaim',
       detail: { killmailId: 1, pilotCharacterId: 501 },
     });
     await log(CORP_A, 'c', { ...pilot, action: 'refileClaim', detail: { killmailId: 1 } });
     await log(CORP_A, 'd', {
       ...officer,
-      action: 'approve',
+      action: 'approveClaim',
       detail: { killmailId: 1, pilotCharacterId: 501 },
     });
     await log(CORP_A, 'e', {
       ...officer,
-      action: 'markPaid',
+      action: 'markClaimPaid',
       detail: { killmailId: 1, pilotCharacterId: 501 },
     });
     await log(CORP_A, 'f', { ...pilot, action: 'fileClaim', detail: { killmailId: 2 } });
     await log(CORP_A, 'g', {
       ...officer,
-      action: 'markPaid',
+      action: 'markClaimPaid',
       detail: { killmailId: 2, pilotCharacterId: 501 },
     });
     await log(CORP_A, 'h', { ...officer, action: 'turnOn', detail: { reenabled: false } });

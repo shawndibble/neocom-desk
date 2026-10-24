@@ -1223,6 +1223,13 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect((await pointer(502).get()).data()).toEqual({ books: { [OTHER]: T0 } });
       expect((await pointer(503).get()).data()).toEqual({ books: { [OTHER]: T0 } });
     });
+
+    it('clears a pointer a past delete left behind when the book is turned on again', async () => {
+      const stray = db.collection('corpTaxBookBilledBy').doc('char:504');
+      await stray.set({ books: { [String(CORP)]: T0 } });
+      await turnOn();
+      expect((await stray.get()).exists).toBe(false);
+    });
   });
 
   describe('verify link', () => {

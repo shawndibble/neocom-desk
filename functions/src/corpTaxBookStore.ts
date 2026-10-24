@@ -305,6 +305,8 @@ export async function turnOnBook(deps: BookDeps, caller: Caller, input: TurnOnIn
   if (input.startDate > utcDate(now))
     fail('invalid-argument', 'The start date cannot be in the future', 'start-in-future');
   const ref = bookRef(deps.db, input.corporationId);
+  // A pointer a past delete missed (it failed, or a late sync) must not grant this book's reads.
+  if (!(await ref.get()).exists) await deleteBilledByPointers(deps, input.corporationId);
   await deps.db.runTransaction(async (tx) => {
     if ((await tx.get(ref)).exists)
       fail('already-exists', 'This corporation already has a Corp Tax Book', 'book-exists');
@@ -383,17 +385,18 @@ async function deleteBookContents(ref: DocumentReference): Promise<void> {
  * same pointer meanwhile keeps its entry.
  */
 async function deleteBilledByPointers(deps: BookDeps, corporationId: number): Promise<void> {
-  const book = new FieldPath('books', String(corporationId));
-  const pointers = await deps.db.collection(BILLED_BY_COLLECTION).where(book, '>=', 0).get();
+  const key = String(corporationId);
+  const field = new FieldPath('books', key);
+  const pointers = await deps.db.collection(BILLED_BY_COLLECTION).where(field, '>=', 0).get();
   for (let i = 0; i < pointers.docs.length; i += CHUNK) {
     await Promise.all(
       pointers.docs.slice(i, i + CHUNK).map((pointer) =>
         deps.db.runTransaction(async (tx) => {
           const books = (await tx.get(pointer.ref)).get('books') as
             Record<string, unknown> | undefined;
-          if (!books || !(String(corporationId) in books)) return;
+          if (!books || !(key in books)) return;
           if (Object.keys(books).length === 1) tx.delete(pointer.ref);
-          else tx.update(pointer.ref, book, FieldValue.delete());
+          else tx.update(pointer.ref, field, FieldValue.delete());
         })
       )
     );
@@ -442,7 +445,7 @@ export async function deleteBook(
   await deleteBookContents(ref);
   // A scheduled sync that loaded its grant before it was dropped may still have been writing.
   await deleteBookContents(ref);
-  // After the last pass, so that sync can't write a pointer back.
+  // After the last pass, like it: narrows (can't close) the window for that sync to write one back.
   await deleteBilledByPointers(deps, call.corporationId);
   return { deleted: true };
 }

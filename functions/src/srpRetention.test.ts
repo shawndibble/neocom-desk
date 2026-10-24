@@ -53,8 +53,8 @@ describe('isSrpAuditForClaim', () => {
   it.each([
     ['fileClaim', { killmailId: 7, hullTypeId: 1 }],
     ['refileClaim', { killmailId: 7 }],
-    ['approve', { killmailId: 7, pilotCharacterId: 9 }],
-    ['markPaid', { killmailId: 7, pilotCharacterId: 9 }],
+    ['approveClaim', { killmailId: 7, pilotCharacterId: 9 }],
+    ['markClaimPaid', { killmailId: 7, pilotCharacterId: 9 }],
   ])('matches a %s entry about the claim', (action, detail) => {
     expect(isSrpAuditForClaim({ action, detail }, 7)).toBe(true);
   });
