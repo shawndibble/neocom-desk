@@ -682,7 +682,7 @@ funnel, for the column picker's reason; see §6c.
 
 One sanctioned reorder: `trailing` view controls after the funnel, so the
 funnel sits right beside the search box, for a row where the filters narrow
-what the search and the list show and the view controls only arrange it (the
+the list and the view controls only arrange it (the
 Ship Tree ladder: view switch and search in `search`, then the funnel, then
 Expand all / Collapse all and the Legend in `trailing`). Like `actions`, they
 act at once and never move into the sheet.

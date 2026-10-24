@@ -403,6 +403,25 @@ describe('ShipTreeTab — ladder', () => {
     expect(await screen.findByRole('dialog', { name: 'Worm' })).toBeVisible();
   });
 
+  it("opens a picked hull's section when it's in this faction", async () => {
+    const user = userEvent.setup();
+    const { container } = renderTab();
+    await screen.findByRole('button', { name: /Merlin/ });
+    const interceptor = container.querySelector<HTMLDetailsElement>('details[data-class="10"]')!;
+    expect(interceptor.open).toBe(false);
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Search hulls in every faction' }),
+      'crow'
+    );
+    await user.click(
+      within(screen.getByRole('list', { name: 'Matching hulls' })).getByRole('button', {
+        name: /Crow/,
+      })
+    );
+    expect(await screen.findByRole('dialog', { name: 'Crow' })).toBeVisible();
+    expect(interceptor.open).toBe(true);
+  });
+
   it('puts the faction bar under the toolbar, whose filters change its counts', async () => {
     renderTab();
     const search = await screen.findByRole('searchbox', { name: 'Search hulls in every faction' });

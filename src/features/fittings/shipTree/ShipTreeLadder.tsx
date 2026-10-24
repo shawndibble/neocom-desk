@@ -57,6 +57,7 @@ import {
   inGameFactionOrder,
   isShipTreeFiltered,
   ladderSections,
+  sectionPath,
   MASTERY_TIERS,
   masteryCounts,
   masteryFilterActive,
@@ -127,9 +128,11 @@ export function ShipTreeLadder({
   const visible = (s: ShipTreeShip) => hullMatches(statuses.get(s.typeID), filter);
   const shown = sections.filter((section) => hasVisible(section, tree, visible));
 
-  // Another faction's hull switches the tree to it, then opens its window.
+  // Another faction's hull switches the tree to it; one of this faction's
+  // opens its section (and those above it) so it's there behind the window.
   const pick = (ship: ShipTreeShip) => {
     if (ship.factionID !== tree.factionID) onFaction(ship.factionID);
+    else setUserOpen(new Set([...userOpen, ...sectionPath(sections, ship.treeGroupID)]));
     onOpenShip(ship);
   };
   const search = (
@@ -268,8 +271,8 @@ function TreeFilterFields({
   draft,
   setDraft,
   flyCounts,
-  tierCounts: counts,
-  masteriesUnavailable: unavailable,
+  tierCounts,
+  masteriesUnavailable,
 }: {
   draft: ShipTreeFilter;
   setDraft: (next: ShipTreeFilter) => void;
@@ -278,7 +281,8 @@ function TreeFilterFields({
   masteriesUnavailable: boolean;
 }) {
   const { t } = useTranslation();
-  const reason = unavailable
+  const narrow = useIsNarrow();
+  const reason = masteriesUnavailable
     ? t('ships.tree.mastery.unavailable')
     : draft.fly === 'cantFly'
       ? t('ships.tree.mastery.needsCanFly')
@@ -292,6 +296,7 @@ function TreeFilterFields({
     <>
       <FilterField label={t('ships.tree.fly.label')} stretch={false}>
         <SegmentedControl<FlyState>
+          fill={narrow}
           label={t('ships.tree.fly.label')}
           options={[
             { value: 'all', label: t('ships.tree.fly.all', { n: flyCounts.all }) },
@@ -313,8 +318,8 @@ function TreeFilterFields({
               key={tier}
               size="md"
               label={tier === 0 ? t('ships.tree.mastery.none') : romanLevel(tier)}
-              count={counts[tier]}
-              countLabel={t('ships.tree.mastery.count', { count: counts[tier] })}
+              count={tierCounts[tier]}
+              countLabel={t('ships.tree.mastery.count', { count: tierCounts[tier] })}
               selected={draft.mastery.has(tier)}
               onToggle={() => toggle(tier)}
               disabled={reason !== undefined}

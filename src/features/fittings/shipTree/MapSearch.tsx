@@ -77,7 +77,8 @@ export function MapSearch({
       {results.length > 0 && (
         <ul
           aria-label={t('ships.tree.searchResults')}
-          className="absolute z-20 mt-1 max-h-80 w-full overflow-y-auto rounded-xs border border-line-bright bg-panel py-1 shadow-lg shadow-black/50"
+          // At least 20rem (or the screen), so names stay readable beside a narrow box.
+          className="absolute z-20 mt-1 max-h-80 w-[max(100%,min(20rem,calc(100vw-2rem)))] overflow-y-auto rounded-xs border border-line-bright bg-panel py-1 shadow-lg shadow-black/50"
         >
           {results.map((s) => {
             const status = statuses.get(s.typeID);

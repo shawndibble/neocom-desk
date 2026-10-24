@@ -148,6 +148,16 @@ export function ladderSections(defs: readonly ShipTreeNodeDef[]): LadderSection[
   return defs.filter((d) => !isNested(d) || d.parent === null).map(build);
 }
 
+/** The class ids from a top-level section down to `classId`'s, or [] if it isn't there. */
+export function sectionPath(sections: readonly LadderSection[], classId: number): number[] {
+  for (const s of sections) {
+    if (s.def.id === classId) return [classId];
+    const below = sectionPath(s.children, classId);
+    if (below.length) return [s.def.id, ...below];
+  }
+  return [];
+}
+
 /** Every section's class id, nested ones too: what Expand all opens. */
 export function allSectionIds(sections: readonly LadderSection[]): number[] {
   return sections.flatMap((s) => [s.def.id, ...allSectionIds(s.children)]);

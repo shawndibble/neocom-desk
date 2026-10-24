@@ -107,8 +107,8 @@ interface FilterBarProps<T> {
   actions?: ReactNode;
   /**
    * View controls after the funnel, so the funnel sits right beside the search
-   * box — for a row whose filters belong to the search rather than to the
-   * view controls (the Ship Tree ladder's Expand all / Collapse all and
+   * box — for a row whose filters narrow the list and whose view controls
+   * only arrange it (the Ship Tree ladder's Expand all / Collapse all and
    * Legend). Like `actions`, never part of the draft and never in the sheet.
    */
   trailing?: ReactNode;

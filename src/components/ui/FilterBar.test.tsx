@@ -275,7 +275,9 @@ describe('countActive', () => {
   it('counts the truthy controls, so 0, empty and false do not count', () => {
     expect(countActive(['jita', 0, '', false, null, undefined, true, 5])).toBe(3);
   });
+});
 
+describe('FilterBar trailing', () => {
   it('puts trailing view controls after the funnel, beside the search box', () => {
     render(
       <FilterBar<Filter>

@@ -18,6 +18,7 @@ import {
   type ShipTreeFilter,
   inGameFactionOrder,
   ladderSections,
+  sectionPath,
   masteryTierEntries,
   ownedBlueprintSummary,
   resolveFactionID,
@@ -324,6 +325,17 @@ describe('ship tree filters', () => {
       [500003, 0],
       [500004, 0],
     ]);
+  });
+
+  it('finds the path down to a nested section', () => {
+    const def = (id: number) => ({ id }) as never;
+    const sections = [
+      { def: def(1), children: [{ def: def(2), children: [] }] },
+      { def: def(3), children: [] },
+    ];
+    expect(sectionPath(sections, 2)).toEqual([1, 2]);
+    expect(sectionPath(sections, 3)).toEqual([3]);
+    expect(sectionPath(sections, 9)).toEqual([]);
   });
 
   it('lists every section id, nested ones too', () => {
