@@ -6,7 +6,13 @@
  * and a 5M ISK PLEX share one scale. Daily averages only (ESI's `average`), the same series
  * Price History's "average" choice draws. Pure, like every builder.
  */
-import { indexToStart, alignTrendSeries, percentChange } from '@/engine/market/priceTrend';
+import {
+  alignTrendSeries,
+  indexToStart,
+  isPricedDay,
+  percentChange,
+  trailingAverage,
+} from '@/engine/market/priceTrend';
 import { planTrendSeries } from '@/engine/market/trendSeries';
 import { getTradeHub } from '@/market/hubs';
 import { formatCompactNumber } from '@/lib/compactNumber';
@@ -22,6 +28,9 @@ const D = 'overview.widgets.data.marketTrend';
 const C = 'overview.widgets.chart.marketTrend';
 const W = 'overview.widgets.marketTrend';
 const MARKET_PATH = '/market/browser';
+/** Ranges long enough that daily noise zigzags: their lines plot a trailing average instead. */
+const SMOOTH_FROM_DAYS = 30;
+const SMOOTH_WINDOW = 7;
 const COLORS: ChartColor[] = ['accent', 's1', 's2', 's3', 's4', 's5'];
 
 /** `+12.4%` / `-3.0%`: the sign is part of the text, so colour is never the only cue. */
@@ -72,10 +81,12 @@ function resolveTrend(
   };
 }
 
+/** The newest day with a real price: a zero-average row is a day nothing traded, not a price. */
 const latestAverage = (item: MarketTrendSeries): number | null =>
-  item.points.length === 0
-    ? null
-    : [...item.points].sort((a, b) => a.date.localeCompare(b.date)).at(-1)!.average;
+  item.points
+    .filter(isPricedDay)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .at(-1)?.average ?? null;
 
 export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs }) => {
   const feed: FeedState<MarketTrendFeed> | undefined = feeds.marketTrend;
@@ -104,7 +115,7 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
     now: latestAverage(item),
   }));
   const names = (flag: (i: TrendLine) => boolean) => data.items.filter(flag).map((i) => i.label);
-  const missing = names((i) => i.points.length === 0 && !i.failed);
+  const missing = names((i) => !i.points.some(isPricedDay) && !i.failed);
   const failedNames = names((i) => i.failed);
   // Said wherever the lines are, so a pick that cannot be drawn is never just absent.
   const notes = [
@@ -172,31 +183,38 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
 
   const volumes = data.items.map((i) => new Map(i.points.map((p) => [p.date, p.volume])));
   const rel = (v: number) => v / 100 - 1;
-  const all = plotted.flatMap((i) => indexed[i]!.filter((v): v is number => v !== null));
+  const smoothed = range >= SMOOTH_FROM_DAYS;
   const lastOf = (values: (number | null)[]) => values.filter((v) => v !== null).at(-1) ?? null;
+  // Percent change per day; a long range draws its trailing average so the tooltip (raw) keeps the real day.
+  const lineValues = (values: (number | null)[]) => {
+    const pct = values.map((v) => (v === null ? null : rel(v) * 100));
+    if (!smoothed) return pct;
+    // The average bridges nothing: a day with no price stays a gap, and a line stops where its data does.
+    return trailingAverage(pct, SMOOTH_WINDOW).map((v, k) => (pct[k] === null ? null : v));
+  };
+  // What each line ends on as drawn, so the legend and summary agree with the picture.
+  const drawn = indexed.map(lineValues);
   const chart: ChartModel = {
     kind: 'lines',
     summary: [
       t(`${C}.summary`, { count: plotted.length, days: range, where }),
+      ...(smoothed ? [t(`${C}.summarySmoothed`, { days: SMOOTH_WINDOW })] : []),
       ...plotted.map((i) =>
         t(`${C}.summaryLine`, {
           item: data.items[i]!.label,
-          change: trendText(lastOf(indexed[i]!) === null ? null : rel(lastOf(indexed[i]!)!)),
+          change: trendText(lastOf(drawn[i]!) === null ? null : lastOf(drawn[i]!)! / 100),
         })
       ),
     ].join(' '),
-    note: [t(`${C}.note`, { where }), ...notes].join(' '),
-    low: trendText(rel(Math.min(...all))),
-    high: trendText(rel(Math.max(...all))),
-    rangeLabel: t(`${C}.range`, { days: range }),
+    ...(notes.length > 0 ? { note: notes.join(' ') } : {}),
     series: plotted.map((i, n) => {
-      const end = lastOf(indexed[i]!);
+      const end = lastOf(drawn[i]!);
       return {
         key: data.items[i]!.key,
         label: data.items[i]!.label,
         color: COLORS[n % COLORS.length]!,
-        end: trendText(end === null ? null : rel(end)),
-        values: indexed[i]!.map((v) => (v === null ? null : rel(v) * 100)),
+        end: trendText(end === null ? null : end / 100),
+        values: drawn[i]!,
       };
     }),
     tips: axis.dates.map((date, d) => ({

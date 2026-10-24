@@ -374,7 +374,11 @@ function GalleryBody({
             isPhone={isPhone}
             justAdded={justAdded === `${kind.id}:${preset.id}`}
             onAdd={(p, title) =>
-              add(kind.id, { title, trendItems: p.items, view: p.view }, `${kind.id}:${p.id}`)
+              add(
+                kind.id,
+                { title, trendItems: p.items, trendHubs: p.trendHubs, view: p.view },
+                `${kind.id}:${p.id}`
+              )
             }
           />
         ))

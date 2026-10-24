@@ -208,3 +208,12 @@ export function linesRuns(
     return runs.filter((r) => r.length > 1).map((r) => r.join(' '));
   });
 }
+
+/** Closed polygons for the soft fill under each `linesRuns` run: the run itself, then straight down to the baseline and back. */
+export function runFills(runs: readonly string[], height: number): string[] {
+  return runs.map((run) => {
+    const pts = run.split(' ');
+    const x = (pt: string) => pt.split(',')[0]!;
+    return `${run} ${x(pts[pts.length - 1]!)},${height} ${x(pts[0]!)},${height}`;
+  });
+}

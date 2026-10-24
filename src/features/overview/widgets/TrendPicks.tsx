@@ -6,16 +6,19 @@
  * Neither is stored until it differs from the default: no hubs picked is the
  * pilot's Market hub, no items picked is the Quickbar.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   Checkbox,
   DropdownMenuCheckboxItem,
   DropdownMenuLabel,
+  IconButton,
   Modal,
   NativeSelect,
+  SearchInput,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { useQuickbar } from '@/features/market/useQuickbar';
@@ -27,6 +30,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOverviewEdit } from './editContext';
 import { MAX_TREND_HUBS, type Widget } from './layout';
 import {
+  searchTrendItems,
   TREND_SOURCE_IDS,
   trendCatalogue,
   type TrendSource,
@@ -102,7 +106,11 @@ export function TrendItemsDialog({
   const [edited, setEdited] = useState<number[] | null>(null);
   const picked =
     edited ?? widget.trendItems ?? quickbar.slice(0, TREND_MAX_SERIES).map((item) => item.typeId);
-  const [catalogue, setCatalogue] = useState<Catalogue>({ status: 'idle' });
+  // A widget's stored picks may not be in the Quickbar (the presets); their names come from the catalogue, so it loads on open.
+  const needsNames = (widget.trendItems ?? []).some((id) => !quickbar.some((q) => q.typeId === id));
+  const [catalogue, setCatalogue] = useState<Catalogue>({
+    status: needsNames ? 'loading' : 'idle',
+  });
 
   // The market catalogue is a lazy download; only choosing a source that needs it fetches it, once.
   const requested = useRef(false);
@@ -113,11 +121,8 @@ export function TrendItemsDialog({
       mounted.current = false;
     };
   }, []);
-  const choose = (next: SourceChoice) => {
-    setSource(next);
-    if (next === 'quickbar' || requested.current) return;
+  const fetchCatalogue = () => {
     requested.current = true;
-    setCatalogue({ status: 'loading' });
     void import('@/sde/loadMarketSde')
       .then(async ({ loadMarketGroups, loadMarketTypes }) =>
         trendCatalogue(await loadMarketGroups(), await loadMarketTypes())
@@ -130,10 +135,38 @@ export function TrendItemsDialog({
         }
       );
   };
+  useEffect(() => {
+    if (needsNames && !requested.current) fetchCatalogue();
+    // Once, on open: the initial state above already shows loading.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const loadCatalogue = () => {
+    if (requested.current) return;
+    setCatalogue({ status: 'loading' });
+    fetchCatalogue();
+  };
+  const choose = (next: SourceChoice) => {
+    setSource(next);
+    if (next !== 'quickbar') loadCatalogue();
+  };
+  const [query, setQuery] = useState('');
+  const searching = query.trim() !== '';
+  const noteId = useId();
 
-  const listed: TrendSourceItem[] =
-    source === 'quickbar'
-      ? quickbar.map(({ typeId, name }) => ({ typeId, name }))
+  const quickbarList = quickbar.map(({ typeId, name }) => ({ typeId, name }));
+  const hits = searching
+    ? searchTrendItems(
+        [
+          { id: 'quickbar', items: quickbarList },
+          ...(catalogue.status === 'ready' ? catalogue.sources : []),
+        ],
+        query
+      )
+    : [];
+  const rows: (TrendSourceItem & { sourceId?: SourceChoice })[] = searching
+    ? hits
+    : source === 'quickbar'
+      ? quickbarList
       : catalogue.status === 'ready'
         ? (catalogue.sources.find((s) => s.id === source)?.items ?? [])
         : [];
@@ -169,25 +202,41 @@ export function TrendItemsDialog({
           onClose();
         }}
       >
-        <label className="grid gap-1 text-xs">
-          <span className="font-semibold">{t('overview.menu.trendSource')}</span>
-          <NativeSelect
-            value={source}
-            onChange={(event) => choose(event.target.value as SourceChoice)}
-          >
-            {SOURCE_CHOICES.map((choice) => (
-              <option key={choice} value={choice}>
-                {t(`overview.menu.trendSources.${choice}`)}
-              </option>
-            ))}
-          </NativeSelect>
-        </label>
+        <SearchInput
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            // A failed load is retried with the Retry button, not on every keystroke.
+            if (event.target.value.trim() !== '' && catalogue.status === 'idle') loadCatalogue();
+          }}
+          onKeyDown={(event) => {
+            // Enter searches; it must not submit the dialog's form.
+            if (event.key === 'Enter') event.preventDefault();
+          }}
+          placeholder={t('overview.menu.trendSearchPlaceholder')}
+          aria-label={t('overview.menu.trendSearch')}
+        />
+        {!searching && (
+          <label className="grid gap-1 text-xs">
+            <span className="font-semibold">{t('overview.menu.trendSource')}</span>
+            <NativeSelect
+              value={source}
+              onChange={(event) => choose(event.target.value as SourceChoice)}
+            >
+              {SOURCE_CHOICES.map((choice) => (
+                <option key={choice} value={choice}>
+                  {t(`overview.menu.trendSources.${choice}`)}
+                </option>
+              ))}
+            </NativeSelect>
+          </label>
+        )}
 
         <ul
-          className="grid max-h-72 gap-1 overflow-y-auto"
+          className="grid max-h-60 gap-1 overflow-y-auto"
           aria-label={t('overview.menu.trendList')}
         >
-          {listed.map((item) => {
+          {rows.map((item) => {
             const on = picked.includes(item.typeId);
             return (
               <li key={item.typeId}>
@@ -195,36 +244,70 @@ export function TrendItemsDialog({
                   <Checkbox
                     checked={on}
                     disabled={!on && full}
+                    aria-describedby={!on && full ? noteId : undefined}
                     onChange={(event) => toggle(item.typeId, event.target.checked)}
                   />
-                  {item.name}
+                  <span>{item.name}</span>
+                  {item.sourceId !== undefined && (
+                    <span className="ml-auto text-xs text-text-dim">
+                      {t(`overview.menu.trendSources.${item.sourceId}`)}
+                    </span>
+                  )}
                 </label>
               </li>
             );
           })}
         </ul>
-        {source === 'quickbar' && quickbar.length === 0 && (
+        {full && (
+          <p id={noteId} className="text-xs text-text-dim">
+            {t('overview.menu.trendFull', { max: TREND_MAX_SERIES })}
+          </p>
+        )}
+        {searching && catalogue.status === 'ready' && hits.length === 0 && (
+          <p className="text-xs text-text-dim">{t('overview.menu.trendNoMatch')}</p>
+        )}
+        {!searching && source === 'quickbar' && quickbar.length === 0 && (
           <p className="text-xs text-text-dim">{t('overview.menu.trendQuickbarEmpty')}</p>
         )}
-        {source !== 'quickbar' && catalogue.status === 'loading' && (
+        {(searching || source !== 'quickbar') && catalogue.status === 'loading' && (
           <p className="text-xs text-text-dim" role="status">
             {t('overview.menu.trendLoading')}
           </p>
         )}
-        {source !== 'quickbar' && catalogue.status === 'failed' && (
+        {(searching || source !== 'quickbar') && catalogue.status === 'failed' && (
           <p className="text-xs text-danger" role="alert">
             {t('overview.menu.trendLoadFailed')}{' '}
-            <Button type="button" size="sm" onClick={() => choose(source)}>
+            <Button type="button" size="sm" onClick={loadCatalogue}>
               {t('overview.menu.trendRetry')}
             </Button>
           </p>
         )}
 
-        <p className="text-xs text-text-dim" aria-live="polite">
-          {t('overview.menu.trendPicked', { count: picked.length, max: TREND_MAX_SERIES })}
-          {picked.length > 0 &&
-            ` ${picked.map((id) => names.get(id) ?? t('overview.menu.trendUnknownItem', { id })).join(', ')}`}
-        </p>
+        <section aria-label={t('overview.menu.trendSelectedLabel')} className="grid gap-1">
+          <h3 className="text-xs font-semibold" aria-live="polite">
+            {t('overview.menu.trendSelected', { count: picked.length, max: TREND_MAX_SERIES })}
+          </h3>
+          <ul className="grid gap-1">
+            {picked.map((id) => {
+              const name = names.get(id) ?? t('overview.menu.trendUnknownItem', { id });
+              return (
+                <li
+                  key={id}
+                  className="flex items-center justify-between gap-2 rounded-xs border border-line pl-2.5 text-sm"
+                >
+                  <span className="min-w-0 truncate">{name}</span>
+                  <IconButton
+                    variant="plain"
+                    size="sm"
+                    icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
+                    label={t('overview.menu.trendRemove', { name })}
+                    onClick={() => toggle(id, false)}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        </section>
         {picked.length > 0 && (
           <p
             className={plan.omitted > 0 ? 'text-xs text-warning' : 'text-xs text-text-dim'}

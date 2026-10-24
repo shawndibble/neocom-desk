@@ -127,6 +127,7 @@ export function newWidget(kind: WidgetKindId, id: string): Widget | null {
 export interface WidgetInit {
   title?: string;
   trendItems?: readonly number[];
+  trendHubs?: readonly string[];
   view?: WidgetView;
 }
 
@@ -144,6 +145,10 @@ export function addWidget(
   if (init?.view && getKind(kind)?.views.includes(init.view)) widget.view = init.view;
   if (init?.trendItems?.length && getKind(kind)?.hasTrendSources) {
     widget.trendItems = [...init.trendItems];
+  }
+  if (init?.trendHubs?.length && getKind(kind)?.hasTrendSources) {
+    const hubs = cleanTrendHubs(init.trendHubs);
+    if (hubs.length) widget.trendHubs = hubs;
   }
   return { ...layout, widgets: [...layout.widgets, widget] };
 }

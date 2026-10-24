@@ -4,6 +4,7 @@ import {
   barHeights,
   areaCoords,
   linesRuns,
+  runFills,
   donutSegments,
   hbarPercent,
   sharesOfMax,
@@ -169,5 +170,18 @@ describe('linesRuns', () => {
 
   it('draws nothing for an all-gap series', () => {
     expect(linesRuns([[null, null]], 20)).toEqual([[]]);
+  });
+});
+
+describe('runFills', () => {
+  it('closes each run down to the baseline under its first and last point', () => {
+    expect(runFills(['10.0,16.0 50.0,6.0 90.0,9.0'], 20)).toEqual([
+      '10.0,16.0 50.0,6.0 90.0,9.0 90.0,20 10.0,20',
+    ]);
+  });
+
+  it('keeps one fill per run, so a gap stays a gap', () => {
+    expect(runFills(['0.0,5.0 10.0,6.0', '50.0,5.0 60.0,7.0'], 20)).toHaveLength(2);
+    expect(runFills([], 20)).toEqual([]);
   });
 });

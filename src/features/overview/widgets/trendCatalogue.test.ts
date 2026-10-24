@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
-import { trendCatalogue, TREND_PLEX_IDS, TREND_SOURCE_IDS } from './trendCatalogue';
+import {
+  searchTrendItems,
+  trendCatalogue,
+  TREND_PLEX_IDS,
+  TREND_SOURCE_IDS,
+} from './trendCatalogue';
 
 const group = (
   id: number,
@@ -107,5 +112,44 @@ describe('trendCatalogue', () => {
     expect(trendCatalogue([], []).map((s) => s.items.length)).toEqual(
       TREND_SOURCE_IDS.map(() => 0)
     );
+  });
+});
+
+describe('searchTrendItems', () => {
+  const lists = [
+    { id: 'quickbar' as const, items: [{ typeId: 34, name: 'Tritanium' }] },
+    {
+      id: 'minerals' as const,
+      items: [
+        { typeId: 34, name: 'Tritanium' },
+        { typeId: 35, name: 'Pyerite' },
+      ],
+    },
+    { id: 'ore' as const, items: [{ typeId: 1230, name: 'Veldspar' }] },
+    { id: 'compressedOre' as const, items: [{ typeId: 28430, name: 'Compressed Veldspar' }] },
+  ];
+
+  it('matches every list at once, ignoring case and surrounding space', () => {
+    expect(searchTrendItems(lists, '  VELD ').map((m) => [m.typeId, m.sourceId])).toEqual([
+      [1230, 'ore'],
+      [28430, 'compressedOre'],
+    ]);
+  });
+
+  it('names an item once, under the first list that holds it', () => {
+    expect(searchTrendItems(lists, 'trit')).toEqual([
+      { typeId: 34, name: 'Tritanium', sourceId: 'quickbar' },
+    ]);
+  });
+
+  it('puts names that start with the query before names that merely contain it', () => {
+    expect(searchTrendItems(lists, 'veldspar').map((m) => m.name)).toEqual([
+      'Veldspar',
+      'Compressed Veldspar',
+    ]);
+  });
+
+  it('finds nothing for a blank query', () => {
+    expect(searchTrendItems(lists, '   ')).toEqual([]);
   });
 });

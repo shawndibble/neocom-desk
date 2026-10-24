@@ -135,8 +135,71 @@ describe('marketTrend builder', () => {
     expect(view.table!.footer).not.toContain('Jita');
     expect(view.summary).not.toContain('Jita');
     if (view.chart?.kind !== 'lines') throw new Error('expected a lines chart');
-    expect(view.chart.note).toContain('whereGlobal');
+    expect(view.chart.note).toBeUndefined();
     expect(view.chart.summary).not.toContain('Jita');
+  });
+
+  it('carries no explanatory sentence, nor a low/high row, when there is nothing to warn about', () => {
+    const view = marketTrend(data([rising, short]), ctx(7));
+    if (view.chart?.kind !== 'lines') throw new Error('expected a lines chart');
+    expect(view.chart.note).toBeUndefined();
+    expect(view.chart.low).toBeUndefined();
+    expect(view.chart.high).toBeUndefined();
+  });
+
+  it('never reads a zero-average day as a -100% crash or the headline mover', () => {
+    const crashed = line(35, 'Pyroxeres', [10, 10, 10, 10, 10, 10, 10, 10, 0]);
+    const view = marketTrend(data([crashed, rising]), ctx(7));
+    expect(view.table!.rows[0]!.cells[1]).toEqual(expect.objectContaining({ iskAmount: 10 }));
+    expect(view.table!.rows[0]!.cells[2]).toBe('0.0%');
+    expect(view.number.value).toBe('+5.7%');
+    if (view.chart?.kind !== 'lines') throw new Error('expected a lines chart');
+    const pyro = view.chart.series.find((s) => s.label === 'Pyroxeres')!;
+    expect(pyro.values.filter((v) => v !== null && v <= -99)).toEqual([]);
+    expect(pyro.end).toBe('0.0%');
+  });
+
+  it('treats an item whose every day is zero as having no history', () => {
+    const view = marketTrend(data([rising, line(9, 'Dead', [0, 0, 0])]), ctx(7));
+    if (view.chart?.kind !== 'lines') throw new Error('expected a lines chart');
+    expect(view.chart.series).toHaveLength(1);
+    expect(view.chart.note).toContain('Dead');
+  });
+
+  it('plots a 7-day average on long ranges while the tooltip keeps the real day', () => {
+    const zigzag = line(
+      36,
+      'Zig',
+      Array.from({ length: 31 }, (_, i) => (i % 2 === 0 ? 100 : 120))
+    );
+    const long = marketTrend(data([zigzag]), ctx(30));
+    const raw = marketTrend(data([zigzag]), ctx(7));
+    if (long.chart?.kind !== 'lines' || raw.chart?.kind !== 'lines') throw new Error('lines');
+    expect(long.chart.summary).toContain('summarySmoothed');
+    expect(raw.chart.summary).not.toContain('summarySmoothed');
+    const tail = long.chart.series[0]!.values.slice(7).map((x) => x ?? 0);
+    expect(Math.max(...tail) - Math.min(...tail)).toBeLessThan(5); // raw swings by 20 points
+    expect(long.chart.series[0]!.values[0]).toBe(0);
+    // Tooltip is the day's own price, not the average.
+    expect(long.chart.tips!.at(-1)!.rows[0]!.value).toContain('"price":"100"');
+  });
+
+  it('keeps a smoothed line to the days it has data for, and ends the legend where the line ends', () => {
+    const steady = line(
+      34,
+      'Steady',
+      Array.from({ length: 31 }, (_, i) => 100 + i)
+    );
+    const early: MarketTrendSeries = {
+      ...line(35, 'Early', []),
+      points: Array.from({ length: 12 }, (_, i) => pt(day(9 + i), 50 + i)),
+    };
+    const view = marketTrend(data([steady, early]), ctx(30));
+    if (view.chart?.kind !== 'lines') throw new Error('lines');
+    const [s, e] = view.chart.series;
+    expect(e!.values.slice(-3)).toEqual([null, null, null]);
+    const last = s!.values.at(-1)!;
+    expect(s!.end).toBe(`+${last.toFixed(1)}%`);
   });
 
   it('keeps the hub names for a mix of global and hub lines', () => {

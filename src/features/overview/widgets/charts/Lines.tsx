@@ -1,20 +1,30 @@
+import { useId, useState } from 'react';
 import { ChartHover } from './ChartHover';
-import { linesRuns } from './geometry';
+import { linesRuns, runFills } from './geometry';
 import { CHART_COLOR } from './palette';
 import type { LinesChartModel } from './types';
 
-/** Colour alone never separates two lines: a slot's dash pattern (and the legend's label and figure) does too. */
-const DASH = ['', '4 2', '1.5 2.5', '6 2 1.5 2', '2 1', '9 3'];
+const DIMMED = 0.25;
 
-/** Several lines on one scale, a legend naming each with where it ends, and a hover that reads every line for the day. Drawn aria-hidden; the summary carries the meaning. */
+/**
+ * One line gets a soft fill under it and no legend (the title and Number view
+ * name it); several lines get thin distinct-colour strokes and a compact
+ * legend whose entries, hovered or focused, bring their line to full weight
+ * and dim the rest (weight, not colour alone, marks the pick). The drawing is
+ * aria-hidden; the summary carries the meaning and the hover reads every line.
+ */
 export function Lines({ model, height }: { model: LinesChartModel; height: number }) {
+  const gradient = `fill-${useId().replace(/:/g, '')}`;
+  const [active, setActive] = useState<string | null>(null);
   const runs = linesRuns(
     model.series.map((s) => s.values),
     height
   );
   const drawn = runs.some((r) => r.length > 0);
+  const single = model.series.length === 1;
+  const picked = !single && active !== null && model.series.some((s) => s.key === active);
   return (
-    <div aria-hidden="true" className="grid gap-1">
+    <div className="grid gap-1">
       {drawn && (
         <ChartHover tips={model.tips} layout="points" className="w-full" style={{ height }}>
           <svg
@@ -24,48 +34,87 @@ export function Lines({ model, height }: { model: LinesChartModel; height: numbe
             className="block w-full"
             style={{ height }}
           >
+            {single && (
+              <>
+                <defs>
+                  <linearGradient id={gradient} x1="0" x2="0" y1="0" y2="1">
+                    <stop
+                      offset="0"
+                      stopColor={CHART_COLOR[model.series[0]!.color]}
+                      stopOpacity="0.35"
+                    />
+                    <stop
+                      offset="1"
+                      stopColor={CHART_COLOR[model.series[0]!.color]}
+                      stopOpacity="0"
+                    />
+                  </linearGradient>
+                </defs>
+                {runFills(runs[0]!, height).map((points, n) => (
+                  <polygon key={`fill:${n}`} points={points} fill={`url(#${gradient})`} />
+                ))}
+              </>
+            )}
             {model.series.map((s, i) =>
-              runs[i]!.map((points, n) => (
-                <polyline
-                  key={`${s.key}:${n}`}
-                  points={points}
-                  fill="none"
-                  stroke={CHART_COLOR[s.color]}
-                  strokeWidth="1.6"
-                  strokeDasharray={DASH[i % DASH.length] || undefined}
-                  vectorEffect="non-scaling-stroke"
-                />
-              ))
+              runs[i]!.map((points, n) => {
+                const on = picked && s.key === active;
+                return (
+                  <polyline
+                    key={`${s.key}:${n}`}
+                    points={points}
+                    fill="none"
+                    stroke={CHART_COLOR[s.color]}
+                    strokeWidth={single ? 1.6 : on ? 2.4 : 1.1}
+                    strokeLinejoin="round"
+                    opacity={picked && !on ? DIMMED : 1}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                );
+              })
             )}
           </svg>
         </ChartHover>
       )}
-      <div className="flex justify-between gap-2 text-[0.6875rem] text-text-dim tabular-nums">
-        <span>{model.low}</span>
-        <span>
-          {model.rangeLabel ? `${model.rangeLabel} · ` : ''}
-          {model.high}
-        </span>
-      </div>
-      <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-[0.6875rem] text-text-dim">
-        {model.series.map((s, i) => (
-          <li key={s.key} className="flex items-center gap-1 tabular-nums">
-            <svg aria-hidden="true" viewBox="0 0 12 4" className="h-1 w-3 shrink-0">
-              <line
-                x1="0"
-                x2="12"
-                y1="2"
-                y2="2"
-                stroke={CHART_COLOR[s.color]}
-                strokeWidth="2"
-                strokeDasharray={DASH[i % DASH.length] || undefined}
-              />
-            </svg>
-            <span className="text-text">{s.label}</span>
-            <span>{s.end}</span>
-          </li>
-        ))}
-      </ul>
+      {(model.low !== undefined || model.high !== undefined) && (
+        <div className="flex justify-between gap-2 text-[0.6875rem] text-text-dim tabular-nums">
+          <span>{model.low}</span>
+          <span>
+            {model.rangeLabel ? `${model.rangeLabel} · ` : ''}
+            {model.high}
+          </span>
+        </div>
+      )}
+      {!single && (
+        <ul className="flex flex-wrap gap-x-3 gap-y-0.5 text-[0.6875rem] text-text-dim">
+          {model.series.map((s) => {
+            const on = picked && s.key === active;
+            return (
+              <li
+                key={s.key}
+                data-active={on || undefined}
+                className="flex items-center gap-1 rounded-xs tabular-nums"
+                onPointerEnter={() => setActive(s.key)}
+                onPointerLeave={() => setActive(null)}
+              >
+                <svg aria-hidden="true" viewBox="0 0 12 4" className="h-1 w-3 shrink-0">
+                  <line
+                    x1="0"
+                    x2="12"
+                    y1="2"
+                    y2="2"
+                    stroke={CHART_COLOR[s.color]}
+                    strokeWidth={on ? 3 : 2}
+                  />
+                </svg>
+                <span className={on ? 'font-semibold text-text underline' : 'text-text'}>
+                  {s.label}
+                </span>
+                <span>{s.end}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

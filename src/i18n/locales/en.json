@@ -4502,8 +4502,7 @@
           "noteFailed_one": "{{lines}} could not be loaded.",
           "noteFailed_other": "{{lines}} could not be loaded.",
           "summaryLine": "{{item}} {{change}}.",
-          "note": "Change in the daily average since the start of the range, {{where}}.",
-          "range": "{{days}} days",
+          "summarySmoothed": "Lines are {{days}}-day averages.",
           "tip": "{{change}} · {{price}} ISK · {{volume}} sold"
         }
       },
@@ -5716,11 +5715,11 @@
         },
         "minerals": {
           "title": "Mineral prices",
-          "desc": "Market trend of Tritanium through Zydrine, ready to go"
+          "desc": "Tritanium, Pyerite and Mexallon at Jita; the Items menu adds more"
         },
         "ore": {
           "title": "Ore prices",
-          "desc": "Market trend of six common raw ores, ready to go"
+          "desc": "Veldspar, Scordite and Pyroxeres at Jita; the Items menu adds more"
         }
       },
       "noMatchHint": "Try another word, or clear the search to see every widget.",
@@ -5949,7 +5948,13 @@
       "trendLines_other": "These picks draw {{count}} lines.",
       "trendOverflow": "These picks make {{total}} lines but the chart draws {{drawn}} (at most {{max}}). Pick fewer items or trade hubs.",
       "trendHidden": "Not drawn: {{names}}.",
-      "trendPicked": "{{count}} of {{max}} chosen.",
+      "trendSearch": "Search items",
+      "trendSearchPlaceholder": "Search all items…",
+      "trendNoMatch": "No item matches that name.",
+      "trendFull": "{{max}} items are picked, the most you can chart. Remove one to add another.",
+      "trendSelectedLabel": "Selected items",
+      "trendSelected": "Selected ({{count}} of {{max}})",
+      "trendRemove": "Remove {{name}}",
       "trendHint": "Each item is drawn at each trade hub you tick, up to six lines. PLEX trades in one region, so it is drawn once.",
       "trendFollowQuickbar": "Follow my Quickbar",
       "trendCancel": "Cancel",

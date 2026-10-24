@@ -17,6 +17,13 @@ describe('Market Trend presets', () => {
     expect(trendPreset('injector')?.items).toEqual([40520]);
   });
 
+  it('prices minerals and ore, three items each, at Jita; PLEX and the injector carry no hubs', () => {
+    expect(trendPreset('minerals')).toMatchObject({ items: [34, 35, 36], trendHubs: ['jita'] });
+    expect(trendPreset('ore')).toMatchObject({ items: [1230, 1228, 1224], trendHubs: ['jita'] });
+    expect(trendPreset('plex')?.trendHubs).toBeUndefined();
+    expect(trendPreset('injector')?.trendHubs).toBeUndefined();
+  });
+
   it('adds a widget with its own items, title and view; instances stay independent', () => {
     const plex = trendPreset('plex')!;
     const a = addWidget(empty, 'marketTrend', () => 'a', {
