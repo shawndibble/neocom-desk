@@ -502,7 +502,12 @@ function MovePlanTabBody({
             onProgress={(doneLegIds) => setSavedHaul({ ...savedHaul, doneLegIds })}
             onReplan={async () => {
               const result = await replanActiveHaul(savedHaul);
-              if (result.status === 'replanned') await setSavedHaul(result.haul);
+              // A tick made while the route was being worked out wins: the new plan is stale.
+              const now = useActiveHaul.getState().value;
+              const unchanged =
+                now?.id === savedHaul.id &&
+                (now.doneLegIds ?? []).join() === (savedHaul.doneLegIds ?? []).join();
+              if (result.status === 'replanned' && unchanged) await setSavedHaul(result.haul);
               return result;
             }}
             onClear={async () => {

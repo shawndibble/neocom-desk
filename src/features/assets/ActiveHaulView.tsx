@@ -7,8 +7,8 @@ import {
   inlineLinkClassName,
   focusRingInsetClassName,
   rowInteractiveClassName,
+  touchCheckboxLabelClassName,
 } from '@/components/ui/controlStyles';
-import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import type { HaulLeg, HaulSection } from '@/engine/route/haulPlan';
 import {
   currentLeg,
@@ -55,6 +55,7 @@ export function ActiveHaulView({
   const [clearing, setClearing] = useState(false);
   const [marked, setMarked] = useState<{ n: number; before: number[] } | null>(null);
   const [replanNote, setReplanNote] = useState<string | null>(null);
+  const [replanning, setReplanning] = useState(false);
   const toggle = (id: number) =>
     setFlipped((prev) => {
       const next = new Set(prev);
@@ -85,7 +86,8 @@ export function ActiveHaulView({
     ? (plan.sections.find((s) => s.characterId === here.characterId)?.legs.indexOf(here) ?? -1) + 1
     : 0;
   const replan = async () => {
-    const result = await onReplan();
+    setReplanning(true);
+    const result = await onReplan().finally(() => setReplanning(false));
     setMarked(null);
     setFlipped(new Set());
     setReplanNote(
@@ -180,14 +182,20 @@ export function ActiveHaulView({
           onClose={() => setMarked(null)}
         />
       )}
-      <div className="sticky -bottom-3 mt-auto -mx-3 -mb-3 flex justify-end gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
+      <div className="sticky -bottom-3 mt-auto -mx-3 -mb-3 flex flex-wrap justify-end gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
         {done.length > 0 && !finished && (
-          <Button variant="ghost" onClick={() => void replan()}>
+          <Button variant="ghost" disabled={replanning} onClick={() => void replan()}>
             {t('assets.movePlan.haul.replan')}
           </Button>
         )}
         {done.length > 0 && (
-          <Button variant="ghost" onClick={() => void onProgress([])}>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setMarked(null);
+              void onProgress([]);
+            }}
+          >
             {t('assets.movePlan.haul.resetProgress')}
           </Button>
         )}
