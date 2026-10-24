@@ -1,11 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Button, Caret, Checkbox, Toast } from '@/components/ui';
+import { Button, Caret, Checkbox, Toast, buttonClassName } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
-  inlineLinkClassName,
   focusRingInsetClassName,
   rowInteractiveClassName,
   touchCheckboxLabelClassName,
@@ -301,7 +300,7 @@ function Section({
             variant={many ? 'ghost' : 'primary'}
           />
           {routeHref && (
-            <Link className={`${inlineLinkClassName} text-sm whitespace-nowrap`} to={routeHref}>
+            <Link className={buttonClassName({ size: 'sm' })} to={routeHref}>
               {t('assets.movePlan.haul.routeSafetyAll')}
             </Link>
           )}
@@ -471,7 +470,7 @@ function LegBlock({
           />
           {href && (
             <Link
-              className={`${inlineLinkClassName} text-sm whitespace-nowrap`}
+              className={buttonClassName({ size: 'sm' })}
               aria-label={t('assets.movePlan.haul.showInRouteSafetyAria', { n })}
               to={href}
             >
