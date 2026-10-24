@@ -21,7 +21,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { Trans, useTranslation } from 'react-i18next';
-import { Button, Checkbox, Disclosure, NeedsConnection, Panel } from '@/components/ui';
+import { Button, Checkbox, Disclosure, InfoTooltip, NeedsConnection, Panel } from '@/components/ui';
 import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
@@ -48,6 +48,13 @@ const CORP_STATUS = {
   'roles-without-grant': 'missing',
   ready: 'granted',
 } as const satisfies Record<CorpAccessState, RowStatus>;
+
+/** Permissions whose row says, in a tooltip, which pages they unlock. */
+const UNLOCKS_TOOLTIP: Partial<Record<ScopeGroup, string>> = {
+  corp: 'settings.permissions.unlocks.corp',
+  corpProjects: 'settings.permissions.unlocks.corpProjects',
+  killmails: 'settings.permissions.unlocks.killmails',
+};
 
 /** `?grant=a,b` from a "Grant missing Permissions" link: the Permissions whose button should flash. */
 function useFlaggedGroups(): ReadonlySet<ScopeGroup> {
@@ -144,7 +151,15 @@ export function PermissionsPanel() {
           missing.length > 0 && <span aria-hidden className="size-4 shrink-0 touch:size-11" />
         )}
         <div className="min-w-0 flex-1">
-          <div className="text-text">{label}</div>
+          <div className="flex items-center gap-1.5 text-text">
+            {label}
+            {UNLOCKS_TOOLTIP[group] && (
+              <InfoTooltip
+                label={t('common.aboutLabel', { label })}
+                content={t(UNLOCKS_TOOLTIP[group])}
+              />
+            )}
+          </div>
           <div className="text-text-dim">{t(PERMISSIONS[group].captionKey)}</div>
           {note && <div className="text-text-dim">{note}</div>}
         </div>

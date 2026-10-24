@@ -344,17 +344,21 @@ function WidgetFrame({
     body = (
       <div className="grid gap-2 p-3 text-[0.8125rem]">
         <b>{view.emptyMessage ?? t(kind.emptyMessageKey)}</b>
-        <span className="text-text-dim">{view.emptyHint ?? t('overview.widgets.emptyHint')}</span>
+        {!view.emptyHealthy && (
+          <span className="text-text-dim">{view.emptyHint ?? t('overview.widgets.emptyHint')}</span>
+        )}
         {view.to !== null && view.emptyLinkLabel !== undefined && (
           <Link to={view.to} className={entityLinkClassName('w-fit')}>
             {view.emptyLinkLabel}
           </Link>
         )}
-        <span>
-          <Button size="sm" onClick={() => onRemove(widget.id)}>
-            {t('overview.widgets.remove')}
-          </Button>
-        </span>
+        {!view.emptyHealthy && (
+          <span>
+            <Button size="sm" onClick={() => onRemove(widget.id)}>
+              {t('overview.widgets.remove')}
+            </Button>
+          </span>
+        )}
       </div>
     );
   } else {
