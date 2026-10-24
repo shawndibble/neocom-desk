@@ -53,6 +53,7 @@ import type { CompetingOrder } from '@/engine/market/undercut';
 import { ItemContextMenu } from './ItemContextMenu';
 import { OpenOrdersList } from './OpenOrdersList';
 import { loadOpenOrdersSnapshot } from './openOrdersPageSnapshot';
+import { invalidateStationBestPrices } from './orderCompetition';
 import { loadCorpOpenOrdersSnapshot } from './corpOpenOrders';
 import { recordOrderProblemSamples, sampleableCharacterIds } from './orderProblemSamples';
 import { sampledProblem } from '@/engine/market/orderProblemHistory';
@@ -135,6 +136,12 @@ export function OpenOrdersPanel({
     { cacheKey: corporation ? 'market:corp-orders' : 'market:open-orders' }
   );
   const deviceCharacterCount = useCharacterCount();
+  // A manual refresh re-prices too: station prices otherwise answer from the
+  // 15-minute price cache.
+  const refreshOrders = useCallback(() => {
+    if (data) invalidateStationBestPrices(data.stationPrices);
+    refresh();
+  }, [data, refresh]);
 
   const {
     filter: urlFilter,
@@ -492,7 +499,7 @@ export function OpenOrdersPanel({
           <IconButton
             icon={<Icon.Refresh />}
             label={t('market.orders.refreshOrders')}
-            onClick={refresh}
+            onClick={refreshOrders}
           />
         </>
       }
