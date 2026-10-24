@@ -19,7 +19,7 @@ import { cx } from '@/lib/cx';
 import type { PickedStation } from '@/features/places/placeSearch';
 import { buildPickerOptions, pickedStationOf, type PickerOption } from './pickerOptions';
 import { useKnownPlaces } from '@/features/places/useKnownPlaces';
-import { useSolarSystemIndex, useSolarSystemList } from './useSolarSystems';
+import { useSolarSystemList } from './useSolarSystems';
 
 const MATCH_LIMIT = 8;
 const NAV_KEYS: readonly string[] = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
@@ -51,22 +51,14 @@ export function SolarSystemSearchField({
     systemsFailed ? 'failed' : systems === null ? 'busy' : 'ok',
     'systems'
   );
-  const systemIndex = useSolarSystemIndex();
   const trimmed = query.trim();
   const placeHits = useKnownPlaces(query, places, MATCH_LIMIT);
   const matches = useMemo(
     () =>
       systems && trimmed !== ''
-        ? buildPickerOptions(
-            systems,
-            query,
-            exclude,
-            placeHits,
-            (id) => systemIndex?.get(id)?.security ?? null,
-            MATCH_LIMIT
-          )
+        ? buildPickerOptions(systems, query, exclude, placeHits, MATCH_LIMIT)
         : [],
-    [systems, query, trimmed, exclude, placeHits, systemIndex]
+    [systems, query, trimmed, exclude, placeHits]
   );
 
   function choose(option: PickerOption) {

@@ -21,7 +21,6 @@ export function buildPickerOptions(
   query: string,
   exclude: ReadonlySet<number> | undefined,
   placeHits: readonly FoundPlace[],
-  securityOf: (systemId: number) => number | null,
   limit: number
 ): PickerOption[] {
   const systemOptions = rankedSearch(
@@ -36,6 +35,11 @@ export function buildPickerOptions(
     security: system.security,
     stationId: null,
   }));
+  // Built only when stations matched: most keystrokes have none.
+  const securityOf =
+    placeHits.length > 0
+      ? new Map(systems.map((system) => [system.id, system.security]))
+      : new Map<number, number>();
   const placeOptions = placeHits
     .filter((place) => !exclude?.has(place.systemId))
     .map((place): PickerOption => ({
@@ -43,7 +47,7 @@ export function buildPickerOptions(
       kind: place.kind,
       name: place.name,
       systemId: place.systemId,
-      security: securityOf(place.systemId),
+      security: securityOf.get(place.systemId) ?? null,
       stationId: place.id,
     }));
   return [...systemOptions, ...placeOptions];
