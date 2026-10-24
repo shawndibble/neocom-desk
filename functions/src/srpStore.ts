@@ -52,6 +52,7 @@ import {
   type SrpSettings,
   type SrpSettingsPatch,
 } from './srpTypes.js';
+import { takeFetchSlot } from './srpThrottle.js';
 import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
 
 /**
@@ -446,13 +447,15 @@ function refileDecision(existing: Record<string, unknown> | undefined): 'new' | 
 
 /**
  * The killmail the pilot names, fetched by the server, once it is the caller's own loss while in
- * this corporation. Shared by filing and the pre-filing doctrine preview.
+ * this corporation. Shared by filing and the pre-filing doctrine preview, which share one
+ * per-pilot fetch budget.
  */
 export async function fetchOwnLoss(
   deps: SrpFileDeps,
   member: SrpMember,
   ref: KillmailRef
 ): Promise<{ zkill: ZkillRecord; hash: string; km: EsiKillmail }> {
+  await takeFetchSlot(deps, member.corporationId, member.characterId);
   const zkill = await softZkill(deps.killmails, ref.killmailId);
   const hash = ref.hash ?? zkill.hash;
   if (!hash) {
