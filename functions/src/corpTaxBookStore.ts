@@ -81,6 +81,7 @@ import {
   type ObservedRow,
 } from './corpTaxBookEngine.js';
 import { ROLES_SCOPE, type IdentityReader } from './corpTaxBookEsi.js';
+import { SRP_COLLECTIONS } from './srpTypes.js';
 import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
 
 /** One type's parsed R2 `open-prices/<typeId>.json` object, or null when R2 has none. Throws on a failed read. */
@@ -363,8 +364,22 @@ export async function ownBookFloor(
 }
 
 /**
+ * The book's half of `corps/{id}`: the document and every subcollection except SRP's,
+ * which shares the document (#4939). Found at run time, so a book collection added
+ * later still goes. SRP never reads the parent document, and Firestore keeps a deleted
+ * document's other subcollections.
+ */
+async function deleteBookContents(ref: DocumentReference): Promise<void> {
+  for (const sub of await ref.listCollections()) {
+    if (!SRP_COLLECTIONS.includes(sub.id)) await ref.firestore.recursiveDelete(sub);
+  }
+  await ref.delete();
+}
+
+/**
  * The player who turned the book on (or the CEO) deletes it outright: the book,
- * everything under it and its Statement verify links. `beforeDelete` lets the
+ * everything under it and its Statement verify links. The corporation's SRP data
+ * under the same `corps/{id}` document stays. `beforeDelete` lets the
  * caller drop what lives outside the book first (the scheduled-sync grant), so a
  * failure there leaves the book standing. Turning the book on again starts clean.
  */
@@ -400,9 +415,9 @@ export async function deleteBook(
       .get();
     await Promise.all(stray.docs.map((d) => d.ref.delete()));
   }
-  await deps.db.recursiveDelete(ref);
+  await deleteBookContents(ref);
   // A scheduled sync that loaded its grant before it was dropped may still have been writing.
-  await deps.db.recursiveDelete(ref);
+  await deleteBookContents(ref);
   return { deleted: true };
 }
 
