@@ -11,9 +11,18 @@ import type { TaxRate } from '@/engine/corpTaxBook/rates';
 import type { Adjustment, Statement } from '@/engine/corpTaxBook/statements';
 import type { SettlePayment } from '@/engine/corpTaxBook/sync';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
-import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type { ExportValue } from '@/lib/exportCells';
-import type { XlsxSheet } from '@/lib/xlsx';
+import type { CsvTranslate } from '@/lib/csv';
+import {
+  byKey,
+  isoTime,
+  joined,
+  jsonOrNull,
+  settingsSheet,
+  sheetFrom,
+  type SettingRow,
+  type SheetColumns,
+} from '@/lib/exportSheets';
+import type { AnyXlsxSheet } from '@/lib/xlsx';
 import type { AuditEntry, BookSettings } from '../taxBook/bookClient';
 import type { BookNames } from './useCorpBook';
 
@@ -39,41 +48,10 @@ export type BookExportNames = Pick<
 
 type MinerName = (minerId: string | undefined) => string | null;
 
-/** Epoch ms as a UTC timestamp, which the writer turns into a date cell. */
-export const isoTime = (ms: number | null | undefined): string | null =>
-  typeof ms === 'number' && Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+const PREFIX = 'corpTaxBook.export';
 
-/** A list in one cell. */
-export const joined = (values: readonly (string | number)[]): string => values.join('; ');
-
-const byKey =
-  <T>(...keys: ((row: T) => string | number)[]) =>
-  (a: T, b: T): number => {
-    for (const key of keys) {
-      const x = key(a);
-      const y = key(b);
-      if (x < y) return -1;
-      if (x > y) return 1;
-    }
-    return 0;
-  };
-
-/** A sheet of rows, sorted, with columns given as `[i18n key, value]`. */
-function sheet<T>(
-  t: CsvTranslate,
-  name: string,
-  rows: readonly T[],
-  columns: [key: string, value: (row: T) => ExportValue][]
-): XlsxSheet<T> {
-  return {
-    name: t(`corpTaxBook.export.sheets.${name}`),
-    rows,
-    columns: columns.map(([key, value]): CsvColumn<T> => ({
-      header: t(`corpTaxBook.export.cols.${key}`),
-      value,
-    })),
-  };
-}
+const sheet = <T>(t: CsvTranslate, name: string, rows: readonly T[], columns: SheetColumns<T>) =>
+  sheetFrom(t, PREFIX, name, rows, columns);
 
 function rateTarget(rate: TaxRate, names: BookExportNames, minerName: MinerName): string | null {
   switch (rate.scope) {
@@ -99,7 +77,7 @@ function settingsRows(
   names: BookExportNames,
   minerName: MinerName,
   t: CsvTranslate
-): [string, ExportValue][] {
+): SettingRow[] {
   const yes = t('corpTaxBook.export.yes');
   const no = t('corpTaxBook.export.no');
   const label = (key: string, options?: Record<string, unknown>) =>
@@ -132,7 +110,7 @@ function settingsRows(
           })
         : label('automaticSyncOff'),
     ],
-    ...s.rates.map((rate): [string, ExportValue] => [
+    ...s.rates.map((rate): SettingRow => [
       label(`rate.${rate.scope}`, {
         target: rateTarget(rate, names, minerName),
         from: 'effectiveFrom' in rate ? rate.effectiveFrom : '',
@@ -146,8 +124,7 @@ export function bookExportSheets(
   input: BookExportInput,
   names: BookExportNames,
   t: CsvTranslate
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each sheet has its own row type
-): XlsxSheet<any>[] {
+): AnyXlsxSheet[] {
   const yes = t('corpTaxBook.export.yes');
   const no = t('corpTaxBook.export.no');
   const minerById = new Map(input.miners.map((m) => [m.id, m]));
@@ -318,14 +295,10 @@ export function bookExportSheets(
         ['finalStatementId', (m) => m.finalStatementId],
       ]
     ),
-    sheet(
+    settingsSheet(
       t,
-      'settings',
-      settingsRows(input.settings, input.scheduledSync ?? null, names, minerName, t),
-      [
-        ['setting', ([label]) => label],
-        ['value', ([, value]) => value],
-      ]
+      PREFIX,
+      settingsRows(input.settings, input.scheduledSync ?? null, names, minerName, t)
     ),
     sheet(
       t,
@@ -342,7 +315,7 @@ export function bookExportSheets(
         ['byId', (e) => e.by],
         ['via', (e) => e.via],
         ['action', (e) => e.action],
-        ['detail', (e) => (Object.keys(e.detail ?? {}).length ? JSON.stringify(e.detail) : null)],
+        ['detail', (e) => jsonOrNull(e.detail)],
       ]
     ),
   ];

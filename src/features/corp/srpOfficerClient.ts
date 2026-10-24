@@ -72,22 +72,25 @@ export async function readSrpHistory(
   return snap.docs.map((d) => d.data() as SrpClaim);
 }
 
-/** The newest entries of the corporation's audit log, newest first. */
+/** The newest entries of the corporation's audit log, newest first; `count` null reads it whole. */
 export async function readSrpActivity(
   characterId: number,
   corporationId: number,
-  count = 100
+  count: number | null = 100
 ): Promise<SrpAuditEntry[]> {
   const stand = srpOfficerBackendOverride();
   if (stand) return stand.activity();
   await ensureSignedIn(characterId);
+  const log = corpDoc(corporationId, 'srpAudit');
   const snap = await getDocs(
-    query(corpDoc(corporationId, 'srpAudit'), orderBy('at', 'desc'), limitTo(count))
+    count === null
+      ? query(log, orderBy('at', 'desc'))
+      : query(log, orderBy('at', 'desc'), limitTo(count))
   );
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<SrpAuditEntry, 'id'>) }));
 }
 
-/** Every claim, whatever its state: the SRP export (#4946). Retention bounds the closed ones. */
+/** Every claim, any state. Retention bounds the closed ones. */
 export async function readAllSrpClaims(
   characterId: number,
   corporationId: number
@@ -97,18 +100,6 @@ export async function readAllSrpClaims(
   await ensureSignedIn(characterId);
   const snap = await getDocs(corpDoc(corporationId, 'srpClaims'));
   return snap.docs.map((d) => d.data() as SrpClaim);
-}
-
-/** The whole SRP log, oldest first: the SRP export (#4946). */
-export async function readAllSrpActivity(
-  characterId: number,
-  corporationId: number
-): Promise<SrpAuditEntry[]> {
-  const stand = srpOfficerBackendOverride();
-  if (stand) return stand.activity();
-  await ensureSignedIn(characterId);
-  const snap = await getDocs(query(corpDoc(corporationId, 'srpAudit'), orderBy('at')));
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<SrpAuditEntry, 'id'>) }));
 }
 
 /** Every audit entry about one claim, oldest first. */

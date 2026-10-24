@@ -13,7 +13,7 @@ _Recorded 2026-10-24 · issue #4946._
 - **The export reads only what the officer can already read** under the existing Firestore
   rules, straight from the client. No callable, no new reach. Verify links
   (`statementLinks`) stay out.
-- **The Delete the book dialog offers the download but never requires it** (variant A of
-  the mockups). Delete holds only while a copy started there is still being read.
+- **The Delete the book dialog offers the download but never requires it.** Delete holds
+  only while a copy started there is still being read.
 - **SRP's button is on Settings (Directors) and the Queue header**, so an Accountant who
   works the Queue can export too.

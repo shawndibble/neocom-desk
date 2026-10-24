@@ -22,7 +22,7 @@ vi.mock('../owner', () => ({ useActiveCorporationId: () => CORP }));
 vi.mock('../srpClient', () => ({ readSrpSettings: reads.settings }));
 vi.mock('../srpOfficerClient', () => ({
   readAllSrpClaims: reads.claims,
-  readAllSrpActivity: reads.activity,
+  readSrpActivity: reads.activity,
 }));
 vi.mock('../srpDoctrineClient', () => ({ readSrpDoctrines: reads.doctrines }));
 vi.mock('@/sde/loadSde', () => ({ loadTypes: () => Promise.resolve({}) }));
@@ -45,7 +45,9 @@ describe('SrpExportButton', () => {
     render(<SrpExportButton />);
     await userEvent.click(button());
     const done = await screen.findByRole('status');
-    for (const read of Object.values(reads)) expect(read).toHaveBeenCalledWith(ME, CORP);
+    for (const read of [reads.settings, reads.claims, reads.doctrines])
+      expect(read).toHaveBeenCalledWith(ME, CORP);
+    expect(reads.activity).toHaveBeenCalledWith(ME, CORP, null);
     expect(save.mock.calls[0][0]).toMatch(/^neocom-corp-srp-test-\d{4}-\d{2}-\d{2}\.xlsx$/);
     expect(done).toHaveTextContent(/· 4 sheets, 1 row$/);
   });

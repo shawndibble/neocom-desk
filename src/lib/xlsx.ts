@@ -4,10 +4,10 @@ import { toCell, type ExportCell, type ExportValue } from './exportCells';
 
 /**
  * A minimal .xlsx (Office Open XML) writer: one sheet for a table export, or
- * several in one workbook (a corp data export, #4946). An xlsx opens
+ * a sheet per record type for a whole-dataset export. An xlsx opens
  * identically in Excel, LibreOffice/OpenOffice and Google Sheets with no
  * import dialog to get wrong — the failure mode CSV can't rule out. Only
- * what a table export needs: inline strings, numbers, dates, a bold frozen
+ * what an export needs: inline strings, numbers, dates, a bold frozen
  * header row. Text is always an inline string, never a formula, so no
  * formula-injection guard is needed here.
  *
@@ -105,7 +105,6 @@ function displayWidth(cell: ExportCell): number {
   }
 }
 
-/** One sheet of a workbook: a name, its rows and the columns that read them. */
 export interface XlsxSheet<T> {
   name: string;
   rows: readonly T[];
@@ -114,10 +113,11 @@ export interface XlsxSheet<T> {
 
 function worksheetXml<T>({ rows, columns }: XlsxSheet<T>): string {
   const widths = columns.map((c) => c.header.length);
+  const letters = columns.map((_, i) => columnName(i));
   const rowXml: string[] = [];
 
   const headerCells = columns.map((c, i) =>
-    cellXml(`${columnName(i)}1`, toCell(c.header), STYLE_HEADER)
+    cellXml(`${letters[i]}1`, toCell(c.header), STYLE_HEADER)
   );
   rowXml.push(`<row r="1">${headerCells.join('')}</row>`);
 
@@ -126,7 +126,7 @@ function worksheetXml<T>({ rows, columns }: XlsxSheet<T>): string {
     const cells = columns.map((c, i) => {
       const cell = toCell(c.value(row) as ExportValue);
       widths[i] = Math.max(widths[i], displayWidth(cell));
-      return cellXml(`${columnName(i)}${rowNumber}`, cell);
+      return cellXml(`${letters[i]}${rowNumber}`, cell);
     });
     rowXml.push(`<row r="${rowNumber}">${cells.join('')}</row>`);
   });
@@ -150,8 +150,10 @@ const SHEET_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.
  * A workbook with a sheet per entry, in order. Sheet `i` is `sheet{i+1}.xml` on
  * relationship `rId{i+1}`; styles take the id after the last sheet.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- each sheet has its own row type
-export function toXlsxWorkbook(sheets: readonly XlsxSheet<any>[]): Uint8Array {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- the row type is invariant per sheet
+export type AnyXlsxSheet = XlsxSheet<any>;
+
+export function toXlsxWorkbook(sheets: readonly AnyXlsxSheet[]): Uint8Array {
   const names = uniqueSheetNames(sheets.map((s) => s.name));
   const n = sheets.length;
   const overrides = sheets

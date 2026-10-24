@@ -1,9 +1,4 @@
-/**
- * One dataset, one format, so one download button rather than a menu (decision
- * `20260929-142526`): the corp data exports (#4946). It reads from the server, so it sits under
- * `NeedsConnection`; it shows `loading` while the workbook is built, then a line naming the file
- * and its row count, or why it failed.
- */
+/** One dataset, one format: a download button, not a menu (decision `20261024-094549`). */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
@@ -25,7 +20,7 @@ export function WorkbookDownloadButton({
   /** Reads the data, writes the workbook and starts the download. */
   build: () => Promise<WorkbookDownload>;
   className?: string;
-  /** Told when the build starts and ends: the Delete dialog holds Delete while the copy is read. */
+  /** Fires around the build, so a caller can hold an action that would cut the copy short. */
   onBusyChange?: (busy: boolean) => void;
 }) {
   const { t } = useTranslation();

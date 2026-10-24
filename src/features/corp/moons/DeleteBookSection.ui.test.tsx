@@ -16,7 +16,7 @@ vi.mock('@/esi/endpoints/corp', () => ({
 vi.mock('../taxBook/bookClient', () => ({
   deleteBook: (...a: unknown[]) => deleteBook(...a),
   readBookData: (...a: unknown[]) => readBookData(...a),
-  readFullAudit: () => Promise.resolve([]),
+  readAudit: () => Promise.resolve([]),
   editBook: vi.fn(),
 }));
 

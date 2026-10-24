@@ -3,10 +3,17 @@
  * log and the Doctrine Fits, a sheet each. Pure: the caller reads them and hands the sheets to
  * `downloadWorkbook`.
  */
-import type { CsvColumn, CsvTranslate } from '@/lib/csv';
-import type { ExportValue } from '@/lib/exportCells';
-import type { XlsxSheet } from '@/lib/xlsx';
-import { isoTime, joined } from '../moons/bookExport';
+import type { CsvTranslate } from '@/lib/csv';
+import {
+  isoTime,
+  joined,
+  jsonOrNull,
+  settingsSheet,
+  sheetFrom,
+  type SettingRow,
+  type SheetColumns,
+} from '@/lib/exportSheets';
+import type { AnyXlsxSheet } from '@/lib/xlsx';
 import type { SrpAuditEntry, SrpClaim } from '../srpClaimTypes';
 import type { DoctrineFit, HullRule, SrpClaimBasis, SrpSettings } from '../srpTypes';
 
@@ -26,21 +33,10 @@ export interface SrpExportNames {
   describe: (entry: SrpAuditEntry) => string;
 }
 
-function sheet<T>(
-  t: CsvTranslate,
-  name: string,
-  rows: readonly T[],
-  columns: [key: string, value: (row: T) => ExportValue][]
-): XlsxSheet<T> {
-  return {
-    name: t(`srp.export.sheets.${name}`),
-    rows,
-    columns: columns.map(([key, value]): CsvColumn<T> => ({
-      header: t(`srp.export.cols.${key}`),
-      value,
-    })),
-  };
-}
+const PREFIX = 'srp.export';
+
+const sheet = <T>(t: CsvTranslate, name: string, rows: readonly T[], columns: SheetColumns<T>) =>
+  sheetFrom(t, PREFIX, name, rows, columns);
 
 /** `2x Name; 1x Name`, in the order each type first appears. */
 function counted(typeIds: readonly number[], names: SrpExportNames): string {
@@ -59,19 +55,19 @@ function settingsRows(
   doctrines: readonly DoctrineFit[],
   names: SrpExportNames,
   t: CsvTranslate
-): [string, ExportValue][] {
+): SettingRow[] {
   if (!s) return [[t('srp.export.setting.enabled'), t('srp.export.never')]];
   const yes = t('srp.export.yes');
   const no = t('srp.export.no');
   const label = (key: string, options?: Record<string, unknown>) =>
     t(`srp.export.setting.${key}`, options);
   const fitName = new Map(doctrines.map((d) => [d.id, d.name]));
-  const ruleRows = (rule: HullRule): [string, ExportValue][] => {
+  const ruleRows = (rule: HullRule): SettingRow[] => {
     const target = t(`srp.export.ruleTarget.${rule.scope}`, {
       name: rule.scope === 'hull' ? names.type(rule.id) : String(rule.id),
       id: rule.id,
     });
-    const rows: [string, ExportValue][] = [
+    const rows: SettingRow[] = [
       [
         label('hullRule', { target }),
         t(`srp.export.rule.${rule.kind}`, rule.kind === 'pay-fixed' ? { isk: rule.iskAmount } : {}),
@@ -106,13 +102,9 @@ export function srpExportSheets(
   input: SrpExportInput,
   names: SrpExportNames,
   t: CsvTranslate
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each sheet has its own row type
-): XlsxSheet<any>[] {
+): AnyXlsxSheet[] {
   return [
-    sheet(t, 'settings', settingsRows(input.settings, input.doctrines, names, t), [
-      ['setting', ([label]) => label],
-      ['value', ([, value]) => value],
-    ]),
+    settingsSheet(t, PREFIX, settingsRows(input.settings, input.doctrines, names, t)),
     sheet(
       t,
       'claims',
@@ -161,7 +153,7 @@ export function srpExportSheets(
         ['action', (e) => e.action],
         ['summary', (e) => names.describe(e)],
         ['killmailId', (e) => numberOf(e.detail?.killmailId)],
-        ['detail', (e) => (Object.keys(e.detail ?? {}).length ? JSON.stringify(e.detail) : null)],
+        ['detail', (e) => jsonOrNull(e.detail)],
       ]
     ),
     sheet(

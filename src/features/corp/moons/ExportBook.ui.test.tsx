@@ -8,13 +8,13 @@ import { ExportBookSection, ExportFirst } from './ExportBook';
 import type { BookContextValue } from './bookContextValue';
 
 const readBookData = vi.fn();
-const readFullAudit = vi.fn();
+const readAudit = vi.fn();
 vi.mock('@/esi/endpoints/corp', () => ({
   getCorporationPublicInfo: () => Promise.resolve({ data: { ticker: 'TEST' } }),
 }));
 vi.mock('../taxBook/bookClient', () => ({
   readBookData: (...a: unknown[]) => readBookData(...a),
-  readFullAudit: (...a: unknown[]) => readFullAudit(...a),
+  readAudit: (...a: unknown[]) => readAudit(...a),
   editBook: vi.fn(),
 }));
 
@@ -93,7 +93,7 @@ const button = () => screen.getByRole('button', { name: 'Download the book (.xls
 
 beforeEach(() => {
   readBookData.mockReset().mockResolvedValue(book);
-  readFullAudit
+  readAudit
     .mockReset()
     .mockResolvedValue([{ id: 'a', at: 0, by: ME, byName: 'Me', action: 'turnOn', detail: {} }]);
   vi.restoreAllMocks();
@@ -107,17 +107,17 @@ describe('ExportBookSection', () => {
     await userEvent.click(button());
     const done = await screen.findByRole('status');
     expect(readBookData).toHaveBeenCalledWith(ME, CORP);
-    expect(readFullAudit).toHaveBeenCalledWith(ME, CORP);
+    expect(readAudit).toHaveBeenCalledWith(ME, CORP, null);
     expect(save.mock.calls[0][0]).toMatch(/^neocom-corp-tax-book-test-\d{4}-\d{2}-\d{2}\.xlsx$/);
-    // Two mining lines, the settings rows and one log entry, across nine sheets.
+    // 2 mining lines + 16 settings rows + 1 log entry.
     expect(done).toHaveTextContent(
-      /^Downloaded neocom-corp-tax-book-test-.*\.xlsx · 9 sheets, \d+ rows$/
+      /^Downloaded neocom-corp-tax-book-test-.*\.xlsx · 9 sheets, 19 rows$/
     );
   });
 
   it('says so when the book cannot be read, and downloads nothing', async () => {
     const save = vi.spyOn(download, 'downloadBlob').mockImplementation(() => {});
-    readFullAudit.mockRejectedValue(new Error('permission-denied'));
+    readAudit.mockRejectedValue(new Error('permission-denied'));
     renderIn(<ExportBookSection />);
     await userEvent.click(button());
     expect(await screen.findByRole('alert')).toHaveTextContent(

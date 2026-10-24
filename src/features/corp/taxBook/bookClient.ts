@@ -497,31 +497,18 @@ export interface AuditEntry {
   detail: Record<string, unknown>;
 }
 
-/** The newest entries of the immutable audit log; its ids sort by time. */
+/** The newest entries of the immutable audit log, newest first; `count` null reads it whole. */
 export async function readAudit(
   characterId: number,
   corporationId: number,
-  count = 100
+  count: number | null = 100
 ): Promise<AuditEntry[]> {
   await ensureSignedIn(characterId);
+  const log = collection(getSyncFirestore(), 'corps', String(corporationId), 'audit');
   const snap = await getDocs(
-    query(
-      collection(getSyncFirestore(), 'corps', String(corporationId), 'audit'),
-      orderBy('at', 'desc'),
-      limitTo(count)
-    )
-  );
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AuditEntry, 'id'>) }));
-}
-
-/** The whole audit log, oldest first: the Activity log sheet of the book export (#4946). Officer-only. */
-export async function readFullAudit(
-  characterId: number,
-  corporationId: number
-): Promise<AuditEntry[]> {
-  await ensureSignedIn(characterId);
-  const snap = await getDocs(
-    query(collection(getSyncFirestore(), 'corps', String(corporationId), 'audit'), orderBy('at'))
+    count === null
+      ? query(log, orderBy('at', 'desc'))
+      : query(log, orderBy('at', 'desc'), limitTo(count))
   );
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AuditEntry, 'id'>) }));
 }

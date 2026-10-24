@@ -1,7 +1,6 @@
 /**
- * The SRP export (#4946): one workbook with Settings, every SRP Claim, the SRP log and the
- * Doctrine Fits. In SRP Settings for Directors, and on the Queue for every officer who works it
- * (an Accountant included): the rules let any SRP officer read all four, so no new reach.
+ * The SRP export (#4946). The rules let any SRP officer, an Accountant too, read all four
+ * sources, so the Queue's button adds no reach.
  */
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +13,7 @@ import { corpTickerOrId } from '../corpTicker';
 import { useActiveCorporationId } from '../owner';
 import { readSrpSettings } from '../srpClient';
 import { readSrpDoctrines } from '../srpDoctrineClient';
-import { readAllSrpActivity, readAllSrpClaims } from '../srpOfficerClient';
+import { readAllSrpClaims, readSrpActivity } from '../srpOfficerClient';
 import { WorkbookDownloadButton } from '../WorkbookDownloadButton';
 import { auditText } from './srpAuditText';
 import { srpExportSheets } from './srpExport';
@@ -28,7 +27,7 @@ function useSrpExport(): () => Promise<WorkbookDownload> {
     const [settings, claims, audit, doctrines, ticker, types, systems] = await Promise.all([
       readSrpSettings(characterId, corporationId),
       readAllSrpClaims(characterId, corporationId),
-      readAllSrpActivity(characterId, corporationId),
+      readSrpActivity(characterId, corporationId, null),
       readSrpDoctrines(characterId, corporationId),
       corpTickerOrId(corporationId),
       // Read at the press, so a click before the page's own name load lands still gets names.

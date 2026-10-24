@@ -1,15 +1,14 @@
 /**
- * The Corp Tax Book export (#4946): one workbook, a sheet per record type. A standing section in
- * the settings' Access tab, and an "Export first" block in the Delete the book confirmation.
- * Any officer who can open the book can export it: the reads are the ones the book already makes,
- * re-read at the press so a copy taken just before a delete is current.
+ * The Corp Tax Book export (#4946), a sheet per record type. Any officer who can open the book
+ * can export it: the same reads the book makes, re-read at the press so a copy taken just before
+ * a delete is current.
  */
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { downloadWorkbook, type WorkbookDownload } from '@/lib/downloadCsv';
 import { corpTickerOrId } from '../corpTicker';
-import { readBookData, readFullAudit } from '../taxBook/bookClient';
+import { readAudit, readBookData } from '../taxBook/bookClient';
 import { WorkbookDownloadButton } from '../WorkbookDownloadButton';
 import { bookExportSheets } from './bookExport';
 import { useBook } from './useBook';
@@ -20,7 +19,7 @@ function useExportBook(): () => Promise<WorkbookDownload> {
   return useCallback(async () => {
     const [data, audit, ticker] = await Promise.all([
       readBookData(characterId, corporationId),
-      readFullAudit(characterId, corporationId),
+      readAudit(characterId, corporationId, null),
       corpTickerOrId(corporationId),
     ]);
     if (!data) throw new Error('The corporation has no Corp Tax Book.');
