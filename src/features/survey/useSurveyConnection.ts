@@ -16,6 +16,7 @@ import { db, type MiningTaxAssignmentRecord } from '@/db';
 import {
   connectionWindow,
   isConnectionLive,
+  structureFromLocation,
   type SurveyConnection,
 } from '@/engine/miningTax/surveyConnection';
 import type { SurveySummary } from '@/engine/survey/series';
@@ -42,6 +43,8 @@ export interface ConnectableSurvey {
   expiresAt: number;
   /** The Survey Location's id; null with no location, or a typed one. */
   locationId: number | null;
+  /** The Survey Location's name, where the structure comes from. */
+  locationName?: string;
   summary: Pick<
     SurveySummary,
     'firstAt' | 'etaAt' | 'finished' | 'finishedAt' | 'lastAt' | 'oreNames'
@@ -61,6 +64,13 @@ export interface ConnectionToast {
 async function systemOf(locationId: number | null, characterId: number): Promise<number | null> {
   if (locationId === null) return null;
   return resolvePlaceSystemId(locationId, characterId).catch(() => null);
+}
+
+/** The connection without its structure, so one the Survey no longer names is dropped rather than stored as `undefined`. */
+function omitStructure(connection: SurveyConnection): SurveyConnection {
+  const rest = { ...connection };
+  delete rest.structureLabel;
+  return rest;
 }
 
 const sameIds = (a: readonly number[], b: readonly number[]) =>
@@ -119,6 +129,7 @@ export function useSurveyConnection({
   const span = survey ? connectionWindow({ ...survey.summary, expiresAt: survey.expiresAt }) : null;
   const oreKey = survey?.summary.oreNames.join('\n') ?? '';
   const locationId = survey?.locationId ?? null;
+  const structureLabel = structureFromLocation(survey?.locationName);
   useEffect(() => {
     if (connection === null || span === null) return;
     let cancelled = false;
@@ -128,11 +139,18 @@ export function useSurveyConnection({
         systemOf(locationId, connection.characterId),
       ]);
       if (cancelled) return;
-      const next: SurveyConnection = { ...connection, ...span, typeIds, systemId };
+      const next: SurveyConnection = {
+        ...omitStructure(connection),
+        ...span,
+        typeIds,
+        systemId,
+        ...(structureLabel ? { structureLabel } : {}),
+      };
       const changed =
         next.untilMs !== connection.untilMs ||
         next.fromDate !== connection.fromDate ||
         next.systemId !== connection.systemId ||
+        next.structureLabel !== connection.structureLabel ||
         !sameIds(next.typeIds, connection.typeIds);
       if (changed) await saveSurveyConnection(next);
     })().catch(() => undefined); // Kept as it was; the next change or reopen tries again.
@@ -141,7 +159,7 @@ export function useSurveyConnection({
     };
     // `span` is read through its two fields, so a new object each render doesn't re-run this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connection, span?.untilMs, span?.fromDate, oreKey, locationId]);
+  }, [connection, span?.untilMs, span?.fromDate, oreKey, locationId, structureLabel]);
 
   // While connected and open: ore mined since keeps being assigned, from opening on.
   const live = connection !== null;
@@ -186,6 +204,7 @@ export function useSurveyConnection({
       surveyMoonOreTypeIds(survey.summary.oreNames),
       systemOf(survey.locationId, characterId),
     ]);
+    const structureLabel = structureFromLocation(survey.locationName);
     const connectedAt = Date.now();
     await saveSurveyConnection({
       surveyId: survey.id,
@@ -194,6 +213,7 @@ export function useSurveyConnection({
       payeeName: payee.name,
       taxPct: tax.pct,
       systemId,
+      ...(structureLabel ? { structureLabel } : {}),
       typeIds,
       ...connectionWindow({ ...survey.summary, expiresAt: survey.expiresAt }),
       expiresAt: survey.expiresAt,

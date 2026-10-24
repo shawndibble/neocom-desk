@@ -32,6 +32,8 @@ export interface SurveyConnection {
   taxPct: number;
   /** The Survey Location's solar system; null until the Survey has one that resolves. */
   systemId: number | null;
+  /** The structure named in the Survey Location ("Mav's Watering Hole" from "Ainsan - Mav's Watering Hole"); the "Moon / structure" label each Assignment gets. */
+  structureLabel?: string;
   /** The moon ore types the Survey's scans show. */
   typeIds: number[];
   /** UTC `YYYY-MM-DD` of the Survey's first scan. */
@@ -72,6 +74,17 @@ export function connectionWindow(input: ConnectionWindowInput): {
   return { fromDate: utcDate(input.firstAt), untilMs: Math.min(end, input.expiresAt) };
 }
 
+/**
+ * The structure in a Survey Location's name: EVE names a station or structure
+ * "System - Structure", so what follows the first " - ". None for a bare
+ * system or a blank name.
+ */
+export function structureFromLocation(name: string | undefined): string | undefined {
+  const at = name?.indexOf(' - ') ?? -1;
+  if (name === undefined || at < 0) return undefined;
+  return name.slice(at + 3).trim() || undefined;
+}
+
 export function isConnectionLive(connection: SurveyConnection, nowMs: number): boolean {
   return nowMs <= connection.untilMs + LEDGER_GRACE_MS;
 }
@@ -98,6 +111,7 @@ function isConnection(value: unknown): value is SurveyConnection {
     typeof c.payeeName === 'string' &&
     typeof c.taxPct === 'number' &&
     (c.systemId === null || typeof c.systemId === 'number') &&
+    (c.structureLabel === undefined || typeof c.structureLabel === 'string') &&
     Array.isArray(c.typeIds) &&
     c.typeIds.every((id) => typeof id === 'number') &&
     typeof c.fromDate === 'string' &&
@@ -127,6 +141,8 @@ export interface AutoAssignSlice {
   date: string;
   solarSystemId: number;
   oreLines: OreLine[];
+  /** The connection's structure, for the Assignment's "Moon / structure" label. */
+  label?: string;
   /** The entry's whole ore, for the double-assignment guard. */
   entryOreLines: readonly OreLine[];
 }
@@ -247,6 +263,7 @@ export function planSurveyAutoAssign(
         date: e.date,
         solarSystemId: e.solarSystemId,
         oreLines: [...oreLines].sort((a, b) => a.typeId - b.typeId),
+        ...(c.structureLabel ? { label: c.structureLabel } : {}),
         entryOreLines: e.oreLines,
       });
     }
