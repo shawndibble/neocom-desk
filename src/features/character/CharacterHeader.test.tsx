@@ -49,9 +49,16 @@ describe('CharacterHeader', () => {
     });
     render(<CharacterHeader characterId={CHARACTER_ID} totalSp={null} unallocatedSp={null} />);
 
+    // One line, each name in its own truncating box.
     expect(
-      await screen.findByText('Bureau of Unified Harvesting / Plenitude Alliance')
+      await screen.findByText(
+        (_, element) =>
+          element?.tagName === 'P' &&
+          element.textContent === 'Bureau of Unified Harvesting / Plenitude Alliance'
+      )
     ).toBeInTheDocument();
+    const alliance = screen.getByText('Plenitude Alliance');
+    expect(alliance).toHaveClass('truncate');
   });
 
   it('keeps both SP chips in place when the numbers are unavailable', async () => {

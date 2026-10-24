@@ -842,22 +842,15 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
     // The filter lives in the URL, so a reload keeps it.
     expect(new URLSearchParams(window.location.search).get('industry.chars')).toBe('all');
 
-    // The rows can still be recomputed after they first appear (Character
-    // modifiers and prices settle late, most under shard CPU load), which
-    // swaps the row nodes and drops a selection made just before. So tick
-    // whichever box is not yet ticked, and retry until the bar shows both.
+    await user.click(
+      await screen.findByRole('checkbox', { name: 'Select Rifter to compare plans' })
+    );
+    await user.click(
+      screen.getByRole('checkbox', { name: 'Select Mechanical Parts to compare plans' })
+    );
     // Below `lg` (jsdom matches no media query) Compare lives in the phone
     // list's bar pinned above the tab bar, not the panel header.
-    let compareBar!: HTMLElement;
-    await waitFor(async () => {
-      for (const name of ['Rifter', 'Mechanical Parts']) {
-        const box = await screen.findByRole('checkbox', {
-          name: `Select ${name} to compare plans`,
-        });
-        if (!(box as HTMLInputElement).checked) await user.click(box);
-      }
-      compareBar = screen.getByRole('region', { name: 'Compare selected blueprints' });
-    });
+    const compareBar = screen.getByRole('region', { name: 'Compare selected blueprints' });
     await user.click(within(compareBar).getByRole('button', { name: 'Compare' }));
 
     expect(await screen.findByRole('table', { name: 'Build Plan comparison' })).toBeInTheDocument();

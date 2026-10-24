@@ -124,6 +124,12 @@ export function useOpportunities({
   useEffect(() => {
     candidatesRef.current = candidates;
   });
+  // The last fully-ranked rows and the batch they price (issue #4918). A
+  // recompute of the same batch (late modifiers/prices, background
+  // revalidation) keeps showing them until it finishes, rather than blanking
+  // the list: a blank unmounts every row, so a Compare tick made then lands on
+  // a gone checkbox and the Compare bar vanishes.
+  const settledRef = useRef<{ batchKey: string; rows: OpportunityRow[] } | null>(null);
 
   const manualRefreshOnly = !autoRecalculates(candidates.length);
   const batchKey = useMemo(
@@ -145,6 +151,7 @@ export function useOpportunities({
   useEffect(() => {
     const currentCandidates = candidatesRef.current;
     if (currentCandidates.length === 0 || !catalog) {
+      settledRef.current = null;
       setState(EMPTY_STATE);
       return;
     }
@@ -159,6 +166,7 @@ export function useOpportunities({
       // and back) must land here without ever entering the loading/fetch
       // path below, which is exactly what "does not auto-recalculate above
       // the threshold" means.
+      settledRef.current = { batchKey, rows: decision.rows };
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({
         ...EMPTY_STATE,
@@ -168,13 +176,20 @@ export function useOpportunities({
       return;
     }
     if (decision.kind === 'needs-refresh') {
+      // Rows priced at since-changed inputs are never shown (issue #2056),
+      // not even while the Refresh that follows computes.
+      settledRef.current = null;
       setState({ ...EMPTY_STATE, needsRefresh: true });
       return;
     }
 
     let cancelled = false;
+    // Another batch's rows (a different Character filter or hub) are not
+    // these blueprints, so only the same batch's rows carry over.
+    const keptRows = settledRef.current?.batchKey === batchKey ? settledRef.current.rows : null;
     setState({
       ...EMPTY_STATE,
+      rows: keptRows ?? [],
       progress: { done: 0, total: currentCandidates.length },
       loading: true,
     });
@@ -236,7 +251,7 @@ export function useOpportunities({
         }
         setState({
           ...EMPTY_STATE,
-          rows: rankProgress(unranked),
+          rows: keptRows ?? rankProgress(unranked),
           progress: { done, total: currentCandidates.length },
           loading: true,
         });
@@ -248,6 +263,7 @@ export function useOpportunities({
       if (cancelled) return;
       const ranked = rankOpportunityRows(unranked);
       writeOpportunitiesCache(batchKey, { inputsKey, rows: ranked });
+      settledRef.current = { batchKey, rows: ranked };
       setState({
         ...EMPTY_STATE,
         rows: ranked,
