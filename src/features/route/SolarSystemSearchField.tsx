@@ -3,6 +3,10 @@
  * step is naming a system: Route Safety's destination, before any route
  * exists. The same local snapshot and ranking as `SolarSystemPicker`, with the
  * results listed under the field rather than in a popover behind a button.
+ *
+ * With `places`, stations and known structures join the systems in one list
+ * (issue #4964), each result marked as a system, station or structure. Picking
+ * a station answers with its system and the station beside it.
  */
 import { useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,11 +17,20 @@ import { SecurityStatus } from '@/components/SecurityStatus';
 import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { cx } from '@/lib/cx';
 import { rankedSearch } from '@/lib/rankedSearch';
-import type { SolarSystemEntry } from '@/sde/marketTypes';
-import { useSolarSystemList } from './useSolarSystems';
+import type { PickedStation } from '@/features/places/placeSearch';
+import { useKnownPlaces } from '@/features/places/useKnownPlaces';
+import { useSolarSystemIndex, useSolarSystemList } from './useSolarSystems';
 
 const MATCH_LIMIT = 8;
 const NAV_KEYS: readonly string[] = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
+interface Option {
+  key: string;
+  kind: 'system' | 'station' | 'structure';
+  name: string;
+  systemId: number;
+  security: number | null;
+  stationId: number | null;
+}
 
 export function SolarSystemSearchField({
   onChange,
@@ -25,13 +38,17 @@ export function SolarSystemSearchField({
   exclude,
   autoFocus = false,
   className,
+  places = false,
 }: {
-  onChange: (systemId: number) => void;
+  /** `station` is set when a station or structure was picked: `systemId` is its system. */
+  onChange: (systemId: number, station?: PickedStation) => void;
   ariaLabel: string;
   /** Systems left out of the results, such as the trip's start. */
   exclude?: ReadonlySet<number>;
   autoFocus?: boolean;
   className?: string;
+  /** Also search stations and known structures, not only systems. */
+  places?: boolean;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -43,22 +60,43 @@ export function SolarSystemSearchField({
     systemsFailed ? 'failed' : systems === null ? 'busy' : 'ok',
     'systems'
   );
-  const matches = useMemo(
-    () =>
-      systems && query.trim() !== ''
-        ? rankedSearch(
-            exclude?.size ? systems.filter((system) => !exclude.has(system.id)) : systems,
-            query,
-            { primary: (system) => system.name, limit: MATCH_LIMIT }
-          )
-        : [],
-    [systems, query, exclude]
-  );
+  const systemIndex = useSolarSystemIndex();
+  const trimmed = query.trim();
+  const placeHits = useKnownPlaces(query, places, MATCH_LIMIT);
+  const matches = useMemo<Option[]>(() => {
+    if (!systems || trimmed === '') return [];
+    const systemOptions = rankedSearch(
+      exclude?.size ? systems.filter((system) => !exclude.has(system.id)) : systems,
+      query,
+      { primary: (system) => system.name, limit: MATCH_LIMIT }
+    ).map((system): Option => ({
+      key: `system:${system.id}`,
+      kind: 'system',
+      name: system.name,
+      systemId: system.id,
+      security: system.security,
+      stationId: null,
+    }));
+    const stationOptions = placeHits
+      .filter((place) => !exclude?.has(place.systemId))
+      .map((place): Option => ({
+        key: `${place.kind}:${place.id}`,
+        kind: place.kind,
+        name: place.name,
+        systemId: place.systemId,
+        security: systemIndex?.get(place.systemId)?.security ?? null,
+        stationId: place.id,
+      }));
+    return [...systemOptions, ...stationOptions];
+  }, [systems, query, trimmed, exclude, placeHits, systemIndex]);
 
-  function choose(system: SolarSystemEntry) {
+  function choose(option: Option) {
     setQuery('');
     setHighlight(null);
-    onChange(system.id);
+    onChange(
+      option.systemId,
+      option.stationId === null ? undefined : { id: option.stationId, name: option.name }
+    );
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -114,9 +152,9 @@ export function SolarSystemSearchField({
           aria-label={ariaLabel}
           className="absolute inset-x-0 top-full z-20 mt-1 flex flex-col rounded-xs border border-line-bright bg-panel p-1 shadow-lg"
         >
-          {matches.map((system, index) => (
+          {matches.map((option, index) => (
             <li
-              key={system.id}
+              key={option.key}
               id={`${listId}-${index}`}
               role="option"
               aria-selected={index === highlight}
@@ -125,10 +163,17 @@ export function SolarSystemSearchField({
                 index === highlight && `bg-panel-2 ${activeOptionClassName}`
               )}
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => choose(system)}
+              onClick={() => choose(option)}
             >
-              {system.name}
-              <SecurityStatus security={system.security} className="ml-1" />
+              {option.name}
+              {option.security !== null && (
+                <SecurityStatus security={option.security} className="ml-1" />
+              )}
+              {places && (
+                <span className="ml-2 text-xs text-text-dim">
+                  {t(`travel.stops.kind.${option.kind}`)}
+                </span>
+              )}
             </li>
           ))}
         </ul>

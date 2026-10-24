@@ -42,7 +42,9 @@ import {
   tappableRowClassName,
 } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
+import type { StopRef } from '@/engine/route/stopRef';
 import { MAX_STOPS, type TripOptions } from '@/engine/route/tripPlan';
+import type { PickedStation } from '@/features/places/placeSearch';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { SolarSystemSearchField } from '@/features/route/SolarSystemSearchField';
 import { useSolarSystemIndex } from '@/features/route/useSolarSystems';
@@ -66,12 +68,15 @@ function StopRow({
   systemId,
   index,
   name,
+  systemName,
   security,
   onRemove,
 }: {
   systemId: number;
   index: number;
   name: string;
+  /** Set for a station stop: the system it sits in, beside the station's name. */
+  systemName: string | null;
   security: number | null;
   onRemove: (index: number) => void;
 }) {
@@ -103,6 +108,7 @@ function StopRow({
       <Badge>{index + 1}</Badge>
       <span className="min-w-0 flex-1 truncate">
         {name}
+        {systemName !== null && <span className="ml-1 text-text-dim">· {systemName}</span>}
         {security !== null && <SecurityStatus security={security} className="ml-1" />}
       </span>
       <IconButton
@@ -136,14 +142,16 @@ export function StopsPanel({
   fromTrigger: string;
   onFromChange: (systemId: number) => void;
   /** In the order typed. */
-  stops: readonly number[];
-  onStopsChange: (next: number[]) => void;
+  stops: readonly StopRef[];
+  /** `picked` is the station just added, so the page can name it before the link round-trips. */
+  onStopsChange: (next: StopRef[], picked?: PickedStation) => void;
   settings: StopOrderSettings;
   onSettingsChange: (patch: Partial<StopOrderSettings>) => void;
   /** A stop no stargate route reaches: there is no order to optimize. */
   optimizeBlocked: boolean;
   /** Set when the flown order differs from the typed one. */
   orderNote: string | null;
+  /** A stop's label: its station's name when it has one, else its system's. */
   nameOf: (systemId: number) => string;
   /** Shown under the destination field while the trip has no stops. */
   quickPicks?: ReactNode;
@@ -157,7 +165,8 @@ export function StopsPanel({
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
-  const position = (systemId: number | string) => stops.indexOf(Number(systemId)) + 1;
+  const stopIds = useMemo(() => stops.map((stop) => stop.systemId), [stops]);
+  const position = (systemId: number | string) => stopIds.indexOf(Number(systemId)) + 1;
   const announcements: Announcements = {
     onDragStart: ({ active }) => t('travel.stops.dragStart', { name: nameOf(Number(active.id)) }),
     onDragOver: ({ active, over }) =>
@@ -179,15 +188,15 @@ export function StopsPanel({
     onDragCancel: ({ active }) => t('travel.stops.dragCancel', { name: nameOf(Number(active.id)) }),
   };
   const taken = useMemo(
-    () => new Set(fromId === null ? stops : [fromId, ...stops]),
-    [fromId, stops]
+    () => new Set(fromId === null ? stopIds : [fromId, ...stopIds]),
+    [fromId, stopIds]
   );
 
   const move = (from: number, to: number) => onStopsChange(arrayMove([...stops], from, to));
   const remove = (index: number) => onStopsChange(stops.filter((_, at) => at !== index));
   function handleDragEnd({ active, over }: DragEndEvent) {
     if (!over || active.id === over.id) return;
-    move(stops.indexOf(Number(active.id)), stops.indexOf(Number(over.id)));
+    move(stopIds.indexOf(Number(active.id)), stopIds.indexOf(Number(over.id)));
   }
 
   const full = stops.length >= MAX_STOPS;
@@ -231,9 +240,13 @@ export function StopsPanel({
                   className="min-w-[12rem] flex-1 md:max-w-sm"
                   ariaLabel={t('travel.stops.destinationLabel')}
                   exclude={taken}
-                  onChange={(systemId) => {
+                  places
+                  onChange={(systemId, station) => {
                     setExpanded(true);
-                    onStopsChange([...stops, systemId]);
+                    onStopsChange(
+                      [...stops, { systemId, stationId: station?.id ?? null }],
+                      station
+                    );
                   }}
                 />
               </>
@@ -250,18 +263,21 @@ export function StopsPanel({
                 screenReaderInstructions: { draggable: t('travel.stops.dragInstructions') },
               }}
             >
-              <SortableContext items={[...stops]} strategy={verticalListSortingStrategy}>
+              <SortableContext items={stopIds} strategy={verticalListSortingStrategy}>
                 <ol
                   aria-label={t('travel.stops.listLabel')}
                   data-stops-list
                   className="focus:outline-none"
                 >
-                  {stops.map((systemId, index) => (
+                  {stops.map(({ systemId, stationId }, index) => (
                     <StopRow
                       key={systemId}
                       systemId={systemId}
                       index={index}
                       name={nameOf(systemId)}
+                      systemName={
+                        stationId === null ? null : (systems?.get(systemId)?.name ?? null)
+                      }
                       security={systems?.get(systemId)?.security ?? null}
                       onRemove={remove}
                     />
@@ -274,8 +290,9 @@ export function StopsPanel({
             <div className="space-y-1">
               <SolarSystemPicker
                 value={null}
-                onChange={(systemId) => {
-                  onStopsChange([...stops, systemId]);
+                places
+                onChange={(systemId, station) => {
+                  onStopsChange([...stops, { systemId, stationId: station?.id ?? null }], station);
                 }}
                 ariaLabel={t('travel.stops.addLabel')}
                 triggerLabel={t('travel.stops.add')}

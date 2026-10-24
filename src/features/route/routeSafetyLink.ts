@@ -25,10 +25,10 @@ import {
   optionalEnumParam,
   optionalIdParam,
   optionalIntParam,
-  orderedIdListParam,
   type UrlParamCodec,
 } from '@/lib/urlState';
 import { MAX_STOPS } from '@/engine/route/tripPlan';
+import { parseStopRefs, serializeStopRefs, type StopRef } from '@/engine/route/stopRef';
 
 /** Every leg's pin token, `''` where the leg is not pinned. */
 export type LegPinTokens = readonly string[];
@@ -53,11 +53,16 @@ export function legPinsParam(): UrlParamCodec<LegPinTokens> {
   };
 }
 
+/** The `stops` link parameter: a system id per stop, each optionally tagged `:station` (issue #4964). */
+export function stopRefsParam(): UrlParamCodec<readonly StopRef[]> {
+  return { parse: parseStopRefs, serialize: (value) => serializeStopRefs(value) };
+}
+
 export const ROUTE_PARAMS = {
   from: optionalIdParam(),
   // The stops in the order typed. `to` is the single-stop link from before
   // stops, still read so an old link opens; nothing writes it any more.
-  stops: orderedIdListParam(),
+  stops: stopRefsParam(),
   to: optionalIdParam(),
   opt: boolParam(),
   ret: boolParam(),
@@ -86,7 +91,8 @@ export function pinFirstLeg(pins: LegPinTokens, holeId: string): string[] {
 
 /**
  * Route Safety to one system: what "View route" opens. With no `fromId` the
- * page starts from the Character's current system on its own; a courier
+ * page starts from the Character's current system on its own; a `stationId`
+ * labels the stop with the station the pilot named there; a courier
  * contract passes its pickup system, since that is where its jumps begin. A
  * page with its own route picker (Assets, Courier) passes the `preference` it
  * counted under, so the route opens the way the number was worked out.
@@ -94,20 +100,29 @@ export function pinFirstLeg(pins: LegPinTokens, holeId: string): string[] {
 export function routeToHref(
   systemId: number,
   fromId?: number | null,
-  preference?: RoutePreferenceKind | null
+  preference?: RoutePreferenceKind | null,
+  stationId?: number | null
 ): string {
   const params = new URLSearchParams();
   if (fromId != null) params.set('from', String(fromId));
   if (preference != null) params.set('pref', ROUTE_PARAMS.pref.serialize(preference) ?? '');
-  params.set('stops', ROUTE_PARAMS.stops.serialize([systemId]) ?? '');
+  params.set(
+    'stops',
+    ROUTE_PARAMS.stops.serialize([{ systemId, stationId: stationId ?? null }]) ?? ''
+  );
   return `${tabPath(TRAVEL_TABS, 'route')}?${params.toString()}`;
 }
 
 /** Route Safety from `fromId` through `stops` in order: the saved route the Overview widget links back to. */
-export function routeStopsHref(fromId: number | null, stops: readonly number[]): string {
+export function routeStopsHref(
+  fromId: number | null,
+  stops: readonly (number | StopRef)[]
+): string {
   const params = new URLSearchParams();
   if (fromId !== null) params.set('from', String(fromId));
-  const serialized = ROUTE_PARAMS.stops.serialize([...stops]);
+  const serialized = ROUTE_PARAMS.stops.serialize(
+    stops.map((stop) => (typeof stop === 'number' ? { systemId: stop, stationId: null } : stop))
+  );
   if (serialized !== null) params.set('stops', serialized);
   const query = params.toString();
   return query === '' ? tabPath(TRAVEL_TABS, 'route') : `${tabPath(TRAVEL_TABS, 'route')}?${query}`;
