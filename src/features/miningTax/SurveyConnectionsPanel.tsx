@@ -4,8 +4,8 @@
  * same Stop as on the Survey, for a pilot who has moved on to another one.
  *
  * Moon ore of one type is often owed to different Payees, so a connection
- * says which moon system and ore it claims. Ore two connections claim while
- * both are being mined is left unassigned (`planSurveyAutoAssign`), and the
+ * claims a moon system and ore (kept in data, not listed here). Ore two
+ * connections claim while both are being mined is left unassigned (`planSurveyAutoAssign`), and the
  * row says so rather than leaving a pilot to wonder where it went.
  */
 import { useEffect, useState } from 'react';
@@ -25,7 +25,6 @@ export function SurveyConnectionsPanel({
   characterIds,
   characterNames,
   systemNames,
-  typeNames,
   nowMs: nowOverride,
 }: {
   /** The Characters the tab shows. */
@@ -33,7 +32,6 @@ export function SurveyConnectionsPanel({
   /** Named beside each row only when more than one Character is tracked. */
   characterNames: ReadonlyMap<number, string>;
   systemNames: ReadonlyMap<number, string>;
-  typeNames: ReadonlyMap<number, string>;
   /** For tests; otherwise the clock, read each minute. */
   nowMs?: number;
 }) {
@@ -62,7 +60,6 @@ export function SurveyConnectionsPanel({
       <ul className="divide-y divide-line text-sm">
         {live.map((c) => {
           const clash = findOreClash(c, live, nowMs);
-          const ore = c.typeIds.map((id) => typeNames.get(id) ?? `#${id}`).join(', ');
           return (
             <li
               key={`${c.surveyId}:${c.characterId}`}
@@ -79,7 +76,6 @@ export function SurveyConnectionsPanel({
                   {c.systemId === null
                     ? t('miningTax.surveyConnections.noLocation')
                     : systemLabel(systemNames, c.systemId)}
-                  {ore !== '' && ` · ${ore}`}
                   {' · '}
                   {t('miningTax.surveyConnections.until', { time: eveWhen(c.untilMs, nowMs) })}
                 </p>
