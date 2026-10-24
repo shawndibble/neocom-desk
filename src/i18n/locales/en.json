@@ -15037,6 +15037,7 @@
         "reminder": "Reminder",
         "rate-change": "Rate change",
         "payee-change": "Who gets paid changed",
+        "srp-result": "SRP result",
         "removal": "Moon owner removal",
         "removalCancelled": "Removal cancelled"
       },
@@ -16583,8 +16584,8 @@
         "approvedOutro": "It will be paid in game by an officer of {{corp}}. You will get a separate payment.",
         "rejectedOutro_one": "You can re-file it once from the SRP page.",
         "rejectedOutro_other": "You can re-file each once from the SRP page.",
-        "sentTo_one": "Mail sent to {{count}} pilot.",
-        "sentTo_other": "Mail sent to {{count}} pilots.",
+        "queuedFor_one": "Mail queued for {{count}} pilot.",
+        "queuedFor_other": "Mail queued for {{count}} pilots, sent about 5 a minute.",
         "failedFor": "Mail failed for {{names}}, status still saved.",
         "noScope": "No mail sent: mail permission missing.",
         "corpFallback": "your corporation",

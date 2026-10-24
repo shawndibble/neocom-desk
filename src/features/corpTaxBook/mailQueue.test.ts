@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import {
+  enqueuePayeeChangeMail,
   enqueueRateChangeMail,
   enqueueReminder,
   enqueueRemovalMails,
+  enqueueSrpResultMails,
   enqueueStatements,
   retryMail,
   type StatementToMail,
@@ -226,5 +228,68 @@ describe('enqueueRateChangeMail', () => {
   it('queues one change only once', async () => {
     await mail(8, '2026-10-05T10:00:00.000Z');
     expect(await mail(8, '2026-10-05T10:00:00.000Z')).toEqual({ queued: 0 });
+  });
+});
+
+describe('enqueuePayeeChangeMail', () => {
+  const base = {
+    corporationId: 5,
+    senderCharacterId: 1,
+    feederCorporationId: 10,
+    changedByName: 'B-UH Moons',
+    moonOwnerName: 'Rock Holders',
+    payeeName: 'Kara Vex',
+    at: Date.parse('2026-10-21T12:00:00Z'),
+    recipients: [
+      { id: 501, name: 'Pilot 501' },
+      { id: 700, name: 'Pilot 700' },
+    ],
+  };
+  beforeEach(async () => {
+    await db.corpMailQueue.clear();
+  });
+
+  it('queues one short mail for exactly each recipient', async () => {
+    expect(await enqueuePayeeChangeMail(base)).toEqual({ queued: 2 });
+    const rows = await db.corpMailQueue.toArray();
+    expect(rows.map((r) => r.recipientId).sort()).toEqual([501, 700]);
+    for (const r of rows) {
+      expect(r).toMatchObject({ kind: 'payee-change', senderCharacterId: 1, corporationId: 5 });
+      expect(r.feederCorporationId).toBe(10);
+      expect(r.body).toContain(`Hi ${r.recipientName},`);
+      expect(r.body).toContain('now go to Kara Vex');
+      expect(`${r.subject} ${r.body}`).not.toMatch(
+        /%|rate|margin|miner|hour|48|remov|feeder|collector/i
+      );
+    }
+  });
+
+  it('mails one change once per recipient', async () => {
+    await enqueuePayeeChangeMail(base);
+    expect(await enqueuePayeeChangeMail(base)).toEqual({ queued: 0 });
+    expect(await db.corpMailQueue.count()).toBe(2);
+  });
+});
+
+describe('enqueueSrpResultMails', () => {
+  beforeEach(async () => {
+    await db.corpMailQueue.clear();
+  });
+  const mails = [1, 2, 3].map((id) => ({
+    recipient: { id, name: `P${id}` },
+    subject: 's',
+    body: 'b',
+  }));
+
+  it('queues one waiting srp-result row per pilot, in order, once per decision', async () => {
+    const input = { corporationId: 5, senderCharacterId: 1, at: 1000, mails };
+    expect(await enqueueSrpResultMails(input)).toEqual({ queued: 3 });
+    expect(await enqueueSrpResultMails(input)).toEqual({ queued: 0 });
+    const rows = (await db.corpMailQueue.toArray()).sort((a, b) => a.order - b.order);
+    expect(rows.map((r) => [r.recipientId, r.kind, r.status])).toEqual([
+      [1, 'srp-result', 'waiting'],
+      [2, 'srp-result', 'waiting'],
+      [3, 'srp-result', 'waiting'],
+    ]);
   });
 });

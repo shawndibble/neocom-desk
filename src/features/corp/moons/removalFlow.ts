@@ -1,5 +1,5 @@
 import { composeRemovalCancelledMail, composeRemovalMail } from '@/engine/corpTaxBook/removalMail';
-import { resolveNames } from '@/features/character/names';
+import { resolveRecipients } from '@/features/corpTaxBook/officerMail';
 import {
   dropRemovalMails,
   enqueueRemovalMails,
@@ -25,11 +25,6 @@ export interface RemovalContext {
 /** `/corp-tax-book/remove-now/<code>`: the payee's page, served by `routes/CorpTaxBookRemoveNow`. */
 export function removeNowUrl(origin: string, code: string): string {
   return `${origin}/corp-tax-book/remove-now/${code}`;
-}
-
-async function recipientList(ids: readonly number[]): Promise<{ id: number; name: string }[]> {
-  const names = await resolveNames([...ids]).catch(() => new Map<number, string>());
-  return ids.map((id) => ({ id, name: names.get(id) ?? `#${id}` }));
 }
 
 /**
@@ -72,7 +67,7 @@ export async function startRemovalAndMail(ctx: RemovalContext): Promise<void> {
     ...started.recipients.filter((id) => owner.has(id)),
     ...started.recipients.filter((id) => !owner.has(id)),
   ];
-  const recipients = (await recipientList(ordered)).map((r) => ({
+  const recipients = (await resolveRecipients(ordered)).map((r) => ({
     ...r,
     startsClock: owner.has(r.id),
   }));
@@ -109,7 +104,7 @@ export async function cancelRemovalAndMail(ctx: RemovalContext): Promise<void> {
     feederCorporationId: ctx.feederCorporationId,
     senderCharacterId: ctx.characterId,
     kind: 'removalCancelled',
-    recipients: await recipientList(recipients),
+    recipients: await resolveRecipients(recipients),
     mail: composeRemovalCancelledMail({
       accountingName: ctx.accountingName,
       ownerName: ctx.ownerName,

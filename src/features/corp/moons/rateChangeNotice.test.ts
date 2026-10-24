@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
-import { agreedRateChange, mailRateChange, SEND_MAIL_SCOPE } from './rateChangeNotice';
+import { agreedRateChange, mailRateChange } from './rateChangeNotice';
+
+const SEND_MAIL_SCOPE = 'esi-mail.send_mail.v1';
 
 const records: Record<number, { ceo_id: number }> = { 10: { ceo_id: 501 }, 20: { ceo_id: 502 } };
 vi.mock('@/features/character/publicInfoData', () => ({

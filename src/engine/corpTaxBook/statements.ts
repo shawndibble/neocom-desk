@@ -109,6 +109,12 @@ export interface Statement {
   lines: StatementLine[];
   /** Σ line tax. */
   amount: number;
+  /** What the book recorded about this Statement's mail; absent on a Statement nobody mailed. */
+  mailsSent?: number;
+  /** The Miner chose "Stop reminders" (D27). */
+  remindersStopped?: boolean;
+  /** Reminders an officer sent by hand; one is allowed after the Miner stopped them. */
+  manualRemindersSent?: number;
 }
 
 /**
