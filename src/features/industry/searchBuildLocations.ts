@@ -16,14 +16,12 @@
  * calling this and taking a 403.
  */
 import { getCharacterSearch } from '@/esi/endpoints';
-import { loadStationSummary } from '@/features/character/stations';
-import { loadStructureSummary } from '@/features/character/structures';
+import { resolvePlaceHits } from '@/features/places/placeSearch';
 import { loadSystemName, loadSystemSecurity } from '@/features/character/systemSecurity';
 import type { IndustryActivity } from '@/engine/industry/types';
 import {
   buildLocationOptions,
   type BuildLocationOption,
-  type LocatablePlace,
   type SystemSummary,
 } from './buildLocations';
 
@@ -68,25 +66,7 @@ export async function searchBuildLocations(
   const stationIds = new Set(hits.station ?? []);
   const wanted = interleave(hits.station ?? [], hits.structure ?? []).slice(0, MAX_RESULTS);
 
-  const resolved = await Promise.all(
-    wanted.map(async (id): Promise<LocatablePlace | null> => {
-      // A 403 on a structure is ordinary: the search is ACL-filtered, but a
-      // structure can leave the ACL between the two calls.
-      const summary = stationIds.has(id)
-        ? await loadStationSummary(id)
-        : await loadStructureSummary(characterId, id);
-      return summary === null
-        ? null
-        : {
-            id,
-            name: summary.name,
-            typeId: summary.typeId,
-            systemId: summary.systemId,
-            npcStation: stationIds.has(id),
-          };
-    })
-  );
-  const places = resolved.filter((place) => place !== null);
+  const places = await resolvePlaceHits(characterId, wanted, stationIds);
 
   const systems = new Map<number, SystemSummary>();
   await Promise.all(

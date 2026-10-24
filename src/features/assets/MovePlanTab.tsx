@@ -152,6 +152,12 @@ function MovePlanTabBody({
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [destSystem, setDestSystem] = useState<number | null>(null);
   const [destStation, setDestStation] = useState<number | null>(null);
+  /** A station found by search that holds none of the pilot's assets: its name and system came with the pick. */
+  const [searchedStation, setSearchedStation] = useState<{
+    id: number;
+    name: string;
+    systemId: number;
+  } | null>(null);
   const [working, setWorking] = useState(false);
   const [result, setResult] = useState<PlanState | null>(null);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -256,9 +262,14 @@ function MovePlanTabBody({
     });
 
   /** Ticks at the destination are kept but ignored, so changing it back restores them. */
-  function chooseDestination(system: number | null, station: number | null) {
+  function chooseDestination(
+    system: number | null,
+    station: number | null,
+    searched: { id: number; name: string; systemId: number } | null = null
+  ) {
     setDestSystem(system);
     setDestStation(station);
+    setSearchedStation(searched);
   }
 
   /**
@@ -323,17 +334,19 @@ function MovePlanTabBody({
     const mine = session.current;
     try {
       const destinationSystem =
-        destStation !== null
-          ? await resolvePlace(
-              { locationId: destStation, characterId: null, kind: 'station' },
-              undefined,
-              {
-                name: false,
-              }
-            )
-              .then((place) => place.systemId)
-              .catch(() => null)
-          : destSystem;
+        searchedStation !== null
+          ? searchedStation.systemId
+          : destStation !== null
+            ? await resolvePlace(
+                { locationId: destStation, characterId: null, kind: 'station' },
+                undefined,
+                {
+                  name: false,
+                }
+              )
+                .then((place) => place.systemId)
+                .catch(() => null)
+            : destSystem;
       const { hulls, sizing } = await loadHulls();
       const base = {
         destinationLocationIds: atDestination,
@@ -351,7 +364,9 @@ function MovePlanTabBody({
           plan,
           destinationSystem,
           destinationStation:
-            destStation !== null ? (loaded.places.get(destStation) ?? null) : null,
+            destStation !== null
+              ? (loaded.places.get(destStation) ?? searchedStation?.name ?? null)
+              : null,
           pickupSystems: loaded.systems,
           haulerSizing: sizing,
         });
@@ -455,12 +470,22 @@ function MovePlanTabBody({
                 </h3>
                 <SolarSystemPicker
                   value={destSystem}
-                  onChange={(id) => chooseDestination(id, null)}
+                  places
+                  onChange={(id, station) =>
+                    station
+                      ? chooseDestination(null, station.id, {
+                          id: station.id,
+                          name: station.name,
+                          systemId: id,
+                        })
+                      : chooseDestination(id, null)
+                  }
                   ariaLabel={t('assets.movePlan.destinationSystem')}
                   placeholder={t('assets.movePlan.destinationSystem')}
                   triggerLabel={
                     destStation !== null
                       ? (stationLabels[ownStations.findIndex(([id]) => id === destStation)] ??
+                        searchedStation?.name ??
                         placeLabel(destStation))
                       : undefined
                   }
