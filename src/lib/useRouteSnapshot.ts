@@ -120,6 +120,20 @@ export interface RouteSnapshot<T> {
  */
 const MAX_CONSECUTIVE_AUTO_RELOADS = 3;
 
+/**
+ * Window over which background-revalidation signals collapse into one reload.
+ * The signal is global and keyless, so on boot (prefetch + background sync
+ * settling dozens of keys over seconds) every mounted loader would otherwise
+ * re-run once per settle between loads: ~18 reloads of each Overview widget,
+ * and a Fuzzwork call each, in one production HAR. Scoping to the keys a load
+ * read would need read-tracking through every loader and helper, so the
+ * reload is coalesced instead: the first signal arms a timer, signals during
+ * it ride along, and the one reload at its end reads everything that settled.
+ * A revalidated row or a recorded failure still reaches the page, at most this
+ * much later.
+ */
+export const REVALIDATION_COALESCE_MS = 1000;
+
 export function useRouteSnapshot<T>(
   load: (characterId: number, signal: RouteSnapshotSignal<T>) => Promise<T>,
   /**
@@ -207,21 +221,43 @@ export function useRouteSnapshot<T>(
    * resetting debounce would, because the flush is driven by the load
    * finishing rather than by the signals going quiet.
    */
-  useEffect(
-    () =>
-      onCacheRevalidated(() => {
-        if (loadInFlight.current) {
-          revalidationPending.current = true;
-          return;
-        }
-        // Nothing was loading when this signal arrived, so it cannot be a
-        // reload chaining off its own reads — an isolated, unrelated settle
-        // always gets its reload, uncapped. Whether *this* reload turns out
-        // to start its own chain is judged independently in `finally` below.
-        setRevalidation((n) => n + 1);
-      }),
-    []
-  );
+  const coalesceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /**
+   * One trailing reload per window. The timer is armed by the first signal and
+   * never reset by later ones (a resetting debounce would starve under a
+   * steady stream of settles). If a load is running when it fires, the reload
+   * is held until that load settles, as before.
+   */
+  const scheduleRevalidation = useCallback(() => {
+    if (coalesceTimer.current !== null) return;
+    coalesceTimer.current = setTimeout(() => {
+      coalesceTimer.current = null;
+      if (loadInFlight.current) {
+        revalidationPending.current = true;
+        return;
+      }
+      setRevalidation((n) => n + 1);
+    }, REVALIDATION_COALESCE_MS);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onCacheRevalidated(() => {
+      if (loadInFlight.current) {
+        revalidationPending.current = true;
+        return;
+      }
+      // Nothing was loading when this signal arrived, so it cannot be a
+      // reload chaining off its own reads — an isolated, unrelated settle
+      // always gets its reload, uncapped. Whether *this* reload turns out
+      // to start its own chain is judged independently in `finally` below.
+      scheduleRevalidation();
+    });
+    return () => {
+      unsubscribe();
+      if (coalesceTimer.current !== null) clearTimeout(coalesceTimer.current);
+      coalesceTimer.current = null;
+    };
+  }, [scheduleRevalidation]);
 
   const { characterId, epoch } = lifecycle;
   useEffect(() => {
@@ -259,7 +295,7 @@ export function useRouteSnapshot<T>(
             revalidationPending.current = false;
             if (consecutiveAutoReloads.current < MAX_CONSECUTIVE_AUTO_RELOADS) {
               consecutiveAutoReloads.current += 1;
-              setRevalidation((n) => n + 1);
+              scheduleRevalidation();
             }
             // else: the chain is capped — drop it. The view keeps whatever
             // it just committed rather than chasing a self-perpetuating
@@ -280,7 +316,15 @@ export function useRouteSnapshot<T>(
     // declaration for why that distinction is what keeps the view from
     // blinking. `staleWhileRevalidate` is a primitive, stable per call site —
     // safe to depend on directly rather than routing it through a ref.
-  }, [characterId, epoch, revalidation, staleWhileRevalidate, cacheKey, skip]);
+  }, [
+    characterId,
+    epoch,
+    revalidation,
+    staleWhileRevalidate,
+    cacheKey,
+    skip,
+    scheduleRevalidation,
+  ]);
 
   const current = snapshot?.epoch === epoch ? snapshot : null;
 
