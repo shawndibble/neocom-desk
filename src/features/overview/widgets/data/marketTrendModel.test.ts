@@ -42,6 +42,7 @@ const line = (
   points: averages.map((a, i) => pt(day(24 - averages.length + 1 + i), a)),
   to: `/market/browser?type=${typeId}&hub=${hubId}`,
   fromCache: false,
+  failed: false,
 });
 const data = (
   lines: MarketTrendSeries[],
@@ -104,12 +105,52 @@ describe('marketTrend builder', () => {
     expect(chart.tips!.at(-1)!.rows.map((r) => r.label)).toEqual(['Tritanium', 'PLEX']);
   });
 
-  it('omits an item with no history from the chart but keeps its row', () => {
+  it('omits an item with no history from the chart but keeps its row, and says so', () => {
     const none = line(9, 'Nothing', []);
     const view = marketTrend(data([rising, none]), ctx());
     expect(view.table!.rows).toHaveLength(2);
     expect(view.table!.rows[1]!.cells[1]).toBe('—');
-    if (view.chart?.kind === 'lines') expect(view.chart.series).toHaveLength(1);
+    if (view.chart?.kind !== 'lines') throw new Error('expected a lines chart');
+    expect(view.chart.series).toHaveLength(1);
+    expect(view.chart.note).toContain('noteNoHistory');
+    expect(view.chart.note).toContain('Nothing');
+    expect(view.table!.footer).toContain('Nothing');
+  });
+
+  it('tells a failed read from a missing market', () => {
+    const failed = { ...line(9, 'Broken', []), failed: true };
+    const none = line(8, 'Nothing', []);
+    const view = marketTrend(data([rising, failed, none]), ctx());
+    expect(view.table!.rows[1]!.cells[1]).toBe('overview.widgets.data.marketTrend.failedCell');
+    expect(view.table!.rows[2]!.cells[1]).toBe('—');
+    if (view.chart?.kind !== 'lines') throw new Error('expected a lines chart');
+    expect(view.chart.note).toMatch(/noteFailed[^}]*Broken/);
+    expect(view.chart.note).toMatch(/noteNoHistory[^}]*Nothing/);
+    expect(view.chart.note).not.toMatch(/noteFailed[^}]*Nothing/);
+  });
+
+  it('names the global market, not the hubs, when every line is global', () => {
+    const view = marketTrend(data([short]), ctx(30, { trendItems: [44992], trendHubs: ['jita'] }));
+    expect(view.table!.footer).toContain('whereGlobal');
+    expect(view.table!.footer).not.toContain('Jita');
+    expect(view.summary).not.toContain('Jita');
+    if (view.chart?.kind !== 'lines') throw new Error('expected a lines chart');
+    expect(view.chart.note).toContain('whereGlobal');
+    expect(view.chart.summary).not.toContain('Jita');
+  });
+
+  it('keeps the hub names for a mix of global and hub lines', () => {
+    const view = marketTrend(data([rising, short]), ctx());
+    expect(view.table!.footer).toContain('whereHub');
+  });
+
+  it('surfaces lines dropped by the cap on the table and chart, not only the Number view', () => {
+    const many = Array.from({ length: 8 }, (_, i) => line(100 + i, `Item ${i}`, [1, 2]));
+    const view = marketTrend(data([rising, ...many]), ctx());
+    const omitted = 'overview.widgets.data.marketTrend.omitted{"count":3}';
+    expect(view.table!.footer).toContain(omitted);
+    if (view.chart?.kind !== 'lines') throw new Error('expected a lines chart');
+    expect(view.chart.note).toContain(omitted);
   });
 
   it('puts the biggest 7 day mover in the Number view and flags the age-out', () => {
@@ -142,7 +183,7 @@ describe('marketTrend builder', () => {
         'Tritanium · Amarr',
       ]);
       expect(view.table!.footer).toBe(
-        'overview.widgets.data.marketTrend.footer{"hub":"Jita, Amarr"}'
+        'overview.widgets.data.marketTrend.footer{"where":"overview.widgets.chart.marketTrend.whereHub{\\"hub\\":\\"Jita, Amarr\\"}"}'
       );
     });
 

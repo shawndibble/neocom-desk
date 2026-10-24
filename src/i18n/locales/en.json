@@ -4474,10 +4474,16 @@
           }
         },
         "marketTrend": {
-          "summary_one": "Price trend of {{count}} item at {{hub}} over {{days}} days.",
-          "summary_other": "Price trend of {{count}} items at {{hub}} over {{days}} days.",
+          "summary_one": "Price trend of {{count}} item {{where}} over {{days}} days.",
+          "summary_other": "Price trend of {{count}} items {{where}} over {{days}} days.",
+          "whereHub": "at {{hub}}",
+          "whereGlobal": "on the global market ({{items}})",
+          "noteNoHistory_one": "{{lines}} has no price history.",
+          "noteNoHistory_other": "No price history for {{lines}}.",
+          "noteFailed_one": "{{lines}} could not be loaded.",
+          "noteFailed_other": "{{lines}} could not be loaded.",
           "summaryLine": "{{item}} {{change}}.",
-          "note": "Change in the daily average since the start of the range, at {{hub}}",
+          "note": "Change in the daily average since the start of the range, {{where}}.",
           "range": "{{days}} days",
           "tip": "{{change}} · {{price}} ISK · {{volume}} sold"
         }
@@ -4582,7 +4588,8 @@
         },
         "marketTrend": {
           "unit": "{{item}} · {{days}} days",
-          "footer": "Daily average at {{hub}}",
+          "footer": "Daily average {{where}}.",
+          "failedCell": "Not loaded",
           "omitted_one": "{{count}} more line isn't shown.",
           "omitted_other": "{{count}} more lines aren't shown.",
           "noHistory": "No price history yet"
@@ -5679,6 +5686,24 @@
       "sizeBadge": "Size {{size}}",
       "onBoard": "On your Overview ×{{count}}",
       "added": "Added",
+      "presets": {
+        "plex": {
+          "title": "PLEX price",
+          "desc": "Market trend of PLEX, ready to go"
+        },
+        "injector": {
+          "title": "Large Skill Injector price",
+          "desc": "Market trend of the Large Skill Injector, ready to go"
+        },
+        "minerals": {
+          "title": "Mineral prices",
+          "desc": "Market trend of Tritanium through Zydrine, ready to go"
+        },
+        "ore": {
+          "title": "Ore prices",
+          "desc": "Market trend of six common raw ores, ready to go"
+        }
+      },
       "noMatchHint": "Try another word, or clear the search to see every widget.",
       "clearSearch": "Clear search",
       "browseAll": "Browse all",
@@ -5889,11 +5914,22 @@
         "minerals": "Minerals",
         "ice": "Ice products",
         "ore": "Ore",
+        "compressedOre": "Compressed ore",
+        "iceOre": "Ice ore",
+        "compressedIceOre": "Compressed ice ore",
+        "moonOre": "Moon ore",
+        "compressedMoonOre": "Compressed moon ore",
         "plex": "PLEX and skill injectors"
       },
       "trendQuickbarEmpty": "Your Quickbar is empty. Pin items in the Market browser, or pick from another list.",
       "trendLoading": "Loading the market catalogue…",
-      "trendLoadFailed": "Could not load the market catalogue. Try again later.",
+      "trendLoadFailed": "Could not load the market catalogue.",
+      "trendRetry": "Retry",
+      "trendUnknownItem": "#{{id}}",
+      "trendLines_one": "These picks draw {{count}} line at your trade hubs.",
+      "trendLines_other": "These picks draw {{count}} lines at your trade hubs.",
+      "trendOverflow": "These picks make {{total}} lines but the chart draws {{drawn}} (at most {{max}}). Pick fewer items or trade hubs.",
+      "trendHidden": "Not drawn: {{names}}.",
       "trendPicked": "{{count}} of {{max}} chosen.",
       "trendHint": "Each item is drawn at each trade hub you tick, up to six lines. PLEX trades in one region, so it is drawn once.",
       "trendFollowQuickbar": "Follow my Quickbar",

@@ -156,6 +156,27 @@ describe('Gallery', () => {
     expect(screen.getByRole('dialog', { name: 'Add a widget' })).toBeInTheDocument();
   });
 
+  it('lists the Market Trend presets beside the plain card and adds one', async () => {
+    const { user, dialog } = await openGallery();
+    for (const name of [
+      'PLEX price',
+      'Large Skill Injector price',
+      'Mineral prices',
+      'Ore prices',
+    ]) {
+      expect(within(dialog).getByRole('button', { name: `Add ${name}` })).toBeInTheDocument();
+    }
+    await user.click(within(dialog).getByRole('button', { name: 'Add PLEX price' }));
+    expect(within(itemOf(dialog, 'PLEX price')).getByRole('status')).toHaveTextContent('Added');
+    // The plain card counts the widget (it is a Market trend) but can still add a plain one.
+    const plain = itemOf(dialog, 'Market trend');
+    expect(
+      within(plain).getByRole('button', { name: 'Add another Market trend' })
+    ).toBeInTheDocument();
+    // A second add of the same preset is allowed.
+    await user.click(within(dialog).getByRole('button', { name: 'Add PLEX price' }));
+  });
+
   it('says a kind is on the Overview, with Add another and no second primary', async () => {
     const { dialog } = await openGallery();
     const item = itemOf(dialog, 'Mail');

@@ -22,6 +22,8 @@ export interface MarketTrendSeries {
   /** Where the item's Price History opens. */
   to: string;
   fromCache: boolean;
+  /** The read failed (not a type with no market): the points are empty because nothing loaded. */
+  failed: boolean;
 }
 
 export interface MarketTrendFeed {
@@ -90,9 +92,13 @@ export async function loadMarketTrend(request: MarketTrendRequest): Promise<Mark
         global ? { mode: 'region', regionId: global.regionId } : { mode: 'hub', hubId: hub.id }
       );
       // A type with no market (ESI 400) is a row of unknowns; any other failure is counted.
+      let failed = false;
       const result = await loadPriceHistory(global?.regionId ?? hub.regionId, ref.typeId).catch(
         (err: unknown) => {
-          if (!(err instanceof EsiError && err.status === 400)) failures += 1;
+          if (!(err instanceof EsiError && err.status === 400)) {
+            failures += 1;
+            failed = true;
+          }
           return null;
         }
       );
@@ -114,6 +120,7 @@ export async function loadMarketTrend(request: MarketTrendRequest): Promise<Mark
           points: points.filter((p) => p.date >= cutoff),
           to: `/market/browser?${new URLSearchParams(params)}`,
           fromCache: result?.fromCache ?? false,
+          failed,
         } satisfies MarketTrendSeries,
       };
     })

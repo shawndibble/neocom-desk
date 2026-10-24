@@ -15,6 +15,7 @@ import type {
   RaidsWhere,
   OverviewLayout,
   WidgetRange,
+  WidgetInit,
   WidgetScope,
   WidgetSize,
   WidgetView,
@@ -23,7 +24,7 @@ import type { RowsPerPage } from './tableSortPage';
 
 export interface OverviewEditActions {
   /** Add one widget of `kind` at the end, scroll to it and flash it. */
-  add: (kind: string) => void;
+  add: (kind: string, init?: WidgetInit) => void;
   remove: (id: string) => void;
   resize: (id: string, size: WidgetSize) => void;
   duplicate: (id: string) => void;

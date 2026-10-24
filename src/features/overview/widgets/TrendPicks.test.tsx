@@ -24,8 +24,18 @@ vi.mock('@/features/market/useQuickbar', () => ({
 vi.mock('@/features/market/hub', () => ({
   useMarketHub: (select: (s: { value: string }) => unknown) => select({ value: 'jita' }),
 }));
+vi.mock('@/features/market/orderBookView', () => ({
+  useGlobalMarketOverrides: () => new Map([[44992, { regionId: 1, regionName: 'Global' }]]),
+}));
+const sde = vi.hoisted(() => ({ failNext: false }));
 vi.mock('@/sde/loadMarketSde', () => ({
-  loadMarketGroups: async () => [{ id: 1857, name: 'Minerals', parentId: 533, hasTypes: true }],
+  loadMarketGroups: async () => {
+    if (sde.failNext) {
+      sde.failNext = false;
+      throw new Error('offline');
+    }
+    return [{ id: 1857, name: 'Minerals', parentId: 533, hasTypes: true }];
+  },
   loadMarketTypes: async () => [
     { typeId: 36, name: 'Mexallon', marketGroupId: 1857, volume: 1 },
     { typeId: 44992, name: 'PLEX', marketGroupId: 1923, volume: 1 },
@@ -73,6 +83,42 @@ describe('TrendItemsDialog', () => {
     open(widget({ trendItems: [1, 2, 3, 4, 5, 6] }));
     expect(screen.getByRole('checkbox', { name: 'Tritanium' })).toBeDisabled();
     expect(screen.getByText(/6 of 6 chosen/)).toBeInTheDocument();
+  });
+
+  it('lists every ore source in the dropdown', async () => {
+    open();
+    const labels = screen.getAllByRole('option').map((o) => o.textContent);
+    expect(labels).toEqual(expect.arrayContaining(['Compressed ore', 'Ice ore', 'Moon ore']));
+  });
+
+  it('warns when the picks make more lines than the chart draws', () => {
+    open(widget({ trendItems: [34, 35, 36, 37], trendHubs: ['jita', 'amarr', 'rens'] }));
+    expect(screen.getByRole('alert')).toHaveTextContent(/12 lines but the chart draws 6/);
+    expect(screen.getByRole('alert')).toHaveTextContent(/Not drawn: #36, #37/);
+  });
+
+  it('counts PLEX once whatever the hubs', () => {
+    open(widget({ trendItems: [44992, 34], trendHubs: ['jita', 'amarr'] }));
+    expect(screen.getByText(/draw 3 lines/)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('closes without storing when a Quickbar-following widget is saved unchanged', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<TrendItemsDialog widget={widget()} title="Market Trend" open onClose={onClose} />);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(setTrendItems).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('retries a failed catalogue load', async () => {
+    const user = userEvent.setup();
+    sde.failNext = true;
+    open();
+    await user.selectOptions(screen.getByRole('combobox'), 'minerals');
+    await user.click(await screen.findByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('checkbox', { name: 'Mexallon' })).toBeInTheDocument();
   });
 
   it('goes back to following the Quickbar', async () => {

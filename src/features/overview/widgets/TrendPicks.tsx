@@ -19,11 +19,17 @@ import {
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { useMarketHub } from '@/features/market/hub';
 import { TRADE_HUBS } from '@/market/hubs';
-import { TREND_MAX_SERIES } from '@/engine/market/trendSeries';
+import { planTrendSeries, TREND_MAX_SERIES } from '@/engine/market/trendSeries';
+import { useGlobalMarketOverrides } from '@/features/market/orderBookView';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOverviewEdit } from './editContext';
 import { MAX_TREND_HUBS, type Widget } from './layout';
-import { trendCatalogue, type TrendSource, type TrendSourceItem } from './trendCatalogue';
+import {
+  TREND_SOURCE_IDS,
+  trendCatalogue,
+  type TrendSource,
+  type TrendSourceItem,
+} from './trendCatalogue';
 
 /** The hubs a widget prices at: its own picks, else the pilot's Market hub. */
 function useTrendHubs(widget: Widget): { pilot: string; current: string[] } {
@@ -63,7 +69,10 @@ export function TrendHubsMenuGroup({ widget }: { widget: Widget }) {
 }
 
 type SourceChoice = 'quickbar' | TrendSource['id'];
-const SOURCE_CHOICES: readonly SourceChoice[] = ['quickbar', 'minerals', 'ice', 'ore', 'plex'];
+const SOURCE_CHOICES: readonly SourceChoice[] = ['quickbar', ...TREND_SOURCE_IDS];
+
+/** PLEX, the one global-market item known before the global markets list loads. */
+const PLEX_TYPE_ID = 44992;
 
 type Catalogue =
   { status: 'idle' | 'loading' | 'failed' } | { status: 'ready'; sources: TrendSource[] };
@@ -83,6 +92,9 @@ export function TrendItemsDialog({
   const { setTrendItems } = useOverviewEdit();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const quickbar = useQuickbar(characterId).items;
+  const { current: hubs } = useTrendHubs(widget);
+  // Global-market items are drawn once whatever the hubs; until the list loads only PLEX is known to be.
+  const globals = useGlobalMarketOverrides(open);
   const [source, setSource] = useState<SourceChoice>('quickbar');
   // Null until the pilot edits, so a Quickbar that loads after the dialog opens still seeds the list.
   const [edited, setEdited] = useState<number[] | null>(null);
@@ -129,6 +141,11 @@ export function TrendItemsDialog({
       for (const item of s.items) names.set(item.typeId, item.name);
   }
   const full = picked.length >= TREND_MAX_SERIES;
+  const plan = planTrendSeries(picked, hubs, (id) => globals?.has(id) ?? id === PLEX_TYPE_ID);
+  const drawnIds = new Set(plan.refs.map((ref) => ref.typeId));
+  const hidden = picked
+    .filter((id) => !drawnIds.has(id))
+    .map((id) => names.get(id) ?? t('overview.menu.trendUnknownItem', { id }));
   const toggle = (typeId: number, on: boolean) =>
     setEdited(on ? [...picked, typeId] : picked.filter((id) => id !== typeId));
 
@@ -138,6 +155,11 @@ export function TrendItemsDialog({
         className="grid gap-3"
         onSubmit={(event) => {
           event.preventDefault();
+          // Untouched picks on a widget that follows the Quickbar: saving would detach it for nothing.
+          if (edited === null && !widget.trendItems?.length) {
+            onClose();
+            return;
+          }
           setTrendItems(widget.id, picked);
           onClose();
         }}
@@ -186,14 +208,34 @@ export function TrendItemsDialog({
         )}
         {source !== 'quickbar' && catalogue.status === 'failed' && (
           <p className="text-xs text-danger" role="alert">
-            {t('overview.menu.trendLoadFailed')}
+            {t('overview.menu.trendLoadFailed')}{' '}
+            <Button type="button" size="sm" onClick={() => choose(source)}>
+              {t('overview.menu.trendRetry')}
+            </Button>
           </p>
         )}
 
         <p className="text-xs text-text-dim" aria-live="polite">
           {t('overview.menu.trendPicked', { count: picked.length, max: TREND_MAX_SERIES })}
-          {picked.length > 0 && ` ${picked.map((id) => names.get(id) ?? `#${id}`).join(', ')}`}
+          {picked.length > 0 &&
+            ` ${picked.map((id) => names.get(id) ?? t('overview.menu.trendUnknownItem', { id })).join(', ')}`}
         </p>
+        {picked.length > 0 && (
+          <p
+            className={plan.omitted > 0 ? 'text-xs text-warning' : 'text-xs text-text-dim'}
+            role={plan.omitted > 0 ? 'alert' : undefined}
+          >
+            {plan.omitted > 0
+              ? t('overview.menu.trendOverflow', {
+                  drawn: plan.refs.length,
+                  total: plan.refs.length + plan.omitted,
+                  max: TREND_MAX_SERIES,
+                })
+              : t('overview.menu.trendLines', { count: plan.refs.length })}
+            {hidden.length > 0 &&
+              ` ${t('overview.menu.trendHidden', { names: hidden.join(', ') })}`}
+          </p>
+        )}
         <p className="text-xs text-text-dim">{t('overview.menu.trendHint')}</p>
 
         <div className="flex flex-wrap justify-end gap-2">

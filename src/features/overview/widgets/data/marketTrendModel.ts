@@ -36,6 +36,8 @@ type TrendLine = MarketTrendSeries & { label: string };
 
 interface ResolvedTrend {
   hubName: string;
+  /** Every drawn line is a global-market item, so the hubs do not describe where it is priced. */
+  allGlobal: boolean;
   lines: TrendLine[];
   omitted: number;
   /** A pick the feed has not read yet, so the view waits rather than draw a part. */
@@ -63,6 +65,7 @@ function resolveTrend(
   }
   return {
     hubName: hubIds.map(hubName).join(', '),
+    allGlobal: lines.length > 0 && lines.every((l) => l.hubId === null),
     lines,
     omitted: plan.omitted,
     pending: lines.length < plan.refs.length,
@@ -84,6 +87,9 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
     return blank(MARKET_PATH, statusOf(feed, { loading: !feed?.error, hasData: false }));
   }
   const data = { ...resolved, items: resolved.lines, fetchedAt: raw.fetchedAt };
+  const where = data.allGlobal
+    ? t(`${C}.whereGlobal`, { items: [...new Set(data.items.map((i) => i.name))].join(', ') })
+    : t(`${C}.whereHub`, { hub: data.hubName });
   if (data.items.length === 0) {
     return {
       ...blank(MARKET_PATH, statusOf(feed, { isEmpty: true })),
@@ -97,12 +103,29 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
     d30: percentChange(item.points, 30),
     now: latestAverage(item),
   }));
+  const names = (flag: (i: TrendLine) => boolean) => data.items.filter(flag).map((i) => i.label);
+  const missing = names((i) => i.points.length === 0 && !i.failed);
+  const failedNames = names((i) => i.failed);
+  // Said wherever the lines are, so a pick that cannot be drawn is never just absent.
+  const notes = [
+    ...(failedNames.length > 0
+      ? [t(`${C}.noteFailed`, { count: failedNames.length, lines: failedNames.join(', ') })]
+      : []),
+    ...(missing.length > 0
+      ? [t(`${C}.noteNoHistory`, { count: missing.length, lines: missing.join(', ') })]
+      : []),
+    ...(data.omitted > 0 ? [t(`${D}.omitted`, { count: data.omitted })] : []),
+  ];
   const rows: TableRowModel[] = changes.map(({ item, d7, d30, now }) => ({
     key: item.key,
     to: item.to,
     cells: [
       item.label,
-      now === null ? UNKNOWN : { text: formatIskCompact(now), iskAmount: now },
+      now === null
+        ? item.failed
+          ? t(`${D}.failedCell`)
+          : UNKNOWN
+        : { text: formatIskCompact(now), iskAmount: now },
       d7 === null ? UNKNOWN : signedCell(trendText(d7), d7),
       d30 === null ? UNKNOWN : signedCell(trendText(d30), d30),
     ],
@@ -116,7 +139,7 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
       { key: 'd30', label: t(`${W}.col.d30`), align: 'end' as const, priority: 3 },
     ],
     rows,
-    footer: t(`${D}.footer`, { hub: data.hubName }),
+    footer: [t(`${D}.footer`, { where }), ...notes].join(' '),
   };
 
   const mover = changes
@@ -130,12 +153,12 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
       ? {
           value: trendText(mover.d7),
           unit: t(`${D}.unit`, { item: mover.item.label, days: 7 }),
-          secondary: { text: t(`${D}.footer`, { hub: data.hubName }) },
+          secondary: { text: t(`${D}.footer`, { where }) },
           notes: data.omitted > 0 ? [t(`${D}.omitted`, { count: data.omitted })] : [],
           tone: 'clear',
         }
       : { value: UNKNOWN, unit: t(`${D}.noHistory`), tone: 'clear' },
-    summary: t(`${C}.summary`, { count: data.items.length, days: range, hub: data.hubName }),
+    summary: t(`${C}.summary`, { count: data.items.length, days: range, where }),
     table,
   };
 
@@ -154,7 +177,7 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
   const chart: ChartModel = {
     kind: 'lines',
     summary: [
-      t(`${C}.summary`, { count: plotted.length, days: range, hub: data.hubName }),
+      t(`${C}.summary`, { count: plotted.length, days: range, where }),
       ...plotted.map((i) =>
         t(`${C}.summaryLine`, {
           item: data.items[i]!.label,
@@ -162,7 +185,7 @@ export const marketTrend: Builder = (feeds, { t, range, trendItems, trendHubs })
         })
       ),
     ].join(' '),
-    note: t(`${C}.note`, { hub: data.hubName }),
+    note: [t(`${C}.note`, { where }), ...notes].join(' '),
     low: trendText(rel(Math.min(...all))),
     high: trendText(rel(Math.max(...all))),
     rangeLabel: t(`${C}.range`, { days: range }),

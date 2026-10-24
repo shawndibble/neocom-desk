@@ -79,6 +79,14 @@ describe('loadMarketTrend', () => {
     loadPriceHistory.mockRejectedValueOnce(new EsiError(400, 'no market'));
     const feed = await loadMarketTrend(request([{ typeIds: [34, 35], hubIds: ['jita'] }]));
     expect(feed.series['34@jita']!.points).toEqual([]);
+    expect(feed.series['34@jita']!.failed).toBe(false);
+  });
+
+  it('flags a line whose read failed, while the others still load', async () => {
+    loadPriceHistory.mockRejectedValueOnce(new Error('offline'));
+    const feed = await loadMarketTrend(request([{ typeIds: [34, 35], hubIds: ['jita'] }]));
+    expect(feed.series['34@jita']!.failed).toBe(true);
+    expect(feed.series['35@jita']!.failed).toBe(false);
   });
 
   it('fails when every read fails, instead of showing "no history"', async () => {

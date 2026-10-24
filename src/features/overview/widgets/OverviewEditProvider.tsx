@@ -164,8 +164,8 @@ export function OverviewEditProvider({
         setToast(null);
         if (before !== null) commit(restoreLayout(before));
       },
-      add: (kind) => {
-        const result = addWidgetUndoable(layoutRef.current, kind, makeWidgetId);
+      add: (kind, init) => {
+        const result = addWidgetUndoable(layoutRef.current, kind, makeWidgetId, init);
         if (commitUndoable(result)) {
           const added = result?.layout.widgets.at(-1);
           if (added) flash(added.id);

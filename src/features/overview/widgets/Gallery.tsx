@@ -44,7 +44,8 @@ import {
 import { useOverviewEdit } from './editContext';
 import { sampleHasChart, sampleView } from './gallerySamples';
 import { type WidgetKindDef, type WidgetSize, type WidgetView } from './kinds';
-import { MAX_WIDGETS, newWidget } from './layout';
+import { MAX_WIDGETS, newWidget, type WidgetInit } from './layout';
+import { TREND_PRESETS, type TrendPreset } from './trendPresets';
 import { Widget } from './Widget';
 
 interface GalleryProps {
@@ -210,6 +211,61 @@ function GalleryItem({
   );
 }
 
+/** The kinds that list presets beside their own card, and the presets' kind. */
+const PRESET_KIND = 'marketTrend';
+
+/** A preset: adds the kind's widget with its items, title and view already set. Listed with its kind's card. */
+function PresetItem({
+  preset,
+  full,
+  isPhone,
+  justAdded,
+  onAdd,
+}: {
+  preset: TrendPreset;
+  full: boolean;
+  isPhone: boolean;
+  justAdded: boolean;
+  onAdd: (preset: TrendPreset, title: string) => void;
+}) {
+  const { t } = useTranslation();
+  const title = t(`overview.gallery.presets.${preset.id}.title`);
+  return (
+    <li className="grid gap-2 rounded-xs border border-line bg-panel-2 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">{title}</div>
+          <p className="mt-0.5 text-[0.8125rem] text-text-dim">
+            {t(`overview.gallery.presets.${preset.id}.desc`)}
+          </p>
+        </div>
+        <div className="shrink-0">
+          {full ? (
+            <span className="text-xs text-text-dim">{t('overview.gallery.limit')}</span>
+          ) : (
+            <Button
+              variant="primary"
+              size={isPhone ? 'md' : 'sm'}
+              className={isPhone ? 'min-h-11 min-w-20' : undefined}
+              aria-label={t('overview.gallery.addLabel', { title })}
+              onClick={() => onAdd(preset, title)}
+            >
+              {t('overview.gallery.add')}
+            </Button>
+          )}
+        </div>
+      </div>
+      <span
+        role="status"
+        className="flex h-4 items-center gap-1 text-xs font-semibold text-success"
+      >
+        {justAdded && <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
+        {justAdded ? t('overview.gallery.added') : ''}
+      </span>
+    </li>
+  );
+}
+
 type Density = 'grid' | 'list';
 
 function GalleryBody({
@@ -253,7 +309,11 @@ function GalleryBody({
   const full = edit.layout.widgets.length >= MAX_WIDGETS;
 
   const offered = board.kinds.filter(board.canDraw);
-  const matching = matchKinds(offered, query, (kind) => `${t(kind.titleKey)} ${t(kind.descKey)}`);
+  const matching = matchKinds(offered, query, (kind) => {
+    const own = `${t(kind.titleKey)} ${t(kind.descKey)}`;
+    if (kind.id !== PRESET_KIND) return own;
+    return `${own} ${TREND_PRESETS.map((p) => t(`overview.gallery.presets.${p.id}.title`)).join(' ')}`;
+  });
   // "Not on your board" only narrows the wide layout: the drawer keeps listing everything.
   const hidingUsed = browse && unusedOnly;
   const shown = hidingUsed ? notOnBoard(matching, counts, addedHere) : matching;
@@ -269,18 +329,18 @@ function GalleryBody({
     })),
   ];
 
-  const add = (id: string) => {
-    edit.add(id);
+  const add = (id: string, init?: WidgetInit, key = id) => {
+    edit.add(id, init);
     onAdded();
     if (isPhone) return;
     setAddedHere((prev) => new Set(prev).add(id));
-    setJustAdded(id);
+    setJustAdded(key);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => setJustAdded(null), ADDED_MS);
   };
 
   const withPreview = !isPhone && !(browse && density === 'list');
-  const renderItem = (kind: WidgetKindDef) => (
+  const renderItem = (kind: WidgetKindDef) => [
     <GalleryItem
       key={kind.id}
       kind={kind}
@@ -290,9 +350,23 @@ function GalleryBody({
       showPreview={withPreview}
       dim={browse && (counts.get(kind.id) ?? 0) > 0}
       justAdded={justAdded === kind.id}
-      onAdd={add}
-    />
-  );
+      onAdd={(id) => add(id)}
+    />,
+    ...(kind.id === PRESET_KIND
+      ? TREND_PRESETS.map((preset) => (
+          <PresetItem
+            key={`${kind.id}:${preset.id}`}
+            preset={preset}
+            full={full}
+            isPhone={isPhone}
+            justAdded={justAdded === `${kind.id}:${preset.id}`}
+            onAdd={(p, title) =>
+              add(kind.id, { title, trendItems: p.items, view: p.view }, `${kind.id}:${p.id}`)
+            }
+          />
+        ))
+      : []),
+  ];
   const listClass =
     browse && density === 'grid'
       ? 'grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-2'

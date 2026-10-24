@@ -123,14 +123,28 @@ export function newWidget(kind: WidgetKindId, id: string): Widget | null {
   return widget;
 }
 
+/** What the Gallery's presets set on the widget they add; the rest stays the kind's default. */
+export interface WidgetInit {
+  title?: string;
+  trendItems?: readonly number[];
+  view?: WidgetView;
+}
+
 export function addWidget(
   layout: OverviewLayout,
   kind: WidgetKindId,
-  makeId: MakeId
+  makeId: MakeId,
+  init?: WidgetInit
 ): OverviewLayout {
   if (!canAdd(layout, kind)) return layout;
-  const widget = newWidget(kind, uniqueId(layout, makeId));
-  if (!widget) return layout;
+  const base = newWidget(kind, uniqueId(layout, makeId));
+  if (!base) return layout;
+  const widget: Widget = { ...base };
+  if (init?.title) widget.title = init.title;
+  if (init?.view && getKind(kind)?.views.includes(init.view)) widget.view = init.view;
+  if (init?.trendItems?.length && getKind(kind)?.hasTrendSources) {
+    widget.trendItems = [...init.trendItems];
+  }
   return { ...layout, widgets: [...layout.widgets, widget] };
 }
 
@@ -355,9 +369,10 @@ const UNDO_LABELS = {
 export function addWidgetUndoable(
   layout: OverviewLayout,
   kind: WidgetKindId,
-  makeId: MakeId
+  makeId: MakeId,
+  init?: WidgetInit
 ): UndoableResult | null {
-  return undoable(layout, addWidget(layout, kind, makeId), UNDO_LABELS.added);
+  return undoable(layout, addWidget(layout, kind, makeId, init), UNDO_LABELS.added);
 }
 
 export function removeWidgetUndoable(layout: OverviewLayout, id: string): UndoableResult | null {
