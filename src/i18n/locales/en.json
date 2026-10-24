@@ -14301,8 +14301,13 @@
       "stopLabel": "Stop {{number}}: {{name}}",
       "unnamed": "System {{id}}",
       "add": "+ Add stop",
-      "addLabel": "Add stop, search solar systems",
-      "destinationLabel": "Destination, search solar systems",
+      "addLabel": "Add stop, search systems and stations",
+      "destinationLabel": "Destination, search systems and stations",
+      "kind": {
+        "system": "System",
+        "station": "Station",
+        "structure": "Structure"
+      },
       "full_one": "Up to {{count}} stop.",
       "full_other": "Up to {{count}} stops.",
       "remove": "Remove {{name}}",

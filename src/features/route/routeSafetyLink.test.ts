@@ -38,6 +38,9 @@ describe('pinFirstLeg', () => {
 describe('routeToHref', () => {
   it('opens Route Safety to the system, leaving the start to the page (the current system)', () => {
     expect(routeToHref(30000142)).toBe('/travel/route?stops=30000142');
+    expect(routeToHref(30000142, null, null, 60003760)).toBe(
+      '/travel/route?stops=30000142%3A60003760'
+    );
   });
 
   it("carries the page's own route preference, so the route opens the way the count was worked out", () => {
