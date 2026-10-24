@@ -964,6 +964,13 @@ link goes and _what_ a view shows is Neocom Desk's own. When this section is
 silent, follow the platform convention (WCAG 2.2, WAI-ARIA APG, Apple HIG,
 Material, Windows).
 
+**Tooltip timing.** A hover waits 400ms before a bubble opens, so a pointer
+crossing a toolbar or table doesn't drop one in its path. Once a bubble is up,
+the next trigger opens at once, and that holds for 300ms after it closes, so
+reading along a row of icons stays quick. Keyboard focus and touch never wait.
+`TooltipProvider` at the app root owns these numbers; chart readouts
+(`PointTooltip`) follow the pointer and never wait.
+
 **Deep links that name a field.** A link whose job is "set this value" (the PI "Set the rate on Plan" link, `#customs`) opens the view with the section expanded and the first field focused, so the pilot lands on the control, not a page that merely mentions it.
 
 **Wire focus (PI Map).** Hover or focus on a planet or product tile thickens its own wires and dots their two ends; every other wire steps back. Hovering or focusing a product lights its whole chain back to the planets, as a trace would. A wire that jumps a tier is dashed; a planet-to-raw wire is amber. The map's help legend names all three. All wires show at rest, so this only reinforces (touch gets it on tap focus).

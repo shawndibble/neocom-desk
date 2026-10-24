@@ -34,7 +34,7 @@ import { ReloadPrompt } from './ReloadPrompt';
 import './installApp'; // registers the beforeinstallprompt listener at boot
 import { BootScreen } from './BootScreen';
 import { ROUTER_BASENAME } from './routerPath';
-import { Spinner } from '@/components/ui';
+import { Spinner, TooltipProvider } from '@/components/ui';
 import { useTranslation } from 'react-i18next';
 import { RequireCharacter } from './RequireCharacter';
 import { ScopeGate } from './ScopeGate';
@@ -398,75 +398,77 @@ export function App() {
   return (
     <ErrorBoundary>
       <AppEffects />
-      <BrowserRouter basename={ROUTER_BASENAME}>
-        <AuthFailureRedirect />
-        <AnalyticsPageViewTracker />
-        <LandingShellOffLandingRelease />
-        <DocumentTitleTracker />
-        <StaleStoresReloader />
-        <Suspense key={numberMark} fallback={<RouteFallback />}>
-          <SentryRoutes>
-            <Route path="/" element={<Root />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/callback" element={<Callback />} />
-            {/* Below: a logged-in Character, then the route's own scopes. */}
-            <Route element={<RequireCharacter />}>
-              <Route element={<SignedInShell />}>
-                {/* A tabbed page (`pageTabs.ts`) mounts once at `<path>/*`, so
+      <TooltipProvider>
+        <BrowserRouter basename={ROUTER_BASENAME}>
+          <AuthFailureRedirect />
+          <AnalyticsPageViewTracker />
+          <LandingShellOffLandingRelease />
+          <DocumentTitleTracker />
+          <StaleStoresReloader />
+          <Suspense key={numberMark} fallback={<RouteFallback />}>
+            <SentryRoutes>
+              <Route path="/" element={<Root />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/callback" element={<Callback />} />
+              {/* Below: a logged-in Character, then the route's own scopes. */}
+              <Route element={<RequireCharacter />}>
+                <Route element={<SignedInShell />}>
+                  {/* A tabbed page (`pageTabs.ts`) mounts once at `<path>/*`, so
                   its tabs are one route instance: switching tab keeps the
                   page mounted, and none of the tables above gain an entry. */}
-                {FEATURE_ROUTES.map(([path, element]) => {
-                  const tabs = PAGE_TABS[path];
-                  const gated = <ScopeGate path={path}>{element}</ScopeGate>;
-                  return (
-                    <Route
-                      key={path}
-                      path={routePatternFor(path)}
-                      element={
-                        tabs ? (
-                          <TabRoute page={tabs} legacy={PAGE_LEGACY_LOCATIONS[path]}>
-                            {gated}
-                          </TabRoute>
-                        ) : (
-                          gated
-                        )
-                      }
-                    />
-                  );
-                })}
+                  {FEATURE_ROUTES.map(([path, element]) => {
+                    const tabs = PAGE_TABS[path];
+                    const gated = <ScopeGate path={path}>{element}</ScopeGate>;
+                    return (
+                      <Route
+                        key={path}
+                        path={routePatternFor(path)}
+                        element={
+                          tabs ? (
+                            <TabRoute page={tabs} legacy={PAGE_LEGACY_LOCATIONS[path]}>
+                              {gated}
+                            </TabRoute>
+                          ) : (
+                            gated
+                          )
+                        }
+                      />
+                    );
+                  })}
+                </Route>
               </Route>
-            </Route>
-            {/* A Fitting Share Code opened with no session (#1544) — it must
+              {/* A Fitting Share Code opened with no session (#1544) — it must
               open with no Character, so it sits outside
               RequireCharacter/ScopeGate. A
               visitor with a Character never sees it: FittingShared redirects
               straight into the editor instead. routeScopes.test.ts asserts
               this exemption is deliberate. */}
-            <Route path="/share/fitting" element={<FittingShared />} />
-            {/* A Share Link (`/s/<id>`), for any share type — same
+              <Route path="/share/fitting" element={<FittingShared />} />
+              {/* A Share Link (`/s/<id>`), for any share type — same
               exemption. `/share/<id>` is the old spelling of the same link
               (ids minted before the short key), kept so links already sent
               still open; the literal `/share/fitting` above outranks it. */}
-            <Route path="/s/:shareId" element={<SharedLink />} />
-            {/* The invite link: a signed-out visitor sees what it is for before logging in. */}
-            <Route path="/communities/join/:code" element={<CommunityJoin />} />
-            <Route path="/share/:shareId" element={<SharedLink />} />
-            {/* A Statement's verify link (#4066): read-only, no login, the token is the credential. */}
-            <Route path="/corp-tax-book/verify/:token" element={<CorpTaxBookVerify />} />
-            {/* The payee's "Remove now" link in a removal mail (#4520): signs in on the page. */}
-            <Route path="/corp-tax-book/remove-now/:code" element={<CorpTaxBookRemoveNow />} />
-            {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
-            <Route path="/error" element={<ErrorProbe />} />
-            <Route path="*" element={<NotFound />} />
-          </SentryRoutes>
-        </Suspense>
-        <ReloadPrompt />
-        <EntityInfoRoute />
-        <PublicInfoModal />
-        <SkillDetailModal />
-        <ItemInfoModal />
-        <PlaceInfoModal />
-      </BrowserRouter>
+              <Route path="/s/:shareId" element={<SharedLink />} />
+              {/* The invite link: a signed-out visitor sees what it is for before logging in. */}
+              <Route path="/communities/join/:code" element={<CommunityJoin />} />
+              <Route path="/share/:shareId" element={<SharedLink />} />
+              {/* A Statement's verify link (#4066): read-only, no login, the token is the credential. */}
+              <Route path="/corp-tax-book/verify/:token" element={<CorpTaxBookVerify />} />
+              {/* The payee's "Remove now" link in a removal mail (#4520): signs in on the page. */}
+              <Route path="/corp-tax-book/remove-now/:code" element={<CorpTaxBookRemoveNow />} />
+              {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
+              <Route path="/error" element={<ErrorProbe />} />
+              <Route path="*" element={<NotFound />} />
+            </SentryRoutes>
+          </Suspense>
+          <ReloadPrompt />
+          <EntityInfoRoute />
+          <PublicInfoModal />
+          <SkillDetailModal />
+          <ItemInfoModal />
+          <PlaceInfoModal />
+        </BrowserRouter>
+      </TooltipProvider>
     </ErrorBoundary>
   );
 }

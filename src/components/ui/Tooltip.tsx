@@ -1,5 +1,6 @@
 import {
   cloneElement,
+  createContext,
   useContext,
   isValidElement,
   useEffect,
@@ -18,6 +19,38 @@ import { HOLD_MS, HOLD_SLOP_PX, TooltipHoldContext } from './tooltipHold';
 
 /** Generous bound on a device's touchend→click echo delay; the tests confirm a later, real click still closes the tooltip normally once this expires. */
 const TOUCH_CLICK_ECHO_MS = 700;
+
+/** Hover wait before a bubble opens, so a pointer passing over a trigger doesn't pop one. Focus and touch skip it. */
+export const TOOLTIP_HOVER_DELAY_MS = 400;
+/** After a bubble closes, the window in which the next trigger opens with no wait (moving along a toolbar). */
+const TOOLTIP_SKIP_DELAY_MS = 300;
+
+const InsideTooltipProvider = createContext(false);
+
+/**
+ * App-root timing for every `Tooltip` under it (§6c): hover waits, and one
+ * shared Radix provider lets a neighbouring trigger open at once. A `Tooltip`
+ * outside it (a test, a story) opens on hover immediately. A bubble that
+ * unmounts while open never tells Radix, so the next hover skips the wait once.
+ */
+export function TooltipProvider({ children }: { children: ReactNode }) {
+  return (
+    <InsideTooltipProvider.Provider value={true}>
+      <TooltipPrimitive.Provider
+        delayDuration={TOOLTIP_HOVER_DELAY_MS}
+        skipDelayDuration={TOOLTIP_SKIP_DELAY_MS}
+      >
+        {children}
+      </TooltipPrimitive.Provider>
+    </InsideTooltipProvider.Provider>
+  );
+}
+
+/** Radix needs a provider; a `Tooltip` with no `TooltipProvider` above brings its own, with no wait. */
+function ProviderUnlessShared({ children }: { children: ReactNode }) {
+  if (useContext(InsideTooltipProvider)) return children;
+  return <TooltipPrimitive.Provider delayDuration={0}>{children}</TooltipPrimitive.Provider>;
+}
 
 /**
  * Whether the latest input was a pointer press rather than a key. jsdom has no
@@ -255,7 +288,7 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
       : children;
 
   return (
-    <TooltipPrimitive.Provider delayDuration={0}>
+    <ProviderUnlessShared>
       <TooltipPrimitive.Root
         // No content, no bubble: a caller keeps one stable tree and passes
         // nothing while it has nothing to say.
@@ -292,7 +325,7 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
           </TooltipPrimitive.Portal>
         )}
       </TooltipPrimitive.Root>
-    </TooltipPrimitive.Provider>
+    </ProviderUnlessShared>
   );
 }
 
