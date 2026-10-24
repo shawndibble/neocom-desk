@@ -1,5 +1,6 @@
 // Collector books: removing a moon owner against the Firestore emulator (issue #4520).
 // Runs only under `npm run test:rules` at the repo root; a plain `npm test` skips it.
+import type { Caller } from './actorAuth.js';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore, type Firestore } from 'firebase-admin/firestore';
@@ -18,7 +19,7 @@ import {
   recordRemovalSent,
   startFeederRemoval,
 } from './corpTaxBookFeederRemoval.js';
-import { turnOnBook, verifyOfficer, type BookDeps, type Caller } from './corpTaxBookStore.js';
+import { turnOnBook, verifyOfficer, type BookDeps } from './corpTaxBookStore.js';
 import { encryptRefreshToken } from './alertGrantCrypto.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 

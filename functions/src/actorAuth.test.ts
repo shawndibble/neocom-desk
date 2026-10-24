@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ROLES_SCOPE } from './corpTaxBookEsi.js';
 import {
   assertOwnToken,
+  callerFromAuth,
   fail,
   requireRolesScope,
   requireLiveRoles,
@@ -54,6 +55,23 @@ describe('signedInCharacter', () => {
     expect(e.code).toBe('unauthenticated');
     expect(e.message).toBe('Sign in with a Character first');
     expect(reasonOf(e)).toBe('not-signed-in');
+  });
+});
+
+describe('callerFromAuth', () => {
+  it('returns the uid and ownerHash of a signed-in Character', () => {
+    expect(callerFromAuth({ uid: 'char:42', token: { ownerHash: 'hash-a' } })).toEqual(caller);
+  });
+  it.each([
+    ['no auth', undefined],
+    ['anonymous uid', { uid: 'anon123', token: { ownerHash: 'h' } }],
+    ['uid with a char: prefix only', { uid: 'char:42x', token: { ownerHash: 'h' } }],
+    ['no ownerHash claim', { uid: 'char:42', token: {} }],
+    ['non-string ownerHash', { uid: 'char:42', token: { ownerHash: 7 } }],
+  ])('refuses %s with the signed-out error', async (_name, auth) => {
+    const e = await caught(() => callerFromAuth(auth));
+    expect(e.code).toBe('unauthenticated');
+    expect(e.message).toBe('Sign in with a Character first');
   });
 });
 

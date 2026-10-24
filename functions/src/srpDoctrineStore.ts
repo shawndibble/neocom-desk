@@ -3,9 +3,9 @@
 // the audit log in the same transaction. Any member may preview the fit check of their
 // own loss; that writes nothing. Parsing: srpDoctrineInput.ts; the match: srpDoctrineCheck.ts.
 
+import { fail, type Caller } from './actorAuth.js';
 import { randomBytes } from 'node:crypto';
 import type { BookCall } from './corpTaxBook.js';
-import { fail, type Caller } from './corpTaxBookStore.js';
 import { doctrinesCollection } from './srpDoctrineRead.js';
 import type { KillmailRef } from './srpKillmail.js';
 import {

@@ -51,11 +51,9 @@ import {
 import {
   appendAudit,
   bookRef,
-  fail,
   feederRef,
   ownBookFloor,
   type BookDeps,
-  type Caller,
 } from './corpTaxBookStore.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import {
@@ -64,6 +62,8 @@ import {
   signedInCharacter,
   verifyAccessToken,
   verifyCallerToken,
+  fail,
+  type Caller,
 } from './actorAuth.js';
 
 export interface FeederGrantDeps extends CorpSyncDeps {

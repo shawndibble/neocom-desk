@@ -1,8 +1,8 @@
 // Per-character cap on SRP killmail fetches. Preview and filing each cost an outbound zKillboard
 // and ESI call before the victim check, so a member could otherwise loop them against any id.
 
+import { fail } from './actorAuth.js';
 import type { Firestore } from 'firebase-admin/firestore';
-import { fail } from './corpTaxBookStore.js';
 import { CORPS_COLLECTION, SRP_THROTTLE } from './srpTypes.js';
 
 export const FETCH_LIMIT = 20;

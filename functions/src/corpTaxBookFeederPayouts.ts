@@ -4,6 +4,7 @@
 // moon owner writes. Failures carry a stable `reason`; no player-facing text lives here.
 // Payouts never touch Tax Payment matching or Statements.
 
+import { fail, type Caller } from './actorAuth.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
 import {
@@ -31,11 +32,9 @@ import {
   appendAudit,
   authorizeOfficer,
   bookRef,
-  fail,
   feederRef,
   type Actor,
   type BookDeps,
-  type Caller,
 } from './corpTaxBookStore.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 

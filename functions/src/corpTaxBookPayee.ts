@@ -5,6 +5,7 @@
 // appends `payeeHistory` (payout matching), records who set it, and names whom the changing
 // officer's client mails: the other side. Failures carry a stable `reason`; no player-facing text.
 
+import { fail, type Caller } from './actorAuth.js';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { record } from './communities.js';
 import { parseFeederTarget, type FeederTargetCall } from './corpTaxBook.js';
@@ -28,12 +29,10 @@ import type { FeederRecord, PayeeSetBy } from './corpTaxBookFeeders.js';
 import {
   appendAudit,
   authorizeOfficer,
-  fail,
   feederRef,
   liveOfficerIds,
   type Actor,
   type BookDeps,
-  type Caller,
 } from './corpTaxBookStore.js';
 
 function parsePayee(data: unknown): Payee {

@@ -105,8 +105,6 @@ export interface BookDeps {
   corporationCeo?: (corporationId: number) => Promise<number | undefined>;
 }
 
-export type { Caller };
-
 type Data = Record<string, unknown>;
 
 export const bookRef = (db: Firestore, corporationId: number) =>
@@ -133,8 +131,6 @@ export async function liveOfficerIds(
 }
 
 const rand = (bytes = 6) => randomBytes(bytes).toString('base64url');
-
-export { fail };
 
 // --- Officer verification --------------------------------------------------
 

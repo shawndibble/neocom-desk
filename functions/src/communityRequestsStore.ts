@@ -6,6 +6,7 @@
 // read from it (never trusted from the client), and the open-Requests cap is
 // counted inside the same transaction as the write.
 
+import type { Caller } from './actorAuth.js';
 import { type Firestore, type Transaction } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { decideMailRelease, utcDayKey } from './communities.js';
@@ -30,12 +31,7 @@ import {
   type PostRequestInput,
   type OwnerActionDecision,
 } from './communityRequests.js';
-import {
-  communityRef,
-  loadCommunity,
-  memberRef,
-  type CallerCharacter,
-} from './communitiesStore.js';
+import { communityRef, loadCommunity, memberRef } from './communitiesStore.js';
 
 const requestCollection = (db: Firestore, communityId: string) =>
   communityRef(db, communityId).collection(REQUESTS_COLLECTION);
@@ -70,7 +66,7 @@ async function requireMember(
   tx: Transaction,
   db: Firestore,
   communityId: string,
-  caller: CallerCharacter
+  caller: Caller
 ): Promise<{ characterName: string }> {
   const member = await tx.get(memberRef(db, communityId, caller.uid));
   if (!member.exists || member.get('ownerHash') !== caller.ownerHash) {
@@ -131,7 +127,7 @@ async function countOpen(
 /** Posts a Request. Returns its id; the client refetches the board. */
 export async function postRequest(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   input: PostRequestInput,
   now = Date.now()
 ): Promise<{ requestId: string }> {
@@ -168,7 +164,7 @@ export async function postRequest(
  */
 export async function editRequest(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   input: EditRequestInput,
   now = Date.now()
 ): Promise<void> {
@@ -214,7 +210,7 @@ export async function editRequest(
 /** The requester restarts the 30-day clock on an open Request. */
 export async function extendRequest(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   requestId: string,
   now = Date.now()
@@ -252,7 +248,7 @@ export async function extendRequest(
  */
 export async function setRequestClosed(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   requestId: string,
   closed: boolean,
@@ -351,7 +347,7 @@ function failPledgeMail(decision: Exclude<ReturnType<typeof decidePledgeMail>, '
  */
 export async function reservePledgeMail(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   requestId: string,
   now = Date.now()
@@ -445,7 +441,7 @@ export async function reservePledgeMail(
 /** The mail went out: stamp the time. */
 export async function confirmPledgeMail(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   requestId: string,
   now = Date.now()
@@ -465,7 +461,7 @@ export async function confirmPledgeMail(
  */
 export async function releasePledgeMail(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   requestId: string,
   now = Date.now()

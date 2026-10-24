@@ -194,6 +194,11 @@ export function FaqPanel() {
       answer: <p>{t('settings.faq.a.characters')}</p>,
     },
     {
+      id: 'row-menus',
+      questionKey: 'settings.faq.q.rowMenus',
+      answer: <p>{t('settings.faq.a.rowMenus')}</p>,
+    },
+    {
       id: 'phone',
       questionKey: 'settings.faq.q.phone',
       answer: <p>{t('settings.faq.a.phone')}</p>,

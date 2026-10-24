@@ -6,6 +6,7 @@
 // the open cap is counted in the same transaction as the write. A share's
 // memberUid is set only when the pilot's Character is a current Member.
 
+import type { Caller } from './actorAuth.js';
 import { type Firestore, type Transaction } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
@@ -19,12 +20,7 @@ import {
   type CreateFleetPayoutInput,
   type CreateDecision,
 } from './communityFleetPayouts.js';
-import {
-  communityRef,
-  loadCommunity,
-  memberRef,
-  type CallerCharacter,
-} from './communitiesStore.js';
+import { communityRef, loadCommunity, memberRef } from './communitiesStore.js';
 
 export const fleetPayoutCollection = (db: Firestore, communityId: string) =>
   communityRef(db, communityId).collection(FLEET_PAYOUTS_COLLECTION);
@@ -55,7 +51,7 @@ async function requireMember(
   tx: Transaction,
   db: Firestore,
   communityId: string,
-  caller: CallerCharacter
+  caller: Caller
 ): Promise<{ characterName: string }> {
   const member = await tx.get(memberRef(db, communityId, caller.uid));
   if (!member.exists || member.get('ownerHash') !== caller.ownerHash) {
@@ -67,7 +63,7 @@ async function requireMember(
 /** Opens a Fleet Payout with its Shares. Returns its id; the client refetches. */
 export async function createFleetPayout(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   input: CreateFleetPayoutInput,
   now = Date.now()
 ): Promise<{ payoutId: string }> {
@@ -126,7 +122,7 @@ export async function createFleetPayout(
 /** The boss marks one Share paid or unpaid. Keeps `paidCount` in step; no change is a no-op. */
 export async function setFleetShareDone(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   payoutId: string,
   shareId: string,
@@ -159,7 +155,7 @@ export async function setFleetShareDone(
 /** The boss or the Community's admin removes a Fleet Payout with its Shares. Already gone is not an error. */
 export async function removeFleetPayout(
   db: Firestore,
-  caller: CallerCharacter,
+  caller: Caller,
   communityId: string,
   payoutId: string
 ): Promise<void> {
