@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ComponentProps } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -95,13 +96,26 @@ const haul: ActiveHaul = {
   },
 };
 
-function renderView(onClear = vi.fn().mockResolvedValue(undefined)) {
+function renderView(
+  onClear = vi.fn().mockResolvedValue(undefined),
+  extra: Partial<ComponentProps<typeof ActiveHaulView>> = {},
+  doneLegIds?: number[]
+) {
+  const onProgress = vi.fn();
+  const onReplan = vi.fn().mockResolvedValue({ status: 'unknown' });
   render(
     <MemoryRouter>
-      <ActiveHaulView haul={haul} onBack={vi.fn()} onClear={onClear} />
+      <ActiveHaulView
+        haul={{ ...haul, doneLegIds }}
+        onBack={vi.fn()}
+        onClear={onClear}
+        onProgress={onProgress}
+        onReplan={onReplan}
+        {...extra}
+      />
     </MemoryRouter>
   );
-  return onClear;
+  return Object.assign(onClear, { onProgress, onReplan });
 }
 
 describe('ActiveHaulView', () => {
@@ -137,11 +151,12 @@ describe('ActiveHaulView', () => {
     expect(screen.getAllByText(/Ship kills, last hour: 3/).length).toBeGreaterThan(0);
   });
 
-  it("folds each leg's cargo until asked", async () => {
+  it("opens the next leg's cargo and folds the others until asked", async () => {
     renderView();
-    expect(screen.queryByText(/Loads 80 m³ at Dodixie IX on arrival/)).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Show cargo for leg 1' }));
     expect(screen.getByText(/Loads 80 m³ at Dodixie IX on arrival/)).toBeTruthy();
+    expect(screen.queryByText(/Drops 80 m³ at Jita 4-4\./)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Show cargo for leg 2' }));
+    expect(screen.getByText(/Drops 80 m³ at Jita 4-4\./)).toBeTruthy();
     expect(screen.getByText('Carrying 80 m³')).toBeTruthy();
   });
 
@@ -176,5 +191,67 @@ describe('ActiveHaulView', () => {
       screen.getAllByRole('button', { name: 'Clear haul' }).find((b) => dialog.contains(b))!
     );
     expect(onClear).toHaveBeenCalledTimes(1);
+  });
+
+  it('ticks a leg done with an Undo toast', async () => {
+    const view = renderView();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Leg 2 done' }));
+    expect(view.onProgress).toHaveBeenCalledWith([0, 1]);
+    expect((await screen.findAllByText('Marked leg 2 done')).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(view.onProgress).toHaveBeenLastCalledWith([]);
+  });
+
+  it('unticks a leg and the ones after it', async () => {
+    const view = renderView(undefined, {}, [0, 1, 2]);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Leg 2 done' }));
+    expect(view.onProgress).toHaveBeenCalledWith([0]);
+  });
+
+  it('keeps done legs in the list and opens the next one’s cargo', () => {
+    renderView(undefined, {}, [0]);
+    const rows = screen.getAllByRole('listitem').filter((li) => li.hasAttribute('data-leg-id'));
+    expect(rows).toHaveLength(3);
+    expect(rows[0].hasAttribute('data-done')).toBe(true);
+    expect(rows[1].hasAttribute('data-done')).toBe(false);
+    expect(screen.getByRole('button', { name: 'Hide cargo for leg 2' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Show cargo for leg 1' })).toBeTruthy();
+    expect(screen.getByText('2 legs · 12 jumps · 20 m³ to Jita 4-4')).toBeTruthy();
+  });
+
+  it('asks before marking when the Current System is where the next leg ends', async () => {
+    const view = renderView(undefined, { currentSystemId: 30002659 });
+    expect(screen.getByText(/where leg 1 ends \(Dodixie IX\)/)).toBeTruthy();
+    expect(view.onProgress).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Mark done' }));
+    expect(view.onProgress).toHaveBeenCalledWith([0]);
+  });
+
+  it('does not ask when the Current System is elsewhere', () => {
+    renderView(undefined, { currentSystemId: 30000142 });
+    expect(screen.queryByRole('button', { name: 'Mark done' })).toBeNull();
+  });
+
+  it('warns that stock may look stale once every leg is done', () => {
+    renderView(undefined, {}, [0, 1, 2]);
+    expect(screen.getByText(/may show the old stock until ESI refreshes/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Replan from here' })).toBeNull();
+  });
+
+  it('resets progress and replans only on ask', async () => {
+    const view = renderView(undefined, {}, [0, 1]);
+    expect(view.onReplan).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Replan from here' }));
+    expect(view.onReplan).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(/Could not replan/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Reset progress' }));
+    expect(view.onProgress).toHaveBeenCalledWith([]);
+  });
+
+  it('says who still carries a load when a replan is refused', async () => {
+    const onReplan = vi.fn().mockResolvedValue({ status: 'loaded', names: ['Alice'] });
+    renderView(undefined, { onReplan }, [0]);
+    await userEvent.click(screen.getByRole('button', { name: 'Replan from here' }));
+    expect(await screen.findByText(/Alice still carries a load/)).toBeTruthy();
   });
 });

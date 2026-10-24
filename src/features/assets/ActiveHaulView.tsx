@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Button, Caret } from '@/components/ui';
+import { Button, Caret, Checkbox, Toast } from '@/components/ui';
 import { Pill } from '@/components/ui/Pill';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
   inlineLinkClassName,
   focusRingInsetClassName,
   rowInteractiveClassName,
+  touchCheckboxLabelClassName,
 } from '@/components/ui/controlStyles';
-import type { HaulLeg, HaulSection } from '@/engine/route/haulPlan';
 import {
   legCarry,
   legCondition,
@@ -18,9 +18,19 @@ import {
   splitPlaceName,
   type LegCondition,
 } from '@/engine/route/haulLeg';
+import type { HaulLeg, HaulSection } from '@/engine/route/haulPlan';
+import {
+  currentLeg,
+  legAtSystem,
+  remainingLegs,
+  remainingTotals,
+  sectionStart,
+  tickLeg,
+  untickLeg,
+} from '@/engine/route/haulProgress';
 import { cx } from '@/lib/cx';
 import { formatCubicMetres } from '@/lib/volume';
-import { legRouteHref, sectionRouteHref, type ActiveHaul } from './activeHaul';
+import { legRouteHref, sectionRouteHref, type ActiveHaul, type ReplanResult } from './activeHaul';
 import { HaulStrip } from './HaulStrip';
 import { HaulWaypointButton } from './HaulWaypointButton';
 import { useHaulLegRows, type LegRows } from './useHaulLegRows';
@@ -29,28 +39,82 @@ interface ActiveHaulViewProps {
   haul: ActiveHaul;
   onBack: () => void;
   onClear: () => Promise<void>;
+  /** Saves the ticked Leg ids on the snapshot. */
+  onProgress: (done: number[]) => void | Promise<void>;
+  /** Re-optimises what is left from where the pilot is; the caller saves a new snapshot. */
+  onReplan: () => Promise<ReplanResult>;
+  /** The pilot's Current System; offers a tick, never makes one. */
+  currentSystemId?: number | null;
 }
 
 /**
  * The active haul as a timeline, one section per Character: stops down a rail
  * and a block per Leg between them, with its distance, the security it flies
- * through (a strip with per-system kills), waypoint and Route Safety actions,
- * and its cargo folded away. Route Safety is the analyser; a Leg states the
- * condition it flies through and links there, so nothing here judges a route.
+ * through (a strip with per-system kills), a done tick, waypoint and Route
+ * Safety actions, and its cargo folded away (open on the next Leg). Route
+ * Safety is the analyser; a Leg states the condition it flies through and
+ * links there, so nothing here judges a route.
  */
-export function ActiveHaulView({ haul, onBack, onClear }: ActiveHaulViewProps) {
+export function ActiveHaulView({
+  haul,
+  onBack,
+  onClear,
+  onProgress,
+  onReplan,
+  currentSystemId = null,
+}: ActiveHaulViewProps) {
   const { t } = useTranslation();
   const { plan, destination } = haul;
+  const done = haul.doneLegIds ?? [];
   const legRows = useHaulLegRows(plan.sections.flatMap((s) => s.legs));
-  const [open, setOpen] = useState<ReadonlySet<number>>(new Set());
+  // Each section's current Leg shows its cargo and the rest fold; a toggle flips that.
+  const [flipped, setFlipped] = useState<ReadonlySet<number>>(new Set());
   const [clearing, setClearing] = useState(false);
+  const [marked, setMarked] = useState<{ n: number; before: number[] } | null>(null);
+  const [replanNote, setReplanNote] = useState<string | null>(null);
+  const [replanning, setReplanning] = useState(false);
   const toggle = (id: number) =>
-    setOpen((prev) => {
+    setFlipped((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  const currentIds = new Set(
+    plan.sections.flatMap((s) => {
+      const leg = currentLeg(s, done);
+      return leg ? [leg.id] : [];
+    })
+  );
+  const tick = (leg: HaulLeg, n: number, checked: boolean) => {
+    setFlipped(new Set());
+    if (checked) {
+      setMarked({ n, before: done });
+      void onProgress(tickLeg(plan, done, leg.id));
+    } else {
+      setMarked(null);
+      void onProgress(untickLeg(plan, done, leg.id));
+    }
+  };
+  const totals = remainingTotals(plan, done);
+  const finished = plan.totals.legs > 0 && totals.legs === 0;
+  const here = legAtSystem(plan, done, currentSystemId);
+  const hereN = here
+    ? (plan.sections.find((s) => s.characterId === here.characterId)?.legs.indexOf(here) ?? -1) + 1
+    : 0;
+  const replan = async () => {
+    setReplanning(true);
+    const result = await onReplan().finally(() => setReplanning(false));
+    setMarked(null);
+    setFlipped(new Set());
+    setReplanNote(
+      result.status === 'loaded'
+        ? t('assets.movePlan.haul.replanLoaded', { names: result.names.join(', ') })
+        : result.status === 'unknown'
+          ? t('assets.movePlan.haul.replanFailed')
+          : null
+    );
+  };
   const jumpsLabel = (count: number) => t('assets.movePlan.haul.jumpCount', { count });
 
   return (
@@ -60,21 +124,38 @@ export function ActiveHaulView({ haul, onBack, onClear }: ActiveHaulViewProps) {
       </h3>
       <p className="m-0 text-sm text-text-dim tabular-nums">
         {t('assets.movePlan.haul.summary', {
-          legs: t('assets.movePlan.haul.legCount', { count: plan.totals.legs }),
-          jumps: jumpsLabel(plan.totals.jumps),
-          volume: formatCubicMetres(plan.totals.m3),
+          legs: t('assets.movePlan.haul.legCount', { count: totals.legs }),
+          jumps: jumpsLabel(totals.jumps),
+          volume: formatCubicMetres(totals.m3),
           destination: destination.name,
         })}
       </p>
+      {here && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xs border border-line-bright px-3 py-2 text-sm">
+          <span>{t('assets.movePlan.haul.hereAsk', { n: hereN, place: here.to.name })}</span>
+          <Button size="sm" onClick={() => tick(here, hereN, true)}>
+            {t('assets.movePlan.haul.hereMark')}
+          </Button>
+        </div>
+      )}
+      {finished && <p className="m-0 text-sm">{t('assets.movePlan.haul.finished')}</p>}
+      {replanNote && (
+        <p role="status" className="m-0 text-sm text-warning">
+          {replanNote}
+        </p>
+      )}
       {plan.sections.map((section) => (
         <Section
           key={section.characterId}
           section={section}
-          open={open}
+          done={done}
+          currentIds={currentIds}
+          flipped={flipped}
           onToggle={toggle}
+          onTick={tick}
+          many={plan.sections.length > 1}
           legRows={legRows}
           capacityM3={haul.capacityM3}
-          many={plan.sections.length > 1}
         />
       ))}
       {plan.sections.length === 0 && (
@@ -107,7 +188,36 @@ export function ActiveHaulView({ haul, onBack, onClear }: ActiveHaulViewProps) {
           ))}
         </ul>
       )}
-      <div className="sticky -bottom-3 mt-auto -mx-3 -mb-3 flex justify-end gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
+      {marked && (
+        <Toast
+          message={t('assets.movePlan.haul.marked', { n: marked.n })}
+          undo={{
+            label: t('assets.movePlan.haul.undo'),
+            onUndo: () => {
+              setMarked(null);
+              void onProgress(marked.before);
+            },
+          }}
+          onClose={() => setMarked(null)}
+        />
+      )}
+      <div className="sticky -bottom-3 mt-auto -mx-3 -mb-3 flex flex-wrap justify-end gap-2 border-t border-line bg-panel px-3 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))]">
+        {done.length > 0 && !finished && (
+          <Button variant="ghost" disabled={replanning} onClick={() => void replan()}>
+            {t('assets.movePlan.haul.replan')}
+          </Button>
+        )}
+        {done.length > 0 && (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setMarked(null);
+              void onProgress([]);
+            }}
+          >
+            {t('assets.movePlan.haul.resetProgress')}
+          </Button>
+        )}
         <Button variant="danger" onClick={() => setClearing(true)}>
           {t('assets.movePlan.haul.clear')}
         </Button>
@@ -140,15 +250,21 @@ const TONE: Record<LegCondition['kind'], 'neutral' | 'success' | 'warning' | 'da
 
 function Section({
   section,
-  open,
+  done,
+  currentIds,
+  flipped,
   onToggle,
+  onTick,
   many,
   legRows,
   capacityM3,
 }: {
   section: HaulSection;
-  open: ReadonlySet<number>;
+  done: readonly number[];
+  currentIds: ReadonlySet<number>;
+  flipped: ReadonlySet<number>;
   onToggle: (id: number) => void;
+  onTick: (leg: HaulLeg, n: number, checked: boolean) => void;
   many: boolean;
   legRows: ReadonlyMap<number, LegRows>;
   capacityM3: number;
@@ -156,7 +272,8 @@ function Section({
   const { t } = useTranslation();
   const { legs } = section;
   const first = legs[0];
-  const routeHref = sectionRouteHref(legs);
+  const left = remainingLegs(section, done);
+  const routeHref = sectionRouteHref(left, sectionStart(section, done));
   return (
     <section
       aria-label={many ? section.name : t('assets.movePlan.haul.legsLabel')}
@@ -176,7 +293,7 @@ function Section({
         <div className="flex flex-wrap items-center gap-3">
           <HaulWaypointButton
             characterId={section.characterId}
-            ids={sectionWaypointIds(legs)}
+            ids={sectionWaypointIds(left)}
             label={t('assets.movePlan.haul.waypointAll')}
             doneLabel={t('assets.movePlan.haul.waypointAllDone')}
             variant={many ? 'ghost' : 'primary'}
@@ -189,19 +306,30 @@ function Section({
         </div>
       </div>
       <div className="ml-2 border-l-2 border-line-bright/55">
-        {first && <Stop name={first.from?.name ?? t('assets.movePlan.haul.startUnknown')} start />}
+        {first && (
+          <Stop name={first.from?.name ?? t('assets.movePlan.haul.startUnknown')} start done />
+        )}
         <ol className="m-0 flex list-none flex-col p-0">
           {legs.map((leg, index) => (
-            <li key={leg.id} data-leg-id={leg.id}>
+            <li key={leg.id} data-leg-id={leg.id} data-done={done.includes(leg.id) || undefined}>
               <LegBlock
                 leg={leg}
                 n={index + 1}
-                expanded={open.has(leg.id)}
+                done={done.includes(leg.id)}
+                current={currentIds.has(leg.id)}
+                expanded={currentIds.has(leg.id) !== flipped.has(leg.id)}
                 onToggle={() => onToggle(leg.id)}
+                onTick={(checked) => onTick(leg, index + 1, checked)}
                 rows={legRows.get(leg.id)}
                 capacityM3={capacityM3}
               />
-              <Stop name={leg.to.name} leg={leg} last={index === legs.length - 1} />
+              <Stop
+                name={leg.to.name}
+                leg={leg}
+                last={index === legs.length - 1}
+                done={done.includes(leg.id)}
+                current={currentIds.has(leg.id)}
+              />
             </li>
           ))}
         </ol>
@@ -216,11 +344,17 @@ function Stop({
   leg,
   start,
   last,
+  done,
+  current,
 }: {
   name: string;
   leg?: HaulLeg;
   start?: boolean;
   last?: boolean;
+  /** Reached: the pilot has ticked the Leg that ends here (the start always is). */
+  done?: boolean;
+  /** The stop the pilot is flying to next. */
+  current?: boolean;
 }) {
   const { t } = useTranslation();
   const { system, detail } = splitPlaceName(name);
@@ -231,7 +365,9 @@ function Stop({
         className={cx(
           'absolute top-2.5 -left-2 block size-3.5 rounded-full border-2 bg-panel',
           start ? 'border-line-bright' : 'border-accent',
-          last && 'bg-accent'
+          last && 'bg-accent',
+          done && 'opacity-40',
+          current && 'ring-2 ring-accent/60'
         )}
       />
       <div className="text-sm font-semibold">{system}</div>
@@ -256,15 +392,21 @@ function Stop({
 function LegBlock({
   leg,
   n,
+  done,
+  current,
   expanded,
   onToggle,
+  onTick,
   rows,
   capacityM3,
 }: {
   leg: HaulLeg;
   n: number;
+  done: boolean;
+  current: boolean;
   expanded: boolean;
   onToggle: () => void;
+  onTick: (checked: boolean) => void;
   rows: LegRows | undefined;
   capacityM3: number;
 }) {
@@ -275,9 +417,22 @@ function LegBlock({
   const carry = legCarry(leg);
   const place = splitPlaceName(leg.to.name).system;
   return (
-    <div className="my-1 ml-5 flex flex-col gap-2.5 rounded-xs border border-line bg-panel-2 p-3">
+    <div
+      className={cx(
+        'my-1 ml-5 flex flex-col gap-2.5 rounded-xs border bg-panel-2 p-3',
+        current ? 'border-line-bright' : 'border-line',
+        done && 'opacity-60'
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <label className={touchCheckboxLabelClassName}>
+            <Checkbox
+              checked={done}
+              onChange={(e) => onTick(e.target.checked)}
+              aria-label={t('assets.movePlan.haul.markDoneAria', { n })}
+            />
+          </label>
           <span className="text-xl leading-none font-semibold tabular-nums">
             {leg.jumps === null ? (
               <span className="text-sm font-normal text-text-dim">
