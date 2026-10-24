@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  activeFilterChips,
   activeFilterCount,
   EMPTY_OPEN_ORDERS_FILTER,
   filterOpenOrders,
@@ -289,118 +288,30 @@ describe('sortOpenOrders', () => {
   });
 });
 
-describe('activeFilterChips / activeFilterCount', () => {
-  it('is empty for the empty filter', () => {
-    expect(activeFilterChips(EMPTY_OPEN_ORDERS_FILTER)).toEqual([]);
+describe('activeFilterCount', () => {
+  it('is zero for the empty filter, and ignores sort and view', () => {
     expect(activeFilterCount(EMPTY_OPEN_ORDERS_FILTER)).toBe(0);
+    expect(activeFilterCount({ ...EMPTY_OPEN_ORDERS_FILTER, sort: 'item', view: 'all' })).toBe(0);
   });
 
-  it('does not produce a chip for sort', () => {
-    const filter: OpenOrdersFilter = { ...EMPTY_OPEN_ORDERS_FILTER, sort: 'iskTiedUp' };
-    expect(activeFilterChips(filter)).toEqual([]);
+  it('ignores whitespace-only search text', () => {
+    expect(activeFilterCount({ ...EMPTY_OPEN_ORDERS_FILTER, text: '   ' })).toBe(0);
   });
 
-  it('produces one chip per selected value for array fields, each clearing only its own value', () => {
-    const filter: OpenOrdersFilter = {
-      ...EMPTY_OPEN_ORDERS_FILTER,
-      characterIds: [1, 2],
-      locationIds: [60003760],
-      problems: ['belowFloor', 'outbid'],
-    };
-    const chips = activeFilterChips(filter);
-    const ids = chips.map((c) => c.id);
-    expect(ids).toEqual(
-      expect.arrayContaining([
-        'character:1',
-        'character:2',
-        'location:60003760',
-        'problem:belowFloor',
-        'problem:outbid',
-      ])
-    );
-    expect(new Set(ids).size).toBe(ids.length);
-
-    const characterChip = chips.find((c) => c.id === 'character:1')!;
-    const cleared = characterChip.clear(filter);
-    expect(cleared.characterIds).toEqual([2]);
-    expect(cleared.locationIds).toEqual([60003760]);
-    expect(cleared.problems).toEqual(['belowFloor', 'outbid']);
-
-    const locationChip = chips.find((c) => c.id === 'location:60003760')!;
-    expect(locationChip.clear(filter).locationIds).toEqual([]);
-  });
-
-  it('clear on each scalar chip removes only that constraint', () => {
+  it('counts each selected value of an array field and each set scalar', () => {
     const filter: OpenOrdersFilter = {
       text: 'trit',
       side: 'buy',
-      characterIds: [1],
+      characterIds: [1, 2],
       locationIds: [60003760],
-      problems: ['outbid'],
+      problems: ['belowFloor', 'outbid'],
       expiringWithinDays: 7,
       costBasis: 'linked',
       minIskTiedUp: 1000,
       view: 'watch',
       sort: 'item',
     };
-    const chips = activeFilterChips(filter);
-    // Every constraint present should have produced a chip; `view` is not one.
-    expect(chips.length).toBe(8);
-
-    for (const chip of chips) {
-      const cleared = chip.clear(filter);
-      // The rest of the filter is untouched.
-      const untouched: Partial<OpenOrdersFilter> = { ...filter };
-      switch (chip.id) {
-        case 'text':
-          expect(cleared.text).toBe('');
-          delete untouched.text;
-          break;
-        case 'side':
-          expect(cleared.side).toBeNull();
-          delete untouched.side;
-          break;
-        case 'character:1':
-          expect(cleared.characterIds).toEqual([]);
-          delete untouched.characterIds;
-          break;
-        case 'location:60003760':
-          expect(cleared.locationIds).toEqual([]);
-          delete untouched.locationIds;
-          break;
-        case 'problem:outbid':
-          expect(cleared.problems).toEqual([]);
-          delete untouched.problems;
-          break;
-        case 'expiringWithinDays':
-          expect(cleared.expiringWithinDays).toBeNull();
-          delete untouched.expiringWithinDays;
-          break;
-        case 'costBasis':
-          expect(cleared.costBasis).toBeNull();
-          delete untouched.costBasis;
-          break;
-        case 'minIskTiedUp':
-          expect(cleared.minIskTiedUp).toBeNull();
-          delete untouched.minIskTiedUp;
-          break;
-        default:
-          throw new Error(`unexpected chip id ${chip.id}`);
-      }
-      for (const key of Object.keys(untouched) as (keyof OpenOrdersFilter)[]) {
-        expect(cleared[key]).toEqual(filter[key]);
-      }
-    }
-  });
-
-  it('activeFilterCount equals the number of chips', () => {
-    const filter: OpenOrdersFilter = {
-      ...EMPTY_OPEN_ORDERS_FILTER,
-      side: 'buy',
-      view: 'all',
-    };
-    expect(activeFilterCount(filter)).toBe(activeFilterChips(filter).length);
-    expect(activeFilterCount(filter)).toBe(1);
+    expect(activeFilterCount(filter)).toBe(10);
   });
 });
 

@@ -85,8 +85,6 @@ import { useOpenOrdersFilterState } from './useOpenOrdersFilterState';
 import { useOpenOrdersWorkThrough } from './useOpenOrdersWorkThrough';
 import { FixListSummary, HealthyFold, ListNotes } from './OpenOrdersFixListParts';
 
-/** A bare visit opens on Needs you, every funnel field clear. */
-
 const TABLE_LABEL_KEY: Record<OpenOrdersView, string> = {
   act: 'market.orders.fixList.tableAct',
   watch: 'market.orders.fixList.tableWatch',
@@ -575,6 +573,8 @@ export function OpenOrdersPanel({
 
   const tableLabel = t(TABLE_LABEL_KEY[view]);
   const noOrders = reauthEntries.length === 0 && !corpReauth && allRows.length === 0;
+  // The grant banner alone says why the corporation's list is empty; no list chrome under it.
+  const corpGrantOnly = corpReauth && allRows.length === 0;
 
   return (
     <>
@@ -630,7 +630,7 @@ export function OpenOrdersPanel({
 
           {fromCacheAny && <CachedNotice fetchedAt={oldestFetchedAt} />}
 
-          {noOrders ? (
+          {corpGrantOnly ? null : noOrders ? (
             // Every Character skipped: the "hasn't shared" note below already says why.
             notShared.length > 0 && snapshot.openOrders.entries.length === 0 ? null : (
               <CachedEmptyState

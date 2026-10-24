@@ -216,103 +216,21 @@ export function sortOpenOrders(
   return [...rows].sort(COMPARATORS[sort]);
 }
 
-/** One chip per active constraint, for the removable "active filters" row. `clear` returns the filter without that constraint. */
-export interface ActiveFilterChip {
-  id: string;
-  labelKey: string;
-  value?: string;
-  clear: (filter: OpenOrdersFilter) => OpenOrdersFilter;
-}
-
-function withoutArrayValue<T>(values: readonly T[], value: T): T[] {
-  return values.filter((v) => v !== value);
-}
-
 /**
- * `sort` and `view` are not removable constraints (there is always exactly
- * one of each) and are deliberately excluded here. `filterOpenOrders` never
- * reads `view` either: the segment splits what the funnel matched.
+ * How many constraints the funnel holds, for `FilterBar`'s `activeCount`: one
+ * per selected value of an array field, one per set scalar. `sort` and `view`
+ * are not constraints (there is always exactly one of each); `filterOpenOrders`
+ * never reads `view` either: the segment splits what the funnel matched.
  */
-export function activeFilterChips(filter: OpenOrdersFilter): ActiveFilterChip[] {
-  const chips: ActiveFilterChip[] = [];
-
-  if (filter.text.trim() !== '') {
-    chips.push({
-      id: 'text',
-      labelKey: 'market.orders.filter.text',
-      value: filter.text,
-      clear: (f) => ({ ...f, text: '' }),
-    });
-  }
-
-  if (filter.side !== null) {
-    chips.push({
-      id: 'side',
-      labelKey: 'market.orders.filter.side',
-      value: filter.side,
-      clear: (f) => ({ ...f, side: null }),
-    });
-  }
-
-  for (const characterId of filter.characterIds) {
-    chips.push({
-      id: `character:${characterId}`,
-      labelKey: 'market.orders.filter.character',
-      value: String(characterId),
-      clear: (f) => ({ ...f, characterIds: withoutArrayValue(f.characterIds, characterId) }),
-    });
-  }
-
-  for (const locationId of filter.locationIds) {
-    chips.push({
-      id: `location:${locationId}`,
-      labelKey: 'market.orders.filter.location',
-      value: String(locationId),
-      clear: (f) => ({ ...f, locationIds: withoutArrayValue(f.locationIds, locationId) }),
-    });
-  }
-
-  for (const problem of filter.problems) {
-    chips.push({
-      id: `problem:${problem}`,
-      labelKey: 'market.orders.filter.problem',
-      value: problem,
-      clear: (f) => ({ ...f, problems: withoutArrayValue(f.problems, problem) }),
-    });
-  }
-
-  if (filter.expiringWithinDays !== null) {
-    chips.push({
-      id: 'expiringWithinDays',
-      labelKey: 'market.orders.filter.expiringWithin',
-      value: String(filter.expiringWithinDays),
-      clear: (f) => ({ ...f, expiringWithinDays: null }),
-    });
-  }
-
-  if (filter.costBasis !== null) {
-    chips.push({
-      id: 'costBasis',
-      labelKey: 'market.orders.filter.costBasis',
-      value: filter.costBasis,
-      clear: (f) => ({ ...f, costBasis: null }),
-    });
-  }
-
-  if (filter.minIskTiedUp !== null) {
-    chips.push({
-      id: 'minIskTiedUp',
-      labelKey: 'market.orders.filter.minIskTiedUp',
-      value: String(filter.minIskTiedUp),
-      clear: (f) => ({ ...f, minIskTiedUp: null }),
-    });
-  }
-
-  return chips;
-}
-
 export function activeFilterCount(filter: OpenOrdersFilter): number {
-  return activeFilterChips(filter).length;
+  const scalars = [
+    filter.text.trim() !== '',
+    filter.side !== null,
+    filter.expiringWithinDays !== null,
+    filter.costBasis !== null,
+    filter.minIskTiedUp !== null,
+  ].filter(Boolean).length;
+  return scalars + filter.characterIds.length + filter.locationIds.length + filter.problems.length;
 }
 
 // --- URL state --------------------------------------------------------------
@@ -375,9 +293,8 @@ export const WORK_THROUGH_PARAM = 'orders.workThrough';
  * The Overview board's tiles are the caller: a tile reading "21 undercut" that
  * opens a page listing thirty is a tile that lied, because the board counts
  * one Character's orders and the page fans out across all of them. Carrying
- * the character makes the two figures agree, and `activeFilterChips` renders
- * every value it applied as its own removable chip — so widening back out is
- * one click, and visibly so.
+ * the character makes the two figures agree, and the funnel's active count
+ * ("Filters (1 active)") says the list arrived narrowed.
  *
  * Built from the same `OPEN_ORDERS_FILTER_PARAMS` codecs the page itself
  * reads live, so a link the board builds and a page that has since changed
