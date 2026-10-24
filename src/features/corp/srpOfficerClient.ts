@@ -6,6 +6,7 @@
  * sent. Refusals carry a `details.reason`: claim-not-found, illegal-transition, reason-required,
  * amount-required, amount-unchanged, amount-changed (the amount moved since the officer looked), not-an-officer, wrong-corp, role-required.
  */
+import type { CallableAction } from '../../../functions/src/callableManifest';
 import {
   collection,
   getDocs,
@@ -131,7 +132,7 @@ const DOUBTED_REASONS: ReadonlySet<string> = new Set([
 async function officerCall<Out>(
   characterId: number,
   corporationId: number,
-  name: string,
+  name: CallableAction,
   data: Record<string, unknown>
 ): Promise<Out> {
   const accessToken = await getValidAccessToken(characterId);

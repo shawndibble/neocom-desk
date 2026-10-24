@@ -3,6 +3,7 @@
  * under the rules (`verifySrpOfficer` first); every change and the pilot's pre-filing check are
  * callables. Only a short-lived access token is sent; the refresh token never leaves Dexie.
  */
+import type { CallableAction } from '../../../functions/src/callableManifest';
 import { collection, getDocs } from 'firebase/firestore/lite';
 import { getValidAccessToken } from '@/auth/session';
 import { getSyncFirestore } from '@/sync/firebaseApp';
@@ -29,7 +30,7 @@ export async function readSrpDoctrines(
 async function directorCall<Out>(
   characterId: number,
   corporationId: number,
-  name: string,
+  name: CallableAction,
   data: Record<string, unknown>
 ): Promise<Out> {
   const accessToken = await getValidAccessToken(characterId);
