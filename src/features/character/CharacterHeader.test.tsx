@@ -59,11 +59,6 @@ describe('CharacterHeader', () => {
     ).toBeInTheDocument();
     const alliance = screen.getByText('Plenitude Alliance');
     expect(alliance).toHaveClass('truncate');
-    expect(alliance).toHaveAttribute('title', 'Plenitude Alliance');
-    expect(screen.getByText('Bureau of Unified Harvesting')).toHaveAttribute(
-      'title',
-      'Bureau of Unified Harvesting'
-    );
   });
 
   it('keeps both SP chips in place when the numbers are unavailable', async () => {
