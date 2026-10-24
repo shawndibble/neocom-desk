@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode } from 'react';
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { editPencilClassName, editableValueClassName } from './materialsTableStyle';
@@ -14,6 +14,13 @@ interface EditableValueProps {
   /** Opens the field; `seed` is the digit the pilot started typing on the value. */
   onEdit: (seed?: string) => void;
   className?: string;
+  /**
+   * Takes focus as it mounts — set when Enter or Escape has just closed this
+   * value's field, so focus comes back to the pencil (§6c) rather than falling
+   * to the page. `onFocused` clears the request.
+   */
+  focusOnMount?: boolean;
+  onFocused?: () => void;
 }
 
 /**
@@ -22,9 +29,24 @@ interface EditableValueProps {
  * field itself once clicked. Shared by the Materials table and its phone
  * cards so both widths use one cue. Typing a digit while it has focus opens
  * the field with that digit, so tabbing down a column and typing still works
- * the way it did when every cell was a field.
+ * the way it did when every cell was a field. The field (`SourcingInput` with
+ * `onSettle`) keeps `useInPlaceEdit`'s contract: Enter or blur saves, Escape
+ * cancels, and Enter or Escape hands focus back here.
  */
-export function EditableValue({ children, label, onEdit, className }: EditableValueProps) {
+export function EditableValue({
+  children,
+  label,
+  onEdit,
+  className,
+  focusOnMount = false,
+  onFocused,
+}: EditableValueProps) {
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!focusOnMount) return;
+    ref.current?.focus();
+    onFocused?.();
+  }, [focusOnMount, onFocused]);
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     if (event.ctrlKey || event.metaKey || event.altKey || !SEED_KEY.test(event.key)) return;
     event.preventDefault();
@@ -32,6 +54,7 @@ export function EditableValue({ children, label, onEdit, className }: EditableVa
   }
   return (
     <button
+      ref={ref}
       type="button"
       onClick={() => onEdit()}
       onKeyDown={onKeyDown}

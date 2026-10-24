@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
   type FocusEvent,
-  type ReactNode,
   type Ref,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -246,6 +245,18 @@ export function MaterialsTable({
     setEditSeed(seed);
     setEditingPrice(typeID);
   }
+  // The value whose field Enter or Escape just closed: it takes focus back as
+  // it remounts (§6c, `useInPlaceEdit`'s contract), keyed "have-34" / "price-34".
+  const [refocus, setRefocus] = useState<string | null>(null);
+  const clearRefocus = useCallback(() => setRefocus(null), []);
+  const settleHave = (typeID: number) => () => {
+    editHave(null);
+    setRefocus(`have-${typeID}`);
+  };
+  const settlePrice = (typeID: number) => () => {
+    editPrice(null);
+    setRefocus(`price-${typeID}`);
+  };
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { held } = session;
@@ -511,7 +522,8 @@ export function MaterialsTable({
     withHint = true,
     fill = false,
     autoFocus = false,
-    seed?: string
+    seed?: string,
+    onSettle?: () => void
   ) {
     // Blueprint Acquisition (issue #838): ownership comes entirely from the
     // Character's real BPO/BPC, never from a typed quantity — an editable
@@ -535,6 +547,7 @@ export function MaterialsTable({
           widthClassName={fill ? 'w-full' : 'w-20'}
           autoFocus={autoFocus}
           seed={seed}
+          onSettle={onSettle}
           placeholder="0"
           mine={owned !== undefined && owned > 0}
           parse={unmaskCount}
@@ -555,7 +568,7 @@ export function MaterialsTable({
     if (editingHave === material.typeID) {
       return (
         <span onBlur={whenFocusLeaves(() => editHave(null))}>
-          {renderHave(material, true, false, true, editSeed)}
+          {renderHave(material, true, false, true, editSeed, settleHave(material.typeID))}
         </span>
       );
     }
@@ -563,6 +576,8 @@ export function MaterialsTable({
     return (
       <span className="flex flex-col items-start gap-0.5 sm:items-end">
         <EditableValue
+          focusOnMount={refocus === `have-${material.typeID}`}
+          onFocused={clearRefocus}
           label={t('industry.errands.haveFor', { material: nameFor(material.typeID) })}
           onEdit={(seed) => editHave(material.typeID, seed)}
           className={owned > 0 ? 'text-accent' : 'text-text-dim'}
@@ -631,6 +646,8 @@ export function MaterialsTable({
           // its Have lands here, and a value that vanished under focus would
           // drop the player at the top of the page. Dim then — nothing is bought.
           <EditableValue
+            focusOnMount={refocus === `price-${material.typeID}`}
+            onFocused={clearRefocus}
             label={t('industry.priceFor', { material: name })}
             onEdit={(seed) => editPrice(material.typeID, seed)}
             className={
@@ -647,8 +664,9 @@ export function MaterialsTable({
               inputMode="decimal"
               widthClassName="w-24"
               mine={overridden}
-              autoFocus={autoFocus || (!inline && editingPrice === material.typeID)}
-              seed={!inline && editingPrice === material.typeID ? editSeed : undefined}
+              autoFocus={autoFocus || editingPrice === material.typeID}
+              seed={editingPrice === material.typeID ? editSeed : undefined}
+              onSettle={editingPrice === material.typeID ? settlePrice(material.typeID) : undefined}
               parse={parsePrice}
               onCommit={(overridePrice) => onSourcingChange(material.typeID, { overridePrice })}
             />
@@ -765,11 +783,7 @@ export function MaterialsTable({
     dispatch({ type: 'focusLeft' });
   }
 
-  function renderHeading(
-    errand: MaterialErrand,
-    rows: readonly MaterialTableRow[],
-    extra?: ReactNode
-  ) {
+  function renderHeading(errand: MaterialErrand, rows: readonly MaterialTableRow[]) {
     const Glyph = ERRAND_GLYPH[errand];
     const headingId = `${idPrefix}-${errand}`;
     const subtotal =
@@ -841,7 +855,6 @@ export function MaterialsTable({
             })}
           </button>
         )}
-        {extra}
         {errand === 'have' && ownedSellNet != null && ownedSellNet > 0 && (
           <span className="ml-auto text-[0.6875rem] text-text-dim tabular-nums">
             {t('industry.errands.haveSellsFor', { amount: formatIskCompact(ownedSellNet) })}
@@ -903,7 +916,6 @@ export function MaterialsTable({
     <NativeSelect
       size="sm"
       className="w-32 shrink-0 [&>select]:min-h-11 [&>select]:normal-case"
-      aria-label={t('industry.errands.sortLabel')}
       value={phoneSort}
       onChange={(event) => setPhoneSort(event.target.value as PhoneSort)}
     >
@@ -951,9 +963,12 @@ export function MaterialsTable({
                         savings={isBuilt(material) ? buildSavings(material) : null}
                         editingHave={editingHave === material.typeID}
                         editingPrice={editingPrice === material.typeID}
-                        onEditHave={() => editHave(material.typeID)}
+                        onEditHave={(seed) => editHave(material.typeID, seed)}
                         onStopEditingHave={() => editHave(null)}
-                        onEditPrice={() => editPrice(material.typeID)}
+                        onEditPrice={(seed) => editPrice(material.typeID, seed)}
+                        refocusHave={refocus === `have-${material.typeID}`}
+                        refocusPrice={refocus === `price-${material.typeID}`}
+                        onRefocused={clearRefocus}
                         onStopEditingPrice={() => editPrice(null)}
                         name={renderName(material, false, true)}
                         total={renderTotal(material)}
@@ -961,7 +976,14 @@ export function MaterialsTable({
                         action={renderAction(material, false)}
                         haveField={
                           editingHave === material.typeID
-                            ? renderHave(material, false, true, true)
+                            ? renderHave(
+                                material,
+                                false,
+                                true,
+                                true,
+                                editSeed,
+                                settleHave(material.typeID)
+                              )
                             : null
                         }
                         priceField={(autoFocus) => renderPrice(material, true, autoFocus)}

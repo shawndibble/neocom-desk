@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { IndustryActivity } from '@/engine/industry/types';
 import { cheaperNearbySystems } from '@/engine/industry/cheaperNearbySystems';
+import { securityBand } from '@/engine/securityStatus';
 import { loadJumpGraph } from '@/sde/jumpGraph';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { loadSystemCostIndices } from './marketData';
@@ -36,7 +37,17 @@ export function useCheaperNearbySystems(
         loadSystemCostIndices(activity).catch(() => null),
       ]);
       if (!live || !graph || !systems || !indices) return;
-      const found = cheaperNearbySystems(graph, systemId, indices, index);
+      // Reactions cannot run in highsec, so a highsec system is no saving for one.
+      const found = cheaperNearbySystems(graph, systemId, indices, index).filter(
+        ({ systemId: id }) => {
+          const security = systems.get(id)?.security;
+          return (
+            activity !== 'reaction' ||
+            security === undefined ||
+            securityBand(security) !== 'highsec'
+          );
+        }
+      );
       setLoaded({
         key,
         rows: found.flatMap(({ systemId: id, jumps, index: value }) => {

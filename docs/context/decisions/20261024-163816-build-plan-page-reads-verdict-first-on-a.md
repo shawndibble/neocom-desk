@@ -1,6 +1,8 @@
 # Scope decisions — Build Plan page reads verdict first, on a profit basis
 
-_Recorded 2026-10-24. Amends 20260906-091110 (Industry page reads verdict first)
+_Recorded 2026-10-24. Amends 20260906-091110 (Industry page reads verdict first),
+20261003-144713 (its "Need, Have, To buy read left to right" bullet: the column
+is now **Buy**, and a phone row reads "Buy N @ price" before "Need · Have"),
 and 20260906-072659 (owned units cost 0 ISK, which is now the `free` basis rather
 than the default), and supersedes ADR 0006's gross/net toggle and its hero-level
 Acquisition Verdict._
@@ -30,8 +32,10 @@ Acquisition Verdict._
   colour swatches: a coloured where-the-sale-goes bar was tried and read as out
   of place against the rest of the page. ISK to spend, buying instead, job time
   and volume sit under the ledger, set apart by a gap and a rule. The cheapest
-  nearby system with a lower cost index is one line inside the job cost
-  breakdown, with Build there.
+  nearby system with a lower cost index is a note under the job cost row, shown
+  whether or not the breakdown is open, with Build there (no highsec system for
+  a reaction plan, where reactions cannot run). The cost index row is the
+  breakdown's last line, right above it.
 - **Setup is one line at the foot of the hero.** Runs moved to the hero's title
   row (with Break Even); the rest reads as one line with Edit setup, which
   opens the unchanged form below the hero.
@@ -60,3 +64,8 @@ Acquisition Verdict._
 - **Known gap.** The sell-value basis counts owned units the top-level job
   consumes; owned stock eaten inside a sub-build is not yet charged, as the
   Use-or-Sell Check never charged it either.
+- **A fully owned row keeps a dim, editable price on the desktop table.** Its
+  Buy reads "—" and its Total says what it sells for; the price stays a value
+  because Tab out of the row's Have lands on it, and a control that vanished
+  under focus would drop the player at the top of the page. The phone card,
+  with no Tab order to keep, drops it.

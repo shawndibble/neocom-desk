@@ -3,9 +3,6 @@ import { focusRingClassName, interactiveClassName } from '@/components/ui/contro
 import { cx } from '@/lib/cx';
 import type { MaterialErrand } from './materialErrands';
 
-/** A number in the phone ledger, right-aligned under its section's column header. */
-export const LEDGER_VALUE = 'flex min-w-0 justify-end text-sm tabular-nums';
-
 /**
  * Each section's colour, carried by its heading. Never the only cue
  * (docs/DESIGN.md §7): every heading also names its section in words and,
@@ -32,9 +29,13 @@ export const ERRAND_LABEL_KEY: Record<MaterialErrand, string> = {
   have: 'industry.errands.have',
 };
 
-/** Editable-in-place value (§6c): faint pencil at rest, field box on hover/focus. 44px tap area is an invisible ::after. */
+/**
+ * Editable-in-place value (§6c): faint pencil at rest, field box on hover/focus.
+ * The 44px touch tier is the button's own height below `md` (§3), never an
+ * overhanging `::after`, which reached into the row's next target.
+ */
 export const editableValueClassName = cx(
-  'relative inline-flex items-center gap-1 rounded-xs border border-transparent px-1 hover:border-line-bright hover:bg-panel-2 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[""]',
+  'inline-flex min-h-11 items-center gap-1 rounded-xs border border-transparent px-1 hover:border-line-bright hover:bg-panel-2 md:min-h-0',
   interactiveClassName,
   focusRingClassName
 );

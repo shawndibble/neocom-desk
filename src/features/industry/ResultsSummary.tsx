@@ -25,6 +25,7 @@ interface CostRowProps {
   indented?: boolean;
   /** `'negative'`/`'positive'` render the value in the `isk-neg`/`isk-pos` tone. */
   tone?: 'negative' | 'positive';
+  className?: string;
 }
 
 /** One ledger row: label (+ optional tooltip) left, value right. */
@@ -35,6 +36,7 @@ function CostRow({
   emphasized = false,
   indented = false,
   tone,
+  className,
 }: CostRowProps) {
   const { t } = useTranslation();
   const toneClass =
@@ -44,7 +46,8 @@ function CostRow({
       className={cx(
         'flex items-center justify-between gap-2 px-2.5 py-1.5 text-[0.6875rem]',
         // One step in from the job cost's own label (padding, caret slot, gap: pl-8).
-        indented && 'pl-12'
+        indented && 'pl-12',
+        className
       )}
     >
       <span className="flex min-w-0 items-center gap-1.5 font-semibold tracking-widest text-text-dim uppercase">
@@ -123,10 +126,9 @@ const COST_INDEX_ROUNDING_STEP = 0.00005;
 /**
  * The ledger from the product's sale down to profit: fees, materials, job
  * cost, (on the sell-value basis) the owned materials not sold, then the
- * figure the hero states. The
- * hero states margin, ISK/hour and break-even; this panel carries the working
- * and the plan facts that are not a verdict (ISK to spend, buying instead,
- * job time, volume).
+ * figure the hero states. Margin, ISK/hour and break-even are the hero's;
+ * this panel carries the working and the plan facts that are not a verdict
+ * (ISK to spend, buying instead, job time, volume).
  *
  * Every ledger figure stays on `formatIsk` at full precision (issue #948):
  * this is the ledger a player reconciles line by line.
@@ -203,10 +205,10 @@ export function ResultsSummary({
       )}
 
       {/* Divider lines only, no box: the panel is already the frame. `-mx-2.5`
-          pulls the rows' own padding out so their text lines up with the bar
-          above and the facts below. Profit's rule is the brighter one — the
-          line the rest adds up to. */}
-      <div className="-mx-2.5 divide-y divide-line [&>*:last-child]:border-line-bright">
+          pulls the rows' own padding out to the panel's edge. Profit's rule is
+          the brighter one — the line the rest adds up to (its own class, not
+          last-child, since the Profit row is absent while it is unknown). */}
+      <div className="-mx-2.5 divide-y divide-line">
         {revenue !== null && (
           <CostRow
             label={
@@ -340,6 +342,7 @@ export function ResultsSummary({
             value={formatIsk(profit)}
             emphasized
             tone={profit >= 0 ? 'positive' : 'negative'}
+            className="relative -mt-px border-t border-line-bright"
           />
         )}
       </div>

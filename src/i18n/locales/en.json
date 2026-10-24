@@ -3558,7 +3558,6 @@
       "tableLabel": "Materials: {{section}}",
       "need": "Need",
       "haveColumn": "Have",
-      "toBuyColumn": "Buy",
       "total": "Total",
       "unpricedCount_one": "+{{count}} unpriced",
       "unpricedCount_other": "+{{count}} unpriced",
@@ -3595,7 +3594,9 @@
       "atPrice": "@ {{price}} ISK",
       "buildCheaper": "Build {{count}} cheaper parts · save {{amount}}",
       "haveSellsFor": "sells for {{amount}} after fees",
-      "rowSellsFor": "sells for {{amount}}"
+      "rowSellsFor": "sells for {{amount}}",
+      "buyQuantity": "Buy <b>{{quantity}}</b>",
+      "needQuantity": "Need {{quantity}}"
     },
     "useAllDone_one": "Filled Have on {{count}} material from your assets",
     "useAllDone_other": "Filled Have on {{count}} materials from your assets",

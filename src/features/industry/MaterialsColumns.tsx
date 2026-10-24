@@ -62,7 +62,7 @@ export function buildMaterialsColumns({
     },
     {
       id: 'toBuy',
-      header: t('industry.errands.toBuyColumn'),
+      header: t('industry.errands.buyColumn'),
       align: 'right',
       className: 'tabular-nums',
       headerCellClassName: 'w-20',

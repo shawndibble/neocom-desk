@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
 import type { MaterialSourcingMap } from '@/engine/industry/types';
 import { cx } from '@/lib/cx';
@@ -20,8 +20,11 @@ interface PhonePriceProps {
   /** The row's Depth Price walk; absent for a built row or one priced at the lowest sell. */
   depth: DepthPrice | undefined;
   editing: boolean;
-  onEdit: () => void;
+  onEdit: (seed?: string) => void;
   onStopEditing: () => void;
+  /** Enter or Escape just closed the field: take focus back. */
+  refocus: boolean;
+  onRefocused: () => void;
   /** The price field itself, shown while editing; `autoFocus` is true once the player asked to edit. */
   field: (autoFocus: boolean) => ReactNode;
 }
@@ -40,6 +43,8 @@ function PhonePrice({
   editing,
   onEdit,
   onStopEditing,
+  refocus,
+  onRefocused,
   field,
 }: PhonePriceProps) {
   const { t } = useTranslation();
@@ -54,6 +59,8 @@ function PhonePrice({
       <EditableValue
         label={t('industry.priceFor', { material: nameFor(material.typeID) })}
         onEdit={onEdit}
+        focusOnMount={refocus}
+        onFocused={onRefocused}
         className={cx('text-xs', overridden ? 'text-accent' : 'text-text')}
       >
         {t('industry.errands.atPrice', { price: maskNumber(state.unitPrice) })}
@@ -80,10 +87,14 @@ interface MaterialsPhoneRowProps {
   savings: number | null;
   editingHave: boolean;
   editingPrice: boolean;
-  onEditHave: () => void;
+  onEditHave: (seed?: string) => void;
   onStopEditingHave: () => void;
-  onEditPrice: () => void;
+  onEditPrice: (seed?: string) => void;
   onStopEditingPrice: () => void;
+  /** Enter or Escape just closed that field: its value takes focus back. */
+  refocusHave: boolean;
+  refocusPrice: boolean;
+  onRefocused: () => void;
   /** Cells the table renders for both layouts, passed in as already-built nodes. */
   name: ReactNode;
   total: ReactNode;
@@ -117,6 +128,9 @@ export function MaterialsPhoneRow({
   onStopEditingHave,
   onEditPrice,
   onStopEditingPrice,
+  refocusHave,
+  refocusPrice,
+  onRefocused,
   name,
   total,
   ownedHint,
@@ -142,6 +156,8 @@ export function MaterialsPhoneRow({
         editing={editingPrice}
         onEdit={onEditPrice}
         onStopEditing={onStopEditingPrice}
+        refocus={refocusPrice}
+        onRefocused={onRefocused}
         field={priceField}
       />
     </span>
@@ -188,9 +204,12 @@ export function MaterialsPhoneRow({
       ) : (
         !fullyOwned && (
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
-            <span className="tabular-nums">
-              <span className="text-text-dim">{t('industry.errands.buyColumn')}</span>{' '}
-              <span className="font-semibold">{formatCount(material.remainingQuantity)}</span>
+            <span className="text-text-dim tabular-nums">
+              <Trans
+                i18nKey="industry.errands.buyQuantity"
+                values={{ quantity: formatCount(material.remainingQuantity) }}
+                components={{ b: <span className="font-semibold text-text" /> }}
+              />
             </span>
             {price}
           </div>
@@ -201,7 +220,7 @@ export function MaterialsPhoneRow({
       {!tier && (
         <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-text-dim tabular-nums">
           <span>
-            {t('industry.errands.need')} {formatCount(material.quantity)}
+            {t('industry.errands.needQuantity', { quantity: formatCount(material.quantity) })}
           </span>
           <span aria-hidden="true">·</span>
           <span className="inline-flex items-center gap-1">
@@ -214,6 +233,8 @@ export function MaterialsPhoneRow({
               <EditableValue
                 label={t('industry.errands.haveFor', { material: nameFor(material.typeID) })}
                 onEdit={onEditHave}
+                focusOnMount={refocusHave}
+                onFocused={onRefocused}
                 className={owned > 0 ? 'text-accent' : 'text-text-dim'}
               >
                 {formatCount(owned)}

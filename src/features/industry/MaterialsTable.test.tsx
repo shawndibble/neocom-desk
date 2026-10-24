@@ -332,6 +332,22 @@ describe('MaterialsTable sourcing', () => {
     expect(toBuyOf('Tritanium')).toBe('750');
   });
 
+  it('keeps the in-place contract: Escape discards and Enter saves, both back on the value', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Harness onChange={onChange} />);
+
+    await user.click(valueButton('Have: Tritanium'));
+    await user.keyboard('42{Escape}');
+    expect(onChange).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(valueButton('Have: Tritanium'));
+
+    // A digit on the focused value opens the field already holding it.
+    await user.keyboard('7{Enter}');
+    expect(onChange).toHaveBeenCalledWith(34, { ownedQuantity: 7 });
+    expect(document.activeElement).toBe(valueButton('Have: Tritanium'));
+  });
+
   it('keeps a visible focus ring on both editable inputs', () => {
     render(<Harness />);
     for (const input of [ownedInput('Tritanium'), priceInput('Tritanium')]) {

@@ -9,7 +9,7 @@ import type { PlanJobKind, PlanScheduleResult, PlanStage } from './planJobSlots'
 const KIND_ORDER: readonly PlanJobKind[] = ['reaction', 'part', 'final'];
 
 /**
- * "Uses 6 slots · done by Thu 14:20 · [Show plan ▾]" for a plan's (or a
+ * "Uses 6 slots · done by Thu 14:20" and a Show plan button for a plan's (or a
  * group's) job tree on its character's slots. Show plan opens a popover with
  * the stage order: "Now: 4 reactions · Wed 09:00: 6 parts · Thu 02:00: final item". When
  * the jobs are shared across Characters, Show plan also lists a lane per

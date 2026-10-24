@@ -363,7 +363,11 @@ export function PlanVerdictHero({
           </div>
 
           {!pricesLoading && pricesReady && profit !== null && (
-            <dl className="grid grid-cols-3 gap-4 md:flex-1">
+            <dl
+              // Two columns on a phone: three left "BREAK-EVEN ⓘ" no room, and
+              // it must not wrap (the labels share one baseline).
+              className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:flex-1"
+            >
               <HeroStat label={t('industry.margin')}>
                 {figures.marginPct === null ? '—' : formatPercent(figures.marginPct)}
               </HeroStat>
