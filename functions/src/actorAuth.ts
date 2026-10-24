@@ -54,9 +54,12 @@ export async function verifyAccessToken(
   }
 }
 
-export interface Actor {
+/** A caller whose token verified: the Character, its claims, and that same token. */
+export interface VerifiedActor {
   characterId: number;
   claims: EveTokenClaims;
+  /** The token `claims` were read from: ESI is read with this and no other. */
+  accessToken: string;
 }
 
 /** The token must be this caller's own Character (and owner, so a transferred one fails). */
@@ -65,13 +68,13 @@ export async function verifyCallerToken(
   caller: Caller,
   accessToken: string | undefined,
   options: VerifyOptions = {}
-): Promise<Actor> {
+): Promise<VerifiedActor> {
   const characterId = signedInCharacter(caller);
   if (accessToken === undefined)
     fail('invalid-argument', 'accessToken is required', 'token-required');
   const claims = await verifyAccessToken(deps.verifyToken, accessToken, options);
   assertOwnToken(caller, characterId, claims);
-  return { characterId, claims };
+  return { characterId, claims, accessToken };
 }
 
 /** `token-mismatch` unless the claims are this signed-in Character, same owner. */
@@ -81,53 +84,55 @@ export function assertOwnToken(caller: Caller, characterId: number, claims: EveT
   }
 }
 
+/** The refusals `requireLiveRoles` itself emits, besides the caller's own role reason. */
+export const DENY_REASON = { missingScope: 'missing-scope', wrongCorp: 'wrong-corp' } as const;
+export type LiveRolesDenyReason = (typeof DENY_REASON)[keyof typeof DENY_REASON];
+
+const MISSING_SCOPE_MESSAGE = 'Grant the corporation roles scope first';
+
 /** `missing-scope` unless the token carries the corporation roles scope. */
 export function requireRolesScope(claims: EveTokenClaims): void {
   if (!claims.scopes.includes(ROLES_SCOPE)) {
-    fail('failed-precondition', 'Grant the corporation roles scope first', 'missing-scope');
+    fail('failed-precondition', MISSING_SCOPE_MESSAGE, DENY_REASON.missingScope);
   }
 }
 
-/** `missing-scope`, `wrong-corp`, or the caller's role reason. */
-export type DenyReason = string;
-
-export interface LiveRolesOptions {
+export interface LiveRolesOptions<Role extends string = string> {
   /** Refuse `wrong-corp` unless the Character is in this corporation now. */
   corporationId?: number;
   /** The role the call needs. */
   need: 'canView' | 'canEdit';
   /** The refusal for a Character without the role. */
-  denied: { message: string; reason: string };
+  denied: { message: string; reason: Role };
   /** Runs before any refusal, e.g. to revoke a cached grant the failed check supersedes. */
-  onDenied?: (reason: DenyReason) => Promise<void> | void;
+  onDenied?: (reason: LiveRolesDenyReason | Role) => Promise<void> | void;
 }
 
-/** Roles read live from ESI with the caller's token; throws the refusal when not held. */
-export async function requireLiveRoles(
+/** Roles read live from ESI with the actor's verified token; throws the refusal when not held. */
+export async function requireLiveRoles<Role extends string>(
   deps: { readIdentity: IdentityReader },
-  actor: Actor,
-  accessToken: string,
-  options: LiveRolesOptions
+  actor: VerifiedActor,
+  options: LiveRolesOptions<Role>
 ): Promise<{ identity: CorpIdentity; roles: OfficerRoles }> {
+  // The one refusal path: onDenied, then a throw.
   const deny = async (
     code: FunctionsErrorCode,
     message: string,
-    reason: DenyReason
+    reason: LiveRolesDenyReason | Role
   ): Promise<never> => {
     await options.onDenied?.(reason);
     return fail(code, message, reason);
   };
   if (!actor.claims.scopes.includes(ROLES_SCOPE)) {
-    await options.onDenied?.('missing-scope');
-    requireRolesScope(actor.claims); // throws
+    return deny('failed-precondition', MISSING_SCOPE_MESSAGE, DENY_REASON.missingScope);
   }
-  const identity = await deps.readIdentity(actor.characterId, accessToken);
+  const identity = await deps.readIdentity(actor.characterId, actor.accessToken);
   if (options.corporationId !== undefined && identity.corporationId !== options.corporationId) {
-    await deny('permission-denied', 'Not a member of this corporation', 'wrong-corp');
+    return deny('permission-denied', 'Not a member of this corporation', DENY_REASON.wrongCorp);
   }
   const roles = decideRoles(identity.roles, identity.ceoId === actor.characterId);
   if (!roles[options.need]) {
-    await deny('permission-denied', options.denied.message, options.denied.reason);
+    return deny('permission-denied', options.denied.message, options.denied.reason);
   }
   return { identity, roles };
 }

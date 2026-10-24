@@ -343,7 +343,7 @@ export async function acceptFeederInvite(
 ): Promise<AcceptFeederInviteResult> {
   const actor = await verifyCallerToken(deps, caller, input.accessToken);
   const { characterId, claims } = actor;
-  const { identity } = await requireLiveRoles(deps, actor, input.accessToken, {
+  const { identity } = await requireLiveRoles(deps, actor, {
     need: 'canEdit',
     denied: { message: 'Only a CEO, Director or Accountant can accept', reason: 'not-an-editor' },
   });

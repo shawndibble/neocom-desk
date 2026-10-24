@@ -117,7 +117,6 @@ export async function authorizeSrpOfficer(
   options: { live: boolean } = { live: true }
 ): Promise<OfficerAccess> {
   const actor = await verifyCallerToken(deps, caller, call.accessToken);
-  const accessToken = call.accessToken as string; // verifyCallerToken refused an absent one
   const now = deps.now();
   const officerRef = officersOf(deps.db, call.corporationId).doc(caller.uid);
   const held = (await officerRef.get()).data() as OfficerAccess | undefined;
@@ -132,7 +131,7 @@ export async function authorizeSrpOfficer(
   if (!options.live && heldUsable) {
     access = held;
   } else {
-    const { identity, roles } = await requireLiveRoles(deps, actor, accessToken, {
+    const { identity, roles } = await requireLiveRoles(deps, actor, {
       corporationId: call.corporationId,
       need: 'canEdit',
       denied: { message: 'No SRP officer role in this corporation', reason: 'not-an-officer' },
