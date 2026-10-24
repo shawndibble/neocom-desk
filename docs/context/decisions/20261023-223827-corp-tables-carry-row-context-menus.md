@@ -7,9 +7,10 @@ _Recorded 2026-10-23._
   - Members roster, Roles holders and Roles history: Show info, Open in EVE, zKillboard, Copy name for the member (`CharacterRowMenu`). Open in EVE and zKillboard are the two real actions.
   - Wallet transactions: the item menu (Quickbar, price alert, Compare, Open in EVE, Build Plan, View in Market, Show info) plus "Filter to this item".
   - Wallet journal (corp only, lines with a Player): Filter to this player, Filter to this type, and the player's actions. Lines without a Player have one action, so no menu; the personal journal gets none.
-  - Moons › Extractions (officers, survey or no ore source): Link a Survey… / Change survey…, Dismiss tax… (aria-disabled with its reason at zero tax). Open moon page is the row click, so not repeated; the trailing caret is gone.
+  - Moons › Extractions (officers): only rows with a survey-sourced ore and tax above zero, where both Change survey… and Dismiss tax… are real. An unknown-ore row already shows the visible Link button, a zero-tax Dismiss would be inert, and Notification ore has no survey: none of those get a ⋮ or right-click menu. Open moon page is the row click; a row without a ⋮ keeps its trailing caret, a row with one drops it.
   - Moons › Miners (officers): Record payment…, Send reminder (aria-disabled with reason), Dismiss tax…, Show info. Caret gone.
-  - SRP officer Pending and Owed (claims with a figure): Change amount…, Show info, Open in EVE, zKillboard, Copy name.
+  - SRP officer Pending and Owed (claims with a figure): Change amount…, Show info, Open in EVE, zKillboard, Copy name. The ⋮ is a separate trailing cell after the row's Approve / Reject cluster, a trade-off accepted so the row's visible buttons stay one tap.
+- **Accepted:** Open in EVE is inert without the Permission, so a user without it sees one real action (zKillboard) in the roster menu.
 - **No menu, and why.**
   - Moons › Statements: no row click, and "Send this period" is already the visible run control above the table.
   - SRP officer History: only the pilot's actions, one real action.

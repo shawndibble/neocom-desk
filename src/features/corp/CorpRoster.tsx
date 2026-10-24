@@ -10,7 +10,7 @@
  * most recently seen first under a down arrow, like any date column. The
  * silent members are the amber ones and the "dark only" filter, not the order.
  */
-import { Fragment, useMemo } from 'react';
+import { Fragment, useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { Pill } from '@/components/ui/Pill';
@@ -296,6 +296,11 @@ export function CorpRosterColumnPicker() {
 }
 
 /** Module-level so the table's windowing and row memo see one stable function. */
+const rosterRowMenu = (row: RosterRow, tr: ReactElement) => (
+  <CharacterRowMenu characterId={row.characterId} name={row.name}>
+    {tr}
+  </CharacterRowMenu>
+);
 const rosterRowKey = (row: RosterRow) => row.characterId;
 
 export function CorpRosterTable({
@@ -348,11 +353,7 @@ export function CorpRosterTable({
         virtualize="auto"
         label={t('corp.members.tableLabel')}
         density="compact"
-        rowContextMenu={(row, tr) => (
-          <CharacterRowMenu characterId={row.characterId} name={row.name}>
-            {tr}
-          </CharacterRowMenu>
-        )}
+        rowContextMenu={rosterRowMenu}
         rowMoreActions
         {...sortProps}
       />

@@ -1,9 +1,8 @@
-import { useState } from 'react';
+import { useCallback, useState, type ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   DataTable,
-  DisabledMenuItem,
   MenuItem,
   Panel,
   RowActionsMenu,
@@ -14,6 +13,7 @@ import {
 } from '@/components/ui';
 import type { ExtractionRow } from '@/engine/corpTaxBook/bookView';
 import { useBook } from './useBook';
+import { caretColumn } from './caretColumn';
 import { ReasonDialog } from './BookDialogs';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { ExtractionTimeline } from './ExtractionTimeline';
@@ -28,6 +28,34 @@ export function ExtractionsTab() {
   const [dismissing, setDismissing] = useState<ExtractionRow | null>(null);
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const navigate = useNavigate();
+  // Open moon page is the row click. Beyond it a row earns a menu only with two real actions:
+  // Change survey (the ore came from a survey; an unknown-ore row has the visible Link button)
+  // and Dismiss tax (inert at zero tax, so it does not count).
+  const hasMenu = (row: ExtractionRow) => canEdit && row.oreSource === 'survey' && row.tax > 0;
+  const rowContextMenu = useCallback(
+    (row: ExtractionRow, tr: ReactElement) =>
+      canEdit && row.oreSource === 'survey' && row.tax > 0 ? (
+        <RowActionsMenu
+          name={names.refinery(row.structureId)}
+          onCloseAutoFocus={onCloseAutoFocus}
+          items={
+            <>
+              <MenuItem onSelect={() => run(() => setLinkingId(row.id))}>
+                {t('corpTaxBook.moons.moon.link.change')}
+              </MenuItem>
+              <MenuItem onSelect={() => run(() => setDismissing(row))}>
+                {t('corpTaxBook.moons.moon.dismiss')}
+              </MenuItem>
+            </>
+          }
+        >
+          {tr}
+        </RowActionsMenu>
+      ) : (
+        tr
+      ),
+    [canEdit, names, run, onCloseAutoFocus, t]
+  );
   const rows = view.extractions;
   const count = (state: ExtractionRow['state']) => rows.filter((r) => r.state === state).length;
   const inChunks = rows
@@ -85,6 +113,7 @@ export function ExtractionsTab() {
       header: t('corpTaxBook.moons.cols.mined'),
       render: (row) => <MinedBar pct={row.minedPct} label={names.refinery(row.structureId)} />,
     },
+    caretColumn<ExtractionRow>((row) => hasMenu(row)),
   ];
 
   return (
@@ -127,39 +156,8 @@ export function ExtractionsTab() {
             rowKey={(row) => row.id}
             onRowClick={(row) => navigate(extractionPath(row.id))}
             rowClassName={() => 'group'}
-            rowContextMenu={(row, tr) =>
-              // Open moon page is the row click; the menu holds what only the
-              // moon page offered. A Notification-sourced ore has no survey to link.
-              canEdit && row.oreSource !== 'notification' ? (
-                <RowActionsMenu
-                  name={names.refinery(row.structureId)}
-                  onCloseAutoFocus={onCloseAutoFocus}
-                  items={
-                    <>
-                      <MenuItem onSelect={() => run(() => setLinkingId(row.id))}>
-                        {row.oreSource === 'survey'
-                          ? t('corpTaxBook.moons.moon.link.change')
-                          : t('corpTaxBook.moons.moon.link.open')}
-                      </MenuItem>
-                      {row.tax > 0 ? (
-                        <MenuItem onSelect={() => run(() => setDismissing(row))}>
-                          {t('corpTaxBook.moons.moon.dismiss')}
-                        </MenuItem>
-                      ) : (
-                        <DisabledMenuItem reason={t('corpTaxBook.moons.moon.dismissNone')}>
-                          {t('corpTaxBook.moons.moon.dismiss')}
-                        </DisabledMenuItem>
-                      )}
-                    </>
-                  }
-                >
-                  {tr}
-                </RowActionsMenu>
-              ) : (
-                tr
-              )
-            }
-            rowMoreActions
+            rowContextMenu={rowContextMenu}
+            rowMoreActions={canEdit}
             defaultSort={{ columnId: 'when', direction: 'desc' }}
             mobileSort
             stackColumns={2}

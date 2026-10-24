@@ -56,7 +56,7 @@ export function CharacterMenuItems({
   name,
 }: {
   characterId: number;
-  /** Empty when the name never resolved: Copy name is then left out. */
+  /** Null, or the `#<id>` placeholder, when the name never resolved: Copy name is then left out. */
   name: string | null;
 }) {
   const { t } = useTranslation();
@@ -67,7 +67,9 @@ export function CharacterMenuItems({
       <ExternalMenuItem href={characterZkillUrl(characterId)}>
         {t('publicInfo.zkillboard')}
       </ExternalMenuItem>
-      {name && <CopyMenuItem text={name}>{t('market.contextMenu.copyName')}</CopyMenuItem>}
+      {name && !name.startsWith('#') && (
+        <CopyMenuItem text={name}>{t('market.contextMenu.copyName')}</CopyMenuItem>
+      )}
     </>
   );
 }

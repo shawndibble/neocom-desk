@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactElement } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -15,6 +15,7 @@ import { minerDetail, type BookView, type MinerRow } from '@/engine/corpTaxBook/
 import { boolParam, textParam } from '@/lib/urlState';
 import { useUrlParams } from '@/lib/useUrlState';
 import { useBook } from './useBook';
+import { caretColumn } from './caretColumn';
 import { isk, shortDate } from './moonsFormat';
 import { minerPath } from './moonsPaths';
 import { OverdueWord, StandingWord } from './moonsParts';
@@ -33,13 +34,28 @@ const isActive = (m: MinerRow) => m.owed > 0 || m.unbilled > 0 || m.pending > 0 
 
 export function MinersTab() {
   const { t } = useTranslation();
-  const { view, names, edit } = useBook();
+  const { view, names, edit, canEdit } = useBook();
   const [dialog, setDialog] = useState<{ kind: 'record' | 'dismiss'; miner: MinerRow } | null>(
     null
   );
   const [notice, setNotice] = useState<string | null>(null);
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const navigate = useNavigate();
+  const rowContextMenu = useCallback(
+    (m: MinerRow, tr: ReactElement) => (
+      <MinerRowMenu
+        miner={m}
+        onRecord={(miner) => run(() => setDialog({ kind: 'record', miner }))}
+        onDismiss={(miner) => run(() => setDialog({ kind: 'dismiss', miner }))}
+        onNotice={setNotice}
+        onOpenChange={(open) => open && setNotice(null)}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
+        {tr}
+      </MinerRowMenu>
+    ),
+    [run, onCloseAutoFocus]
+  );
   const [params, setParams] = useUrlParams(PARAMS);
   const nameOf = (m: MinerRow) => names.character(m.mainCharacterId);
 
@@ -131,6 +147,7 @@ export function MinersTab() {
       render: (m) => (m.lastPaidAt ? shortDate(m.lastPaidAt) : '—'),
       sortValue: (m) => m.lastPaidAt ?? '',
     },
+    caretColumn<MinerRow>(() => canEdit),
   ];
 
   return (
@@ -193,18 +210,8 @@ export function MinersTab() {
             rowKey={(m) => m.id}
             onRowClick={(m) => navigate(minerPath(m.id))}
             rowClassName={() => 'group'}
-            rowContextMenu={(m, tr) => (
-              <MinerRowMenu
-                miner={m}
-                onRecord={(miner) => run(() => setDialog({ kind: 'record', miner }))}
-                onDismiss={(miner) => run(() => setDialog({ kind: 'dismiss', miner }))}
-                onNotice={setNotice}
-                onCloseAutoFocus={onCloseAutoFocus}
-              >
-                {tr}
-              </MinerRowMenu>
-            )}
-            rowMoreActions
+            rowContextMenu={rowContextMenu}
+            rowMoreActions={canEdit}
             defaultSort={{ columnId: 'overdue', direction: 'desc' }}
             mobileSort
             stackSummary={t('corpTaxBook.moons.miners.summary', {

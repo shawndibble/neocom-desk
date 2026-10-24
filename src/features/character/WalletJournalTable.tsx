@@ -6,7 +6,7 @@
  * other.
  */
 import { formatIsoDay } from '@/lib/formatDateTick';
-import { useMemo, type ReactElement, type ReactNode } from 'react';
+import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
@@ -408,29 +408,38 @@ export function JournalTable({
   );
   // Corp journal only: a line with a Player offers that player's filter and actions,
   // and its ref type's filter; a line with none has one action, so no menu.
-  const rowContextMenu = (entry: JournalRow, tr: ReactElement): ReactElement => {
-    if (entry.playerId === undefined) return tr;
-    const playerId = entry.playerId;
-    const name = playerOptions?.find((option) => option.id === String(playerId))?.name ?? null;
-    return (
-      <CharacterRowMenu
-        characterId={playerId}
-        name={name}
-        extraItems={
-          <>
-            <MenuItem onSelect={() => onFilterChange({ ...filter, player: String(playerId) })}>
-              {t('wallet.filterToPlayer')}
-            </MenuItem>
-            <MenuItem onSelect={() => onFilterChange({ ...filter, refType: journalRefKey(entry) })}>
-              {t('wallet.filterToType')}
-            </MenuItem>
-          </>
-        }
-      >
-        {tr}
-      </CharacterRowMenu>
-    );
-  };
+  const playerNames = useMemo(
+    () => new Map(playerOptions?.map((option) => [option.id, option.name])),
+    [playerOptions]
+  );
+  const rowContextMenu = useCallback(
+    (entry: JournalRow, tr: ReactElement): ReactElement => {
+      if (entry.playerId === undefined) return tr;
+      const playerId = entry.playerId;
+      const name = playerNames.get(String(playerId)) ?? null;
+      return (
+        <CharacterRowMenu
+          characterId={playerId}
+          name={name}
+          extraItems={
+            <>
+              <MenuItem onSelect={() => onFilterChange({ ...filter, player: String(playerId) })}>
+                {t('wallet.filterToPlayer')}
+              </MenuItem>
+              <MenuItem
+                onSelect={() => onFilterChange({ ...filter, refType: journalRefKey(entry) })}
+              >
+                {t('wallet.filterToType')}
+              </MenuItem>
+            </>
+          }
+        >
+          {tr}
+        </CharacterRowMenu>
+      );
+    },
+    [playerNames, filter, onFilterChange, t]
+  );
   // A filter with no criteria active still runs (it's the identity filter), so
   // "is a filter active" is asked separately here rather than read off the result.
   const filterIsActive = activeWalletJournalFilterCount(filter) > 0 || filter.text.trim() !== '';

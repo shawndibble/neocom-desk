@@ -109,4 +109,20 @@ describe('CorpRoleAudit', () => {
     expect(screen.getByRole('menuitem', { name: /Open in EVE/ })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /zKillboard/ })).toBeInTheDocument();
   });
+
+  it('opens the ⋮ on a role-change line with the member actions', async () => {
+    fixture.loadedAt = CHANGED_AT;
+    fixture.changes = [
+      { characterId: 1, issuerId: 2, changedAtMs: CHANGED_AT, granted: ['Director'], removed: [] },
+    ];
+    render(
+      <MemoryRouter>
+        <CorpRoleAudit tabs={{ bar: null, tabsId: 't', tabId: 'x' }} />
+      </MemoryRouter>
+    );
+    const history = screen.getByRole('table', { name: /role changes|history/i });
+    await userEvent.click(within(history).getAllByRole('button', { name: /More actions for/ })[0]!);
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /zKillboard/ })).toBeInTheDocument();
+  });
 });
