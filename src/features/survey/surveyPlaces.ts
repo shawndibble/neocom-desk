@@ -78,22 +78,43 @@ export function rankExactFirst(places: readonly SurveyPlace[], query: string): S
     : [...exact, ...places.filter((place) => !isExactPlace(place, query))];
 }
 
+// Any mark but a letter, digit or space: what splits a name into verbatim runs.
+const PUNCTUATION = /[^\p{L}\p{N}\s]+/u;
+
+/** The longest stretch of the text with no punctuation, a lone letter at either end dropped. */
+function longestPlainRun(text: string): string {
+  const runs = text.split(PUNCTUATION).map((run) => {
+    const words = run.trim().split(/\s+/);
+    while (words.length > 0 && words[0].length < 2) words.shift();
+    while (words.length > 0 && words[words.length - 1].length < 2) words.pop();
+    return words.join(' ');
+  });
+  return runs.reduce((longest, run) => (run.length > longest.length ? run : longest), '');
+}
+
 /**
- * The queries to put to ESI's search, tightest first: what was typed, its words
- * without punctuation (a possessive's lone "s" dropped), the name after the
- * system, then the system alone. Each below ESI's floor is skipped.
+ * The queries to put to ESI's search, tightest first. Whether ESI matches a
+ * substring or word by word, one of them should land: what was typed, the name
+ * after the system, the longest stretch with no punctuation (each copied from the
+ * name, so a substring of it), the words without punctuation (a possessive's lone
+ * "s" dropped), then the system alone. Each below ESI's floor is skipped.
  */
 export function structureSearchTerms(query: string): string[] {
   const typed = query.trim();
-  const words = (text: string) =>
-    text
-      .replace(APOSTROPHES, ' ')
-      .split(NOT_WORD)
-      .filter((word) => word.length > 1)
-      .join(' ');
+  const words = typed
+    .replace(APOSTROPHES, ' ')
+    .split(NOT_WORD)
+    .filter((word) => word.length > 1)
+    .join(' ');
   const [system, ...rest] = typed.split(SYSTEM_SEPARATOR);
-  const candidates = [typed, words(typed)];
-  if (rest.length > 0) candidates.push(words(rest.join(' ')), words(system));
+  const named = rest.length > 0;
+  const candidates = [
+    typed,
+    named ? rest.join(' - ') : '',
+    longestPlainRun(typed),
+    words,
+    named ? system : '',
+  ];
   const terms: string[] = [];
   for (const term of candidates) {
     const seen = terms.some((t) => t.toLowerCase() === term.toLowerCase());
@@ -117,6 +138,15 @@ export function searchLocalPlaces(
     limit: STATION_LIMIT,
   }).map((s): SurveyPlace => ({ id: s.id, name: s.name, kind: 'station' }));
   return [...foundSystems, ...foundStations];
+}
+
+/** Known structures then ESI's hits, each structure once. */
+export function mergeStructures(
+  known: readonly SurveyPlace[],
+  found: readonly SurveyPlace[]
+): SurveyPlace[] {
+  const ids = new Set(known.map((place) => place.id));
+  return [...known, ...found.filter((place) => !ids.has(place.id))];
 }
 
 /** What was typed, offered as a free-text place when no result already carries that name. */
@@ -148,7 +178,9 @@ export async function searchCachedStructures(): Promise<(query: string) => Surve
  * The structures this Character can dock at whose name matches. A refused or
  * failed lookup is just fewer results. When ESI finds nothing for what was typed,
  * each looser query in turn is asked, keeping only the hits whose name matches
- * the full text, so asking by the system alone never floods the list.
+ * the full text, so asking by the system alone never floods the list. The first
+ * query ESI answers with any ids is the last one asked, even when every lookup
+ * is refused, so a search costs at most one round of lookups.
  */
 export async function searchStructures(
   characterId: number,
@@ -161,17 +193,17 @@ export async function searchStructures(
     const hits = (await getCharacterSearch(characterId, ['structure'], term, { signal })).data;
     if (signal?.aborted) return [];
     const ids = (hits?.structure ?? []).slice(0, STRUCTURE_LIMIT);
+    if (ids.length === 0) continue;
     const resolved = await Promise.all(
       ids.map(async (id): Promise<SurveyPlace | null> => {
         const summary = await loadStructureSummary(characterId, id).catch(() => null);
         return summary === null ? null : { id, name: summary.name, kind: 'structure' };
       })
     );
-    const places = resolved.filter(
+    return resolved.filter(
       (place): place is SurveyPlace =>
         place !== null && (term === typed || matchesPlace(place.name, query))
     );
-    if (places.length > 0) return places;
   }
   return [];
 }

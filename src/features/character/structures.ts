@@ -293,13 +293,22 @@ export async function readCachedStructureNames(
   return names;
 }
 
+/** A structure whose name this device already holds. */
+export interface CachedStructure {
+  id: number;
+  name: string;
+}
+
 /**
  * Every structure this device has named, read from the roster-wide rows with no
  * request: a typeahead's instant matches. Refusal memos under the same prefix
  * are skipped, as is everything while a purge is pending.
  */
-export async function listCachedStructures(): Promise<{ id: number; name: string }[]> {
+export async function listCachedStructures(): Promise<CachedStructure[]> {
   if (await isCachePurgePending(GLOBAL_CACHE_CHARACTER_ID)) return [];
+  // A prefix range over the compound key, as `purgeSharedStructureCache` deletes:
+  // U+FFFF is the highest UTF-16 code unit, so the bound sits above every
+  // `structure:…` key.
   const rows = await db.esiCache
     .where('[characterId+key]')
     .between(
@@ -309,7 +318,7 @@ export async function listCachedStructures(): Promise<{ id: number; name: string
       true
     )
     .toArray();
-  const structures: { id: number; name: string }[] = [];
+  const structures: CachedStructure[] = [];
   for (const row of rows) {
     const id = /^structure:(\d+)$/.exec(row.key)?.[1];
     const name = (row.value as Partial<UniverseStructure> | undefined)?.name;

@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import { Button, LiveStatus, Spinner, TextInput } from '@/components/ui';
+import { activeOptionClassName } from '@/components/ui/controlStyles';
 import { useRetryFocus } from '@/lib/useRetryFocus';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { useSolarSystemList } from '@/features/route/useSolarSystems';
@@ -41,6 +42,7 @@ import {
   isExactPlace,
   manualPlaceOption,
   matchesPlace,
+  mergeStructures,
   MIN_STRUCTURE_SEARCH_LENGTH,
   rankExactFirst,
   searchCachedStructures,
@@ -107,12 +109,14 @@ export function SurveyLocationPicker({
 
   const typed = query?.trim() ?? '';
   const canSearch = granted !== undefined && granted.includes(SEARCH_SCOPE);
-  const searchKey = canSearch && typed.length >= MIN_STRUCTURE_SEARCH_LENGTH ? typed : '';
+  const searchText = canSearch && typed.length >= MIN_STRUCTURE_SEARCH_LENGTH ? typed : '';
+  // Hits belong to the Character that searched, so another one's never pass for current.
+  const searchKey = searchText === '' ? '' : `${characterId}:${searchText}`;
   useEffect(() => {
     if (searchKey === '') return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      void searchStructures(characterId, searchKey, controller.signal)
+      void searchStructures(characterId, searchText, controller.signal)
         .catch(() => [])
         .then((places) => {
           if (!controller.signal.aborted) setStructureHits({ key: searchKey, places });
@@ -122,7 +126,7 @@ export function SurveyLocationPicker({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [searchKey, characterId]);
+  }, [searchKey, searchText, characterId]);
 
   const searching = searchKey !== '' && structureHits?.key !== searchKey;
 
@@ -135,10 +139,10 @@ export function SurveyLocationPicker({
         : structureHits.key === searchKey
           ? structureHits.places
           : structureHits.places.filter((place) => matchesPlace(place.name, typed));
-    const structures = [...knownStructures(typed), ...found].filter(
-      (place, index, all) => all.findIndex((other) => other.id === place.id) === index
+    const results = rankExactFirst(
+      [...local, ...mergeStructures(knownStructures(typed), found)],
+      typed
     );
-    const results = rankExactFirst([...local, ...structures], typed);
     const manual = manualPlaceOption(results, typed);
     return manual === null ? results : [...results, manual];
   }, [systems, stations, knownStructures, typed, structureHits, searchKey]);
@@ -165,23 +169,26 @@ export function SurveyLocationPicker({
     setPasted(null);
   }
 
-  // A paste naming a place, or an Enter held for the search, settles once the answer lands.
-  const due =
-    pasted !== null && pasted === query && exact !== undefined
-      ? exact
-      : heldEnter !== null && heldEnter === query && !searching
-        ? enterPick()
-        : undefined;
-  const settle = useEffectEvent(choose);
+  // A paste naming a place picks it; an Enter held for the search is answered once it lands.
+  const pastedPick = pasted !== null && pasted === query ? exact : undefined;
+  const heldAnswered = heldEnter !== null && heldEnter === query && !searching;
+  const autoPick = useEffectEvent(() => {
+    const place = pastedPick ?? (heldAnswered ? enterPick() : undefined);
+    if (place !== undefined) choose(place);
+    // Nothing to take (several hits, no exact one): the pilot picks from the list.
+    else if (heldAnswered) setHeldEnter(null);
+  });
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- answers an async arrival (the cache read or ESI's search), not a render-time derivation
-    if (due !== undefined) settle(due);
-  }, [due]);
+    if (pastedPick !== undefined || heldAnswered) autoPick();
+  }, [pastedPick, heldAnswered]);
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (COMBOBOX_NAV_KEYS.includes(event.key)) {
       event.preventDefault();
       setOpen(true);
+      // Moving the highlight takes back a held Enter: the pilot is choosing again.
+      setHeldEnter(null);
       setHighlight(moveHighlight(event.key as ComboboxNavKey, active, places.length));
     } else if (event.key === 'Enter') {
       const place = enterPick();
@@ -272,7 +279,7 @@ export function SurveyLocationPicker({
                 aria-selected={index === active}
                 className={cx(
                   'flex cursor-pointer items-baseline justify-between gap-3 px-2 py-1 hover:bg-panel-2 touch:min-h-11 touch:items-center',
-                  index === active && 'bg-panel-2'
+                  index === active && `bg-panel-2 ${activeOptionClassName}`
                 )}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(place)}

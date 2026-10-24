@@ -4,6 +4,7 @@ import {
   foldPlaceName,
   manualPlaceOption,
   matchesPlace,
+  mergeStructures,
   rankExactFirst,
   searchCachedStructures,
   searchLocalPlaces,
@@ -76,11 +77,12 @@ describe('matchesPlace', () => {
 });
 
 describe('structureSearchTerms', () => {
-  it('tries what was typed, then without punctuation, then the name after the system', () => {
+  it('tries what was typed, then pieces of the name verbatim, then its bare words, then the system', () => {
     expect(structureSearchTerms("Ainsan - Mav's Watering Hole")).toEqual([
       "Ainsan - Mav's Watering Hole",
+      "Mav's Watering Hole",
+      'Watering Hole',
       'Ainsan Mav Watering Hole',
-      'Mav Watering Hole',
       'Ainsan',
     ]);
   });
@@ -89,6 +91,17 @@ describe('structureSearchTerms', () => {
     expect(structureSearchTerms('  efa  ')).toEqual(['efa']);
     expect(structureSearchTerms('ef')).toEqual([]);
     expect(structureSearchTerms('Ef - Mo')).toEqual(['Ef - Mo', 'Ef Mo']);
+  });
+});
+
+describe('mergeStructures', () => {
+  it('keeps each structure once, the known one first', () => {
+    const known = [{ id: 1, name: 'A', kind: 'structure' as const }];
+    const found = [
+      { id: 1, name: 'A', kind: 'structure' as const },
+      { id: 2, name: 'B', kind: 'structure' as const },
+    ];
+    expect(mergeStructures(known, found).map((p) => p.id)).toEqual([1, 2]);
   });
 });
 
@@ -144,7 +157,7 @@ describe('searchStructures', () => {
 
   it('retries a looser query when ESI finds nothing for the pasted name', async () => {
     getCharacterSearch.mockImplementation(async (_c: number, _k: string[], term: string) => ({
-      data: term === 'Ainsan Mav Watering Hole' ? { structure: [1001] } : {},
+      data: term === "Mav's Watering Hole" ? { structure: [1001] } : {},
     }));
     loadStructureSummary.mockResolvedValue({ name: "Ainsan - Mav's Watering Hole" });
     expect(await searchStructures(7, "Ainsan - Mav's Watering Hole")).toEqual([
@@ -152,8 +165,15 @@ describe('searchStructures', () => {
     ]);
     expect(getCharacterSearch.mock.calls.map((call) => call[2])).toEqual([
       "Ainsan - Mav's Watering Hole",
-      'Ainsan Mav Watering Hole',
+      "Mav's Watering Hole",
     ]);
+  });
+
+  it('asks no looser query once ESI answers with ids, even ones it cannot see', async () => {
+    getCharacterSearch.mockResolvedValue({ data: { structure: [1003] } });
+    loadStructureSummary.mockResolvedValue(null);
+    expect(await searchStructures(7, "Ainsan - Mav's Watering Hole")).toEqual([]);
+    expect(getCharacterSearch).toHaveBeenCalledOnce();
   });
 
   it('keeps only the hits of a looser query that match the full name typed', async () => {

@@ -123,10 +123,38 @@ describe('SurveyLocationPicker', () => {
     expect(screen.getAllByText('Searching structures…').length).toBeGreaterThan(0);
     expect(onPick).not.toHaveBeenCalled();
     await search.answer(MAVS, []);
-    await search.answer('Ainsan Mav Watering Hole', [1001]);
+    await search.answer("Mav's Watering Hole", [1001]);
     await waitFor(() =>
       expect(onPick).toHaveBeenCalledWith({ id: 1001, name: MAVS, kind: 'structure' })
     );
+  });
+
+  it('picks a pasted name ESI finds when this device has never seen it', async () => {
+    scopes.granted = [ESI_REGISTRY.getCharacterSearch.scope];
+    const search = heldSearch();
+    const onPick = vi.fn();
+    render(<SurveyLocationPicker value={null} characterId={7} onPick={onPick} />);
+    const box = screen.getByRole('combobox');
+    fireEvent.paste(box);
+    fireEvent.change(box, { target: { value: MAVS } });
+    await search.answer(MAVS, [1001]);
+    await waitFor(() =>
+      expect(onPick).toHaveBeenCalledWith({ id: 1001, name: MAVS, kind: 'structure' })
+    );
+  });
+
+  it('takes back a held Enter when an arrow key moves the highlight', async () => {
+    scopes.granted = [ESI_REGISTRY.getCharacterSearch.scope];
+    const search = heldSearch();
+    const onPick = vi.fn();
+    render(<SurveyLocationPicker value={null} characterId={7} onPick={onPick} />);
+    const box = screen.getByRole('combobox');
+    fireEvent.change(box, { target: { value: MAVS } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    fireEvent.keyDown(box, { key: 'ArrowDown' });
+    await search.answer(MAVS, [1001]);
+    expect(await screen.findByRole('option', { name: /Mav's Watering Hole/ })).toBeTruthy();
+    expect(onPick).not.toHaveBeenCalled();
   });
 
   it('keeps a held Enter as a manual location when the search finds nothing', async () => {
