@@ -190,6 +190,19 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect((await book().collection('officers').doc(`char:${JUNIOR}`).get()).exists).toBe(false);
     });
 
+    it('revokes the held access when the renewal token lacks the roles scope (#4969)', async () => {
+      await turnOn();
+      const officer = () => book().collection('officers').doc(`char:${JUNIOR}`).get();
+      expect((await officer()).exists).toBe(true);
+      now = T0 + 11 * 60_000;
+      const noScope: BookDeps = {
+        ...deps(),
+        verifyToken: async (token) => ({ ...(await deps().verifyToken(token)), scopes: [] }),
+      };
+      await reason(verifyOfficer(noScope, who(JUNIOR), parseBookCall(withToken(JUNIOR))));
+      expect((await officer()).exists).toBe(false);
+    });
+
     it('rejects a token for another Character', async () => {
       await turnOn();
       const call = { corporationId: CORP, accessToken: `tok-${ACCOUNTANT}` };
