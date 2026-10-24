@@ -34,7 +34,7 @@ export type SrpClaimRow = Pick<
   'killmailId' | 'state' | 'amount' | 'characterName' | 'hullTypeId' | 'solarSystemId' | 'filedAt'
 >;
 
-interface CorpFeedBase {
+export interface CorpFeedBase {
   readable: boolean;
   /** Unreadable because the grant lapsed: Grant access fixes it. */
   needsReauth: boolean;
