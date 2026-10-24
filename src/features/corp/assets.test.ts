@@ -13,6 +13,7 @@ import {
   assetPlaceIds,
   loadCorpAssetLabels,
   resolveMissingLocationNames,
+  structureNameMap,
   toCorpAssetInputs,
 } from './assets';
 
@@ -180,6 +181,19 @@ describe('toCorpAssetInputs', () => {
 });
 
 describe('corp asset labels', () => {
+  it('names a structure from the corp structures list, ahead of any lookup', async () => {
+    const STRUCTURE_ID = 1035466617946;
+    const names = structureNameMap([
+      { structure_id: STRUCTURE_ID, name: 'Jita - Test Corp Home Fortizar' },
+      { structure_id: 1035466617947 },
+    ] as never);
+    expect([...names]).toEqual([[STRUCTURE_ID, 'Jita - Test Corp Home Fortizar']]);
+
+    const assets = ASSETS.map((asset) => ({ ...asset, location_id: STRUCTURE_ID }));
+    const labels = await loadCorpAssetLabels(assets, assetPlaceIds(assets), names);
+    expect(labels.locations.get(STRUCTURE_ID)).toBe('Jita - Test Corp Home Fortizar');
+  });
+
   it('resolves type names through loadTypeNames', async () => {
     const labels = await loadCorpAssetLabels(ASSETS);
     expect(labels.types.get(34)).toBe('Type 34');

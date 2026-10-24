@@ -13,6 +13,7 @@ import type {
   LocationLedger,
 } from '@/engine/corp/assetLedger';
 import type { HangarDivisionNumber } from '@/engine/corp/assetDivisions';
+import { UPWELL_STRUCTURE_ID_FLOOR } from '@/esi/locationIds';
 import { tabForState, type CorpAssetTab } from './corpAssetsTabs';
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
@@ -21,6 +22,7 @@ const STATE_KEY: Readonly<Record<LedgerState, string>> = {
   offices: 'corp.assets.state.offices',
   deliveries: 'corp.assets.state.deliveries',
   inSpace: 'corp.assets.state.inSpace',
+  fuelBay: 'corp.assets.state.fuelBay',
   impounded: 'corp.assets.state.impounded',
   assetSafety: 'corp.assets.state.assetSafety',
   lockdown: 'corp.assets.state.lockdown',
@@ -32,7 +34,7 @@ export interface LedgerLabels {
   typeName(typeId: number): string;
   /** The full name of an office, structure or system, else "Location #id". */
   placeName(locationId: number | null): string;
-  /** The name's first segment ("Efa" of "Efa - Hangar Keep"), for a chip; null when unresolved. */
+  /** The name's first segment ("Efa" of "Efa - Hangar Keep"), for a chip; the whole name for an Upwell structure; null when unresolved. */
   shortPlaceName(locationId: number | null): string | null;
   /** The corp's own name for a hangar division, else "Division n". */
   divisionName(division: number): string;
@@ -54,7 +56,11 @@ export function makeLedgerLabels(input: {
         : (locationNames.get(locationId) ?? t('corp.assets.unknownLocation', { locationId })),
     shortPlaceName: (locationId) => {
       const name = locationId === null ? undefined : locationNames.get(locationId);
-      return name === undefined ? null : (name.split(' - ')[0] ?? name);
+      if (name === undefined) return null;
+      // An Upwell structure's first segment is its system, which names nothing
+      // a Director can tell apart; keep the whole name.
+      if (locationId !== null && locationId >= UPWELL_STRUCTURE_ID_FLOOR) return name;
+      return name.split(' - ')[0] ?? name;
     },
     divisionName: (division) =>
       divisionNames.get(division) ?? t('corp.vitals.division', { division }),

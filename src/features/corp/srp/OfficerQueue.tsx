@@ -329,15 +329,17 @@ export function OfficerQueue({ data, ready }: { data: SrpQueueData; ready: Ready
           ) : rows.length === 0 ? (
             <EmptyState title={empty[0]} hint={empty[1]} />
           ) : (
-            <DataTable
-              label={t(`srp.officer.title.${tab}`)}
-              columns={columns}
-              rows={rows}
-              rowKey={(row) => row.killmailId}
-              onRowClick={(row) => setOpenId(row.killmailId)}
-              selectedRowKey={openId}
-              stackLayout={phone ? 'dense' : 'labelled'}
-            />
+            <div className="overflow-x-auto">
+              <DataTable
+                label={t(`srp.officer.title.${tab}`)}
+                columns={columns}
+                rows={rows}
+                rowKey={(row) => row.killmailId}
+                onRowClick={(row) => setOpenId(row.killmailId)}
+                selectedRowKey={openId}
+                stackLayout={phone ? 'dense' : 'labelled'}
+              />
+            </div>
           )}
           {tab === 'history' && history.status === 'ready' && history.more && (
             <div className="px-3 pb-3">

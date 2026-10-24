@@ -99,18 +99,20 @@ export function ExtractionsTab() {
         <ExtractionTimeline rows={rows} />
       </Panel>
       <Panel title={t('corpTaxBook.moons.tabs.extractions')} padded={false}>
-        <DataTable
-          label={t('corpTaxBook.moons.tabs.extractions')}
-          columns={columns}
-          rows={rows}
-          rowKey={(row) => row.id}
-          onRowClick={(row) => navigate(extractionPath(row.id))}
-          rowClassName={() => 'group'}
-          defaultSort={{ columnId: 'when', direction: 'desc' }}
-          mobileSort
-          stackColumns={2}
-          stackSummary={t('corpTaxBook.moons.extractionsSummary', { count: rows.length })}
-        />
+        <div className="overflow-x-auto">
+          <DataTable
+            label={t('corpTaxBook.moons.tabs.extractions')}
+            columns={columns}
+            rows={rows}
+            rowKey={(row) => row.id}
+            onRowClick={(row) => navigate(extractionPath(row.id))}
+            rowClassName={() => 'group'}
+            defaultSort={{ columnId: 'when', direction: 'desc' }}
+            mobileSort
+            stackColumns={2}
+            stackSummary={t('corpTaxBook.moons.extractionsSummary', { count: rows.length })}
+          />
+        </div>
       </Panel>
     </div>
   );
