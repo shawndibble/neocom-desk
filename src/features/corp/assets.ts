@@ -18,7 +18,11 @@
  * the read it will use.
  */
 import { conditionalPagedFetch } from '@/esi/cache';
-import { getCorporationAssets, type CorporationAsset } from '@/esi/endpoints';
+import {
+  getCorporationAssets,
+  type CorporationAsset,
+  type CorporationStructure,
+} from '@/esi/endpoints';
 import type { StatusResult } from '@/esi/cache';
 import { readCachedNames, resolveNames } from '@/features/character/names';
 import {
@@ -155,6 +159,21 @@ export async function resolveMissingLocationNames(
   return names;
 }
 
+/**
+ * Structure names from the corporation's own structures read (the one Corp
+ * Board uses), so a hangar's structure is named without a per-id lookup the
+ * Character may not be on the ACL for. Unnamed entries are left out.
+ */
+export function structureNameMap(
+  structures: readonly CorporationStructure[] | null | undefined
+): Map<number, string> {
+  const names = new Map<number, string>();
+  for (const structure of structures ?? []) {
+    if (structure.name) names.set(structure.structure_id, structure.name);
+  }
+  return names;
+}
+
 /** Every label the corp assets view prints, resolved in as few calls as ESI allows. */
 export interface CorpAssetLabels {
   types: ReadonlyMap<number, string>;
@@ -177,11 +196,12 @@ export const EMPTY_CORP_ASSET_LABELS: CorpAssetLabels = {
  */
 export async function loadCorpAssetLabels(
   assets: readonly CorporationAsset[],
-  placeIds: readonly number[] = assetPlaceIds(assets)
+  placeIds: readonly number[] = assetPlaceIds(assets),
+  structureNames: ReadonlyMap<number, string> = new Map()
 ): Promise<CorpAssetLabels> {
   const [types, locations] = await Promise.all([
     loadTypeNames(assets.map((asset) => asset.type_id)),
     cachedAssetLocationNames(placeIds),
   ]);
-  return { types, locations };
+  return { types, locations: new Map([...locations, ...structureNames]) };
 }

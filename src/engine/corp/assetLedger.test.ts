@@ -75,7 +75,7 @@ describe('classifyCorpAssets', () => {
     ['AssetSafety', 'assetSafety'],
     ['Locked', 'lockdown'],
     ['Deliveries', 'capsuleerDeliveries'],
-    ['StructureFuel', 'inSpace'],
+    ['StructureFuel', 'fuelBay'],
     ['ServiceSlot3', 'inSpace'],
     ['QuantumCoreRoom', 'inSpace'],
     ['StructureDeedBay', 'inSpace'],

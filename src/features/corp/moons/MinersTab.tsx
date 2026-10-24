@@ -169,20 +169,22 @@ export function MinersTab() {
             count={counts.guests}
           />
         </div>
-        <DataTable
-          label={t('corpTaxBook.moons.tabs.miners')}
-          columns={columns}
-          rows={rows}
-          rowKey={(m) => m.id}
-          onRowClick={(m) => navigate(minerPath(m.id))}
-          rowClassName={() => 'group'}
-          defaultSort={{ columnId: 'overdue', direction: 'desc' }}
-          mobileSort
-          stackSummary={t('corpTaxBook.moons.miners.summary', {
-            shown: rows.length,
-            total: view.miners.length,
-          })}
-        />
+        <div className="overflow-x-auto">
+          <DataTable
+            label={t('corpTaxBook.moons.tabs.miners')}
+            columns={columns}
+            rows={rows}
+            rowKey={(m) => m.id}
+            onRowClick={(m) => navigate(minerPath(m.id))}
+            rowClassName={() => 'group'}
+            defaultSort={{ columnId: 'overdue', direction: 'desc' }}
+            mobileSort
+            stackSummary={t('corpTaxBook.moons.miners.summary', {
+              shown: rows.length,
+              total: view.miners.length,
+            })}
+          />
+        </div>
         {hidden > 0 && (
           <p className="border-t border-line px-3 py-2 text-xs text-text-dim">
             {t('corpTaxBook.moons.miners.hidden', { count: hidden })}
