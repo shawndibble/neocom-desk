@@ -23,7 +23,9 @@ _Recorded 2026-10-23 · issue #4896._
   the active Character, so an untouched collection is never staler than an
   idle tab already allows. The sweep gates on the new `lastFullSyncAt`, not
   `lastSyncedAt`, so steady editing cannot keep postponing it. An ownerHash
-  change also forces a full pass, since its wipe empties every collection.
+  change also forces a full pass, since its wipe empties every collection, and
+  so does any failed pass: a narrowed success on another collection must not
+  clear the error while the failed one stays unsynced.
 - **A narrowed pass writes no heartbeat and leaves every other collection's
   pull cursor alone.** The heartbeat means "every collection synced"
   (`purgeStaleAccounts`); the sweep and a full pass within the day still stamp

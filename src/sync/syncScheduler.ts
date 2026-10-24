@@ -189,6 +189,10 @@ export function createSyncScheduler(
       });
     } catch (error) {
       failure = { error };
+      // Any failure, narrowed or full, leaves something unsynced. The next
+      // pass runs full so it retries that, and no narrowed success on some
+      // other collection can clear the error while the failed one stays behind.
+      lastFullPullAt.delete(characterId);
       reportFailure('sync', error);
       setStatus(characterId, {
         state: 'error',

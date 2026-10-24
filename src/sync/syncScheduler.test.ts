@@ -158,6 +158,31 @@ describe('collection-scoped scheduling', () => {
     expect(seen).toEqual(['all']);
   });
 
+  it.each([
+    ['full', 'all'],
+    ['narrowed', 'narrowed'],
+  ] as const)(
+    'runs full after a failed %s pass, even inside the window of an earlier full one',
+    async (_label, failing) => {
+      let fail = false;
+      scheduler = create(async () => {
+        if (fail) throw new Error('offline');
+      });
+      await fullPass();
+      fail = true;
+      if (failing === 'all') await scheduler.triggerSync(1).catch(() => {});
+      else {
+        scheduler.scheduleSync(1, { collections: ['plans'], debounceMs: 10 });
+        await flush();
+      }
+      fail = false;
+      seen = [];
+      scheduler.scheduleSync(1, { collections: ['quickbars'], debounceMs: 10 });
+      await flush();
+      expect(seen).toEqual(['all']);
+    }
+  );
+
   it('does not let a narrowed pass extend the window', async () => {
     await fullPass();
     clock += PARTIAL_PASS_WINDOW_MS - 10;
