@@ -51,11 +51,12 @@ export function nextShape(next: Pick<BoardDeadline, 'to'> | null): NextShape {
 
 /**
  * The phone height to hold open for a remembered shape: the `md` button's `h-11`, the
- * `text-sm` readout's one line, or nothing. Never seen (or unreadable) holds the button's
- * room, the usual case for a Character in training.
+ * `text-sm` readout's one line, or nothing. Only what this device saw last time is held:
+ * a guess on a first load that turns out wrong (no clock) drops the whole board by the
+ * line it held, which is the very shift the slot is there to prevent.
  */
 export function reservedNextHeight(remembered: string | null): 'h-11' | 'h-5' | null {
-  if (remembered === 'none') return null;
+  if (remembered === 'link') return 'h-11';
   if (remembered === 'text') return 'h-5';
-  return 'h-11';
+  return null;
 }

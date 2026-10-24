@@ -48,6 +48,10 @@ async function cardBoxes(page: Page, count: number): Promise<Box[]> {
   const cards = page.locator('main section[aria-label]');
   // The first load on a cold dev server is slow; later assertions use the default budget.
   await expect(cards).toHaveCount(count, { timeout: FIRST_LOAD_MS });
+  // Measure the settled board: the boxes are read one at a time, so a widget whose read lands
+  // between two reads (its skeleton giving way to its body) would move the cards after it and
+  // read as an overlap that is never on screen.
+  await expect(page.locator('main section[aria-busy="true"]')).toHaveCount(0);
   const boxes: Box[] = [];
   for (let i = 0; i < count; i += 1) boxes.push((await cards.nth(i).boundingBox())!);
   return boxes;
