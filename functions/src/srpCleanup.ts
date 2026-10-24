@@ -1,6 +1,7 @@
 // SRP retention sweep (ADR 0026): the scheduled sweep that deletes Paid and
-// Rejected SRP Claims one year after they close, leaving one srpAudit entry per corporation
-// per run (claim ids only). Timing is the pure `decideSrpClaimSweep` in srpRetention.ts.
+// Rejected SRP Claims one year after they close, with every srpAudit entry about them
+// (#4942), leaving one count-only srpAudit entry per corporation per run. Timing is the pure
+// `decideSrpClaimSweep` in srpRetention.ts; which entries go is `isSrpAuditForClaim`.
 
 import type {
   DocumentReference,
@@ -9,7 +10,7 @@ import type {
   QueryDocumentSnapshot,
 } from 'firebase-admin/firestore';
 import { CORPS_COLLECTION, SRP_AUDIT, SRP_CLAIMS } from './srpTypes.js';
-import { SRP_RETENTION_MS, decideSrpClaimSweep } from './srpRetention.js';
+import { SRP_RETENTION_MS, decideSrpClaimSweep, isSrpAuditForClaim } from './srpRetention.js';
 
 /** Claims read per query page. */
 export const SRP_SWEEP_PAGE_SIZE = 100;
@@ -41,37 +42,29 @@ async function* pages(
   }
 }
 
-/** Claim ids one audit entry lists; a run that deletes more writes more entries. */
-export const SRP_AUDIT_MAX_CLAIM_IDS = 200;
-
 /**
- * One audit entry per corporation per run (per 200 claims), listing claim ids only: no
- * character id or name, so the feed stays short and keeps no pilot identity past retention.
+ * One audit entry per corporation per run: the count only. A claim's killmail id leads back to
+ * its pilot through public killmail data, so the entry names none (#4942).
  */
-async function writeSweepAudit(
-  corp: DocumentReference,
-  now: number,
-  claimIds: string[]
-): Promise<void> {
-  for (let i = 0; i < claimIds.length; i += SRP_AUDIT_MAX_CLAIM_IDS) {
-    const ids = claimIds.slice(i, i + SRP_AUDIT_MAX_CLAIM_IDS);
-    await corp
-      .collection(SRP_AUDIT)
-      .doc(`${String(now).padStart(15, '0')}~sweep-${i / SRP_AUDIT_MAX_CLAIM_IDS}`)
-      .set({
-        at: now,
-        by: null,
-        byName: 'retention sweep',
-        action: 'retentionDelete',
-        detail: { count: ids.length, claimIds: ids },
-      });
-  }
+async function writeSweepAudit(corp: DocumentReference, now: number, count: number): Promise<void> {
+  if (count === 0) return;
+  await corp
+    .collection(SRP_AUDIT)
+    .doc(`${String(now).padStart(15, '0')}~sweep`)
+    .set({
+      at: now,
+      by: null,
+      byName: 'retention sweep',
+      action: 'retentionDelete',
+      detail: { count },
+    });
 }
 
 /**
- * Deletes every Paid or Rejected claim closed a year ago, then writes one audit entry per
- * corporation (claim ids only). Each claim is decided again inside the transaction that
- * deletes it, so a claim re-filed meanwhile is kept. Bounded per run, idempotent (a deleted
+ * Deletes every Paid or Rejected claim closed a year ago, with its filing, re-filing and
+ * officer entries in the SRP log, then writes one count-only audit entry per corporation. Each
+ * claim is decided again inside the transaction that deletes it, so a claim re-filed meanwhile
+ * is kept with its log, and a claim and its entries go together or not at all. Bounded per run, idempotent (a deleted
  * claim is gone), and one failing claim does not stop the rest.
  */
 export async function sweepSrpClaims(
@@ -84,7 +77,7 @@ export async function sweepSrpClaims(
   const result: SrpSweepResult = { deleted: 0, failed: 0, truncated: false };
 
   for (const corp of await db.collection(CORPS_COLLECTION).listDocuments()) {
-    const deletedIds: string[] = [];
+    let deletedCount = 0;
     try {
       const query = corp.collection(SRP_CLAIMS).where('closedAt', '<=', now - SRP_RETENTION_MS);
       for await (const page of pages(query, 'closedAt', pageSize)) {
@@ -92,7 +85,7 @@ export async function sweepSrpClaims(
           if (decideSrpClaimSweep(candidate.data(), now) !== 'delete') continue;
           if (result.deleted >= maxDeletes) {
             result.truncated = true;
-            await writeSweepAudit(corp, now, deletedIds);
+            await writeSweepAudit(corp, now, deletedCount);
             return result;
           }
           try {
@@ -101,12 +94,22 @@ export async function sweepSrpClaims(
               if (!fresh.exists || decideSrpClaimSweep(fresh.data() ?? {}, now) !== 'delete') {
                 return false;
               }
+              // The claim's id is its killmail id; every entry about it names that killmail.
+              const killmailId = Number(fresh.id);
+              const trail = Number.isSafeInteger(killmailId)
+                ? (
+                    await tx.get(
+                      corp.collection(SRP_AUDIT).where('detail.killmailId', '==', killmailId)
+                    )
+                  ).docs.filter((entry) => isSrpAuditForClaim(entry.data(), killmailId))
+                : [];
               tx.delete(fresh.ref);
+              for (const entry of trail) tx.delete(entry.ref);
               return true;
             });
             if (done) {
               result.deleted += 1;
-              deletedIds.push(candidate.id);
+              deletedCount += 1;
             }
           } catch {
             result.failed += 1;
@@ -118,7 +121,7 @@ export async function sweepSrpClaims(
       result.failed += 1;
     }
     try {
-      await writeSweepAudit(corp, now, deletedIds);
+      await writeSweepAudit(corp, now, deletedCount);
     } catch {
       result.failed += 1;
     }

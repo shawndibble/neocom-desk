@@ -1208,6 +1208,21 @@ suite('Corp Tax Book callables (emulator)', () => {
       expect((await book().get()).exists).toBe(true);
       expect((await book().collection(SRP_CLAIMS).doc('kept').get()).exists).toBe(true);
     });
+
+    it("removes the book from every Character's billed-by pointer (#4942)", async () => {
+      await turnOn();
+      const pointer = (id: number) => db.collection('corpTaxBookBilledBy').doc(`char:${id}`);
+      const OTHER = '98000777';
+      await pointer(501).set({ books: { [String(CORP)]: T0 } });
+      await pointer(502).set({ books: { [String(CORP)]: T0, [OTHER]: T0 } });
+      await pointer(503).set({ books: { [OTHER]: T0 } });
+
+      await deleteBook(deps(), who(DIRECTOR), withToken(DIRECTOR));
+
+      expect((await pointer(501).get()).exists).toBe(false);
+      expect((await pointer(502).get()).data()).toEqual({ books: { [OTHER]: T0 } });
+      expect((await pointer(503).get()).data()).toEqual({ books: { [OTHER]: T0 } });
+    });
   });
 
   describe('verify link', () => {

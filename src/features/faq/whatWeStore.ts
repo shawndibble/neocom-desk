@@ -252,7 +252,7 @@ export interface RetentionGroup {
  * `engine/wallet/archiveCoverage.ts`,
  * `esi/cachePrune.ts`, `features/notifications/feed.ts`, `sync/merge.ts`,
  * `functions/src/purgeStaleAccounts.ts`, `functions/src/communityRequests.ts`,
- * `features/share/shareStore.ts`, `functions/src/srpRetention.ts`; the Corp Tax
+ * `features/share/shareStore.ts`, `functions/src/srpRetention.ts` and `srpCleanup.ts`; the Corp Tax
  * Book has no sweep, only `deleteBook` in `functions/src/corpTaxBookStore.ts`),
  * so change one and change the other (`FaqPanel.test.tsx` reads the numbers out
  * of those functions files).

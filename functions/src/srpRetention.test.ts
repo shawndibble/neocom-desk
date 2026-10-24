@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SRP_RETENTION_MS, decideSrpClaimSweep } from './srpRetention.js';
+import { SRP_RETENTION_MS, decideSrpClaimSweep, isSrpAuditForClaim } from './srpRetention.js';
 
 const CLOSED = Date.parse('2025-10-23T12:00:00Z');
 const YEAR_LATER = CLOSED + SRP_RETENTION_MS;
@@ -46,5 +46,32 @@ describe('decideSrpClaimSweep', () => {
   it('keeps an unknown state', () => {
     expect(decideSrpClaimSweep({ state: 'weird', closedAt: CLOSED }, YEAR_LATER * 3)).toBe('keep');
     expect(decideSrpClaimSweep({ closedAt: CLOSED }, YEAR_LATER * 3)).toBe('keep');
+  });
+});
+
+describe('isSrpAuditForClaim', () => {
+  it.each([
+    ['fileClaim', { killmailId: 7, hullTypeId: 1 }],
+    ['refileClaim', { killmailId: 7 }],
+    ['approve', { killmailId: 7, pilotCharacterId: 9 }],
+    ['markPaid', { killmailId: 7, pilotCharacterId: 9 }],
+  ])('matches a %s entry about the claim', (action, detail) => {
+    expect(isSrpAuditForClaim({ action, detail }, 7)).toBe(true);
+  });
+
+  it("leaves another claim's entries", () => {
+    expect(isSrpAuditForClaim({ action: 'fileClaim', detail: { killmailId: 8 } }, 7)).toBe(false);
+  });
+
+  it('leaves corp-level entries, which name no killmail', () => {
+    for (const action of ['turnOn', 'turnOff', 'saveSettings', 'reclaim', 'addDoctrine']) {
+      expect(isSrpAuditForClaim({ action, detail: {} }, 7)).toBe(false);
+    }
+    expect(isSrpAuditForClaim({ action: 'retentionDelete', detail: { count: 1 } }, 7)).toBe(false);
+    expect(isSrpAuditForClaim({}, 7)).toBe(false);
+  });
+
+  it('never matches on a string id', () => {
+    expect(isSrpAuditForClaim({ detail: { killmailId: '7' } }, 7)).toBe(false);
   });
 });
