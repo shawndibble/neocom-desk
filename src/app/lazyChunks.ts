@@ -163,7 +163,9 @@ export function throughBarrel(options: {
     const lists = [
       ...source.matchAll(new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*${quoted}`, 'g')),
     ];
-    return lists.length === mentions ? lists.flatMap((list) => clauseNames(list[1])) : null;
+    return mentions > 0 && lists.length === mentions
+      ? lists.flatMap((list) => clauseNames(list[1]))
+      : null;
   };
 
   return (id) => {

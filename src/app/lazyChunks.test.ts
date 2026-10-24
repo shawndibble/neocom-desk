@@ -390,6 +390,7 @@ describe('throughBarrel', () => {
     '/src/app/Layout.tsx': [barrel, '/src/lib/format.ts'],
     '/src/routes/Odd.tsx': [barrel],
     '/src/routes/Star.tsx': [barrel],
+    '/src/routes/Relative.tsx': [barrel],
   };
   const code: Record<string, string> = {
     [barrel]:
@@ -398,6 +399,7 @@ describe('throughBarrel', () => {
       'import { Button as B, Group } from "@/components/ui";\nimport { x } from "@/lib/format";\n',
     '/src/routes/Odd.tsx': 'import { Missing } from "@/components/ui";\n',
     '/src/routes/Star.tsx': 'import * as UI from "@/components/ui";\n',
+    '/src/routes/Relative.tsx': 'import { Button } from "../components/ui";\n',
   };
   const precise = throughBarrel({
     barrel,
@@ -416,6 +418,7 @@ describe('throughBarrel', () => {
   it('keeps the whole barrel when an import cannot be traced', () => {
     expect(precise('/src/routes/Odd.tsx')).toEqual([barrel]);
     expect(precise('/src/routes/Star.tsx')).toEqual([barrel]);
+    expect(precise('/src/routes/Relative.tsx')).toEqual([barrel]);
   });
 
   it('passes every other module through', () => {
