@@ -3,11 +3,10 @@
 
 import type { Firestore } from 'firebase-admin/firestore';
 import { fail } from './corpTaxBookStore.js';
-import { CORPS_COLLECTION } from './srpTypes.js';
+import { CORPS_COLLECTION, SRP_THROTTLE } from './srpTypes.js';
 
 export const FETCH_LIMIT = 20;
 export const FETCH_WINDOW_MS = 60_000;
-export const SRP_THROTTLE = 'srpThrottle';
 
 export interface ThrottleState {
   windowStart: number;

@@ -24,6 +24,7 @@ import {
   type BookDeps,
   type Caller,
 } from './corpTaxBookStore.js';
+import { SRP_CLAIMS, SRP_COLLECTIONS } from './srpTypes.js';
 
 const CORP = 98000001;
 const T0 = Date.parse('2026-10-18T12:00:00Z');
@@ -1176,6 +1177,36 @@ suite('Corp Tax Book callables (emulator)', () => {
 
       await turnOn();
       expect((await book().collection('statements').get()).empty).toBe(true);
+    });
+
+    it("deletes every book collection but leaves the corporation's SRP data untouched", async () => {
+      await turnOn();
+      await edit(ACCOUNTANT, { action: 'issueStatement', statement: statement('s1') });
+      // A nested book collection, and one the delete has never heard of.
+      const payouts = () => book().collection('feeders').doc('98000002').collection('payouts');
+      await payouts().doc('p1').set({ a: 1 });
+      await book().collection('futureBookThing').doc('x').set({ a: 1 });
+      for (const name of SRP_COLLECTIONS) {
+        await book().collection(name).doc('kept').set({ name });
+      }
+
+      await deleteBook(deps(), who(DIRECTOR), withToken(DIRECTOR));
+
+      expect((await book().get()).exists).toBe(false);
+      const left = (await book().listCollections()).map((c) => c.id).sort();
+      expect(left).toEqual([...SRP_COLLECTIONS].sort());
+      for (const name of SRP_COLLECTIONS) {
+        expect((await book().collection(name).doc('kept').get()).data()).toEqual({ name });
+      }
+      expect((await payouts().get()).empty).toBe(true);
+      // The SRP retention sweep walks `corps` with listDocuments(): the corp must still show up.
+      expect((await db.collection('corps').listDocuments()).map((d) => d.id)).toContain(
+        String(CORP)
+      );
+
+      await turnOn();
+      expect((await book().get()).exists).toBe(true);
+      expect((await book().collection(SRP_CLAIMS).doc('kept').get()).exists).toBe(true);
     });
   });
 
