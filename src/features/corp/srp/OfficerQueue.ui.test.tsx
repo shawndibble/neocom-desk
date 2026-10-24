@@ -309,12 +309,15 @@ describe('OfficerQueue own claim', () => {
       'aria-disabled',
       'true'
     );
+    // Hover first: a click leaves the pointer on the button, so a later hover
+    // fires no pointerenter and the bubble races the click's open/close.
+    await userEvent.hover(approve);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'You cannot decide your own claim. Another officer must.'
+    );
+    await userEvent.unhover(approve);
     await userEvent.click(approve);
     expect(data.approve).not.toHaveBeenCalled();
-    await userEvent.hover(approve);
-    expect(
-      (await screen.findAllByText('You cannot decide your own claim. Another officer must.')).length
-    ).toBeGreaterThan(0);
     // Another officer's claim stays live.
     expect(screen.getAllByRole('button', { name: 'Approve' })[1]).not.toHaveAttribute(
       'aria-disabled'
