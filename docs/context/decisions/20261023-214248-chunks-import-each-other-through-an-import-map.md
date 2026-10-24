@@ -2,14 +2,16 @@
 
 _Recorded 2026-10-23._
 
-- **Chunks import each other by stable names that an import map in `index.html` resolves to the hashed files (`build.chunkImportMap`), so a deploy renames only the chunks whose own code changed.** Before this, a chunk's file name carried its imports' hashes, so a changed leaf renamed every importer, and every importer of those. The entry changes on every deploy (it carries the release), so every chunk that imported it was renamed too. Measured in CI on two builds of one tree with different releases (791 js/css files, 513 lazy):
+- **Chunks import each other by stable names that an import map in `index.html` resolves to the hashed files (`build.chunkImportMap`), so a deploy renames only the chunks whose own code (or preload lists, below) changed.** Before this, a chunk's file name carried its imports' hashes, so a changed leaf renamed every importer, and every importer of those. The entry changes on every deploy (it carries the release), so every chunk that imported it was renamed too. Measured in CI on two builds of one tree with different releases (791 js/css files, 513 lazy):
 
-  | Change since the last build   | Production until now | Map only | Map, no Sentry stamp          |
-  | ----------------------------- | -------------------- | -------- | ----------------------------- |
-  | release only                  | 785 (2.8 MB gzip)    | 336      | **1** (the entry, 99 KB gzip) |
-  | one `src/lib` leaf (`isk.ts`) | 786                  | 360      | **4** (133 KB gzip)           |
-  | one route page                | —                    | 336      | **2**                         |
-  | one lazy `en.json` string     | —                    | 336      | **2**                         |
+  | Change since the last build   | Production until now | No map, no Sentry stamp | Map, no Sentry stamp          |
+  | ----------------------------- | -------------------- | ----------------------- | ----------------------------- |
+  | release only                  | 785 (2.8 MB gzip)    | 336                     | **1** (the entry, 99 KB gzip) |
+  | one `src/lib` leaf (`isk.ts`) | 786                  | 360                     | **4** (133 KB gzip)           |
+  | one route page                | —                    | 336                     | **2**                         |
+  | one lazy `en.json` string     | —                    | 336                     | **2**                         |
+
+- **A chunk is also renamed when its preload lists change (`preloadGraphSignature`, folded in through `augmentChunkHash`).** Vite writes each `import()`'s preload list (`__vite__mapDeps`: the target, everything it statically imports, and their css) after the hash is fixed. With the map alone, one probe broke content addressing: a route page gaining one static import left 6 chunks with their old names and new bytes, `routeChunks` and `Layout` (boot) among them. The precache (`revision: null`) and the `lazy-chunks` route never refetch a name they hold, so a pilot would keep the old list for good. A list that names a stable key the map no longer has 404s, and `#stale-build-boot` turns that into a worker unregister and reload. With the signature the same probe renames those 6 and leaves no chunk with the same name and new bytes. A graph edit renames the chunks whose `import()`s reach it (34 for that probe); a code-only edit renames none of them.
 
 - **The Sentry plugin no longer stamps the release into every chunk (`release.inject: false`).** In the deploy build it prepended `SENTRY_RELEASE={id:<release>}` to every chunk, and the release carries the commit, so production renamed every chunk on every deploy, map or no map (the "Production until now" column). `Sentry.init` already sets `release` (`src/instrument.ts`), and source maps match on the per-chunk debug ids, which stay.
 
