@@ -16,7 +16,7 @@ import type {
   HaulPlan,
   HaulSection,
 } from './haulPlan';
-import { mergeStacks } from './haulLeg';
+import { mergeStacks } from './haulPlan';
 
 const sorted = (ids: Iterable<number>): number[] => [...new Set(ids)].sort((a, b) => a - b);
 

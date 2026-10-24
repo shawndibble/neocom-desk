@@ -425,7 +425,7 @@ function LegBlock({
   const hold = legHold(legs, leg);
   const carried = hold.aboard.reduce((sum, l) => sum + l.m3, 0);
   const aboardItems = heldItems(hold.aboard);
-  const loadingItems = hold.loadsOnArrival?.stacks ?? null;
+  const loadingItems = hold.loadsOnArrival?.stacks?.length ? hold.loadsOnArrival.stacks : null;
   return (
     <div
       className={cx(
@@ -554,16 +554,30 @@ const ITEMS_SHOWN = 6;
 /** What a load is made of, biggest by volume first. */
 function ItemList({ items }: { items: readonly HaulStack[] }) {
   const { t } = useTranslation();
+  const [all, setAll] = useState(false);
   const sorted = [...items].sort((a, b) => b.quantity * b.unitM3 - a.quantity * a.unitM3);
   const more = sorted.length - ITEMS_SHOWN;
   return (
     <ul className="m-0 ml-4 flex list-none flex-col gap-0.5 border-l border-line p-0 pl-3 text-text-dim">
-      {sorted.slice(0, ITEMS_SHOWN).map((s) => (
+      {(all ? sorted : sorted.slice(0, ITEMS_SHOWN)).map((s) => (
         <li key={s.typeId}>
           {t('assets.movePlan.haul.itemLine', { quantity: formatCount(s.quantity), name: s.name })}
         </li>
       ))}
-      {more > 0 && <li>{t('assets.movePlan.haul.itemsMore', { count: more })}</li>}
+      {more > 0 && (
+        <li>
+          <button
+            type="button"
+            aria-expanded={all}
+            onClick={() => setAll(!all)}
+            className={cx(inlineLinkClassName, focusRingInsetClassName)}
+          >
+            {all
+              ? t('assets.movePlan.haul.itemsFewer')
+              : t('assets.movePlan.haul.itemsMore', { count: more })}
+          </button>
+        </li>
+      )}
     </ul>
   );
 }

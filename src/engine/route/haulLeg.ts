@@ -3,7 +3,7 @@
  * security condition it flies through, the waypoint ids it sets, and whether
  * the hold is full. Conditions only, never a verdict (decision 20260912-172628).
  */
-import type { HaulLeg, HaulStack } from './haulPlan';
+import { mergeStacks, type HaulLeg, type HaulStack } from './haulPlan';
 import type { RouteSafetyRow } from './routeSafety';
 
 export type LegCondition =
@@ -37,17 +37,6 @@ export interface HeldLoad {
   m3: number;
   /** What the load is made of; absent for a haul saved before items. */
   stacks?: HaulStack[];
-}
-
-/** Stacks of one type added together, first appearance first. */
-export function mergeStacks(stacks: readonly HaulStack[]): HaulStack[] {
-  const byType = new Map<number, HaulStack>();
-  for (const s of stacks) {
-    const seen = byType.get(s.typeId);
-    if (seen) seen.quantity += s.quantity;
-    else byType.set(s.typeId, { ...s });
-  }
-  return [...byType.values()];
 }
 
 /** The items across `loads`, merged by type; `null` when no load has an item list. */

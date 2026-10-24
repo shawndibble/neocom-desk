@@ -109,6 +109,17 @@ export interface HaulPlan {
   totals: { legs: number; jumps: number; m3: number };
 }
 
+/** Stacks of one type added together, first appearance first. */
+export function mergeStacks(stacks: readonly HaulStack[]): HaulStack[] {
+  const byType = new Map<number, HaulStack>();
+  for (const s of stacks) {
+    const seen = byType.get(s.typeId);
+    if (seen) seen.quantity += s.quantity;
+    else byType.set(s.typeId, { ...s });
+  }
+  return [...byType.values()];
+}
+
 const EPS = 1e-9;
 
 export function planHaul(input: HaulInput): HaulPlan {
@@ -224,8 +235,10 @@ export function planHaul(input: HaulInput): HaulPlan {
 
 /**
  * Takes `m3` worth of units off `stacks` (in place, in order) and returns them.
- * Whole units only, so a leg may sit a fraction of a unit under its m³; the
- * `last` take of a pickup gets whatever is left, so no unit is lost.
+ * Whole units only, so a non-last leg may sit up to a unit under its m³ (or
+ * take none of a unit bigger than its room). The `last` take of a pickup gets
+ * whatever is left so no unit is lost, which can sit over that leg's m³ by the
+ * units earlier legs could not fit.
  */
 function takeStacks(stacks: HaulStack[], m3: number, last: boolean): HaulStack[] {
   const taken: HaulStack[] = [];

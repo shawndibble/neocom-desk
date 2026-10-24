@@ -184,7 +184,8 @@ describe('ActiveHaulView', () => {
     });
     expect(screen.getByText('3,200,000 × Item 34')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Show cargo for leg 3' }));
-    expect(screen.getByText('and 2 more types')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'and 2 more types' }));
+    expect(screen.getByText('11 × Item 1')).toBeTruthy();
   });
 
   it("sets one leg's stop, or every stop of the route, as waypoints", async () => {
