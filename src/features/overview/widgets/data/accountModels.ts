@@ -445,11 +445,11 @@ const priceWatch: Builder = (feeds, { t }) => {
 
 /** The account-money and inbox kinds: the feeds each reads and the builder that draws it. */
 export const ACCOUNT_DEFS: Readonly<Record<string, KindDef>> = {
-  wallet: { feeds: ['wallet', 'journal'], build: wallet },
-  mail: { feeds: ['mail'], build: mail },
-  orders: { feeds: ['orders', 'skills'], build: orders },
-  contracts: { feeds: ['contracts'], build: contracts },
-  miningTax: { feeds: ['mining'], build: miningTax },
-  stock: { feeds: ['stock'], build: stock },
-  priceWatch: { feeds: ['priceAlerts'], build: priceWatch },
+  wallet: { feeds: ['wallet', 'journal'], scope: 'character', build: wallet },
+  mail: { feeds: ['mail'], scope: 'character', build: mail },
+  orders: { feeds: ['orders', 'skills'], scope: 'account', build: orders },
+  contracts: { feeds: ['contracts'], scope: 'character', build: contracts },
+  miningTax: { feeds: ['mining'], scope: 'account', build: miningTax },
+  stock: { feeds: ['stock'], scope: 'account', build: stock },
+  priceWatch: { feeds: ['priceAlerts'], scope: 'account', build: priceWatch },
 };

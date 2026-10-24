@@ -10,76 +10,105 @@
  * inside a source's effect, so time-dependent text stays true as the clock
  * ticks and a build never invents a new object per render of a source.
  */
-import { blank, type KindDef } from './builderKit';
+import { blank, type Builder, type KindDef } from './builderKit';
 import { ACCOUNT_DEFS } from './accountModels';
 import { comingUp, sp, training } from './characterBuilders';
 import { KIND_DEFS } from './kindModels';
 import { WORLD_DEFS } from './worldModels';
 import type { BuildContext, FeedId, Feeds, KindView } from './types';
 
-// --- Which reads a kind needs ------------------------------------------------
-
-/** The distinct feeds needed by `kinds`; only these are ever fetched. */
-export function feedsFor(kinds: readonly string[]): FeedId[] {
-  const out = new Set<FeedId>();
-  for (const kind of kinds) for (const feed of KIND_FEEDS[kind] ?? []) out.add(feed);
-  return [...out];
-}
-
-/** Kinds whose read covers every Character; a widget scoped to the header Character still narrows to it in the builder. */
-const SUMS_ACROSS = new Set([
-  'miningTax',
-  'stock',
-  'priceWatch',
-  'incursions',
-  'orders',
-  'netWorth',
-  'miningYield',
-  // One route on this device, whichever Character is the header's.
-  'routeSafety',
-  // Reads every tracked Character's killboard; the builder narrows to the header Character.
-  'kills',
-  // Every Character's journal, classified together; the builder narrows to the header Character.
-  'omega',
-  // Every Character's fills and journal, pooled or narrowed to the header Character in the builder.
-  'tradingProfit',
-  // Every Character's jobs and job slots; the builder narrows to the header Character.
-  'industry',
-  // Every Character's dens; the builder narrows to the header Character.
-  'mercenaryDens',
-]);
-
-export function kindSumsAcrossCharacters(kind: string): boolean {
-  return SUMS_ACROSS.has(kind);
-}
+// --- The kind registry --------------------------------------------------------
+//
+// One `KindDef` per kind (see `builderKit.ts`) is the whole declaration: feeds,
+// cross-Character scope, builder and lazy builder. Everything else asks here:
+// the provider for feeds, `scope.ts` and the menu for scope, `useWidgetView` for
+// builders. The settings that change a view come from the catalogue
+// (`viewSettings.ts`); each feed's source from `feedSources.tsx`; the invariants
+// tying the tables together are `kindRegistry.test.ts`.
 
 /**
- * Every widget kind: the feeds it reads and the builder that draws it. The Corp
- * overview's kinds and Skyhook raids join later through `registerKindDefs`, keeping
- * their builders and copy off the Overview's startup graph.
+ * Every widget kind. The Corp overview's kinds join later through `registerKindDefs`,
+ * keeping their builders and copy off the Overview's startup graph; Skyhook raids'
+ * builder arrives through its own `loadBuild`.
  */
 const KINDS: Record<string, KindDef> = {
   ...ACCOUNT_DEFS,
-  training: { feeds: ['skills'], build: training },
-  sp: { feeds: ['skills', 'spExtras'], build: sp },
-  comingUp: { feeds: ['calendar'], build: comingUp },
+  training: { feeds: ['skills'], scope: 'character', build: training },
+  sp: { feeds: ['skills', 'spExtras'], scope: 'character', build: sp },
+  comingUp: { feeds: ['calendar'], scope: 'character', build: comingUp },
   ...WORLD_DEFS,
   ...KIND_DEFS,
 };
 
-const kindFeeds: Record<string, readonly FeedId[]> = Object.fromEntries(
-  Object.entries(KINDS).map(([kind, def]) => [kind, def.feeds])
-);
-
-/** Kind -> the feeds it reads. A kind absent here reads no feed and draws without data. */
-export const KIND_FEEDS: Readonly<Record<string, readonly FeedId[]>> = kindFeeds;
-
 /** Adds or replaces kinds that load later; idempotent. */
 export function registerKindDefs(defs: Readonly<Record<string, KindDef>>): void {
-  for (const [kind, def] of Object.entries(defs)) {
-    KINDS[kind] = def;
-    kindFeeds[kind] = def.feeds;
-  }
+  Object.assign(KINDS, defs);
+}
+
+export const kindDef = (kind: string): KindDef | undefined => KINDS[kind];
+
+export const allKindIds = (): string[] => Object.keys(KINDS);
+
+/** Kind -> the feeds it reads. Undefined for a kind with no declaration (coming soon, or from a newer build). */
+export const feedsOf = (kind: string): readonly FeedId[] | undefined => KINDS[kind]?.feeds;
+
+/** The distinct feeds needed by `kinds`; only these are ever fetched. */
+export function feedsFor(kinds: readonly string[]): FeedId[] {
+  const out = new Set<FeedId>();
+  for (const kind of kinds) for (const feed of feedsOf(kind) ?? []) out.add(feed);
+  return [...out];
+}
+
+/** Whether the kind's read covers every Character; a widget scoped to the header Character still narrows to it in the builder. */
+export function kindSumsAcrossCharacters(kind: string): boolean {
+  return KINDS[kind]?.scope === 'account';
+}
+
+// --- Lazy builders -----------------------------------------------------------
+
+const lazyBuilders = new Map<string, Builder>();
+const lazyLoads = new Map<string, Promise<void>>();
+const lazyListeners = new Set<() => void>();
+let lazyEpoch = 0;
+
+/** Moves each time a lazy builder lands; a view built before then is stale. */
+export const builderEpoch = (): number => lazyEpoch;
+
+export function subscribeBuilders(listener: () => void): () => void {
+  lazyListeners.add(listener);
+  return () => {
+    lazyListeners.delete(listener);
+  };
+}
+
+/**
+ * Loads the real builder of each kind that declares `loadBuild`, once. Until it
+ * lands `buildView` uses the declared stand-in; views rebuild on `builderEpoch`.
+ * A failed load is forgotten so the next call retries.
+ */
+export function ensureBuilders(kinds: readonly string[]): Promise<void> {
+  const loads = kinds.flatMap((kind) => {
+    const def = KINDS[kind];
+    if (!def?.loadBuild || lazyBuilders.has(kind)) return [];
+    let load = lazyLoads.get(kind);
+    if (!load) {
+      load = def.loadBuild().then(
+        (build) => {
+          lazyBuilders.set(kind, build);
+          lazyLoads.delete(kind);
+          lazyEpoch += 1;
+          for (const listener of lazyListeners) listener();
+        },
+        (error: unknown) => {
+          lazyLoads.delete(kind);
+          throw error;
+        }
+      );
+      lazyLoads.set(kind, load);
+    }
+    return [load];
+  });
+  return Promise.all(loads).then(() => undefined);
 }
 
 /**
@@ -105,7 +134,7 @@ function placeholder(kind: string): KindView {
 export function buildView(kind: string, feeds: Feeds, ctx: BuildContext): KindView {
   const def = KINDS[kind];
   if (!def) return placeholder(kind);
-  return zeroIsClear(def.build(feeds, ctx));
+  return zeroIsClear((lazyBuilders.get(kind) ?? def.build)(feeds, ctx));
 }
 
 /**

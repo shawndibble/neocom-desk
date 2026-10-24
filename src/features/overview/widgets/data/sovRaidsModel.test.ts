@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SovRaidSkyhook, SovRaidsWidgetData } from './sovRaidsLoader';
-import { buildView, registerKindDefs } from './models';
+import { buildView, ensureBuilders } from './models';
 import { sovRaids } from './sovRaidsModel';
 import type { BuildContext, Feeds } from './types';
 
@@ -358,13 +358,13 @@ describe('sovRaids Near me', () => {
 });
 
 describe('the Overview stand-in', () => {
-  it('reads as loading until the lazy builder registers, then draws the read', () => {
+  it('reads as loading until the lazy builder lands, then draws the read', async () => {
     const read = feeds({ skyhooks: [hook('X7', -HOUR, HOUR)] });
     expect(buildView('sovRaids', read, ctx).status.loading).toBe(true);
     expect(
       buildView('sovRaids', { sovRaids: { loading: false, error: true, data: null } }, ctx).status
     ).toMatchObject({ loading: false, error: true });
-    registerKindDefs({ sovRaids: { feeds: ['sovRaids'], build: sovRaids } });
+    await ensureBuilders(['sovRaids']);
     expect(buildView('sovRaids', read, ctx).number.value).toBe('1');
   });
 });
