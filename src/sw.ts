@@ -81,6 +81,13 @@ const DAY_SECONDS = 24 * 60 * 60;
 // `Access-Control-Allow-Origin: *` — so responses are readable rather than
 // opaque, and an error (e.g. a blueprint's 400 on /icon) is never cached.
 const cacheOnly200 = new CacheableResponsePlugin({ statuses: [200] });
+// Same-origin static files only. Cloudflare Pages answers a path it has no file
+// for with index.html and a 200 (SPA rendering), so a retired chunk or SDE file
+// would otherwise be cached as HTML under its own URL.
+const notHtml = {
+  cacheWillUpdate: async ({ response }: { response: Response }) =>
+    response.headers.get('content-type')?.includes('text/html') ? null : response,
+};
 
 // SDE files not in the precache (vite.config.ts globIgnores, built from
 // src/sde/lazySdeFiles.ts): cache-first under their content-versioned URL. A
@@ -97,6 +104,7 @@ registerRoute(
     cacheName: 'sde-data',
     plugins: [
       cacheOnly200,
+      notHtml,
       new ExpirationPlugin({
         maxEntries: 150,
         maxAgeSeconds: 90 * DAY_SECONDS,
@@ -116,7 +124,11 @@ registerRoute(
   ({ url, request }) => isLazyChunk(url, request.mode, self.location.origin, scopePath),
   new CacheFirst({
     cacheName: LAZY_CHUNK_CACHE,
-    plugins: [cacheOnly200, new ExpirationPlugin({ maxEntries: 1500, purgeOnQuotaError: true })],
+    plugins: [
+      cacheOnly200,
+      notHtml,
+      new ExpirationPlugin({ maxEntries: 1500, purgeOnQuotaError: true }),
+    ],
   })
 );
 
