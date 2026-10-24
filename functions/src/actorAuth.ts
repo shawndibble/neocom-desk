@@ -6,8 +6,8 @@
 //   verifyCallerToken   ...and is the caller's own    -> reason `token-mismatch`
 //   requireLiveRoles    roles scope + live ESI read   -> `missing-scope`, `wrong-corp`, role refusal
 //
-// Cached-vs-live (ADR 0023 D7, 0026 D8) stays with the stores: they own the officer record
-// they cache, and call `requireLiveRoles` only when the cache cannot answer. Refresh tokens
+// Cached-vs-live (ADR 0023 D7, 0026 D8): `officerCache.ts` decides whether a stored officer
+// record can answer; the stores call `requireLiveRoles` only when it cannot. Refresh tokens
 // never come here. Pure of Firestore.
 import { HttpsError, type FunctionsErrorCode } from 'firebase-functions/v2/https';
 import { decideRoles, type OfficerRoles } from './corpTaxBook.js';
