@@ -6455,7 +6455,8 @@
         "structure": "Structure",
         "manual": "Manual"
       },
-      "useManual": "Use \"{{name}}\" as a manual location"
+      "useManual": "Use \"{{name}}\" as a manual location",
+      "searchingStructures": "Searching structures…"
     },
     "changeOwner": {
       "open": "Change owner",
