@@ -511,17 +511,19 @@
   /* Labelled cards (`stackColumns={1}`/`{2}`): pinned to the card's own
      top-right corner instead of flowing as a bottom row, which used to
      leave a dead ~40px strip under a title-height's worth of nothing. The
-     button is sized to a 44px touch target here regardless of its own
-     (desktop-oriented) size prop. */
+     button is the 36px touch tier (`sm`, DESIGN.md §3) here regardless of
+     its own (desktop-oriented) size prop, and centred on the title line
+     (card padding + half a title line, minus half the button) so the first
+     row reads as one row rather than a title beside a 44px block. */
   .dt-stacked:not(.dt-stack-dense) td.dt-actions {
     position: absolute;
-    top: 0.5rem;
+    top: 0;
     right: 0.75rem;
   }
 
   .dt-stacked:not(.dt-stack-dense) td.dt-actions button {
-    width: 2.75rem;
-    height: 2.75rem;
+    width: 2.25rem;
+    height: 2.25rem;
   }
 
   /* The expand/collapse disclosure chevron (`expandableRow`): pinned beside

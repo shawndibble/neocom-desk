@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   ColumnPickerMenu,
+  MenuItem,
   DataAgeBadge,
   DataTable,
   DateRangeFields,
@@ -44,6 +45,7 @@ import {
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { ItemInfoLink } from '@/features/entities';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import {
   activeWalletTransactionFilterCount,
   EMPTY_WALLET_TRANSACTION_FILTER,
@@ -361,6 +363,24 @@ export function CorpTransactionsPanel({
                 sort={sort}
                 onSortChange={onSortChange}
                 responsive="table"
+                rowContextMenu={(txn, tr) => (
+                  <ItemContextMenu
+                    typeId={txn.type_id}
+                    itemName={nameFor(txn.type_id)}
+                    hideStockTarget
+                    linksKeepBrowserMenu
+                    extraItems={
+                      <MenuItem
+                        onSelect={() => onFilterChange({ ...filter, text: nameFor(txn.type_id) })}
+                      >
+                        {t('wallet.filterToItem')}
+                      </MenuItem>
+                    }
+                  >
+                    {tr}
+                  </ItemContextMenu>
+                )}
+                rowMoreActions
               />
             </div>
           )}

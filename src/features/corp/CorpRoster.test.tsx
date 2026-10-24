@@ -1,5 +1,6 @@
 import { afterEach, describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { CorpRosterTable, type RosterRow } from './CorpRoster';
@@ -37,6 +38,19 @@ describe('CorpRosterTable', () => {
     expect(cells).toHaveLength(2);
     expect(cells[1]).toHaveTextContent(/dark/i);
     expect(cells[0]).not.toHaveTextContent(/dark/i);
+  });
+
+  it('opens the ⋮ with the member actions', async () => {
+    render(
+      <MemoryRouter>
+        <CorpRosterTable rows={[row(1, false)]} />
+      </MemoryRouter>
+    );
+    await userEvent.click(screen.getByRole('button', { name: /More actions for Member 1/ }));
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Open in EVE/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /zKillboard/ })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
   });
 
   describe('Joined date follows the Time format setting', () => {

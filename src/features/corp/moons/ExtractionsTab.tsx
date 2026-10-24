@@ -1,10 +1,20 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { caretColumn } from './caretColumn';
 import { useTranslation } from 'react-i18next';
-import { DataTable, Panel, StatChip, StatChips, type DataTableColumn } from '@/components/ui';
+import {
+  DataTable,
+  DisabledMenuItem,
+  MenuItem,
+  Panel,
+  RowActionsMenu,
+  StatChip,
+  StatChips,
+  useOpenAfterMenu,
+  type DataTableColumn,
+} from '@/components/ui';
 import type { ExtractionRow } from '@/engine/corpTaxBook/bookView';
 import { useBook } from './useBook';
+import { ReasonDialog } from './BookDialogs';
 import { LinkSurveyDialog } from './LinkSurveyDialog';
 import { ExtractionTimeline } from './ExtractionTimeline';
 import { isk, shortDate, shortDateTime } from './moonsFormat';
@@ -13,8 +23,10 @@ import { MinedBar, OreLine, StateWord } from './moonsParts';
 
 export function ExtractionsTab() {
   const { t } = useTranslation();
-  const { view, names, canEdit } = useBook();
+  const { view, names, canEdit, edit } = useBook();
   const [linkingId, setLinkingId] = useState<string | null>(null);
+  const [dismissing, setDismissing] = useState<ExtractionRow | null>(null);
+  const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const navigate = useNavigate();
   const rows = view.extractions;
   const count = (state: ExtractionRow['state']) => rows.filter((r) => r.state === state).length;
@@ -73,7 +85,6 @@ export function ExtractionsTab() {
       header: t('corpTaxBook.moons.cols.mined'),
       render: (row) => <MinedBar pct={row.minedPct} label={names.refinery(row.structureId)} />,
     },
-    caretColumn<ExtractionRow>(),
   ];
 
   return (
@@ -116,6 +127,39 @@ export function ExtractionsTab() {
             rowKey={(row) => row.id}
             onRowClick={(row) => navigate(extractionPath(row.id))}
             rowClassName={() => 'group'}
+            rowContextMenu={(row, tr) =>
+              // Open moon page is the row click; the menu holds what only the
+              // moon page offered. A Notification-sourced ore has no survey to link.
+              canEdit && row.oreSource !== 'notification' ? (
+                <RowActionsMenu
+                  name={names.refinery(row.structureId)}
+                  onCloseAutoFocus={onCloseAutoFocus}
+                  items={
+                    <>
+                      <MenuItem onSelect={() => run(() => setLinkingId(row.id))}>
+                        {row.oreSource === 'survey'
+                          ? t('corpTaxBook.moons.moon.link.change')
+                          : t('corpTaxBook.moons.moon.link.open')}
+                      </MenuItem>
+                      {row.tax > 0 ? (
+                        <MenuItem onSelect={() => run(() => setDismissing(row))}>
+                          {t('corpTaxBook.moons.moon.dismiss')}
+                        </MenuItem>
+                      ) : (
+                        <DisabledMenuItem reason={t('corpTaxBook.moons.moon.dismissNone')}>
+                          {t('corpTaxBook.moons.moon.dismiss')}
+                        </DisabledMenuItem>
+                      )}
+                    </>
+                  }
+                >
+                  {tr}
+                </RowActionsMenu>
+              ) : (
+                tr
+              )
+            }
+            rowMoreActions
             defaultSort={{ columnId: 'when', direction: 'desc' }}
             mobileSort
             stackColumns={2}
@@ -123,6 +167,27 @@ export function ExtractionsTab() {
           />
         </div>
       </Panel>
+      {dismissing && (
+        <ReasonDialog
+          open
+          onClose={() => setDismissing(null)}
+          title={t('corpTaxBook.moons.moon.dismissTitle')}
+          intro={t('corpTaxBook.moons.moon.dismissIntro', { tax: isk(dismissing.tax) })}
+          reasonLabel={t('corpTaxBook.moons.dialogs.reasonShown')}
+          confirmLabel={t('corpTaxBook.moons.dialogs.dismissConfirm', {
+            amount: isk(dismissing.tax),
+          })}
+          run={async (reason) => {
+            await edit({
+              action: 'dismiss',
+              scope: 'extraction',
+              targetId: dismissing.id,
+              reason,
+              amountIsk: dismissing.tax,
+            });
+          }}
+        />
+      )}
       {linkingId && (
         <LinkSurveyDialog open onClose={() => setLinkingId(null)} extractionId={linkingId} />
       )}
