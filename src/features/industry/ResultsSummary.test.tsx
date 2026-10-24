@@ -172,7 +172,7 @@ describe('ResultsSummary: job cost breakdown (#116)', () => {
     const jobFeeButton = screen.getByRole('button', { name: /^total job cost/i });
     expect(jobFeeButton).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('EIV')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Cost index · Jita/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Jita')).not.toBeInTheDocument();
     expect(screen.queryByText('SCC surcharge')).not.toBeInTheDocument();
     expect(screen.queryByText('Facility tax')).not.toBeInTheDocument();
   });
@@ -186,7 +186,9 @@ describe('ResultsSummary: job cost breakdown (#116)', () => {
     expect(jobFeeButton).toHaveAttribute('aria-expanded', 'true');
 
     expect(screen.getByText('EIV').closest('div')).toHaveTextContent('1,000');
-    expect(screen.getByText(/Cost index · Jita/).closest('div')).toHaveTextContent('50');
+    // The system the index was read for is the cost index row's second line.
+    expect(screen.getByText('Jita').closest('div')).toHaveTextContent('Cost index');
+    expect(screen.getByText('Jita').closest('div')).toHaveTextContent('50');
     expect(screen.getByText('SCC surcharge').closest('div')).toHaveTextContent('10');
     expect(screen.getByText('Facility tax').closest('div')).toHaveTextContent('5');
   });

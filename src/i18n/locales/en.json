@@ -3624,7 +3624,6 @@
     },
     "ledger": {
       "sale": "{{name}} sale",
-      "costIndexIn": "Cost index · {{system}}",
       "ownedNotSold": "Your materials",
       "ownedNotSoldHint": "What the owned materials this job uses would net if sold instead — not sold, so a cost while the profit counts them at sell value.",
       "iskToSpend": "ISK to spend",
@@ -3639,7 +3638,8 @@
       "productSellsAt": "{{name}} priced at",
       "hubLowestSell": "{{hub}} lowest sell",
       "wholePlanTime": "Whole plan, on free slots",
-      "buildThere": "Build there"
+      "buildThere": "Build there",
+      "costIndex": "Cost index"
     },
     "ownedControl": {
       "label": "Owned materials",

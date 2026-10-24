@@ -28,6 +28,15 @@ import {
 } from './reactionFacilityDefaults';
 
 /** The toast's status region: the sr-only LiveStatus regions are empty here. */
+/** The cost index row's second line: the system the index was read for. */
+const costIndexSystem = (name: string) =>
+  screen.findByText(
+    (_, el) =>
+      el?.tagName === 'SPAN' &&
+      el.textContent === name &&
+      el.closest('div')?.textContent?.includes('Cost index') === true
+  );
+
 function toastStatus() {
   const live = screen.getAllByRole('status').filter((el) => el.textContent);
   expect(live).toHaveLength(1);
@@ -1134,7 +1143,7 @@ describe('BuildPlanDetail build system', () => {
     await user.click(await screen.findByRole('button', { name: 'Show details' }));
     await user.click(await screen.findByRole('button', { name: /^total job cost/i }));
 
-    expect(await screen.findByText(/Cost index · Badivefi/)).toBeInTheDocument();
+    expect(await costIndexSystem('Badivefi')).toBeInTheDocument();
   });
 
   it('keeps the typed text and says so when ESI knows no such system', async () => {
@@ -1197,7 +1206,7 @@ describe('BuildPlanDetail build system', () => {
     await user.click(await screen.findByRole('button', { name: 'Show details' }));
     await user.click(await screen.findByRole('button', { name: /^total job cost/i }));
 
-    expect(await screen.findByText(/Cost index · Jita/)).toBeInTheDocument();
+    expect(await costIndexSystem('Jita')).toBeInTheDocument();
     expect(loadMarketSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'jita' }),
       expect.anything(),

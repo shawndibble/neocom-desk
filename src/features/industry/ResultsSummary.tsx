@@ -266,32 +266,6 @@ export function ResultsSummary({
             indented
           />
           <CostRow
-            label={
-              systemCostIndex === null ? (
-                t('industry.costIndexFee')
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  {t('industry.ledger.costIndexIn', { system: costIndexSystemName })}
-                  <InfoTooltip
-                    label={t('common.aboutLabel', { label: t('industry.costIndexFee') })}
-                    content={
-                      <Trans i18nKey="industry.costIndexTooltip" components={{ b: <strong /> }} />
-                    }
-                  />
-                  <CostIndexTrend
-                    value={formatCostIndex(systemCostIndex)}
-                    systemId={costIndexSystemId}
-                    systemName={costIndexSystemName}
-                    activity={activity}
-                    index={systemCostIndex}
-                  />
-                </span>
-              )
-            }
-            value={formatIsk(result.jobFee.grossCost)}
-            indented
-          />
-          <CostRow
             label={t('industry.sccSurcharge')}
             value={formatIsk(result.jobFee.sccSurcharge)}
             tooltip={t('industry.sccSurchargeTooltip')}
@@ -300,6 +274,41 @@ export function ResultsSummary({
           <CostRow
             label={t('industry.facilityTaxAmount')}
             value={formatIsk(result.jobFee.facilityTax)}
+            indented
+          />
+          {/* Last, so it sits right above the cheaper-nearby note it is
+              compared against. The figure follows its name; the system it was
+              read for takes its own line, so the label never wraps mid-name. */}
+          <CostRow
+            label={
+              systemCostIndex === null ? (
+                t('industry.costIndexFee')
+              ) : (
+                <span className="flex flex-col gap-0.5">
+                  <span className="flex items-center gap-1.5">
+                    {t('industry.ledger.costIndex')}
+                    <InfoTooltip
+                      label={t('common.aboutLabel', { label: t('industry.costIndexFee') })}
+                      content={
+                        <Trans i18nKey="industry.costIndexTooltip" components={{ b: <strong /> }} />
+                      }
+                    />
+                    <span aria-hidden="true">·</span>
+                    <CostIndexTrend
+                      value={formatCostIndex(systemCostIndex)}
+                      systemId={costIndexSystemId}
+                      systemName={costIndexSystemName}
+                      activity={activity}
+                      index={systemCostIndex}
+                    />
+                  </span>
+                  <span className="font-normal tracking-normal normal-case">
+                    {costIndexSystemName}
+                  </span>
+                </span>
+              )
+            }
+            value={formatIsk(result.jobFee.grossCost)}
             indented
           />
         </Disclosure>
