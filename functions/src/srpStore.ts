@@ -14,14 +14,13 @@ import { randomBytes } from 'node:crypto';
 import { type Firestore, type Transaction } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import {
-  decideRoles,
   isCacheFresh,
   satisfies,
   type BookCall,
   type Need,
   type OfficerAccess,
 } from './corpTaxBook.js';
-import { ROLES_SCOPE, type CorporationLookup } from './corpTaxBookEsi.js';
+import type { CorporationLookup } from './corpTaxBookEsi.js';
 import { fail, type BookDeps, type Caller } from './corpTaxBookStore.js';
 import {
   appraisalItems,
@@ -53,7 +52,7 @@ import {
   type SrpSettingsPatch,
 } from './srpTypes.js';
 import { takeFetchSlot } from './srpThrottle.js';
-import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
+import { requireLiveRoles, verifyCallerToken } from './actorAuth.js';
 
 /**
  * How long an officer record lets rules show the queue, claims, audit and settings. Short on
@@ -78,30 +77,6 @@ export const claimRef = (db: Firestore, corporationId: number, killmailId: numbe
 
 const rand = () => randomBytes(6).toString('base64url');
 
-/** The token must be this Character's own, for this deployment's EVE app. */
-async function verifiedClaims(
-  deps: SrpDeps,
-  caller: Caller,
-  accessToken: string | undefined
-): Promise<EveTokenClaims> {
-  const characterId = characterIdForUid(caller.uid);
-  if (characterId === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
-  if (accessToken === undefined)
-    fail('invalid-argument', 'accessToken is required', 'token-required');
-  let claims: EveTokenClaims;
-  try {
-    claims = await deps.verifyToken(accessToken);
-  } catch {
-    // Opaque on purpose; mintFirebaseToken logs the cause.
-    throw new HttpsError('unauthenticated', 'EVE access token rejected');
-  }
-  if (claims.characterId !== characterId || claims.ownerHash !== caller.ownerHash) {
-    fail('permission-denied', 'The access token is for a different Character', 'token-mismatch');
-  }
-  return claims;
-}
-
 // --- Member check ----------------------------------------------------------
 
 export interface SrpMember {
@@ -120,7 +95,7 @@ export async function authorizeMember(
   caller: Caller,
   call: BookCall
 ): Promise<SrpMember> {
-  const claims = await verifiedClaims(deps, caller, call.accessToken);
+  const { claims } = await verifyCallerToken(deps, caller, call.accessToken);
   const corporationId = await deps.lookupCorporation(claims.characterId);
   if (corporationId !== call.corporationId) {
     fail('permission-denied', 'Not a member of this corporation', 'wrong-corp');
@@ -141,8 +116,8 @@ export async function authorizeSrpOfficer(
   need: Extract<Need, 'edit' | 'director' | 'ceo'>,
   options: { live: boolean } = { live: true }
 ): Promise<OfficerAccess> {
-  const claims = await verifiedClaims(deps, caller, call.accessToken);
-  const accessToken = call.accessToken as string; // verifiedClaims refused an absent one
+  const actor = await verifyCallerToken(deps, caller, call.accessToken);
+  const accessToken = call.accessToken as string; // verifyCallerToken refused an absent one
   const now = deps.now();
   const officerRef = officersOf(deps.db, call.corporationId).doc(caller.uid);
   const held = (await officerRef.get()).data() as OfficerAccess | undefined;
@@ -157,25 +132,19 @@ export async function authorizeSrpOfficer(
   if (!options.live && heldUsable) {
     access = held;
   } else {
-    if (!claims.scopes.includes(ROLES_SCOPE)) {
-      if (held) await officerRef.delete();
-      fail('failed-precondition', 'Grant the corporation roles scope first', 'missing-scope');
-    }
-    const identity = await deps.readIdentity(claims.characterId, accessToken);
-    if (identity.corporationId !== call.corporationId) {
-      if (held) await officerRef.delete();
-      fail('permission-denied', 'Not a member of this corporation', 'wrong-corp');
-    }
-    const roles = decideRoles(identity.roles, identity.ceoId === claims.characterId);
-    if (!roles.canEdit) {
+    const { identity, roles } = await requireLiveRoles(deps, actor, accessToken, {
+      corporationId: call.corporationId,
+      need: 'canEdit',
+      denied: { message: 'No SRP officer role in this corporation', reason: 'not-an-officer' },
       // A failed renewal revokes the read access the old check granted.
-      if (held) await officerRef.delete();
-      fail('permission-denied', 'No SRP officer role in this corporation', 'not-an-officer');
-    }
+      onDenied: async () => {
+        if (held) await officerRef.delete();
+      },
+    });
     access = {
       ...roles,
-      characterId: claims.characterId,
-      characterName: claims.name,
+      characterId: actor.characterId,
+      characterName: actor.claims.name,
       ownerHash: caller.ownerHash,
       corporationId: call.corporationId,
       roles: identity.roles,

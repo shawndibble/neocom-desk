@@ -5,6 +5,7 @@
 
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { createActionGroup, type CallableHandler } from './callableRouter.js';
+import type { CallableAction } from './callableManifest.js';
 import { runDailyHousekeeping } from './dailyHousekeeping.js';
 import { defineSecret } from 'firebase-functions/params';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
@@ -296,7 +297,7 @@ export const mintFirebaseToken = onCall<{ accessToken?: unknown }>(
 // makes re-registering after an FCM token rotation replace the entry instead
 // of accumulating one per token.
 const alertsActions = createActionGroup();
-const alertsAction = (name: string, handler: CallableHandler): void => {
+const alertsAction = (name: CallableAction<'alerts'>, handler: CallableHandler): void => {
   alertsActions.register(name, handler);
 };
 
@@ -469,7 +470,7 @@ function callerOf(request: {
 
 // One deployed function per group instead of one per callable (see callableRouter.ts).
 const communityActions = createActionGroup();
-const communityAction = (name: string, handler: CallableHandler): void => {
+const communityAction = (name: CallableAction<'community'>, handler: CallableHandler): void => {
   communityActions.register(name, handler);
 };
 export const communityCall = onCall<unknown>({ maxInstances: 10 }, communityActions.route);
@@ -639,7 +640,7 @@ const corpTaxBookDeps = (): BookDeps => ({
 
 const corpTaxBookActions = createActionGroup();
 /** A Corp Tax Book router action: no deployed function of its own. New callables use this. */
-const corpTaxBookAction = (name: string, handler: CallableHandler): void => {
+const corpTaxBookAction = (name: CallableAction<'corpTaxBook'>, handler: CallableHandler): void => {
   corpTaxBookActions.register(name, handler);
 };
 

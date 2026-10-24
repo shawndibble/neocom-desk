@@ -8,6 +8,7 @@
  * Firestore here is the `lite` build (no listeners), so callers refetch after
  * a change.
  */
+import type { CallableAction } from '../../../../functions/src/callableManifest';
 import type { PayeeSetBy } from '@/engine/corpTaxBook/payeeChange';
 import {
   collection,
@@ -97,7 +98,11 @@ export interface SyncReceipt {
 }
 
 /** One Corp Tax Book callable, signed in as `characterId`; the other taxBook clients share it. */
-export async function call<In, Out>(characterId: number, name: string, data: In): Promise<Out> {
+export async function call<In, Out>(
+  characterId: number,
+  name: CallableAction,
+  data: In
+): Promise<Out> {
   await ensureSignedIn(characterId);
   const result = await callRouted<In, Out>(name, data);
   return result;

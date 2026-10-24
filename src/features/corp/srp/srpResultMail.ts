@@ -105,7 +105,7 @@ export async function queueSrpResultMails(
     corpName: string;
     pilots: readonly SrpMailPilot[];
     senderCharacterId: number;
-    /** The officer's corporation; null while unknown, which fails the mail. */
+    /** The officer's corporation; null while unknown (the mail does not need it). */
     corporationId: number | null;
   }
 ): Promise<MailRun> {
@@ -113,30 +113,35 @@ export async function queueSrpResultMails(
   const run: MailRun = { queued: [], failed: [], missingScope: false };
   if (pilots.length === 0) return run;
   const byId = new Map(pilots.map((p) => [p.characterId, p]));
-  const out =
-    input.corporationId === null
-      ? ({ status: 'failed' } as const)
-      : await queueOfficerMail({
-          senderCharacterId: input.senderCharacterId,
-          recipients: pilots.map((p) => p.characterId),
-          knownNames: new Map(pilots.map((p) => [p.characterId, p.characterName])),
-          enqueue: (recipients) =>
-            enqueueSrpResultMails({
-              corporationId: input.corporationId!,
-              senderCharacterId: input.senderCharacterId,
-              at: Date.now(),
-              mails: recipients.map((recipient) => ({
-                recipient,
-                ...buildSrpResultMail(t, {
-                  kind: input.kind,
-                  pilot: recipient.name,
-                  corpName: input.corpName,
-                  claims: byId.get(recipient.id)?.claims ?? [],
-                }),
-              })),
+  const out = await queueOfficerMail({
+    senderCharacterId: input.senderCharacterId,
+    recipients: pilots.map((p) => p.characterId),
+    knownNames: new Map(pilots.map((p) => [p.characterId, p.characterName])),
+    enqueue: (recipients) =>
+      enqueueSrpResultMails({
+        // The queue row only scopes by corporation; the mail needs none, so an unresolved one is 0.
+        corporationId: input.corporationId ?? 0,
+        senderCharacterId: input.senderCharacterId,
+        kind: input.kind,
+        mails: recipients.map((recipient) => {
+          const claims = byId.get(recipient.id)?.claims ?? [];
+          return {
+            recipient,
+            killmailIds: claims.map((c) => c.killmailId),
+            ...buildSrpResultMail(t, {
+              kind: input.kind,
+              pilot: recipient.name,
+              corpName: input.corpName,
+              claims,
             }),
-        });
-  if (out.status === 'queued') return { ...run, queued: pilots.map((p) => p.characterName) };
+          };
+        }),
+      }),
+  });
+  if (out.status === 'queued') {
+    // Only the mails really queued: a repeat of one decision queues none.
+    return { ...run, queued: pilots.slice(0, out.queued).map((p) => p.characterName) };
+  }
   if (out.status === 'no-scope') return { ...run, missingScope: true };
   return { ...run, failed: pilots.map((p) => p.characterName) };
 }

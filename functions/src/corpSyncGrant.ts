@@ -53,7 +53,8 @@ import type { FeederRecord } from './corpTaxBookFeeders.js';
 import { runBookSync, type BookSyncResult, type StopReason } from './corpTaxBookScheduledSync.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import type { IdentityReader } from './corpTaxBookEsi.js';
-import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
+import { assertOwnToken, signedInCharacter, verifyAccessToken } from './actorAuth.js';
+import type { EveTokenClaims } from './verifyEveToken.js';
 
 export const CORP_SYNC_GRANTS_COLLECTION = 'corpTaxBookSyncGrants';
 export const SCHEDULED_SYNC_DOC = 'scheduledSync';
@@ -171,14 +172,10 @@ export async function saveCorpSyncGrant(
   caller: Caller,
   input: SaveCorpSyncGrantInput
 ): Promise<{ corporationId: number; characterId: number; enabledAt: number }> {
-  const callerId = characterIdForUid(caller.uid);
-  if (callerId === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const callerId = signedInCharacter(caller);
 
   const supplied = await verifyGrantToken(deps, input.accessToken);
-  if (supplied.characterId !== callerId || supplied.ownerHash !== caller.ownerHash) {
-    fail('permission-denied', 'The token is for a different Character', 'token-mismatch');
-  }
+  assertOwnToken(caller, callerId, supplied);
 
   // The access token alone proves nothing about the refresh token beside it:
   // redeeming the refresh token at SSO proves it is a live token for this same
@@ -269,15 +266,12 @@ export async function saveCorpSyncGrant(
 }
 
 async function verifyGrantToken(deps: CorpSyncDeps, accessToken: string): Promise<EveTokenClaims> {
-  let claims: EveTokenClaims;
-  try {
-    claims = await deps.verify(accessToken);
-  } catch (err) {
-    deps.log('Corp sync grant access token rejected', {
-      error: err instanceof Error ? err.message : 'unknown',
-    });
-    throw new HttpsError('unauthenticated', 'EVE access token rejected');
-  }
+  const claims = await verifyAccessToken(deps.verify, accessToken, {
+    onReject: (err) =>
+      deps.log('Corp sync grant access token rejected', {
+        error: err instanceof Error ? err.message : 'unknown',
+      }),
+  });
   if (!sameScopes(claims.scopes)) {
     fail(
       'permission-denied',
@@ -326,9 +320,7 @@ export async function revokeCorpSyncGrant(
   caller: Caller,
   call: { corporationId: number; accessToken?: string }
 ): Promise<{ deleted: boolean; revoked: boolean }> {
-  const callerId = characterIdForUid(caller.uid);
-  if (callerId === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const callerId = signedInCharacter(caller);
   const grant = (await grantRef(deps.db, call.corporationId).get()).data() as
     CorpSyncGrantDoc | undefined;
   if (!grant) return { deleted: false, revoked: false };

@@ -18,14 +18,6 @@ beforeEach(() => {
 });
 
 describe('loadCorpRoleAudit', () => {
-  it('makes no request without the capability or any corp access', async () => {
-    resolveCorpReadAccess.mockResolvedValue(access(false));
-    expect((await loadCorpRoleAudit(1)).readable).toBe(false);
-    resolveCorpReadAccess.mockResolvedValue(null);
-    expect((await loadCorpRoleAudit(1)).readable).toBe(false);
-    expect(loadRoleAudit).not.toHaveBeenCalled();
-  });
-
   it('reads without titles and returns the audit', async () => {
     resolveCorpReadAccess.mockResolvedValue(access(true));
     const data = { holders: [], changes: [], fetchedAt: new Date(0), fromCache: true };

@@ -4,6 +4,7 @@
 // it tests without an emulator (alertGrantStore.ts / index.ts wire the real
 // ones). A token is never logged, never put in an error, never returned.
 
+import { verifyAccessToken } from './actorAuth.js';
 import { encryptRefreshToken, decryptRefreshToken } from './alertGrantCrypto.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
 
@@ -132,15 +133,13 @@ async function verifyAlertsToken(
   deps: AlertGrantDeps,
   accessToken: string
 ): Promise<EveTokenClaims> {
-  let claims: EveTokenClaims;
-  try {
-    claims = await deps.verify(accessToken);
-  } catch (err) {
-    deps.log('Alerts Grant access token rejected', {
-      error: err instanceof Error ? err.message : 'unknown',
-    });
-    throw new AlertGrantError('unauthenticated', 'EVE access token rejected');
-  }
+  const claims = await verifyAccessToken(deps.verify, accessToken, {
+    onReject: (err) =>
+      deps.log('Alerts Grant access token rejected', {
+        error: err instanceof Error ? err.message : 'unknown',
+      }),
+    toError: () => new AlertGrantError('unauthenticated', 'EVE access token rejected'),
+  });
   if (claims.scopes.length !== 1 || claims.scopes[0] !== ALERTS_SCOPE) {
     throw new AlertGrantError('permission-denied', `Token must carry only ${ALERTS_SCOPE}`);
   }

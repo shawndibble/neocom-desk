@@ -8,6 +8,7 @@
  * link) but has no way to confirm. Firebase: reach this only from the lazy
  * verify route and the Mining Tax tab (`app/bootImportGraph.test.ts`).
  */
+import type { CallableAction } from '../../../functions/src/callableManifest';
 import { underFirebaseSession } from '@/features/communities/pledgeWrites';
 import { callRouted } from '@/sync/routedCallable';
 import { ensureSignedIn } from '@/sync/syncAuth';
@@ -19,7 +20,8 @@ export interface PendingGrouping {
   mainCharacterId: number;
 }
 
-const call = <In, Out>(name: string, data: In): Promise<Out> => callRouted<In, Out>(name, data);
+const call = <In, Out>(name: CallableAction, data: In): Promise<Out> =>
+  callRouted<In, Out>(name, data);
 
 /** The groupings waiting for `characterId`, read as that Character. */
 export function listPendingGroupings(characterId: number): Promise<PendingGrouping[]> {

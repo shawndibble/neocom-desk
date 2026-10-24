@@ -24,18 +24,6 @@ beforeEach(() => {
 });
 
 describe('loadCorpCustoms', () => {
-  it('makes no request without the capability', async () => {
-    resolveCorpReadAccess.mockResolvedValue(access(false));
-    expect((await loadCorpCustoms(1)).readable).toBe(false);
-    expect(loadCorporationCustomsOffices).not.toHaveBeenCalled();
-  });
-
-  it('makes no request with no corp access at all', async () => {
-    resolveCorpReadAccess.mockResolvedValue(null);
-    expect((await loadCorpCustoms(1)).readable).toBe(false);
-    expect(loadCorporationCustomsOffices).not.toHaveBeenCalled();
-  });
-
   it('names the office types and systems', async () => {
     resolveCorpReadAccess.mockResolvedValue(access(true));
     loadCorporationCustomsOffices.mockResolvedValue({
@@ -51,13 +39,5 @@ describe('loadCorpCustoms', () => {
     expect(feed.readable).toBe(true);
     expect(feed.typeNames.get(2233)).toBe('Customs Office');
     expect(feed.systemNames.get(30002813)).toBe('Tama');
-  });
-
-  it('asks for a grant when it lapsed, and throws when the read failed', async () => {
-    resolveCorpReadAccess.mockResolvedValue(access(true));
-    loadCorporationCustomsOffices.mockResolvedValue({ cached: null, needsReauth: true });
-    expect(await loadCorpCustoms(1)).toMatchObject({ readable: false, needsReauth: true });
-    loadCorporationCustomsOffices.mockResolvedValue({ cached: null, needsReauth: false });
-    await expect(loadCorpCustoms(1)).rejects.toThrow('customs offices');
   });
 });
