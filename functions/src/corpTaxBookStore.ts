@@ -15,7 +15,7 @@ import {
   type QueryDocumentSnapshot,
   type Transaction,
 } from 'firebase-admin/firestore';
-import { HttpsError, type FunctionsErrorCode } from 'firebase-functions/v2/https';
+import { HttpsError } from 'firebase-functions/v2/https';
 import {
   ACCESS_TTL_MS,
   ADJUSTMENTS,
@@ -41,7 +41,6 @@ import {
   STATEMENT_LINKS,
   TOKENS_COLLECTION,
   WRITE_OFFS,
-  decideRoles,
   needsLiveCheck,
   dismissalNeedsDirector,
   defaultSettings,
@@ -81,9 +80,16 @@ import {
   type MirrorExtraction,
   type ObservedRow,
 } from './corpTaxBookEngine.js';
-import { ROLES_SCOPE, type IdentityReader } from './corpTaxBookEsi.js';
+import type { IdentityReader } from './corpTaxBookEsi.js';
 import { SRP_COLLECTIONS } from './srpTypes.js';
-import { characterIdForUid, type EveTokenClaims } from './verifyEveToken.js';
+import {
+  fail,
+  requireLiveRoles,
+  signedInCharacter,
+  verifyCallerToken,
+  type Caller,
+} from './actorAuth.js';
+import type { EveTokenClaims } from './verifyEveToken.js';
 
 /** One type's parsed R2 `open-prices/<typeId>.json` object, or null when R2 has none. Throws on a failed read. */
 export type OpenPricesReader = (typeId: number) => Promise<unknown | null>;
@@ -99,11 +105,7 @@ export interface BookDeps {
   corporationCeo?: (corporationId: number) => Promise<number | undefined>;
 }
 
-/** Who is calling: the Firebase uid `char:{id}` and the ownerHash claim. */
-export interface Caller {
-  uid: string;
-  ownerHash: string;
-}
+export type { Caller };
 
 type Data = Record<string, unknown>;
 
@@ -132,10 +134,7 @@ export async function liveOfficerIds(
 
 const rand = (bytes = 6) => randomBytes(bytes).toString('base64url');
 
-/** Throws an HttpsError carrying a stable `reason` for the UI to map. */
-export function fail(code: FunctionsErrorCode, message: string, reason: string): never {
-  throw new HttpsError(code, message, { reason });
-}
+export { fail };
 
 // --- Officer verification --------------------------------------------------
 
@@ -158,9 +157,7 @@ export async function authorizeOfficer(
   need: Need,
   options: AuthOptions
 ): Promise<OfficerAccess> {
-  const characterId = characterIdForUid(caller.uid);
-  if (characterId === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const characterId = signedInCharacter(caller);
   const now = deps.now();
   const officerRef = sub(deps.db, call.corporationId, OFFICERS).doc(caller.uid);
   const held = (await officerRef.get()).data() as OfficerAccess | undefined;
@@ -184,33 +181,20 @@ export async function authorizeOfficer(
       fail('failed-precondition', 'This needs a fresh role check', 'live-check-required');
     access = held;
   } else {
-    let claims: EveTokenClaims;
-    try {
-      claims = await deps.verifyToken(call.accessToken);
-    } catch {
-      // Opaque on purpose; mintFirebaseToken logs the cause.
-      throw new HttpsError('unauthenticated', 'EVE access token rejected');
-    }
-    if (claims.characterId !== characterId || claims.ownerHash !== caller.ownerHash) {
-      fail('permission-denied', 'The access token is for a different Character', 'token-mismatch');
-    }
+    const actor = await verifyCallerToken(deps, caller, call.accessToken);
+    const { claims } = actor;
     if (!options.live && heldUsable) {
       access = held;
     } else {
-      if (!claims.scopes.includes(ROLES_SCOPE)) {
-        fail('failed-precondition', 'Grant the corporation roles scope first', 'missing-scope');
-      }
-      const identity = await deps.readIdentity(characterId, call.accessToken);
-      if (identity.corporationId !== call.corporationId) {
-        if (held) await officerRef.delete();
-        fail('permission-denied', 'Not a member of this corporation', 'wrong-corp');
-      }
-      const roles = decideRoles(identity.roles, identity.ceoId === characterId);
-      if (!roles.canView) {
+      const { identity, roles } = await requireLiveRoles(deps, actor, call.accessToken, {
+        corporationId: call.corporationId,
+        need: 'canView',
+        denied: { message: 'No officer role in this corporation', reason: 'not-an-officer' },
         // A failed renewal revokes the read access the old check granted.
-        if (held) await officerRef.delete();
-        fail('permission-denied', 'No officer role in this corporation', 'not-an-officer');
-      }
+        onDenied: async (reason) => {
+          if (reason !== 'missing-scope' && held) await officerRef.delete();
+        },
+      });
       access = {
         ...roles,
         characterId,
@@ -1518,9 +1502,7 @@ export async function confirmGrouping(
   corporationId: number,
   minerId: string
 ) {
-  const characterId = characterIdForUid(caller.uid);
-  if (characterId === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const characterId = signedInCharacter(caller);
   const ref = sub(deps.db, corporationId, MINERS).doc(minerId);
   await deps.db.runTransaction(async (tx) => {
     const miner = (await tx.get(ref)).data();
@@ -1575,9 +1557,7 @@ export async function declineGrouping(
   corporationId: number,
   minerId: string
 ) {
-  const characterId = characterIdForUid(caller.uid);
-  if (characterId === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const characterId = signedInCharacter(caller);
   await declinePending(deps, corporationId, minerId, characterId, { characterId, name: '' });
 }
 
@@ -1603,9 +1583,7 @@ export async function declineGroupingByToken(deps: BookDeps, token: string, char
  * recognise the request, nothing of the other characters or any lines.
  */
 export async function listPendingGroupings(deps: BookDeps, caller: Caller) {
-  const characterId = characterIdForUid(caller.uid);
-  if (characterId === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const characterId = signedInCharacter(caller);
   const snap = await deps.db
     .collectionGroup(MINERS)
     .where('pendingConfirmation', 'array-contains', characterId)
@@ -1645,9 +1623,7 @@ export async function claimPayment(
   corporationId: number,
   paymentId: string
 ) {
-  const characterId = characterIdForUid(caller.uid);
-  if (characterId === undefined)
-    fail('unauthenticated', 'Sign in with a Character first', 'not-signed-in');
+  const characterId = signedInCharacter(caller);
   const paymentRef = sub(deps.db, corporationId, PAYMENTS).doc(paymentId);
   return deps.db.runTransaction(async (tx) => {
     const book = await tx.get(bookRef(deps.db, corporationId));
