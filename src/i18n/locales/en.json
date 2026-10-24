@@ -2150,6 +2150,25 @@
     }
   },
   "plans": {
+    "closest": {
+      "title": "Who's closest",
+      "titleCount_one": "Who's closest · {{count}} Character",
+      "titleCount_other": "Who's closest · {{count}} Characters",
+      "owner": "Plan owner",
+      "sp": "{{sp}} SP to train",
+      "progress": "Loaded {{loaded}} of {{total}}",
+      "complete_one": "{{count}} Character already has this plan",
+      "complete_other": "{{count}} Characters already have this plan",
+      "showMore": "Show {{count}} more",
+      "unavailable": "{{count}} unavailable",
+      "reason": {
+        "skills-permission": "skills permission not granted",
+        "skills-failed": "skills failed to load",
+        "attributes-unavailable": "attributes unavailable",
+        "implants-unavailable": "implants unavailable",
+        "plan-invalid": "plan could not be timed"
+      }
+    },
     "catalogFailed": "Couldn't load the skill list",
     "catalogFailedHint": "The skill data could not be read on this device. Try again.",
     "title": "Skill Plans",
