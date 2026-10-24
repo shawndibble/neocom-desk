@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterAvatar, Disclosure } from '@/components/ui';
+import { focusRingClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import type { PlanTimingUnavailableReason } from '@/engine/skills/planTimeToFinish';
 import type { EngineSkill, PlanEntry } from '@/engine/types';
 import type { CharacterRecord } from '@/db';
@@ -112,7 +114,7 @@ function ClosestBody({ ranking, loaded, total, ownerId, nameOf }: ClosestBodyPro
       {more.length > 0 && !showAll && (
         <button
           type="button"
-          className="text-accent hover:underline"
+          className={cx('text-accent hover:underline', focusRingClassName)}
           onClick={() => setShowAll(true)}
         >
           {t('plans.closest.showMore', { count: more.length })}
@@ -149,7 +151,7 @@ function NamesLine({
       <button
         type="button"
         aria-expanded={expanded}
-        className="text-text-dim hover:text-text hover:underline"
+        className={cx('text-text-dim hover:text-text hover:underline', focusRingClassName)}
         onClick={() => setExpanded((v) => !v)}
       >
         {label}
