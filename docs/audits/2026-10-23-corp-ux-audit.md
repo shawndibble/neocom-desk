@@ -377,3 +377,9 @@ Fixes landed on `develop` in PRs #4897 (Assets), #4899 (Corp Board + permission 
 New in the re-walk:
 
 - R1 · Medium · Statements "All periods": after switching cadence from Monthly to Every 7 days, the Ready to send row is labelled "Oct 2026" while the Closed and Open rows read "8 Oct – 14 Oct" and so on. The verify page for the same Statement correctly reads "1–7 Oct 2026". The table label must follow the period actually covered. Evidence: `v43-statements.png`.
+
+### Follow-up round, 2026-10-24
+
+- R1 fixed in #4917: period labels now follow the covered days ("1–7 Oct 2026", "25–30 Sep 2026"); moving the start date also moves an N-day anchor that sat on the old start, client and server; days before a later anchor form a stub period.
+- Row context menus (#4915 + #4919, decision `20261023-223827-corp-tables-carry-row-context-menus.md`): ⋮ plus right-click on Members roster and Roles tables, Corp Wallet journal (corp lines with a Player) and transactions, Moons Miners (officers), Moons Extractions (officers, survey ore with tax only), SRP officer Pending/Owed (claims with an amount). No menu where a row has fewer than two real actions (Statements, SRP History, `/srp` member tables). Verified in browser: the ⋮ is the last cell at the table's right edge; on phone cards it is a 36px button pinned top-right, centred on the title line (button y 0–36, title cell y 8–33), down from the old 44px block.
+- Review follow-ups F1–F27 landed in #4912 and #4914; F25 (CEO without the Director role seeing SRP Settings) left as a note.
