@@ -277,12 +277,13 @@ describe('enqueueSrpResultMails', () => {
   });
   const mails = [1, 2, 3].map((id) => ({
     recipient: { id, name: `P${id}` },
+    killmailIds: [id * 10],
     subject: 's',
     body: 'b',
   }));
+  const input = { corporationId: 5, senderCharacterId: 1, kind: 'approved' as const, mails };
 
   it('queues one waiting srp-result row per pilot, in order, once per decision', async () => {
-    const input = { corporationId: 5, senderCharacterId: 1, at: 1000, mails };
     expect(await enqueueSrpResultMails(input)).toEqual({ queued: 3 });
     expect(await enqueueSrpResultMails(input)).toEqual({ queued: 0 });
     const rows = (await db.corpMailQueue.toArray()).sort((a, b) => a.order - b.order);
@@ -291,5 +292,25 @@ describe('enqueueSrpResultMails', () => {
       [2, 'srp-result', 'waiting'],
       [3, 'srp-result', 'waiting'],
     ]);
+  });
+
+  it('a double submit a moment apart still queues once', async () => {
+    const now = vi.spyOn(Date, 'now');
+    try {
+      now.mockReturnValue(1000);
+      await enqueueSrpResultMails(input);
+      now.mockReturnValue(2000);
+      expect(await enqueueSrpResultMails(input)).toEqual({ queued: 0 });
+    } finally {
+      now.mockRestore();
+    }
+    expect(await db.corpMailQueue.count()).toBe(3);
+  });
+
+  it('a different decision (kind or claims) is mailed', async () => {
+    await enqueueSrpResultMails(input);
+    expect(await enqueueSrpResultMails({ ...input, kind: 'rejected' })).toEqual({ queued: 3 });
+    const other = mails.map((m) => ({ ...m, killmailIds: [m.killmailIds[0]! + 1] }));
+    expect(await enqueueSrpResultMails({ ...input, mails: other })).toEqual({ queued: 3 });
   });
 });

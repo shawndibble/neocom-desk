@@ -140,10 +140,38 @@ describe('queueSrpResultMails', () => {
     expect(run).toEqual({ queued: [], failed: [], missingScope: false });
   });
 
-  it('an unknown corporation fails the mail without throwing', async () => {
+  it('an unknown corporation still mails (the queue row is not tied to a corp)', async () => {
     await grant([MAIL]);
     const run = await queueSrpResultMails(t, input([pilot(1, 'A')], { corporationId: null }));
-    expect(run.failed).toEqual(['A']);
+    expect(run).toEqual({ queued: ['A'], failed: [], missingScope: false });
+    expect(await db.corpMailQueue.count()).toBe(1);
+  });
+
+  it('an unknown corporation without the mail scope says permission missing', async () => {
+    await grant(['esi-skills.read_skills.v1']);
+    const run = await queueSrpResultMails(t, input([pilot(1, 'A')], { corporationId: null }));
+    expect(run.missingScope).toBe(true);
+    expect(run.failed).toEqual([]);
+  });
+
+  it('a queue that throws fails the mail without throwing', async () => {
+    await grant([MAIL]);
+    const spy = vi.spyOn(db.corpMailQueue, 'bulkPut').mockRejectedValue(new Error('quota'));
+    try {
+      const run = await queueSrpResultMails(t, input([pilot(1, 'A'), pilot(2, 'B')]));
+      expect(run).toEqual({ queued: [], failed: ['A', 'B'], missingScope: false });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('reports only the mails really queued; a repeat of one decision queues none', async () => {
+    await grant([MAIL]);
+    const pilots = [pilot(1, 'A'), pilot(2, 'B')];
+    await queueSrpResultMails(t, input(pilots));
+    const again = await queueSrpResultMails(t, input(pilots));
+    expect(again).toEqual({ queued: [], failed: [], missingScope: false });
+    expect(await db.corpMailQueue.count()).toBe(2);
   });
 });
 
@@ -160,6 +188,11 @@ describe('summary', () => {
     );
     expect(mailSummary(t, { queued: [], failed: [], missingScope: true })).toBe(
       'No mail sent: mail permission missing.'
+    );
+  });
+  it('plural count from the real number queued', () => {
+    expect(mailSummary(t, { queued: ['A', 'B', 'C'], failed: [], missingScope: false })).toBe(
+      'Mail queued for 3 pilots, sent about 5 a minute.'
     );
   });
   it('adds nothing when nothing was mailed', () => {
