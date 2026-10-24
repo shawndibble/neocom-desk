@@ -586,6 +586,7 @@ nightly when both sources move to a newer build and opens an auto-merging PR.
   reminder rule) and `statementMail.ts` (the short Statement mail). Client:
   `src/features/corpTaxBook/`: `mailQueue.ts` (`enqueueStatements`,
   `enqueueReminder`, `retryMail`, the API the Statements tab calls),
+  `officerMail.ts` (the one door for any Officer mail, SRP results included: `canSendMail`, `resolveRecipients`, fire-and-forget `queueOfficerMail`; nothing else calls `sendMail` for an officer's notice),
   `mailQueueStore.ts` (Dexie `corpMailQueue`, one row per mail),
   `mailQueueRunner.ts` (`stepQueue` / `runMailQueue` under the
   `neocom:mailQueue` Web Lock), `bookApi.ts` (verify tokens, `recordMail` /

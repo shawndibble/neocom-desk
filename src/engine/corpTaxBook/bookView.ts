@@ -918,7 +918,7 @@ export function periodRows(view: BookView): PeriodRow[] {
         }).state === 'overdue'
       )
         overdue = true;
-      if (((s as Statement & { mailsSent?: number }).mailsSent ?? 0) === 0) unmailed = true;
+      if ((s.mailsSent ?? 0) === 0) unmailed = true;
       paid += settlement?.credited ?? 0;
       outstanding += settlement && !settlement.settled ? settlement.remaining : 0;
     }

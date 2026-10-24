@@ -92,7 +92,7 @@ const pendingSet = () => [
 afterEach(() => useActiveCharacter.setState({ activeCharacterId: null }));
 beforeEach(() => {
   vi.clearAllMocks();
-  mailResult.mockResolvedValue({ sent: [], failed: [], missingScope: false });
+  mailResult.mockResolvedValue({ queued: [], failed: [], missingScope: false });
 });
 
 describe('OfficerQueue pending', () => {
@@ -138,13 +138,13 @@ describe('OfficerQueue pending', () => {
   });
 
   it('reports the result mail after a batch approve, and a failed one keeps the status', async () => {
-    mailResult.mockResolvedValue({ sent: ['Pilot1'], failed: ['Pilot2'], missingScope: false });
+    mailResult.mockResolvedValue({ queued: ['Pilot1'], failed: ['Pilot2'], missingScope: false });
     setup(pendingSet());
     await userEvent.click(screen.getByRole('button', { name: 'Select all (2)' }));
     await userEvent.click(screen.getByRole('button', { name: 'Approve (2)' }));
     expect(
       await findLine(
-        'Approved 2 of 2. Mail sent to 1 pilot. Mail failed for Pilot2, status still saved.'
+        'Approved 2 of 2. Mail queued for 1 pilot. Mail failed for Pilot2, status still saved.'
       )
     ).toBeInTheDocument();
     expect(mailResult).toHaveBeenCalledWith('approved', [
@@ -157,7 +157,7 @@ describe('OfficerQueue pending', () => {
   });
 
   it('says so when the mail permission is missing, never blocking the approval', async () => {
-    mailResult.mockResolvedValue({ sent: [], failed: [], missingScope: true });
+    mailResult.mockResolvedValue({ queued: [], failed: [], missingScope: true });
     const data = setup(pendingSet());
     await userEvent.click(screen.getAllByRole('button', { name: 'Approve' })[0]!);
     expect(data.approve).toHaveBeenCalled();
@@ -189,11 +189,11 @@ describe('OfficerQueue pending', () => {
   });
 
   it('keeps the grant-mail note when a run had no pilots to mail', async () => {
-    mailResult.mockResolvedValueOnce({ sent: [], failed: [], missingScope: true });
+    mailResult.mockResolvedValueOnce({ queued: [], failed: [], missingScope: true });
     const data = setup(pendingSet());
     await userEvent.click(screen.getAllByRole('button', { name: 'Approve' })[0]!);
     expect(await screen.findByText("Can't mail the pilot")).toBeInTheDocument();
-    mailResult.mockResolvedValueOnce({ sent: [], failed: [], missingScope: false });
+    mailResult.mockResolvedValueOnce({ queued: [], failed: [], missingScope: false });
     data.approveMany.mockResolvedValueOnce({
       results: [{ ok: false, killmailId: 2, reason: 'illegal-transition', message: 'x' }],
     } as never);
@@ -228,13 +228,13 @@ describe('OfficerQueue reject', () => {
   });
 
   it('mails the pilot the reason and reports it', async () => {
-    mailResult.mockResolvedValue({ sent: ['Pilot1'], failed: [], missingScope: false });
+    mailResult.mockResolvedValue({ queued: ['Pilot1'], failed: [], missingScope: false });
     setup(pendingSet());
     await userEvent.click(screen.getAllByRole('button', { name: 'Reject…' })[0]!);
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByRole('textbox'), 'Solo roam');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Reject claim' }));
-    expect(await findLine(/Rejected Pilot1.*Mail sent to 1 pilot\./)).toBeInTheDocument();
+    expect(await findLine(/Rejected Pilot1.*Mail queued for 1 pilot\./)).toBeInTheDocument();
     expect(mailResult).toHaveBeenCalledWith('rejected', [
       expect.objectContaining({ claim: expect.objectContaining({ reason: 'Solo roam' }) }),
     ]);

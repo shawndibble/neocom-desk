@@ -16,7 +16,8 @@ import {
   setRefineryLabel,
 } from '../taxBook/feederClient';
 import { ChangePayeeDialog, PayeeChangeStrip } from './MoonOwnerPayee';
-import { canMail, mailPayeeChange } from './payeeChangeMail';
+import { enqueuePayeeChangeMail } from '@/features/corpTaxBook/mailQueue';
+import { canSendMail, queueOfficerMail } from '@/features/corpTaxBook/officerMail';
 import { PayMoonOwnerHost } from './PayMoonOwnerHost';
 import { RemoveMoonOwnerDialog, SetRateDialog, SettledOtherwiseDialog } from './MoonOwnerDialogs';
 import { MoonOwnerPage } from './MoonOwnerPage';
@@ -168,20 +169,26 @@ export function MoonOwnerDetail({ id }: { id: string }) {
                 corporationId,
                 corp,
                 payee,
-                canMail(grantedScopes)
+                canSendMail(grantedScopes)
               );
               // After the save, and never awaited: the change does not wait on the mail.
               if (out.changed && out.at !== undefined) {
-                void mailPayeeChange({
+                const at = out.at;
+                void queueOfficerMail({
+                  senderCharacterId: characterId,
                   grantedScopes,
-                  characterId,
-                  corporationId,
-                  feederCorporationId: corp,
                   recipients: out.recipients ?? [],
-                  changedByName: accountingName ?? names.corporation(corporationId),
-                  moonOwnerName: name,
-                  payeeName: newPayeeName,
-                  at: out.at,
+                  enqueue: (recipients) =>
+                    enqueuePayeeChangeMail({
+                      corporationId,
+                      senderCharacterId: characterId,
+                      feederCorporationId: corp,
+                      at,
+                      changedByName: accountingName ?? names.corporation(corporationId),
+                      moonOwnerName: name,
+                      payeeName: newPayeeName,
+                      recipients,
+                    }),
                 });
               }
             })

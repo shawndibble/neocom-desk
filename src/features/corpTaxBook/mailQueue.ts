@@ -13,6 +13,7 @@ import {
   type MailKind,
   type MailQueueItem,
 } from '@/engine/corpTaxBook/mailQueue';
+import { utcDay } from '@/engine/localDay';
 import { composeRateChangeMail } from '@/engine/corpTaxBook/ownerRateMail';
 import { composePayeeChangeMail } from '@/engine/corpTaxBook/payeeChange';
 import type { OwnerRateChange } from '@/engine/corpTaxBook/ownerRate';
@@ -225,12 +226,43 @@ export async function retryMail(item: MailQueueItem): Promise<void> {
   await saveItem(retryItem(item, await nextOrder()));
 }
 
+/** One short notice per recipient, queued paced behind whatever is waiting. */
+async function queueNotices(
+  base: Pick<MailQueueItem, 'corporationId' | 'senderCharacterId' | 'kind'> &
+    Partial<Pick<MailQueueItem, 'feederCorporationId'>>,
+  notices: readonly {
+    recipient: { id: number; name: string };
+    /** Identifies the change, so one change is mailed once per recipient. */
+    statementId: string;
+    mail: { subject: string; body: string };
+  }[]
+): Promise<{ queued: number }> {
+  const batchId = crypto.randomUUID();
+  const start = await nextOrder();
+  const items: MailQueueItem[] = notices.map((n, i) => ({
+    id: crypto.randomUUID(),
+    batchId,
+    ...base,
+    statementId: n.statementId,
+    recipientId: n.recipient.id,
+    recipientName: n.recipient.name,
+    amount: 0,
+    subject: n.mail.subject,
+    body: n.mail.body,
+    order: start + i,
+    status: 'waiting',
+    createdAt: Date.now(),
+    attempts: 0,
+  }));
+  const { added } = await addToQueue(items);
+  return { queued: added.length };
+}
+
 /**
- * Queues the short "your rate changed" mail, one per recipient. Never throws
- * into the rate change: the caller has already saved it. A mail already queued
+ * Queues the short "your rate changed" mail, one per recipient. A mail already queued
  * for the same change and recipient is not queued twice.
  */
-export async function enqueueRateChangeMail(input: {
+export function enqueueRateChangeMail(input: {
   corporationId: number;
   accountingCorporationName: string;
   senderCharacterId: number;
@@ -238,85 +270,85 @@ export async function enqueueRateChangeMail(input: {
   change: OwnerRateChange;
   recipients: readonly { id: number; name: string }[];
 }): Promise<{ queued: number }> {
-  const batchId = crypto.randomUUID();
-  const start = await nextOrder();
   // The change is the edit that made it: 8% → 6% → 8% on one day is three mails, not two.
   const { change } = input;
   const event = change.recordedAt ?? `${change.date}:${change.newPct}`;
-  const items: MailQueueItem[] = input.recipients.map((r, i) => {
-    const mail = composeRateChangeMail({
-      accountingCorporationName: input.accountingCorporationName,
-      recipientName: r.name,
-      change: input.change,
-    });
-    return {
-      id: crypto.randomUUID(),
-      batchId,
+  return queueNotices(
+    {
       corporationId: input.corporationId,
-      statementId: `rate:${input.feederCorporationId}:${event}:${r.id}`,
-      kind: 'rate-change',
       senderCharacterId: input.senderCharacterId,
-      recipientId: r.id,
-      recipientName: r.name,
-      amount: 0,
-      subject: mail.subject,
-      body: mail.body,
-      order: start + i,
-      status: 'waiting',
-      createdAt: Date.now(),
-      attempts: 0,
-    };
-  });
-  const { added } = await addToQueue(items);
-  return { queued: added.length };
+      kind: 'rate-change',
+    },
+    input.recipients.map((r) => ({
+      recipient: r,
+      statementId: `rate:${input.feederCorporationId}:${event}:${r.id}`,
+      mail: composeRateChangeMail({
+        accountingCorporationName: input.accountingCorporationName,
+        recipientName: r.name,
+        change,
+      }),
+    }))
+  );
 }
 
 /**
- * Queues the short "payments now go to" mail (#4653), one per recipient. Never throws into the
- * payee change: the caller has already saved it. One change (`at`) is mailed once per recipient.
+ * Queues the short "payments now go to" mail (#4653), one per recipient. One change (`at`) is
+ * mailed once per recipient.
  */
-export async function enqueuePayeeChangeMail(input: {
+export function enqueuePayeeChangeMail(input: {
   corporationId: number;
   senderCharacterId: number;
   feederCorporationId: number;
   /** When the change was made (ms): one mail per change and recipient. */
   at: number;
-  /** UTC day of the change. */
-  date: string;
   changedByName: string;
   moonOwnerName: string;
   payeeName: string;
   recipients: readonly { id: number; name: string }[];
 }): Promise<{ queued: number }> {
-  const batchId = crypto.randomUUID();
-  const start = await nextOrder();
-  const items: MailQueueItem[] = input.recipients.map((r, i) => {
-    const mail = composePayeeChangeMail({
-      recipientName: r.name,
-      changedByName: input.changedByName,
-      moonOwnerName: input.moonOwnerName,
-      payeeName: input.payeeName,
-      date: input.date,
-    });
-    return {
-      id: crypto.randomUUID(),
-      batchId,
+  return queueNotices(
+    {
       corporationId: input.corporationId,
-      feederCorporationId: input.feederCorporationId,
-      statementId: `payee:${input.feederCorporationId}:${input.at}:${r.id}`,
-      kind: 'payee-change',
       senderCharacterId: input.senderCharacterId,
-      recipientId: r.id,
-      recipientName: r.name,
-      amount: 0,
-      subject: mail.subject,
-      body: mail.body,
-      order: start + i,
-      status: 'waiting',
-      createdAt: Date.now(),
-      attempts: 0,
-    };
-  });
-  const { added } = await addToQueue(items);
-  return { queued: added.length };
+      kind: 'payee-change',
+      feederCorporationId: input.feederCorporationId,
+    },
+    input.recipients.map((r) => ({
+      recipient: r,
+      statementId: `payee:${input.feederCorporationId}:${input.at}:${r.id}`,
+      mail: composePayeeChangeMail({
+        recipientName: r.name,
+        changedByName: input.changedByName,
+        moonOwnerName: input.moonOwnerName,
+        payeeName: input.payeeName,
+        date: utcDay(input.at),
+      }),
+    }))
+  );
+}
+
+/**
+ * Queues the mail that tells each pilot how their SRP claims were decided. The mails are
+ * written by the caller (they need the officer's i18n); the queue only paces and persists them.
+ * `at` is the decision's stamp, so one decision is mailed once per pilot.
+ */
+export function enqueueSrpResultMails(input: {
+  /** The officer's corporation: scopes the queue row. */
+  corporationId: number;
+  senderCharacterId: number;
+  at: number;
+  mails: readonly { recipient: { id: number; name: string }; subject: string; body: string }[];
+}): Promise<{ queued: number }> {
+  return queueNotices(
+    {
+      corporationId: input.corporationId,
+      senderCharacterId: input.senderCharacterId,
+      kind: 'srp-result',
+    },
+    input.mails.map((m) => ({
+      recipient: m.recipient,
+      statementId: `srp:${input.at}:${m.recipient.id}`,
+      mail: m,
+    }))
+  );
 }

@@ -15,19 +15,6 @@ import { addDays, periodLabel, refineryPlaceholder } from './moonsFormat';
 import type { BookContextValue } from './bookContextValue';
 import { useBook } from './useBook';
 
-/** Statements the book already mailed are never offered again (`mailsSent` > 0). */
-export function mailsSent(statement: Statement): number {
-  return (statement as Statement & { mailsSent?: number }).mailsSent ?? 0;
-}
-
-export function remindersStopped(statement: Statement): boolean {
-  return (statement as Statement & { remindersStopped?: boolean }).remindersStopped === true;
-}
-
-export function manualRemindersSent(statement: Statement): number {
-  return (statement as Statement & { manualRemindersSent?: number }).manualRemindersSent ?? 0;
-}
-
 /**
  * The refinery names an issued Statement carries, for a guest's verify page that cannot look them
  * up. A refinery whose name is unknown is left out: the verify page shows its own placeholder.
@@ -112,8 +99,8 @@ export function useMinerReminder(minerId: string, onNotice: (text: string) => vo
         amountDue: detail.row.owed,
         carried: 0,
       }),
-      remindersStopped: remindersStopped(openStatement),
-      manualRemindersSent: manualRemindersSent(openStatement),
+      remindersStopped: openStatement.remindersStopped === true,
+      manualRemindersSent: openStatement.manualRemindersSent ?? 0,
     });
     onNotice(
       result.ok
