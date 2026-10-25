@@ -505,6 +505,12 @@ describe('onlySide', () => {
     );
   });
 
+  it('non-strict keeps options that touch no tank module, for the list', () => {
+    const mixed = { ...result, noDownside: [option(2, 0.1), option(9, 0.1), option(5, 0.1)] };
+    const listed = onlySide(mixed, 'armor', groupOf, false);
+    expect(listed.noDownside.map((o) => o.candidate.toTypeId)).toEqual([9, 5]);
+  });
+
   it('a shield-only fit under Armor reports no gain when no armor module helps', () => {
     const shieldOnly = {
       ...result,

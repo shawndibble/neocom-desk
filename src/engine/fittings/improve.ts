@@ -589,16 +589,23 @@ export function bestScore(result: ImproveResult): number | null {
 }
 
 /**
- * The result cut to the options that put `side`'s tank modules on the fit, so a
- * side is never credited with a swap that only moves the other side's (or a
- * common) module. `checked` is kept: it counts the search, not the options.
+ * The result cut to the options that suit `side`, so a side is never credited
+ * with a swap that only moves the other side's module. `strict` also drops
+ * options that touch no tank module (a weapon, a Damage Control) and is how a
+ * side's figure is counted; the list keeps them. `checked` is kept: it counts
+ * the search, not the options.
  */
 export function onlySide(
   result: ImproveResult,
   side: DefenseSide,
-  groupOf: (typeId: number) => number | undefined
+  groupOf: (typeId: number) => number | undefined,
+  strict = true
 ): ImproveResult {
-  const keep = (option: ImproveOption) => sideOf(groupOf(option.candidate.toTypeId) ?? -1) === side;
+  const keep = (option: ImproveOption) => {
+    const group = groupOf(option.candidate.toTypeId);
+    const own = group === undefined ? null : sideOf(group);
+    return own === side || (!strict && own === null);
+  };
   return {
     ...result,
     noDownside: result.noDownside.filter(keep),
