@@ -332,7 +332,7 @@ describe('ResultsSummary: profit if sold now (issue #5007)', () => {
     expect(screen.getByText('No buy orders at Jita')).toBeInTheDocument();
   });
 
-  it('leaves the row out when there is no product sale to quote, or no profit', () => {
+  it('leaves the row out when there is no product sale to quote', () => {
     renderSummary();
     expect(screen.queryByText('Profit if sold now')).not.toBeInTheDocument();
   });
