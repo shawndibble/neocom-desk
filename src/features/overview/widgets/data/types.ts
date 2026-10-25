@@ -44,8 +44,8 @@ import type {
   CalendarEventsChoice,
   ProfitSource,
   RaidsWhere,
-  StructuresShow,
   WidgetRange,
+  WidgetShow,
 } from '../layout';
 import type { ChartModel } from '../charts/types';
 import type { SkillsQueuePanelData, WalletPanelData } from './loaders';
@@ -366,14 +366,14 @@ export interface BuildContext {
   raidsWhere?: RaidsWhere;
   /** Skyhook raids Near me: the jumps radius; left out, the default. */
   raidsRadius?: number;
-  /** Structures: every structure, or only those that need attention; left out, All. */
-  structuresShow?: StructuresShow;
   /** Profit: which earnings it adds up; left out, Builds. */
   profitSource?: ProfitSource;
   /** Market Trend: the items it draws; left out, the Quickbar's first. */
   trendItems?: number[];
   /** Market Trend: the Trade Hubs it prices at; left out, the pilot's Market hub. */
   trendHubs?: string[];
+  /** A kind with a Show setting: what it draws (`kinds.ts` lists each kind's); left out, the default. */
+  show?: WidgetShow;
   /** The Time format clock days are cut on (`useTimeZone`); left out, the machine's own. */
   zone?: DayZone;
 }

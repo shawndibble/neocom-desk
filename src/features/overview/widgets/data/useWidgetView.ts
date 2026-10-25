@@ -152,10 +152,10 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
     calendarEvents,
     raidsWhere,
     raidsRadius,
-    structuresShow,
     profitSource,
     trendItems,
     trendHubs,
+    show,
   } = settings;
   const request = useMemo<ViewRequest>(
     () => ({
@@ -166,10 +166,10 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
       calendarEvents,
       raidsWhere,
       raidsRadius,
-      structuresShow,
       profitSource,
       trendItems,
       trendHubs,
+      show,
     }),
     [
       kind,
@@ -179,10 +179,10 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
       calendarEvents,
       raidsWhere,
       raidsRadius,
-      structuresShow,
       profitSource,
       trendItems,
       trendHubs,
+      show,
     ]
   );
   const requests = useMemo(() => [request], [request]);

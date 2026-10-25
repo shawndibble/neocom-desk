@@ -10,7 +10,7 @@ import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { categoryOn, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
-import { getKind } from './kinds';
+import { getKind, widgetKeys } from './kinds';
 
 export function PhoneCustomizeList() {
   const { t } = useTranslation();
@@ -26,7 +26,7 @@ export function PhoneCustomizeList() {
         {rows.map((widget, index) => {
           const kind = getKind(widget.kind);
           if (!kind) return null;
-          const title = widget.title ?? t(kind.titleKey);
+          const title = widget.title ?? t(widgetKeys(kind, widget.show).titleKey);
           const earlier = rows[index - 1];
           const later = rows[index + 1];
           return (

@@ -1,6 +1,6 @@
 /**
  * Builders for the kinds that came after the old board (net worth, profit,
- * mining yield, loyalty points, best clone, wallet flow, location) and the
+ * mining yield, loyalty points, best clone, location), the wallet's Flow, and the
  * feed lists they need. Same contract as `models.ts`: pure, derived at render
  * time, the widget's range applied here over data shared by every widget of
  * the kind.
@@ -66,9 +66,14 @@ export function humanizeRefType(refType: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-// --- Wallet flow ----------------------------------------------------------------
+// --- Wallet, Show Flow ------------------------------------------------------------
 
-const walletFlow: Builder = (feeds, { t, now, range }) => {
+/**
+ * The wallet kind's Flow: net, net bars and a table by ref type. It and its copy
+ * (`chart.walletFlow`, `walletFlow`) keep the retired Wallet flow kind's name on
+ * purpose, so renaming churns no copy or tests.
+ */
+export const walletFlow: Builder = (feeds, { t, now, range }) => {
   const feed = feeds.journal;
   const data = feed?.data ?? null;
   const to = '/wallet';
@@ -899,7 +904,6 @@ const kills: Builder = (feeds, { t, now, range, scopeAll, activeCharacterId }) =
 
 /** The kinds built in this file, each with the feeds it reads. */
 export const KIND_DEFS: Readonly<Record<string, KindDef>> = {
-  walletFlow: { feeds: ['journal'], scope: 'character', build: walletFlow },
   netWorth: { feeds: ['netWorth'], scope: 'account', build: netWorth },
   lp: { feeds: ['lp'], scope: 'character', build: lp },
   clones: { feeds: ['clones'], scope: 'character', build: clones },

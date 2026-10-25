@@ -12,9 +12,17 @@ import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
 import { TREND_MAX_SERIES } from '@/engine/market/trendSeries';
 import { getTradeHub } from '@/market/hubs';
 import { isRowsPerPage, DEFAULT_ROWS_PER_PAGE, type RowsPerPage } from './tableSortPage';
-import { getKind, isAddable, type WidgetKindId, type WidgetSize, type WidgetView } from './kinds';
+import {
+  getKind,
+  isAddable,
+  storedShow,
+  type WidgetKindId,
+  type WidgetShow,
+  type WidgetSize,
+  type WidgetView,
+} from './kinds';
 
-export type { WidgetKindId, WidgetSize, WidgetView };
+export type { WidgetKindId, WidgetShow, WidgetSize, WidgetView };
 
 export type WidgetScope = 'header' | 'all';
 export type CalendarEventsChoice = 'committed' | 'all';
@@ -29,9 +37,6 @@ export const DEFAULT_RAIDS_RADIUS = 8;
 export const isRaidsRadius = (value: unknown): value is number =>
   typeof value === 'number' && RAIDS_RADII.includes(value);
 
-/** Structures: every structure, or only those with a timer, low fuel or an offline service. All is never stored. */
-export type StructuresShow = 'all' | 'problems';
-export const STRUCTURES_SHOWS: readonly StructuresShow[] = ['all', 'problems'];
 /**
  * Profit: which earnings it adds up. Stored on every Profit widget; absent is
  * one saved before the setting existed, i.e. Builds (what that widget showed).
@@ -88,14 +93,14 @@ export interface Widget {
   raidsWhere?: 'near';
   /** Skyhook raids only: jumps for Near me. Absent means the default (8). */
   raidsRadius?: number;
-  /** Structures only: 'problems' lists only the structures that need attention. Absent means All. */
-  structuresShow?: 'problems';
   /** Profit only: which earnings it adds up. Absent means Builds (a widget saved before the setting). */
   profitSource?: ProfitSource;
   /** Market Trend only: the items it draws, newest pick last. Absent means the Quickbar's first items. */
   trendItems?: number[];
   /** Market Trend only: the Trade Hubs it prices at. Absent means the pilot's Market hub. */
   trendHubs?: string[];
+  /** A kind with a Show setting: what it draws. Absent means the kind's first Show; stored only for another. */
+  show?: WidgetShow;
   showOnPhone: boolean;
 }
 
@@ -127,8 +132,11 @@ function uniqueId(layout: OverviewLayout, makeId: MakeId): string {
   return id;
 }
 
-/** A widget with its kind's defaults; null for a kind this build does not know. */
-export function newWidget(kind: WidgetKindId, id: string): Widget | null {
+/**
+ * A widget with its kind's defaults, on `show` when the kind offers it; null for a
+ * kind this build does not know.
+ */
+export function newWidget(kind: WidgetKindId, id: string, show?: WidgetShow): Widget | null {
   const def = getKind(kind);
   if (!def) return null;
   const widget: Widget = {
@@ -141,6 +149,8 @@ export function newWidget(kind: WidgetKindId, id: string): Widget | null {
   };
   if (def.hasRange) widget.range = DEFAULT_RANGE;
   if (def.hasProfitSource) widget.profitSource = DEFAULT_PROFIT_SOURCE;
+  const stored = storedShow(def, show);
+  if (stored) widget.show = stored;
   return widget;
 }
 
@@ -150,6 +160,37 @@ export interface WidgetInit {
   trendItems?: readonly number[];
   trendHubs?: readonly string[];
   view?: WidgetView;
+  size?: WidgetSize;
+  show?: WidgetShow;
+}
+
+/** A new widget with `init` applied over its kind's defaults; whatever the kind does not offer is left out. */
+function withInit(kind: WidgetKindId, id: string, init?: WidgetInit): Widget | null {
+  const def = getKind(kind);
+  const base = newWidget(kind, id, init?.show);
+  if (!def || !base) return null;
+  const widget: Widget = { ...base };
+  if (init?.title) widget.title = init.title;
+  if (init?.view && def.views.includes(init.view)) widget.view = init.view;
+  if (init?.size) widget.size = init.size;
+  if (init?.trendItems?.length && def.hasTrendSources) {
+    widget.trendItems = [...init.trendItems];
+  }
+  if (init?.trendHubs?.length && def.hasTrendSources) {
+    const hubs = cleanTrendHubs(init.trendHubs);
+    if (hubs.length) widget.trendHubs = hubs;
+  }
+  return widget;
+}
+
+/** A widget a default layout or a Role brings: a kind, or a kind with settings (a Gallery preset's). */
+export type WidgetSeed = WidgetKindId | ({ kind: WidgetKindId } & WidgetInit);
+
+export const seedKind = (seed: WidgetSeed): WidgetKindId =>
+  typeof seed === 'string' ? seed : seed.kind;
+
+export function seedWidget(seed: WidgetSeed, id: string): Widget | null {
+  return typeof seed === 'string' ? newWidget(seed, id) : withInit(seed.kind, id, seed);
 }
 
 export function addWidget(
@@ -159,18 +200,8 @@ export function addWidget(
   init?: WidgetInit
 ): OverviewLayout {
   if (!canAdd(layout, kind)) return layout;
-  const base = newWidget(kind, uniqueId(layout, makeId));
-  if (!base) return layout;
-  const widget: Widget = { ...base };
-  if (init?.title) widget.title = init.title;
-  if (init?.view && getKind(kind)?.views.includes(init.view)) widget.view = init.view;
-  if (init?.trendItems?.length && getKind(kind)?.hasTrendSources) {
-    widget.trendItems = [...init.trendItems];
-  }
-  if (init?.trendHubs?.length && getKind(kind)?.hasTrendSources) {
-    const hubs = cleanTrendHubs(init.trendHubs);
-    if (hubs.length) widget.trendHubs = hubs;
-  }
+  const widget = withInit(kind, uniqueId(layout, makeId), init);
+  if (!widget) return layout;
   return { ...layout, widgets: [...layout.widgets, widget] };
 }
 
@@ -314,6 +345,22 @@ export function setRaidsWhere(
   });
 }
 
+/** Stored only when it differs from the default. The view and range stay: every Show offers the kind's views. */
+export function setShow(layout: OverviewLayout, id: string, show: WidgetShow): OverviewLayout {
+  return update(layout, id, (w) => {
+    const def = getKind(w.kind);
+    if (!def?.shows.includes(show)) return null;
+    const next = storedShow(def, show);
+    if (next === storedShow(def, w.show)) return null;
+    if (!next) {
+      const { show: _dropped, ...rest } = w;
+      void _dropped;
+      return rest;
+    }
+    return { ...w, show: next };
+  });
+}
+
 /** Stored only when it differs from the default. */
 export function setRaidsRadius(layout: OverviewLayout, id: string, radius: number): OverviewLayout {
   if (!isRaidsRadius(radius)) return layout;
@@ -327,23 +374,6 @@ export function setRaidsRadius(layout: OverviewLayout, id: string, radius: numbe
       return rest;
     }
     return { ...w, raidsRadius: radius };
-  });
-}
-
-/** Stored only when it differs from the default, so a widget nobody touched stays as small as before. */
-export function setStructuresShow(
-  layout: OverviewLayout,
-  id: string,
-  show: StructuresShow
-): OverviewLayout {
-  return update(layout, id, (w) => {
-    if (!getKind(w.kind)?.hasStructuresShow || show === (w.structuresShow ?? 'all')) return null;
-    if (show === 'all') {
-      const { structuresShow: _dropped, ...rest } = w;
-      void _dropped;
-      return rest;
-    }
-    return { ...w, structuresShow: 'problems' };
   });
 }
 

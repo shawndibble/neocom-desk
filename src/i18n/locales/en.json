@@ -4699,8 +4699,14 @@
       },
       "wallet": {
         "title": "Wallet",
-        "description": "Your balance",
+        "description": "Your balance, or what came in against what went out",
         "empty": "Your wallet has not loaded yet.",
+        "shows": {
+          "flow": {
+            "title": "Wallet flow",
+            "empty": "There is no wallet activity in this range."
+          }
+        },
         "change_one": "{{isk}} in {{count}} day",
         "change_other": "{{isk}} in {{count}} days",
         "unchanged_one": "No change in {{count}} day",
@@ -4713,9 +4719,6 @@
         }
       },
       "walletFlow": {
-        "title": "Wallet flow",
-        "description": "Income against spending over a range",
-        "empty": "There is no wallet activity in this range.",
         "change_one": "{{isk}} vs previous {{count}} day",
         "change_other": "{{isk}} vs previous {{count}} days",
         "unchanged_one": "Same as previous {{count}} day",
@@ -5333,8 +5336,18 @@
       },
       "corpWallet": {
         "title": "Corp wallet",
-        "description": "The balance of each wallet division",
+        "description": "Each wallet division's balance, or the master wallet's cash flow and income",
         "empty": "There are no wallet divisions to show.",
+        "shows": {
+          "flow": {
+            "title": "Cash flow",
+            "empty": "No master wallet activity in this window."
+          },
+          "sources": {
+            "title": "Income by source",
+            "empty": "No income in this window."
+          }
+        },
         "col": {
           "division": "Division",
           "balance": "Balance",
@@ -5348,9 +5361,6 @@
         "unused_other": "{{count}} unused divisions"
       },
       "corpCashFlow": {
-        "title": "Cash flow",
-        "description": "Money into and out of the master wallet, and how long it lasts",
-        "empty": "No master wallet activity in this window.",
         "col": {
           "day": "Day",
           "in": "In",
@@ -5370,9 +5380,6 @@
         "summary": "Net {{isk}} ISK over {{count}} days: {{income}} in, {{spending}} out."
       },
       "corpIncome": {
-        "title": "Income by source",
-        "description": "Where the master wallet’s money comes from: bounties, taxes, market and more",
-        "empty": "No income in this window.",
         "col": {
           "source": "Source",
           "amount": "Amount",
@@ -5734,6 +5741,18 @@
         "injector": {
           "title": "Large Skill Injector price",
           "desc": "The Large Skill Injector over time, at your trade hub"
+        },
+        "walletFlow": {
+          "title": "Wallet flow",
+          "desc": "Income against spending over a range"
+        },
+        "corpCashFlow": {
+          "title": "Cash flow",
+          "desc": "Money into and out of the master wallet, and how long it lasts"
+        },
+        "corpIncome": {
+          "title": "Income by source",
+          "desc": "Where the master wallet’s money comes from: bounties, taxes, market and more"
         }
       },
       "noMatchHint": "Try another word, or clear the search to see every widget.",
@@ -5974,6 +5993,15 @@
         "committed": "Accepted and tentative",
         "all": "All events"
       },
+      "show": "Show",
+      "showChoice": {
+        "balance": "Balance",
+        "flow": "Flow",
+        "divisions": "Divisions",
+        "sources": "Sources",
+        "all": "All structures",
+        "problems": "Problems only"
+      },
       "where": "Where",
       "whereChoice": {
         "alliance": "My alliance",
@@ -5981,11 +6009,6 @@
       },
       "radius": "Radius",
       "radiusJumps": "{{count}} jumps",
-      "structuresShow": "Show",
-      "structuresShowChoice": {
-        "all": "All structures",
-        "problems": "Problems only"
-      },
       "profitSource": "Source",
       "profitSourceChoice": {
         "builds": "Builds",

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { NO_CORP_CAPABILITIES, type CorpCapabilities } from '@/engine/corpRoles';
 import { getKind } from '@/features/overview/widgets/kinds';
-import { CORP_DEFAULT_KINDS, corpDefaultLayout, corpWidgetBoard } from './corpGrid';
+import { seedKind } from '@/features/overview/widgets/layout';
+import { CORP_DEFAULT_SEEDS, corpDefaultLayout, corpWidgetBoard } from './corpGrid';
+
+const DEFAULT_KINDS = CORP_DEFAULT_SEEDS.map(seedKind);
 
 const ALL: CorpCapabilities = {
   canReadWallet: true,
@@ -33,8 +36,8 @@ const drawnFor = (caps: CorpCapabilities) => {
 
 describe('the Corp Board default layout', () => {
   it('opens with the clocks first, then money, then people, like the board it replaces', () => {
-    expect(corpDefaultLayout().widgets.map((w) => w.kind)).toEqual([...CORP_DEFAULT_KINDS]);
-    expect(CORP_DEFAULT_KINDS.slice(0, 2)).toEqual(['corpDeadlines', 'structures']);
+    expect(corpDefaultLayout().widgets.map((w) => w.kind)).toEqual(DEFAULT_KINDS);
+    expect(CORP_DEFAULT_SEEDS.slice(0, 2)).toEqual(['corpDeadlines', 'structures']);
   });
 
   it('holds every default kind whatever the Character reads, so a saved edit keeps the rest', () => {
@@ -51,18 +54,25 @@ describe('the Corp Board default layout', () => {
   it('draws an Accountant the money widgets and no clocks', () => {
     expect(drawnFor({ ...NO_CORP_CAPABILITIES, canReadWallet: true })).toEqual([
       'corpWallet',
-      'corpCashFlow',
-      'corpIncome',
+      'corpWallet',
+      'corpWallet',
+    ]);
+    // Divisions, then Flow and Sources, opened as Cash flow and Income by source were.
+    const money = corpDefaultLayout().widgets.filter((w) => w.kind === 'corpWallet');
+    expect(money.map((w) => [w.show, w.view])).toEqual([
+      [undefined, 'table'],
+      ['flow', 'chart'],
+      ['sources', 'table'],
     ]);
   });
 
   it('draws a Director every default widget', () => {
-    expect(drawnFor(ALL)).toEqual([...CORP_DEFAULT_KINDS]);
+    expect(drawnFor(ALL)).toEqual(DEFAULT_KINDS);
   });
 
   it('opens every widget at its kind’s own size and view, with unique ids', () => {
     const { widgets } = corpDefaultLayout();
-    for (const w of widgets) {
+    for (const w of widgets.filter((x) => x.show === undefined)) {
       expect(w.size, w.kind).toBe(getKind(w.kind)!.defaultSize);
       expect(w.view, w.kind).toBe(getKind(w.kind)!.defaultView);
     }
@@ -70,8 +80,7 @@ describe('the Corp Board default layout', () => {
   });
 
   it('never puts a coming-soon kind in the default', () => {
-    for (const kind of CORP_DEFAULT_KINDS)
-      expect(getKind(kind)?.availability, kind).toBe('available');
+    for (const kind of DEFAULT_KINDS) expect(getKind(kind)?.availability, kind).toBe('available');
   });
 });
 
@@ -94,6 +103,6 @@ describe('the Corp Board board', () => {
       corpWidgetBoard(caps)
         .defaultLayout(() => `x${++n}`)
         .widgets.map((w) => w.kind)
-    ).toEqual([...CORP_DEFAULT_KINDS]);
+    ).toEqual(DEFAULT_KINDS);
   });
 });

@@ -17,6 +17,12 @@ import type { EsiEndpointId } from '@/esi/registry';
 export type WidgetSize = 'S' | 'M' | 'L' | 'F';
 export type WidgetView = 'number' | 'chart' | 'table';
 export type WidgetKindId = string;
+/**
+ * What a kind with a Show setting draws from its one feed: the wallet's balance or its flow, the
+ * corp wallet's divisions, its flow or its income sources, all structures or only the problems.
+ * Each kind lists the ones it offers.
+ */
+export type WidgetShow = 'balance' | 'flow' | 'divisions' | 'sources' | 'all' | 'problems';
 
 export const KIND_CATEGORIES = [
   'character',
@@ -77,10 +83,14 @@ export interface WidgetKindDef {
   hasCalendarEvents: boolean;
   /** Whether the kind has the Where setting (My alliance / Near me) and its jumps radius. */
   hasRaidsWhere: boolean;
-  /** Whether the kind has the Show setting (All structures / Problems only). */
-  hasStructuresShow: boolean;
   /** Whether the kind has the Source setting (Builds / Trading / Both): Profit. */
   hasProfitSource: boolean;
+  /** The Show setting's options, the default first; empty for a kind without one. */
+  shows: readonly WidgetShow[];
+  /** Shows that read no time window, so Range does not apply to them. */
+  rangelessShows: readonly WidgetShow[];
+  /** A Show other than the default names the widget (Wallet flow, Cash flow); else it keeps the kind's title. */
+  hasNamedShows: boolean;
   /** ESI endpoints the kind needs, for the "needs permission" state. */
   endpoints: readonly EsiEndpointId[];
   emptyMessageKey: string;
@@ -114,8 +124,13 @@ interface Spec {
   plexPlan?: true;
   calendarEvents?: true;
   raidsWhere?: true;
-  structuresShow?: true;
   profitSource?: true;
+  /** The Show options, the default first. */
+  shows?: readonly WidgetShow[];
+  /** Shows that read no window (a kind with `range` and a Show only some of whose options are ranged). */
+  rangelessShows?: readonly WidgetShow[];
+  /** Each non-default Show has its own title and empty copy (`overview.widgets.<id>.shows.<show>`). */
+  namedShows?: true;
   soon?: true;
   endpoints: readonly EsiEndpointId[];
 }
@@ -168,14 +183,8 @@ const SPECS = {
     view: 'chart',
     size: 'S',
     range: true,
-    endpoints: ['getCharacterWallet', 'getCharacterWalletJournal'],
-  },
-  walletFlow: {
-    category: 'money',
-    views: NCT,
-    view: 'chart',
-    size: 'M',
-    range: true,
+    shows: ['balance', 'flow'],
+    namedShows: true,
     endpoints: ['getCharacterWallet', 'getCharacterWalletJournal'],
   },
   netWorth: {
@@ -304,7 +313,8 @@ const SPECS = {
     views: NCT,
     view: 'table',
     size: 'M',
-    structuresShow: true,
+    // Problems only: a timer, fuel at warning or worse, or an offline service.
+    shows: ['all', 'problems'],
     endpoints: ['getCorporationStructures'],
   },
   moonChunks: {
@@ -434,25 +444,12 @@ const SPECS = {
     views: NCT,
     view: 'table',
     size: 'M',
-    endpoints: ['getCorporationWallets', 'getCorporationDivisions'],
-  },
-  corpCashFlow: {
-    corp: 'corpMoney',
-    capabilities: ['canReadWallet'],
-    views: NCT,
-    view: 'chart',
-    size: 'M',
     range: true,
-    endpoints: ['getCorporationWallets', 'getCorporationWalletJournal'],
-  },
-  corpIncome: {
-    corp: 'corpMoney',
-    capabilities: ['canReadWallet'],
-    views: NCT,
-    view: 'table',
-    size: 'M',
-    range: true,
-    endpoints: ['getCorporationWalletJournal'],
+    shows: ['divisions', 'flow', 'sources'],
+    namedShows: true,
+    // Division balances are as of now: Range is offered only for Flow and Sources.
+    rangelessShows: ['divisions'],
+    endpoints: ['getCorporationWallets', 'getCorporationDivisions', 'getCorporationWalletJournal'],
   },
   corpOrders: {
     corp: 'corpMoney',
@@ -556,8 +553,10 @@ export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(
   hasPlexPlan: s.plexPlan === true,
   hasCalendarEvents: s.calendarEvents === true,
   hasRaidsWhere: s.raidsWhere === true,
-  hasStructuresShow: s.structuresShow === true,
   hasProfitSource: s.profitSource === true,
+  shows: s.shows ?? [],
+  rangelessShows: s.rangelessShows ?? [],
+  hasNamedShows: s.namedShows === true,
   endpoints: s.endpoints,
   emptyMessageKey: `overview.widgets.${id}.empty`,
   availability: s.soon ? 'comingSoon' : 'available',
@@ -567,6 +566,42 @@ const BY_ID = new Map(WIDGET_KINDS.map((k) => [k.id, k]));
 
 export function getKind(id: WidgetKindId): WidgetKindDef | undefined {
   return BY_ID.get(id);
+}
+
+const isShowOf = (kind: WidgetKindDef, value: unknown): value is WidgetShow =>
+  kind.shows.some((show) => show === value);
+
+/** The Show a widget draws: its stored one when the kind offers it, else the default; none for a kind without. */
+export function showOf(kind: WidgetKindDef, stored: unknown): WidgetShow | undefined {
+  return isShowOf(kind, stored) ? stored : kind.shows[0];
+}
+
+/** What a widget stores for `value`: a Show the kind offers other than its default, else nothing. */
+export function storedShow(kind: WidgetKindDef, value: unknown): WidgetShow | undefined {
+  return isShowOf(kind, value) && value !== kind.shows[0] ? value : undefined;
+}
+
+/** Whether the widget's Range changes what it draws: the kind reads a window and so does its Show. */
+export function rangeAppliesTo(kind: WidgetKindDef, stored: unknown): boolean {
+  const show = showOf(kind, stored);
+  return kind.hasRange && (show === undefined || !kind.rangelessShows.includes(show));
+}
+
+/** A widget's title and empty-state keys: a Show other than the default carries its own. */
+export function widgetKeys(
+  kind: WidgetKindDef,
+  stored: unknown
+): { titleKey: string; emptyMessageKey: string } {
+  const show = showOf(kind, stored);
+  if (show === undefined || show === kind.shows[0] || !kind.hasNamedShows) {
+    return { titleKey: kind.titleKey, emptyMessageKey: kind.emptyMessageKey };
+  }
+  // Spelled out, not a prefix variable plus ".title": a template ending in a bare segment pins every
+  // `title` and `empty` key of the lazy locale into the startup shell (localeSplit.ts).
+  return {
+    titleKey: `overview.widgets.${kind.id}.shows.${show}.title`,
+    emptyMessageKey: `overview.widgets.${kind.id}.shows.${show}.empty`,
+  };
 }
 
 /** A kind the pilot can put on a board: known and actually built. */

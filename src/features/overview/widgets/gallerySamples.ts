@@ -123,6 +123,7 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         rangeLabel: t('overview.widgets.chart.span', { count: 30 }),
       },
     },
+    // The Wallet flow preset card: the Wallet on its Flow.
     walletFlow: {
       value: '+232M',
       unit: t('overview.gallery.samples.walletFlow.unit'),
@@ -713,6 +714,7 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ['Taxes', 0.18, '11%'],
       ]),
     },
+    // The Cash flow and Income by source preset cards: the corp wallet on its Flow and Sources.
     corpCashFlow: {
       value: '+1.4B',
       isk: 1_400_000_000,

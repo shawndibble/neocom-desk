@@ -319,7 +319,7 @@ describe('structures', () => {
   });
 
   describe('Show: Problems only', () => {
-    const problems = ctx({ structuresShow: 'problems' });
+    const problems = ctx({ show: 'problems' });
     const troubled = () => [
       ...fleet(),
       source(4, 'Efa - Reinforced Fortizar', { stateTimerEndMs: NOW + 2 * HOUR }),
@@ -384,7 +384,7 @@ describe('structures', () => {
     });
 
     it('lists every structure under the default', () => {
-      const view = buildView('structures', feeds(troubled()), ctx({ structuresShow: 'all' }));
+      const view = buildView('structures', feeds(troubled()), ctx({ show: 'all' }));
       expect(view.table!.rows).toHaveLength(5);
     });
   });

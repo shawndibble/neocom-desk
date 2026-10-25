@@ -144,12 +144,14 @@ describe('parseLayout', () => {
   it("keeps Structures' Problems only and drops a bad value or one on another kind", () => {
     const structures = (over: Record<string, unknown>) =>
       parseLayout(wrap(good({ kind: 'structures', ...over })))!.widgets[0];
-    expect(structures({ structuresShow: 'problems' }).structuresShow).toBe('problems');
-    expect('structuresShow' in structures({ structuresShow: 'all' })).toBe(false);
-    expect('structuresShow' in structures({ structuresShow: 'broken' })).toBe(false);
-    expect(
-      'structuresShow' in parseLayout(wrap(good({ structuresShow: 'problems' })))!.widgets[0]
-    ).toBe(false);
+    expect(structures({ show: 'problems' }).show).toBe('problems');
+    expect('show' in structures({ show: 'all' })).toBe(false);
+    expect('show' in structures({ show: 'broken' })).toBe(false);
+    expect('show' in parseLayout(wrap(good({ show: 'problems' })))!.widgets[0]).toBe(false);
+    // Saved under its own field before the Show setting was shared: read as the shared one.
+    const old = structures({ structuresShow: 'problems' });
+    expect(old.show).toBe('problems');
+    expect(old).not.toHaveProperty('structuresShow');
   });
 
   it('reads a retired Offline services widget as Structures on Problems only, in place', () => {
@@ -167,7 +169,7 @@ describe('parseLayout', () => {
       size: 'L',
       view: 'number',
       title: 'Down',
-      structuresShow: 'problems',
+      show: 'problems',
     });
   });
 
@@ -185,6 +187,41 @@ describe('parseLayout', () => {
     expect(builds).toMatchObject({ profitSource: 'builds', range: 90 });
     expect(both.profitSource).toBe('both');
     expect(wallet).not.toHaveProperty('profitSource');
+  });
+
+  it('keeps a valid Show, and drops the default, an unknown one and one on another kind', () => {
+    const show = (kind: string, value: unknown) =>
+      parseLayout(wrap(good({ kind, show: value })))!.widgets[0];
+    expect(show('wallet', 'flow').show).toBe('flow');
+    expect(show('corpWallet', 'sources').show).toBe('sources');
+    expect('show' in show('wallet', 'balance')).toBe(false);
+    expect('show' in show('wallet', 'sources')).toBe(false);
+    expect('show' in show('orders', 'flow')).toBe(false);
+  });
+
+  it('folds the retired wallet kinds into their Show, keeping place, size, view and range', () => {
+    const out = parseLayout(
+      wrap(
+        good({ id: 'a', kind: 'walletFlow', size: 'L', view: 'table', range: 90, title: 'In/out' }),
+        good({ id: 'b', kind: 'corpCashFlow', size: 'M', view: 'chart', range: 7 }),
+        good({ id: 'c', kind: 'corpIncome', size: 'S', view: 'number', range: 30 }),
+        good({ id: 'd', kind: 'orders' })
+      )
+    )!;
+    expect(out.widgets).toEqual([
+      good({
+        id: 'a',
+        kind: 'wallet',
+        show: 'flow',
+        size: 'L',
+        view: 'table',
+        range: 90,
+        title: 'In/out',
+      }),
+      good({ id: 'b', kind: 'corpWallet', show: 'flow', size: 'M', view: 'chart', range: 7 }),
+      good({ id: 'c', kind: 'corpWallet', show: 'sources', size: 'S', view: 'number', range: 30 }),
+      good({ id: 'd' }),
+    ]);
   });
 
   it('keeps a valid rowsPerPage and drops one that is not offered', () => {

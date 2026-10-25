@@ -23,7 +23,8 @@ import {
   useCorpOverviewLayout,
 } from '@/features/overview/widgets/layoutStore';
 import type { OverviewLayout } from '@/features/overview/widgets/layout';
-import { CORP_DEFAULT_KINDS } from '@/features/corp/grid/corpGrid';
+import { CORP_DEFAULT_SEEDS } from '@/features/corp/grid/corpGrid';
+import { seedKind } from '@/features/overview/widgets/layout';
 import { resetRouteSnapshots } from '@/lib/routeSnapshotCache';
 import { setStatus } from '@/sync/status';
 import { Corp } from './Corp';
@@ -384,7 +385,7 @@ describe('the layout', () => {
     // The whole default is saved, not this Character's slice: a Director main keeps its wallet.
     await waitFor(async () =>
       expect((await storedLayout())?.widgets.map((w) => w.kind)).toEqual([
-        ...CORP_DEFAULT_KINDS,
+        ...CORP_DEFAULT_SEEDS.map(seedKind),
         'corpMembers',
       ])
     );
@@ -416,7 +417,7 @@ describe('the layout', () => {
     setStatus(CHARACTER_ID, { state: 'idle', lastSyncedAt: NOW });
     await waitFor(async () =>
       expect((await storedLayout())?.widgets.map((w) => w.kind)).toEqual([
-        ...CORP_DEFAULT_KINDS,
+        ...CORP_DEFAULT_SEEDS.map(seedKind),
         'corpMembers',
       ])
     );
