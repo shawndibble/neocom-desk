@@ -25,6 +25,7 @@ import {
   Spinner,
   Caret,
   StatChange,
+  StatChangeList,
   TypeIcon,
 } from '@/components/ui';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
@@ -301,24 +302,24 @@ export function ImprovePanel({
     const changes = diffFittingStats(own, option.after)
       .changes.filter((change) => !omit.includes(change.key))
       .sort((a, b) => Number(isResource(a.key)) - Number(isResource(b.key)));
-    const shown: ReactNode[] = changes
-      .slice(0, all ? undefined : CHANGES_SHOWN)
-      .map((change) => <StatChange key={change.key} change={change} />);
+    if (changes.length === 0) return t('fittings.variations.noChanges');
+    // One stat per row, so a long list reads down instead of running on as a sentence.
+    const shown = changes.slice(0, all ? undefined : CHANGES_SHOWN);
     const rest = changes.length - shown.length;
-    if (rest > 0) {
-      const label = t('fittings.makeItFit.otherStats', { count: rest });
-      shown.push(
-        onOpen ? (
-          <button key="rest" type="button" className={textActionClassName()} onClick={onOpen}>
-            {label}
-          </button>
-        ) : (
-          label
-        )
-      );
-    }
-    if (shown.length === 0) return t('fittings.variations.noChanges');
-    return shown.flatMap((node, i) => (i === 0 ? [node] : [', ', node]));
+    const label = rest > 0 ? t('fittings.makeItFit.otherStats', { count: rest }) : null;
+    return (
+      <>
+        <StatChangeList changes={shown} />
+        {label !== null &&
+          (onOpen ? (
+            <button type="button" className={textActionClassName()} onClick={onOpen}>
+              {label}
+            </button>
+          ) : (
+            <span className="block">{label}</span>
+          ))}
+      </>
+    );
   }
 
   /** Each stat the swap makes worse, with its before → after, so the loss has a size. */
@@ -522,7 +523,12 @@ export function ImprovePanel({
         return leads.length === 0
           ? null
           : {
-              node: leads.flatMap((lead, i) => (i === 0 ? [lead.node] : [', ', lead.node])),
+              // A line each, like the change rows below them.
+              node: leads.map((lead, i) => (
+                <span key={i} className="block">
+                  {lead.node}
+                </span>
+              )),
               keys: leads.flatMap((lead) => lead.keys),
             };
       }
@@ -1241,7 +1247,10 @@ export function ImprovePanel({
                 {rows(state.result.tradeOffs, state.before, 'to')}
               </MakeItFitSection>
             )}
-            <div className="bg-panel border-line sticky bottom-0 space-y-2 border-t pt-2">
+            {/* Pinned over the scroll body's own bottom padding (0.75rem, plus the
+                safe area in a phone sheet), not above it: a sticky bottom-0 stops at
+                the padding, leaving a strip where rows scroll past under the bar. */}
+            <div className="bg-panel border-line sticky bottom-[calc(-0.75rem_-_env(safe-area-inset-bottom))] space-y-2 border-t pt-2 pb-[calc(0.75rem_+_env(safe-area-inset-bottom))]">
               {chosen.length > 0 && checkable && (
                 <div className="space-y-1 text-sm" data-testid="improve-selection">
                   {summary ? (
