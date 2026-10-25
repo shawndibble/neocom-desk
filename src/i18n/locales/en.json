@@ -1461,6 +1461,17 @@
       "applied_one": "Applied {{count}} change. Not saved yet.",
       "applied_other": "Applied {{count}} changes. Not saved yet.",
       "undo": "Undo",
+      "unloaded": {
+        "launcher_one": "{{count}} launcher has no missiles loaded, so damage goals ignore it.",
+        "launcher_other": "{{count}} launchers have no missiles loaded, so damage goals ignore them.",
+        "turret_one": "{{count}} turret has no ammo loaded, so damage goals ignore it.",
+        "turret_other": "{{count}} turrets have no ammo loaded, so damage goals ignore them.",
+        "weapon_one": "{{count}} weapon has no charge loaded, so damage goals ignore it.",
+        "weapon_other": "{{count}} weapons have no charge loaded, so damage goals ignore them."
+      },
+      "loadBestCharge": "Load best charge",
+      "chargesLoaded_one": "Loaded charges into {{count}} weapon. Not saved yet.",
+      "chargesLoaded_other": "Loaded charges into {{count}} weapons. Not saved yet.",
       "oreLabel": "Ore",
       "oreOption": "{{ores}} ({{family}} crystals)",
       "oreHint": "Every miner is scored with the best crystal for this ore, so rows compare like for like. Apply swaps the miners and leaves the loaded crystals alone.",

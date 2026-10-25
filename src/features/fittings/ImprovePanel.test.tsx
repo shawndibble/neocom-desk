@@ -6,6 +6,7 @@ import '@/i18n';
 import { baseFittingStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { ImproveGoal, ImproveOption, ImproveResult } from '@/engine/fittings/improve';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
+import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
 import { ImprovePanel, type ImproveSettings } from './ImprovePanel';
 import type { ImproveSearch, ImproveState } from './useImprove';
 
@@ -77,7 +78,13 @@ const renderPanel = (
   onApply = vi.fn(),
   onGoalChange = vi.fn(),
   config: ImproveSettings = settings(),
-  extra: { onFixFirst?: () => void; freeSections?: ReactNode; goal?: ImproveGoal } = {}
+  extra: {
+    onFixFirst?: () => void;
+    freeSections?: ReactNode;
+    goal?: ImproveGoal;
+    unloaded?: UnloadedWeapons | null;
+    onLoadBestCharge?: () => void;
+  } = {}
 ) =>
   render(
     <ImprovePanel
@@ -89,10 +96,31 @@ const renderPanel = (
       settings={config}
       onFixFirst={extra.onFixFirst ?? vi.fn()}
       freeSections={extra.freeSections}
+      unloaded={extra.unloaded}
+      onLoadBestCharge={extra.onLoadBestCharge}
     />
   );
 
 describe('ImprovePanel', () => {
+  it('warns about launchers with no missiles and offers Load best charge', async () => {
+    const onLoadBestCharge = vi.fn();
+    renderPanel(search(done({})), vi.fn(), vi.fn(), settings(), {
+      unloaded: { count: 2, kind: 'launcher' },
+      onLoadBestCharge,
+    });
+    expect(
+      screen.getByText('2 launchers have no missiles loaded, so damage goals ignore them.')
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Load best charge' }));
+    expect(onLoadBestCharge).toHaveBeenCalledOnce();
+  });
+
+  it('shows no notice when every weapon is loaded', () => {
+    renderPanel(search(done({})), vi.fn(), vi.fn(), settings(), { unloaded: null });
+    expect(screen.queryByText(/no missiles loaded|no ammo loaded/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load best charge' })).not.toBeInTheDocument();
+  });
+
   it('shows Fix this first and no suggestions for an over-budget fit', async () => {
     const onFixFirst = vi.fn();
     renderPanel(

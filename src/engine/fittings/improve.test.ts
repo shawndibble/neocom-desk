@@ -362,6 +362,12 @@ describe('goalAvailability', () => {
     });
     expect(goalAvailability('tank', unarmed)).toEqual({ available: true });
   });
+
+  it('keeps reach available when the fitted weapons have no charge loaded', () => {
+    const base = stats([]);
+    const empty = { ...base, offense: { ...base.offense, dps: 0, chargelessWeaponCount: 2 } };
+    expect(goalAvailability('reach', empty)).toEqual({ available: true });
+  });
 });
 
 describe('improveCandidates', () => {
