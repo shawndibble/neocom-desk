@@ -48,6 +48,12 @@ const HAUL_GROUPS: readonly number[] = [765, 782];
 /** Inertial Stabilizers, Nanofiber Internal Structure, and the navigation rigs (782) that cut inertia or mass. */
 const ALIGN_GROUPS: readonly number[] = [762, 763, 782];
 
+/** Remote Shield Booster (41), Remote Armor Repairer (325), Remote Hull Repairer (585), and the ancillary remote boosters and repairers. */
+const REPAIR_GROUPS: readonly number[] = [41, 325, 585, 1697, 1698];
+
+/** Remote Capacitor Transmitter. */
+const TRANSFER_GROUPS: readonly number[] = [67];
+
 /** The module groups, beyond a module's own, that Rework tries for each Improve Goal. The tank groups are added per Defense Choice. */
 const GOAL_GROUPS: Record<ImproveGoal, readonly number[]> = {
   overall: [...DAMAGE_GROUPS, ...REACH_GROUPS, ...SPEED_GROUPS, ...CAP_GROUPS],
@@ -60,6 +66,8 @@ const GOAL_GROUPS: Record<ImproveGoal, readonly number[]> = {
   haul: HAUL_GROUPS,
   align: ALIGN_GROUPS,
   warp: ALIGN_GROUPS,
+  repair: REPAIR_GROUPS,
+  transfer: TRANSFER_GROUPS,
 };
 
 /** The goals whose score includes the fit's tank. */
@@ -84,7 +92,15 @@ export function sideOf(groupId: number): DefenseSide | null {
 }
 
 export type Job =
-  'propulsion' | 'scram' | 'web' | 'ewar' | 'cap' | 'remoteRepair' | 'mining' | 'cloak';
+  | 'propulsion'
+  | 'scram'
+  | 'web'
+  | 'ewar'
+  | 'cap'
+  | 'remoteRepair'
+  | 'capTransfer'
+  | 'mining'
+  | 'cloak';
 
 /** The groups that do a job no damage or EHP score notices when it is lost. */
 const JOB_GROUPS: Record<Job, readonly number[]> = {
@@ -93,7 +109,8 @@ const JOB_GROUPS: Record<Job, readonly number[]> = {
   web: [65],
   ewar: [201, 80, 208, 291, 379, 71, 68],
   cap: [43, 76, 767, 768],
-  remoteRepair: [325, 41, 67],
+  remoteRepair: [325, 41, 585, 1697, 1698],
+  capTransfer: [67],
   mining: [54, 464, 483],
   cloak: [330],
 };
@@ -114,6 +131,8 @@ export function scoredJobs(goal: ImproveGoal): readonly Job[] {
   if (goal === 'speed') return ['propulsion'];
   if (goal === 'overall') return ['cap'];
   if (goal === 'mining') return ['mining'];
+  if (goal === 'repair') return ['remoteRepair'];
+  if (goal === 'transfer') return ['capTransfer'];
   return [];
 }
 

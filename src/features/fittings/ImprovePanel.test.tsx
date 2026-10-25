@@ -345,4 +345,34 @@ describe('ImprovePanel', () => {
     });
     expect(screen.getByText(/Align 55\.45 → 27\.73 s · Warp 3 → 3\.6 AU\/s/)).toBeInTheDocument();
   });
+
+  it('disables Repair more and Transfer more with their reasons on a fit that gives neither', async () => {
+    renderPanel(search({ status: 'idle' }));
+    for (const [name, reason] of [
+      [/Repair more/, 'No remote repairers on this fit'],
+      [/Transfer more/, 'No remote capacitor transmitters on this fit'],
+    ] as const) {
+      const chip = screen.getByRole('button', { name });
+      expect(chip).toHaveAttribute('aria-disabled', 'true');
+      await userEvent.hover(chip);
+      expect(await screen.findByText(reason)).toBeInTheDocument();
+    }
+  });
+
+  it('shows HP/s on a Repair more row and GJ/s on a Transfer more row', () => {
+    const support = { ...before.support, remoteRepair: { shield: 0, armor: 100, hull: 0 } };
+    const own = { ...before, support };
+    const gain = option(10, {
+      support: { ...support, remoteRepair: { shield: 0, armor: 125.5, hull: 0 }, capTransfer: 40 },
+    });
+    renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
+      goal: 'repair',
+    });
+    expect(screen.getByText('Repairs 100 → 125.5 HP/s')).toBeInTheDocument();
+    cleanup();
+    renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
+      goal: 'transfer',
+    });
+    expect(screen.getByText('Transfers 0 → 40 GJ/s')).toBeInTheDocument();
+  });
 });

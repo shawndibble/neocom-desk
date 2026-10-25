@@ -1354,7 +1354,9 @@
         "mining": "Mine more",
         "haul": "Carry more",
         "align": "Align faster",
-        "warp": "Align and warp faster"
+        "warp": "Align and warp faster",
+        "repair": "Repair more",
+        "transfer": "Transfer more"
       },
       "unavailable": {
         "noWeapons": "Nothing on this fit deals damage",
@@ -1362,7 +1364,9 @@
         "noMiners": "No miners on this fit",
         "noHold": "This hull has no cargo or other hold",
         "noAlign": "This hull has no align time to improve",
-        "noWarp": "This hull has no align time or warp speed to improve"
+        "noWarp": "This hull has no align time or warp speed to improve",
+        "noRemoteRepair": "No remote repairers on this fit",
+        "noCapTransfer": "No remote capacitor transmitters on this fit"
       },
       "guardrail": {
         "combat": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration.",
@@ -1397,7 +1401,9 @@
         "mining": "No variation of a fitted miner mines more of this ore.",
         "haul": "No variation of a fitted module adds to this hold.",
         "align": "No variation of a fitted module makes this fit align faster.",
-        "warp": "No variation of a fitted module helps this fit align and warp faster."
+        "warp": "No variation of a fitted module helps this fit align and warp faster.",
+        "repair": "No variation of a fitted remote repairer repairs more within the guardrails.",
+        "transfer": "No variation of a fitted remote capacitor transmitter transfers more within the guardrails."
       },
       "closest": "Closest swaps",
       "broke": {
@@ -1454,6 +1460,8 @@
       "holdHint": "Rows are scored on this hold's size alone.",
       "holdLine": "{{hold}} {{before}} → {{after}} m³",
       "alignLine": "Align {{before}} → {{after}} s",
+      "repairLine": "Repairs {{before}} → {{after}} HP/s",
+      "transferLine": "Transfers {{before}} → {{after}} GJ/s",
       "warpLine": "{{align}} · Warp {{before}} → {{after}} AU/s",
       "hold": {
         "cargo": "Cargo hold",
