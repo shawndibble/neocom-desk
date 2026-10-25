@@ -12,6 +12,7 @@
  * running) and per single drone on a drone stack.
  */
 import type { AppliedDpsInputs, AppliedWeapon, DamageSplit } from './appliedDps';
+import { weaponReloadDuty } from './tank';
 import type { WeaponRange } from './types';
 
 export const APPLIED_DPS_ATTRIBUTE = {
@@ -163,10 +164,13 @@ function moduleWeapon(result: ItemResultLike): AppliedWeapon | null {
   const dps = read(result.attributes, APPLIED_DPS_ATTRIBUTE.dps);
   if (dps <= 0) return null;
   const charge = result.charge?.attributes;
+  const duty = weaponReloadDuty(result.attributes, false);
+  const reload = duty < 1 ? { reloadDuty: duty } : {};
   if (isMissile(charge)) {
     return {
       kind: 'missile',
       dps,
+      ...reload,
       range: missileFlightRange(charge),
       explosionRadius: read(charge, APPLIED_DPS_ATTRIBUTE.explosionRadius),
       explosionVelocity: read(charge, APPLIED_DPS_ATTRIBUTE.explosionVelocity),
@@ -175,7 +179,13 @@ function moduleWeapon(result: ItemResultLike): AppliedWeapon | null {
     };
   }
   if (read(result.attributes, APPLIED_DPS_ATTRIBUTE.tracking) > 0) {
-    return { kind: 'turret', dps, ...trackingOf(result.attributes), ...damageSplit(charge) };
+    return {
+      kind: 'turret',
+      dps,
+      ...reload,
+      ...trackingOf(result.attributes),
+      ...damageSplit(charge),
+    };
   }
   // Smartbombs, a launcher with nothing loaded, …: nothing to apply.
   return null;

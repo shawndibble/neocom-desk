@@ -43,6 +43,8 @@ interface TrackingWeapon {
 }
 
 interface DamageTyped {
+  /** The share (0–1] of a long fight it spends firing, not reloading; absent: it never reloads. */
+  reloadDuty?: number;
   /** How its damage splits by type — what the target's resists bite on. Absent: an even split. */
   damage?: DamageSplit;
 }
@@ -171,6 +173,16 @@ export function appliedDps(
         throughResists(weapon.damage ?? EVEN_SPLIT, resists),
     0
   );
+}
+
+/** The same weapons with each one's DPS scaled by its reload share: what it sustains over a long fight. */
+export function sustainedInputs(inputs: AppliedDpsInputs): AppliedDpsInputs {
+  return {
+    ...inputs,
+    weapons: inputs.weapons.map((w) =>
+      w.reloadDuty !== undefined && w.reloadDuty < 1 ? { ...w, dps: w.dps * w.reloadDuty } : w
+    ),
+  };
 }
 
 /** The firing weapons' listed DPS — untouched by any Target Profile. */

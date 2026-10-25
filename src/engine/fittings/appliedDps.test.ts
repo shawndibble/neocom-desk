@@ -8,6 +8,7 @@ import {
   graphMaxSpeed,
   missileApplication,
   rawDps,
+  sustainedInputs,
   turretDamageMultiplier,
   turretHitChance,
   type AppliedDpsInputs,
@@ -249,5 +250,17 @@ describe('graphs', () => {
   it('runs the speed axis to at least 1000 m/s, or twice the target speed rounded to 500', () => {
     expect(graphMaxSpeed({ signatureRadius: 125, velocity: 200 })).toBe(1000);
     expect(graphMaxSpeed({ signatureRadius: 35, velocity: 2600 })).toBe(5500);
+  });
+});
+
+describe('sustainedInputs', () => {
+  it('scales a reloading weapon’s DPS by its share and leaves the rest alone', () => {
+    const inputs: AppliedDpsInputs = {
+      weapons: [{ ...missile, reloadDuty: 0.5 }, turret],
+      droneControlRange: 20000,
+    };
+    const { weapons } = sustainedInputs(inputs);
+    expect(weapons.map((w) => w.dps)).toEqual([50, 100]);
+    expect(inputs.weapons[0].dps).toBe(100);
   });
 });

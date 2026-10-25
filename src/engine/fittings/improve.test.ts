@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  damageOf,
   findImprovements,
   goalAvailability,
   improveCandidates,
@@ -11,6 +12,8 @@ import {
 import { buildVariationIndex } from '../market/variations';
 import type { Fitting, FittingStats, RuleBreak } from './types';
 import { baseFittingStats } from './__fixtures__/fittingStats';
+import { BUILT_IN_TARGET_PROFILES } from './targetProfile';
+import type { AppliedWeapon } from './appliedDps';
 
 /** What each fitted type adds to the fit; the fit's stats are the base plus every module's row. */
 interface Row {
@@ -456,5 +459,46 @@ describe('improveCandidates', () => {
       { slot: 'low', slotIndex: 0 },
       { slot: 'low', slotIndex: 1 },
     ]);
+  });
+});
+
+describe('damageOf', () => {
+  const cruiser = BUILT_IN_TARGET_PROFILES.find((p) => p.id === 'builtin:cruiser')!;
+  const launchers = (dps: number, reloadDuty: number): FittingStats => {
+    const weapon: AppliedWeapon = {
+      kind: 'missile',
+      dps,
+      reloadDuty,
+      range: 40000,
+      explosionRadius: 100,
+      explosionVelocity: 200,
+      damageReductionFactor: 1,
+    };
+    return { ...stats([]), applied: { weapons: [weapon], droneControlRange: 20000 } };
+  };
+
+  it('ranks by sustained applied DPS: RLML II raw 177.1 sustains less than HML II raw 165.3', () => {
+    const rlml = launchers(177.1, 114.8 / 177.1);
+    const hml = launchers(165.3, 158.9 / 165.3);
+    expect(damageOf(rlml, cruiser)).toBeCloseTo(114.8, 1);
+    expect(damageOf(hml, cruiser)).toBeCloseTo(158.9, 1);
+    expect(damageOf(hml, cruiser)).toBeGreaterThan(damageOf(rlml, cruiser));
+  });
+
+  it('without a target equals the listed sustained DPS, drones and fighters counted once', () => {
+    const base = stats([]);
+    const carrier = {
+      ...base,
+      offense: { ...base.offense, dps: 1002.4, sustainedDps: 1002.4 },
+      droneDps: 0,
+      fighters: { ...base.fighters, dps: 501.2 },
+    } as FittingStats;
+    expect(damageOf(carrier, undefined)).toBe(carrier.offense.sustainedDps);
+  });
+
+  it('falls back to the listed sustained DPS when no weapon fires', () => {
+    expect(damageOf(stats([{ dps: 80 }]), cruiser)).toBe(
+      80 + baseFittingStats().offense.sustainedDps
+    );
   });
 });

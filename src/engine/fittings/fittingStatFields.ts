@@ -64,10 +64,9 @@ export type StatChangeKey = FittingStatKey | 'capacitor' | ImproveDamageKey;
 
 /**
  * The damage figure an Improve row leads with, which no Fitting-diff view
- * lists: DPS applied to a Target Profile, or the fit's sustained DPS with its
- * drones and fighters. Not in `NUMERIC_FIELDS`, so no diff ever reports them.
+ * lists: DPS applied to a Target Profile (sustained, reload included). Not in `NUMERIC_FIELDS`, so no diff ever reports them.
  */
-export type ImproveDamageKey = 'appliedDps' | 'sustainedDamage';
+export type ImproveDamageKey = 'appliedDps';
 
 /** Which way a change is an improvement; `neutral` stats only move with the hull, so no change is good or bad. */
 export type StatDirection = 'higher' | 'lower' | 'neutral';
@@ -276,7 +275,6 @@ export const STAT_DIGITS: Readonly<Record<StatChangeKey, number>> = {
   ...Object.fromEntries(NUMERIC_FIELDS.map((field) => [field.key, field.digits])),
   capacitor: 0,
   appliedDps: 1,
-  sustainedDamage: 1,
 } as Readonly<Record<StatChangeKey, number>>;
 
 export function round(value: number, digits: number): number {
@@ -293,7 +291,6 @@ export const STAT_DIRECTION: Readonly<Record<StatChangeKey, StatDirection>> = {
   ...Object.fromEntries(NUMERIC_FIELDS.map((field) => [field.key, field.direction])),
   capacitor: 'higher',
   appliedDps: 'higher',
-  sustainedDamage: 'higher',
 } as Readonly<Record<StatChangeKey, StatDirection>>;
 
 /** Role stats (`skillGains`) where less is better: a reload, a fuel bill. Absent: higher. */
