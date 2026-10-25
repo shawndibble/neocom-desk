@@ -32,6 +32,7 @@ import {
   usedOf,
   type Resource,
 } from './makeItFit';
+import { ewarOf, tackleOf } from './improveTackle';
 import { gainMetrics, type GainMetric } from './skillGains';
 import { fitsResourceBudget } from './skillGaps';
 import type { TargetProfile } from './targetProfile';
@@ -40,7 +41,7 @@ import type { Fitting, FittingModule, FittingSlotKind, FittingStats, HoldStats }
 
 /** The combat Improve Goals, in the order the drawer shows them. */
 export const COMBAT_GOALS = ['overall', 'damage', 'tank', 'speed', 'reach', 'cheaper'] as const;
-/** Every Improve Goal: the combat ones, Mine more, the hauling and movement ones, then the logistics ones. */
+/** Every Improve Goal: the combat ones, Mine more, the hauling and movement ones, the logistics ones, then tackle and EWAR. */
 export const IMPROVE_GOALS = [
   ...COMBAT_GOALS,
   'mining',
@@ -49,6 +50,8 @@ export const IMPROVE_GOALS = [
   'warp',
   'repair',
   'transfer',
+  'tackle',
+  'ewar',
 ] as const;
 export type ImproveGoal = (typeof IMPROVE_GOALS)[number];
 
@@ -195,7 +198,9 @@ export type GoalAvailability =
         | 'noAlign'
         | 'noWarp'
         | 'noRemoteRepair'
-        | 'noCapTransfer';
+        | 'noCapTransfer'
+        | 'noTackle'
+        | 'noEwar';
     };
 
 const isArmed = (s: FittingStats) => s.offense.dps > 0 || s.droneDps > 0 || s.fighters.dps > 0;
@@ -225,6 +230,12 @@ export function goalAvailability(goal: ImproveGoal, before: FittingStats): GoalA
     return { available: false, reason: 'noRemoteRepair' };
   if (goal === 'transfer' && before.support.capTransfer <= 0)
     return { available: false, reason: 'noCapTransfer' };
+  if (goal === 'tackle') {
+    const { points, web } = tackleOf(before);
+    if (points <= 0 && web <= 0) return { available: false, reason: 'noTackle' };
+  }
+  if (goal === 'ewar' && ewarOf(before).strength <= 0)
+    return { available: false, reason: 'noEwar' };
   return { available: true };
 }
 
@@ -242,6 +253,15 @@ function relative(before: number, after: number): number {
   if (before === after) return 0;
   if (before === 0) return after > 0 ? 1 : -1;
   return (after - before) / Math.abs(before);
+}
+
+/** The mean relative gain over the figures the fit already has; a figure it lost counts -1. */
+function meanGain(pairs: readonly (readonly [number, number])[]): number {
+  const present = pairs.filter(([before]) => before > 0);
+  if (present.length === 0) return 0;
+  return (
+    present.reduce((sum, [before, after]) => sum + relative(before, after), 0) / present.length
+  );
 }
 
 function scoreOf(
@@ -278,6 +298,21 @@ function scoreOf(
       return relative(remoteRepairOf(before), remoteRepairOf(after));
     case 'transfer':
       return relative(before.support.capTransfer, after.support.capTransfer);
+    case 'tackle': {
+      const [was, now] = [tackleOf(before), tackleOf(after)];
+      return meanGain([
+        [was.points, now.points],
+        [was.web, now.web],
+        [was.range, now.range],
+      ]);
+    }
+    case 'ewar': {
+      const [was, now] = [ewarOf(before), ewarOf(after)];
+      return meanGain([
+        [was.strength, now.strength],
+        [was.range, now.range],
+      ]);
+    }
   }
 }
 

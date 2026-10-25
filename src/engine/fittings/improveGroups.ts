@@ -54,6 +54,12 @@ const REPAIR_GROUPS: readonly number[] = [41, 325, 585, 1697, 1698];
 /** Remote Capacitor Transmitter. */
 const TRANSFER_GROUPS: readonly number[] = [67];
 
+/** Warp Scrambler (scramblers and disruptors) and Stasis Webifier. */
+const TACKLE_GROUPS: readonly number[] = [52, 65];
+
+/** ECM, Remote Sensor Dampener, Weapon Disruptor, Target Painter. */
+const EWAR_GROUPS: readonly number[] = [201, 208, 291, 379];
+
 /** The module groups, beyond a module's own, that Rework tries for each Improve Goal. The tank groups are added per Defense Choice. */
 const GOAL_GROUPS: Record<ImproveGoal, readonly number[]> = {
   overall: [...DAMAGE_GROUPS, ...REACH_GROUPS, ...SPEED_GROUPS, ...CAP_GROUPS],
@@ -68,6 +74,8 @@ const GOAL_GROUPS: Record<ImproveGoal, readonly number[]> = {
   warp: ALIGN_GROUPS,
   repair: REPAIR_GROUPS,
   transfer: TRANSFER_GROUPS,
+  tackle: TACKLE_GROUPS,
+  ewar: EWAR_GROUPS,
 };
 
 /** The goals whose score includes the fit's tank. */
@@ -96,6 +104,7 @@ export type Job =
   | 'scram'
   | 'web'
   | 'ewar'
+  | 'drain'
   | 'cap'
   | 'remoteRepair'
   | 'capTransfer'
@@ -107,7 +116,8 @@ const JOB_GROUPS: Record<Job, readonly number[]> = {
   propulsion: [46],
   scram: [52],
   web: [65],
-  ewar: [201, 80, 208, 291, 379, 71, 68],
+  ewar: [201, 80, 208, 291, 379],
+  drain: [71, 68],
   cap: [43, 76, 767, 768],
   remoteRepair: [325, 41, 585, 1697, 1698],
   capTransfer: [67],
@@ -133,6 +143,8 @@ export function scoredJobs(goal: ImproveGoal): readonly Job[] {
   if (goal === 'mining') return ['mining'];
   if (goal === 'repair') return ['remoteRepair'];
   if (goal === 'transfer') return ['capTransfer'];
+  if (goal === 'tackle') return ['scram', 'web'];
+  if (goal === 'ewar') return ['ewar'];
   return [];
 }
 

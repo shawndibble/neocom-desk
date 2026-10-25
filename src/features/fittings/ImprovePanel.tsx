@@ -24,6 +24,7 @@ import {
   Spinner,
 } from '@/components/ui';
 import { TANK_GOALS } from '@/engine/fittings/improveGroups';
+import { ewarOf, tackleOf } from '@/engine/fittings/improveTackle';
 import { Collapse } from '@/components/ui/Collapse';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import {
@@ -196,7 +197,7 @@ export function ImprovePanel({
     });
   }
 
-  /** Carry more, the align goals, Repair more, Transfer more: the figure the goal scores, before and after. */
+  /** Carry more, the align goals, Repair more, Transfer more, Hold tighter, Stronger EWAR: the figure the goal scores, before and after. */
   function moveLine(option: ImproveOption | RejectedOption, own: FittingStats): string | null {
     const align = () =>
       t('fittings.improve.alignLine', {
@@ -221,6 +222,26 @@ export function ImprovePanel({
         before: m3sFormat(own.support.capTransfer),
         after: m3sFormat(option.after.support.capTransfer),
       });
+    if (goal === 'tackle') {
+      const [was, now] = [tackleOf(own), tackleOf(option.after)];
+      return t('fittings.improve.tackleLine', {
+        pointsBefore: m3sFormat(was.points),
+        pointsAfter: m3sFormat(now.points),
+        webBefore: m3sFormat(was.web),
+        webAfter: m3sFormat(now.web),
+        rangeBefore: m3sFormat(was.range / 1000),
+        rangeAfter: m3sFormat(now.range / 1000),
+      });
+    }
+    if (goal === 'ewar') {
+      const [was, now] = [ewarOf(own), ewarOf(option.after)];
+      return t('fittings.improve.ewarLine', {
+        strengthBefore: m3sFormat(was.strength),
+        strengthAfter: m3sFormat(now.strength),
+        rangeBefore: m3sFormat(was.range / 1000),
+        rangeAfter: m3sFormat(now.range / 1000),
+      });
+    }
     if (goal === 'align') return align();
     if (goal === 'warp')
       return t('fittings.improve.warpLine', {

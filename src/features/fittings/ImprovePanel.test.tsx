@@ -375,4 +375,54 @@ describe('ImprovePanel', () => {
     });
     expect(screen.getByText('Transfers 0 → 40 GJ/s')).toBeInTheDocument();
   });
+  it('disables Hold tighter and Stronger EWAR with their reasons on a fit with neither', async () => {
+    renderPanel(search({ status: 'idle' }));
+    for (const [name, reason] of [
+      [/Hold tighter/, 'No warp scramblers, disruptors or webs on this fit'],
+      [/Stronger EWAR/, 'No electronic warfare modules on this fit'],
+    ] as const) {
+      const chip = screen.getByRole('button', { name });
+      expect(chip).toHaveAttribute('aria-disabled', 'true');
+      await userEvent.hover(chip);
+      expect(await screen.findByText(reason)).toBeInTheDocument();
+    }
+  });
+
+  it('shows tackle figures on a Hold tighter row and labels EWAR as module figures', () => {
+    const row = (kind: 'warpDisruption' | 'web' | 'ecm', amount: number, optimal: number) => ({
+      kind,
+      typeId: 1,
+      count: 1,
+      amount,
+      optimal,
+      falloff: 0,
+      effects: [],
+    });
+    const withRows = (rows: ReturnType<typeof row>[]) => ({
+      ...before,
+      support: { ...before.support, rows },
+    });
+    const own = withRows([
+      row('warpDisruption', 2, 9000),
+      row('web', 50, 10000),
+      row('ecm', 4, 20000),
+    ]);
+    const gain = option(10, {
+      support: {
+        ...before.support,
+        rows: [row('warpDisruption', 3, 12000), row('web', 60, 12000), row('ecm', 5, 30000)],
+      },
+    });
+    renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
+      goal: 'tackle',
+    });
+    expect(screen.getByText('Points 2 → 3 · Web 50 → 60% · Reach 9 → 12 km')).toBeInTheDocument();
+    cleanup();
+    renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
+      goal: 'ewar',
+    });
+    expect(
+      screen.getByText('Module strength 4 → 5 · Reach 20 → 30 km (not the effect on a target)')
+    ).toBeInTheDocument();
+  });
 });
