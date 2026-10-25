@@ -727,6 +727,11 @@ export const ESI_REGISTRY = {
     route: '/industry/systems',
     scope: PUBLIC,
   },
+  // Which systems have an NPC station that runs industry jobs (Build there hint).
+  getIndustryFacilities: {
+    route: '/industry/facilities',
+    scope: PUBLIC,
+  },
   // Route Safety's "Incursions near you" (issue #3540): one call lists them all.
   getIncursions: {
     route: '/incursions',

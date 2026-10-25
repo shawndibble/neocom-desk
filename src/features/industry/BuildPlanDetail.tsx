@@ -54,6 +54,7 @@ import {
   reactionPlanFacilityContextFor,
   autoBuildDepthContext,
 } from './planFacilityContext';
+import { moveSaving } from '@/engine/industry/moveSaving';
 import { REACTION_FACILITY_PRESETS } from './reactionFacilityDefaults';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { hydrateActivityFacilityDefaults } from './facilityDefaults';
@@ -1169,14 +1170,18 @@ export function BuildPlanDetail({
       : undefined;
   const cheapest = cheaperSystems[0];
   const currentIndex = snapshot?.systemCostIndex ?? null;
+  const cheaperNearbySaving =
+    cheapest && result && currentIndex !== null && currentIndex > 0
+      ? moveSaving(result.jobFee, currentIndex, cheapest.index, cheapest.npcStation)
+      : 0;
   const cheaperNearbyLine =
-    cheapest && result && currentIndex !== null && currentIndex > 0 ? (
+    cheapest && cheaperNearbySaving > 0 ? (
       <>
         {t('industry.ledger.cheaperNearby', {
           system: cheapest.name,
           count: cheapest.jumps,
           index: formatCostIndex(cheapest.index),
-          amount: formatIsk(result.jobFee.grossCost * (1 - cheapest.index / currentIndex)),
+          amount: formatIsk(cheaperNearbySaving),
         })}{' '}
         {/* The same move the build-system field makes: the band follows the
             system, and a picked structure is cleared since it was elsewhere. */}
@@ -1189,6 +1194,15 @@ export function BuildPlanDetail({
               buildSystemName: cheapest.name,
               ...clearedBuildLocation,
               security: securityBand(cheapest.security),
+              // The station found there is what the plan builds in: no rigs,
+              // and the tax drops back to the NPC rate `jobFee` applies.
+              ...(cheapest.npcStation
+                ? {
+                    facility: 'npcStation' as const,
+                    rigFit: EMPTY_RIG_FIT,
+                    facilityTaxPct: undefined,
+                  }
+                : {}),
             })
           }
         >
