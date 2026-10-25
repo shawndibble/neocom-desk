@@ -77,6 +77,8 @@ export interface WidgetKindDef {
   hasCalendarEvents: boolean;
   /** Whether the kind has the Where setting (My alliance / Near me) and its jumps radius. */
   hasRaidsWhere: boolean;
+  /** Whether the kind has the Show setting (All structures / Problems only). */
+  hasStructuresShow: boolean;
   /** ESI endpoints the kind needs, for the "needs permission" state. */
   endpoints: readonly EsiEndpointId[];
   emptyMessageKey: string;
@@ -104,6 +106,7 @@ interface Spec {
   plexPlan?: true;
   calendarEvents?: true;
   raidsWhere?: true;
+  structuresShow?: true;
   soon?: true;
   endpoints: readonly EsiEndpointId[];
 }
@@ -298,6 +301,7 @@ const SPECS = {
     views: NCT,
     view: 'table',
     size: 'M',
+    structuresShow: true,
     endpoints: ['getCorporationStructures'],
   },
   moonChunks: {
@@ -390,14 +394,6 @@ const SPECS = {
       'getCorporationSkyhooks',
       'getCorporationSovereigntyHubs',
     ],
-  },
-  corpServices: {
-    corp: 'corpStructures',
-    capabilities: ['canReadStructures'],
-    views: NT,
-    view: 'table',
-    size: 'M',
-    endpoints: ['getCorporationStructures'],
   },
   corpStarbases: {
     corp: 'corpStructures',
@@ -557,6 +553,7 @@ export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(
   hasPlexPlan: s.plexPlan === true,
   hasCalendarEvents: s.calendarEvents === true,
   hasRaidsWhere: s.raidsWhere === true,
+  hasStructuresShow: s.structuresShow === true,
   endpoints: s.endpoints,
   emptyMessageKey: `overview.widgets.${id}.empty`,
   availability: s.soon ? 'comingSoon' : 'available',

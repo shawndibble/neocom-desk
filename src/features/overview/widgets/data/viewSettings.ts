@@ -24,6 +24,8 @@ export interface ViewSettings {
   /** Skyhook raids: 'near' lists any holder's space within `raidsRadius` jumps; left out, My alliance. */
   raidsWhere?: 'near';
   raidsRadius?: number;
+  /** Structures: 'problems' lists only the structures that need attention; left out, All. */
+  structuresShow?: 'problems';
   /** Market Trend: the items it draws; left out, the Quickbar's first. */
   trendItems?: number[];
   /** Market Trend: the Trade Hubs it prices at; left out, the pilot's Market hub. */
@@ -45,6 +47,7 @@ export type SettingsContext = Pick<
   | 'calendarEvents'
   | 'raidsWhere'
   | 'raidsRadius'
+  | 'structuresShow'
   | 'trendItems'
   | 'trendHubs'
 >;
@@ -82,6 +85,11 @@ export const VIEW_SETTINGS = {
       s.raidsWhere === 'near'
         ? { raidsWhere: 'near', raidsRadius: s.raidsRadius ?? DEFAULT_RAIDS_RADIUS }
         : { raidsWhere: 'alliance', raidsRadius: DEFAULT_RAIDS_RADIUS },
+  },
+  structuresShow: {
+    enabledFor: (k) => k.hasStructuresShow,
+    fields: ['structuresShow'],
+    resolve: (s) => ({ structuresShow: s.structuresShow === 'problems' ? 'problems' : 'all' }),
   },
   trend: {
     enabledFor: (k) => k.hasTrendSources,

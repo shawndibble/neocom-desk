@@ -276,7 +276,6 @@ describe('per-widget capability gating (AC3)', () => {
     expect(await widget('Structures')).toBeInTheDocument();
     expect(await widget('Moon extractions')).toBeInTheDocument();
     expect(await widget('Due soon')).toBeInTheDocument();
-    expect(await widget('Offline services')).toBeInTheDocument();
     await waitFor(() => expect(mocked.loadCorporationStructures).toHaveBeenCalled());
     expect(mocked.loadCorporationWallets).not.toHaveBeenCalled();
     expect(mocked.loadCorporationWalletJournal).not.toHaveBeenCalled();

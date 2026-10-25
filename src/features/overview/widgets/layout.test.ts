@@ -26,6 +26,7 @@ import {
   newWidget,
   setScope,
   setShowOnPhone,
+  setStructuresShow,
   setView,
   snapshotLayout,
   stepWidget,
@@ -312,6 +313,21 @@ describe('setCalendarEvents', () => {
     const l = layoutOf(w('a', 'comingUp'), w('b', 'orders'));
     expect(setCalendarEvents(l, 'a', 'committed')).toBe(l);
     expect(setCalendarEvents(l, 'b', 'all')).toBe(l);
+  });
+});
+
+describe('setStructuresShow', () => {
+  it('stores Problems only and drops the field when it goes back to All', () => {
+    const l = layoutOf(w('a', 'structures'));
+    const problems = setStructuresShow(l, 'a', 'problems');
+    expect(problems.widgets[0].structuresShow).toBe('problems');
+    expect('structuresShow' in setStructuresShow(problems, 'a', 'all').widgets[0]).toBe(false);
+  });
+
+  it('changes nothing for the default or a kind with no Show choice', () => {
+    const l = layoutOf(w('a', 'structures'), w('b', 'orders'));
+    expect(setStructuresShow(l, 'a', 'all')).toBe(l);
+    expect(setStructuresShow(l, 'b', 'problems')).toBe(l);
   });
 });
 

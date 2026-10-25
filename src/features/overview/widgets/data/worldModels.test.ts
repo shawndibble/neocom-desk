@@ -317,6 +317,56 @@ describe('structures', () => {
     const view = buildView('structures', feeds(fleet()), ctx());
     expect(view.number.secondary?.text).toBe('Lowfuel Keepstar');
   });
+
+  describe('Show: Problems only', () => {
+    const problems = ctx({ structuresShow: 'problems' });
+    const troubled = () => [
+      ...fleet(),
+      source(4, 'Efa - Reinforced Fortizar', { stateTimerEndMs: NOW + 2 * HOUR }),
+      // Five days of fuel is on the watch list, not low: the board calls low at three.
+      source(5, 'Efa - Watch Raitaru', { fuelExpiresMs: NOW + 5 * DAY }),
+    ];
+
+    it('lists only structures with a timer, low fuel or an offline service', () => {
+      const view = buildView('structures', feeds(troubled()), problems);
+      expect(view.table!.rows.map((r) => text(r.cells[0])).sort()).toEqual([
+        'Lowfuel Keepstar',
+        'Offline Athanor',
+        'Reinforced Fortizar',
+      ]);
+      expect(view.rows.map((r) => r.title)).not.toContain('Efa - Watch Raitaru');
+    });
+
+    it('charts the fuel of those structures only', () => {
+      const view = buildView('structures', feeds(troubled()), problems);
+      if (view.chart?.kind !== 'hbars') throw new Error('hbars');
+      expect(view.chart.rows.map((r) => r.label).sort()).toEqual([
+        'Lowfuel Keepstar',
+        'Offline Athanor',
+        'Reinforced Fortizar',
+      ]);
+    });
+
+    it('counts the structures that need attention and names the worst', () => {
+      const view = buildView('structures', feeds(troubled()), problems);
+      expect(view.number.value).toBe('3');
+      expect(view.number.unit).toBe('overview.widgets.structures.needAttention{"count":3}');
+      expect(view.number.secondary?.text).toBe('Reinforced Fortizar');
+      expect(view.number.tone).toBe('critical');
+    });
+
+    it('reads as good news when nothing needs attention', () => {
+      const view = buildView('structures', feeds([source(1, 'Efa - Helios Prime')]), problems);
+      expect(view.status.isEmpty).toBe(true);
+      expect(view.emptyHealthy).toBe(true);
+      expect(view.emptyMessage).toBe('overview.widgets.structures.noProblems');
+    });
+
+    it('lists every structure under the default', () => {
+      const view = buildView('structures', feeds(troubled()), ctx({ structuresShow: 'all' }));
+      expect(view.table!.rows).toHaveLength(5);
+    });
+  });
 });
 
 describe('moonChunks', () => {

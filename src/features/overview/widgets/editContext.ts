@@ -14,6 +14,7 @@ import type {
   CalendarEventsChoice,
   RaidsWhere,
   OverviewLayout,
+  StructuresShow,
   WidgetRange,
   WidgetInit,
   WidgetScope,
@@ -44,6 +45,7 @@ export interface OverviewEditActions {
   setCalendarEvents: (id: string, choice: CalendarEventsChoice) => void;
   setRaidsWhere: (id: string, where: RaidsWhere) => void;
   setRaidsRadius: (id: string, radius: number) => void;
+  setStructuresShow: (id: string, show: StructuresShow) => void;
   setTrendItems: (id: string, items: number[]) => void;
   setTrendHubs: (id: string, hubs: string[]) => void;
   rename: (id: string, title: string) => void;
@@ -88,6 +90,7 @@ export const OverviewEditContext = createContext<OverviewEdit>({
   setCalendarEvents: none,
   setRaidsWhere: none,
   setRaidsRadius: none,
+  setStructuresShow: none,
   setTrendItems: none,
   setTrendHubs: none,
   rename: none,

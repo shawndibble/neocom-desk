@@ -53,7 +53,6 @@ const CORP_IDS = [
   'structures',
   'moonChunks',
   'corpDeadlines',
-  'corpServices',
   'corpStarbases',
   'corpSovereignty',
   'corpCustomsOffices',

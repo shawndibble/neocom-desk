@@ -248,6 +248,18 @@ describe('Widget menu', () => {
     expect(screen.queryByRole('menuitemradio', { name: '90d' })).toBeNull();
   });
 
+  it('offers Show to Structures and stores Problems only', async () => {
+    const fleet: OverviewLayout = {
+      version: 1,
+      widgets: [w('s', 'structures', { view: 'table' })],
+    };
+    const { user, seen } = setup({ initial: fleet });
+    await user.click(screen.getByRole('button', { name: 'Settings for Structures' }));
+    expect(screen.getByRole('menuitemradio', { name: 'All structures' })).toBeChecked();
+    await user.click(screen.getByRole('menuitemradio', { name: 'Problems only' }));
+    expect(seen.current.widgets[0].structuresShow).toBe('problems');
+  });
+
   it('offers Where to Skyhook raids, and the jumps radius only under Near me', async () => {
     const raids: OverviewLayout = { version: 1, widgets: [w('r', 'sovRaids', { view: 'table' })] };
     const { user, seen } = setup({ initial: raids });

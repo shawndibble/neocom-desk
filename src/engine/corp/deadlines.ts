@@ -64,7 +64,7 @@ export interface DueSoonCount {
  *
  * - `untimed` lands nowhere. An offline service is a standing fault with no
  *   instant at all, so counting it on any day would invent a deadline. Those
- *   items get their own surface instead (`Offline services`).
+ *   items get their own surface instead (Structures' Problems only).
  * - `passed` lands on day 0. ESI drops `fuel_expires` once a structure runs
  *   dry, so there is no instant left to bucket — but the thing is outstanding
  *   *now*, which is exactly what day 0 means.

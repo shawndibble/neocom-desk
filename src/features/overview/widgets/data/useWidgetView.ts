@@ -145,8 +145,16 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
 
 /** The view for one widget. */
 export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSettings): KindView {
-  const { range, plexPer30Days, calendarEvents, raidsWhere, raidsRadius, trendItems, trendHubs } =
-    settings;
+  const {
+    range,
+    plexPer30Days,
+    calendarEvents,
+    raidsWhere,
+    raidsRadius,
+    structuresShow,
+    trendItems,
+    trendHubs,
+  } = settings;
   const request = useMemo<ViewRequest>(
     () => ({
       kind,
@@ -156,6 +164,7 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
       calendarEvents,
       raidsWhere,
       raidsRadius,
+      structuresShow,
       trendItems,
       trendHubs,
     }),
@@ -167,6 +176,7 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
       calendarEvents,
       raidsWhere,
       raidsRadius,
+      structuresShow,
       trendItems,
       trendHubs,
     ]

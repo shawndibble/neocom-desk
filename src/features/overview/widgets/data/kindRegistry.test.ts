@@ -138,6 +138,7 @@ const ALT: Record<keyof typeof VIEW_SETTINGS, ViewRequest[]> = {
     { kind: '', scopeAll: false, raidsWhere: 'near' },
     { kind: '', scopeAll: false, raidsWhere: 'near', raidsRadius: 15 },
   ],
+  structuresShow: [{ kind: '', scopeAll: false, structuresShow: 'problems' }],
   trend: [
     { kind: '', scopeAll: false, trendItems: [34] },
     { kind: '', scopeAll: false, trendHubs: ['amarr'] },
@@ -166,6 +167,7 @@ describe('view key', () => {
         !k.hasPlexPlan &&
         !k.hasCalendarEvents &&
         !k.hasRaidsWhere &&
+        !k.hasStructuresShow &&
         !k.hasTrendSources
     )!;
     const base = viewKey({ kind: plain.id, scopeAll: false });

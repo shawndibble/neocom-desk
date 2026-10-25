@@ -621,16 +621,6 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         note: t('overview.widgets.corpDeadlines.chartNote', { days: 14 }),
       },
     },
-    corpServices: {
-      value: '3',
-      unit: t('overview.widgets.corpServices.unit'),
-      note: t('overview.widgets.corpServices.most', { name: 'Efa Astrahus', count: 2 }),
-      rows: [
-        ['Efa Astrahus', 'Standup Market Hub I', t('overview.board.structureOffline')],
-        ['Efa Astrahus', 'Standup Manufacturing Plant I', t('overview.board.structureOffline')],
-        ['Efa Athanor', 'Standup Reprocessing Facility I', t('overview.board.structureOffline')],
-      ],
-    },
     corpStarbases: {
       value: '4',
       unit: t('overview.widgets.corpStarbases.unit'),

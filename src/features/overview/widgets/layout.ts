@@ -29,6 +29,10 @@ export const DEFAULT_RAIDS_RADIUS = 8;
 export const isRaidsRadius = (value: unknown): value is number =>
   typeof value === 'number' && RAIDS_RADII.includes(value);
 
+/** Structures: every structure, or only those with a timer, low fuel or an offline service. All is never stored. */
+export type StructuresShow = 'all' | 'problems';
+export const STRUCTURES_SHOWS: readonly StructuresShow[] = ['all', 'problems'];
+
 export type WidgetRange = 7 | 30 | 90 | 365;
 export const WIDGET_RANGES: readonly WidgetRange[] = [7, 30, 90];
 /** What a price-history kind offers: ESI keeps about 13 months of market history. */
@@ -72,6 +76,8 @@ export interface Widget {
   raidsWhere?: 'near';
   /** Skyhook raids only: jumps for Near me. Absent means the default (8). */
   raidsRadius?: number;
+  /** Structures only: 'problems' lists only the structures that need attention. Absent means All. */
+  structuresShow?: 'problems';
   /** Market Trend only: the items it draws, newest pick last. Absent means the Quickbar's first items. */
   trendItems?: number[];
   /** Market Trend only: the Trade Hubs it prices at. Absent means the pilot's Market hub. */
@@ -306,6 +312,23 @@ export function setRaidsRadius(layout: OverviewLayout, id: string, radius: numbe
       return rest;
     }
     return { ...w, raidsRadius: radius };
+  });
+}
+
+/** Stored only when it differs from the default, so a widget nobody touched stays as small as before. */
+export function setStructuresShow(
+  layout: OverviewLayout,
+  id: string,
+  show: StructuresShow
+): OverviewLayout {
+  return update(layout, id, (w) => {
+    if (!getKind(w.kind)?.hasStructuresShow || show === (w.structuresShow ?? 'all')) return null;
+    if (show === 'all') {
+      const { structuresShow: _dropped, ...rest } = w;
+      void _dropped;
+      return rest;
+    }
+    return { ...w, structuresShow: 'problems' };
   });
 }
 
