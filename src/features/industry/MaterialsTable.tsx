@@ -112,6 +112,11 @@ interface MaterialsTableProps {
    */
   onBuildAll?: (typeIDs: readonly number[]) => void;
   /**
+   * Opens "Buy ore instead" (issue #5134) from the To buy heading. Passed only
+   * while the plan still has a mineral to buy.
+   */
+  onBuyOre?: () => void;
+  /**
    * What the owned units this job consumes would net if sold, after fees;
    * shown on the folded owned section's heading. Omitted when unknown.
    */
@@ -212,6 +217,7 @@ export function MaterialsTable({
   canBuildHere,
   onToggleBuildHere,
   onBuildAll,
+  onBuyOre,
   ownedSellNet,
   sellValueFor,
   onShowRecipe,
@@ -853,6 +859,11 @@ export function MaterialsTable({
               count: cheaperBuilt.length,
               amount: formatIskCompact(cheaperSaves),
             })}
+          </button>
+        )}
+        {errand === 'toBuy' && onBuyOre && (
+          <button type="button" className={textActionClassName('mr-auto')} onClick={onBuyOre}>
+            {t('industry.buyOre.action')}
           </button>
         )}
         {errand === 'have' && ownedSellNet != null && ownedSellNet > 0 && (
