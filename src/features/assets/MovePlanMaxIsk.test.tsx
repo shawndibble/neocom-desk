@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { MaxIskInput } from './MovePlanMaxIsk';
@@ -42,9 +42,10 @@ describe('MaxIskInput', () => {
     const onChange = vi.fn();
     render(<Harness initial={null} onChange={onChange} />);
     await userEvent.type(field(), '500');
-    expect(onChange).toHaveBeenLastCalledWith(500);
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith(500));
+    expect(onChange).toHaveBeenCalledTimes(1);
     await userEvent.clear(field());
-    expect(onChange).toHaveBeenLastCalledWith(null);
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith(null));
   });
 
   it('flags zero and garbage, and never reads them as no limit', async () => {

@@ -331,4 +331,35 @@ describe('planHaul with a max ISK per haul', () => {
     });
     expect(plan.sections[0].trips).toBe(1);
   });
+
+  it('fills a trip from another pickup when the nearest cannot add a unit', () => {
+    const near = { ...pickup(P1, P1, 5), stacks: [stack(5, 50, 34)] };
+    const far = { ...pickup(P3, P3, 5), stacks: [stack(5, 10, 35)] };
+    const plan = planHaul({
+      graph: LINE,
+      characters: [character([near, far])],
+      capacityM3: 100,
+      destination,
+      maxIskPerHaul: 100,
+    });
+    // Trip 1: 1 x 50 ISK would fit, so take 2 of the 50s, then nothing near fits; nothing more is added.
+    const first = plan.sections[0].legs.filter((l) => l.trip === 1 && l.kind === 'pickup');
+    expect(first.every((l) => (l.isk ?? 0) <= 100)).toBe(true);
+    const units = plan.sections
+      .flatMap((s) => s.legs)
+      .flatMap((l) => (l.kind === 'pickup' ? (l.stacks ?? []) : []))
+      .reduce((n, s) => n + s.quantity, 0);
+    expect(units).toBe(10);
+  });
+
+  it('treats an empty stack list as having no values', () => {
+    const plan = planHaul({
+      graph: LINE,
+      characters: [character([{ ...pickup(P1, P1, 10), stacks: [] }])],
+      capacityM3: 100,
+      destination,
+      maxIskPerHaul: 100,
+    });
+    expect(plan.leftOut).toEqual([]);
+  });
 });

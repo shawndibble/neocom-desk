@@ -13,6 +13,7 @@
  * returns to the destination do not. Whatever the plan cannot cover is
  * reported in `leftOut`, never dropped.
  */
+import { normalizeMaxIsk } from '@/engine/assets/haulPacking';
 import { flownJumpDistancesFrom } from './holeDetour';
 import type { FindJumpRouteOptions, JumpGraph } from './jumpRoute';
 import { MAX_STOPS } from './tripPlan';
@@ -139,12 +140,7 @@ const EPS = 1e-9;
 export function planHaul(input: HaulInput): HaulPlan {
   const { graph, options = {}, characters, capacityM3, destination } = input;
   const maxStops = input.maxStops ?? MAX_STOPS;
-  const maxIsk =
-    typeof input.maxIskPerHaul === 'number' &&
-    Number.isFinite(input.maxIskPerHaul) &&
-    input.maxIskPerHaul > 0
-      ? input.maxIskPerHaul
-      : null;
+  const maxIsk = normalizeMaxIsk(input.maxIskPerHaul);
   const sweeps = new Map<number, ReadonlyMap<number, number>>();
   const jumpsBetween = (from: number | null, to: number | null): number | null => {
     if (from === null || to === null) return null;
@@ -206,16 +202,19 @@ export function planHaul(input: HaulInput): HaulPlan {
         ...(ships ? { ships } : {}),
       });
 
+    /** Whether any stack of this Character carries a price, so every leg of a trip shows a value or none does. */
+    const valued = c.pickups.some((p) => p.stacks?.some((s) => s.unitIsk !== undefined));
     let start: HaulPlace | null = c.start;
     while (!capped && left.some((l) => l.m3 > EPS)) {
       trips += 1;
       let hold = 0;
       let holdIsk = 0;
-      let valued = false;
+      /** Pickups whose stacks cannot add a unit to what is left of this trip. */
+      const full = new Set<unknown>();
       let here: HaulPlace | null = start;
       let loaded = false;
       while (hold < capacityM3 - EPS) {
-        const open = left.filter((l) => l.m3 > EPS);
+        const open = left.filter((l) => l.m3 > EPS && !full.has(l));
         if (open.length === 0) break;
         if (visits >= maxStops) {
           capped = true;
@@ -224,7 +223,7 @@ export function planHaul(input: HaulInput): HaulPlan {
         const next = nearest(open, here, jumpsBetween);
         // Under a limit the stacks decide what rides: a take is whole units that
         // fit the room in both m³ and ISK, and what is left stays for the next trip.
-        const limited = maxIsk !== null && next.stacks !== null;
+        const limited = maxIsk !== null && (next.stacks?.length ?? 0) > 0;
         let take = Math.min(next.m3, capacityM3 - hold);
         let stacks: HaulStack[] | undefined;
         if (limited) {
@@ -232,7 +231,10 @@ export function planHaul(input: HaulInput): HaulPlan {
           take = stacks.reduce((sum, s) => sum + s.quantity * s.unitM3, 0);
           next.m3 = next.stacks!.reduce((sum, s) => sum + s.quantity * s.unitM3, 0);
           if (stacks.length === 0) {
-            if (hold > 0) break; // this trip is full
+            if (hold > 0) {
+              full.add(next); // nothing here fits what is left of this trip
+              continue;
+            }
             // Not even one unit rides an empty hold: report it, never loop on it.
             leftOut.push(leftOutOf(c, next.pickup, next.m3, 'overLimit'));
             next.m3 = 0;
@@ -244,7 +246,6 @@ export function planHaul(input: HaulInput): HaulPlan {
           next.m3 -= take;
         }
         const isk = stacks?.reduce((sum, s) => sum + s.quantity * (s.unitIsk ?? 0), 0);
-        if (isk !== undefined && stacks?.some((s) => s.unitIsk !== undefined)) valued = true;
         leg(
           trips,
           'pickup',

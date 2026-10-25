@@ -79,6 +79,11 @@ function load(
   return n;
 }
 
+/** The usable ISK limit: a finite number above 0, else null for no limit. */
+export function normalizeMaxIsk(raw: unknown): number | null {
+  return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null;
+}
+
 /**
  * `maxIsk` caps what one haul is worth: a haul is full when its volume or its
  * value reaches the limit. Null, 0 or a non-number means no limit.
@@ -88,7 +93,7 @@ export function packHauls(
   holds: readonly PackHold[],
   maxIsk?: number | null
 ): PackResult {
-  const limit = typeof maxIsk === 'number' && Number.isFinite(maxIsk) && maxIsk > 0 ? maxIsk : null;
+  const limit = normalizeMaxIsk(maxIsk);
   const usable = holds
     .filter((h) => h.capacityM3 > 0)
     // Equal holds: the fleet hangar first, so the cargo hold stays free for loose stock.

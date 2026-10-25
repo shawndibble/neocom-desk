@@ -1,7 +1,9 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FieldError, TextInput } from '@/components/ui';
 import { maskNumber, unmaskNumber } from '@/lib/numberMask';
+
+const COMMIT_DELAY_MS = 500;
 
 interface MaxIskInputProps {
   /** The saved limit; null for none. */
@@ -28,11 +30,16 @@ export function MaxIskInput({ value, onChange }: MaxIskInputProps) {
   const typed = blank ? null : unmaskNumber(text);
   const invalid = !blank && (typed === undefined || typed === null || typed <= 0);
 
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  /** Re-plans once typing pauses: a tiny limit mid-entry ("5" of "5000000") would split into a haul per unit. */
   function onType(raw: string) {
     setText(raw);
-    if (raw.trim() === '') return onChange(null);
-    const next = unmaskNumber(raw);
-    if (next !== undefined && next > 0) onChange(next);
+    clearTimeout(timer.current);
+    const next = raw.trim() === '' ? null : unmaskNumber(raw);
+    if (next === undefined || next === 0) return;
+    timer.current = setTimeout(() => onChange(next), COMMIT_DELAY_MS);
   }
 
   return (
@@ -51,7 +58,7 @@ export function MaxIskInput({ value, onChange }: MaxIskInputProps) {
           aria-describedby={invalid ? errorId : undefined}
           onChange={(e) => onType(e.target.value)}
         />
-        <span className="text-sm text-text-dim">ISK</span>
+        <span className="text-sm text-text-dim">{t('assets.movePlan.maxIskUnit')}</span>
       </label>
       {invalid && (
         <FieldError id={errorId} className="text-xs">

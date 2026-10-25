@@ -202,7 +202,7 @@ function MovePlanTabBody({
   > | null>(null);
   const maxIsk = useMaxIskPerHaul((st) => st.value);
   const setMaxIsk = useMaxIskPerHaul((st) => st.setValue);
-  useHydratedStore(useMaxIskPerHaul);
+  const maxIskReady = useHydratedStore(useMaxIskPerHaul);
   /** The pilot's hauler pick for the shown plan only; never saved, reset with each plan. */
   const [haulerOverride, setHaulerOverride] = useState<HaulerOverride | undefined>();
   const savedHaul = useActiveHaul((st) => st.value);
@@ -499,6 +499,8 @@ function MovePlanTabBody({
       return;
     }
     if (urlKey === shownKey || urlKey === restoring.current || !loaded || !urlPlan) return;
+    // The saved limit shapes the plan, so a link's plan waits for it.
+    if (!maxIskReady) return;
     restoring.current = urlKey;
     const mine = session.current;
     void (async () => {
@@ -525,7 +527,7 @@ function MovePlanTabBody({
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the URL's plan or the loaded assets change; the helpers close over `loaded`
-  }, [urlKey, loaded, shownKey]);
+  }, [urlKey, loaded, shownKey, maxIskReady]);
 
   /** Works the shown plan out again for a changed ship choice or hauler. */
   function replan(nextPacked: ReadonlySet<number>, nextOverride: HaulerOverride | undefined) {

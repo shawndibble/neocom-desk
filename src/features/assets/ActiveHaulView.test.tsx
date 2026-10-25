@@ -119,6 +119,30 @@ function renderView(
 }
 
 describe('ActiveHaulView', () => {
+  it('names a stack left out over the ISK limit, not a raw key', () => {
+    renderView(vi.fn().mockResolvedValue(undefined), {
+      haul: {
+        ...haul,
+        plan: {
+          ...haul.plan,
+          leftOut: [
+            {
+              characterId: 1,
+              name: 'Alice',
+              locationId: 9,
+              place: 'Rens VI',
+              m3: 4,
+              reason: 'overLimit',
+            },
+          ],
+        },
+      },
+    });
+    expect(
+      screen.getByText(/Rens VI \(Alice\): 4 m³ has units worth more than your ISK limit/)
+    ).toBeTruthy();
+  });
+
   it('summarises the route and lists every leg, repeat station included', () => {
     renderView();
     expect(screen.getByText('3 legs · 16 jumps · 100 m³ to Jita 4-4')).toBeTruthy();
