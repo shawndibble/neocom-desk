@@ -26,7 +26,10 @@ export const ALLIANCE_NAME = 'Test Alliance';
  * from `src/esi/registry.ts`, which imports nothing at runtime, so pulling it
  * in here drags in no Dexie/fetch code.
  */
-export { SCOPES } from '../../src/esi/scopes';
+import { SCOPES as BASE_SCOPES, scopesForGroup } from '../../src/esi/scopes';
+
+/** The Base Grant plus the opt-in mercenaryDens Permission, so den specs see their data. */
+export const SCOPES: readonly string[] = [...BASE_SCOPES, ...scopesForGroup('mercenaryDens')];
 
 /**
  * Skill typeIDs from public/data/skills.json. Caldari Cruiser's prereq

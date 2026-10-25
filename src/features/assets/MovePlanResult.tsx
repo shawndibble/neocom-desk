@@ -2,7 +2,7 @@ import { formatCount } from '@/lib/formatCount';
 import { useRef, useState, type ReactNode, type Ref } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useTranslation } from 'react-i18next';
-import { Button, Checkbox, Disclosure, Modal } from '@/components/ui';
+import { Button, Checkbox, Disclosure, FilterChip, Modal } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import {
   CUSTOM_HAULER_TYPE_ID,
@@ -18,6 +18,8 @@ import { PlanLine } from './MovePlanLine';
 import { PickupHaulList } from './MovePlanHauls';
 import { HaulerPicker } from './MovePlanHaulerPicker';
 import { MaxIskInput } from './MovePlanMaxIsk';
+import { OwnedMark } from './MovePlanOwnedMark';
+import { ownedFirstOrder } from './ownedHullText';
 
 /** Alternatives shown beside the suggested hauler; the rest sit under "All haulers". */
 const INLINE_ALTERNATIVES = 3;
@@ -111,6 +113,7 @@ export function PlanResult({
     null
   );
   const [dontRemind, setDontRemind] = useState(false);
+  const [ownedFirst, setOwnedFirst] = useState(false);
   const focusAfterCommit = useFocusAfterCommit({ preventScroll: true });
   /** Pickup the ship being packed sits in; its heading takes focus once the Pack button is gone. */
   const packFrom = useRef<string | null>(null);
@@ -244,7 +247,23 @@ export function PlanResult({
         </>
       )}
       {totals.totalM3 > 0 && (
-        <HaulerPicker plan={plan} override={haulerOverride} onPick={onPickHauler} />
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <HaulerPicker
+            plan={plan}
+            override={haulerOverride}
+            onPick={onPickHauler}
+            ownedFirst={ownedFirst}
+          />
+          {plan.comparison.some((o) => o.hull.owned) && (
+            <FilterChip
+              size="md"
+              label={t('assets.movePlan.ownedFirst')}
+              tooltip={t('assets.movePlan.ownedFirstHint')}
+              selected={ownedFirst}
+              onToggle={() => setOwnedFirst((on) => !on)}
+            />
+          )}
+        </div>
       )}
       {totals.totalM3 > 0 && (
         <>
@@ -268,11 +287,14 @@ export function PlanResult({
           onToggle={onToggleCompare}
         >
           <ul className="text-text-dim">
-            {plan.comparison.map((o) => (
-              <li key={o.hull.typeId}>
-                {o.hull.name} ·{' '}
-                {t('assets.movePlan.tripCount', { count: withShips(o.trips, o.tooBigCount) })}
-                {o.unfitCount > 0 && ` · ${leavesBehind(o.unfitCount)}`}
+            {ownedFirstOrder(plan.comparison, ownedFirst).map((o) => (
+              <li key={o.hull.typeId} className="flex items-baseline gap-2">
+                <span className="min-w-0 truncate">
+                  {o.hull.name} ·{' '}
+                  {t('assets.movePlan.tripCount', { count: withShips(o.trips, o.tooBigCount) })}
+                  {o.unfitCount > 0 && ` · ${leavesBehind(o.unfitCount)}`}
+                </span>
+                <OwnedMark t={t} hull={o.hull} />
               </li>
             ))}
           </ul>
