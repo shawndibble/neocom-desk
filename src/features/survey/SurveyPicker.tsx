@@ -61,7 +61,7 @@ export function SurveyPicker({ currentId, onPick }: SurveyPickerProps) {
       for (const entry of wanted) {
         if (requested.current.has(entry.id)) continue;
         requested.current.add(entry.id);
-        // Cache first: a label needs no fresh read, and the survey in view is already loaded.
+        // Cache first: a label needs no fresh read, and the survey in view is loaded by the page.
         const result = await loadSurveyCached(entry.id);
         if (cancelled) {
           requested.current.delete(entry.id);

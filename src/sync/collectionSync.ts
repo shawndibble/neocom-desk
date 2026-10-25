@@ -26,6 +26,7 @@ import {
   writePullCursor,
   type PullCursor,
 } from './localBookkeeping';
+import { isMissingIndex } from './missingIndex';
 import { mergeRecords, TOMBSTONE_TTL_MS, type LocalTombstone, type RemoteDoc } from './merge';
 import {
   PLANET_RICHNESS,
@@ -159,17 +160,6 @@ interface PullWindow<R> {
   /** Where to store `next`, once the pass has applied everything it read. */
   cursorKey: string;
   next: PullCursor;
-}
-
-/**
- * Firestore refuses a composite query whose index is not deployed yet with
- * `failed-precondition`. `firestore.indexes.json` is deployed by hand, so a
- * client running this code before that lands must not simply stop syncing:
- * the pass degrades to the unfiltered read it used to do, and records itself
- * as a full read so nothing is missed.
- */
-function isMissingIndex(err: unknown): boolean {
-  return (err as { code?: string } | null)?.code === 'failed-precondition';
 }
 
 export async function pullOwnedDocs<R extends { ownerHash: string; updatedAt?: number }>(

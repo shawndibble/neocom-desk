@@ -81,33 +81,38 @@ export function useSurvey(id: string | null): {
   refresh: () => Promise<void>;
 } {
   const [loaded, setLoaded] = useState<Loaded>(null);
-  // How many scans the last load saw, and when that count last changed: the poll's pace.
-  const activity = useRef({ count: -1, at: 0 });
+  // How many scans the last load of this survey saw, and when that count last changed: the poll's pace.
+  const activity = useRef({ id, count: -1, at: 0 });
 
-  const take = useCallback((forId: string, result: LoadSurveyResult) => {
-    if (result.ok && result.scans.length !== activity.current.count) {
-      activity.current = { count: result.scans.length, at: Date.now() };
+  const applyResult = useCallback((forId: string, result: LoadSurveyResult) => {
+    const seen = activity.current;
+    // A late answer for the survey switched away from doesn't set this one's pace.
+    if (result.ok && seen.id === forId && result.scans.length !== seen.count) {
+      activity.current = { id: forId, count: result.scans.length, at: Date.now() };
     }
     setLoaded((prev) => settle(prev, forId, result));
   }, []);
 
   const refresh = useCallback(async () => {
     if (id === null) return;
-    take(id, await loadSurvey(id));
-  }, [id, take]);
+    applyResult(id, await loadSurvey(id));
+  }, [id, applyResult]);
 
   useEffect(() => {
     if (id === null) return;
     let cancelled = false;
     let lastRunAt = 0;
-    activity.current = { count: -1, at: Date.now() };
+    activity.current = { id, count: -1, at: Date.now() };
     const run = () => {
       lastRunAt = Date.now();
-      return loadSurvey(id)
-        .then((result) => {
-          if (!cancelled) take(id, result);
-        })
-        .catch(() => undefined);
+      return (
+        loadSurvey(id)
+          .then((result) => {
+            if (!cancelled) applyResult(id, result);
+          })
+          // loadSurvey answers its own failures; this only keeps the poll chain alive.
+          .catch(() => undefined)
+      );
     };
     let timer = 0;
     // Each wait starts once the last poll has answered, so a scan it found speeds up the next.
@@ -135,7 +140,7 @@ export function useSurvey(id: string | null): {
       document.removeEventListener('visibilitychange', onReturn);
       window.removeEventListener('focus', onReturn);
     };
-  }, [id, take]);
+  }, [id, applyResult]);
 
   const state = useMemo<SurveyLoadState>(() => {
     if (id === null) return { status: 'none' };

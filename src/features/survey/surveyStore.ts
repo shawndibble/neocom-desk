@@ -36,6 +36,7 @@ import { generateShareId } from '@/engine/share/shareId';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import type { SurveyRock, SurveyScan } from '@/engine/survey/series';
 import { loadShare, saveShare, shareUrl } from '@/features/share/shareStore';
+import { isMissingIndex } from '@/sync/missingIndex';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { MAX_SCAN_TEXT, rejectScanText, ScanRejected } from './scanResult';
 
@@ -231,6 +232,11 @@ interface SurveyCache {
   info: SurveyInfoShare | null;
   /** When the share doc, tax and info were last read; 0 when they are due. */
   detailsReadAt: number;
+  /**
+   * Bumped by each of this app's edits to them, so a load that began before
+   * the edit (and read the old values) doesn't mark them fresh again.
+   */
+  detailsGen: number;
   scans: Map<string, SurveyScan>;
   scansCursor: Timestamp | null;
   ignores: Map<string, { at: number; ignored: boolean }>;
@@ -238,6 +244,8 @@ interface SurveyCache {
 }
 
 const caches = new Map<string, SurveyCache>();
+/** Loads under way, so a cached read (the picker) at mount waits for the page's first load instead of paying for its own. */
+const inflight = new Map<string, Promise<LoadSurveyResult>>();
 /**
  * The subcollections whose `createdAt` index is not deployed yet (indexes go
  * out by hand): they fall back to a full read for the rest of the session
@@ -248,17 +256,16 @@ const missingIndex = new Set<string>();
 /** Drops what was read of every survey. For tests. */
 export function forgetSurveyCache(): void {
   caches.clear();
+  inflight.clear();
   missingIndex.clear();
 }
 
 /** The next load re-reads the share doc, tax and info: this app just changed one. */
 function markDetailsDue(id: string): void {
   const cache = caches.get(id);
-  if (cache !== undefined) cache.detailsReadAt = 0;
-}
-
-function isMissingIndex(error: unknown): boolean {
-  return (error as { code?: unknown } | null)?.code === 'failed-precondition';
+  if (cache === undefined) return;
+  cache.detailsReadAt = 0;
+  cache.detailsGen += 1;
 }
 
 function subcollection(id: string, name: string) {
@@ -307,8 +314,11 @@ function newestDocs(id: string, name: string): Promise<QuerySnapshot> {
   );
 }
 
+/** The later of two server times, to the nanosecond: two docs can land in the same millisecond. */
 function laterOf(cursor: Timestamp | null, at: Timestamp): Timestamp {
-  return cursor === null || at.toMillis() > cursor.toMillis() ? at : cursor;
+  if (cursor === null) return at;
+  const ms = at.toMillis() - cursor.toMillis();
+  return ms > 0 || (ms === 0 && at.nanoseconds > cursor.nanoseconds) ? at : cursor;
 }
 
 /** A stored scan's rocks, or null when its text is not a scan. */
@@ -341,7 +351,15 @@ function resultOf(cache: SurveyCache): LoadSurveyResult {
  * this sees a scan another pilot added a moment ago; the share doc, tax and
  * info are re-read once `SURVEY_DETAILS_TTL_MS` has passed.
  */
-export async function loadSurvey(id: string): Promise<LoadSurveyResult> {
+export function loadSurvey(id: string): Promise<LoadSurveyResult> {
+  const load = readSurvey(id).finally(() => {
+    if (inflight.get(id) === load) inflight.delete(id);
+  });
+  inflight.set(id, load);
+  return load;
+}
+
+async function readSurvey(id: string): Promise<LoadSurveyResult> {
   const startedAt = Date.now();
   let cache = caches.get(id);
   // Past its expiry the rules refuse every read: ask the share doc, which says "gone".
@@ -351,7 +369,11 @@ export async function loadSurvey(id: string): Promise<LoadSurveyResult> {
   }
   const detailsDue =
     cache === undefined || startedAt - cache.detailsReadAt >= SURVEY_DETAILS_TTL_MS;
-  if (detailsDue) {
+  const gen = cache?.detailsGen ?? 0;
+  let entry: SurveyCache;
+  if (cache !== undefined && !detailsDue) {
+    entry = cache;
+  } else {
     const found = await loadShare(id);
     const gone = !found.ok ? found.reason !== 'failed' : found.share.type !== 'survey';
     if (gone) {
@@ -360,19 +382,19 @@ export async function loadSurvey(id: string): Promise<LoadSurveyResult> {
     }
     if (!found.ok) return { ok: false, reason: 'failed' };
     const details = { expiresAt: found.share.expiresAt, owner: ownerOf(found.share.payload) };
-    cache = cache ?? {
+    entry = cache ?? {
       ...details,
       tax: null,
       info: null,
       detailsReadAt: 0,
+      detailsGen: 0,
       scans: new Map(),
       scansCursor: null,
       ignores: new Map(),
       ignoresCursor: null,
     };
-    Object.assign(cache, details);
+    Object.assign(entry, details);
   }
-  const entry = cache!;
 
   try {
     await Promise.all([
@@ -386,7 +408,7 @@ export async function loadSurvey(id: string): Promise<LoadSurveyResult> {
     entry.detailsReadAt = 0;
     return { ok: false, reason: 'failed' };
   }
-  if (detailsDue) entry.detailsReadAt = startedAt;
+  if (detailsDue && entry.detailsGen === gen) entry.detailsReadAt = startedAt;
   caches.set(id, entry);
   return resultOf(entry);
 }
@@ -398,7 +420,7 @@ export async function loadSurvey(id: string): Promise<LoadSurveyResult> {
 export async function loadSurveyCached(id: string): Promise<LoadSurveyResult> {
   const cache = caches.get(id);
   if (cache !== undefined && cache.expiresAt > Date.now()) return resultOf(cache);
-  return loadSurvey(id);
+  return inflight.get(id) ?? loadSurvey(id);
 }
 
 /** Merges the scans created since the last pull. A failed read throws: there is no survey without its scans. */

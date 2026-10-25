@@ -678,6 +678,28 @@ describe('polling a survey', () => {
     expect(loadShare).toHaveBeenCalledTimes(3);
   });
 
+  it('keeps an edit due when a load that began before it lands after', async () => {
+    serve({});
+    await loadSurvey('abc123XYZ');
+    vi.setSystemTime(NOW + SURVEY_DETAILS_TTL_MS);
+    let answer!: (v: unknown) => void;
+    loadShare.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    const stale = loadSurvey('abc123XYZ');
+    await setSurveyTax({ id: 'abc123XYZ', expiresAt: LIVE, name: 'Moon Corp', pct: 8 });
+    answer({ ok: true, share: { type: 'survey', payload: { v: 1 }, expiresAt: LIVE } });
+    await stale;
+    loadShare.mockClear();
+    await loadSurvey('abc123XYZ');
+    expect(loadShare).toHaveBeenCalledTimes(1);
+  });
+
+  it('has a cached load wait for one already under way instead of reading again', async () => {
+    serve({ surveyScans: [scanDoc('s1', 1000)] });
+    const [page, label] = [loadSurvey('abc123XYZ'), loadSurveyCached('abc123XYZ')];
+    expect(await label).toEqual(await page);
+    expect(loadShare).toHaveBeenCalledTimes(1);
+  });
+
   it('is not-found once the survey has expired, or its share is gone', async () => {
     serve({ surveyScans: [scanDoc('s1', 1000)] });
     await loadSurvey('abc123XYZ');
