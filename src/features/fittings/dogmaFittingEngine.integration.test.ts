@@ -1608,6 +1608,8 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       {
         kind: 'missile',
         dps: expect.closeTo(13.07, 2),
+        // The launcher's magazine, then its reload: the share it spends firing.
+        reloadDuty: expect.closeTo(0.9785, 3),
         range: expect.closeTo(4730 * 6.5, 0),
         explosionRadius: expect.closeTo(140, 3),
         explosionVelocity: expect.closeTo(85, 3),
