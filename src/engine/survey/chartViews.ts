@@ -102,9 +102,23 @@ export interface PaceInterval {
   opacity: number;
 }
 
+/** One invisible plot row the pace chart's tooltip snaps to. */
+export interface PaceRow {
+  at: number;
+  /** Index into `intervals`, or -1 for the tail row past the last scan (no tooltip there). */
+  interval: number;
+  /** A constant series so the chart has something to hover. */
+  idle: 0;
+}
+
 export interface PaceShareSeries {
   /** One entry per interval, for the bars, the tooltip and the table. */
   intervals: PaceInterval[];
+  /**
+   * Tooltip rows: each interval's start, middle and 1 ms before its end, then one at the last scan
+   * (interval -1) so hovering the projected stretch after it snaps there, not to the last interval.
+   */
+  rows: PaceRow[];
   /** Ores mined in at least one interval, in `oreNames` order. */
   activeOres: string[];
   /** Each ore's index in `summary.oreNames`, for its colour. */
@@ -164,5 +178,12 @@ export function paceShareSeries(summary: SurveySummary): PaceShareSeries {
     opacity: paceFade(r.progress, maxProgress),
   }));
   const activeOres = summary.oreNames.filter((o) => active.has(o));
-  return { intervals, activeOres, toneIndex };
+  const rows: PaceRow[] = intervals.flatMap((i, interval) => [
+    { at: i.from, interval, idle: 0 as const },
+    { at: (i.from + i.to) / 2, interval, idle: 0 as const },
+    { at: i.to - 1, interval, idle: 0 as const },
+  ]);
+  const last = intervals[intervals.length - 1];
+  if (last !== undefined) rows.push({ at: last.to, interval: -1, idle: 0 });
+  return { intervals, rows, activeOres, toneIndex };
 }

@@ -6639,7 +6639,6 @@
     "paceLength": "{{length}} between scans",
     "paceAxis": "share of progress",
     "paceProgress": "{{percent}}% of the field mined this scan",
-    "paceShare": "{{percent}}%",
     "pacePercentOf": "{{percent}}% of {{ore}}",
     "paceTableCell": "{{share}}% ({{percent}}%)",
     "tableProgress": "Field mined",

@@ -30,6 +30,8 @@ import { formatDuration, formatEveClock } from '@/engine/survey/chatMessage';
 import {
   depletionSeries,
   iskSeries,
+  type PaceInterval,
+  type PaceRow,
   type PaceShareSeries,
   type SurveySeriesRow,
 } from '@/engine/survey/chartViews';
@@ -333,18 +335,88 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
   );
 }
 
-/** One plot row of the pace chart: where the tooltip snaps, and which interval it reads. */
-interface PaceRow {
-  at: number;
-  interval: number;
-  idle: 0;
+/** The pace tooltip's content for one interval: ores ranked by share, idle ones left out. */
+export function PaceTipBody({
+  interval,
+  activeOres,
+  toneIndex,
+}: {
+  interval: PaceInterval;
+  activeOres: string[];
+  toneIndex: Record<string, number>;
+}) {
+  const { t } = useTranslation();
+  const ranked = activeOres
+    .filter((ore) => interval.shares[ore] !== undefined)
+    .sort((a, b) => interval.shares[b] - interval.shares[a]);
+  return (
+    <ChartTooltipShell>
+      <div className="min-w-48 space-y-1 text-xs">
+        <div className="font-semibold text-text">
+          {t('survey.paceRange', {
+            from: formatEveClock(interval.from),
+            to: formatEveClock(interval.to),
+          })}
+        </div>
+        <div className="text-text-dim">
+          {t('survey.paceLength', { length: formatDuration(interval.to - interval.from) })}
+        </div>
+        <div>{t('survey.paceProgress', { percent: formatPace(interval.progress) })}</div>
+        {ranked.length > 0 && (
+          <div className="space-y-0.5 border-t border-line pt-1">
+            {ranked.map((ore) => (
+              <div key={ore} className="flex items-center gap-2">
+                <Swatch tone={oreTone(toneIndex[ore])} />
+                <span className="min-w-9 shrink-0 text-right font-semibold text-text">
+                  {formatPace(interval.shares[ore])}%
+                </span>
+                <span className="min-w-0 flex-1 truncate text-text-dim">
+                  {t('survey.pacePercentOf', {
+                    percent: formatPace(interval.percents[ore]),
+                    ore,
+                  })}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </ChartTooltipShell>
+  );
+}
+
+/** Props Recharts hands a ReferenceArea's custom shape. */
+interface SliceShapeProps {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  fill?: string;
+  fillOpacity?: number;
+}
+
+/** A slice inset 1px top and bottom, so stacked slices show a 2px gap and bars keep their edges. */
+function SliceShape({ x, y, width, height, fill, fillOpacity }: SliceShapeProps) {
+  if (x === undefined || y === undefined || width === undefined || height === undefined) {
+    return <g />;
+  }
+  return (
+    <rect
+      x={x}
+      y={y + 1}
+      width={Math.max(0, width)}
+      height={Math.max(0, height - 2)}
+      fill={fill}
+      fillOpacity={fillOpacity}
+    />
+  );
 }
 
 /**
  * The Depletion view's pace chart: one 100% bar per scan interval, from scan to scan on the shared
  * time axis, split into each mined ore's share of that interval's progress. Slices keep the
- * legend's order and colours with the first (most valuable) ore at the bottom; a 2px surface-coloured
- * stroke separates them. Quiet intervals fade. The caller wraps it in its figure and table; only the
+ * legend's order and colours with the first (most valuable) ore at the bottom; each is inset
+ * 1px top and bottom (see SliceShape), leaving a 2px gap. Quiet intervals fade. The caller wraps it in its figure and table; only the
  * plot is here.
  */
 export function PaceByOreChart({
@@ -355,19 +427,9 @@ export function PaceByOreChart({
   pace: PaceShareSeries;
 }) {
   const { t } = useTranslation();
-  const { intervals, activeOres, toneIndex } = pace;
+  const { intervals, rows, activeOres, toneIndex } = pace;
   const { xAxis } = timeAxis(summary);
 
-  // The tooltip needs plot rows to snap to: each interval's start, middle and 1 ms before its end.
-  const rows = useMemo<PaceRow[]>(
-    () =>
-      intervals.flatMap((i, interval) => [
-        { at: i.from, interval, idle: 0 as const },
-        { at: (i.from + i.to) / 2, interval, idle: 0 as const },
-        { at: i.to - 1, interval, idle: 0 as const },
-      ]),
-    [intervals]
-  );
   // The bars themselves: each ore's slice runs from the shares of the ores below it to its own top.
   const slices = useMemo(
     () =>
@@ -396,43 +458,7 @@ export function PaceByOreChart({
     const row = payload?.[0]?.payload as PaceRow | undefined;
     const interval = row === undefined ? undefined : intervals[row.interval];
     if (!active || interval === undefined) return null;
-    const ranked = activeOres
-      .filter((ore) => interval.shares[ore] !== undefined)
-      .sort((a, b) => interval.shares[b] - interval.shares[a]);
-    return (
-      <ChartTooltipShell>
-        <div className="min-w-48 space-y-1 text-xs">
-          <div className="font-semibold text-text">
-            {t('survey.paceRange', {
-              from: formatEveClock(interval.from),
-              to: formatEveClock(interval.to),
-            })}
-          </div>
-          <div className="text-text-dim">
-            {t('survey.paceLength', { length: formatDuration(interval.to - interval.from) })}
-          </div>
-          <div>{t('survey.paceProgress', { percent: formatPace(interval.progress) })}</div>
-          {ranked.length > 0 && (
-            <div className="space-y-0.5 border-t border-line pt-1">
-              {ranked.map((ore) => (
-                <div key={ore} className="flex items-center gap-2">
-                  <Swatch tone={oreTone(toneIndex[ore])} />
-                  <span className="w-9 shrink-0 text-right font-semibold text-text">
-                    {t('survey.paceShare', { percent: formatPace(interval.shares[ore]) })}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-text-dim">
-                    {t('survey.pacePercentOf', {
-                      percent: formatPace(interval.percents[ore]),
-                      ore,
-                    })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </ChartTooltipShell>
-    );
+    return <PaceTipBody interval={interval} activeOres={activeOres} toneIndex={toneIndex} />;
   }
 
   return (
@@ -451,6 +477,7 @@ export function PaceByOreChart({
             fontSize: '0.625rem',
           },
         })}
+        {/* One ReferenceArea per slice: about 8 ores x intervals SVG rects, by design. */}
         {slices.map((s) => (
           <ReferenceArea
             key={s.key}
@@ -460,8 +487,7 @@ export function PaceByOreChart({
             y2={s.y2}
             fill={oreTone(toneIndex[s.ore])}
             fillOpacity={s.opacity}
-            stroke="var(--color-panel)"
-            strokeWidth={2}
+            shape={SliceShape}
             ifOverflow="visible"
           />
         ))}

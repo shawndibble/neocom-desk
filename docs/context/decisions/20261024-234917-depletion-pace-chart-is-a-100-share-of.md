@@ -6,3 +6,7 @@ _Recorded 2026-10-24. Supersedes [Depletion pace-by-ore is per-ore percent lines
 - **Slice order is fixed, not sorted per bar:** the depletion legend's order and colours, the first (most valuable) ore at the bottom, a 2px surface gap between slices. A fixed order lets the eye follow one ore across scans.
 - **Quiet intervals fade.** Bar opacity runs linearly from 0.35 (nothing mined) to 1 (the busiest interval), by the interval's progress: m³ mined over every ore's starting volume together. Shares alone would give a trivial scrape the same weight as a big one.
 - **The tooltip gives the interval, its length, the field mined this scan, then each active ore, largest share first, with its share and its raw "% of ore".** Idle ores are omitted. The hidden table has one column per mined ore reading "share% (raw%)", plus a Field mined column.
+- **Shares are rounded individually for display,** so a tooltip or table row may total 99 to 101%; the bars themselves are exact.
+- **Fade is relative to the busiest scan of this survey,** not an absolute scale, so the same mining fades differently in a different survey.
+- **The pace chart's top margin is 28, not the shared 20,** to fit the axis title above the bars; horizontal margins are unchanged, so the time axis still lines up with the depletion chart.
+- **The 2px gap is vertical only:** each slice is inset 1px top and bottom, so neighbouring bars touch edge to edge. The tooltip is hidden over the projected stretch after the last scan.

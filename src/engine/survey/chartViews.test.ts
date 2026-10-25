@@ -146,6 +146,7 @@ describe('paceShareSeries', () => {
       intervals: [],
       activeOres: [],
       toneIndex: { A: 0 },
+      rows: [],
     });
   });
 
@@ -222,8 +223,37 @@ describe('paceShareSeries', () => {
   it('never divides by zero through a real survey', () => {
     const s = summarizeSurvey([scan(0, ['A', 0], ['B', 100]), scan(5, ['A', 0], ['B', 0])])!;
     const [i] = paceShareSeries(s).intervals;
-    expect(i.shares.B).toBeCloseTo(100);
-    expect(Number.isFinite(i.progress)).toBe(true);
+    expect(i.percents).toEqual({ B: 100 });
+    expect(i.shares).toEqual({ B: 100 });
+    expect(i.progress).toBeCloseTo(100);
+    expect(i.opacity).toBe(1);
+  });
+
+  it('reports no progress when the summary has no starting volume (hand-built summary)', () => {
+    const base = summarizeSurvey([scan(0, ['A', 100]), scan(5, ['A', 50])])!;
+    const [i] = paceShareSeries({ ...base, startVolume: 0 }).intervals;
+    expect(i.progress).toBe(0);
+    expect(i.opacity).toBe(1);
+  });
+
+  it('clamps progress to 100 (hand-built summary)', () => {
+    const base = summarizeSurvey([scan(0, ['A', 100]), scan(5, ['A', 50])])!;
+    const [i] = paceShareSeries({ ...base, startVolume: 10 }).intervals;
+    expect(i.progress).toBe(100);
+  });
+
+  it('plots rows at each interval start, middle and 1 ms before its end, then a tail row', () => {
+    const s = summarizeSurvey([scan(0, ['A', 100]), scan(10, ['A', 50]), scan(20, ['A', 20])])!;
+    const { rows } = paceShareSeries(s);
+    expect(rows).toEqual([
+      { at: T0, interval: 0, idle: 0 },
+      { at: T0 + 5 * MIN, interval: 0, idle: 0 },
+      { at: T0 + 10 * MIN - 1, interval: 0, idle: 0 },
+      { at: T0 + 10 * MIN, interval: 1, idle: 0 },
+      { at: T0 + 15 * MIN, interval: 1, idle: 0 },
+      { at: T0 + 20 * MIN - 1, interval: 1, idle: 0 },
+      { at: T0 + 20 * MIN, interval: -1, idle: 0 },
+    ]);
   });
 
   it('keeps the colour index of the full ore list and drops ores never mined', () => {
