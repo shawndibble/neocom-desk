@@ -49,6 +49,14 @@ describe('groupByModule', () => {
     expect(ids(groups).map((g) => g[0])).toEqual([13, 11, 10, 12]);
   });
 
+  it('ranks a free option with no gain below a priced one that gains', () => {
+    const groups = groupByModule(
+      [option(10, 0, 0, 0, 1), option(11, 0.3, 5_000_000, 1, 2)],
+      'value'
+    );
+    expect(ids(groups).map((g) => g[0])).toEqual([11, 10]);
+  });
+
   it('sorts cheapest first, unpriced last', () => {
     const groups = groupByModule(
       [option(10, 0.9, 900, 0, 1), option(11, 0.1, null, 1, 2), option(12, 0.1, 100, 2, 3)],

@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  Caret,
   StatChange,
   TypeIcon,
 } from '@/components/ui';
@@ -76,8 +77,6 @@ const m3sFormat = createNumberFormat({ maximumFractionDigits: 1 });
 const m3Format = createNumberFormat({ maximumFractionDigits: 0 });
 const twoDecimals = createNumberFormat({ maximumFractionDigits: 2 });
 
-const percentFormat = createNumberFormat({ maximumFractionDigits: 1 });
-
 /** The furthest a turret's optimal or a missile's range reaches, in km. */
 const reachKm = (s: FittingStats) =>
   Math.max(
@@ -107,6 +106,9 @@ function slotsOf(candidate: ImproveOption['candidate']): string[] {
 export interface ImproveSettings {
   reach: ImproveReach;
   onReachChange: (reach: ImproveReach) => void;
+  /** How each section's rows are ordered. */
+  sort: ImproveSort;
+  onSortChange: (sort: ImproveSort) => void;
   mode: ImproveMode;
   onModeChange: (mode: ImproveMode) => void;
   /** Total budget (planning) or extra-spend cap (refitting) in ISK; null is no limit. */
@@ -165,6 +167,7 @@ function brokeText(
 }
 
 const NO_TICKS: ReadonlyMap<string, ImproveOption> = new Map();
+const NO_OPEN: ReadonlySet<string> = new Set();
 
 export function ImprovePanel({
   goal,
@@ -183,9 +186,12 @@ export function ImprovePanel({
   const { t } = useTranslation();
   const moreId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
-  const [sort, setSort] = useState<ImproveSort>('gain');
-  // Modules whose other options are showing.
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const { sort, onSortChange: setSort } = settings;
+  // Modules whose other options, and rows whose other stats, are showing; like ticks, they belong to one result.
+  const [open, setOpen] = useState<{ result: ImproveResult | null; keys: ReadonlySet<string> }>({
+    result: null,
+    keys: new Set(),
+  });
   // Ticked rows, by key; at most one per fitted module (ticking another variation of it unticks the first).
   // Ticks belong to the result they were made in: a new search (a goal
   // change, an edit to the fit) starts with none.
@@ -197,6 +203,14 @@ export function ImprovePanel({
   }>({ result: null, byModule: new Map(), replaced: new Map() });
   const { state, before, hull } = search;
   const result = state.status === 'done' ? state.result : null;
+  const expanded = open.result === result ? open.keys : NO_OPEN;
+  const flip = (key: string) =>
+    setOpen({
+      result,
+      keys: new Set(
+        expanded.has(key) ? [...expanded].filter((k) => k !== key) : [...expanded, key]
+      ),
+    });
   const ticked = ticks.result === result ? ticks.byModule : NO_TICKS;
   const replaced = ticks.result === result ? ticks.replaced : new Map<string, string>();
   const setTicked = (
@@ -221,16 +235,33 @@ export function ImprovePanel({
         })
       : moveLabel(option.candidate);
 
-  function changeLine(option: ImproveOption | RejectedOption, own: FittingStats): ReactNode {
+  /** The swap's other changes; `onOpen` makes the "N other stats" tail a button that spells them out. */
+  function changeLine(
+    option: ImproveOption | RejectedOption,
+    own: FittingStats,
+    all = false,
+    onOpen?: () => void
+  ): ReactNode {
     // What the swap does first; the CPU, powergrid and calibration it takes after.
     const changes = [...diffFittingStats(own, option.after).changes].sort(
       (a, b) => Number(isResource(a.key)) - Number(isResource(b.key))
     );
     const shown: ReactNode[] = changes
-      .slice(0, CHANGES_SHOWN)
+      .slice(0, all ? undefined : CHANGES_SHOWN)
       .map((change) => <StatChange key={change.key} change={change} />);
     const rest = changes.length - shown.length;
-    if (rest > 0) shown.push(t('fittings.makeItFit.otherStats', { count: rest }));
+    if (rest > 0) {
+      const label = t('fittings.makeItFit.otherStats', { count: rest });
+      shown.push(
+        onOpen ? (
+          <button key="rest" type="button" className={textActionClassName()} onClick={onOpen}>
+            {label}
+          </button>
+        ) : (
+          label
+        )
+      );
+    }
     if (shown.length === 0) return t('fittings.variations.noChanges');
     return shown.flatMap((node, i) => (i === 0 ? [node] : [', ', node]));
   }
@@ -385,8 +416,9 @@ export function ImprovePanel({
     setTicked(next, nextReplaced);
   }
 
-  function optionRow(option: ImproveOption, own: FittingStats) {
-    const id = `improve-${optionKey(option)}`;
+  function optionRow(option: ImproveOption, own: FittingStats, section: string) {
+    const id = `improve-${section}-${optionKey(option)}`;
+    const statsKey = `stats:${id}`;
     const lead = leadLine(option, own);
     return (
       <li key={optionKey(option)} className="border-line rounded-xs border p-2 text-sm">
@@ -406,12 +438,14 @@ export function ImprovePanel({
               <span className="font-medium">{swapLabel(option)}</span>
               {goal !== 'cheaper' && (
                 <span className="text-success shrink-0 text-xs font-medium">
-                  {t('fittings.improve.gain', { percent: percentFormat(option.score * 100) })}
+                  {t('fittings.improve.gain', { percent: m3sFormat(option.score * 100) })}
                 </span>
               )}
             </span>
             {lead && <span className="block text-xs">{lead}</span>}
-            <span className="text-text-dim block text-xs">{changeLine(option, own)}</span>
+            <span className="text-text-dim block text-xs">
+              {changeLine(option, own, expanded.has(statsKey), () => flip(statsKey))}
+            </span>
             {option.downsides.length > 0 && (
               <span className="text-warning block text-xs">
                 {t('fittings.improve.givesUp', {
@@ -438,38 +472,36 @@ export function ImprovePanel({
     );
   }
 
-  function rows(options: ImproveOption[], own: FittingStats) {
+  function rows(options: ImproveOption[], own: FittingStats, section: string) {
     return (
       <ul className="space-y-1">
-        {groupByModule(options, sort).map((group) => {
+        {groupByModule(options, sort).map((group, index) => {
           const all = [group.best, ...group.others];
           // A ticked alternative takes the row's place; the rest stay behind it.
           const shown = all.find((option) => ticked.has(optionKey(option))) ?? group.best;
           const rest = all.filter((option) => option !== shown);
-          const open = expanded.has(group.key);
-          const listId = `${moreId}-${group.key}`;
+          const groupKey = `${section}:${group.key}`;
+          const isOpen = expanded.has(groupKey);
+          const listId = `${moreId}-${section}-${index}`;
           return (
             <Fragment key={group.key}>
-              {optionRow(shown, own)}
+              {optionRow(shown, own, section)}
               {rest.length > 0 && (
                 <li className="pl-2">
                   <button
                     type="button"
                     className={textActionClassName()}
-                    aria-expanded={open}
+                    aria-expanded={isOpen}
                     aria-controls={listId}
-                    onClick={() =>
-                      setExpanded((prev) => {
-                        const next = new Set(prev);
-                        if (!next.delete(group.key)) next.add(group.key);
-                        return next;
-                      })
-                    }
+                    onClick={() => flip(groupKey)}
                   >
                     {t('fittings.improve.moreOptions', { count: rest.length })}
+                    <Caret expanded={isOpen} />
                   </button>
-                  <Collapse open={open} id={listId} className="pt-1">
-                    <ul className="space-y-1">{rest.map((option) => optionRow(option, own))}</ul>
+                  <Collapse open={isOpen} id={listId} className="pt-1">
+                    <ul className="space-y-1">
+                      {rest.map((option) => optionRow(option, own, section))}
+                    </ul>
                   </Collapse>
                 </li>
               )}
@@ -856,12 +888,12 @@ export function ImprovePanel({
             />
             {state.result.noDownside.length > 0 && (
               <MakeItFitSection heading={t('fittings.improve.section.noDownside')}>
-                {rows(state.result.noDownside, state.before)}
+                {rows(state.result.noDownside, state.before, 'nd')}
               </MakeItFitSection>
             )}
             {state.result.tradeOffs.length > 0 && (
               <MakeItFitSection heading={t('fittings.improve.section.tradeOffs')}>
-                {rows(state.result.tradeOffs, state.before)}
+                {rows(state.result.tradeOffs, state.before, 'to')}
               </MakeItFitSection>
             )}
             <div className="bg-surface border-line sticky bottom-0 space-y-2 border-t pt-2">

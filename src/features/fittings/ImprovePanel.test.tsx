@@ -58,6 +58,8 @@ function done(result: Partial<ImproveResult>, own: FittingStats = before): Impro
 const settings = (patch: Partial<ImproveSettings> = {}): ImproveSettings => ({
   reach: 'upgrade',
   onReachChange: vi.fn(),
+  sort: 'gain',
+  onSortChange: vi.fn(),
   mode: 'buy',
   onModeChange: vi.fn(),
   spendCap: null,
@@ -202,14 +204,37 @@ describe('ImprovePanel', () => {
     expect(row).toHaveTextContent('90.7');
   });
 
-  it('reorders by the chosen sort', async () => {
+  it('orders each section by the remembered sort, and reports a change', async () => {
     const pricey = option(11, { ehp: 1100 }, { score: 0.5, iskDelta: 900_000_000 });
     const cheap = option(21, { ehp: 1100 }, { score: 0.1, iskDelta: 1_000_000 });
-    renderPanel(search(done({ noDownside: [cheap, pricey] })));
+    const state = search(done({ noDownside: [cheap, pricey] }));
     const first = () => screen.getAllByRole('checkbox')[0]!.closest('li')!;
+    const onSortChange = vi.fn();
+    const { unmount } = renderPanel(state, vi.fn(), vi.fn(), settings({ onSortChange }));
     expect(first()).toHaveTextContent('+50%');
     await userEvent.click(screen.getByRole('button', { name: 'Best value' }));
+    expect(onSortChange).toHaveBeenCalledWith('value');
+    unmount();
+    renderPanel(state, vi.fn(), vi.fn(), settings({ sort: 'value' }));
     expect(first()).toHaveTextContent('+10%');
+  });
+
+  it('opens "N other stats" inline', async () => {
+    const gain = option(11, {
+      ehp: 1100,
+      cpuUsed: before.cpuUsed + 1,
+      powergridUsed: before.powergridUsed + 1,
+      calibrationUsed: before.calibrationUsed + 1,
+      droneDps: before.droneDps + 1,
+      droneCapacity: before.droneCapacity + 1,
+      capacitorCapacity: before.capacitorCapacity + 1,
+    });
+    renderPanel(search(done({ noDownside: [gain] })));
+    const row = screen.getByRole('checkbox').closest('li')!;
+    const before_ = row.querySelectorAll('[data-verdict]').length;
+    await userEvent.click(screen.getByRole('button', { name: /other stats?/ }));
+    expect(row.querySelectorAll('[data-verdict]').length).toBeGreaterThan(before_);
+    expect(screen.queryByRole('button', { name: /other stats?/ })).not.toBeInTheDocument();
   });
 
   it('ticks one variation per fitted module', async () => {

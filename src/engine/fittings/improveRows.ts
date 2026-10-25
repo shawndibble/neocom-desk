@@ -19,14 +19,15 @@ const MILLION = 1_000_000;
 /** The module a candidate changes: its source and slots, not the paired downgrade. */
 export const moduleKey = (candidate: ImproveCandidate): string =>
   `${candidate.fromTypeId ?? 'empty'}|${candidate.at
-    .map((at) => `${at.slot}${at.slotIndex}`)
+    .map((at) => `${at.slot}:${at.slotIndex}`)
     .sort()
     .join(',')}`;
 
-/** Gain per million ISK; a free or saving option beats every priced one, an unpriced one has none. */
+/** Gain per million ISK; a free or saving gain beats every priced one, an unpriced one has none. */
 function valueOf(option: ImproveOption): number | null {
   if (option.iskDelta === null) return null;
-  return option.iskDelta <= 0 ? Infinity : option.score / (option.iskDelta / MILLION);
+  if (option.iskDelta > 0) return option.score / (option.iskDelta / MILLION);
+  return option.score > 0 ? Infinity : option.score;
 }
 
 /** Null (unpriced) sorts after every number. */
