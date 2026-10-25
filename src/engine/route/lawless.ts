@@ -1,10 +1,8 @@
 /**
  * Lawless (insurgency) systems on a route (issue #2870): which stored ids may
- * still be shown. The lawless-systems job checks the list every 15
- * minutes (the R2 copy is rewritten each run; the `syncLawlessSystems` Firestore
- * fallback re-confirms an unchanged list every 30, issue #4272), so `updatedAt` means "last confirmed"; past
- * `LAWLESS_STALE_AFTER_MS` the list is not shown at all — a stale list must
- * never read as current.
+ * still be shown. `updatedAt` means "last confirmed" (the job re-checks every
+ * 15 minutes); past `LAWLESS_STALE_AFTER_MS` the list is not shown at all — a
+ * stale list must never read as current.
  */
 
 export const LAWLESS_STALE_AFTER_MS = 60 * 60 * 1000;

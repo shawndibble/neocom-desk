@@ -41,7 +41,11 @@ async function readList(characterId: number): Promise<void> {
     lastRead = { at: Date.now(), data: fromR2 };
     return;
   }
-  if (!isSyncConfigured()) return;
+  if (!isSyncConfigured()) {
+    // Nothing to fall back to: remember the miss so remounts do not refetch R2 every time.
+    lastRead = { at: Date.now(), data: null };
+    return;
+  }
   try {
     // Dynamic: Firebase stays out of the startup graph.
     const [{ doc, getDoc }, { getSyncFirestore }, { ensureAnySession }] = await Promise.all([

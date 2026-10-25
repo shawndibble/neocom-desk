@@ -11,7 +11,7 @@ import { createR2Put, type R2Put } from './r2Client.js';
 
 /** What the app reads: `{ systemIds, updatedAt }`, the shape of `systemConditions/lawless`. */
 export const LAWLESS_SYSTEMS_R2_KEY = 'lawless-systems/systems.json';
-/** Runs are 15 minutes apart: five is the longest a CDN copy is worth keeping. */
+/** Runs are 15 minutes apart: five minutes is the longest a CDN copy is worth keeping. */
 const HEADERS = {
   'Content-Type': 'application/json',
   'Cache-Control': 'public, max-age=300',
