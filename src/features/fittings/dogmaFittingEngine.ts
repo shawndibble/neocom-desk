@@ -56,6 +56,7 @@ import {
   type Fitting,
   type FittingSlotKind,
   type FittingStats,
+  type RuleBreak,
   type PilotProfile,
   type DamageProfile,
   type ProjectedEffects,
@@ -365,6 +366,57 @@ async function modulesWithHarmlessCharges(
 }
 
 /**
+ * The engine's violations as the rule breaks a fit reports: everything but
+ * skills (the Skill Plan owns those) and resources (CPU, powergrid and
+ * calibration have their own figures). An item-level break names the type
+ * fitted at its index (`dogmaFit.items`); the ship-level ones carry no type.
+ */
+export function ruleBreaksOf(
+  dogmaFit: Fit,
+  violations: readonly Violation[] | undefined
+): RuleBreak[] {
+  const breaks: RuleBreak[] = [];
+  for (const { target, rule } of violations ?? []) {
+    switch (rule.type) {
+      case 'skill':
+      case 'resource':
+        break;
+      case 'max_group':
+        breaks.push({
+          kind: 'max_group',
+          groupId: rule.group_id,
+          limit: rule.limit,
+          used: rule.used,
+          allowed: rule.allowed,
+        });
+        break;
+      case 'max_type':
+        breaks.push({
+          kind: 'max_type',
+          typeId: rule.type_id,
+          used: rule.used,
+          allowed: rule.allowed,
+        });
+        break;
+      case 'slots':
+        breaks.push({
+          kind: 'slots',
+          slot: rule.slot,
+          used: rule.used,
+          available: rule.available,
+        });
+        break;
+      default:
+        breaks.push({
+          kind: rule.type,
+          typeId: target.type === 'ship' ? null : (dogmaFit.items[target.index]?.type_id ?? null),
+        });
+    }
+  }
+  return breaks;
+}
+
+/**
  * Works out a Fitting's stats under a pilot's skills and implants, with EHP
  * measured against `damageProfile` (the engine's uniform default without
  * one), inside `weather` when there is one. Loads the engine first if this
@@ -388,7 +440,8 @@ export async function computeFittingStats(
     withWeather(toDogmaFit(fitting, profile, damageProfile), weatherTypeId),
     incoming
   );
-  const calculation = calculate(dogmaFit);
+  const calculation = calculate(dogmaFit, { validate: true });
+  const ruleBreaks = ruleBreaksOf(dogmaFit, calculation.violations);
   const harmlessCharges = await modulesWithHarmlessCharges(fitting, calculation);
 
   // Overheated values come from the engine itself (its overload state), not
@@ -408,9 +461,25 @@ export async function computeFittingStats(
   // what the pilot set, not the what-if.
   const allOverheated = overheatAll && heatedCalculation !== null;
   if (allOverheated) {
-    const unheated = statsFrom(fitting, dogmaFit, calculation, calculation, null, harmlessCharges);
+    const unheated = statsFrom(
+      fitting,
+      dogmaFit,
+      calculation,
+      calculation,
+      null,
+      harmlessCharges,
+      ruleBreaks
+    );
     return {
-      ...statsFrom(fitting, dogmaFit, calculation, heatedCalculation, null, harmlessCharges),
+      ...statsFrom(
+        fitting,
+        dogmaFit,
+        calculation,
+        heatedCalculation,
+        null,
+        harmlessCharges,
+        ruleBreaks
+      ),
       allOverheated: true,
       unheated: { ...unheated, allOverheated: false, unheated: null },
     };
@@ -422,7 +491,8 @@ export async function computeFittingStats(
       calculation,
       calculation,
       withOverheated ? heatedCalculation : null,
-      harmlessCharges
+      harmlessCharges,
+      ruleBreaks
     ),
     allOverheated: false,
     unheated: null,
@@ -441,7 +511,8 @@ function statsFrom(
   shown: ReturnType<typeof calculate>,
   beside: ReturnType<typeof calculate> | null,
   /** Module type ids none of whose charges deal damage (probe launchers). */
-  harmlessCharges: ReadonlySet<number>
+  harmlessCharges: ReadonlySet<number>,
+  ruleBreaks: RuleBreak[]
 ): Omit<FittingStats, 'allOverheated' | 'unheated'> {
   const baseStats = extractFittingStats(dogmaFit.items, shown.ship.attributes, shown.items);
 
@@ -497,6 +568,7 @@ function statsFrom(
 
   return {
     ...baseStats,
+    ruleBreaks,
     targeting: { ...baseStats.targeting, maxLockedTargets: lockedTargets.effective },
     ...extractDroneLimits(dogmaFit.items, shown.items, shown.character.attributes),
     calibrationUsed,

@@ -9,7 +9,7 @@ import {
   type ImproveOption,
 } from './improve';
 import { buildVariationIndex } from '../market/variations';
-import type { Fitting, FittingStats } from './types';
+import type { Fitting, FittingStats, RuleBreak } from './types';
 import { baseFittingStats } from './__fixtures__/fittingStats';
 
 /** What each fitted type adds to the fit; the fit's stats are the base plus every module's row. */
@@ -24,6 +24,8 @@ interface Row {
   sig?: number;
   /** Capacitor recharge time added, in ms. */
   recharge?: number;
+  /** Fitting rules this module breaks. */
+  breaks?: RuleBreak[];
 }
 
 function stats(rows: Row[]): FittingStats {
@@ -32,6 +34,7 @@ function stats(rows: Row[]): FittingStats {
   const base = baseFittingStats();
   return {
     ...base,
+    ruleBreaks: rows.flatMap((row) => row.breaks ?? []),
     cpuUsed: sum('cpu'),
     capacitorRechargeTime: base.capacitorRechargeTime + sum('recharge'),
     ehp: base.ehp + sum('ehp'),
@@ -87,6 +90,34 @@ async function search(
 }
 
 const toIds = (options: readonly ImproveOption[]) => options.map((o) => o.candidate.toTypeId);
+
+describe('findImprovements fitting rules', () => {
+  const twoDamageControls: RuleBreak = {
+    kind: 'max_group',
+    groupId: 60,
+    limit: 'fitted',
+    used: 2,
+    allowed: 1,
+  };
+  const wrongSlot: RuleBreak = { kind: 'wrong_slot', typeId: 9 };
+
+  it('drops a candidate whose after-fit breaks a rule the starting fit did not', async () => {
+    const table = { 1: { dps: 0 }, 2: { dps: 50, breaks: [twoDamageControls] }, 3: { dps: 20 } };
+    const result = await search('damage', table, [candidate(1, 2), candidate(1, 3)]);
+    expect(toIds(result.noDownside)).toEqual([3]);
+    expect(result.rejected).toEqual([]);
+  });
+
+  it('still improves a fit that already breaks a rule, without adding a break', async () => {
+    const table = {
+      1: { dps: 0, breaks: [wrongSlot] },
+      2: { dps: 50, breaks: [wrongSlot, twoDamageControls] },
+      3: { dps: 20, breaks: [wrongSlot] },
+    };
+    const result = await search('damage', table, [candidate(1, 2), candidate(1, 3)]);
+    expect(toIds(result.noDownside)).toEqual([3]);
+  });
+});
 
 describe('findImprovements goals', () => {
   it('More damage keeps only swaps that raise damage, best first', async () => {

@@ -277,6 +277,7 @@ export function extractFittingStats(
   itemResults: readonly ItemCalculationResult[]
 ): Omit<
   FittingStats,
+  | 'ruleBreaks'
   | 'calibrationUsed'
   | 'droneBandwidthUsed'
   | 'maxActiveDrones'

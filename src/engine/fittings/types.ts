@@ -278,7 +278,49 @@ export interface LockedTargets {
   effective: number;
 }
 
+/** Rules that count a thing against a limit: the fit breaks them by `used` passing the limit. */
+export type CountedRuleBreak =
+  | {
+      kind: 'max_group';
+      groupId: number;
+      /** Whether the limit counts fitted, online or active modules. */
+      limit: 'fitted' | 'online' | 'active';
+      used: number;
+      allowed: number;
+    }
+  | { kind: 'max_type'; typeId: number; used: number; allowed: number }
+  | {
+      kind: 'slots';
+      /** A rack or a hardpoint kind (`turret`, `launcher`). */
+      slot: string;
+      used: number;
+      available: number;
+    };
+
+/** Rules an item breaks on its own: the wrong slot, a rig of the wrong size, a charge that does not fit. */
+export interface ItemRuleBreak {
+  kind:
+    | 'wrong_slot'
+    | 'slot_taken'
+    | 'wrong_slot_index'
+    | 'subsystem_taken'
+    | 'rig_size'
+    | 'ship_restricted'
+    | 'capital_item'
+    | 'structure_item'
+    | 'ship_item'
+    | 'charge_group'
+    | 'charge_size';
+  /** The fitted item (the module, for a charge) that breaks it; null when the rule names the ship. */
+  typeId: number | null;
+}
+
+/** A fitting rule the fit breaks, other than a missing skill or a resource overage. */
+export type RuleBreak = CountedRuleBreak | ItemRuleBreak;
+
 export interface FittingStats {
+  /** The fitting rules the fit breaks (not skills, not CPU/powergrid/calibration, which have their own figures). */
+  ruleBreaks: RuleBreak[];
   cpuUsed: number;
   cpuTotal: number;
   powergridUsed: number;

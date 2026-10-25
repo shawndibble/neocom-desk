@@ -32,6 +32,7 @@ export function neutralExtendedStats(): Pick<
   | 'holds'
   | 'jumpDrive'
   | 'lockedTargets'
+  | 'ruleBreaks'
   | 'allOverheated'
   | 'unheated'
 > {
@@ -57,6 +58,7 @@ export function neutralExtendedStats(): Pick<
     holds: NO_HOLDS,
     jumpDrive: null,
     lockedTargets: { ship: 0, pilot: 2, effective: 0 },
+    ruleBreaks: [],
     allOverheated: false,
     unheated: null,
     capacitorBudget: {

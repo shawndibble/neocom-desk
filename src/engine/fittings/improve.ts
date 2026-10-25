@@ -23,6 +23,7 @@ import {
   type DefenseSide,
   type Job,
 } from './improveGroups';
+import { newRuleBreaks } from './ruleBreaks';
 import { applyModuleUpgrade } from './moduleUpgrades';
 import {
   overageOf,
@@ -700,6 +701,8 @@ export async function findImprovements({
 
   /** Scores one calculated change; false when cancelled mid-way is the caller's concern. */
   function take(candidate: ImproveCandidate, swapped: Fitting, after: FittingStats) {
+    // The game refuses a fit that breaks a fitting rule the open one keeps: never offered.
+    if (newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length > 0) return;
     const { isk: iskDelta, destroysRigs } = iskDeltaOf(candidate, priceOf, mode);
     const score = scoreOf(goal, before, after, iskDelta, target, hold);
     if (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON)) return;
