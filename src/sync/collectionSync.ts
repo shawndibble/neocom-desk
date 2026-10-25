@@ -52,14 +52,20 @@ export async function runBounded(writes: (() => Promise<unknown>)[]): Promise<vo
  * the old doc (it reads `ownerHash == current`), so the write is an update the
  * rules refuse: `hashMatches` reads the stored hash. Delete is uid-only for
  * exactly this (firestore.rules), so the stale doc is removed and the write
- * retried once. The session's own claim is checked before the pass
- * (`ensureSignedIn`), so a refusal here is the stored doc's.
+ * retried once — but only once `ctx.confirmOwner` proves this device is the
+ * current owner; otherwise the refusal stands. Not atomic: a failed retry
+ * leaves the id empty, and the local row pushes it again next pass.
  */
-export async function setOwnedDoc(ref: DocumentReference, data: DocumentData): Promise<void> {
+export async function setOwnedDoc(
+  ref: DocumentReference,
+  data: DocumentData,
+  ctx: SyncContext
+): Promise<void> {
   try {
     await setDoc(ref, data);
   } catch (error) {
     if ((error as { code?: unknown } | null)?.code !== 'permission-denied') throw error;
+    if (!(await ctx.confirmOwner?.())) throw error;
     await deleteDoc(ref);
     await setDoc(ref, data);
   }
@@ -120,6 +126,11 @@ export interface SyncContext {
   now: number;
   /** Called after a pass pushes at least one doc, so the driver bumps the change marker. */
   onPush?: () => void;
+  /**
+   * Whether this device provably holds the Character now (`confirmOwnership`),
+   * asked at most once a pass. Without it `setOwnedDoc` never deletes.
+   */
+  confirmOwner?: () => Promise<boolean>;
 }
 
 /**
@@ -255,17 +266,21 @@ export async function syncEditableCollection(
   if (plan.pushUpserts.length > 0 || plan.pushTombstones.length > 0) ctx.onPush?.();
   await runBounded([
     ...plan.pushUpserts.map(
-      (p) => () => setOwnedDoc(doc(col, p.id), spec.toRemoteDoc(p, ctx.ownerHash))
+      (p) => () => setOwnedDoc(doc(col, p.id), spec.toRemoteDoc(p, ctx.ownerHash), ctx)
     ),
     ...plan.pushTombstones.map(
       (t) => () =>
-        setOwnedDoc(doc(col, t.id), {
-          id: t.id,
-          characterId: ctx.characterId,
-          updatedAt: t.deletedAt,
-          ownerHash: ctx.ownerHash,
-          deleted: true,
-        })
+        setOwnedDoc(
+          doc(col, t.id),
+          {
+            id: t.id,
+            characterId: ctx.characterId,
+            updatedAt: t.deletedAt,
+            ownerHash: ctx.ownerHash,
+            deleted: true,
+          },
+          ctx
+        )
     ),
     ...plan.purgeRemote.map((id) => () => deleteDoc(doc(col, id))),
   ]);

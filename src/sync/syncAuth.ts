@@ -85,7 +85,8 @@ async function whenAuthRestored(auth: Auth): Promise<void> {
   if (typeof auth.authStateReady === 'function') await auth.authStateReady();
 }
 
-async function mintAndSignIn(auth: Auth, characterId: number, uid: string): Promise<void> {
+/** Mint + sign in; resolves with the ownerHash the new session carries. */
+async function mintAndSignIn(auth: Auth, characterId: number, uid: string): Promise<string> {
   const accessToken = await getValidAccessToken(characterId);
   const mint = httpsCallable<{ accessToken: string }, MintResponse>(
     getSyncFunctions(),
@@ -98,6 +99,7 @@ async function mintAndSignIn(auth: Auth, characterId: number, uid: string): Prom
     await signOut(auth);
     throw new Error(`Signed in as unexpected uid: ${credential.user.uid}`);
   }
+  return result.data.ownerHash;
 }
 
 /**
@@ -140,7 +142,12 @@ export async function ensureSignedIn(characterId: number, ownerHash?: string): P
 
   const promise = (async () => {
     if (await sessionUsable(auth, uid, ownerHash)) return uid;
-    await mintAndSignIn(auth, characterId, uid);
+    const minted = await mintAndSignIn(auth, characterId, uid);
+    // The mint's EVE token refresh can rewrite the Character's ownerHash after
+    // the caller read it; writing under the old one would be refused everywhere.
+    if (ownerHash !== undefined && minted !== ownerHash) {
+      throw new Error('Character changed owner during sign-in');
+    }
     return uid;
   })();
   inflight.set(characterId, promise);
@@ -148,6 +155,22 @@ export async function ensureSignedIn(characterId: number, ownerHash?: string): P
     return await promise;
   } finally {
     if (inflight.get(characterId) === promise) inflight.delete(characterId);
+  }
+}
+
+/**
+ * Prove this device still holds the Character under `ownerHash`: a fresh mint
+ * needs a live EVE token, which CCP revokes on transfer, while a persisted
+ * Firebase session outlives it. Gates `setOwnedDoc` deleting a doc it cannot
+ * read, so a previous owner's device can never clear the new owner's.
+ */
+export async function confirmOwnership(characterId: number, ownerHash: string): Promise<boolean> {
+  const auth = getSyncAuth(characterId);
+  await whenAuthRestored(auth);
+  try {
+    return (await mintAndSignIn(auth, characterId, uidForCharacter(characterId))) === ownerHash;
+  } catch {
+    return false;
   }
 }
 

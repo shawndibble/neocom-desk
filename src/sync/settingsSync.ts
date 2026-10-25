@@ -115,22 +115,30 @@ export async function syncSettings(ctx: SyncContext): Promise<void> {
       // A key written outside setSyncedSetting has no timestamp yet: stamp now.
       const updatedAt = s.updatedAt > 0 ? s.updatedAt : now;
       if (meta[s.key] !== updatedAt) stamps.set(s.key, updatedAt);
-      return setOwnedDoc(doc(settingsCol, s.key), {
-        key: s.key,
-        value: s.value,
-        updatedAt,
-        ownerHash,
-        deleted: false,
-      });
+      return setOwnedDoc(
+        doc(settingsCol, s.key),
+        {
+          key: s.key,
+          value: s.value,
+          updatedAt,
+          ownerHash,
+          deleted: false,
+        },
+        ctx
+      );
     }),
     ...settings.pushTombstones.map((t) =>
       // No `value` field — Firestore rejects undefined, and a tombstone carries none.
-      setOwnedDoc(doc(settingsCol, t.key), {
-        key: t.key,
-        updatedAt: t.deletedAt,
-        ownerHash,
-        deleted: true,
-      })
+      setOwnedDoc(
+        doc(settingsCol, t.key),
+        {
+          key: t.key,
+          updatedAt: t.deletedAt,
+          ownerHash,
+          deleted: true,
+        },
+        ctx
+      )
     ),
     ...settings.purgeRemote.map((key) => deleteDoc(doc(settingsCol, key))),
   ]);

@@ -161,7 +161,8 @@ export async function syncFeed(ctx: SyncContext): Promise<void> {
   if (pushed.length > 0) ctx.onPush?.();
   await runBounded([
     ...pushed.map(
-      (row) => () => setOwnedDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash, writeNow))
+      (row) => () =>
+        setOwnedDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash, writeNow), ctx)
     ),
     ...plan.purgeRemote.map((id) => () => deleteDoc(doc(col, id))),
   ]);

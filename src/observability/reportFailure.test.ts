@@ -47,6 +47,17 @@ describe('reportFailure', () => {
     expect(captureException).toHaveBeenCalledTimes(1);
   });
 
+  it('still reports a pass where dropped fetches sit beside a refusal', () => {
+    const dropped = Object.assign(new Error('Request failed with error: undefined'), {
+      code: 'unknown',
+    });
+    const denied = Object.assign(new Error('Missing or insufficient permissions.'), {
+      code: 'permission-denied',
+    });
+    reportFailure('sync', new AggregateError([dropped, dropped, denied], 'x (and 2 more)'));
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
   it('skips a dead SSO grant, but not other token endpoint failures', () => {
     const authError = (code: string) =>
       Object.assign(new Error(`${code}: x`), { name: 'AuthError', code });

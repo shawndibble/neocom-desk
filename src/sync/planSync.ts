@@ -46,7 +46,7 @@ import {
 } from './localBookkeeping';
 import { bumpRemoteMarker, canSkipPass, readRemoteMarker } from './syncMarker';
 import { createSyncScheduler, type SyncPriority, type SyncScope } from './syncScheduler';
-import { ensureSignedIn } from './syncAuth';
+import { confirmOwnership, ensureSignedIn } from './syncAuth';
 import { isAllowedSyncedSettingKey } from './syncedSettings';
 import {
   BUILD_PLANS,
@@ -497,6 +497,7 @@ async function syncCharacter(
   const firestore = getSyncFirestore(characterId);
   const now = Date.now();
   let pushed = false;
+  let confirmed: Promise<boolean> | undefined;
   const ctx: SyncContext = {
     firestore,
     uid,
@@ -506,6 +507,7 @@ async function syncCharacter(
     onPush: () => {
       pushed = true;
     },
+    confirmOwner: () => (confirmed ??= confirmOwnership(characterId, ownerHash)),
   };
 
   // The marker as it stood before this pass pulled anything: storing it after
