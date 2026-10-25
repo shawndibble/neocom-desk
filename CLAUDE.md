@@ -58,6 +58,10 @@ dev`) — Shawn frequently has another agent working there at the same
   the `saveAlertGrant` callable; the Corp Tax Book sync grant (ADR 0025); and
   a feeder's mining-only grant, its second narrow kind. Never send any other
   refresh token to Firebase, and never log any.
+- **`/code-review` runs before the PR is opened, never after.** Commit on the
+  branch, review against the merge-base with `origin/develop`, fix the findings,
+  then push, open the PR and arm auto-merge. Every push to an open PR is another
+  full CI run, and parallel agents share the Actions capacity.
 - **Never run the full suite (`npm run test:run`) or `npm run build` locally.** CI is
   the gate. While iterating: `npm run typecheck` and `npx vitest run <file>` for
   the files you touched, never a whole directory. `/code-review` sub-agents are
