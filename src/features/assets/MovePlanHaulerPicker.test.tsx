@@ -31,12 +31,40 @@ const plan = {
   comparison: [badger, nereus],
 } as unknown as MovePlan;
 
-const pickOption = async (name: string) => {
-  await userEvent.click(screen.getByRole('combobox', { name: 'Hauler' }));
-  await userEvent.click(await screen.findByRole('option', { name }));
-};
+const pickOption = (name: string) => userEvent.click(screen.getByRole('radio', { name }));
 
 describe('HaulerPicker', () => {
+  it('tags the suggested hull and says what each one cannot carry', () => {
+    const short = { ...nereus, unfitCount: 2 };
+    const p = { ...plan, comparison: [badger, short] } as unknown as MovePlan;
+    render(<HaulerPicker plan={p} override={undefined} onPick={vi.fn()} />);
+    expect(screen.getByText('Suggested')).toBeTruthy();
+    expect(screen.getByText("Can't carry 2 stacks")).toBeTruthy();
+    expect(screen.getByText('Carries everything')).toBeTruthy();
+  });
+
+  it('shows the first four hulls, the chosen one too, and the rest on request', async () => {
+    const many = [badger, nereus, option(1, 'C', 1), option(2, 'D', 1), option(3, 'E', 1)];
+    const p = { ...plan, comparison: many } as unknown as MovePlan;
+    const onToggle = vi.fn();
+    const { rerender } = render(
+      <HaulerPicker plan={p} override={undefined} onPick={vi.fn()} onToggleExpanded={onToggle} />
+    );
+    expect(screen.queryByRole('radio', { name: 'E' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Show 1 more' }));
+    expect(onToggle).toHaveBeenCalled();
+    rerender(
+      <HaulerPicker
+        plan={p}
+        override={undefined}
+        onPick={vi.fn()}
+        expanded
+        onToggleExpanded={onToggle}
+      />
+    );
+    expect(screen.getByRole('radio', { name: 'E' })).toBeTruthy();
+  });
+
   it('picks another hull, and the suggested one clears the override', async () => {
     const onPick = vi.fn();
     render(<HaulerPicker plan={plan} override={undefined} onPick={onPick} />);
@@ -48,7 +76,7 @@ describe('HaulerPicker', () => {
     const onPick = vi.fn();
     const onNereus = { ...plan, active: nereus } as unknown as MovePlan;
     render(<HaulerPicker plan={onNereus} override={{ hullTypeId: 650 }} onPick={onPick} />);
-    await pickOption('Badger (suggested)');
+    await pickOption('Badger');
     expect(onPick).toHaveBeenLastCalledWith(undefined);
   });
 
@@ -85,7 +113,7 @@ describe('HaulerPicker', () => {
     expect(field.getAttribute('aria-invalid')).toBe('true');
     expect(onPick).not.toHaveBeenCalled();
   });
-  it('marks owned hulls in the options with their jumps', async () => {
+  it('marks owned hulls with their jumps', async () => {
     const owned = {
       ...nereus,
       hull: {
@@ -96,8 +124,6 @@ describe('HaulerPicker', () => {
     };
     const ownedPlan = { ...plan, comparison: [badger, owned] } as unknown as MovePlan;
     render(<HaulerPicker plan={ownedPlan} override={undefined} onPick={vi.fn()} />);
-    await userEvent.click(screen.getByRole('combobox', { name: 'Hauler' }));
-    expect(await screen.findByRole('option', { name: 'Nereus · Owned · 4 jumps' })).toBeTruthy();
-    expect(screen.getByRole('option', { name: /Badger/ }).textContent).not.toMatch(/Owned/);
+    expect(screen.getByText('Owned · 4 jumps')).toBeTruthy();
   });
 });

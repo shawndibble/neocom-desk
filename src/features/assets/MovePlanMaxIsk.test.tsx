@@ -24,7 +24,7 @@ function Harness({
   );
 }
 
-const field = () => screen.getByRole('textbox', { name: /max isk per haul/i });
+const field = () => screen.getByRole('textbox', { name: /cap per haul/i });
 
 describe('MaxIskInput', () => {
   it('is blank, with a No limit hint, when nothing is saved', () => {
