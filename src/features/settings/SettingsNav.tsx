@@ -108,7 +108,7 @@ interface SettingsIndexProps {
 export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
   const { t } = useTranslation();
   const { status, line } = useUpdateStatusLine();
-  const { updating, failed, update } = useApplyUpdate();
+  const { updating, notice, update } = useApplyUpdate();
   const storageAtRisk = useStorageAtRisk((s) => s.atRisk);
 
   return (
@@ -175,9 +175,9 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
                       </Button>
                     )}
                   </div>
-                  {isApp && failed && (
+                  {isApp && notice && (
                     <div className="px-3 pb-2">
-                      <ActionResult kind="error">{t('settings.updateFailed')}</ActionResult>
+                      <ActionResult kind={notice.kind}>{notice.text}</ActionResult>
                     </div>
                   )}
                 </li>

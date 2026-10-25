@@ -4,6 +4,14 @@ import { forceUpdate } from './forceUpdate';
 import { hideBootCover, useBootCover } from './bootCover';
 import { renderHook } from '@testing-library/react';
 
+const { fetchLatestRelease } = vi.hoisted(() => ({
+  fetchLatestRelease: vi.fn<() => Promise<string | null>>(),
+}));
+vi.mock('./latestRelease', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./latestRelease')>()),
+  fetchLatestRelease,
+}));
+
 const reload = vi.fn();
 const realServiceWorker = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
 
@@ -25,6 +33,7 @@ function stubServiceWorker(registration: unknown) {
 describe('forceUpdate', () => {
   beforeEach(() => {
     vi.stubGlobal('location', { ...window.location, reload });
+    fetchLatestRelease.mockResolvedValue(null);
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -110,6 +119,30 @@ describe('forceUpdate', () => {
     const done = forceUpdate();
     await vi.advanceTimersByTimeAsync(20000);
     await done;
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it('reports pending, without reloading, when a newer release is published but no new worker came', async () => {
+    const { result } = renderHook(() => useBootCover());
+    fetchLatestRelease.mockResolvedValue('neocom-desk@0.1.0+newer');
+    stubServiceWorker({
+      update: vi.fn().mockResolvedValue(undefined),
+      waiting: null,
+      installing: null,
+    });
+    await expect(forceUpdate()).resolves.toBe('pending');
+    expect(reload).not.toHaveBeenCalled();
+    expect(result.current).toBe(false);
+  });
+
+  it('reloads when no new worker came and the published release is the running one', async () => {
+    fetchLatestRelease.mockResolvedValue(__APP_RELEASE__);
+    stubServiceWorker({
+      update: vi.fn().mockResolvedValue(undefined),
+      waiting: null,
+      installing: null,
+    });
+    await forceUpdate();
     expect(reload).toHaveBeenCalledOnce();
   });
 

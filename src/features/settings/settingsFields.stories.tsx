@@ -57,6 +57,15 @@ export const ResultSuccess: Story = {
   render: () => <ActionResult kind="success">Saved.</ActionResult>,
 };
 
+/** @summary Neutral line after a button press: nothing went wrong, nothing happened yet. */
+export const ResultInfo: Story = {
+  render: () => (
+    <ActionResult kind="info">
+      The update is still rolling out. Try again in a few minutes.
+    </ActionResult>
+  ),
+};
+
 /** @summary Error line after a button press. */
 export const ResultError: Story = {
   render: () => <ActionResult kind="error">Could not save.</ActionResult>,

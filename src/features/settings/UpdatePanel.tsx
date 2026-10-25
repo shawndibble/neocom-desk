@@ -7,7 +7,7 @@ import { ActionResult } from '@/features/settings/settingsFields';
 export function UpdatePanel() {
   const { t } = useTranslation();
   const { status, line } = useUpdateStatusLine();
-  const { updating, failed, update } = useApplyUpdate();
+  const { updating, notice, update } = useApplyUpdate();
   const available = status === 'available';
 
   return (
@@ -25,7 +25,7 @@ export function UpdatePanel() {
         >
           {t('settings.updateAction')}
         </Button>
-        {failed && <ActionResult kind="error">{t('settings.updateFailed')}</ActionResult>}
+        {notice && <ActionResult kind={notice.kind}>{notice.text}</ActionResult>}
       </div>
     </Panel>
   );
