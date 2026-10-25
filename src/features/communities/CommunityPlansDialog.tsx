@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Modal, Spinner } from '@/components/ui';
 import type { PlanEntry } from '@/engine/types';
-import { loadCommunityMembers, loadMyCommunities } from './communityStore';
+import { loadCommunityMembers, loadMyCommunitiesCached } from './communityStore';
 import { loadCommunityPlans } from './sharedPlans';
 import { SharedPlanList, type SharedPlanRow } from './SharedPlanList';
 
@@ -32,7 +32,7 @@ export function CommunityPlansDialog({
     let cancelled = false;
     (async () => {
       try {
-        const communities = await loadMyCommunities(characterId);
+        const communities = await loadMyCommunitiesCached(characterId);
         const rows = (
           await Promise.all(
             communities.map(async (community) => {

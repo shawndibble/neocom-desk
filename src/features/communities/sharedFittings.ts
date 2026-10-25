@@ -39,7 +39,12 @@ import { uidForCharacter } from '@/sync/uid';
 import { loadTypes } from '@/sde/loadSde';
 import { loadFittingsAll, markFittingsShared } from './shareSelection';
 import { communityBackendOverride } from './backendOverride';
-import { loadCommunityMembers, loadMyCommunities, type CommunitySummary } from './communityStore';
+import {
+  loadCommunityMembers,
+  loadMyCommunities,
+  loadMyCommunitiesCached,
+  type CommunitySummary,
+} from './communityStore';
 
 /** firestore.rules caps; a Fitting past them is left unshared rather than failing the batch. */
 const MAX_CODE_LENGTH = 90_000;
@@ -151,7 +156,7 @@ export async function loadSharedFittings(characterId: number): Promise<{
   fittings: SharedFitting[];
   sharerNames: Map<string, string>;
 }> {
-  const communities = await loadMyCommunities(characterId);
+  const communities = await loadMyCommunitiesCached(characterId);
   const [perCommunity, perMembers] = await Promise.all([
     Promise.all(communities.map((community) => loadCommunityFittings(characterId, community.id))),
     Promise.all(communities.map((community) => loadCommunityMembers(characterId, community.id))),
@@ -166,7 +171,7 @@ export async function loadShareStatus(
   characterId: number,
   key: SharedFittingKey
 ): Promise<{ communities: CommunitySummary[]; sharedIn: Set<string> }> {
-  const communities = await loadMyCommunities(characterId);
+  const communities = await loadMyCommunitiesCached(characterId);
   const docId = sharedFittingId(uidForCharacter(characterId), key);
   await ensureSignedIn(characterId);
   const db = getSyncFirestore();

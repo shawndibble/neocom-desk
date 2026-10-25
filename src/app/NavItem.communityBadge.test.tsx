@@ -5,9 +5,9 @@ import '@/i18n';
 import { db } from '@/db';
 
 vi.mock('@/sync/firebaseApp', () => ({ getSyncAuth: () => ({ currentUser: { uid: 'char:1' } }) }));
-const store = vi.hoisted(() => ({ loadMyCommunities: vi.fn() }));
+const store = vi.hoisted(() => ({ loadMyCommunitiesCached: vi.fn() }));
 vi.mock('@/features/communities/communityStore', () => store);
-const requests = vi.hoisted(() => ({ loadRequests: vi.fn() }));
+const requests = vi.hoisted(() => ({ loadRequestsSince: vi.fn() }));
 vi.mock('@/features/communities/requestStore', () => requests);
 
 import { refreshRequestBadge, resetRequestBadge } from '@/features/communities/requestBadge';
@@ -42,28 +42,28 @@ beforeEach(async () => {
     { key: 'communityWatch:1', value: true },
     { key: 'communityRequestsSeen:1:c1', value: 0 },
   ]);
-  store.loadMyCommunities.mockResolvedValue([{ id: 'c1' }]);
+  store.loadMyCommunitiesCached.mockResolvedValue([{ id: 'c1' }]);
 });
 
 describe('NavItem on Communities', () => {
   it('shows the count of new Requests in the link’s name, and nothing at zero', async () => {
-    requests.loadRequests.mockResolvedValue(board(0));
+    requests.loadRequestsSince.mockResolvedValue(board(0));
     render(
       <MemoryRouter>
         <Entry to="/communities" label="Communities" />
       </MemoryRouter>
     );
     expect(screen.getByRole('link', { name: 'Communities' })).toBeInTheDocument();
-    requests.loadRequests.mockResolvedValue(board(3));
+    requests.loadRequestsSince.mockResolvedValue(board(3));
     await act(() => refreshRequestBadge(1, NOW));
     expect(screen.getByRole('link', { name: 'Communities, 3 new Requests' })).toBeInTheDocument();
-    requests.loadRequests.mockResolvedValue(board(1));
+    requests.loadRequestsSince.mockResolvedValue(board(1));
     await act(() => refreshRequestBadge(1, NOW));
     expect(screen.getByRole('link', { name: 'Communities, 1 new Request' })).toBeInTheDocument();
   });
 
   it('puts no count on any other destination', async () => {
-    requests.loadRequests.mockResolvedValue(board(3));
+    requests.loadRequestsSince.mockResolvedValue(board(3));
     render(
       <MemoryRouter>
         <Entry to="/market" label="Market" />

@@ -5,13 +5,13 @@ import '@/i18n';
 import en from '@/i18n/locales/en.json';
 
 const store = vi.hoisted(() => ({
-  loadMyCommunities: vi.fn(),
+  loadMyCommunitiesCached: vi.fn(),
   loadCommunityMembers: vi.fn(),
   loadCommunityPlans: vi.fn(),
 }));
 
 vi.mock('./communityStore', () => ({
-  loadMyCommunities: store.loadMyCommunities,
+  loadMyCommunitiesCached: store.loadMyCommunitiesCached,
   loadCommunityMembers: store.loadCommunityMembers,
 }));
 vi.mock('./sharedPlans', () => ({ loadCommunityPlans: store.loadCommunityPlans }));
@@ -37,7 +37,7 @@ const shared = (over: Record<string, unknown>) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  store.loadMyCommunities.mockResolvedValue([{ id: 'c1', name: 'Pals' }]);
+  store.loadMyCommunitiesCached.mockResolvedValue([{ id: 'c1', name: 'Pals' }]);
   store.loadCommunityMembers.mockResolvedValue([{ uid: 'char:2', characterName: 'Kara Voss' }]);
   store.loadCommunityPlans.mockResolvedValue([
     shared({}),
@@ -94,7 +94,7 @@ describe('CommunityPlansDialog', () => {
   });
 
   it('says so when it cannot load', async () => {
-    store.loadMyCommunities.mockRejectedValue(new Error('offline'));
+    store.loadMyCommunitiesCached.mockRejectedValue(new Error('offline'));
     renderDialog();
     expect(await screen.findByRole('alert')).toHaveTextContent(d.failed);
   });

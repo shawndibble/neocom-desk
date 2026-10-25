@@ -123,7 +123,7 @@ export async function loadCommunityAlertEntries(
   ]);
   const myUid = uidForCharacter(characterId);
   if (getSyncAuth().currentUser?.uid !== myUid) return null;
-  const mine = await store.loadMyCommunities(characterId);
+  const mine = await store.loadMyCommunitiesCached(characterId);
   if (admin) await rememberCommunityAdmin(characterId, mine);
   const entries: CommunityAlertEntry[] = [];
   for (const community of mine) {
