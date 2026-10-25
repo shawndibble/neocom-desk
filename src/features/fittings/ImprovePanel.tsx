@@ -8,6 +8,7 @@
  */
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   Button,
   Checkbox,
@@ -51,6 +52,7 @@ import {
 } from '@/engine/fittings/improve';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import type { Resource } from '@/engine/fittings/makeItFit';
+import { formatIskCompact } from '@/lib/isk';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { alignTimeSeconds } from '@/engine/fittings/stats';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
@@ -129,6 +131,23 @@ interface Props {
   fitting?: Fitting | null;
   /** The page's Target Profile, for the summary's DPS. */
   target?: TargetProfile;
+}
+
+/** The guardrail a rejected swap broke; a budget or cap says by how much. */
+function brokeText(
+  t: TFunction,
+  option: RejectedOption,
+  { mode, spendCap }: Pick<ImproveSettings, 'mode' | 'spendCap'>,
+  fitTotal: number | null
+): string {
+  if (option.guardrail !== 'spend' || spendCap === null || option.iskDelta === null)
+    return t(`fittings.improve.broke.${option.guardrail}`);
+  const planning = mode === 'buy';
+  const over = (planning ? (fitTotal ?? 0) + option.iskDelta : option.iskDelta) - spendCap;
+  return t(planning ? 'fittings.improve.broke.spendBudget' : 'fittings.improve.broke.spendCap', {
+    over: formatIskCompact(over),
+    cap: formatIskCompact(spendCap),
+  });
 }
 
 const NO_TICKS: ReadonlyMap<string, ImproveOption> = new Map();
@@ -412,6 +431,8 @@ export function ImprovePanel({
     chosen.length > 0 &&
     (!checkable || checked === null || (summary !== null && summary.problems.length === 0));
 
+  // A blank hull has no fitted module to vary: the empty state must not talk about one.
+  const noModules = fitting?.modules.length === 0;
   // A fit that doesn't fit has nothing to improve yet: hand over to Make it fit (`20261019-144736`).
   if (state.status === 'overBudget')
     return (
@@ -640,6 +661,15 @@ export function ImprovePanel({
         </div>
       )}
 
+      {state.status === 'belowPrice' && (
+        <p className="text-warning text-sm" data-testid="improve-below-price">
+          {t('fittings.improve.belowPrice', {
+            budget: formatIskCompact(state.budget),
+            price: formatIskCompact(state.fitTotal),
+          })}
+        </p>
+      )}
+
       {state.status === 'failed' && (
         <p className="text-danger text-sm">{t('fittings.improve.failed')}</p>
       )}
@@ -666,7 +696,13 @@ export function ImprovePanel({
       {state.status === 'done' &&
         (state.result.noDownside.length === 0 && state.result.tradeOffs.length === 0 ? (
           <div className="space-y-2">
-            <p className="text-sm">{t(`fittings.improve.nothing.${goal}`)}</p>
+            <p className="text-sm">
+              {t(
+                noModules
+                  ? 'fittings.improve.nothing.noModules'
+                  : `fittings.improve.nothing.${goal}`
+              )}
+            </p>
             {state.result.stopped && (
               <div className="space-y-2">
                 <p className="text-text-dim text-xs">
@@ -694,7 +730,7 @@ export function ImprovePanel({
                         {line && <p className="text-xs">{line}</p>}
                         <p className="text-text-dim text-xs">{changeLine(option, state.before)}</p>
                         <p className="text-warning text-xs">
-                          {t(`fittings.improve.broke.${option.guardrail}`)}
+                          {brokeText(t, option, settings, state.fitTotal)}
                         </p>
                       </li>
                     );
@@ -702,7 +738,11 @@ export function ImprovePanel({
                 </ul>
               </MakeItFitSection>
             )}
-            <p className="text-text-dim text-xs">{t(`fittings.improve.widen.${settings.reach}`)}</p>
+            {!noModules && (
+              <p className="text-text-dim text-xs">
+                {t(`fittings.improve.widen.${settings.reach}`)}
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
