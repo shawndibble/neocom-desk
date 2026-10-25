@@ -29,8 +29,8 @@ describe('isSettledRow', () => {
     expect(isSettledRow({ structureId: 5000, date: '2026-10-12' }, { '5000': w })).toBe(false);
   });
 
-  it('a grace of at least a day, so ESI’s hour of cache and late ledger postings are covered', () => {
-    expect(SETTLED_GRACE_MS).toBeGreaterThanOrEqual(DAY);
+  it('a grace of days, so ESI’s hour of cache and late ledger postings are covered', () => {
+    expect(SETTLED_GRACE_MS).toBeGreaterThanOrEqual(3 * DAY);
   });
 });
 

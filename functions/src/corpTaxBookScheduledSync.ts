@@ -31,7 +31,7 @@ import {
   SCHEDULED_VIA,
   bookRef,
   editBookAs,
-  syncBookWrites,
+  syncBookAs,
   writeBilledByPointers,
   type BookDeps,
 } from './corpTaxBookStore.js';
@@ -130,6 +130,8 @@ export interface AdminBookState {
   writeOffs?: (AllocWriteOff & { minerId: string })[];
   /** Per refinery, the last read merged in full: which rows are final (corpTaxBookObservedThrough.ts). */
   observedThrough: ObservedThrough;
+  /** The book doc's `createdAt`: tells this book from one deleted and turned on again. */
+  createdAt: unknown;
 }
 
 /** The sync's reads of the book, with the admin SDK (the client reads the same collections under the rules). */
@@ -164,6 +166,7 @@ export async function readBookStateAdmin(
     extractions,
     paidStatementIds: new Set((paid.data()?.ids as string[] | undefined) ?? []),
     observedThrough: readObservedThrough(data.observedThrough),
+    createdAt: data.createdAt,
     writeOffs: writeOffDocs.flatMap((d) => {
       const w = writeOffForAllocation(d);
       return w && typeof d.minerId === 'string' ? [{ ...w, minerId: d.minerId }] : [];
@@ -336,8 +339,9 @@ export async function runBookSync(
   // Rows a full earlier read already merged at their final quantity would write nothing:
   // leave them out of the merge and its per-row reads. They still refresh the billed-by
   // pointers, which record that this sync saw the Character.
-  const settled = placed.filter((r) => isSettledRow(r, before.observedThrough));
-  const toMerge = placed.filter((r) => !isSettledRow(r, before.observedThrough));
+  const settled: ObservedRow[] = [];
+  const toMerge: ObservedRow[] = [];
+  for (const r of placed) (isSettledRow(r, before.observedThrough) ? settled : toMerge).push(r);
   const batches = chunks(toMerge, OBSERVED_PER_CALL);
   const extraCalls = chunks(extractions, EXTRACTIONS_PER_CALL);
 
@@ -351,23 +355,26 @@ export async function runBookSync(
     extractions: extraCalls.shift() ?? [],
     donations: resolved,
   });
-  const receipt = await syncBookWrites(deps, access, first, { scheduled: true });
-  const writtenExtractions = [...receipt.writtenExtractions];
+  const receipt = await syncBookAs(deps, access, first, { scheduled: true });
   for (const observed of batches) {
-    await syncBookWrites(deps, access, call({ observed }), { scheduled: true });
+    await syncBookAs(deps, access, call({ observed }), { scheduled: true });
   }
   for (const rest of extraCalls) {
-    const more = await syncBookWrites(deps, access, call({ extractions: rest }), {
-      scheduled: true,
-    });
-    writtenExtractions.push(...more.writtenExtractions);
+    await syncBookAs(deps, access, call({ extractions: rest }), { scheduled: true });
   }
   if (settled.length > 0) await writeBilledByPointers(deps, corporationId, settled);
   // Only now, with every row of this run merged: a failed merge above leaves the
   // watermark where it was, so the next run merges those rows again.
   const observedThrough = advanceObservedThrough(before.observedThrough, ledgerReads);
   if (!isDeepStrictEqual(observedThrough, before.observedThrough)) {
-    await bookRef(db, corporationId).update({ observedThrough });
+    await db.runTransaction(async (tx) => {
+      const ref = bookRef(db, corporationId);
+      const held = await tx.get(ref);
+      // A book deleted and turned on again during the run starts with no rows: it must not
+      // inherit the old book's watermark, or its closed days would never be merged.
+      if (!held.exists || held.get('createdAt') !== before.createdAt) return;
+      tx.update(ref, { observedThrough });
+    });
   }
 
   const edit = (action: ScheduledAction) =>
@@ -383,21 +390,24 @@ export async function runBookSync(
   const { assigned, error: reassignError } = await reassignUnmatched(edit, before, known);
 
   // --- Settle ---------------------------------------------------------------
-  // What this run wrote, applied to what it read, rather than reading the book again.
-  const after = withRunWrites(before, {
-    addedPayments: receipt.addedPayments,
-    writtenExtractions,
-    assigned,
-  });
-  const toSettle = planSettlements({
-    statements: after.statements,
-    payments: after.payments,
-    dismissals: after.dismissals,
-    alreadyPaid: after.paidStatementIds,
-    extractions: after.extractions,
-    ...(after.writeOffs ? { writeOffs: after.writeOffs } : {}),
-    startDate: after.startDate,
-  });
+  // Read again, right before settling, whenever this run brought in money: a settle is never
+  // undone (D22), so it plans from the book as it is now, officers' edits during the run included,
+  // rather than from the copy read before the (slow) ESI reads.
+  const after =
+    receipt.donationsAdded > 0 || assigned.size > 0
+      ? await readBookStateAdmin(db, corporationId)
+      : before;
+  const toSettle = after
+    ? planSettlements({
+        statements: after.statements,
+        payments: after.payments,
+        dismissals: after.dismissals,
+        alreadyPaid: after.paidStatementIds,
+        extractions: after.extractions,
+        ...(after.writeOffs ? { writeOffs: after.writeOffs } : {}),
+        startDate: after.startDate,
+      })
+    : [];
   for (const ids of chunks(toSettle, SETTLE_PER_CALL)) {
     await edit({ action: 'settleStatements', statementIds: ids });
   }
@@ -421,40 +431,6 @@ export async function runBookSync(
     ...(reassignError ? { reassignError } : {}),
     systemIds,
   };
-}
-
-/**
- * The book state after this run's own writes: the Payments it created, the Extraction fields it
- * merged and the Miners it assigned. The same docs a fresh read would return, minus whatever an
- * officer changed meanwhile, which a run that added nothing never re-read either.
- */
-export function withRunWrites(
-  state: AdminBookState,
-  writes: {
-    addedPayments: readonly Data[];
-    writtenExtractions: readonly Data[];
-    /** Payment id → the Miner it was assigned to. */
-    assigned: ReadonlyMap<string, string>;
-  }
-): AdminBookState {
-  const added = new Set(writes.addedPayments.map((p) => p.id));
-  const payments = [
-    ...state.payments
-      .filter((p) => !added.has(p.id))
-      .map((p) => {
-        const minerId = writes.assigned.get(p.id);
-        return minerId === undefined ? p : { ...p, minerId };
-      }),
-    ...(writes.addedPayments as unknown as AdminBookState['payments']),
-  ];
-  const extractions = new Map<unknown, SyncExtraction>(
-    state.extractions.map((x, i) => [(x as unknown as Data).id ?? i, x])
-  );
-  for (const fields of writes.writtenExtractions) {
-    const held = extractions.get(fields.id);
-    extractions.set(fields.id, { ...held, ...fields } as unknown as SyncExtraction);
-  }
-  return { ...state, payments, extractions: [...extractions.values()] };
 }
 
 async function reassignUnmatched(

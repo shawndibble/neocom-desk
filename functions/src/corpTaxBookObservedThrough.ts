@@ -11,13 +11,15 @@
 // last read that refinery's ledger in full (not truncated) and merged every row
 // of it. It is written only after all of that run's merges succeeded. A row is
 // skipped when its day closed at least `SETTLED_GRACE_MS` before that read. The
-// grace covers ESI's hour of cache and ledger rows posted late. A refinery with
+// grace covers ESI's hour of cache and ledger rows posted late: how late CCP can
+// post a row is not documented, so it is generous (three days, about a dozen
+// scheduled reads of each day); the reads saved are the ~27 older days. A refinery with
 // no entry (a new one, a first run, a truncated read) is merged in full, as before.
 
 const DAY_MS = 24 * 3_600_000;
 
 /** How long after a day closes its ledger rows are trusted to have stopped changing. */
-export const SETTLED_GRACE_MS = DAY_MS;
+export const SETTLED_GRACE_MS = 3 * DAY_MS;
 
 /** Refinery id → epoch ms of the last read of its ledger that was merged in full. */
 export type ObservedThrough = Record<string, number>;

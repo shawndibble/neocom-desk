@@ -22,7 +22,7 @@ import {
   type CorpSyncGrantDoc,
   type ScheduledSyncStatus,
 } from './corpSyncGrant.js';
-import { turnOnBook, verifyOfficer, type BookDeps } from './corpTaxBookStore.js';
+import { deleteBook, turnOnBook, verifyOfficer, type BookDeps } from './corpTaxBookStore.js';
 import type { EsiRead, SyncEsi } from './corpTaxBookSyncEsi.js';
 
 const CORP = 98000001;
@@ -578,6 +578,51 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
         esiState.ledger = readAt([row('2026-10-10', 160)]);
         await runScheduledCorpSyncs(syncDeps(), fakeEsi());
         expect(await quantity('2026-10-10')).toBe(160);
+      });
+
+      it('a book deleted and turned on again mid-run does not inherit the old watermark', async () => {
+        await optIn(ACCOUNTANT);
+        now = T0 + 6 * H;
+        esiState.ledger = readAt([row('2026-10-10', 100)]);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(await through()).toEqual({ '5000': now });
+
+        now = T0 + 12 * H;
+        esiState.ledger = readAt([row('2026-10-10', 100)]);
+        const recreating: SyncEsi = {
+          ...fakeEsi(),
+          // While the run reads ESI, the book is deleted and turned on again, empty.
+          journal: async () => {
+            await deleteBook(
+              bookDeps(),
+              who(DIRECTOR),
+              parseBookCall({ corporationId: CORP, accessToken: `tok-${DIRECTOR}` })
+            );
+            now += 1;
+            await turnOnBook(
+              bookDeps(),
+              who(DIRECTOR),
+              parseTurnOnInput({
+                corporationId: CORP,
+                accessToken: `tok-${DIRECTOR}`,
+                startDate: '2026-10-01',
+                startRatePct: 10,
+              })
+            );
+            await verifyOfficer(
+              bookDeps(),
+              who(ACCOUNTANT),
+              parseBookCall({ corporationId: CORP, accessToken: `tok-${ACCOUNTANT}` })
+            );
+            return esiState.journal as never;
+          },
+        };
+        await runScheduledCorpSyncs(syncDeps(), recreating);
+        expect(await through()).toBeUndefined();
+
+        now = T0 + 18 * H;
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(await quantity('2026-10-10')).toBe(100);
       });
 
       it('records no read when the run’s merge fails, so the next run merges everything again', async () => {

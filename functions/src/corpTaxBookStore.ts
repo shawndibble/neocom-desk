@@ -529,26 +529,6 @@ export async function syncBookAs(
   input: SyncInput,
   options: { scheduled?: boolean } = {}
 ) {
-  const { observedChanged, extractions, donationsAdded } = await syncBookWrites(
-    deps,
-    access,
-    input,
-    options
-  );
-  return { observedChanged, extractions, donationsAdded };
-}
-
-/**
- * `syncBookAs`, also returning the Payment docs it created and the Extraction fields it
- * merged, so the scheduled sync can bring the state it read up to date in memory instead
- * of reading the whole book again (#5048).
- */
-export async function syncBookWrites(
-  deps: BookDeps,
-  access: OfficerAccess,
-  input: SyncInput,
-  options: { scheduled?: boolean } = {}
-) {
   const book = bookRef(deps.db, input.corporationId);
   if (!(await book.get()).exists)
     fail('not-found', 'This corporation has no Corp Tax Book', 'no-book');
@@ -563,18 +543,15 @@ export async function syncBookWrites(
   const observedChanged = await mergeObservedInto(deps, input.corporationId, input.observed);
 
   const extractions = sub(deps.db, input.corporationId, EXTRACTIONS);
-  const writtenExtractions: Data[] = [];
   for (const x of input.extractions) {
     const id = `${x.structureId}_${Date.parse(x.extractionStartTime)}`;
     const fields: Data = { ...x, id };
     for (const key of Object.keys(fields)) if (fields[key] === undefined) delete fields[key];
     await extractions.doc(id).set(fields, { merge: true });
-    writtenExtractions.push(fields);
   }
 
   const payments = sub(deps.db, input.corporationId, PAYMENTS);
   let donationsAdded = 0;
-  const addedPayments: Data[] = [];
   for (const dn of input.donations) {
     const id = `j${dn.division}_${dn.refId}`;
     const data: Data = {
@@ -593,7 +570,6 @@ export async function syncBookWrites(
       // create(): a re-synced donation never overwrites an officer's "not tax" mark.
       await payments.doc(id).create(data);
       donationsAdded += 1;
-      addedPayments.push(data);
     } catch (err) {
       if ((err as { code?: number }).code !== 6) throw err;
     }
@@ -624,13 +600,7 @@ export async function syncBookWrites(
       }
     );
   });
-  return {
-    observedChanged,
-    extractions: input.extractions.length,
-    donationsAdded,
-    addedPayments,
-    writtenExtractions,
-  };
+  return { observedChanged, extractions: input.extractions.length, donationsAdded };
 }
 
 // --- Edits -----------------------------------------------------------------
