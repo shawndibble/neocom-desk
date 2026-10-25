@@ -11,6 +11,7 @@ import {
   type LayerDefense,
   type LocalRepair,
   type OffenseStats,
+  type SpoolFigures,
   type OverheatedStats,
   type WeaponRange,
   type WeaponRow,
@@ -474,6 +475,23 @@ function damageFigures(
 }
 
 /**
+ * A spool weapon's first-cycle DPS and its time to full bonus, from the
+ * engine's own attributes: `damagePerSecond` is fully spooled, the volley never
+ * is, and the bonus grows by a fixed step each rate-of-fire cycle up to a cap.
+ */
+function spoolFigures(attributes: AttributeMap, quantity: number): SpoolFigures | null {
+  const read = (id: number) => readAttribute(attributes, id);
+  const perCycle = read(ITEM_DOGMA_ATTRIBUTE.spoolBonusPerCycle);
+  const cycleSeconds = read(ITEM_DOGMA_ATTRIBUTE.rateOfFire) / 1000;
+  if (perCycle <= 0 || cycleSeconds <= 0) return null;
+  const cycles = Math.ceil(read(ITEM_DOGMA_ATTRIBUTE.spoolBonusMax) / perCycle - 1e-6);
+  return {
+    unspooledDps: (read(ITEM_DOGMA_ATTRIBUTE.damageVolley) * quantity) / cycleSeconds,
+    secondsToFull: cycles * cycleSeconds,
+  };
+}
+
+/**
  * The row's reach: a module's or a sentry's. A drone that flies to its
  * target, or a fighter, fights wherever it's sent — its own optimal says
  * nothing about where the ship can fight from.
@@ -559,6 +577,13 @@ export function extractOffense(
     row.dps += figures.dps;
     row.sustainedDps += figures.sustainedDps;
     row.volley += figures.volley;
+    const spool = spoolFigures(result.attributes, item.quantity);
+    if (spool) {
+      row.spool = {
+        unspooledDps: (row.spool?.unspooledDps ?? 0) + spool.unspooledDps,
+        secondsToFull: Math.max(row.spool?.secondsToFull ?? 0, spool.secondsToFull),
+      };
+    }
     if (heated && row.overheated) {
       const heatedFigures = damageFigures(heated.attributes, item.quantity, item.isDrone);
       row.overheated.dps += heatedFigures.dps;

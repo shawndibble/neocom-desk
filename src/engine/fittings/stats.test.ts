@@ -322,7 +322,7 @@ function weaponResult(
   maxState: 'active' | 'overload' = 'overload'
 ) {
   return {
-    attributes: new Map([
+    attributes: new Map<number, { value: number }>([
       [ITEM_DOGMA_ATTRIBUTE.damagePerSecond, { value: dps }],
       [ITEM_DOGMA_ATTRIBUTE.damageVolley, { value: volley }],
     ]),
@@ -352,6 +352,26 @@ describe('extractOffense', () => {
     expect(offense.weapons[1].volley).toBeCloseTo(480, 6);
     expect(offense.dps).toBeCloseTo(173.6, 6);
     expect(offense.volley).toBeCloseTo(784, 6);
+  });
+
+  it('gives a spool weapon its unspooled DPS and time to full spool, and a plain weapon neither', () => {
+    const spooler = (dps: number, volley: number) => {
+      const result = weaponResult(dps, volley);
+      result.attributes.set(ITEM_DOGMA_ATTRIBUTE.rateOfFire, { value: 4000 });
+      result.attributes.set(ITEM_DOGMA_ATTRIBUTE.spoolBonusPerCycle, { value: 0.1 });
+      result.attributes.set(ITEM_DOGMA_ATTRIBUTE.spoolBonusMax, { value: 2 });
+      return result;
+    };
+    const offense = extractOffense(
+      [BLASTER, BLASTER, { ...BLASTER, typeId: 47918 }],
+      [weaponResult(26.8, 152), weaponResult(26.8, 152), spooler(30, 40)],
+      null
+    );
+
+    expect(offense.weapons[0].spool).toBeUndefined();
+    expect(offense.weapons[1].spool?.unspooledDps).toBeCloseTo(10, 6);
+    // 2 / 0.1 = 20 cycles of 4 s.
+    expect(offense.weapons[1].spool?.secondsToFull).toBeCloseTo(80, 6);
   });
 
   it('keeps the same weapon with a different charge on its own row', () => {

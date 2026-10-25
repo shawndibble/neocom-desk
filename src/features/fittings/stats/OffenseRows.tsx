@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { RowMoreActions } from '@/components/ui';
 import { weaponRowKey } from '@/engine/fittings/stats';
@@ -8,6 +9,7 @@ import type {
   FittingModule,
   FittingModuleResult,
   FittingStats,
+  SpoolFigures,
   WeaponRow,
 } from '@/engine/fittings/types';
 import { HeatFigure, StatRowContent, StatRows } from '../StatFacts';
@@ -28,12 +30,15 @@ function DamageFigures({
   figures,
   sustained = 'tooltip',
   previewed = false,
+  spool,
 }: {
   stats: FittingStats;
   figures: (stats: FittingStats) => DamageFiguresValue;
   sustained?: 'tooltip' | 'line';
   /** The fit's total: a previewed change to its DPS, volley or sustained DPS shows in place. */
   previewed?: boolean;
+  /** A spool weapon's row: its DPS reads unspooled → spooled, its volley says it is unspooled. */
+  spool?: SpoolFigures;
 }) {
   const { t } = useTranslation();
   const sustainedLabel = (s: FittingStats) =>
@@ -47,7 +52,14 @@ function DamageFigures({
       <span>
         <HeatFigure
           stats={stats}
-          format={(s) => t('fittings.stats.weaponDps', { value: fmt1(figures(s).dps) })}
+          format={(s) =>
+            spool
+              ? t('fittings.stats.weaponDpsSpooled', {
+                  from: fmt1(spool.unspooledDps),
+                  to: fmt1(figures(s).dps),
+                })
+              : t('fittings.stats.weaponDps', { value: fmt1(figures(s).dps) })
+          }
           note={tooltip}
           keys={previewed ? ['totalDps'] : undefined}
         />
@@ -56,7 +68,11 @@ function DamageFigures({
       <span>
         <HeatFigure
           stats={stats}
-          format={(s) => t('fittings.stats.weaponVolley', { value: fmt0(figures(s).volley) })}
+          format={(s) =>
+            t(spool ? 'fittings.stats.weaponVolleyUnspooled' : 'fittings.stats.weaponVolley', {
+              value: fmt0(figures(s).volley),
+            })
+          }
           keys={previewed ? ['totalVolley'] : undefined}
         />
       </span>
@@ -76,6 +92,13 @@ function DamageFigures({
       </span>
     </>
   );
+}
+
+/** "spools up in ~2 min" — seconds under a minute and a half, whole minutes beyond. */
+function spoolTimeText(t: TFunction, seconds: number): string {
+  return seconds < 90
+    ? t('fittings.stats.spoolsUpSeconds', { count: Math.max(1, Math.round(seconds)) })
+    : t('fittings.stats.spoolsUpMinutes', { count: Math.round(seconds / 60) });
 }
 
 const FIRING: readonly FittingItemState[] = ['active', 'overload'];
@@ -153,6 +176,7 @@ export function OffenseRows({
                   : 'fittings.stats.dronesNoOverheat'
               )
             : undefined,
+          row.spool ? spoolTimeText(t, row.spool.secondsToFull) : undefined,
           ...(row.range ? rangeLines(t, row.range.optimal, row.range.falloff) : []),
         ]);
         const content = (
@@ -166,6 +190,7 @@ export function OffenseRows({
                   s.offense.weapons.find((other) => weaponRowKey(other) === weaponRowKey(row)) ??
                   row
                 }
+                spool={row.spool}
               />
             }
             action={hasMenu ? <RowMoreActions /> : undefined}
@@ -193,7 +218,11 @@ export function OffenseRows({
       })}
       <li className={statRowClassName(true)}>
         <StatRowContent
-          name={t('fittings.stats.offenseTotal')}
+          name={t(
+            stats.offense.weapons.some((row) => row.spool)
+              ? 'fittings.stats.offenseTotalSpooled'
+              : 'fittings.stats.offenseTotal'
+          )}
           inline
           figure={
             <DamageFigures stats={stats} figures={(s) => s.offense} sustained="line" previewed />
