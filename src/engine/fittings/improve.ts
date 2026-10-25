@@ -590,12 +590,63 @@ export function rankImproveOptions<T extends ImproveOption>(options: readonly T[
   });
 }
 
+/**
+ * What the pilot holds and what the open fit already needs, by type id, for
+ * Planning's "Count what I own": an owned unit costs nothing to buy.
+ */
+export interface OwnedStock {
+  owned: ReadonlyMap<number, number>;
+  /** Units of each type the open fit uses now (`fittingItemCounts`). */
+  fitCounts: ReadonlyMap<number, number>;
+}
+
+/** Units of each type a candidate (its pair too) adds to the fit, negative for what it removes. */
+export function candidateTypeChanges(candidate: ImproveCandidate): Map<number, number> {
+  const changes = new Map<number, number>();
+  const bump = (typeId: number, by: number) => changes.set(typeId, (changes.get(typeId) ?? 0) + by);
+  for (let c: ImproveCandidate | undefined = candidate; c; c = c.pairedWith) {
+    bump(c.toTypeId, c.at.length);
+    if (c.fromTypeId !== null) bump(c.fromTypeId, -c.at.length);
+  }
+  return changes;
+}
+
+/** Units still to buy of `need` with `owned` in hand. */
+const missingOf = (need: number, owned: number) => Math.max(0, need - owned);
+
+/**
+ * How much the still-to-buy price moves when `changes` are made: each type is
+ * priced for the units `owned` does not cover. Null when a changed type has no price.
+ */
+export function stillToBuyDelta(
+  changes: ReadonlyMap<number, number>,
+  priceOf: (typeId: number) => number | null,
+  { owned, fitCounts }: OwnedStock
+): number | null {
+  let delta = 0;
+  for (const [typeId, by] of changes) {
+    if (by === 0) continue;
+    const price = priceOf(typeId);
+    if (price === null) return null;
+    const have = owned.get(typeId) ?? 0;
+    const need = fitCounts.get(typeId) ?? 0;
+    delta += price * (missingOf(need + by, have) - missingOf(need, have));
+  }
+  return delta;
+}
+
 /** Hub sell price of every part, per the mode (`ImproveOption.iskDelta`). */
 function iskDeltaOf(
   candidate: ImproveCandidate,
   priceOf: (typeId: number) => number | null,
-  mode: ImproveMode
+  mode: ImproveMode,
+  stock?: OwnedStock
 ): { isk: number | null; destroysRigs: boolean } {
+  if (mode === 'buy' && stock)
+    return {
+      isk: stillToBuyDelta(candidateTypeChanges(candidate), priceOf, stock),
+      destroysRigs: false,
+    };
   const to = priceOf(candidate.toTypeId);
   const from = candidate.fromTypeId === null ? 0 : priceOf(candidate.fromTypeId);
   const isRig = candidate.at[0].slot === 'rig';
@@ -681,8 +732,10 @@ export interface FindImprovementsParams {
   mode?: ImproveMode;
   /** Planning: the total fit price may not pass it. Refitting: the extra spend may not. Null: no limit. */
   spendCap?: number | null;
-  /** What the fit costs now, for Planning's total budget. */
+  /** What the fit costs now, for Planning's total budget; still to buy when `stock` is given. */
   fitTotal?: number | null;
+  /** Planning: what the pilot owns; owned units cost nothing, so the cost and the budget count only what is still to buy. */
+  stock?: OwnedStock;
   /** After each candidate: how many are done, of how many. */
   onProgress?: (checked: number, total: number) => void;
   /** Cancel: nothing comes back. */
@@ -709,6 +762,7 @@ export async function findImprovements({
   mode = 'buy',
   spendCap = null,
   fitTotal = null,
+  stock,
   onProgress,
   isCancelled,
   shouldStop,
@@ -725,7 +779,7 @@ export async function findImprovements({
   function take(candidate: ImproveCandidate, swapped: Fitting, after: FittingStats) {
     // The game refuses a fit that breaks a fitting rule the open one keeps: never offered.
     if (newRuleBreaks(before.ruleBreaks, after.ruleBreaks).length > 0) return;
-    const { isk: iskDelta, destroysRigs } = iskDeltaOf(candidate, priceOf, mode);
+    const { isk: iskDelta, destroysRigs } = iskDeltaOf(candidate, priceOf, mode, stock);
     const score = scoreOf(goal, before, after, iskDelta, target, hold);
     if (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON)) return;
     const option: ImproveOption = {

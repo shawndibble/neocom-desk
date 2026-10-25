@@ -33,6 +33,7 @@ import { commandOf } from '@/engine/fittings/improveCommand';
 import { hullRoleOf, roleUnlocks } from '@/engine/fittings/improveRole';
 import { ewarOf, tackleOf } from '@/engine/fittings/improveTackle';
 import { Collapse } from '@/components/ui/Collapse';
+import { OwnedCostLine, OwnedStockControl, type ImproveOwnedSettings } from './ImproveOwnedStock';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import {
   applyImproveCandidate,
@@ -150,6 +151,8 @@ export interface ImproveSettings {
   /** Carry more: the hold scored. */
   hold: ImproveHold;
   onHoldChange: (hold: ImproveHold) => void;
+  /** Planning: count what the pilot owns; absent when no Character has the assets scope. */
+  owned?: ImproveOwnedSettings;
 }
 
 interface Props {
@@ -340,6 +343,12 @@ export function ImprovePanel({
   }
 
   function isk(option: ImproveOption) {
+    const stock = state.status === 'done' ? state.owned?.stock : undefined;
+    if (counting && stock && option.iskDelta !== null) {
+      const own = stock.owned.get(option.candidate.toTypeId) ?? 0;
+      if (own > 0)
+        return <OwnedCostLine need={option.candidate.at.length} own={own} isk={option.iskDelta} />;
+    }
     if (option.iskDelta === null)
       return <span className="text-text-dim">{t('fittings.improve.noPrice')}</span>;
     return option.iskDelta < 0 ? (
@@ -727,6 +736,7 @@ export function ImprovePanel({
           mode: settings.mode,
           spendCap: settings.spendCap,
           fitTotal: state.fitTotal,
+          ...(state.owned ? { stock: state.owned.stock, priceOf: state.owned.priceOf } : {}),
           target,
         })
       : null;
@@ -823,6 +833,12 @@ export function ImprovePanel({
     (id === goal || roleGoals.includes(id) || FIT_DERIVED_GOALS.includes(id));
   const relevantGoals = IMPROVE_GOALS.filter(isRelevant);
   const otherGoals = IMPROVE_GOALS.filter((id) => !isRelevant(id));
+  // Planning counts owned stock while the switch is on and the Character may read assets.
+  const counting = settings.mode === 'buy' && Boolean(settings.owned?.on);
+  const ownedPlaceText =
+    settings.owned?.place === 'all'
+      ? t('market.appraisal.minusOwnedEverywhere')
+      : (settings.owned?.placeLabel ?? '');
   const settingsSummary = [
     t(`fittings.improve.reach.${settings.reach}`),
     t(`fittings.improve.mode.${settings.mode}`),
@@ -831,6 +847,9 @@ export function ImprovePanel({
       : t(`fittings.improve.summaryCap.${settings.mode}`, {
           cap: formatIskCompact(settings.spendCap),
         }),
+    ...(counting && settings.owned
+      ? [t('fittings.improve.owned.summary', { place: ownedPlaceText })]
+      : []),
   ].join(' · ');
   const pickGoal = (id: ImproveGoal) => {
     if (goal === id) return;
@@ -982,8 +1001,20 @@ export function ImprovePanel({
               onChange={settings.onModeChange}
               fill
             />
+            {settings.mode === 'buy' && settings.owned && (
+              <OwnedStockControl
+                owned={settings.owned}
+                noneHere={state.status === 'done' && state.owned?.anyOwned === false}
+              />
+            )}
             <label className="block space-y-1 text-sm">
-              <span>{t(`fittings.improve.cap.${settings.mode}`)}</span>
+              <span>
+                {t(
+                  counting
+                    ? 'fittings.improve.cap.buyOwned'
+                    : `fittings.improve.cap.${settings.mode}`
+                )}
+              </span>
               <IskInput
                 value={settings.spendCap === null ? '' : String(settings.spendCap)}
                 onChange={(value) => settings.onSpendCapChange(value === '' ? null : Number(value))}
@@ -1251,8 +1282,15 @@ export function ImprovePanel({
                         {' · '}
                         {settings.mode === 'buy' && summary.total !== null ? (
                           <>
-                            {t('fittings.improve.selection.total')}{' '}
+                            {t(
+                              counting
+                                ? 'fittings.improve.selection.stillToBuy'
+                                : 'fittings.improve.selection.total'
+                            )}{' '}
                             <IskAmount value={summary.total} />
+                            {counting &&
+                              settings.spendCap !== null &&
+                              ` ${t('fittings.improve.selection.ofBudget', { cap: formatIskCompact(settings.spendCap) })}`}
                           </>
                         ) : (
                           <>
