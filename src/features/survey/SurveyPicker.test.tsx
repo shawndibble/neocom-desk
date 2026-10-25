@@ -6,7 +6,7 @@ import { db } from '@/db';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 
 const { loadSurvey } = vi.hoisted(() => ({ loadSurvey: vi.fn() }));
-vi.mock('./surveyStore', () => ({ loadSurvey }));
+vi.mock('./surveyStore', () => ({ loadSurveyCached: loadSurvey }));
 
 import { SurveyPicker } from './SurveyPicker';
 import { noteSurvey, renameSurvey, useSurveyHistory } from './surveyHistory';

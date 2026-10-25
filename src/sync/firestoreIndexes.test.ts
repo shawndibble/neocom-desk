@@ -168,33 +168,57 @@ describe('firestore.indexes.json field overrides', () => {
     ]);
   });
 
-  it('expires a Survey Scan with its survey, and indexes none of its fields', () => {
+  it('expires a Survey Scan with its survey, and indexes only createdAt, for the incremental poll', () => {
     // Scans sit under `shares/{id}` but a TTL delete of the parent leaves its
     // subcollection behind, so each scan carries the survey's `expiresAt`.
     expect(overridesFor('surveyScans')).toEqual([
       { collectionGroup: 'surveyScans', fieldPath: '*', ttl: false, indexes: [] },
       { collectionGroup: 'surveyScans', fieldPath: 'expiresAt', ttl: true, indexes: [] },
+      {
+        collectionGroup: 'surveyScans',
+        fieldPath: 'createdAt',
+        ttl: false,
+        indexes: [{ order: 'ASCENDING', queryScope: 'COLLECTION' }],
+      },
     ]);
   });
 
-  it('expires a Survey moon tax with its survey, and indexes none of its fields', () => {
+  it('expires a Survey moon tax with its survey, and indexes only createdAt, newest first', () => {
     expect(overridesFor('surveyTax')).toEqual([
       { collectionGroup: 'surveyTax', fieldPath: '*', ttl: false, indexes: [] },
       { collectionGroup: 'surveyTax', fieldPath: 'expiresAt', ttl: true, indexes: [] },
+      {
+        collectionGroup: 'surveyTax',
+        fieldPath: 'createdAt',
+        ttl: false,
+        indexes: [{ order: 'DESCENDING', queryScope: 'COLLECTION' }],
+      },
     ]);
   });
 
-  it('expires an ignored-scan doc with its survey, and indexes none of its fields', () => {
+  it('expires an ignored-scan doc with its survey, and indexes only createdAt, for the incremental poll', () => {
     expect(overridesFor('surveyIgnores')).toEqual([
       { collectionGroup: 'surveyIgnores', fieldPath: '*', ttl: false, indexes: [] },
       { collectionGroup: 'surveyIgnores', fieldPath: 'expiresAt', ttl: true, indexes: [] },
+      {
+        collectionGroup: 'surveyIgnores',
+        fieldPath: 'createdAt',
+        ttl: false,
+        indexes: [{ order: 'ASCENDING', queryScope: 'COLLECTION' }],
+      },
     ]);
   });
 
-  it('expires a Survey location and notes doc with its survey, and indexes none of its fields', () => {
+  it('expires a Survey location and notes doc with its survey, and indexes only createdAt, newest first', () => {
     expect(overridesFor('surveyInfo')).toEqual([
       { collectionGroup: 'surveyInfo', fieldPath: '*', ttl: false, indexes: [] },
       { collectionGroup: 'surveyInfo', fieldPath: 'expiresAt', ttl: true, indexes: [] },
+      {
+        collectionGroup: 'surveyInfo',
+        fieldPath: 'createdAt',
+        ttl: false,
+        indexes: [{ order: 'DESCENDING', queryScope: 'COLLECTION' }],
+      },
     ]);
   });
 
