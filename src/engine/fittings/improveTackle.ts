@@ -48,6 +48,7 @@ export function ewarOf(s: FittingStats): EwarFigures {
   const modules = rows.reduce((sum, row) => sum + row.count, 0);
   if (modules === 0) return { strength: 0, range: 0 };
   return {
+    // A row's amount is one module's strength (not in SUMMED), so scale by count.
     strength: rows.reduce((sum, row) => sum + row.amount * row.count, 0),
     range: rows.reduce((sum, row) => sum + (row.optimal + row.falloff) * row.count, 0) / modules,
   };
