@@ -5,6 +5,8 @@ import { focusRingInsetClassName, rowInteractiveClassName } from '@/components/u
 import { cx } from '@/lib/cx';
 import type { Fitting } from '@/engine/fittings/types';
 import { STAT_EYEBROW_TYPE } from '../statKit';
+import { useSectionPreviewed } from '../statPreviewContext';
+import type { Section } from './sectionIds';
 import { FittingYourCharactersPanel } from '../FittingYourCharactersPanel';
 import { useCharacterGaps, type GapCharacter } from '../useCharacterGaps';
 
@@ -12,6 +14,7 @@ export function StatSection({
   title,
   meta,
   warning,
+  id,
   expanded,
   onToggle,
   level: Heading,
@@ -22,12 +25,16 @@ export function StatSection({
   meta: ReactNode;
   /** Shown on the row itself, so a warning inside a collapsed section isn't missed. */
   warning?: string;
+  /** Which section: a previewed change inside it puts a dot on the row, so a shut section doesn't hide it. */
+  id: Section;
   expanded: boolean;
   onToggle: () => void;
   /** `h4` under a column group label; `h3` in a side panel, under its title. */
   level: 'h3' | 'h4';
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
+  const previewed = useSectionPreviewed(id);
   return (
     <section className="border-b border-line last:border-b-0">
       {/* Every section's row looks alike, open or shut: its small-caps title, the headline figure beside. Hover fills it `panel-2`, so it rests unfilled. */}
@@ -44,6 +51,12 @@ export function StatSection({
           >
             <Caret expanded={expanded} />
             {title}
+            {previewed && (
+              <>
+                <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-accent" />
+                <span className="sr-only">{`, ${t('fittings.stats.previewedChange')}`}</span>
+              </>
+            )}
           </button>
         </Heading>
         {/* Status text, never boxed: a box would read as a control (DESIGN.md §6). */}

@@ -24,6 +24,7 @@ import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 import { FittingItemActionsProvider } from './fittingItemActions';
 import { fakeItemActions } from './__fixtures__/itemActions';
 import { MakeItFitContext } from './makeItFitContext';
+import { diffFittingStats } from '@/engine/fittings/variationDelta';
 
 beforeEach(async () => {
   await db.settings.clear();
@@ -1620,5 +1621,54 @@ describe('FittingStatsSections Fitting section over budget', () => {
     expect(screen.getByText('CPU 25% · PG 50%')).not.toHaveClass('text-danger');
     await expandFitting();
     expect(screen.queryByRole('button', { name: /^Fix / })).toBeNull();
+  });
+});
+
+describe('FittingStatsSections previewed change', () => {
+  const current = stats();
+  const after = stats({
+    ehp: 5000,
+    navigation: { maxVelocity: 400, agility: 3.2, mass: 1000000, warpSpeed: 5 },
+    shield: { ...layer(450, 514), emResonance: 0.4 },
+    targeting: {
+      maxTargetRange: 20000,
+      maxLockedTargets: 4,
+      scanResolution: 600,
+      signatureRadius: 40,
+    },
+  });
+
+  it('shows current → after on exactly the stats the diff reports, and nothing else', () => {
+    const delta = diffFittingStats(current, after);
+    render(
+      <FittingStatsSections
+        stats={current}
+        statsProgress={null}
+        statsError={false}
+        price={null}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={typeName}
+        preview={delta}
+      />
+    );
+    // A stat shows in its section's headline and its body; signature radius sits in the collapsed Targeting section, so only its header dot shows it.
+    const named = new Set(
+      [...document.querySelectorAll('[data-verdict]')].map((el) =>
+        el.parentElement?.previousElementSibling?.textContent?.replace(/ [\d.,]+ to .*$/, '')
+      )
+    );
+    expect(named).toEqual(new Set(['EHP', 'Max velocity', 'Shield EM resist']));
+    expect(delta.changes.map((c) => c.key)).toContain('signatureRadius');
+    expect(
+      screen.getByRole('heading', { name: 'Targeting, Previewed change inside' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Capacitor' })).toBeInTheDocument();
+  });
+
+  it('reads as it always does with no preview', () => {
+    renderSections(current);
+    expect(document.querySelectorAll('[data-verdict]')).toHaveLength(0);
+    expect(screen.queryByText('Previewed change inside')).not.toBeInTheDocument();
   });
 });

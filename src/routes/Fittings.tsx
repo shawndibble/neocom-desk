@@ -492,6 +492,7 @@ function FittingsPage() {
       targetProfiles={targetProfiles}
       overlay={overlay}
       onOpenMakeItFit={makeItFit.open}
+      preview={improve.preview}
     />
   );
 

@@ -11,6 +11,7 @@ import { overBudgetResources } from '@/engine/fittings/improveFree';
 import { hullRoleOf, rememberedGoal } from '@/engine/fittings/improveRole';
 import { loadBestCharges, unloadedWeapons } from '@/engine/fittings/improveCharges';
 import type { Fitting, FittingModuleResult } from '@/engine/fittings/types';
+import type { FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import type { FittingContext } from './fittingContext';
 import { useChargeChoices } from './useChargeChoices';
 import type { ChargeLoading } from './useChargeLoading';
@@ -76,7 +77,12 @@ export function useImproveDrawer({
   context,
   moduleResults,
   openMakeItFit,
-}: UseImproveDrawerArgs): { open: () => void; drawer: ReactNode } {
+}: UseImproveDrawerArgs): {
+  open: () => void;
+  drawer: ReactNode;
+  /** The stat changes to preview in the stats column; null when Improve is shut or nothing is ticked or hovered. */
+  preview: FittingStatsDelta | null;
+} {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const legacyGoal = useImproveGoal((state) => state.value);
@@ -110,6 +116,8 @@ export function useImproveDrawer({
   const [defense, setDefense] = useState<DefenseChoice>('keep');
   const [includeRigs, setIncludeRigs] = useState(false);
   const [includeOfficer, setIncludeOfficer] = useState(false);
+  // What the ticked and hovered rows would change, for the stats column; never part of the Fitting or its history.
+  const [preview, setPreview] = useState<FittingStatsDelta | null>(null);
   // The Fitting before the last Apply and the one it made, for the toast's Undo; null once it is gone.
   const [undo, setUndo] = useState<{ before: Fitting; applied: Fitting; message: string } | null>(
     null
@@ -180,6 +188,7 @@ export function useImproveDrawer({
       onApply={apply}
       fitting={fitting}
       target={targetProfiles.hydrated ? targetProfiles.selected : undefined}
+      onPreview={setPreview}
       unloaded={unloaded}
       onLoadBestCharge={chargeSteps.length > 0 ? loadBestCharge : undefined}
       onFixFirst={(resource) => {
@@ -276,5 +285,5 @@ export function useImproveDrawer({
       )}
     </>
   );
-  return { open, drawer };
+  return { open, drawer, preview: isOpen ? preview : null };
 }

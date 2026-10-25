@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { FittingStats, LocalRepair } from '@/engine/fittings/types';
+import type { StatChangeKey } from '@/engine/fittings/variationDelta';
 import { Facts, HeatFigure, StatGroup, StatNote, type Fact } from './StatFacts';
 import { fixed0, fixed1, fixedFormat } from '@/lib/fixedFormat';
 
@@ -28,15 +29,15 @@ export function TankFacts({
   const { t } = useTranslation();
   const { tank } = stats;
   const hasTank = tank.burstEffective > 0 || tank.sustainedEffective > 0;
-  const figure = (format: (s: FittingStats) => string) => (
-    <HeatFigure stats={stats} format={format} />
+  const figure = (format: (s: FittingStats) => string, keys?: readonly StatChangeKey[]) => (
+    <HeatFigure stats={stats} format={format} keys={keys} />
   );
   const perSecond = (value: number) =>
     t('fittings.stats.unit.hpPerSecond', { value: fixed1(value) });
   const facts: Fact[] = [
     ...REPAIR_LAYERS.filter((layer) => stats.repair[layer] > 0).map((layer) => ({
       label: t(`fittings.stats.repair.${layer}`),
-      value: figure((s) => perSecond(s.repair[layer])),
+      value: figure((s) => perSecond(s.repair[layer]), [`${layer}Repair`]),
     })),
     ...(tank.passiveShield > 0
       ? [
@@ -98,22 +99,27 @@ export function CapacitorFacts({ stats }: { stats: FittingStats }) {
   const { t } = useTranslation();
   const budget = stats.capacitorBudget;
   const perSecond = (value: string) => t('fittings.stats.unit.gjPerSecond', { value });
-  const figure = (format: (s: FittingStats) => string) => (
-    <HeatFigure stats={stats} format={format} />
+  const figure = (format: (s: FittingStats) => string, keys?: readonly StatChangeKey[]) => (
+    <HeatFigure stats={stats} format={format} keys={keys} />
   );
   return (
     <Facts
       items={[
         {
           label: t('fittings.stats.fact.capacity'),
-          value: figure((s) => t('fittings.stats.unit.gj', { value: fixed0(s.capacitorCapacity) })),
+          value: figure(
+            (s) => t('fittings.stats.unit.gj', { value: fixed0(s.capacitorCapacity) }),
+            ['capacitorCapacity']
+          ),
         },
         {
           label: t('fittings.stats.fact.recharge'),
-          value: figure((s) =>
-            t('fittings.stats.unit.seconds', {
-              value: fixed0(s.capacitorRechargeTime / 1000),
-            })
+          value: figure(
+            (s) =>
+              t('fittings.stats.unit.seconds', {
+                value: fixed0(s.capacitorRechargeTime / 1000),
+              }),
+            ['capacitorRechargeTime']
           ),
         },
         {

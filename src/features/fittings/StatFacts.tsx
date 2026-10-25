@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Field, Fields } from '@/components/ui';
 import { HintText } from '@/components/ui/HintText';
 import { unheatedIfChanged } from '@/engine/fittings/stats';
+import type { StatChangeKey } from '@/engine/fittings/variationDelta';
+import { PreviewedFigure } from './statPreview';
 import { STAT_DETAIL, STAT_EYEBROW, statRowClassName } from './statKit';
 
 /**
@@ -16,6 +18,24 @@ import { STAT_DETAIL, STAT_EYEBROW, statRowClassName } from './statKit';
  * unheated figure still shows in the tooltip.
  */
 export function HeatFigure<S extends { unheated: S | null }>({
+  keys,
+  ...props
+}: {
+  stats: S;
+  format: (stats: S) => string;
+  note?: string;
+  toneClassName?: string;
+  /** The stats this figure shows: a previewed change to one reads `<current> → <after>` instead. */
+  keys?: readonly StatChangeKey[];
+}) {
+  return (
+    <PreviewedFigure keys={keys}>
+      <PlainHeatFigure {...props} />
+    </PreviewedFigure>
+  );
+}
+
+function PlainHeatFigure<S extends { unheated: S | null }>({
   stats,
   format,
   note,

@@ -27,10 +27,13 @@ function DamageFigures({
   stats,
   figures,
   sustained = 'tooltip',
+  previewed = false,
 }: {
   stats: FittingStats;
   figures: (stats: FittingStats) => DamageFiguresValue;
   sustained?: 'tooltip' | 'line';
+  /** The fit's total: a previewed change to its DPS, volley or sustained DPS shows in place. */
+  previewed?: boolean;
 }) {
   const { t } = useTranslation();
   const sustainedLabel = (s: FittingStats) =>
@@ -46,6 +49,7 @@ function DamageFigures({
           stats={stats}
           format={(s) => t('fittings.stats.weaponDps', { value: fmt1(figures(s).dps) })}
           note={tooltip}
+          keys={previewed ? ['totalDps'] : undefined}
         />
       </span>
       <span className="text-text-dim"> · </span>
@@ -53,6 +57,7 @@ function DamageFigures({
         <HeatFigure
           stats={stats}
           format={(s) => t('fittings.stats.weaponVolley', { value: fmt0(figures(s).volley) })}
+          keys={previewed ? ['totalVolley'] : undefined}
         />
       </span>
       {tooltip && <span className="sr-only"> ({tooltip})</span>}
@@ -63,7 +68,11 @@ function DamageFigures({
     <>
       {numbers}
       <span className="block text-right text-[0.6875rem] font-normal text-text-dim tabular-nums">
-        <HeatFigure stats={stats} format={sustainedLabel} />
+        <HeatFigure
+          stats={stats}
+          format={sustainedLabel}
+          keys={previewed ? ['sustainedDps'] : undefined}
+        />
       </span>
     </>
   );
@@ -186,7 +195,9 @@ export function OffenseRows({
         <StatRowContent
           name={t('fittings.stats.offenseTotal')}
           inline
-          figure={<DamageFigures stats={stats} figures={(s) => s.offense} sustained="line" />}
+          figure={
+            <DamageFigures stats={stats} figures={(s) => s.offense} sustained="line" previewed />
+          }
         />
       </li>
     </StatRows>
