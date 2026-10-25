@@ -8,6 +8,7 @@ import { scalePx } from '@/lib/fontScale';
 import type { ReactElement } from 'react';
 import { XAxis, YAxis } from 'recharts';
 import { formatEveClock } from '@/engine/survey/chatMessage';
+import { spacedLabels } from '@/engine/survey/labelSpacing';
 import { timeTicks } from '@/engine/survey/timeTicks';
 import type { SurveySummary } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
@@ -81,4 +82,27 @@ export function makeScanDot(onRemove?: (at: number) => void) {
       </g>
     );
   };
+}
+
+/**
+ * Which labels fit on a chart: the indexes of `labels` (at a time, with a
+ * weight for who wins a clash) to draw, `gap` px apart at least. `plotWidth`
+ * is the chart's reported width; before it reports one there is nothing to
+ * measure, so all show.
+ */
+export function thinLabels(
+  labels: { at: number; weight: number }[],
+  domain: [number, number] | readonly [number, number],
+  plotWidth: number,
+  gap: number
+): Set<number> {
+  const plotPx = Math.max(0, plotWidth - scalePx(Y_AXIS_WIDTH) - MARGIN.right);
+  if (plotPx === 0) return new Set(labels.keys());
+  return spacedLabels(
+    labels.map((l) => ({
+      x: ((l.at - domain[0]) / (domain[1] - domain[0])) * plotPx,
+      weight: l.weight,
+    })),
+    gap
+  );
 }
