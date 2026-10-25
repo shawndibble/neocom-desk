@@ -146,7 +146,7 @@ export function ImprovePanel({
     result: ImproveResult | null;
     byModule: ReadonlyMap<string, ImproveOption>;
   }>({ result: null, byModule: new Map() });
-  const { state, before } = search;
+  const { state, before, hull } = search;
   const result = state.status === 'done' ? state.result : null;
   const ticked = ticks.result === result ? ticks.byModule : new Map<string, ImproveOption>();
   const setTicked = (byModule: ReadonlyMap<string, ImproveOption>) =>
@@ -366,7 +366,7 @@ export function ImprovePanel({
           className="flex flex-wrap gap-2"
         >
           {IMPROVE_GOALS.map((id) => {
-            const availability = before ? goalAvailability(id, before) : { available: true };
+            const availability = before ? goalAvailability(id, before, hull) : { available: true };
             const reason =
               'reason' in availability
                 ? t(`fittings.improve.unavailable.${availability.reason}`)

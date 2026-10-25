@@ -6,7 +6,7 @@
  * at the pilot's Trade Hub. Runs only while `enabled`, so a closed drawer
  * costs nothing; Cancel aborts the calculation in the worker.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DEFAULT_IMPROVE_HOLD,
   findImprovements,
@@ -28,6 +28,13 @@ import {
 } from '@/engine/fittings/improve';
 import { overBudgetResources } from '@/engine/fittings/improveFree';
 import {
+  DEFAULT_GOAL_OF_ROLE,
+  HULL_ROLES,
+  hullRoleOf,
+  type GoalsByRole,
+  type HullRef,
+} from '@/engine/fittings/improveRole';
+import {
   bestCrystalKey,
   crystalKeyOf,
   crystalsOfFamily,
@@ -47,7 +54,10 @@ import { loadFittingPrice } from './fittingPrice';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
 
-/** The last Improve Goal, remembered on this device like other Fittings preferences. */
+/**
+ * The old global Improve Goal, kept only to seed a role that has none yet
+ * (`rememberedGoal`); the goal is now remembered per hull role.
+ */
 export const useImproveGoal = createLocalSetting<ImproveGoal>({
   key: 'fittingsImproveGoal',
   defaultValue: 'overall',
@@ -56,6 +66,43 @@ export const useImproveGoal = createLocalSetting<ImproveGoal>({
       ? (raw as ImproveGoal)
       : 'overall',
 });
+
+/** The last Improve Goal per hull role (combat, mining, ...), remembered on this device. */
+export const useImproveGoalByRole = createLocalSetting<GoalsByRole>({
+  key: 'fittingsImproveGoalByRole',
+  defaultValue: {},
+  parse: (raw) => {
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+    const goals = raw as Record<string, unknown>;
+    const kept: GoalsByRole = {};
+    for (const role of HULL_ROLES) {
+      const goal = goals[role];
+      if (typeof goal === 'string' && (IMPROVE_GOALS as readonly string[]).includes(goal))
+        kept[role] = goal as ImproveGoal;
+    }
+    return kept;
+  },
+});
+
+/** The open Fitting's hull as the catalogue knows it; undefined while either is unknown. */
+export function hullOf(
+  fitting: Fitting | null | undefined,
+  catalogue: FittingCatalogue | null
+): HullRef | undefined {
+  const groupId = fitting ? catalogue?.types[String(fitting.shipTypeId)]?.groupID : undefined;
+  return fitting && groupId !== undefined ? { typeId: fitting.shipTypeId, groupId } : undefined;
+}
+
+/** The goal to search: `goal` if the fit can score it, else the hull role's default, else Best overall. */
+export function searchableGoal(
+  goal: ImproveGoal,
+  before: FittingStats,
+  hull: HullRef | undefined
+): ImproveGoal {
+  if (goalAvailability(goal, before, hull).available) return goal;
+  const fallback = DEFAULT_GOAL_OF_ROLE[hullRoleOf(hull)];
+  return goalAvailability(fallback, before, hull).available ? fallback : 'overall';
+}
 
 /** How far Improve goes from the fitted modules, remembered on this device. */
 export const useImproveReach = createLocalSetting<ImproveReach>({
@@ -137,8 +184,10 @@ export type ImproveState =
     };
 
 export interface ImproveSearch {
-  /** The goal searched: the remembered one, or Best overall when this fit cannot score it. */
+  /** The goal searched: the remembered one, or the hull role's default when this fit cannot score it. */
   goal: ImproveGoal;
+  /** The open Fitting's hull, for the goal chips' role unlock. */
+  hull?: HullRef;
   state: ImproveState;
   /** The open Fitting's stats before any swap, for each row's goal check; null until known. */
   before: FittingStats | null;
@@ -270,6 +319,16 @@ export function useImprove(
   const cancelRef = useRef<() => void>(() => {});
   const stopRef = useRef(false);
   const { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
+  const hullTypeId = variants?.fitting.shipTypeId;
+  const hullGroupId =
+    hullTypeId === undefined ? undefined : catalogue?.types[String(hullTypeId)]?.groupID;
+  const hull = useMemo(
+    () =>
+      hullTypeId !== undefined && hullGroupId !== undefined
+        ? { typeId: hullTypeId, groupId: hullGroupId }
+        : undefined,
+    [hullTypeId, hullGroupId]
+  );
 
   useEffect(() => {
     if (!enabled || !variants || !catalogue) return;
@@ -303,8 +362,8 @@ export function useImprove(
           setState({ status: 'overBudget', resources: over });
           return;
         }
-        // A remembered goal this fit cannot score (Longer reach on a drone boat) searches Best overall.
-        const searched = goalAvailability(goal, own).available ? goal : 'overall';
+        // A remembered goal this fit cannot score (Longer reach on a drone boat) searches the role's default.
+        const searched = searchableGoal(goal, own, hull);
         // A tank goal under Shield or Armor runs both sides, the chosen one first, to compare them.
         const sides: DefenseChoice[] =
           defense !== 'keep' && TANK_GOALS.has(searched)
@@ -424,6 +483,7 @@ export function useImprove(
     variants,
     catalogue,
     goal,
+    hull,
     target,
     hubId,
     attempt,
@@ -444,7 +504,8 @@ export function useImprove(
   const restart = useCallback(() => setAttempt((n) => n + 1), []);
 
   return {
-    goal: before && !goalAvailability(goal, before).available ? 'overall' : goal,
+    goal: before ? searchableGoal(goal, before, hull) : goal,
+    hull,
     state: enabled ? state : { status: 'idle' },
     before: enabled ? before : null,
     cancel,

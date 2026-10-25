@@ -4,9 +4,11 @@ import { Modal, SlideOver, Toast, useTimedToast } from '@/components/ui';
 import {
   applyImproveCandidate,
   type DefenseChoice,
+  type ImproveGoal,
   type ImproveOption,
 } from '@/engine/fittings/improve';
 import { overBudgetResources } from '@/engine/fittings/improveFree';
+import { hullRoleOf, rememberedGoal } from '@/engine/fittings/improveRole';
 import { loadBestCharges, unloadedWeapons } from '@/engine/fittings/improveCharges';
 import type { Fitting, FittingModuleResult } from '@/engine/fittings/types';
 import type { FittingContext } from './fittingContext';
@@ -21,6 +23,8 @@ import type { FittingCatalogue } from './useFittingCatalogue';
 import {
   useImprove,
   useImproveGoal,
+  useImproveGoalByRole,
+  hullOf,
   useImproveHold,
   useImproveMode,
   useImproveOre,
@@ -72,8 +76,13 @@ export function useImproveDrawer({
 }: UseImproveDrawerArgs): { open: () => void; drawer: ReactNode } {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
-  const goal = useImproveGoal((state) => state.value);
-  const setGoal = useImproveGoal((state) => state.setValue);
+  const legacyGoal = useImproveGoal((state) => state.value);
+  const goalsByRole = useImproveGoalByRole((state) => state.value);
+  const setGoalsByRole = useImproveGoalByRole((state) => state.setValue);
+  // One remembered goal per hull role: a Hulk does not start on the Drake's More damage.
+  const role = hullRoleOf(hullOf(fitting, catalogue));
+  const goal = rememberedGoal(goalsByRole, legacyGoal, role);
+  const setGoal = (next: ImproveGoal) => setGoalsByRole({ ...goalsByRole, [role]: next });
   const reach = useImproveReach((state) => state.value);
   const setReach = useImproveReach((state) => state.setValue);
   const mode = useImproveMode((state) => state.value);
