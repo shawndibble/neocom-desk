@@ -39,7 +39,7 @@ archive, ratting ISK/h, loss replacement matching, doctrine view — surfaced
 GPL-3 Windows desktop, live, weekly releases: build planner with run planner,
 invention, order-book ladder, Daytrade/Swing/Regional/Firesales scanners,
 Order update work-through, FIFO Profits — surfaced #3985–#3995).
-EVE Omni, Canopus, Eve-Omnitool, Eve Deep Industry, SNOW//OPS, New Eden Command,
+EVE Omni, Canopus, Eve Deep Industry, SNOW//OPS, New Eden Command,
 eve-hub.ru, Telescope, EVE Killmap, The Bounty Bid, PI Nexus, sde-deltas (all
 closed classes 1-3 or intel/dev infra; Slipway Jobs view + slot deduction is
 already Active Jobs / job-slot count), Pod Warden (native PI/skill/order/in-game-
@@ -304,6 +304,8 @@ Numbering is stable — later runs cite these by number. Append, never renumber.
 
 #4736 NARROW — Transactions: per-row reason for a missing margin (engine-decided causes only) plus an uncosted-revenue total (EVE Market Tool).
 
+#5134 NARROW — Build Plans: "Buy ore instead" comparison for a mineral shortfall (compressed ore bought and refined at the Character's refine rate vs buying minerals; cheapest/lightest only; Eve-Omnitool ore planner, EVE Motor Market).
+
 #5006 NARROW — Skills: a read-only "Who's closest" list in the plan editor's Plan tools pane (SP missing and time to finish per roster Character, own attributes/implants, no queue offset; EveLens #137).
 
 #5127 NARROW — LP Store: a Sells/day column (output's market volume at the pilot's hub; Days to Sell cut) (EVE Farm).
@@ -396,6 +398,8 @@ of pricing them as 1 (Janice #34/#28/#22).
 #5002 NARROW — Overview: Market Trend widget, fixed basket (minerals, PLEX, Large Skill Injector) with 7d/30d change (eve-exchange dashboard).
 
 ## Killed / dropped candidates (never filed)
+
+- **Eve-Omnitool** (eve-omnitool.com, live, forum thread 519645, near-daily updates): market (structure prices, margin/station profit finder, My orders, Sold/day columns, Trade hubs), industry (cost calculator, reactions ranking, What to build, blueprint collection tiles/tree/list, ore reprocessing planner, reprocessing paste calculator, mining income calculators), intel (gate-camp route check, D-Scan, live map). Surfaced #5134 (ore planner, narrowed). Covered: reactions (`activity`), What to build (Market-wide opportunities), blueprint collection (`OwnedBlueprintsPanel` All owned, #2335), Sold/day (`dailySales`), My orders (Open Orders), reprocessing paste (Appraisal refine-then-sell), mining calculators (survey/Mining Yield), public structure markets (opt-in structuremarkets scope, decision `20260906-203425`). Killed: **Collection gaps** (unowned blueprints per group — SDE-wide enumeration, no decision value, blueprint-collector minority, drifts toward `.out-of-scope/blueprint-job-planning.md`); **Hubs on route** (thin filter over Hauling Trip Plan `haulPlan.ts` and Travel waypoints; trader niche; cheap fix is hubs as optional stops, not a candidate); gate-camp/D-Scan/live map (intel, kill-test 2).
 
 Grouped by the test that killed them; the reason is what stops a re-pitch.
 
