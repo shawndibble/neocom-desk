@@ -24,7 +24,7 @@ import {
 } from './corpSyncGrant.js';
 import { deleteBook, turnOnBook, verifyOfficer, type BookDeps } from './corpTaxBookStore.js';
 import type { EsiRead, SyncEsi } from './corpTaxBookSyncEsi.js';
-import { QUIET_FIELD } from './corpTaxBookQuietRun.js';
+import { QUIET_DOC } from './corpTaxBookQuietRun.js';
 import {
   installBookWriteTracking,
   stampBook,
@@ -657,7 +657,7 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
           60_000
         );
       const run = () => versioned(() => runScheduledCorpSyncs(syncDeps(), fakeEsi()));
-      const marker = async () => (await book().get()).data()?.[QUIET_FIELD];
+      const marker = async () => (await book().collection('meta').doc(QUIET_DOC).get()).data();
       const paid = async () =>
         ((await book().collection('meta').doc('paid').get()).data()?.ids as string[]) ?? [];
       /** Runs until the book holds a quiet marker: the donation lands, then a run finds nothing to do. */
@@ -668,6 +668,8 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
           await run();
         }
         expect(await marker()).toMatchObject({ at: now, known: [50] });
+        // Officers-only: the book doc, which any signed-in Character may read, carries none of it.
+        expect(Object.keys((await book().get()).data() ?? {})).not.toContain(QUIET_DOC);
       }
 
       beforeAll(() => installBookWriteTracking());
@@ -690,9 +692,8 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
         expect(await marker()).toBeUndefined();
       });
 
-      it('reads in full when ESI brings a new donation', async () => {
+      it('reads in full when ESI brings a new donation, and clears the marker', async () => {
         await quietBook();
-        await book().collection('statements').doc('s1').set(statement);
         (esiState.journal as { data: unknown[] }).data.push({
           id: 2,
           date: '2026-10-18T10:00:00Z',
@@ -703,7 +704,20 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
         now += 6 * H;
         await run();
         expect((await book().collection('payments').doc('j1_2').get()).exists).toBe(true);
-        expect(await paid()).toEqual(['s1']);
+        // Nothing settled, but the run was not quiet: the old marker no longer vouches.
+        expect(await marker()).toBeUndefined();
+      });
+
+      it('reads in full when the paid Statements are not the ones it saw', async () => {
+        await quietBook();
+        await book().collection('statements').doc('s1').set(statement);
+        await book()
+          .collection('meta')
+          .doc('paid')
+          .set({ ids: ['s0'] });
+        now += 6 * H;
+        await run();
+        expect(await paid()).toEqual(['s0', 's1']);
       });
 
       it('reads in full when a Character new to it mines, who may match an Unmatched donation', async () => {

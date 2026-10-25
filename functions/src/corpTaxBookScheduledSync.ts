@@ -13,7 +13,7 @@
 // officer's own Characters (that needs the officer's device).
 
 import { isDeepStrictEqual } from 'node:util';
-import { FieldValue, type DocumentSnapshot, type Firestore } from 'firebase-admin/firestore';
+import type { DocumentSnapshot, Firestore } from 'firebase-admin/firestore';
 import { parseEditAction, parseSyncInput, type OfficerAccess } from './corpTaxBook.js';
 import {
   META,
@@ -44,7 +44,7 @@ import {
 } from './corpTaxBookObservedThrough.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
 import {
-  QUIET_FIELD,
+  QUIET_DOC,
   fingerprintOf,
   journalThroughOf,
   quietAfterReads,
@@ -144,8 +144,6 @@ export interface AdminBookState {
   createdAt: unknown;
   /** The stamps of the collections read here, as the book doc showed them first (corpTaxBookQuietRun.ts). */
   versions: Record<string, string> | null;
-  /** The last quiet run's marker, if any. */
-  quiet: QuietMarker | null;
 }
 
 type BookSnap = DocumentSnapshot;
@@ -160,7 +158,6 @@ function bookDocState(snap: BookSnap) {
     observedThrough: readObservedThrough(data.observedThrough),
     createdAt: data.createdAt,
     versions: quietVersionsOf(data),
-    quiet: readQuietMarker(data[QUIET_FIELD]),
   };
 }
 
@@ -174,11 +171,8 @@ async function readActiveBook(db: Firestore, corporationId: number): Promise<Boo
  * of the collections the quiet marker vouches for (they stay empty: nothing on
  * the quiet path reads them).
  */
-async function readQuietBookState(snap: BookSnap): Promise<AdminBookState> {
-  const [extractions, paid] = await Promise.all([
-    snap.ref.collection(EXTRACTIONS).get(),
-    snap.ref.collection(META).doc(PAID_DOC).get(),
-  ]);
+async function readQuietBookState(snap: BookSnap, paid: BookSnap): Promise<AdminBookState> {
+  const extractions = await snap.ref.collection(EXTRACTIONS).get();
   return {
     ...bookDocState(snap),
     miners: [],
@@ -203,7 +197,8 @@ export async function readBookStateAdmin(
   return snap ? readBookStateFrom(snap) : null;
 }
 
-async function readBookStateFrom(snap: BookSnap): Promise<AdminBookState> {
+/** `paid`: the `meta/paid` doc when the caller has just read it. */
+async function readBookStateFrom(snap: BookSnap, paidRead?: BookSnap): Promise<AdminBookState> {
   const ref = snap.ref;
   const list = async <T>(name: string): Promise<T[]> =>
     (await ref.collection(name).get()).docs.map((d) => d.data() as T);
@@ -214,7 +209,7 @@ async function readBookStateFrom(snap: BookSnap): Promise<AdminBookState> {
       list<AdminBookState['payments'][number]>(PAYMENTS),
       list<MirrorDismissal>(DISMISSALS),
       list<SyncExtraction>(EXTRACTIONS),
-      ref.collection(META).doc(PAID_DOC).get(),
+      paidRead ?? ref.collection(META).doc(PAID_DOC).get(),
       list<Record<string, unknown>>(WRITE_OFFS),
     ]);
   return {
@@ -279,12 +274,17 @@ export async function runBookSync(
   // its Miners, Statements and payments (corpTaxBookQuietRun.ts) — unless the ESI reads below
   // bring something new, when it reads them after all.
   const headState = bookDocState(head);
-  let quiet = quietAtStart(headState.quiet, headState, startedAt);
-  let before = quiet ? await readQuietBookState(head) : await readBookStateFrom(head);
-  if (quiet && fingerprintOf(before.paidStatementIds) !== before.quiet!.paid) {
-    quiet = false;
-    before = await readBookStateFrom(head);
-  }
+  const markerRef = head.ref.collection(META).doc(QUIET_DOC);
+  const [paid, markerSnap] = await db.getAll(head.ref.collection(META).doc(PAID_DOC), markerRef);
+  const marker = readQuietMarker(markerSnap.data());
+  const vouching =
+    quietAtStart(marker, headState, startedAt) && fingerprintOf(paidIdsOf(paid)) === marker.paid
+      ? marker
+      : null;
+  let quiet = vouching !== null;
+  let before = vouching
+    ? await readQuietBookState(head, paid)
+    : await readBookStateFrom(head, paid);
 
   // --- ESI reads (nothing is written until all of them are in) -------------
   const observers = await esi.observers(corporationId, accessToken);
@@ -367,8 +367,8 @@ export async function runBookSync(
   if (!donationsRead) missing.push('donations');
 
   if (
-    quiet &&
-    !quietAfterReads(before.quiet!, {
+    vouching !== null &&
+    !quietAfterReads(vouching, {
       donationsRead,
       donations,
       characterIds: feed.rows.map((r) => r.characterId),
@@ -507,7 +507,7 @@ export async function runBookSync(
   // it, so the next runs can skip that read while nothing changes; any other full run clears
   // an older marker. Best effort: without a marker the next run just reads in full.
   if (!quiet) {
-    const marker: QuietMarker | null =
+    const next: QuietMarker | null =
       donationsRead &&
       fresh.length === 0 &&
       assigned.size === 0 &&
@@ -526,13 +526,13 @@ export async function runBookSync(
             paid: fingerprintOf(before.paidStatementIds),
           }
         : null;
-    if (marker !== null || before.quiet !== null) {
+    if (next !== null || markerSnap.exists) {
       try {
         await db.runTransaction(async (tx) => {
-          const ref = bookRef(db, corporationId);
-          const held = await tx.get(ref);
+          const held = await tx.get(bookRef(db, corporationId));
           if (!held.exists || held.get('createdAt') !== before.createdAt) return;
-          tx.update(ref, { [QUIET_FIELD]: marker ?? FieldValue.delete() });
+          if (next) tx.set(markerRef, next);
+          else tx.delete(markerRef);
         });
       } catch (e) {
         console.error('quiet marker not written', e instanceof Error ? e.message : e);

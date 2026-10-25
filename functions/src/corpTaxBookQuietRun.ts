@@ -15,15 +15,22 @@
 // It never settles, assigns or adds a payment on the skipped path, so a stale
 // marker can only delay those, never make a wrong settle (D22). A delay is
 // bounded: the marker expires after QUIET_MAX_AGE_MS, which forces a full run
-// even if a version stamp was ever missed.
+// whatever hid a change — a stamp that failed, one that landed before its
+// write committed (corpTaxBookVersionTracking.ts records at the call), or a
+// multi-page journal read whose pages came from different ESI snapshots, which
+// can drop a donation below the refId watermark.
 
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { DISMISSALS, MINERS, PAYMENTS, STATEMENTS, WRITE_OFFS } from './corpTaxBook.js';
 import { COLLECTION_VERSIONS_FIELD } from './corpTaxBookVersionKeys.js';
 
-/** Field on `corps/{id}`: the last quiet run's marker. Written only by the scheduled sync. */
-export const QUIET_FIELD = 'scheduledQuiet';
+/**
+ * Doc under `corps/{id}/meta`: the last quiet run's marker. Written only by the
+ * scheduled sync. Not on the book doc: any signed-in Character may read that, and
+ * the marker lists the corp's Characters; `meta` is officers-only.
+ */
+export const QUIET_DOC = 'scheduledQuiet';
 
 /** A marker older than this is ignored: at least one full run a day, whatever the stamps say. */
 export const QUIET_MAX_AGE_MS = 24 * 3_600_000;
