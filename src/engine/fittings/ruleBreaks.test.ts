@@ -53,4 +53,12 @@ describe('newRuleBreaks', () => {
     };
     expect(newRuleBreaks([damageControls(2)], [damageControls(2), other])).toEqual([other]);
   });
+
+  it('counts a further copy of the same item-level break as new', () => {
+    expect(newRuleBreaks([wrongSlot(5)], [wrongSlot(5), wrongSlot(5)])).toEqual([wrongSlot(5)]);
+  });
+
+  it('counts a counted break once however many copies the engine lists', () => {
+    expect(newRuleBreaks([hardpoints(3)], [hardpoints(3)])).toEqual([]);
+  });
 });

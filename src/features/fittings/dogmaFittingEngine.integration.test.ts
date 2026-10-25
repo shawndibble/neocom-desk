@@ -76,6 +76,10 @@ const HEAVY_MISSILE_LAUNCHER_II = 2410;
 const SCOURGE_HEAVY_MISSILE = 209;
 // Looked up by exact name in `public/data/types.json`, 2026-09-29.
 const OMEN = 2006;
+// Looked up by exact name in `public/data/types.json`, 2026-10-25.
+const LIGHT_MISSILE_LAUNCHER_II = 2404;
+const VENTURE = 32880;
+const MINER_I = 483;
 const HEAVY_PULSE_LASER_II = 3520;
 const MULTIFREQUENCY_M = 254;
 const SCORCH_M = 12818;
@@ -1271,7 +1275,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     const launchers = [0, 1, 2].map((slotIndex) => ({
       slot: 'high' as const,
       slotIndex,
-      typeId: 2404,
+      typeId: LIGHT_MISSILE_LAUNCHER_II,
       state: 'online' as const,
     }));
     const overLaunched = await computeFittingStats(rifter(launchers), profile);
@@ -1281,11 +1285,11 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
 
     const venture = (count: number): Fitting => ({
       name: 'Venture',
-      shipTypeId: 32880,
+      shipTypeId: VENTURE,
       modules: Array.from({ length: count }, (_, slotIndex) => ({
         slot: 'high' as const,
         slotIndex,
-        typeId: 483,
+        typeId: MINER_I,
         state: 'online' as const,
       })),
       drones: [],

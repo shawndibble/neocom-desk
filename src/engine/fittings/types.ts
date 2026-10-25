@@ -289,8 +289,13 @@ export type CountedRuleBreak =
       allowed: number;
     }
   | { kind: 'max_type'; typeId: number; used: number; allowed: number }
-  /** `slot` is a rack or a hardpoint kind (`turret`, `launcher`). */
-  | { kind: 'slots'; slot: string; used: number; available: number };
+  | {
+      kind: 'slots';
+      /** A rack or a hardpoint kind (`turret`, `launcher`). */
+      slot: string;
+      used: number;
+      available: number;
+    };
 
 /** Rules an item breaks on its own: the wrong slot, a rig of the wrong size, a charge that does not fit. */
 export interface ItemRuleBreak {

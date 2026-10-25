@@ -385,7 +385,7 @@ export function ruleBreaksOf(
         breaks.push({
           kind: 'max_group',
           groupId: rule.group_id,
-          limit: rule.limit === 'fitted' || rule.limit === 'active' ? rule.limit : 'online',
+          limit: rule.limit,
           used: rule.used,
           allowed: rule.allowed,
         });
