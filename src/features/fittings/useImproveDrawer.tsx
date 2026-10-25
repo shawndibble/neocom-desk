@@ -1,13 +1,16 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, SlideOver, Toast } from '@/components/ui';
+import { Modal, SlideOver, Toast, useTimedToast } from '@/components/ui';
 import {
   applyImproveCandidate,
   type DefenseChoice,
   type ImproveOption,
 } from '@/engine/fittings/improve';
 import type { Fitting } from '@/engine/fittings/types';
+import { ImproveImplants } from './ImproveImplants';
 import { ImprovePanel } from './ImprovePanel';
+import { ImproveTrain } from './ImproveTrain';
+import type { FitResource } from './makeItFitContext';
 import type { TargetProfiles } from './targetProfiles';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import {
@@ -31,6 +34,10 @@ interface UseImproveDrawerArgs {
   targetProfiles: TargetProfiles;
   isPhone: boolean;
   edit: FittingWorkspace['edit'];
+  /** The active Character, for Train; null shows no Train section. */
+  characterId: number | null;
+  /** Opens Make it fit on a budget, for "Fix this first". */
+  openMakeItFit: (resource: FitResource) => void;
 }
 
 /**
@@ -45,6 +52,8 @@ export function useImproveDrawer({
   targetProfiles,
   isPhone,
   edit,
+  characterId,
+  openMakeItFit,
 }: UseImproveDrawerArgs): { open: () => void; drawer: ReactNode } {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
@@ -68,6 +77,9 @@ export function useImproveDrawer({
   if (fitting === null && isOpen) setIsOpen(false);
   // A later edit (a Ring change while the toast is up) ends the Undo: restoring would discard it.
   const undoable = undo !== null && fitting !== null && sameModules(fitting, undo.applied);
+  // What the last implant put in the set was, for its confirmation toast.
+  const [implantApplied, setImplantApplied] = useState<string | null>(null);
+  useTimedToast(implantApplied, () => setImplantApplied(null));
   const open = useCallback(() => setIsOpen(true), []);
   const close = () => setIsOpen(false);
   const search = useImprove(
@@ -101,6 +113,38 @@ export function useImproveDrawer({
       search={search}
       catalogue={catalogue}
       onApply={apply}
+      onFixFirst={(resource) => {
+        setIsOpen(false);
+        openMakeItFit(resource);
+      }}
+      freeSections={
+        fitting && (
+          <>
+            <ImproveTrain
+              goal={search.goal}
+              evaluator={workspace.skillGains}
+              characterId={characterId}
+              fittingName={fitting.name}
+              catalogue={catalogue}
+            />
+            {workspace.profile && (
+              <ImproveImplants
+                goal={search.goal}
+                open={isOpen}
+                implants={{
+                  fitting,
+                  profile: workspace.profile,
+                  basis: workspace.implantBasis,
+                  onChange: workspace.setImplantSet,
+                }}
+                onApplied={(name) =>
+                  setImplantApplied(t('fittings.makeItFit.implantsApplied', { names: name }))
+                }
+              />
+            )}
+          </>
+        )
+      }
       settings={{
         reach,
         onReachChange: (next) => void setReach(next),
@@ -129,6 +173,7 @@ export function useImproveDrawer({
           {body}
         </SlideOver>
       )}
+      {implantApplied !== null && <Toast message={implantApplied} />}
       {undo && undoable && (
         <Toast
           message={undo.message}

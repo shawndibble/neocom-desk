@@ -54,7 +54,7 @@ export function ModuleUpgradeList({ rows, ...item }: ModuleUpgradeListProps) {
   );
 }
 
-function ModuleUpgradeItem({
+export function ModuleUpgradeItem({
   row,
   typeName,
   skills,

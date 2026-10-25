@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -71,7 +72,8 @@ const renderPanel = (
   s: ImproveSearch,
   onApply = vi.fn(),
   onGoalChange = vi.fn(),
-  config: ImproveSettings = settings()
+  config: ImproveSettings = settings(),
+  extra: { onFixFirst?: () => void; freeSections?: ReactNode } = {}
 ) =>
   render(
     <ImprovePanel
@@ -81,10 +83,42 @@ const renderPanel = (
       catalogue={null}
       onApply={onApply}
       settings={config}
+      onFixFirst={extra.onFixFirst ?? vi.fn()}
+      freeSections={extra.freeSections}
     />
   );
 
 describe('ImprovePanel', () => {
+  it('shows Fix this first and no suggestions for an over-budget fit', async () => {
+    const onFixFirst = vi.fn();
+    renderPanel(
+      search({ status: 'overBudget', resources: ['cpu', 'calibration'] }),
+      vi.fn(),
+      vi.fn(),
+      settings(),
+      { onFixFirst, freeSections: <p>Train rows</p> }
+    );
+    expect(screen.getByRole('heading', { name: 'Fix this first' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Improve Goal' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Train rows')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Fix calibration' }));
+    expect(onFixFirst).toHaveBeenCalledWith('calibration');
+    expect(screen.getByRole('button', { name: 'Fix CPU' })).toBeInTheDocument();
+  });
+
+  it('shows the free sections above the swaps when the fit fits', () => {
+    renderPanel(
+      search(done({ noDownside: [option(10, { ehp: before.ehp * 2 })] })),
+      vi.fn(),
+      vi.fn(),
+      settings(),
+      { freeSections: <p>Train rows</p> }
+    );
+    const train = screen.getByText('Train rows');
+    const swaps = screen.getByRole('heading', { name: 'No downside' });
+    expect(train.compareDocumentPosition(swaps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('shows progress with Cancel, and Show best so far once the search is slow', async () => {
     const s = search({ status: 'searching', checked: 4, total: 10, slow: true });
     renderPanel(s);
