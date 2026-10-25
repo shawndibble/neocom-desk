@@ -113,8 +113,8 @@ Copy `.env.example` to `.env` and fill it in — see
 
 This is everything needed to fork the repo and get a working site of your own.
 Only step 1 is needed to run locally; steps 2 to 4 add sync, push alerts and
-hosting. Nothing is hardcoded to the original deployment except the optional
-shared public data (see "What a fork does not get").
+hosting. The values that point at the original deployment are listed below, in
+steps 2 to 4 and "What a fork does not get".
 
 You need Node 24, a GitHub account, an EVE account, and a Google account for
 Firebase.
@@ -133,7 +133,7 @@ Firebase.
 3. Fork and clone, then:
 
    ```sh
-   npm install
+   npm ci
    npm run verify-hooks -- --fix
    cp .env.example .env     # set VITE_EVE_CLIENT_ID
    npm run dev
@@ -180,6 +180,15 @@ It never receives a refresh token except the opt-in grants listed in
    openssl rand -base64 32 | firebase functions:secrets:set ALERTS_TOKEN_KEY
    ```
 
+   The functions also declare the `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`
+   secrets, so the deploy fails until both exist. If you are not running R2
+   (see "What a fork does not get"), set placeholders:
+
+   ```sh
+   echo unused | firebase functions:secrets:set R2_ACCESS_KEY_ID
+   echo unused | firebase functions:secrets:set R2_SECRET_ACCESS_KEY
+   ```
+
 7. Deploy:
 
    ```sh
@@ -203,35 +212,43 @@ push to `main`.
    `VITE_EVE_CLIENT_ID` and the `VITE_FIREBASE_*` variables. Optional:
    `VITE_SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`, and the secret
    `SENTRY_AUTH_TOKEN` for source maps.
-3. Custom domain: change `public/CNAME` to your domain, or delete the file to
-   serve from `https://<user>.github.io/<repo>/`. Subpath hosting needs
-   `base` in `vite.config.ts` changed from `'/'` to `'/<repo>/'`, and the
-   callback URL in the EVE application updated to match.
+3. Custom domain: change `public/CNAME` to your domain (a user or org Pages
+   site at `<user>.github.io` also works). Serve from the domain root: subpath hosting is untested, since
+   `public/` and the landing page use absolute `/…` asset paths.
 4. In the Firebase console, add your domain under Authentication > Settings >
    Authorized domains.
-5. Edit `deploy.yml`: the `keep-old-assets.mjs` step names
-   `https://neocomdesk.com`, so point it at your site.
+5. Optional: the `keep-old-assets.mjs` step in `deploy.yml` names
+   `https://neocomdesk.com`. It never blocks a deploy, but point it at your
+   site so tabs on an older build keep their chunks.
 6. Push to `main`. The `deploy-dev` job (Cloudflare Pages) is the original
-   author's preview channel for `develop`; it needs `CLOUDFLARE_API_TOKEN` and
+   author's preview channel for `develop`. It fails on every push to
+   `develop` unless you delete it or add the secrets: it needs `CLOUDFLARE_API_TOKEN` and
    `CLOUDFLARE_ACCOUNT_ID` secrets in a `dev` environment, and you can delete
    the job if you do not want a preview site.
 
-CI (`.github/workflows/ci.yml`) needs no secrets.
+CI (`.github/workflows/ci.yml`) needs no secrets. The scheduled workflows
+(`public-data-*.yml`, `sde-refresh.yml`, `sde-verify.yml`, `cache-warm.yml`,
+`keepalive.yml`) are the original maintainer's housekeeping. Leave them
+disabled in the Actions tab; the `public-data-*` jobs need the R2 secrets and
+`sde-refresh.yml` needs a `SDE_REFRESH_TOKEN` that opens PRs.
 
 ### 4. Branding to replace
 
 These still carry the original identity and are worth changing for a public
 fork:
 
-- `USER_AGENT` in `src/esi/userAgent.ts`: ESI and EVE Workbench ask for a
+- `USER_AGENT` in `src/esi/userAgent.ts` and its copy in
+  `scripts/lib/constants.mjs`: ESI and EVE Workbench ask for a
   descriptive user agent that points at the real operator. Never use a
   personal email address.
+- `REPO_URL` and `DISCORD_URL` in `src/lib/links.ts`, shown in the landing
+  footer and Settings.
 - Icons and screenshots in `public/` (`brand/`, `icons/`, `screenshots/`),
   the app name in `package.json`, and `public/privacy.html`, which
   names the operator and links the original repository.
-- The Android wrapper in `twa/` and `docs/ANDROID-TWA.md` (package
+- The Android wrapper (`twa/`, `public/.well-known/assetlinks.json`, package
   `com.neocomdesk.app`) is optional. Skip it unless you publish to the Play
-  Store.
+  Store; see `docs/ANDROID-TWA.md`.
 
 ### What a fork does not get
 
