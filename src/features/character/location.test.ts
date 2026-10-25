@@ -35,6 +35,33 @@ describe('loadCharacterSolarSystemId', () => {
     expect((await db.esiCache.get([CHARACTER_ID, 'characterLocation']))?.value).toBe(30000142);
   });
 
+  it('re-reads ESI on a later page load rather than serving a minutes-old location', async () => {
+    let systemId = 30000142;
+    let calls = 0;
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/location`, () => {
+        calls += 1;
+        return HttpResponse.json({ solar_system_id: systemId });
+      })
+    );
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      expect(await loadCharacterSolarSystemId(CHARACTER_ID)).toBe(30000142);
+
+      // Same page load asking again: inside the 5 s TTL, no second call.
+      expect(await loadCharacterSolarSystemId(CHARACTER_ID)).toBe(30000142);
+      expect(calls).toBe(1);
+
+      // The pilot flew on; opening another page 30 s later must see it.
+      systemId = 30002187;
+      vi.setSystemTime(Date.now() + 30_000);
+      expect(await loadCharacterSolarSystemId(CHARACTER_ID)).toBe(30002187);
+      expect(calls).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('returns null on a 403 (missing grant) WITHOUT signalling a re-auth failure', async () => {
     server.use(
       http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/location`, () =>
