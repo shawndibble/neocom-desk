@@ -24,7 +24,7 @@ const SOURCE: R2SnapshotSource<PublicCourierContractRow> = {
   /** Its own key: one payload shape per entry. */
   cacheKey: 'publicCourierContracts',
   /** Published by the same job as the offers snapshot, so the same window. */
-  staleAfterMs: 30 * 60_000,
+  staleAfterMs: 60 * 60_000,
   read: readR2CourierSnapshot,
 };
 
