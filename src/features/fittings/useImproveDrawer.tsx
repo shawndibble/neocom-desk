@@ -131,15 +131,6 @@ export function useImproveDrawer({
   useTimedToast(implantApplied, () => setImplantApplied(null));
   const open = useCallback(() => setIsOpen(true), []);
   const close = () => setIsOpen(false);
-  const search = useImprove(
-    workspace.variants,
-    catalogue,
-    goal,
-    targetProfiles.hydrated ? targetProfiles.selected : undefined,
-    isOpen,
-    { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold }
-  );
-
   // The Charge Picker's figures cost one calculation per charge, so only while the drawer is open.
   const { groups: chargeGroups } = useChargeChoices({
     fitting: isOpen ? fitting : null,
@@ -148,6 +139,16 @@ export function useImproveDrawer({
   });
   const unloaded = fitting && chargeGroups ? unloadedWeapons(fitting, chargeGroups) : null;
   const chargeSteps = fitting && chargeGroups ? loadBestCharges(fitting, chargeGroups) : [];
+
+  const search = useImprove(
+    workspace.variants,
+    catalogue,
+    goal,
+    targetProfiles.hydrated ? targetProfiles.selected : undefined,
+    isOpen,
+    { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold },
+    chargeSteps
+  );
 
   function loadBestCharge() {
     if (!fitting) return;

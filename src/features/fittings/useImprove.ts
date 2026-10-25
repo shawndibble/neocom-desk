@@ -43,7 +43,7 @@ import {
   minerWithoutCrystal,
   unloadedMiners,
 } from '@/engine/fittings/improveMining';
-import type { ChargeLoadStep } from '@/engine/fittings/improveCharges';
+import { assumeCharges, type ChargeLoadStep } from '@/engine/fittings/improveCharges';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import { IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
 import { TANK_GOALS, type DefenseSide } from '@/engine/fittings/improveGroups';
@@ -367,15 +367,20 @@ function candidateTypeIds(candidates: readonly ImproveCandidate[]): number[] {
   return [...ids];
 }
 
+const NO_CHARGES: readonly ChargeLoadStep[] = [];
+
 export function useImprove(
   variants: VariantEvaluator | null,
   catalogue: FittingCatalogue | null,
   goal: ImproveGoal,
   target: TargetProfile | undefined,
   enabled: boolean,
-  config: ImproveConfig
+  config: ImproveConfig,
+  chargePlan: readonly ChargeLoadStep[] = NO_CHARGES
 ): ImproveSearch {
   const hubId = useMarketHub((state) => state.value);
+  // The plan is a new array each render; the search reruns only when its content changes.
+  const chargePlanKey = JSON.stringify(chargePlan);
   const [state, setState] = useState<ImproveState>({ status: 'idle' });
   const [before, setBefore] = useState<FittingStats | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -469,7 +474,9 @@ export function useImprove(
         }
         // Mine more: every miner carries the picked ore's crystal, the baseline's too.
         let scoredBefore = own;
-        let load = (fitting: Fitting) => fitting;
+        // Empty guns and launchers are scored loaded with the best charge, so an unarmed-looking fit isn't stripped of support.
+        const charges = JSON.parse(chargePlanKey) as ChargeLoadStep[];
+        let load = (fitting: Fitting) => assumeCharges(fitting, variants.fitting, charges);
         let plan: CrystalPlan | null = null;
         if (searched === 'mining') {
           plan = await crystalPlan(variants, catalogue, oreFamily, own, controller.signal);
@@ -481,6 +488,8 @@ export function useImprove(
               .after;
           }
         }
+        if (searched !== 'mining' && charges.length > 0)
+          scoredBefore = (await variants.compare(load(variants.fitting), controller.signal)).after;
         const stats = async (fitting: Fitting) => {
           const { after } = await variants.compare(load(fitting), controller.signal);
           // A miner with no crystal of the ore would mine another ore's m³/s: left out, not compared.
@@ -586,6 +595,7 @@ export function useImprove(
     includeOfficer,
     oreFamily,
     hold,
+    chargePlanKey,
   ]);
 
   const cancel = useCallback(() => cancelRef.current(), []);

@@ -125,7 +125,9 @@ describe('ImprovePanel', () => {
       onLoadBestCharge,
     });
     expect(
-      screen.getByText('2 launchers have no missiles loaded, so damage goals ignore them.')
+      screen.getByText(
+        '2 launchers have no missiles loaded, so swaps are scored as if they held the best one.'
+      )
     ).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Load best charge' }));
     expect(onLoadBestCharge).toHaveBeenCalledOnce();
