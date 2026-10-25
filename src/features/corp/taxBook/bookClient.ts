@@ -105,7 +105,7 @@ export async function call<In, Out>(
   data: In
 ): Promise<Out> {
   await ensureSignedIn(characterId);
-  const result = await callRouted<In, Out>(name, data);
+  const result = await callRouted<In, Out>(name, data, characterId);
   return result;
 }
 

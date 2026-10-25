@@ -41,7 +41,7 @@ import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
 import { communityBackendOverride } from './backendOverride';
 import { callCommunity } from './communityStore';
-import { trackPledgeWrite, underFirebaseSession } from './pledgeWrites';
+import { underFirebaseSession } from './pledgeWrites';
 
 const KINDS: readonly RequestLineKind[] = ['item', 'bpc', 'bpo'];
 
@@ -440,8 +440,8 @@ export async function updateMyPledge(
     override.savePledge(communityId, requestId, Object.keys(next).length === 0 ? null : next);
     return override.loadPledges(communityId, requestId).find((p) => p.uid === uid) ?? null;
   }
-  return trackPledgeWrite(() =>
-    underFirebaseSession(() => writeMyPledge(characterId, communityId, requestId, uid, change))
+  return underFirebaseSession(() =>
+    writeMyPledge(characterId, communityId, requestId, uid, change)
   );
 }
 
@@ -517,34 +517,32 @@ export async function saveMyQuote(
     override.saveQuote(communityId, requestId, quote);
     return override.loadPledges(communityId, requestId).find((p) => p.uid === uid) ?? null;
   }
-  return trackPledgeWrite(() =>
-    underFirebaseSession(async () => {
-      await ensureSignedIn(characterId);
-      const ref = doc(
-        getSyncFirestore(characterId),
-        'communities',
-        communityId,
-        'itemRequests',
-        requestId,
-        'pledges',
-        uid
-      );
-      if (quote === null) {
-        await deleteDoc(ref);
-        return null;
-      }
-      const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
-      if (!ownerHash) throw new Error('This Character has no owner hash yet');
-      await setDoc(ref, {
-        ownerHash,
-        communityId,
-        lines: {},
-        quote,
-        updatedAt: serverTimestamp(),
-      });
-      return readPledge(uid, (await getDoc(ref)).data() ?? {});
-    })
-  );
+  return underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    const ref = doc(
+      getSyncFirestore(characterId),
+      'communities',
+      communityId,
+      'itemRequests',
+      requestId,
+      'pledges',
+      uid
+    );
+    if (quote === null) {
+      await deleteDoc(ref);
+      return null;
+    }
+    const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
+    if (!ownerHash) throw new Error('This Character has no owner hash yet');
+    await setDoc(ref, {
+      ownerHash,
+      communityId,
+      lines: {},
+      quote,
+      updatedAt: serverTimestamp(),
+    });
+    return readPledge(uid, (await getDoc(ref)).data() ?? {});
+  });
 }
 
 /**
@@ -574,32 +572,30 @@ export async function saveQuoteLinks(
     }
     return;
   }
-  await trackPledgeWrite(() =>
-    underFirebaseSession(async () => {
-      await ensureSignedIn(characterId);
-      const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
-      if (!ownerHash) throw new Error('This Character has no owner hash yet');
-      const ref = doc(
-        getSyncFirestore(characterId),
-        'communities',
+  await underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
+    if (!ownerHash) throw new Error('This Character has no owner hash yet');
+    const ref = doc(
+      getSyncFirestore(characterId),
+      'communities',
+      communityId,
+      'itemRequests',
+      requestId,
+      'pledges',
+      uid
+    );
+    await runTransaction(getSyncFirestore(characterId), async (tx) => {
+      const stored = await tx.get(ref);
+      const quote = stored.exists() ? readQuote(stored.data().quote) : undefined;
+      if (!quote || quote.quotedAt !== quotedAt) return;
+      tx.set(ref, {
+        ownerHash,
         communityId,
-        'itemRequests',
-        requestId,
-        'pledges',
-        uid
-      );
-      await runTransaction(getSyncFirestore(characterId), async (tx) => {
-        const stored = await tx.get(ref);
-        const quote = stored.exists() ? readQuote(stored.data().quote) : undefined;
-        if (!quote || quote.quotedAt !== quotedAt) return;
-        tx.set(ref, {
-          ownerHash,
-          communityId,
-          lines: {},
-          quote: withLinks(quote),
-          updatedAt: serverTimestamp(),
-        });
+        lines: {},
+        quote: withLinks(quote),
+        updatedAt: serverTimestamp(),
       });
-    })
-  );
+    });
+  });
 }

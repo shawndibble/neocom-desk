@@ -16,7 +16,8 @@ export async function saveAlertGrantRemote(tokens: {
 }): Promise<void> {
   await callRouted<typeof tokens, { characterId: number; enabledAt: number }>(
     'saveAlertGrant',
-    tokens
+    tokens,
+    undefined
   );
 }
 
@@ -24,6 +25,7 @@ export async function deleteAlertGrantRemote(characterId: number): Promise<void>
   await ensureSignedIn(characterId);
   await callRouted<Record<string, never>, { deleted: boolean; revoked: boolean }>(
     'deleteAlertGrant',
-    {}
+    {},
+    characterId
   );
 }

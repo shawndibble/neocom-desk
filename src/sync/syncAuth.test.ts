@@ -37,7 +37,7 @@ const fakeAuthFor = (id: number): FakeAuth => {
   }
   return auth;
 };
-const legacyAuth = { id: 0, currentUser: null };
+const legacyAuth = { id: 0, currentUser: null as { uid: string } | null };
 const started = vi.hoisted(() => ({ ids: [] as number[] }));
 const disposeCharacterApp = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock('./firebaseApp', () => ({
@@ -203,6 +203,20 @@ describe('removing sessions', () => {
     await removeCharacterSession(1);
     expect(signOut).toHaveBeenCalledWith(fakeAuthFor(1));
     expect(disposeCharacterApp).toHaveBeenCalledWith(1);
+  });
+
+  it('also signs out a pre-#5074 default-app session of that character', async () => {
+    legacyAuth.currentUser = { uid: 'char:1' };
+    await removeCharacterSession(1);
+    expect(signOut).toHaveBeenCalledWith(legacyAuth);
+    legacyAuth.currentUser = null;
+  });
+
+  it('leaves a legacy session of another character alone', async () => {
+    legacyAuth.currentUser = { uid: 'char:2' };
+    await removeCharacterSession(1);
+    expect(signOut).not.toHaveBeenCalledWith(legacyAuth);
+    legacyAuth.currentUser = null;
   });
 
   it('still deletes the app when the sign-out fails', async () => {

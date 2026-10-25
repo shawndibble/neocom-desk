@@ -36,7 +36,8 @@ export { getFirebaseApp };
 const EMULATOR_HOST = '127.0.0.1';
 const authInstances = new Map<number, Auth>();
 const firestoreConnected = new Set<number>();
-let functionsConnected = false;
+const functionsConnected = new Set<number | undefined>();
+let legacyAuth: Auth | undefined;
 
 /**
  * A Character's own Auth, with its own persisted session (issue #5074). Same
@@ -73,22 +74,31 @@ export function getSyncFirestore(characterId: number): Firestore {
  * out: it may still be persisted from before, holding a Character's credential.
  */
 export function getLegacySyncAuth(): Auth {
-  return initializeAuth(getFirebaseApp(), {
+  legacyAuth ??= initializeAuth(getFirebaseApp(), {
     persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
   });
+  return legacyAuth;
 }
 
 /** Delete a Character's app and with it its persisted session. */
 export async function disposeCharacterApp(characterId: number): Promise<void> {
   authInstances.delete(characterId);
   firestoreConnected.delete(characterId);
+  functionsConnected.delete(characterId);
   await deleteCharacterApp(characterId);
 }
 
-export function getSyncFunctions(): Functions {
-  const functions = getFunctions(getFirebaseApp());
-  if (emulatorsOn() && !functionsConnected) {
-    functionsConnected = true;
+/**
+ * Callables send the session of the app their Functions was built on, so pass
+ * the Character that should authenticate. Without one: the default app, which
+ * holds no session (the mint callable, which authenticates by access token).
+ */
+export function getSyncFunctions(characterId?: number): Functions {
+  const functions = getFunctions(
+    characterId === undefined ? getFirebaseApp() : getCharacterApp(characterId)
+  );
+  if (emulatorsOn() && !functionsConnected.has(characterId)) {
+    functionsConnected.add(characterId);
     connectFunctionsEmulator(functions, EMULATOR_HOST, 5001);
   }
   return functions;

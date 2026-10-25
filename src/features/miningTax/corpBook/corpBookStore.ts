@@ -592,7 +592,8 @@ export async function claimCorpTaxBookPayment(
     await ensureSignedIn(characterId);
     return callRouted<{ corporationId: number; paymentId: string }, { minerId: string }>(
       'claimCorpTaxBookPaymentCallable',
-      { corporationId, paymentId }
+      { corporationId, paymentId },
+      characterId
     );
   });
 }
@@ -633,7 +634,8 @@ export async function teachRefinerySystems(
           await ensureSignedIn(characterId);
           await callRouted<{ corporationId: number; systems: Record<string, number> }, unknown>(
             'learnCorpTaxBookRefinerySystemsCallable',
-            { corporationId: book.corporationId, systems: Object.fromEntries(fresh) }
+            { corporationId: book.corporationId, systems: Object.fromEntries(fresh) },
+            characterId
           );
         });
       } catch {

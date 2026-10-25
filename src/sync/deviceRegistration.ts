@@ -269,7 +269,9 @@ export async function registerDeviceForWebPush(
           projectionRows: projectionsByCharacter.get(character.characterId) ?? NO_PROJECTION_ROWS,
           eveTypes: eveTypesByCharacter.get(character.characterId) ?? NO_EVE_TYPES,
         })),
-      }
+      },
+      // Each Character is proven by its own access token in the payload: no session.
+      undefined
     );
     // Remembered only when every Character landed: one that couldn't get a
     // token, or that the backend rejected, must be retried on the next poll

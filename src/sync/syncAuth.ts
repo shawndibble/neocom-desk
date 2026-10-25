@@ -45,6 +45,10 @@ export async function removeCharacterSession(characterId: number): Promise<void>
   inflight.delete(characterId);
   try {
     await signOut(getSyncAuth(characterId));
+    // A session saved before #5074 lives in the default app.
+    const legacy = getLegacySyncAuth();
+    await whenAuthRestored(legacy);
+    if (legacy.currentUser?.uid === uidForCharacter(characterId)) await signOut(legacy);
   } finally {
     await disposeCharacterApp(characterId);
   }
@@ -66,11 +70,8 @@ export async function signOutOfSync(characterIds: readonly number[] = []): Promi
 }
 
 /**
- * Bound on the mint callable. Sign-ins run one at a time, so the callable's own
- * 70 s default (per attempt, twice over) would stall every queued sign-in
- * behind one slow mint. Deliberately not a timeout around the whole queued
- * task: that would free the queue while an abandoned `signInWithCustomToken`
- * could still land and swap the session.
+ * Bound on the mint callable: its own 70 s default (per attempt, twice over)
+ * would leave a caller waiting on one slow mint.
  */
 const MINT_TIMEOUT_MS = 20_000;
 

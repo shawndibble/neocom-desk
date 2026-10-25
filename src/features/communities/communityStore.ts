@@ -390,7 +390,7 @@ export async function callCommunity<In, Out>(
   if (override) return override.call(name, data) as Out;
   await ensureSignedIn(characterId);
   try {
-    return await callRouted<In, Out>(name, data);
+    return await callRouted<In, Out>(name, data, characterId);
   } finally {
     // Even a failed call may have landed (a timeout after the write).
     if (CHANGES_MY_COMMUNITIES.has(name)) invalidateMyCommunities(characterId);
@@ -419,9 +419,13 @@ export interface InvitePreview {
 
 /** The invite page's preview. Needs no session: a visitor has not signed in yet. */
 export async function previewInvite(inviteCode: string): Promise<InvitePreview> {
-  return callRouted<{ inviteCode: string }, InvitePreview>('previewCommunityCallable', {
-    inviteCode,
-  });
+  return callRouted<{ inviteCode: string }, InvitePreview>(
+    'previewCommunityCallable',
+    {
+      inviteCode,
+    },
+    undefined
+  );
 }
 
 export function joinCommunity(characterId: number, inviteCode: string, characterName: string) {
