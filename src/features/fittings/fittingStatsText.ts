@@ -87,8 +87,9 @@ export function fittingStatsText(stats: FittingStats, t: Translate): string {
       ? [
           k('drones', {
             dps: stats.droneDps.toFixed(1),
-            used: stats.droneBandwidthUsed.toFixed(0),
-            total: stats.droneBandwidthTotal.toFixed(0),
+            // One decimal, as the editor shows it (a 12.5 Mbit/s hull is not 13), no trailing .0.
+            used: String(Number(stats.droneBandwidthUsed.toFixed(1))),
+            total: String(Number(stats.droneBandwidthTotal.toFixed(1))),
           }),
         ]
       : []),

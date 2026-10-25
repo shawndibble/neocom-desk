@@ -255,10 +255,10 @@ describe('fittingToDogmaFit', () => {
       slot: { type: 'implant', index: 10 },
       state: 'online',
     });
-    // One the lookup does not know keeps its place in the list.
+    // One the lookup does not know takes the lowest slot no known implant holds.
     expect(dogmaFit.items).toContainEqual({
       type_id: 19540,
-      slot: { type: 'implant', index: 2 },
+      slot: { type: 'implant', index: 1 },
       state: 'online',
     });
     expect(dogmaFit.items).toContainEqual({
@@ -267,6 +267,23 @@ describe('fittingToDogmaFit', () => {
       state: 'online',
       booster_side_effects: [],
     });
+  });
+
+  it('never numbers an implant it cannot place onto a slot a known implant holds', () => {
+    // List position would give the unknown one slot 1, clashing with the known slot-1 implant.
+    const slotOf = (typeId: number) =>
+      typeId === 9899 ? { kind: 'implant' as const, slot: 1 } : undefined;
+    const dogmaFit = fittingToDogmaFit(
+      fitting(),
+      { skillLevels: new Map(), implantTypeIds: [19540, 9899], boosterTypeIds: [] },
+      undefined,
+      null,
+      slotOf
+    );
+    const indexOf = (typeId: number) =>
+      dogmaFit.items.find((item) => item.type_id === typeId)?.slot as { index: number };
+    expect(indexOf(9899).index).toBe(1);
+    expect(indexOf(19540).index).toBe(2);
   });
 
   it("maps the pilot's boosters into booster slots, numbered from 1, with side effects off", () => {
