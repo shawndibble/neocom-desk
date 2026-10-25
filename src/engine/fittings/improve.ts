@@ -32,7 +32,8 @@ import {
   usedOf,
   type Resource,
 } from './makeItFit';
-import { commandGain, hasCommand } from './improveCommand';
+import { commandGain, commandOf, hasCommand } from './improveCommand';
+import { hullRoleOf, roleUnlocks, type HullRef } from './improveRole';
 import { ewarOf, tackleOf } from './improveTackle';
 import { gainMetrics, type GainMetric } from './skillGains';
 import { fitsResourceBudget } from './skillGaps';
@@ -219,7 +220,13 @@ const hasShipWeapons = (s: FittingStats) =>
   s.applied.weapons.some((w) => w.kind === 'turret' || w.kind === 'missile');
 
 /** Whether the fit can score `goal`, and why not: the drawer shows a disabled chip with the reason. */
-export function goalAvailability(goal: ImproveGoal, before: FittingStats): GoalAvailability {
+export function goalAvailability(
+  goal: ImproveGoal,
+  before: FittingStats,
+  hull?: HullRef
+): GoalAvailability {
+  // A hull built for the job offers the goal on an empty fit: its search is fills of the goal's groups.
+  if (roleUnlocks(hullRoleOf(hull)).includes(goal)) return { available: true };
   if (goal === 'damage' && !isArmed(before)) return { available: false, reason: 'noWeapons' };
   if (goal === 'reach' && !hasShipWeapons(before))
     return { available: false, reason: 'noGunsOrLaunchers' };
@@ -262,6 +269,11 @@ function relative(before: number, after: number): number {
 }
 
 /** The mean relative gain over the figures the fit already has; a figure it lost counts -1. */
+/** The relative change, or the absolute one in the goal's unit when the fit starts from nothing (a fill from zero has no ratio). */
+function gainOrAbsolute(before: number, after: number): number {
+  return before === 0 ? after - before : relative(before, after);
+}
+
 function meanGain(pairs: readonly (readonly [number, number])[]): number {
   const present = pairs.filter(([before]) => before > 0);
   if (present.length === 0) return 0;
@@ -293,17 +305,17 @@ function scoreOf(
     case 'cheaper':
       return iskDelta === null ? null : -iskDelta;
     case 'mining':
-      return relative(before.mining.perSecond, after.mining.perSecond);
+      return gainOrAbsolute(before.mining.perSecond, after.mining.perSecond);
     case 'haul':
-      return relative(before.holds[hold], after.holds[hold]);
+      return gainOrAbsolute(before.holds[hold], after.holds[hold]);
     case 'align':
       return metrics.align;
     case 'warp':
       return metrics.align + relative(before.navigation.warpSpeed, after.navigation.warpSpeed);
     case 'repair':
-      return relative(remoteRepairOf(before), remoteRepairOf(after));
+      return gainOrAbsolute(remoteRepairOf(before), remoteRepairOf(after));
     case 'transfer':
-      return relative(before.support.capTransfer, after.support.capTransfer);
+      return gainOrAbsolute(before.support.capTransfer, after.support.capTransfer);
     case 'tackle': {
       const [was, now] = [tackleOf(before), tackleOf(after)];
       return meanGain([
@@ -313,7 +325,10 @@ function scoreOf(
       ]);
     }
     case 'command':
-      return commandGain(before, after);
+      // From nothing there is no ratio: a bigger buff, then a longer compression reach (km), wins.
+      return hasCommand(before)
+        ? commandGain(before, after)
+        : commandOf(after).strength + commandOf(after).compression / 1e7;
     case 'ewar': {
       const [was, now] = [ewarOf(before), ewarOf(after)];
       return meanGain([
