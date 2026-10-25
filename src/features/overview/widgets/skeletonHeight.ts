@@ -50,14 +50,14 @@ const TABLE_BORDER = 1;
 const HEADER_ROW = 25;
 /** A header row of sort buttons, which stand 36px tall on a phone (the touch floor). */
 const SORTABLE_HEADER_DESK = 29.3;
-const SORTABLE_HEADER_PHONE = 52.5;
+const SORTABLE_HEADER_PHONE = 44.5;
 /**
  * A table row: `md:h-7` on a desktop; on a phone a plain row is `h-8` and one that links or
  * opens a detail is `h-9` (the touch floor).
  */
 const ROW_DESK = 28;
 const ROW_PHONE = 32;
-const ROW_PHONE_LINKED = 44;
+const ROW_PHONE_LINKED = 36;
 /** The "+N more" line under a table cut at the size's rows: an `sm` button and its padding. */
 const MORE_DESK = 37;
 const MORE_PHONE = 45;

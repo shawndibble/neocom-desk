@@ -298,7 +298,7 @@ export function MoonTaxRow({
           <Button
             id={moon.manageId}
             size="sm"
-            className="touch:min-h-9 sm:ml-auto"
+            className="sm:ml-auto"
             disabled={!ready}
             loading={busy}
             onClick={() => void openTax()}

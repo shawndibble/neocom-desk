@@ -49,7 +49,7 @@ describe('estimatedBodyHeight', () => {
   it("reserves Open orders' sortable header, its default page of ten, the pager and slots footer", () => {
     // Measured with twelve orders: ten rows on the first page.
     expectNear(est('orders', 'table', 'L', false), 430.8);
-    expectNear(est('orders', 'table', 'L', true), 502);
+    expectNear(est('orders', 'table', 'L', true), 494);
   });
 
   it("pages a paged table at any size, not at the size's row cut", () => {
@@ -67,7 +67,7 @@ describe('estimatedBodyHeight', () => {
 
   it('stands a linked row at the touch floor on a phone, and at the plain height on a desktop', () => {
     expect(est('incursions', 'table', 'M', true) - est('comingUp', 'table', 'M', true)).toBe(
-      5 * (44 - 32)
+      5 * (36 - 32)
     );
     expect(est('incursions', 'table', 'M', false)).toBe(est('comingUp', 'table', 'M', false));
   });
