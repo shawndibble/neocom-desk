@@ -1,8 +1,6 @@
 import { setTimeout as sleep } from 'node:timers/promises';
-import { error as logError, info as logInfo, warn as logWarn } from 'firebase-functions/logger';
+import { info as logInfo, warn as logWarn } from 'firebase-functions/logger';
 import { firestore } from './firestore.js';
-import { LP_CORP_STATION_SYSTEMS } from './data/lpCorpStationSystems.js';
-import { LP_STORE_REQUEST_GAP_MS, fetchLpStoreRows } from './lpOffersSnapshot.js';
 import { createR2Get, createR2Put, publicContractsRunVerdict } from './r2Publisher.js';
 import {
   publishCourierToR2,
@@ -25,16 +23,9 @@ import {
   type PublicContractOfferRow,
   type PublicCourierContractRow,
 } from './publicContracts.js';
-import { publishLpStoreOffersToR2 } from './r2DailySnapshots.js';
-import {
-  INDUSTRY_SYSTEMS_URL,
-  parseCostIndices,
-  writeCostIndicesToR2,
-} from './costIndicesSnapshot.js';
 import { runWorkbenchSync } from './workbenchFits.js';
 import { r2WorkbenchHulls, workbenchFitsStore } from './workbenchFitsStore.js';
 import { PUBLIC_HOST_USER_AGENT } from './marketHistoryJob.js';
-import { ESI_COMPATIBILITY_DATE } from './esiNotifications.js';
 
 /** Doc under `systemConditions` holding the archive version the last publish was built from. */
 const PUBLIC_CONTRACTS_ARCHIVE_FINGERPRINT_DOC = 'publicContractsArchiveFingerprint';
@@ -187,61 +178,4 @@ export async function runSyncWorkbenchFits(): Promise<void> {
     requestGapMs: WORKBENCH_REQUEST_GAP_MS,
   });
   logInfo('EVE Workbench fits sync', { ...result });
-}
-
-const ESI_PUBLIC_HEADERS = {
-  'User-Agent': PUBLIC_HOST_USER_AGENT,
-  'X-User-Agent': PUBLIC_HOST_USER_AGENT,
-  'X-Compatibility-Date': ESI_COMPATIBILITY_DATE,
-  Accept: 'application/json',
-};
-
-const LP_STORE_MAX_FAILED_SHARE = 0.1;
-
-/** Body of syncLpStoreOffers (see its doc in index.ts). */
-export async function runSyncLpStoreOffers(): Promise<void> {
-  // Before the ~170-request crawl, so a missing R2 config fails fast.
-  const r2 = r2ConfigOrThrow();
-  const { rows, failed } = await fetchLpStoreRows({
-    corporations: LP_CORP_STATION_SYSTEMS,
-    fetchJson: async (url) => {
-      const response = await fetch(url, {
-        headers: ESI_PUBLIC_HEADERS,
-      });
-      const body: unknown = response.ok ? await response.json().catch(() => null) : null;
-      return { status: response.status, retryAfter: response.headers.get('Retry-After'), body };
-    },
-    sleep,
-    requestGapMs: LP_STORE_REQUEST_GAP_MS,
-  });
-  logInfo('LP store offers sync', { corporations: rows.length, failed: failed.length });
-  if (rows.length === 0 || failed.length > Math.max(1, rows.length * LP_STORE_MAX_FAILED_SHARE)) {
-    logError('LP store offers sync skipped publishing', { failed });
-    return;
-  }
-  await publishLpStoreOffersToR2(rows, Date.now(), createR2Put(r2));
-  logInfo('LP store offers published to R2', { corporations: rows.length });
-}
-
-/** Body of the cost index half of syncLpStoreOffers (see its doc in index.ts). */
-export async function runSyncCostIndices(): Promise<void> {
-  const r2 = r2ConfigOrThrow();
-  const response = await fetch(INDUSTRY_SYSTEMS_URL, {
-    headers: ESI_PUBLIC_HEADERS,
-  });
-  if (!response.ok) throw new Error(`industry systems: HTTP ${response.status}`);
-  const indices = parseCostIndices(await response.json());
-  const systems = Object.keys(indices).length;
-  // Fail loud rather than store an empty day.
-  if (systems === 0) throw new Error('industry systems: no systems parsed');
-  const date = new Date().toISOString().slice(0, 10);
-  const result = await writeCostIndicesToR2(
-    [{ date, indices }],
-    { get: createR2Get(r2), put: createR2Put(r2) },
-    Date.now()
-  );
-  logInfo('cost indices published to R2', { systems, ...result });
-  // The merge is idempotent, so a failed system is fixed by the next run; fail it so the log shows.
-  if (result.failed > 0)
-    throw new Error(`cost indices: ${result.failed} failed: ${result.firstError}`);
 }

@@ -22,7 +22,6 @@ const DEPLOYED = [
   'syncActiveWars',
   'syncCorpTaxBooks',
   'syncLawlessSystems',
-  'syncLpStoreOffers',
   'syncMarketOpenPrices',
   'syncPublicContractOffers',
   'syncWorkbenchFits',

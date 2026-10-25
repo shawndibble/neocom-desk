@@ -26,12 +26,7 @@ import { openPricesR2Key } from './r2DailySnapshots.js';
 import { createR2Get } from './r2Publisher.js';
 import { runSyncActiveWars } from './activeWarsJob.js';
 import { runSyncLawlessSystems, runSyncMarketOpenPrices } from './marketHistoryJob.js';
-import {
-  runSyncCostIndices,
-  runSyncLpStoreOffers,
-  runSyncPublicContractOffers,
-  runSyncWorkbenchFits,
-} from './snapshotJobs.js';
+import { runSyncPublicContractOffers, runSyncWorkbenchFits } from './snapshotJobs.js';
 import { verifyEveAccessToken, verifyOptionsFromEnv, uidForCharacter } from './verifyEveToken.js';
 import {
   AlertGrantError,
@@ -1337,56 +1332,6 @@ export const syncWorkbenchFits = onSchedule(
 );
 
 /**
- * syncLpStoreOffers: the LP Store page's item-first search (issue #2873). Reads
- * every LP corporation's public offers from ESI (~170 requests, paced) and
- * republishes them with each corporation's station systems to R2
- * (`lp-store-offers/snapshot.json`), so the app can search an item across all
- * stores and rank corporations by jumps. R2, not Firestore: the whole snapshot is
- * read by every visitor to the page, and R2 has no egress fee.
- * Needs the R2 secrets and env like `syncPublicContractOffers`.
- *
- * Once a day: store offers change on patch days, not by the hour. A run that
- * lost more than a tenth of the corporations (ESI down) publishes nothing and
- * leaves yesterday's snapshot standing, since the write replaces it wholesale.
- *
- * Another Cloud Scheduler job past the free three, the same trade as
- * `syncWorkbenchFits`; the deployment now has eight scheduled functions.
- *
- * The system cost index history (`cost-indices/<systemId>.json`) rides
- * this schedule rather than a ninth function: it needs the same R2 secrets and runs
- * once a day. The two are independent; one failing still runs the other, and the run
- * fails afterwards naming what failed. 1GiB/540s is the open prices job's budget for
- * the same ~5,500 read-merge-write round trips (32 at a time).
- */
-
-export const syncLpStoreOffers = onSchedule(
-  {
-    // A cron pinned to UTC, so the cost index half stamps a stable UTC date
-    // (`every 24 hours` drifts and could skip or repeat a date).
-    schedule: '30 0 * * *',
-    timeZone: 'Etc/UTC',
-    memory: '1GiB',
-    timeoutSeconds: 540,
-    secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
-  },
-  async () => {
-    const failed: string[] = [];
-    for (const [name, run] of [
-      ['LP store offers', runSyncLpStoreOffers],
-      ['cost indices', runSyncCostIndices],
-    ] as const) {
-      try {
-        await run();
-      } catch (err) {
-        failed.push(name);
-        logError(`${name} sync failed`, { error: String(err) });
-      }
-    }
-    if (failed.length > 0) throw new Error(`Sync failed: ${failed.join(', ')}`);
-  }
-);
-
-/**
  * syncMarketOpenPrices: the price-history chart's Buy and Sell lines (decision
  * 20261018-121126). Once a day, shortly after the previous UTC day's last
  * EVE Ref market-order snapshot (23:45) is published, folds that snapshot into
@@ -1408,7 +1353,7 @@ export const syncLpStoreOffers = onSchedule(
  * then the 23:45 slot was skipped for good (`findFinalSnapshot`). A stream that
  * errors or ends truncated also throws and retries. A tracked region
  * implausibly thin, or one under half its size on the previous published day,
- * publishes nothing, the same stance as `syncLpStoreOffers`: retrying the same
+ * publishes nothing, the same stance as the LP store job (`publicDataLpStore.ts`): retrying the same
  * file would not change it, that day simply has no point, and the backfill
  * script can fill it later. 1GiB because the decompress-and-fold peaked at ~300MB RSS
  * in a local measurement and the contracts job has OOM'd before; 540s because
