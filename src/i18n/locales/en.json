@@ -11071,7 +11071,7 @@
     },
     "alertsOffer": {
       "title": "Get alerts when Neocom is closed?",
-      "body": "Turn on alerts for {{name}}. EVE asks you to authorize notifications only. You can change this per character in Settings, where mail alerts are an optional extra you can add.",
+      "body": "Turn on alerts for {{name}}. EVE asks you to authorize notifications only. You can change this per character in Settings, where mail alerts are an optional extra you can add, after a list of what they read.",
       "bodyNearby": "Turn on alerts for {{name}}. EVE asks you to authorize notifications and location only, for EVE notifications and nearby Incursions and raidable skyhooks. You can change this per character in Settings, where mail alerts are an optional extra you can add.",
       "enable": "Turn on",
       "dismiss": "Not now"
@@ -12926,7 +12926,7 @@
         "pushKinds": "Alerts with a known time: a skill level finishing, training stopping or a queue ending, an industry job finishing (yours or your corporation's), a courier delivery due, a contract or market order about to expire, a clone jump ready, a PI extraction finishing or an extractor expiring, a calendar event starting, a structure low on fuel, and EVE timers such as a reinforcement ending. Alerts when closed adds EVE's own notifications, such as a structure under attack, nearby Incursions and raidable skyhooks, and, if you add mail, new mail, for each Character you turn it on for. Everything else, including Community alerts, needs the app open. Quiet time (a daily no-push window, set per device) silences every closed-app push; the alerts still appear in your Alerts list. Turn them on in Settings › Notifications.",
         "permissions": "EVE grants permissions only at login, so plain login asks for everything the pages read. You can pick instead: <custom>Log in with custom permissions</custom> on the login page. Only skills, the skill queue and structure lookup are required. Add more later in Settings › Permissions; revoke on <ccp>EVE's authorized apps page</ccp>. Corporation data, structure markets and jump fatigue are never in the plain login; each is a separate opt-in. So is Alerts when closed, a grant per Character for notifications and, if you add them, location (nearby alerts) and mail headers (new-mail alerts) only.",
         "dataLag": "Neocom Desk reads EVE's ESI, which is not live. A Character's own data is reused for 10 minutes (a day for game constants such as item names), or until EVE says it may change, if later, so moving between pages doesn't ask again. EVE also caches some data for minutes and corporation data for about an hour, so a short timer may already have happened. The age badge by a page's title shows data age: amber after an hour, red after a day. It's hidden on narrow screens; <data>Settings › Cached data</data> lists every source. A Refresh button asks EVE again right away.",
-        "alerts": "Alerts are the bell panel (press A). With the app open, it checks each Character and raises Alerts for the events you enabled in Settings › Notifications. With it closed, known-time alerts such as a skill finishing are scheduled up to 72 hours ahead and pushed to devices with notifications on. Alerts when closed is off until you enable it per Character: you authorize that Character a second time, for notifications and location only, and our server checks EVE's notifications and the Character's solar system about every 15 minutes and pushes the types you chose, with their text, and any Incursion or raidable skyhook within your jump limit, via Google's push service. Mail is a further, separate step per Character (Add mail): our server then reads only your mail headers, never a message, and pushes each new mail's sender and subject to your device through Google's push service. The sender and subject pass through that service and are shown in the pop-up, so they can appear on a lock screen. Our server keeps only the number of the latest mail it handled, and keeps none of them. Turning Alerts when closed off deletes that token. Quiet time, set per device, pauses pushes for a daily window (you can let attacks through); its times and time zone are stored with the device registration. On iPhone and iPad, install the app first.",
+        "alerts": "Alerts are the bell panel (press A). With the app open, it checks each Character and raises Alerts for the events you enabled in Settings › Notifications. With it closed, known-time alerts such as a skill finishing are scheduled up to 72 hours ahead and pushed to devices with notifications on. Alerts when closed is off until you enable it per Character: you authorize that Character a second time, for the permissions listed before you log in (notifications, and location and mail if you include them), and our server checks EVE's notifications and the Character's solar system about every 15 minutes and pushes the types you chose, with their text, and any Incursion or raidable skyhook within your jump limit, via Google's push service. Before any login, Neocom Desk lists the permissions it will ask for and why, including mail, and you can leave mail or location out. If you include mail, our server then reads only your mail headers, never a message, and pushes each new mail's sender and subject to your device through Google's push service. The sender and subject pass through that service and are shown in the pop-up, so they can appear on a lock screen. Our server keeps only the number of the latest mail it handled, and keeps none of them. Turning Alerts when closed off deletes that token. Quiet time, set per device, pauses pushes for a daily window (you can let attacks through); its times and time zone are stored with the device registration. On iPhone and iPad, install the app first.",
         "characters": "Yes. Each Character logs in on its own: Characters › Add character (press C). Switch between them in the switcher; sort or group them on the Characters page. Alerts, Alerts when closed and Community membership are per Character. Some pages, such as Contacts, can show all Characters together.",
         "rowMenus": "Tables with several actions per row show a ⋮ (More actions) button at the end. Right-click the row, or touch and hold on a phone, for the same menu. Overview widgets and fitting tiles have menus too. No ⋮: the row has one action, so just click it.",
         "phone": "Yes. A phone browser or home-screen install gets a narrower layout with bottom navigation. It's designed desktop-first, beside the game, so dense tables and editors are easier on a big screen. The age badge is hidden on a phone. On iPhone and iPad, notifications need the installed app.",
@@ -13096,43 +13096,70 @@
         "manage": "Manage",
         "manageFor": "Manage Alerts when closed",
         "summary": "{{on}} of {{total}} characters",
-        "needsReauthCount_one": "{{count}} needs re-authorizing",
-        "needsReauthCount_other": "{{count}} need re-authorizing",
         "more": "+{{count}} more",
-        "hint": "EVE notifications, like a structure under attack, while the app is closed. Authorizes one Character for notifications only; Turn off deletes our encrypted token.",
-        "stores": "Stores an encrypted, notifications-only token on our server.",
-        "hintNearby": "EVE notifications, like a structure under attack, and nearby Incursions and raidable skyhooks, while the app is closed. Authorizes one Character for notifications and location only; Turn off deletes our encrypted token.",
-        "storesNearby": "Stores an encrypted token on our server that reads only notifications and location.",
-        "hintMail": "Mail alerts are optional, per Character: Add mail lets our server read only your mail headers (sender and subject, never the message) every 15 minutes, and send the sender and subject to this device through Google's push service. We keep no mail content. Turn off deletes the token.",
+        "hint": "Get alerts while the app is closed. Tick Device on an event, then sign each Character in to EVE once: that one login asks for exactly what the Character's ticked events need. Turn off deletes our encrypted token.",
         "covers": {
           "line": "Our server holds an encrypted token that reads only {{list}}.",
           "notifications": "notifications",
           "location": "location",
           "mail": "mail headers"
         },
-        "addMail": "Add mail",
-        "addMailFor": "Re-authorize {{name}} to add new-mail alerts (reads mail headers only)",
         "state": {
           "off": "Off",
           "on": "On",
           "needs-reauth": "Needs re-authorizing",
-          "onWithoutNearby": "On, without nearby alerts"
+          "onNeedsSignIn": "On, needs a login"
         },
-        "addNearby": "Add nearby",
-        "addNearbyFor": "Re-authorize {{name}} to add nearby Incursions and raidable skyhooks",
-        "turnOn": "Turn on",
-        "turnOnFor": "Turn on alerts when closed for {{name}}",
         "turnOff": "Turn off",
         "turnOffFor": "Turn off alerts when closed for {{name}}",
-        "reauthorize": "Re-authorize",
+        "reauthorize": "Re-authorize…",
         "reauthorizeFor": "Re-authorize alerts when closed for {{name}}",
-        "turnOnAll": "Turn on for all",
         "result": {
           "on": "Alerts when closed is on for {{name}}.",
           "mismatch": "You authorized {{authorized}}, not {{expected}}. Nothing was saved. Press Turn on for {{expected}} again and pick {{expected}} on EVE's page.",
           "failed": "Could not turn on alerts when closed for {{name}}. Try again.",
           "cancelled": "Authorization cancelled. Nothing was saved.",
           "offFailed": "Could not turn off alerts when closed for {{name}}. Check your connection and try again."
+        },
+        "needsSignInCount_one": "{{count}} needs a login",
+        "needsSignInCount_other": "{{count}} need a login",
+        "needsNone": "Every Character has what its ticked Device alerts need.",
+        "needsLine_one": "{{count}} Character needs a login for: {{list}}.",
+        "needsLine_other": "{{count}} Characters need a login for: {{list}}.",
+        "need": {
+          "notifications": "EVE notifications",
+          "location": "nearby alerts",
+          "mail": "new mail"
+        },
+        "rowNeeds": "Needs a login for: {{list}}.",
+        "offNeeds": "Off. A login would let our server read: {{list}}.",
+        "offNothing": "Off. Nothing ticked for Device needs a login.",
+        "signIn": "Log in…",
+        "signInFor": "Log {{name}} in to EVE for alerts when closed",
+        "signInAll_one": "Log in {{count}} character…",
+        "signInAll_other": "Log in {{count}} characters…",
+        "confirm": {
+          "intro_one": "EVE opens once for 1 Character. Here is what the login will ask for, and why. Nothing is requested until you press Continue.",
+          "intro_other": "EVE opens once for each of {{count}} Characters, one after another. Here is what the logins will ask for, and why. Nothing is requested until you press Continue.",
+          "forCharacters": "For: {{list}}",
+          "forMany": "For {{count}} Characters",
+          "notifications": {
+            "label": "EVE notifications",
+            "why": "Read the Character's in-game notifications (a structure under attack, a war declaration) so they can reach this device while the app is closed."
+          },
+          "location": {
+            "label": "Location, for nearby alerts",
+            "why": "Read where the Character is so Incursions and raidable skyhooks near it can be pushed. Needed for: Incursion nearby, Skyhook raidable nearby.",
+            "leftOut": "Left out: those alerts only arrive while the app is open. Untick their Device boxes in the list to stop being asked."
+          },
+          "mail": {
+            "label": "Mail headers, for new-mail alerts",
+            "why": "Read only the headers (sender and subject, never the message) every 15 minutes. The sender and subject are sent to this device through Google's push service and can show on a lock screen. Needed for: New mail.",
+            "leftOut": "Left out: new mail only alerts while the app is open. Untick New mail's Device box to stop being asked."
+          },
+          "tokenNote": "We keep an encrypted token on our server for each Character, holding only these permissions. It never reaches this device, and Turn off deletes it.",
+          "back": "Back",
+          "continue": "Continue to EVE"
         }
       },
       "pushFailed": {

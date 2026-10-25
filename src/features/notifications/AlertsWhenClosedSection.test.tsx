@@ -16,7 +16,7 @@ vi.mock('@/sync/alertsGrantApi', () => ({
 import { AlertsWhenClosedSection } from './AlertsWhenClosedSection';
 import { DEFAULT_NOTIFICATION_PREFERENCES, useNotificationPreferences } from './preferences';
 import { markAlertsNeedReauth, readAlertsGrants } from './alertsGrant';
-import { queueAlertsForAll } from './alertsGrant';
+import { queueAlertsWalk } from './alertsGrant';
 
 const characters = [
   { characterId: 1, name: 'Alpha' },
@@ -34,6 +34,23 @@ async function renderSection(state?: unknown, { open = true } = {}) {
     await userEvent.click(await screen.findByRole('button', { name: /Alerts when closed/ }));
   }
   return result;
+}
+
+/** Device sign-ins holding the mail and location scopes, so those events count as ticked-and-usable. */
+async function seedTokens(...ids: number[]) {
+  for (const characterId of ids) {
+    await db.tokens.put({
+      characterId,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 600_000,
+      scopes: ['esi-mail.read_mail.v1', 'esi-location.read_location.v1'],
+    } as never);
+  }
+}
+
+async function takes(extra: 'alertsNearby' | 'alertsMail', characterIds: number[] = []) {
+  await db.settings.put({ key: extra, value: { supported: true, characterIds } });
 }
 
 async function turnOn(characterId: number) {
@@ -84,7 +101,7 @@ describe('AlertsWhenClosedSection', () => {
     );
   });
 
-  it('closed, it counts the Characters that are on and the ones needing re-auth', async () => {
+  it('closed, it counts the Characters that are on and the ones needing a sign-in', async () => {
     await db.settings.put({
       key: 'alertsGrants',
       value: {
@@ -94,22 +111,101 @@ describe('AlertsWhenClosedSection', () => {
     });
     await renderSection(undefined, { open: false });
     expect(await screen.findByText(/1 of 2 characters/)).toBeInTheDocument();
-    expect(screen.getByText(/1 needs re-authorizing/)).toBeInTheDocument();
+    expect(screen.getByText(/1 needs a login/)).toBeInTheDocument();
   });
 
-  it('starts every Character off, saying what is stored', async () => {
+  it('says what every Character is missing, in one place', async () => {
+    await takes('alertsNearby');
+    await takes('alertsMail');
+    await seedTokens(1, 2);
     await renderSection();
-    expect(await screen.findByTestId('alerts-state-1')).toHaveTextContent('Off');
-    expect(screen.getByTestId('alerts-state-2')).toHaveTextContent('Off');
-    expect(screen.getAllByText(/encrypted, notifications-only token/i).length).toBeGreaterThan(1);
+    expect(
+      await screen.findByText(
+        '2 Characters need a login for: EVE notifications, nearby alerts, and new mail.'
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Log in 2 characters…' })).toBeInTheDocument();
   });
 
-  it('Turn on starts the Alerts login for that row', async () => {
+  it('nothing is requested from the list: Log in… only opens the permission screen', async () => {
     await renderSection();
     await userEvent.click(
-      await screen.findByRole('button', { name: /Turn on alerts when closed for Beta/ })
+      await screen.findByRole('button', { name: 'Log Beta in to EVE for alerts when closed' })
     );
-    expect(login.begin).toHaveBeenCalledWith(2);
+    expect(login.begin).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(/Nothing is requested until you press Continue/)
+    ).toBeInTheDocument();
+  });
+
+  it('the permission screen lists notifications, and Continue signs in only that Character', async () => {
+    await renderSection();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Log Beta in to EVE for alerts when closed' })
+    );
+    expect(screen.getByText('EVE notifications')).toBeInTheDocument();
+    expect(screen.queryByText(/Mail headers/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to EVE' }));
+    expect(login.begin).toHaveBeenCalledTimes(1);
+    expect(login.begin).toHaveBeenCalledWith(2, { nearby: false, mail: false });
+  });
+
+  it('shows mail and location plainly, with a way to leave each out', async () => {
+    await takes('alertsNearby');
+    await takes('alertsMail');
+    await seedTokens(1, 2);
+    await renderSection();
+    await userEvent.click(await screen.findByRole('button', { name: 'Log in 2 characters…' }));
+    expect(screen.getByText(/never the message/)).toBeInTheDocument();
+    expect(screen.getByText(/Needed for: Incursion nearby/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: /Mail headers/ }));
+    expect(
+      screen.getByText(/Left out: new mail only alerts while the app is open/)
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to EVE' }));
+    expect(login.begin).toHaveBeenCalledWith(1, { nearby: true, mail: false });
+  });
+
+  it('one sign-in per Character, each with its own union, one at a time', async () => {
+    await takes('alertsNearby');
+    await takes('alertsMail');
+    await seedTokens(1, 2);
+    useNotificationPreferences.setState({
+      value: {
+        ...DEFAULT_NOTIFICATION_PREFERENCES,
+        perCharacter: { 2: { newMail: { browser: false } } },
+      },
+    });
+    await renderSection();
+    await userEvent.click(await screen.findByRole('button', { name: 'Log in 2 characters…' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to EVE' }));
+    expect(login.begin).toHaveBeenCalledTimes(1);
+    expect(login.begin).toHaveBeenCalledWith(1, { nearby: true, mail: true });
+    // The next step waits for the return from EVE and is already decided.
+    expect(JSON.parse(sessionStorage.getItem('neocom.alerts.queue')!).remaining).toEqual([
+      { characterId: 2, nearby: true, mail: false },
+    ]);
+  });
+
+  it('skips a Character that already holds all it needs, and shows it as On', async () => {
+    await turnOn(1);
+    await renderSection();
+    await waitFor(() => expect(screen.getByTestId('alerts-state-1')).toHaveTextContent(/^On$/));
+    expect(
+      screen.queryByRole('button', { name: 'Log Alpha in to EVE for alerts when closed' })
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: /Log in \d+ characters/ })).toBeNull();
+  });
+
+  it('a Character with nothing ticked for Device is not asked at all', async () => {
+    useNotificationPreferences.setState({
+      value: { ...DEFAULT_NOTIFICATION_PREFERENCES, browserEnabled: false },
+    });
+    await renderSection();
+    expect(
+      await screen.findByText(/Every Character has what its ticked Device alerts need/)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Log in/ })).toBeNull();
   });
 
   it('renders On with Turn off, and Turn off deletes the grant', async () => {
@@ -131,11 +227,11 @@ describe('AlertsWhenClosedSection', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: /Turn off alerts when closed for Alpha/ })
     );
-    expect(await screen.findByRole('status')).toHaveTextContent(/Could not turn off/);
+    expect(await screen.findByText(/Could not turn off/)).toBeInTheDocument();
     expect(screen.getByTestId('alerts-state-1')).toHaveTextContent('On');
   });
 
-  it('renders Needs re-authorizing with a Re-authorize action', async () => {
+  it('renders Needs re-authorizing with a Re-authorize action through the same listing', async () => {
     await markAlertsNeedReauth(1);
     await renderSection();
     await waitFor(() =>
@@ -144,35 +240,19 @@ describe('AlertsWhenClosedSection', () => {
     await userEvent.click(
       screen.getByRole('button', { name: /Re-authorize alerts when closed for Alpha/ })
     );
-    expect(login.begin).toHaveBeenCalledWith(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to EVE' }));
+    expect(login.begin).toHaveBeenCalledWith(1, { nearby: false, mail: false });
   });
 
-  it('Turn on for all starts with the first Character that is not on', async () => {
-    await turnOn(1);
-    await renderSection();
-    // One Character left to authorize: the all-action is not offered.
-    await waitFor(() => expect(screen.getByTestId('alerts-state-1')).toHaveTextContent('On'));
-    expect(screen.queryByRole('button', { name: 'Turn on for all' })).toBeNull();
-  });
-
-  it('Turn on for all steps through Characters one at a time', async () => {
-    await renderSection();
-    await userEvent.click(await screen.findByRole('button', { name: 'Turn on for all' }));
-    expect(login.begin).toHaveBeenCalledTimes(1);
-    expect(login.begin).toHaveBeenCalledWith(1);
-  });
-
-  it('after a success it carries on with the next queued Character', async () => {
-    queueAlertsForAll([2]);
+  it('after a success it carries on with the next queued step, with its own scopes', async () => {
+    queueAlertsWalk([{ characterId: 2, nearby: true, mail: false }]);
     await renderSection({ alertsGrant: { status: 'on', characterId: 1, name: 'Alpha' } });
-    await waitFor(() => expect(login.begin).toHaveBeenCalledWith(2));
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Alerts when closed is on for Alpha'
-    );
+    await waitFor(() => expect(login.begin).toHaveBeenCalledWith(2, { nearby: true, mail: false }));
+    expect(await screen.findByText(/Alerts when closed is on for Alpha/)).toBeInTheDocument();
   });
 
   it('a mismatch names who was authorized and stops the walk', async () => {
-    queueAlertsForAll([2]);
+    queueAlertsWalk([{ characterId: 2, nearby: false, mail: false }]);
     await renderSection({
       alertsGrant: {
         status: 'mismatch',
@@ -181,17 +261,44 @@ describe('AlertsWhenClosedSection', () => {
         authorizedName: 'Beta',
       },
     });
-    expect(await screen.findByRole('status')).toHaveTextContent(/You authorized Beta, not Alpha/);
+    expect(await screen.findByText(/You authorized Beta, not Alpha/)).toBeInTheDocument();
     expect(login.begin).not.toHaveBeenCalled();
     expect(screen.getByTestId('alerts-state-1')).toHaveTextContent('Off');
   });
 
   it('says so on a cancel and on a failure', async () => {
     const { unmount } = await renderSection({ alertsGrant: { status: 'cancelled' } });
-    expect(await screen.findByRole('status')).toHaveTextContent(/cancelled/);
+    expect(await screen.findByText(/cancelled/)).toBeInTheDocument();
     unmount();
     await renderSection({ alertsGrant: { status: 'failed', characterId: 2 } });
-    expect(await screen.findByRole('status')).toHaveTextContent(/Could not turn on .* Beta/);
+    expect(await screen.findByText(/Could not turn on .* Beta/)).toBeInTheDocument();
+  });
+
+  it('a grant missing only the mail shows On with what it needs, and Turn off stays', async () => {
+    await turnOn(1);
+    await takes('alertsMail');
+    await seedTokens(1);
+    await renderSection();
+    await waitFor(() =>
+      expect(screen.getByTestId('alerts-state-1')).toHaveTextContent('On, needs a login')
+    );
+    expect(screen.getByText('Needs a login for: new mail.')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Turn off alerts when closed for Alpha/ })
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Log Alpha in to EVE for alerts when closed' })
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to EVE' }));
+    expect(login.begin).toHaveBeenCalledWith(1, { nearby: false, mail: true });
+  });
+
+  it('never offers a scope the server has not announced', async () => {
+    await seedTokens(1, 2);
+    await renderSection();
+    await userEvent.click(await screen.findByRole('button', { name: 'Log in 2 characters…' }));
+    expect(screen.queryByText(/Mail headers/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Location, for nearby/)).not.toBeInTheDocument();
   });
 });
 
@@ -217,89 +324,5 @@ describe('Quiet time (issue #4566)', () => {
     await within(quiet).findByLabelText('From');
     await userEvent.click(toggle);
     await waitFor(() => expect(within(quiet).queryByLabelText('From')).not.toBeInTheDocument());
-  });
-});
-
-describe('AlertsWhenClosedSection: mail alerts (ADR 0029)', () => {
-  it('says nothing about mail until the server takes the mail scope', async () => {
-    await turnOn(1);
-    await renderSection();
-    expect(await screen.findByTestId('alerts-state-1')).toHaveTextContent(/^On$/);
-    expect(screen.queryByRole('button', { name: /add mail/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/mail headers/)).not.toBeInTheDocument();
-  });
-
-  it('offers Add mail to a grant without it, says what it will read, and asks for mail only on that press', async () => {
-    await turnOn(1);
-    await db.settings.put({ key: 'alertsMail', value: { supported: true, characterIds: [] } });
-    await renderSection();
-    expect(await screen.findByText(/never the message/)).toBeInTheDocument();
-    expect(
-      screen.getByText('Our server holds an encrypted token that reads only notifications.')
-    ).toBeInTheDocument();
-    await userEvent.click(
-      screen.getByRole('button', {
-        name: 'Re-authorize Alpha to add new-mail alerts (reads mail headers only)',
-      })
-    );
-    expect(login.begin).toHaveBeenCalledWith(1, { add: 'mail' });
-  });
-
-  it('a plain Turn on never asks for mail, even once the server takes it', async () => {
-    await db.settings.put({ key: 'alertsMail', value: { supported: true, characterIds: [] } });
-    await renderSection();
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Turn on alerts when closed for Alpha' })
-    );
-    expect(login.begin).toHaveBeenCalledWith(1);
-  });
-
-  it('shows what a grant with mail reads, and no longer offers Add mail', async () => {
-    await turnOn(1);
-    await db.settings.put({ key: 'alertsMail', value: { supported: true, characterIds: [1] } });
-    await db.settings.put({ key: 'alertsNearby', value: { supported: true, characterIds: [1] } });
-    await renderSection();
-    expect(
-      await screen.findByText(
-        'Our server holds an encrypted token that reads only notifications, location, and mail headers.'
-      )
-    ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /add mail/i })).not.toBeInTheDocument();
-  });
-});
-
-describe('AlertsWhenClosedSection: nearby alerts (ADR 0028)', () => {
-  it('says nothing about nearby alerts until the server takes the location scope', async () => {
-    await turnOn(1);
-    await renderSection();
-    expect(await screen.findByTestId('alerts-state-1')).toHaveTextContent(/^On$/);
-    expect(screen.queryByRole('button', { name: /add nearby/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/notifications only; Turn off/)).toBeInTheDocument();
-  });
-
-  it('offers to re-authorize a grant from before nearby alerts, and says what it covers', async () => {
-    await turnOn(1);
-    await db.settings.put({ key: 'alertsNearby', value: { supported: true, characterIds: [] } });
-    await renderSection();
-    await waitFor(() =>
-      expect(screen.getByTestId('alerts-state-1')).toHaveTextContent('On, without nearby alerts')
-    );
-    expect(
-      screen.getByText(/nearby Incursions and raidable skyhooks, while the app is closed/)
-    ).toBeInTheDocument();
-    await userEvent.click(
-      screen.getByRole('button', {
-        name: 'Re-authorize Alpha to add nearby Incursions and raidable skyhooks',
-      })
-    );
-    expect(login.begin).toHaveBeenCalledWith(1);
-  });
-
-  it('shows a grant that already carries the location as plainly on', async () => {
-    await turnOn(1);
-    await db.settings.put({ key: 'alertsNearby', value: { supported: true, characterIds: [1] } });
-    await renderSection();
-    await waitFor(() => expect(screen.getByTestId('alerts-state-1')).toHaveTextContent(/^On$/));
-    expect(screen.queryByRole('button', { name: /add nearby/i })).not.toBeInTheDocument();
   });
 });

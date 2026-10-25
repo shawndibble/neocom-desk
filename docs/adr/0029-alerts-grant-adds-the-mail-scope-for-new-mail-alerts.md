@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-10-25). Amends ADR 0028 (which amended ADR 0020).
+Accepted (2026-10-25). Consent rule amended by ADR 0030 (the sign-in walk's permission listing replaces Add mail). Amends ADR 0028 (which amended ADR 0020).
 
 ## Context
 

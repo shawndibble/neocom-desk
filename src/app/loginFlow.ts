@@ -99,30 +99,29 @@ export async function beginEveLogin(options: EveLoginOptions = {}): Promise<void
 }
 
 /**
- * Turn on Alerts when closed for one Character (ADR 0020), or add a scope to it:
- * a separate SSO round trip for the grant's narrow scopes, returning to the page
- * it was pressed on. The location scope for nearby alerts (ADR 0028) is asked for
- * only once the deployed server has said it takes it; the mail scope (ADR 0029)
- * only on an explicit `add: 'mail'`, or to keep a Character's mail alerts through
- * a re-authorization, since SSO issues a token with exactly what was requested.
+ * One EVE sign-in for a Character's Alerts Grant (ADR 0020), returning to the
+ * page it was pressed on. `wanted` names the optional scopes the player agreed
+ * to on the permission listing (issue #5156); SSO issues a token with exactly
+ * what was requested, so a scope the Character's grant already holds is always
+ * kept. A scope is asked for only once the deployed server has said it takes it
+ * (ADR 0028, 0029). Called without `wanted` (the first-run offer, which says so
+ * in its own copy) it asks for the location when supported and never for new mail.
  * The callback never stores its token on this device; see
  * `features/notifications/alertsGrant.ts`.
  */
 export async function beginAlertsLogin(
   characterId: number,
-  { add }: { add?: 'mail' } = {}
+  { nearby = true, mail = false }: { nearby?: boolean; mail?: boolean } = {}
 ): Promise<void> {
   const { readAlertsNearby, readAlertsMail } = await import('@/features/notifications/alertsGrant');
-  const { supported } = await readAlertsNearby().catch(() => ({ supported: false }));
-  const mail = await readAlertsMail().catch((): AlertsExtraState => ({
-    supported: false,
-    characterIds: [],
-  }));
+  const none = (): AlertsExtraState => ({ supported: false, characterIds: [] });
+  const nearbyState = await readAlertsNearby().catch(none);
+  const mailState = await readAlertsMail().catch(none);
   rememberThisPage();
   assignLocation(
     await startAlertsLogin(characterId, undefined, {
-      nearby: supported,
-      mail: mail.supported && (add === 'mail' || mail.characterIds.includes(characterId)),
+      nearby: nearbyState.supported && (nearby || nearbyState.characterIds.includes(characterId)),
+      mail: mailState.supported && (mail || mailState.characterIds.includes(characterId)),
     })
   );
 }
