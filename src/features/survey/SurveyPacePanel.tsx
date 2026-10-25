@@ -1,8 +1,8 @@
 /**
  * The pace figures under the Survey's charts, on the same time axis as the chart
  * above them: `TotalPaceFigure` (Ore left) is the mining rate between each pair
- * of scans as one area; `ByOrePaceFigure` (Depletion by ore) is, per ore, the percent
- * of its starting total mined in each interval. Each carries its hidden data table.
+ * of scans as one area; `ByOrePaceFigure` (Depletion by ore) is, per interval, each ore's
+ * share of the progress made (a 100% bar). Each carries its hidden data table.
  * Statically imports `recharts`, so — same rule as `SurveyCharts.tsx` — this must only
  * be reached through a dynamic `import()` from `SurveyBoard.tsx`.
  */
@@ -21,7 +21,7 @@ import {
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { formatEveClock } from '@/engine/survey/chatMessage';
 import type { SurveySummary } from '@/engine/survey/series';
-import { paceByOreSeries, type PaceInterval } from '@/engine/survey/chartViews';
+import { paceShareSeries, type PaceInterval } from '@/engine/survey/chartViews';
 import { formatCount } from '@/lib/formatCount';
 import { MARGIN, formatPace, thinLabels, timeAxis, yAxis } from './surveyChartParts';
 import { PaceByOreChart } from './SurveyViewCharts';
@@ -151,18 +151,27 @@ export function TotalPaceFigure({ summary }: { summary: SurveySummary }) {
 export function ByOrePaceFigure({ summary }: { summary: SurveySummary }) {
   const { t } = useTranslation();
   const label = t('survey.chartRateByOre');
-  const pace = useMemo(() => paceByOreSeries(summary), [summary]);
+  const pace = useMemo(() => paceShareSeries(summary), [summary]);
   const columns = useMemo<DataTableColumn<PaceInterval>[]>(
     () => [
       { id: 'from', header: t('survey.tableFrom'), render: (i) => formatEveClock(i.from) },
       { id: 'to', header: t('survey.tableTo'), render: (i) => formatEveClock(i.to) },
+      {
+        id: 'progress',
+        header: t('survey.tableProgress'),
+        render: (i: PaceInterval) => `${formatPace(i.progress)}%`,
+      },
+      // One column per ore: its share of the interval's progress, then its raw percent in brackets.
       ...pace.activeOres.map((ore) => ({
         id: `ore:${ore}`,
         header: ore,
         render: (i: PaceInterval) =>
-          i.percents[ore] === undefined
+          i.shares[ore] === undefined
             ? '–'
-            : t('survey.paceTablePercent', { percent: formatPace(i.percents[ore]) }),
+            : t('survey.paceTableCell', {
+                share: formatPace(i.shares[ore]),
+                percent: formatPace(i.percents[ore]),
+              }),
       })),
     ],
     [pace.activeOres, t]
