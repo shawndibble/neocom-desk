@@ -1320,6 +1320,27 @@
     animation: toast-in 200ms ease-out both;
   }
 
+  /**
+   * Slides a control in from the left as it mounts, e.g. the Permissions "Grant selected"
+   * button appearing beside Select none. Reduced motion gets none (DESIGN.md §6c).
+   */
+  .slide-in-left {
+    animation: slide-in-left 200ms ease-out both;
+  }
+
+  @keyframes slide-in-left {
+    from {
+      opacity: 0;
+      transform: translateX(-12px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .slide-in-left {
+      animation: none;
+    }
+  }
+
   @keyframes toast-in {
     from {
       opacity: 0;

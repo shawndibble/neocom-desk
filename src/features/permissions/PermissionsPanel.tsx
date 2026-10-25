@@ -211,7 +211,7 @@ export function PermissionsPanel() {
         {writes.length > 0 &&
           (headed ? (
             <section aria-label={t('permissions.writeSection')} className="space-y-1 pt-2">
-              <h3 className="text-xs font-semibold text-text">{t('permissions.writeSection')}</h3>
+              <h3 className="text-sm font-semibold text-text">{t('permissions.writeSection')}</h3>
               <p className="text-xs text-text-dim">{t('permissions.writeSectionHint')}</p>
               <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">{writes.map(renderRow)}</ul>
             </section>
@@ -251,7 +251,12 @@ export function PermissionsPanel() {
                 </Button>
                 {chosen.length > 0 && (
                   <NeedsConnection>
-                    <Button size="sm" onClick={() => grant(chosen)}>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      className="slide-in-left"
+                      onClick={() => grant(chosen)}
+                    >
                       {t('settings.permissions.grantSelected', { count: chosen.length })}
                     </Button>
                   </NeedsConnection>
