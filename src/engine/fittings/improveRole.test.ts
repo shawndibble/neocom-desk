@@ -127,3 +127,27 @@ describe('a blank hull ranks fills by absolute gain', () => {
     expect(result!.noDownside.map((o) => o.candidate.toTypeId)).toEqual([11, 10, 12]);
   });
 });
+
+describe('a Nestor with empty highs', () => {
+  it('fills the first empty high with remote repairers for Repair more', () => {
+    const index = buildVariationIndex({}, {});
+    const candidates = improveCandidates(
+      [],
+      index,
+      { '20': 'high', '21': 'high' },
+      {
+        goal: 'repair',
+        slotCounts: { high: 5, medium: 0, low: 0, rig: 0, subsystem: 0 },
+        pool: {
+          groupOf: () => 325,
+          typeIdsInGroup: (group) => (group === 325 ? [20, 21] : []),
+          published: () => true,
+        },
+      }
+    );
+    expect(candidates.map((c) => [c.toTypeId, c.at[0]!.slotIndex])).toEqual([
+      [20, 0],
+      [21, 0],
+    ]);
+  });
+});

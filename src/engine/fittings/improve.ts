@@ -268,12 +268,12 @@ function relative(before: number, after: number): number {
   return (after - before) / Math.abs(before);
 }
 
-/** The mean relative gain over the figures the fit already has; a figure it lost counts -1. */
 /** The relative change, or the absolute one in the goal's unit when the fit starts from nothing (a fill from zero has no ratio). */
 function gainOrAbsolute(before: number, after: number): number {
   return before === 0 ? after - before : relative(before, after);
 }
 
+/** The mean relative gain over the figures the fit already has; a figure it lost counts -1. */
 function meanGain(pairs: readonly (readonly [number, number])[]): number {
   const present = pairs.filter(([before]) => before > 0);
   if (present.length === 0) return 0;
@@ -325,10 +325,10 @@ function scoreOf(
       ]);
     }
     case 'command':
-      // From nothing there is no ratio: a bigger buff, then a longer compression reach (km), wins.
+      // From nothing there is no ratio: a bigger buff wins, a longer compression reach (km) breaks a tie.
       return hasCommand(before)
         ? commandGain(before, after)
-        : commandOf(after).strength + commandOf(after).compression / 1e7;
+        : commandOf(after).strength * 1e6 + commandOf(after).compression / 1000;
     case 'ewar': {
       const [was, now] = [ewarOf(before), ewarOf(after)];
       return meanGain([
