@@ -59,9 +59,9 @@ export async function bestCrystalKey(
   return best?.key ?? null;
 }
 
-/** "Type B II" for the key "B2". */
-export function crystalLabel(key: string): string {
-  return `Type ${key[0]} ${key[1] === '2' ? 'II' : 'I'}`;
+/** The letter and tier of a crystal key: "B2" is B, II. */
+export function crystalParts(key: string): { letter: string; tier: 'I' | 'II' } {
+  return { letter: key[0]!, tier: key[1] === '2' ? 'II' : 'I' };
 }
 
 /**

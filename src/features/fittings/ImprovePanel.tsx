@@ -57,7 +57,7 @@ import {
   type RejectedOption,
 } from '@/engine/fittings/improve';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
-import { crystalLabel } from '@/engine/fittings/improveMining';
+import { crystalParts } from '@/engine/fittings/improveMining';
 import type { Resource } from '@/engine/fittings/makeItFit';
 import { formatIskCompact } from '@/lib/isk';
 import { createNumberFormat } from '@/lib/numberLocale';
@@ -694,6 +694,8 @@ export function ImprovePanel({
   const unloadedCrystals = crystalBasis?.unloaded ?? null;
   const unloadedNow = state.status === 'done' ? (state.fitAsIs?.mining.perSecond ?? 0) : 0;
   const unloadedBest = state.status === 'done' ? state.before.mining.perSecond : 0;
+  // Said only when "Now" and the rows are on different crystals.
+  const basisDiffers = crystalBasis !== undefined && unloadedNow !== unloadedBest;
   const chosen = useMemo(() => [...ticked.values()], [ticked]);
 
   // The rows were each scored alone: one recalculation of the ticked set checks them together.
@@ -1067,7 +1069,7 @@ export function ImprovePanel({
               count: unloadedCrystals.count,
               family: settings.oreFamily,
               now: m3sFormat(unloadedNow),
-              crystal: crystalLabel(crystalBasis!.bestKey),
+              crystal: t('fittings.improve.crystalType', crystalParts(crystalBasis?.bestKey ?? '')),
               best: m3sFormat(unloadedBest),
             })}
           </p>
@@ -1201,7 +1203,7 @@ export function ImprovePanel({
               <p className="text-sm" data-testid="improve-best-found">
                 <span className="text-text-dim">{t('fittings.improve.bestFound')} </span>
                 <span className="font-medium">{bestFound}</span>
-                {crystalBasis && (
+                {basisDiffers && (
                   <span className="text-text-dim">
                     {' '}
                     {t('fittings.improve.bestCrystals', {

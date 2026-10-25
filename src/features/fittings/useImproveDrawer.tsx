@@ -174,7 +174,11 @@ export function useImproveDrawer({
     setUndo({
       before: fitting,
       applied,
-      message: t('fittings.improve.crystalsLoaded', { count: crystals.unloaded.count }),
+      message: t('fittings.improve.crystalsLoaded', {
+        // `accepts` can skip a miner the calculation has not reached yet.
+        count: applied.modules.filter((m, i) => m.chargeTypeId !== fitting.modules[i]?.chargeTypeId)
+          .length,
+      }),
     });
   }
 

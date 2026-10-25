@@ -8,7 +8,7 @@ import {
 import {
   bestCrystalKey,
   crystalKeyOf,
-  crystalLabel,
+  crystalParts,
   crystalsOfFamily,
   loadCrystals,
   minerWithoutCrystal,
@@ -183,10 +183,10 @@ describe('minerWithoutCrystal', () => {
   });
 });
 
-describe('crystalLabel', () => {
-  it('reads a crystal key as its type', () => {
-    expect(crystalLabel('B2')).toBe('Type B II');
-    expect(crystalLabel('A1')).toBe('Type A I');
+describe('crystalParts', () => {
+  it('reads a crystal key as its letter and tier', () => {
+    expect(crystalParts('B2')).toEqual({ letter: 'B', tier: 'II' });
+    expect(crystalParts('A1')).toEqual({ letter: 'A', tier: 'I' });
   });
 });
 
