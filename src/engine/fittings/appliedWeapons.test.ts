@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ITEM_DOGMA_ATTRIBUTE } from './types';
 import {
   APPLIED_DPS_ATTRIBUTE as A,
   DEFAULT_DRONE_CONTROL_RANGE,
@@ -206,6 +207,34 @@ describe('extractAppliedDpsInputs fighters', () => {
       kind: 'fighter',
       damage: { em: 0, thermal: 0.75, kinetic: 0.25, explosive: 0 },
     });
+  });
+});
+
+describe('extractAppliedDpsInputs reload', () => {
+  it('carries a launcher’s reload share: 5 cycles of 4 s, then a 10 s reload', () => {
+    const launcher = attrs({
+      [A.dps]: 13,
+      [ITEM_DOGMA_ATTRIBUTE.rateOfFire]: 4000,
+      [ITEM_DOGMA_ATTRIBUTE.chargeAmount]: 5,
+      [ITEM_DOGMA_ATTRIBUTE.chargeRate]: 1,
+      [ITEM_DOGMA_ATTRIBUTE.reloadTime]: 10000,
+    });
+    const inputs = extractAppliedDpsInputs(
+      [high],
+      [{ attributes: launcher, state: 'active', charge: { attributes: scourgeHeavy } }],
+      attrs({})
+    );
+    expect(inputs.weapons[0]).toMatchObject({ kind: 'missile', dps: 13 });
+    expect(inputs.weapons[0].reloadDuty).toBeCloseTo(20 / 30, 6);
+  });
+
+  it('leaves a weapon that never reloads without a share', () => {
+    const inputs = extractAppliedDpsInputs(
+      [high],
+      [{ attributes: blaster, state: 'active' }],
+      attrs({})
+    );
+    expect(inputs.weapons[0].reloadDuty).toBeUndefined();
   });
 });
 

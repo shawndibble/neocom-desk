@@ -29,11 +29,12 @@ import {
   capacitorBudget,
   capacitorStatusAtDrain,
   loadAdjustment,
+  magazineOf,
   reloadDuty,
   sustainedRepair,
+  weaponReloadDuty,
   type CapacitorBudget,
   type CapacitorUser,
-  type Magazine,
   type RepairLayer,
   type Repairer,
 } from './tank';
@@ -449,20 +450,6 @@ export function needsChargeToFire(attributes: AttributeMap): boolean {
   );
 }
 
-/**
- * The share of a long fight a weapon spends firing rather than reloading.
- * Only a module that uses charges per shot (`chargeRate`: projectiles,
- * hybrids, missiles) runs its magazine dry; a laser carries no `chargeRate`
- * — its crystal is never used up per shot (the pinned engine, 2026-09-29) —
- * and drones and fighters never reload, so all of those fire the whole time.
- * A weapon's cycle is its rate of fire: a launcher carries no `cycleTime`.
- */
-function weaponReloadDuty(attributes: AttributeMap, neverReloads: boolean): number {
-  const read = (id: number) => readAttribute(attributes, id);
-  if (neverReloads || read(ITEM_DOGMA_ATTRIBUTE.chargeRate) <= 0) return 1;
-  return reloadDuty(magazineOf(read, ITEM_DOGMA_ATTRIBUTE.rateOfFire));
-}
-
 function damageFigures(
   attributes: AttributeMap,
   quantity: number,
@@ -644,25 +631,6 @@ function runningModules<I extends CalculatedItem, R extends RunningResult>(
       ? [{ item, result }]
       : [];
   });
-}
-
-/**
- * A loaded module's magazine: the charges the engine says it holds, over
- * what one cycle uses, and its reload. The same for an ancillary repairer,
- * a cap booster and a weapon — whose cycle is its rate of fire.
- */
-function magazineOf(
-  read: (id: number) => number,
-  cycleAttribute: number = ITEM_DOGMA_ATTRIBUTE.cycleTime
-): Magazine {
-  const chargeRate = read(ITEM_DOGMA_ATTRIBUTE.chargeRate) || 1;
-  return {
-    // The engine's figures are single-precision: a blaster's 160 rounds come
-    // back as 159.9999976, which a bare floor would cut to 159.
-    cycles: Math.floor(read(ITEM_DOGMA_ATTRIBUTE.chargeAmount) / chargeRate + 1e-4),
-    cycleSeconds: read(cycleAttribute) / 1000,
-    reloadSeconds: read(ITEM_DOGMA_ATTRIBUTE.reloadTime) / 1000,
-  };
 }
 
 /**

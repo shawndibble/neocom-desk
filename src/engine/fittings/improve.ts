@@ -281,13 +281,14 @@ export function goalAvailability(
 }
 
 /**
- * Sustained applied DPS against the Target Profile (fighters included), or
- * the listed sustained DPS of guns, drones and fighters when there is no
- * profile or no firing weapon to apply.
+ * Sustained applied DPS against the Target Profile (reload included, fighters
+ * included), or the fit's listed sustained DPS when there is no profile or no
+ * firing weapon to apply. `offense` already holds a row for every drone and
+ * fighter, so nothing is added to it.
  */
 export function damageOf(s: FittingStats, target: TargetProfile | undefined): number {
   if (target && s.applied.weapons.length > 0) return peakAppliedDps(s, target);
-  return s.offense.sustainedDps + s.droneDps + s.fighters.dps;
+  return s.offense.sustainedDps;
 }
 
 function relative(before: number, after: number): number {

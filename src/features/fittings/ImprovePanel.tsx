@@ -442,14 +442,9 @@ export function ImprovePanel({
       line === null ? null : { node: <span key={key}>{line}</span>, keys: [] };
     const dps = (): Lead => {
       const [was, now] = [damageOf(own, target), damageOf(option.after, target)];
-      // A damage figure is labelled for what it is: applied to the Target Profile, the fit's own sustained DPS, or that plus its drones and fighters.
+      // A damage figure is labelled for what it is: applied to the Target Profile, or the fit's listed sustained DPS.
       if (target && own.applied.weapons.length > 0) return stat('appliedDps', was, now);
-      const shipOnly = (s: FittingStats) => damageOf(s, undefined) === s.offense.sustainedDps;
-      return stat(
-        shipOnly(own) && shipOnly(option.after) ? 'sustainedDps' : 'sustainedDamage',
-        was,
-        now
-      );
+      return stat('sustainedDps', was, now);
     };
     const tank = () => stat('ehp', own.ehp, option.after.ehp);
     const role = (metric: RoleMetric): Lead | null => {
