@@ -16,6 +16,8 @@ import { r2WorkbenchStore } from './workbenchFitsStore.js';
 const FETCH_BUDGET_MS = 900_000;
 /** ≤ 4 requests a second against a free, unauthenticated API on a shared runner IP. */
 const REQUEST_GAP_MS = 250;
+/** A hung socket must not run past the fetch budget and lose the unflushed fits to the job timeout. */
+const REQUEST_TIMEOUT_MS = 30_000;
 
 export async function runPublicWorkbenchFits(
   env: Record<string, string | undefined>,
@@ -26,6 +28,7 @@ export async function runPublicWorkbenchFits(
     store: r2WorkbenchStore({ get: createR2Get(config), put: createR2Put(config) }),
     fetchJson: async (url) => {
       const response = await fetch(url, {
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         headers: {
           'User-Agent': ESI_USER_AGENT,
           'X-User-Agent': ESI_USER_AGENT,
