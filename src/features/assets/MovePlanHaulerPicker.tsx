@@ -15,6 +15,7 @@ import {
   type HaulerOverride,
   type MovePlan,
 } from '@/engine/assets/movePlan';
+import { ownedFirstOrder, ownedText } from './ownedHullText';
 import { maskNumber, unmaskNumber } from '@/lib/numberMask';
 
 const CUSTOM = 'custom';
@@ -24,13 +25,15 @@ interface HaulerPickerProps {
   override: HaulerOverride | undefined;
   /** Undefined goes back to the suggested hauler. */
   onPick: (override: HaulerOverride | undefined) => void;
+  /** List owned hulls first; the plan's own ranking is untouched. */
+  ownedFirst?: boolean;
 }
 
 /**
  * Per-plan hauler choice: the suggested hull, any other listed hull, or one
  * typed m³. Lives only as long as the plan; the saved Cargo Space is never touched.
  */
-export function HaulerPicker({ plan, override, onPick }: HaulerPickerProps) {
+export function HaulerPicker({ plan, override, onPick, ownedFirst = false }: HaulerPickerProps) {
   const { t } = useTranslation();
   const errorId = useId();
   const [customMode, setCustomMode] = useState(override !== undefined && 'customM3' in override);
@@ -81,11 +84,16 @@ export function HaulerPicker({ plan, override, onPick }: HaulerPickerProps) {
             <SelectValue placeholder={t('assets.movePlan.noHaulerOption')} />
           </SelectTrigger>
           <SelectContent>
-            {plan.comparison.map((o) => (
+            {ownedFirstOrder(plan.comparison, ownedFirst).map((o) => (
               <SelectItem key={o.hull.typeId} value={String(o.hull.typeId)}>
-                {o.hull.typeId === suggestedId
-                  ? t('assets.movePlan.haulerSuggestedOption', { hull: o.hull.name })
-                  : o.hull.name}
+                {[
+                  o.hull.typeId === suggestedId
+                    ? t('assets.movePlan.haulerSuggestedOption', { hull: o.hull.name })
+                    : o.hull.name,
+                  ownedText(t, o.hull),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </SelectItem>
             ))}
             <SelectItem value={CUSTOM}>{t('assets.movePlan.customOption')}</SelectItem>

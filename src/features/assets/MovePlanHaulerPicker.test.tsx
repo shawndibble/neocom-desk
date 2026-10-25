@@ -84,4 +84,19 @@ describe('HaulerPicker', () => {
     expect(field.getAttribute('aria-invalid')).toBe('true');
     expect(onPick).not.toHaveBeenCalled();
   });
+  it('marks owned hulls in the options with their jumps', async () => {
+    const owned = {
+      ...nereus,
+      hull: {
+        ...nereus.hull,
+        owned: true,
+        ownedAt: { systemId: 30000142, jumps: 4, characterName: 'Alice' },
+      },
+    };
+    const ownedPlan = { ...plan, comparison: [badger, owned] } as unknown as MovePlan;
+    render(<HaulerPicker plan={ownedPlan} override={undefined} onPick={vi.fn()} />);
+    await userEvent.click(screen.getByRole('combobox', { name: 'Hauler' }));
+    expect(await screen.findByRole('option', { name: 'Nereus · Owned · 4 jumps' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: /Badger/ }).textContent).not.toMatch(/Owned/);
+  });
 });
