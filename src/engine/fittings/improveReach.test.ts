@@ -4,6 +4,7 @@ import {
   bestScore,
   findImprovements,
   improveCandidates,
+  onlySide,
   type CandidateOptions,
   type ImproveCandidate,
   type ImproveGoal,
@@ -478,5 +479,39 @@ describe('Defense search result', () => {
     const f = fit([['low', 0, 11]]);
     const result = await run('tank', f, [fill(4, 1), fill(5, 1)], {});
     expect(bestScore(result)).toBeGreaterThan(0);
+  });
+});
+
+describe('onlySide', () => {
+  const option = (toTypeId: number, score: number) =>
+    ({ candidate: { fromTypeId: 1, toTypeId, at: [] }, score }) as never;
+  const result = {
+    noDownside: [option(2, 0.11), option(11, 0.05), option(5, 0.02)],
+    tradeOffs: [option(4, 0.3)],
+    rejected: [option(3, 0.4)],
+    checked: 7,
+    stopped: false,
+  };
+  const groupOf = (id: number) => GROUP[id];
+
+  it('keeps only options that put the side’s tank modules on the fit', () => {
+    const armor = onlySide(result, 'armor', groupOf);
+    expect(armor.noDownside.map((o) => o.candidate.toTypeId)).toEqual([5]);
+    expect(armor.tradeOffs.map((o) => o.candidate.toTypeId)).toEqual([4]);
+    expect(armor.rejected).toEqual([]);
+    expect(armor.checked).toBe(7);
+    expect(onlySide(result, 'shield', groupOf).noDownside.map((o) => o.candidate.toTypeId)).toEqual(
+      [2]
+    );
+  });
+
+  it('a shield-only fit under Armor reports no gain when no armor module helps', () => {
+    const shieldOnly = {
+      ...result,
+      noDownside: [option(2, 0.11), option(11, 0.11)],
+      tradeOffs: [],
+      rejected: [],
+    };
+    expect(bestScore(onlySide(shieldOnly, 'armor', groupOf))).toBeNull();
   });
 });

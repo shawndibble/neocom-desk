@@ -467,18 +467,26 @@ export function ImprovePanel({
             onChange={(value) => settings.onSpendCapChange(value === '' ? null : Number(value))}
           />
         </label>
-        <SegmentedControl
-          label={t('fittings.improve.defenseLabel')}
-          options={DEFENSE_CHOICES.map((value) => ({
-            value,
-            label: t(`fittings.improve.defense.${value}`),
-          }))}
-          value={settings.defense}
-          onChange={settings.onDefenseChange}
-          fill
-        />
-        {!TANK_GOALS.has(goal) && (
-          <p className="text-text-dim text-xs">{t('fittings.improve.defenseHint')}</p>
+        {TANK_GOALS.has(goal) && (
+          <>
+            <SegmentedControl
+              label={t('fittings.improve.defenseLabel')}
+              options={DEFENSE_CHOICES.map((value) => ({
+                value,
+                label: t(`fittings.improve.defense.${value}`),
+                // Upgrade swaps a module within its own type, so it can't change tank side.
+                ...(value !== 'keep' && settings.reach === 'upgrade'
+                  ? { disabled: true, disabledReason: t('fittings.improve.defenseUpgrade') }
+                  : {}),
+              }))}
+              value={settings.defense}
+              onChange={settings.onDefenseChange}
+              fill
+            />
+            {settings.reach === 'upgrade' && (
+              <p className="text-text-dim text-xs">{t('fittings.improve.defenseUpgrade')}</p>
+            )}
+          </>
         )}
         <div>
           <button

@@ -18,6 +18,7 @@ import {
   IMPROVE_REACHES,
   improveCandidates,
   type DefenseChoice,
+  onlySide,
   type ImproveCandidate,
   type ImproveGoal,
   type ImproveHold,
@@ -41,7 +42,7 @@ import {
   loadCrystals,
 } from '@/engine/fittings/improveMining';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
-import { TANK_GOALS } from '@/engine/fittings/improveGroups';
+import { TANK_GOALS, type DefenseSide } from '@/engine/fittings/improveGroups';
 import type { Resource } from '@/engine/fittings/makeItFit';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/types';
@@ -455,16 +456,23 @@ export function useImprove(
           // "Show best so far" ends the whole search: the other side was not searched, so it is not compared.
           if (stopRef.current) break;
         }
-        const sideResults =
-          sets.length === 2 && results.length === 2
-            ? ({
-                [sets[0].side]: results[0],
-                [sets[1].side]: results[1],
-              } as Record<'shield' | 'armor', ImproveResult>)
-            : undefined;
+        // A side counts only the options that put its own tank modules on the fit.
+        const groupOf = (typeId: number) => catalogue.types[String(typeId)]?.groupID;
+        const compared = sets.length === 2 && results.length === 2;
+        const sided = compared
+          ? results.map((result, i) => onlySide(result, sets[i].side as DefenseSide, groupOf))
+          : results;
+        // One count for both side runs, the same total the progress bar showed.
+        const checked = results.reduce((sum, result) => sum + result.checked, 0);
+        const sideResults = compared
+          ? ({
+              [sets[0].side]: sided[0],
+              [sets[1].side]: sided[1],
+            } as Record<'shield' | 'armor', ImproveResult>)
+          : undefined;
         setState({
           status: 'done',
-          result: results[0],
+          result: { ...sided[0], checked },
           before: scoredBefore,
           elapsedMs: performance.now() - started,
           ...(sideResults ? { sides: sideResults } : {}),
