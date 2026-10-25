@@ -11,17 +11,18 @@
  * this module:
  *
  * - **Sustained** repair holds burst while the capacitor's peak recharge
- *   (plus boosters and nosferatu, as the engine counts them) covers every
- *   running module. When it doesn't, the modules that aren't repairers are
+ *   (plus boosters) covers every running module. A nosferatu is not counted
+ *   as income: it only takes from a target that has capacitor. When it doesn't, the modules that aren't repairers are
  *   fed first, and the capacitor-using repairers all run at the share of
  *   their draw that is left — Pyfa's "sustainable" tank takes the same view.
  * - A loaded **ancillary** repairer (charges instead of, or on top of,
  *   capacitor) runs its whole magazine and then stops for the reload, so it
- *   averages its burst over `cycles × cycle + reload`.
+ *   averages its burst, and its capacitor draw, over `cycles × cycle + reload`.
  * - A **cap booster** does the same: its injection is averaged over its
  *   magazine and reload (`reloadDuty`, the one rule for both). The engine's
  *   own peak load counts it at its charge-per-cycle rate with no reload, so
- *   `boosterReloadShortfall` is what the sustained tank adds back to it.
+ *   `boosterReloadShortfall` is what the sustained tank adds back to it
+ *   (`loadAdjustment` is that, with the ancillary and nosferatu corrections).
  */
 import type { CapacitorStatus, LocalRepair } from './types';
 
@@ -55,6 +56,8 @@ export interface CapacitorUser {
   injectionPerCharge?: number;
   /** A cap booster's charges and reload, which its injection is averaged over. */
   magazine?: Magazine;
+  /** A loaded ancillary repairer's charges and reload, which its draw is averaged over. */
+  ancillary?: Magazine;
 }
 
 /** A cap booster: it injects (a negative draw) from a loaded charge. */
@@ -72,16 +75,31 @@ export function boosterReloadShortfall(users: readonly CapacitorUser[]): number 
     .reduce((sum, user) => sum - user.capPerSecond * (1 - reloadDuty(user.magazine)), 0);
 }
 
+/**
+ * GJ/s to add to the engine's own peak load (every running module's draw,
+ * boosters and nosferatu netted off at full speed) to get this module's:
+ * boosters lose injection to their reloads, ancillary repairers draw less for
+ * theirs, and a nosferatu's take is not counted. 0 when none applies, so the
+ * engine's figures stand.
+ */
+export function loadAdjustment(users: readonly CapacitorUser[]): number {
+  return users.reduce((sum, user) => {
+    if (isBooster(user)) return sum - user.capPerSecond * (1 - reloadDuty(user.magazine));
+    if (user.capPerSecond < 0) return sum - user.capPerSecond;
+    return sum - user.capPerSecond * (1 - reloadDuty(user.ancillary));
+  }, 0);
+}
+
 export interface CapacitorBudget {
   /** GJ/s the capacitor refills at its fastest (25% full). */
   peakRecharge: number;
-  /** GJ/s every running module draws. */
+  /** GJ/s every running module draws, ancillary repairers averaged over their reloads. */
   drain: number;
   /** GJ/s cap boosters inject, one charge a cycle, averaged over their reloads. */
   boosterInjection: number;
-  /** GJ/s nosferatu take from their targets. */
+  /** GJ/s nosferatu take from a target that has capacitor. Shown, but not in `delta`. */
   nosferatuGain: number;
-  /** Peak recharge + injection + nosferatu − drain; below 0 the capacitor runs down. */
+  /** Peak recharge + injection − drain; below 0 the capacitor runs down. */
   delta: number;
   /** `delta` as a share of peak recharge, percent. */
   deltaPct: number;
@@ -111,11 +129,11 @@ export function capacitorBudget(
     } else if (user.capPerSecond < 0) {
       nosferatuGain -= user.capPerSecond;
     } else {
-      drain += user.capPerSecond;
+      drain += user.capPerSecond * reloadDuty(user.ancillary);
     }
   }
-  const delta = peakRecharge + boosterInjection + nosferatuGain - drain;
-  const shortWithoutBoosters = drain - nosferatuGain - peakRecharge;
+  const delta = peakRecharge + boosterInjection - drain;
+  const shortWithoutBoosters = drain - peakRecharge;
   return {
     peakRecharge,
     drain,
@@ -150,13 +168,16 @@ export interface SustainedRepair {
 
 /**
  * Sustained local repair. `peakLoad` is the engine's own total (every
- * running module, the repairers included, boosters and nosferatu netted off).
+ * running module, the repairers included) adjusted by `loadAdjustment`.
  */
 export function sustainedRepair(
   repairers: readonly Repairer[],
   { peakRecharge, peakLoad }: { peakRecharge: number; peakLoad: number }
 ): SustainedRepair {
-  const repairDraw = repairers.reduce((sum, r) => sum + Math.max(0, r.capPerSecond), 0);
+  const repairDraw = repairers.reduce(
+    (sum, r) => sum + Math.max(0, r.capPerSecond) * reloadDuty(r.ancillary),
+    0
+  );
   const left = peakRecharge - (peakLoad - repairDraw);
   const capFraction = repairDraw <= 0 ? 1 : Math.min(1, Math.max(0, left / repairDraw));
 
@@ -171,7 +192,7 @@ export function sustainedRepair(
 
 /**
  * Stable level, or time to empty, of a capacitor under a steady net drain
- * (GJ/s — draw less nosferatu and reload-averaged cap booster injection),
+ * (GJ/s — draw less reload-averaged cap booster injection),
  * on the game's recharge curve: dC/dt = 10·C/τ·(√s − s) − drain, s the
  * fraction full, which peaks at 2.5·C/τ at 25%. Closed form, not the
  * engine's per-cycle simulation: once cap boosters are averaged over their

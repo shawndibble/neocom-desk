@@ -632,7 +632,8 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     );
     // The Medium Energy Nosferatu II's 36 GJ every 5 s.
     expect(budget.nosferatuGain).toBeCloseTo(36 / 5, 6);
-    expect(budget.delta).toBeCloseTo(read(-5) - reloadShortfall, 6);
+    // The engine's delta counts the nosferatu as income; ours does not.
+    expect(budget.delta).toBeCloseTo(read(-5) - reloadShortfall - budget.nosferatuGain, 6);
 
     // The remote armor repairer repairs someone else: the local tank has no armor.
     expect(tank.burst.armor).toBe(0);
@@ -708,6 +709,51 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
         [0]
       )
     ).toBeNull();
+  });
+
+  it("works a charge's capacitor out under the stats' own basis: Electrical weather halves the recharge", () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Caracal guide basis',
+      shipTypeId: CARACAL,
+      modules: [
+        { slot: 'medium', slotIndex: 0, typeId: MEDIUM_SHIELD_BOOSTER_II, state: 'active' },
+        { slot: 'medium', slotIndex: 1, typeId: MEDIUM_SHIELD_BOOSTER_II, state: 'active' },
+        { slot: 'medium', slotIndex: 2, typeId: MEDIUM_SHIELD_BOOSTER_II, state: 'active' },
+        {
+          slot: 'medium',
+          slotIndex: 3,
+          typeId: MEDIUM_CAPACITOR_BOOSTER_II,
+          state: 'active',
+          chargeTypeId: NAVY_CAP_BOOSTER_400,
+        },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const pilot = buildAllVProfile(SUPPORT_SKILL_IDS);
+    const ELECTRICAL_1 = 47381;
+    const under = engine.compareCharges(
+      fitting,
+      pilot,
+      MEDIUM_CAPACITOR_BOOSTER_II,
+      [NAVY_CAP_BOOSTER_400],
+      { pilot, options: { weatherTypeId: ELECTRICAL_1 } }
+    )[0]!;
+    const clear = engine.compareCharges(fitting, pilot, MEDIUM_CAPACITOR_BOOSTER_II, [
+      NAVY_CAP_BOOSTER_400,
+    ])[0]!;
+
+    // The stats headline: the same fit in the same weather.
+    const weathered = withWeather(fittingToDogmaFit(fitting, pilot), ELECTRICAL_1);
+    const calculation = calculate(weathered);
+    const stats = extractFittingStats(
+      weathered.items,
+      calculation.ship.attributes,
+      calculation.items
+    );
+    expect(under.cap!.capacitor).toEqual(stats.capacitor);
+    // Without the weather the guide answered for a different capacitor.
+    expect(under.cap!.capacitor).not.toEqual(clear.cap!.capacitor);
   });
 
   it('averages a Navy Cap Booster 400 over its reload: 26.1 GJ/s, not 33.3', () => {

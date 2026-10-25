@@ -26,9 +26,9 @@ import {
   CHARACTER_BASE_LOCKED_TARGETS,
 } from './types';
 import {
-  boosterReloadShortfall,
   capacitorBudget,
   capacitorStatusAtDrain,
+  loadAdjustment,
   reloadDuty,
   sustainedRepair,
   type CapacitorBudget,
@@ -57,6 +57,7 @@ interface ItemCalculationResult {
 interface CalculatedItem {
   type_id: number;
   slot: { type: string };
+  charge?: unknown;
 }
 
 function readAttribute(attributes: AttributeMap, attributeId: number): number {
@@ -115,10 +116,11 @@ function capacitorStatus(shipAttributes: AttributeMap): CapacitorStatus {
 
 /**
  * The capacitor headline. The engine's own stable level / time to empty
- * counts a cap booster at one charge a cycle with no reload, so a fit it
- * holds up can read "stable" beside a negative Delta. Where a cap booster
- * loses injection to its reloads, the headline is worked out from the same
- * reload-averaged drain as the Delta instead (`capacitorStatusAtDrain`), so
+ * counts a cap booster at one charge a cycle with no reload, and a nosferatu
+ * as income, so a fit it holds up can read "stable" beside a negative Delta.
+ * Where a cap booster loses injection to its reloads, an ancillary repairer
+ * draws less for its own, or a nosferatu runs, the headline is worked out
+ * from the same drain as the Delta instead (`capacitorStatusAtDrain`), so
  * the two agree; every other fit keeps the engine's per-cycle figure.
  */
 function reloadAwareCapacitorStatus(
@@ -130,7 +132,7 @@ function reloadAwareCapacitorStatus(
     attributes: result.attributes,
     state: result.state ?? 'offline',
   }));
-  if (boosterReloadShortfall(capacitorUsers(items, results)) <= 0) {
+  if (Math.abs(loadAdjustment(capacitorUsers(items, results))) < 1e-9) {
     return capacitorStatus(shipAttributes);
   }
   const budget = extractCapacitorBudget(items, results, shipAttributes);
@@ -663,17 +665,22 @@ function magazineOf(
   };
 }
 
-/** Every running module's capacitor use, a cap booster's with its magazine. */
+/**
+ * Every running module's capacitor use, a cap booster's with its magazine and
+ * a loaded repairer's with the magazine its draw averages over.
+ */
 function capacitorUsers(
   items: readonly CalculatedItem[],
   results: readonly RunningResult[]
 ): CapacitorUser[] {
-  return runningModules(items, results).map(({ result }) => {
+  return runningModules(items, results).map(({ item, result }) => {
     const read = (id: number) => readAttribute(result.attributes, id);
     const injectionPerCharge = read(ITEM_DOGMA_ATTRIBUTE.capacitorInjectionAmount);
+    const repairs = REPAIR_LAYERS.some((layer) => read(REPAIR_RATE_ATTRIBUTE[layer]) > 0);
     return {
       capPerSecond: read(ITEM_DOGMA_ATTRIBUTE.capacitorPeakLoad),
       ...(injectionPerCharge > 0 ? { injectionPerCharge, magazine: magazineOf(read) } : {}),
+      ...(repairs && item.charge !== undefined ? { ancillary: magazineOf(read) } : {}),
     };
   });
 }
@@ -790,10 +797,11 @@ export function extractTank(
 
   const { sustained, capFraction } = sustainedRepair(repairers, {
     peakRecharge: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakRecharge),
-    // The engine's load nets cap boosters in at their no-reload rate.
+    // The engine's load nets cap boosters in at their no-reload rate, ancillary
+    // repairers at their draw with no reload, and nosferatu as income.
     peakLoad:
       readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakLoad) +
-      boosterReloadShortfall(capacitorUsers(items, results)),
+      loadAdjustment(capacitorUsers(items, results)),
   });
   const passiveShield = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.passiveShieldRechargeRate);
   const passiveEffective = readAttribute(
