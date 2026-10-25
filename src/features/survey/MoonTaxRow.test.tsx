@@ -139,6 +139,7 @@ describe('MoonTaxRow', () => {
     fireEvent.blur(rate, { relatedTarget: document.body });
     await waitFor(() =>
       expect(setSurveyTax).toHaveBeenCalledWith({
+        characterId: expect.any(Number),
         id: 'abc123XYZ',
         expiresAt: 5000,
         name: 'Moon Corp',

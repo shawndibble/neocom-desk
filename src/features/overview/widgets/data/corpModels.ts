@@ -4,11 +4,11 @@
  * registry (`models.ts`) through `registerKindDefs` when the Corp route loads.
  * Structures and Moon extractions are the Overview's own kinds, reused as they are.
  */
-import type { KindDef } from './builderKit';
+import { byShow, type KindDef } from './builderKit';
 import { corpAssets } from './corpAssetsModels';
 import { corpContracts } from './corpContractsModels';
 import { corpOrders } from './corpOrdersModels';
-import { corpDeadlines, corpJobs, corpServices } from './corpClockModels';
+import { corpDeadlines, corpJobs } from './corpClockModels';
 import { corpSovereignty } from './corpSovereigntyModels';
 import { corpStarbases } from './corpStarbaseModels';
 import { corpCustomsOffices } from './corpCustomsModels';
@@ -24,15 +24,16 @@ export const CORP_DEFS: Readonly<Record<string, KindDef>> = {
     scope: 'character',
     build: corpDeadlines,
   },
-  corpServices: { feeds: ['structures'], scope: 'character', build: corpServices },
   corpStarbases: { feeds: ['corpStarbases'], scope: 'character', build: corpStarbases },
   corpSovereignty: { feeds: ['corpSovereignty'], scope: 'character', build: corpSovereignty },
   corpJobs: { feeds: ['corpJobs'], scope: 'character', build: corpJobs },
   corpCustomsOffices: { feeds: ['corpCustoms'], scope: 'character', build: corpCustomsOffices },
   corpRoleAudit: { feeds: ['corpRoleAudit'], scope: 'character', build: corpRoleAudit },
-  corpWallet: { feeds: ['corpWallet'], scope: 'character', build: corpWallet },
-  corpCashFlow: { feeds: ['corpWallet'], scope: 'character', build: corpCashFlow },
-  corpIncome: { feeds: ['corpWallet'], scope: 'character', build: corpIncome },
+  corpWallet: {
+    feeds: ['corpWallet'],
+    scope: 'character',
+    build: byShow({ divisions: corpWallet, flow: corpCashFlow, sources: corpIncome }, corpWallet),
+  },
   corpMembers: { feeds: ['corpMembers'], scope: 'character', build: corpMembers },
   corpInactive: { feeds: ['corpMembers'], scope: 'character', build: corpInactive },
   corpMining: { feeds: ['corpMining'], scope: 'character', build: corpMining },

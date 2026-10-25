@@ -38,8 +38,7 @@ const PRECACHE_PREFIX = 'workbox-precache';
 
 /**
  * Step one: purge every Character's remote data. Syncing halts first, for the
- * rest of the page's life: a sync could push purged rows back, or switch the
- * shared Firebase session mid-purge. Sequential for that same session.
+ * rest of the page's life: a sync could push purged rows back.
  *
  * A purge that can't run now (dead refresh token, offline) is not retried:
  * that Character's synced copy waits for the 90-day inactivity purge.
@@ -74,8 +73,7 @@ export interface CharacterCommunity {
 }
 
 /**
- * Every Community of every Character on this device, read sequentially (one
- * shared Firebase session). A Character whose Communities can't be read now
+ * Every Community of every Character on this device, read sequentially. A Character whose Communities can't be read now
  * (offline, expired login) counts as having none.
  */
 export async function loadAllCommunities(): Promise<CharacterCommunity[]> {
@@ -191,13 +189,14 @@ async function clearRuntimeCaches(): Promise<void> {
  */
 export async function deleteAllLocalData(syncConfigured: boolean): Promise<void> {
   // First, so no later step failing can leave a login on this device.
+  const ids = (await db.characters.toArray()).map((character) => character.characterId);
   await db.tokens.clear();
 
   scheduleProjectionRebuild.cancel();
   await unregisterProjectionRegistration();
   if (syncConfigured) {
     await haltSync();
-    await signOutOfSync().catch(() => {
+    await signOutOfSync(ids).catch(() => {
       // Its persisted session is deleted below with the rest of IndexedDB.
     });
   }

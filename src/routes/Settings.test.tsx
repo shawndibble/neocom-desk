@@ -2063,6 +2063,19 @@ describe('Settings — update state', () => {
     expect(await within(nav).findByRole('alert')).toHaveTextContent(/could not check/i);
   });
 
+  it('phone index: says the update is still rolling out when no new worker came yet', async () => {
+    window.history.pushState({}, '', '/settings');
+    stubViewport(false);
+    serviceWorker(registration({ waiting: {} }));
+    vi.mocked(forceUpdate).mockResolvedValue('pending');
+    render(<App />);
+
+    const nav = await screen.findByRole('navigation', { name: /settings sections/i });
+    await userEvent.click(await within(nav).findByRole('button', { name: 'Update now' }));
+    expect(await within(nav).findByText(/still rolling out/i)).toBeInTheDocument();
+    expect(within(nav).queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('phone index: checking, then no updates', async () => {
     window.history.pushState({}, '', '/settings');
     stubViewport(false);

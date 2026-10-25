@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { DEADLINE_STRIP_DAYS, deadlinesByDay, dueSoon, groupBoardByKind } from './deadlines';
+import { DEADLINE_STRIP_DAYS, deadlinesByDay, dueSoon } from './deadlines';
 import {
-  CORP_BOARD_ITEM_KINDS,
   type CorpBoardItem,
   type CorpBoardItemKind,
   type CorpBoardSeverity,
@@ -245,55 +244,6 @@ describe('dueSoon', () => {
 
     expect(dueSoon(items, NOW, 2 * HOUR).total).toBe(0);
     expect(dueSoon(items, NOW, 4 * HOUR).total).toBe(1);
-  });
-});
-
-describe('groupBoardByKind', () => {
-  it('groups in declared kind order, not in board order', () => {
-    const grouped = groupBoardByKind([
-      item({ id: 'job', kind: 'jobDelivery' }),
-      item({ id: 'fuel', kind: 'structureFuel' }),
-      item({ id: 'timer', kind: 'structureTimer' }),
-    ]);
-
-    expect([...grouped.keys()]).toEqual(['structureTimer', 'structureFuel', 'jobDelivery']);
-  });
-
-  it('omits a kind with nothing due, so "no rows" stays distinct from "no card"', () => {
-    const grouped = groupBoardByKind([item({ id: 'fuel', kind: 'structureFuel' })]);
-
-    expect(grouped.has('structureFuel')).toBe(true);
-    expect(grouped.has('moonExtraction')).toBe(false);
-    expect(grouped.size).toBe(1);
-  });
-
-  it('keeps the board ordering inside a group', () => {
-    const grouped = groupBoardByKind([
-      item({ id: 'first', kind: 'structureFuel' }),
-      item({ id: 'second', kind: 'moonExtraction' }),
-      item({ id: 'third', kind: 'structureFuel' }),
-    ]);
-
-    expect(grouped.get('structureFuel')?.map((entry) => entry.id)).toEqual(['first', 'third']);
-  });
-
-  it('is empty for an empty board', () => {
-    expect(groupBoardByKind([]).size).toBe(0);
-  });
-
-  it('handles every declared kind', () => {
-    const grouped = groupBoardByKind(
-      CORP_BOARD_ITEM_KINDS.map((kind) =>
-        item({
-          id: kind,
-          kind,
-          timing: kind === 'serviceOffline' ? 'untimed' : 'timed',
-          deadlineMs: kind === 'serviceOffline' ? null : NOW + HOUR,
-        })
-      )
-    );
-
-    expect([...grouped.keys()]).toEqual([...CORP_BOARD_ITEM_KINDS]);
   });
 });
 

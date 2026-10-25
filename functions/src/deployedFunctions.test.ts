@@ -22,10 +22,7 @@ const DEPLOYED = [
   'syncActiveWars',
   'syncCorpTaxBooks',
   'syncLawlessSystems',
-  'syncLpStoreOffers',
-  'syncMarketOpenPrices',
   'syncPublicContractOffers',
-  'syncWorkbenchFits',
 ];
 
 describe('deployed functions', () => {

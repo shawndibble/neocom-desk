@@ -8,9 +8,9 @@
  * kind with different settings never share a memoised view.
  */
 import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
-import { getKind, type WidgetKindDef } from '../kinds';
-import { DEFAULT_RAIDS_RADIUS, DEFAULT_RANGE } from '../layout';
-import type { CalendarEventsChoice, WidgetRange } from '../layout';
+import { getKind, showOf, type WidgetKindDef, type WidgetShow } from '../kinds';
+import { DEFAULT_RAIDS_RADIUS, DEFAULT_RANGE, LEGACY_PROFIT_SOURCE } from '../layout';
+import type { CalendarEventsChoice, ProfitSource, WidgetRange } from '../layout';
 import type { BuildContext } from './types';
 
 /** A widget's own settings, as stored; every field is absent when left at its default. */
@@ -24,10 +24,14 @@ export interface ViewSettings {
   /** Skyhook raids: 'near' lists any holder's space within `raidsRadius` jumps; left out, My alliance. */
   raidsWhere?: 'near';
   raidsRadius?: number;
+  /** Profit: which earnings it adds up; left out, Builds (a widget saved before the setting). */
+  profitSource?: ProfitSource;
   /** Market Trend: the items it draws; left out, the Quickbar's first. */
   trendItems?: number[];
   /** Market Trend: the Trade Hubs it prices at; left out, the pilot's Market hub. */
   trendHubs?: string[];
+  /** A kind with a Show setting: what it draws; left out, the kind's first Show. */
+  show?: WidgetShow;
 }
 
 /** What a kind is asked to build: which kind, which Characters, and its own settings. */
@@ -45,8 +49,10 @@ export type SettingsContext = Pick<
   | 'calendarEvents'
   | 'raidsWhere'
   | 'raidsRadius'
+  | 'profitSource'
   | 'trendItems'
   | 'trendHubs'
+  | 'show'
 >;
 
 interface SettingSpec {
@@ -54,8 +60,8 @@ interface SettingSpec {
   enabledFor: (kind: WidgetKindDef) => boolean;
   /** The `ViewSettings` fields it owns; every field must be owned by exactly one spec. */
   fields: readonly (keyof ViewSettings)[];
-  /** The settings as the builder reads them, defaults filled in. */
-  resolve: (settings: ViewSettings) => Partial<SettingsContext>;
+  /** The settings as the builder reads them, defaults filled in; `kind` for a default that depends on it. */
+  resolve: (settings: ViewSettings, kind: WidgetKindDef | undefined) => Partial<SettingsContext>;
 }
 
 export const VIEW_SETTINGS = {
@@ -83,11 +89,21 @@ export const VIEW_SETTINGS = {
         ? { raidsWhere: 'near', raidsRadius: s.raidsRadius ?? DEFAULT_RAIDS_RADIUS }
         : { raidsWhere: 'alliance', raidsRadius: DEFAULT_RAIDS_RADIUS },
   },
+  profitSource: {
+    enabledFor: (k) => k.hasProfitSource,
+    fields: ['profitSource'],
+    resolve: (s) => ({ profitSource: s.profitSource ?? LEGACY_PROFIT_SOURCE }),
+  },
   trend: {
     enabledFor: (k) => k.hasTrendSources,
     fields: ['trendItems', 'trendHubs'],
     // Left out means "follow the Quickbar / the Market hub", which is not the same as any list.
     resolve: (s) => ({ trendItems: s.trendItems, trendHubs: s.trendHubs }),
+  },
+  show: {
+    enabledFor: (k) => k.shows.length > 0,
+    fields: ['show'],
+    resolve: (s, k) => (k && k.shows.length > 0 ? { show: showOf(k, s.show) } : {}),
   },
 } satisfies Record<string, SettingSpec>;
 
@@ -102,7 +118,7 @@ export function settingsContext(kind: string, settings: ViewSettings): SettingsC
   const def = getKind(kind);
   const out: Partial<SettingsContext> = {};
   for (const spec of SPECS) {
-    Object.assign(out, spec.resolve(def && spec.enabledFor(def) ? settings : {}));
+    Object.assign(out, spec.resolve(def && spec.enabledFor(def) ? settings : {}, def));
   }
   return out as SettingsContext;
 }

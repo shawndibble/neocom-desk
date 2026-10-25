@@ -39,7 +39,13 @@ import { uidForCharacter } from '@/sync/uid';
 import { loadTypes } from '@/sde/loadSde';
 import { loadFittingsAll, markFittingsShared } from './shareSelection';
 import { communityBackendOverride } from './backendOverride';
-import { loadCommunityMembers, loadMyCommunities, type CommunitySummary } from './communityStore';
+import { createReadCache } from './readCache';
+import {
+  loadCommunityMembersCached,
+  loadMyCommunities,
+  withMyCommunities,
+  type CommunitySummary,
+} from './communityStore';
 
 /** firestore.rules caps; a Fitting past them is left unshared rather than failing the batch. */
 const MAX_CODE_LENGTH = 90_000;
@@ -86,15 +92,69 @@ async function toDoc(characterId: number, input: SharedFittingInput) {
   };
 }
 
-/** Every Fitting shared into one Community, by anyone. */
+/**
+ * How long `loadCommunityFittingsCached` reuses a Community's shared Fittings. This
+ * device's own shares and unshares drop it at once; another Member's show within it.
+ */
+export const SHARED_FITTINGS_TTL_MS = 10 * 60_000;
+
+const fittingsCache = createReadCache<SharedFitting[]>();
+const fittingsKey = (characterId: number, communityId: string) => `${characterId}:${communityId}:`;
+
+/**
+ * Runs a write to a Community's shared Fittings, then drops that cached list: after the
+ * write, so a read that was in flight during it is dropped too, and even when it failed.
+ */
+async function changingFittings<T>(
+  characterId: number,
+  communityId: string,
+  write: () => Promise<T>
+): Promise<T> {
+  try {
+    return await write();
+  } finally {
+    fittingsCache.drop(fittingsKey(characterId, communityId));
+  }
+}
+
+/** Every Fitting shared into one Community, by anyone, read now (and remembered). */
 export async function loadCommunityFittings(
   characterId: number,
   communityId: string
 ): Promise<SharedFitting[]> {
   const standIn = communityBackendOverride()?.loadFittings;
   if (standIn) return standIn(communityId);
+  return fittingsCache.set(
+    fittingsKey(characterId, communityId),
+    Date.now(),
+    readCommunityFittings(characterId, communityId)
+  );
+}
+
+/**
+ * As `loadCommunityFittings`, reused for `SHARED_FITTINGS_TTL_MS`: the Fittings start screen
+ * and the editor's share status open often and change rarely.
+ */
+export async function loadCommunityFittingsCached(
+  characterId: number,
+  communityId: string,
+  now = Date.now()
+): Promise<SharedFitting[]> {
+  const standIn = communityBackendOverride()?.loadFittings;
+  if (standIn) return standIn(communityId);
+  const key = fittingsKey(characterId, communityId);
+  return (
+    fittingsCache.get(key, (at) => now - at < SHARED_FITTINGS_TTL_MS) ??
+    fittingsCache.set(key, now, readCommunityFittings(characterId, communityId))
+  );
+}
+
+async function readCommunityFittings(
+  characterId: number,
+  communityId: string
+): Promise<SharedFitting[]> {
   await ensureSignedIn(characterId);
-  const snap = await getDocs(fittingsOf(getSyncFirestore(), communityId));
+  const snap = await getDocs(fittingsOf(getSyncFirestore(characterId), communityId));
   const loaded: SharedFitting[] = [];
   for (const entry of snap.docs) {
     const parsed = parseSharedFittingId(entry.id);
@@ -135,7 +195,7 @@ export async function loadMySharedFittingKeys(
   }
   const uid = await ensureSignedIn(characterId);
   const mine = await getDocs(
-    query(fittingsOf(getSyncFirestore(), communityId), where('ownerUid', '==', uid))
+    query(fittingsOf(getSyncFirestore(characterId), communityId), where('ownerUid', '==', uid))
   );
   const keys = new Set<string>();
   for (const entry of mine.docs) {
@@ -151,14 +211,19 @@ export async function loadSharedFittings(characterId: number): Promise<{
   fittings: SharedFitting[];
   sharerNames: Map<string, string>;
 }> {
-  const communities = await loadMyCommunities(characterId);
-  const [perCommunity, perMembers] = await Promise.all([
-    Promise.all(communities.map((community) => loadCommunityFittings(characterId, community.id))),
-    Promise.all(communities.map((community) => loadCommunityMembers(characterId, community.id))),
-  ]);
-  const sharerNames = new Map<string, string>();
-  for (const member of perMembers.flat()) sharerNames.set(member.uid, member.characterName);
-  return { communities, fittings: perCommunity.flat(), sharerNames };
+  return withMyCommunities(characterId, async (communities) => {
+    const [perCommunity, perMembers] = await Promise.all([
+      Promise.all(
+        communities.map((community) => loadCommunityFittingsCached(characterId, community.id))
+      ),
+      Promise.all(
+        communities.map((community) => loadCommunityMembersCached(characterId, community.id))
+      ),
+    ]);
+    const sharerNames = new Map<string, string>();
+    for (const member of perMembers.flat()) sharerNames.set(member.uid, member.characterName);
+    return { communities, fittings: perCommunity.flat(), sharerNames };
+  });
 }
 
 /** The Communities this Character is in, and which of them already hold this one Fitting. */
@@ -166,19 +231,23 @@ export async function loadShareStatus(
   characterId: number,
   key: SharedFittingKey
 ): Promise<{ communities: CommunitySummary[]; sharedIn: Set<string> }> {
-  const communities = await loadMyCommunities(characterId);
   const docId = sharedFittingId(uidForCharacter(characterId), key);
-  await ensureSignedIn(characterId);
-  const db = getSyncFirestore();
-  const held = await Promise.all(
-    communities.map(async (community) =>
-      (await getDoc(doc(fittingsOf(db, community.id), docId))).exists() ? community.id : null
-    )
-  );
-  return {
-    communities,
-    sharedIn: new Set(held.filter((id): id is string => id !== null)),
-  };
+  // From the Community's shared list, which this device's own shares keep current.
+  return withMyCommunities(characterId, async (communities) => {
+    const held = await Promise.all(
+      communities.map(async (community) =>
+        (await loadCommunityFittingsCached(characterId, community.id)).some(
+          (fitting) => fitting.id === docId
+        )
+          ? community.id
+          : null
+      )
+    );
+    return {
+      communities,
+      sharedIn: new Set(held.filter((id): id is string => id !== null)),
+    };
+  });
 }
 
 /** What toggling a Fitting in a Community did, for the notice it leaves. */
@@ -219,15 +288,17 @@ export async function shareFitting(
   const data = await toDoc(characterId, input);
   if (data === null) return false;
   await ensureSignedIn(characterId);
-  await setDoc(
-    doc(
-      getSyncFirestore(),
-      'communities',
-      communityId,
-      'fittings',
-      sharedFittingId(uidForCharacter(characterId), input)
-    ),
-    data
+  await changingFittings(characterId, communityId, () =>
+    setDoc(
+      doc(
+        getSyncFirestore(characterId),
+        'communities',
+        communityId,
+        'fittings',
+        sharedFittingId(uidForCharacter(characterId), input)
+      ),
+      data
+    )
   );
   return true;
 }
@@ -238,13 +309,15 @@ export async function unshareFitting(
   key: SharedFittingKey
 ): Promise<void> {
   await ensureSignedIn(characterId);
-  await deleteDoc(
-    doc(
-      getSyncFirestore(),
-      'communities',
-      communityId,
-      'fittings',
-      sharedFittingId(uidForCharacter(characterId), key)
+  await changingFittings(characterId, communityId, () =>
+    deleteDoc(
+      doc(
+        getSyncFirestore(characterId),
+        'communities',
+        communityId,
+        'fittings',
+        sharedFittingId(uidForCharacter(characterId), key)
+      )
     )
   );
 }
@@ -266,14 +339,16 @@ export async function shareFittings(
     )
   ).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
   await ensureSignedIn(characterId);
-  const db = getSyncFirestore();
-  for (let start = 0; start < docs.length; start += BATCH_SIZE) {
-    const batch = writeBatch(db);
-    for (const { id, data } of docs.slice(start, start + BATCH_SIZE)) {
-      batch.set(doc(fittingsOf(db, communityId), id), data);
+  const db = getSyncFirestore(characterId);
+  await changingFittings(characterId, communityId, async () => {
+    for (let start = 0; start < docs.length; start += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      for (const { id, data } of docs.slice(start, start + BATCH_SIZE)) {
+        batch.set(doc(fittingsOf(db, communityId), id), data);
+      }
+      await batch.commit();
     }
-    await batch.commit();
-  }
+  });
   if (docs.length > 0) await markFittingsShared(characterId);
   return docs.length;
 }
@@ -281,13 +356,15 @@ export async function shareFittings(
 /** Stops sharing every Fitting this Character put in one Community. */
 export async function unshareAllFittings(characterId: number, communityId: string): Promise<void> {
   const uid = await ensureSignedIn(characterId);
-  const db = getSyncFirestore();
+  const db = getSyncFirestore(characterId);
   const mine = await getDocs(query(fittingsOf(db, communityId), where('ownerUid', '==', uid)));
-  for (let start = 0; start < mine.docs.length; start += BATCH_SIZE) {
-    const batch = writeBatch(db);
-    for (const entry of mine.docs.slice(start, start + BATCH_SIZE)) batch.delete(entry.ref);
-    await batch.commit();
-  }
+  await changingFittings(characterId, communityId, async () => {
+    for (let start = 0; start < mine.docs.length; start += BATCH_SIZE) {
+      const batch = writeBatch(db);
+      for (const entry of mine.docs.slice(start, start + BATCH_SIZE)) batch.delete(entry.ref);
+      await batch.commit();
+    }
+  });
 }
 
 /** The logout prompt's "remove my shared Fittings": every Community, best effort per Community. */
@@ -308,32 +385,35 @@ export async function followSavedFitting(
   record: { id: string; name: string; code: string }
 ): Promise<void> {
   try {
-    const communities = await loadMyCommunities(characterId);
     const docId = sharedFittingId(uidForCharacter(characterId), {
       source: 'saved',
       key: record.id,
     });
     await ensureSignedIn(characterId);
-    const db = getSyncFirestore();
-    await Promise.all(
-      communities.map(async (community) => {
-        const key = { source: 'saved', key: record.id } as const;
-        const [existing, allExcluded] = await Promise.all([
-          getDoc(doc(fittingsOf(db, community.id), docId)),
-          loadFittingsAll(characterId, community.id),
-        ]);
-        // Deleted since this save began: don't bring it back.
-        if (
-          followsSave(existing.exists(), allExcluded, key) &&
-          (await localDb.fittings.get(record.id))
-        ) {
-          await shareFitting(characterId, community.id, {
-            ...key,
-            name: record.name,
-            code: record.code,
-          });
-        }
-      })
+    const db = getSyncFirestore(characterId);
+    // The list may be cached; each copy's existence is read fresh, so one deleted on another
+    // device is never brought back.
+    await withMyCommunities(characterId, (communities) =>
+      Promise.all(
+        communities.map(async (community) => {
+          const key = { source: 'saved', key: record.id } as const;
+          const [existing, allExcluded] = await Promise.all([
+            getDoc(doc(fittingsOf(db, community.id), docId)),
+            loadFittingsAll(characterId, community.id),
+          ]);
+          // Deleted since this save began: don't bring it back.
+          if (
+            followsSave(existing.exists(), allExcluded, key) &&
+            (await localDb.fittings.get(record.id))
+          ) {
+            await shareFitting(characterId, community.id, {
+              ...key,
+              name: record.name,
+              code: record.code,
+            });
+          }
+        })
+      )
     );
   } catch {
     // Best effort: the copy stays as it was until the next save.

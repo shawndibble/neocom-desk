@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const connectAuthEmulator = vi.fn();
 const connectFirestoreEmulator = vi.fn();
 const connectFunctionsEmulator = vi.fn();
+const deleteCharacterApp = vi.fn<(id: number) => Promise<void>>(async () => undefined);
 const initializeAuth = vi.fn<(app: unknown, deps: unknown) => { kind: string }>(() => ({
   kind: 'auth',
 }));
@@ -27,6 +28,8 @@ vi.mock('firebase/functions', () => ({
 vi.mock('./firebaseCore', async (importActual) => ({
   ...(await importActual<typeof import('./firebaseCore')>()),
   getFirebaseApp: vi.fn(() => ({ name: 'app' })),
+  getCharacterApp: vi.fn((id: number) => ({ name: `char-${id}` })),
+  deleteCharacterApp: (id: number) => deleteCharacterApp(id),
 }));
 
 async function load() {
@@ -35,8 +38,8 @@ async function load() {
 }
 
 function touchAll(mod: Awaited<ReturnType<typeof load>>) {
-  mod.getSyncAuth();
-  mod.getSyncFirestore();
+  mod.getSyncAuth(1);
+  mod.getSyncFirestore(1);
   mod.getSyncFunctions();
 }
 
@@ -88,12 +91,24 @@ describe('firebaseApp emulator switch', () => {
   it('initializes Auth once, without a popup/redirect resolver, keeping getAuth persistence', async () => {
     vi.stubEnv('DEV', false);
     const mod = await load();
-    mod.getSyncAuth();
-    mod.getSyncAuth();
+    mod.getSyncAuth(7);
+    mod.getSyncAuth(7);
     expect(initializeAuth).toHaveBeenCalledTimes(1);
     expect(initializeAuth).toHaveBeenCalledWith(
-      { name: 'app' },
+      { name: 'char-7' },
       { persistence: ['indexedDB', 'local', 'session'] }
     );
+  });
+
+  it('gives each Character its own Auth, and a fresh one after its app is disposed', async () => {
+    vi.stubEnv('DEV', false);
+    const mod = await load();
+    mod.getSyncAuth(1);
+    mod.getSyncAuth(2);
+    expect(initializeAuth).toHaveBeenCalledTimes(2);
+    await mod.disposeCharacterApp(1);
+    expect(deleteCharacterApp).toHaveBeenCalledWith(1);
+    mod.getSyncAuth(1);
+    expect(initializeAuth).toHaveBeenCalledTimes(3);
   });
 });

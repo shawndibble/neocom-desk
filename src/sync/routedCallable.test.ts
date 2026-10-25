@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fns = vi.hoisted(() => ({ callable: vi.fn(), httpsCallable: vi.fn() }));
+const fns = vi.hoisted(() => ({
+  callable: vi.fn(),
+  httpsCallable: vi.fn(),
+  getSyncFunctions: vi.fn(),
+}));
 vi.mock('firebase/functions', () => ({ httpsCallable: fns.httpsCallable }));
-vi.mock('./firebaseApp', () => ({ getSyncFunctions: () => 'functions' }));
+vi.mock('./firebaseApp', () => ({ getSyncFunctions: fns.getSyncFunctions }));
 
 import { failureAnnotation } from '@/observability/reportFailure';
 import { callRouted, routerFor } from './routedCallable';
@@ -35,12 +39,14 @@ describe('routerFor', () => {
 
 describe('callRouted', () => {
   beforeEach(() => {
+    fns.getSyncFunctions.mockReset().mockReturnValue('functions');
     fns.httpsCallable.mockReset().mockReturnValue(fns.callable);
     fns.callable.mockReset().mockResolvedValue({ data: { ok: true } });
   });
 
   it('sends the action and data to the router and returns its data', async () => {
-    const out = await callRouted('joinCommunityCallable', { inviteCode: 'x' });
+    const out = await callRouted('joinCommunityCallable', { inviteCode: 'x' }, 42);
+    expect(fns.getSyncFunctions).toHaveBeenCalledWith(42);
     expect(fns.httpsCallable).toHaveBeenCalledWith('functions', 'communityCall');
     expect(fns.callable).toHaveBeenCalledWith({
       action: 'joinCommunityCallable',
@@ -52,7 +58,7 @@ describe('callRouted', () => {
   it('names the callable, and keeps the error code, on a failure it rethrows', async () => {
     const failure = Object.assign(new Error('internal'), { code: 'functions/internal' });
     fns.callable.mockRejectedValue(failure);
-    await expect(callRouted('saveAlertGrant', {})).rejects.toBe(failure);
+    await expect(callRouted('saveAlertGrant', {}, undefined)).rejects.toBe(failure);
     expect(failureAnnotation(failure)).toEqual({
       callable: 'saveAlertGrant',
       error_codes: 'functions/internal',

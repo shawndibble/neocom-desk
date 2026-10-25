@@ -5,6 +5,9 @@
  */
 import { formatAge } from '@/lib/age';
 import type { WidgetStateInput } from '../state';
+import type { WidgetShow } from '../kinds';
+import type { EsiEndpointId } from '@/esi/registry';
+import type { SettingsContext } from './viewSettings';
 import type {
   BuildContext,
   FeedId,
@@ -87,11 +90,30 @@ export const count = (n: number): string => String(n);
 export type Builder = (feeds: Feeds, ctx: BuildContext) => KindView;
 
 /**
+ * A kind with a Show setting: one builder per Show, all over the kind's feeds. `fallback`
+ * draws a Show it has no builder for, which `viewSettings` never hands it but a test may.
+ */
+export function byShow(
+  builders: Readonly<Partial<Record<WidgetShow, Builder>>>,
+  fallback: Builder
+): Builder {
+  return (feeds, ctx) => ((ctx.show && builders[ctx.show]) || fallback)(feeds, ctx);
+}
+
+/**
  * Whether a kind's read covers every Character. `account` kinds can draw a widget
  * scoped to All characters (the builder narrows to the header Character when the
  * widget is not); a `character` kind cannot, and says so on the widget.
  */
 export type KindScope = 'character' | 'account';
+
+/** What one widget of a kind reads under its settings (`KindDef.bySettings`). */
+export interface SettingsReads {
+  feeds: readonly FeedId[];
+  scope: KindScope;
+  /** The endpoints its "needs permission" state asks for. */
+  endpoints: readonly EsiEndpointId[];
+}
 
 /**
  * One widget kind, declared once: the feeds it reads, whether it sums across
@@ -110,4 +132,11 @@ export interface KindDef {
   build: Builder;
   /** The real builder, behind `import()` to keep its copy off the startup graph; `ensureBuilders` loads it. */
   loadBuild?: () => Promise<Builder>;
+  /**
+   * For a kind whose reads follow a per-widget setting (Profit's Source): the
+   * feeds, scope and ESI endpoints under those settings. `feeds` above is then
+   * every feed it may read, `scope` what it is with no settings, and the
+   * catalogue's `endpoints` every endpoint it may need.
+   */
+  bySettings?: (settings: SettingsContext) => SettingsReads;
 }

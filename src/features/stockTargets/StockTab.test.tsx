@@ -156,13 +156,26 @@ describe('StockTab', () => {
     renderTab();
     await screen.findByRole('table', { name: 'Stock targets' });
     await userEvent.click(screen.getByRole('button', { name: /Edit stock target for Catalyst/ }));
-    const field = screen.getByRole('spinbutton', { name: 'Stock target for Catalyst' });
+    const field = screen.getByRole('textbox', { name: 'Stock target for Catalyst' });
     await userEvent.clear(field);
     await userEvent.type(field, '55{Enter}');
     await waitFor(() =>
       expect(
         useStockLists.getState().value[0].items.find((item) => item.typeId === CATALYST)?.target
       ).toBe(55)
+    );
+  });
+
+  it('starts the edit with a digit typed on the target, and keeps typing after it', async () => {
+    seed([efa]);
+    renderTab();
+    await screen.findByRole('table', { name: 'Stock targets' });
+    screen.getByRole('button', { name: /Edit stock target for Catalyst/ }).focus();
+    await userEvent.keyboard('75{Enter}');
+    await waitFor(() =>
+      expect(
+        useStockLists.getState().value[0].items.find((item) => item.typeId === CATALYST)?.target
+      ).toBe(75)
     );
   });
 

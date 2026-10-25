@@ -44,8 +44,8 @@ const MAX_NAME_LENGTH = 200;
 
 type PlanToShare = Pick<SkillPlanRecord, 'id' | 'name' | 'entries' | 'updatedAt'>;
 
-function plansOf(communityId: string) {
-  return collection(getSyncFirestore(), 'communities', communityId, 'skillPlans');
+function plansOf(characterId: number, communityId: string) {
+  return collection(getSyncFirestore(characterId), 'communities', communityId, 'skillPlans');
 }
 
 /** The data a Community stores for a plan; null when it cannot be shared (too many skills, or no owner on this device). */
@@ -73,7 +73,7 @@ export async function sharePlan(
   if (data === null) return false;
   await ensureSignedIn(characterId);
   await setDoc(
-    doc(plansOf(communityId), sharedPlanId(uidForCharacter(characterId), plan.id)),
+    doc(plansOf(characterId, communityId), sharedPlanId(uidForCharacter(characterId), plan.id)),
     data
   );
   await markPlansShared(characterId);
@@ -86,7 +86,9 @@ export async function unsharePlan(
   planId: string
 ): Promise<void> {
   await ensureSignedIn(characterId);
-  await deleteDoc(doc(plansOf(communityId), sharedPlanId(uidForCharacter(characterId), planId)));
+  await deleteDoc(
+    doc(plansOf(characterId, communityId), sharedPlanId(uidForCharacter(characterId), planId))
+  );
 }
 
 /** The plans this Character has in a Community: plan id to the `updatedAt` its copy was made from. */
@@ -104,7 +106,9 @@ export async function loadMySharedPlans(
     );
   }
   const uid = await ensureSignedIn(characterId);
-  const mine = await getDocs(query(plansOf(communityId), where('ownerUid', '==', uid)));
+  const mine = await getDocs(
+    query(plansOf(characterId, communityId), where('ownerUid', '==', uid))
+  );
   const shared = new Map<string, number>();
   for (const entry of mine.docs) {
     const parsed = parseSharedPlanId(entry.id);
@@ -121,7 +125,7 @@ export async function loadCommunityPlans(
   const standIn = communityBackendOverride()?.loadPlans;
   if (standIn) return standIn(communityId);
   await ensureSignedIn(characterId);
-  const snap = await getDocs(plansOf(communityId));
+  const snap = await getDocs(plansOf(characterId, communityId));
   const plans: SharedPlan[] = [];
   for (const entry of snap.docs) {
     const parsed = parseSharedPlanId(entry.id);

@@ -1,0 +1,397 @@
+import { describe, expect, it } from 'vitest';
+import {
+  findImprovements,
+  goalAvailability,
+  improveCandidates,
+  rankImproveOptions,
+  type ImproveCandidate,
+  type ImproveGoal,
+  type ImproveOption,
+} from './improve';
+import { buildVariationIndex } from '../market/variations';
+import type { Fitting, FittingStats } from './types';
+import { baseFittingStats } from './__fixtures__/fittingStats';
+
+/** What each fitted type adds to the fit; the fit's stats are the base plus every module's row. */
+interface Row {
+  dps?: number;
+  ehp?: number;
+  speed?: number;
+  cpu?: number;
+  /** Turns the capacitor unstable. */
+  capUnstable?: boolean;
+}
+
+function stats(rows: Row[]): FittingStats {
+  const sum = (key: 'dps' | 'ehp' | 'speed' | 'cpu') =>
+    rows.reduce((total, row) => total + (row[key] ?? 0), 0);
+  const base = baseFittingStats();
+  return {
+    ...base,
+    cpuUsed: sum('cpu'),
+    ehp: base.ehp + sum('ehp'),
+    capacitor: rows.some((row) => row.capUnstable)
+      ? { stable: false, depletesInSeconds: 120 }
+      : base.capacitor,
+    navigation: { ...base.navigation, maxVelocity: base.navigation.maxVelocity + sum('speed') },
+    offense: {
+      ...base.offense,
+      dps: base.offense.dps + sum('dps'),
+      sustainedDps: base.offense.sustainedDps + sum('dps'),
+    },
+  } as FittingStats;
+}
+
+function fit(typeIds: number[]): Fitting {
+  return {
+    shipTypeId: 1,
+    name: 'Test',
+    modules: typeIds.map((typeId, slotIndex) => ({ slot: 'low', slotIndex, typeId })),
+  } as unknown as Fitting;
+}
+
+const calc = (table: Record<number, Row>) => async (f: Fitting) =>
+  stats(f.modules.map((m) => table[m.typeId] ?? {}));
+
+const candidate = (fromTypeId: number, toTypeId: number, slotIndex = 0): ImproveCandidate => ({
+  fromTypeId,
+  toTypeId,
+  at: [{ slot: 'low', slotIndex }],
+});
+
+async function search(
+  goal: ImproveGoal,
+  table: Record<number, Row>,
+  candidates: ImproveCandidate[],
+  prices: Record<number, number> = {},
+  base = fit([1])
+) {
+  const stat = calc(table);
+  const before = await stat(base);
+  const result = await findImprovements({
+    fitting: base,
+    before,
+    goal,
+    candidates,
+    stats: stat,
+    priceOf: (typeId) => prices[typeId] ?? null,
+  });
+  if (result === null) throw new Error('cancelled');
+  return result;
+}
+
+const toIds = (options: readonly ImproveOption[]) => options.map((o) => o.candidate.toTypeId);
+
+describe('findImprovements goals', () => {
+  it('More damage keeps only swaps that raise damage, best first', async () => {
+    const table = { 1: { dps: 0 }, 2: { dps: 20 }, 3: { dps: 50 }, 4: { dps: -10 } };
+    const result = await search('damage', table, [
+      candidate(1, 2),
+      candidate(1, 3),
+      candidate(1, 4),
+    ]);
+    expect(toIds(result.noDownside)).toEqual([3, 2]);
+    expect(result.tradeOffs).toEqual([]);
+  });
+
+  it('Tankier scores EHP', async () => {
+    const table = { 1: {}, 2: { ehp: 100 }, 3: { dps: 50 } };
+    const result = await search('tank', table, [candidate(1, 2), candidate(1, 3)]);
+    expect(toIds(result.noDownside)).toEqual([2]);
+  });
+
+  it('Faster scores max velocity', async () => {
+    const table = { 1: {}, 2: { speed: 20 }, 3: { ehp: 500 } };
+    const result = await search('speed', table, [candidate(1, 2), candidate(1, 3)]);
+    expect(toIds(result.noDownside)).toEqual([2]);
+  });
+
+  it('Best overall adds the stats up, so a big damage gain outweighs a small speed loss', async () => {
+    const table = { 1: {}, 2: { dps: 50, speed: -10 }, 3: { speed: 10 } };
+    const result = await search('overall', table, [candidate(1, 2), candidate(1, 3)]);
+    expect(toIds([...result.noDownside, ...result.tradeOffs])).toContain(2);
+    expect(result.tradeOffs[0].candidate.toTypeId).toBe(2);
+    expect(result.tradeOffs[0].downsides).toContain('speed');
+  });
+
+  it('Longer reach scores the guns’ optimal and falloff', async () => {
+    const turret = (optimal: number) => ({
+      kind: 'turret' as const,
+      dps: 100,
+      optimal,
+      falloff: 10000,
+      tracking: 1,
+      optimalSigRadius: 40000,
+    });
+    const reachStats = async (f: Fitting) => {
+      const s = stats([]);
+      const optimal = f.modules[0].typeId === 2 ? 30000 : 20000;
+      return { ...s, applied: { ...s.applied, weapons: [turret(optimal)] } } as FittingStats;
+    };
+    const base = fit([1]);
+    const before = await reachStats(base);
+    const result = await findImprovements({
+      fitting: base,
+      before,
+      goal: 'reach',
+      candidates: [candidate(1, 2)],
+      stats: reachStats,
+      priceOf: () => null,
+    });
+    expect(toIds(result!.noDownside)).toEqual([2]);
+  });
+
+  it('Cheaper ranks by ISK saved', async () => {
+    const table = { 1: {}, 2: {}, 3: {} };
+    const result = await search('cheaper', table, [candidate(1, 2), candidate(1, 3)], {
+      1: 1000,
+      2: 800,
+      3: 100,
+    });
+    expect(toIds(result.noDownside)).toEqual([3, 2]);
+    expect(result.noDownside[0].iskDelta).toBe(-900);
+  });
+
+  it('Cheaper never offers an unpriced swap: it cannot say it saves anything', async () => {
+    const result = await search('cheaper', { 1: {}, 2: {} }, [candidate(1, 2)], { 1: 1000 });
+    expect(result.noDownside).toEqual([]);
+    expect(result.tradeOffs).toEqual([]);
+  });
+});
+
+describe('findImprovements guardrails', () => {
+  it('rejects a swap that puts the fit over CPU', async () => {
+    const table = { 1: { cpu: 50 }, 2: { cpu: 150, dps: 50 } };
+    const result = await search('damage', table, [candidate(1, 2)]);
+    expect(result.noDownside).toEqual([]);
+    expect(result.rejected.map((r) => r.guardrail)).toEqual(['budget']);
+  });
+
+  it('rejects a combat swap that turns a stable capacitor unstable', async () => {
+    const table = { 1: {}, 2: { dps: 50, capUnstable: true } };
+    const result = await search('damage', table, [candidate(1, 2)]);
+    expect(result.noDownside).toEqual([]);
+    expect(result.rejected[0].guardrail).toBe('capStable');
+  });
+
+  it('Cheaper keeps damage, tank and speed each within 5%', async () => {
+    const table = {
+      1: {},
+      // Damage 100 → 90: 10% down.
+      2: { dps: -10 },
+      // Damage 100 → 97: within 5%, a trade-off.
+      3: { dps: -3 },
+    };
+    const result = await search('cheaper', table, [candidate(1, 2), candidate(1, 3)], {
+      1: 1000,
+      2: 100,
+      3: 500,
+    });
+    expect(toIds(result.tradeOffs)).toEqual([3]);
+    expect(result.rejected.map((r) => [r.candidate.toTypeId, r.guardrail])).toEqual([
+      [2, 'keepsStats'],
+    ]);
+  });
+
+  it('lists the closest rejected swaps, best score first', async () => {
+    const table = {
+      1: { cpu: 50 },
+      2: { cpu: 150, dps: 10 },
+      3: { cpu: 150, dps: 40 },
+      4: { cpu: 150, dps: 20 },
+    };
+    const result = await search('damage', table, [
+      candidate(1, 2),
+      candidate(1, 3),
+      candidate(1, 4),
+    ]);
+    expect(toIds(result.rejected)).toEqual([3, 4, 2]);
+  });
+});
+
+describe('findImprovements whole-fit results', () => {
+  it('swaps every copy a candidate names, and the option carries the swapped Fitting and its stats', async () => {
+    const table = { 1: {}, 2: { dps: 10 } };
+    const base = fit([1, 1]);
+    const result = await search(
+      'damage',
+      table,
+      [
+        {
+          fromTypeId: 1,
+          toTypeId: 2,
+          at: [
+            { slot: 'low', slotIndex: 0 },
+            { slot: 'low', slotIndex: 1 },
+          ],
+        },
+      ],
+      {},
+      base
+    );
+    const option = result.noDownside[0];
+    expect(option.fitting.modules.map((m) => m.typeId)).toEqual([2, 2]);
+    expect(option.after).toEqual(await calc(table)(option.fitting));
+    expect(option.after.offense.dps).toBe(120);
+  });
+
+  it('prices every copy swapped', async () => {
+    const table = { 1: {}, 2: { dps: 10 } };
+    const result = await search(
+      'damage',
+      table,
+      [
+        {
+          fromTypeId: 1,
+          toTypeId: 2,
+          at: [
+            { slot: 'low', slotIndex: 0 },
+            { slot: 'low', slotIndex: 1 },
+          ],
+        },
+      ],
+      { 1: 100, 2: 300 },
+      fit([1, 1])
+    );
+    expect(result.noDownside[0].iskDelta).toBe(400);
+  });
+
+  it('skips a candidate whose calculation throws', async () => {
+    const base = fit([1]);
+    const ok = calc({ 1: {}, 3: { dps: 5 } });
+    const before = await ok(base);
+    const result = await findImprovements({
+      fitting: base,
+      before,
+      goal: 'damage',
+      candidates: [candidate(1, 2), candidate(1, 3)],
+      stats: async (f) => {
+        if (f.modules[0].typeId === 2) throw new Error('boom');
+        return ok(f);
+      },
+      priceOf: () => null,
+    });
+    expect(toIds(result!.noDownside)).toEqual([3]);
+  });
+
+  it('throws when every calculation fails, rather than report nothing improves', async () => {
+    const base = fit([1]);
+    const before = await calc({})(base);
+    await expect(
+      findImprovements({
+        fitting: base,
+        before,
+        goal: 'damage',
+        candidates: [candidate(1, 2)],
+        stats: async () => {
+          throw new Error('worker gone');
+        },
+        priceOf: () => null,
+      })
+    ).rejects.toThrow();
+  });
+
+  it('reports progress and returns null when cancelled', async () => {
+    const base = fit([1]);
+    const stat = calc({});
+    const before = await stat(base);
+    const progress: number[] = [];
+    let cancelled = false;
+    const result = await findImprovements({
+      fitting: base,
+      before,
+      goal: 'damage',
+      candidates: [candidate(1, 2), candidate(1, 3), candidate(1, 4)],
+      stats: stat,
+      priceOf: () => null,
+      onProgress: (done) => {
+        progress.push(done);
+        if (done === 1) cancelled = true;
+      },
+      isCancelled: () => cancelled,
+    });
+    expect(result).toBeNull();
+    expect(progress).toEqual([1]);
+  });
+
+  it('stops early with what it has when asked for the best so far', async () => {
+    const base = fit([1]);
+    const stat = calc({ 2: { dps: 10 }, 3: { dps: 20 } });
+    const before = await stat(base);
+    let stop = false;
+    const result = await findImprovements({
+      fitting: base,
+      before,
+      goal: 'damage',
+      candidates: [candidate(1, 2), candidate(1, 3)],
+      stats: stat,
+      priceOf: () => null,
+      onProgress: () => {
+        stop = true;
+      },
+      shouldStop: () => stop,
+    });
+    expect(result!.stopped).toBe(true);
+    expect(toIds(result!.noDownside)).toEqual([2]);
+    expect(result!.checked).toBe(1);
+  });
+});
+
+describe('rankImproveOptions', () => {
+  const option = (score: number, iskDelta: number | null, toTypeId: number) =>
+    ({ score, iskDelta, candidate: candidate(1, toTypeId) }) as unknown as ImproveOption;
+
+  it('breaks a tie on score by the cheaper swap', () => {
+    const ranked = rankImproveOptions([option(0.1, 500, 2), option(0.1, 100, 3)]);
+    expect(toIds(ranked)).toEqual([3, 2]);
+  });
+
+  it('sorts an unpriced swap last, even ahead of a better score', () => {
+    const ranked = rankImproveOptions([option(0.5, null, 2), option(0.1, 100, 3)]);
+    expect(toIds(ranked)).toEqual([3, 2]);
+  });
+});
+
+describe('goalAvailability', () => {
+  it('disables damage and reach on a fit that fires nothing, with a reason', () => {
+    const unarmed = { ...stats([]), offense: { ...stats([]).offense, dps: 0, sustainedDps: 0 } };
+    expect(goalAvailability('damage', unarmed)).toEqual({ available: false, reason: 'noWeapons' });
+    expect(goalAvailability('reach', unarmed)).toEqual({
+      available: false,
+      reason: 'noGunsOrLaunchers',
+    });
+    expect(goalAvailability('tank', unarmed)).toEqual({ available: true });
+  });
+
+  it('keeps reach available when the fitted weapons have no charge loaded', () => {
+    const base = stats([]);
+    const empty = { ...base, offense: { ...base.offense, dps: 0, chargelessWeaponCount: 2 } };
+    expect(goalAvailability('reach', empty)).toEqual({ available: true });
+  });
+});
+
+describe('improveCandidates', () => {
+  // 10: Tech I root; 11 its Tech II; 12 faction; 13 officer; 14 deadspace; 15 a high-slot sibling.
+  const index = buildVariationIndex(
+    {
+      10: { parentTypeId: null, metaGroupId: 1 },
+      11: { parentTypeId: 10, metaGroupId: 2 },
+      12: { parentTypeId: 10, metaGroupId: 4 },
+      13: { parentTypeId: 10, metaGroupId: 5 },
+      14: { parentTypeId: 10, metaGroupId: 6 },
+      15: { parentTypeId: 10, metaGroupId: 2 },
+    },
+    { 1: 'Tech I', 2: 'Tech II', 4: 'Faction', 5: 'Officer', 6: 'Deadspace' }
+  );
+  const rackOf = { 10: 'low', 11: 'low', 12: 'low', 13: 'low', 14: 'low', 15: 'high' };
+
+  it('offers each fitted type’s same-rack variations once, with every copy, without Officer or Deadspace', () => {
+    const fitting = fit([10, 10]);
+    const result = improveCandidates(fitting.modules, index, rackOf);
+    expect(result.map((c) => c.toTypeId)).toEqual([11, 12]);
+    expect(result[0].at).toEqual([
+      { slot: 'low', slotIndex: 0 },
+      { slot: 'low', slotIndex: 1 },
+    ]);
+  });
+});

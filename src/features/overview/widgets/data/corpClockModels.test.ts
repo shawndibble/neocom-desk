@@ -4,7 +4,7 @@ import type { CorporationIndustryJob } from '@/esi/endpoints';
 import { formatDateOnly } from '@/lib/timestamp';
 import type { MoonChunksBoardData, StructuresBoardData } from '../../data/boardData';
 import type { CorpJobsFeed, CorpSovereigntyFeed, CorpStarbasesFeed } from './corpFeeds';
-import { corpDeadlines, corpJobs, corpServices } from './corpClockModels';
+import { corpDeadlines, corpJobs } from './corpClockModels';
 import type { BuildContext, FeedState, Feeds } from './types';
 
 const t = (key: string, options?: Record<string, unknown>) =>
@@ -407,52 +407,6 @@ describe('corpDeadlines', () => {
       corpJobs: jobsFeed([]),
     };
     expect(corpDeadlines(feeds, ctx).status.isEmpty).toBe(true);
-  });
-});
-
-describe('corpServices', () => {
-  const offline = (id: number, name: string, services: string[]) =>
-    structure({
-      structureId: id,
-      name,
-      services: services.map((service) => ({ name: service, state: 'offline' as const })),
-    });
-
-  it('counts offline services and names the structure with the most', () => {
-    const view = corpServices(
-      {
-        structures: structuresFeed([
-          offline(1, 'Efa - Helios', ['Reprocessing']),
-          offline(2, 'Efa - Prime', ['Market', 'Cloning']),
-          structure({ structureId: 3, services: [{ name: 'Moon', state: 'online' }] }),
-        ]),
-      },
-      ctx
-    );
-    expect(view.number.value).toBe('3');
-    expect(view.number.tone).toBe('warning');
-    expect(view.number.secondary?.text).toBe(
-      'overview.widgets.corpServices.most{"name":"Prime","count":2}'
-    );
-    expect(view.table?.rows.map((row) => row.cells)).toEqual([
-      ['Helios', 'Reprocessing'],
-      ['Prime', 'Cloning'],
-      ['Prime', 'Market'],
-    ]);
-    expect(view.to).toBeNull();
-  });
-
-  it('is the empty state when read fine with none offline', () => {
-    const view = corpServices({ structures: structuresFeed([structure()]) }, ctx);
-    expect(view.status.isEmpty).toBe(true);
-    expect(view.number.value).toBe('0');
-  });
-
-  it('keeps unreadable and loading apart from none offline', () => {
-    expect(corpServices({ structures: loading() }, ctx).status.loading).toBe(true);
-    const lapsed = corpServices({ structures: structuresFeed(null, true) }, ctx);
-    expect(lapsed.status.needsPermission).toBe(true);
-    expect(lapsed.emptyMessage).toBe('overview.board.corpUnreadable');
   });
 });
 

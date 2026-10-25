@@ -243,7 +243,7 @@ export type ImplantGoal = { id: ImplantGoalId; group: GoalGroup; display: GoalDi
 /** Peak applied DPS against `target` at any range — so an implant or booster that only improves application or reach still counts. */
 const peakCache = new WeakMap<FittingStats, Map<TargetProfile, number>>();
 
-function peakAppliedDps(stats: FittingStats, target: TargetProfile | undefined): number {
+export function peakAppliedDps(stats: FittingStats, target: TargetProfile | undefined): number {
   if (!target || stats.applied.weapons.length === 0) return 0;
   // Screening reads the same baseline for every family it tries: work it out once.
   let byTarget = peakCache.get(stats);

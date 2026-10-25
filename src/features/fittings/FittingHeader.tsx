@@ -46,6 +46,8 @@ interface FittingHeaderProps {
   onLibrary: (action: LibraryAction) => void;
   /** Opens Fitting vs Fitting compare (#1547) for this Fitting. */
   onCompare: () => void;
+  /** Opens Improve in the ⋮ menu; absent where the Fitting cannot be edited. */
+  onImprove?: () => void;
   /** Renames the open Fitting, independent of Save. */
   onRename: (name: string) => void;
   /** The Fitting's Jita price, for Export; null while it loads. */
@@ -100,7 +102,9 @@ function CompactFittingHeader({
   stats,
   share,
   onRename,
+  improveItem,
 }: {
+  improveItem: ReactNode;
   share?: EditorShare;
   onRename: () => void;
   fitting: Fitting;
@@ -134,6 +138,7 @@ function CompactFittingHeader({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-56">
             <DropdownMenuItem onSelect={onRename}>{t('fittings.header.rename')}</DropdownMenuItem>
+            {improveItem}
             <DropdownMenuSeparator />
             {libraryItems}
             <DropdownMenuSeparator />
@@ -184,6 +189,7 @@ export function FittingHeader({
   subtitle,
   onLibrary,
   onCompare,
+  onImprove,
   onRename,
   price,
   cloneImplants,
@@ -248,6 +254,9 @@ export function FittingHeader({
   const compareItem = (
     <DropdownMenuItem onSelect={onCompare}>{t('fittings.compare.entryButton')}</DropdownMenuItem>
   );
+  const improveItem = onImprove && (
+    <DropdownMenuItem onSelect={onImprove}>{t('fittings.improve.menuItem')}</DropdownMenuItem>
+  );
   const context = badges && (
     <>
       <AlphaCloneChip {...badges.alpha} />
@@ -285,6 +294,7 @@ export function FittingHeader({
           stats={stats}
           share={share}
           onRename={() => setRenaming(true)}
+          improveItem={improveItem}
         />
         {renameModal}
       </>
@@ -321,6 +331,7 @@ export function FittingHeader({
               <IconButton icon={<More />} label={t('fittings.header.moreActions')} />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-48">
+              {improveItem}
               {compareItem}
               <DropdownMenuItem
                 disabled={!copyStats.canCopy}

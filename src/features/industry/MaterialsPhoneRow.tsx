@@ -7,7 +7,7 @@ import { formatIskCompact } from '@/lib/isk';
 import { maskNumber } from '@/lib/numberMask';
 import { formatCount } from '@/lib/formatCount';
 import { DepthPriceLine } from './DepthPriceLine';
-import { EditableValue } from './EditableValue';
+import { EditableValue } from '@/components/ui';
 import { whenFocusLeaves } from './focusLeaves';
 import { materialRowState } from './materialRow';
 import type { MaterialTableRow } from './subBuildPlan';
@@ -57,7 +57,7 @@ function PhonePrice({
   return (
     <>
       <EditableValue
-        label={t('industry.priceFor', { material: nameFor(material.typeID) })}
+        label={t('industry.editPriceFor', { material: nameFor(material.typeID) })}
         onEdit={onEdit}
         focusOnMount={refocus}
         onFocused={onRefocused}
@@ -231,7 +231,7 @@ export function MaterialsPhoneRow({
               </span>
             ) : (
               <EditableValue
-                label={t('industry.errands.haveFor', { material: nameFor(material.typeID) })}
+                label={t('industry.errands.editHaveFor', { material: nameFor(material.typeID) })}
                 onEdit={onEditHave}
                 focusOnMount={refocusHave}
                 onFocused={onRefocused}

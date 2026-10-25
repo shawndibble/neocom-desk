@@ -7,6 +7,7 @@ import type { BuildResult } from '@/engine/industry/types';
 import { ResultsSummary } from './ResultsSummary';
 import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type { MaterialCostLine } from '@/engine/industry/types';
+import { formatIsk } from '@/lib/isk';
 
 /** One material the plan needs 100 of and the player already holds all 100 of. */
 const OWNED_MATERIALS: MaterialCostLine[] = [
@@ -305,5 +306,39 @@ describe('ResultsSummary: total volume (issue #874)', () => {
     renderSummary({ totalVolume: { volume: 10, anyUnknown: true } });
 
     expect(screen.getByText(/at least/i)).toBeInTheDocument();
+  });
+});
+
+describe('ResultsSummary: profit if sold now (issue #5007)', () => {
+  const SELL_NOW = {
+    unitPrice: 90,
+    quantity: 10,
+    gross: 900,
+    salesTax: 67.5,
+    net: 832.5,
+    forgone: 0,
+    profit: 267.5,
+  };
+
+  it('states the Sell now profit under Profit, with a tooltip naming both bases', () => {
+    renderSummary({ sellNow: SELL_NOW });
+    expect(screen.getByText('Profit if sold now')).toBeInTheDocument();
+    expect(screen.getByText(formatIsk(267.5))).toHaveClass('text-isk-pos');
+    expect(screen.getByRole('button', { name: /about profit if sold now/i })).toBeInTheDocument();
+  });
+
+  it('says there are no buy orders, rather than a figure, when the hub has none', () => {
+    renderSummary({ sellNow: null });
+    expect(screen.getByText('No buy orders at Jita')).toBeInTheDocument();
+  });
+
+  it('leaves the row out when there is no product sale to quote', () => {
+    renderSummary();
+    expect(screen.queryByText('Profit if sold now')).not.toBeInTheDocument();
+  });
+
+  it('leaves the row out while profit is unknown', () => {
+    renderSummary({ sellNow: SELL_NOW, profit: null });
+    expect(screen.queryByText('Profit if sold now')).not.toBeInTheDocument();
   });
 });

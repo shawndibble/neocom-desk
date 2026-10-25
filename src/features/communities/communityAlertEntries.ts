@@ -7,8 +7,7 @@
  * Cost is kept off everyone who never runs a Community. A Character is only
  * read once the Communities page has seen it administer one (`rememberCommunityAdmin`),
  * and only while the Firebase session is already its own: the poll never mints
- * a token or swaps the session, which the sync sweep and the Communities page
- * are relying on. A Character it cannot read right now returns null, so the
+ * a token. A Character it cannot read right now returns null, so the
  * poll skips rather than writing a baseline that would make the next good poll
  * look like a burst of arrivals.
  *
@@ -58,19 +57,22 @@ async function loadPledgeEntries(
 ): Promise<CommunityAlertEntry[]> {
   const now = Date.now();
   // A standing Request takes quotes, not Pledges, so it never raises a Pledge alert.
-  // Only the Character's own Requests are read (one query on ownerUid); their
-  // Pledges then come from one collection-group query for the Community, not
-  // one read per Request.
+  // Only the Character's own Requests are read (one query on ownerUid), then the
+  // Pledges on each of them: what is pledged to this Character, not every Pledge in
+  // the Community.
   const mine = (await requests.loadMyRequests(characterId, community.id)).filter(
     (request) => request.notify.app && !request.standing && isOpenRequest(request, now)
   );
   if (mine.length === 0) return [];
   const base = { communityId: community.id, communityName: community.name };
-  const allPledges = await requests.loadCommunityPledges(characterId, community.id);
-  const pledgesOf = mine.map((request) => ({
-    request,
-    pledges: (allPledges.get(request.id) ?? []).filter((pledge) => pledge.uid !== myUid),
-  }));
+  const pledgesOf = await Promise.all(
+    mine.map(async (request) => ({
+      request,
+      pledges: (await requests.loadPledges(characterId, community.id, request.id)).filter(
+        (pledge) => pledge.uid !== myUid
+      ),
+    }))
+  );
   const names = pledgerNames.get(community.id) ?? new Map<string, string>();
   pledgerNames.set(community.id, names);
   const unseen = pledgesOf.flatMap(({ pledges }) => pledges).filter((p) => !names.has(p.uid));
@@ -122,19 +124,20 @@ export async function loadCommunityAlertEntries(
     import('./requestStore'),
   ]);
   const myUid = uidForCharacter(characterId);
-  if (getSyncAuth().currentUser?.uid !== myUid) return null;
-  const mine = await store.loadMyCommunities(characterId);
-  if (admin) await rememberCommunityAdmin(characterId, mine);
-  const entries: CommunityAlertEntry[] = [];
-  for (const community of mine) {
-    if (admin && store.isCommunityAdmin(community, characterId)) {
-      entries.push(...(await loadAdminEntries(characterId, community, store)));
+  if (getSyncAuth(characterId).currentUser?.uid !== myUid) return null;
+  return store.withMyCommunities(characterId, async (mine) => {
+    if (admin) await rememberCommunityAdmin(characterId, mine);
+    const entries: CommunityAlertEntry[] = [];
+    for (const community of mine) {
+      if (admin && store.isCommunityAdmin(community, characterId)) {
+        entries.push(...(await loadAdminEntries(characterId, community, store)));
+      }
+      if (watching) {
+        entries.push(...(await loadPledgeEntries(characterId, myUid, community, store, requests)));
+      }
     }
-    if (watching) {
-      entries.push(...(await loadPledgeEntries(characterId, myUid, community, store, requests)));
-    }
-  }
-  return entries;
+    return entries;
+  });
 }
 
 async function loadAdminEntries(

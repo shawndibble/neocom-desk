@@ -205,6 +205,9 @@ export interface LinesChartModel extends ChartBase {
   low?: string;
   high?: string;
   rangeLabel?: string;
+  /** The time axis's two ends ("5 weeks ago", "this week"), when the scale row does not name the span. */
+  xStart?: string;
+  xEnd?: string;
   /** One readout per day, listing every line. */
   tips?: ChartTip[];
 }

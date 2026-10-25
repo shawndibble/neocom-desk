@@ -22,10 +22,19 @@ export function routerFor(name: string): (typeof ROUTER_FUNCTIONS)[CallableGroup
   return ROUTER_FUNCTIONS[group];
 }
 
-export async function callRouted<In, Out>(name: CallableAction, data: In): Promise<Out> {
+/**
+ * `characterId` picks the Firebase app whose session authenticates the call (sessions live in
+ * per-Character apps). Pass `undefined` only for a callable that needs no session: the guest
+ * verify page, an invite preview, or one proven by a token in `data`.
+ */
+export async function callRouted<In, Out>(
+  name: CallableAction,
+  data: In,
+  characterId: number | undefined
+): Promise<Out> {
   try {
     const result = await httpsCallable<{ action: string; data: In }, Out>(
-      getSyncFunctions(),
+      getSyncFunctions(characterId),
       routerFor(name)
     )({ action: name, data });
     return result.data;

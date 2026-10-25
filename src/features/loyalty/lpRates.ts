@@ -3,7 +3,7 @@
  * own **LP Value** when they've set one (for every store), else that store's
  * market LP Value at the Trade Hub being priced at (`marketLpValue.ts`).
  */
-import { lpRate, type LpRate } from '@/engine/loyalty/marketLpValue';
+import { blueprintLpRate, lpRate, type LpRate } from '@/engine/loyalty/marketLpValue';
 import type { TradeHub } from '@/market/hubs';
 import { useLpValue } from './lpValue';
 import { loadMarketLpValues } from './marketLpValue';
@@ -26,4 +26,9 @@ export async function loadLpRates(
   const market =
     own > 0 ? new Map<number, number | null>() : await loadMarketLpValues(corporationIds, hub);
   return (corporationId) => lpRate(own, market.get(corporationId) ?? null);
+}
+
+/** The rate a blueprint's LP is priced at (`blueprintLpRate`): the pilot's own, else free. */
+export async function loadBlueprintLpRate(): Promise<LpRate> {
+  return blueprintLpRate(await ownLpValue());
 }

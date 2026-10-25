@@ -9,7 +9,8 @@ import { setSurveyInfo, setSurveyTax } from './surveyStore';
 
 export async function writeTemplateToSurvey(
   survey: { id: string; expiresAt: number },
-  template: InfoTemplate
+  template: InfoTemplate,
+  characterId: number
 ): Promise<void> {
   const { id, expiresAt } = survey;
   if (template.location || template.notes) {
@@ -18,9 +19,16 @@ export async function writeTemplateToSurvey(
       expiresAt,
       location: template.location ?? null,
       notes: template.notes ?? '',
+      characterId,
     });
   }
   if (template.tax) {
-    await setSurveyTax({ id, expiresAt, name: template.tax.name, pct: template.tax.pct });
+    await setSurveyTax({
+      id,
+      expiresAt,
+      name: template.tax.name,
+      pct: template.tax.pct,
+      characterId,
+    });
   }
 }

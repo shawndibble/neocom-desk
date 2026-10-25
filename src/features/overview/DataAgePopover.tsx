@@ -17,7 +17,7 @@ import { cx } from '@/lib/cx';
 import { formatAge } from '@/lib/age';
 import type { FetchRow } from './widgets/headerSummary';
 import { boardKey, useWidgetBoard } from './widgets/board';
-import { getKind } from './widgets/kinds';
+import { getKind, widgetKeys } from './widgets/kinds';
 
 /**
  * The button on a board's tab row ("Data updated 2m ago") and the popover
@@ -46,9 +46,9 @@ export function DataAgePopover({
 }) {
   const { t } = useTranslation();
   const board = useWidgetBoard();
-  const title = (kind: string) => {
-    const def = getKind(kind);
-    return def ? t(def.titleKey) : kind;
+  const title = (row: FetchRow) => {
+    const def = getKind(row.kind);
+    return def ? t(widgetKeys(def, row.show).titleKey) : row.kind;
   };
   const age = (date: Date) => formatAge(Math.max(0, now - date.getTime()), t);
   const stalest = breakdown[0];
@@ -56,7 +56,7 @@ export function DataAgePopover({
     <Popover>
       <Tooltip
         content={t('overview.header.stalest', {
-          name: title(stalest.kind),
+          name: title(stalest),
           age: age(fetchedAt),
         })}
       >
@@ -93,7 +93,7 @@ export function DataAgePopover({
             {breakdown.map((row) => (
               <tr key={row.kind} className="border-b border-line last:border-b-0">
                 <th scope="row" className="px-3 py-2 text-left font-normal">
-                  {title(row.kind)}
+                  {title(row)}
                 </th>
                 <td className="px-3 py-2 text-right tabular-nums">
                   {row.fetchedAt ? (

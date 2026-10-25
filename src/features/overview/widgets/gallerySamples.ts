@@ -123,6 +123,7 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         rangeLabel: t('overview.widgets.chart.span', { count: 30 }),
       },
     },
+    // The Wallet flow preset card: the Wallet on its Flow.
     walletFlow: {
       value: '+232M',
       unit: t('overview.gallery.samples.walletFlow.unit'),
@@ -335,20 +336,33 @@ function buildSamples(t: TFunction): Record<string, Sample> {
       isk: 1_120_000_000,
       unit: 'ISK',
       note: t('overview.gallery.samples.profit.note'),
+      // A new Profit widget opens on Both: builds and trades side by side.
       rows: [
-        ['Rifter', '', '120M'],
-        ['Gila', '', '340M'],
-        ['Hurricane', '', '660M'],
+        ['Hurricane', t('overview.widgets.profit.source.builds'), '660M'],
+        ['Gila', t('overview.widgets.profit.source.builds'), '340M'],
+        ['Damage Control II', t('overview.widgets.profit.source.trading'), '58M'],
       ],
       chart: {
-        kind: 'bars',
+        kind: 'lines',
         summary: '',
-        values: [180, 260, -90, 330, 140],
-        gains: true,
-        barLabels: ['+180M', '+260M', '-90M', '+330M', '+140M'],
-        max: '330M',
-        xStart: t('overview.widgets.chart.weeksAgo', { count: 5 }),
-        xEnd: t('overview.widgets.chart.thisWeek'),
+        series: [
+          {
+            key: 'builds',
+            label: t('overview.widgets.profit.source.builds'),
+            color: 's1',
+            end: '+820M',
+            values: [180, 260, -90, 330, 140],
+          },
+          {
+            key: 'trading',
+            label: t('overview.widgets.profit.source.trading'),
+            color: 's2',
+            end: '+300M',
+            values: [40, 70, 55, 30, 105],
+          },
+        ],
+        low: '-90M',
+        high: '+330M',
       },
     },
     marketTrend: {
@@ -415,27 +429,6 @@ function buildSamples(t: TFunction): Record<string, Sample> {
             values: [0, 1.2, 0.4, 1.8, -0.6, 0.3, -0.5],
           },
         ],
-      },
-    },
-    tradingProfit: {
-      value: '+132M',
-      isk: 132_000_000,
-      unit: t('overview.widgets.data.tradingProfit.unit', { count: 30 }),
-      note: t('overview.gallery.samples.tradingProfit.note'),
-      rows: [
-        ['Damage Control II', '', '+58M'],
-        ['Tritanium', '', '+41M'],
-        ['Gila', '', '+33M'],
-      ],
-      chart: {
-        kind: 'bars',
-        summary: '',
-        values: [20, 35, -10, 48, 39],
-        gains: true,
-        barLabels: ['+20M', '+35M', '-10M', '+48M', '+39M'],
-        max: '48M',
-        xStart: t('overview.widgets.chart.daysAgo', { count: 5 }),
-        xEnd: t('overview.widgets.chart.today'),
       },
     },
     miningYield: {
@@ -621,16 +614,6 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         note: t('overview.widgets.corpDeadlines.chartNote', { days: 14 }),
       },
     },
-    corpServices: {
-      value: '3',
-      unit: t('overview.widgets.corpServices.unit'),
-      note: t('overview.widgets.corpServices.most', { name: 'Efa Astrahus', count: 2 }),
-      rows: [
-        ['Efa Astrahus', 'Standup Market Hub I', t('overview.board.structureOffline')],
-        ['Efa Astrahus', 'Standup Manufacturing Plant I', t('overview.board.structureOffline')],
-        ['Efa Athanor', 'Standup Reprocessing Facility I', t('overview.board.structureOffline')],
-      ],
-    },
     corpStarbases: {
       value: '4',
       unit: t('overview.widgets.corpStarbases.unit'),
@@ -731,6 +714,7 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         ['Taxes', 0.18, '11%'],
       ]),
     },
+    // The Cash flow and Income by source preset cards: the corp wallet on its Flow and Sources.
     corpCashFlow: {
       value: '+1.4B',
       isk: 1_400_000_000,

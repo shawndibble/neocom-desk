@@ -19,12 +19,14 @@ import {
   setCalendarEvents,
   setRaidsRadius,
   setRaidsWhere,
+  setProfitSource,
   setTrendHubs,
   setTrendItems,
   setPlexPer30Days,
   setRowsPerPage,
   newWidget,
   setScope,
+  setShow,
   setShowOnPhone,
   setView,
   snapshotLayout,
@@ -300,6 +302,53 @@ describe('setRaidsWhere and setRaidsRadius', () => {
   });
 });
 
+describe('setProfitSource', () => {
+  it('opens a new Profit widget on Both', () => {
+    expect(newWidget('profit', 'a')?.profitSource).toBe('both');
+    expect('profitSource' in newWidget('wallet', 'b')!).toBe(false);
+  });
+
+  it('stores every choice, Builds included, since absent already means Builds', () => {
+    const l = layoutOf(w('a', 'profit', { profitSource: 'both' }));
+    const builds = setProfitSource(l, 'a', 'builds');
+    expect(builds.widgets[0].profitSource).toBe('builds');
+    expect(setProfitSource(builds, 'a', 'trading').widgets[0].profitSource).toBe('trading');
+  });
+
+  it('changes nothing for the current choice, absent read as Builds, or another kind', () => {
+    const l = layoutOf(w('a', 'profit'), w('b', 'orders'));
+    expect(setProfitSource(l, 'a', 'builds')).toBe(l);
+    expect(setProfitSource(l, 'b', 'trading')).toBe(l);
+    expect(setProfitSource(l, 'a', 'everything' as never)).toBe(l);
+  });
+});
+
+describe('setShow', () => {
+  it('stores a Show other than the default and drops it on the default, keeping view and range', () => {
+    const l = layoutOf(w('a', 'corpWallet', { view: 'chart', range: 90 }));
+    const sources = setShow(l, 'a', 'sources');
+    expect(sources.widgets[0]).toEqual({ ...l.widgets[0], show: 'sources' });
+    expect('show' in setShow(sources, 'a', 'divisions').widgets[0]).toBe(false);
+  });
+
+  it('changes nothing for the current Show, one the kind lacks, or a kind without one', () => {
+    const l = layoutOf(w('a', 'wallet'), w('b', 'orders'));
+    expect(setShow(l, 'a', 'balance')).toBe(l);
+    expect(setShow(l, 'a', 'divisions')).toBe(l);
+    expect(setShow(l, 'b', 'flow')).toBe(l);
+  });
+});
+
+describe('newWidget and addWidget with a Show', () => {
+  it('opens on the chosen Show, stored only when it is not the default', () => {
+    expect(newWidget('wallet', 'a', 'flow')).toMatchObject({ kind: 'wallet', show: 'flow' });
+    expect('show' in newWidget('wallet', 'a', 'balance')!).toBe(false);
+    expect('show' in newWidget('orders', 'a', 'flow')!).toBe(false);
+    const added = addWidget(layoutOf(), 'corpWallet', counter(), { show: 'sources' });
+    expect(added.widgets[0]).toMatchObject({ kind: 'corpWallet', show: 'sources', range: 30 });
+  });
+});
+
 describe('setCalendarEvents', () => {
   it('stores All events and drops the field when it goes back to the default', () => {
     const l = layoutOf(w('a', 'comingUp'));
@@ -312,6 +361,16 @@ describe('setCalendarEvents', () => {
     const l = layoutOf(w('a', 'comingUp'), w('b', 'orders'));
     expect(setCalendarEvents(l, 'a', 'committed')).toBe(l);
     expect(setCalendarEvents(l, 'b', 'all')).toBe(l);
+  });
+});
+
+describe('the Structures Show', () => {
+  it('stores Problems only and drops the field when it goes back to All', () => {
+    const l = layoutOf(w('a', 'structures'));
+    const problems = setShow(l, 'a', 'problems');
+    expect(problems.widgets[0].show).toBe('problems');
+    expect('show' in setShow(problems, 'a', 'all').widgets[0]).toBe(false);
+    expect(setShow(l, 'a', 'all')).toBe(l);
   });
 });
 

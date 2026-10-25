@@ -3,6 +3,7 @@ import { db } from '@/db';
 import {
   appendTombstones,
   clearCharacterSyncBookkeeping,
+  settingsSeenSeqKey,
   heartbeatKey,
   ownerHashKey,
   readTombstones,
@@ -19,6 +20,7 @@ describe('clearCharacterSyncBookkeeping', () => {
     const characterKeys = [
       ownerHashKey(1),
       heartbeatKey('char:1'),
+      settingsSeenSeqKey(1),
       ...EDITABLE_COLLECTIONS.map((collection) => tombstoneKey(collection, 1)),
     ];
     await db.settings.bulkPut([

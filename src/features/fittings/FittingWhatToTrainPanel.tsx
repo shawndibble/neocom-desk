@@ -74,7 +74,7 @@ import {
   statRowClassName,
 } from './statKit';
 
-interface WhatToTrainRow extends SkillGain {
+export interface WhatToTrainRow extends SkillGain {
   name: string;
 }
 
@@ -292,7 +292,7 @@ function WhatToTrainRanking({
   );
 }
 
-interface WhatToTrainItemProps {
+export interface WhatToTrainItemProps {
   row: WhatToTrainRow;
   rank: number;
   evaluator: SkillGainEvaluator;
@@ -316,7 +316,7 @@ function levelSpan(from: number, to: number): string {
  * takes at the top right; beneath, the plan it is already in, then a level
  * picker beside Add to plan. The changes and the time follow the level picked.
  */
-function WhatToTrainItem({
+export function WhatToTrainItem({
   row,
   rank,
   evaluator,

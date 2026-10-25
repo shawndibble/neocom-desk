@@ -34,6 +34,14 @@ export const tombstoneKey = (
 ): string => `${INTERNAL_PREFIX}${collection.tombstoneSegment}.${characterId}`;
 
 /**
+ * The settings applied-seq (settingsSync.ts) one Character last reconciled
+ * against. Lives beside the pull cursor and is dropped with the rest of a
+ * removed Character's bookkeeping.
+ */
+export const settingsSeenSeqKey = (characterId: number): string =>
+  `${INTERNAL_PREFIX}settingsSeenSeq.${characterId}`;
+
+/**
  * A per-(Character, collection) **pull cursor** (issue #581): where the last
  * incremental read of that remote collection got to.
  *
@@ -63,6 +71,39 @@ export interface PullCursor {
   fullAt: number;
 }
 
+/**
+ * The remote change marker (`characters/{uid}.syncVersion`, syncMarker.ts) this
+ * device last saw at the start of a successful full pass, and when that pass
+ * ran. An idle background pass that finds the marker unchanged skips its reads.
+ * Dropped with the pull cursors: whatever voids a cursor voids this too.
+ */
+export const syncMarkerKey = (characterId: number): string =>
+  `${INTERNAL_PREFIX}syncMarker.${characterId}`;
+
+export interface SeenSyncMarker {
+  version: number;
+  /** Epoch ms the full pass that saw `version` started. */
+  fullAt: number;
+}
+
+export async function readSeenSyncMarker(characterId: number): Promise<SeenSyncMarker | undefined> {
+  const value = (await db.settings.get(syncMarkerKey(characterId)))?.value as
+    Partial<SeenSyncMarker> | undefined;
+  if (typeof value?.version !== 'number' || typeof value?.fullAt !== 'number') return undefined;
+  return { version: value.version, fullAt: value.fullAt };
+}
+
+export async function writeSeenSyncMarker(
+  characterId: number,
+  seen: SeenSyncMarker
+): Promise<void> {
+  await db.settings.put({ key: syncMarkerKey(characterId), value: seen });
+}
+
+export async function clearSeenSyncMarker(characterId: number): Promise<void> {
+  await db.settings.delete(syncMarkerKey(characterId));
+}
+
 export async function readPullCursor(key: string): Promise<PullCursor | undefined> {
   const value = (await db.settings.get(key))?.value as Partial<PullCursor> | undefined;
   if (typeof value?.high !== 'number' || typeof value?.fullAt !== 'number') return undefined;
@@ -81,6 +122,7 @@ export async function writePullCursor(key: string, cursor: PullCursor): Promise<
  */
 export async function clearPullCursors(characterId: number): Promise<void> {
   await db.settings.where('key').startsWith(`${PULL_CURSOR_PREFIX}${characterId}.`).delete();
+  await clearSeenSyncMarker(characterId);
 }
 
 /**
@@ -123,6 +165,7 @@ export async function clearCharacterSyncBookkeeping(characterId: number): Promis
   await db.settings.bulkDelete([
     ownerHashKey(characterId),
     heartbeatKey(uidForCharacter(characterId)),
+    settingsSeenSeqKey(characterId),
     ...EDITABLE_COLLECTIONS.map((collection) => tombstoneKey(collection, characterId)),
   ]);
   await clearPullCursors(characterId);

@@ -9,13 +9,14 @@
  * alerts poll does it (`communityAlertEntries.ts`): a Character is only read
  * once the Communities page has listed a Community for it
  * (`rememberCommunityWatch`), and only while the Firebase session is already
- * its own: the poll never mints a token or swaps the session. A Community's
+ * its own: the poll never mints a token. A Community's
  * first read sets its baseline to now, so Requests that were already on the
  * board are not announced as new.
  */
 import { useEffect, useSyncExternalStore } from 'react';
 import { db } from '@/db';
 import { countNewRequests } from '@/engine/communities/requests';
+import { joinTabElection } from '@/lib/tabLeader';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { isOnline, onReconnect } from '@/stores/network';
 import { communityBackendOverride } from './backendOverride';
@@ -114,24 +115,32 @@ export async function refreshRequestBadge(characterId: number, now = Date.now())
     import('./requestStore'),
   ]);
   const myUid = uidForCharacter(characterId);
-  if (getSyncAuth().currentUser?.uid !== myUid) return;
+  if (getSyncAuth(characterId).currentUser?.uid !== myUid) return;
   const started = generation;
-  const next = new Map<string, number>();
-  for (const community of await store.loadMyCommunities(characterId)) {
-    if (viewed.has(community.id)) {
-      // Being looked at: Requests that arrive now are seen, not new.
-      await db.settings.put({ key: seenKey(characterId, community.id), value: now });
-      continue;
-    }
-    const seen = (await db.settings.get(seenKey(characterId, community.id)))?.value;
-    if (typeof seen !== 'number') {
-      await db.settings.put({ key: seenKey(characterId, community.id), value: now });
-      continue;
-    }
-    const board = await requests.loadRequests(characterId, community.id);
-    const fresh = countNewRequests(board, myUid, seen, now);
-    if (fresh > 0) next.set(community.id, fresh);
-  }
+  const next = await store.withMyCommunities(
+    characterId,
+    async (communities) => {
+      const counted = new Map<string, number>();
+      for (const community of communities) {
+        if (viewed.has(community.id)) {
+          // Being looked at: Requests that arrive now are seen, not new.
+          await db.settings.put({ key: seenKey(characterId, community.id), value: now });
+          continue;
+        }
+        const seen = (await db.settings.get(seenKey(characterId, community.id)))?.value;
+        if (typeof seen !== 'number') {
+          await db.settings.put({ key: seenKey(characterId, community.id), value: now });
+          continue;
+        }
+        // Only what was posted since: an idle tick is one read per Community, not its whole board.
+        const posted = await requests.loadRequestsSince(characterId, community.id, seen);
+        const fresh = countNewRequests(posted, myUid, seen, now);
+        if (fresh > 0) counted.set(community.id, fresh);
+      }
+      return counted;
+    },
+    now
+  );
   // The Character changed while this read was in flight: its count is not the new one's.
   if (started !== generation) return;
   // A tab opened during the read marked its Community seen: that count is not new either.
@@ -139,19 +148,27 @@ export async function refreshRequestBadge(characterId: number, now = Date.now())
   publish(next);
 }
 
-/** Mounted once in the shell: reads at start, then on an interval and when the tab is shown again. */
+/**
+ * Mounted once in the shell: reads at start, then on an interval and when the tab is shown again.
+ * Only the visible Tab Leader reads (the Foreground Poller's election, `lib/tabLeader.ts`): a
+ * hidden tab, or a second visible window, keeps the count it last had instead of paying for its
+ * own reads. A tab that becomes leader reads at once.
+ */
 export function useRequestBadgePoll() {
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   useEffect(() => {
     resetRequestBadge();
     if (characterId === null) return;
-    const refresh = () => {
+    const id = characterId;
+    const seat = joinTabElection('poller', () => refresh());
+    function refresh() {
+      if (document.visibilityState !== 'visible' || !seat.isLeader()) return;
       // Every board read is a Firebase round trip that cannot succeed offline.
       if (!isOnline()) return;
-      void refreshRequestBadge(characterId).catch((err) =>
+      void refreshRequestBadge(id).catch((err) =>
         console.warn('Request badge could not be refreshed', err)
       );
-    };
+    }
     refresh();
     const timer = setInterval(refresh, REQUEST_BADGE_POLL_MS);
     const onVisible = () => {
@@ -160,6 +177,7 @@ export function useRequestBadgePoll() {
     document.addEventListener('visibilitychange', onVisible);
     const offReconnect = onReconnect(refresh);
     return () => {
+      seat.leave();
       offReconnect();
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);

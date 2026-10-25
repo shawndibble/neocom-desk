@@ -17,22 +17,34 @@ export function useUpdateStatusLine(): { status: UpdateStatus; line: string } {
   return { status, line: status === 'unknown' ? '' : t(STATUS_KEYS[status]) };
 }
 
+/** Why the page stayed up after Update: the check failed, or the new build has not reached this device yet. */
+export type UpdateNotice = { kind: 'error' | 'info'; text: string } | null;
+
 /**
- * Applies a waiting build (or reloads) through the boot-screen cover. A failed
- * check keeps the page up and sets `failed`.
+ * Applies a waiting build (or reloads) through the boot-screen cover. When
+ * `forceUpdate` keeps the page up instead, `notice` says why.
  */
 export function useApplyUpdate() {
+  const { t } = useTranslation();
   const [updating, setUpdating] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [outcome, setOutcome] = useState<'failed' | 'pending' | undefined>();
 
   async function update() {
     setUpdating(true);
-    setFailed(false);
-    if ((await forceUpdate()) === 'failed') {
-      setFailed(true);
+    setOutcome(undefined);
+    const result = await forceUpdate();
+    if (result) {
+      setOutcome(result);
       setUpdating(false);
     }
   }
 
-  return { updating, failed, update: () => void update() };
+  const notice: UpdateNotice =
+    outcome === 'failed'
+      ? { kind: 'error', text: t('settings.updateFailed') }
+      : outcome === 'pending'
+        ? { kind: 'info', text: t('settings.updatePending') }
+        : null;
+
+  return { updating, notice, update: () => void update() };
 }

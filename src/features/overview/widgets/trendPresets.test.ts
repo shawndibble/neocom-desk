@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { TREND_MAX_SERIES } from '@/engine/market/trendSeries';
 import { addWidget, type OverviewLayout } from './layout';
-import { TREND_PRESETS, trendPreset } from './trendPresets';
+import { TREND_PRESETS } from './trendPresets';
+
+const trendPreset = (id: string) => TREND_PRESETS.find((p) => p.id === id);
 
 const empty: OverviewLayout = { version: 1, widgets: [] };
 

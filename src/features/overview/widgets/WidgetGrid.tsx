@@ -41,7 +41,7 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { boardKey, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
 import { flexRule, GRID_GAP, PHONE_GRID_GAP } from './gridStyle';
-import { getKind, type WidgetSize } from './kinds';
+import { getKind, widgetKeys, type WidgetSize } from './kinds';
 import type { Widget as WidgetModel } from './layout';
 import { SIZES } from './sizes';
 import { visibleWidgets } from './visibility';
@@ -62,7 +62,7 @@ function useWidgetTitle() {
   const { t } = useTranslation();
   return (widget: WidgetModel): string => {
     const kind = getKind(widget.kind);
-    return widget.title ?? (kind ? t(kind.titleKey) : widget.kind);
+    return widget.title ?? (kind ? t(widgetKeys(kind, widget.show).titleKey) : widget.kind);
   };
 }
 

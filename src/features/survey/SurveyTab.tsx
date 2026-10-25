@@ -116,7 +116,8 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
       // Scan first, so the new survey's first load already has it.
       await addSurveyScan({ id: started.id, text, expiresAt: started.expiresAt, by: ownerName });
       // Best effort: a template that fails to write leaves the panel blank, as without one.
-      if (startTemplate) await writeTemplateToSurvey(started, startTemplate).catch(() => undefined);
+      if (startTemplate)
+        await writeTemplateToSurvey(started, startTemplate, characterId).catch(() => undefined);
       setStartTemplateId(null);
       noteSubmittedScan();
       await setCurrentId(started.id);
@@ -234,16 +235,22 @@ export function SurveyTab({ tabBar, tabsId }: SurveyTabProps) {
   const [ignoreFailed, setIgnoreFailed] = useState(false);
   const setIgnored = useCallback(
     async (scanId: string, ignored: boolean) => {
-      if (currentId === null || state.status !== 'ready') return;
+      if (currentId === null || state.status !== 'ready' || characterId === null) return;
       setIgnoreFailed(false);
       try {
-        await setSurveyScanIgnored({ id: currentId, expiresAt: state.expiresAt, scanId, ignored });
+        await setSurveyScanIgnored({
+          id: currentId,
+          expiresAt: state.expiresAt,
+          scanId,
+          ignored,
+          characterId,
+        });
         await refresh();
       } catch {
         setIgnoreFailed(true);
       }
     },
-    [currentId, state, refresh]
+    [currentId, state, characterId, refresh]
   );
   const finish = useCallback(async (): Promise<boolean> => {
     if (currentId === null || state.status !== 'ready') return false;

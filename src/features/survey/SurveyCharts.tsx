@@ -1,8 +1,10 @@
 /**
- * The Survey tab's two charts, drawn with Recharts on one shared time axis:
- * the volume left in the field, stacked by ore with a dot and a total-volume
- * label on every scan and a dashed run to zero at the current pace,
- * and under it the mining rate between each pair of scans. Statically imports
+ * The Survey tab's charts, drawn with Recharts on one shared time axis. Ore left
+ * (the default) is the volume left in the field, stacked by ore with a dot and a
+ * total-volume label on every scan and a dashed run to zero at the current pace,
+ * and under it the total mining rate between each pair of scans. Depletion by
+ * ore is its chart with the mining rate stacked by ore under it; ISK left is one
+ * chart. Statically imports
  * `recharts`, so — same rule as `miningTax/MiningYieldCharts.tsx` — this must
  * only be reached through a dynamic `import()` from `SurveyBoard.tsx`.
  *
@@ -26,21 +28,13 @@ import {
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { formatEveClock } from '@/engine/survey/chatMessage';
-import { spacedLabels } from '@/engine/survey/labelSpacing';
 import type { SurveySummary } from '@/engine/survey/series';
 import type { SurveyChartView } from '@/engine/survey/chartViews';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import {
-  FULL_HEIGHT,
-  MARGIN,
-  makeScanDot,
-  timeAxis,
-  yAxis,
-  Y_AXIS_WIDTH,
-} from './surveyChartParts';
+import { FULL_HEIGHT, MARGIN, makeScanDot, thinLabels, timeAxis, yAxis } from './surveyChartParts';
 import { DepletionChart, IskChart } from './SurveyViewCharts';
+import { ByOrePaceFigure, TotalPaceFigure } from './SurveyPacePanel';
 import { oreTone } from './surveyTones';
-import { formatCount } from '@/lib/formatCount';
 import { createNumberFormat } from '@/lib/numberLocale';
 
 const formatVolume = createNumberFormat({ maximumFractionDigits: 3 });
@@ -54,7 +48,6 @@ interface ScanTableRow {
 
 /** Room a label needs, in px: "301.8K" and "1,116" at 10px. */
 const DELTA_LABEL_GAP = 46;
-const RATE_LABEL_GAP = 34;
 
 interface VolumeRow {
   at: number;
@@ -105,36 +98,17 @@ export function SurveyCharts({
   const [plotWidth, setPlotWidth] = useState(0);
   const { domain, xAxis } = timeAxis(summary);
   const rows = volumeRows(summary);
-  // The rate is one flat block per pair of scans, from the earlier scan to the
-  // later: a step area drawn from each interval's start, closed at the last
-  // scan. The values are labelled at the middle of each block.
-  const last = summary.intervals[summary.intervals.length - 1];
-  const rateSteps =
-    last === undefined
-      ? []
-      : [
-          ...summary.intervals.map((i) => ({ at: i.from, rate: i.rate })),
-          { at: last.to, rate: last.rate },
-        ];
-  const rateLabels = summary.intervals.map((i) => ({ at: (i.from + i.to) / 2, rate: i.rate }));
   // Scans can bunch up in time, so labels are thinned to the ones that fit.
-  // Every scan keeps its dot; the tooltip carries the rest.
-  const plotPx = Math.max(0, plotWidth - scalePx(Y_AXIS_WIDTH) - MARGIN.right);
-  const pxAt = (at: number) => ((at - domain[0]) / (domain[1] - domain[0])) * plotPx;
-  // Before the chart reports a width there is nothing to measure, so show all.
-  const thin = (labels: { x: number; weight: number }[], gap: number) =>
-    plotPx === 0 ? new Set(labels.keys()) : spacedLabels(labels, gap);
-  // The projected finish row sits after the scans and draws no label.
-  const deltaShown = thin(
-    rows.slice(0, summary.points.length).map((r) => ({ x: pxAt(r.at), weight: r.total ?? 0 })),
+  // Every scan keeps its dot; the tooltip carries the rest. The projected
+  // finish row sits after the scans and draws no label.
+  const rowsWithTotal = rows.slice(0, summary.points.length);
+  const deltaShown = thinLabels(
+    rowsWithTotal.map((r) => ({ at: r.at, weight: r.total ?? 0 })),
+    domain,
+    plotWidth,
     scalePx(DELTA_LABEL_GAP)
   );
-  const rateShown = thin(
-    rateLabels.map((r) => ({ x: pxAt(r.at), weight: r.rate })),
-    scalePx(RATE_LABEL_GAP)
-  );
   const chartRows = rows.map((r, i) => (deltaShown.has(i) ? { ...r, totalLabel: r.total } : r));
-  const shownRateLabels = rateLabels.filter((_, i) => rateShown.has(i));
 
   const scanRows = useMemo<ScanTableRow[]>(
     () =>
@@ -171,19 +145,6 @@ export function SurveyCharts({
     ],
     [summary.oreNames, t]
   );
-  const rateColumns = useMemo<DataTableColumn<SurveySummary['intervals'][number]>[]>(
-    () => [
-      { id: 'from', header: t('survey.tableFrom'), render: (i) => formatEveClock(i.from) },
-      { id: 'to', header: t('survey.tableTo'), render: (i) => formatEveClock(i.to) },
-      {
-        id: 'rate',
-        header: t('survey.tableRate'),
-        render: (i) => `${formatCount(i.rate)} m³/s`,
-      },
-    ],
-    [t]
-  );
-
   function VolumeTooltip({ active, payload }: TooltipContentProps) {
     const row = payload?.[0]?.payload as VolumeRow | undefined;
     if (!active || !row || row.total === undefined) return null;
@@ -312,7 +273,14 @@ export function SurveyCharts({
     </div>
   );
 
-  if (!compact && view === 'depletion') return <DepletionChart summary={summary} />;
+  if (!compact && view === 'depletion') {
+    return (
+      <div className="space-y-1">
+        <DepletionChart summary={summary} />
+        {summary.intervals.length > 0 && <ByOrePaceFigure summary={summary} />}
+      </div>
+    );
+  }
   if (!compact && view === 'isk') return <IskChart summary={summary} />;
 
   if (compact) return plot;
@@ -334,72 +302,7 @@ export function SurveyCharts({
         </div>
       </figure>
 
-      {rateSteps.length > 0 && (
-        <figure aria-label={t('survey.chartRate')} className="m-0">
-          <div className="h-32 w-full">
-            <ResponsiveContainer>
-              <ComposedChart data={rateSteps} margin={{ ...MARGIN, top: 20 }}>
-                <CartesianGrid stroke="var(--color-line)" vertical={false} />
-                {xAxis(false)}
-                {yAxis({
-                  label: {
-                    value: t('survey.chartRateAxis'),
-                    position: 'insideTopLeft',
-                    offset: 8,
-                    fill: 'var(--color-text-dim)',
-                    fontSize: '0.625rem',
-                  },
-                })}
-                <Area
-                  data={rateSteps}
-                  dataKey="rate"
-                  type="stepAfter"
-                  stroke="var(--color-accent)"
-                  fill="var(--color-accent-dim)"
-                  fillOpacity={0.75}
-                  isAnimationActive={false}
-                />
-                <Line
-                  data={shownRateLabels}
-                  dataKey="rate"
-                  stroke="none"
-                  dot={false}
-                  isAnimationActive={false}
-                  legendType="none"
-                >
-                  <LabelList
-                    dataKey="rate"
-                    position="top"
-                    offset={4}
-                    fill="var(--color-text)"
-                    fontSize="0.625rem"
-                    formatter={(value: unknown) =>
-                      typeof value === 'number' ? formatCount(value) : ''
-                    }
-                  />
-                </Line>
-                {summary.pace !== null && (
-                  <ReferenceLine
-                    y={summary.pace}
-                    stroke="var(--color-text)"
-                    strokeDasharray="5 4"
-                  />
-                )}
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-          <figcaption className="sr-only">{t('survey.chartRate')}</figcaption>
-          <div className="sr-only">
-            <DataTable
-              columns={rateColumns}
-              responsive="table"
-              rows={summary.intervals}
-              rowKey={(i) => i.from}
-              label={t('survey.chartRate')}
-            />
-          </div>
-        </figure>
-      )}
+      {summary.intervals.length > 0 && <TotalPaceFigure summary={summary} />}
     </div>
   );
 }

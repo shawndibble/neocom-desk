@@ -36,11 +36,12 @@ import {
   type StandingRequest,
 } from '@/engine/communities/buyback';
 import { getSyncFirestore } from '@/sync/firebaseApp';
+import { isMissingIndex } from '@/sync/missingIndex';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
 import { communityBackendOverride } from './backendOverride';
 import { callCommunity } from './communityStore';
-import { trackPledgeWrite, underFirebaseSession } from './pledgeWrites';
+import { underFirebaseSession } from './pledgeWrites';
 
 const KINDS: readonly RequestLineKind[] = ['item', 'bpc', 'bpo'];
 
@@ -93,8 +94,46 @@ export async function loadRequests(
   if (override?.loadItemRequests) return override.loadItemRequests(communityId);
   const snap = await underFirebaseSession(async () => {
     await ensureSignedIn(characterId);
-    return getDocs(collection(getSyncFirestore(), 'communities', communityId, 'itemRequests'));
+    return getDocs(
+      collection(getSyncFirestore(characterId), 'communities', communityId, 'itemRequests')
+    );
   });
+  return snap.docs
+    .map((entry) => readRequest(entry.id, entry.data()))
+    .filter((request): request is CommunityRequest => request !== null)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/**
+ * The Requests posted after `since` (epoch ms), newest first: what the nav badge
+ * counts. A single-field range on `createdAt` (an automatic index), so a tick with
+ * nothing new is one read rather than the whole board. Until an index exists it
+ * reads the board and filters it, as before.
+ */
+export async function loadRequestsSince(
+  characterId: number,
+  communityId: string,
+  since: number
+): Promise<CommunityRequest[]> {
+  const override = communityBackendOverride();
+  if (override?.loadItemRequests) {
+    return override.loadItemRequests(communityId).filter((request) => request.createdAt > since);
+  }
+  let snap;
+  try {
+    snap = await underFirebaseSession(async () => {
+      await ensureSignedIn(characterId);
+      return getDocs(
+        query(
+          collection(getSyncFirestore(characterId), 'communities', communityId, 'itemRequests'),
+          where('createdAt', '>', since)
+        )
+      );
+    });
+  } catch (err) {
+    if (!isMissingIndex(err)) throw err;
+    return (await loadRequests(characterId, communityId)).filter((r) => r.createdAt > since);
+  }
   return snap.docs
     .map((entry) => readRequest(entry.id, entry.data()))
     .filter((request): request is CommunityRequest => request !== null)
@@ -118,7 +157,7 @@ export async function loadMyRequests(
     await ensureSignedIn(characterId);
     return getDocs(
       query(
-        collection(getSyncFirestore(), 'communities', communityId, 'itemRequests'),
+        collection(getSyncFirestore(characterId), 'communities', communityId, 'itemRequests'),
         where('ownerUid', '==', myUid)
       )
     );
@@ -256,7 +295,7 @@ export async function loadPledges(
     await ensureSignedIn(characterId);
     return getDocs(
       collection(
-        getSyncFirestore(),
+        getSyncFirestore(characterId),
         'communities',
         communityId,
         'itemRequests',
@@ -291,7 +330,10 @@ export async function loadCommunityPledges(
   const snap = await underFirebaseSession(async () => {
     await ensureSignedIn(characterId);
     return getDocs(
-      query(collectionGroup(getSyncFirestore(), 'pledges'), where('communityId', '==', communityId))
+      query(
+        collectionGroup(getSyncFirestore(characterId), 'pledges'),
+        where('communityId', '==', communityId)
+      )
     );
   });
   for (const entry of snap.docs) {
@@ -301,6 +343,80 @@ export async function loadCommunityPledges(
     found.set(requestId, [...(found.get(requestId) ?? []), pledge]);
   }
   return found;
+}
+
+/**
+ * This Character's own Pledges in a Community, by Request id: the delivery sweep needs nothing
+ * else. One collection-group query on `communityId` and `ownerHash` (every Pledge carries both,
+ * the rules bind them), so it costs what the Character has pledged, not the whole Community.
+ * Until its composite index is deployed it reads every Pledge in the Community, as before.
+ */
+export async function loadMyPledges(
+  characterId: number,
+  communityId: string
+): Promise<Map<string, RequestPledge>> {
+  const uid = uidForCharacter(characterId);
+  const mineOf = (all: ReadonlyMap<string, readonly RequestPledge[]>) => {
+    const mine = new Map<string, RequestPledge>();
+    for (const [requestId, list] of all) {
+      const pledge = list.find((p) => p.uid === uid);
+      if (pledge) mine.set(requestId, pledge);
+    }
+    return mine;
+  };
+  const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
+  if (communityBackendOverride()?.loadAllPledges || !ownerHash) {
+    return mineOf(await loadCommunityPledges(characterId, communityId));
+  }
+  let snap;
+  try {
+    snap = await underFirebaseSession(async () => {
+      await ensureSignedIn(characterId);
+      return getDocs(
+        query(
+          collectionGroup(getSyncFirestore(characterId), 'pledges'),
+          where('communityId', '==', communityId),
+          where('ownerHash', '==', ownerHash)
+        )
+      );
+    });
+  } catch (err) {
+    if (!isMissingIndex(err)) throw err;
+    return mineOf(await loadCommunityPledges(characterId, communityId));
+  }
+  const mine = new Map<string, RequestPledge>();
+  for (const entry of snap.docs) {
+    const requestId = entry.ref.parent.parent?.id;
+    // The document id is the Pledger: an owner hash alone never makes a Pledge this Character's.
+    if (!requestId || entry.id !== uid) continue;
+    const pledge = readPledge(entry.id, entry.data());
+    if (pledge) mine.set(requestId, pledge);
+  }
+  return mine;
+}
+
+/** Some Requests of a Community by id, one read each; one since removed is left out. */
+export async function loadRequestsById(
+  characterId: number,
+  communityId: string,
+  requestIds: readonly string[]
+): Promise<CommunityRequest[]> {
+  if (communityBackendOverride()?.loadItemRequests) {
+    const wanted = new Set(requestIds);
+    return (await loadRequests(characterId, communityId)).filter((r) => wanted.has(r.id));
+  }
+  const snaps = await underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return Promise.all(
+      requestIds.map((id) =>
+        getDoc(doc(getSyncFirestore(characterId), 'communities', communityId, 'itemRequests', id))
+      )
+    );
+  });
+  return snaps
+    .filter((snap) => snap.exists())
+    .map((snap) => readRequest(snap.id, snap.data()))
+    .filter((request): request is CommunityRequest => request !== null);
 }
 
 /**
@@ -324,8 +440,8 @@ export async function updateMyPledge(
     override.savePledge(communityId, requestId, Object.keys(next).length === 0 ? null : next);
     return override.loadPledges(communityId, requestId).find((p) => p.uid === uid) ?? null;
   }
-  return trackPledgeWrite(() =>
-    underFirebaseSession(() => writeMyPledge(characterId, communityId, requestId, uid, change))
+  return underFirebaseSession(() =>
+    writeMyPledge(characterId, communityId, requestId, uid, change)
   );
 }
 
@@ -340,7 +456,7 @@ async function writeMyPledge(
   const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
   if (!ownerHash) throw new Error('This Character has no owner hash yet');
   const ref = doc(
-    getSyncFirestore(),
+    getSyncFirestore(characterId),
     'communities',
     communityId,
     'itemRequests',
@@ -348,7 +464,7 @@ async function writeMyPledge(
     'pledges',
     uid
   );
-  const withdrawn = await runTransaction(getSyncFirestore(), async (tx) => {
+  const withdrawn = await runTransaction(getSyncFirestore(characterId), async (tx) => {
     const stored = await tx.get(ref);
     const before = stored.exists() ? readPledge(uid, stored.data()) : null;
     const next = change(before?.lines ?? {});
@@ -401,34 +517,32 @@ export async function saveMyQuote(
     override.saveQuote(communityId, requestId, quote);
     return override.loadPledges(communityId, requestId).find((p) => p.uid === uid) ?? null;
   }
-  return trackPledgeWrite(() =>
-    underFirebaseSession(async () => {
-      await ensureSignedIn(characterId);
-      const ref = doc(
-        getSyncFirestore(),
-        'communities',
-        communityId,
-        'itemRequests',
-        requestId,
-        'pledges',
-        uid
-      );
-      if (quote === null) {
-        await deleteDoc(ref);
-        return null;
-      }
-      const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
-      if (!ownerHash) throw new Error('This Character has no owner hash yet');
-      await setDoc(ref, {
-        ownerHash,
-        communityId,
-        lines: {},
-        quote,
-        updatedAt: serverTimestamp(),
-      });
-      return readPledge(uid, (await getDoc(ref)).data() ?? {});
-    })
-  );
+  return underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    const ref = doc(
+      getSyncFirestore(characterId),
+      'communities',
+      communityId,
+      'itemRequests',
+      requestId,
+      'pledges',
+      uid
+    );
+    if (quote === null) {
+      await deleteDoc(ref);
+      return null;
+    }
+    const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
+    if (!ownerHash) throw new Error('This Character has no owner hash yet');
+    await setDoc(ref, {
+      ownerHash,
+      communityId,
+      lines: {},
+      quote,
+      updatedAt: serverTimestamp(),
+    });
+    return readPledge(uid, (await getDoc(ref)).data() ?? {});
+  });
 }
 
 /**
@@ -458,32 +572,30 @@ export async function saveQuoteLinks(
     }
     return;
   }
-  await trackPledgeWrite(() =>
-    underFirebaseSession(async () => {
-      await ensureSignedIn(characterId);
-      const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
-      if (!ownerHash) throw new Error('This Character has no owner hash yet');
-      const ref = doc(
-        getSyncFirestore(),
-        'communities',
+  await underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
+    if (!ownerHash) throw new Error('This Character has no owner hash yet');
+    const ref = doc(
+      getSyncFirestore(characterId),
+      'communities',
+      communityId,
+      'itemRequests',
+      requestId,
+      'pledges',
+      uid
+    );
+    await runTransaction(getSyncFirestore(characterId), async (tx) => {
+      const stored = await tx.get(ref);
+      const quote = stored.exists() ? readQuote(stored.data().quote) : undefined;
+      if (!quote || quote.quotedAt !== quotedAt) return;
+      tx.set(ref, {
+        ownerHash,
         communityId,
-        'itemRequests',
-        requestId,
-        'pledges',
-        uid
-      );
-      await runTransaction(getSyncFirestore(), async (tx) => {
-        const stored = await tx.get(ref);
-        const quote = stored.exists() ? readQuote(stored.data().quote) : undefined;
-        if (!quote || quote.quotedAt !== quotedAt) return;
-        tx.set(ref, {
-          ownerHash,
-          communityId,
-          lines: {},
-          quote: withLinks(quote),
-          updatedAt: serverTimestamp(),
-        });
+        lines: {},
+        quote: withLinks(quote),
+        updatedAt: serverTimestamp(),
       });
-    })
-  );
+    });
+  });
 }

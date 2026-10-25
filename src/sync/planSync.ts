@@ -8,9 +8,8 @@
 // Merge policy is pure and lives in merge.ts: last-write-wins per record id,
 // tombstones for deletes kept 30 days.
 //
-// Syncs are serialized GLOBALLY, not just per character: the Firebase session is
-// a single slot swapped by ensureSignedIn, so two concurrent syncs would race
-// the auth state mid-flight. Status is tracked per character so a later
+// Syncs are serialized GLOBALLY, not just per character: one pass at a time
+// keeps the read load and the sweep ordering simple. Status is tracked per character so a later
 // character's success cannot mask an earlier one's failure. Within one
 // character's sync the collections pull concurrently (syncCharacter). Queued
 // syncs start foreground-first (SyncPriority), so an edit never waits behind a
@@ -37,8 +36,16 @@ import {
 } from './settingsSync';
 import { getSyncFirestore } from './firebaseApp';
 import { handleOwnerHashChange } from './ownerHash';
-import { appendTombstones, heartbeatKey, tombstoneKey } from './localBookkeeping';
-import { createSyncScheduler, type SyncScope } from './syncScheduler';
+import {
+  appendTombstones,
+  clearSeenSyncMarker,
+  heartbeatKey,
+  readSeenSyncMarker,
+  tombstoneKey,
+  writeSeenSyncMarker,
+} from './localBookkeeping';
+import { bumpRemoteMarker, canSkipPass, readRemoteMarker } from './syncMarker';
+import { createSyncScheduler, type SyncPriority, type SyncScope } from './syncScheduler';
 import { ensureSignedIn } from './syncAuth';
 import { isAllowedSyncedSettingKey } from './syncedSettings';
 import {
@@ -443,12 +450,42 @@ async function settleAllThenThrow(tasks: readonly NamedTask[], limit: number): P
 }
 
 /**
+ * Bump the marker. A failed bump clears this device's claim too and reports
+ * false; other devices then wait for their safety reconcile.
+ */
+async function bumpMarkerQuietly(
+  firestore: SyncContext['firestore'],
+  uid: string,
+  characterId: number
+): Promise<boolean> {
+  try {
+    await bumpRemoteMarker(firestore, uid, 1);
+    return true;
+  } catch {
+    await clearSeenSyncMarker(characterId);
+    return false;
+  }
+}
+
+/**
  * One pass for one Character over `requested`: every collection, or only the
  * named ones (syncScheduler.ts decides when narrowing is safe). Each listed
  * collection is still pulled before it is pushed — narrowing skips whole
  * collections, never the pull of one it writes. Resolves with the scope it ran.
+ *
+ * Change marker (issue #5073, syncMarker.ts): a full pass reads the Character's
+ * marker first. A `background` one that finds it unchanged since this device's
+ * last full pass ends there, one read instead of one query per collection.
+ * Every pass that pushes bumps the marker once its pushes landed. The marker
+ * never gates a foreground pass (boot, sync now, an edit), so local edits
+ * always push. A marker the rules refuse (not deployed yet) or that fails to
+ * bump only costs the shortcut, never the sync.
  */
-async function syncCharacter(characterId: number, requested: SyncScope): Promise<SyncScope> {
+async function syncCharacter(
+  characterId: number,
+  requested: SyncScope,
+  priority: SyncPriority
+): Promise<SyncScope> {
   const character = await db.characters.get(characterId);
   if (!character) throw new Error(`Unknown character ${characterId}`);
   // A new owner's wipe empties every collection and clears every cursor:
@@ -456,10 +493,40 @@ async function syncCharacter(characterId: number, requested: SyncScope): Promise
   const scope: SyncScope = (await handleOwnerHashChange(character)) ? 'all' : requested;
 
   const uid = await ensureSignedIn(characterId);
-  const firestore = getSyncFirestore();
+  const firestore = getSyncFirestore(characterId);
   const ownerHash = character.ownerHash;
   const now = Date.now();
-  const ctx: SyncContext = { firestore, uid, ownerHash, characterId, now };
+  let pushed = false;
+  const ctx: SyncContext = {
+    firestore,
+    uid,
+    ownerHash,
+    characterId,
+    now,
+    onPush: () => {
+      pushed = true;
+    },
+  };
+
+  // The marker as it stood before this pass pulled anything: storing it after
+  // is safe whatever lands meanwhile (a later bump just earns one more full pass).
+  let markerBefore: number | undefined;
+  if (scope === 'all') {
+    try {
+      let remote = await readRemoteMarker(firestore, uid);
+      const seen = priority === 'background' ? await readSeenSyncMarker(characterId) : undefined;
+      if (canSkipPass(seen, remote, now)) return 'all';
+      if (remote === null) {
+        await bumpRemoteMarker(firestore, uid, 0);
+        remote = 0;
+      }
+      markerBefore = remote;
+    } catch {
+      markerBefore = undefined;
+    }
+    // Whatever this pass finds, the old claim "nothing changed" is spent.
+    await clearSeenSyncMarker(characterId);
+  }
 
   // A failing collection no longer stops the ones after it: each collection's
   // cursor only advances on its own success, so what did apply stays applied
@@ -474,10 +541,24 @@ async function syncCharacter(characterId: number, requested: SyncScope): Promise
     { name: NOTIFICATION_FEED.remoteName, run: () => syncFeed(ctx) },
     { name: SYNCED_SETTINGS.remoteName, run: () => syncSettings(ctx) },
   ];
-  await settleAllThenThrow(
-    scope === 'all' ? tasks : tasks.filter((task) => scope.has(task.name)),
-    COLLECTION_PULL_CONCURRENCY
-  );
+  let bumped = true;
+  try {
+    await settleAllThenThrow(
+      scope === 'all' ? tasks : tasks.filter((task) => scope.has(task.name)),
+      COLLECTION_PULL_CONCURRENCY
+    );
+  } catch (error) {
+    // Any failure, narrowed or not, can leave a local edit unpushed: the next
+    // background pass must read for real rather than trust an unchanged marker.
+    await clearSeenSyncMarker(characterId);
+    throw error;
+  } finally {
+    // What did land still has to reach the other devices, failure or not.
+    if (pushed) bumped = await bumpMarkerQuietly(firestore, uid, characterId);
+  }
+  if (scope === 'all' && markerBefore !== undefined && bumped) {
+    await writeSeenSyncMarker(characterId, { version: markerBefore, fullAt: now });
+  }
   // Heartbeat below means "every collection synced", which a narrowed pass
   // has not shown.
   if (scope !== 'all') return scope;

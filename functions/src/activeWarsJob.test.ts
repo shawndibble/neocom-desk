@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { runActiveWarsSweep, type ActiveWarsDeps, type ActiveWarsDoc } from './activeWarsJob.js';
+import { runActiveWarsSweep, type ActiveWarsDeps, type ActiveWarsDoc } from './activeWarsSweep.js';
 
 vi.mock('firebase-functions/logger', () => ({ info: vi.fn(), warn: vi.fn() }));
 

@@ -19,6 +19,7 @@
  */
 
 import { brokerFee, salesTax } from '@/engine/industry/fees';
+import { mergeCostLines } from '@/engine/industry/mergeCostLines';
 import { SKILL_IDS } from '@/engine/industry/types';
 import type { HubPrices, MaterialCostLine, SkillLevels } from '@/engine/industry/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
@@ -38,6 +39,72 @@ export function sellableMaterials<T extends MaterialCostLine & { acquisitionTier
   materials: readonly T[]
 ): T[] {
   return materials.filter((material) => material.acquisitionTier === undefined);
+}
+
+/**
+ * A resolved plan material, as far as the owned stock in it goes: the line
+ * itself and, when it is built, the inputs its own job consumes.
+ * `ResolvedMaterial` fits it; a test fixture does not need a whole sub-build.
+ */
+export interface OwnedStockNode extends MaterialCostLine {
+  subBuild?: { inputs: readonly OwnedStockNode[] };
+}
+
+/**
+ * Every owned unit a plan's resolved tree would consume, one line per type.
+ * Owned stock is claimed wherever in the tree a material is used, so a
+ * sub-build's inputs hold stock the top level never sees; this walks the
+ * whole tree, so the sale prices what building would actually use up. One
+ * type claimed in several branches merges into one stack: it would be
+ * listed once, and the broker minimum bites once. Blueprint Acquisition rows
+ * stay out at every depth, as `sellableMaterials` keeps them out of the top.
+ */
+export function ownedStockLines(materials: readonly OwnedStockNode[]): MaterialCostLine[] {
+  const byType = new Map<number, MaterialCostLine>();
+  const visit = (nodes: readonly OwnedStockNode[]) => {
+    for (const node of sellableMaterials(nodes)) {
+      if (node.ownedQuantity > 0) {
+        const costLine: MaterialCostLine = {
+          typeID: node.typeID,
+          baseQuantity: node.baseQuantity,
+          quantity: node.quantity,
+          ownedQuantity: node.ownedQuantity,
+          remainingQuantity: node.remainingQuantity,
+          unitPrice: node.unitPrice,
+          lineCost: node.lineCost,
+          unpriced: node.unpriced,
+        };
+        const existing = byType.get(node.typeID);
+        byType.set(node.typeID, existing ? mergeCostLines(existing, costLine) : costLine);
+      }
+      if (node.subBuild) visit(node.subBuild.inputs);
+    }
+  };
+  visit(materials);
+  return [...byType.values()];
+}
+
+/** Both sides of the sale hub's book: what a buy order pays, what a sell order asks. */
+export interface SaleBooks {
+  hubPrices: HubPrices;
+  hubBuyPrices: HubPrices;
+}
+
+/**
+ * What a plan's owned stock would fetch on `basis` — the one sale every
+ * sell-value figure on a Build Plan reads (the verdict, Costs & revenue,
+ * Break Even's trials), so none of them drifts from another. Sell-now fills
+ * buy orders, so it reads the buy side; a listed order reads the sell side.
+ */
+export function planOwnedStockSale(
+  materials: readonly OwnedStockNode[],
+  books: SaleBooks,
+  basis: LiquidationBasis,
+  skills: SkillLevels,
+  standing?: ResolvedStandings
+): OwnedStockSale {
+  const prices = basis === 'instant' ? books.hubBuyPrices : books.hubPrices;
+  return ownedStockSale(ownedStockLines(materials), prices, basis, skills, standing);
 }
 
 export interface OwnedStockSaleLine {

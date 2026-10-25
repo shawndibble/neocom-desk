@@ -7,6 +7,7 @@ import { brokerFeePct, salesTaxPct } from '@/engine/industry/fees';
 import type { BuildResult, MaterialPriceBasis } from '@/engine/industry/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
+import type { ProductSellNow } from '@/engine/industry/productSellNow';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
@@ -45,6 +46,11 @@ export interface BreakdownContext {
    * net if sold, and the break-even once that is added to the cost.
    */
   sellValue?: { forgone: number; breakEvenPrice: number | null } | null;
+  /**
+   * The product sold into the hub's buy orders (issue #5007), on the hero's
+   * basis; `null` when the hub has no buy order for it, absent when unknown.
+   */
+  sellNow?: ProductSellNow | null;
   /** Materials costed at a Depth Price, each with its book walk. */
   depthRows?: readonly { typeID: number; name: string; walk: DepthPrice }[];
 }
@@ -246,6 +252,36 @@ export function CalculationBreakdown({
                   broker: formatIsk(result.brokerFee),
                 })}
               </Formula>
+              {context.sellNow === null && (
+                <p>
+                  {t('industry.breakdown.sellNowNone', {
+                    hub: context.hubName,
+                    product: context.productName,
+                  })}
+                </p>
+              )}
+              {context.sellNow && (
+                <>
+                  <p>{t('industry.breakdown.sellNow', { hub: context.hubName })}</p>
+                  <Formula>
+                    {t(
+                      context.sellNow.forgone > 0
+                        ? 'industry.breakdown.sellNowFormulaSellValue'
+                        : 'industry.breakdown.sellNowFormula',
+                      {
+                        quantity: formatCount(context.sellNow.quantity),
+                        unitPrice: formatIsk(context.sellNow.unitPrice),
+                        gross: formatIsk(context.sellNow.gross),
+                        tax: formatIsk(context.sellNow.salesTax),
+                        total: formatIsk(result.totalCost),
+                        forgone: formatIsk(context.sellNow.forgone),
+                        profit: formatIsk(context.sellNow.profit),
+                      }
+                    )}
+                  </Formula>
+                  <p>{t('industry.breakdown.sellNowDepth')}</p>
+                </>
+              )}
             </Section>
           )}
 

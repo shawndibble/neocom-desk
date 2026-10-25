@@ -8,6 +8,7 @@
  * the widget, so a pilot never reads one Character's figure as the account's.
  */
 import { feedsOf, kindSumsAcrossCharacters } from './data/models';
+import type { ViewSettings } from './data/viewSettings';
 import type { WidgetScope } from './layout';
 
 export interface ScopePresentation {
@@ -19,9 +20,15 @@ export interface ScopePresentation {
   fallbackNote: boolean;
 }
 
-export function scopePresentation(kind: string, widgetScope: WidgetScope): ScopePresentation {
+/** `settings` are the widget's own, for a kind whose scope follows one (Profit sums only on Trading). */
+export function scopePresentation(
+  kind: string,
+  widgetScope: WidgetScope,
+  settings?: ViewSettings
+): ScopePresentation {
   if (widgetScope !== 'all') return { scopeAll: false, chip: false, fallbackNote: false };
-  if (kindSumsAcrossCharacters(kind)) return { scopeAll: true, chip: true, fallbackNote: false };
+  if (kindSumsAcrossCharacters(kind, settings))
+    return { scopeAll: true, chip: true, fallbackNote: false };
   // A kind with no data yet has nothing to be a fallback of.
   return { scopeAll: false, chip: false, fallbackNote: feedsOf(kind) !== undefined };
 }

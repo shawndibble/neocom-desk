@@ -8,6 +8,7 @@ import type { BuildResult, IndustryActivity } from '@/engine/industry/types';
 import type { MaterialVolumeTotals } from '@/engine/industry/materialVolume';
 import type { LiquidationBasis, OwnedStockSale } from '@/engine/industry/ownedStockSale';
 import type { ProfitBasis } from '@/engine/industry/profitBasis';
+import type { ProductSellNow } from '@/engine/industry/productSellNow';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { formatDuration } from '@/lib/duration';
@@ -108,6 +109,12 @@ interface ResultsSummaryProps {
   profitBasis: ProfitBasis | null;
   /** Profit on `profitBasis` — the ledger's bottom line, the hero's big number. */
   profit: number | null;
+  /**
+   * The product sold into the hub's buy orders instead, on the same basis as
+   * `profit` (issue #5007). `null` when the hub has no buy order for it;
+   * absent when there is no product sale to quote.
+   */
+  sellNow?: ProductSellNow | null;
   /** Grand total m3 across the materials table, for hauling-trip planning (issue #874). */
   totalVolume: MaterialVolumeTotals;
   /** The plan's trade hub, where the product is priced at its lowest sell. */
@@ -152,6 +159,7 @@ export function ResultsSummary({
   onSaleBasisChange,
   profitBasis,
   profit,
+  sellNow,
   totalVolume,
   hubName,
   planSeconds,
@@ -345,13 +353,32 @@ export function ResultsSummary({
             className="relative -mt-px border-t border-line-bright"
           />
         )}
+        {/* The second sale basis, under the headline it is read against: the
+            headline stays on the listed sell order (scope decision for #5007). */}
+        {profit !== null && sellNow !== undefined && (
+          <CostRow
+            label={t('industry.ledger.profitIfSoldNow')}
+            tooltip={t('industry.ledger.profitIfSoldNowHint')}
+            value={
+              sellNow === null ? (
+                <span className="font-normal text-text-dim">
+                  {t('industry.ledger.noBuyOrders', { hub: hubName })}
+                </span>
+              ) : (
+                formatIsk(sellNow.profit)
+              )
+            }
+            tone={sellNow === null ? undefined : sellNow.profit >= 0 ? 'positive' : 'negative'}
+          />
+        )}
       </div>
 
-      {/* A separate group — facts about the plan, not lines of the sum — so a
-          gap and a rule set it apart from the profit it would otherwise sit on.
-          `pl-5.5` is the ledger's caret slot plus its gap, so every label in
-          the panel starts at one edge. */}
-      <dl className="mt-5! grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 border-t border-line pt-4 pl-5.5 text-xs">
+      {/* Facts about the plan, not lines of the sum: a footer band flush to the
+          panel's edges (the `-mx-3 -mb-3` undo the panel's `p-3`), styled like
+          the verdict hero's setup strip, so Profit ends the ledger and this
+          reads as the card's foot. `mt-0!` sits it straight under Profit, so
+          one rule divides them, not a gap and a rule. No caret indent. */}
+      <dl className="-mx-3 mt-0! -mb-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 rounded-b-xs border-t border-line bg-bg/40 px-3 py-3 text-xs">
         {revenue !== null && (
           <>
             <dt className="text-text-dim">

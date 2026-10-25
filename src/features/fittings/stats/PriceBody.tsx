@@ -4,7 +4,7 @@ import { Button, IskAmount } from '@/components/ui';
 import { guarded } from '@/app/routeChunks';
 import type { PriceView } from './priceView';
 import { PriceHubSelect } from '../PriceHubSelect';
-import { Facts, StatField, StatFields, StatNote } from '../StatFacts';
+import { StatField, StatFields, StatNote } from '../StatFacts';
 
 const FittingAppraisalModal = lazy(() =>
   guarded(() => import('../FittingAppraisalModal')).then((m) => ({
@@ -24,7 +24,7 @@ export function IskLabel({ value }: { value: number }) {
 export function PriceBody({ view }: { view: PriceView }) {
   const { t } = useTranslation();
   const [appraisalOpen, setAppraisalOpen] = useState(false);
-  const { named, nothingPriced, unpriced } = view;
+  const { named, unpriced } = view;
   return (
     <>
       <StatFields>
@@ -40,14 +40,6 @@ export function PriceBody({ view }: { view: PriceView }) {
           <FittingAppraisalModal open onClose={() => setAppraisalOpen(false)} price={named} />
         </Suspense>
       )}
-      <Facts
-        items={[
-          {
-            label: t('fittings.stats.fact.sell'),
-            value: nothingPriced ? '—' : <IskLabel value={named.totals.sell} />,
-          },
-        ]}
-      />
       {unpriced.length > 0 && (
         <StatNote tone="warning">
           <p>{t('fittings.stats.priceUnpriced', { count: unpriced.length })}</p>

@@ -17,7 +17,8 @@ export async function saveCorpSyncGrantRemote(
   await ensureSignedIn(characterId);
   await callRouted<typeof grant, { characterId: number; enabledAt: number }>(
     'saveCorpTaxBookSyncGrantCallable',
-    grant
+    grant,
+    characterId
   );
 }
 
@@ -28,7 +29,8 @@ export async function revokeCorpSyncGrantRemote(
   await ensureSignedIn(characterId);
   await callRouted<typeof call, { deleted: boolean; revoked: boolean }>(
     'revokeCorpTaxBookSyncGrantCallable',
-    call
+    call,
+    characterId
   );
 }
 
@@ -48,5 +50,5 @@ export async function saveFeederGrantRemote(
   return callRouted<
     FeederGrantCall,
     { collectorCorporationId: number; feederCorporationId: number; rejoined: boolean }
-  >('saveCorpTaxBookFeederGrantCallable', grant);
+  >('saveCorpTaxBookFeederGrantCallable', grant, characterId);
 }

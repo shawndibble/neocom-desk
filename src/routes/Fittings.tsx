@@ -41,6 +41,7 @@ import { LoadWarnings } from '@/features/fittings/FittingLoadCard';
 import { FittingEditorHeader } from '@/features/fittings/FittingEditorHeader';
 import { FittingEditorLayout } from '@/features/fittings/FittingEditorLayout';
 import { useMakeItFitDialog } from '@/features/fittings/useMakeItFitDialog';
+import { useImproveDrawer } from '@/features/fittings/useImproveDrawer';
 import type { LibraryAction } from '@/features/fittings/FittingHeader';
 import { FittingStartScreen } from '@/features/fittings/FittingStartScreen';
 import { FittingLibraryDialogs } from '@/features/fittings/FittingLibraryDialogs';
@@ -396,6 +397,19 @@ function FittingsPage() {
     edit((f) => swapModuleType(f, moduleSlot.slot, moduleSlot.slotIndex, typeId));
   }
   const targetProfiles = useTargetProfiles();
+  const improve = useImproveDrawer({
+    workspace,
+    fitting,
+    catalogue,
+    targetProfiles,
+    isPhone,
+    edit,
+    characterId: activeCharacterId,
+    charges,
+    context,
+    moduleResults,
+    openMakeItFit: makeItFit.open,
+  });
   const overlay = useOverlayFitting({
     characterId: activeCharacterId,
     profile: workspace.profile,
@@ -517,6 +531,7 @@ function FittingsPage() {
             saved={saved}
             onLibrary={openLibrary}
             onSavedToEve={() => setInGameFittingsKey((key) => key + 1)}
+            onImprove={improve.open}
           />
           {workspace.tooLargeToShare && (
             <p role="alert" className="text-xs text-warning">
@@ -547,6 +562,7 @@ function FittingsPage() {
             statsSections={statsSections}
           />
           {makeItFit.dialog}
+          {improve.drawer}
           <FittingLibraryDialogs
             library={library}
             onClose={closeLibrary}

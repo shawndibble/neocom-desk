@@ -8,6 +8,7 @@ import { scalePx } from '@/lib/fontScale';
 import type { ReactElement } from 'react';
 import { XAxis, YAxis } from 'recharts';
 import { formatEveClock } from '@/engine/survey/chatMessage';
+import { spacedLabels } from '@/engine/survey/labelSpacing';
 import { timeTicks } from '@/engine/survey/timeTicks';
 import type { SurveySummary } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
@@ -26,9 +27,9 @@ export function timeAxis(summary: SurveySummary): {
   ticks: number[];
   xAxis: (hide: boolean) => ReactElement;
 } {
-  // A little past the finish, so its marker and label sit inside the plot.
+  // A hair past the finish so its marker is not clipped; the label sits left of the line.
   const end = summary.etaAt ?? summary.lastAt;
-  const domain: [number, number] = [summary.firstAt, end + (end - summary.firstAt) * 0.07];
+  const domain: [number, number] = [summary.firstAt, end + (end - summary.firstAt) * 0.01];
   const ticks = timeTicks(domain[0], domain[1]);
   const xAxis = (hide: boolean) => (
     <XAxis
@@ -48,7 +49,11 @@ export function timeAxis(summary: SurveySummary): {
 
 /** The standard value axis; `compact` narrows it, `label` adds an axis title. */
 export function yAxis(
-  opts: { compact?: boolean; label?: React.ComponentProps<typeof YAxis>['label'] } = {}
+  opts: {
+    compact?: boolean;
+    label?: React.ComponentProps<typeof YAxis>['label'];
+    domain?: React.ComponentProps<typeof YAxis>['domain'];
+  } = {}
 ): ReactElement {
   return (
     <YAxis
@@ -57,6 +62,7 @@ export function yAxis(
       stroke="var(--color-line-bright)"
       tick={{ fill: 'var(--color-text-dim)', fontSize: '0.6875rem' }}
       label={opts.label}
+      domain={opts.domain}
     />
   );
 }
@@ -82,3 +88,36 @@ export function makeScanDot(onRemove?: (at: number) => void) {
     );
   };
 }
+
+/**
+ * Which labels fit on a chart: the indexes of `labels` (at a time, with a
+ * weight for who wins a clash) to draw, `gap` px apart at least. `plotWidth`
+ * is the chart's reported width; before it reports one there is nothing to
+ * measure, so all show.
+ */
+export function thinLabels(
+  labels: { at: number; weight: number }[],
+  domain: [number, number] | readonly [number, number],
+  plotWidth: number,
+  gap: number
+): Set<number> {
+  const plotPx = Math.max(0, plotWidth - scalePx(Y_AXIS_WIDTH) - MARGIN.right);
+  if (plotPx === 0) return new Set(labels.keys());
+  return spacedLabels(
+    labels.map((l) => ({
+      x: ((l.at - domain[0]) / (domain[1] - domain[0])) * plotPx,
+      weight: l.weight,
+    })),
+    gap
+  );
+}
+
+/**
+ * A percent for display: whole numbers from 10 up, one decimal below, and "<0.1" for a positive
+ * sliver that would round to 0 while its line still draws.
+ */
+export const formatPace = (v: number): string => {
+  if (v >= 10) return String(Math.round(v));
+  const r = Math.round(v * 10) / 10;
+  return r === 0 && v > 0 ? '<0.1' : String(r);
+};

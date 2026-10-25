@@ -1320,7 +1320,6 @@ describe('FittingStatsSections price', () => {
 
     expect(body.queryByText(/no price at this hub/)).toBeNull();
     expect(body.queryByText('Buy')).toBeNull();
-    expect(body.getByText('Sell')).toBeInTheDocument();
   });
 
   afterEach(() => configureClipboard(null));

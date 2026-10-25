@@ -105,7 +105,8 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
   }
   const feedIds = useMemo(() => {
     const ids = new Set<FeedId>();
-    for (const request of stable) for (const id of feedsOf(request.kind) ?? NO_FEEDS) ids.add(id);
+    for (const request of stable)
+      for (const id of feedsOf(request.kind, request) ?? NO_FEEDS) ids.add(id);
     return [...ids];
   }, [stable]);
   // Re-render only when a feed these kinds read changes, not on any feed's update.
@@ -125,7 +126,7 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
         cachedView(
           store,
           request,
-          feedsOf(request.kind) ?? NO_FEEDS,
+          feedsOf(request.kind, request) ?? NO_FEEDS,
           {
             t,
             now,
@@ -145,8 +146,17 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
 
 /** The view for one widget. */
 export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSettings): KindView {
-  const { range, plexPer30Days, calendarEvents, raidsWhere, raidsRadius, trendItems, trendHubs } =
-    settings;
+  const {
+    range,
+    plexPer30Days,
+    calendarEvents,
+    raidsWhere,
+    raidsRadius,
+    profitSource,
+    trendItems,
+    trendHubs,
+    show,
+  } = settings;
   const request = useMemo<ViewRequest>(
     () => ({
       kind,
@@ -156,8 +166,10 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
       calendarEvents,
       raidsWhere,
       raidsRadius,
+      profitSource,
       trendItems,
       trendHubs,
+      show,
     }),
     [
       kind,
@@ -167,8 +179,10 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
       calendarEvents,
       raidsWhere,
       raidsRadius,
+      profitSource,
       trendItems,
       trendHubs,
+      show,
     ]
   );
   const requests = useMemo(() => [request], [request]);

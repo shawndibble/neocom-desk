@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getKind, isAddable } from './kinds';
+import { presetSeed } from './galleryPresets';
 import {
   BASE_KINDS,
   ROLES,
@@ -15,7 +16,13 @@ describe('ROLES', () => {
   it('has the six roles and the four base kinds', () => {
     expect(ROLE_IDS).toHaveLength(6);
     expect(BASE_KINDS).toEqual(['wallet', 'training', 'comingUp', 'mail']);
-    expect(ROLES.trader).toEqual(['orders', 'priceWatch', 'stock', 'walletFlow', 'netWorth']);
+    expect(ROLES.trader).toEqual([
+      'orders',
+      'priceWatch',
+      'stock',
+      presetSeed('walletFlow'),
+      'netWorth',
+    ]);
     expect(ROLES.explorerHauler).toEqual(['routeSafety', 'hauling', 'incursions', 'location']);
   });
 });
@@ -36,9 +43,12 @@ describe('buildLayoutFromRoles', () => {
       'orders',
       'priceWatch',
       'stock',
-      'walletFlow',
+      'wallet',
       'netWorth',
     ]);
+    // The Role's Wallet flow is the Wallet on its Flow, opened as the old kind was.
+    expect(l.widgets[7]).toMatchObject({ show: 'flow', size: 'M', view: 'chart' });
+    expect('show' in l.widgets[0]!).toBe(false);
     expect(l.version).toBe(1);
   });
 

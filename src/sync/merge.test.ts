@@ -414,6 +414,157 @@ describe('mergeSettings', () => {
   });
 });
 
+describe('mergeSettings: incremental pull (#5045)', () => {
+  // The cursor: the previous pass reconciled everything stamped at or below it.
+  const SINCE = NOW - 10_000;
+  const EMPTY_RESULT = {
+    push: [],
+    pull: [],
+    pushTombstones: [],
+    deleteLocal: [],
+    purgeRemote: [],
+    clearLocalTombstones: [],
+  };
+
+  describe('key absent from the window', () => {
+    it('leaves a local value stamped at or below the cursor alone', () => {
+      // Full read: absence = never pushed, so push. Windowed: already in sync.
+      const local = [{ key: 'sync.a', value: 1, updatedAt: SINCE }];
+      expect(mergeSettings(local, [], [], NOW).push).toEqual(local);
+      expect(mergeSettings(local, [], [], NOW, SINCE)).toEqual(EMPTY_RESULT);
+    });
+
+    it('pushes a local value edited after the cursor', () => {
+      const local = [{ key: 'sync.a', value: 1, updatedAt: SINCE + 1 }];
+      expect(mergeSettings(local, [], [], NOW, SINCE).push).toEqual(local);
+    });
+
+    it('never pushes an unstamped local value from a window', () => {
+      // `updatedAt: 0` means "any remote copy wins" (useSyncedSetting's seed).
+      // A window cannot show whether one exists, so pushing — stamped `now` —
+      // could overwrite it. The sync pass forces a full read instead.
+      const local = [{ key: 'sync.a', value: 1, updatedAt: 0 }];
+      expect(mergeSettings(local, [], [], NOW).push).toEqual(local);
+      expect(mergeSettings(local, [], [], NOW, SINCE)).toEqual(EMPTY_RESULT);
+    });
+
+    it('does not re-push a local tombstone recorded at or below the cursor', () => {
+      // Settings tombstones never expire. On a full read with no remote doc
+      // they are reasserted; repeated on every windowed pass that would be one
+      // write per deleted key per pass, forever.
+      const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: SINCE };
+      expect(mergeSettings([], [tombstone], [], NOW).pushTombstones).toEqual([tombstone]);
+      expect(mergeSettings([], [tombstone], [], NOW, SINCE)).toEqual(EMPTY_RESULT);
+    });
+
+    it('pushes a tombstone recorded after the cursor, and never clears it on absence', () => {
+      const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: SINCE + 1 };
+      const result = mergeSettings([], [tombstone], [], NOW, SINCE);
+      expect(result.pushTombstones).toEqual([tombstone]);
+      expect(result.clearLocalTombstones).toEqual([]);
+    });
+  });
+
+  describe('remote delete', () => {
+    it('deletes the local value when the remote tombstone is in the window', () => {
+      const result = mergeSettings(
+        [{ key: 'sync.a', value: 1, updatedAt: SINCE - 100 }],
+        [],
+        [{ key: 'sync.a', updatedAt: SINCE + 50, deleted: true }],
+        NOW,
+        SINCE
+      );
+      expect(result.deleteLocal).toEqual(['sync.a']);
+      expect(result.push).toEqual([]);
+    });
+
+    it('resurrects a value rewritten locally after the remote delete', () => {
+      const local = [{ key: 'sync.a', value: 2, updatedAt: SINCE + 100 }];
+      const result = mergeSettings(
+        local,
+        [],
+        [{ key: 'sync.a', updatedAt: SINCE + 50, deleted: true }],
+        NOW,
+        SINCE
+      );
+      expect(result.push).toEqual(local);
+      expect(result.deleteLocal).toEqual([]);
+    });
+
+    it('leaves the local tombstone in place when the remote one arrives in the window', () => {
+      const result = mergeSettings(
+        [],
+        [{ key: 'sync.a', deletedAt: SINCE + 10 }],
+        [{ key: 'sync.a', updatedAt: SINCE + 50, deleted: true }],
+        NOW,
+        SINCE
+      );
+      expect(result).toEqual(EMPTY_RESULT);
+    });
+  });
+
+  describe('local delete', () => {
+    it('pulls a remote write that postdates the local delete, clearing the tombstone', () => {
+      const result = mergeSettings(
+        [],
+        [{ key: 'sync.a', deletedAt: SINCE + 10 }],
+        [{ key: 'sync.a', value: 3, updatedAt: SINCE + 50 }],
+        NOW,
+        SINCE
+      );
+      expect(result.pull).toEqual([{ key: 'sync.a', value: 3, updatedAt: SINCE + 50 }]);
+      expect(result.clearLocalTombstones).toEqual(['sync.a']);
+    });
+
+    it('reasserts the delete over a stale remote write in the window, however old the delete', () => {
+      // The doc is in the window (it was written since the cursor) but its
+      // stamp predates the delete: a stale re-push. The tombstone wins even
+      // though the delete itself is below the cursor.
+      const tombstone: SyncedSettingTombstone = { key: 'sync.a', deletedAt: SINCE - 40 };
+      const result = mergeSettings(
+        [],
+        [tombstone],
+        [{ key: 'sync.a', value: 'stale', updatedAt: SINCE - 60 }],
+        NOW,
+        SINCE
+      );
+      expect(result.pushTombstones).toEqual([tombstone]);
+      expect(result.pull).toEqual([]);
+      expect(result.clearLocalTombstones).toEqual([]);
+    });
+  });
+
+  describe('edit on both sides', () => {
+    it('is last-write-wins exactly as on a full read', () => {
+      const local = [
+        { key: 'sync.a', value: 1, updatedAt: SINCE + 200 },
+        { key: 'sync.b', value: 1, updatedAt: SINCE - 500 },
+        { key: 'sync.c', value: 1, updatedAt: SINCE + 30 },
+      ];
+      const remote = [
+        { key: 'sync.a', value: 2, updatedAt: SINCE + 100 },
+        { key: 'sync.b', value: 2, updatedAt: SINCE + 100 },
+        { key: 'sync.c', value: 1, updatedAt: SINCE + 30 },
+      ];
+      const windowed = mergeSettings(local, [], remote, NOW, SINCE);
+      expect(windowed).toEqual(mergeSettings(local, [], remote, NOW));
+      expect(windowed.push.map((s) => s.key)).toEqual(['sync.a']);
+      expect(windowed.pull.map((s) => s.key)).toEqual(['sync.b']);
+    });
+
+    it('pulls a key this device has never held', () => {
+      const result = mergeSettings(
+        [],
+        [],
+        [{ key: 'sync.a', value: 2, updatedAt: SINCE + 1 }],
+        NOW,
+        SINCE
+      );
+      expect(result.pull).toEqual([{ key: 'sync.a', value: 2, updatedAt: SINCE + 1 }]);
+    });
+  });
+});
+
 function feedRow(overrides: Partial<FeedRow> = {}): FeedRow {
   return { id: 'occ-1', firedAt: NOW - 1000, ...overrides };
 }

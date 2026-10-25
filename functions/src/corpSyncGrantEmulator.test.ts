@@ -3,7 +3,7 @@
 // repo root (which starts the emulator and sets FIRESTORE_EMULATOR_HOST); a plain
 // `npm test` skips it.
 import type { Caller } from './actorAuth.js';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -22,8 +22,14 @@ import {
   type CorpSyncGrantDoc,
   type ScheduledSyncStatus,
 } from './corpSyncGrant.js';
-import { turnOnBook, verifyOfficer, type BookDeps } from './corpTaxBookStore.js';
+import { deleteBook, turnOnBook, verifyOfficer, type BookDeps } from './corpTaxBookStore.js';
 import type { EsiRead, SyncEsi } from './corpTaxBookSyncEsi.js';
+import { QUIET_DOC } from './corpTaxBookQuietRun.js';
+import {
+  installBookWriteTracking,
+  stampBook,
+  withBookVersions,
+} from './corpTaxBookVersionTracking.js';
 
 const CORP = 98000001;
 const T0 = Date.parse('2026-10-18T12:00:00Z');
@@ -507,6 +513,246 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
       expect(
         (await audit()).some((a) => a.action === 'assignPayment' && a.via === 'scheduled sync')
       ).toBe(true);
+    });
+
+    describe('settled rows (#5048)', () => {
+      const H = 3_600_000;
+      const row = (date: string, quantity: number, character = 50) => ({
+        character_id: character,
+        recorded_corporation_id: CORP,
+        type_id: 45490,
+        quantity,
+        last_updated: date,
+      });
+      const readAt = (rows: unknown[], truncated = false): EsiRead<unknown[]> => ({
+        kind: 'ok',
+        data: rows,
+        fetchedAt: new Date(now).toISOString(),
+        truncated,
+      });
+      const quantity = async (date: string, structureId = 5000, character = 50) =>
+        (
+          await book().collection('observed').doc(`${character}_45490_${date}_${structureId}`).get()
+        ).data()?.quantity;
+      const through = async () => (await book().get()).data()?.observedThrough;
+
+      it('records a full read, then leaves rows final at that read out of the merge', async () => {
+        await optIn(ACCOUNTANT);
+        now = T0 + 6 * H;
+        esiState.ledger = readAt([row('2026-10-10', 100), row('2026-10-17', 100)]);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(await through()).toEqual({ '5000': now });
+        const first = now;
+
+        now = T0 + 12 * H;
+        // A closed day cannot really grow; 999 only shows the row was left out of the merge.
+        esiState.ledger = readAt([row('2026-10-10', 999), row('2026-10-17', 150)]);
+        expect((await runScheduledCorpSyncs(syncDeps(), fakeEsi())).synced).toBe(1);
+        expect(await quantity('2026-10-10')).toBe(100);
+        // Yesterday is inside the grace: its growth still lands.
+        expect(await quantity('2026-10-17')).toBe(150);
+        expect(await through()).toEqual({ '5000': now });
+        expect(now).toBeGreaterThan(first);
+        // The settled row's Character still gets its billed-by pointer.
+        const pointer = await db.collection('corpTaxBookBilledBy').doc('char:50').get();
+        expect(pointer.data()?.books).toHaveProperty(String(CORP));
+      });
+
+      it('merges a new refinery’s old rows in full: it has no read on record', async () => {
+        await optIn(ACCOUNTANT);
+        now = T0 + 6 * H;
+        esiState.ledger = readAt([row('2026-10-10', 100)]);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+
+        now = T0 + 12 * H;
+        esiState.observers = ok([5000, 6000]);
+        esiState.ledger = readAt([row('2026-10-10', 100), row('2026-10-09', 40, 51)]);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(await quantity('2026-10-09', 6000, 51)).toBe(40);
+        expect(await through()).toEqual({ '5000': now, '6000': now });
+      });
+
+      it('records no read for a truncated ledger, so the next run merges all of it', async () => {
+        await optIn(ACCOUNTANT);
+        now = T0 + 6 * H;
+        esiState.ledger = readAt([row('2026-10-10', 100)], true);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(await through()).toBeUndefined();
+
+        now = T0 + 12 * H;
+        // The first read missed pages: the rest of that closed day turns up now.
+        esiState.ledger = readAt([row('2026-10-10', 160)]);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(await quantity('2026-10-10')).toBe(160);
+      });
+
+      it('a book deleted and turned on again mid-run does not inherit the old watermark', async () => {
+        await optIn(ACCOUNTANT);
+        now = T0 + 6 * H;
+        esiState.ledger = readAt([row('2026-10-10', 100)]);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(await through()).toEqual({ '5000': now });
+
+        now = T0 + 12 * H;
+        esiState.ledger = readAt([row('2026-10-10', 100)]);
+        const recreating: SyncEsi = {
+          ...fakeEsi(),
+          // While the run reads ESI, the book is deleted and turned on again, empty.
+          journal: async () => {
+            await deleteBook(
+              bookDeps(),
+              who(DIRECTOR),
+              parseBookCall({ corporationId: CORP, accessToken: `tok-${DIRECTOR}` })
+            );
+            now += 1;
+            await turnOnBook(
+              bookDeps(),
+              who(DIRECTOR),
+              parseTurnOnInput({
+                corporationId: CORP,
+                accessToken: `tok-${DIRECTOR}`,
+                startDate: '2026-10-01',
+                startRatePct: 10,
+              })
+            );
+            await verifyOfficer(
+              bookDeps(),
+              who(ACCOUNTANT),
+              parseBookCall({ corporationId: CORP, accessToken: `tok-${ACCOUNTANT}` })
+            );
+            return esiState.journal as never;
+          },
+        };
+        await runScheduledCorpSyncs(syncDeps(), recreating);
+        expect(await through()).toBeUndefined();
+
+        now = T0 + 18 * H;
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(await quantity('2026-10-10')).toBe(100);
+      });
+
+      it('records no read when the run’s merge fails, so the next run merges everything again', async () => {
+        await optIn(ACCOUNTANT);
+        now = T0 + 6 * H;
+        // A row the upload refuses fails the whole run before anything is merged.
+        esiState.ledger = readAt([row('2026-10-10', 100), row('2026-12-01', 1)]);
+        expect((await runScheduledCorpSyncs(syncDeps(), fakeEsi())).synced).toBe(0);
+        expect(await through()).toBeUndefined();
+
+        esiState.ledger = readAt([row('2026-10-10', 100)]);
+        await runScheduledCorpSyncs(syncDeps(), fakeEsi());
+        expect(await quantity('2026-10-10')).toBe(100);
+      });
+    });
+
+    describe('quiet runs (#5048)', () => {
+      const H = 3_600_000;
+      // The real version stamps (#5047), as the deployed job runs under them; stamped once at
+      // the end of each run, since a stamp mid-run only contends with the run's own transactions.
+      const versioned = <T>(run: () => Promise<T>) =>
+        withBookVersions(
+          (id, touched) => stampBook(db, id, touched),
+          run,
+          () => undefined,
+          60_000
+        );
+      const run = () => versioned(() => runScheduledCorpSyncs(syncDeps(), fakeEsi()));
+      const marker = async () => (await book().collection('meta').doc(QUIET_DOC).get()).data();
+      const paid = async () =>
+        ((await book().collection('meta').doc('paid').get()).data()?.ids as string[]) ?? [];
+      /** Runs until the book holds a quiet marker: the donation lands, then a run finds nothing to do. */
+      async function quietBook() {
+        await optIn(ACCOUNTANT);
+        for (let i = 1; i <= 2; i++) {
+          now = T0 + i * 6 * H;
+          await run();
+        }
+        expect(await marker()).toMatchObject({ at: now, known: [50] });
+        // Officers-only: the book doc, which any signed-in Character may read, carries none of it.
+        expect(Object.keys((await book().get()).data() ?? {})).not.toContain(QUIET_DOC);
+      }
+
+      beforeAll(() => installBookWriteTracking());
+
+      it('skips the full read while the book is unchanged, and reads again once a stamp moves', async () => {
+        await quietBook();
+        // Written with no stamp: a quiet run cannot see it, which shows it did not read Statements.
+        await book().collection('statements').doc('s1').set(statement);
+        now += 6 * H;
+        expect((await run()).synced).toBe(1);
+        expect(await paid()).toEqual([]);
+        // The ledger and the sync record still land on the quiet path.
+        expect((await book().get()).data()?.lastSync).toMatchObject({ at: now, scheduled: true });
+
+        // Any server write to Statements moves the stamp: the next run reads in full and settles.
+        await versioned(() => book().collection('statements').doc('s1').set(statement));
+        now += 6 * H;
+        await run();
+        expect(await paid()).toEqual(['s1']);
+        expect(await marker()).toBeUndefined();
+      });
+
+      it('reads in full when ESI brings a new donation, and clears the marker', async () => {
+        await quietBook();
+        (esiState.journal as { data: unknown[] }).data.push({
+          id: 2,
+          date: '2026-10-18T10:00:00Z',
+          ref_type: 'player_donation',
+          amount: 1_000_000,
+          first_party_id: 50,
+        });
+        now += 6 * H;
+        await run();
+        expect((await book().collection('payments').doc('j1_2').get()).exists).toBe(true);
+        // Nothing settled, but the run was not quiet: the old marker no longer vouches.
+        expect(await marker()).toBeUndefined();
+      });
+
+      it('reads in full when the paid Statements are not the ones it saw', async () => {
+        await quietBook();
+        await book().collection('statements').doc('s1').set(statement);
+        await book()
+          .collection('meta')
+          .doc('paid')
+          .set({ ids: ['s0'] });
+        now += 6 * H;
+        await run();
+        expect(await paid()).toEqual(['s0', 's1']);
+      });
+
+      it('reads in full when a Character new to it mines, who may match an Unmatched donation', async () => {
+        (esiState.journal as { data: unknown[] }).data.push({
+          id: 3,
+          date: '2026-10-17T11:00:00Z',
+          ref_type: 'player_donation',
+          amount: 2_000_000,
+          first_party_id: 51,
+        });
+        await quietBook();
+        expect((await book().collection('payments').doc('j1_3').get()).data()?.minerId).toBe(
+          undefined
+        );
+        (esiState.ledger as { data: unknown[] }).data.push({
+          character_id: 51,
+          recorded_corporation_id: CORP,
+          type_id: 45490,
+          quantity: 10,
+          last_updated: '2026-10-17',
+        });
+        now += 6 * H;
+        await run();
+        expect((await book().collection('payments').doc('j1_3').get()).data()?.minerId).toBe(
+          'solo:51'
+        );
+      });
+
+      it('reads in full once the marker is a day old, whatever the stamps say', async () => {
+        await quietBook();
+        await book().collection('statements').doc('s1').set(statement);
+        now += 24 * H;
+        await run();
+        expect(await paid()).toEqual(['s1']);
+      });
     });
 
     it('syncs a book with no refineries of its own once it has moon owners (#4616)', async () => {

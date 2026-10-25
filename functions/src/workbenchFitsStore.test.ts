@@ -2,7 +2,8 @@ import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import type { R2Put } from './r2Client.js';
 import type { StoredWorkbenchFit } from './workbenchFits.js';
-import { r2WorkbenchHulls } from './workbenchFitsStore.js';
+import { WORKBENCH_SYNC_STATE_R2_KEY } from './workbenchFits.js';
+import { r2WorkbenchHulls, r2WorkbenchStore } from './workbenchFitsStore.js';
 
 function fit(id: string, dateAdded: number): StoredWorkbenchFit {
   return { id, name: id, authorId: 1, authorName: 'Pilot', dateAdded, eft: `[Vexor, ${id}]` };
@@ -54,5 +55,33 @@ describe('r2WorkbenchHulls', () => {
     const hulls = r2WorkbenchHulls(r2);
     expect(await hulls.readHull(626)).toEqual([fit('a', 2)]);
     expect(await hulls.readHull(627)).toEqual([]);
+  });
+});
+
+describe('r2WorkbenchStore state', () => {
+  const head = { ids: ['a', 'b'], dateAdded: 5 };
+
+  it('reads a fresh start when no checkpoint object exists', async () => {
+    expect(await r2WorkbenchStore(fakeR2()).readState()).toEqual({ boundary: null, pass: null });
+  });
+
+  it('saves the checkpoint as an uncached R2 object and reads it back', async () => {
+    const r2 = fakeR2();
+    const state = { boundary: head, pass: { nextPage: 7, head: { ids: ['c'], dateAdded: 9 } } };
+    await r2WorkbenchStore(r2).saveState(state);
+    expect(r2.puts[0].key).toBe(WORKBENCH_SYNC_STATE_R2_KEY);
+    expect(r2.puts[0].json).toMatchObject(state);
+    expect(r2.puts[0].headers['Cache-Control']).toBe('no-store');
+    const back = await r2WorkbenchStore(
+      fakeR2({ [WORKBENCH_SYNC_STATE_R2_KEY]: r2.puts[0].json })
+    ).readState();
+    expect(back).toEqual(state);
+  });
+
+  it('treats a malformed checkpoint as a fresh start', async () => {
+    const bad = { boundary: { ids: 'x' }, pass: { nextPage: 0, head } };
+    expect(
+      await r2WorkbenchStore(fakeR2({ [WORKBENCH_SYNC_STATE_R2_KEY]: bad })).readState()
+    ).toEqual({ boundary: null, pass: null });
   });
 });

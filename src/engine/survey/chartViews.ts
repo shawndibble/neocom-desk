@@ -84,3 +84,87 @@ export function iskSeries(summary: SurveySummary): IskSeries {
   }
   return { rows, pricedOres, unpricedOres, toneIndex };
 }
+
+/** One scan interval of the pace chart. */
+export interface PaceInterval {
+  from: number;
+  to: number;
+  /**
+   * Percent of the ore's starting total (`SurveyOre.startVolume`) mined in this interval, raw
+   * (not per hour: a long gap reads as a tall value). Only ores mined in it are present.
+   */
+  percents: Record<string, number>;
+  /** Each mined ore's share of the interval's progress, 0-100; sums to 100, or `{}` when idle. */
+  shares: Record<string, number>;
+  /** m³ mined in the interval as a percent of every ore's starting volume together. */
+  progress: number;
+}
+
+/** One invisible plot row the pace chart's tooltip snaps to. */
+export interface PaceRow {
+  at: number;
+  /** Index into `intervals`, or -1 for the tail row past the last scan (no tooltip there). */
+  interval: number;
+  /** A constant series so the chart has something to hover. */
+  idle: 0;
+}
+
+export interface PaceShareSeries {
+  /** One entry per interval, for the bars, the tooltip and the table. */
+  intervals: PaceInterval[];
+  /**
+   * Tooltip rows: each interval's start, middle and 1 ms before its end, then one at the last scan
+   * (interval -1) so hovering the projected stretch after it snaps there, not to the last interval.
+   */
+  rows: PaceRow[];
+  /** Ores mined in at least one interval, in `oreNames` order. */
+  activeOres: string[];
+  /** Each ore's index in `summary.oreNames`, for its colour. */
+  toneIndex: Record<string, number>;
+}
+
+/**
+ * The Depletion view's pace chart: per scan interval, each ore's share of that interval's
+ * progress. Progress per ore is the percent of its starting total mined (the denominator is fixed
+ * per ore, `startVolume`, as the depletion lines use), so ores of any size count alike; shares are
+ * those percents normalised to sum to 100.
+ */
+export function paceShareSeries(summary: SurveySummary): PaceShareSeries {
+  const toneIndex: Record<string, number> = {};
+  summary.oreNames.forEach((ore, i) => {
+    toneIndex[ore] = i;
+  });
+  const startOf = new Map(summary.ores.map((o) => [o.ore, o.startVolume]));
+  const active = new Set<string>();
+
+  const raw = summary.intervals.map((i) => {
+    const percents: Record<string, number> = {};
+    let sum = 0;
+    for (const [ore, volume] of Object.entries(i.minedByOre)) {
+      const start = startOf.get(ore) ?? 0;
+      // A start of 0 cannot come out of summarizeSurvey with mining against it; skip rather than divide.
+      if (volume <= 0 || start <= 0) continue;
+      // Clamped as depletionSeries is, so a rounding quirk can never push a percent past 100.
+      const percent = clampPercent((volume / start) * 100);
+      percents[ore] = percent;
+      sum += percent;
+      active.add(ore);
+    }
+    const shares: Record<string, number> = {};
+    if (sum > 0)
+      for (const [ore, percent] of Object.entries(percents)) shares[ore] = (percent / sum) * 100;
+    const progress =
+      summary.startVolume > 0 ? clampPercent((i.mined / summary.startVolume) * 100) : 0;
+    return { from: i.from, to: i.to, percents, shares, progress };
+  });
+  const intervals: PaceInterval[] = raw;
+  const activeOres = summary.oreNames.filter((o) => active.has(o));
+  const rows: PaceRow[] = intervals.flatMap((i, interval) => [
+    { at: i.from, interval, idle: 0 as const },
+    { at: (i.from + i.to) / 2, interval, idle: 0 as const },
+    { at: i.to - 1, interval, idle: 0 as const },
+  ]);
+  const last = intervals[intervals.length - 1];
+  if (last !== undefined) rows.push({ at: last.to, interval: -1, idle: 0 });
+  return { intervals, rows, activeOres, toneIndex };
+}

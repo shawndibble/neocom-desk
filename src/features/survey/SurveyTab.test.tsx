@@ -24,6 +24,8 @@ vi.mock('./surveyStore', () => ({
   startSurvey,
   addSurveyScan,
   loadSurvey,
+  // The survey picker's labels read through the cache; here it is the same load.
+  loadSurveyCached: loadSurvey,
   setSurveyScanIgnored,
   finishSurvey,
 }));
@@ -426,6 +428,7 @@ Blue Ice	10	1,000 m3	1.00 ISK	5 km`;
       fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
       await waitFor(() =>
         expect(setSurveyScanIgnored).toHaveBeenCalledWith({
+          characterId: expect.any(Number),
           id: ID,
           expiresAt: EXPIRES,
           scanId: 'b',

@@ -29,6 +29,8 @@ interface FittingEditorHeaderProps {
   onLibrary: (action: LibraryAction) => void;
   /** A Save to EVE landed, so In-game Fittings should refetch. */
   onSavedToEve: () => void;
+  /** Opens Improve. */
+  onImprove: () => void;
 }
 
 /**
@@ -48,6 +50,7 @@ export function FittingEditorHeader({
   saved: { savedRecord, currentShareCode, hasUnsavedEdits },
   onLibrary,
   onSavedToEve,
+  onImprove,
 }: FittingEditorHeaderProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -65,6 +68,7 @@ export function FittingEditorHeader({
         subtitle={subtitle}
         onRename={workspace.rename}
         onLibrary={onLibrary}
+        onImprove={onImprove}
         onCompare={() => {
           // Unsaved edits against a saved Fitting: Compare opens saved vs.
           // current rather than just the one code already in the URL.
@@ -90,7 +94,6 @@ export function FittingEditorHeader({
         }}
         save={
           <FittingSaveButton
-            compact={compact}
             onSave={() => void workspace.save()}
             canSave={workspace.canSave}
             saveBlockedReason={

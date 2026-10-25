@@ -17,6 +17,7 @@ import {
   loadChargeIntoCompatible,
   type ModuleAt,
 } from '@/engine/fittings/fittingEdit';
+import type { ChargeLoadStep } from '@/engine/fittings/improveCharges';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import type { Fitting, FittingModule, FittingModuleResult } from '@/engine/fittings/types';
 import type { FittingContext } from './fittingContext';
@@ -49,6 +50,11 @@ export interface ChargeLoading {
   /** Every charge in the cargo that `module` takes. */
   cargoChargesFor: (module: FittingModule) => number[];
   load: (chargeTypeId: number, options?: LoadChargeOptions) => void;
+  /**
+   * Every step in one edit (one Back), without a status line; the Fitting it
+   * made, or null when the edit didn't run or changed nothing.
+   */
+  loadSteps: (steps: readonly ChargeLoadStep[]) => Fitting | null;
   /** What the last load did ("Loaded … into 3 of 4 modules"), for a status line; null before one. */
   message: string | null;
 }
@@ -177,9 +183,31 @@ export function useChargeLoading({
     [edit, accepts, chargesPerLoad, catalogue, t]
   );
 
+  const loadSteps = useCallback(
+    (steps: readonly ChargeLoadStep[]): Fitting | null => {
+      let made: Fitting | null = null;
+      edit((current) => {
+        const next = steps.reduce(
+          (acc, step) =>
+            loadChargeIntoCompatible(acc, step.chargeTypeId, {
+              accepts: (module) => accepts(module, step.chargeTypeId),
+              chargesPerLoad,
+              fromCargo: step.fromCargo,
+              only: step.at,
+            }).fitting,
+          current
+        );
+        made = next === current ? null : next;
+        return next;
+      });
+      return made;
+    },
+    [edit, accepts, chargesPerLoad]
+  );
+
   // One object while none of its parts changes, so the item menus it feeds keep their memoization.
   return useMemo(
-    () => ({ accepts, targetsFor, cargoChargesFor, load, message }),
-    [accepts, targetsFor, cargoChargesFor, load, message]
+    () => ({ accepts, targetsFor, cargoChargesFor, load, loadSteps, message }),
+    [accepts, targetsFor, cargoChargesFor, load, loadSteps, message]
   );
 }

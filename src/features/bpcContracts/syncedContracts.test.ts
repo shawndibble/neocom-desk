@@ -139,7 +139,7 @@ describe('loadPublicBpcContracts', () => {
       characterId: GLOBAL_CACHE_CHARACTER_ID,
       key: 'publicContractOffers',
       value: { rows: [], originals: [], lastSyncedAt: 50, marker: 'cached' },
-      fetchedAt: Date.now() - 31 * 60_000,
+      fetchedAt: Date.now() - 61 * 60_000,
     });
     const fetchMock = serveR2(r2Index(50));
 

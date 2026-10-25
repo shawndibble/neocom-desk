@@ -151,6 +151,8 @@ interface PlanVerdictHeroProps {
   locationBlock?: ReactionLocationBlock;
   /** The one-line setup summary under the verdict, with its Edit setup link. */
   footer?: ReactNode;
+  /** The setup form that slides open under the footer, attached to this card. */
+  expansion?: ReactNode;
 }
 
 export interface ReactionLocationBlock {
@@ -197,6 +199,7 @@ export function PlanVerdictHero({
   locationBlock,
   vs90dPct = null,
   footer,
+  expansion,
 }: PlanVerdictHeroProps) {
   const { t } = useTranslation();
   const pricesUnavailableLabel = usePricesUnavailableLabel();
@@ -428,10 +431,11 @@ export function PlanVerdictHero({
       </div>
 
       {footer && (
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-b-xs border-t border-line bg-bg/40 px-4 py-2 text-xs text-text-dim">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-b-xs border-t [&:has(+[data-state=open])]:rounded-b-none border-line bg-bg/40 px-4 py-2 text-xs text-text-dim">
           {footer}
         </div>
       )}
+      {expansion}
 
       <CalculationBreakdown
         open={breakdownOpen}

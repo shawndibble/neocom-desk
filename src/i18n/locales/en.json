@@ -816,7 +816,7 @@
       }
     },
     "header": {
-      "menu": "Fittings",
+      "menu": "Open",
       "rename": "Rename fitting",
       "newFromHull": "New from a hull…",
       "import": "Import…",
@@ -1073,7 +1073,6 @@
         "cpu": "CPU",
         "powergrid": "Powergrid",
         "calibration": "Calibration",
-        "sell": "Sell",
         "maxActiveDrones": "Max active drones",
         "droneControlRange": "Drone control range",
         "cargo": "Cargo hold",
@@ -1340,6 +1339,190 @@
       },
       "saves": "Saves",
       "costs": "Costs"
+    },
+    "improve": {
+      "menuItem": "Improve…",
+      "title": "Improve",
+      "goalLabel": "Improve Goal",
+      "goal": {
+        "overall": "Best overall",
+        "damage": "More damage",
+        "tank": "Tankier",
+        "speed": "Faster",
+        "reach": "Longer reach",
+        "cheaper": "Cheaper",
+        "mining": "Mine more",
+        "haul": "Carry more",
+        "align": "Align faster",
+        "warp": "Align and warp faster",
+        "repair": "Repair more",
+        "transfer": "Transfer more",
+        "tackle": "Hold tighter",
+        "ewar": "Stronger EWAR",
+        "command": "Stronger fleet support"
+      },
+      "unavailable": {
+        "noWeapons": "Nothing on this fit deals damage",
+        "noGunsOrLaunchers": "No guns or launchers on this fit",
+        "noMiners": "No miners on this fit",
+        "noHold": "This hull has no cargo or other hold",
+        "noAlign": "This hull has no align time to improve",
+        "noWarp": "This hull has no align time or warp speed to improve",
+        "noRemoteRepair": "No remote repairers on this fit",
+        "noCapTransfer": "No remote capacitor transmitters on this fit",
+        "noTackle": "No warp scramblers, disruptors or webs on this fit",
+        "noEwar": "No electronic warfare modules on this fit",
+        "noCommand": "No command bursts, compressors or industrial core on this fit"
+      },
+      "guardrail": {
+        "combat": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration.",
+        "cheaper": "Keeps damage, tank and speed each within 5%, the capacitor stable and the fit within CPU, powergrid and calibration."
+      },
+      "checking": "Checking {{checked}} of {{total}} swaps…",
+      "progressLabel": "Improve search progress",
+      "cancel": "Cancel",
+      "bestSoFar": "Show best so far",
+      "cancelled": "Search cancelled. Nothing was changed.",
+      "searchAgain": "Search again",
+      "failed": "Could not work out improvements for this Fitting.",
+      "swap_one": "{{from}} → {{to}}",
+      "swap_other": "{{count}}× {{from}} → {{to}}",
+      "givesUp": "Gives up: {{stats}}",
+      "noPrice": "No price",
+      "fixFirst": "This fit is over a budget, so there is nothing to improve yet. Fix it first, then come back.",
+      "section": {
+        "fixFirst": "Fix this first",
+        "train": "Train",
+        "implants": "Implants",
+        "noDownside": "No downside",
+        "tradeOffs": "Trade-offs"
+      },
+      "nothing": {
+        "overall": "No variation of a fitted module improves this fit overall.",
+        "damage": "No variation of a fitted module adds damage.",
+        "tank": "No variation of a fitted module adds tank.",
+        "speed": "No variation of a fitted module makes this fit faster.",
+        "reach": "No variation of a fitted module adds reach.",
+        "cheaper": "No variation of a fitted module saves ISK within the guardrails.",
+        "mining": "No variation of a fitted miner mines more of this ore.",
+        "haul": "No variation of a fitted module adds to this hold.",
+        "align": "No variation of a fitted module makes this fit align faster.",
+        "warp": "No variation of a fitted module helps this fit align and warp faster.",
+        "repair": "No variation of a fitted remote repairer repairs more within the guardrails.",
+        "transfer": "No variation of a fitted remote capacitor transmitter transfers more within the guardrails.",
+        "tackle": "No variation of a fitted scrambler, disruptor or web holds tighter within the guardrails.",
+        "ewar": "No variation of a fitted electronic warfare module is stronger within the guardrails.",
+        "command": "No variation of a fitted burst, compressor or core gives the fleet more within the guardrails."
+      },
+      "closest": "Closest swaps",
+      "broke": {
+        "budget": "Goes over CPU, powergrid or calibration",
+        "capStable": "Makes the capacitor unstable",
+        "keepsStats": "Loses more than 5% of damage, tank or speed",
+        "spend": "Costs more than your budget or spend cap"
+      },
+      "widen": {
+        "upgrade": "Only variations of the modules already fitted are tried. Rebalance or Rework tries more.",
+        "rebalance": "Variations and other modules of the same kind are tried. Rework tries more.",
+        "rework": "Only the module groups that can move this goal are tried."
+      },
+      "reachLabel": "Improve Reach",
+      "reach": { "upgrade": "Upgrade", "rebalance": "Rebalance", "rework": "Rework" },
+      "reachHint": {
+        "upgrade": "Turns a fitted module into a variation of itself.",
+        "rebalance": "Also tries a different module doing the same job.",
+        "rework": "Tries any module that can move this goal, but never drops the last module doing a job this goal does not score."
+      },
+      "modeLabel": "Improve mode",
+      "mode": { "buy": "Planning to buy", "refit": "Refitting a ship I own" },
+      "cap": {
+        "buy": "Total budget (ISK)",
+        "refit": "Extra spend cap (ISK)"
+      },
+      "defenseLabel": "Defense Choice",
+      "defense": { "keep": "Keep as is", "shield": "Shield", "armor": "Armor" },
+      "defenseUpgrade": "Pick Rebalance or Rework to change tank side",
+      "sideResult": "{{side}}: {{result}}",
+      "sideNone": "no gain",
+      "sideGain": "up to +{{percent}}%",
+      "moreLabel": "Also try…",
+      "includeRigs": "Rigs",
+      "includeOfficer": "Officer and Deadspace modules",
+      "destroysRig": "Removing the old rig destroys it; the new one is paid in full.",
+      "fill_one": "Add {{to}}",
+      "fill_other": "Add {{count}}× {{to}}",
+      "pair": "{{add}}, paid for by {{downgrade}}",
+      "partial": "Best of the first {{checked}} swaps checked.",
+      "checked_one": "Checked {{count}} swap in {{seconds}} s",
+      "checked_other": "Checked {{count}} swaps in {{seconds}} s",
+      "apply": "Apply",
+      "applyCount_one": "Apply {{count}} change",
+      "applyCount_other": "Apply {{count}} changes",
+      "applied_one": "Applied {{count}} change. Not saved yet.",
+      "applied_other": "Applied {{count}} changes. Not saved yet.",
+      "undo": "Undo",
+      "replacesPick": "Replaces your pick: {{swap}}",
+      "selection": {
+        "changes_one": "{{count}} change",
+        "changes_other": "{{count}} changes",
+        "total": "fit costs",
+        "unpriced_one": "{{count}} unpriced",
+        "unpriced_other": "{{count}} unpriced",
+        "dps": "DPS {{before}} → {{after}}",
+        "ehp": "EHP {{before}} → {{after}}",
+        "checking": "Checking the ticked changes together…",
+        "failed": "Couldn't check the ticked changes together. They may not fit together.",
+        "resource": { "cpu": "CPU", "powergrid": "powergrid", "calibration": "calibration" },
+        "problem": {
+          "over": "Together these over-run the {{resource}}.",
+          "capStable": "Together these leave the capacitor unstable.",
+          "spend": "Together these pass your spend cap."
+        }
+      },
+      "unloaded": {
+        "launcher_one": "{{count}} launcher has no missiles loaded, so damage goals ignore it.",
+        "launcher_other": "{{count}} launchers have no missiles loaded, so damage goals ignore them.",
+        "turret_one": "{{count}} turret has no ammo loaded, so damage goals ignore it.",
+        "turret_other": "{{count}} turrets have no ammo loaded, so damage goals ignore them.",
+        "weapon_one": "{{count}} weapon has no charge loaded, so damage goals ignore it.",
+        "weapon_other": "{{count}} weapons have no charge loaded, so damage goals ignore them."
+      },
+      "loadBestCharge": "Load best charge",
+      "chargesLoaded_one": "Loaded charges into {{count}} weapon. Not saved yet.",
+      "chargesLoaded_other": "Loaded charges into {{count}} weapons. Not saved yet.",
+      "oreLabel": "Ore",
+      "oreOption": "{{ores}} ({{family}} crystals)",
+      "oreHint": "Every miner is scored with the best crystal for this ore, so rows compare like for like. Apply swaps the miners and leaves the loaded crystals alone.",
+      "holdLabel": "Hold",
+      "holdOption": "{{hold}} ({{size}} m³)",
+      "holdHint": "Rows are scored on this hold's size alone.",
+      "holdLine": "{{hold}} {{before}} → {{after}} m³",
+      "alignLine": "Align {{before}} → {{after}} s",
+      "repairLine": "Repairs {{before}} → {{after}} HP/s",
+      "transferLine": "Transfers {{before}} → {{after}} GJ/s",
+      "tackleLine": "Points {{pointsBefore}} → {{pointsAfter}} · Web {{webBefore}} → {{webAfter}}% · Reach {{rangeBefore}} → {{rangeAfter}} km",
+      "ewarLine": "Module strength {{strengthBefore}} → {{strengthAfter}} · Reach {{rangeBefore}} → {{rangeAfter}} km (not the effect on a target)",
+      "command": {
+        "strength": "Burst strength {{before}} → {{after}}",
+        "burstRange": "Burst reach {{before}} → {{after}} km",
+        "compression": "Compression {{before}} → {{after}} km",
+        "fuel": "Core fuel {{before}} → {{after}} per cycle"
+      },
+      "warpLine": "{{align}} · Warp {{before}} → {{after}} AU/s",
+      "hold": {
+        "cargo": "Cargo hold",
+        "fleetHangar": "Fleet hangar",
+        "miningHold": "Ore hold",
+        "ammoHold": "Ammo hold",
+        "planetaryHold": "Planetary commodities hold",
+        "commandCenterHold": "Command center hold",
+        "mineralHold": "Mineral hold",
+        "gasHold": "Gas hold",
+        "iceHold": "Ice hold",
+        "fuelBay": "Fuel bay",
+        "infrastructureHold": "Infrastructure hold"
+      },
+      "oreLine": "Mines {{before}} → {{after}} m³/s of {{ores}} ({{family}} crystals)"
     },
     "variations": {
       "title": "Variations",
@@ -2776,6 +2959,7 @@
     "autoBuildConfirmGroup_other": "This will overwrite craft/buy choices on {{count}} plans in this group — continue?",
     "price": "Price",
     "priceFor": "Price for {{material}}",
+    "editPriceFor": "Edit price for {{material}}",
     "depthPriceLine": "{{best}} best · {{avg}} avg for {{need}}",
     "depthPriceShort": "only {{listed}} listed",
     "resetPriceFor": "Reset {{material}} to the market price",
@@ -2851,8 +3035,8 @@
     "bpAcqShowingOf_other": "Showing {{shown}} of {{count}}",
     "bpAcqAtHub": "At {{hub}}",
     "bpAcqLpPriced": "{{isk}} ISK with LP at your {{rate}} ISK/LP",
-    "bpAcqLpPricedMarket": "{{isk}} ISK with LP at the store’s market {{rate}} ISK/LP",
-    "bpAcqLpIskOnly": "ISK only — no market rate for this store’s LP",
+    "bpAcqLpFree": "{{isk}} ISK, LP counted as already earned",
+    "bpAcqLpValueHint": "Blank (0) counts your LP as already earned, so a copy costs only the store’s ISK and the turn-ins you still need. Type a rate to charge for the LP too.",
     "bpAcqLpLoading": "Loading LP Store offers…",
     "bpAcqLpUnavailable": "Couldn't load LP Store offers.",
     "bpAcqNoLpOffers": "No LP Store your characters have LP with offers this blueprint.",
@@ -3251,7 +3435,7 @@
       "pricesOre": "Ore, ice and gas: priced as themselves. Refining is not modelled, so a plan that eats minerals prices minerals.",
       "pricesOwned": "Owned units: 0 ISK. Ore you mined is free here — the plan does not charge what you could have sold it for.",
       "pricesBuilt": "Built materials: their own recipe instead of a price — inputs plus total job cost, at every level you chose to build.",
-      "pricesProduct": "{{product}}: always {{hub}} lowest sell, whichever side the materials use.",
+      "pricesProduct": "{{product}}: always {{hub}} lowest sell, whichever side the materials use. Profit if sold now is the one figure priced at its highest buy instead.",
       "materialsTitle": "Material cost",
       "materials": "Quantity after ME {{me}} waste (rounded once per job, not per run) × unit price. Owned units come off first.",
       "materialsReaction": "Quantity × unit price. Reactions have no ME, so no waste is saved. Owned units come off first.",
@@ -3272,6 +3456,11 @@
       "revenue": "Units produced × {{hub}} lowest sell.",
       "revenueFormula": "{{quantity}} units × {{unitPrice}} = {{revenue}}",
       "revenueAssumption": "Assumes it fills at today's lowest sell. Undercutting, price moves and time on the market are not modelled.",
+      "sellNow": "Profit if sold now: the same units sold straight into {{hub}}'s highest buy order. Paid at once, sales tax only, no broker fee.",
+      "sellNowFormula": "{{quantity}} units × {{unitPrice}} = {{gross}} − sales tax {{tax}} − total cost {{total}} = {{profit}}",
+      "sellNowFormulaSellValue": "{{quantity}} units × {{unitPrice}} = {{gross}} − sales tax {{tax}} − total cost {{total}} − your materials {{forgone}} = {{profit}}",
+      "sellNowDepth": "Priced at the highest buy order; a large quantity may fill lower.",
+      "sellNowNone": "{{hub}} has no buy orders for {{product}}, so there is no Sell now figure.",
       "fees": "From your skills: Accounting {{accounting}} sets sales tax, Broker Relations {{broker}} sets broker fee. Standings toward the station owner: {{factionStanding}} faction, {{corpStanding}} corp.",
       "feesFormula": "Sales tax {{taxPct}} = {{tax}} · broker fee {{brokerPct}} = {{broker}}",
       "profitTitle": "Profit",
@@ -3592,6 +3781,7 @@
       "undo": "Undo",
       "changeTierFor": "Change tier: {{material}}",
       "haveFor": "Have: {{material}}",
+      "editHaveFor": "Edit Have for {{material}}",
       "savesVsBuying": "saves {{amount}} ISK vs buying",
       "sortLabel": "Sort materials",
       "sort": {
@@ -3646,6 +3836,9 @@
       "sale": "{{name}} sale",
       "ownedNotSold": "Your materials",
       "ownedNotSoldHint": "What the owned materials this job uses would net if sold instead — not sold, so a cost while the profit counts them at sell value.",
+      "profitIfSoldNow": "Profit if sold now",
+      "profitIfSoldNowHint": "Selling straight into hub buy orders: no waiting and no broker fee, but a lower price. Profit above assumes you list at the lowest sell price.",
+      "noBuyOrders": "No buy orders at {{hub}}",
       "iskToSpend": "ISK to spend",
       "buyInstead": "Buying {{name}} instead",
       "buyCostsMore": "+{{amount}} more",
@@ -4419,7 +4612,11 @@
         "profit": {
           "summary": "Realized profit {{total}} from {{runs}} logged runs in the last {{range}} days. Per period, oldest first: {{buckets}}.",
           "noteDaily": "ISK profit per day; a loss hangs below the axis",
-          "noteWeekly": "ISK profit per week; a loss hangs below the axis"
+          "noteWeekly": "ISK profit per week; a loss hangs below the axis",
+          "summaryBoth": "Profit {{total}} in the last {{range}} days: builds {{builds}}, trading {{trading}}. Per period, oldest first: {{buckets}}.",
+          "noteBothDaily": "ISK profit per day from builds and from trading. Broker fees aren't taken off.",
+          "noteBothWeekly": "ISK profit per week from builds and from trading. Broker fees aren't taken off.",
+          "tipTotal": "Total"
         },
         "tradingProfit": {
           "summary": "Trading profit {{total}} from {{matched}} of {{count}} sales in the last {{range}} days.",
@@ -4693,8 +4890,14 @@
       },
       "wallet": {
         "title": "Wallet",
-        "description": "Your balance",
+        "description": "Your balance, or what came in against what went out",
         "empty": "Your wallet has not loaded yet.",
+        "shows": {
+          "flow": {
+            "title": "Wallet flow",
+            "empty": "There is no wallet activity in this range."
+          }
+        },
         "change_one": "{{isk}} in {{count}} day",
         "change_other": "{{isk}} in {{count}} days",
         "unchanged_one": "No change in {{count}} day",
@@ -4707,9 +4910,6 @@
         }
       },
       "walletFlow": {
-        "title": "Wallet flow",
-        "description": "Income against spending over a range",
-        "empty": "There is no wallet activity in this range.",
         "change_one": "{{isk}} vs previous {{count}} day",
         "change_other": "{{isk}} vs previous {{count}} days",
         "unchanged_one": "Same as previous {{count}} day",
@@ -4842,26 +5042,32 @@
         }
       },
       "profit": {
-        "title": "Build profit",
-        "description": "What your builds earned",
+        "title": "Profit",
+        "description": "What your builds and your market trading earned",
         "empty": "No production has been logged yet.",
+        "emptyBoth": "No logged builds and no sales in this range.",
+        "tradingFailed": "Trading couldn't be read, so this is builds only.",
         "vsPrevious_one": "{{delta}} vs the previous day",
         "vsPrevious_other": "{{delta}} vs the previous {{count}} days",
+        "source": {
+          "builds": "Build",
+          "trading": "Trade"
+        },
         "col": {
           "product": "Product",
           "profit": "Profit",
           "built": "Built",
-          "perUnit": "Per unit"
-        }
-      },
-      "tradingProfit": {
-        "title": "Trading profit",
-        "description": "What your market sales made, against the buys behind them",
-        "empty": "No sales in your wallet history for this range.",
-        "col": {
-          "item": "Item",
-          "sales": "Sales",
-          "margin": "Margin"
+          "perUnit": "Per unit",
+          "name": "Product or item",
+          "source": "Source"
+        },
+        "trading": {
+          "empty": "No sales in your wallet history for this range.",
+          "col": {
+            "item": "Item",
+            "sales": "Sales",
+            "margin": "Margin"
+          }
         }
       },
       "miningYield": {
@@ -4994,6 +5200,9 @@
           "lowFuel": "Low fuel",
           "offline": "Service offline"
         },
+        "needAttention_one": "needs attention",
+        "needAttention_other": "need attention",
+        "noProblems": "No structure needs attention.",
         "col": {
           "structure": "Structure",
           "fuel": "Fuel left",
@@ -5209,19 +5418,6 @@
         "summary_one": "{{count}} corp clock is due in 24 hours, {{overdue}} already overdue.",
         "summary_other": "{{count}} corp clocks are due in 24 hours, {{overdue}} already overdue."
       },
-      "corpServices": {
-        "title": "Offline services",
-        "description": "Structure services that are switched off",
-        "empty": "Every structure service is online.",
-        "col": {
-          "structure": "Structure",
-          "service": "Service"
-        },
-        "unit": "offline",
-        "most": "{{name}} has {{count}}",
-        "summary_one": "{{count}} structure service is offline.",
-        "summary_other": "{{count}} structure services are offline across {{structures}} structures."
-      },
       "rowDetail": {
         "jumps_one": "{{count}} jump away",
         "jumps_other": "{{count}} jumps away",
@@ -5331,8 +5527,18 @@
       },
       "corpWallet": {
         "title": "Corp wallet",
-        "description": "The balance of each wallet division",
+        "description": "Each wallet division's balance, or the master wallet's cash flow and income",
         "empty": "There are no wallet divisions to show.",
+        "shows": {
+          "flow": {
+            "title": "Cash flow",
+            "empty": "No master wallet activity in this window."
+          },
+          "sources": {
+            "title": "Income by source",
+            "empty": "No income in this window."
+          }
+        },
         "col": {
           "division": "Division",
           "balance": "Balance",
@@ -5346,9 +5552,6 @@
         "unused_other": "{{count}} unused divisions"
       },
       "corpCashFlow": {
-        "title": "Cash flow",
-        "description": "Money into and out of the master wallet, and how long it lasts",
-        "empty": "No master wallet activity in this window.",
         "col": {
           "day": "Day",
           "in": "In",
@@ -5368,9 +5571,6 @@
         "summary": "Net {{isk}} ISK over {{count}} days: {{income}} in, {{spending}} out."
       },
       "corpIncome": {
-        "title": "Income by source",
-        "description": "Where the master wallet’s money comes from: bounties, taxes, market and more",
-        "empty": "No income in this window.",
         "col": {
           "source": "Source",
           "amount": "Amount",
@@ -5732,6 +5932,18 @@
         "injector": {
           "title": "Large Skill Injector price",
           "desc": "The Large Skill Injector over time, at your trade hub"
+        },
+        "walletFlow": {
+          "title": "Wallet flow",
+          "desc": "Income against spending over a range"
+        },
+        "corpCashFlow": {
+          "title": "Cash flow",
+          "desc": "Money into and out of the master wallet, and how long it lasts"
+        },
+        "corpIncome": {
+          "title": "Income by source",
+          "desc": "Where the master wallet’s money comes from: bounties, taxes, market and more"
         }
       },
       "noMatchHint": "Try another word, or clear the search to see every widget.",
@@ -5821,9 +6033,6 @@
         },
         "profit": {
           "note": "This month · +18%"
-        },
-        "tradingProfit": {
-          "note": "41 of 45 sales matched"
         },
         "miningYield": {
           "note": "Average over the range"
@@ -5975,6 +6184,15 @@
         "committed": "Accepted and tentative",
         "all": "All events"
       },
+      "show": "Show",
+      "showChoice": {
+        "balance": "Balance",
+        "flow": "Flow",
+        "divisions": "Divisions",
+        "sources": "Sources",
+        "all": "All structures",
+        "problems": "Problems only"
+      },
       "where": "Where",
       "whereChoice": {
         "alliance": "My alliance",
@@ -5982,6 +6200,12 @@
       },
       "radius": "Radius",
       "radiusJumps": "{{count}} jumps",
+      "profitSource": "Source",
+      "profitSourceChoice": {
+        "builds": "Builds",
+        "trading": "Trading",
+        "both": "Both"
+      },
       "rename": "Rename",
       "renameTitle": "Rename {{title}}",
       "renameLabel": "Name",
@@ -6534,6 +6758,14 @@
     "chartVolume": "Volume left",
     "chartRate": "Mining rate",
     "chartRateAxis": "m³/s",
+    "chartRateByOre": "Share of each scan's progress, by ore",
+    "paceRange": "{{from}} to {{to}} EVE",
+    "paceLength": "{{length}} between scans",
+    "paceAxis": "share of progress",
+    "paceProgress": "{{percent}}% of the field mined this scan",
+    "pacePercentOf": "{{percent}}% of {{ore}}",
+    "paceTableCell": "{{share}}% ({{percent}}%)",
+    "tableProgress": "Field mined",
     "chartDone": "Done {{time}}",
     "chartTotal": "Total",
     "chartMined": "−{{amount}} m³ this scan",
@@ -12507,6 +12739,7 @@
       "offline": "Offline, couldn't check"
     },
     "updateFailed": "Could not check for a new version. Check your connection and try again.",
+    "updatePending": "The update is still rolling out. Try again in a few minutes.",
     "analyticsTitle": "Analytics",
     "analyticsLabel": "Send page views",
     "analyticsHint": "Sends only the page name to Google Analytics. Never character, corporation or other IDs.",

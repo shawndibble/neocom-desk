@@ -43,16 +43,16 @@ export const STAT_TOLERANCE = 0.05;
 /** Pairs are only tried for this many best-estimated combinations. */
 export const PAIR_LIMIT = 40;
 
-type Resource = 'cpu' | 'powergrid' | 'calibration';
-const RESOURCES: readonly Resource[] = ['cpu', 'powergrid', 'calibration'];
+export type Resource = 'cpu' | 'powergrid' | 'calibration';
+export const RESOURCES: readonly Resource[] = ['cpu', 'powergrid', 'calibration'];
 
-function used(stats: FittingStats, resource: Resource): number {
+export function usedOf(stats: FittingStats, resource: Resource): number {
   if (resource === 'cpu') return stats.cpuUsed;
   if (resource === 'powergrid') return stats.powergridUsed;
   return stats.calibrationUsed;
 }
 
-function overageOf(stats: FittingStats, resource: Resource): number {
+export function overageOf(stats: FittingStats, resource: Resource): number {
   if (resource === 'cpu') return resourceOverage(stats.cpuUsed, stats.cpuTotal);
   if (resource === 'powergrid') return resourceOverage(stats.powergridUsed, stats.powergridTotal);
   return resourceOverage(stats.calibrationUsed, stats.calibrationTotal);
@@ -161,7 +161,7 @@ export async function findFitSwaps({
   // Pairs: estimate each from its two singles' freed resources, keep the best
   // few, and recalculate those whole — stacking can sink a summed estimate.
   const freed = (option: FitOption, resource: Resource) =>
-    used(before, resource) - used(option.after, resource);
+    usedOf(before, resource) - usedOf(option.after, resource);
   const pairs: { swaps: FitSwap[]; estimate: number }[] = [];
   for (let i = 0; i < singles.length; i++) {
     for (let j = i + 1; j < singles.length; j++) {

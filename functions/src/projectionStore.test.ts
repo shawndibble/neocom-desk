@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
   dispatchDueProjections,
+  purgeFiredProjections,
   projectionDocId,
   writeDeviceRegistration,
   type PushSender,
@@ -26,6 +27,9 @@ class FakeFirestore {
   readonly collections = new Map<string, Map<string, Data>>();
   /** Batch commits left to fail before they start succeeding again. */
   failCommits = 0;
+  /** Batched set/delete ops committed, to prove what a call actually wrote. */
+  batchWrites = 0;
+  batchDeletes = 0;
 
   private store(name: string): Map<string, Data> {
     let s = this.collections.get(name);
@@ -74,11 +78,12 @@ class FakeFirestore {
     };
   }
 
-  private query(name: string, filters: [string, Op, unknown][]) {
+  private query(name: string, filters: [string, Op, unknown][], max = Infinity) {
     return {
       doc: (id: string) => this.ref(name, id),
       where: (field: string, op: Op, value: unknown) =>
-        this.query(name, [...filters, [field, op, value]]),
+        this.query(name, [...filters, [field, op, value]], max),
+      limit: (n: number) => this.query(name, filters, n),
       get: async () => {
         const docs = [...this.store(name).entries()]
           .filter(([, data]) =>
@@ -91,8 +96,9 @@ class FakeFirestore {
               return Array.isArray(actual) && actual.includes(value);
             })
           )
+          .slice(0, max)
           .map(([id]) => this.snapshotOf(name, id));
-        return { docs, empty: docs.length === 0 };
+        return { docs, empty: docs.length === 0, size: docs.length };
       },
     };
   }
@@ -101,11 +107,17 @@ class FakeFirestore {
     const ops: (() => Promise<void>)[] = [];
     const batch = {
       set: (ref: { set: (d: Data) => Promise<void> }, data: Data) => {
-        ops.push(() => ref.set(data));
+        ops.push(async () => {
+          this.batchWrites += 1;
+          await ref.set(data);
+        });
         return batch;
       },
       delete: (ref: { delete: () => Promise<void> }) => {
-        ops.push(() => ref.delete());
+        ops.push(async () => {
+          this.batchDeletes += 1;
+          await ref.delete();
+        });
         return batch;
       },
       commit: async () => {
@@ -173,6 +185,44 @@ function unfiredRowsOf(db: FakeFirestore, deviceId: string): string[] {
 }
 
 describe('writeDeviceRegistration', () => {
+  it('re-registering an identical set writes and deletes no rows', async () => {
+    const db = new FakeFirestore();
+    const rows = [row('industryJobComplete'), row('skillTrainingComplete')];
+    await upload(db, 'A', [{ characterId: CHAR, rows }]);
+    db.batchWrites = 0;
+    db.batchDeletes = 0;
+
+    await upload(db, 'A', [{ characterId: CHAR, rows }]);
+
+    expect(db.batchWrites).toBe(0);
+    expect(db.batchDeletes).toBe(0);
+    expect(unfiredRowsOf(db, 'A')).toHaveLength(2);
+  });
+
+  it('writes only changed and added rows and deletes only removed ones', async () => {
+    const db = new FakeFirestore();
+    const same = row('industryJobComplete');
+    const changed = row('skillTrainingComplete');
+    const removed = row('eveNotification');
+    await upload(db, 'A', [{ characterId: CHAR, rows: [same, changed, removed] }]);
+    db.batchWrites = 0;
+    db.batchDeletes = 0;
+    const added = row('marketOrderExpired');
+
+    await upload(db, 'A', [
+      { characterId: CHAR, rows: [same, { ...changed, fireAt: changed.fireAt + 1 }, added] },
+    ]);
+
+    expect(db.batchWrites).toBe(2);
+    expect(db.batchDeletes).toBe(1);
+    expect(unfiredRowsOf(db, 'A').sort()).toEqual(
+      [same, changed, added].map((r) => projectionDocId('A', r.occurrenceKey)).sort()
+    );
+    expect(db.get('projections', projectionDocId('A', changed.occurrenceKey))?.fireAt).toBe(
+      changed.fireAt + 1
+    );
+  });
+
   it('stores each device’s own eveTypes, so two devices keep independent lists', async () => {
     const db = new FakeFirestore();
     await upload(db, 'A', [{ characterId: CHAR, rows: [] }], [CHAR], { [CHAR]: ['X', 'Y'] });
@@ -503,7 +553,7 @@ describe('dispatchDueProjections', () => {
   });
 });
 
-// The Firestore queries in `dispatchDueProjections` re-express `isDue` and
+// The Firestore queries in `dispatchDueProjections` and `purgeFiredProjections` re-express `isDue` and
 // `isPastRetention` as `where` filters (a query cannot call them), so these
 // pin each query's boundary to the function it mirrors.
 describe('dispatchDueProjections query boundaries', () => {
@@ -532,11 +582,27 @@ describe('dispatchDueProjections query boundaries', () => {
       expect(db.get('projections', id)).toMatchObject({ fired: true, firedAt: NOW });
 
       const later = NOW + FIRED_RETENTION_MS + d;
-      await dispatchDueProjections(asFirestore(db), new FakeMessaging(), later);
+      await purgeFiredProjections(asFirestore(db), later);
 
       expect(db.get('projections', id) === undefined).toBe(isPastRetention(NOW, later));
     }
   );
+});
+
+describe('purgeFiredProjections', () => {
+  it('purges in bounded pages and says when a backlog is left for the next day', async () => {
+    const db = new FakeFirestore();
+    const old = NOW - FIRED_RETENTION_MS - 1;
+    for (let i = 0; i < 5; i += 1) db.seed('projections', `r${i}`, { fired: true, firedAt: old });
+    db.seed('projections', 'recent', { fired: true, firedAt: NOW });
+    expect(
+      await purgeFiredProjections(asFirestore(db), NOW, { pageSize: 2, maxPasses: 2 })
+    ).toEqual({ deleted: 4, truncated: true });
+    expect(
+      await purgeFiredProjections(asFirestore(db), NOW, { pageSize: 2, maxPasses: 2 })
+    ).toEqual({ deleted: 1, truncated: false });
+    expect(db.ids('projections')).toEqual(['recent']);
+  });
 });
 
 describe('quiet time (issue #4566)', () => {

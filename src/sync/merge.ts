@@ -527,12 +527,37 @@ export interface SettingsMergeResult {
  * Plans carry): a device offline past the remote 30-day window never observes
  * the delete, and once the remote tombstone is purged it re-pushes its stale
  * copy on the next sync.
+ *
+ * `since` marks an **incremental pull** (issue #5045), as in
+ * {@link mergeRecords}: `remote` then holds only the docs stamped after
+ * `since`, and a key's absence means "unchanged since the last pass", not
+ * "the remote side has nothing". Every decision that reads absence:
+ *
+ *   - `l && !r` pushes only when `l.updatedAt > since`; at or below it the
+ *     previous pass already reconciled the key. An unstamped value
+ *     (`updatedAt: 0`, `useSyncedSetting`'s seed) never pushes from a window:
+ *     it must lose to any remote copy, and a window cannot show whether one
+ *     exists. settingsSync.ts forces a full read while one is present.
+ *   - a local tombstone with no `r` pushes only when `deletedAt > since`.
+ *     Unlike `mergeRecords`, which pushes on any windowed absence, settings
+ *     tombstones never expire, so that would rewrite every deleted key on
+ *     every pass forever. At or below the cursor, the pass that last saw it
+ *     either pushed it or saw the remote tombstone. Either way the tombstone
+ *     is never *cleared* on absence: that rule is the same on both reads.
+ *
+ * Every branch with `r` present is the same on both reads: a doc in the
+ * window is the whole remote truth for its key. The remote tombstone purge
+ * runs, in practice, only on a full read — an expired tombstone is below
+ * every cursor — so
+ * it lands within one `FULL_RECONCILE_INTERVAL_MS` (collectionSync.ts) of
+ * expiry rather than on the day.
  */
 export function mergeSettings(
   local: SyncedSettingValue[],
   localTombstones: SyncedSettingTombstone[],
   remote: RemoteSyncedSetting[],
-  now: number
+  now: number,
+  since?: number
 ): SettingsMergeResult {
   const result: SettingsMergeResult = {
     push: [],
@@ -584,14 +609,17 @@ export function mergeSettings(
       if (r && r.updatedAt > t.deletedAt) {
         result.pull.push({ key, value: r.value, updatedAt: r.updatedAt });
         result.clearLocalTombstones.push(key); // edited elsewhere after the delete
-      } else {
+      } else if (r || since === undefined || t.deletedAt > since) {
         result.pushTombstones.push(t); // reassert: remote has nothing, or is stale
       }
+      // else: windowed and below the cursor — already reconciled, keep it.
       continue;
     }
 
     if (l && !r) {
-      result.push.push(l);
+      // Under a cursor only an edit made after it is new; an unstamped value
+      // waits for the full read settingsSync.ts forces for it.
+      if (since === undefined || (l.updatedAt > 0 && l.updatedAt > since)) result.push.push(l);
     } else if (!l && r) {
       result.pull.push({ key, value: r.value, updatedAt: r.updatedAt });
     } else if (l && r) {

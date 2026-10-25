@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Caret,
   DataTable,
+  EditableValue,
   IconButton,
   IskAmount,
   NativeSelect,
@@ -32,7 +33,6 @@ import { maskNumber, unmaskCount, unmaskNumber } from '@/lib/numberMask';
 import { ItemInfoLink } from '@/features/entities';
 import { buildMaterialsColumns } from './MaterialsColumns';
 import { NotApplicable } from './NotApplicable';
-import { EditableValue } from './EditableValue';
 import { whenFocusLeaves } from './focusLeaves';
 import { materialRowState } from './materialRow';
 import { DepthPriceLine } from './DepthPriceLine';
@@ -578,7 +578,7 @@ export function MaterialsTable({
         <EditableValue
           focusOnMount={refocus === `have-${material.typeID}`}
           onFocused={clearRefocus}
-          label={t('industry.errands.haveFor', { material: nameFor(material.typeID) })}
+          label={t('industry.errands.editHaveFor', { material: nameFor(material.typeID) })}
           onEdit={(seed) => editHave(material.typeID, seed)}
           className={owned > 0 ? 'text-accent' : 'text-text-dim'}
         >
@@ -648,7 +648,7 @@ export function MaterialsTable({
           <EditableValue
             focusOnMount={refocus === `price-${material.typeID}`}
             onFocused={clearRefocus}
-            label={t('industry.priceFor', { material: name })}
+            label={t('industry.editPriceFor', { material: name })}
             onEdit={(seed) => editPrice(material.typeID, seed)}
             className={
               overridden ? 'text-accent' : state.fullyOwned ? 'text-text-dim' : 'text-text'
@@ -1014,6 +1014,7 @@ export function MaterialsTable({
       {toast && (
         <Toast
           message={toastText(toast.message)}
+          instance={toast}
           undo={toast.undo ? { label: t('industry.errands.undo'), onUndo: undo } : undefined}
           onClose={() => dispatch({ type: 'toastExpired' })}
         />

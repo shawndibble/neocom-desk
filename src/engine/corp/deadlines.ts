@@ -13,7 +13,7 @@
  */
 import { DEADLINE_SEVERITIES } from '../character/severity';
 import { dayStart, nextDay, type DayZone } from '../localDay';
-import { CORP_BOARD_ITEM_KINDS, type CorpBoardItem, type CorpBoardItemKind } from './board';
+import type { CorpBoardItem } from './board';
 import type { CorpBoardSeverity } from './board';
 
 /** How far ahead the Deadline Strip looks on a full-width viewport. */
@@ -64,7 +64,7 @@ export interface DueSoonCount {
  *
  * - `untimed` lands nowhere. An offline service is a standing fault with no
  *   instant at all, so counting it on any day would invent a deadline. Those
- *   items get their own surface instead (`Offline services`).
+ *   items get their own surface instead (Structures' Problems only).
  * - `passed` lands on day 0. ESI drops `fuel_expires` once a structure runs
  *   dry, so there is no instant left to bucket — but the thing is outstanding
  *   *now*, which is exactly what day 0 means.
@@ -158,25 +158,4 @@ export function dueSoon(
     if (item.deadlineMs <= nowMs) overdue += 1;
   }
   return { total, overdue };
-}
-
-/**
- * The board split by kind, in `CORP_BOARD_ITEM_KINDS` order, each group keeping
- * the order the board gave it.
- *
- * A `Map` rather than a `Record` so the iteration order is the declared kind
- * order and not an object-key accident, and so a kind with nothing due is
- * simply absent — the view needs "no rows" and "no card" to stay different
- * answers, and it decides which one applies from the Corp Capability, never
- * from this.
- */
-export function groupBoardByKind(
-  items: readonly CorpBoardItem[]
-): Map<CorpBoardItemKind, CorpBoardItem[]> {
-  const grouped = new Map<CorpBoardItemKind, CorpBoardItem[]>();
-  for (const kind of CORP_BOARD_ITEM_KINDS) {
-    const forKind = items.filter((item) => item.kind === kind);
-    if (forKind.length > 0) grouped.set(kind, forKind);
-  }
-  return grouped;
 }

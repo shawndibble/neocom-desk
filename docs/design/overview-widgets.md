@@ -151,7 +151,7 @@ Overview** and **Just the basics**. The union of the Roles' Widget Kinds plus th
 base four becomes the Layout. "Start from a role" in Customize reuses it.
 "New" tags are not shown on a first-run Layout.
 
-Role → kinds: Trader: orders, priceWatch, stock, walletFlow, netWorth ·
+Role → kinds: Trader: orders, priceWatch, stock, wallet on Flow (Wallet flow), netWorth ·
 Industrialist: industry, profit, stock, structures · Planetary industry:
 planetary · Miner: miningYield, survey, miningTax, moonChunks · Fighter:
 location, kills, jumpTimers, incursions · Explorer and hauler: routeSafety,
@@ -230,7 +230,7 @@ Header & alerts
 
 Widgets (catalogue)
 - [ ] E23 Existing 13 cards exist as Widget Kinds (orders, miningTax, contracts, planetary, industry, comingUp, spExtraction→sp, mail, priceAlerts→priceWatch, incursions, stock, structures, moonChunks) plus training and wallet.
-- [ ] E24 New kinds from recent work where the data already exists in the app (netWorth, profit, miningYield, survey, routeSafety, hauling, lp, clones, walletFlow, location, kills, jumpTimers).
+- [ ] E24 New kinds from recent work where the data already exists in the app (netWorth, profit, miningYield, survey, routeSafety, hauling, lp, clones, walletFlow (since folded into wallet's Flow Show), location, kills, jumpTimers).
 - [ ] E25 Honest charts per §8; hidden text summaries.
 
 Persistence
@@ -293,7 +293,9 @@ Customize, Gallery, menu and phone list are shared.
 
 - **One catalogue.** One global kind table; corp-only ids start with `corp`.
   Each kind lists the boards it is on; Structures and Moon extractions are on
-  both. Corp kinds carry `capabilities` (any one opens it) and sit in the corp
+  both. Offline services (`corpServices`) is retired into Structures' Show:
+  Problems only; `parseLayout` reads a saved one as that, in place
+  (`migrateRetiredKind` in `widgets/migrate.ts`). Corp kinds carry `capabilities` (any one opens it) and sit in the corp
   Gallery groups `CORP_KIND_CATEGORIES` (Clocks, Money, People, Industry, Ops).
 - **One layout per pilot**, `sync.corpOverviewLayout`; not per corporation or
   Character.
@@ -332,8 +334,7 @@ Reset and the Gallery all follow it. A saved layout keeps the view it stored
 | sp | Number | S | Number, Table |
 | location | Number | S | Number, Table |
 | clones | Table | M | Number, Table |
-| wallet | Chart | S | Number, Chart, Table |
-| walletFlow | Chart | M | Number, Chart, Table |
+| wallet (Show: Balance, Flow) | Chart | S (Wallet flow preset: M) | Number, Chart, Table |
 | netWorth | Chart | M | Number, Chart, Table |
 | orders | Table | L | Number, Chart, Table |
 | priceWatch | Table | M | Number, Table |
@@ -354,3 +355,5 @@ Reset and the Gallery all follow it. A saved layout keeps the view it stored
 | mail | Table | M | Number, Table |
 
 Coming-soon kinds open as a Number until they are built.
+
+`profit` has a Source setting (Builds / Trading / Both; a new one opens on Both). It took over the retired `tradingProfit` kind, whose saved widgets load as `profit` on Trading.

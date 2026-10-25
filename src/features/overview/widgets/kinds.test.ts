@@ -8,6 +8,9 @@ import {
   getKind,
   isAddable,
   kindOpenTo,
+  rangeAppliesTo,
+  showOf,
+  widgetKeys,
   type WidgetKindDef,
 } from './kinds';
 import { NO_CORP_CAPABILITIES } from '@/engine/corpRoles';
@@ -19,7 +22,6 @@ const ALL_IDS = [
   'jumpTimers',
   'clones',
   'wallet',
-  'walletFlow',
   'netWorth',
   'orders',
   'priceWatch',
@@ -42,7 +44,6 @@ const ALL_IDS = [
   'hauling',
   'kills',
   'omega',
-  'tradingProfit',
   'eveTime',
   'comingUp',
   'contracts',
@@ -53,13 +54,10 @@ const CORP_IDS = [
   'structures',
   'moonChunks',
   'corpDeadlines',
-  'corpServices',
   'corpStarbases',
   'corpSovereignty',
   'corpCustomsOffices',
   'corpWallet',
-  'corpCashFlow',
-  'corpIncome',
   'corpOrders',
   'corpMembers',
   'corpInactive',
@@ -206,15 +204,7 @@ describe('widget kind catalogue', () => {
     // Not everything is a Number: some answer best as a chart, some as a table.
     for (const id of ['training', 'sp', 'location', 'miningTax'])
       expect(view(id), id).toBe('number');
-    for (const id of [
-      'wallet',
-      'walletFlow',
-      'netWorth',
-      'lp',
-      'profit',
-      'miningYield',
-      'routeSafety',
-    ]) {
+    for (const id of ['wallet', 'netWorth', 'lp', 'profit', 'miningYield', 'routeSafety']) {
       expect(view(id), id).toBe('chart');
     }
     for (const id of [
@@ -261,18 +251,63 @@ describe('widget kind catalogue', () => {
   it('gives a range only to the kinds that read a time window', () => {
     const ranged = WIDGET_KINDS.filter((k: WidgetKindDef) => k.hasRange).map((k) => k.id);
     expect(ranged.sort()).toEqual([
-      'corpCashFlow',
-      'corpIncome',
       'corpMining',
+      'corpWallet',
       'kills',
       'marketTrend',
       'miningYield',
       'omega',
       'profit',
-      'tradingProfit',
       'wallet',
-      'walletFlow',
     ]);
+  });
+
+  it('gives the wallet kinds a Show setting, its first option the default', () => {
+    expect(getKind('wallet')!.shows).toEqual(['balance', 'flow']);
+    expect(getKind('corpWallet')!.shows).toEqual(['divisions', 'flow', 'sources']);
+    expect(getKind('orders')!.shows).toEqual([]);
+    expect(getKind('structures')!.shows).toEqual(['all', 'problems']);
+    for (const retired of ['walletFlow', 'corpCashFlow', 'corpIncome']) {
+      expect(getKind(retired), retired).toBeUndefined();
+    }
+  });
+
+  it('reads a stored Show, falling back to the default for a missing or unknown one', () => {
+    const wallet = getKind('wallet')!;
+    expect(showOf(wallet, 'flow')).toBe('flow');
+    expect(showOf(wallet, undefined)).toBe('balance');
+    expect(showOf(wallet, 'sources')).toBe('balance');
+    expect(showOf(wallet, 7)).toBe('balance');
+    expect(showOf(getKind('orders')!, 'flow')).toBeUndefined();
+  });
+
+  it('applies the range only to a Show that reads a window', () => {
+    const corp = getKind('corpWallet')!;
+    // Divisions are balances now: no window, as before the merge.
+    expect(rangeAppliesTo(corp, undefined)).toBe(false);
+    expect(rangeAppliesTo(corp, 'divisions')).toBe(false);
+    expect(rangeAppliesTo(corp, 'flow')).toBe(true);
+    expect(rangeAppliesTo(corp, 'sources')).toBe(true);
+    expect(rangeAppliesTo(getKind('wallet')!, undefined)).toBe(true);
+    expect(rangeAppliesTo(getKind('wallet')!, 'flow')).toBe(true);
+    expect(rangeAppliesTo(getKind('sp')!, undefined)).toBe(false);
+  });
+
+  it('names a widget after its Show when it is not the default', () => {
+    const corp = getKind('corpWallet')!;
+    expect(widgetKeys(corp, undefined)).toEqual({
+      titleKey: 'overview.widgets.corpWallet.title',
+      emptyMessageKey: 'overview.widgets.corpWallet.empty',
+    });
+    expect(widgetKeys(corp, 'sources')).toEqual({
+      titleKey: 'overview.widgets.corpWallet.shows.sources.title',
+      emptyMessageKey: 'overview.widgets.corpWallet.shows.sources.empty',
+    });
+    expect(widgetKeys(getKind('wallet')!, 'nope').titleKey).toBe('overview.widgets.wallet.title');
+    // Structures keeps its own name on Problems only.
+    expect(widgetKeys(getKind('structures')!, 'problems').titleKey).toBe(
+      'overview.widgets.structures.title'
+    );
   });
 
   it('looks kinds up', () => {

@@ -34,9 +34,11 @@ import {
   setCalendarEvents,
   setRaidsRadius,
   setRaidsWhere,
+  setProfitSource,
   setTrendHubs,
   setTrendItems,
   setScope,
+  setShow,
   setShowOnPhone,
   setView,
   snapshotLayout,
@@ -212,8 +214,10 @@ export function OverviewEditProvider({
       setCalendarEvents: (id, choice) => commit(setCalendarEvents(layoutRef.current, id, choice)),
       setRaidsWhere: (id, where) => commit(setRaidsWhere(layoutRef.current, id, where)),
       setRaidsRadius: (id, radius) => commit(setRaidsRadius(layoutRef.current, id, radius)),
+      setProfitSource: (id, source) => commit(setProfitSource(layoutRef.current, id, source)),
       setTrendItems: (id, items) => commit(setTrendItems(layoutRef.current, id, items)),
       setTrendHubs: (id, hubs) => commit(setTrendHubs(layoutRef.current, id, hubs)),
+      setShow: (id, show) => commit(setShow(layoutRef.current, id, show)),
       rename: (id, title) => commit(renameWidget(layoutRef.current, id, title)),
       setShowOnPhone: (id, show) => commit(setShowOnPhone(layoutRef.current, id, show)),
     };
@@ -225,6 +229,7 @@ export function OverviewEditProvider({
       {toast && (
         <Toast
           message={toast.message}
+          instance={toast}
           undo={{
             label: t('overview.customize.undo.action'),
             onUndo: () => {

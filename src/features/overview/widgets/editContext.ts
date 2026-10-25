@@ -12,11 +12,13 @@
 import { createContext, useContext } from 'react';
 import type {
   CalendarEventsChoice,
+  ProfitSource,
   RaidsWhere,
   OverviewLayout,
   WidgetRange,
   WidgetInit,
   WidgetScope,
+  WidgetShow,
   WidgetSize,
   WidgetView,
 } from './layout';
@@ -44,8 +46,10 @@ export interface OverviewEditActions {
   setCalendarEvents: (id: string, choice: CalendarEventsChoice) => void;
   setRaidsWhere: (id: string, where: RaidsWhere) => void;
   setRaidsRadius: (id: string, radius: number) => void;
+  setProfitSource: (id: string, source: ProfitSource) => void;
   setTrendItems: (id: string, items: number[]) => void;
   setTrendHubs: (id: string, hubs: string[]) => void;
+  setShow: (id: string, show: WidgetShow) => void;
   rename: (id: string, title: string) => void;
   setShowOnPhone: (id: string, show: boolean) => void;
 }
@@ -87,9 +91,11 @@ export const OverviewEditContext = createContext<OverviewEdit>({
   setPlexPer30Days: none,
   setCalendarEvents: none,
   setRaidsWhere: none,
+  setProfitSource: none,
   setRaidsRadius: none,
   setTrendItems: none,
   setTrendHubs: none,
+  setShow: none,
   rename: none,
   setShowOnPhone: none,
 });

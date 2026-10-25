@@ -12,6 +12,8 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { boundedString, record } from './communities.js';
 import {
+  BOOKS_COLLECTION,
+  FEEDERS,
   FEEDER_OF_COLLECTION,
   REMOVAL_LINKS_COLLECTION,
   parseFeederTarget,
@@ -33,6 +35,7 @@ import { endFeeder } from './corpTaxBookFeederGrant.js';
 import { feedersToRead } from './corpTaxBookFeederSync.js';
 import { tryRebuildFeederView } from './corpTaxBookFeederView.js';
 import { hashInviteCode, type FeederRecord } from './corpTaxBookFeeders.js';
+import { isMissingIndex, isTopLevelChild } from './indexedSweep.js';
 import {
   appendAudit,
   authorizeOfficer,
@@ -386,21 +389,73 @@ export async function forceRemovalNow(
 
 // --- Taking effect -----------------------------------------------------------
 
-/** End every removal whose wait is over. Scheduled hourly; one failure never stops the rest. */
+/**
+ * The feeder records pending removal, with their data. A collection-group
+ * equality query, so the hourly run is one read while nothing is pending.
+ * Until its index is deployed (indexes go out by hand) it falls back to
+ * reading every pointer and then every record, as before.
+ */
+async function pendingRemovals(
+  { db, log }: Pick<CorpSyncDeps, 'db' | 'log'>,
+  pointerCollection: string
+): Promise<{ feederCorporationId: number; collectorCorporationId: number; rec: FeederRecord }[]> {
+  try {
+    const snap = await db.collectionGroup(FEEDERS).where('status', '==', 'pending-removal').get();
+    return snap.docs.flatMap((d) => {
+      if (!isTopLevelChild(d, BOOKS_COLLECTION)) return [];
+      const collector = Number(d.ref.parent.parent!.id);
+      const feeder = Number(d.id);
+      return Number.isSafeInteger(collector) && Number.isSafeInteger(feeder)
+        ? [
+            {
+              feederCorporationId: feeder,
+              collectorCorporationId: collector,
+              rec: d.data() as FeederRecord,
+            },
+          ]
+        : [];
+    });
+  } catch (err) {
+    if (!isMissingIndex(err)) throw err;
+    log('Collection-group index not deployed yet; using the per-parent scan', {
+      sweep: 'finalizeDueRemovals',
+    });
+  }
+  const found = [];
+  for (const pointer of await feedersToRead(db, pointerCollection)) {
+    // One unreadable record must not stop the rest, as before.
+    try {
+      const rec = (
+        await feederRef(db, pointer.collectorCorporationId, pointer.feederCorporationId).get()
+      ).data() as FeederRecord | undefined;
+      if (rec) found.push({ ...pointer, rec });
+    } catch (err) {
+      log('Removal could not take effect', {
+        ...pointer,
+        error: err instanceof Error ? err.name : 'unknown',
+      });
+    }
+  }
+  return found;
+}
+
+/**
+ * End every removal whose wait is over. Scheduled hourly; one failure never stops the rest.
+ * `pointerCollection` only matters on the fallback scan; the indexed query finds
+ * every pending feeder under `corps/*`.
+ */
 export async function finalizeDueRemovals(
   deps: CorpSyncDeps,
   pointerCollection: string = FEEDER_OF_COLLECTION
 ): Promise<{ ended: number }> {
   let ended = 0;
-  for (const { feederCorporationId, collectorCorporationId } of await feedersToRead(
-    deps.db,
+  for (const { feederCorporationId, collectorCorporationId, rec } of await pendingRemovals(
+    deps,
     pointerCollection
   )) {
     try {
-      const rec = (
-        await feederRef(deps.db, collectorCorporationId, feederCorporationId).get()
-      ).data() as FeederRecord | undefined;
-      if (!rec || !isRemovalDue({ status: rec.status, removal: rec.removal }, deps.now())) {
+      // Decided on the query's copy; the guard below re-checks inside endFeeder's transaction.
+      if (!isRemovalDue({ status: rec.status, removal: rec.removal }, deps.now())) {
         continue;
       }
       const startedAt = rec.removal!.startedAt;

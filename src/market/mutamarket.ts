@@ -97,7 +97,7 @@ async function callableTransport({
   ]);
   await ensureAnySession(characterId);
   const call = httpsCallable<typeof input, MutamarketEstimateResponse>(
-    getSyncFunctions(),
+    getSyncFunctions(characterId),
     'mutamarketEstimate',
     { timeout: CALL_TIMEOUT_MS }
   );

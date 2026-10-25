@@ -93,6 +93,7 @@ export function SurveyInfoEditor({
       expiresAt: survey.expiresAt,
       location: nextLocation,
       notes: trimmed,
+      characterId,
     })
       .then(onStored)
       .catch(() => {

@@ -45,7 +45,7 @@ import { useOverviewEdit } from './editContext';
 import { sampleHasChart, sampleView } from './gallerySamples';
 import { type WidgetKindDef, type WidgetSize, type WidgetView } from './kinds';
 import { MAX_WIDGETS, newWidget, type WidgetInit } from './layout';
-import { TREND_PRESETS, type TrendPreset } from './trendPresets';
+import { PRESET_KINDS, presetsOf, type GalleryPreset } from './galleryPresets';
 import { Widget } from './Widget';
 
 interface GalleryProps {
@@ -77,15 +77,16 @@ function previewView(kind: WidgetKindDef, t: TFunction): WidgetView {
   return kind.views.includes('chart') && hasChart ? 'chart' : 'number';
 }
 
-function Preview({ kind, sample }: { kind: WidgetKindDef; sample?: string }) {
+function Preview({ kind, preset }: { kind: WidgetKindDef; preset?: GalleryPreset }) {
   const { t } = useTranslation();
-  // A preset previews its own sample (a one-line chart), not its kind's.
-  const sampleKey = sample ?? kind.id;
+  // A preset previews its own sample, in its own view and size, not its kind's.
+  const sampleKey = preset?.sample ?? kind.id;
+  const size = preset?.init.size ?? kind.defaultSize;
   const view = useMemo(() => sampleView(sampleKey, t), [sampleKey, t]);
   const widget = useMemo(() => {
-    const base = newWidget(kind.id, `preview-${sampleKey}`);
-    return base ? { ...base, view: sample ? 'chart' : previewView(kind, t) } : null;
-  }, [kind, sample, sampleKey, t]);
+    const base = newWidget(kind.id, `preview-${sampleKey}`, preset?.init.show);
+    return base ? { ...base, view: preset?.init.view ?? previewView(kind, t) } : null;
+  }, [kind, preset, sampleKey, t]);
   if (!view || !widget) return null;
   return (
     // Inert: a picture of the widget, not one. Nothing in it takes focus or a click.
@@ -95,7 +96,7 @@ function Preview({ kind, sample }: { kind: WidgetKindDef; sample?: string }) {
       data-testid="gallery-preview"
       className="pointer-events-none relative max-h-44 overflow-hidden rounded-xs border border-line bg-bg p-2.5 select-none"
     >
-      <div className={cx('mx-auto max-w-full', PREVIEW_WIDTH[kind.defaultSize])}>
+      <div className={cx('mx-auto max-w-full', PREVIEW_WIDTH[size])}>
         <Widget widget={widget} onRemove={noop} previewView={view} hideHeader />
       </div>
       <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-bg to-transparent" />
@@ -213,10 +214,7 @@ function GalleryItem({
   );
 }
 
-/** The kinds that list presets beside their own card, and the presets' kind. */
-const PRESET_KIND = 'marketTrend';
-
-/** A preset: adds the kind's widget with its items, title and view already set. Listed with its kind's card. */
+/** A preset: adds the kind's widget with some settings already chosen (`galleryPresets.ts`). Listed with its kind's card. */
 function PresetItem({
   kind,
   preset,
@@ -227,12 +225,12 @@ function PresetItem({
   onAdd,
 }: {
   kind: WidgetKindDef;
-  preset: TrendPreset;
+  preset: GalleryPreset;
   full: boolean;
   isPhone: boolean;
   showPreview: boolean;
   justAdded: boolean;
-  onAdd: (preset: TrendPreset, title: string) => void;
+  onAdd: (preset: GalleryPreset, title: string) => void;
 }) {
   const { t } = useTranslation();
   const title = t(`overview.gallery.presets.${preset.id}.title`);
@@ -268,12 +266,7 @@ function PresetItem({
         {justAdded && <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" />}
         {justAdded ? t('overview.gallery.added') : ''}
       </span>
-      {showPreview && (
-        <Preview
-          kind={kind}
-          sample={preset.id === 'plex' ? 'marketTrendPlex' : 'marketTrendInjector'}
-        />
-      )}
+      {showPreview && <Preview kind={kind} preset={preset} />}
     </li>
   );
 }
@@ -323,13 +316,14 @@ function GalleryBody({
   const offered = board.kinds.filter(board.canDraw);
   const matching = matchKinds(offered, query, (kind) => {
     const own = `${t(kind.titleKey)} ${t(kind.descKey)}`;
-    if (kind.id !== PRESET_KIND) return own;
-    return `${own} ${TREND_PRESETS.map((p) => t(`overview.gallery.presets.${p.id}.title`)).join(' ')}`;
+    const presets = presetsOf(kind.id);
+    if (presets.length === 0) return own;
+    return `${own} ${presets.map((p) => t(`overview.gallery.presets.${p.id}.title`)).join(' ')}`;
   });
   // "Not on your board" only narrows the wide layout: the drawer keeps listing everything.
   const hidingUsed = browse && unusedOnly;
-  // Market Trend stays listed: its presets add a second widget, which is the point of a preset.
-  const kept = new Set([...addedHere, PRESET_KIND]);
+  // A kind with presets stays listed: its presets add a second widget, which is the point of a preset.
+  const kept = new Set([...addedHere, ...PRESET_KINDS]);
   const shown = hidingUsed ? notOnBoard(matching, counts, kept) : matching;
   const catCounts = categoryCounts(shown, board);
   const items = shown.filter((kind) => category === 'all' || categoryOn(board, kind) === category);
@@ -355,11 +349,12 @@ function GalleryBody({
 
   // A search that names a preset shows that preset; one that matches the kind itself shows them all.
   const presetsFor = (kind: WidgetKindDef) => {
+    const presets = presetsOf(kind.id);
     const needle = query.trim().toLowerCase();
     if (!needle || `${t(kind.titleKey)} ${t(kind.descKey)}`.toLowerCase().includes(needle)) {
-      return TREND_PRESETS;
+      return presets;
     }
-    return TREND_PRESETS.filter((p) =>
+    return presets.filter((p) =>
       t(`overview.gallery.presets.${p.id}.title`).toLowerCase().includes(needle)
     );
   };
@@ -377,26 +372,20 @@ function GalleryBody({
       justAdded={justAdded === kind.id}
       onAdd={(id) => add(id)}
     />,
-    ...(kind.id === PRESET_KIND
-      ? presetsFor(kind).map((preset) => (
-          <PresetItem
-            key={`${kind.id}:${preset.id}`}
-            kind={kind}
-            preset={preset}
-            full={full}
-            isPhone={isPhone}
-            showPreview={withPreview}
-            justAdded={justAdded === `${kind.id}:${preset.id}`}
-            onAdd={(p, title) =>
-              add(
-                kind.id,
-                { title, trendItems: p.items, trendHubs: p.trendHubs, view: p.view },
-                `${kind.id}:${p.id}`
-              )
-            }
-          />
-        ))
-      : []),
+    ...presetsFor(kind).map((preset) => (
+      <PresetItem
+        key={`${kind.id}:${preset.id}`}
+        kind={kind}
+        preset={preset}
+        full={full}
+        isPhone={isPhone}
+        showPreview={withPreview}
+        justAdded={justAdded === `${kind.id}:${preset.id}`}
+        onAdd={(p, title) =>
+          add(kind.id, p.titled ? { ...p.init, title } : p.init, `${kind.id}:${p.id}`)
+        }
+      />
+    )),
   ];
   const listClass =
     browse && density === 'grid'

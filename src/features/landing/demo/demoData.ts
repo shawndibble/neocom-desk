@@ -25,6 +25,7 @@ import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import type { SkillCatalog } from '@/features/skills/skillMap';
 import { blank, statusOf } from '@/features/overview/widgets/data/builderKit';
 import { buildView } from '@/features/overview/widgets/data/models';
+import { settingsContext } from '@/features/overview/widgets/data/viewSettings';
 import { wobble } from '@/features/overview/samplePilot';
 import { ordersStateChart, ordersTable } from '@/features/overview/widgets/data/ordersModels';
 import type { Feeds, FeedState, KindView, Translate } from '@/features/overview/widgets/data/types';
@@ -251,7 +252,7 @@ export const DEMO_WIDGETS: readonly Widget[] = [
   { id: 'd-coming', kind: 'comingUp', size: 'M', view: 'table' },
   { id: 'd-wallet', kind: 'wallet', size: 'M', view: 'chart', range: 30 },
   { id: 'd-survey', kind: 'survey', size: 'M', view: 'chart' },
-  { id: 'd-flow', kind: 'walletFlow', size: 'M', view: 'chart', range: 30 },
+  { id: 'd-flow', kind: 'wallet', show: 'flow', size: 'M', view: 'chart', range: 30 },
   { id: 'd-training', kind: 'training', size: 'L', view: 'table' },
   { id: 'd-orders', kind: 'orders', size: 'F', view: 'table', rowsPerPage: 5 },
 ].map((w) => ({ ...w, scope: 'header', showOnPhone: true }) as Widget);
@@ -341,7 +342,8 @@ export function buildDemoViews(t: TFunction, now: number): ReadonlyMap<string, K
             activeCharacterId: null,
             scopeAll: false,
             notTrainingAlert: false,
-            range: widget.range ?? 30,
+            // The widget's own settings, resolved as the real board resolves them (Range, Show, ...).
+            ...settingsContext(widget.kind, widget),
           })
     );
   }

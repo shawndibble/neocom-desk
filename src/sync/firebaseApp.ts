@@ -24,7 +24,7 @@ import {
 } from 'firebase/auth';
 import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore/lite';
 import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase/functions';
-import { emulatorsOn, getFirebaseApp } from './firebaseCore';
+import { deleteCharacterApp, emulatorsOn, getCharacterApp, getFirebaseApp } from './firebaseCore';
 
 export { getFirebaseApp };
 
@@ -34,43 +34,71 @@ export { getFirebaseApp };
 // hosts below are dead code there. Each connector may be called only once per
 // instance (Firebase throws on a second call after first use), hence the guards.
 const EMULATOR_HOST = '127.0.0.1';
-let authConnected = false;
-let firestoreConnected = false;
-let functionsConnected = false;
-
-let syncAuth: Auth | undefined;
+const authInstances = new Map<number, Auth>();
+const firestoreConnected = new Set<number>();
+const functionsConnected = new Set<number | undefined>();
+let legacyAuth: Auth | undefined;
 
 /**
- * Auth as `getAuth` builds it (same persistence, so a session saved before this
- * change still restores) minus `browserPopupRedirectResolver`: that resolver
+ * A Character's own Auth, with its own persisted session (issue #5074). Same
+ * persistence as `getAuth` minus `browserPopupRedirectResolver`: that resolver
  * loads Google's gapi iframe (`apis.google.com`, third-party cookies) as soon
  * as Auth starts, and the app only ever signs in with a custom token.
  */
-export function getSyncAuth(): Auth {
-  syncAuth ??= initializeAuth(getFirebaseApp(), {
-    persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
-  });
-  const auth = syncAuth;
-  if (emulatorsOn() && !authConnected) {
-    authConnected = true;
-    connectAuthEmulator(auth, `http://${EMULATOR_HOST}:9099`, { disableWarnings: true });
+export function getSyncAuth(characterId: number): Auth {
+  let auth = authInstances.get(characterId);
+  if (!auth) {
+    auth = initializeAuth(getCharacterApp(characterId), {
+      persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
+    });
+    authInstances.set(characterId, auth);
+    if (emulatorsOn()) {
+      connectAuthEmulator(auth, `http://${EMULATOR_HOST}:9099`, { disableWarnings: true });
+    }
   }
   return auth;
 }
 
-export function getSyncFirestore(): Firestore {
-  const firestore = getFirestore(getFirebaseApp());
-  if (emulatorsOn() && !firestoreConnected) {
-    firestoreConnected = true;
+/** The Firestore that sends this Character's session. */
+export function getSyncFirestore(characterId: number): Firestore {
+  const firestore = getFirestore(getCharacterApp(characterId));
+  if (emulatorsOn() && !firestoreConnected.has(characterId)) {
+    firestoreConnected.add(characterId);
     connectFirestoreEmulator(firestore, EMULATOR_HOST, 8080);
   }
   return firestore;
 }
 
-export function getSyncFunctions(): Functions {
-  const functions = getFunctions(getFirebaseApp());
-  if (emulatorsOn() && !functionsConnected) {
-    functionsConnected = true;
+/**
+ * The pre-#5074 shared session, in the default app. Only for signing a device
+ * out: it may still be persisted from before, holding a Character's credential.
+ */
+export function getLegacySyncAuth(): Auth {
+  legacyAuth ??= initializeAuth(getFirebaseApp(), {
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
+  });
+  return legacyAuth;
+}
+
+/** Delete a Character's app and with it its persisted session. */
+export async function disposeCharacterApp(characterId: number): Promise<void> {
+  authInstances.delete(characterId);
+  firestoreConnected.delete(characterId);
+  functionsConnected.delete(characterId);
+  await deleteCharacterApp(characterId);
+}
+
+/**
+ * Callables send the session of the app their Functions was built on, so pass
+ * the Character that should authenticate. Without one: the default app, which
+ * holds no session (the mint callable, which authenticates by access token).
+ */
+export function getSyncFunctions(characterId?: number): Functions {
+  const functions = getFunctions(
+    characterId === undefined ? getFirebaseApp() : getCharacterApp(characterId)
+  );
+  if (emulatorsOn() && !functionsConnected.has(characterId)) {
+    functionsConnected.add(characterId);
     connectFunctionsEmulator(functions, EMULATOR_HOST, 5001);
   }
   return functions;

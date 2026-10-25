@@ -1093,6 +1093,28 @@ describe('Requests', () => {
         await assertFails(board(characterAuth(env, 2, 'hash-2-new-owner').firestore(), 'c1'));
       });
 
+      it('lets a Member read only their own Pledges in a Community (the delivery sweep, #5051)', async () => {
+        const db = characterAuth(env, 2, 'hash-2').firestore();
+        await assertSucceeds(
+          getDocs(
+            query(
+              collectionGroup(db, 'pledges'),
+              where('communityId', '==', 'c1'),
+              where('ownerHash', '==', 'hash-2')
+            )
+          )
+        );
+        await assertFails(
+          getDocs(
+            query(
+              collectionGroup(db, 'pledges'),
+              where('communityId', '==', 'c2'),
+              where('ownerHash', '==', 'hash-2')
+            )
+          )
+        );
+      });
+
       it('denies an unfiltered query and one filtered to a Community the Member is not in', async () => {
         const db = characterAuth(env, 2, 'hash-2').firestore();
         await assertFails(getDocs(collectionGroup(db, 'pledges')));

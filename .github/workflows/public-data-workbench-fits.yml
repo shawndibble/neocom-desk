@@ -1,0 +1,26 @@
+name: Public data - Workbench fits
+
+# Copies EVE Workbench's public fits into R2 (workbench-fits/<shipTypeId>.json, one
+# object per hull) every 12 hours; the Popular fits panel reads them from
+# https://data.neocomdesk.com. Each run fetches for up to 15 minutes and saves a
+# checkpoint (R2 workbench-fits-state/state.json), so a run that does not finish the
+# pass resumes at the next one. The Workbench API needs no key.
+# Pattern and secrets: public-data-job.yml.
+on:
+  schedule:
+    - cron: '20 4,16 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-data-workbench-fits
+  cancel-in-progress: false
+
+jobs:
+  run:
+    uses: ./.github/workflows/public-data-job.yml
+    with:
+      script: scripts/public-data/workbench-fits.mjs
+    secrets: inherit

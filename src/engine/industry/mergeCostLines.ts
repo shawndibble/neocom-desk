@@ -1,11 +1,13 @@
 /**
  * How two occurrences of one material combine into a single priced line.
  *
- * One rule, in one place, because there are two callers that must not drift:
+ * One rule, in one place, because its callers must not drift:
  * `features/industry/subBuildPlan.ts` merges a plan's own resolved tree by
- * typeID, and `engine/industry/groupRollup.ts` merges those merges across a
- * Build Group's members. Both had the rule written out field by field, which
- * is one rule and two chances to get it wrong.
+ * typeID, `engine/industry/groupRollup.ts` merges those merges across a
+ * Build Group's members, and `engine/industry/ownedStockSale.ts` merges the
+ * owned stock a tree claims into one stack per type. The first two had the
+ * rule written out field by field, which is one rule and two chances to get
+ * it wrong.
  *
  * Three of the fields need saying out loud:
  *

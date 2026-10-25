@@ -83,11 +83,21 @@ async function commitInChunks(db: Firestore, ops: ((batch: WriteBatch) => void)[
   }
 }
 
+/** Same fields and values. */
+function sameRow(a: object, b: object): boolean {
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  const keys = Object.keys(right);
+  return Object.keys(left).length === keys.length && keys.every((k) => left[k] === right[k]);
+}
+
 /**
- * Write one device's registration and replace its Projection, per Character:
+ * Write one device's registration and sync its Projection, per Character:
  *
- * - only this device's unfired rows for that Character are deleted and
- *   rewritten — other devices' rows and every fired row are left alone;
+ * - this device's unfired rows for that Character are diffed against the
+ *   upload: only new or changed rows are written, only rows no longer present
+ *   are deleted, identical rows are untouched — other devices' rows and every
+ *   fired row are left alone;
  * - this device's unfired rows for a Character it held last time but no
  *   longer does are deleted (roster drift);
  * - on a device's first per-device upload, each held Character's legacy
@@ -163,11 +173,11 @@ export async function writeDeviceRegistration(
 
   await Promise.all([
     ...write.projections.map(async ({ characterId, rows }) => {
-      const stale = [
-        ...(await ownUnfired(characterId)),
-        ...(sweepLegacy(characterId) ? await legacyUnfired(characterId) : []),
-      ];
-      const ops: ((b: WriteBatch) => void)[] = stale.map((doc) => (b) => b.delete(doc.ref));
+      const own = await ownUnfired(characterId);
+      const legacy = sweepLegacy(characterId) ? await legacyUnfired(characterId) : [];
+      const existing = new Map(own.map((doc) => [doc.id, doc.data()]));
+      const kept = new Set<string>();
+      const ops: ((b: WriteBatch) => void)[] = legacy.map((doc) => (b) => b.delete(doc.ref));
       for (const row of rows) {
         const stored: StoredProjectionRow & { fired: false; firedAt: null } = {
           deviceId: write.deviceId,
@@ -181,8 +191,16 @@ export async function writeDeviceRegistration(
           fired: false,
           firedAt: null,
         };
-        const ref = projections.doc(projectionDocId(write.deviceId, row.occurrenceKey));
+        const id = projectionDocId(write.deviceId, row.occurrenceKey);
+        kept.add(id);
+        // A heartbeat re-upload is mostly identical rows: leave those alone.
+        const current = existing.get(id);
+        if (current && sameRow(current, stored)) continue;
+        const ref = projections.doc(id);
         ops.push((b) => b.set(ref, stored));
+      }
+      for (const doc of own) {
+        if (!kept.has(doc.id)) ops.push((b) => b.delete(doc.ref));
       }
       await commitInChunks(db, ops);
     }),
@@ -217,7 +235,7 @@ export function readQuietHours(raw: unknown): QuietHours | undefined {
 }
 
 /**
- * Fire every due row, then purge fired rows past retention. Per row, in
+ * Fire every due row (`purgeFiredProjections` purges old ones). Per row, in
  * order: stale (>7 days past fireAt) → delete unsent; a device-scoped row
  * whose device has no registration → delete (orphan: its token was deleted
  * after FCM reported it dead — e.g. the device logged out, which deletes its
@@ -335,16 +353,42 @@ export async function dispatchDueProjections(
       }
     })
   );
+}
 
-  // Fired rows are kept as the backend's half of the Notification Feed, then
-  // purged like every other Feed row (round 20/45) — mirrors `isPastRetention`
-  // as a query filter, same reasoning as `isDue` above.
-  const purgeSnapshot = await projections
+/**
+ * Fired rows are kept as the backend's half of the Notification Feed, then
+ * purged like every other Feed row (round 20/45) — mirrors `isPastRetention`
+ * as a query filter, same reasoning as `isDue` in `dispatchDueProjections`.
+ * A task of `dailyHousekeeping`, not of every dispatch tick: the retention is
+ * 30 days, so a day's lag is nothing, and an empty query is still a billed read.
+ */
+export async function purgeFiredProjections(
+  db: Firestore,
+  now: number,
+  limits: { pageSize?: number; maxPasses?: number } = {}
+): Promise<{ deleted: number; truncated: boolean }> {
+  // Bounded like the Notification Feed purge (decision 20260907-235147): a
+  // day's backlog in one run must not outgrow memory or the shared timeout.
+  const pageSize = limits.pageSize ?? FIRED_PURGE_PAGE_SIZE;
+  const maxPasses = limits.maxPasses ?? FIRED_PURGE_MAX_PASSES;
+  const query = db
+    .collection(PROJECTIONS_COLLECTION)
     .where('fired', '==', true)
     .where('firedAt', '<', now - FIRED_RETENTION_MS)
-    .get();
-  await commitInChunks(
-    db,
-    purgeSnapshot.docs.map((doc) => (b) => b.delete(doc.ref))
-  );
+    .limit(pageSize);
+  let deleted = 0;
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const page = await query.get();
+    await commitInChunks(
+      db,
+      page.docs.map((doc) => (b) => b.delete(doc.ref))
+    );
+    deleted += page.docs.length;
+    if (page.docs.length < pageSize) return { deleted, truncated: false };
+  }
+  return { deleted, truncated: true };
 }
+
+/** Fired projections deleted per page, and pages per run (the rest waits a day). */
+export const FIRED_PURGE_PAGE_SIZE = 500;
+export const FIRED_PURGE_MAX_PASSES = 20;

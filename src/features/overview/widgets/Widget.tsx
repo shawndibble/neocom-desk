@@ -40,7 +40,8 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useOverviewRefresh } from './data/refreshContext';
 import type { KindView, NumberModel, NumberSecondary } from './data/types';
 import { useWidgetView } from './data/useWidgetView';
-import { getKind } from './kinds';
+import { getKind, widgetKeys } from './kinds';
+import { endpointsOf } from './data/models';
 import { Chart } from './charts/Chart';
 import type { Widget as WidgetModel } from './layout';
 import { scopePresentation } from './scope';
@@ -270,7 +271,7 @@ export function Widget(props: WidgetProps) {
 
 function LiveWidget(props: WidgetProps) {
   const { widget } = props;
-  const scope = scopePresentation(widget.kind, widget.scope);
+  const scope = scopePresentation(widget.kind, widget.scope, widget);
   // The kind's declared settings pick what counts; the rest are ignored (`viewSettings.ts`).
   const view = useWidgetView(widget.kind, scope.scopeAll, widget);
   return <WidgetFrame {...props} view={view} rememberHeight />;
@@ -316,7 +317,7 @@ function WidgetFrame({
   const { setRowsPerPage } = useOverviewEdit();
   const characterId = useActiveCharacter((state) => state.activeCharacterId);
   const now = useTicker(OVERVIEW_TICK_MS);
-  const scope = scopePresentation(widget.kind, widget.scope);
+  const scope = scopePresentation(widget.kind, widget.scope, widget);
   const { state, showLastGood, reauthNote } = resolveWidget(view.status);
   const isPhone = useIsPhone();
   const sizeKey = heightKey(widget, characterId, isPhone);
@@ -334,7 +335,9 @@ function WidgetFrame({
 
   // The grid only draws kinds it knows; a widget rendered alone without one has no title to show.
   if (!kind) return null;
-  const title = widget.title ?? t(kind.titleKey);
+  const keys = widgetKeys(kind, widget.show);
+  const title = widget.title ?? t(keys.titleKey);
+  const endpoints = endpointsOf(widget.kind, widget);
 
   let body;
   if (state === 'loading') {
@@ -342,11 +345,11 @@ function WidgetFrame({
   } else if (state === 'needsPermission') {
     body = (
       <div className="grid gap-2 p-3 text-[0.8125rem]">
-        {characterId !== null && kind.endpoints.length > 0 ? (
+        {characterId !== null && endpoints.length > 0 ? (
           <GrantBanner
             variant="ghost"
             characterId={characterId}
-            endpoints={kind.endpoints}
+            endpoints={endpoints}
             title={t('overview.widgets.needsPermission')}
             hint={t('overview.widgets.needsPermissionHint', { title })}
             actionLabel={t('overview.widgets.grantAction')}
@@ -386,7 +389,7 @@ function WidgetFrame({
   } else if (state === 'empty') {
     body = (
       <div className="grid gap-2 p-3 text-[0.8125rem]">
-        <b>{view.emptyMessage ?? t(kind.emptyMessageKey)}</b>
+        <b>{view.emptyMessage ?? t(keys.emptyMessageKey)}</b>
         {!view.emptyHealthy && (
           <span className="text-text-dim">{view.emptyHint ?? t('overview.widgets.emptyHint')}</span>
         )}
@@ -424,15 +427,11 @@ function WidgetFrame({
   }
 
   // A lapsed grant over saved data: the figures stay, with a small note to log in again.
-  if (reauthNote && characterId !== null && kind.endpoints.length > 0) {
+  if (reauthNote && characterId !== null && endpoints.length > 0) {
     body = (
       <>
         {body}
-        <ReauthCachedNote
-          className="px-3 pb-3"
-          characterId={characterId}
-          endpoints={kind.endpoints}
-        />
+        <ReauthCachedNote className="px-3 pb-3" characterId={characterId} endpoints={endpoints} />
       </>
     );
   }

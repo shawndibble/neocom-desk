@@ -88,7 +88,23 @@ function structuresNumber(
   };
 }
 
-export const structures: Builder = (feeds, { t, now }) => {
+/**
+ * Problems only: how many structures need attention, the worst one named. Zero
+ * never reaches here; the widget shows its good-news empty state instead.
+ */
+function problemsNumber(
+  t: Translate,
+  rows: readonly { name: string; tone: DeadlineSeverity }[]
+): NumberModel {
+  return {
+    value: count(rows.length),
+    unit: t('overview.widgets.structures.needAttention', { count: rows.length }),
+    secondary: rows[0] ? { text: rows[0].name } : undefined,
+    tone: worstSeverity(rows.map((row) => row.tone)),
+  };
+}
+
+export const structures: Builder = (feeds, { t, now, show }) => {
   const feed = feeds.structures;
   const raw = feed?.data ?? null;
   // No structures page exists: a plain title, not a link back to /corp.
@@ -107,31 +123,34 @@ export const structures: Builder = (feeds, { t, now }) => {
       summary: structuresSummary(t, view),
     };
   }
-  const counts = structureCounts(items);
-  const clock = structuresDeadline(items, now);
-  const flagged = items.filter(
-    (item) => item.kind !== 'structureFuel' || item.severity !== 'clear'
-  );
 
   // One row per structure, healthy ones too: the pilot asks "is everything fuelled", not only "what is wrong".
-  const rows = (raw.structures ?? []).map((source) => {
+  const all = (raw.structures ?? []).map((source) => {
     const id = source.structureId;
     const fuel = items.find((item) => item.id === `fuel:${id}`);
     const timer = items.find((item) => item.id === `state:${id}`);
     const offline = items.filter((item) => item.id.startsWith(`service:${id}:`));
+    const unanchor = items.find((item) => item.id === `unanchor:${id}`);
     const own = [fuel, timer, ...offline].filter(
       (item): item is CorpBoardItem => item !== undefined
     );
     const tone = worstSeverity(own.map((item) => item.severity));
+    const lowFuel =
+      fuel !== undefined && (fuel.severity === 'warning' || fuel.severity === 'critical');
     const state = timer
       ? structureStateLabel(timer.detail)
       : offline.length > 0
         ? t('overview.widgets.structures.state.offline')
-        : fuel && (fuel.severity === 'warning' || fuel.severity === 'critical')
+        : lowFuel
           ? t('overview.widgets.structures.state.lowFuel')
           : t('overview.widgets.structures.state.ok');
     return {
       id,
+      // Every board item of this structure, so Problems only can keep exactly these.
+      items: unanchor ? [...own, unanchor] : own,
+      name: shortStructureName(source.name),
+      // What the Problems only setting keeps: the same three things the State column names.
+      problem: timer !== undefined || offline.length > 0 || lowFuel,
       remaining: fuel?.timing === 'timed' ? (fuel.remainingMs ?? 0) : Number.NEGATIVE_INFINITY,
       tone,
       cells: [
@@ -142,10 +161,19 @@ export const structures: Builder = (feeds, { t, now }) => {
       ] as TableCell[],
     };
   });
-  rows.sort(
+  all.sort(
     (a, b) =>
       (a.tone === b.tone ? 0 : worstSeverity([a.tone, b.tone]) === a.tone ? -1 : 1) ||
       a.remaining - b.remaining
+  );
+  const problemsOnly = show === 'problems';
+  const rows = problemsOnly ? all.filter((row) => row.problem) : all;
+  // Problems only reads the board of the structures it lists, so no hidden one sets a deadline or the summary.
+  const shown = problemsOnly ? rows.flatMap((row) => row.items) : items;
+  const counts = structureCounts(shown);
+  const clock = structuresDeadline(shown, now);
+  const flagged = shown.filter(
+    (item) => item.kind !== 'structureFuel' || item.severity !== 'clear'
   );
   const table: TableModel = {
     columns: [
@@ -169,9 +197,17 @@ export const structures: Builder = (feeds, { t, now }) => {
   };
 
   return {
-    ...blank(to, statusOf(feed, { isEmpty: view.structureCount === 0 })),
+    ...blank(
+      to,
+      statusOf(feed, { isEmpty: problemsOnly ? rows.length === 0 : view.structureCount === 0 })
+    ),
+    ...(problemsOnly && rows.length === 0 && view.structureCount > 0
+      ? { emptyMessage: t('overview.widgets.structures.noProblems'), emptyHealthy: true }
+      : {}),
     fetchedAt: view.fetchedAt,
-    number: structuresNumber(t, items, counts.timers, structuresSeverity(view) ?? 'clear'),
+    number: problemsOnly
+      ? problemsNumber(t, rows)
+      : structuresNumber(t, items, counts.timers, structuresSeverity(view) ?? 'clear'),
     rows: flagged.map((item) => ({
       key: item.id,
       title: item.subject,
@@ -194,11 +230,11 @@ export const structures: Builder = (feeds, { t, now }) => {
           },
         ]
       : [],
-    summary: structuresSummary(t, view),
+    summary: structuresSummary(t, { ...view, items: shown }),
     chart:
       hbarsFromRows(
         t,
-        items
+        shown
           .filter((item) => item.kind === 'structureFuel' && item.timing === 'timed')
           .map((item) => {
             const seconds = Math.max(0, item.remainingMs ?? 0) / 1000;

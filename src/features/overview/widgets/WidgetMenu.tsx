@@ -1,12 +1,13 @@
 /**
  * A widget's settings menu: the ⋮ in its header.
  *
- * View, Character and Range are radio groups (the current choice ticked), shown
- * only for what the kind has: a kind with one view has no View group, one
- * without a time window has no Range. Rename opens a small dialog after the
- * menu has closed (a text field inside a Radix menu loses keystrokes to its
- * typeahead, and docs/DESIGN.md §6c "Menu item that opens a dialog" fixes the
- * focus order). Esc, outside click and focus return come from the primitive.
+ * Show, View, Character and Range are radio groups (the current choice ticked),
+ * shown only for what the kind has: a kind with one view has no View group, one
+ * without a time window (or on a Show that reads none) has no Range. Rename
+ * opens a small dialog after the menu has closed (a text field inside a Radix
+ * menu loses keystrokes to its typeahead, and docs/DESIGN.md §6c "Menu item
+ * that opens a dialog" fixes the focus order). Esc, outside click and focus
+ * return come from the primitive.
  *
  * `inert` is the signed-out landing page's demo: the same menu over a layout
  * whose actions do nothing, where Rename must not open its dialog either.
@@ -33,7 +34,7 @@ import * as Icon from '@/components/ui/icons';
 import { kindSumsAcrossCharacters } from './data/models';
 import { boardKey, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
-import { getKind } from './kinds';
+import { getKind, rangeAppliesTo, showOf, widgetKeys } from './kinds';
 import { TrendHubsMenuGroup, TrendItemsDialog } from './TrendPicks';
 import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
 import {
@@ -45,13 +46,16 @@ import {
   RAIDS_RADII,
   RAIDS_WHERES,
   type RaidsWhere,
+  LEGACY_PROFIT_SOURCE,
+  PROFIT_SOURCES,
+  type ProfitSource,
   rangesOf,
   type CalendarEventsChoice,
   type Widget,
   type WidgetRange,
   type WidgetScope,
 } from './layout';
-import type { WidgetView } from './kinds';
+import type { WidgetShow, WidgetView } from './kinds';
 
 function RenameDialog({
   widget,
@@ -192,9 +196,10 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
   const kind = getKind(widget.kind);
   if (!kind) return null;
 
-  const fallbackTitle = t(kind.titleKey);
+  const fallbackTitle = t(widgetKeys(kind, widget.show).titleKey);
   const title = widget.title ?? fallbackTitle;
-  const canSum = kindSumsAcrossCharacters(widget.kind);
+  const hasRange = rangeAppliesTo(kind, widget.show);
+  const canSum = kindSumsAcrossCharacters(widget.kind, widget);
   const index = edit.layout.widgets.findIndex((w) => w.id === widget.id);
   const last = edit.layout.widgets.length - 1;
 
@@ -212,6 +217,23 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
           />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-60" onCloseAutoFocus={onCloseAutoFocus}>
+          {/* What the widget draws comes before how; every Show offers the kind's views, so View stays put. */}
+          {kind.shows.length > 1 && (
+            <>
+              <DropdownMenuLabel>{t('overview.menu.show')}</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={showOf(kind, widget.show)}
+                onValueChange={(next) => edit.setShow(widget.id, next as WidgetShow)}
+              >
+                {kind.shows.map((show) => (
+                  <DropdownMenuRadioItem key={show} value={show}>
+                    {t(`overview.menu.showChoice.${show}`)}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+              <DropdownMenuSeparator />
+            </>
+          )}
           {kind.views.length > 1 && (
             <>
               <DropdownMenuLabel>{t('overview.menu.view')}</DropdownMenuLabel>
@@ -248,7 +270,7 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
               )}
             </>
           )}
-          {kind.hasRange && (
+          {hasRange && (
             <>
               {board.characterScope && <DropdownMenuSeparator />}
               <DropdownMenuLabel>{t('overview.menu.range')}</DropdownMenuLabel>
@@ -315,6 +337,22 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
               )}
             </>
           )}
+          {kind.hasProfitSource && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>{t('overview.menu.profitSource')}</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={widget.profitSource ?? LEGACY_PROFIT_SOURCE}
+                onValueChange={(next) => edit.setProfitSource(widget.id, next as ProfitSource)}
+              >
+                {PROFIT_SOURCES.map((source) => (
+                  <DropdownMenuRadioItem key={source} value={source}>
+                    {t(`overview.menu.profitSourceChoice.${source}`)}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </>
+          )}
           {kind.hasTrendSources && (
             <>
               <DropdownMenuSeparator />
@@ -335,9 +373,10 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
           )}
           {/* The View group ends in its own separator; any group after it does not. */}
           {(board.characterScope ||
-            kind.hasRange ||
+            hasRange ||
             kind.hasCalendarEvents ||
             kind.hasRaidsWhere ||
+            kind.hasProfitSource ||
             kind.hasTrendSources ||
             kind.hasPlexPlan) && <DropdownMenuSeparator />}
           <DropdownMenuItem onSelect={() => run(() => (inert ? undefined : setRenaming(true)))}>

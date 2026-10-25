@@ -4,7 +4,6 @@ import { getHubPrices, getRegionSellPrices } from '@/market/prices';
 import { db } from '@/db';
 import { loadGlobalMarketOverrides } from '@/features/market/orderBookView';
 import { findLpOfferMatches } from '@/features/market/appraisalLpAcquisition';
-import { loadMarketLpValues } from '@/features/loyalty/marketLpValue';
 import { loadOwnedStockSnapshot } from './ownedStockDetection';
 import {
   blueprintTypeIdsIn,
@@ -22,6 +21,7 @@ vi.mock('./ownedStockDetection', () => ({
 }));
 const lpValueState = vi.hoisted(() => ({ value: 0, hydrate: async () => {} }));
 vi.mock('@/features/loyalty/lpValue', () => ({ useLpValue: { getState: () => lpValueState } }));
+// Blueprints never read a store's market LP Value; mocked so its loaders stay out.
 vi.mock('@/features/loyalty/marketLpValue', () => ({ loadMarketLpValues: vi.fn() }));
 
 const JITA = getTradeHub('jita')!;
@@ -89,9 +89,8 @@ beforeEach(() => {
   vi.mocked(loadOwnedStockSnapshot).mockResolvedValue(ownedHulls(0) as never);
   vi.mocked(loadGlobalMarketOverrides).mockResolvedValue(new Map());
   vi.mocked(db.characters.toArray).mockResolvedValue([{ characterId: 7 }] as never);
-  // Corp 1's LP sells for 4 ISK on the market.
-  vi.mocked(loadMarketLpValues).mockResolvedValue(new Map([[1, 4]]));
-  lpValueState.value = 0;
+  // The pilot values LP at 4 ISK.
+  lpValueState.value = 4;
 });
 
 describe('loadBlueprintPurchaseOffers', () => {
@@ -105,22 +104,23 @@ describe('loadBlueprintPurchaseOffers', () => {
     expect(offersFor(BLUEPRINT)).toEqual([{ me: 0, te: 0, runs: -1, quantity: 1, price: 5_000 }]);
   });
 
-  it('prices an LP redemption at the store’s market LP Value when the pilot set none', async () => {
+  it('prices an LP redemption at the pilot’s LP Value', async () => {
     const offersFor = await loadBlueprintPurchaseOffers(7, JITA, [BLUEPRINT]);
     // 1,000 ISK + 500 LP at 4 ISK/LP.
     expect(offersFor(BLUEPRINT)).toEqual([{ me: 0, te: 0, runs: 1, quantity: 1, price: 3_000 }]);
   });
 
-  it('uses the pilot’s own LP Value over the market’s', async () => {
-    lpValueState.value = 10;
+  it('counts the LP as already earned when the pilot set no LP Value: the ISK cost alone', async () => {
+    lpValueState.value = 0;
     const offersFor = await loadBlueprintPurchaseOffers(7, JITA, [BLUEPRINT]);
-    expect(offersFor(BLUEPRINT)).toEqual([expect.objectContaining({ price: 6_000 })]);
+    expect(offersFor(BLUEPRINT)).toEqual([expect.objectContaining({ price: 1_000 })]);
   });
 
-  it('leaves a redemption out when nothing prices its LP, rather than counting the LP free', async () => {
-    vi.mocked(loadMarketLpValues).mockResolvedValue(new Map([[1, null]]));
+  it('rounds the price to whole ISK', async () => {
+    lpValueState.value = 2.3333;
     const offersFor = await loadBlueprintPurchaseOffers(7, JITA, [BLUEPRINT]);
-    expect(offersFor(BLUEPRINT)).toEqual([]);
+    // 1,000 + 500 × 2.3333 = 2,166.65.
+    expect(offersFor(BLUEPRINT)).toEqual([expect.objectContaining({ price: 2_167 })]);
   });
 
   it('charges only the turn-ins the pilot does not already hold', async () => {
@@ -173,21 +173,21 @@ describe('lpBlueprintPickPrice', () => {
   it('prices one redemption with owned turn-ins free and the rest at the hub price', async () => {
     vi.mocked(loadOwnedStockSnapshot).mockResolvedValue(ownedHulls(1) as never);
     const offer = lpMatch(3).matchesByTypeId.get(BLUEPRINT)![0]!.offer;
-    const price = await lpBlueprintPickPrice(offer as never, 1, JITA);
+    const price = await lpBlueprintPickPrice(offer as never, JITA);
     expect(price).toBe(3_400);
   });
 
   it('is no price when a turn-in still to buy is unpriced', async () => {
     vi.mocked(getHubPrices).mockResolvedValue(new Map());
     const offer = lpMatch(1).matchesByTypeId.get(BLUEPRINT)![0]!.offer;
-    const price = await lpBlueprintPickPrice(offer as never, 1, JITA);
+    const price = await lpBlueprintPickPrice(offer as never, JITA);
     expect(price).toBeNull();
   });
 
-  it('is no price when nothing prices the LP', async () => {
-    vi.mocked(loadMarketLpValues).mockResolvedValue(new Map([[1, null]]));
+  it('charges the ISK cost alone when the pilot set no LP Value', async () => {
+    lpValueState.value = 0;
     const offer = lpMatch(0).matchesByTypeId.get(BLUEPRINT)![0]!.offer;
-    expect(await lpBlueprintPickPrice(offer as never, 1, JITA)).toBeNull();
+    expect(await lpBlueprintPickPrice(offer as never, JITA)).toBe(1_000);
   });
 });
 

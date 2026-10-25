@@ -958,6 +958,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
       {historyToast && (
         <Toast
           message={historyToast.message}
+          instance={historyToast}
           undo={
             historyToast.onUndo
               ? { label: t('industry.historyUndo'), onUndo: historyToast.onUndo }

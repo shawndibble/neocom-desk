@@ -22,7 +22,3 @@ export const TREND_PRESETS: readonly TrendPreset[] = [
   { id: 'plex', items: [44992], view: 'chart' },
   { id: 'injector', items: [40520], view: 'chart' },
 ];
-
-export function trendPreset(id: string): TrendPreset | undefined {
-  return TREND_PRESETS.find((p) => p.id === id);
-}

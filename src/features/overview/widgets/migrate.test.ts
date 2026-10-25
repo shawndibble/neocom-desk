@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isReturningPilot, migrateFromCards, parseHiddenCards } from './migrate';
+import {
+  isReturningPilot,
+  migrateFromCards,
+  migrateRetiredKind,
+  parseHiddenCards,
+} from './migrate';
 
 const kinds = (l: { widgets: { kind: string }[] }) => l.widgets.map((w) => w.kind);
 
@@ -105,5 +110,101 @@ describe('parseHiddenCards', () => {
     expect(parseHiddenCards('mining')).toBeNull();
     expect(parseHiddenCards({ mining: true })).toBeNull();
     expect(parseHiddenCards(null)).toBeNull();
+  });
+});
+
+describe('migrateRetiredKind', () => {
+  it('turns an Offline services widget into Structures on Problems only, keeping the rest', () => {
+    const saved = {
+      id: 'x',
+      kind: 'corpServices',
+      size: 'M',
+      view: 'table',
+      scope: 'header',
+      showOnPhone: false,
+      rowsPerPage: 25,
+    };
+    expect(migrateRetiredKind(saved)).toEqual({
+      ...saved,
+      kind: 'structures',
+      show: 'problems',
+    });
+  });
+
+  it("reads Structures' own structuresShow field as the shared Show", () => {
+    const base = { id: 's', kind: 'structures', size: 'M', view: 'table' };
+    expect(migrateRetiredKind({ ...base, structuresShow: 'problems' })).toEqual({
+      ...base,
+      show: 'problems',
+    });
+    expect(migrateRetiredKind({ ...base, structuresShow: 'all' })).toEqual(base);
+  });
+
+  it('returns any other widget as it was', () => {
+    const saved = { id: 'y', kind: 'structures', view: 'chart' };
+    expect(migrateRetiredKind(saved)).toBe(saved);
+  });
+
+  const saved = (over: Record<string, unknown>) => ({
+    id: 'a',
+    kind: 'profit',
+    size: 'L',
+    view: 'table',
+    scope: 'all',
+    range: 90,
+    title: 'Mine',
+    showOnPhone: false,
+    ...over,
+  });
+
+  it('turns a Trading profit widget into Profit on Trading, keeping everything else', () => {
+    expect(migrateRetiredKind(saved({ kind: 'tradingProfit' }))).toEqual(
+      saved({ kind: 'profit', profitSource: 'trading' })
+    );
+  });
+
+  it('puts a Profit widget saved before the setting on Builds, so it shows what it did', () => {
+    expect(migrateRetiredKind(saved({}))).toEqual(saved({ profitSource: 'builds' }));
+    expect(migrateRetiredKind(saved({ profitSource: 'nonsense' }))).toEqual(
+      saved({ profitSource: 'builds' })
+    );
+  });
+
+  it('leaves a Profit widget with a Source, and every other kind, as found', () => {
+    const both = saved({ profitSource: 'both' });
+    expect(migrateRetiredKind(both)).toBe(both);
+    const wallet = saved({ kind: 'wallet' });
+    expect(migrateRetiredKind(wallet)).toBe(wallet);
+  });
+
+  it('turns each retired wallet kind into its Show, every other field kept', () => {
+    const base = {
+      id: 'a',
+      size: 'M',
+      view: 'table',
+      range: 90,
+      scope: 'header',
+      showOnPhone: true,
+    };
+    expect(migrateRetiredKind({ ...base, kind: 'walletFlow' })).toEqual({
+      ...base,
+      kind: 'wallet',
+      show: 'flow',
+    });
+    expect(migrateRetiredKind({ ...base, kind: 'corpCashFlow' })).toEqual({
+      ...base,
+      kind: 'corpWallet',
+      show: 'flow',
+    });
+    expect(migrateRetiredKind({ ...base, kind: 'corpIncome' })).toEqual({
+      ...base,
+      kind: 'corpWallet',
+      show: 'sources',
+    });
+  });
+
+  it('returns anything else as it was', () => {
+    const wallet = { id: 'a', kind: 'wallet' };
+    expect(migrateRetiredKind(wallet)).toBe(wallet);
   });
 });

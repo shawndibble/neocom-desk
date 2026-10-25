@@ -69,7 +69,7 @@ One list of every way into a Fitting: saved (My Fittings) + In-game rows.
 - Pick, then Start fitting (double-click starts at once).
 - Popular fits panel per hull (`PopularFitsPanel.tsx`): source tabs zKillboard / EVE Workbench.
   - zKillboard: recent hull losses with full fit (`@/lib/zkillboard` `fetchHullLosses` + ESI `getKillmail`), loss count, last seen, approx ISK value, Open.
-  - EVE Workbench: fits from the R2 object `workbench-fits/<shipTypeId>.json` (Cloud Function `syncWorkbenchFits`, `workbenchFits.ts`; no Firebase session), created age, price at default Trade Hub (partial price flag, unpriced count), out-of-date check against current game (`WorkbenchOutOfDate`, `workbenchSightings`), sighting badge.
+  - EVE Workbench: fits from the R2 object `workbench-fits/<shipTypeId>.json` (GitHub Actions job `public-data-workbench-fits.yml`, every 12 h, `workbenchFits.ts`, checkpoint in R2 `workbench-fits-state/state.json`; no Firebase session), created age, price at default Trade Hub (partial price flag, unpriced count), out-of-date check against current game (`WorkbenchOutOfDate`, `workbenchSightings`), sighting badge.
   - Failure/empty/loading states each have copy; "Everything else still works".
 
 ### Load / Import (`FittingLoadCard.tsx`, `loadFittingFromText.ts`, `engine/fittings/load.ts`)

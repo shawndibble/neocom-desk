@@ -1,7 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import type { DepthPrice } from '@/engine/industry/depthPrice';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { formatIsk } from '@/lib/isk';
+import { formatIsk, formatIskCompact } from '@/lib/isk';
+
+/**
+ * Shorthand from 1M up (a blueprint's "1.5B", which otherwise grows the cell),
+ * cents below, where a material's 4,512.30 vs 4,498.10 is the difference.
+ */
+function depthIsk(value: number): string {
+  return Math.abs(value) >= 1_000_000 ? formatIskCompact(value) : formatIsk(value, 2);
+}
 
 /**
  * A walked material's Price-cell second line: the lowest sell
@@ -20,8 +28,8 @@ export function DepthPriceLine({ depth }: { depth: DepthPrice }) {
   return (
     <span className="text-[0.6875rem] whitespace-nowrap text-text-dim tabular-nums">
       {t('industry.depthPriceLine', {
-        best: formatIsk(depth.best, 2),
-        avg: formatIsk(depth.avg, 2),
+        best: depthIsk(depth.best),
+        avg: depthIsk(depth.avg),
         need: formatCompactNumber(depth.need),
       })}
     </span>

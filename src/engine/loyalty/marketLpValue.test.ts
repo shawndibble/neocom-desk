@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lpRate, marketLpValue } from './marketLpValue';
+import { blueprintLpRate, lpRate, marketLpValue } from './marketLpValue';
 
 const offer = (iskPerLp: number | null, sellVolume = 100, quantity = 1) => ({
   iskPerLp,
@@ -57,5 +57,16 @@ describe('lpRate', () => {
   it('leaves the LP unpriced — never free — when neither is known', () => {
     expect(lpRate(0, null)).toEqual({ rate: null, source: null });
     expect(lpRate(Number.NaN, null)).toEqual({ rate: null, source: null });
+  });
+});
+
+describe('blueprintLpRate', () => {
+  it('uses the pilot’s own LP Value whenever one is set', () => {
+    expect(blueprintLpRate(2000)).toEqual({ rate: 2000, source: 'yours' });
+  });
+
+  it('counts the LP as already earned — free, not a market guess — when none is set', () => {
+    expect(blueprintLpRate(0)).toEqual({ rate: 0, source: 'free' });
+    expect(blueprintLpRate(Number.NaN)).toEqual({ rate: 0, source: 'free' });
   });
 });

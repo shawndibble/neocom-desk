@@ -11,8 +11,15 @@
  * another device's copy.
  */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
-import { isAddable, type WidgetKindId } from './kinds';
-import { newWidget, type MakeId, type OverviewLayout, type Widget } from './layout';
+import { isAddable, type WidgetKindId, type WidgetShow } from './kinds';
+import {
+  isProfitSource,
+  LEGACY_PROFIT_SOURCE,
+  newWidget,
+  type MakeId,
+  type OverviewLayout,
+  type Widget,
+} from './layout';
 
 export const OVERVIEW_HIDDEN_CARDS_KEY = 'sync.overviewHiddenCards';
 export const OVERVIEW_CARD_ORDER_KEY = 'sync.overviewCardOrder';
@@ -95,4 +102,44 @@ export function migrateFromCards(
 /** Whether the old settings show this pilot used the board before the grid. */
 export function isReturningPilot(hidden: readonly string[], order: readonly string[]): boolean {
   return hidden.length > 0 || order.length > 0;
+}
+
+/** Retired kinds that became another kind on one of its Shows. */
+const SHOW_FOLDS: Readonly<Record<string, { kind: WidgetKindId; show: WidgetShow }>> = {
+  corpServices: { kind: 'structures', show: 'problems' },
+  walletFlow: { kind: 'wallet', show: 'flow' },
+  corpCashFlow: { kind: 'corpWallet', show: 'flow' },
+  corpIncome: { kind: 'corpWallet', show: 'sources' },
+};
+
+/**
+ * A saved widget of a retired or reshaped kind, as this build reads it; any
+ * other widget comes back as the very object passed. `parseLayout` runs it on
+ * every read, so a layout another device wrote before the change still loads,
+ * and the new form is only written on the pilot's next edit. Size, view,
+ * scope, range, title and the rest stay as saved; `parseLayout` repairs
+ * whatever the new kind does not offer.
+ *
+ * - Offline services folded into Structures' Problems only: the same feed, and
+ *   the structures with an offline service are among the problems it lists.
+ *   Structures' own `structuresShow: 'problems'` (briefly stored before the
+ *   Show setting was shared) reads as `show: 'problems'`.
+ * - Wallet flow became the Wallet's Flow; Cash flow and Income by source the
+ *   Corp wallet's Flow and Sources (decision `20261024-192832`).
+ * - Trading profit became Profit on Trading; a Profit widget saved before the
+ *   Source setting existed is put on Builds, which is all it ever showed
+ *   (decision `20261024-191335`).
+ */
+export function migrateRetiredKind(raw: Record<string, unknown>): Record<string, unknown> {
+  const folded = typeof raw.kind === 'string' ? SHOW_FOLDS[raw.kind] : undefined;
+  if (folded) return { ...raw, kind: folded.kind, show: folded.show };
+  if (raw.kind === 'structures' && raw.structuresShow !== undefined) {
+    const { structuresShow, ...rest } = raw;
+    return structuresShow === 'problems' ? { ...rest, show: 'problems' } : rest;
+  }
+  if (raw.kind === 'tradingProfit') return { ...raw, kind: 'profit', profitSource: 'trading' };
+  if (raw.kind === 'profit' && !isProfitSource(raw.profitSource)) {
+    return { ...raw, profitSource: LEGACY_PROFIT_SOURCE };
+  }
+  return raw;
 }

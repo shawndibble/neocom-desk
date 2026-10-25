@@ -9,7 +9,10 @@ import { removeCharacter, removeCharacterAfterSync } from './removeCharacter';
 const syncMock = vi.hoisted(() => ({
   clearCharacterSyncBookkeeping: vi.fn(async () => {}),
   triggerSync: vi.fn<(characterId: number) => Promise<void>>(async () => {}),
+  removeCharacterSession: vi.fn<(characterId: number) => Promise<void>>(async () => {}),
 }));
+const syncStatus = vi.hoisted(() => ({ configured: false }));
+vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => syncStatus.configured }));
 vi.mock('@/sync', () => syncMock);
 const pushMock = vi.hoisted(() => ({
   scheduleProjectionRebuild: Object.assign(vi.fn(), { cancel: vi.fn() }),
@@ -188,6 +191,23 @@ beforeEach(async () => {
 });
 
 describe('removeCharacter', () => {
+  it('deletes the Character’s Firebase app and session when sync is configured', async () => {
+    syncStatus.configured = true;
+    try {
+      await seedCharacter(1);
+      await removeCharacter(1);
+      expect(syncMock.removeCharacterSession).toHaveBeenCalledWith(1);
+    } finally {
+      syncStatus.configured = false;
+    }
+  });
+
+  it('leaves Firebase alone when sync is not configured', async () => {
+    await seedCharacter(1);
+    await removeCharacter(1);
+    expect(syncMock.removeCharacterSession).not.toHaveBeenCalled();
+  });
+
   it('re-uploads the remaining roster, without unregistering, while Characters remain', async () => {
     await seedCharacter(1);
     await seedCharacter(2);

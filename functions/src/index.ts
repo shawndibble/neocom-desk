@@ -15,18 +15,18 @@ import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getMessaging } from 'firebase-admin/messaging';
 import { firestore } from './firestore.js';
+import {
+  installBookWriteTracking,
+  stampBook,
+  withBookVersions,
+} from './corpTaxBookVersionTracking.js';
 import { runPurgeNotificationFeed, runPurgeStaleAccounts } from './purgeJobs.js';
 import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, r2ConfigOrThrow } from './r2Publish.js';
 import { openPricesR2Key } from './r2DailySnapshots.js';
 import { createR2Get } from './r2Publisher.js';
 import { runSyncActiveWars } from './activeWarsJob.js';
-import { runSyncLawlessSystems, runSyncMarketOpenPrices } from './marketHistoryJob.js';
-import {
-  runSyncCostIndices,
-  runSyncLpStoreOffers,
-  runSyncPublicContractOffers,
-  runSyncWorkbenchFits,
-} from './snapshotJobs.js';
+import { runSyncLawlessSystems } from './marketHistoryJob.js';
+import { runSyncPublicContractOffers } from './snapshotJobs.js';
 import { verifyEveAccessToken, verifyOptionsFromEnv, uidForCharacter } from './verifyEveToken.js';
 import {
   AlertGrantError,
@@ -42,7 +42,11 @@ import { firestoreAlertGrantStore, firestorePollerStore } from './alertGrantStor
 import { fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
 import { pollEveNotifications as pollEveNotificationsRun } from './pollEveNotifications.js';
 import { buildDeviceRegistration, parseRegisterDeviceInput } from './registerDevice.js';
-import { dispatchDueProjections, writeDeviceRegistration } from './projectionStore.js';
+import {
+  dispatchDueProjections,
+  purgeFiredProjections,
+  writeDeviceRegistration,
+} from './projectionStore.js';
 import {
   parseBookCall,
   parseClaimPaymentInput,
@@ -245,6 +249,11 @@ import {
 } from './mutamarket.js';
 
 initializeApp();
+// Every write under `corps/{id}` restamps that book's version marker (issue #5047). Each
+// entry point that can reach a book runs inside `bookVersioned`, which does the stamping.
+installBookWriteTracking();
+const bookVersioned = <T>(handler: () => T | Promise<T>): Promise<T> =>
+  withBookVersions((id, touched) => stampBook(firestore(), id, touched), handler, logError);
 
 // Built at cold start so a missing EVE_CLIENT_ID fails deployment/startup
 // loudly instead of silently accepting any EVE app's tokens per request.
@@ -328,19 +337,18 @@ alertsAction('registerDevice', async (request) => {
   // so the client can offer a toggle for them. Only `seenTypes` is read out.
   const { store } = alertGrantDeps();
   const seenTypes: Record<string, string[]> = {};
-  await Promise.all(
-    registration.characterIds.map(async (characterId) => {
-      try {
-        seenTypes[String(characterId)] = (await store.get(characterId))?.seenTypes ?? [];
-      } catch (err) {
-        // The registration already landed; a failed read only delays new toggles.
-        logError('Device registration: seenTypes read failed', {
-          characterId,
-          error: String(err),
-        });
-      }
-    })
-  );
+  try {
+    const grants = await store.getMany(registration.characterIds);
+    for (const characterId of registration.characterIds) {
+      seenTypes[String(characterId)] = grants.get(characterId)?.seenTypes ?? [];
+    }
+  } catch (err) {
+    // The registration already landed; a failed read only delays new toggles.
+    logError('Device registration: seenTypes read failed', {
+      characterIds: registration.characterIds,
+      error: String(err),
+    });
+  }
 
   return { deviceId: input.deviceId, registered: registration.characterIds, rejected, seenTypes };
 });
@@ -393,7 +401,7 @@ alertsAction('deleteAlertGrant', async (request) => {
 // The device and Alerts Grant router (see callableRouter.ts). Clients call this. The secret is only used by the grant actions.
 export const alertsCall = onCall<unknown>(
   { maxInstances: 10, secrets: [ALERTS_TOKEN_KEY] },
-  alertsActions.route
+  (request) => bookVersioned(() => alertsActions.route(request))
 );
 
 /**
@@ -462,7 +470,9 @@ const communityActions = createActionGroup();
 const communityAction = (name: CallableAction<'community'>, handler: CallableHandler): void => {
   communityActions.register(name, handler);
 };
-export const communityCall = onCall<unknown>({ maxInstances: 10 }, communityActions.route);
+export const communityCall = onCall<unknown>({ maxInstances: 10 }, (request) =>
+  bookVersioned(() => communityActions.route(request))
+);
 
 communityAction('createCommunityCallable', (request) =>
   createCommunity(firestore(), callerOf(request), parseCreateInput(request.data))
@@ -822,10 +832,11 @@ corpTaxBookAction('forceCorpTaxBookRemovalCallable', (request) =>
 /** Ends every removal whose 24 hours are up. Deploy is manual, like the other schedules. */
 export const finalizeCorpTaxBookRemovals = onSchedule(
   { schedule: 'every 1 hours', secrets: FEEDER_VIEW_SECRETS, maxInstances: 1 },
-  async () => {
-    const summary = await finalizeDueRemovals(corpSyncDeps());
-    logInfo('finalizeCorpTaxBookRemovals finished', { ...summary });
-  }
+  () =>
+    bookVersioned(async () => {
+      const summary = await finalizeDueRemovals(corpSyncDeps());
+      logInfo('finalizeCorpTaxBookRemovals finished', { ...summary });
+    })
 );
 
 // Paying a moon owner (issue #4514): record a payout, mark a journal row not a payout, and attach
@@ -868,10 +879,11 @@ export const syncCorpTaxBooks = onSchedule(
     timeoutSeconds: 540,
     maxInstances: 1,
   },
-  async () => {
-    const summary = await runScheduledCorpSyncs(corpSyncDeps(), esiSyncReader());
-    logInfo('syncCorpTaxBooks finished', { ...summary });
-  }
+  () =>
+    bookVersioned(async () => {
+      const summary = await runScheduledCorpSyncs(corpSyncDeps(), esiSyncReader());
+      logInfo('syncCorpTaxBooks finished', { ...summary });
+    })
 );
 
 corpTaxBookAction('verifyCorpOfficerCallable', (request) =>
@@ -1082,7 +1094,7 @@ corpTaxBookAction('stopCorpTaxBookRemindersCallable', (request) => {
 // small transactions). Clients call this.
 export const corpTaxBookCall = onCall<unknown>(
   { maxInstances: 10, secrets: FEEDER_VIEW_SECRETS, timeoutSeconds: 120 },
-  corpTaxBookActions.route
+  (request) => bookVersioned(() => corpTaxBookActions.route(request))
 );
 
 /**
@@ -1101,6 +1113,11 @@ export const corpTaxBookCall = onCall<unknown>(
  *   their Shares. Bounded to 500 deletes a run.
  * - sweepSrpClaims (ADR 0026): deletes Paid and Rejected SRP Claims a year after
  *   they close, with their SRP log entries. Bounded to 500 deletes a run.
+ * - purgeFiredProjections: deletes Scheduled Push rows fired more than 30 days ago (was every
+ *   `dispatchProjections` tick, an empty billed query 96 times a day).
+ * The three sweeps and the stale-account purge read with one query each (collection-group for
+ * the sweeps, indexes in firestore.indexes.json, deployed by hand) and fall back to the old
+ * per-parent scan until those indexes exist (indexedSweep.ts).
  */
 export const dailyHousekeeping = onSchedule(
   { schedule: 'every 24 hours', secrets: [ALERTS_TOKEN_KEY], timeoutSeconds: 540 },
@@ -1109,8 +1126,20 @@ export const dailyHousekeeping = onSchedule(
       [
         { name: 'purgeNotificationFeed', run: runPurgeNotificationFeed },
         {
+          name: 'purgeFiredProjections',
+          run: async () => {
+            const { deleted, truncated } = await purgeFiredProjections(firestore(), Date.now());
+            if (truncated) {
+              logWarn('Fired projection purge: pass limit reached, backlog continues next run', {
+                deleted,
+              });
+            }
+          },
+        },
+        {
           name: 'purgeStaleAccounts',
-          run: () => runPurgeStaleAccounts({ alertGrantDeps, corpSyncDeps }),
+          // Removing a purged account's sync grant writes its book's status (issue #5047).
+          run: () => bookVersioned(() => runPurgeStaleAccounts({ alertGrantDeps, corpSyncDeps })),
         },
         {
           name: 'sweepCommunityRequests',
@@ -1207,7 +1236,12 @@ export const syncActiveWars = onSchedule(
  * type, to Cloudflare R2 (`contract-offers/`) for clients to search. R2 is the
  * only store (ADR 0019; issue #4270 removed the Firestore copies).
  *
- * Every 30 minutes, matching EVE Ref's own twice-hourly refresh cadence.
+ * Every 60 minutes (issue #5066, was 30): the job was ~70% of billable function
+ * time. An hourly publish leaves a snapshot up to ~90 minutes behind EVE Ref.
+ * Memory is 1GiB (issue #5108, was 2GiB): the Cloud Run memory-utilization
+ * metric put the 14-day p99 at 35% of 2GiB (~720MiB), after the bundle-shard
+ * read of #4820. The 2GiB was sized for the Firestore row write #4286 removed.
+ * To roll back, set it to 2GiB and redeploy.
  *
  * The archive is streamed rather than buffered: `contracts.csv` is read into
  * a lookup of only the fields the join needs, then `contract_items.csv` is
@@ -1228,9 +1262,9 @@ export const syncActiveWars = onSchedule(
  * out of this snapshot client-side — so the archive is fetched once per cycle
  * again rather than twice.
  *
- * Memory is 2GiB against the retired blueprint-only sync's 1GiB, and the
- * timeout 540s against its 300s. Neither is measured at this volume; both are provisioned for
- * ~3x the rows on the evidence that exists. That evidence is specific: a
+ * History: memory was provisioned at 2GiB against the retired blueprint-only
+ * sync's 1GiB, and the timeout 540s against its 300s, for ~3x the rows on the
+ * evidence that existed then (superseded for memory by the note above). That evidence is specific: a
  * 512MiB ceiling died at 527MiB *during the (then Firestore) write* with ~122k rows, having
  * survived the streaming parse — so the ceiling scales with the retained rows
  * and their encoding, which is exactly what triples here. Under-provisioning
@@ -1251,158 +1285,12 @@ export const syncActiveWars = onSchedule(
  */
 export const syncPublicContractOffers = onSchedule(
   {
-    schedule: 'every 30 minutes',
-    memory: '2GiB',
+    schedule: 'every 60 minutes',
+    memory: '1GiB',
     timeoutSeconds: 540,
     secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
   },
   runSyncPublicContractOffers
-);
-
-/**
- * syncWorkbenchFits: EVE Workbench's public fits, grouped by hull into one R2
- * object per hull (`workbench-fits/<shipTypeId>.json`, issue #4271) for the
- * Popular fit panel's EVE Workbench tab (issue #2484). Workbench's list
- * can't be filtered by hull, so this keeps our own copy — see
- * workbenchFits.ts for the pass/checkpoint design, and the decision doc it
- * ships with.
- *
- * Every 12 hours (cost: it was every 30 minutes), each run fetching for at
- * most `WORKBENCH_FETCH_BUDGET_MS` then flushing to R2 (only hulls whose fits
- * changed). Requests are sequential with a 250ms gap (≤ 4/s
- * against a free, unauthenticated API), so a run stores roughly 1,000 fits:
- * the first pass over ~38k fits takes ~40 runs, about 20 days at this cadence, after which a run
- * is one list page plus however many fits were published since.
- *
- * The 360s budget leaves 180s of the 540s timeout for the flush, which reads
- * and rewrites every hull the run touched (a few hundred during the first
- * pass). A flush that overran the timeout would never save the checkpoint, so
- * every later run would redo the same pages — this margin is what prevents it.
- *
- * 1GiB because a run reads back every hull it touches whole (then merges and
- * gzips it), and the most-fitted hulls are a few MB of EFT each. The one-time
- * migration run streams the legacy docs 20 at a time, so it holds at most a
- * page plus the hulls being written.
- *
- * Another Cloud Scheduler job past the free three — the same trade
- * `captureMiningPriceSnapshot` already made.
- */
-
-export const syncWorkbenchFits = onSchedule(
-  {
-    schedule: 'every 12 hours',
-    memory: '1GiB',
-    timeoutSeconds: 540,
-    secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
-  },
-  runSyncWorkbenchFits
-);
-
-/**
- * syncLpStoreOffers: the LP Store page's item-first search (issue #2873). Reads
- * every LP corporation's public offers from ESI (~170 requests, paced) and
- * republishes them with each corporation's station systems to R2
- * (`lp-store-offers/snapshot.json`), so the app can search an item across all
- * stores and rank corporations by jumps. R2, not Firestore: the whole snapshot is
- * read by every visitor to the page, and R2 has no egress fee.
- * Needs the R2 secrets and env like `syncPublicContractOffers`.
- *
- * Once a day: store offers change on patch days, not by the hour. A run that
- * lost more than a tenth of the corporations (ESI down) publishes nothing and
- * leaves yesterday's snapshot standing, since the write replaces it wholesale.
- *
- * Another Cloud Scheduler job past the free three, the same trade as
- * `syncWorkbenchFits`; the deployment now has eight scheduled functions.
- *
- * The system cost index history (`cost-indices/<systemId>.json`) rides
- * this schedule rather than a ninth function: it needs the same R2 secrets and runs
- * once a day. The two are independent; one failing still runs the other, and the run
- * fails afterwards naming what failed. 1GiB/540s is the open prices job's budget for
- * the same ~5,500 read-merge-write round trips (32 at a time).
- */
-
-export const syncLpStoreOffers = onSchedule(
-  {
-    // A cron pinned to UTC, so the cost index half stamps a stable UTC date
-    // (`every 24 hours` drifts and could skip or repeat a date).
-    schedule: '30 0 * * *',
-    timeZone: 'Etc/UTC',
-    memory: '1GiB',
-    timeoutSeconds: 540,
-    secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
-  },
-  async () => {
-    const failed: string[] = [];
-    for (const [name, run] of [
-      ['LP store offers', runSyncLpStoreOffers],
-      ['cost indices', runSyncCostIndices],
-    ] as const) {
-      try {
-        await run();
-      } catch (err) {
-        failed.push(name);
-        logError(`${name} sync failed`, { error: String(err) });
-      }
-    }
-    if (failed.length > 0) throw new Error(`Sync failed: ${failed.join(', ')}`);
-  }
-);
-
-/**
- * syncMarketOpenPrices: the price-history chart's Buy and Sell lines (decision
- * 20261018-121126). Once a day, shortly after the previous UTC day's last
- * EVE Ref market-order snapshot (23:45) is published, folds that snapshot into
- * the highest buy and lowest sell per hub *station* and type (only orders
- * placed at the station; decision 20261019-004148 moved it from region-wide) and
- * merges the day into R2's `open-prices/<typeId>.json`, every hub station in
- * one object (~20,000 objects; layout decision 20261018-164126, storage
- * decision 20261018-201511-moving-the-daily-snapshots-to-r2). The region-wide
- * fold still runs in the same pass, but only for the plausibility guards; it is
- * no longer stored. Only the small meta doc stays in Firestore, for the shrink
- * guard. The mining pages price from these same objects (decision
- * 20261019-091155, which retired the separate `mining-prices/` month objects).
- *
- * Idempotent (re-running a day replaces its entry). The day's 23:45 snapshot is
- * normally listed by ~23:50, but a run that finds only an earlier one (EVE Ref
- * lagging) or none must not store a price that is not the day's last, so it
- * throws and Cloud Scheduler retries it (`retryCount`, 15 then 30 minutes
- * apart); an earlier snapshot is accepted once the next day is listed, since
- * then the 23:45 slot was skipped for good (`findFinalSnapshot`). A stream that
- * errors or ends truncated also throws and retries. A tracked region
- * implausibly thin, or one under half its size on the previous published day,
- * publishes nothing, the same stance as `syncLpStoreOffers`: retrying the same
- * file would not change it, that day simply has no point, and the backfill
- * script can fill it later. 1GiB because the decompress-and-fold peaked at ~300MB RSS
- * in a local measurement and the contracts job has OOM'd before; 540s because
- * the same measurement took ~45s to download and fold, leaving room for the
- * ~20,000 read-merge-write round trips of ~37 KB objects (32 at a time). Folding
- * every type per station (#4279) adds one map lookup per row and holds ~5 x 15k
- * station/type pairs, the size of the region fold; it writes no more objects
- * than the region fold did (a type priced only away from the hub stations gets
- * no new day), so the same 540s holds. A
- * type that fails to read or write throws the run, so it is retried whole; the
- * merge is idempotent.
- *
- * Another Cloud Scheduler job past the free three; with `captureMiningPriceSnapshot`
- * folded in here the deployment has ten scheduled functions.
- */
-export const syncMarketOpenPrices = onSchedule(
-  // A cron, unlike the other jobs' 'every N' strings, runs in the scheduler's
-  // default zone; pinning Etc/UTC keeps it right after the 23:45 UTC snapshot.
-  {
-    schedule: '45 0 * * *',
-    timeZone: 'Etc/UTC',
-    memory: '1GiB',
-    timeoutSeconds: 540,
-    // A thrown run (the final snapshot not listed yet, a broken download) is
-    // retried at ~01:00, ~01:30 and ~02:00 UTC; `previousUtcDate` still names
-    // the same day on every retry.
-    retryCount: 3,
-    minBackoffSeconds: 900,
-    maxBackoffSeconds: 1800,
-    secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
-  },
-  runSyncMarketOpenPrices
 );
 
 // mutamarketEstimate (mutamarket.ts). Session required: an import publishes

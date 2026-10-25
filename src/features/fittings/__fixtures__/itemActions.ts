@@ -31,6 +31,7 @@ export function fakeItemActions(
     targetsFor: (chargeTypeId) => takes[chargeTypeId] ?? [],
     cargoChargesFor: () => cargoCharges,
     load: vi.fn(),
+    loadSteps: vi.fn(() => null),
     message: null,
   };
   return {

@@ -34,9 +34,16 @@ service cloud.firestore {
       // stamped after each successful sync, which the scheduled
       // purgeStaleAccounts function reads. Owner-only, that one field only —
       // no ownerHash guard, it carries no user data.
+      //
+      // The same doc carries the change marker (issue #5073): `syncVersion`, a
+      // counter every pass that pushes bumps, so an idle background pass reads
+      // this one doc instead of querying every collection. Owner-only, whole
+      // number only; either field may be absent (a marker-only create).
+      allow get: if isOwner();
       allow create, update: if isOwner()
-        && request.resource.data.keys().hasOnly(['lastSyncedAt'])
-        && request.resource.data.lastSyncedAt is number;
+        && request.resource.data.keys().hasOnly(['lastSyncedAt', 'syncVersion'])
+        && (!('lastSyncedAt' in request.resource.data) || request.resource.data.lastSyncedAt is number)
+        && (!('syncVersion' in request.resource.data) || request.resource.data.syncVersion is int);
 
       match /plans/{planId} {
         allow get: if isOwner() && hashMatches();
@@ -249,7 +256,7 @@ service cloud.firestore {
     // in Cloudflare R2 (decision
     // 20261018-232147-eve-workbench-fits-live-in-r2). The workbenchFits rule
     // is gone, so the implicit deny covers the stale collection, and
-    // workbenchFitsSync (the sync's admin-only checkpoint) never had one.
+    // workbenchFitsSync (the old sync checkpoint, now an R2 object) never had one.
     // Stored Share Links (src/features/share/shareStore.ts): a short
     // /s/{id} URL whose content lives here for a week. Not per-Character
     // data, and the person opening a link may have no account at all — so

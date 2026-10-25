@@ -65,7 +65,6 @@ describe('SurveyCharts views', () => {
     expect(within(table).getByRole('columnheader', { name: 'All ore' })).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: 'Scordite' })).toBeInTheDocument();
     expect(table.closest('figure')).not.toBeNull();
-    expect(screen.queryByRole('table', { name: /mining rate/i })).toBeNull();
   });
 
   it('isk view tabulates priced ores only', () => {
@@ -82,5 +81,49 @@ describe('SurveyCharts views', () => {
     render(<SurveyCharts summary={summary} />);
     expect(screen.getByRole('table', { name: /volume left/i })).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: /isk left/i })).toBeNull();
+  });
+});
+
+describe('SurveyCharts pace panel', () => {
+  const summary = summarizeSurvey([
+    scan(0, [
+      ['Veldspar', 1000],
+      ['Scordite', 500],
+    ]),
+    scan(60_000, [
+      ['Veldspar', 700],
+      ['Scordite', 440],
+    ]),
+  ])!;
+
+  it('Ore left ends with the Total pace chart and its table only', () => {
+    render(<SurveyCharts summary={summary} />);
+    expect(screen.getByRole('table', { name: /^mining rate$/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('table', { name: /share of each scan's progress, by ore/i })
+    ).toBeNull();
+  });
+
+  it('Depletion ends with the by-ore pace chart and table', () => {
+    render(<SurveyCharts summary={summary} view="depletion" />);
+    expect(screen.getByRole('table', { name: /ore left by percent/i })).toBeInTheDocument();
+    const table = screen.getByRole('table', { name: /share of each scan's progress, by ore/i });
+    expect(within(table).getAllByRole('row')).toHaveLength(1 + 1);
+    expect(within(table).getByRole('columnheader', { name: 'Veldspar' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Scordite' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Field mined' })).toBeInTheDocument();
+    // 300 m³ of 1000 is 30% of Veldspar, 60 of 500 is 12% of Scordite: shares 71 / 29.
+    expect(within(table).getByRole('cell', { name: '71% (30%)' })).toBeInTheDocument();
+    expect(within(table).getByRole('cell', { name: '29% (12%)' })).toBeInTheDocument();
+    expect(within(table).getByRole('cell', { name: '24%' })).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: /^mining rate$/i })).toBeNull();
+  });
+
+  it('draws no pace chart with a single scan, in either view', () => {
+    const one = summarizeSurvey([scan(0, [['Veldspar', 1000]])])!;
+    const { rerender } = render(<SurveyCharts summary={one} />);
+    expect(screen.queryByRole('table', { name: /mining rate/i })).toBeNull();
+    rerender(<SurveyCharts summary={one} view="depletion" />);
+    expect(screen.queryByRole('table', { name: /mining rate/i })).toBeNull();
   });
 });

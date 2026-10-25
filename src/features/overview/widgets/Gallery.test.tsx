@@ -182,6 +182,40 @@ describe('Gallery', () => {
     expect(added).toMatchObject({ title: 'PLEX price', trendItems: [44992] });
   });
 
+  it('still finds Wallet flow, and adds the Wallet on its Flow as the old kind opened', async () => {
+    const { user, dialog } = await openGallery();
+    await user.type(within(dialog).getByRole('searchbox'), 'wallet flow');
+    await user.click(within(dialog).getByRole('button', { name: 'Add Wallet flow' }));
+    const widgets = (JSON.parse(screen.getByTestId('layout').textContent!) as OverviewLayout)
+      .widgets;
+    expect(widgets.at(-1)).toMatchObject({
+      kind: 'wallet',
+      show: 'flow',
+      view: 'chart',
+      size: 'M',
+    });
+    // A Show names its widget itself: no stored title.
+    expect('title' in widgets.at(-1)!).toBe(false);
+  });
+
+  it('still finds Cash flow and Income by source on the Corp Board', async () => {
+    const caps = Object.fromEntries(
+      Object.keys(NO_CORP_CAPABILITIES).map((k) => [k, true])
+    ) as unknown as CorpCapabilities;
+    const { user, dialog } = await openGallery({
+      initial: { version: 1, widgets: [] },
+      board: corpWidgetBoard(caps),
+    });
+    await user.click(within(dialog).getByRole('button', { name: 'Add Cash flow' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Add Income by source' }));
+    const widgets = (JSON.parse(screen.getByTestId('layout').textContent!) as OverviewLayout)
+      .widgets;
+    expect(widgets.map((x) => [x.kind, x.show, x.view])).toEqual([
+      ['corpWallet', 'flow', 'chart'],
+      ['corpWallet', 'sources', 'table'],
+    ]);
+  });
+
   it('shows a preview on each preset card, as on the other cards', async () => {
     const { dialog } = await openGallery();
     const card = itemOf(dialog, 'PLEX price');
@@ -287,13 +321,15 @@ describe('Gallery Browse all', () => {
 
   it('hides kinds already on the board until the filter is turned off', async () => {
     const { user, dialog } = await browse();
-    expect(within(dialog).queryByRole('button', { name: /^Add (another )?Wallet$/ })).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: /^Add (another )?Training$/ })).toBeNull();
     expect(within(dialog).getByRole('button', { name: 'Not on your board' })).toHaveAttribute(
       'aria-pressed',
       'true'
     );
     await user.click(within(dialog).getByRole('button', { name: 'Not on your board' }));
-    expect(within(dialog).getByRole('button', { name: 'Add another Wallet' })).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('button', { name: 'Add another Training' })
+    ).toBeInTheDocument();
   });
 
   it('leads with Featured and does not repeat those kinds below it', async () => {

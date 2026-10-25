@@ -16,14 +16,16 @@ import {
   isAddable,
   kindOpenTo,
   type WidgetKindDef,
-  type WidgetKindId,
 } from '@/features/overview/widgets/kinds';
+import { presetSeed } from '@/features/overview/widgets/galleryPresets';
 import {
   MAX_WIDGETS,
-  newWidget,
+  seedKind,
+  seedWidget,
   type MakeId,
   type OverviewLayout,
   type Widget,
+  type WidgetSeed,
 } from '@/features/overview/widgets/layout';
 import { seqId } from '@/features/overview/widgets/roles';
 
@@ -36,25 +38,25 @@ import { seqId } from '@/features/overview/widgets/roles';
  * roles would, once edited and saved, drop the Director main's widgets on
  * every device.
  */
-export const CORP_DEFAULT_KINDS: readonly WidgetKindId[] = [
+export const CORP_DEFAULT_SEEDS: readonly WidgetSeed[] = [
   'corpDeadlines',
   'structures',
   'moonChunks',
   'corpJobs',
-  'corpServices',
   'corpWallet',
-  'corpCashFlow',
+  // The corp wallet on its Flow and its Sources, opened as Cash flow and Income by source were.
+  presetSeed('corpCashFlow'),
   'corpMembers',
   'corpInactive',
-  'corpIncome',
+  presetSeed('corpIncome'),
   'corpMining',
 ];
 
 export function corpDefaultLayout(makeId: MakeId = seqId('c')): OverviewLayout {
   const widgets: Widget[] = [];
-  for (const id of CORP_DEFAULT_KINDS) {
-    if (!isAddable(id) || widgets.length >= MAX_WIDGETS) continue;
-    const widget = newWidget(id, makeId());
+  for (const seed of CORP_DEFAULT_SEEDS) {
+    if (!isAddable(seedKind(seed)) || widgets.length >= MAX_WIDGETS) continue;
+    const widget = seedWidget(seed, makeId());
     if (widget) widgets.push(widget);
   }
   return { version: 1, widgets };

@@ -33,7 +33,7 @@ import { lookupSolarSystem } from '@/sde/solarSystems';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { loadPlacedBlueprints } from './blueprintPlacement';
-import { listCommunityIds } from './communityStore';
+import { invalidateCommunityRoster, listCommunityIds } from './communityStore';
 import { loadBlueprintShare } from './shareSelection';
 
 /**
@@ -55,8 +55,8 @@ const inFlight = new Map<
   { run: Promise<PublishResult>; next: Promise<PublishResult> | null }
 >();
 
-function memberRef(communityId: string, uid: string) {
-  return doc(getSyncFirestore(), 'communities', communityId, 'members', uid);
+function memberRef(characterId: number, communityId: string, uid: string) {
+  return doc(getSyncFirestore(characterId), 'communities', communityId, 'members', uid);
 }
 
 /**
@@ -107,7 +107,7 @@ async function publish(characterId: number, communityId: string): Promise<Publis
   ]);
   if (!character?.ownerHash) return unavailable;
   const uid = await ensureSignedIn(characterId);
-  const member = await getDoc(memberRef(communityId, uid));
+  const member = await getDoc(memberRef(characterId, communityId, uid));
   if (!member.exists()) return unavailable;
   const data = member.data();
   const pushedAt = (data.pushedAt as Timestamp | undefined)?.toMillis?.();
@@ -130,14 +130,14 @@ async function publish(characterId: number, communityId: string): Promise<Publis
     // Invalidate the stored hash first: a push cut off before the final stamp
     // must not leave a hash that matches chunks it no longer describes.
     await ensureSignedIn(characterId);
-    await updateDoc(memberRef(communityId, uid), {
+    await updateDoc(memberRef(characterId, communityId, uid), {
       pushedAt: serverTimestamp(),
       libraryHash: '',
       chunkCount: oldChunkCount,
     });
     await Promise.all(
       chunks.map((chunk, index) =>
-        setDoc(doc(memberRef(communityId, uid), 'library', String(index)), {
+        setDoc(doc(memberRef(characterId, communityId, uid), 'library', String(index)), {
           ownerHash: character.ownerHash,
           items: chunk,
         })
@@ -145,17 +145,21 @@ async function publish(characterId: number, communityId: string): Promise<Publis
     );
     await Promise.all(
       Array.from({ length: Math.max(0, oldChunkCount - chunks.length) }, (_, i) =>
-        deleteDoc(doc(memberRef(communityId, uid), 'library', String(chunks.length + i)))
+        deleteDoc(
+          doc(memberRef(characterId, communityId, uid), 'library', String(chunks.length + i))
+        )
       )
     );
   }
   // The slow build above can outlast another Character's sign-in.
   await ensureSignedIn(characterId);
-  await updateDoc(memberRef(communityId, uid), {
+  await updateDoc(memberRef(characterId, communityId, uid), {
     pushedAt: serverTimestamp(),
     libraryHash: hash,
     chunkCount: chunks.length,
   });
+  // The roster read before this push carries the old stamp: this device shows the new library.
+  invalidateCommunityRoster(characterId, communityId);
   return { outcome: plan, skipped };
 }
 
@@ -201,7 +205,7 @@ export async function publishAllSharedLibraries(characterId: number): Promise<vo
 export async function removeSharedLibraries(characterId: number): Promise<void> {
   const uid = await ensureSignedIn(characterId);
   for (const communityId of await listCommunityIds(characterId)) {
-    const member = memberRef(communityId, uid);
+    const member = memberRef(characterId, communityId, uid);
     const chunks = await getDocs(collection(member, 'library'));
     // Hash first, so a removal cut off mid-way can't leave a hash that matches an emptied library.
     await updateDoc(member, {
@@ -211,5 +215,6 @@ export async function removeSharedLibraries(characterId: number): Promise<void> 
     });
     await Promise.all(chunks.docs.map((chunk) => deleteDoc(chunk.ref)));
     await updateDoc(member, { pushedAt: serverTimestamp(), libraryHash: '', chunkCount: 0 });
+    invalidateCommunityRoster(characterId, communityId);
   }
 }

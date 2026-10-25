@@ -3,6 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { SHARES_COLLECTION } from '@/features/share/shareStore';
 import { REMOTE_COLLECTION_NAMES } from './syncedCollections';
 
+/** Collection-group single-field indexes the scheduled sweeps query (functions/, #5049). */
+const SWEEP_GROUP_FIELDS: [group: string, field: string][] = [
+  ['feeders', 'status'],
+  ['itemRequests', 'expiresAt'],
+  ['itemRequests', 'closedAt'],
+  ['fleetPayouts', 'expiresAt'],
+  ['srpClaims', 'closedAt'],
+];
+
 /**
  * Drift guard over `firestore.indexes.json` — **not** a proof that Firestore
  * honours the exemptions (issue #583's AC1). It cannot be: the Firestore
@@ -122,9 +131,30 @@ describe('firestore.indexes.json field overrides', () => {
       'pledges',
       // A guest's pending Miner groupings are found across books (#4210).
       'miners',
+      // Scheduled sweeps query across every parent instead of once per parent (#5049).
+      ...SWEEP_GROUP_FIELDS.map(([group]) => group),
     ]);
     expect(config.fieldOverrides.filter((o) => !groups.has(o.collectionGroup))).toEqual([]);
   });
+
+  it.each(SWEEP_GROUP_FIELDS)(
+    'indexes %s.%s at collection-group scope, keeping the default collection indexes',
+    (group, field) => {
+      // functions/src/indexedSweep.ts: the sweeps fall back to the per-parent scan
+      // until this is deployed, so a missing entry costs reads, not a failing job.
+      expect(overridesFor(group)).toContainEqual({
+        collectionGroup: group,
+        fieldPath: field,
+        ttl: false,
+        indexes: [
+          { order: 'ASCENDING', queryScope: 'COLLECTION' },
+          { order: 'DESCENDING', queryScope: 'COLLECTION' },
+          { arrayConfig: 'CONTAINS', queryScope: 'COLLECTION' },
+          { order: 'ASCENDING', queryScope: 'COLLECTION_GROUP' },
+        ],
+      });
+    }
+  );
 
   it('indexes pending Miner groupings by character at collection-group scope', () => {
     // `listPendingGroupings` runs `collectionGroup('miners').where('pendingConfirmation', 'array-contains', id)`.
@@ -157,6 +187,19 @@ describe('firestore.indexes.json field overrides', () => {
     ]);
   });
 
+  it('indexes one Member’s own Pledges in a Community at collection-group scope', () => {
+    // `loadMyPledges` (the delivery sweep): communityId and ownerHash. It falls back to the
+    // Community's whole Pledge query until this is deployed.
+    expect(config.indexes).toContainEqual({
+      collectionGroup: 'pledges',
+      queryScope: 'COLLECTION_GROUP',
+      fields: [
+        { fieldPath: 'communityId', order: 'ASCENDING' },
+        { fieldPath: 'ownerHash', order: 'ASCENDING' },
+      ],
+    });
+  });
+
   it('expires shares by a TTL policy on expiresAt, and indexes none of their fields', () => {
     // A stored Share Link is only ever read by id (`features/share/shareStore.ts`),
     // so nothing needs an index; without the wildcard every field of every
@@ -168,33 +211,57 @@ describe('firestore.indexes.json field overrides', () => {
     ]);
   });
 
-  it('expires a Survey Scan with its survey, and indexes none of its fields', () => {
+  it('expires a Survey Scan with its survey, and indexes only createdAt, for the incremental poll', () => {
     // Scans sit under `shares/{id}` but a TTL delete of the parent leaves its
     // subcollection behind, so each scan carries the survey's `expiresAt`.
     expect(overridesFor('surveyScans')).toEqual([
       { collectionGroup: 'surveyScans', fieldPath: '*', ttl: false, indexes: [] },
       { collectionGroup: 'surveyScans', fieldPath: 'expiresAt', ttl: true, indexes: [] },
+      {
+        collectionGroup: 'surveyScans',
+        fieldPath: 'createdAt',
+        ttl: false,
+        indexes: [{ order: 'ASCENDING', queryScope: 'COLLECTION' }],
+      },
     ]);
   });
 
-  it('expires a Survey moon tax with its survey, and indexes none of its fields', () => {
+  it('expires a Survey moon tax with its survey, and indexes only createdAt, newest first', () => {
     expect(overridesFor('surveyTax')).toEqual([
       { collectionGroup: 'surveyTax', fieldPath: '*', ttl: false, indexes: [] },
       { collectionGroup: 'surveyTax', fieldPath: 'expiresAt', ttl: true, indexes: [] },
+      {
+        collectionGroup: 'surveyTax',
+        fieldPath: 'createdAt',
+        ttl: false,
+        indexes: [{ order: 'DESCENDING', queryScope: 'COLLECTION' }],
+      },
     ]);
   });
 
-  it('expires an ignored-scan doc with its survey, and indexes none of its fields', () => {
+  it('expires an ignored-scan doc with its survey, and indexes only createdAt, for the incremental poll', () => {
     expect(overridesFor('surveyIgnores')).toEqual([
       { collectionGroup: 'surveyIgnores', fieldPath: '*', ttl: false, indexes: [] },
       { collectionGroup: 'surveyIgnores', fieldPath: 'expiresAt', ttl: true, indexes: [] },
+      {
+        collectionGroup: 'surveyIgnores',
+        fieldPath: 'createdAt',
+        ttl: false,
+        indexes: [{ order: 'ASCENDING', queryScope: 'COLLECTION' }],
+      },
     ]);
   });
 
-  it('expires a Survey location and notes doc with its survey, and indexes none of its fields', () => {
+  it('expires a Survey location and notes doc with its survey, and indexes only createdAt, newest first', () => {
     expect(overridesFor('surveyInfo')).toEqual([
       { collectionGroup: 'surveyInfo', fieldPath: '*', ttl: false, indexes: [] },
       { collectionGroup: 'surveyInfo', fieldPath: 'expiresAt', ttl: true, indexes: [] },
+      {
+        collectionGroup: 'surveyInfo',
+        fieldPath: 'createdAt',
+        ttl: false,
+        indexes: [{ order: 'DESCENDING', queryScope: 'COLLECTION' }],
+      },
     ]);
   });
 

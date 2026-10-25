@@ -498,7 +498,7 @@ export async function mergeObservedInto(
  * the miner's client finds it whatever corporation they are in now. Refreshed on
  * every sync; a failure never fails the sync, the next one writes it again.
  */
-async function writeBilledByPointers(
+export async function writeBilledByPointers(
   deps: BookDeps,
   corporationId: number,
   rows: readonly ObservedRow[]

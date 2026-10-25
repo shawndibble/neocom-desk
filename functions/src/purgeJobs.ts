@@ -16,8 +16,11 @@ import {
   STALE_ACCOUNT_READ_PAGE_SIZE,
   STALE_ACCOUNT_MAX_PASSES,
   decideAccountAction,
+  isFullScanDay,
   lastSyncedAtOf,
+  staleAccountCutoff,
 } from './purgeStaleAccounts.js';
+import { isMissingIndex } from './indexedSweep.js';
 
 /** The Notification Feed purge, a task of `dailyHousekeeping` (see its doc in index.ts). */
 export async function runPurgeNotificationFeed(): Promise<void> {
@@ -61,6 +64,51 @@ export interface StaleAccountPurgeDeps {
   corpSyncDeps: () => CorpSyncDeps;
 }
 
+/**
+ * The accounts to purge. Daily: one query on the heartbeat (a single-field
+ * index Firestore keeps by default), so one read when nothing is stale.
+ * Weekly (`isFullScanDay`), or if that index is somehow missing: the full scan,
+ * which also seeds the docs with no heartbeat that the query can never match.
+ */
+async function staleAccountRefs(
+  db: FirebaseFirestore.Firestore,
+  now: number
+): Promise<FirebaseFirestore.DocumentReference[]> {
+  const characters = db.collection('characters');
+  if (!isFullScanDay(now)) {
+    try {
+      const stale = await characters
+        .where(LAST_SYNCED_FIELD, '<', staleAccountCutoff(now))
+        .select(LAST_SYNCED_FIELD)
+        .get();
+      return stale.docs
+        .filter((doc) => decideAccountAction(lastSyncedAtOf(doc.data()), now) === 'purge')
+        .map((doc) => doc.ref);
+    } catch (err) {
+      if (!isMissingIndex(err)) throw err;
+      logWarn('Stale account purge: heartbeat index missing, using the full scan');
+    }
+  }
+
+  const all = await characters.listDocuments();
+  const snaps = new Map<string, FirebaseFirestore.DocumentSnapshot>();
+  // Heartbeat reads are batched and masked to the one field the decision
+  // needs; the rest of each parent doc is never loaded.
+  for (let i = 0; i < all.length; i += STALE_ACCOUNT_READ_PAGE_SIZE) {
+    const page = all.slice(i, i + STALE_ACCOUNT_READ_PAGE_SIZE);
+    for (const snap of await db.getAll(...page, { fieldMask: [LAST_SYNCED_FIELD] })) {
+      snaps.set(snap.ref.path, snap);
+    }
+  }
+  const refs: FirebaseFirestore.DocumentReference[] = [];
+  for (const ref of all) {
+    const action = decideAccountAction(lastSyncedAtOf(snaps.get(ref.path)?.data()), now);
+    if (action === 'seed') await ref.set({ [LAST_SYNCED_FIELD]: now }, { merge: true });
+    if (action === 'purge') refs.push(ref);
+  }
+  return refs;
+}
+
 /** The stale-account purge, a task of `dailyHousekeeping` (see its doc in index.ts). */
 export async function runPurgeStaleAccounts({
   alertGrantDeps,
@@ -71,26 +119,8 @@ export async function runPurgeStaleAccounts({
   let passes = 0;
   let purged = 0;
 
-  const refs = await db.collection('characters').listDocuments();
-  const snaps = new Map<string, FirebaseFirestore.DocumentSnapshot>();
-  // Heartbeat reads are batched and masked to the one field the decision
-  // needs; the rest of each parent doc is never loaded.
-  for (let i = 0; i < refs.length; i += STALE_ACCOUNT_READ_PAGE_SIZE) {
-    const page = refs.slice(i, i + STALE_ACCOUNT_READ_PAGE_SIZE);
-    for (const snap of await db.getAll(...page, { fieldMask: [LAST_SYNCED_FIELD] })) {
-      snaps.set(snap.ref.path, snap);
-    }
-  }
-
+  const refs = await staleAccountRefs(db, now);
   for (const ref of refs) {
-    const snap = snaps.get(ref.path);
-    const action = decideAccountAction(lastSyncedAtOf(snap?.data()), now);
-    if (action === 'keep') continue;
-    if (action === 'seed') {
-      await ref.set({ [LAST_SYNCED_FIELD]: now }, { merge: true });
-      continue;
-    }
-
     // Shared Community data lives outside `characters/{uid}`, so the
     // subcollection sweep below would never reach it (ADR 0018).
     try {

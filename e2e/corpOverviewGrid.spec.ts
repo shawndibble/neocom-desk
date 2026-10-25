@@ -21,7 +21,6 @@ test.describe('Corp Board widget grid', () => {
       'Structures',
       'Moon extractions',
       'Corp industry jobs',
-      'Offline services',
       'Corp wallet',
       'Cash flow',
       'Members',

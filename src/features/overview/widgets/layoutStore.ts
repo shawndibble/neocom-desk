@@ -15,7 +15,7 @@
  * widgets on the next write.
  */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
-import { getKind } from './kinds';
+import { getKind, storedShow } from './kinds';
 import {
   cleanTrendHubs,
   cleanTrendItems,
@@ -28,6 +28,7 @@ import {
   type Widget,
   type WidgetRange,
 } from './layout';
+import { migrateRetiredKind } from './migrate';
 import { SIZES } from './sizes';
 import { isRowsPerPage } from './tableSortPage';
 
@@ -36,7 +37,8 @@ export const OVERVIEW_LAYOUT_KEY = 'sync.overviewLayout';
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
-function parseWidget(raw: unknown): Widget | null {
+function parseWidget(stored: unknown): Widget | null {
+  const raw = isRecord(stored) ? migrateRetiredKind(stored) : stored;
   if (!isRecord(raw) || typeof raw.id !== 'string' || typeof raw.kind !== 'string') return null;
   const def = getKind(raw.kind);
   // A kind from a newer build: keep it exactly as found.
@@ -68,6 +70,11 @@ function parseWidget(raw: unknown): Widget | null {
     delete out.raidsRadius;
   }
   if (!def.hasPlexPlan || !isPlexPlan(raw.plexPer30Days)) delete out.plexPer30Days;
+  if (!def.hasProfitSource) delete out.profitSource;
+  // The default Show is never stored, so an older build's layout and this one's read alike.
+  const show = storedShow(def, raw.show);
+  if (show) out.show = show;
+  else delete out.show;
   const items = cleanTrendItems(raw.trendItems);
   if (!def.hasTrendSources || items.length === 0) delete out.trendItems;
   else out.trendItems = items;

@@ -79,3 +79,62 @@ export function neutralExtendedStats(): Pick<
     },
   };
 }
+
+function layer(hp: number) {
+  return {
+    hp,
+    ehp: hp,
+    emResonance: 1,
+    thermalResonance: 1,
+    kineticResonance: 1,
+    explosiveResonance: 1,
+  };
+}
+
+/** A whole, plain combat fit's stats: 100 DPS, 1,000 EHP, 200 m/s, a stable capacitor. */
+export function baseFittingStats(): FittingStats {
+  return {
+    cpuUsed: 0,
+    cpuTotal: 100,
+    powergridUsed: 0,
+    powergridTotal: 100,
+    calibrationUsed: 0,
+    calibrationTotal: 400,
+    droneDps: 0,
+    droneBandwidthUsed: 0,
+    droneBandwidthTotal: 0,
+    maxActiveDrones: 0,
+    droneBandwidthByType: {},
+    hardpoints: { turrets: 0, launchers: 0 },
+    droneCapacity: 0,
+    ehp: 1000,
+    capacitor: { stable: true, stablePercentage: 50 },
+    capacitorCapacity: 1500,
+    capacitorRechargeTime: 300000,
+    shield: layer(400),
+    armor: layer(300),
+    hull: layer(300),
+    targeting: {
+      maxTargetRange: 60000,
+      maxLockedTargets: 6,
+      scanResolution: 400,
+      signatureRadius: 120,
+    },
+    navigation: { maxVelocity: 200, agility: 4, mass: 10_000_000, warpSpeed: 3 },
+    unknownItemTypeIds: [],
+    applied: { weapons: [], droneControlRange: 20000 },
+    slotCounts: { high: 4, medium: 4, low: 4, rig: 3, subsystem: 0 },
+    modules: [],
+    offense: {
+      weapons: [],
+      dps: 100,
+      sustainedDps: 100,
+      volley: 500,
+      overheated: null,
+      chargelessWeaponCount: 0,
+    },
+    repair: { shield: 0, armor: 0, hull: 0 },
+    overheated: null,
+    ...neutralExtendedStats(),
+  } as FittingStats;
+}
