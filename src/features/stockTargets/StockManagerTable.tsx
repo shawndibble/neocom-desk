@@ -39,6 +39,8 @@ function TargetCell({
   const buttonRef = useRef<HTMLButtonElement>(null);
   // Set once the field has closed, so the blur its own unmount fires cannot save an escaped value.
   const closed = useRef(false);
+  // Set when a typed digit opened the field: that digit stays, never selected for replacing.
+  const seeded = useRef(false);
   const focusAfterCommit = useFocusAfterCommit();
   function close() {
     closed.current = true;
@@ -59,14 +61,19 @@ function TargetCell({
     return (
       <TextInput
         size="sm"
-        type="number"
-        min={1}
+        // Text with a numeric keypad, not type="number": a seeded digit needs
+        // the caret after it, and a number field can't place its caret.
+        inputMode="numeric"
         autoFocus
         aria-label={t('stockTargets.table.targetFor', { name })}
         className="w-24 text-right"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        onFocus={(e) => e.currentTarget.select()}
+        onFocus={(e) => {
+          const field = e.currentTarget;
+          if (seeded.current) field.setSelectionRange(field.value.length, field.value.length);
+          else field.select();
+        }}
         onClick={(e) => e.stopPropagation()}
         onBlur={() => {
           // Blur that is not the field's own close saves, as leaving any edit field does.
@@ -95,7 +102,10 @@ function TargetCell({
       label={t('stockTargets.table.editTargetFor', { name })}
       onEdit={(seed) => {
         closed.current = false;
-        setDraft(seed ?? String(row.target));
+        // A target is a whole number: only a digit seeds the field.
+        const digit = seed !== undefined && /^\d$/.test(seed);
+        seeded.current = digit;
+        setDraft(digit ? seed : String(row.target));
       }}
     >
       {formatNumber(row.target)}

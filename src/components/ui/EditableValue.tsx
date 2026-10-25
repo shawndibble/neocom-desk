@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   type ComponentPropsWithRef,
@@ -25,7 +26,7 @@ const editableValueClassName = cx(
 
 type EditableValueProps = Omit<
   ComponentPropsWithRef<'button'>,
-  'children' | 'onClick' | 'onKeyDown' | 'type' | 'aria-label'
+  'children' | 'onClick' | 'onKeyDown' | 'type' | 'aria-label' | 'aria-labelledby'
 > & {
   /** @summary The visible value, e.g. "3,000" or "@ 4 ISK". */
   children: ReactNode;
@@ -42,6 +43,7 @@ type EditableValueProps = Omit<
    * rather than falling to the page. `onFocused` clears the request.
    */
   focusOnMount?: boolean;
+  /** @summary Called once the value has taken focus for `focusOnMount`, to clear the request. */
   onFocused?: () => void;
 };
 
@@ -74,11 +76,15 @@ export function EditableValue({
     ownRef.current?.focus();
     onFocused?.();
   }, [focusOnMount, onFocused]);
-  function setRef(node: HTMLButtonElement | null) {
-    ownRef.current = node;
-    if (typeof ref === 'function') ref(node);
-    else if (ref) ref.current = node;
-  }
+  // Stable, so React doesn't detach and re-attach the caller's ref every render.
+  const setRef = useCallback(
+    (node: HTMLButtonElement | null) => {
+      ownRef.current = node;
+      if (typeof ref === 'function') ref(node);
+      else if (ref) ref.current = node;
+    },
+    [ref]
+  );
   function onKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     if (event.ctrlKey || event.metaKey || event.altKey || !SEED_KEY.test(event.key)) return;
     event.preventDefault();

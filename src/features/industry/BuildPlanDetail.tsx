@@ -735,6 +735,9 @@ export function BuildPlanDetail({
         modifiers.skills,
         standing
       );
+      // The hero's own rule: an owned type with no price leaves no sell value
+      // to charge, and a trial's run count can reach stock this one didn't.
+      if (sale.unpriced.length > 0) return trialResult.profit;
       return trialResult.profit - sale.net;
     }, plan.runs);
     if (runs !== null) update({ runs });
