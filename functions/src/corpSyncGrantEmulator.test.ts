@@ -3,7 +3,7 @@
 // repo root (which starts the emulator and sets FIRESTORE_EMULATOR_HOST); a plain
 // `npm test` skips it.
 import type { Caller } from './actorAuth.js';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
@@ -24,6 +24,12 @@ import {
 } from './corpSyncGrant.js';
 import { deleteBook, turnOnBook, verifyOfficer, type BookDeps } from './corpTaxBookStore.js';
 import type { EsiRead, SyncEsi } from './corpTaxBookSyncEsi.js';
+import { QUIET_FIELD } from './corpTaxBookQuietRun.js';
+import {
+  installBookWriteTracking,
+  stampBook,
+  withBookVersions,
+} from './corpTaxBookVersionTracking.js';
 
 const CORP = 98000001;
 const T0 = Date.parse('2026-10-18T12:00:00Z');
@@ -636,6 +642,102 @@ suite('Corp Tax Book scheduled sync (emulator)', () => {
         esiState.ledger = readAt([row('2026-10-10', 100)]);
         await runScheduledCorpSyncs(syncDeps(), fakeEsi());
         expect(await quantity('2026-10-10')).toBe(100);
+      });
+    });
+
+    describe('quiet runs (#5048)', () => {
+      const H = 3_600_000;
+      // The real version stamps (#5047), as the deployed job runs under them; stamped once at
+      // the end of each run, since a stamp mid-run only contends with the run's own transactions.
+      const versioned = <T>(run: () => Promise<T>) =>
+        withBookVersions(
+          (id, touched) => stampBook(db, id, touched),
+          run,
+          () => undefined,
+          60_000
+        );
+      const run = () => versioned(() => runScheduledCorpSyncs(syncDeps(), fakeEsi()));
+      const marker = async () => (await book().get()).data()?.[QUIET_FIELD];
+      const paid = async () =>
+        ((await book().collection('meta').doc('paid').get()).data()?.ids as string[]) ?? [];
+      /** Runs until the book holds a quiet marker: the donation lands, then a run finds nothing to do. */
+      async function quietBook() {
+        await optIn(ACCOUNTANT);
+        for (let i = 1; i <= 2; i++) {
+          now = T0 + i * 6 * H;
+          await run();
+        }
+        expect(await marker()).toMatchObject({ at: now, known: [50] });
+      }
+
+      beforeAll(() => installBookWriteTracking());
+
+      it('skips the full read while the book is unchanged, and reads again once a stamp moves', async () => {
+        await quietBook();
+        // Written with no stamp: a quiet run cannot see it, which shows it did not read Statements.
+        await book().collection('statements').doc('s1').set(statement);
+        now += 6 * H;
+        expect((await run()).synced).toBe(1);
+        expect(await paid()).toEqual([]);
+        // The ledger and the sync record still land on the quiet path.
+        expect((await book().get()).data()?.lastSync).toMatchObject({ at: now, scheduled: true });
+
+        // Any server write to Statements moves the stamp: the next run reads in full and settles.
+        await versioned(() => book().collection('statements').doc('s1').set(statement));
+        now += 6 * H;
+        await run();
+        expect(await paid()).toEqual(['s1']);
+        expect(await marker()).toBeUndefined();
+      });
+
+      it('reads in full when ESI brings a new donation', async () => {
+        await quietBook();
+        await book().collection('statements').doc('s1').set(statement);
+        (esiState.journal as { data: unknown[] }).data.push({
+          id: 2,
+          date: '2026-10-18T10:00:00Z',
+          ref_type: 'player_donation',
+          amount: 1_000_000,
+          first_party_id: 50,
+        });
+        now += 6 * H;
+        await run();
+        expect((await book().collection('payments').doc('j1_2').get()).exists).toBe(true);
+        expect(await paid()).toEqual(['s1']);
+      });
+
+      it('reads in full when a Character new to it mines, who may match an Unmatched donation', async () => {
+        (esiState.journal as { data: unknown[] }).data.push({
+          id: 3,
+          date: '2026-10-17T11:00:00Z',
+          ref_type: 'player_donation',
+          amount: 2_000_000,
+          first_party_id: 51,
+        });
+        await quietBook();
+        expect((await book().collection('payments').doc('j1_3').get()).data()?.minerId).toBe(
+          undefined
+        );
+        (esiState.ledger as { data: unknown[] }).data.push({
+          character_id: 51,
+          recorded_corporation_id: CORP,
+          type_id: 45490,
+          quantity: 10,
+          last_updated: '2026-10-17',
+        });
+        now += 6 * H;
+        await run();
+        expect((await book().collection('payments').doc('j1_3').get()).data()?.minerId).toBe(
+          'solo:51'
+        );
+      });
+
+      it('reads in full once the marker is a day old, whatever the stamps say', async () => {
+        await quietBook();
+        await book().collection('statements').doc('s1').set(statement);
+        now += 24 * H;
+        await run();
+        expect(await paid()).toEqual(['s1']);
       });
     });
 

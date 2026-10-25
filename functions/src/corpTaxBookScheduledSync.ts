@@ -13,7 +13,7 @@
 // officer's own Characters (that needs the officer's device).
 
 import { isDeepStrictEqual } from 'node:util';
-import type { Firestore } from 'firebase-admin/firestore';
+import { FieldValue, type DocumentSnapshot, type Firestore } from 'firebase-admin/firestore';
 import { parseEditAction, parseSyncInput, type OfficerAccess } from './corpTaxBook.js';
 import {
   META,
@@ -43,6 +43,16 @@ import {
   type ObservedThrough,
 } from './corpTaxBookObservedThrough.js';
 import type { SyncEsi } from './corpTaxBookSyncEsi.js';
+import {
+  QUIET_FIELD,
+  fingerprintOf,
+  journalThroughOf,
+  quietAfterReads,
+  quietAtStart,
+  quietVersionsOf,
+  readQuietMarker,
+  type QuietMarker,
+} from './corpTaxBookQuietRun.js';
 import {
   detectGaps,
   donationsFromJournal,
@@ -132,16 +142,69 @@ export interface AdminBookState {
   observedThrough: ObservedThrough;
   /** The book doc's `createdAt`: tells this book from one deleted and turned on again. */
   createdAt: unknown;
+  /** The stamps of the collections read here, as the book doc showed them first (corpTaxBookQuietRun.ts). */
+  versions: Record<string, string> | null;
+  /** The last quiet run's marker, if any. */
+  quiet: QuietMarker | null;
 }
+
+type BookSnap = DocumentSnapshot;
+
+/** The book doc's part of the state; `readBookStateAdmin` adds the collections. */
+function bookDocState(snap: BookSnap) {
+  const data = snap.data() as Data;
+  return {
+    startDate: String(data.startDate ?? ''),
+    divisions: Array.isArray(data.divisions) ? (data.divisions as number[]) : [1],
+    lastSync: (data.lastSync as AdminBookState['lastSync'] | undefined) ?? null,
+    observedThrough: readObservedThrough(data.observedThrough),
+    createdAt: data.createdAt,
+    versions: quietVersionsOf(data),
+    quiet: readQuietMarker(data[QUIET_FIELD]),
+  };
+}
+
+async function readActiveBook(db: Firestore, corporationId: number): Promise<BookSnap | null> {
+  const snap = await bookRef(db, corporationId).get();
+  return snap.exists && snap.get('active') === true ? snap : null;
+}
+
+/**
+ * A quiet run's state: the book doc, the extractions and the paid ids, and none
+ * of the collections the quiet marker vouches for (they stay empty: nothing on
+ * the quiet path reads them).
+ */
+async function readQuietBookState(snap: BookSnap): Promise<AdminBookState> {
+  const [extractions, paid] = await Promise.all([
+    snap.ref.collection(EXTRACTIONS).get(),
+    snap.ref.collection(META).doc(PAID_DOC).get(),
+  ]);
+  return {
+    ...bookDocState(snap),
+    miners: [],
+    statements: [],
+    payments: [],
+    dismissals: [],
+    extractions: extractions.docs.map((d) => d.data() as SyncExtraction),
+    paidStatementIds: paidIdsOf(paid),
+    writeOffs: [],
+  };
+}
+
+const paidIdsOf = (paid: BookSnap): Set<string> =>
+  new Set((paid.data()?.ids as string[] | undefined) ?? []);
 
 /** The sync's reads of the book, with the admin SDK (the client reads the same collections under the rules). */
 export async function readBookStateAdmin(
   db: Firestore,
   corporationId: number
 ): Promise<AdminBookState | null> {
-  const ref = bookRef(db, corporationId);
-  const snap = await ref.get();
-  if (!snap.exists || snap.get('active') !== true) return null;
+  const snap = await readActiveBook(db, corporationId);
+  return snap ? readBookStateFrom(snap) : null;
+}
+
+async function readBookStateFrom(snap: BookSnap): Promise<AdminBookState> {
+  const ref = snap.ref;
   const list = async <T>(name: string): Promise<T[]> =>
     (await ref.collection(name).get()).docs.map((d) => d.data() as T);
   const [miners, statements, payments, dismissals, extractions, paid, writeOffDocs] =
@@ -154,19 +217,14 @@ export async function readBookStateAdmin(
       ref.collection(META).doc(PAID_DOC).get(),
       list<Record<string, unknown>>(WRITE_OFFS),
     ]);
-  const data = snap.data() as Data;
   return {
-    startDate: String(data.startDate ?? ''),
-    divisions: Array.isArray(data.divisions) ? (data.divisions as number[]) : [1],
-    lastSync: (data.lastSync as AdminBookState['lastSync'] | undefined) ?? null,
+    ...bookDocState(snap),
     miners,
     statements,
     payments,
     dismissals,
     extractions,
-    paidStatementIds: new Set((paid.data()?.ids as string[] | undefined) ?? []),
-    observedThrough: readObservedThrough(data.observedThrough),
-    createdAt: data.createdAt,
+    paidStatementIds: paidIdsOf(paid),
     writeOffs: writeOffDocs.flatMap((d) => {
       const w = writeOffForAllocation(d);
       return w && typeof d.minerId === 'string' ? [{ ...w, minerId: d.minerId }] : [];
@@ -214,8 +272,19 @@ export async function runBookSync(
   const { deps, esi, access, accessToken, corporationId } = args;
   const { db } = deps;
 
-  const before = await readBookStateAdmin(db, corporationId);
-  if (!before) return { kind: 'stopped', reason: 'book-off' };
+  const startedAt = deps.now();
+  const head = await readActiveBook(db, corporationId);
+  if (!head) return { kind: 'stopped', reason: 'book-off' };
+  // A book unchanged since a run that had nothing to match, re-match or settle skips reading
+  // its Miners, Statements and payments (corpTaxBookQuietRun.ts) — unless the ESI reads below
+  // bring something new, when it reads them after all.
+  const headState = bookDocState(head);
+  let quiet = quietAtStart(headState.quiet, headState, startedAt);
+  let before = quiet ? await readQuietBookState(head) : await readBookStateFrom(head);
+  if (quiet && fingerprintOf(before.paidStatementIds) !== before.quiet!.paid) {
+    quiet = false;
+    before = await readBookStateFrom(head);
+  }
 
   // --- ESI reads (nothing is written until all of them are in) -------------
   const observers = await esi.observers(corporationId, accessToken);
@@ -297,6 +366,21 @@ export async function runBookSync(
   }
   if (!donationsRead) missing.push('donations');
 
+  if (
+    quiet &&
+    !quietAfterReads(before.quiet!, {
+      donationsRead,
+      donations,
+      characterIds: feed.rows.map((r) => r.characterId),
+      extractions: fingerprintOf(before.extractions),
+    })
+  ) {
+    const full = await readBookStateAdmin(db, corporationId);
+    if (!full) return { kind: 'stopped', reason: 'book-off' };
+    before = full;
+    quiet = false;
+  }
+
   // --- Decide ---------------------------------------------------------------
   const now = deps.now();
   const gaps = mergeGaps(
@@ -321,7 +405,8 @@ export async function runBookSync(
     ...before.payments.filter((p) => p.minerId !== undefined).map((p) => p.characterId as number),
   ]);
   const stored = new Set(before.payments.map((p) => p.id));
-  const fresh = donations
+  // Quiet: every donation is one the quiet run saw stored (quietAfterReads).
+  const fresh = (quiet ? [] : donations)
     .filter((d) => !stored.has(paymentId(d)))
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, DONATIONS_PER_CALL);
@@ -387,7 +472,10 @@ export async function runBookSync(
     );
 
   // --- Re-match Unmatched donations -----------------------------------------
-  const { assigned, error: reassignError } = await reassignUnmatched(edit, before, known);
+  // Quiet: the quiet run re-matched nothing, and no Unmatched donation or known Character is new.
+  const { assigned, error: reassignError } = quiet
+    ? { assigned: new Map<string, string>(), error: undefined }
+    : await reassignUnmatched(edit, before, known);
 
   // --- Settle ---------------------------------------------------------------
   // Read again, right before settling, whenever this run brought in money: a settle is never
@@ -397,19 +485,59 @@ export async function runBookSync(
     receipt.donationsAdded > 0 || assigned.size > 0
       ? await readBookStateAdmin(db, corporationId)
       : before;
-  const toSettle = after
-    ? planSettlements({
-        statements: after.statements,
-        payments: after.payments,
-        dismissals: after.dismissals,
-        alreadyPaid: after.paidStatementIds,
-        extractions: after.extractions,
-        ...(after.writeOffs ? { writeOffs: after.writeOffs } : {}),
-        startDate: after.startDate,
-      })
-    : [];
+  // Quiet: the book is the one the quiet run planned from, and that plan was empty.
+  const toSettle =
+    after && !quiet
+      ? planSettlements({
+          statements: after.statements,
+          payments: after.payments,
+          dismissals: after.dismissals,
+          alreadyPaid: after.paidStatementIds,
+          extractions: after.extractions,
+          ...(after.writeOffs ? { writeOffs: after.writeOffs } : {}),
+          startDate: after.startDate,
+        })
+      : [];
   for (const ids of chunks(toSettle, SETTLE_PER_CALL)) {
     await edit({ action: 'settleStatements', statementIds: ids });
+  }
+
+  // --- Quiet marker ---------------------------------------------------------
+  // A full run that had nothing to match, re-match or settle vouches for the book as it read
+  // it, so the next runs can skip that read while nothing changes; any other full run clears
+  // an older marker. Best effort: without a marker the next run just reads in full.
+  if (!quiet) {
+    const marker: QuietMarker | null =
+      donationsRead &&
+      fresh.length === 0 &&
+      assigned.size === 0 &&
+      !reassignError &&
+      toSettle.length === 0 &&
+      before.versions !== null
+        ? {
+            at: startedAt,
+            createdAt: before.createdAt,
+            versions: before.versions,
+            startDate: before.startDate,
+            divisions: before.divisions,
+            journalThrough: journalThroughOf(donations),
+            known: [...known].sort((x, y) => x - y),
+            extractions: fingerprintOf(before.extractions),
+            paid: fingerprintOf(before.paidStatementIds),
+          }
+        : null;
+    if (marker !== null || before.quiet !== null) {
+      try {
+        await db.runTransaction(async (tx) => {
+          const ref = bookRef(db, corporationId);
+          const held = await tx.get(ref);
+          if (!held.exists || held.get('createdAt') !== before.createdAt) return;
+          tx.update(ref, { [QUIET_FIELD]: marker ?? FieldValue.delete() });
+        });
+      } catch (e) {
+        console.error('quiet marker not written', e instanceof Error ? e.message : e);
+      }
+    }
   }
 
   // --- Moon owner payouts: what the wallet sent, attached to what was recorded --------
