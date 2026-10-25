@@ -104,13 +104,21 @@ async function mintAndSignIn(auth: Auth, characterId: number, uid: string): Prom
  * Whether the restored session is still good: a cached ID token is returned
  * as is, an expired one is refreshed over the network, and a session that can
  * no longer refresh (disabled user, revoked) throws.
+ *
+ * With `ownerHash`, the token's ownerHash claim must also be that one. Custom
+ * claims survive every ID-token refresh, so a session persisted before the
+ * Character changed owner keeps the old claim, and the rules refuse every
+ * hash-guarded write (`incomingHashMatches`) until it is minted again.
  */
-async function sessionUsable(auth: Auth, uid: string): Promise<boolean> {
+async function sessionUsable(auth: Auth, uid: string, ownerHash?: string): Promise<boolean> {
   const user = auth.currentUser;
   if (user?.uid !== uid) return false;
-  if (typeof user.getIdToken !== 'function') return true;
   try {
-    await user.getIdToken();
+    if (ownerHash !== undefined && typeof user.getIdTokenResult === 'function') {
+      const { claims } = await user.getIdTokenResult();
+      return claims.ownerHash === ownerHash;
+    }
+    if (typeof user.getIdToken === 'function') await user.getIdToken();
     return true;
   } catch {
     return false;
@@ -119,18 +127,19 @@ async function sessionUsable(auth: Auth, uid: string): Promise<boolean> {
 
 /**
  * Ensure this character's own Firebase session exists; mint + sign in only
- * when it is missing or cannot refresh. Returns the Firebase uid.
+ * when it is missing, cannot refresh, or (given `ownerHash`) carries another
+ * owner's claim. Returns the Firebase uid.
  */
-export async function ensureSignedIn(characterId: number): Promise<string> {
+export async function ensureSignedIn(characterId: number, ownerHash?: string): Promise<string> {
   const uid = uidForCharacter(characterId);
   const auth = getSyncAuth(characterId);
   await whenAuthRestored(auth);
-  if (await sessionUsable(auth, uid)) return uid;
+  if (await sessionUsable(auth, uid, ownerHash)) return uid;
   const existing = inflight.get(characterId);
   if (existing) return existing;
 
   const promise = (async () => {
-    if (await sessionUsable(auth, uid)) return uid;
+    if (await sessionUsable(auth, uid, ownerHash)) return uid;
     await mintAndSignIn(auth, characterId, uid);
     return uid;
   })();

@@ -492,9 +492,9 @@ async function syncCharacter(
   // whatever the request named, only a full pass refills them.
   const scope: SyncScope = (await handleOwnerHashChange(character)) ? 'all' : requested;
 
-  const uid = await ensureSignedIn(characterId);
-  const firestore = getSyncFirestore(characterId);
   const ownerHash = character.ownerHash;
+  const uid = await ensureSignedIn(characterId, ownerHash);
+  const firestore = getSyncFirestore(characterId);
   const now = Date.now();
   let pushed = false;
   const ctx: SyncContext = {

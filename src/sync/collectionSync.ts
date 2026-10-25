@@ -13,6 +13,8 @@ import {
   setDoc,
   where,
   type CollectionReference,
+  type DocumentData,
+  type DocumentReference,
   type Firestore,
 } from 'firebase/firestore/lite';
 import { db, type PlanetRichnessRecord, type StationPinRecord } from '@/db';
@@ -41,6 +43,26 @@ export async function runBounded(writes: (() => Promise<unknown>)[]): Promise<vo
   await mapWithConcurrencyLimit(writes, PUSH_CONCURRENCY, async (write) => {
     await write();
   });
+}
+
+/**
+ * `setDoc` for a doc carrying this owner's `ownerHash`, over whatever a
+ * previous owner left at the same id. Ids derived from a key (a setting, a
+ * station, a feed occurrence) recur across owners, and the pull never shows
+ * the old doc (it reads `ownerHash == current`), so the write is an update the
+ * rules refuse: `hashMatches` reads the stored hash. Delete is uid-only for
+ * exactly this (firestore.rules), so the stale doc is removed and the write
+ * retried once. The session's own claim is checked before the pass
+ * (`ensureSignedIn`), so a refusal here is the stored doc's.
+ */
+export async function setOwnedDoc(ref: DocumentReference, data: DocumentData): Promise<void> {
+  try {
+    await setDoc(ref, data);
+  } catch (error) {
+    if ((error as { code?: unknown } | null)?.code !== 'permission-denied') throw error;
+    await deleteDoc(ref);
+    await setDoc(ref, data);
+  }
 }
 
 async function writeTombstones(key: string, tombstones: LocalTombstone[]): Promise<void> {
@@ -233,11 +255,11 @@ export async function syncEditableCollection(
   if (plan.pushUpserts.length > 0 || plan.pushTombstones.length > 0) ctx.onPush?.();
   await runBounded([
     ...plan.pushUpserts.map(
-      (p) => () => setDoc(doc(col, p.id), spec.toRemoteDoc(p, ctx.ownerHash))
+      (p) => () => setOwnedDoc(doc(col, p.id), spec.toRemoteDoc(p, ctx.ownerHash))
     ),
     ...plan.pushTombstones.map(
       (t) => () =>
-        setDoc(doc(col, t.id), {
+        setOwnedDoc(doc(col, t.id), {
           id: t.id,
           characterId: ctx.characterId,
           updatedAt: t.deletedAt,

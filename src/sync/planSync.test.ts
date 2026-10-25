@@ -731,6 +731,54 @@ describe('triggerSync: ownerHash-scoped reads', () => {
     await triggerSync(1);
     expect(await db.skillPlans.get('stale')).toBeUndefined();
   });
+
+  describe("a previous owner's doc at an id this owner writes", () => {
+    // The rules' `update` needs the stored doc's ownerHash to match; the pull
+    // never sees such a doc, so the write lands on it as an update and is refused.
+    // The double's two-argument write, as the module mock defines it.
+    const write = vi.mocked(setDoc).getMockImplementation() as unknown as (
+      ref: unknown,
+      data: unknown
+    ) => Promise<void>;
+    beforeEach(() => {
+      vi.mocked(setDoc).mockImplementation(async (ref: unknown, data: unknown) => {
+        const { col, id } = ref as unknown as FakeRef;
+        const stored = remoteStore.get(col.path)?.get(id);
+        if (stored && 'ownerHash' in stored && stored.ownerHash !== (data as DocData).ownerHash) {
+          throw Object.assign(new Error('Missing or insufficient permissions.'), {
+            code: 'permission-denied',
+          });
+        }
+        return write(ref, data);
+      });
+    });
+    afterEach(() => {
+      vi.mocked(setDoc).mockImplementation(write as never);
+    });
+
+    it('replaces a synced setting the previous owner left', async () => {
+      seedRemote(SETTINGS_PATH, [
+        { key: 'sync.tradeHub', value: 'amarr', updatedAt: 1, ownerHash: 'previous-owner' },
+      ]);
+      await seedLocalSetting('sync.tradeHub', 'jita');
+      await triggerSync(1);
+      expect(getSyncStatus(1).state).toBe('idle');
+      expect(remoteStore.get(SETTINGS_PATH)?.get('sync.tradeHub')).toMatchObject({
+        value: 'jita',
+        ownerHash: HASH,
+      });
+    });
+
+    it('replaces a station pin the previous owner left', async () => {
+      seedRemote(STATION_PINS_PATH, [remoteStationPinDoc({ ownerHash: 'previous-owner' })]);
+      await db.stationPins.put(stationPin());
+      await triggerSync(1);
+      expect(getSyncStatus(1).state).toBe('idle');
+      expect(remoteStore.get(STATION_PINS_PATH)?.get('1:60003760')).toMatchObject({
+        ownerHash: HASH,
+      });
+    });
+  });
 });
 
 /**

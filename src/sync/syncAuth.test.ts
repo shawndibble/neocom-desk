@@ -24,7 +24,11 @@ vi.mock('@/auth/session', () => ({
 
 interface FakeAuth {
   id: number;
-  currentUser: { uid: string; getIdToken?: () => Promise<string> } | null;
+  currentUser: {
+    uid: string;
+    getIdToken?: () => Promise<string>;
+    getIdTokenResult?: () => Promise<{ claims: Record<string, unknown> }>;
+  } | null;
   authStateReady?: () => Promise<void>;
 }
 /** One Auth per Character, like the named apps in `firebaseApp.ts`. */
@@ -124,6 +128,26 @@ describe('ensureSignedIn', () => {
     fakeAuthFor(1).currentUser = { uid: 'char:1', getIdToken };
     await ensureSignedIn(1);
     expect(getIdToken).toHaveBeenCalled();
+    expect(mint).not.toHaveBeenCalled();
+  });
+
+  it('mints again when the session carries a previous ownerHash', async () => {
+    // Developer claims survive every ID-token refresh, so a session minted
+    // before a transfer would fail every hash-guarded write for good.
+    fakeAuthFor(1).currentUser = {
+      uid: 'char:1',
+      getIdTokenResult: async () => ({ claims: { ownerHash: 'old' } }),
+    };
+    await expect(ensureSignedIn(1, 'new')).resolves.toBe('char:1');
+    expect(mint).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a session whose ownerHash claim is current', async () => {
+    fakeAuthFor(1).currentUser = {
+      uid: 'char:1',
+      getIdTokenResult: async () => ({ claims: { ownerHash: 'h' } }),
+    };
+    await ensureSignedIn(1, 'h');
     expect(mint).not.toHaveBeenCalled();
   });
 
