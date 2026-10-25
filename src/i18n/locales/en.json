@@ -1358,7 +1358,8 @@
         "repair": "Repair more",
         "transfer": "Transfer more",
         "tackle": "Hold tighter",
-        "ewar": "Stronger EWAR"
+        "ewar": "Stronger EWAR",
+        "command": "Stronger fleet support"
       },
       "unavailable": {
         "noWeapons": "Nothing on this fit deals damage",
@@ -1370,7 +1371,8 @@
         "noRemoteRepair": "No remote repairers on this fit",
         "noCapTransfer": "No remote capacitor transmitters on this fit",
         "noTackle": "No warp scramblers, disruptors or webs on this fit",
-        "noEwar": "No electronic warfare modules on this fit"
+        "noEwar": "No electronic warfare modules on this fit",
+        "noCommand": "No command bursts, compressors or industrial core on this fit"
       },
       "guardrail": {
         "combat": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration.",
@@ -1409,7 +1411,8 @@
         "repair": "No variation of a fitted remote repairer repairs more within the guardrails.",
         "transfer": "No variation of a fitted remote capacitor transmitter transfers more within the guardrails.",
         "tackle": "No variation of a fitted scrambler, disruptor or web holds tighter within the guardrails.",
-        "ewar": "No variation of a fitted electronic warfare module is stronger within the guardrails."
+        "ewar": "No variation of a fitted electronic warfare module is stronger within the guardrails.",
+        "command": "No variation of a fitted burst, compressor or core gives the fleet more within the guardrails."
       },
       "closest": "Closest swaps",
       "broke": {
@@ -1470,6 +1473,12 @@
       "transferLine": "Transfers {{before}} → {{after}} GJ/s",
       "tackleLine": "Points {{pointsBefore}} → {{pointsAfter}} · Web {{webBefore}} → {{webAfter}}% · Reach {{rangeBefore}} → {{rangeAfter}} km",
       "ewarLine": "Module strength {{strengthBefore}} → {{strengthAfter}} · Reach {{rangeBefore}} → {{rangeAfter}} km (not the effect on a target)",
+      "command": {
+        "strength": "Burst strength {{before}} → {{after}}",
+        "burstRange": "Burst reach {{before}} → {{after}} km",
+        "compression": "Compression {{before}} → {{after}} km",
+        "fuel": "Core fuel {{before}} → {{after}} per cycle"
+      },
       "warpLine": "{{align}} · Warp {{before}} → {{after}} AU/s",
       "hold": {
         "cargo": "Cargo hold",

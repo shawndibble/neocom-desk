@@ -24,6 +24,7 @@ import {
   Spinner,
 } from '@/components/ui';
 import { TANK_GOALS } from '@/engine/fittings/improveGroups';
+import { commandOf } from '@/engine/fittings/improveCommand';
 import { ewarOf, tackleOf } from '@/engine/fittings/improveTackle';
 import { Collapse } from '@/components/ui/Collapse';
 import { textActionClassName } from '@/components/ui/textActionClassName';
@@ -197,7 +198,7 @@ export function ImprovePanel({
     });
   }
 
-  /** Carry more, the align goals, Repair more, Transfer more, Hold tighter, Stronger EWAR: the figure the goal scores, before and after. */
+  /** Carry more, the align goals, Repair more, Transfer more, Hold tighter, Stronger EWAR, Stronger fleet support: the figure the goal scores, before and after. */
   function moveLine(option: ImproveOption | RejectedOption, own: FittingStats): string | null {
     const align = () =>
       t('fittings.improve.alignLine', {
@@ -232,6 +233,19 @@ export function ImprovePanel({
         rangeBefore: m3sFormat(was.range / 1000),
         rangeAfter: m3sFormat(now.range / 1000),
       });
+    }
+    if (goal === 'command') {
+      const [was, now] = [commandOf(own), commandOf(option.after)];
+      return (['strength', 'burstRange', 'compression', 'fuel'] as const)
+        .filter((key) => was[key] > 0)
+        .map((key) => {
+          const km = key === 'burstRange' || key === 'compression' ? 1000 : 1;
+          return t(`fittings.improve.command.${key}`, {
+            before: m3sFormat(was[key] / km),
+            after: m3sFormat(now[key] / km),
+          });
+        })
+        .join(' · ');
     }
     if (goal === 'ewar') {
       const [was, now] = [ewarOf(own), ewarOf(option.after)];

@@ -425,4 +425,43 @@ describe('ImprovePanel', () => {
       screen.getByText('Module strength 4 → 5 · Reach 20 → 30 km (not the effect on a target)')
     ).toBeInTheDocument();
   });
+  it('disables Stronger fleet support with its reason on a fit with no fleet modules', async () => {
+    renderPanel(search({ status: 'idle' }));
+    const chip = screen.getByRole('button', { name: /Stronger fleet support/ });
+    expect(chip).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.hover(chip);
+    expect(
+      await screen.findByText('No command bursts, compressors or industrial core on this fit')
+    ).toBeInTheDocument();
+  });
+
+  it('shows only the fleet figures the fit has on a Stronger fleet support row', () => {
+    const withSupport = (strength: number, rangeMeters: number, fuel: number) => ({
+      ...before,
+      fleetSupport: {
+        bursts: [
+          {
+            typeId: 1,
+            count: 1,
+            strengths: [strength],
+            rangeMeters,
+            durationSeconds: 60,
+            reloadSeconds: 30,
+          },
+        ],
+        compressors: [],
+        core: { typeId: 3, fuelTypeId: 4, fuelPerCycle: fuel, cycleSeconds: 3600 },
+      },
+    });
+    const own = withSupport(10, 30000, 200);
+    const gain = option(10, { fleetSupport: withSupport(12, 40000, 150).fleetSupport });
+    renderPanel(search(done({ noDownside: [gain] }, own), own), vi.fn(), vi.fn(), settings(), {
+      goal: 'command',
+    });
+    expect(
+      screen.getByText(
+        'Burst strength 10 → 12 · Burst reach 30 → 40 km · Core fuel 200 → 150 per cycle'
+      )
+    ).toBeInTheDocument();
+  });
 });

@@ -60,6 +60,9 @@ const TACKLE_GROUPS: readonly number[] = [52, 65];
 /** ECM, Remote Sensor Dampener, Weapon Disruptor, Target Painter. */
 const EWAR_GROUPS: readonly number[] = [201, 208, 291, 379];
 
+/** Command Burst, Compressor, Industrial Core. */
+const COMMAND_GROUPS: readonly number[] = [1770, 4174, 515];
+
 /** The module groups, beyond a module's own, that Rework tries for each Improve Goal. The tank groups are added per Defense Choice. */
 const GOAL_GROUPS: Record<ImproveGoal, readonly number[]> = {
   overall: [...DAMAGE_GROUPS, ...REACH_GROUPS, ...SPEED_GROUPS, ...CAP_GROUPS],
@@ -76,6 +79,7 @@ const GOAL_GROUPS: Record<ImproveGoal, readonly number[]> = {
   transfer: TRANSFER_GROUPS,
   tackle: TACKLE_GROUPS,
   ewar: EWAR_GROUPS,
+  command: COMMAND_GROUPS,
 };
 
 /** The goals whose score includes the fit's tank. */
@@ -105,6 +109,7 @@ export type Job =
   | 'web'
   | 'ewar'
   | 'drain'
+  | 'fleet'
   | 'cap'
   | 'remoteRepair'
   | 'capTransfer'
@@ -118,6 +123,7 @@ const JOB_GROUPS: Record<Job, readonly number[]> = {
   web: [65],
   ewar: [201, 80, 208, 291, 379],
   drain: [71, 68],
+  fleet: [1770, 4174, 515],
   cap: [43, 76, 767, 768],
   remoteRepair: [325, 41, 585, 1697, 1698],
   capTransfer: [67],
@@ -145,6 +151,7 @@ export function scoredJobs(goal: ImproveGoal): readonly Job[] {
   if (goal === 'transfer') return ['capTransfer'];
   if (goal === 'tackle') return ['scram', 'web'];
   if (goal === 'ewar') return ['ewar'];
+  if (goal === 'command') return ['fleet'];
   return [];
 }
 
