@@ -202,9 +202,11 @@ describe('ActiveHaulView', () => {
           sections: [{ ...haul.plan.sections[0], legs: flight }],
           leftOut: [],
           flown: [],
+          totals: { legs: 2, jumps: 10, m3: 0 },
         },
       },
     });
+    expect(screen.getByText('2 legs · 10 jumps to Jita 4-4')).toBeTruthy();
     expect(screen.getByText('Take Rifter at Dodixie IX')).toBeTruthy();
     expect(screen.getByText('Fly Rifter to Jita 4-4')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /cargo for leg/ })).toBeNull();

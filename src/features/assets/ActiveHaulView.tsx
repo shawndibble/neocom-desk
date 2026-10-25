@@ -127,12 +127,15 @@ export function ActiveHaulView({
         {t('assets.movePlan.haul.title')}
       </h3>
       <p className="m-0 text-sm text-text-dim tabular-nums">
-        {t('assets.movePlan.haul.summary', {
-          legs: t('assets.movePlan.haul.legCount', { count: totals.legs }),
-          jumps: jumpsLabel(totals.jumps),
-          volume: formatCubicMetres(totals.m3),
-          destination: destination.name,
-        })}
+        {t(
+          totals.m3 > 0 ? 'assets.movePlan.haul.summary' : 'assets.movePlan.haul.summaryShipsOnly',
+          {
+            legs: t('assets.movePlan.haul.legCount', { count: totals.legs }),
+            jumps: jumpsLabel(totals.jumps),
+            volume: formatCubicMetres(totals.m3),
+            destination: destination.name,
+          }
+        )}
       </p>
       {here && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xs border border-line-bright px-3 py-2 text-sm">

@@ -7711,6 +7711,7 @@
       "haul": {
         "title": "Haul in progress",
         "summary": "{{legs}} · {{jumps}} · {{volume}} m³ to {{destination}}",
+        "summaryShipsOnly": "{{legs}} · {{jumps}} to {{destination}}",
         "legCount_one": "{{count}} leg",
         "legCount_other": "{{count}} legs",
         "jumpCount_one": "{{count}} jump",
@@ -7772,7 +7773,7 @@
         "hereMark": "Mark done",
         "finished": "Every leg is done. ESI caches assets for about an hour, so the Move plan may show the old stock until ESI refreshes.",
         "replan": "Replan from here",
-        "replanLoaded": "{{names}} still carries a load. Deliver it and tick that leg first, then replan.",
+        "replanLoaded": "{{names}} still carries a load or is flying a ship. Finish that trip and tick its last leg first, then replan.",
         "replanFailed": "Could not replan the route. Try again later.",
         "resetProgress": "Reset progress",
         "clear": "Clear haul",
