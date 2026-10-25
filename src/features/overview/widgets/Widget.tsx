@@ -127,7 +127,14 @@ function NumberBody({ model, dimmed = false }: { model: NumberModel; dimmed?: bo
           )}
         </span>
         {model.unit && (
-          <small className="text-xs font-normal tracking-normal text-text-dim">{model.unit}</small>
+          <Tooltip content={model.unit}>
+            <small
+              tabIndex={0}
+              className="min-w-0 max-w-full truncate text-xs font-normal tracking-normal text-text-dim"
+            >
+              {model.unit}
+            </small>
+          </Tooltip>
         )}
       </div>
       {model.secondary && <SecondaryLine secondary={model.secondary} />}

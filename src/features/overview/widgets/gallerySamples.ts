@@ -351,6 +351,72 @@ function buildSamples(t: TFunction): Record<string, Sample> {
         xEnd: t('overview.widgets.chart.thisWeek'),
       },
     },
+    marketTrend: {
+      value: '+8.4%',
+      unit: t('overview.widgets.data.marketTrend.unit', { item: 'Tritanium', days: 7 }),
+      rows: [
+        ['Tritanium', '', '+8.4%'],
+        ['PLEX', '', '-2.1%'],
+        ['Large Skill Injector', '', '+0.6%'],
+      ],
+      chart: {
+        kind: 'lines',
+        summary: '',
+        series: [
+          {
+            key: 'a',
+            label: 'Tritanium',
+            color: 'accent',
+            end: '+8.4%',
+            values: [0, 2, 1, 5, 9, 8.4],
+          },
+          {
+            key: 'b',
+            label: 'PLEX',
+            color: 's1',
+            end: '-2.1%',
+            values: [0, -1, -3, -2, -2.5, -2.1],
+          },
+        ],
+      },
+    },
+    // The PLEX and Large Skill Injector preset cards: one line each, so the area fill shows.
+    marketTrendPlex: {
+      value: '+1.7%',
+      unit: t('overview.widgets.data.marketTrend.unit', { item: 'PLEX', days: 7 }),
+      rows: [['PLEX', '', '+1.7%']],
+      chart: {
+        kind: 'lines',
+        summary: '',
+        series: [
+          {
+            key: 'a',
+            label: 'PLEX',
+            color: 'accent',
+            end: '+1.7%',
+            values: [0, -1, -0.5, 0.4, 1.2, 0.8, 1.7],
+          },
+        ],
+      },
+    },
+    marketTrendInjector: {
+      value: '-0.5%',
+      unit: t('overview.widgets.data.marketTrend.unit', { item: 'Large Skill Injector', days: 7 }),
+      rows: [['Large Skill Injector', '', '-0.5%']],
+      chart: {
+        kind: 'lines',
+        summary: '',
+        series: [
+          {
+            key: 'a',
+            label: 'Large Skill Injector',
+            color: 'accent',
+            end: '-0.5%',
+            values: [0, 1.2, 0.4, 1.8, -0.6, 0.3, -0.5],
+          },
+        ],
+      },
+    },
     tradingProfit: {
       value: '+132M',
       isk: 132_000_000,

@@ -35,12 +35,13 @@ describe('BuildPlanAutoBuildControl', () => {
     ]);
   });
 
-  it('shows only a reserved Reactions chip when Reactions is not eligible — no Manufacturing chip, no Planetary chip', async () => {
+  it('says reactions are left out, as plain hint text, when Reactions is not eligible — no Manufacturing or Planetary chip', async () => {
     render(<BuildPlanAutoBuildControl maxDepth={2} scope={['manufacturing']} onApply={vi.fn()} />);
 
     expect(screen.queryByText('Manufacturing')).not.toBeInTheDocument();
-    const reactionsChip = screen.getByText('Reactions');
-    expect(reactionsChip).toHaveClass('text-text-dim');
+    const reactionsChip = screen.getByText('no reactions');
+    // Plain text, not a chip: it cannot be clicked, so it must not look like a toggle.
+    expect(reactionsChip.tagName).not.toBe('BUTTON');
     fireEvent.pointerMove(reactionsChip);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'Edit setup and turn on Include Reactions to use this'
@@ -48,7 +49,7 @@ describe('BuildPlanAutoBuildControl', () => {
     expect(screen.queryByText('Planetary')).not.toBeInTheDocument();
   });
 
-  it('lights up Reactions once it is in scope (issue #698), with its own tooltip — no Manufacturing or Planetary chip', async () => {
+  it('says reactions are included once in scope (issue #698), with its own tooltip — no Manufacturing or Planetary chip', async () => {
     render(
       <BuildPlanAutoBuildControl
         maxDepth={2}
@@ -58,8 +59,7 @@ describe('BuildPlanAutoBuildControl', () => {
     );
 
     expect(screen.queryByText('Manufacturing')).not.toBeInTheDocument();
-    const reactionsChip = screen.getByText('Reactions');
-    expect(reactionsChip).not.toHaveClass('text-text-dim');
+    const reactionsChip = screen.getByText('incl. reactions');
     fireEvent.pointerMove(reactionsChip);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
       'Reaction materials are included when Auto Build runs'

@@ -23,6 +23,28 @@ describe('parseLayout', () => {
     expect(parseLayout(raw)).toEqual(raw);
   });
 
+  it("keeps a Market Trend widget's picks and a year, and strips them from other kinds", () => {
+    const picks = { trendItems: [34, 35], trendHubs: ['jita', 'amarr'] };
+    const [trend, wallet] = parseLayout(
+      wrap(
+        good({ id: 'a', kind: 'marketTrend', range: 365, ...picks }),
+        good({ id: 'b', kind: 'wallet', range: 365, ...picks })
+      )
+    )!.widgets;
+    expect(trend).toMatchObject({ range: 365, ...picks });
+    expect(wallet.range).toBe(30);
+    expect(wallet).not.toHaveProperty('trendItems');
+    expect(wallet).not.toHaveProperty('trendHubs');
+  });
+
+  it('drops a Market Trend pick that is not a known id', () => {
+    const [trend] = parseLayout(
+      wrap(good({ id: 'a', kind: 'marketTrend', trendItems: ['x'], trendHubs: ['nowhere'] }))
+    )!.widgets;
+    expect(trend).not.toHaveProperty('trendItems');
+    expect(trend).not.toHaveProperty('trendHubs');
+  });
+
   it('returns null for garbage', () => {
     for (const raw of [null, undefined, 'x', 3, [], {}, { version: 1 }, { widgets: 'no' }]) {
       expect(parseLayout(raw)).toBeNull();

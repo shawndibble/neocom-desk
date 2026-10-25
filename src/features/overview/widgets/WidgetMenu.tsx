@@ -34,6 +34,7 @@ import { kindSumsAcrossCharacters } from './data/models';
 import { boardKey, useWidgetBoard } from './board';
 import { useOverviewEdit } from './editContext';
 import { getKind } from './kinds';
+import { TrendHubsMenuGroup, TrendItemsDialog } from './TrendPicks';
 import { DEFAULT_PLEX_PER_30_DAYS } from '@/engine/omegaCoverage';
 import {
   isPlexPlan,
@@ -44,7 +45,7 @@ import {
   RAIDS_RADII,
   RAIDS_WHERES,
   type RaidsWhere,
-  WIDGET_RANGES,
+  rangesOf,
   type CalendarEventsChoice,
   type Widget,
   type WidgetRange,
@@ -187,6 +188,7 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
   const { run, onCloseAutoFocus } = useOpenAfterMenu();
   const [renaming, setRenaming] = useState(false);
   const [planning, setPlanning] = useState(false);
+  const [picking, setPicking] = useState(false);
   const kind = getKind(widget.kind);
   if (!kind) return null;
 
@@ -254,9 +256,11 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
                 value={String(widget.range)}
                 onValueChange={(next) => edit.setRange(widget.id, Number(next) as WidgetRange)}
               >
-                {WIDGET_RANGES.map((days) => (
+                {rangesOf(widget.kind).map((days) => (
                   <DropdownMenuRadioItem key={days} value={String(days)}>
-                    {t('overview.menu.rangeDays', { days })}
+                    {days === 365
+                      ? t('overview.menu.rangeYear')
+                      : t('overview.menu.rangeDays', { days })}
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>
@@ -311,6 +315,16 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
               )}
             </>
           )}
+          {kind.hasTrendSources && (
+            <>
+              <DropdownMenuSeparator />
+              <TrendHubsMenuGroup widget={widget} />
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => run(() => (inert ? undefined : setPicking(true)))}>
+                {t('overview.menu.trendItems')}
+              </DropdownMenuItem>
+            </>
+          )}
           {kind.hasPlexPlan && (
             <>
               <DropdownMenuSeparator />
@@ -324,6 +338,7 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
             kind.hasRange ||
             kind.hasCalendarEvents ||
             kind.hasRaidsWhere ||
+            kind.hasTrendSources ||
             kind.hasPlexPlan) && <DropdownMenuSeparator />}
           <DropdownMenuItem onSelect={() => run(() => (inert ? undefined : setRenaming(true)))}>
             {t('overview.menu.rename')}
@@ -355,6 +370,16 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {picking && (
+        <TrendItemsDialog
+          // A fresh pick list each time the dialog opens.
+          key={(widget.trendItems ?? []).join(',')}
+          widget={widget}
+          title={title}
+          open
+          onClose={() => setPicking(false)}
+        />
+      )}
       {planning && (
         <PlexPlanDialog widget={widget} title={title} open onClose={() => setPlanning(false)} />
       )}

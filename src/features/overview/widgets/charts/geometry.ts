@@ -176,3 +176,44 @@ export function ganttNowPercent(axis: GanttAxis): number {
   const span = axis.to - axis.from || 1;
   return Math.min(100, Math.max(0, ((axis.now - axis.from) / span) * 100));
 }
+
+/**
+ * Polyline point strings (`x,y` pairs in a `100 x height` viewBox) for several
+ * series that share one vertical scale, so lines stay comparable. A gap
+ * (`null`) breaks a line into separate runs rather than bridging it; a run of
+ * one day has no line to draw and is dropped.
+ */
+export function linesRuns(
+  series: readonly (readonly (number | null)[])[],
+  height: number
+): string[][] {
+  const known = series.flatMap((s) => s.filter((v): v is number => v !== null));
+  if (known.length === 0) return series.map(() => []);
+  const min = Math.min(...known);
+  const span = Math.max(...known) - min || 1;
+  return series.map((values) => {
+    const runs: string[][] = [];
+    let run: string[] = [];
+    values.forEach((value, i) => {
+      if (value === null) {
+        if (run.length > 0) runs.push(run);
+        run = [];
+        return;
+      }
+      const x = values.length > 1 ? (i / (values.length - 1)) * 100 : 50;
+      const y = height - 4 - ((value - min) / span) * (height - 10);
+      run.push(`${x.toFixed(1)},${y.toFixed(1)}`); // fixed format: SVG points
+    });
+    if (run.length > 0) runs.push(run);
+    return runs.filter((r) => r.length > 1).map((r) => r.join(' '));
+  });
+}
+
+/** Closed polygons for the soft fill under each `linesRuns` run: the run itself, then straight down to the baseline and back. */
+export function runFills(runs: readonly string[], height: number): string[] {
+  return runs.map((run) => {
+    const pts = run.split(' ');
+    const x = (pt: string) => pt.split(',')[0]!;
+    return `${run} ${x(pts[pts.length - 1]!)},${height} ${x(pts[0]!)},${height}`;
+  });
+}

@@ -23,6 +23,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Button, TextInput, Toast } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import type { SurveyConnection } from '@/engine/miningTax/surveyConnection';
 import { eveWhen } from '@/lib/eveTime';
@@ -54,7 +55,7 @@ export interface TaxSurvey {
   published: SurveyTaxShare | null;
 }
 
-/** "Auto-assigned until …", with the Tax tab and Stop: what a connected Survey shows in place of Assign Taxes. */
+/** The Tax tab and Stop, then "Auto-assigned until …" on its own line below: what a connected Survey shows in place of Assign Taxes. */
 function ConnectedNote({
   connection,
   nowMs,
@@ -68,22 +69,25 @@ function ConnectedNote({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 sm:ml-auto">
-      <span role="status" className="text-sm text-text-dim">
+    <>
+      <div className="flex items-center gap-x-3 sm:ml-auto">
+        <Link
+          to={MINING_TAX_HREF}
+          className={buttonClassName({ size: 'sm', className: 'touch:min-h-11' })}
+        >
+          {t('survey.moonTax.openTax')}
+        </Link>
+        <Button id={stopId} size="sm" variant="ghost" className="touch:min-h-11" onClick={onStop}>
+          {t('survey.moonTax.stop')}
+        </Button>
+      </div>
+      <span role="status" className="-mt-1 flex w-full items-center gap-1.5 text-sm text-text-dim">
+        <Icon.Pending size={Icon.ICON_SIZE.sm} aria-hidden="true" />
         {connection.systemId === null
           ? t('survey.moonTax.connectedNoLocation')
           : t('survey.moonTax.connected', { time: eveWhen(connection.untilMs, nowMs) })}
       </span>
-      <Link
-        to={MINING_TAX_HREF}
-        className={buttonClassName({ size: 'sm', className: 'touch:min-h-11' })}
-      >
-        {t('survey.moonTax.openTax')}
-      </Link>
-      <Button id={stopId} size="sm" variant="ghost" className="touch:min-h-11" onClick={onStop}>
-        {t('survey.moonTax.stop')}
-      </Button>
-    </div>
+    </>
   );
 }
 

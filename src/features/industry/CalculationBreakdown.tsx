@@ -40,6 +40,11 @@ export interface BreakdownContext {
   productUnitPrice: number | null;
   /** The plan's wall-clock time on its character's free slots; absent without slot data. */
   planSeconds?: number;
+  /**
+   * The hero's sell-value basis, when it is on: what the owned materials would
+   * net if sold, and the break-even once that is added to the cost.
+   */
+  sellValue?: { forgone: number; breakEvenPrice: number | null } | null;
   /** Materials costed at a Depth Price, each with its book walk. */
   depthRows?: readonly { typeID: number; name: string; walk: DepthPrice }[];
 }
@@ -246,7 +251,6 @@ export function CalculationBreakdown({
 
         <Section title={t('industry.breakdown.profitTitle')}>
           <p>{t('industry.breakdown.profitNet')}</p>
-          <p>{t('industry.breakdown.profitGross')}</p>
           <p>
             {t('industry.breakdown.profitIskPerHour', {
               time: formatDuration(result.seconds),
@@ -273,6 +277,14 @@ export function CalculationBreakdown({
               })}
             </Formula>
             <p>{t('industry.breakdown.breakEvenFloor')}</p>
+            {context.sellValue && context.sellValue.breakEvenPrice !== null && (
+              <p>
+                {t('industry.breakdown.breakEvenSellValue', {
+                  forgone: formatIsk(context.sellValue.forgone),
+                  breakEven: formatIsk(context.sellValue.breakEvenPrice),
+                })}
+              </p>
+            )}
           </Section>
         )}
 

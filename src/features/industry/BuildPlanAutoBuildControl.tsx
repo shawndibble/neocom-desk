@@ -61,7 +61,7 @@ export function BuildPlanAutoBuildControl({
   }
 
   return (
-    <div className="flex flex-col gap-1 text-xs sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+    <div className="flex flex-wrap items-center gap-2 text-xs">
       <span className="whitespace-nowrap">{t('industry.buildStrategyLabel')}</span>
       <BuildStrategySelect
         strategy={strategy}

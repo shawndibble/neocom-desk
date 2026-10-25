@@ -292,6 +292,18 @@ describe('corpGrantCoverage', () => {
     expect(coverage.capabilities.canReadWallet).toBe(true);
   });
 
+  it('keeps SRP settings for a Director whose older grant lacks the titles scope', () => {
+    const TITLES = 'esi-corporations.read_titles.v1';
+    expect(CORP_SCOPES_FOR_CAPABILITY.canConfigureSrp).toEqual([ROLES]);
+    const coverage = corpGrantCoverage(
+      corpCapabilities(['Director']),
+      scopesForGroup('corp').filter((scope) => scope !== TITLES)
+    );
+    expect(coverage.capabilities.canReadRoleAudit).toBe(false);
+    expect(coverage.capabilities.canManageSrp).toBe(true);
+    expect(coverage.capabilities.canConfigureSrp).toBe(true);
+  });
+
   it('keeps a Station_Manager’s older grant ready when only the skyhook scope is missing (#4775)', () => {
     const SKYHOOKS = 'esi-structures.read_corporation.v1';
     expect(CORP_SCOPES_FOR_CAPABILITY.canReadSkyhooks).toEqual([SKYHOOKS]);

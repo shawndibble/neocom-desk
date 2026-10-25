@@ -20,7 +20,7 @@ describe('GroupOwnedDiffersHint', () => {
     renderHint(DIFF, GROUP);
     expect(
       screen.getByText(
-        'Group total differs: Rifter run counts 1,200 Tritanium owned, this plan 800.'
+        'Rifter run keeps its own count of your Tritanium: 1,200, where this plan counts 800. Its plans share that stock.'
       )
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open the group' })).toHaveAttribute(

@@ -142,6 +142,12 @@ describe('corpCapabilities', () => {
     expect(corpCapabilities(['Station_Manager']).canManageSrp).toBe(false);
   });
 
+  it('opens SRP settings to a Director alone, never an Accountant', () => {
+    expect(corpCapabilities(['Director']).canConfigureSrp).toBe(true);
+    expect(corpCapabilities(['Accountant']).canConfigureSrp).toBe(false);
+    expect(corpCapabilities(['Junior_Accountant']).canConfigureSrp).toBe(false);
+  });
+
   it('opens the starbase reads to a Director alone', () => {
     expect(corpCapabilities(['Station_Manager']).canReadStarbases).toBe(false);
     expect(corpCapabilities(['Director']).canReadStarbases).toBe(true);

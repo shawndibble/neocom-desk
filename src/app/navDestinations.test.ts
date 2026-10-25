@@ -19,6 +19,7 @@ const ALL_CORP_VIEWS = {
   canReadMiningLedger: true,
   canReadRoleAudit: true,
   canManageSrp: true,
+  canConfigureSrp: true,
 };
 const NO_CORP_VIEWS = {
   canReadMembers: false,
@@ -27,6 +28,7 @@ const NO_CORP_VIEWS = {
   canReadMiningLedger: false,
   canReadRoleAudit: false,
   canManageSrp: false,
+  canConfigureSrp: false,
 };
 
 const MOONS_TAB_PATHS = [
@@ -282,7 +284,7 @@ describe('listNavDestinations', () => {
       listNavDestinations({
         locked: NO_LOCKS,
         corpVisible: true,
-        corpCapabilities: { ...NO_CORP_VIEWS, canManageSrp, canReadRoleAudit: director },
+        corpCapabilities: { ...NO_CORP_VIEWS, canManageSrp, canConfigureSrp: director },
         srpVisible,
         t,
       })
@@ -294,6 +296,19 @@ describe('listNavDestinations', () => {
     expect(tabs(true, false)).toEqual([]);
     // An Accountant (no Director role): Settings is hidden, so the Queue alone draws no tab bar.
     expect(tabs(true, true, false)).toEqual([]);
+  });
+
+  it('lists SRP Settings for a Director whose grant lacks the role-audit scope', () => {
+    const tabs = listNavDestinations({
+      locked: NO_LOCKS,
+      corpVisible: true,
+      corpCapabilities: { ...NO_CORP_VIEWS, canManageSrp: true, canConfigureSrp: true },
+      srpVisible: true,
+      t,
+    })
+      .filter((entry) => entry.pagePath === '/corp/srp' && entry.kind === 'tab')
+      .map((entry) => entry.path);
+    expect(tabs).toEqual(['/corp/srp/queue', '/corp/srp/settings']);
   });
 
   it('lists the SRP sub-view of Overview only while the corporation has SRP on, never locked', () => {

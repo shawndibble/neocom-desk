@@ -27,12 +27,16 @@ export const MARKET_HUB_SETTING_KEY = 'sync.marketHub';
 /** What it was stored under before it synced; its value is adopted once. */
 export const LEGACY_MARKET_HUB_SETTING_KEY = 'marketHub';
 
+/** A stored hub id, if it still names a hub; a hub retired between releases is still a valid string. */
+export function parseMarketHub(raw: unknown): TradeHub['id'] | null {
+  return typeof raw === 'string' && getTradeHub(raw as TradeHub['id'])
+    ? (raw as TradeHub['id'])
+    : null;
+}
+
 export const useMarketHub = createSyncedSetting<TradeHub['id']>({
   key: MARKET_HUB_SETTING_KEY,
   legacyKey: LEGACY_MARKET_HUB_SETTING_KEY,
   defaultValue: DEFAULT_TRADE_HUB.id,
-  // A hub id retired between releases is still a valid string, so the
-  // typeof default is not enough — it has to still name a hub.
-  parse: (raw) =>
-    typeof raw === 'string' && getTradeHub(raw as TradeHub['id']) ? (raw as TradeHub['id']) : null,
+  parse: parseMarketHub,
 });

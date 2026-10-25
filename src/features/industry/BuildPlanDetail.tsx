@@ -1,6 +1,11 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
-import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
+import {
+  fieldBaseClassName,
+  fieldSizeClassName,
+  tappableRowClassName,
+  touchCheckboxLabelClassName,
+} from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
@@ -39,7 +44,13 @@ import {
   type BuildStrategy,
 } from '@/engine/industry/autoMakeOrBuy';
 import { craftScope } from '@/engine/industry/craftScope';
-import { ownedStockSale, sellableMaterials } from '@/engine/industry/ownedStockSale';
+import {
+  ownedStockSale,
+  sellableMaterials,
+  type LiquidationBasis,
+} from '@/engine/industry/ownedStockSale';
+import { profitOnBasis, type ProfitBasis } from '@/engine/industry/profitBasis';
+import { securityBand } from '@/engine/securityStatus';
 import type { FacilityKind, MaterialPriceBasis, RigKind } from '@/engine/industry/types';
 import { rigKindLabelKey } from './rigFitLabels';
 import { RigMatchHelper } from './RigMatchHelper';
@@ -119,6 +130,10 @@ import { blueprintTypeIdsIn, useBlueprintPurchaseOffers } from './blueprintPurch
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { BuildPlanAutoBuildControl } from './BuildPlanAutoBuildControl';
 import { ResultsSummary } from './ResultsSummary';
+import { useCheaperNearbySystems } from './useCheaperNearbySystems';
+import { formatCostIndex } from './format';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
+import { textActionClassName } from '@/components/ui/textActionClassName';
 import { BpcCoverageWarning, PlanVerdictHero } from './PlanVerdictHero';
 import { PlanSetupFacts } from './PlanSetupFacts';
 import { useNearestLowsecSystem } from './useNearestLowsecSystem';
@@ -293,6 +308,7 @@ export function BuildPlanDetail({
     changeSourcing,
     changeOneSourcing,
     toggleBuildHere,
+    buildHereAll,
     toggleIncludeReactions,
   } = usePlanEdits(plan, activity, onChange);
   const hub = useMemo(() => getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB, [plan.hubId]);
@@ -369,11 +385,21 @@ export function BuildPlanDetail({
   const { copied: copyState, flash: flashCopy } = useCopyFeedback<'copied' | 'failed'>(2000);
   /** Blueprint Acquisition rows (issue #838) `shoppingListText` just left out of a successful copy. */
   const [blueprintsLeftOut, setBlueprintsLeftOut] = useState(0);
-  // Verdict-first layout: the inputs fold behind a chip summary, the ledger
-  // follows the viewport (open where there is room beside the materials,
-  // folded on a phone until asked), and the one Calculation Breakdown is
-  // owned here so the hero's button and the ledger's "?"s open the same modal.
+  // Verdict-first layout: the setup folds to one line at the hero's foot, the
+  // ledger follows the viewport (open where there is room beside the
+  // materials, folded on a phone until asked), and the one Calculation
+  // Breakdown is owned here so the hero's break-even ⓘ and the ledger
+  // header's ⓘ open the same modal.
   const [setupOpen, setSetupOpen] = useState(false);
+  // How the hero counts owned materials, and how they would be sold. Page
+  // state, not plan state: a way of reading the plan, like a sort.
+  const [profitBasis, setProfitBasis] = useState<ProfitBasis>('sellValue');
+  const [saleBasis, setSaleBasis] = useState<LiquidationBasis>('instant');
+  // The build-here list a strategy change replaced, for the toast's Undo.
+  const [strategyUndo, setStrategyUndo] = useState<{
+    previous: number[];
+    built: number;
+  } | null>(null);
   // The plan and profit a failed search ran against: the note is stale once either moves.
   const [noBreakEvenAt, setNoBreakEvenAt] = useState<{
     plan: BuildPlanRecord;
@@ -706,13 +732,27 @@ export function BuildPlanDetail({
   const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices, bpcCoverage } =
     resolved;
 
-  /** Runs at which this plan's profit first reaches zero — buying a BPO is the case it exists for. */
+  /**
+   * Runs at which this plan's profit first reaches zero — buying a BPO is the
+   * case it exists for. On the hero's profit basis: on sell value, each trial's
+   * profit is net of what the owned stock that many runs would use could fetch,
+   * since a bigger job eats more of it.
+   */
   const applyBreakEvenRuns = () => {
-    const runs = breakEvenRuns(
-      (trial) => resolveAt({ ...plan, runs: trial }).result?.profit ?? null,
-      plan.runs
-    );
-    setNoBreakEvenAt(runs === null ? { plan, profit: result?.profit ?? null } : null);
+    const runs = breakEvenRuns((trial) => {
+      const trialResult = resolveAt({ ...plan, runs: trial }).result;
+      if (!trialResult || trialResult.profit === null) return null;
+      if (heroBasis !== 'sellValue' || !snapshot) return trialResult.profit;
+      const sale = ownedStockSale(
+        sellableMaterials(trialResult.materials),
+        saleBasis === 'instant' ? snapshot.hubBuyPrices : snapshot.hubPrices,
+        saleBasis,
+        modifiers.skills,
+        standing
+      );
+      return trialResult.profit - sale.net;
+    }, plan.runs);
+    setNoBreakEvenAt(runs === null ? { plan, profit: heroFigures?.profit ?? null } : null);
     if (runs !== null) update({ runs });
   };
 
@@ -1000,6 +1040,12 @@ export function BuildPlanDetail({
     source: 'rows',
   });
 
+  const cheaperSystems = useCheaperNearbySystems(
+    buildSystem?.id,
+    activity,
+    snapshot?.systemCostIndex ?? null
+  );
+
   if (!entry || !blueprint) {
     return <EmptyState title={t('industry.blueprintMissing')} className="py-8" />;
   }
@@ -1033,7 +1079,9 @@ export function BuildPlanDetail({
       scope: craftScopeList,
       strategy: options.strategy,
     });
+    const previous = plan.buildHere ?? [];
     update({ buildHere: [...picked] });
+    setStrategyUndo({ previous: [...previous], built: picked.size });
   }
 
   const { itemMenuFor, itemActionsFor } = buildItemMenuProps(catalog);
@@ -1092,11 +1140,136 @@ export function BuildPlanDetail({
     result !== null &&
     !result.materials.some((m) => m.typeID === plan.blueprintTypeID && m.acquisitionTier);
 
+  const ownedForSale = ownedSale && ownedSale.instant.ownedUnits > 0 ? ownedSale[saleBasis] : null;
+  // Nothing owned, or an owned material with no price: no sell value to
+  // charge, so there is no basis to switch and the plan's own figure stands.
+  const heroBasis: ProfitBasis | null =
+    ownedForSale && ownedForSale.unpriced.length === 0 ? profitBasis : null;
+  const heroFigures = result
+    ? profitOnBasis(heroBasis ?? 'free', {
+        result,
+        ownedSellNet: ownedForSale?.net ?? null,
+        productQuantity: productQuantity ?? 0,
+        productUnitPrice,
+        accountingLevel: modifiers.skills[SKILL_IDS.accounting] ?? 0,
+        brokerRelationsLevel: modifiers.skills[SKILL_IDS.brokerRelations] ?? 0,
+        factionStanding: standing?.factionStanding,
+        corpStanding: standing?.corpStanding,
+      })
+    : null;
+  const cheapest = cheaperSystems[0];
+  const currentIndex = snapshot?.systemCostIndex ?? null;
+  const cheaperNearbyLine =
+    cheapest && result && currentIndex !== null && currentIndex > 0 ? (
+      <>
+        {t('industry.ledger.cheaperNearby', {
+          system: cheapest.name,
+          count: cheapest.jumps,
+          index: formatCostIndex(cheapest.index),
+          amount: formatIsk(result.jobFee.grossCost * (1 - cheapest.index / currentIndex)),
+        })}{' '}
+        {/* The same move the build-system field makes: the band follows the
+            system, and a picked structure is cleared since it was elsewhere. */}
+        <button
+          type="button"
+          className={textActionClassName('inline-flex')}
+          onClick={() =>
+            movePlan({
+              buildSystemId: cheapest.id,
+              buildSystemName: cheapest.name,
+              ...clearedBuildLocation,
+              security: securityBand(cheapest.security),
+            })
+          }
+        >
+          {t('industry.ledger.buildThere')}
+        </button>
+      </>
+    ) : null;
+
+  const setupStrip = (
+    <>
+      {/* While the form is open it is the summary; the strip keeps only its toggle. */}
+      {!setupOpen && (
+        <PlanSetupFacts
+          plan={plan}
+          activity={activity}
+          hub={hub}
+          facilityPreset={facilityPreset}
+          buildSystemName={buildSystem?.name ?? null}
+          buildLocationName={buildLocationName}
+          includeReactions={includeReactions}
+          reactionBuildSystemName={reactionBuildSystem?.name ?? null}
+          reactionBuildLocationName={reactionBuildLocationName}
+          reactionsInHighsec={reactionsInHighsec}
+          resolvedMe={resolvedMe}
+          resolvedTe={resolvedTe}
+          lacksBlueprintRow={lacksBlueprintRow}
+        />
+      )}
+      <button
+        type="button"
+        className={textActionClassName('shrink-0')}
+        aria-expanded={setupOpen}
+        onClick={() => setSetupOpen((open) => !open)}
+      >
+        {setupOpen ? t('industry.setupDone') : t('industry.setupEdit')}
+      </button>
+    </>
+  );
+
+  const ownedLabelId = `${plan.id}-owned-label`;
+  const ownedValueId = `${plan.id}-owned-value`;
+  const ownedScopeLabel =
+    plan.ownedStockScope?.mode === 'selected'
+      ? t('industry.ownedStockScopeSelected')
+      : t('industry.ownedStockScopeEverywhere');
+
+  const runsControl = (
+    <span className="flex flex-wrap items-center gap-2 text-sm text-text-dim">
+      <SourcingInput
+        value={plan.runs}
+        label={t('industry.runs')}
+        inputMode="numeric"
+        widthClassName="w-16"
+        // Blank/garbage reverts to the last committed value rather than
+        // snapping to the minimum — clearing the box to retype "10" as
+        // "100" must not overwrite it with 1 mid-edit.
+        parse={(raw) => parseOrKeep(plan.runs, raw, (n) => Math.max(1, Math.round(n)))}
+        onCommit={(runs) => update({ runs })}
+      />
+      <span aria-hidden="true">{t('industry.hero.runsUnit', { count: plan.runs })}</span>
+      {/* The plan's time, priced or not: it is a fact of the recipe, so it
+          stays when prices are unreachable and the ledger is an empty state. */}
+      {result && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span className="tabular-nums">{formatDuration(planSeconds ?? result.seconds)}</span>
+        </>
+      )}
+      {pricesReady && heroFigures?.profit != null && heroFigures.profit < 0 && (
+        <Button size="sm" onClick={applyBreakEvenRuns}>
+          {t('industry.breakEvenRuns')}
+        </Button>
+      )}
+      {noBreakEvenAt?.plan === plan && noBreakEvenAt.profit === (heroFigures?.profit ?? null) && (
+        <span role="status" className="text-xs">
+          {t('industry.breakEvenRunsNone')}
+        </span>
+      )}
+    </span>
+  );
+
   return (
     <div className="space-y-4">
-      {result && !error && (
+      {result && !error && heroFigures ? (
         <PlanVerdictHero
           result={result}
+          figures={heroFigures}
+          basis={heroBasis}
+          onBasisChange={setProfitBasis}
+          runsControl={runsControl}
+          footer={setupStrip}
           pricesReady={pricesReady}
           pricesUnreachable={pricesUnreachable}
           pricesLoading={pricesLoading}
@@ -1104,11 +1277,16 @@ export function BuildPlanDetail({
           productTypeID={entry.productTypeID}
           itemMenuFor={itemMenuFor}
           itemActionsFor={itemActionsFor}
-          runs={plan.runs}
           bpcCoverage={bpcCoverage}
           blueprintName={nameForType(catalog, plan.blueprintTypeID)}
           onSetRuns={(runs) => update({ runs })}
-          breakdown={breakdownContext}
+          breakdown={{
+            ...breakdownContext,
+            sellValue:
+              heroBasis === 'sellValue' && ownedForSale
+                ? { forgone: ownedForSale.net, breakEvenPrice: heroFigures.breakEvenPrice }
+                : null,
+          }}
           breakdownOpen={breakdownOpen}
           onBreakdownOpenChange={setBreakdownOpen}
           onLogProduction={() => setLogRequest((n) => n + 1)}
@@ -1117,10 +1295,16 @@ export function BuildPlanDetail({
           skillGate={topLevelSkillGate}
           nameForSkill={(typeID) => nameForType(catalog, typeID)}
           nameForCharacter={(characterId) => characterNames.get(characterId) ?? t('common.unknown')}
-          planSeconds={planSeconds}
           slotLine={planSchedule && <PlanScheduleLine plan={planSchedule} />}
           vs90dPct={productVs90d ?? null}
         />
+      ) : (
+        <Panel title={t('industry.setup')}>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+            {runsControl}
+            {setupStrip}
+          </div>
+        </Panel>
       )}
       {result && !error && result.revenue !== null && (
         <AssumesBaseStandingsNote
@@ -1129,26 +1313,14 @@ export function BuildPlanDetail({
         />
       )}
 
-      <Panel
-        title={t('industry.setup')}
-        actions={
-          <Button size="sm" aria-expanded={setupOpen} onClick={() => setSetupOpen((open) => !open)}>
-            {setupOpen ? (
-              <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-            ) : (
-              <Icon.Rename size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-            )}
-            {setupOpen ? t('industry.setupDone') : t('industry.setupEdit')}
-          </Button>
-        }
-      >
-        {setupOpen ? (
+      {setupOpen && (
+        <Panel title={t('industry.setup')}>
           <div className="space-y-4">
-            <div>
-              <h3 className={cx(eyebrowClassName, 'border-b border-line pb-1')}>
-                {t('industry.groupBlueprint')}
-              </h3>
-              {bpcCoverage && (
+            {bpcCoverage && (
+              <div>
+                <h3 className={cx(eyebrowClassName, 'border-b border-line pb-1')}>
+                  {t('industry.groupBlueprint')}
+                </h3>
                 <div className="mt-2">
                   <BpcCoverageWarning
                     coverage={bpcCoverage}
@@ -1156,49 +1328,8 @@ export function BuildPlanDetail({
                     onSetRuns={(runs) => update({ runs })}
                   />
                 </div>
-              )}
-              <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div className="flex items-end gap-2">
-                  <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs">
-                    {t('industry.runs')}
-                    <SourcingInput
-                      value={plan.runs}
-                      label={t('industry.runs')}
-                      inputMode="numeric"
-                      widthClassName="w-full"
-                      // Blank/garbage reverts to the last committed value rather than
-                      // snapping to the minimum — clearing the box to retype "10" as
-                      // "100" must not overwrite it with 1 mid-edit.
-                      parse={(raw) =>
-                        parseOrKeep(plan.runs, raw, (n) => Math.max(1, Math.round(n)))
-                      }
-                      onCommit={(runs) => update({ runs })}
-                    />
-                  </label>
-                  {pricesReady && result?.profit != null && result.profit < 0 && (
-                    <Button size="sm" onClick={applyBreakEvenRuns}>
-                      {t('industry.breakEvenRuns')}
-                    </Button>
-                  )}
-                </div>
-                {noBreakEvenAt?.plan === plan &&
-                  noBreakEvenAt.profit === (result?.profit ?? null) && (
-                    <p role="status" className="col-span-full text-xs text-text-dim">
-                      {t('industry.breakEvenRunsNone')}
-                    </p>
-                  )}
-
-                {/*
-                ME/TE are no longer pilot-set fields (issue #838): the
-                Blueprint Acquisition tier picker resolves them — whichever
-                owned or purchasable tier is cheapest overall — and the
-                blueprint row in the materials table shows and changes it. A pilot who sources a
-                copy the app cannot see still overrides its price the way
-                any material's price is overridden (#839 will add a picker
-                for choosing among multiple owned instances).
-              */}
               </div>
-            </div>
+            )}
 
             <div>
               <h3
@@ -1616,24 +1747,8 @@ export function BuildPlanDetail({
               </div>
             </div>
           </div>
-        ) : (
-          <PlanSetupFacts
-            plan={plan}
-            activity={activity}
-            hub={hub}
-            facilityPreset={facilityPreset}
-            buildSystemName={buildSystem?.name ?? null}
-            buildLocationName={buildLocationName}
-            includeReactions={includeReactions}
-            reactionBuildSystemName={reactionBuildSystem?.name ?? null}
-            reactionBuildLocationName={reactionBuildLocationName}
-            reactionsInHighsec={reactionsInHighsec}
-            resolvedMe={resolvedMe}
-            resolvedTe={resolvedTe}
-            lacksBlueprintRow={lacksBlueprintRow}
-          />
-        )}
-      </Panel>
+        </Panel>
+      )}
 
       {/*
         Side by side from `xl`, not `lg` (issue #2165): at 1024 the fixed 20rem
@@ -1645,12 +1760,10 @@ export function BuildPlanDetail({
         <Panel
           title={t('industry.materials')}
           actions={
-            // `flex-wrap` because this is the one converted toolbar that needs a
-            // saved build plan to reach, so it is the one I could not screenshot
-            // at 390px. Five items — badge, three controls, duration — beside the
-            // panel title, since the shopping-list copy joined the row; if they
-            // ever do run out of room, wrapping inside the (min-height, not
-            // fixed) header beats clipping.
+            // `flex-wrap`: four items — data age, the shopping-list copy (its
+            // label hidden below `md`), export and refresh — beside the panel
+            // title; if they ever run out of room, wrapping inside the
+            // (min-height, not fixed) header beats clipping.
             <span className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-text-dim">
               {fetchedAt && <DataAgeBadge date={fetchedAt} />}
               {/*
@@ -1665,30 +1778,38 @@ export function BuildPlanDetail({
                     ? t('industry.copyShoppingListFailed')
                     : null}
               </LiveStatus>
-              <IconButton
+              <Button
                 size="sm"
-                icon={
-                  copyState === 'copied' ? (
-                    <Icon.Done />
-                  ) : copyState === 'failed' ? (
-                    <Icon.Warn />
-                  ) : (
-                    <Icon.CopyToClipboard />
-                  )
-                }
-                // Both outcomes change the glyph as well as the tone, so neither
-                // is carried by colour alone (docs/DESIGN.md §7).
-                tone={copyState === 'failed' ? 'danger' : 'default'}
-                label={
-                  copyState === 'copied'
+                onClick={() => void copyShoppingList()}
+                disabled={!!error || !result || !hasShoppingList(shoppingMaterials)}
+              >
+                {/* Both outcomes change the glyph as well as the words, so neither
+                    is carried by colour alone (docs/DESIGN.md §7). */}
+                {copyState === 'copied' ? (
+                  <Icon.Done size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                ) : copyState === 'failed' ? (
+                  <Icon.Warn size={Icon.ICON_SIZE.sm} aria-hidden="true" className="text-danger" />
+                ) : (
+                  <Icon.CopyToClipboard size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                )}
+                {/* A short visible label from `md` up, icon-only below it so the
+                    header keeps its title on a phone; the full words stay the
+                    button's accessible name either way. */}
+                <span aria-hidden="true" className="max-md:hidden">
+                  {copyState === 'copied'
                     ? t('industry.copyShoppingListDone')
                     : copyState === 'failed'
                       ? t('industry.copyShoppingListFailed')
-                      : t('industry.copyShoppingList')
-                }
-                onClick={() => void copyShoppingList()}
-                disabled={!!error || !result || !hasShoppingList(shoppingMaterials)}
-              />
+                      : t('industry.copyShoppingListShort')}
+                </span>
+                <span className="sr-only">
+                  {copyState === 'copied'
+                    ? t('industry.copyShoppingListDone')
+                    : copyState === 'failed'
+                      ? t('industry.copyShoppingListFailed')
+                      : t('industry.copyShoppingList')}
+                </span>
+              </Button>
               {!error && result && visibleMaterials.length > 0 && (
                 <TableActionsMenu name={t('industry.materials')} tableExport={materialsExport} />
               )}
@@ -1698,11 +1819,6 @@ export function BuildPlanDetail({
                 label={t('industry.refresh')}
                 onClick={() => setRefreshTick((v) => v + 1)}
               />
-              {result && (
-                <span className="tabular-nums">
-                  {formatDuration(planSeconds ?? result.seconds)}
-                </span>
-              )}
             </span>
           }
         >
@@ -1721,48 +1837,84 @@ export function BuildPlanDetail({
               and Trade hub it read as another thing about where the job runs.
             */}
               <div className="mb-3 flex flex-col gap-3">
-                <BuildPlanAutoBuildControl
-                  maxDepth={autoBuildMaxDepth}
-                  scope={craftScopeList}
-                  disabled={!makeOrBuyContext}
-                  onApply={applyAutoBuild}
-                />
-                <OwnedStockScopeControl
-                  scope={plan.ownedStockScope}
-                  detectedStock={detectedStock}
-                  detection={detection}
-                  onChange={(ownedStockScope) => update({ ownedStockScope })}
-                  corpAssetsToggle={
-                    <span className="flex items-center gap-1">
-                      <FilterChip
-                        label={t('industry.includeCorpAssets')}
-                        selected={plan.includeCorpAssets ?? false}
-                        disabled={!corpOwnedStock.available}
-                        onToggle={() =>
-                          update({ includeCorpAssets: !(plan.includeCorpAssets ?? false) })
-                        }
-                      />
-                      <InfoTooltip
-                        label={t('industry.includeCorpAssetsTooltipLabel')}
-                        content={
-                          corpOwnedStock.available
-                            ? t('industry.includeCorpAssetsTooltip')
-                            : t('industry.includeCorpAssetsUnavailable')
-                        }
-                      />
+                {/*
+                  One row, two labelled groups: the strategy applies the moment
+                  it is picked (Undo in the toast), and everything about which
+                  owned stock the table counts sits behind one Owned button —
+                  read once per plan, not on every visit.
+                */}
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <BuildPlanAutoBuildControl
+                    maxDepth={autoBuildMaxDepth}
+                    scope={craftScopeList}
+                    disabled={!makeOrBuyContext}
+                    onApply={applyAutoBuild}
+                  />
+                  <div className="flex items-center gap-2 text-xs">
+                    <span id={ownedLabelId} className="whitespace-nowrap">
+                      {t('industry.ownedControl.label')}
                     </span>
-                  }
-                  action={
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => materialsTable.current?.fillAll()}>
-                        {t('industry.useAllOwned')}
-                      </Button>
-                      <Button size="sm" onClick={() => materialsTable.current?.clearAll()}>
-                        {t('industry.useNoneOwned')}
-                      </Button>
-                    </div>
-                  }
-                />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        {/* §6c: a trigger that opens a popover is field chrome with a trailing caret. */}
+                        <button
+                          type="button"
+                          aria-labelledby={`${ownedLabelId} ${ownedValueId}`}
+                          className={cx(
+                            fieldBaseClassName,
+                            fieldSizeClassName.sm,
+                            'inline-flex items-center gap-2'
+                          )}
+                        >
+                          <span id={ownedValueId}>
+                            {plan.includeCorpAssets
+                              ? t('industry.ownedControl.withCorp', { scope: ownedScopeLabel })
+                              : ownedScopeLabel}
+                          </span>
+                          <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="start"
+                        aria-label={t('industry.ownedControl.label')}
+                        className="w-80 space-y-3 p-3"
+                      >
+                        <OwnedStockScopeControl
+                          scope={plan.ownedStockScope}
+                          detectedStock={detectedStock}
+                          detection={detection}
+                          onChange={(ownedStockScope) => update({ ownedStockScope })}
+                        />
+                        <div className="space-y-1">
+                          <FilterChip
+                            label={t('industry.includeCorpAssets')}
+                            selected={plan.includeCorpAssets ?? false}
+                            disabled={!corpOwnedStock.available}
+                            onToggle={() =>
+                              update({ includeCorpAssets: !(plan.includeCorpAssets ?? false) })
+                            }
+                          />
+                          <p className="text-xs text-text-dim">
+                            {corpOwnedStock.available
+                              ? t('industry.includeCorpAssetsTooltip')
+                              : t('industry.includeCorpAssetsUnavailable')}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 border-t border-line pt-3 text-xs">
+                          <span className="flex-1 text-text-dim">
+                            {t('industry.ownedControl.fill')}
+                          </span>
+                          <Button size="sm" onClick={() => materialsTable.current?.fillAll()}>
+                            {t('industry.useAllOwned')}
+                          </Button>
+                          <Button size="sm" onClick={() => materialsTable.current?.clearAll()}>
+                            {t('industry.useNoneOwned')}
+                          </Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
                 <GroupOwnedDiffersHint
                   difference={
                     group
@@ -1794,6 +1946,11 @@ export function BuildPlanDetail({
                 makeOrBuy={materialAdvice}
                 canBuildHere={canBuildHere}
                 onToggleBuildHere={toggleBuildHere}
+                onBuildAll={buildHereAll}
+                ownedSellNet={ownedForSale?.net ?? null}
+                sellValueFor={(typeID) =>
+                  ownedForSale?.lines.find((line) => line.typeID === typeID)?.net
+                }
                 onShowRecipe={setRecipeTypeId}
                 onOpenAcquisitionPicker={setAcquisitionPickerTypeId}
                 skillGates={skillGates}
@@ -1894,7 +2051,7 @@ export function BuildPlanDetail({
                       <dd className="text-right tabular-nums">{formatIsk(result.revenue)}</dd>
                     </>
                   )}
-                  {result.profit !== null && (
+                  {heroFigures?.profit != null && (
                     <>
                       {/*
                         The rule is on the row itself rather than an element
@@ -1910,15 +2067,15 @@ export function BuildPlanDetail({
                         (docs/DESIGN.md §7).
                       */}
                       <dt className="border-t border-line pt-1 text-text-dim">
-                        {t('industry.netProfit')}
+                        {t('industry.profit')}
                       </dt>
                       <dd
                         className={cx(
                           'border-t border-line pt-1 text-right tabular-nums',
-                          result.profit < 0 ? 'text-isk-neg' : 'text-isk-pos'
+                          heroFigures.profit < 0 ? 'text-isk-neg' : 'text-isk-pos'
                         )}
                       >
-                        {formatIsk(result.profit)}
+                        {formatIsk(heroFigures.profit)}
                       </dd>
                     </>
                   )}
@@ -1953,9 +2110,14 @@ export function BuildPlanDetail({
               costIndexSystemId={buildSystem?.id}
               activity={activity}
               ownedSale={ownedSale}
-              nameFor={(typeID) => nameForType(catalog, typeID)}
+              saleBasis={saleBasis}
+              onSaleBasisChange={setSaleBasis}
+              profitBasis={heroBasis}
+              profit={heroFigures?.profit ?? null}
+              cheaperNearby={cheaperNearbyLine}
+              hubName={hub.systemName}
+              planSeconds={planSeconds}
               totalVolume={materialVolume}
-              onOpenBreakdown={() => setBreakdownOpen(true)}
             />
           </CollapsiblePanel>
         )}
@@ -1991,6 +2153,19 @@ export function BuildPlanDetail({
         standing={standing}
         logRequest={logRequest}
       />
+      {strategyUndo && (
+        <Toast
+          message={t('industry.strategyApplied', { count: strategyUndo.built })}
+          undo={{
+            label: t('industry.errands.undo'),
+            onUndo: () => {
+              update({ buildHere: strategyUndo.previous });
+              setStrategyUndo(null);
+            },
+          }}
+          onClose={() => setStrategyUndo(null)}
+        />
+      )}
       {copyState === 'copied' && blueprintsLeftOut > 0 && (
         <Toast
           message={t('industry.copyShoppingListBlueprintsLeftOut', { count: blueprintsLeftOut })}

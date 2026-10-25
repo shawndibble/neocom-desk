@@ -67,6 +67,10 @@ export interface WidgetKindDef {
   defaultView: WidgetView;
   /** Whether the kind reads a time window (7 / 30 / 90 days). */
   hasRange: boolean;
+  /** Whether the time window also offers a year (a price-history kind). */
+  hasLongRange: boolean;
+  /** Whether the pilot picks which items and Trade Hubs the widget draws (Market Trend). */
+  hasTrendSources: boolean;
   /** Whether the kind reads the pilot's Omega plan (PLEX per 30 days), a per-widget setting. */
   hasPlexPlan: boolean;
   /** Whether the kind lists calendar events and lets the pilot pick which (accepted and tentative, or all). */
@@ -95,6 +99,8 @@ interface Spec {
   view: WidgetView;
   size: WidgetSize;
   range?: true;
+  longRange?: true;
+  trendSources?: true;
   plexPlan?: true;
   calendarEvents?: true;
   raidsWhere?: true;
@@ -179,6 +185,16 @@ const SPECS = {
     views: NT,
     view: 'table',
     size: 'M',
+    endpoints: [],
+  },
+  marketTrend: {
+    category: 'trade',
+    views: NCT,
+    view: 'chart',
+    size: 'M',
+    range: true,
+    longRange: true,
+    trendSources: true,
     endpoints: [],
   },
   stock: {
@@ -536,6 +552,8 @@ export const WIDGET_KINDS: readonly WidgetKindDef[] = Object.entries(
   defaultSize: s.size,
   defaultView: s.view,
   hasRange: s.range === true,
+  hasLongRange: s.longRange === true,
+  hasTrendSources: s.trendSources === true,
   hasPlexPlan: s.plexPlan === true,
   hasCalendarEvents: s.calendarEvents === true,
   hasRaidsWhere: s.raidsWhere === true,

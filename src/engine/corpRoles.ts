@@ -109,6 +109,12 @@ export interface CorpCapabilities {
    * Not an ESI read; the callables re-check live. Settings need a Director.
    */
   canManageSrp: boolean;
+  /**
+   * SRP Settings: Director alone, like `decideRoles`' settings gate. A role check needing only
+   * the roles scope, so a Director whose older grant lacks the titles scope (which
+   * `canReadRoleAudit` needs) still sees Settings.
+   */
+  canConfigureSrp: boolean;
 }
 
 export type CorpCapability = keyof CorpCapabilities;
@@ -137,6 +143,7 @@ export const CORP_CAPABILITIES: readonly CorpCapability[] = [
   'canReadDivisions',
   'canReadSkyhooks',
   'canManageSrp',
+  'canConfigureSrp',
 ];
 
 /** The answer for a Character with no roles — and the shape of "not loaded yet". */
@@ -157,6 +164,7 @@ export const NO_CORP_CAPABILITIES: CorpCapabilities = {
   canReadDivisions: false,
   canReadSkyhooks: false,
   canManageSrp: false,
+  canConfigureSrp: false,
 };
 
 /**
@@ -205,6 +213,8 @@ const ROLES_FOR_CAPABILITY: Readonly<Record<CorpCapability, readonly string[]>> 
   canReadSkyhooks: ['Station_Manager'],
   // Director (via the Director clause) or Accountant; Junior_Accountant only views the Tax Book.
   canManageSrp: ['Accountant'],
+  // Director alone, via the Director clause.
+  canConfigureSrp: [],
 };
 
 /** Capabilities every corp member holds: ESI names no role for them, so they say nothing about roles. */

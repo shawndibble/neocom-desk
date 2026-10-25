@@ -20,6 +20,7 @@ const ALL: CorpCapabilities = {
   canReadDivisions: true,
   canReadSkyhooks: true,
   canManageSrp: true,
+  canConfigureSrp: true,
 };
 
 /** What a Character with `caps` sees of the default layout. */

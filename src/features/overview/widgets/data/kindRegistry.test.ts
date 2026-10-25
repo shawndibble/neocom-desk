@@ -138,6 +138,10 @@ const ALT: Record<keyof typeof VIEW_SETTINGS, ViewRequest[]> = {
     { kind: '', scopeAll: false, raidsWhere: 'near' },
     { kind: '', scopeAll: false, raidsWhere: 'near', raidsRadius: 15 },
   ],
+  trend: [
+    { kind: '', scopeAll: false, trendItems: [34] },
+    { kind: '', scopeAll: false, trendHubs: ['amarr'] },
+  ],
 };
 
 describe('view key', () => {
@@ -157,7 +161,12 @@ describe('view key', () => {
 
   it('ignores a setting the kind does not declare', () => {
     const plain = WIDGET_KINDS.find(
-      (k) => !k.hasRange && !k.hasPlexPlan && !k.hasCalendarEvents && !k.hasRaidsWhere
+      (k) =>
+        !k.hasRange &&
+        !k.hasPlexPlan &&
+        !k.hasCalendarEvents &&
+        !k.hasRaidsWhere &&
+        !k.hasTrendSources
     )!;
     const base = viewKey({ kind: plain.id, scopeAll: false });
     for (const variants of Object.values(ALT)) {

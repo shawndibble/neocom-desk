@@ -97,6 +97,8 @@ import { previewImportFile, previewImportText } from './importPreview';
 import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { InjectorFactsPanel } from './InjectorFactsPanel';
 import { SkillsToBuyPanel } from './SkillsToBuyPanel';
+import { CLOSEST_AUTO_LOAD_MAX, WhoIsClosest } from './WhoIsClosest';
+import { useCharacters } from '@/features/character/useCharacters';
 import { LiveQueueLead } from './LiveQueueLead';
 import { projectQueueEnd } from '@/engine/skills/queueStatus';
 import {
@@ -257,6 +259,7 @@ export function PlanEditor({
 }: PlanEditorProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
+  const roster = useCharacters();
   const navigate = useNavigate();
   // Which side the tools pane lands on — the same hook the rest of the app's two-column
   // layouts switch on, so this pane can never disagree with them.
@@ -1635,6 +1638,24 @@ export function PlanEditor({
         ],
       },
     },
+    // Several Characters only: a single-Character account has no one to rank.
+    ...(roster.length > 1
+      ? [
+          {
+            id: 'closest',
+            title: t('plans.closest.title'),
+            hideTitle: roster.length > CLOSEST_AUTO_LOAD_MAX,
+            content: (
+              <WhoIsClosest
+                roster={roster}
+                ownerId={characterId}
+                entries={plan.entries}
+                skills={catalog.engineSkills}
+              />
+            ),
+          },
+        ]
+      : []),
   ];
 
   // One instance, placed on one side or the other — never both. The two

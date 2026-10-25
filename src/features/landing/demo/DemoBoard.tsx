@@ -67,6 +67,8 @@ export default function DemoBoard() {
       setCalendarEvents: none,
       setRaidsWhere: none,
       setRaidsRadius: none,
+      setTrendItems: none,
+      setTrendHubs: none,
       rename: none,
       setShowOnPhone: none,
     }),

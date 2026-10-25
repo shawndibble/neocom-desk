@@ -62,7 +62,7 @@ export function buildMaterialsColumns({
     },
     {
       id: 'toBuy',
-      header: t('industry.errands.toBuyColumn'),
+      header: t('industry.errands.buyColumn'),
       align: 'right',
       className: 'tabular-nums',
       headerCellClassName: 'w-20',
@@ -70,7 +70,8 @@ export function buildMaterialsColumns({
       sortValue: (material) =>
         material.subBuilds.length > 0 ? undefined : material.remainingQuantity,
       render: (material) =>
-        material.subBuilds.length > 0 ? (
+        // Built, or already owned in full: nothing to buy.
+        material.subBuilds.length > 0 || material.remainingQuantity === 0 ? (
           <NotApplicable />
         ) : (
           <span>{formatCount(material.remainingQuantity)}</span>

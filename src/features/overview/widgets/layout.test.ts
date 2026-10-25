@@ -19,6 +19,8 @@ import {
   setCalendarEvents,
   setRaidsRadius,
   setRaidsWhere,
+  setTrendHubs,
+  setTrendItems,
   setPlexPer30Days,
   setRowsPerPage,
   newWidget,
@@ -190,6 +192,63 @@ describe('setRange', () => {
     const l = layoutOf(w('a', 'wallet', { range: 30 }), w('b', 'orders'));
     expect(setRange(l, 'a', 7).widgets[0].range).toBe(7);
     expect(setRange(l, 'b', 7)).toBe(l);
+  });
+});
+
+describe('a year of range', () => {
+  it('is offered by Market Trend alone', () => {
+    const l = layoutOf(w('a', 'marketTrend', { range: 30 }), w('b', 'wallet', { range: 30 }));
+    expect(setRange(l, 'a', 365).widgets[0].range).toBe(365);
+    expect(setRange(l, 'b', 365)).toBe(l);
+  });
+});
+
+describe('addWidget trendHubs init', () => {
+  const empty = layoutOf();
+
+  it('applies cleaned hubs to a kind with trend sources, copied not aliased', () => {
+    const hubs = ['jita', 'nowhere', 'jita'];
+    const next = addWidget(empty, 'marketTrend', counter(), { trendHubs: hubs });
+    expect(next.widgets[0].trendHubs).toEqual(['jita']);
+    next.widgets[0].trendHubs!.push('amarr');
+    expect(hubs).toEqual(['jita', 'nowhere', 'jita']);
+  });
+
+  it('leaves no trendHubs when none are valid, and ignores them on other kinds', () => {
+    expect(
+      addWidget(empty, 'marketTrend', counter(), { trendHubs: ['x'] }).widgets[0]
+    ).not.toHaveProperty('trendHubs');
+    expect(
+      addWidget(empty, 'wallet', counter(), { trendHubs: ['jita'] }).widgets[0]
+    ).not.toHaveProperty('trendHubs');
+  });
+});
+
+describe('setTrendItems and setTrendHubs', () => {
+  const l = layoutOf(w('a', 'marketTrend'), w('b', 'wallet'));
+
+  it('stores the picks, deduplicated and capped at six items', () => {
+    const next = setTrendItems(l, 'a', [34, 34, 35, 36, 37, 38, 39, 40]);
+    expect(next.widgets[0].trendItems).toEqual([34, 35, 36, 37, 38, 39]);
+  });
+
+  it('drops junk and clears when nothing valid is left', () => {
+    const set = setTrendItems(l, 'a', [34]);
+    const cleared = setTrendItems(set, 'a', ['x', -1, 1.5]);
+    expect(cleared.widgets[0]).not.toHaveProperty('trendItems');
+  });
+
+  it('keeps the very same layout when nothing changes or the kind has no sources', () => {
+    const set = setTrendItems(l, 'a', [34]);
+    expect(setTrendItems(set, 'a', [34])).toBe(set);
+    expect(setTrendItems(l, 'b', [34])).toBe(l);
+    expect(setTrendHubs(l, 'b', ['jita'])).toBe(l);
+  });
+
+  it('keeps known hubs only, at most three', () => {
+    const next = setTrendHubs(l, 'a', ['jita', 'nowhere', 'amarr', 'rens', 'hek']);
+    expect(next.widgets[0].trendHubs).toEqual(['jita', 'amarr', 'rens']);
+    expect(setTrendHubs(next, 'a', []).widgets[0]).not.toHaveProperty('trendHubs');
   });
 });
 

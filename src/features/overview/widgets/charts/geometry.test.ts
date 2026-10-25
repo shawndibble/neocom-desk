@@ -3,6 +3,8 @@ import {
   areaPoints,
   barHeights,
   areaCoords,
+  linesRuns,
+  runFills,
   donutSegments,
   hbarPercent,
   sharesOfMax,
@@ -145,5 +147,41 @@ describe('areaCoords', () => {
 
   it('gives nothing for fewer than two values', () => {
     expect(areaCoords([3], 70)).toEqual([]);
+  });
+});
+
+describe('linesRuns', () => {
+  it('scales every line on one shared range', () => {
+    const [a, b] = linesRuns(
+      [
+        [0, 10],
+        [5, 5],
+      ],
+      20
+    );
+    expect(a).toEqual(['0.0,16.0 100.0,6.0']);
+    expect(b).toEqual(['0.0,11.0 100.0,11.0']);
+  });
+
+  it('breaks a line at a gap and drops a one-day run', () => {
+    const [a] = linesRuns([[1, 2, null, 3, null, 4, 5]], 20);
+    expect(a).toHaveLength(2);
+  });
+
+  it('draws nothing for an all-gap series', () => {
+    expect(linesRuns([[null, null]], 20)).toEqual([[]]);
+  });
+});
+
+describe('runFills', () => {
+  it('closes each run down to the baseline under its first and last point', () => {
+    expect(runFills(['10.0,16.0 50.0,6.0 90.0,9.0'], 20)).toEqual([
+      '10.0,16.0 50.0,6.0 90.0,9.0 90.0,20 10.0,20',
+    ]);
+  });
+
+  it('keeps one fill per run, so a gap stays a gap', () => {
+    expect(runFills(['0.0,5.0 10.0,6.0', '50.0,5.0 60.0,7.0'], 20)).toHaveLength(2);
+    expect(runFills([], 20)).toEqual([]);
   });
 });

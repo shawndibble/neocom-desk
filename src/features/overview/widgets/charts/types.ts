@@ -190,6 +190,25 @@ export interface OmegaChartModel extends ChartBase {
   lines: { value: number; label: string }[];
 }
 
+export interface LinesChartModel extends ChartBase {
+  kind: 'lines';
+  /** Each shares the day axis and the vertical scale; `null` is a day with no trade. */
+  series: {
+    key: string;
+    label: string;
+    color: ChartColor;
+    /** Where the line ends, already formatted ("+12.4%"), shown in the legend. */
+    end: string;
+    values: (number | null)[];
+  }[];
+  /** The scale's two ends, already formatted; omitted when the title and tooltips carry them. */
+  low?: string;
+  high?: string;
+  rangeLabel?: string;
+  /** One readout per day, listing every line. */
+  tips?: ChartTip[];
+}
+
 export type ChartModel =
   | AreaChartModel
   | BarsChartModel
@@ -201,6 +220,7 @@ export type ChartModel =
   | StackRowsChartModel
   | SparkChartModel
   | SurveyChartModel
-  | OmegaChartModel;
+  | OmegaChartModel
+  | LinesChartModel;
 
 export type ChartKind = ChartModel['kind'];
