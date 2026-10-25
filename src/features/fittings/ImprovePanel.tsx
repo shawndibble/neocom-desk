@@ -31,6 +31,7 @@ import {
   DEFENSE_CHOICES,
   goalAvailability,
   effectiveHold,
+  remoteRepairOf,
   IMPROVE_GOALS,
   IMPROVE_HOLDS,
   IMPROVE_MODES,
@@ -195,7 +196,7 @@ export function ImprovePanel({
     });
   }
 
-  /** Carry more, Align faster, Align and warp faster: the figure the goal scores, before and after. */
+  /** Carry more, the align goals, Repair more, Transfer more: the figure the goal scores, before and after. */
   function moveLine(option: ImproveOption | RejectedOption, own: FittingStats): string | null {
     const align = () =>
       t('fittings.improve.alignLine', {
@@ -210,6 +211,16 @@ export function ImprovePanel({
         after: m3Format(option.after.holds[hold]),
       });
     }
+    if (goal === 'repair')
+      return t('fittings.improve.repairLine', {
+        before: m3sFormat(remoteRepairOf(own)),
+        after: m3sFormat(remoteRepairOf(option.after)),
+      });
+    if (goal === 'transfer')
+      return t('fittings.improve.transferLine', {
+        before: m3sFormat(own.support.capTransfer),
+        after: m3sFormat(option.after.support.capTransfer),
+      });
     if (goal === 'align') return align();
     if (goal === 'warp')
       return t('fittings.improve.warpLine', {

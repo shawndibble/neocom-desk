@@ -40,8 +40,16 @@ import type { Fitting, FittingModule, FittingSlotKind, FittingStats, HoldStats }
 
 /** The combat Improve Goals, in the order the drawer shows them. */
 export const COMBAT_GOALS = ['overall', 'damage', 'tank', 'speed', 'reach', 'cheaper'] as const;
-/** Every Improve Goal: the combat ones, Mine more, then the hauling and movement ones. */
-export const IMPROVE_GOALS = [...COMBAT_GOALS, 'mining', 'haul', 'align', 'warp'] as const;
+/** Every Improve Goal: the combat ones, Mine more, the hauling and movement ones, then the logistics ones. */
+export const IMPROVE_GOALS = [
+  ...COMBAT_GOALS,
+  'mining',
+  'haul',
+  'align',
+  'warp',
+  'repair',
+  'transfer',
+] as const;
 export type ImproveGoal = (typeof IMPROVE_GOALS)[number];
 
 /** The holds Carry more can score, as `HoldStats` fields: the pilot picks one. */
@@ -179,10 +187,23 @@ export type GoalAvailability =
   | { available: true }
   | {
       available: false;
-      reason: 'noWeapons' | 'noGunsOrLaunchers' | 'noMiners' | 'noHold' | 'noAlign' | 'noWarp';
+      reason:
+        | 'noWeapons'
+        | 'noGunsOrLaunchers'
+        | 'noMiners'
+        | 'noHold'
+        | 'noAlign'
+        | 'noWarp'
+        | 'noRemoteRepair'
+        | 'noCapTransfer';
     };
 
 const isArmed = (s: FittingStats) => s.offense.dps > 0 || s.droneDps > 0 || s.fighters.dps > 0;
+/** Shield, armor and hull HP/s the fit hands to other ships, on one scale. */
+export const remoteRepairOf = (s: FittingStats) => {
+  const { shield, armor, hull } = s.support.remoteRepair;
+  return shield + armor + hull;
+};
 const canAlign = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navigation.agility) > 0;
 const hasShipWeapons = (s: FittingStats) =>
   s.applied.weapons.some((w) => w.kind === 'turret' || w.kind === 'missile');
@@ -200,6 +221,10 @@ export function goalAvailability(goal: ImproveGoal, before: FittingStats): GoalA
   if (goal === 'align' && !canAlign(before)) return { available: false, reason: 'noAlign' };
   if (goal === 'warp' && !(canAlign(before) && before.navigation.warpSpeed > 0))
     return { available: false, reason: 'noWarp' };
+  if (goal === 'repair' && remoteRepairOf(before) <= 0)
+    return { available: false, reason: 'noRemoteRepair' };
+  if (goal === 'transfer' && before.support.capTransfer <= 0)
+    return { available: false, reason: 'noCapTransfer' };
   return { available: true };
 }
 
@@ -249,6 +274,10 @@ function scoreOf(
       return metrics.align;
     case 'warp':
       return metrics.align + relative(before.navigation.warpSpeed, after.navigation.warpSpeed);
+    case 'repair':
+      return relative(remoteRepairOf(before), remoteRepairOf(after));
+    case 'transfer':
+      return relative(before.support.capTransfer, after.support.capTransfer);
   }
 }
 
