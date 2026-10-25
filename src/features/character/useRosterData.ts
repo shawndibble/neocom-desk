@@ -14,7 +14,7 @@ export function useRosterData(characters: readonly { characterId: number }[] | u
   const [attentionById, setAttentionById] = useState<Map<number, AttentionEntry>>(new Map());
   const [refreshingAll, setRefreshingAll] = useState(false);
 
-  /** The one place a fresh roster snapshot becomes `rosterCore` — shared by the cache-only load effect and "Refresh all" so a future added field only needs adding to `rosterView.ts`'s `RosterCore`. */
+  /** "Refresh all"'s finished roster becomes `rosterCore`. Like the live cache snapshot below, it goes through `rosterCoreMap`, so a future added field only needs adding to `rosterView.ts`'s `RosterCore`. */
   function applyRoster(roster: readonly RosterEntry[], now: number) {
     setRosterCore(rosterCoreMap(roster, now));
   }
@@ -27,18 +27,21 @@ export function useRosterData(characters: readonly { characterId: number }[] | u
   // Live over the cache rows the snapshot reads, not read once: a sync still
   // landing when the page opens (straight after a first login) would otherwise
   // leave every row "Unknown" until something else changed the characters.
-  // `characters` is only the trigger: the snapshot reads them itself, and is empty with none.
+  // No dependency on `characters`: the snapshot reads them itself (and is empty
+  // with none), so the live query already re-runs when they change.
   useEffect(() => {
     const subscription = liveQuery(() => loadRosterSnapshot()).subscribe({
       next: (roster) => setRosterCore(rosterCoreMap(roster, Date.now())),
-      // Keeps the last snapshot shown, as the one-shot read did when it failed.
+      // A failed local read ends the live query; the last snapshot stays shown,
+      // as it did when the one-shot read failed.
       error: () => undefined,
     });
     return () => subscription.unsubscribe();
-  }, [characters]);
+  }, []);
 
-  // Mirrors the cache-only effect above, cache-only by default: manufacturing
-  // running counts and PI attention across the whole roster.
+  // Cache-only by default: manufacturing running counts and PI attention across
+  // the whole roster. Still read once per `characters` change, unlike the
+  // snapshot above.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
