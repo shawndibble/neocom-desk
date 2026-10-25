@@ -1242,7 +1242,10 @@ export const syncActiveWars = onSchedule(
  * type, to Cloudflare R2 (`contract-offers/`) for clients to search. R2 is the
  * only store (ADR 0019; issue #4270 removed the Firestore copies).
  *
- * Every 30 minutes, matching EVE Ref's own twice-hourly refresh cadence.
+ * Every 60 minutes (issue #5066, was 30): the job was ~70% of billable function
+ * time. An hourly publish leaves a snapshot up to ~90 minutes behind EVE Ref.
+ * Memory stays 2GiB: the real peak was not measurable here (no read access to
+ * the Cloud Run memory metric), so it is not lowered on a guess.
  *
  * The archive is streamed rather than buffered: `contracts.csv` is read into
  * a lookup of only the fields the join needs, then `contract_items.csv` is
@@ -1286,7 +1289,7 @@ export const syncActiveWars = onSchedule(
  */
 export const syncPublicContractOffers = onSchedule(
   {
-    schedule: 'every 30 minutes',
+    schedule: 'every 60 minutes',
     memory: '2GiB',
     timeoutSeconds: 540,
     secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
