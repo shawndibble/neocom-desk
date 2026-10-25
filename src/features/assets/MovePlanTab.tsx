@@ -17,6 +17,7 @@ import {
   planMove,
   type HaulerOverride,
   type MoveHull,
+  type MoveHullOwnedAt,
   type PackHold,
 } from '@/engine/assets/movePlan';
 import {
@@ -32,7 +33,9 @@ import {
   type FittingCatalogue,
 } from '@/features/fittings/useFittingCatalogue';
 import { hullPackHolds } from '@/features/market/haulingCargo';
-import { useCurrentSystem } from '@/features/route/currentSystem';
+import { loadCurrentSystemId, useCurrentSystem } from '@/features/route/currentSystem';
+import { jumpsBetween, loadJumpBasis } from '@/features/route/jumpBasis';
+import { nearestOwnedHulls, ownedHullCopies } from './ownedHullDistance';
 import { SolarSystemPicker } from '@/features/route/SolarSystemPicker';
 import { mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
@@ -129,6 +132,66 @@ async function load(characterIds: readonly number[]): Promise<Loaded> {
   const hues = pickupHues(stacks.map((s) => s.locationId));
   const rigs = fittedRigCounts(sources);
   return { sources, shipTypeIds, stacks, typeNames, unitM3, places, systems, hues, rigs, skipped };
+}
+
+/**
+ * Where the nearest owned copy of each hull sits, and its jumps from the
+ * character it is nearest to: local graph, saved Jump Basis, no ESI route call.
+ * Anything unreadable leaves a hull without a place or with an unknown count,
+ * never a failed plan.
+ */
+async function ownedHullPlaces(loaded: Loaded, hullTypeIds: ReadonlySet<number>) {
+  const copies = ownedHullCopies(loaded.sources, hullTypeIds);
+  if (copies.length === 0) return new Map<number, MoveHullOwnedAt>();
+  const systemOf = new Map(loaded.systems);
+  await Promise.all(
+    copies
+      .filter((c) => !systemOf.has(c.locationId))
+      .map(async (c) => {
+        systemOf.set(
+          c.locationId,
+          await resolvePlace(
+            {
+              locationId: c.locationId,
+              characterId: c.characterId,
+              kind: c.locationType === 'station' ? 'station' : 'structure',
+            },
+            undefined,
+            { name: false, settle: true }
+          )
+            .then((place) => place.systemId)
+            .catch(() => null)
+        );
+      })
+  );
+  const distance = new Map<string, number | null>();
+  try {
+    const basis = await loadJumpBasis();
+    const origins = new Map(
+      await Promise.all(
+        loaded.sources.map(
+          async (s) =>
+            [s.characterId, await loadCurrentSystemId(s.characterId).catch(() => null)] as const
+        )
+      )
+    );
+    await Promise.all(
+      copies.map(async (c) => {
+        const origin = origins.get(c.characterId) ?? null;
+        const systemId = systemOf.get(c.locationId);
+        if (origin === null || systemId == null) return;
+        const result = await jumpsBetween(origin, systemId, basis);
+        distance.set(`${c.characterId}:${systemId}`, result.kind === 'known' ? result.jumps : null);
+      })
+    );
+  } catch {
+    // Owned and placed, distance unknown.
+  }
+  return nearestOwnedHulls(
+    copies,
+    systemOf,
+    (characterId, systemId) => distance.get(`${characterId}:${systemId}`) ?? null
+  );
 }
 
 interface MovePlanTabProps {
@@ -360,6 +423,10 @@ function MovePlanTabBody({
         (r) => (profile.skillLevels.get(r.skillTypeID) ?? 0) >= r.level
       )
     );
+    const ownedAt = await ownedHullPlaces(
+      loaded,
+      new Set(sized.filter((h) => owned.has(h.typeId)).map((h) => h.typeId))
+    );
     const hulls = sized.map((h, i) => ({
       typeId: h.typeId,
       name: h.name,
@@ -367,6 +434,7 @@ function MovePlanTabBody({
       capacityM3: hullHolds.current.get(h.typeId)!.reduce((sum, x) => sum + x.capacityM3, 0),
       holds: hullHolds.current.get(h.typeId)!,
       owned: owned.has(h.typeId),
+      ownedAt: ownedAt.get(h.typeId),
       canFly: flyable[i],
     }));
     return { hulls, sizing: sizingFailures > 0 && hulls.length === 0 ? 'unavailable' : undefined };

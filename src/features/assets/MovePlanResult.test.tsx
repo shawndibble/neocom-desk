@@ -600,4 +600,77 @@ describe('PlanResult', () => {
     renderWith(plan, vi.fn(), 30000142);
     expect(screen.queryByRole('button', { name: 'Show my route' })).toBeNull();
   });
+  describe('owned hulls in the comparison', () => {
+    const option = (typeId: number, name: string, extra: Partial<typeof hull>) => ({
+      ...hauledBy([cargoHaul(100), cargoHaul(50)]),
+      hull: { ...hull, typeId, name, ...extra },
+    });
+    const crowded = (): MovePlan => {
+      const comparison = [
+        option(1, 'Alpha', {}),
+        option(2, 'Bravo', {
+          owned: true,
+          ownedAt: { systemId: 30000142, jumps: 3, characterName: 'Alice' },
+        } as never),
+        option(3, 'Charlie', {
+          owned: true,
+          ownedAt: { systemId: 30000144, jumps: null, characterName: 'Alice' },
+        } as never),
+        option(4, 'Delta', { owned: true } as never),
+        option(5, 'Echo', {}),
+      ];
+      return { ...plan, suggested: comparison[0], active: comparison[0], comparison } as MovePlan;
+    };
+    const renderCrowded = () =>
+      render(
+        <MemoryRouter>
+          <PlanResult
+            state={{
+              plan: crowded(),
+              destinationSystem: null,
+              destinationStation: 'Amarr VIII',
+              pickupSystems: new Map(),
+            }}
+            compareOpen
+            headingRef={{ current: null }}
+            onToggleCompare={vi.fn()}
+            haulerOverride={undefined}
+            onPickHauler={vi.fn()}
+            onBack={vi.fn()}
+            onPackShip={vi.fn()}
+            onUnpackShip={vi.fn()}
+            rigsOf={() => 0}
+            canPack={() => true}
+            name={() => 'Alice'}
+            placeLabel={String}
+            hueOf={() => 0}
+          />
+        </MemoryRouter>
+      );
+
+    it('marks owned rows with jumps, unknown, or just Owned; others stay plain', () => {
+      renderCrowded();
+      expect(screen.getByLabelText('Owned, 3 jumps from Alice').textContent).toBe(
+        'Owned · 3 jumps'
+      );
+      expect(screen.getByLabelText('Owned, distance from Alice unknown').textContent).toBe(
+        'Owned · jumps unknown'
+      );
+      expect(screen.getByText('Owned')).toBeTruthy();
+      expect(screen.queryByText(/Owned · 0/)).toBeNull();
+    });
+
+    it('lists owned hulls first on request, and the ranking is the default', async () => {
+      renderCrowded();
+      const names = () =>
+        screen
+          .getAllByRole('listitem')
+          .map((li) => li.textContent ?? '')
+          .filter((x) => /^(Alpha|Bravo|Charlie|Delta|Echo) ·/.test(x))
+          .map((x) => x.split(' ·')[0]);
+      expect(names()).toEqual(['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo']);
+      await userEvent.click(screen.getByRole('button', { name: 'Owned first' }));
+      expect(names()).toEqual(['Bravo', 'Charlie', 'Delta', 'Alpha', 'Echo']);
+    });
+  });
 });

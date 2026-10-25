@@ -17,6 +17,15 @@ import { packHauls, type Haul, type PackHold, type PackLine } from './haulPackin
 
 export type { Haul, HoldLoad, PackHold } from './haulPacking';
 
+/** Where the nearest owned copy of a hull sits, worked out by the caller. */
+export interface MoveHullOwnedAt {
+  systemId: number;
+  /** Jumps from the nearest character's Current System; null when unknown. */
+  jumps: number | null;
+  /** The character the count is from. */
+  characterName: string;
+}
+
 export interface MoveHull {
   typeId: number;
   name: string;
@@ -28,6 +37,8 @@ export interface MoveHull {
   holds: PackHold[];
   /** Whether any of the user's Characters owns this hull. */
   owned: boolean;
+  /** The nearest owned copy, when the caller could place one. */
+  ownedAt?: MoveHullOwnedAt;
   /** Whether the pilot has the skills to fly this hull; one they cannot is never suggested. */
   canFly: boolean;
 }
