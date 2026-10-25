@@ -42,6 +42,7 @@ export const LANDING_SCOPE_GROUPS: readonly { id: string; rows: readonly ScopeRo
       { kind: 'group', group: 'corpProjects' },
       { kind: 'group', group: 'mining' },
       { kind: 'group', group: 'planets' },
+      { kind: 'group', group: 'mercenaryDens' },
     ],
   },
   {

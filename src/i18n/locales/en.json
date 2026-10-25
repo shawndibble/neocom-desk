@@ -12634,7 +12634,7 @@
     },
     "planets": {
       "label": "Planets",
-      "caption": "Your planetary colonies and Mercenary Dens."
+      "caption": "Your planetary colonies."
     },
     "mail": {
       "label": "Mail",
@@ -12687,6 +12687,10 @@
     "killmails": {
       "label": "Killmails",
       "caption": "Your own losses, so you can pick one to file for ship replacement."
+    },
+    "mercenaryDens": {
+      "label": "Mercenary dens",
+      "caption": "Your Mercenary Dens and their operations, for the Overview widget and den alerts."
     },
     "core": {
       "skills": {
@@ -13488,7 +13492,8 @@
       "unlocks": {
         "corp": "Unlocks Corp Board, Members, Corp Wallet, Corp Assets, Moons, SRP officer view",
         "corpProjects": "Unlocks Corp projects in Build Opportunities",
-        "killmails": "Unlocks the SRP lost-ship list"
+        "killmails": "Unlocks the SRP lost-ship list",
+        "mercenaryDens": "Unlocks the Mercenary dens Overview widget and den alerts"
       }
     }
   },

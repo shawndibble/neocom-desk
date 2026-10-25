@@ -69,8 +69,6 @@ describe('SCOPES (Base Grant)', () => {
         'esi-clones.read_clones.v1',
         'esi-universe.read_structures.v1',
         'esi-planets.manage_planets.v1',
-        'esi-structures.read_character.v1',
-        'esi-activities.read_character.v1',
         'esi-characters.read_contacts.v1',
         'esi-characters.read_loyalty.v1',
         'esi-characters.read_standings.v1',
@@ -126,6 +124,14 @@ describe('scopesForGroup', () => {
     expect([...scopesForGroup('structureMarkets')].sort()).toEqual(
       ['esi-markets.structure_markets.v1'].sort()
     );
+  });
+
+  it("lists exactly the mercenaryDens group's scopes (issue #5153)", () => {
+    expect([...scopesForGroup('mercenaryDens')].sort()).toEqual(
+      ['esi-activities.read_character.v1', 'esi-structures.read_character.v1'].sort()
+    );
+    expect(SCOPES).not.toContain('esi-structures.read_character.v1');
+    expect(SCOPES).not.toContain('esi-activities.read_character.v1');
   });
 
   it("lists exactly the jumpFatigue group's scopes (issue #3581)", () => {
@@ -272,10 +278,17 @@ describe('PERMISSIONS', () => {
   // Hand-written, not derived from DEFAULT_ON_GROUPS/OPT_IN_GROUPS above: those
   // are filtered by `defaultOn` itself, so a derived expectation here would
   // pass no matter which way a group's flag flipped.
-  it('marks corp, structureMarkets, jumpFatigue, corpProjects and killmails opt-in and every other group default-on', () => {
+  it('marks corp, structureMarkets, jumpFatigue, corpProjects, killmails and mercenaryDens opt-in and every other group default-on', () => {
     const optIn = SCOPE_GROUPS.filter((group) => !PERMISSIONS[group].defaultOn);
     expect([...optIn].sort()).toEqual(
-      ['corp', 'structureMarkets', 'jumpFatigue', 'corpProjects', 'killmails'].sort()
+      [
+        'corp',
+        'structureMarkets',
+        'jumpFatigue',
+        'corpProjects',
+        'killmails',
+        'mercenaryDens',
+      ].sort()
     );
   });
 });

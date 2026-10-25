@@ -136,7 +136,7 @@ const CATALOG = [
   },
   {
     // Per Character: ESI has no corporation den route (issue #4782). The den
-    // scope sits in the `planets` Permission.
+    // scope sits in the opt-in `mercenaryDens` Permission.
     id: 'mercenaryDenReinforced',
     labelKey: 'settings.notifications.event.mercenaryDenReinforced',
     defaultChannels: 'both',
