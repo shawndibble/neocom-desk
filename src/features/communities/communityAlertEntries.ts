@@ -123,18 +123,19 @@ export async function loadCommunityAlertEntries(
   ]);
   const myUid = uidForCharacter(characterId);
   if (getSyncAuth().currentUser?.uid !== myUid) return null;
-  const mine = await store.loadMyCommunities(characterId);
-  if (admin) await rememberCommunityAdmin(characterId, mine);
-  const entries: CommunityAlertEntry[] = [];
-  for (const community of mine) {
-    if (admin && store.isCommunityAdmin(community, characterId)) {
-      entries.push(...(await loadAdminEntries(characterId, community, store)));
+  return store.withMyCommunities(characterId, async (mine) => {
+    if (admin) await rememberCommunityAdmin(characterId, mine);
+    const entries: CommunityAlertEntry[] = [];
+    for (const community of mine) {
+      if (admin && store.isCommunityAdmin(community, characterId)) {
+        entries.push(...(await loadAdminEntries(characterId, community, store)));
+      }
+      if (watching) {
+        entries.push(...(await loadPledgeEntries(characterId, myUid, community, store, requests)));
+      }
     }
-    if (watching) {
-      entries.push(...(await loadPledgeEntries(characterId, myUid, community, store, requests)));
-    }
-  }
-  return entries;
+    return entries;
+  });
 }
 
 async function loadAdminEntries(

@@ -76,9 +76,86 @@ export async function listCommunityIds(characterId: number): Promise<string[]> {
   return index.docs.map((entry) => entry.id);
 }
 
+/**
+ * How long `loadMyCommunitiesCached` reuses a Character's list. Reading it is one
+ * query plus one read per Community, and the background readers (the request
+ * badge, the Community alerts) would otherwise pay that on every tick. This
+ * device's own joins, leaves and admin changes invalidate it at once; what
+ * changes elsewhere (an admin letting this Character in, another Member joining)
+ * shows within this window.
+ */
+export const MY_COMMUNITIES_TTL_MS = 10 * 60_000;
+
+interface MineEntry {
+  at: number;
+  value: Promise<CommunitySummary[]>;
+}
+const mineCache = new Map<number, MineEntry>();
+
+/** Forget the cached list, for one Character or all: after a change to its memberships. */
+export function invalidateMyCommunities(characterId?: number): void {
+  if (characterId === undefined) mineCache.clear();
+  else mineCache.delete(characterId);
+}
+
+function remember(characterId: number, value: Promise<CommunitySummary[]>, at: number) {
+  const entry = { at, value };
+  mineCache.set(characterId, entry);
+  // A failed read is not kept; one invalidated meanwhile is already gone.
+  value.catch(() => {
+    if (mineCache.get(characterId) === entry) mineCache.delete(characterId);
+  });
+}
+
+/**
+ * The Character's Communities, reused for `MY_COMMUNITIES_TTL_MS`. Concurrent
+ * callers share one read. For readers that can show a list up to that old;
+ * the Communities page reads `loadMyCommunities`, which refreshes this too.
+ */
+export async function loadMyCommunitiesCached(
+  characterId: number,
+  now = Date.now()
+): Promise<CommunitySummary[]> {
+  const override = communityBackendOverride();
+  if (override) return override.loadMine();
+  const held = mineCache.get(characterId);
+  if (held && now - held.at < MY_COMMUNITIES_TTL_MS) return held.value;
+  const value = readMyCommunities(characterId);
+  remember(characterId, value, now);
+  return value;
+}
+
+/**
+ * Runs `read` over the cached list. A Community this Character was removed from, or that was
+ * deleted, elsewhere (no call on this device dropped the cache) refuses its Member reads: then
+ * the cache is dropped and `read` runs once more over a fresh list, so one gone Community never
+ * fails the whole read for the rest of the TTL.
+ */
+export async function withMyCommunities<T>(
+  characterId: number,
+  read: (communities: CommunitySummary[]) => Promise<T>,
+  now = Date.now()
+): Promise<T> {
+  const cached = await loadMyCommunitiesCached(characterId, now);
+  try {
+    return await read(cached);
+  } catch (err) {
+    if ((err as { code?: string } | null)?.code !== 'permission-denied') throw err;
+    invalidateMyCommunities(characterId);
+    return read(await loadMyCommunities(characterId));
+  }
+}
+
+/** The Character's Communities, read now (and remembered for `loadMyCommunitiesCached`). */
 export async function loadMyCommunities(characterId: number): Promise<CommunitySummary[]> {
   const override = communityBackendOverride();
   if (override) return override.loadMine();
+  const value = readMyCommunities(characterId);
+  remember(characterId, value, Date.now());
+  return value;
+}
+
+async function readMyCommunities(characterId: number): Promise<CommunitySummary[]> {
   const uid = await ensureSignedIn(characterId);
   const db = getSyncFirestore();
   const index = await getDocs(collection(db, 'characters', uid, 'communities'));
@@ -220,9 +297,27 @@ export async function callCommunity<In, Out>(
   const override = communityBackendOverride();
   if (override) return override.call(name, data) as Out;
   await ensureSignedIn(characterId);
-  const result = await callRouted<In, Out>(name, data);
-  return result;
+  try {
+    return await callRouted<In, Out>(name, data);
+  } finally {
+    // Even a failed call may have landed (a timeout after the write).
+    if (CHANGES_MY_COMMUNITIES.has(name)) invalidateMyCommunities(characterId);
+  }
 }
+
+/** The calls that change a Character's Communities or what their summaries show. */
+const CHANGES_MY_COMMUNITIES: ReadonlySet<CallableAction> = new Set<CallableAction>([
+  'createCommunityCallable',
+  'joinCommunityCallable',
+  'leaveCommunityCallable',
+  'deleteCommunityCallable',
+  'removeCommunityMemberCallable',
+  'transferCommunityAdminCallable',
+  'setCommunityApprovalCallable',
+  'decideCommunityJoinRequestCallable',
+  'revokeCommunityInviteCallable',
+  'regenerateCommunityInviteCallable',
+]);
 
 export interface InvitePreview {
   name: string;
