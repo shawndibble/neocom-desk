@@ -74,6 +74,14 @@ Detail moved out of `CLAUDE.md` so it is read on demand. The short rules stay in
   render (lazy route chunks, jsdom, React warm-up), which lands on whichever
   test happens to run first. Pay it once in a `beforeAll` warm-up render with
   its own hook timeout, as `src/routes/IndustryPlanPage.test.tsx` does.
+- **Bumping the dogma engine or SDE: run the reference fits.** Bump
+  `@eveshipfit/dogma-engine` and `@eveshipfit/sde` together (ADR 0016), then run
+  `npx vitest run src/features/fittings/dogmaFittingEngine.reference.integration.test.ts`.
+  It pins eight standard All V fits (Drake, Hurricane, Omen, Vexor, Myrmidon,
+  Hulk, Guardian, Tengu), each value with its source beside it. A value that
+  moves must be justified in the PR from the engine or SDE change that caused
+  it. Never re-pin blind. A bug the suite reveals is filed, and today's value
+  stays pinned with a `TODO(#issue)`.
 
 ## Running the app against the Firebase emulators (local only)
 
