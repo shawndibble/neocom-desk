@@ -114,9 +114,27 @@ export type Job =
   | 'remoteRepair'
   | 'capTransfer'
   | 'mining'
-  | 'cloak';
+  | 'cloak'
+  | 'analyzer'
+  | 'probeLauncher'
+  | 'scanArray'
+  | 'acquisitionArray'
+  | 'surveyScanner'
+  | 'salvage'
+  | 'tractor'
+  | 'cyno'
+  | 'sphereLauncher'
+  | 'smartBomb';
 
-/** The groups that do a job no damage or EHP score notices when it is lost. */
+/**
+ * The groups that do a job no damage or EHP score notices when it is lost.
+ * Each is its own job, so one goal's Rework never drops another's last module.
+ * SDE group ids beyond the combat ones: Data Analyzer and Relic Analyzer 538,
+ * Scan Probe Launcher 481, Scan Rangefinding and Pinpointing Array 1223,
+ * Scan Acquisition Array 1238, Survey Scanner 49, Salvager 1122, Tractor Beam
+ * 650, Cynosural Field Generator 658, Interdiction Sphere Launcher 589,
+ * Smart Bomb 72.
+ */
 const JOB_GROUPS: Record<Job, readonly number[]> = {
   propulsion: [46],
   scram: [52],
@@ -129,6 +147,16 @@ const JOB_GROUPS: Record<Job, readonly number[]> = {
   capTransfer: [67],
   mining: [54, 464, 483],
   cloak: [330],
+  analyzer: [538],
+  probeLauncher: [481],
+  scanArray: [1223],
+  acquisitionArray: [1238],
+  surveyScanner: [49],
+  salvage: [1122],
+  tractor: [650],
+  cyno: [658],
+  sphereLauncher: [589],
+  smartBomb: [72],
 };
 
 const JOB_OF_GROUP = new Map<number, Job>(
