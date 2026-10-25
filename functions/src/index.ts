@@ -26,7 +26,7 @@ import { openPricesR2Key } from './r2DailySnapshots.js';
 import { createR2Get } from './r2Publisher.js';
 import { runSyncActiveWars } from './activeWarsJob.js';
 import { runSyncLawlessSystems } from './marketHistoryJob.js';
-import { runSyncPublicContractOffers, runSyncWorkbenchFits } from './snapshotJobs.js';
+import { runSyncPublicContractOffers } from './snapshotJobs.js';
 import { verifyEveAccessToken, verifyOptionsFromEnv, uidForCharacter } from './verifyEveToken.js';
 import {
   AlertGrantError,
@@ -1290,45 +1290,6 @@ export const syncPublicContractOffers = onSchedule(
     secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
   },
   runSyncPublicContractOffers
-);
-
-/**
- * syncWorkbenchFits: EVE Workbench's public fits, grouped by hull into one R2
- * object per hull (`workbench-fits/<shipTypeId>.json`, issue #4271) for the
- * Popular fit panel's EVE Workbench tab (issue #2484). Workbench's list
- * can't be filtered by hull, so this keeps our own copy — see
- * workbenchFits.ts for the pass/checkpoint design, and the decision doc it
- * ships with.
- *
- * Every 12 hours (cost: it was every 30 minutes), each run fetching for at
- * most `WORKBENCH_FETCH_BUDGET_MS` then flushing to R2 (only hulls whose fits
- * changed). Requests are sequential with a 250ms gap (≤ 4/s
- * against a free, unauthenticated API), so a run stores roughly 1,000 fits:
- * the first pass over ~38k fits takes ~40 runs, about 20 days at this cadence, after which a run
- * is one list page plus however many fits were published since.
- *
- * The 360s budget leaves 180s of the 540s timeout for the flush, which reads
- * and rewrites every hull the run touched (a few hundred during the first
- * pass). A flush that overran the timeout would never save the checkpoint, so
- * every later run would redo the same pages — this margin is what prevents it.
- *
- * 1GiB because a run reads back every hull it touches whole (then merges and
- * gzips it), and the most-fitted hulls are a few MB of EFT each. The one-time
- * migration run streams the legacy docs 20 at a time, so it holds at most a
- * page plus the hulls being written.
- *
- * Another Cloud Scheduler job past the free three — the same trade
- * `captureMiningPriceSnapshot` already made.
- */
-
-export const syncWorkbenchFits = onSchedule(
-  {
-    schedule: 'every 12 hours',
-    memory: '1GiB',
-    timeoutSeconds: 540,
-    secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
-  },
-  runSyncWorkbenchFits
 );
 
 // mutamarketEstimate (mutamarket.ts). Session required: an import publishes

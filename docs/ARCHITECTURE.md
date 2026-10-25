@@ -26,13 +26,13 @@ no app server. Two kinds of data:
   the Items board and BPC Sourcing read only the types they need. The other,
   off the same archive fetch, is public courier contracts as a route and a fee
   (issue #909), one object.
-  A second, separate job (`syncWorkbenchFits`, issue #2484) copies EVE
+  A second, separate job (GitHub Actions `.github/workflows/public-data-workbench-fits.yml`, `functions/src/publicDataWorkbenchFits.ts`, issues #2484, #5071) copies EVE
   Workbench's public fits into R2, one object per hull
   (`workbench-fits/<shipTypeId>.json`, issue #4271), because Workbench's API
   can't filter by hull; the client fetches a hull's object by id with no
   Firebase session, since the fitter works logged out
-  (`features/fittings/workbenchFits.ts`). Only the sync's checkpoint
-  (`workbenchFitsSync`, admin-only) stays in Firestore.
+  (`features/fittings/workbenchFits.ts`). The sync's checkpoint is the R2 object
+  `workbench-fits-state/state.json`, not Firestore.
 
 - A daily GitHub Actions job (`.github/workflows/public-data-market-open-prices.yml`, `functions/src/publicDataMarketOpenPrices.ts`) folds EVE Ref's last market-order
   snapshot of the previous UTC day into the R2 object `open-prices/<typeId>.json`:
