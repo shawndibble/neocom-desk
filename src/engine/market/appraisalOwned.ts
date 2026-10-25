@@ -1,50 +1,101 @@
 /**
  * Appraisal "minus owned": what a pasted pile still needs once the stock a
- * pilot already holds at one station is taken off. Pure — the caller fetches
+ * pilot already holds at one place is taken off. Pure — the caller fetches
  * the assets. Fittings' Copy multibuy reuses `subtractOwned` (#2829).
  *
- * `ownedAtStation` is station hangars only: an asset whose `location_type` is `station`
- * and whose `location_id` is the chosen station. Containers and corp hangars
- * are out of v1.
+ * One rule decides where an asset counts: walk its `location_id` chain (via
+ * `item_id`) up to a place — an NPC station (`location_type: 'station'`) or a
+ * player structure (a top-level `other` row) — passing only through
+ * containers. The walk stops, and the asset counts nowhere, at a ship:
+ * fitted slots and cargo/bays all sit under one. Corp hangars and ship cargo
+ * are out of scope.
  */
+import { isShipBayFlag } from '../assetTree';
 
 export interface OwnedAsset {
+  item_id: number;
   type_id: number;
   quantity: number;
   location_id: number;
   location_type: string;
+  location_flag: string;
 }
 
-/** Quantity per type id held at `stationId`, summed over every Character's asset list. */
-export function ownedAtStation(
+export interface OwnedPlace {
+  id: number;
+  kind: 'station' | 'structure';
+}
+
+/** Bays and holds only a ship has, beyond the fitted slots and Cargo/DroneBay `isShipBayFlag` knows. */
+const SHIP_HELD_FLAG_PATTERN =
+  /^(ShipHangar|FleetHangar|FighterBay|FighterTube\d+|SubSystemBay|FrigateEscapeBay|[A-Za-z]+Hold|[A-Za-z]+Bay)$/;
+
+function isShipHeld(flag: string): boolean {
+  return isShipBayFlag(flag) || SHIP_HELD_FLAG_PATTERN.test(flag);
+}
+
+/** The place an asset counts at, or null when a ship, a missing parent or a loop is in the way. */
+function placeOf(asset: OwnedAsset, byItemId: ReadonlyMap<number, OwnedAsset>): OwnedPlace | null {
+  const seen = new Set<number>();
+  let current = asset;
+  for (;;) {
+    if (isShipHeld(current.location_flag)) return null;
+    if (current.location_type === 'station') return { id: current.location_id, kind: 'station' };
+    if (current.location_type === 'other') return { id: current.location_id, kind: 'structure' };
+    if (current.location_type !== 'item') return null;
+    const parent = byItemId.get(current.location_id);
+    if (!parent || seen.has(parent.item_id)) return null;
+    seen.add(parent.item_id);
+    current = parent;
+  }
+}
+
+function eachPlacedAsset(
   assetLists: readonly (readonly OwnedAsset[])[],
-  stationId: number
-): Map<number, number> {
-  const owned = new Map<number, number>();
+  visit: (asset: OwnedAsset, place: OwnedPlace) => void
+): void {
   for (const assets of assetLists) {
+    const byItemId = new Map(assets.map((a) => [a.item_id, a]));
     for (const asset of assets) {
-      if (asset.location_type !== 'station' || asset.location_id !== stationId) continue;
-      owned.set(asset.type_id, (owned.get(asset.type_id) ?? 0) + asset.quantity);
+      const place = placeOf(asset, byItemId);
+      if (place) visit(asset, place);
     }
   }
+}
+
+/** Quantity per type id held at `placeId` (station or structure), summed over every Character's asset list. */
+export function ownedAtPlace(
+  assetLists: readonly (readonly OwnedAsset[])[],
+  placeId: number
+): Map<number, number> {
+  const owned = new Map<number, number>();
+  eachPlacedAsset(assetLists, (asset, place) => {
+    if (place.id !== placeId) return;
+    owned.set(asset.type_id, (owned.get(asset.type_id) ?? 0) + asset.quantity);
+  });
   return owned;
 }
 
 /**
- * Quantity per type id held anywhere — station hangars, containers, structures,
- * ships — summed over every Character's asset list. Every asset row is one
- * stack of one type (a container's contents are rows of their own), so adding
- * them up counts nothing twice. The "All locations" choice of Minus owned, for
- * a pile pasted from the pilot's own assets, wherever those sit.
+ * Quantity per type id held at any place, summed over every Character's asset
+ * list: the "any location" choice of Minus owned. Fitted modules and ship
+ * contents are not stock, so they stay out.
  */
 export function ownedAnywhere(assetLists: readonly (readonly OwnedAsset[])[]): Map<number, number> {
   const owned = new Map<number, number>();
-  for (const assets of assetLists) {
-    for (const asset of assets) {
-      owned.set(asset.type_id, (owned.get(asset.type_id) ?? 0) + asset.quantity);
-    }
-  }
+  eachPlacedAsset(assetLists, (asset) => {
+    owned.set(asset.type_id, (owned.get(asset.type_id) ?? 0) + asset.quantity);
+  });
   return owned;
+}
+
+/** Every place that holds counted stock, once each, in first-seen order. */
+export function ownedPlaces(assetLists: readonly (readonly OwnedAsset[])[]): OwnedPlace[] {
+  const places = new Map<number, OwnedPlace>();
+  eachPlacedAsset(assetLists, (_asset, place) => {
+    if (!places.has(place.id)) places.set(place.id, place);
+  });
+  return [...places.values()];
 }
 
 export type WithOwned<T> = T & {
