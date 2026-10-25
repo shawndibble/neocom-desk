@@ -1403,31 +1403,20 @@
         "rework": "Only the module groups that can move this goal are tried."
       },
       "reachLabel": "Improve Reach",
-      "reach": {
-        "upgrade": "Upgrade",
-        "rebalance": "Rebalance",
-        "rework": "Rework"
-      },
+      "reach": { "upgrade": "Upgrade", "rebalance": "Rebalance", "rework": "Rework" },
       "reachHint": {
         "upgrade": "Turns a fitted module into a variation of itself.",
         "rebalance": "Also tries a different module doing the same job.",
         "rework": "Tries any module that can move this goal, but never drops the last module doing a job this goal does not score."
       },
       "modeLabel": "Improve mode",
-      "mode": {
-        "buy": "Planning to buy",
-        "refit": "Refitting a ship I own"
-      },
+      "mode": { "buy": "Planning to buy", "refit": "Refitting a ship I own" },
       "cap": {
         "buy": "Total budget (ISK)",
         "refit": "Extra spend cap (ISK)"
       },
       "defenseLabel": "Defense Choice",
-      "defense": {
-        "keep": "Keep as is",
-        "shield": "Shield",
-        "armor": "Armor"
-      },
+      "defense": { "keep": "Keep as is", "shield": "Shield", "armor": "Armor" },
       "defenseHint": "Defense Choice only changes Tankier and Best overall.",
       "sideResult": "{{side}}: {{result}}",
       "sideNone": "no gain",
@@ -1450,7 +1439,7 @@
       "undo": "Undo",
       "oreLabel": "Ore",
       "oreOption": "{{ores}} ({{family}} crystals)",
-      "oreHint": "Every miner is scored with the best crystal for this ore, so rows compare like for like.",
+      "oreHint": "Every miner is scored with the best crystal for this ore, so rows compare like for like. Apply swaps the miners and leaves the loaded crystals alone.",
       "oreLine": "Mines {{before}} → {{after}} m³/s of {{ores}} ({{family}} crystals)"
     },
     "variations": {

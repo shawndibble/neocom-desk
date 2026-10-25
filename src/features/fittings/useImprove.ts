@@ -326,11 +326,13 @@ export function useImprove(
         // Mine more: every miner carries the picked ore's crystal, the baseline's too.
         let scoredBefore = own;
         let load = (fitting: Fitting) => fitting;
+        let plan: ((moduleTypeId: number) => number | null) | null = null;
         if (searched === 'mining') {
-          const plan = await crystalPlan(variants, catalogue, oreFamily, own, controller.signal);
+          plan = await crystalPlan(variants, catalogue, oreFamily, own, controller.signal);
           if (cancelled) return;
-          if (plan) {
-            load = (fitting) => loadCrystals(fitting, plan);
+          const crystalFor = plan;
+          if (crystalFor) {
+            load = (fitting) => loadCrystals(fitting, crystalFor);
             scoredBefore = (await variants.compare(load(variants.fitting), controller.signal))
               .after;
           }
@@ -343,8 +345,18 @@ export function useImprove(
             before: scoredBefore,
             goal: searched,
             candidates: set.candidates,
-            stats: async (fitting) =>
-              (await variants.compare(load(fitting), controller.signal)).after,
+            stats: async (fitting) => {
+              const { after } = await variants.compare(load(fitting), controller.signal);
+              // A miner with no crystal of the ore would mine another ore's m³/s: left out, not compared.
+              if (
+                plan &&
+                after.mining.rows.some(
+                  (row) => !row.isDrone && row.chargeTypeId !== plan!(row.typeId)
+                )
+              )
+                throw new Error('A miner takes no crystal of this ore');
+              return after;
+            },
             priceOf: (typeId) => priceMap?.get(typeId)?.sellMin ?? null,
             ...(target ? { target } : {}),
             mode,

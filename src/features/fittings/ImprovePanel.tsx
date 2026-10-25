@@ -117,7 +117,6 @@ export function ImprovePanel({
 }: Props) {
   const { t } = useTranslation();
   const moreId = useId();
-  const oreId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
   // Ticked rows, by key; at most one per fitted module (ticking another variation of it unticks the first).
   // Ticks belong to the result they were made in: a new search (a goal
@@ -306,9 +305,9 @@ export function ImprovePanel({
         </p>
         {goal === 'mining' && (
           <div className="space-y-1 text-sm">
-            <label htmlFor={oreId}>{t('fittings.improve.oreLabel')}</label>
+            <span aria-hidden="true">{t('fittings.improve.oreLabel')}</span>
             <Select value={settings.oreFamily} onValueChange={settings.onOreFamilyChange}>
-              <SelectTrigger id={oreId} className="w-full">
+              <SelectTrigger aria-label={t('fittings.improve.oreLabel')} className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
