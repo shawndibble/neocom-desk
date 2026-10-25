@@ -40,7 +40,7 @@ import type {
 import type { CorpStockTargets } from '@/features/corp/stockTargets';
 import type { BoardDeadline } from '../nextDeadline';
 import type { WidgetStateInput } from '../state';
-import type { CalendarEventsChoice, RaidsWhere, WidgetRange } from '../layout';
+import type { CalendarEventsChoice, RaidsWhere, StructuresShow, WidgetRange } from '../layout';
 import type { ChartModel } from '../charts/types';
 import type { SkillsQueuePanelData, WalletPanelData } from './loaders';
 import type {
@@ -360,6 +360,8 @@ export interface BuildContext {
   raidsWhere?: RaidsWhere;
   /** Skyhook raids Near me: the jumps radius; left out, the default. */
   raidsRadius?: number;
+  /** Structures: every structure, or only those that need attention; left out, All. */
+  structuresShow?: StructuresShow;
   /** Market Trend: the items it draws; left out, the Quickbar's first. */
   trendItems?: number[];
   /** Market Trend: the Trade Hubs it prices at; left out, the pilot's Market hub. */

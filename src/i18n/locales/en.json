@@ -4994,6 +4994,9 @@
           "lowFuel": "Low fuel",
           "offline": "Service offline"
         },
+        "needAttention_one": "needs attention",
+        "needAttention_other": "need attention",
+        "noProblems": "No structure needs attention.",
         "col": {
           "structure": "Structure",
           "fuel": "Fuel left",
@@ -5208,19 +5211,6 @@
         "chartNote": "Deadlines per day, next {{days}} days",
         "summary_one": "{{count}} corp clock is due in 24 hours, {{overdue}} already overdue.",
         "summary_other": "{{count}} corp clocks are due in 24 hours, {{overdue}} already overdue."
-      },
-      "corpServices": {
-        "title": "Offline services",
-        "description": "Structure services that are switched off",
-        "empty": "Every structure service is online.",
-        "col": {
-          "structure": "Structure",
-          "service": "Service"
-        },
-        "unit": "offline",
-        "most": "{{name}} has {{count}}",
-        "summary_one": "{{count}} structure service is offline.",
-        "summary_other": "{{count}} structure services are offline across {{structures}} structures."
       },
       "rowDetail": {
         "jumps_one": "{{count}} jump away",
@@ -5982,6 +5972,11 @@
       },
       "radius": "Radius",
       "radiusJumps": "{{count}} jumps",
+      "structuresShow": "Show",
+      "structuresShowChoice": {
+        "all": "All structures",
+        "problems": "Problems only"
+      },
       "rename": "Rename",
       "renameTitle": "Rename {{title}}",
       "renameLabel": "Name",

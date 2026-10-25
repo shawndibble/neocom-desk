@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isReturningPilot, migrateFromCards, parseHiddenCards } from './migrate';
+import {
+  isReturningPilot,
+  migrateFromCards,
+  migrateRetiredKind,
+  parseHiddenCards,
+} from './migrate';
 
 const kinds = (l: { widgets: { kind: string }[] }) => l.widgets.map((w) => w.kind);
 
@@ -105,5 +110,29 @@ describe('parseHiddenCards', () => {
     expect(parseHiddenCards('mining')).toBeNull();
     expect(parseHiddenCards({ mining: true })).toBeNull();
     expect(parseHiddenCards(null)).toBeNull();
+  });
+});
+
+describe('migrateRetiredKind', () => {
+  it('turns an Offline services widget into Structures on Problems only, keeping the rest', () => {
+    const saved = {
+      id: 'x',
+      kind: 'corpServices',
+      size: 'M',
+      view: 'table',
+      scope: 'header',
+      showOnPhone: false,
+      rowsPerPage: 25,
+    };
+    expect(migrateRetiredKind(saved)).toEqual({
+      ...saved,
+      kind: 'structures',
+      structuresShow: 'problems',
+    });
+  });
+
+  it('returns any other widget as it was', () => {
+    const saved = { id: 'y', kind: 'structures', view: 'chart' };
+    expect(migrateRetiredKind(saved)).toBe(saved);
   });
 });

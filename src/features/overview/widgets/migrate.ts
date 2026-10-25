@@ -92,6 +92,19 @@ export function migrateFromCards(
   return { version: 1, widgets };
 }
 
+/**
+ * A saved widget of a retired kind, as the kind that took it over. Offline
+ * services folded into Structures' Problems only: the same feed, and the
+ * structures with an offline service are among the problems it lists. Size,
+ * view, title and the rest stay as saved; `parseLayout` repairs whatever the
+ * new kind does not offer.
+ */
+export function migrateRetiredKind(raw: Record<string, unknown>): Record<string, unknown> {
+  if (raw.kind === 'corpServices')
+    return { ...raw, kind: 'structures', structuresShow: 'problems' };
+  return raw;
+}
+
 /** Whether the old settings show this pilot used the board before the grid. */
 export function isReturningPilot(hidden: readonly string[], order: readonly string[]): boolean {
   return hidden.length > 0 || order.length > 0;

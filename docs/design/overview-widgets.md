@@ -293,7 +293,9 @@ Customize, Gallery, menu and phone list are shared.
 
 - **One catalogue.** One global kind table; corp-only ids start with `corp`.
   Each kind lists the boards it is on; Structures and Moon extractions are on
-  both. Corp kinds carry `capabilities` (any one opens it) and sit in the corp
+  both. Offline services (`corpServices`) is retired into Structures' Show:
+  Problems only; `parseLayout` reads a saved one as that, in place
+  (`migrateRetiredKind` in `widgets/migrate.ts`). Corp kinds carry `capabilities` (any one opens it) and sit in the corp
   Gallery groups `CORP_KIND_CATEGORIES` (Clocks, Money, People, Industry, Ops).
 - **One layout per pilot**, `sync.corpOverviewLayout`; not per corporation or
   Character.

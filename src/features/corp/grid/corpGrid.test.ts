@@ -45,7 +45,7 @@ describe('the Corp Board default layout', () => {
   it('draws a Station Manager the clocks and no money or people widgets', () => {
     expect(
       drawnFor({ ...NO_CORP_CAPABILITIES, canReadStructures: true, canReadMoonExtractions: true })
-    ).toEqual(['corpDeadlines', 'structures', 'moonChunks', 'corpServices']);
+    ).toEqual(['corpDeadlines', 'structures', 'moonChunks']);
   });
 
   it('draws an Accountant the money widgets and no clocks', () => {

@@ -1,5 +1,5 @@
 /**
- * Corp clock builders: Due soon, Offline services and Corp industry jobs.
+ * Corp clock builders: Due soon and Corp industry jobs.
  * Same contract as `models.ts`: pure, derived at render time.
  */
 import { worstSeverity, type DeadlineSeverity } from '@/engine/character/severity';
@@ -9,7 +9,6 @@ import {
   DUE_SOON_WINDOW_MS,
   deadlinesByDay,
   dueSoon,
-  groupBoardByKind,
 } from '@/engine/corp/deadlines';
 import type { DayZone } from '@/engine/localDay';
 import type { CorporationIndustryJob } from '@/esi/endpoints';
@@ -250,76 +249,6 @@ export const corpDeadlines: Builder = (feeds, { t, now, zone }) => {
       overdue: due.overdue,
     }),
     chart: dayChart(t, items, now, zone),
-  };
-};
-
-// --- Offline services -------------------------------------------------------------
-
-export const corpServices: Builder = (feeds, { t, now }) => {
-  const feed = feeds.structures;
-  const data = feed?.data ?? null;
-  if (!data) return blank(null, statusOf(feed));
-  if (data.structures === null) return corpUnreadable(null, feed, data.needsReauth, t);
-
-  const items = buildCorpBoard({
-    nowMs: now,
-    staleWindowMs: CORP_CACHE_WINDOW_MS,
-    structures: data.structures,
-  });
-  const services = [...(groupBoardByKind(items).get('serviceOffline') ?? [])].sort(
-    (a, b) =>
-      shortStructureName(a.subject).localeCompare(shortStructureName(b.subject)) ||
-      a.detail.localeCompare(b.detail)
-  );
-
-  const perStructure = new Map<string, number>();
-  for (const item of services) {
-    perStructure.set(item.subject, (perStructure.get(item.subject) ?? 0) + 1);
-  }
-  const [most] = [...perStructure].sort((a, b) => b[1] - a[1]);
-  const secondary: NumberSecondary | undefined = most
-    ? {
-        text:
-          perStructure.size > 1
-            ? t('overview.widgets.corpServices.most', {
-                name: shortStructureName(most[0]),
-                count: most[1],
-              })
-            : shortStructureName(most[0]),
-      }
-    : undefined;
-
-  return {
-    ...blank(null, statusOf(feed, { isEmpty: services.length === 0 })),
-    fetchedAt: data.fetchedAt,
-    number: {
-      value: count(services.length),
-      unit: t('overview.widgets.corpServices.unit'),
-      secondary,
-      tone: worstSeverity(services.map((item) => item.severity)),
-    },
-    rows: services.map((item) => ({
-      key: item.id,
-      title: shortStructureName(item.subject),
-      detail: item.detail,
-      value: t('overview.board.structureOffline'),
-      tone: item.severity,
-    })),
-    table: {
-      columns: [
-        { key: 'structure', label: t('overview.widgets.corpServices.col.structure'), priority: 0 },
-        { key: 'service', label: t('overview.widgets.corpServices.col.service'), priority: 1 },
-      ],
-      rows: services.map((item) => ({
-        key: item.id,
-        cells: [shortStructureName(item.subject), item.detail],
-        tone: item.severity,
-      })),
-    },
-    summary: t('overview.widgets.corpServices.summary', {
-      count: services.length,
-      structures: perStructure.size,
-    }),
   };
 };
 

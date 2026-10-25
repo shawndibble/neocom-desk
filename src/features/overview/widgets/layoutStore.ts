@@ -16,6 +16,7 @@
  */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { getKind } from './kinds';
+import { migrateRetiredKind } from './migrate';
 import {
   cleanTrendHubs,
   cleanTrendItems,
@@ -36,7 +37,8 @@ export const OVERVIEW_LAYOUT_KEY = 'sync.overviewLayout';
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
-function parseWidget(raw: unknown): Widget | null {
+function parseWidget(stored: unknown): Widget | null {
+  const raw = isRecord(stored) ? migrateRetiredKind(stored) : stored;
   if (!isRecord(raw) || typeof raw.id !== 'string' || typeof raw.kind !== 'string') return null;
   const def = getKind(raw.kind);
   // A kind from a newer build: keep it exactly as found.
@@ -60,6 +62,7 @@ function parseWidget(raw: unknown): Widget | null {
   if (!isRowsPerPage(raw.rowsPerPage)) delete out.rowsPerPage;
   if (!def.hasCalendarEvents || raw.calendarEvents !== 'all') delete out.calendarEvents;
   if (!def.hasRaidsWhere || raw.raidsWhere !== 'near') delete out.raidsWhere;
+  if (!def.hasStructuresShow || raw.structuresShow !== 'problems') delete out.structuresShow;
   if (
     !def.hasRaidsWhere ||
     !isRaidsRadius(raw.raidsRadius) ||

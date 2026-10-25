@@ -45,6 +45,8 @@ import {
   RAIDS_RADII,
   RAIDS_WHERES,
   type RaidsWhere,
+  STRUCTURES_SHOWS,
+  type StructuresShow,
   rangesOf,
   type CalendarEventsChoice,
   type Widget,
@@ -315,6 +317,22 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
               )}
             </>
           )}
+          {kind.hasStructuresShow && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>{t('overview.menu.structuresShow')}</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={widget.structuresShow ?? 'all'}
+                onValueChange={(next) => edit.setStructuresShow(widget.id, next as StructuresShow)}
+              >
+                {STRUCTURES_SHOWS.map((show) => (
+                  <DropdownMenuRadioItem key={show} value={show}>
+                    {t(`overview.menu.structuresShowChoice.${show}`)}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </>
+          )}
           {kind.hasTrendSources && (
             <>
               <DropdownMenuSeparator />
@@ -338,6 +356,7 @@ export function WidgetMenu({ widget, inert = false }: { widget: Widget; inert?: 
             kind.hasRange ||
             kind.hasCalendarEvents ||
             kind.hasRaidsWhere ||
+            kind.hasStructuresShow ||
             kind.hasTrendSources ||
             kind.hasPlexPlan) && <DropdownMenuSeparator />}
           <DropdownMenuItem onSelect={() => run(() => (inert ? undefined : setRenaming(true)))}>

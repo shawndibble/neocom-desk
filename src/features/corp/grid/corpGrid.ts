@@ -41,7 +41,6 @@ export const CORP_DEFAULT_KINDS: readonly WidgetKindId[] = [
   'structures',
   'moonChunks',
   'corpJobs',
-  'corpServices',
   'corpWallet',
   'corpCashFlow',
   'corpMembers',

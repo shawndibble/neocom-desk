@@ -141,6 +141,36 @@ describe('parseLayout', () => {
     expect('raidsWhere' in parseLayout(wrap(good({ raidsWhere: 'near' })))!.widgets[0]).toBe(false);
   });
 
+  it("keeps Structures' Problems only and drops a bad value or one on another kind", () => {
+    const structures = (over: Record<string, unknown>) =>
+      parseLayout(wrap(good({ kind: 'structures', ...over })))!.widgets[0];
+    expect(structures({ structuresShow: 'problems' }).structuresShow).toBe('problems');
+    expect('structuresShow' in structures({ structuresShow: 'all' })).toBe(false);
+    expect('structuresShow' in structures({ structuresShow: 'broken' })).toBe(false);
+    expect(
+      'structuresShow' in parseLayout(wrap(good({ structuresShow: 'problems' })))!.widgets[0]
+    ).toBe(false);
+  });
+
+  it('reads a retired Offline services widget as Structures on Problems only, in place', () => {
+    const out = parseLayout(
+      wrap(
+        good({ id: 'a', kind: 'wallet', view: 'number' }),
+        good({ id: 's', kind: 'corpServices', size: 'L', view: 'number', title: 'Down' }),
+        good({ id: 'c', kind: 'corpMembers', view: 'table' })
+      )
+    )!;
+    expect(out.widgets.map((w) => w.id)).toEqual(['a', 's', 'c']);
+    expect(out.widgets[1]).toMatchObject({
+      id: 's',
+      kind: 'structures',
+      size: 'L',
+      view: 'number',
+      title: 'Down',
+      structuresShow: 'problems',
+    });
+  });
+
   it('keeps a valid rowsPerPage and drops one that is not offered', () => {
     expect(parseLayout(wrap(good({ rowsPerPage: 25 })))!.widgets[0].rowsPerPage).toBe(25);
     expect('rowsPerPage' in parseLayout(wrap(good({ rowsPerPage: 7 })))!.widgets[0]).toBe(false);
