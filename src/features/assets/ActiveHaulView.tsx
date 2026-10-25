@@ -384,10 +384,15 @@ function Stop({
             leg.kind === 'pickup' ? 'border-accent text-accent' : 'border-warning text-warning'
           )}
         >
-          {t(leg.kind === 'pickup' ? 'assets.movePlan.haul.load' : 'assets.movePlan.haul.drop', {
-            volume: formatCubicMetres(leg.m3),
-            place: system,
-          })}
+          {leg.ships
+            ? t(leg.kind === 'pickup' ? 'assets.movePlan.haul.take' : 'assets.movePlan.haul.fly', {
+                ships: leg.ships.join(', '),
+                place: system,
+              })
+            : t(leg.kind === 'pickup' ? 'assets.movePlan.haul.load' : 'assets.movePlan.haul.drop', {
+                volume: formatCubicMetres(leg.m3),
+                place: system,
+              })}
         </span>
       )}
     </div>
@@ -485,64 +490,69 @@ function LegBlock({
         </div>
       </div>
       {rows?.status === 'ready' && <HaulStrip rows={rows.rows} />}
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-label={t(
-          expanded ? 'assets.movePlan.haul.cargoHide' : 'assets.movePlan.haul.cargoShow',
-          { n }
-        )}
-        onClick={onToggle}
-        className={cx(
-          'flex min-h-9 items-center gap-2 border-t border-dashed border-line pt-2 text-left text-sm text-text-dim',
-          rowInteractiveClassName,
-          focusRingInsetClassName
-        )}
-      >
-        <Caret expanded={expanded} />
-        {carried > 0
-          ? t('assets.movePlan.haul.carryLoaded', { volume: formatCubicMetres(carried) })
-          : t('assets.movePlan.haul.carryEmpty')}
-      </button>
-      {expanded && (
-        <div className="flex flex-col gap-1 text-sm tabular-nums">
-          {hold.aboard.length > 0 && (
-            <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
-              {hold.aboard.map((load, i) => (
-                <li key={i}>
-                  {t('assets.movePlan.haul.cargoLine', {
-                    place: splitPlaceName(load.place).system,
-                    volume: formatCubicMetres(load.m3),
+      {/* A flight has no hold to show: the pilot flies the ship itself. */}
+      {!leg.ships && (
+        <>
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-label={t(
+              expanded ? 'assets.movePlan.haul.cargoHide' : 'assets.movePlan.haul.cargoShow',
+              { n }
+            )}
+            onClick={onToggle}
+            className={cx(
+              'flex min-h-9 items-center gap-2 border-t border-dashed border-line pt-2 text-left text-sm text-text-dim',
+              rowInteractiveClassName,
+              focusRingInsetClassName
+            )}
+          >
+            <Caret expanded={expanded} />
+            {carried > 0
+              ? t('assets.movePlan.haul.carryLoaded', { volume: formatCubicMetres(carried) })
+              : t('assets.movePlan.haul.carryEmpty')}
+          </button>
+          {expanded && (
+            <div className="flex flex-col gap-1 text-sm tabular-nums">
+              {hold.aboard.length > 0 && (
+                <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
+                  {hold.aboard.map((load, i) => (
+                    <li key={i}>
+                      {t('assets.movePlan.haul.cargoLine', {
+                        place: splitPlaceName(load.place).system,
+                        volume: formatCubicMetres(load.m3),
+                      })}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {aboardItems && <ItemList items={aboardItems} />}
+              {hold.loadsOnArrival ? (
+                <p className="m-0 text-text-dim">
+                  {t('assets.movePlan.haul.carryLoadsOnArrival', {
+                    volume: formatCubicMetres(hold.loadsOnArrival.m3),
+                    place: splitPlaceName(hold.loadsOnArrival.place).system,
                   })}
-                </li>
-              ))}
-            </ul>
+                </p>
+              ) : (
+                <p className="m-0 text-text-dim">
+                  {t('assets.movePlan.haul.carryDrops', {
+                    volume,
+                    place: splitPlaceName(leg.to.name).system,
+                  })}
+                </p>
+              )}
+              {loadingItems && <ItemList items={loadingItems} />}
+              {carried > 0 && capacityM3 > 0 && (
+                <p className="m-0 text-text-dim">
+                  {t('assets.movePlan.haul.holdFill', {
+                    percent: Math.round((carried / capacityM3) * 100),
+                  })}
+                </p>
+              )}
+            </div>
           )}
-          {aboardItems && <ItemList items={aboardItems} />}
-          {hold.loadsOnArrival ? (
-            <p className="m-0 text-text-dim">
-              {t('assets.movePlan.haul.carryLoadsOnArrival', {
-                volume: formatCubicMetres(hold.loadsOnArrival.m3),
-                place: splitPlaceName(hold.loadsOnArrival.place).system,
-              })}
-            </p>
-          ) : (
-            <p className="m-0 text-text-dim">
-              {t('assets.movePlan.haul.carryDrops', {
-                volume,
-                place: splitPlaceName(leg.to.name).system,
-              })}
-            </p>
-          )}
-          {loadingItems && <ItemList items={loadingItems} />}
-          {carried > 0 && capacityM3 > 0 && (
-            <p className="m-0 text-text-dim">
-              {t('assets.movePlan.haul.holdFill', {
-                percent: Math.round((carried / capacityM3) * 100),
-              })}
-            </p>
-          )}
-        </div>
+        </>
       )}
     </div>
   );

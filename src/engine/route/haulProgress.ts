@@ -122,12 +122,14 @@ export function replanInputs(plan: HaulPlan, done: readonly number[]): ReplanInp
       const seen = stock.get(l.locationId);
       if (seen) {
         seen.m3 += l.m3;
+        if (l.ships) seen.ships = [...(seen.ships ?? []), ...l.ships];
         if (l.stacks) seen.stacks = mergeStacks([...(seen.stacks ?? []), ...l.stacks]);
       } else {
         stock.set(l.locationId, {
           ...l.to,
           locationId: l.locationId,
           m3: l.m3,
+          ...(l.ships ? { ships: [...l.ships] } : {}),
           ...(l.stacks ? { stacks: mergeStacks(l.stacks) } : {}),
         });
       }

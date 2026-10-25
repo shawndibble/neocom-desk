@@ -40,6 +40,8 @@ export interface HaulPickupInput extends HaulPlace {
   m3: number;
   /** What `m3` is made of; absent when the caller has no item list. */
   stacks?: readonly HaulStack[];
+  /** Hulls flown out from here, one name per ship; each is a flight to the destination. */
+  ships?: readonly string[];
 }
 
 export interface HaulCharacterInput {
@@ -48,7 +50,7 @@ export interface HaulCharacterInput {
   /** Where the Character is now; `null` when unknown. */
   start: HaulPlace | null;
   pickups: readonly HaulPickupInput[];
-  /** Ships this Character flies out rather than hauls: noted, never routed. */
+  /** Ships this Character flies out from a place the plan cannot route from: noted, never routed. */
   flown: readonly string[];
 }
 
@@ -81,6 +83,8 @@ export interface HaulLeg {
   locationId: number | null;
   /** The items a `pickup` leg loads; absent on a delivery and on a haul saved before items. */
   stacks?: HaulStack[];
+  /** The ship a flight's two legs take and fly; absent on a cargo leg. */
+  ships?: string[];
 }
 
 export interface HaulSection {
@@ -156,8 +160,6 @@ export function planHaul(input: HaulInput): HaulPlan {
         left.push({ pickup, m3: pickup.m3, stacks: pickup.stacks?.map((s) => ({ ...s })) ?? null });
       }
     }
-    if (left.length === 0) continue;
-
     const legs: HaulLeg[] = [];
     let visits = 0;
     let trips = 0;
@@ -169,7 +171,8 @@ export function planHaul(input: HaulInput): HaulPlan {
       to: HaulPlace,
       m3: number,
       locationId: number | null,
-      stacks?: HaulStack[]
+      stacks?: HaulStack[],
+      ships?: string[]
     ) =>
       legs.push({
         id: nextId++,
@@ -182,6 +185,7 @@ export function planHaul(input: HaulInput): HaulPlan {
         m3,
         locationId,
         ...(stacks ? { stacks } : {}),
+        ...(ships ? { ships } : {}),
       });
 
     let start: HaulPlace | null = c.start;
@@ -217,6 +221,28 @@ export function planHaul(input: HaulInput): HaulPlan {
     }
 
     for (const l of left) if (l.m3 > EPS) leftOut.push(leftOutOf(c, l.pickup, l.m3, 'cap'));
+
+    // Each ship is a flight of its own, after the cargo: take it where it sits, fly it out.
+    const flights: { pickup: HaulPickupInput; ship: string }[] = [];
+    for (const p of c.pickups) {
+      for (const ship of p.ships ?? []) {
+        if (p.systemId === null) {
+          const note = flown.find((f) => f.characterId === c.characterId);
+          if (note) note.ships.push(ship);
+          else flown.push({ characterId: c.characterId, name: c.name, ships: [ship] });
+        } else flights.push({ pickup: p, ship });
+      }
+    }
+    while (flights.length > 0) {
+      const next = nearest(flights, start, jumpsBetween);
+      flights.splice(flights.indexOf(next), 1);
+      trips += 1;
+      leg(trips, 'pickup', start, next.pickup, 0, next.pickup.locationId, undefined, [next.ship]);
+      leg(trips, 'delivery', next.pickup, destination, 0, null, undefined, [next.ship]);
+      start = destination;
+    }
+
+    if (left.length === 0 && legs.length === 0) continue;
     sections.push({ characterId: c.characterId, name: c.name, legs, trips });
   }
 
