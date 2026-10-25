@@ -5,7 +5,9 @@ const fire = vi.hoisted(() => ({
   stored: null as Record<string, unknown> | null,
   sets: [] as unknown[],
   deletes: 0,
-  docs: [] as { id: string; data: Record<string, unknown> }[],
+  docs: [] as { id: string; data: Record<string, unknown>; requestId?: string }[],
+  /** Documents `getDoc` finds by path; anything else falls back to `stored`. */
+  byPath: {} as Record<string, Record<string, unknown>>,
   /** How many times the transaction callback runs: a retry re-reads the document. */
   attempts: 1,
   reads: [] as string[],
@@ -32,13 +34,20 @@ vi.mock('firebase/firestore/lite', () => ({
     }
     fire.reads.push(`read as ${session.current}`);
     return {
-      docs: fire.docs.map((d) => ({ id: d.id, data: () => d.data, ref: {} })),
+      docs: fire.docs.map((d) => ({
+        id: d.id,
+        data: () => d.data,
+        ref: { parent: { parent: d.requestId ? { id: d.requestId } : null } },
+      })),
     };
   },
-  getDoc: async () => ({
-    exists: () => fire.stored !== null,
-    data: () => fire.stored ?? undefined,
-  }),
+  getDoc: async (ref: { path: string }) => {
+    if (Object.keys(fire.byPath).length > 0) {
+      const found = fire.byPath[ref.path];
+      return { id: ref.path.split('/').at(-1), exists: () => !!found, data: () => found };
+    }
+    return { exists: () => fire.stored !== null, data: () => fire.stored ?? undefined };
+  },
   serverTimestamp: () => 'SERVER_TIME',
   runTransaction: async (
     _db: unknown,
@@ -84,8 +93,10 @@ vi.mock('@/db', () => ({
 }));
 
 import {
+  loadMyPledges,
   loadMyRequests,
   loadPledges,
+  loadRequestsById,
   loadRequests,
   loadRequestsSince,
   updateMyPledge,
@@ -106,6 +117,8 @@ beforeEach(() => {
   fire.attempts = 1;
   fire.beforeRetry = null;
   fire.reads = [];
+  fire.byPath = {};
+  fire.missingIndex = false;
   session.current = 0;
   session.log = [];
 });
@@ -252,6 +265,49 @@ describe('loadRequestsSince', () => {
     fire.missingIndex = true;
     const found = await loadRequestsSince(1, 'c1', 10);
     expect(found.map((r) => r.id)).toEqual(['new']);
+  });
+});
+
+describe('loadMyPledges', () => {
+  const pledgeDoc = (uid: string, requestId: string) => ({
+    id: uid,
+    requestId,
+    data: { ownerHash: 'owner-1', communityId: 'c1', lines: { 0: entry() } },
+  });
+
+  it('asks for this Character’s own Pledges in the Community only', async () => {
+    fire.wheres.length = 0;
+    fire.docs = [pledgeDoc('char:1', 'r1'), pledgeDoc('char:1', 'r2')];
+    const mine = await loadMyPledges(1, 'c1');
+    expect(fire.wheres).toEqual([
+      ['communityId', '==', 'c1'],
+      ['ownerHash', '==', 'owner-1'],
+    ]);
+    expect([...mine.keys()]).toEqual(['r1', 'r2']);
+  });
+
+  it('never counts another Pledger’s document as this Character’s', async () => {
+    fire.docs = [pledgeDoc('char:2', 'r1')];
+    expect((await loadMyPledges(1, 'c1')).size).toBe(0);
+  });
+
+  it('reads the Community’s Pledges and keeps its own while the index is missing', async () => {
+    fire.docs = [pledgeDoc('char:2', 'r1'), pledgeDoc('char:1', 'r2')];
+    fire.missingIndex = true;
+    expect([...(await loadMyPledges(1, 'c1')).keys()]).toEqual(['r2']);
+  });
+});
+
+describe('loadRequestsById', () => {
+  it('reads each Request by id and leaves out one since removed', async () => {
+    fire.byPath = {
+      'communities/c1/itemRequests/r1': {
+        ownerUid: 'char:2',
+        lines: [{ typeId: 34, name: 'Tritanium', quantity: 5 }],
+      },
+    };
+    const found = await loadRequestsById(1, 'c1', ['r1', 'gone']);
+    expect(found.map((r) => r.id)).toEqual(['r1']);
   });
 });
 

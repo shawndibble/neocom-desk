@@ -39,7 +39,7 @@ import { loadContractItemsDetailed } from '@/features/character/contractItems';
 import { characterIdForUid, uidForCharacter } from '@/sync/uid';
 import { communityBackendOverride } from './backendOverride';
 import { pledgeEditVersion } from './pledgeWrites';
-import { loadCommunityPledges, loadRequests, updateMyPledge } from './requestStore';
+import { loadMyPledges, loadRequestsById, updateMyPledge } from './requestStore';
 
 /** The Permission delivery marking needs. */
 export const DELIVERY_ENDPOINTS: readonly EsiEndpointId[] = [
@@ -273,7 +273,7 @@ async function requestIsClosed(
   now: number
 ): Promise<boolean | 'unknown'> {
   try {
-    const request = (await loadRequests(characterId, communityId)).find((r) => r.id === requestId);
+    const [request] = await loadRequestsById(characterId, communityId, [requestId]);
     return request === undefined || !isOpenRequest(request, now);
   } catch (err) {
     console.warn('Request delivery: could not tell whether the Request closed', err);
@@ -422,10 +422,12 @@ async function doSync(
     return { status: 'needs-scope', updated: 0, flags: none };
   }
 
-  const [requests, pledges] = await Promise.all([
-    loadRequests(characterId, communityId),
-    loadCommunityPledges(characterId, communityId),
-  ]);
+  // Only this Character's own Pledges, then only the Requests they are on: a sweep with nothing
+  // pledged is one read, not the whole board and every Pledge in the Community.
+  const mine = await loadMyPledges(characterId, communityId);
+  if (mine.size === 0) return { status: 'ok', updated: 0, flags: none };
+  const requests = await loadRequestsById(characterId, communityId, [...mine.keys()]);
+  const pledges = new Map([...mine].map(([requestId, pledge]) => [requestId, [pledge]]));
   const planned = myOpenPledges(requests, pledges, uidForCharacter(characterId), now);
   const slots = buildSlots(planned);
   if (slots.length === 0) return { status: 'ok', updated: 0, flags: none };

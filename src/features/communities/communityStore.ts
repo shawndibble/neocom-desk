@@ -7,11 +7,12 @@
  * here is the `lite` build (no listeners), so callers refetch after a change.
  */
 import type { CallableAction } from '../../../functions/src/callableManifest';
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore/lite';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query } from 'firebase/firestore/lite';
 import type { MemberLibrary } from '@/engine/communities/libraryMatrix';
 import type { SharedBlueprint } from '@/engine/communities/sharedLibrary';
 import { getSyncFirestore } from '@/sync/firebaseApp';
 import { callRouted } from '@/sync/routedCallable';
+import { createReadCache, dropCached } from './readCache';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { uidForCharacter } from '@/sync/uid';
 import {
@@ -84,28 +85,37 @@ export async function listCommunityIds(characterId: number): Promise<string[]> {
  * changes elsewhere (an admin letting this Character in, another Member joining)
  * shows within this window.
  */
-export const MY_COMMUNITIES_TTL_MS = 10 * 60_000;
+export const MY_COMMUNITIES_TTL_MS = 15 * 60_000;
 
-interface MineEntry {
-  at: number;
-  value: Promise<CommunitySummary[]>;
-}
-const mineCache = new Map<number, MineEntry>();
+const mineCache = createReadCache<CommunitySummary[]>();
 
-/** Forget the cached list, for one Character or all: after a change to its memberships. */
+/**
+ * How long `loadCommunityMembersCached` reuses a Community's roster. A roster changes when
+ * someone joins or leaves, or pushes a library (its `pushedAt`); the libraries themselves are
+ * re-read only when that stamp moves (`loadMemberLibrariesFor`).
+ */
+export const ROSTER_TTL_MS = 20 * 60_000;
+
+const rosterCache = createReadCache<CommunityMember[]>();
+/** Stamped with the Member's `libraryAsOf`: the same stamp is the same library. */
+const libraryCache = createReadCache<SharedBlueprint[]>();
+
+/**
+ * Forget what is cached for one Character, or for all: its list of Communities and every
+ * roster, library and shared Fitting list read through it (every `createReadCache`). After a change to its memberships, and whenever a
+ * Community refused it (`withMyCommunities`).
+ */
 export function invalidateMyCommunities(characterId?: number): void {
-  if (characterId === undefined) mineCache.clear();
-  else mineCache.delete(characterId);
+  dropCached(characterId);
 }
 
-function remember(characterId: number, value: Promise<CommunitySummary[]>, at: number) {
-  const entry = { at, value };
-  mineCache.set(characterId, entry);
-  // A failed read is not kept; one invalidated meanwhile is already gone.
-  value.catch(() => {
-    if (mineCache.get(characterId) === entry) mineCache.delete(characterId);
-  });
+/** Forget one Community's roster for a Character: after it pushed its own library there. */
+export function invalidateCommunityRoster(characterId: number, communityId: string): void {
+  rosterCache.drop(`${characterId}:${communityId}:`);
 }
+
+const remember = (characterId: number, value: Promise<CommunitySummary[]>, at: number) =>
+  mineCache.set(`${characterId}:`, at, value);
 
 /**
  * The Character's Communities, reused for `MY_COMMUNITIES_TTL_MS`. Concurrent
@@ -118,11 +128,14 @@ export async function loadMyCommunitiesCached(
 ): Promise<CommunitySummary[]> {
   const override = communityBackendOverride();
   if (override) return override.loadMine();
-  const held = mineCache.get(characterId);
-  if (held && now - held.at < MY_COMMUNITIES_TTL_MS) return held.value;
-  const value = readMyCommunities(characterId);
-  remember(characterId, value, now);
-  return value;
+  const held = mineCache.get(`${characterId}:`, (at) => now - at < MY_COMMUNITIES_TTL_MS);
+  if (held) return held;
+  return remember(characterId, readMyCommunities(characterId), now);
+}
+
+/** Firestore refused a Member read: the Character is not (or no longer) a Member. */
+export function isRefused(err: unknown): boolean {
+  return (err as { code?: string } | null)?.code === 'permission-denied';
 }
 
 /**
@@ -133,16 +146,17 @@ export async function loadMyCommunitiesCached(
  */
 export async function withMyCommunities<T>(
   characterId: number,
-  read: (communities: CommunitySummary[]) => Promise<T>,
+  /** `retried`: this run is over the fresh list, after a refusal; a reader can stop rethrowing. */
+  read: (communities: CommunitySummary[], attempt: { retried: boolean }) => Promise<T>,
   now = Date.now()
 ): Promise<T> {
   const cached = await loadMyCommunitiesCached(characterId, now);
   try {
-    return await read(cached);
+    return await read(cached, { retried: false });
   } catch (err) {
-    if ((err as { code?: string } | null)?.code !== 'permission-denied') throw err;
+    if (!isRefused(err)) throw err;
     invalidateMyCommunities(characterId);
-    return read(await loadMyCommunities(characterId));
+    return read(await loadMyCommunities(characterId), { retried: true });
   }
 }
 
@@ -150,9 +164,7 @@ export async function withMyCommunities<T>(
 export async function loadMyCommunities(characterId: number): Promise<CommunitySummary[]> {
   const override = communityBackendOverride();
   if (override) return override.loadMine();
-  const value = readMyCommunities(characterId);
-  remember(characterId, value, Date.now());
-  return value;
+  return remember(characterId, readMyCommunities(characterId), Date.now());
 }
 
 async function readMyCommunities(characterId: number): Promise<CommunitySummary[]> {
@@ -179,12 +191,42 @@ async function readMyCommunities(characterId: number): Promise<CommunitySummary[
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** A Community's roster, read now (and remembered for `loadCommunityMembersCached`). */
 export async function loadCommunityMembers(
   characterId: number,
   communityId: string
 ): Promise<CommunityMember[]> {
   const override = communityBackendOverride();
   if (override) return override.loadMembers(communityId);
+  return rosterCache.set(
+    `${characterId}:${communityId}:`,
+    Date.now(),
+    readCommunityMembers(characterId, communityId)
+  );
+}
+
+/**
+ * A Community's roster, reused for `ROSTER_TTL_MS`. Read it inside `withMyCommunities`, so a
+ * Community that refuses this Character drops it along with the list.
+ */
+export async function loadCommunityMembersCached(
+  characterId: number,
+  communityId: string,
+  now = Date.now()
+): Promise<CommunityMember[]> {
+  const override = communityBackendOverride();
+  if (override) return override.loadMembers(communityId);
+  const key = `${characterId}:${communityId}:`;
+  return (
+    rosterCache.get(key, (at) => now - at < ROSTER_TTL_MS) ??
+    rosterCache.set(key, now, readCommunityMembers(characterId, communityId))
+  );
+}
+
+async function readCommunityMembers(
+  characterId: number,
+  communityId: string
+): Promise<CommunityMember[]> {
   await ensureSignedIn(characterId);
   const snap = await getDocs(collection(getSyncFirestore(), 'communities', communityId, 'members'));
   return snap.docs
@@ -230,15 +272,68 @@ export async function loadMemberLibraries(
 }
 
 /**
- * As `loadMemberLibraries`, but an unreadable Member reads empty AND is named
- * in `failedUids`, so the caller can tell "shares nothing" from "could not read".
+ * The listed Members' shared blueprints, from their roster entries: a Member whose
+ * `libraryAsOf` is null shares nothing and is not read at all, and one whose stamp is the
+ * one already read comes from memory. An unreadable Member reads empty and is named in
+ * `failedUids`; with `strict`, its failure throws instead.
  */
-export function loadMemberLibrariesDetailed(
+export async function loadMemberLibrariesFor(
   characterId: number,
   communityId: string,
-  memberUids: readonly string[]
+  members: readonly Pick<CommunityMember, 'uid' | 'libraryAsOf'>[],
+  { strict = false }: { strict?: boolean } = {}
 ): Promise<{ libraries: MemberLibrary[]; failedUids: string[] }> {
-  return readMemberLibraries(characterId, communityId, memberUids, false);
+  if (communityBackendOverride()?.loadLibraries) {
+    return readMemberLibraries(
+      characterId,
+      communityId,
+      members.map((m) => m.uid),
+      strict
+    );
+  }
+  const db = getSyncFirestore();
+  const failedUids: string[] = [];
+  const libraries = await Promise.all(
+    members.map(async ({ uid, libraryAsOf: asOf }): Promise<MemberLibrary> => {
+      if (asOf === null) return { uid, items: [] };
+      const key = `${characterId}:${communityId}:${uid}`;
+      try {
+        const items =
+          libraryCache.get(key, (stamp) => stamp === asOf) ??
+          libraryCache.set(
+            key,
+            asOf,
+            ensureSignedIn(characterId).then(() => readLibrary(db, communityId, uid))
+          );
+        return { uid, items: await items };
+      } catch (err) {
+        // Refused: this Character is no longer a Member, so nothing it holds for it is current,
+        // and the caller (inside `withMyCommunities`) reads its list again.
+        if (isRefused(err)) {
+          invalidateMyCommunities(characterId);
+          throw err;
+        }
+        if (strict) throw err;
+        failedUids.push(uid);
+        return { uid, items: [] };
+      }
+    })
+  );
+  return { libraries, failedUids };
+}
+
+async function readLibrary(
+  db: ReturnType<typeof getSyncFirestore>,
+  communityId: string,
+  uid: string
+): Promise<SharedBlueprint[]> {
+  const chunks = await getDocs(
+    collection(db, 'communities', communityId, 'members', uid, 'library')
+  );
+  return chunks.docs.flatMap((chunk) => {
+    const list = chunk.data().items;
+    return Array.isArray(list) ? (list as SharedBlueprint[]) : [];
+  });
 }
 
 async function readMemberLibraries(
@@ -264,14 +359,7 @@ async function readMemberLibraries(
     memberUids.map(async (uid) => {
       // One unreadable Member (just removed, say) must not blank everyone else's column.
       try {
-        const chunks = await getDocs(
-          collection(db, 'communities', communityId, 'members', uid, 'library')
-        );
-        const items = chunks.docs.flatMap((chunk) => {
-          const list = chunk.data().items;
-          return Array.isArray(list) ? (list as SharedBlueprint[]) : [];
-        });
-        return { uid, items };
+        return { uid, items: await readLibrary(db, communityId, uid) };
       } catch (err) {
         if (strict) throw err;
         failedUids.push(uid);
@@ -415,6 +503,8 @@ export async function releaseMailInvite(
 }
 
 export const MAX_MAIL_INVITES_PER_DAY = 20;
+/** How many sent mail invites the panel lists, newest first. */
+export const MAIL_INVITES_SHOWN = 50;
 
 export interface SentMailInvite {
   targetCharacterId: number;
@@ -434,7 +524,14 @@ export async function loadMailInviteStatus(
   const day = new Date(now).toISOString().slice(0, 10);
   const [quota, invites] = await Promise.all([
     getDoc(doc(db, 'characters', uid, 'mailInviteQuota', day)),
-    getDocs(collection(db, 'communities', communityId, 'mailInvites')),
+    // The newest sent ones only: the list shows recent invites, and the daily cap is 20.
+    getDocs(
+      query(
+        collection(db, 'communities', communityId, 'mailInvites'),
+        orderBy('sentAt', 'desc'),
+        limit(MAIL_INVITES_SHOWN)
+      )
+    ),
   ]);
   const used = Number(quota.exists() ? (quota.data().count ?? 0) : 0);
   const sent = invites.docs

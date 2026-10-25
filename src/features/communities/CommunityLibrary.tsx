@@ -38,7 +38,7 @@ import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
 import { loadBlueprints } from '@/sde/loadSde';
 import { loadSolarSystemsById } from '@/sde/solarSystems';
 import { uidForCharacter } from '@/sync/uid';
-import { loadMemberLibrariesDetailed, type CommunityMember } from './communityStore';
+import { loadMemberLibrariesFor, type CommunityMember } from './communityStore';
 import { loadLibrariesWithFallback } from './communityCache';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
 import { useReconnectCount } from '@/stores/network';
@@ -234,9 +234,10 @@ export function CommunityLibrary({
     };
   }, []);
 
+  // Each Member with the library stamp the roster carries: a new stamp is a new library.
   const memberKey = members
     ? members
-        .map((member) => member.uid)
+        .map((member) => `${member.uid}@${member.libraryAsOf ?? ''}`)
         .sort()
         .join(',')
     : null;
@@ -245,12 +246,16 @@ export function CommunityLibrary({
     let cancelled = false;
     (async () => {
       try {
-        const uids = memberKey ? memberKey.split(',') : [];
+        const roster = (memberKey ? memberKey.split(',') : []).map((entry) => {
+          const [uid, asOf] = entry.split('@');
+          return { uid, libraryAsOf: asOf ? Number(asOf) : null };
+        });
+        const uids = roster.map((member) => member.uid);
         // Offline, or with every read failed, the saved libraries answer; one
         // Member unreadable while online reads empty and the rest still show.
         const [{ libraries, cached }, groups, marketTypes, blueprints] = await Promise.all([
           loadLibrariesWithFallback(characterId, communityId, uids, () =>
-            loadMemberLibrariesDetailed(characterId, communityId, uids)
+            loadMemberLibrariesFor(characterId, communityId, roster)
           ),
           loadMarketGroups(),
           // The lazy market catalogue only files blueprints under market

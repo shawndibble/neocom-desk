@@ -187,6 +187,19 @@ describe('firestore.indexes.json field overrides', () => {
     ]);
   });
 
+  it('indexes one Member’s own Pledges in a Community at collection-group scope', () => {
+    // `loadMyPledges` (the delivery sweep): communityId and ownerHash. It falls back to the
+    // Community's whole Pledge query until this is deployed.
+    expect(config.indexes).toContainEqual({
+      collectionGroup: 'pledges',
+      queryScope: 'COLLECTION_GROUP',
+      fields: [
+        { fieldPath: 'communityId', order: 'ASCENDING' },
+        { fieldPath: 'ownerHash', order: 'ASCENDING' },
+      ],
+    });
+  });
+
   it('expires shares by a TTL policy on expiresAt, and indexes none of their fields', () => {
     // A stored Share Link is only ever read by id (`features/share/shareStore.ts`),
     // so nothing needs an index; without the wildcard every field of every
