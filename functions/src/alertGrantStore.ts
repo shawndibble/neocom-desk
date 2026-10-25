@@ -37,7 +37,10 @@ export function firestorePollerStore(
   // The store lives for one poll run. The listing already read every active
   // grant in full, so `refresh` starts from that copy instead of reading each
   // doc again; the rotated-token write below still re-reads it in its
-  // transaction, so a re-grant since the listing is never overwritten.
+  // transaction, so a re-grant since the listing is never overwritten. The
+  // copy can be minutes old by the end of a run: a grant the user deleted
+  // meanwhile is still tried once, but deleting it also revoked the token at
+  // SSO, so that refresh fails and every write stays guarded on the old blob.
   const listed = new Map<number, AlertGrantDoc>();
   return {
     async listActive() {

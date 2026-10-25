@@ -423,15 +423,27 @@ async function pendingRemovals(
   }
   const found = [];
   for (const pointer of await feedersToRead(db, pointerCollection)) {
-    const rec = (
-      await feederRef(db, pointer.collectorCorporationId, pointer.feederCorporationId).get()
-    ).data() as FeederRecord | undefined;
-    if (rec) found.push({ ...pointer, rec });
+    // One unreadable record must not stop the rest, as before.
+    try {
+      const rec = (
+        await feederRef(db, pointer.collectorCorporationId, pointer.feederCorporationId).get()
+      ).data() as FeederRecord | undefined;
+      if (rec) found.push({ ...pointer, rec });
+    } catch (err) {
+      log('Removal could not take effect', {
+        ...pointer,
+        error: err instanceof Error ? err.name : 'unknown',
+      });
+    }
   }
   return found;
 }
 
-/** End every removal whose wait is over. Scheduled hourly; one failure never stops the rest. */
+/**
+ * End every removal whose wait is over. Scheduled hourly; one failure never stops the rest.
+ * `pointerCollection` only matters on the fallback scan; the indexed query finds
+ * every pending feeder under `corps/*`.
+ */
 export async function finalizeDueRemovals(
   deps: CorpSyncDeps,
   pointerCollection: string = FEEDER_OF_COLLECTION

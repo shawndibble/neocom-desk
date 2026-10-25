@@ -51,11 +51,11 @@ export async function sweepRequests(
   const result: SweepResult = { deleted: 0, failed: 0, truncated: false };
 
   const seen = new Set<string>();
-  const rules: [field: string, cutoff: number][] = [
+  const retentionQueries: [field: string, cutoff: number][] = [
     ['expiresAt', now - EXPIRED_RETENTION_MS],
     ['closedAt', now - CLOSED_RETENTION_MS],
   ];
-  for (const [field, cutoff] of rules) {
+  for (const [field, cutoff] of retentionQueries) {
     async function* perCommunity() {
       for (const community of await db.collection(COMMUNITIES_COLLECTION).listDocuments()) {
         const board = community.collection(REQUESTS_COLLECTION);

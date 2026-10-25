@@ -1119,7 +1119,14 @@ export const dailyHousekeeping = onSchedule(
         { name: 'purgeNotificationFeed', run: runPurgeNotificationFeed },
         {
           name: 'purgeFiredProjections',
-          run: () => purgeFiredProjections(firestore(), Date.now()),
+          run: async () => {
+            const { deleted, truncated } = await purgeFiredProjections(firestore(), Date.now());
+            if (truncated) {
+              logWarn('Fired projection purge: pass limit reached, backlog continues next run', {
+                deleted,
+              });
+            }
+          },
         },
         {
           name: 'purgeStaleAccounts',

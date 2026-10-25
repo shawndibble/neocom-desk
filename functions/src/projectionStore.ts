@@ -344,14 +344,33 @@ export async function dispatchDueProjections(
  * A task of `dailyHousekeeping`, not of every dispatch tick: the retention is
  * 30 days, so a day's lag is nothing, and an empty query is still a billed read.
  */
-export async function purgeFiredProjections(db: Firestore, now: number): Promise<void> {
-  const purgeSnapshot = await db
+export async function purgeFiredProjections(
+  db: Firestore,
+  now: number,
+  limits: { pageSize?: number; maxPasses?: number } = {}
+): Promise<{ deleted: number; truncated: boolean }> {
+  // Bounded like the Notification Feed purge (decision 20260907-235147): a
+  // day's backlog in one run must not outgrow memory or the shared timeout.
+  const pageSize = limits.pageSize ?? FIRED_PURGE_PAGE_SIZE;
+  const maxPasses = limits.maxPasses ?? FIRED_PURGE_MAX_PASSES;
+  const query = db
     .collection(PROJECTIONS_COLLECTION)
     .where('fired', '==', true)
     .where('firedAt', '<', now - FIRED_RETENTION_MS)
-    .get();
-  await commitInChunks(
-    db,
-    purgeSnapshot.docs.map((doc) => (b) => b.delete(doc.ref))
-  );
+    .limit(pageSize);
+  let deleted = 0;
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const page = await query.get();
+    await commitInChunks(
+      db,
+      page.docs.map((doc) => (b) => b.delete(doc.ref))
+    );
+    deleted += page.docs.length;
+    if (page.docs.length < pageSize) return { deleted, truncated: false };
+  }
+  return { deleted, truncated: true };
 }
+
+/** Fired projections deleted per page, and pages per run (the rest waits a day). */
+export const FIRED_PURGE_PAGE_SIZE = 500;
+export const FIRED_PURGE_MAX_PASSES = 20;

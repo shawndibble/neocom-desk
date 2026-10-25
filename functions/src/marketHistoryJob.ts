@@ -33,7 +33,9 @@ export const PUBLIC_HOST_USER_AGENT = ESI_USER_AGENT;
 /**
  * `systemConditions/lawless` as this warm instance last read or wrote it. This
  * job is its only writer, so after the first run an instance knows the doc
- * without paying a read every 15 minutes; a cold start reads it once.
+ * without paying a read every 15 minutes; a cold start reads it once. Another
+ * instance (or a hand edit) can change the doc behind this copy; the heartbeat
+ * rewrite (`LAWLESS_HEARTBEAT_MS`) bounds how long that goes unnoticed.
  */
 let lawlessSeen: Record<string, unknown> | undefined;
 
