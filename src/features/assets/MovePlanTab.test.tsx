@@ -110,6 +110,80 @@ async function open() {
   return user;
 }
 
+const corpInputs = [
+  {
+    itemId: 9000,
+    typeId: 27,
+    quantity: 1,
+    locationId: AMARR,
+    locationType: 'station' as const,
+    locationFlag: 'OfficeFolder',
+  },
+  {
+    itemId: 1,
+    typeId: 34,
+    quantity: 1000,
+    locationId: 9000,
+    locationType: 'item' as const,
+    locationFlag: 'CorpSAG2',
+    isSingleton: false,
+  },
+  {
+    itemId: 2,
+    typeId: 35,
+    quantity: 5,
+    locationId: JITA,
+    locationType: 'station' as const,
+    locationFlag: 'Impounded',
+    isSingleton: false,
+  },
+];
+
+function openCorp(entry = '/') {
+  render(
+    <MemoryRouter initialEntries={[entry]}>
+      <MovePlanTab
+        onClose={() => {}}
+        characterIds={[]}
+        activeCharacterId={1}
+        corp={{ pilotId: 1, name: 'Corporation hangars', inputs: corpInputs }}
+      />
+    </MemoryRouter>
+  );
+}
+
+describe('MovePlanTab for a corporation', () => {
+  it("offers only the corporation's hangar stock, at its office station, and says who flies", async () => {
+    openCorp();
+    expect(await screen.findByText('Corporation hangars')).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: /select everything at amarr viii/i })).toBeTruthy();
+    expect(screen.queryByRole('checkbox', { name: /jita 4-4/i })).toBeNull();
+    expect(screen.getByText(/Your active Character|your active Character/)).toBeTruthy();
+  });
+
+  it('plans the picked stock to a destination', async () => {
+    const user = userEvent.setup();
+    openCorp();
+    await user.click(
+      await screen.findByRole('checkbox', { name: /select everything at amarr viii/i })
+    );
+    await user.click(screen.getByRole('button', { name: 'Pick a system' }));
+    await user.click(screen.getByRole('button', { name: 'Show plan' }));
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+  });
+
+  it("does not rebuild a personal plan link on the corporation's tab", async () => {
+    openCorp(`/?mv=${encodeURIComponent('1:60008494:34:loose')}&mvd=s30000142`);
+    expect(await screen.findByRole('button', { name: 'Show plan' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+  });
+
+  it('rebuilds a corporation plan link', async () => {
+    openCorp(`/?mvc=1&mv=${encodeURIComponent('1:60008494:34:loose')}&mvd=s30000142`);
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeTruthy();
+  });
+});
+
 describe('MovePlanTab', () => {
   beforeEach(() => {
     failing.name = false;

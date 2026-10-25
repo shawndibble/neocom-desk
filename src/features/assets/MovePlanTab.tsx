@@ -27,6 +27,9 @@ import {
   type SkippedCharacterAssets,
 } from '@/features/assets/assets';
 import { resolvePlace } from '@/features/places';
+import { corpMoveAssets } from '@/features/corp/corpMoveSource';
+import type { CorpAssetInput } from '@/engine/corp/assetDivisions';
+import { db } from '@/db';
 import { loadTypeNames, loadTypePackagedVolumes } from '@/features/character/typeNames';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
 import {
@@ -91,11 +94,31 @@ interface Loaded {
   rigs: Map<number, number>;
   /** Chosen Characters whose assets could not be read: their stock is missing from the picker. */
   skipped: SkippedCharacterAssets[];
+  /** Who flies a corporation's plan; null for a personal plan or an unnamed pilot. */
+  pilotName: string | null;
 }
 
-async function load(characterIds: readonly number[]): Promise<Loaded> {
+/**
+ * The corporation's hangar stock as the one source the plan reads. It is keyed
+ * by the pilot who flies it: the plan's pickups resolve, measure and start from
+ * that pilot, and the corporation read needed a Director, not a second pilot.
+ */
+async function loadCorpSources(corp: CorpMoveSource): Promise<{
+  entries: MovePlanSource[];
+  skipped: SkippedCharacterAssets[];
+}> {
+  return {
+    entries: [{ characterId: corp.pilotId, name: corp.name, assets: corpMoveAssets(corp.inputs) }],
+    skipped: [],
+  };
+}
+
+async function load(
+  characterIds: readonly number[],
+  corp: CorpMoveSource | undefined
+): Promise<Loaded> {
   const [{ entries: sources, skipped }, types, groupCategories] = await Promise.all([
-    loadOtherCharactersAssetsDetailed(characterIds),
+    corp ? loadCorpSources(corp) : loadOtherCharactersAssetsDetailed(characterIds),
     loadTypes(),
     loadGroupCategories().catch(() => ({}) as Record<string, number>),
   ]);
@@ -133,7 +156,20 @@ async function load(characterIds: readonly number[]): Promise<Loaded> {
   );
   const hues = pickupHues(stacks.map((s) => s.locationId));
   const rigs = fittedRigCounts(sources);
-  return { sources, shipTypeIds, stacks, typeNames, unitM3, places, systems, hues, rigs, skipped };
+  const pilotName = corp ? ((await db.characters.get(corp.pilotId))?.name ?? null) : null;
+  return {
+    sources,
+    shipTypeIds,
+    stacks,
+    typeNames,
+    unitM3,
+    places,
+    systems,
+    hues,
+    rigs,
+    skipped,
+    pilotName,
+  };
 }
 
 /** Systems resolved for owned-hull places, per load, so a re-plan never repeats a failed structure lookup. */
@@ -199,6 +235,15 @@ async function ownedHullPlaces(loaded: Loaded, hullTypeIds: ReadonlySet<number>)
   }
 }
 
+/** A corporation's stock to plan a move from (Corp assets → Move) instead of the Characters' own. */
+export interface CorpMoveSource {
+  /** The active Character: the one who flies, whose skills size the haulers. */
+  pilotId: number;
+  /** What the picker calls the stock's owner. */
+  name: string;
+  inputs: readonly CorpAssetInput[];
+}
+
 interface MovePlanTabProps {
   /** Leaves the plan: Cancel. The page returns to its Items tab. */
   onClose: () => void;
@@ -207,6 +252,8 @@ interface MovePlanTabProps {
   activeCharacterId: number | null;
   /** Reports the Characters this tab's read skipped, for the header picker's `missingNames`. */
   onSkippedChange?: (names: readonly string[] | undefined) => void;
+  /** Plan from the corporation's hangars. The Characters are then unused. */
+  corp?: CorpMoveSource;
 }
 
 /**
@@ -218,7 +265,8 @@ interface MovePlanTabProps {
  * opens the leg list, and Route Safety answers the safety question.
  */
 export function MovePlanTab(props: MovePlanTabProps) {
-  return <MovePlanTabBody key={idSetKey(props.characterIds)} {...props} />;
+  const key = props.corp ? `corp:${props.corp.pilotId}` : idSetKey(props.characterIds);
+  return <MovePlanTabBody key={key} {...props} />;
 }
 
 function MovePlanTabBody({
@@ -226,11 +274,14 @@ function MovePlanTabBody({
   characterIds,
   activeCharacterId,
   onSkippedChange,
+  corp,
 }: MovePlanTabProps) {
   const { t } = useTranslation();
   // Frozen for this mount: a different Character set remounts the tab (`key` below).
   const [ids] = useState(characterIds);
-  const loadIds = useCallback(() => load(ids), [ids]);
+  const isCorp = corp !== undefined;
+  const [corpSource] = useState(corp);
+  const loadIds = useCallback(() => load(ids, corpSource), [ids, corpSource]);
   const { status, data: loaded = null } = useAsyncLoad(loadIds);
   const failed = status === 'failed';
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -276,8 +327,8 @@ function MovePlanTabBody({
   const currentSystem = useCurrentSystem();
   useHydratedStore(useActiveHaul);
   const [urlValues, setUrlValues] = useUrlParams(MOVE_PLAN_URL_SCHEMA);
-  const urlPlan = planFromUrl(urlValues);
-  const urlKey = movePlanKey(urlValues);
+  const urlPlan = planFromUrl(urlValues, isCorp);
+  const urlKey = movePlanKey(urlValues, isCorp);
   const navigate = useNavigate();
   /** The plan the screen shows, as the URL names it: tells a URL change this tab made from one the pilot made (Back, a link). */
   const [shownKey, setShownKey] = useState<string | null>(null);
@@ -518,14 +569,15 @@ function MovePlanTabBody({
         setResult(state);
         const values: MovePlanUrlValues = {
           ...NO_MOVE_PLAN,
+          mvc: isCorp,
           mv: [...selected],
           mvd:
             destStation !== null
               ? { kind: 'station', id: destStation }
               : { kind: 'system', id: destSystem! },
         };
-        setShownKey(movePlanKey(values));
-        pushedPlan.current = movePlanKey(values);
+        setShownKey(movePlanKey(values, isCorp));
+        pushedPlan.current = movePlanKey(values, isCorp);
         // A history entry: Back returns to the picker.
         setUrlValues(values, { push: true });
         focusAfterCommit(planHeadingRef);
@@ -607,7 +659,7 @@ function MovePlanTabBody({
     setPacked(nextPacked);
     setHaulerOverride(nextOverride);
     const patch = { mvp: [...nextPacked], mvh: nextOverride ?? null };
-    setShownKey(movePlanKey({ ...urlValues, ...patch }));
+    setShownKey(movePlanKey({ ...urlValues, ...patch }, isCorp));
     setUrlValues(patch);
     setResult((r) =>
       r
@@ -723,6 +775,13 @@ function MovePlanTabBody({
         <LiveStatus>
           {failed ? t('assets.movePlan.failed') : planFailed ? t('assets.movePlan.planFailed') : ''}
         </LiveStatus>
+        {isCorp && (
+          <p className="text-xs text-text-dim">
+            {t('assets.movePlan.corpPilotNote', {
+              pilot: loaded?.pilotName ?? t('assets.movePlan.corpPilotFallback'),
+            })}
+          </p>
+        )}
         {savedHaul && !showingHaul && (
           <div>
             <Button size="sm" onClick={() => setShowingHaul(true)}>
@@ -767,7 +826,9 @@ function MovePlanTabBody({
             headingRef={planHeadingRef}
             onBack={() => {
               // The URL closes the plan (see the effect above): step out of the entry this tab pushed, else drop the plan from the one it is on.
-              if (pushedPlan.current === movePlanKey({ ...urlValues, mvp: [], mvh: null })) {
+              if (
+                pushedPlan.current === movePlanKey({ ...urlValues, mvp: [], mvh: null }, isCorp)
+              ) {
                 pushedPlan.current = null;
                 navigate(-1);
               } else setUrlValues(NO_MOVE_PLAN);
@@ -828,7 +889,7 @@ function MovePlanTabBody({
                     className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 py-1 sm:flex-wrap sm:overflow-visible"
                   >
                     <span className="shrink-0 text-xs text-text-dim">
-                      {t('assets.movePlan.yourStations')}
+                      {t(isCorp ? 'assets.movePlan.corpStations' : 'assets.movePlan.yourStations')}
                     </span>
                     {ownStations.map(([id, fullName], i) => (
                       <FilterChip

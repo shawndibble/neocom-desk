@@ -42,6 +42,8 @@ const ABYSSAL_NEUT = vi.hoisted(() => 47832);
 vi.mock('@/sde/loadSde', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/sde/loadSde')>()),
   loadBlueprints: vi.fn(async () => ({})),
+  loadTypes: vi.fn(async () => ({})),
+  loadGroupCategories: vi.fn(async () => ({})),
   loadMutaplasmids: vi.fn(async () => ({
     attributeNames: {},
     mutaplasmids: {},
@@ -67,6 +69,19 @@ vi.mock('@/features/character/typeNames', async (importOriginal) => ({
   loadTypeNames: vi.fn(
     async (ids: readonly number[]) => new Map(ids.map((id) => [id, `Name ${id}`]))
   ),
+  loadTypePackagedVolumes: vi.fn(async () => new Map()),
+}));
+// The Move tab reads ship data, the pilot's skills and place names; this file only opens it.
+vi.mock('@/features/fittings/useFittingCatalogue', () => ({
+  useFittingCatalogue: () => null,
+  useFittingCatalogueFailed: () => false,
+}));
+vi.mock('@/features/fittings/fittingPilotProfile', () => ({
+  usePilotProfile: () => ({ profile: null, failed: false, skillsKnown: true, retry: () => {} }),
+}));
+vi.mock('@/features/places', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/places')>()),
+  resolvePlace: vi.fn(async () => ({ name: 'Jita IV - Moon 4', systemId: 30000142 })),
 }));
 vi.mock('@/features/corp/wallet', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/corp/wallet')>()),
@@ -320,6 +335,20 @@ describe('state tabs', () => {
     ).toBeInTheDocument();
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
+  });
+
+  it('opens Move from /corp/assets/move with the corporation hangar stock, and leaves the ledger links alone', async () => {
+    const user = userEvent.setup();
+    await ledger('/corp/assets/move?q=r');
+    expect(screen.getByRole('tab', { name: 'Move', selected: true })).toBeInTheDocument();
+    expect(await screen.findByText('Corporation hangars')).toBeInTheDocument();
+    // The stock, not the impounded hull or the delivery.
+    expect(
+      screen.getByRole('checkbox', { name: /select everything at .* for Corporation hangars/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Name 587')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: /^All/ }));
+    expect(currentLocation()).toBe('/corp/assets?q=r');
   });
 
   it('sends an old tree deep link to /corp/assets, keeping the query', async () => {

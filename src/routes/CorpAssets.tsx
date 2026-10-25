@@ -80,11 +80,15 @@ import {
 } from '@/engine/corp/assetLedger';
 import {
   CORP_ASSET_TABS,
-  corpAssetTabFromPath,
+  corpAssetsPageTabFromPath,
+  corpAssetsPageTabPath,
   corpAssetTabPath,
   tabForState,
+  type CorpAssetsPageTab,
   type CorpAssetTab,
 } from '@/features/corp/corpAssetsTabs';
+import { MovePlanTab } from '@/features/assets/MovePlanTab';
+import { NO_MOVE_PLAN } from '@/features/assets/movePlanUrl';
 import { loadTypeCategories, type AssetCategory } from '@/features/corp/assetCategories';
 import {
   buildLocationRows,
@@ -129,6 +133,8 @@ const EMPTY_DIVISION_NAMES: ReadonlyMap<number, string | null> = new Map();
 const EMPTY_CATEGORIES: ReadonlyMap<number, AssetCategory> = new Map();
 const ALL = 'all';
 const EMPTY_KEYS: ReadonlySet<string> = new Set();
+
+const MOVE_PLAN_KEYS = Object.keys(NO_MOVE_PLAN);
 
 const TAB_LABEL_KEY: Readonly<Record<CorpAssetTab, string>> = {
   all: 'corp.assets.tab.all',
@@ -274,11 +280,11 @@ interface PlaceFilter {
 
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
 function CorpAssetsView({
-  tab,
+  pageTab,
   canReadBlueprints,
   canReadStructures,
 }: {
-  tab: CorpAssetTab;
+  pageTab: CorpAssetsPageTab;
   canReadBlueprints: boolean;
   canReadStructures: boolean;
 }) {
@@ -286,6 +292,9 @@ function CorpAssetsView({
   const navigate = useNavigate();
   const location = useLocation();
   const tabsId = useTabsId();
+  const moving = pageTab === 'move';
+  // Move is no ledger state: the ledger reads All under it, and its tables are not shown.
+  const tab: CorpAssetTab = moving ? 'all' : pageTab;
   // `useRouteSnapshot` keys its reload on the Character and refresh only, so
   // this loader must not close over changing state: the parent remounts this
   // view (`key`) when `canReadBlueprints` flips instead.
@@ -565,9 +574,13 @@ function CorpAssetsView({
   const hasAnyAssets = (data?.inputs ?? []).length > 0;
 
   function selectTab(id: string) {
+    // A plan belongs to the Move tab: leaving it, or coming back, starts from the picker.
+    const next = new URLSearchParams(location.search);
+    for (const key of MOVE_PLAN_KEYS) next.delete(key);
+    const search = next.toString();
     void navigate({
-      pathname: corpAssetTabPath(id as CorpAssetTab),
-      search: location.search,
+      pathname: corpAssetsPageTabPath(id as CorpAssetsPageTab),
+      search: search === '' ? '' : `?${search}`,
     });
   }
 
@@ -593,10 +606,10 @@ function CorpAssetsView({
   const activeFilterCount = [params.loc, params.div, params.cat].filter((v) => v !== null).length;
   const shownCount = byLocation ? locationRows.length : itemRows.length;
 
-  const tabs = CORP_ASSET_TABS.filter(
-    (id) => id === 'all' || id === 'offices' || id === tab || counts[id] > 0
+  const ledgerTabs = CORP_ASSET_TABS.filter(
+    (id) => id === 'all' || id === 'offices' || (!moving && id === tab) || counts[id] > 0
   ).map((id) => ({
-    id,
+    id: id as CorpAssetsPageTab,
     label: t(TAB_LABEL_KEY[id]),
     count: counts[id],
     ...(id === 'impounded' || id === 'assetSafety'
@@ -605,6 +618,10 @@ function CorpAssetsView({
         ? { countTone: 'warning' as const }
         : {}),
   }));
+  const tabs = [
+    ...ledgerTabs,
+    { id: 'move' as CorpAssetsPageTab, label: t('corp.assets.tab.move') },
+  ];
 
   const noMatches = (
     <EmptyState
@@ -744,7 +761,7 @@ function CorpAssetsView({
           }
           actions={
             <div className="ml-auto flex items-center gap-1.5">
-              {!byLocation && (
+              {!byLocation && !moving && (
                 <IconButton
                   icon={<Icon.Select />}
                   label={t('assets.select.toggle')}
@@ -792,92 +809,109 @@ function CorpAssetsView({
             <Tabs
               tabsId={tabsId}
               tabs={tabs}
-              value={tab}
+              value={pageTab}
               onChange={selectTab}
               label={t('corp.assets.tabsLabel')}
               activation="manual"
             />
-            <TabPanel tabsId={tabsId} tabId={tab} className="space-y-2">
-              {selectMode && !byLocation && (
-                <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
-                  {selectedKeys.size > 0 && (
-                    <span
-                      aria-hidden="true"
-                      className="text-[0.6875rem] text-text-dim tabular-nums"
-                    >
-                      {t('assets.select.selectedCount', { count: selectedKeys.size })}
-                    </span>
-                  )}
-                  <Button
-                    size="sm"
-                    onClick={() =>
-                      setSelectedKeys((prev) => new Set([...prev, ...itemRows.map((r) => r.key)]))
-                    }
-                  >
-                    {t('assets.select.selectAllInView')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={selectedKeys.size === 0}
-                    onClick={() => setSelectedKeys(() => EMPTY_KEYS)}
-                  >
-                    {t('assets.select.deselectAll')}
-                  </Button>
-                  {selectedKeys.size > 0 && (
-                    <>
+            <TabPanel tabsId={tabsId} tabId={pageTab} className="space-y-2">
+              {moving && snapshot.activeCharacterId !== null ? (
+                <MovePlanTab
+                  characterIds={[]}
+                  activeCharacterId={snapshot.activeCharacterId}
+                  corp={{
+                    pilotId: snapshot.activeCharacterId,
+                    name: t('corp.assets.move.owner'),
+                    inputs: data.inputs,
+                  }}
+                  onClose={() => selectTab('all')}
+                />
+              ) : (
+                <>
+                  {selectMode && !byLocation && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
+                      {selectedKeys.size > 0 && (
+                        <span
+                          aria-hidden="true"
+                          className="text-[0.6875rem] text-text-dim tabular-nums"
+                        >
+                          {t('assets.select.selectedCount', { count: selectedKeys.size })}
+                        </span>
+                      )}
                       <Button
                         size="sm"
-                        disabled={!itemActions.quickbar.available}
-                        onClick={handleBulkAddToQuickbar}
+                        onClick={() =>
+                          setSelectedKeys(
+                            (prev) => new Set([...prev, ...itemRows.map((r) => r.key)])
+                          )
+                        }
                       >
-                        {t('assets.select.addToQuickbar')}
+                        {t('assets.select.selectAllInView')}
                       </Button>
-                      <Button size="sm" onClick={handleBulkAddToCompare}>
-                        {t('assets.select.addToCompare')}
+                      <Button
+                        size="sm"
+                        disabled={selectedKeys.size === 0}
+                        onClick={() => setSelectedKeys(() => EMPTY_KEYS)}
+                      >
+                        {t('assets.select.deselectAll')}
                       </Button>
-                      <Button size="sm" onClick={handleBulkCopyNames}>
-                        {t('assets.select.copyNames')}
-                      </Button>
-                    </>
+                      {selectedKeys.size > 0 && (
+                        <>
+                          <Button
+                            size="sm"
+                            disabled={!itemActions.quickbar.available}
+                            onClick={handleBulkAddToQuickbar}
+                          >
+                            {t('assets.select.addToQuickbar')}
+                          </Button>
+                          <Button size="sm" onClick={handleBulkAddToCompare}>
+                            {t('assets.select.addToCompare')}
+                          </Button>
+                          <Button size="sm" onClick={handleBulkCopyNames}>
+                            {t('assets.select.copyNames')}
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   )}
-                </div>
+                  <Panel padded={false} className="flex min-h-0 flex-col">
+                    {byLocation ? (
+                      <CorpAssetLocationTable
+                        rows={locationRows}
+                        labels={labels}
+                        onOpenRow={openLocationRow}
+                        renderToolbar={(picker, exportMenu) => (
+                          <div className="border-b border-line p-3">
+                            {renderToolbar(picker, exportMenu)}
+                          </div>
+                        )}
+                        truncated={data.truncated}
+                        emptyState={noMatches}
+                      />
+                    ) : (
+                      <CorpAssetItemTable
+                        rows={itemRows}
+                        labels={labels}
+                        below={params.below}
+                        blueprintTypeIds={blueprintTypeIds}
+                        selectMode={selectMode}
+                        selectedKeys={selectedKeys}
+                        onToggleKey={toggleKey}
+                        canEditTargets={targetsApi.hydrated && data.corporationId !== null}
+                        onSetTarget={targetsApi.setTarget}
+                        onRemoveTarget={targetsApi.removeTarget}
+                        renderToolbar={(picker, exportMenu) => (
+                          <div className="border-b border-line p-3">
+                            {renderToolbar(picker, exportMenu)}
+                          </div>
+                        )}
+                        truncated={data.truncated}
+                        emptyState={noMatches}
+                      />
+                    )}
+                  </Panel>
+                </>
               )}
-              <Panel padded={false} className="flex min-h-0 flex-col">
-                {byLocation ? (
-                  <CorpAssetLocationTable
-                    rows={locationRows}
-                    labels={labels}
-                    onOpenRow={openLocationRow}
-                    renderToolbar={(picker, exportMenu) => (
-                      <div className="border-b border-line p-3">
-                        {renderToolbar(picker, exportMenu)}
-                      </div>
-                    )}
-                    truncated={data.truncated}
-                    emptyState={noMatches}
-                  />
-                ) : (
-                  <CorpAssetItemTable
-                    rows={itemRows}
-                    labels={labels}
-                    below={params.below}
-                    blueprintTypeIds={blueprintTypeIds}
-                    selectMode={selectMode}
-                    selectedKeys={selectedKeys}
-                    onToggleKey={toggleKey}
-                    canEditTargets={targetsApi.hydrated && data.corporationId !== null}
-                    onSetTarget={targetsApi.setTarget}
-                    onRemoveTarget={targetsApi.removeTarget}
-                    renderToolbar={(picker, exportMenu) => (
-                      <div className="border-b border-line p-3">
-                        {renderToolbar(picker, exportMenu)}
-                      </div>
-                    )}
-                    truncated={data.truncated}
-                    emptyState={noMatches}
-                  />
-                )}
-              </Panel>
             </TabPanel>
           </div>
         )}
@@ -902,11 +936,11 @@ function CorpAssetsRoute({
 }) {
   const wildcard = useParams()['*'] ?? '';
   const { search } = useLocation();
-  const tab = corpAssetTabFromPath(wildcard);
-  if (tab === null) return <Navigate replace to={{ pathname: '/corp/assets', search }} />;
+  const pageTab = corpAssetsPageTabFromPath(wildcard);
+  if (pageTab === null) return <Navigate replace to={{ pathname: '/corp/assets', search }} />;
   return (
     <CorpAssetsView
-      tab={tab}
+      pageTab={pageTab}
       canReadBlueprints={canReadBlueprints}
       canReadStructures={canReadStructures}
     />
