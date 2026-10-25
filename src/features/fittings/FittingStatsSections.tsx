@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui';
+import { textActionClassName } from '@/components/ui/textActionClassName';
 import { useShipDataNeedsConnection } from './useDogmaEngineStatus';
 import type {
   Fitting,
@@ -97,6 +98,8 @@ interface FittingStatsSectionsProps {
   moduleResults?: FittingModuleResult[] | null;
   /** A change to preview in place (`current → after`), from Improve's ticked or hovered rows; absent or null: none. */
   preview?: FittingStatsDelta | null;
+  /** Opens Improve from the header; absent where the Fitting cannot be edited. */
+  onImprove?: () => void;
 }
 
 /**
@@ -128,6 +131,7 @@ export function FittingStatsSections({
   whatToTrain,
   yourCharacters,
   showDrones = true,
+  onImprove,
   fitting = null,
   moduleResults = null,
   preview = null,
@@ -241,6 +245,11 @@ export function FittingStatsSections({
           >
             {situationValue}
           </StatsScopeTrigger>
+          {onImprove && (
+            <button type="button" className={textActionClassName('ml-auto')} onClick={onImprove}>
+              {t('fittings.improve.menuItem')}
+            </button>
+          )}
         </div>
         {statsError && (
           <div

@@ -85,6 +85,8 @@ export interface FittingItemActions {
   /** Opens the Add panel on a slot — the slot's "Add module" action. */
   browseFor: (rack: FittingSlotKind, index: number) => void;
   fillRack: (rack: FittingSlotKind, typeId: number) => void;
+  /** Opens Improve; absent where it can't (the empty-slot menu then omits its entry). */
+  openImprove?: () => void;
 
   launchDrones: (typeId: number) => void;
   recallDrones: (typeId: number) => void;
