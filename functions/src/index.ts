@@ -56,6 +56,8 @@ import {
   writeDeviceRegistration,
 } from './projectionStore.js';
 import { pollServerEvents } from './serverEventPoll.js';
+import { createRegistrationReader } from './registrationReader.js';
+import { ALERTS_POLL_STATS_KEYS, SERVER_POLL_STATS_KEYS, createRunStats } from './runStats.js';
 import { fetchFuzzworkPrices, fetchZkillLosses } from './serverEventSources.js';
 import {
   deleteDeviceIfToken,
@@ -473,29 +475,35 @@ export const dispatchProjections = onSchedule(
   async () => {
     const db = firestore();
     const messaging = getMessaging();
+    const serverStats = createRunStats(SERVER_POLL_STATS_KEYS);
     // Independent halves: one failing must not stop the other.
     const [projected, polled] = await Promise.allSettled([
       dispatchDueProjections(db, messaging, Date.now(), logError),
       // Price alerts and ship losses for a closed app (issue #5121): public data,
       // no EVE token, pushed to the devices that enabled them.
       pollServerEvents({
-        listDevices: () => listPolledDevices(db),
+        listDevices: () => listPolledDevices(db, serverStats),
         fetchLosses: (characterId) => fetchZkillLosses(characterId),
         fetchPrices: (stationId, typeIds) => fetchFuzzworkPrices(stationId, typeIds),
         send: async (token, data) => {
+          serverStats.add('fcmSends');
           await messaging.send({ token, data });
         },
-        saveBaselines: (deviceId, baselines) => saveServerBaselines(db, deviceId, baselines),
-        deleteDevice: (deviceId, fcmToken) => deleteDeviceIfToken(db, deviceId, fcmToken),
+        saveBaselines: (deviceId, baselines) =>
+          saveServerBaselines(db, deviceId, baselines, serverStats),
+        deleteDevice: (deviceId, fcmToken) =>
+          deleteDeviceIfToken(db, deviceId, fcmToken, serverStats),
         log: (message, data) => logWarn(message, data),
         now: () => Date.now(),
+        stats: serverStats,
       }),
     ]);
     if (projected.status === 'rejected')
       logError('Scheduled Push dispatch failed', { error: String(projected.reason) });
     if (polled.status === 'rejected')
       logError('Server event poll failed', { error: String(polled.reason) });
-    else logInfo('Server event poll finished', { ...polled.value });
+    // One line per tick, counts only: query `jsonPayload.message="Server event poll finished"`.
+    else logInfo('Server event poll finished', { ...polled.value, ...serverStats.snapshot() });
   }
 );
 
@@ -559,7 +567,24 @@ export const pollEveNotifications = onSchedule(
   },
   async () => {
     const messaging = getMessaging();
+    const stats = createRunStats(ALERTS_POLL_STATS_KEYS);
+    const registrations = createRegistrationReader(firestore(), stats);
+    // The public lists are read once per run, whoever asks first: the candidates
+    // check before any location read and the nearby phase afterwards share them.
+    const once = <T>(read: () => Promise<T>): (() => Promise<T>) => {
+      let pending: Promise<T> | undefined;
+      return () => (pending ??= read());
+    };
+    const incursions = once(() => {
+      stats.add('esiIncursionsCalls');
+      return fetchIncursions();
+    });
+    const skyhooks = once(() => {
+      stats.add('esiSkyhooksCalls');
+      return fetchRaidableSkyhooks();
+    });
     const send = async (token: string, message: PushMessage) => {
+      stats.add('fcmSends');
       await messaging.send({
         token,
         data: message.data,
@@ -571,7 +596,10 @@ export const pollEveNotifications = onSchedule(
       store: firestorePollerStore(firestore(), {
         key: () => parseAlertsKey(ALERTS_TOKEN_KEY.value()),
         refresh: (clientId, refreshToken) => refreshAtSso(clientId, refreshToken),
+        stats,
+        registrations,
       }),
+      stats,
       fetchNotifications: (characterId, accessToken, etag) =>
         fetchEsiNotifications(characterId, accessToken, etag),
       send,
@@ -585,12 +613,22 @@ export const pollEveNotifications = onSchedule(
       nearby: {
         fetchLocation: (characterId, accessToken) =>
           fetchCharacterLocation(characterId, accessToken),
+        hasCandidates: async (wanted) => {
+          const [incursionList, skyhookList] = await Promise.all([
+            wanted.incursions ? incursions() : null,
+            wanted.skyhooks ? skyhooks() : null,
+          ]);
+          // A list that failed or asked to back off is not known to be empty.
+          const empty = (read: { kind: string; value?: unknown[] } | null) =>
+            read === null || (read.kind === 'ok' && read.value?.length === 0);
+          return !(empty(incursionList) && empty(skyhookList));
+        },
         runPhase: (locations) =>
           runNearbyPhase({
             deps: {
-              store: firestoreNearbyStore(firestore()),
-              fetchIncursions: () => fetchIncursions(),
-              fetchRaidableSkyhooks: () => fetchRaidableSkyhooks(),
+              store: firestoreNearbyStore(firestore(), { registrations, stats }),
+              fetchIncursions: incursions,
+              fetchRaidableSkyhooks: skyhooks,
             },
             locations,
             send,
@@ -599,7 +637,8 @@ export const pollEveNotifications = onSchedule(
           }),
       },
     });
-    logInfo('pollEveNotifications finished', { ...summary });
+    // One line per run, counts only: query `jsonPayload.message="pollEveNotifications finished"`.
+    logInfo('pollEveNotifications finished', { ...summary, ...stats.snapshot() });
   }
 );
 

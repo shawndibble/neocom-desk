@@ -179,3 +179,57 @@ describe('pollServerEvents', () => {
     expect(flaky.saved.get('A') ?? { '7': baseline }).toEqual({ '7': baseline });
   });
 });
+
+describe('pollServerEvents: stale devices and run counts (issue #5144)', () => {
+  const DAY = 24 * 3_600_000;
+  const SLOT = 4_000 * 15 * 60_000; // the hourly slot of the back-off
+  const stale = (days: number, at: number) => device({ updatedAtMs: at - days * DAY });
+  const at = (now: number) => (d: ServerPollDeps) => ({ ...d, now: () => now });
+
+  it('polls a stale device only on the hourly run', async () => {
+    const off = harness([stale(20, SLOT + 900_000)]);
+    await pollServerEvents(at(SLOT + 900_000)(off.deps));
+    expect(off.deps.fetchLosses).not.toHaveBeenCalled();
+    expect(off.saved.size).toBe(0);
+
+    const hourly = harness([stale(20, SLOT)]);
+    await pollServerEvents(at(SLOT)(hourly.deps));
+    expect(hourly.deps.fetchLosses).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a dormant device alone and forgets its readings once, so waking it seeds silently', async () => {
+    const baseline = { shipLossIds: [1] };
+    const dormant = harness([
+      { ...stale(120, SLOT), characters: device({}, baseline).characters },
+      device({ deviceId: 'B', updatedAtMs: SLOT }),
+    ]);
+    await pollServerEvents(at(SLOT)(dormant.deps));
+    expect(dormant.deps.saveBaselines).toHaveBeenCalledWith('A', {});
+
+    const cleared = harness([
+      {
+        ...stale(120, SLOT),
+        characters: [{ ...device({}, baseline).characters[0]!, baseline: {} }],
+      },
+    ]);
+    await pollServerEvents(at(SLOT)(cleared.deps));
+    expect(cleared.deps.saveBaselines).not.toHaveBeenCalled();
+    expect(cleared.deps.fetchLosses).not.toHaveBeenCalled();
+  });
+
+  it('counts the run', async () => {
+    const { createRunStats, SERVER_POLL_STATS_KEYS } = await import('./runStats.js');
+    const stats = createRunStats(SERVER_POLL_STATS_KEYS);
+    const h = harness([device({ updatedAtMs: SLOT }), stale(20, SLOT + 900_000)]);
+    await pollServerEvents({ ...h.deps, stats, now: () => SLOT + 900_000 });
+    expect(stats.snapshot()).toMatchObject({
+      devicesListed: 2,
+      devicesPolled: 1,
+      devicesSkippedSleeping: 1,
+      devicesSkippedDormant: 0,
+      zkillboardCalls: 1,
+      fuzzworkCalls: 1,
+      durationMs: 0,
+    });
+  });
+});

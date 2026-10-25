@@ -1464,7 +1464,14 @@
       "sideResult": "{{side}}: {{result}}",
       "sideNone": "no gain",
       "sideGain": "up to +{{percent}}%",
-      "moreLabel": "Also try…",
+      "moreLabel": "Rigs and officer modules",
+      "moreGoals": "More goals ({{count}})",
+      "settingsLabel": "Search settings",
+      "summaryNoCap": "no budget",
+      "summaryCap": {
+        "buy": "budget {{cap}}",
+        "refit": "cap {{cap}}"
+      },
       "includeRigs": "Rigs",
       "includeOfficer": "Officer and Deadspace modules",
       "destroysRig": "Removing the old rig destroys it; the new one is paid in full.",
