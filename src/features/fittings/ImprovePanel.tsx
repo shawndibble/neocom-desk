@@ -59,7 +59,11 @@ import { alignTimeSeconds } from '@/engine/fittings/stats';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { summariseSelection } from '@/engine/fittings/improveSelection';
-import { diffFittingStats } from '@/engine/fittings/variationDelta';
+import {
+  diffFittingStats,
+  STAT_DIGITS,
+  type StatChange as StatChangeValue,
+} from '@/engine/fittings/variationDelta';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { MakeItFitSection } from './MakeItFitSection';
@@ -218,6 +222,25 @@ export function ImprovePanel({
     return shown.flatMap((node, i) => (i === 0 ? [node] : [', ', node]));
   }
 
+  /** Each stat the swap makes worse, with its before → after, so the loss has a size. */
+  function lostLine(option: ImproveOption): ReactNode {
+    return option.lost.flatMap((stat, i): ReactNode[] => {
+      const node =
+        stat.key in STAT_DIGITS ? (
+          <StatChange key={stat.key} change={stat as StatChangeValue} />
+        ) : (
+          <span key={stat.key}>
+            {t('fittings.improve.lostRole', {
+              stat: t(`fittings.whatToTrain.sort.${stat.key}`),
+              before: stat.before,
+              after: stat.after,
+            })}
+          </span>
+        );
+      return i === 0 ? [node] : [', ', node];
+    });
+  }
+
   function isk(option: ImproveOption) {
     if (option.iskDelta === null)
       return <span className="text-text-dim">{t('fittings.improve.noPrice')}</span>;
@@ -359,13 +382,9 @@ export function ImprovePanel({
                   )}
                   {line && <span className="block text-xs">{line}</span>}
                   <span className="text-text-dim block text-xs">{changeLine(option, own)}</span>
-                  {option.downsides.length > 0 && (
+                  {option.lost.length > 0 && (
                     <span className="text-warning block text-xs">
-                      {t('fittings.improve.givesUp', {
-                        stats: option.downsides
-                          .map((metric) => t(`fittings.whatToTrain.sort.${metric}`))
-                          .join(', '),
-                      })}
+                      {t('fittings.improve.givesUp')} {lostLine(option)}
                     </span>
                   )}
                   <span className="block text-xs">{isk(option)}</span>
