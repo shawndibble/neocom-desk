@@ -39,6 +39,9 @@ const SPEED_GROUPS: readonly number[] = [46, 762, 763, 764, 782];
 /** Cap Recharger, Capacitor Power Relay, Capacitor Flux Coil, capacitor rigs. */
 const CAP_GROUPS: readonly number[] = [43, 767, 768, 781];
 
+/** Mining Laser, Strip Miner (and Ice Harvester), Deep Core Strip Miner, Mining Laser Upgrade, mining rigs (1232). */
+const MINING_GROUPS: readonly number[] = [54, 464, 483, 546, 1232];
+
 /** The module groups, beyond a module's own, that Rework tries for each Improve Goal. The tank groups are added per Defense Choice. */
 const GOAL_GROUPS: Record<ImproveGoal, readonly number[]> = {
   overall: [...DAMAGE_GROUPS, ...REACH_GROUPS, ...SPEED_GROUPS, ...CAP_GROUPS],
@@ -47,6 +50,7 @@ const GOAL_GROUPS: Record<ImproveGoal, readonly number[]> = {
   speed: SPEED_GROUPS,
   reach: REACH_GROUPS,
   cheaper: [],
+  mining: MINING_GROUPS,
 };
 
 /** The goals whose score includes the fit's tank. */
@@ -100,6 +104,7 @@ export function jobOf(groupId: number | undefined): Job | null {
 export function scoredJobs(goal: ImproveGoal): readonly Job[] {
   if (goal === 'speed') return ['propulsion'];
   if (goal === 'overall') return ['cap'];
+  if (goal === 'mining') return ['mining'];
   return [];
 }
 

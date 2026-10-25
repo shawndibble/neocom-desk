@@ -18,6 +18,7 @@ import {
   useImprove,
   useImproveGoal,
   useImproveMode,
+  useImproveOre,
   useImproveReach,
   useImproveSpendCap,
 } from './useImprove';
@@ -64,6 +65,8 @@ export function useImproveDrawer({
   const setReach = useImproveReach((state) => state.setValue);
   const mode = useImproveMode((state) => state.value);
   const setMode = useImproveMode((state) => state.setValue);
+  const oreFamily = useImproveOre((state) => state.value);
+  const setOreFamily = useImproveOre((state) => state.setValue);
   const spendCap = useImproveSpendCap((state) => state.value);
   const setSpendCap = useImproveSpendCap((state) => state.setValue);
   // Not remembered: a Defense Choice, and the Rigs and Officer ticks, are about this fit.
@@ -89,7 +92,7 @@ export function useImproveDrawer({
     goal,
     targetProfiles.hydrated ? targetProfiles.selected : undefined,
     isOpen,
-    { reach, mode, spendCap, defense, includeRigs, includeOfficer }
+    { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily }
   );
 
   function apply(options: ImproveOption[]) {
@@ -162,6 +165,8 @@ export function useImproveDrawer({
         onIncludeRigsChange: setIncludeRigs,
         includeOfficer,
         onIncludeOfficerChange: setIncludeOfficer,
+        oreFamily,
+        onOreFamilyChange: (next) => void setOreFamily(next),
       }}
     />
   );
