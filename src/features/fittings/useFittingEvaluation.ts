@@ -23,8 +23,9 @@ import type { Appraisal } from '@/engine/market/appraisal';
 import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { useStatsConditions } from './statsConditions';
+import { useChargeBasis } from './useChargeBasis';
 import { useDamageProfiles, type DamageProfiles } from './damageProfiles';
-import { explainModule, type DogmaAssetProgress } from './dogmaFittingEngine';
+import { explainModule, type ChargeBasis, type DogmaAssetProgress } from './dogmaFittingEngine';
 import type { AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { loadFittingPrice } from './fittingPrice';
 import { useDogmaEngine } from './fittingContext';
@@ -84,6 +85,8 @@ export interface FittingEvaluation {
    * out under. Null until the pilot, the Damage Profile and the engine are ready.
    */
   explainModule: ((moduleIndex: number) => Promise<AffectedAttribute[]>) | null;
+  /** What the Charge Picker works a charge out under — the stats' own basis; null until the pilot and the Damage Profile are ready. */
+  chargeBasis: ChargeBasis | null;
   /** "What to train"; null until the pilot, the Damage Profile and the engine are ready. */
   skillGains: SkillGainEvaluator | null;
   /**
@@ -191,6 +194,8 @@ export function useFittingEvaluation({
     };
   }, [fitting, pilot, damageProfile, conditions, engine]);
 
+  const chargeBasis = useChargeBasis(pilot, damageProfile, conditions);
+
   const compareWeather = useMemo(() => {
     if (fitting === null || pilot === null || damageProfile === null) return null;
     return async (weatherTypeId: number) => {
@@ -228,6 +233,7 @@ export function useFittingEvaluation({
     variants: evaluators?.variants ?? null,
     explainModule: explain,
     skillGains: evaluators?.skillGains ?? null,
+    chargeBasis,
     compareWeather,
   };
 }

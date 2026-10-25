@@ -23,7 +23,7 @@ import type {
 import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
-import type { ChargeEngineStats } from './dogmaFittingEngine';
+import type { ChargeBasis, ChargeEngineStats } from './dogmaFittingEngine';
 import type { FittingContext } from './fittingContext';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import { useKeyedLoad } from '@/lib/useAsyncLoad';
@@ -137,11 +137,14 @@ function weaponGroupsOf(
 /**
  * What the engine's figures for one group depend on: everything in the
  * Fitting except the group's own charges (which `compareCharges` replaces)
- * and the cargo.
+ * and the cargo, and what it is worked out under (`ChargeBasis`) — its pilot
+ * is the cache's own key.
  */
-function engineKey(fitting: Fitting, moduleTypeId: number): string {
+function engineKey(fitting: Fitting, moduleTypeId: number, basis?: ChargeBasis): string {
   return JSON.stringify({
     ...fitting,
+    damageProfile: basis?.damageProfile,
+    conditions: basis?.options,
     name: '',
     cargo: [],
     modules: fitting.modules.map((m) =>
@@ -161,27 +164,28 @@ const ENGINE_CACHE_LIMIT = 24;
 
 function engineFigures(
   fitting: Fitting,
-  { engine, profile, catalogue }: FittingContext,
+  { engine, profile, catalogue, basis }: FittingContext,
   group: WeaponGroupBase
 ): EngineResult {
-  const key = `${group.moduleTypeId}|${engineKey(fitting, group.moduleTypeId)}`;
-  const cache = engineCache.get(profile) ?? new Map<string, EngineResult>();
-  engineCache.set(profile, cache);
+  const pilot = basis?.pilot ?? profile;
+  const key = `${group.moduleTypeId}|${engineKey(fitting, group.moduleTypeId, basis)}`;
+  const cache = engineCache.get(pilot) ?? new Map<string, EngineResult>();
+  engineCache.set(pilot, cache);
   const hit = cache.get(key);
   if (hit) return hit;
 
   const module = { slot: group.slot, typeId: group.moduleTypeId };
   const ids = group.chargeGroupIds.flatMap((id) => catalogue.typeIdsByGroup.get(id) ?? []);
-  const fits = engine.checkCharges(fitting.shipTypeId, module, ids, profile);
+  const fits = engine.checkCharges(fitting.shipTypeId, module, ids, pilot);
   const candidates = ids.filter((id) => fits.has(id) && catalogue.types[String(id)] !== undefined);
   const result: EngineResult = {
     candidates,
     stats: new Map(
       engine
-        .compareCharges(fitting, profile, group.moduleTypeId, candidates)
+        .compareCharges(fitting, profile, group.moduleTypeId, candidates, basis)
         .map((s) => [s.typeId, s])
     ),
-    skillMissing: engine.chargesMissingSkills(fitting.shipTypeId, module, candidates, profile),
+    skillMissing: engine.chargesMissingSkills(fitting.shipTypeId, module, candidates, pilot),
   };
   if (cache.size >= ENGINE_CACHE_LIMIT) cache.delete(cache.keys().next().value!);
   cache.set(key, result);

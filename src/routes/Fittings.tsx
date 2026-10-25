@@ -103,7 +103,7 @@ function FittingsPage() {
   }, []);
   const workspace = useFittingWorkspace();
   const catalogue = useFittingCatalogue();
-  const context = useFittingContext(workspace.profile, catalogue);
+  const context = useFittingContext(workspace.profile, catalogue, workspace.chargeBasis);
   const isDesktop = useIsDesktop();
   const isPhone = useIsPhone();
   const threeColumns = useMediaQuery(THREE_COLUMN_QUERY);
