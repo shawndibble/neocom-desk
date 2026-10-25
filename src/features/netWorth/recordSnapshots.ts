@@ -10,6 +10,7 @@ import { db } from '@/db';
 import { STALE_AFTER } from '@/esi/cache';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { PLEX_TYPE_ID } from '@/engine/contracts/contractOffers';
+import { openIssuedItemContracts, type StockContractItem } from '@/engine/netWorth/contractStock';
 import {
   buildSnapshotRow,
   lacksLayer,
@@ -19,6 +20,8 @@ import {
 } from '@/engine/netWorth/snapshot';
 import { lastKnownAbyssalValues } from '@/features/abyssal/abyssalEstimates';
 import { loadCharacterAssets } from '@/features/assets/assets';
+import { loadContracts } from '@/features/character/contracts';
+import { loadContractItemsDetailed } from '@/features/character/contractItems';
 import { loadOrders } from '@/features/character/orders';
 import { loadWalletBalanceWithStatus } from '@/features/character/wallet';
 import { MARKET_HUB_SETTING_KEY } from '@/features/market/hub';
@@ -31,6 +34,44 @@ export const REQUIRED_SCOPES = [
   ESI_REGISTRY.getCharacterAssets.scope,
   ESI_REGISTRY.getCharacterOrders.scope,
 ];
+
+/** Open-contract item reads one snapshot may add; the rest wait for the next run (they are cached once read). */
+const MAX_CONTRACT_ITEM_READS = 30;
+
+/** ESI's definite "no such contract": the contract is left out rather than holding the whole layer back. */
+const GONE_STATUSES = [404, 410];
+
+/**
+ * The Character's contracts and the items of its own open item-exchange and
+ * auction ones, or `null` when the layer cannot be read today: the permission
+ * is missing or revoked, a read is stale or incomplete, or an item read failed
+ * for a reason that may pass. The row then leaves the layer off and is re-read.
+ */
+async function readContractStock(
+  characterId: number,
+  now: number
+): Promise<SnapshotFetch['contractStock']> {
+  const contracts = await loadContracts(characterId);
+  if (contracts.needsReauth || !contracts.cached) return null;
+  if (contracts.cached.truncated || isStale(contracts.cached)) return null;
+  const open = openIssuedItemContracts(contracts.cached.data, characterId, now);
+  const itemsByContractId = new Map<number, readonly StockContractItem[] | null>();
+  let reads = 0;
+  for (const contract of open) {
+    if (reads >= MAX_CONTRACT_ITEM_READS) return null;
+    const outcome = await loadContractItemsDetailed(characterId, contract.contract_id).catch(
+      () => null
+    );
+    if (outcome?.networkRead) reads += 1;
+    if (!outcome?.result) {
+      if (!outcome || !GONE_STATUSES.includes(outcome.failureStatus ?? 0)) return null;
+      itemsByContractId.set(contract.contract_id, null);
+      continue;
+    }
+    itemsByContractId.set(contract.contract_id, outcome.result.data);
+  }
+  return { contracts: contracts.cached.data, itemsByContractId };
+}
 
 export type SnapshotFetch = Omit<SnapshotInputs, 'characterId' | 'now'>;
 
@@ -59,6 +100,10 @@ export const liveSources: SnapshotSources = {
     const scopes = token?.scopes ?? [];
     // Checked up front so a missing permission never provokes a live 403.
     if (!REQUIRED_SCOPES.every((scope) => scopes.includes(scope))) return null;
+    // Optional: without the permission the layer is absent, never a zero.
+    const contractStock = scopes.includes(ESI_REGISTRY.getCharacterContracts.scope)
+      ? await readContractStock(characterId, Date.now()).catch(() => null)
+      : null;
     const [wallet, assets, orders] = await Promise.all([
       loadWalletBalanceWithStatus(characterId),
       loadCharacterAssets(characterId),
@@ -79,9 +124,12 @@ export const liveSources: SnapshotSources = {
     // Without the mutaplasmid data no module reads as abyssal: a day's row is
     // final, so wait for a run that can value them rather than freeze it low.
     if (!abyssal) return null;
-    const typeIds = [...new Set((assetList ?? []).map((a) => a.type_id))].filter(
-      (id) => id !== PLEX_TYPE_ID && !abyssal.isAbyssalType(id)
+    const contractTypeIds = [...(contractStock?.itemsByContractId.values() ?? [])].flatMap(
+      (items) => (items ?? []).map((line) => line.type_id)
     );
+    const typeIds = [
+      ...new Set([...(assetList ?? []).map((a) => a.type_id), ...contractTypeIds]),
+    ].filter((id) => id !== PLEX_TYPE_ID && !abyssal.isAbyssalType(id));
     const [hubPrices, averages] = await Promise.all([
       getHubPrices(getTradeHub(hubId) ?? DEFAULT_TRADE_HUB, typeIds),
       getAveragePriceByType(),
@@ -100,6 +148,7 @@ export const liveSources: SnapshotSources = {
       assets: assetList,
       orders: orders.cached?.data ?? null,
       priceByTypeId,
+      contractStock,
       itemValueByItemId: abyssal.values,
     };
   },
@@ -114,7 +163,11 @@ async function recordOne(
 ): Promise<SnapshotOutcome> {
   const held = await db.netWorthSnapshots.get(snapshotId(characterId, utcDay(now)));
   // A row from before a layer existed is re-read once; a complete one is final for the day.
-  if (held && !lacksLayer(held)) return 'already-recorded';
+  if (held) {
+    const scopes = (await db.tokens.get(characterId))?.scopes ?? [];
+    const contracts = scopes.includes(ESI_REGISTRY.getCharacterContracts.scope);
+    if (!lacksLayer(held, { contracts })) return 'already-recorded';
+  }
   const fetched = await sources.fetch(characterId);
   if (!fetched) return 'skipped';
   const row = buildSnapshotRow({ ...fetched, characterId, now });

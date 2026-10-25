@@ -169,7 +169,7 @@ describe('netWorth', () => {
     characterId,
     day,
     covered,
-    layers: { isk: 1000, assets: 9000, escrow: 0, sellOrders: 2000 },
+    layers: { isk: 1000, assets: 9000, escrow: 0, sellOrders: 2000, contracts: 0 },
     history: [],
   });
 
@@ -194,8 +194,14 @@ describe('netWorth', () => {
 
   it('draws the layers over time and says how the total moved when there is a history', () => {
     const history = [
-      { day: '2026-10-09', layers: { isk: 500, assets: 8000, escrow: 0, sellOrders: 1500 } },
-      { day: '2026-10-10', layers: { isk: 1000, assets: 9000, escrow: 0, sellOrders: 2000 } },
+      {
+        day: '2026-10-09',
+        layers: { isk: 500, assets: 8000, escrow: 0, sellOrders: 1500, contracts: 0 },
+      },
+      {
+        day: '2026-10-10',
+        layers: { isk: 1000, assets: 9000, escrow: 0, sellOrders: 2000, contracts: 0 },
+      },
     ];
     const view = buildView(
       'netWorth',

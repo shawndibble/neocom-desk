@@ -29,14 +29,16 @@ const row = (
 });
 
 describe('layerValues / netWorthOf', () => {
-  it('splits a row into the four layers, reading a missing sell stock as 0', () => {
+  it('splits a row into the layers, reading a missing sell stock or contract stock as 0', () => {
     expect(layerValues(row('2026-10-01'))).toEqual({
       isk: 100,
       assets: 50,
       escrow: 10,
       sellOrders: 5,
+      contracts: 0,
     });
     expect(layerValues(row('2026-10-01', { sellStock: undefined })).sellOrders).toBe(0);
+    expect(layerValues(row('2026-10-01', { contractStock: 9 })).contracts).toBe(9);
   });
 
   it('sums only the shown layers', () => {
@@ -53,7 +55,7 @@ describe('toggleHidden', () => {
   });
 
   it('refuses to hide the last visible one', () => {
-    const hidden = ['assets', 'escrow', 'escrow', 'sellOrders'] as const;
+    const hidden = ['assets', 'escrow', 'escrow', 'sellOrders', 'contracts'] as const;
     expect(toggleHidden(hidden, 'isk', LAYER_IDS)).toEqual(hidden);
   });
 
@@ -177,6 +179,15 @@ describe('listedLayers', () => {
   it('lists a layer when only one of several Characters holds it', () => {
     const rows = [row('2026-10-01', empty, 1), row('2026-10-01', { ...empty, escrow: 3 }, 2)];
     expect(listedLayers(rows)).toEqual(['isk', 'assets', 'escrow']);
+  });
+
+  it('lists In contracts only once a row carries a value for it', () => {
+    expect(listedLayers([row('2026-10-01', { ...empty, contractStock: 0 })])).not.toContain(
+      'contracts'
+    );
+    expect(listedLayers([row('2026-10-01', { ...empty, contractStock: 3 })])).toContain(
+      'contracts'
+    );
   });
 
   it('reads rows as stored: a missing sellStock is not a value', () => {
