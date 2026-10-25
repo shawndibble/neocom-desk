@@ -16,7 +16,7 @@ import type { EsiEndpointId } from '@/esi/registry';
 import { ownedAtPlace } from '@/engine/market/appraisalOwned';
 import { loadAllCharactersAssets } from '@/features/assets/assets';
 import { loadStationName } from '@/features/character/stations';
-import { loadStructureName } from '@/features/character/structures';
+import { loadStructureNameNoRoster } from '@/features/character/structures';
 import { useAppraisalOwnedPref } from '@/features/market/appraisalOwnedPref';
 import { useMarketHub } from '@/features/market/hub';
 import { TRADE_HUBS, getTradeHub } from '@/market/hubs';
@@ -99,7 +99,12 @@ export function useFittingExport(fitting: Fitting, cloneImplants: readonly numbe
       const placeName =
         hub?.systemName ??
         (isStructure
-          ? entries[0] && (await loadStructureName(entries[0].characterId, stationId))
+          ? await loadStructureNameNoRoster(
+              entries.find((entry) =>
+                entry.assets.some((a) => a.location_type === 'other' && a.location_id === stationId)
+              )?.characterId ?? 0,
+              stationId
+            )
           : await loadStationName(stationId)) ??
         t('market.appraisal.minusOwnedUnknownStructure', { id: stationId });
       const text = await exportFitting('multibuy', fitting, cloneImplants, owned);

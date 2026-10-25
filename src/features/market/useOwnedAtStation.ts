@@ -12,7 +12,7 @@ import {
 } from '@/engine/market/appraisalOwned';
 import { loadAllCharactersAssets } from '@/features/assets/assets';
 import { loadStationName } from '@/features/character/stations';
-import { loadStructureName } from '@/features/character/structures';
+import { loadStructureNameNoRoster } from '@/features/character/structures';
 
 export interface OwnedAtStation {
   /** Null while off, loading, or when nothing could be read. */
@@ -44,16 +44,19 @@ export function useOwnedAtStation(enabled: boolean, scope: OwnedScope): OwnedAtS
         if (cancelled) return;
         const loaded = entries.map((entry) => entry.assets);
         setLists(loaded);
-        const characterId = entries[0]?.characterId;
         const resolved = new Map<number, string>();
         await Promise.all(
           ownedPlaces(loaded).map(async (place) => {
+            // Ask a Character that holds stock there; no roster sweep, so a refusal costs one call.
+            const holder = entries.find((entry) =>
+              entry.assets.some((a) => a.location_type === 'other' && a.location_id === place.id)
+            );
             const name =
               place.kind === 'station'
                 ? await loadStationName(place.id)
-                : characterId === undefined
-                  ? null
-                  : await loadStructureName(characterId, place.id);
+                : holder
+                  ? await loadStructureNameNoRoster(holder.characterId, place.id)
+                  : null;
             if (name) resolved.set(place.id, name);
           })
         );
@@ -64,6 +67,7 @@ export function useOwnedAtStation(enabled: boolean, scope: OwnedScope): OwnedAtS
       });
     return () => {
       cancelled = true;
+      setLists(null);
     };
   }, [enabled]);
 

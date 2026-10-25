@@ -143,7 +143,12 @@ export function AppraisalPanel({
   const placeLabel = (id: number) =>
     TRADE_HUBS.find((h) => h.stationId === id)?.systemName ??
     placeNames.get(id) ??
-    t('market.appraisal.minusOwnedUnknownStructure', { id });
+    t(
+      places.find((place) => place.id === id)?.kind === 'station'
+        ? 'market.appraisal.minusOwnedUnknownStation'
+        : 'market.appraisal.minusOwnedUnknownStructure',
+      { id }
+    );
   // Trade Hubs are always offered; any other place that holds stock joins them, and so does a saved pick not read yet.
   const otherPlaceIds = [
     ...places.map((place) => place.id),
