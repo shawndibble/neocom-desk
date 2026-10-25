@@ -1,9 +1,10 @@
 name: Public data - lawless systems
 
 # Publishes the lawless (insurgency) system ids to R2 (lawless-systems/systems.json)
-# every 15 min; the app reads it from https://data.neocomdesk.com. GitHub may start
-# a scheduled run late: the app tolerates a list up to an hour old. Pattern and
-# secrets: public-data-job.yml.
+# every 15 min; the app reads it from https://data.neocomdesk.com. GitHub starts
+# scheduled runs hours late, so a Cloudflare Worker also fires workflow_dispatch on
+# time (workers/public-data-dispatch); this `schedule:` is the fallback. The app
+# tolerates a list up to an hour old. Pattern and secrets: public-data-job.yml.
 on:
   schedule:
     - cron: '*/15 * * * *'
