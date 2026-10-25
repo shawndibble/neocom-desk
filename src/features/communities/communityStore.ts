@@ -146,16 +146,17 @@ export function isRefused(err: unknown): boolean {
  */
 export async function withMyCommunities<T>(
   characterId: number,
-  read: (communities: CommunitySummary[]) => Promise<T>,
+  /** `retried`: this run is over the fresh list, after a refusal; a reader can stop rethrowing. */
+  read: (communities: CommunitySummary[], attempt: { retried: boolean }) => Promise<T>,
   now = Date.now()
 ): Promise<T> {
   const cached = await loadMyCommunitiesCached(characterId, now);
   try {
-    return await read(cached);
+    return await read(cached, { retried: false });
   } catch (err) {
     if (!isRefused(err)) throw err;
     invalidateMyCommunities(characterId);
-    return read(await loadMyCommunities(characterId));
+    return read(await loadMyCommunities(characterId), { retried: true });
   }
 }
 
@@ -306,9 +307,13 @@ export async function loadMemberLibrariesFor(
           );
         return { uid, items: await items };
       } catch (err) {
+        // Refused: this Character is no longer a Member, so nothing it holds for it is current,
+        // and the caller (inside `withMyCommunities`) reads its list again.
+        if (isRefused(err)) {
+          invalidateMyCommunities(characterId);
+          throw err;
+        }
         if (strict) throw err;
-        // Refused: this Character is no longer a Member, so nothing it holds for it is current.
-        if (isRefused(err)) invalidateMyCommunities(characterId);
         failedUids.push(uid);
         return { uid, items: [] };
       }

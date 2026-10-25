@@ -113,10 +113,12 @@ describe('withMyCommunities', () => {
     await loadMyCommunitiesCached(1, NOW);
     fs.getDocs.mockResolvedValue({ docs: [] }); // removed from c1 on another device
     const seen: string[][] = [];
+    const attempts: boolean[] = [];
     const result = await withMyCommunities(
       1,
-      async (list) => {
+      async (list, { retried }) => {
         seen.push(list.map((c) => c.id));
+        attempts.push(retried);
         if (list.some((c) => c.id === 'c1')) {
           throw Object.assign(new Error('Missing or insufficient permissions.'), {
             code: 'permission-denied',
@@ -128,6 +130,7 @@ describe('withMyCommunities', () => {
     );
     expect(result).toBe('ok');
     expect(seen).toEqual([['c1'], []]);
+    expect(attempts).toEqual([false, true]);
     // The fresh list is what the cache holds now.
     expect(await loadMyCommunitiesCached(1, NOW)).toEqual([]);
   });
@@ -210,15 +213,17 @@ describe('rosters and libraries', () => {
     expect(libraryReads()).toBe(2);
   });
 
-  it('a library this Character is refused drops its cached Communities', async () => {
+  it('a library this Character is refused drops its cached Communities and is thrown', async () => {
     await loadMyCommunitiesCached(1, NOW);
     fs.getDocs.mockRejectedValueOnce(
       Object.assign(new Error('Missing or insufficient permissions.'), {
         code: 'permission-denied',
       })
     );
-    const read = await loadMemberLibrariesFor(1, 'c1', [{ uid: 'char:2', libraryAsOf: 100 }]);
-    expect(read.failedUids).toEqual(['char:2']);
+    // Thrown, not read as empty: `withMyCommunities` around it then reads the list again.
+    await expect(
+      loadMemberLibrariesFor(1, 'c1', [{ uid: 'char:2', libraryAsOf: 100 }])
+    ).rejects.toMatchObject({ code: 'permission-denied' });
     const indexReads = () =>
       fs.getDocs.mock.calls.filter(([ref]) => String(ref.path).endsWith('/communities')).length;
     const before = indexReads();

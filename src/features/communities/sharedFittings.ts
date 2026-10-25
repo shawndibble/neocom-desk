@@ -101,7 +101,6 @@ export const SHARED_FITTINGS_TTL_MS = 10 * 60_000;
 const fittingsCache = createReadCache<SharedFitting[]>();
 const fittingsKey = (characterId: number, communityId: string) => `${characterId}:${communityId}:`;
 
-/** After this Character changed what it shares in a Community: its next read is fresh. */
 /**
  * Runs a write to a Community's shared Fittings, then drops that cached list: after the
  * write, so a read that was in flight during it is dropped too, and even when it failed.
@@ -386,32 +385,35 @@ export async function followSavedFitting(
   record: { id: string; name: string; code: string }
 ): Promise<void> {
   try {
-    const communities = await loadMyCommunities(characterId);
     const docId = sharedFittingId(uidForCharacter(characterId), {
       source: 'saved',
       key: record.id,
     });
     await ensureSignedIn(characterId);
     const db = getSyncFirestore();
-    await Promise.all(
-      communities.map(async (community) => {
-        const key = { source: 'saved', key: record.id } as const;
-        const [existing, allExcluded] = await Promise.all([
-          getDoc(doc(fittingsOf(db, community.id), docId)),
-          loadFittingsAll(characterId, community.id),
-        ]);
-        // Deleted since this save began: don't bring it back.
-        if (
-          followsSave(existing.exists(), allExcluded, key) &&
-          (await localDb.fittings.get(record.id))
-        ) {
-          await shareFitting(characterId, community.id, {
-            ...key,
-            name: record.name,
-            code: record.code,
-          });
-        }
-      })
+    // The list may be cached; each copy's existence is read fresh, so one deleted on another
+    // device is never brought back.
+    await withMyCommunities(characterId, (communities) =>
+      Promise.all(
+        communities.map(async (community) => {
+          const key = { source: 'saved', key: record.id } as const;
+          const [existing, allExcluded] = await Promise.all([
+            getDoc(doc(fittingsOf(db, community.id), docId)),
+            loadFittingsAll(characterId, community.id),
+          ]);
+          // Deleted since this save began: don't bring it back.
+          if (
+            followsSave(existing.exists(), allExcluded, key) &&
+            (await localDb.fittings.get(record.id))
+          ) {
+            await shareFitting(characterId, community.id, {
+              ...key,
+              name: record.name,
+              code: record.code,
+            });
+          }
+        })
+      )
     );
   } catch {
     // Best effort: the copy stays as it was until the next save.
