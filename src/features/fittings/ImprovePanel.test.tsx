@@ -182,15 +182,48 @@ describe('ImprovePanel', () => {
     expect(onApply).toHaveBeenCalledWith([gain, trade]);
   });
 
+  it('shows one row per module with its best option, the rest behind "more options"', async () => {
+    const best = option(11, { ehp: 1100 }, { score: 0.3 });
+    const other = option(12, { ehp: 1050 }, { score: 0.1 });
+    renderPanel(search(done({ noDownside: [other, best] })));
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+    expect(screen.getByText('+30%')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '1 more option' }));
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+    expect(screen.getByText('+10%')).toBeInTheDocument();
+  });
+
+  it('leads a damage row with its DPS before → after', () => {
+    const own = { ...before, offense: { ...before.offense, sustainedDps: 90.7 } };
+    const gain = option(11, { offense: { ...before.offense, sustainedDps: 128 } });
+    renderPanel(search(done({ noDownside: [gain] }, own), own));
+    const row = screen.getByRole('checkbox').closest('li')!;
+    expect(row.querySelector('[data-verdict="better"]')).toHaveTextContent('→ 128');
+    expect(row).toHaveTextContent('90.7');
+  });
+
+  it('reorders by the chosen sort', async () => {
+    const pricey = option(11, { ehp: 1100 }, { score: 0.5, iskDelta: 900_000_000 });
+    const cheap = option(21, { ehp: 1100 }, { score: 0.1, iskDelta: 1_000_000 });
+    renderPanel(search(done({ noDownside: [cheap, pricey] })));
+    const first = () => screen.getAllByRole('checkbox')[0]!.closest('li')!;
+    expect(first()).toHaveTextContent('+50%');
+    await userEvent.click(screen.getByRole('button', { name: 'Best value' }));
+    expect(first()).toHaveTextContent('+10%');
+  });
+
   it('ticks one variation per fitted module', async () => {
     const a = option(11, { ehp: 1100 });
     const b = option(12, { ehp: 1050 });
     const onApply = vi.fn();
     renderPanel(search(done({ noDownside: [a, b] })), onApply);
+    await userEvent.click(screen.getByRole('button', { name: '1 more option' }));
     const boxes = screen.getAllByRole('checkbox');
     await userEvent.click(boxes[0]);
     await userEvent.click(boxes[1]);
-    expect(boxes[0]).not.toBeChecked();
+    expect(
+      screen.getAllByRole('checkbox').filter((box) => (box as HTMLInputElement).checked)
+    ).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: 'Apply 1 change' }));
     expect(onApply).toHaveBeenCalledWith([b]);
   });
@@ -354,7 +387,19 @@ describe('ImprovePanel', () => {
     const broke = { ...option(21, { mining: mining(11) }), guardrail: 'budget' as const };
     const noGain = search(
       done(
-        { noDownside: [gain, { ...gain, candidate: { ...gain.candidate, toTypeId: 11 } }] },
+        {
+          noDownside: [
+            gain,
+            {
+              ...gain,
+              candidate: {
+                ...gain.candidate,
+                toTypeId: 11,
+                at: [{ slot: 'low' as const, slotIndex: 1 }],
+              },
+            },
+          ],
+        },
         own
       ),
       own
@@ -587,6 +632,7 @@ describe('ImprovePanel', () => {
       const b = option(12, { ehp: 1050 });
       const s = checked(before, done({ noDownside: [a, b] }));
       renderPanel(s, vi.fn(), vi.fn(), settings(), { fitting });
+      await userEvent.click(screen.getByRole('button', { name: '1 more option' }));
       const boxes = screen.getAllByRole('checkbox');
       await userEvent.click(boxes[0]);
       await userEvent.click(boxes[1]);
