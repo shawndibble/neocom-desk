@@ -16,6 +16,8 @@ import { recordPushFailure, settlePushRegistration } from './pushFailure';
 import { recordSeenEveTypes } from './seenEveTypes';
 import { useNotificationPreferences } from './preferencesStore';
 import { quietHoursPayload } from './quietTime';
+import { recordAlertsNearby } from './alertsGrant';
+import { routeRulesForServer, serverPushChoicesByCharacter } from './serverPushChoices';
 import { webPushSupport, type WebPushSupport } from '@/sync/webPushSupport';
 
 export interface EnableWebPushResult {
@@ -46,16 +48,26 @@ export async function enableWebPush(): Promise<EnableWebPushResult> {
       const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY ?? '';
       // The Enable tap uploads the same type lists a rebuild would: an empty
       // default here would wipe this device's list on the server.
-      const [{ enabledEveTypesByCharacter }, { liveDependencies }] = await Promise.all([
-        import('./projectionRebuild'),
-        import('./foregroundPoller'),
-      ]);
+      const [{ enabledEveTypesByCharacter }, { liveDependencies }, { currentThresholds }] =
+        await Promise.all([
+          import('./projectionRebuild'),
+          import('./foregroundPoller'),
+          import('./pollDomains/shared'),
+        ]);
+      const live = liveDependencies();
+      const serverChoicesByCharacter = await serverPushChoicesByCharacter({
+        ...live,
+        thresholdsFor: currentThresholds,
+      });
       const result = await registerDeviceForWebPush(vapidKey, registration, new Map(), {
-        eveTypesByCharacter: await enabledEveTypesByCharacter(liveDependencies()),
+        eveTypesByCharacter: await enabledEveTypesByCharacter(live),
         quietHours: quietHoursPayload(useNotificationPreferences.getState().value),
+        serverChoicesByCharacter,
+        routeRules: await routeRulesForServer(serverChoicesByCharacter),
       });
       settlePushRegistration(result);
       await recordSeenEveTypes(result?.seenTypes);
+      await recordAlertsNearby(result?.nearbyGrants);
     } catch (err) {
       // Registration failing must not undo a permission grant the browser
       // already gave — the user is still enrolled for the feed/foreground

@@ -1,5 +1,6 @@
-// Alerts Grant custody (issue #3753, ADR 0020): save/delete logic for the one
-// server-held EVE token — a refresh token scoped to notifications only. Pure of
+// Alerts Grant custody (issue #3753, ADR 0020, ADR 0027): save/delete logic for
+// the one server-held EVE token — a refresh token scoped to notifications and,
+// when the user granted it for nearby alerts, the Character's location. Pure of
 // Firebase: the Firestore store, key, verifier and SSO revoke are injected, so
 // it tests without an emulator (alertGrantStore.ts / index.ts wire the real
 // ones). A token is never logged, never put in an error, never returned.
@@ -8,8 +9,20 @@ import { verifyAccessToken } from './actorAuth.js';
 import { encryptRefreshToken, decryptRefreshToken } from './alertGrantCrypto.js';
 import type { EveTokenClaims } from './verifyEveToken.js';
 
-/** The only scope an Alerts Grant may carry. */
+/** The scope every Alerts Grant carries. */
 export const ALERTS_SCOPE = 'esi-characters.read_notifications.v1';
+/**
+ * The one optional extra (ADR 0027): the Character's location, so the poller
+ * can push nearby Incursions and raidable skyhooks. A grant saved before it
+ * existed holds the notifications scope alone and keeps working for that.
+ */
+export const ALERTS_LOCATION_SCOPE = 'esi-location.read_location.v1';
+const ALLOWED_SCOPES: ReadonlySet<string> = new Set([ALERTS_SCOPE, ALERTS_LOCATION_SCOPE]);
+
+/** Whether a grant's token can read the Character's location (absent `scopes`: saved before ADR 0027). */
+export function grantCoversNearby(grant: Pick<AlertGrantDoc, 'scopes'>): boolean {
+  return grant.scopes?.includes(ALERTS_LOCATION_SCOPE) === true;
+}
 
 const SSO_TIMEOUT_MS = 10_000;
 const TOKEN_URL = 'https://login.eveonline.com/v2/oauth/token';
@@ -29,6 +42,11 @@ export interface AlertGrantDoc {
   /** Every notification type seen for this Character; the poller owns it. */
   seenTypes: string[];
   status: 'active' | 'revoked';
+  /**
+   * The scopes the stored token carries, sorted (ADR 0027). Absent on a grant
+   * saved before the location scope existed, which means notifications only.
+   */
+  scopes?: string[];
 }
 
 export interface AlertGrantStore {
@@ -87,7 +105,7 @@ export function parseSaveAlertGrantInput(data: unknown): SaveAlertGrantInput {
 export async function saveAlertGrant(
   deps: AlertGrantDeps,
   input: SaveAlertGrantInput
-): Promise<{ characterId: number; enabledAt: number }> {
+): Promise<{ characterId: number; enabledAt: number; nearby: boolean }> {
   const supplied = await verifyAlertsToken(deps, input.accessToken);
 
   // The access token alone proves nothing about the refresh token beside it:
@@ -120,6 +138,7 @@ export async function saveAlertGrant(
     etag: previousActive?.etag ?? null,
     seenTypes: previousActive?.seenTypes ?? [],
     status: 'active',
+    scopes: [...claims.scopes].sort(),
   };
   await deps.store.set(characterId, doc);
 
@@ -128,7 +147,7 @@ export async function saveAlertGrant(
   if (existing) {
     await revokeStored(deps, characterId, existing, refreshed.refreshToken);
   }
-  return { characterId, enabledAt: doc.enabledAt };
+  return { characterId, enabledAt: doc.enabledAt, nearby: grantCoversNearby(doc) };
 }
 
 async function verifyAlertsToken(
@@ -142,8 +161,17 @@ async function verifyAlertsToken(
       }),
     toError: () => new AlertGrantError('unauthenticated', 'EVE access token rejected'),
   });
-  if (claims.scopes.length !== 1 || claims.scopes[0] !== ALERTS_SCOPE) {
-    throw new AlertGrantError('permission-denied', `Token must carry only ${ALERTS_SCOPE}`);
+  // Notifications, optionally with location; nothing else, and no repeats.
+  const scopes = new Set(claims.scopes);
+  if (
+    scopes.size !== claims.scopes.length ||
+    !scopes.has(ALERTS_SCOPE) ||
+    [...scopes].some((scope) => !ALLOWED_SCOPES.has(scope))
+  ) {
+    throw new AlertGrantError(
+      'permission-denied',
+      `Token must carry ${ALERTS_SCOPE}, optionally with ${ALERTS_LOCATION_SCOPE}, and nothing else`
+    );
   }
   return claims;
 }

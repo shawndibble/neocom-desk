@@ -1,8 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  ALERTS_LOCATION_SCOPE,
   ALERTS_SCOPE,
   AlertGrantError,
+  grantCoversNearby,
   deleteAlertGrant,
   parseSaveAlertGrantInput,
   refreshAtSso,
@@ -71,7 +73,7 @@ describe('saveAlertGrant', () => {
   it('stores an encrypted token, never the plaintext, and returns no token', async () => {
     const { deps, docs } = makeDeps();
     const res = await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
-    expect(res).toEqual({ characterId: 42, enabledAt: 1_000 });
+    expect(res).toEqual({ characterId: 42, enabledAt: 1_000, nearby: false });
     const doc = docs.get(42)!;
     expect(JSON.stringify(doc)).not.toContain(REFRESH);
     expect(decryptRefreshToken(doc.encryptedRefreshToken, 42, KEY)).toBe(`${REFRESH}-rotated`);
@@ -82,8 +84,18 @@ describe('saveAlertGrant', () => {
       seenTypes: [],
       status: 'active',
       clientId: 'client-1',
+      scopes: [ALERTS_SCOPE],
     });
     expect(JSON.stringify(res)).not.toContain(REFRESH);
+  });
+
+  it('accepts the location scope beside notifications and says the grant covers nearby alerts', async () => {
+    const scopes = [ALERTS_LOCATION_SCOPE, ALERTS_SCOPE];
+    const { deps, docs } = makeDeps({ verify: async () => claims({ scopes }) });
+    const res = await saveAlertGrant(deps, { accessToken: 'a', refreshToken: REFRESH });
+    expect(res).toEqual({ characterId: 42, enabledAt: 1_000, nearby: true });
+    expect(docs.get(42)?.scopes).toEqual([ALERTS_SCOPE, ALERTS_LOCATION_SCOPE].sort());
+    expect(grantCoversNearby(docs.get(42)!)).toBe(true);
   });
 
   it('rejects a token that fails verification, storing nothing', async () => {
@@ -102,6 +114,12 @@ describe('saveAlertGrant', () => {
     ['a wrong scope', ['esi-skills.read_skills.v1']],
     ['an extra scope', [ALERTS_SCOPE, 'esi-skills.read_skills.v1']],
     ['no scope', []],
+    ['location alone', [ALERTS_LOCATION_SCOPE]],
+    [
+      'location with another scope',
+      [ALERTS_SCOPE, ALERTS_LOCATION_SCOPE, 'esi-skills.read_skills.v1'],
+    ],
+    ['a repeated scope', [ALERTS_SCOPE, ALERTS_SCOPE]],
   ])('rejects %s', async (_n, scopes) => {
     const { deps, docs } = makeDeps({ verify: async () => claims({ scopes }) });
     await expect(
@@ -260,5 +278,13 @@ describe('refreshAtSso', () => {
     await expect(refreshAtSso('c', REFRESH, odd as unknown as typeof fetch)).rejects.toThrow(
       /malformed/
     );
+  });
+});
+
+describe('grantCoversNearby', () => {
+  it('is false for a grant saved before the location scope existed (no scopes field)', () => {
+    expect(grantCoversNearby({ scopes: undefined })).toBe(false);
+    expect(grantCoversNearby({ scopes: [ALERTS_SCOPE] })).toBe(false);
+    expect(grantCoversNearby({ scopes: [ALERTS_SCOPE, ALERTS_LOCATION_SCOPE] })).toBe(true);
   });
 });

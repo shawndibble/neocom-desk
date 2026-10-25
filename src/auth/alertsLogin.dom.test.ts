@@ -10,7 +10,7 @@ import {
   scopesForRetry,
   LoginError,
 } from './session';
-import { ALERTS_SCOPE } from './alertsScope';
+import { ALERTS_LOCATION_SCOPE, ALERTS_SCOPE } from './alertsScope';
 import { db } from '@/db';
 
 const cfg = { clientId: 'client-abc', redirectUri: 'https://app.example/neocom-desk/callback' };
@@ -62,6 +62,13 @@ describe('startAlertsLogin', () => {
   it('asks SSO for the notifications scope and nothing else', async () => {
     const url = await startAlertsLogin(111, cfg);
     expect(new URL(url).searchParams.get('scope')).toBe(ALERTS_SCOPE);
+  });
+
+  it('adds the location scope, and only that, when asked for nearby alerts (ADR 0027)', async () => {
+    const url = await startAlertsLogin(111, cfg, { nearby: true });
+    expect(new URL(url).searchParams.get('scope')?.split(' ').sort()).toEqual(
+      [ALERTS_LOCATION_SCOPE, ALERTS_SCOPE].sort()
+    );
   });
 
   it('records which Character the row was for, under that round trip', async () => {

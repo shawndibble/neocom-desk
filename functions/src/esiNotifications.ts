@@ -42,7 +42,7 @@ export function isBudgetLow(headers: Headers): boolean {
   return errorsLeft !== null && errorsLeft < ERROR_LIMIT_FLOOR;
 }
 
-function retryAfterMs(headers: Headers): number | null {
+export function retryAfterMs(headers: Headers): number | null {
   const seconds = numberHeader(headers, 'Retry-After');
   return seconds === null ? null : Math.max(0, seconds) * 1000;
 }

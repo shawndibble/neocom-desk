@@ -28,6 +28,7 @@ import {
 } from './dispatchProjections.js';
 import type { CharacterProjection } from './registerDevice.js';
 import { suppressPush, type QuietHours } from './quietHours.js';
+import type { NearbyEventId, NearbyRouteRules } from './nearbyAlerts.js';
 
 export const PROJECTIONS_COLLECTION = 'projections';
 export const DEVICE_REGISTRATIONS_COLLECTION = 'deviceRegistrations';
@@ -65,6 +66,15 @@ export interface DeviceRegistrationWrite {
    * `set` replaces only this device's lists.
    */
   eveTypesByCharacter: Record<number, string[]>;
+  /**
+   * Verified Characters' server-pushed event ids and nearby N from this
+   * device (issues #5121, #5122). A Character with no entry keeps what this
+   * device stored before (an older client sends none).
+   */
+  serverEventsByCharacter?: Record<number, string[]>;
+  nearbyJumpsByCharacter?: Record<number, Partial<Record<NearbyEventId, number>>>;
+  /** This device's Travel Settings (issue #5122); `undefined` keeps the stored ones. */
+  routeRules?: NearbyRouteRules;
   /**
    * This device's quiet time (issue #4566). `undefined` (an older client)
    * keeps what the registration already stores; `null` clears it.
@@ -122,6 +132,20 @@ export async function writeDeviceRegistration(
     typeof previous?.eveTypesByCharacter === 'object' && previous.eveTypesByCharacter !== null
       ? (previous.eveTypesByCharacter as Record<string, string[]>)
       : {};
+  const previousMap = <T>(field: string): Record<string, T> =>
+    typeof previous?.[field] === 'object' && previous[field] !== null
+      ? (previous[field] as Record<string, T>)
+      : {};
+  const perCharacter = <T>(field: string, uploaded: Record<number, T> | undefined) => {
+    const stored = previousMap<T>(field);
+    return Object.fromEntries(
+      write.characterIds.flatMap((id) => {
+        const value = uploaded?.[id] ?? stored[String(id)];
+        return value === undefined ? [] : [[String(id), value]];
+      })
+    );
+  };
+  const routeRules = write.routeRules ?? (previous?.routeRules as NearbyRouteRules | undefined);
   // An upload without a window keeps the stored one; `null` drops it (`set`
   // below rebuilds the doc, so an omitted field is a deleted one).
   const quietHours =
@@ -167,6 +191,11 @@ export async function writeDeviceRegistration(
         write.eveTypesByCharacter[id] ?? previousEveTypes[String(id)] ?? [],
       ])
     ),
+    serverEventsByCharacter: perCharacter('serverEventsByCharacter', write.serverEventsByCharacter),
+    nearbyJumpsByCharacter: perCharacter('nearbyJumpsByCharacter', write.nearbyJumpsByCharacter),
+    ...(routeRules ? { routeRules } : {}),
+    // The nearby-alerts poller's state (pollNearby.ts): never the client's to set.
+    ...(previous?.nearbyState ? { nearbyState: previous.nearbyState } : {}),
     ...(quietHours ? { quietHours } : {}),
     updatedAt: FieldValue.serverTimestamp(),
   });

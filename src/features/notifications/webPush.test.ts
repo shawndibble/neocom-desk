@@ -19,6 +19,13 @@ vi.mock('./projectionRebuild', () => ({
   enabledEveTypesByCharacter: vi.fn(async () => new Map([[1, ['StructureDestroyed']]])),
 }));
 vi.mock('./foregroundPoller', () => ({ liveDependencies: vi.fn(() => ({})) }));
+const CHOICES = new Map([
+  [1, { serverEvents: [], nearbyJumps: { incursionNearby: 5, skyhookRaidableNearby: 5 } }],
+]);
+vi.mock('./serverPushChoices', () => ({
+  serverPushChoicesByCharacter: vi.fn(async () => CHOICES),
+  routeRulesForServer: vi.fn(async () => null),
+}));
 
 const readyRegistration = {} as ServiceWorkerRegistration;
 
@@ -55,7 +62,12 @@ describe('enableWebPush', () => {
       expect.any(String),
       readyRegistration,
       new Map(),
-      { eveTypesByCharacter: new Map([[1, ['StructureDestroyed']]]), quietHours: null }
+      {
+        eveTypesByCharacter: new Map([[1, ['StructureDestroyed']]]),
+        quietHours: null,
+        serverChoicesByCharacter: CHOICES,
+        routeRules: null,
+      }
     );
   });
 

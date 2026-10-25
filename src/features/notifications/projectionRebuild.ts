@@ -24,6 +24,8 @@ import type { PollDependencies } from './foregroundPoller';
 import { POLL_DOMAINS, type PollDomain } from './pollDomains';
 import type { PollerState } from './pollerState';
 import { useSeenEveTypesStore } from './seenEveTypes';
+import { currentThresholds } from './pollDomains/shared';
+import { serverPushChoicesByCharacter } from './serverPushChoices';
 
 export type ProjectionRebuildDependencies = Pick<
   PollDependencies,
@@ -167,5 +169,9 @@ async function rebuildOnce(
     }
   });
 
-  await deps.uploadProjection(rowsByCharacter, await enabledEveTypesByCharacter(deps));
+  await deps.uploadProjection(
+    rowsByCharacter,
+    await enabledEveTypesByCharacter(deps),
+    await serverPushChoicesByCharacter({ ...deps, thresholdsFor: currentThresholds })
+  );
 }

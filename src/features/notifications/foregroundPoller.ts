@@ -34,6 +34,7 @@ import { settleFillTimes } from './fillTimeSettle';
 import type { EventEnabledMap, EveTypeEnabledMap } from './eventSelection';
 import { readNotificationPermission } from './permission';
 import { uploadProjectionRows } from './projectionUpload';
+import type { ServerPushChoices } from './serverPushChoices';
 import { rebuildProjection } from './projectionRebuild';
 import {
   reviseContractFeedRow,
@@ -168,7 +169,9 @@ export interface PollDependencies {
    */
   uploadProjection: (
     rowsByCharacter: ReadonlyMap<number, ProjectionRow[]>,
-    eveTypesByCharacter: ReadonlyMap<number, readonly string[]>
+    eveTypesByCharacter: ReadonlyMap<number, readonly string[]>,
+    /** Each Character's server-pushed event choices (`serverPushChoices.ts`). */
+    serverChoicesByCharacter?: ReadonlyMap<number, ServerPushChoices>
   ) => Promise<void>;
 }
 

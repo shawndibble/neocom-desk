@@ -117,6 +117,58 @@ describe('registerDeviceForWebPush', () => {
     });
   });
 
+  it('sends each Character’s server-pushed events and nearby N, and the Travel Settings', async () => {
+    vi.mocked(getToken).mockResolvedValue('fcm-token');
+    vi.spyOn(db.characters, 'toArray').mockResolvedValue([
+      { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
+      { characterId: 2, name: 'B', ownerHash: 'h', addedAt: 0 },
+    ] as never);
+    vi.mocked(getValidAccessToken).mockImplementation(async (id) => `token-${id}`);
+    const routeRules = { preference: 'shortest' as const, securityPenalty: 50, avoid: [30000142] };
+    const nearbyJumps = { incursionNearby: 5, skyhookRaidableNearby: 3 };
+
+    await registerDeviceForWebPush('vapid-key', registration, new Map(), {
+      serverChoicesByCharacter: new Map([[1, { serverEvents: ['incursionNearby'], nearbyJumps }]]),
+      routeRules,
+    });
+
+    const sent = call.mock.calls[0][0].data;
+    expect(sent.routeRules).toEqual(routeRules);
+    expect(sent.characters[0]).toMatchObject({ serverEvents: ['incursionNearby'], nearbyJumps });
+    // No entry: nothing sent, so the server keeps what it has.
+    expect(sent.characters[1]).not.toHaveProperty('serverEvents');
+    expect(sent.characters[1]).not.toHaveProperty('nearbyJumps');
+  });
+
+  it('a changed nearby choice is never skipped as unchanged', async () => {
+    vi.mocked(getToken).mockResolvedValue('fcm-token');
+    vi.spyOn(db.characters, 'toArray').mockResolvedValue([
+      { characterId: 1, name: 'A', ownerHash: 'h', addedAt: 0 },
+    ] as never);
+    vi.mocked(getValidAccessToken).mockImplementation(async (id) => `token-${id}`);
+    const nearbyJumps = { incursionNearby: 5, skyhookRaidableNearby: 3 };
+    const choose = (serverEvents: string[]) => ({
+      skipIfUnchanged: true,
+      serverChoicesByCharacter: new Map([[1, { serverEvents, nearbyJumps }]]),
+    });
+
+    await registerDeviceForWebPush(
+      'vapid-key',
+      registration,
+      new Map(),
+      choose(['incursionNearby'])
+    );
+    await registerDeviceForWebPush(
+      'vapid-key',
+      registration,
+      new Map(),
+      choose(['incursionNearby'])
+    );
+    await registerDeviceForWebPush('vapid-key', registration, new Map(), choose([]));
+
+    expect(call).toHaveBeenCalledTimes(2);
+  });
+
   it('includes each Character’s Projection rows from the passed-in map, keyed by characterId', async () => {
     vi.mocked(getToken).mockResolvedValue('fcm-token');
     vi.spyOn(db.characters, 'toArray').mockResolvedValue([

@@ -29,10 +29,13 @@ import { recordPushFailure, settlePushRegistration } from './pushFailure';
 import { recordSeenEveTypes } from './seenEveTypes';
 import { useNotificationPreferences } from './preferencesStore';
 import { quietHoursPayload } from './quietTime';
+import { recordAlertsNearby } from './alertsGrant';
+import { routeRulesForServer, type ServerPushChoices } from './serverPushChoices';
 
 export async function uploadProjectionRows(
   rowsByCharacter: ReadonlyMap<number, ProjectionRow[]>,
-  eveTypesByCharacter: ReadonlyMap<number, readonly string[]>
+  eveTypesByCharacter: ReadonlyMap<number, readonly string[]>,
+  serverChoicesByCharacter: ReadonlyMap<number, ServerPushChoices> = new Map()
 ): Promise<void> {
   if (webPushSupport() !== 'supported') return;
   if (readNotificationPermission() !== 'granted') return;
@@ -45,9 +48,12 @@ export async function uploadProjectionRows(
       skipIfUnchanged: true,
       eveTypesByCharacter,
       quietHours: quietHoursPayload(useNotificationPreferences.getState().value),
+      serverChoicesByCharacter,
+      routeRules: await routeRulesForServer(serverChoicesByCharacter),
     });
     settlePushRegistration(result);
     await recordSeenEveTypes(result?.seenTypes);
+    await recordAlertsNearby(result?.nearbyGrants);
   } catch (err) {
     // Same fire-and-forget contract as sendBrowserNotification/
     // recordFeedNotification in foregroundPoller.ts: the poll itself must

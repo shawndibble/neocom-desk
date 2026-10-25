@@ -242,6 +242,31 @@ describe('writeDeviceRegistration', () => {
     });
   });
 
+  it('stores serverEvents, nearbyJumps and routeRules, keeping each when an upload omits it', async () => {
+    const db = new FakeFirestore();
+    const rules = { preference: 'shortest' as const, securityPenalty: 50, avoid: [30000142] };
+    await writeDeviceRegistration(asFirestore(db), {
+      deviceId: 'A',
+      fcmToken: 'token-A',
+      characterIds: [CHAR],
+      projections: [],
+      eveTypesByCharacter: {},
+      serverEventsByCharacter: { [CHAR]: ['incursionNearby'] },
+      nearbyJumpsByCharacter: { [CHAR]: { incursionNearby: 5 } },
+      routeRules: rules,
+    });
+    // The poller's own state rides on the doc; an upload never wipes it.
+    const nearbyState = { characters: {}, pushed: { k: 1 } };
+    await asFirestore(db).collection('deviceRegistrations').doc('A').update({ nearbyState });
+    // An older client sends none of them.
+    await upload(db, 'A', [{ characterId: CHAR, rows: [] }]);
+    expect(db.get('deviceRegistrations', 'A')?.nearbyState).toEqual(nearbyState);
+    const doc = db.get('deviceRegistrations', 'A');
+    expect(doc?.serverEventsByCharacter).toEqual({ [String(CHAR)]: ['incursionNearby'] });
+    expect(doc?.nearbyJumpsByCharacter).toEqual({ [String(CHAR)]: { incursionNearby: 5 } });
+    expect(doc?.routeRules).toEqual(rules);
+  });
+
   it("keeps device A's unfired rows when device B uploads for the same Character", async () => {
     const db = new FakeFirestore();
     const jobA = row('industryJobComplete');
