@@ -66,7 +66,6 @@ describe('SurveyCharts views', () => {
     expect(within(table).getByRole('columnheader', { name: 'All ore' })).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: 'Scordite' })).toBeInTheDocument();
     expect(table.closest('figure')).not.toBeNull();
-    expect(screen.queryByRole('table', { name: /mining rate/i })).toBeNull();
   });
 
   it('isk view tabulates priced ores only', () => {
@@ -117,5 +116,42 @@ describe('SurveyCharts pace panel', () => {
     await user.click(screen.getByRole('button', { name: 'Total' }));
     expect(screen.queryByRole('table', { name: /mining rate by ore/i })).toBeNull();
     expect(screen.getByRole('table', { name: /^mining rate$/i })).toBeInTheDocument();
+  });
+});
+
+describe('SurveyCharts pace panel on the Depletion view', () => {
+  const summary = summarizeSurvey([
+    scan(0, [
+      ['Veldspar', 1000],
+      ['Scordite', 500],
+    ]),
+    scan(60_000, [
+      ['Veldspar', 700],
+      ['Scordite', 440],
+    ]),
+  ])!;
+
+  it('shows the pace panel and toggle under the depletion chart', async () => {
+    const user = userEvent.setup();
+    render(<SurveyCharts summary={summary} view="depletion" />);
+    expect(screen.getByRole('table', { name: /ore left by percent/i })).toBeInTheDocument();
+    expect(screen.getByRole('table', { name: /^mining rate$/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'By ore' }));
+    expect(screen.getByRole('table', { name: /mining rate by ore/i })).toBeInTheDocument();
+  });
+
+  it('keeps the Total / By ore choice when switching views', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<SurveyCharts summary={summary} view="depletion" />);
+    await user.click(screen.getByRole('button', { name: 'By ore' }));
+    rerender(<SurveyCharts summary={summary} view="ore" />);
+    expect(screen.getByRole('button', { name: 'By ore' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('table', { name: /mining rate by ore/i })).toBeInTheDocument();
+  });
+
+  it('draws no pace panel with a single scan', () => {
+    const one = summarizeSurvey([scan(0, [['Veldspar', 1000]])])!;
+    render(<SurveyCharts summary={one} view="depletion" />);
+    expect(screen.queryByRole('button', { name: 'By ore' })).toBeNull();
   });
 });
