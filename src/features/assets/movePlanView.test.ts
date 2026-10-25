@@ -136,6 +136,7 @@ describe('sortStacksByVolume', () => {
 describe('foldHauls', () => {
   const haul = (typeId: number, quantity: number): Haul => ({
     usedM3: quantity,
+    iskValue: 0,
     holds: [
       {
         kind: 'cargo',

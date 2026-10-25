@@ -20,6 +20,8 @@ export interface PackLine {
   quantity: number;
   /** m³ of one unit as hauled. */
   unitM3: number;
+  /** ISK one unit is worth; absent or 0 counts as unpriced. */
+  unitIsk?: number;
 }
 
 export interface HoldLoad {
@@ -33,12 +35,16 @@ export interface Haul {
   /** Largest hold first. */
   holds: HoldLoad[];
   usedM3: number;
+  /** ISK the load is worth, by the lines' `unitIsk`. */
+  iskValue: number;
 }
 
 export interface PackResult {
   hauls: Haul[];
   /** Stacks whose single unit is bigger than the hull's biggest hold; never divided. */
   unfit: PackLine[];
+  /** Stacks whose single unit is worth more than the ISK limit; never hauled. */
+  overLimit: PackLine[];
 }
 
 const EPS = 1e-9;
@@ -47,22 +53,47 @@ function newHaul(holds: readonly PackHold[]): Haul {
   return {
     holds: holds.map((h) => ({ kind: h.kind, capacityM3: h.capacityM3, usedM3: 0, lines: [] })),
     usedM3: 0,
+    iskValue: 0,
   };
 }
 
 /** Puts as many of `left` units as fit into `hold`; returns how many went in. */
-function load(haul: Haul, hold: HoldLoad, line: PackLine, left: number): number {
+function load(
+  haul: Haul,
+  hold: HoldLoad,
+  line: PackLine,
+  left: number,
+  maxIsk: number | null
+): number {
   const room = hold.capacityM3 - hold.usedM3;
-  const n = line.unitM3 > 0 ? Math.min(left, Math.floor(room / line.unitM3 + EPS)) : left;
+  let n = line.unitM3 > 0 ? Math.min(left, Math.floor(room / line.unitM3 + EPS)) : left;
+  const unitIsk = line.unitIsk ?? 0;
+  if (maxIsk !== null && unitIsk > 0)
+    n = Math.min(n, Math.floor((maxIsk - haul.iskValue) / unitIsk + EPS));
   if (n <= 0) return 0;
   const m3 = n * line.unitM3;
   hold.lines.push({ typeId: line.typeId, quantity: n, m3 });
   hold.usedM3 += m3;
   haul.usedM3 += m3;
+  haul.iskValue += n * unitIsk;
   return n;
 }
 
-export function packHauls(lines: readonly PackLine[], holds: readonly PackHold[]): PackResult {
+/** The usable ISK limit: a finite number above 0, else null for no limit. */
+export function normalizeMaxIsk(raw: unknown): number | null {
+  return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null;
+}
+
+/**
+ * `maxIsk` caps what one haul is worth: a haul is full when its volume or its
+ * value reaches the limit. Null, 0 or a non-number means no limit.
+ */
+export function packHauls(
+  lines: readonly PackLine[],
+  holds: readonly PackHold[],
+  maxIsk?: number | null
+): PackResult {
+  const limit = normalizeMaxIsk(maxIsk);
   const usable = holds
     .filter((h) => h.capacityM3 > 0)
     // Equal holds: the fleet hangar first, so the cargo hold stays free for loose stock.
@@ -74,6 +105,7 @@ export function packHauls(lines: readonly PackLine[], holds: readonly PackHold[]
   const biggest = usable[0]?.capacityM3 ?? 0;
   const hauls: Haul[] = [];
   const unfit: PackLine[] = [];
+  const overLimit: PackLine[] = [];
 
   const ordered = lines
     .filter((l) => l.quantity > 0)
@@ -84,10 +116,14 @@ export function packHauls(lines: readonly PackLine[], holds: readonly PackHold[]
       unfit.push(line);
       continue;
     }
+    if (limit !== null && (line.unitIsk ?? 0) > limit + EPS) {
+      overLimit.push(line);
+      continue;
+    }
     let left = line.quantity;
     for (const haul of hauls) {
       for (const hold of haul.holds) {
-        left -= load(haul, hold, line, left);
+        left -= load(haul, hold, line, left, limit);
         if (left === 0) break;
       }
       if (left === 0) break;
@@ -96,7 +132,7 @@ export function packHauls(lines: readonly PackLine[], holds: readonly PackHold[]
       const haul = newHaul(usable);
       let placed = 0;
       for (const hold of haul.holds) {
-        placed += load(haul, hold, line, left - placed);
+        placed += load(haul, hold, line, left - placed, limit);
         if (placed === left) break;
       }
       if (placed === 0) {
@@ -108,5 +144,5 @@ export function packHauls(lines: readonly PackLine[], holds: readonly PackHold[]
       left -= placed;
     }
   }
-  return { hauls, unfit };
+  return { hauls, unfit, overLimit };
 }

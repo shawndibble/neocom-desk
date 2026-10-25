@@ -4,7 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import type { Haul, MovePlan } from '@/engine/assets/movePlan';
+import type { Haul, HaulerOption, MovePlan } from '@/engine/assets/movePlan';
 import { PlanResult } from './MovePlanResult';
 
 const hull = {
@@ -19,6 +19,7 @@ const hull = {
 
 const cargoHaul = (m3: number): Haul => ({
   usedM3: m3,
+  iskValue: 0,
   holds: [
     {
       kind: 'cargo',
@@ -33,8 +34,9 @@ const hauledBy = (hauls: Haul[], unfit: never[] = []) => ({
   hull,
   trips: hauls.length,
   unfitCount: unfit.length,
+  overLimitCount: 0,
   tooBigCount: 0,
-  pickups: [{ characterId: 1, locationId: 60003760, hauls, unfit, tooBigShips: [] }],
+  pickups: [{ characterId: 1, locationId: 60003760, hauls, unfit, overLimit: [], tooBigShips: [] }],
 });
 
 const plan = {
@@ -61,6 +63,7 @@ const plan = {
     characters: 1,
     shipsToFly: 0,
     unknownVolumeCount: 0,
+    unpricedCount: 0,
     trips: 2,
   },
   suggested: hauledBy([cargoHaul(100), cargoHaul(50)]),
@@ -92,6 +95,8 @@ describe('PlanResult', () => {
     render(
       <MemoryRouter>
         <PlanResult
+          maxIsk={null}
+          onChangeMaxIsk={() => {}}
           state={{
             plan: withActive(plan),
             destinationSystem: null,
@@ -132,6 +137,8 @@ describe('PlanResult', () => {
     render(
       <MemoryRouter>
         <PlanResult
+          maxIsk={null}
+          onChangeMaxIsk={() => {}}
           state={{
             plan: withActive(big),
             destinationSystem: null,
@@ -161,6 +168,7 @@ describe('PlanResult', () => {
   it('shows the fleet hangar apart from the cargo hold, and what the hauler leaves behind', () => {
     const haul: Haul = {
       usedM3: 50_100,
+      iskValue: 0,
       holds: [
         {
           kind: 'fleetHangar',
@@ -181,12 +189,14 @@ describe('PlanResult', () => {
       suggested: {
         ...hauledBy([haul]),
         unfitCount: 1,
+        overLimitCount: 0,
         pickups: [
           {
             characterId: 1,
             locationId: 60003760,
             hauls: [haul],
             unfit: [{ typeId: 28661, quantity: 1, unitM3: 50_000 }],
+            overLimit: [],
             tooBigShips: [],
           },
         ],
@@ -195,6 +205,8 @@ describe('PlanResult', () => {
     render(
       <MemoryRouter>
         <PlanResult
+          maxIsk={null}
+          onChangeMaxIsk={() => {}}
           state={{
             plan: withActive(withUnfit),
             destinationSystem: null,
@@ -233,6 +245,7 @@ describe('PlanResult', () => {
       ...hauledBy([cargoHaul(100)]),
       hull: { ...hull, typeId: 649, name: 'Wreathe' },
       unfitCount: 1,
+      overLimitCount: 0,
     };
     const many = {
       ...plan,
@@ -242,6 +255,8 @@ describe('PlanResult', () => {
     render(
       <MemoryRouter>
         <PlanResult
+          maxIsk={null}
+          onChangeMaxIsk={() => {}}
           state={{
             plan: withActive(many),
             destinationSystem: null,
@@ -291,6 +306,7 @@ describe('PlanResult', () => {
             locationId: 60003760,
             hauls: [cargoHaul(100)],
             unfit: [],
+            overLimit: [],
             tooBigShips: [{ typeId: 47466, quantity: 1, unitM3: 50_000 }],
           },
         ],
@@ -299,6 +315,8 @@ describe('PlanResult', () => {
     render(
       <MemoryRouter>
         <PlanResult
+          maxIsk={null}
+          onChangeMaxIsk={() => {}}
           state={{
             plan: withActive(tooBigPlan),
             destinationSystem: null,
@@ -337,6 +355,8 @@ describe('PlanResult', () => {
       render(
         <MemoryRouter>
           <PlanResult
+            maxIsk={null}
+            onChangeMaxIsk={() => {}}
             state={{
               plan: withActive(shipPlan),
               destinationSystem: null,
@@ -397,6 +417,8 @@ describe('PlanResult', () => {
       render(
         <MemoryRouter>
           <PlanResult
+            maxIsk={null}
+            onChangeMaxIsk={() => {}}
             state={{
               plan: withActive(two),
               destinationSystem: null,
@@ -442,6 +464,8 @@ describe('PlanResult', () => {
       render(
         <MemoryRouter>
           <PlanResult
+            maxIsk={null}
+            onChangeMaxIsk={() => {}}
             state={{
               plan: withActive(none),
               destinationSystem: null,
@@ -506,6 +530,8 @@ describe('PlanResult', () => {
       return (
         <MemoryRouter>
           <PlanResult
+            maxIsk={null}
+            onChangeMaxIsk={() => {}}
             state={{
               plan: withActive(next),
               destinationSystem: null,
@@ -557,6 +583,8 @@ describe('PlanResult', () => {
     render(
       <MemoryRouter>
         <PlanResult
+          maxIsk={null}
+          onChangeMaxIsk={() => {}}
           state={{
             plan: p,
             destinationSystem,
@@ -600,6 +628,69 @@ describe('PlanResult', () => {
     renderWith(plan, vi.fn(), 30000142);
     expect(screen.queryByRole('button', { name: 'Show my route' })).toBeNull();
   });
+
+  describe('max ISK per haul', () => {
+    const limited = (over: Partial<MovePlan['totals']>, active: Partial<HaulerOption> = {}) =>
+      withActive({
+        ...plan,
+        totals: { ...plan.totals, ...over },
+        suggested: { ...plan.suggested!, ...active },
+      } as MovePlan);
+    const show = (p: MovePlan, maxIsk: number | null, pricesUnavailable = false) =>
+      render(
+        <MemoryRouter>
+          <PlanResult
+            maxIsk={maxIsk}
+            onChangeMaxIsk={() => {}}
+            state={{
+              plan: p,
+              destinationSystem: null,
+              destinationStation: 'Amarr VIII',
+              pickupSystems: new Map(),
+              pricesUnavailable,
+            }}
+            compareOpen={false}
+            headingRef={{ current: null }}
+            onToggleCompare={vi.fn()}
+            haulerOverride={undefined}
+            onPickHauler={vi.fn()}
+            onBack={vi.fn()}
+            onPackShip={vi.fn()}
+            onUnpackShip={vi.fn()}
+            rigsOf={() => 0}
+            canPack={() => true}
+            name={() => 'Tritanium'}
+            placeLabel={() => 'Jita 4-4'}
+            hueOf={() => 0}
+          />
+        </MemoryRouter>
+      );
+
+    it('shows the input beside the hauler picker', () => {
+      show(limited({}), null);
+      expect(screen.getByRole('textbox', { name: /max isk per haul/i })).toBeTruthy();
+    });
+
+    it('names the unpriced stacks only once a limit is set', () => {
+      const { unmount } = show(limited({ unpricedCount: 2 }), 1_000_000);
+      expect(screen.getByText(/2 stacks have no price/)).toBeTruthy();
+      unmount();
+      show(limited({ unpricedCount: 2 }), null);
+      expect(screen.queryByText(/have no price/)).toBeNull();
+    });
+
+    it('says so when prices could not load, instead of a silent no-limit', () => {
+      show(limited({ unpricedCount: 2 }), 1_000_000, true);
+      expect(screen.getByText(/Prices could not be loaded/)).toBeTruthy();
+    });
+
+    it('labels over-limit stacks apart from the ones that do not fit', () => {
+      show(limited({}, { overLimitCount: 1, unfitCount: 0 }), 1_000_000);
+      expect(screen.getByText(/1 stack is left behind: one unit is worth more/)).toBeTruthy();
+      expect(screen.queryByText(/cannot carry/)).toBeNull();
+    });
+  });
+
   describe('owned hulls in the comparison', () => {
     const option = (typeId: number, name: string, extra: Partial<typeof hull>) => ({
       ...hauledBy([cargoHaul(100), cargoHaul(50)]),
@@ -625,6 +716,8 @@ describe('PlanResult', () => {
       render(
         <MemoryRouter>
           <PlanResult
+            maxIsk={null}
+            onChangeMaxIsk={() => {}}
             state={{
               plan: crowded(),
               destinationSystem: null,
