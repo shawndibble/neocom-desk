@@ -133,12 +133,12 @@ describe('fittingToDogmaFit', () => {
     expect(wrongBase.items[0]).not.toHaveProperty('mutation');
   });
 
-  it('hands every mutated item in bare when the mutaplasmid data is not loaded', () => {
+  it('hands every mutated item in base-only when the mutaplasmid data is not loaded', () => {
     const dogmaFit = fittingToDogmaFit(
       neut({ baseTypeId: 16475, mutaplasmidTypeId: 47831, attributes: { 6: 419.25 } }),
       emptyProfile
     );
-    expect(dogmaFit.items[0]).not.toHaveProperty('mutation');
+    expect(dogmaFit.items[0]?.mutation).toEqual({ base: 16475 });
   });
 
   it('maps the hull and name straight across', () => {
