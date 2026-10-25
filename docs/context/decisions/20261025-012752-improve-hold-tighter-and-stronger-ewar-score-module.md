@@ -1,0 +1,7 @@
+# Scope decisions — Improve: Hold tighter and Stronger EWAR score module figures (issue #5031)
+
+_Recorded 2026-10-25 · issue #5031._
+
+- **Hold tighter is the mean relative gain over three figures the fit already has: scram and disruptor points (summed), the strongest web's slowdown %, and the shortest tackle reach (optimal range of the scram, disruptor or web that reaches least far).** A figure the swap loses counts as a full loss, so dropping the web to add a point never reads as a gain. Read from `support.rows` (`improveTackle.ts`). Disabled with "No warp scramblers, disruptors or webs on this fit". Bubbles are not modelled and stay out.
+- **Stronger EWAR is the mean relative gain in total module strength (each module's headline effect, summed over ECM, target painters, tracking and guidance disruptors, sensor dampeners) and the mean reach (optimal + falloff) per module.** It is not the effect on a target, which the engine does not compute, and every row that shows it says so ("not the effect on a target"). Disabled with "No electronic warfare modules on this fit".
+- **Jobs.** Neutralizers and nosferatu leave the `ewar` job for a new `drain` job, so Stronger EWAR (which does not score them) may not remove the last one. Hold tighter scores `scram` and `web`; Stronger EWAR scores `ewar`. Rework groups: scrambler/disruptor (52) and web (65) for Hold tighter; ECM (201), sensor dampener (208), weapon disruptor (291) and target painter (379) for Stronger EWAR. Cap stability stays the guardrail.

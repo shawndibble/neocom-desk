@@ -1356,7 +1356,9 @@
         "align": "Align faster",
         "warp": "Align and warp faster",
         "repair": "Repair more",
-        "transfer": "Transfer more"
+        "transfer": "Transfer more",
+        "tackle": "Hold tighter",
+        "ewar": "Stronger EWAR"
       },
       "unavailable": {
         "noWeapons": "Nothing on this fit deals damage",
@@ -1366,7 +1368,9 @@
         "noAlign": "This hull has no align time to improve",
         "noWarp": "This hull has no align time or warp speed to improve",
         "noRemoteRepair": "No remote repairers on this fit",
-        "noCapTransfer": "No remote capacitor transmitters on this fit"
+        "noCapTransfer": "No remote capacitor transmitters on this fit",
+        "noTackle": "No warp scramblers, disruptors or webs on this fit",
+        "noEwar": "No electronic warfare modules on this fit"
       },
       "guardrail": {
         "combat": "Keeps the capacitor stable and the fit within CPU, powergrid and calibration.",
@@ -1403,7 +1407,9 @@
         "align": "No variation of a fitted module makes this fit align faster.",
         "warp": "No variation of a fitted module helps this fit align and warp faster.",
         "repair": "No variation of a fitted remote repairer repairs more within the guardrails.",
-        "transfer": "No variation of a fitted remote capacitor transmitter transfers more within the guardrails."
+        "transfer": "No variation of a fitted remote capacitor transmitter transfers more within the guardrails.",
+        "tackle": "No variation of a fitted scrambler, disruptor or web holds tighter within the guardrails.",
+        "ewar": "No variation of a fitted electronic warfare module is stronger within the guardrails."
       },
       "closest": "Closest swaps",
       "broke": {
@@ -1462,6 +1468,8 @@
       "alignLine": "Align {{before}} → {{after}} s",
       "repairLine": "Repairs {{before}} → {{after}} HP/s",
       "transferLine": "Transfers {{before}} → {{after}} GJ/s",
+      "tackleLine": "Points {{pointsBefore}} → {{pointsAfter}} · Web {{webBefore}} → {{webAfter}}% · Reach {{rangeBefore}} → {{rangeAfter}} km",
+      "ewarLine": "Module strength {{strengthBefore}} → {{strengthAfter}} · Reach {{rangeBefore}} → {{rangeAfter}} km (not the effect on a target)",
       "warpLine": "{{align}} · Warp {{before}} → {{after}} AU/s",
       "hold": {
         "cargo": "Cargo hold",
