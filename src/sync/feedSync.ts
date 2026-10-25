@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, setDoc } from 'firebase/firestore/lite';
+import { collection, deleteDoc, doc } from 'firebase/firestore/lite';
 import { db, type NotificationFeedRecord } from '@/db';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
 import {
@@ -10,7 +10,7 @@ import {
 import { writePullCursor } from './localBookkeeping';
 import { mergeFeed, type RemoteFeedDoc } from './merge';
 import { NOTIFICATION_FEED } from './syncedCollections';
-import { pullOwnedDocs, runBounded, type SyncContext } from './collectionSync';
+import { pullOwnedDocs, runBounded, setOwnedDoc, type SyncContext } from './collectionSync';
 
 // ---------------------------------------------------------------------------
 // Notification Feed sync (issue #362)
@@ -161,7 +161,8 @@ export async function syncFeed(ctx: SyncContext): Promise<void> {
   if (pushed.length > 0) ctx.onPush?.();
   await runBounded([
     ...pushed.map(
-      (row) => () => setDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash, writeNow))
+      (row) => () =>
+        setOwnedDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash, writeNow), ctx)
     ),
     ...plan.purgeRemote.map((id) => () => deleteDoc(doc(col, id))),
   ]);

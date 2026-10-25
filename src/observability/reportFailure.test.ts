@@ -36,6 +36,28 @@ describe('reportFailure', () => {
     expect(captureException).not.toHaveBeenCalled();
   });
 
+  it("skips Firestore Lite's fetch that never got a response, but not its server errors", () => {
+    // Lite maps the thrown fetch's missing `status` to `unknown` and its missing
+    // `statusText` into the message.
+    const lite = (code: string, detail: string) =>
+      Object.assign(new Error(`Request failed with error: ${detail}`), { code });
+    reportFailure('sync', lite('unknown', 'undefined'));
+    expect(captureException).not.toHaveBeenCalled();
+    reportFailure('sync', lite('unknown', 'Backend error'));
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
+  it('still reports a pass where dropped fetches sit beside a refusal', () => {
+    const dropped = Object.assign(new Error('Request failed with error: undefined'), {
+      code: 'unknown',
+    });
+    const denied = Object.assign(new Error('Missing or insufficient permissions.'), {
+      code: 'permission-denied',
+    });
+    reportFailure('sync', new AggregateError([dropped, dropped, denied], 'x (and 2 more)'));
+    expect(captureException).toHaveBeenCalledTimes(1);
+  });
+
   it('skips a dead SSO grant, but not other token endpoint failures', () => {
     const authError = (code: string) =>
       Object.assign(new Error(`${code}: x`), { name: 'AuthError', code });

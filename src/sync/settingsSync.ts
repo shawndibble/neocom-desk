@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, setDoc } from 'firebase/firestore/lite';
+import { collection, deleteDoc, doc } from 'firebase/firestore/lite';
 import { db } from '@/db';
 import { INTERNAL_PREFIX, settingsSeenSeqKey, writePullCursor } from './localBookkeeping';
 import {
@@ -8,7 +8,7 @@ import {
   type SyncedSettingValue,
 } from './merge';
 import { SYNCED_SETTINGS } from './syncedCollections';
-import { pullOwnedDocs, type SyncContext } from './collectionSync';
+import { pullOwnedDocs, setOwnedDoc, type SyncContext } from './collectionSync';
 
 // Local bookkeeping (Dexie settings table). 'sync.__' keys are internal and
 // never synced; 'sync.' keys are the user settings that DO sync.
@@ -115,22 +115,30 @@ export async function syncSettings(ctx: SyncContext): Promise<void> {
       // A key written outside setSyncedSetting has no timestamp yet: stamp now.
       const updatedAt = s.updatedAt > 0 ? s.updatedAt : now;
       if (meta[s.key] !== updatedAt) stamps.set(s.key, updatedAt);
-      return setDoc(doc(settingsCol, s.key), {
-        key: s.key,
-        value: s.value,
-        updatedAt,
-        ownerHash,
-        deleted: false,
-      });
+      return setOwnedDoc(
+        doc(settingsCol, s.key),
+        {
+          key: s.key,
+          value: s.value,
+          updatedAt,
+          ownerHash,
+          deleted: false,
+        },
+        ctx
+      );
     }),
     ...settings.pushTombstones.map((t) =>
       // No `value` field — Firestore rejects undefined, and a tombstone carries none.
-      setDoc(doc(settingsCol, t.key), {
-        key: t.key,
-        updatedAt: t.deletedAt,
-        ownerHash,
-        deleted: true,
-      })
+      setOwnedDoc(
+        doc(settingsCol, t.key),
+        {
+          key: t.key,
+          updatedAt: t.deletedAt,
+          ownerHash,
+          deleted: true,
+        },
+        ctx
+      )
     ),
     ...settings.purgeRemote.map((key) => deleteDoc(doc(settingsCol, key))),
   ]);
