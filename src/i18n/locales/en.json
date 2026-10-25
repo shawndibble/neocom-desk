@@ -1467,7 +1467,7 @@
         "refit": "Extra spend cap (ISK)"
       },
       "defenseLabel": "Defense Choice",
-      "defense": { "keep": "Keep as is", "shield": "Shield", "armor": "Armor" },
+      "defense": { "keep": "Keep as is", "shield": "Shield", "armor": "Armor", "either": "Either" },
       "defenseUpgrade": "Pick Rebalance or Rework to change tank side",
       "sideResult": "{{side}}: {{result}}",
       "sideNone": "no gain",

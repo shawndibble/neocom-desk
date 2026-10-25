@@ -644,6 +644,26 @@ export function onlySide(
   };
 }
 
+/**
+ * The result cut to the options on neither side (Damage Control, hull, resist-all
+ * modules): the "Either" figure of the Defense Choice summary.
+ */
+export function onlyNeutral(
+  result: ImproveResult,
+  groupOf: (typeId: number) => number | undefined
+): ImproveResult {
+  const keep = (option: ImproveOption) => {
+    const group = groupOf(option.candidate.toTypeId);
+    return group === undefined || sideOf(group) === null;
+  };
+  return {
+    ...result,
+    noDownside: result.noDownside.filter(keep),
+    tradeOffs: result.tradeOffs.filter(keep),
+    rejected: result.rejected.filter(keep),
+  };
+}
+
 export interface FindImprovementsParams {
   fitting: Fitting;
   /** The open Fitting's own stats, under the same conditions as `stats`. */

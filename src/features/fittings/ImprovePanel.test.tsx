@@ -513,6 +513,31 @@ describe('ImprovePanel', () => {
     );
   });
 
+  it('adds an Either figure for neutral rows such as Damage Control, and omits it with none', () => {
+    const state = done({ noDownside: [option(30, {})] });
+    if (state.status !== 'done') throw new Error('state');
+    const empty = { noDownside: [], tradeOffs: [], rejected: [], checked: 2, stopped: false };
+    const withNeutral = { ...empty, noDownside: state.result.noDownside };
+    const sides = { shield: state.result, armor: empty };
+    const view = renderPanel(
+      search({ ...state, sides, neutral: withNeutral }),
+      vi.fn(),
+      vi.fn(),
+      settings({ defense: 'shield' })
+    );
+    expect(screen.getByTestId('improve-sides')).toHaveTextContent(
+      'Shield: up to +10% · Armor: no gain · Either: up to +10%'
+    );
+    view.unmount();
+    renderPanel(
+      search({ ...state, sides, neutral: empty }),
+      vi.fn(),
+      vi.fn(),
+      settings({ defense: 'shield' })
+    );
+    expect(screen.getByTestId('improve-sides')).not.toHaveTextContent('Either');
+  });
+
   it('disables Mine more with its reason on a fit with no miners', async () => {
     renderPanel(search({ status: 'idle' }, before));
     await openMoreGoals();
