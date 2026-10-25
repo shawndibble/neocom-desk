@@ -1,0 +1,6 @@
+# Scope decisions — Mine more scores one ore's best crystal for every row (issue #5028)
+
+_Recorded 2026-10-25 · issue #5028._
+
+- **Mine more is scored in m³/s for one ore the pilot picks, as its crystal family.** Mining yield carries no ore input; the ore enters only through the crystal. The ore picker lists the crystal families (`CRYSTAL_FAMILY_ORES`), each shown with its ores, and is remembered on this device (`fittingsImproveOre`). Before every whole-fit calculation, the baseline's included, the crystal is loaded in every miner, so each row compares the same ore. The crystal is the letter and tech level (A I … C II) that mines the most on the open Fitting, found by trying each once; the same one is used for every miner type, a miner that takes no such crystal keeps its own charge. The crystal loads only for scoring: Apply changes the miners, never the fit's charges. Every row names the ore and shows its m³/s before and after.
+- **Mine more is a goal chip like the combat ones.** It is disabled with "No miners on this fit" when no miner module is fitted (mining drones alone give no module to swap). It reuses Reach and the capacitor and budget Guardrails; Rework's groups are the miners, strip miners, Mining Laser Upgrades and mining rigs. It has no Train or Implants section yet.

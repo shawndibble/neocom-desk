@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { baseFittingStats } from '@/engine/fittings/__fixtures__/fittingStats';
-import type { ImproveOption, ImproveResult } from '@/engine/fittings/improve';
+import type { ImproveGoal, ImproveOption, ImproveResult } from '@/engine/fittings/improve';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { ImprovePanel, type ImproveSettings } from './ImprovePanel';
 import type { ImproveSearch, ImproveState } from './useImprove';
@@ -43,10 +43,10 @@ function search(state: ImproveState, own: FittingStats | null = before): Improve
   };
 }
 
-function done(result: Partial<ImproveResult>): ImproveState {
+function done(result: Partial<ImproveResult>, own: FittingStats = before): ImproveState {
   return {
     status: 'done',
-    before,
+    before: own,
     elapsedMs: 1200,
     result: { noDownside: [], tradeOffs: [], rejected: [], checked: 3, stopped: false, ...result },
   };
@@ -65,6 +65,8 @@ const settings = (patch: Partial<ImproveSettings> = {}): ImproveSettings => ({
   onIncludeRigsChange: vi.fn(),
   includeOfficer: false,
   onIncludeOfficerChange: vi.fn(),
+  oreFamily: 'Simple Asteroid',
+  onOreFamilyChange: vi.fn(),
   ...patch,
 });
 
@@ -73,11 +75,11 @@ const renderPanel = (
   onApply = vi.fn(),
   onGoalChange = vi.fn(),
   config: ImproveSettings = settings(),
-  extra: { onFixFirst?: () => void; freeSections?: ReactNode } = {}
+  extra: { onFixFirst?: () => void; freeSections?: ReactNode; goal?: ImproveGoal } = {}
 ) =>
   render(
     <ImprovePanel
-      goal="damage"
+      goal={extra.goal ?? 'damage'}
       onGoalChange={onGoalChange}
       search={s}
       catalogue={null}
@@ -249,5 +251,52 @@ describe('ImprovePanel', () => {
     expect(screen.getByTestId('improve-sides')).toHaveTextContent(
       'Shield: up to +10% · Armor: no gain'
     );
+  });
+
+  it('disables Mine more with its reason on a fit with no miners', async () => {
+    renderPanel(search({ status: 'idle' }, before));
+    const chip = screen.getByRole('button', { name: /Mine more/ });
+    expect(chip).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.hover(chip);
+    expect(await screen.findByText('No miners on this fit')).toBeInTheDocument();
+  });
+
+  it('shows the ore on every Mine more row and in the closest swaps, with the m³/s it gives', () => {
+    const mining = (perSecond: number) => ({
+      rows: [],
+      perSecond,
+      perHour: perSecond * 3600,
+      wastePerSecond: 0,
+      wastePct: 0,
+    });
+    const own = { ...before, mining: mining(10) };
+    const gain = option(10, { mining: mining(12.5) });
+    const broke = { ...option(21, { mining: mining(11) }), guardrail: 'budget' as const };
+    const noGain = search(
+      done(
+        { noDownside: [gain, { ...gain, candidate: { ...gain.candidate, toTypeId: 11 } }] },
+        own
+      ),
+      own
+    );
+    renderPanel(noGain, vi.fn(), vi.fn(), settings(), { goal: 'mining' });
+    const lines = screen.getAllByText(/Mines 10 → 12\.5 m³\/s of Veldspar, Scordite/);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toHaveTextContent('(Simple Asteroid crystals)');
+    cleanup();
+    renderPanel(search(done({ rejected: [broke] }, own), own), vi.fn(), vi.fn(), settings(), {
+      goal: 'mining',
+    });
+    expect(screen.getByText(/Mines 10 → 11 m³\/s of Veldspar/)).toBeInTheDocument();
+  });
+
+  it('reports the ore the pilot picks', async () => {
+    const onOreFamilyChange = vi.fn();
+    renderPanel(search({ status: 'idle' }), vi.fn(), vi.fn(), settings({ onOreFamilyChange }), {
+      goal: 'mining',
+    });
+    await userEvent.click(screen.getByRole('combobox', { name: 'Ore' }));
+    await userEvent.click(await screen.findByRole('option', { name: /Rare Moon/ }));
+    expect(onOreFamilyChange).toHaveBeenCalledWith('Rare Moon');
   });
 });

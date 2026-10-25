@@ -16,6 +16,11 @@ import {
   IskInput,
   ProgressBar,
   SegmentedControl,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
 } from '@/components/ui';
 import { TANK_GOALS } from '@/engine/fittings/improveGroups';
@@ -23,9 +28,9 @@ import { Collapse } from '@/components/ui/Collapse';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import {
   bestScore,
-  COMBAT_GOALS,
   DEFENSE_CHOICES,
   goalAvailability,
+  IMPROVE_GOALS,
   IMPROVE_MODES,
   IMPROVE_REACHES,
   type DefenseChoice,
@@ -36,7 +41,9 @@ import {
   type ImproveResult,
   type RejectedOption,
 } from '@/engine/fittings/improve';
+import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import type { Resource } from '@/engine/fittings/makeItFit';
+import { createNumberFormat } from '@/lib/numberLocale';
 import type { FittingStats } from '@/engine/fittings/types';
 import { diffFittingStats } from '@/engine/fittings/variationDelta';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -48,6 +55,8 @@ import type { ImproveSearch } from './useImprove';
 
 /** How many stat changes a row spells out before counting the rest. */
 const CHANGES_SHOWN = 4;
+
+const m3sFormat = createNumberFormat({ maximumFractionDigits: 1 });
 
 const isResource = (key: string) => /^(cpu|powergrid|calibration)/.test(key);
 
@@ -78,6 +87,9 @@ export interface ImproveSettings {
   onIncludeRigsChange: (on: boolean) => void;
   includeOfficer: boolean;
   onIncludeOfficerChange: (on: boolean) => void;
+  /** Mine more: the crystal family (ore) the miners are scored with. */
+  oreFamily: string;
+  onOreFamilyChange: (family: string) => void;
 }
 
 interface Props {
@@ -105,6 +117,7 @@ export function ImprovePanel({
 }: Props) {
   const { t } = useTranslation();
   const moreId = useId();
+  const oreId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
   // Ticked rows, by key; at most one per fitted module (ticking another variation of it unticks the first).
   // Ticks belong to the result they were made in: a new search (a goal
@@ -161,6 +174,17 @@ export function ImprovePanel({
     );
   }
 
+  /** Mine more: the ore the row is scored with, and the m³/s it gives. */
+  function oreLine(option: ImproveOption | RejectedOption, own: FittingStats) {
+    const family = settings.oreFamily;
+    return t('fittings.improve.oreLine', {
+      ores: (CRYSTAL_FAMILY_ORES[family] ?? []).join(', '),
+      family,
+      before: m3sFormat(own.mining.perSecond),
+      after: m3sFormat(option.after.mining.perSecond),
+    });
+  }
+
   function toggle(option: ImproveOption) {
     const next = new Map(ticked);
     const key = optionKey(option);
@@ -193,6 +217,9 @@ export function ImprovePanel({
                 />
                 <span className="min-w-0">
                   <span className="block font-medium">{swapLabel(option)}</span>
+                  {goal === 'mining' && (
+                    <span className="block text-xs">{oreLine(option, own)}</span>
+                  )}
                   <span className="text-text-dim block text-xs">{changeLine(option, own)}</span>
                   {option.downsides.length > 0 && (
                     <span className="text-warning block text-xs">
@@ -248,7 +275,7 @@ export function ImprovePanel({
           aria-label={t('fittings.improve.goalLabel')}
           className="flex flex-wrap gap-2"
         >
-          {COMBAT_GOALS.map((id) => {
+          {IMPROVE_GOALS.map((id) => {
             const availability = before ? goalAvailability(id, before) : { available: true };
             const reason =
               'reason' in availability
@@ -277,6 +304,24 @@ export function ImprovePanel({
               : 'fittings.improve.guardrail.combat'
           )}
         </p>
+        {goal === 'mining' && (
+          <div className="space-y-1 text-sm">
+            <label htmlFor={oreId}>{t('fittings.improve.oreLabel')}</label>
+            <Select value={settings.oreFamily} onValueChange={settings.onOreFamilyChange}>
+              <SelectTrigger id={oreId} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(CRYSTAL_FAMILY_ORES).map(([family, ores]) => (
+                  <SelectItem key={family} value={family}>
+                    {t('fittings.improve.oreOption', { ores: ores.join(', '), family })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-text-dim text-xs">{t('fittings.improve.oreHint')}</p>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -431,6 +476,9 @@ export function ImprovePanel({
                       className="border-line rounded-xs border p-2 text-sm"
                     >
                       <p className="font-medium">{swapLabel(option)}</p>
+                      {goal === 'mining' && (
+                        <p className="text-xs">{oreLine(option, state.before)}</p>
+                      )}
                       <p className="text-text-dim text-xs">{changeLine(option, state.before)}</p>
                       <p className="text-warning text-xs">
                         {t(`fittings.improve.broke.${option.guardrail}`)}

@@ -8,9 +8,9 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  COMBAT_GOALS,
   findImprovements,
   goalAvailability,
+  IMPROVE_GOALS,
   IMPROVE_MODES,
   IMPROVE_REACHES,
   improveCandidates,
@@ -23,10 +23,17 @@ import {
   type ModulePool,
 } from '@/engine/fittings/improve';
 import { overBudgetResources } from '@/engine/fittings/improveFree';
+import {
+  bestCrystalKey,
+  crystalKeyOf,
+  crystalsOfFamily,
+  loadCrystals,
+} from '@/engine/fittings/improveMining';
+import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import { TANK_GOALS } from '@/engine/fittings/improveGroups';
 import type { Resource } from '@/engine/fittings/makeItFit';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
-import type { FittingStats } from '@/engine/fittings/types';
+import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/types';
 import { buildVariationIndex } from '@/engine/market/variations';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { useMarketHub } from '@/features/market/hub';
@@ -41,7 +48,7 @@ export const useImproveGoal = createLocalSetting<ImproveGoal>({
   key: 'fittingsImproveGoal',
   defaultValue: 'overall',
   parse: (raw) =>
-    typeof raw === 'string' && (COMBAT_GOALS as readonly string[]).includes(raw)
+    typeof raw === 'string' && (IMPROVE_GOALS as readonly string[]).includes(raw)
       ? (raw as ImproveGoal)
       : 'overall',
 });
@@ -66,6 +73,15 @@ export const useImproveMode = createLocalSetting<ImproveMode>({
       : 'buy',
 });
 
+/** The ore Mine more scores, as its crystal family; remembered on this device. */
+export const DEFAULT_ORE_FAMILY = 'Simple Asteroid';
+export const useImproveOre = createLocalSetting<string>({
+  key: 'fittingsImproveOre',
+  defaultValue: DEFAULT_ORE_FAMILY,
+  parse: (raw) =>
+    typeof raw === 'string' && raw in CRYSTAL_FAMILY_ORES ? raw : DEFAULT_ORE_FAMILY,
+});
+
 /** The total budget (planning) or extra-spend cap (refitting) in ISK; null is no limit. */
 export const useImproveSpendCap = createLocalSetting<number | null>({
   key: 'fittingsImproveSpendCap',
@@ -81,6 +97,8 @@ export interface ImproveConfig {
   defense: DefenseChoice;
   includeRigs: boolean;
   includeOfficer: boolean;
+  /** Mine more: the crystal family (ore) every miner is scored with. */
+  oreFamily: string;
 }
 
 /** After this long a search offers "Show best so far". */
@@ -158,6 +176,56 @@ function searchCandidates(
   });
 }
 
+/**
+ * Mine more's ore: which crystal each miner type loads, for `family`. The
+ * crystal letter and tech level that mine the most on the open Fitting is
+ * used for every miner type, so each row is the one ore's best case. Null
+ * when no fitted miner takes a crystal of the family.
+ */
+async function crystalPlan(
+  variants: VariantEvaluator,
+  catalogue: FittingCatalogue,
+  family: string,
+  own: FittingStats,
+  signal: AbortSignal
+): Promise<((moduleTypeId: number) => number | null) | null> {
+  const nameOf = (typeId: number) => catalogue.types[String(typeId)]?.name;
+  const known = new Map<number, number[]>();
+  const crystalsFor = (typeId: number): number[] => {
+    let crystals = known.get(typeId);
+    if (!crystals) {
+      const slot = catalogue.rackOf[String(typeId)] as FittingSlotKind | undefined;
+      const groups = slot
+        ? variants.engine.chargeGroupIdsFor(variants.fitting.shipTypeId, slot, typeId)
+        : [];
+      crystals = crystalsOfFamily(
+        family,
+        groups.flatMap((group) => catalogue.typeIdsByGroup.get(group) ?? []),
+        nameOf
+      );
+      known.set(typeId, crystals);
+    }
+    return crystals;
+  };
+  const keyOf = (crystal: number) => crystalKeyOf(nameOf(crystal) ?? '');
+  const forKey = (key: string) => (typeId: number) =>
+    crystalsFor(typeId).find((crystal) => keyOf(crystal) === key) ?? null;
+  const minerTypes = new Set(
+    own.mining.rows.filter((row) => !row.isDrone).map((row) => row.typeId)
+  );
+  const keys = new Set<string>();
+  for (const typeId of minerTypes)
+    for (const crystal of crystalsFor(typeId)) {
+      const key = keyOf(crystal);
+      if (key) keys.add(key);
+    }
+  const best = await bestCrystalKey([...keys], async (key) => {
+    const { after } = await variants.compare(loadCrystals(variants.fitting, forKey(key)), signal);
+    return after.mining.perSecond;
+  });
+  return best === null ? null : forKey(best);
+}
+
 /** Every type id a candidate (and the downgrade paired with it) buys or sells. */
 function candidateTypeIds(candidates: readonly ImproveCandidate[]): number[] {
   const ids = new Set<number>();
@@ -185,7 +253,7 @@ export function useImprove(
   const [attempt, setAttempt] = useState(0);
   const cancelRef = useRef<() => void>(() => {});
   const stopRef = useRef(false);
-  const { reach, mode, spendCap, defense, includeRigs, includeOfficer } = config;
+  const { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily } = config;
 
   useEffect(() => {
     if (!enabled || !variants || !catalogue) return;
@@ -232,7 +300,7 @@ export function useImprove(
             variants,
             catalogue,
             searched,
-            { reach, mode, spendCap, defense: side, includeRigs, includeOfficer },
+            { reach, mode, spendCap, defense: side, includeRigs, includeOfficer, oreFamily },
             own.slotCounts
           ),
         }));
@@ -255,15 +323,28 @@ export function useImprove(
         // A cap that cannot be checked is not silently waived.
         if (spendCap !== null && (priceMap === null || (mode === 'buy' && fitTotal === null)))
           throw new Error('Prices unavailable for the spend cap');
+        // Mine more: every miner carries the picked ore's crystal, the baseline's too.
+        let scoredBefore = own;
+        let load = (fitting: Fitting) => fitting;
+        if (searched === 'mining') {
+          const plan = await crystalPlan(variants, catalogue, oreFamily, own, controller.signal);
+          if (cancelled) return;
+          if (plan) {
+            load = (fitting) => loadCrystals(fitting, plan);
+            scoredBefore = (await variants.compare(load(variants.fitting), controller.signal))
+              .after;
+          }
+        }
         const results: ImproveResult[] = [];
         let done = 0;
         for (const set of sets) {
           const result = await findImprovements({
             fitting: variants.fitting,
-            before: own,
+            before: scoredBefore,
             goal: searched,
             candidates: set.candidates,
-            stats: async (fitting) => (await variants.compare(fitting, controller.signal)).after,
+            stats: async (fitting) =>
+              (await variants.compare(load(fitting), controller.signal)).after,
             priceOf: (typeId) => priceMap?.get(typeId)?.sellMin ?? null,
             ...(target ? { target } : {}),
             mode,
@@ -296,7 +377,7 @@ export function useImprove(
         setState({
           status: 'done',
           result: results[0],
-          before: own,
+          before: scoredBefore,
           elapsedMs: performance.now() - started,
           ...(sideResults ? { sides: sideResults } : {}),
         });
@@ -323,6 +404,7 @@ export function useImprove(
     defense,
     includeRigs,
     includeOfficer,
+    oreFamily,
   ]);
 
   const cancel = useCallback(() => cancelRef.current(), []);

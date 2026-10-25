@@ -39,7 +39,9 @@ import type { Fitting, FittingModule, FittingSlotKind, FittingStats } from './ty
 
 /** The combat Improve Goals, in the order the drawer shows them. */
 export const COMBAT_GOALS = ['overall', 'damage', 'tank', 'speed', 'reach', 'cheaper'] as const;
-export type ImproveGoal = (typeof COMBAT_GOALS)[number];
+/** Every Improve Goal: the combat ones, then Mine more. */
+export const IMPROVE_GOALS = [...COMBAT_GOALS, 'mining'] as const;
+export type ImproveGoal = (typeof IMPROVE_GOALS)[number];
 
 /**
  * A Guardrail an option broke: `budget` the fit no longer fits its CPU,
@@ -144,7 +146,8 @@ const DOWNSIDE_METRICS: readonly GainMetric[] = [
 ];
 
 export type GoalAvailability =
-  { available: true } | { available: false; reason: 'noWeapons' | 'noGunsOrLaunchers' };
+  | { available: true }
+  | { available: false; reason: 'noWeapons' | 'noGunsOrLaunchers' | 'noMiners' };
 
 const isArmed = (s: FittingStats) => s.offense.dps > 0 || s.droneDps > 0 || s.fighters.dps > 0;
 const hasShipWeapons = (s: FittingStats) =>
@@ -155,6 +158,9 @@ export function goalAvailability(goal: ImproveGoal, before: FittingStats): GoalA
   if (goal === 'damage' && !isArmed(before)) return { available: false, reason: 'noWeapons' };
   if (goal === 'reach' && !hasShipWeapons(before))
     return { available: false, reason: 'noGunsOrLaunchers' };
+  // Swaps are module swaps: mining drones alone give nothing to change.
+  if (goal === 'mining' && !before.mining.rows.some((row) => !row.isDrone))
+    return { available: false, reason: 'noMiners' };
   return { available: true };
 }
 
@@ -195,6 +201,8 @@ function scoreOf(
       return metrics.optimal + metrics.falloff;
     case 'cheaper':
       return iskDelta === null ? null : -iskDelta;
+    case 'mining':
+      return relative(before.mining.perSecond, after.mining.perSecond);
   }
 }
 
