@@ -63,7 +63,18 @@ import { createNumberFormat } from '@/lib/numberLocale';
 import { alignTimeSeconds } from '@/engine/fittings/stats';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
-import { diffFittingStats, type FittingStatsDelta } from '@/engine/fittings/variationDelta';
+import {
+  capacitorChange,
+  diffFittingStats,
+  type FittingStatsDelta,
+  type StatChangeKey,
+} from '@/engine/fittings/variationDelta';
+import {
+  overallTerms,
+  roleChanges,
+  type GainMetric,
+  type RoleMetric,
+} from '@/engine/fittings/skillGains';
 import { ADD_PREVIEW_DELAY_MS } from './useModuleAddPreview';
 import { groupByModule, IMPROVE_SORTS, type ImproveSort } from '@/engine/fittings/improveRows';
 import { summariseSelection } from '@/engine/fittings/improveSelection';
@@ -88,6 +99,15 @@ const reachKm = (s: FittingStats) =>
       w.kind === 'turret' ? w.optimal : w.kind === 'missile' ? w.range : 0
     )
   ) / 1000;
+
+/** What a row leads with: the figure, and the detail-line stats it already shows. */
+interface Lead {
+  node: ReactNode;
+  keys: string[];
+}
+
+/** How many figures Best overall's lead line shows: the two that moved the score most. */
+const OVERALL_LEAD_FIGURES = 2;
 
 const alignOf = (s: FittingStats) => alignTimeSeconds(s.navigation.mass, s.navigation.agility);
 
@@ -270,12 +290,13 @@ export function ImprovePanel({
     option: ImproveOption | RejectedOption,
     own: FittingStats,
     all = false,
-    onOpen?: () => void
+    onOpen?: () => void,
+    omit: readonly string[] = []
   ): ReactNode {
     // What the swap does first; the CPU, powergrid and calibration it takes after.
-    const changes = [...diffFittingStats(own, option.after).changes].sort(
-      (a, b) => Number(isResource(a.key)) - Number(isResource(b.key))
-    );
+    const changes = diffFittingStats(own, option.after)
+      .changes.filter((change) => !omit.includes(change.key))
+      .sort((a, b) => Number(isResource(a.key)) - Number(isResource(b.key)));
     const shown: ReactNode[] = changes
       .slice(0, all ? undefined : CHANGES_SHOWN)
       .map((change) => <StatChange key={change.key} change={change} />);
@@ -407,37 +428,122 @@ export function ImprovePanel({
     return null;
   }
 
-  /** The goal's own figure, before → after, first on every row. */
-  function leadLine(option: ImproveOption, own: FittingStats): ReactNode {
-    const stat = (key: 'sustainedDps' | 'ehp' | 'maxVelocity', before: number, after: number) => (
-      <StatChange key={key} change={{ key, before, after }} />
-    );
-    const dps = () => stat('sustainedDps', damageOf(own, target), damageOf(option.after, target));
+  /**
+   * The goal's own figure, before → after, first on every row. `keys` are the
+   * detail-line stats it already shows, so the row does not say them twice.
+   */
+  function leadLine(option: ImproveOption, own: FittingStats): Lead | null {
+    const stat = (key: StatChangeKey, before: number, after: number): Lead => ({
+      node: <StatChange key={key} change={{ key, before, after }} />,
+      keys: [key],
+    });
+    const text = (key: string, line: string | null): Lead | null =>
+      line === null ? null : { node: <span key={key}>{line}</span>, keys: [] };
+    const dps = (): Lead => {
+      const [was, now] = [damageOf(own, target), damageOf(option.after, target)];
+      // A damage figure is labelled for what it is: applied to the Target Profile, the fit's own sustained DPS, or that plus its drones and fighters.
+      if (target && own.applied.weapons.length > 0) return stat('appliedDps', was, now);
+      const shipOnly = (s: FittingStats) => damageOf(s, undefined) === s.offense.sustainedDps;
+      return stat(
+        shipOnly(own) && shipOnly(option.after) ? 'sustainedDps' : 'sustainedDamage',
+        was,
+        now
+      );
+    };
     const tank = () => stat('ehp', own.ehp, option.after.ehp);
+    const role = (metric: RoleMetric): Lead | null => {
+      const change = roleChanges(own, option.after).find((c) => c.key === metric);
+      return change
+        ? {
+            node: (
+              <span key={metric}>
+                {t(`fittings.whatToTrain.role.${metric}`, {
+                  before: change.before,
+                  after: change.after,
+                })}
+              </span>
+            ),
+            keys: [],
+          }
+        : null;
+    };
+    // One figure that earned Best overall's score, worded as the row's other lines word it.
+    const term = (metric: GainMetric): Lead | null => {
+      switch (metric) {
+        case 'dps':
+          return dps();
+        case 'ehp':
+          return tank();
+        case 'activeTank': {
+          const total = (s: FittingStats) => s.repair.shield + s.repair.armor + s.repair.hull;
+          return text(
+            metric,
+            t('fittings.improve.activeTankLine', {
+              before: m3sFormat(total(own)),
+              after: m3sFormat(total(option.after)),
+            })
+          );
+        }
+        case 'speed':
+          return stat(
+            'maxVelocity',
+            own.navigation.maxVelocity,
+            option.after.navigation.maxVelocity
+          );
+        case 'align':
+          return text(
+            metric,
+            t('fittings.improve.alignLine', {
+              before: twoDecimals(alignOf(own)),
+              after: twoDecimals(alignOf(option.after)),
+            })
+          );
+        case 'capacitor': {
+          const change = capacitorChange(own, option.after);
+          return change && stat('capacitor', change.before, change.after);
+        }
+        case 'lockRange':
+          return stat(
+            'maxTargetRange',
+            own.targeting.maxTargetRange / 1000,
+            option.after.targeting.maxTargetRange / 1000
+          );
+        default:
+          return role(metric);
+      }
+    };
     switch (goal) {
       case 'damage':
         return dps();
       case 'tank':
         return tank();
-      case 'overall':
-        return (
-          <>
-            {dps()}
-            {', '}
-            {tank()}
-          </>
-        );
+      case 'overall': {
+        // The figures that moved the score most, never one that stood still.
+        const leads = overallTerms(own, option.after)
+          .map(({ metric }) => term(metric))
+          .filter((lead): lead is Lead => lead !== null)
+          .slice(0, OVERALL_LEAD_FIGURES);
+        return leads.length === 0
+          ? null
+          : {
+              node: leads.flatMap((lead, i) => (i === 0 ? [lead.node] : [', ', lead.node])),
+              keys: leads.flatMap((lead) => lead.keys),
+            };
+      }
       case 'speed':
         return stat('maxVelocity', own.navigation.maxVelocity, option.after.navigation.maxVelocity);
       case 'reach':
-        return t('fittings.improve.reachLine', {
-          before: m3sFormat(reachKm(own)),
-          after: m3sFormat(reachKm(option.after)),
-        });
+        return text(
+          goal,
+          t('fittings.improve.reachLine', {
+            before: m3sFormat(reachKm(own)),
+            after: m3sFormat(reachKm(option.after)),
+          })
+        );
       case 'mining':
-        return oreLine(option, own);
+        return text(goal, oreLine(option, own));
       default:
-        return moveLine(option, own);
+        return text(goal, moveLine(option, own));
     }
   }
 
@@ -447,7 +553,7 @@ export function ImprovePanel({
       (top, option) => (top === null || option.score > top.score ? option : top),
       null
     );
-    return best === null ? null : leadLine(best, own);
+    return best === null ? null : (leadLine(best, own)?.node ?? null);
   }
 
   function toggle(option: ImproveOption) {
@@ -514,9 +620,9 @@ export function ImprovePanel({
                 </span>
               )}
             </span>
-            {lead && <span className="block text-xs">{lead}</span>}
+            {lead && <span className="block text-xs">{lead.node}</span>}
             <span className="text-text-dim block text-xs">
-              {changeLine(option, own, expanded.has(statsKey), () => flip(statsKey))}
+              {changeLine(option, own, expanded.has(statsKey), () => flip(statsKey), lead?.keys)}
             </span>
             {option.lost.length > 0 && (
               <span className="text-warning block text-xs">

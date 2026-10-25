@@ -20,7 +20,7 @@ export interface FittingStatsDelta {
  * `NUMERIC_FIELDS`. `before`/`after` hold a negated depletion time on the
  * unstable side so it never collides with a stable percentage's positive range.
  */
-function capacitorChange(before: FittingStats, after: FittingStats): StatChange | null {
+export function capacitorChange(before: FittingStats, after: FittingStats): StatChange | null {
   const metric = (capacitor: FittingStats['capacitor']) =>
     capacitor.stable ? capacitor.stablePercentage : -capacitor.depletesInSeconds;
 
