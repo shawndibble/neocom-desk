@@ -64,7 +64,8 @@ export type StatChangeKey = FittingStatKey | 'capacitor' | ImproveDamageKey;
 
 /**
  * The damage figure an Improve row leads with, which no Fitting-diff view
- * lists: DPS applied to a Target Profile (sustained, reload included). Not in `NUMERIC_FIELDS`, so no diff ever reports them.
+ * lists: DPS applied to a Target Profile (sustained, reload included). Not in
+ * `NUMERIC_FIELDS`, so no diff ever reports it.
  */
 export type ImproveDamageKey = 'appliedDps';
 
