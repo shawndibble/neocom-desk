@@ -1246,6 +1246,57 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(thanatos.jumpDrive?.fuelPerLightYear).toBeGreaterThan(0);
   });
 
+  it('reports the fitting rules a fit breaks: two Damage Controls, hardpoints, a Venture past its turrets', async () => {
+    const profile = buildAllVProfile(ALL_TEST_SKILL_IDS);
+    const rifter = (modules: Fitting['modules']): Fitting => ({
+      name: 'Rifter',
+      shipTypeId: RIFTER,
+      modules,
+      drones: [],
+      cargo: [],
+    });
+    const lows = [0, 1].map((slotIndex) => ({
+      slot: 'low' as const,
+      slotIndex,
+      typeId: DAMAGE_CONTROL_II,
+      state: 'online' as const,
+    }));
+    const doubled = await computeFittingStats(rifter(lows), profile);
+    expect(doubled.ruleBreaks).toContainEqual(
+      expect.objectContaining({ kind: 'max_group', groupId: 60, used: 2, allowed: 1 })
+    );
+    const single = await computeFittingStats(rifter(lows.slice(0, 1)), profile);
+    expect(single.ruleBreaks).toEqual([]);
+
+    const launchers = [0, 1, 2].map((slotIndex) => ({
+      slot: 'high' as const,
+      slotIndex,
+      typeId: 2404,
+      state: 'online' as const,
+    }));
+    const overLaunched = await computeFittingStats(rifter(launchers), profile);
+    expect(overLaunched.ruleBreaks).toContainEqual(
+      expect.objectContaining({ kind: 'slots', slot: 'launcher' })
+    );
+
+    const venture = (count: number): Fitting => ({
+      name: 'Venture',
+      shipTypeId: 32880,
+      modules: Array.from({ length: count }, (_, slotIndex) => ({
+        slot: 'high' as const,
+        slotIndex,
+        typeId: 483,
+        state: 'online' as const,
+      })),
+      drones: [],
+      cargo: [],
+    });
+    expect((await computeFittingStats(venture(2), profile)).ruleBreaks).toEqual([]);
+    expect((await computeFittingStats(venture(3), profile)).ruleBreaks).toContainEqual(
+      expect.objectContaining({ kind: 'slots', slot: 'turret' })
+    );
+  });
+
   it('names what affects a module: its skills, the hull, a damage mod (penalised) and its charge', () => {
     const fitting: Fitting = {
       name: 'Rifter',
