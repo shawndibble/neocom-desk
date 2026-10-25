@@ -35,16 +35,17 @@ function isOpenOwnContract(contract: StockContract, characterId: number, now: nu
   return expires === null || expires > now;
 }
 
+function isItemContract(contract: StockContract): boolean {
+  return contract.type === 'item_exchange' || contract.type === 'auction';
+}
+
 /** The Character's own open item-exchange and auction contracts: the ones whose items need reading. */
 export function openIssuedItemContracts(
   contracts: readonly StockContract[],
   characterId: number,
   now: number
 ): StockContract[] {
-  return contracts.filter(
-    (c) =>
-      (c.type === 'item_exchange' || c.type === 'auction') && isOpenOwnContract(c, characterId, now)
-  );
+  return contracts.filter((c) => isItemContract(c) && isOpenOwnContract(c, characterId, now));
 }
 
 /** `null` when a line cannot be valued: the whole contract is then left out rather than guessed. */
@@ -76,7 +77,7 @@ export function contractStockValue(input: {
     if (!isOpenOwnContract(contract, input.characterId, input.now)) continue;
     if (contract.type === 'courier') {
       total += contract.reward ?? 0;
-    } else if (contract.type === 'item_exchange' || contract.type === 'auction') {
+    } else if (isItemContract(contract)) {
       const items = input.itemsByContractId.get(contract.contract_id);
       if (items) total += itemsValue(items, input.priceByTypeId) ?? 0;
     }

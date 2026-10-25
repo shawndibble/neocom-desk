@@ -47,11 +47,14 @@ const GONE_STATUSES = [404, 410];
  * is missing or revoked, a read is stale or incomplete, or an item read failed
  * for a reason that may pass. The row then leaves the layer off and is re-read.
  */
-async function readContractStock(characterId: number): Promise<SnapshotFetch['contractStock']> {
+async function readContractStock(
+  characterId: number,
+  now: number
+): Promise<SnapshotFetch['contractStock']> {
   const contracts = await loadContracts(characterId);
   if (contracts.needsReauth || !contracts.cached) return null;
   if (contracts.cached.truncated || isStale(contracts.cached)) return null;
-  const open = openIssuedItemContracts(contracts.cached.data, characterId, Date.now());
+  const open = openIssuedItemContracts(contracts.cached.data, characterId, now);
   const itemsByContractId = new Map<number, readonly StockContractItem[] | null>();
   let reads = 0;
   for (const contract of open) {
@@ -65,7 +68,6 @@ async function readContractStock(characterId: number): Promise<SnapshotFetch['co
       itemsByContractId.set(contract.contract_id, null);
       continue;
     }
-    if (isStale(outcome.result)) return null;
     itemsByContractId.set(contract.contract_id, outcome.result.data);
   }
   return { contracts: contracts.cached.data, itemsByContractId };
@@ -100,7 +102,7 @@ export const liveSources: SnapshotSources = {
     if (!REQUIRED_SCOPES.every((scope) => scopes.includes(scope))) return null;
     // Optional: without the permission the layer is absent, never a zero.
     const contractStock = scopes.includes(ESI_REGISTRY.getCharacterContracts.scope)
-      ? await readContractStock(characterId).catch(() => null)
+      ? await readContractStock(characterId, Date.now()).catch(() => null)
       : null;
     const [wallet, assets, orders] = await Promise.all([
       loadWalletBalanceWithStatus(characterId),
