@@ -216,6 +216,7 @@ describe('net worth', () => {
     assets,
     escrow,
     sellOrders,
+    contracts: 0,
   });
   const char = (
     id: number,
@@ -269,7 +270,7 @@ describe('net worth', () => {
     it('is empty with no Characters', () => {
       expect(netWorthSeries([])).toEqual({
         days: [],
-        layers: { isk: [], assets: [], escrow: [], sellOrders: [] },
+        layers: { isk: [], assets: [], escrow: [], sellOrders: [], contracts: [] },
         totals: [],
       });
     });

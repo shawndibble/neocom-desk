@@ -11,6 +11,7 @@ export const LAYER_LABEL_KEYS: Record<LayerId, string> = {
   assets: 'wallet.netWorth.layers.assets',
   escrow: 'wallet.netWorth.layers.escrow',
   sellOrders: 'wallet.netWorth.layers.sellOrders',
+  contracts: 'wallet.netWorth.layers.contracts',
 };
 
 export const LAYER_COLOR: Record<LayerId, string> = {
@@ -18,6 +19,7 @@ export const LAYER_COLOR: Record<LayerId, string> = {
   assets: 'var(--color-kind-calendar-event)',
   escrow: 'var(--color-kind-skill-training)',
   sellOrders: 'var(--color-kind-skill-plan)',
+  contracts: 'var(--color-kind-order-expiry)',
 };
 
 export const LAYER_SWATCH: Record<LayerId, string> = {
@@ -25,6 +27,7 @@ export const LAYER_SWATCH: Record<LayerId, string> = {
   assets: 'bg-kind-calendar-event',
   escrow: 'bg-kind-skill-training',
   sellOrders: 'bg-kind-skill-plan',
+  contracts: 'bg-kind-order-expiry',
 };
 
 /** Character line hues, cycled; a repeat gets a dash pattern so hue is never the only cue. */

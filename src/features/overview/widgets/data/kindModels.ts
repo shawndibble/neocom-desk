@@ -56,6 +56,7 @@ const W = 'overview.widgets';
 const NET_WORTH_BAR: readonly { id: LayerId; color: ChartColor }[] = [
   { id: 'assets', color: 's1' },
   { id: 'sellOrders', color: 's4' },
+  { id: 'contracts', color: 's5' },
   { id: 'escrow', color: 's2' },
   { id: 'isk', color: 's3' },
 ];
@@ -137,11 +138,17 @@ const netWorth: Builder = (feeds, { t, activeCharacterId, scopeAll }) => {
       summary: t(`${D}.netWorth.none`),
     };
   }
-  const layers: Record<LayerId, number> = { isk: 0, assets: 0, escrow: 0, sellOrders: 0 };
+  const layers: Record<LayerId, number> = {
+    isk: 0,
+    assets: 0,
+    escrow: 0,
+    sellOrders: 0,
+    contracts: 0,
+  };
   for (const character of included) {
     for (const id of Object.keys(layers) as LayerId[]) layers[id] += character.layers[id];
   }
-  const total = layers.isk + layers.assets + layers.escrow + layers.sellOrders;
+  const total = layers.isk + layers.assets + layers.escrow + layers.sellOrders + layers.contracts;
   const day = included.reduce((latest, c) => (c.day > latest ? c.day : latest), '');
   // ISK and assets are always layers; the rest only when something is in them.
   const shown = NET_WORTH_BAR.filter(

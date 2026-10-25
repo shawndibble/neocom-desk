@@ -7,7 +7,7 @@ import { findMissingDays, utcDay, type NetWorthSnapshotRow } from './snapshot';
 import { parseInstant } from '../esiInstant';
 import { DAY_MS } from '@/lib/age';
 
-export const LAYER_IDS = ['isk', 'assets', 'escrow', 'sellOrders'] as const;
+export const LAYER_IDS = ['isk', 'assets', 'escrow', 'sellOrders', 'contracts'] as const;
 export type LayerId = (typeof LAYER_IDS)[number];
 export type LayerValues = Record<LayerId, number>;
 
@@ -17,6 +17,7 @@ export function layerValues(row: NetWorthSnapshotRow): LayerValues {
     assets: row.assetValue,
     escrow: row.escrow,
     sellOrders: row.sellStock ?? 0,
+    contracts: row.contractStock ?? 0,
   };
 }
 
@@ -99,7 +100,7 @@ export function totalsFor(
   latest: ReadonlyMap<number, LayerValues>,
   opts: { included: readonly number[]; hidden: readonly number[]; shown: readonly LayerId[] }
 ): { total: number; perLayer: LayerValues } {
-  const perLayer: LayerValues = { isk: 0, assets: 0, escrow: 0, sellOrders: 0 };
+  const perLayer: LayerValues = { isk: 0, assets: 0, escrow: 0, sellOrders: 0, contracts: 0 };
   for (const id of opts.included) {
     if (opts.hidden.includes(id)) continue;
     const values = latest.get(id);

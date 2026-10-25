@@ -863,6 +863,8 @@ export interface NetWorthSnapshotRecord {
   escrow: number;
   /** Remaining sell-order stock; absent on rows written before it existed. */
   sellStock?: number;
+  /** Items and courier rewards locked in the Character's own open contracts; absent without the contracts permission. */
+  contractStock?: number;
   hubId: string;
   /** Epoch ms of the write. */
   updatedAt: number;

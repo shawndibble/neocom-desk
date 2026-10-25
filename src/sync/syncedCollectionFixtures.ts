@@ -223,6 +223,7 @@ export const FULL_NET_WORTH_SNAPSHOT: Required<NetWorthSnapshotRecord> = {
   plexValue: 3_000_000_000,
   escrow: 250_000_000,
   sellStock: 800_000_000,
+  contractStock: 120_000_000,
   hubId: 'jita',
   updatedAt: UPDATED_AT,
 };
