@@ -45,6 +45,7 @@ closed classes 1-3 or intel/dev infra; Slipway Jobs view + slot deduction is
 already Active Jobs / job-slot count), Pod Warden (native PI/skill/order/in-game-
 notification push app — PI alerts covered by kill-tests 12/17 and ADR 0020),
 Isktracker - Incursions (unexamined, non-pipeline).
+EVE Farm (alexandruconea/evefarm, MIT Java desktop, live, 0 stars: all-character tracker with net-worth series, LP Purchases ledger, LP per Day calendar, Abyss/Gamelog tracker, industry calculator — surfaced #5127/#5128; the rest is Killed).
 JitaSpace (jita.space, MIT, live: Next.js companion with mail, assets, wallet, orders,
 contracts, calendar, LP store, travel, fittings, skills, SDE/dogma explorer and
 SDE build-diff history — no industry or PI; every pipeline-adjacent page is
@@ -305,6 +306,10 @@ Numbering is stable — later runs cite these by number. Append, never renumber.
 
 #5006 NARROW — Skills: a read-only "Who's closest" list in the plan editor's Plan tools pane (SP missing and time to finish per roster Character, own attributes/implants, no queue offset; EveLens #137).
 
+#5127 NARROW — LP Store: a Sells/day column (output's market volume at the pilot's hub; Days to Sell cut) (EVE Farm).
+
+#5128 NARROW — Net worth: an In contracts layer (items in open issued contracts at item value + courier reward escrow; not price or collateral, no production layer) (EVE Farm).
+
 #5007 SHIP — Build Plans: Sale Profitability on a Sell now (buy orders) basis beside Sell order, inside the Calculation Breakdown (EVE Industry Scanner Instant/Patient).
 
 **Verdict is the hostile review's, not the ticket's fate.** `SHIP` means the
@@ -537,3 +542,5 @@ invention-planning.md`, #2848 not planned — only the Market-Wide label
 - **eve-exchange dashboard leftovers:** PLEX-only price chart (subset of Price History + #5002), ISK traded in PLEX (market-wide vanity metric, low reach), per-hub Large Skill Injector widget (InjectorFacts and the extraction-net decision cover it), free-form item picker and indexed-to-100 chart (scope creep until #5002 shows demand).
 
 - **Issue-tracker mining leftovers:** copy prices in the in-game import format (Janice #52) — already ships as Copy sell list (decisions `20260924-131419`, `20261007-220503`); extending it to Stock Targets/Open Orders re-list is one 0-reaction request; **busy-blueprint-counts-as-owned** (jEveAssets #516/#543) — that bug is the assets endpoint, we read `/characters/{id}/blueprints`; verify one live Character with a blueprint in research before any ticket, and never grow it toward research/copy job planning (`.out-of-scope/blueprint-job-planning.md`); **per-structure industry tax split**, **batched job-done digest**, **find Characters by capability**, **gas sell-vs-react**, **strip charges on EFT export** — weak demand, narrow audience or covered; **hauling cost in a Build Plan** — third-party rate cards go stale (standing rule).
+
+- **EVE Farm leftovers** (alexandruconea/evefarm): **LP Purchases lots** — an `lp_store` journal row carries only ISK and the corporation (no offer, quantity or type), so matching an offer is a guess, which breaks 'refuse rather than guess' (decision 20260924-001906), and the audience is LP flippers only; only a wording tweak to the no-lot refusal could survive; **LP per Day calendar** — the points endpoint caches ~1h and LP spent between reads is invisible, so the diff under-counts exactly when it matters, and a local-first app leaves holes; **In production net-worth layer** — valuing running-job outputs books profit before the sale and disagrees with Build profit, a materials-cost version is a different feature; **month-end item-level asset snapshots**, **Best Asset/Ship/Module tiles** — storage-heavy or vanity, not pursued; **Gamelog NPC kills, Abyss run timer, aggro voice, clipboard cargo watcher, Copy EVE Settings** — read or write the game client, kill-test 2 and out of remit.
