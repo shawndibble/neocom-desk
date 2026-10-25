@@ -547,7 +547,8 @@ export interface SettingsMergeResult {
  *
  * Every branch with `r` present is the same on both reads: a doc in the
  * window is the whole remote truth for its key. The remote tombstone purge
- * only runs on a full read — an expired tombstone is below every cursor — so
+ * runs, in practice, only on a full read — an expired tombstone is below
+ * every cursor — so
  * it lands within one `FULL_RECONCILE_INTERVAL_MS` (collectionSync.ts) of
  * expiry rather than on the day.
  */

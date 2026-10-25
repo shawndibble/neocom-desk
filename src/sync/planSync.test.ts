@@ -2759,6 +2759,43 @@ describe('triggerSync: incremental settings pull (#5045)', () => {
     });
   });
 
+  it('relays a value pulled for one Character to another whose cursor is already past it', async () => {
+    // Settings are one local set, but each Character has its own remote copy
+    // and cursor. A device holding only Character 2 learns of this edit only
+    // if this device pushes it into Character 2's collection.
+    const SETTINGS_PATH_2 = 'characters/char:2/settings';
+    await db.characters.put({ characterId: 2, name: 'Alt', ownerHash: HASH, addedAt: 2 });
+    const now = Date.now();
+    seedRemote(SETTINGS_PATH_2, [
+      { key: 'sync.corpDarkAfterDays', value: 7, updatedAt: now - 1_000, ownerHash: HASH },
+    ]);
+    await triggerSync(2);
+    await triggerSync(2); // Character 2's cursor now at now - 1000
+
+    // Another device, holding only Character 1, edited a setting earlier.
+    seedRemote(SETTINGS_PATH, [
+      { key: 'sync.tradeHub', value: 'amarr', updatedAt: now - 5_000, ownerHash: HASH },
+    ]);
+    await triggerSync(1);
+    expect((await db.settings.get('sync.tradeHub'))?.value).toBe('amarr');
+
+    const from = readsSoFar();
+    await triggerSync(2);
+
+    expect(filtersFor(SETTINGS_PATH_2, from)).toEqual([OWNER_FILTER]);
+    expect(remoteStore.get(SETTINGS_PATH_2)?.get('sync.tradeHub')).toMatchObject({
+      value: 'amarr',
+      updatedAt: now - 5_000,
+    });
+
+    // Reconciled: both Characters are back on one windowed read.
+    const after = readsSoFar();
+    await triggerSync(1);
+    await triggerSync(2);
+    expect(filtersFor(SETTINGS_PATH, after)).toHaveLength(2);
+    expect(filtersFor(SETTINGS_PATH_2, after)).toHaveLength(2);
+  });
+
   it('keeps the cursor when a mid-pass local write overtook a pulled doc', async () => {
     await triggerSync(1);
     const before = await readCursor(SETTINGS_CURSOR_KEY);

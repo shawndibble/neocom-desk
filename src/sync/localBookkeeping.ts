@@ -34,6 +34,14 @@ export const tombstoneKey = (
 ): string => `${INTERNAL_PREFIX}${collection.tombstoneSegment}.${characterId}`;
 
 /**
+ * The settings applied-seq (settingsSync.ts) one Character last reconciled
+ * against. Lives beside the pull cursor and is dropped with the rest of a
+ * removed Character's bookkeeping.
+ */
+export const settingsSeenSeqKey = (characterId: number): string =>
+  `${INTERNAL_PREFIX}settingsSeenSeq.${characterId}`;
+
+/**
  * A per-(Character, collection) **pull cursor** (issue #581): where the last
  * incremental read of that remote collection got to.
  *
@@ -123,6 +131,7 @@ export async function clearCharacterSyncBookkeeping(characterId: number): Promis
   await db.settings.bulkDelete([
     ownerHashKey(characterId),
     heartbeatKey(uidForCharacter(characterId)),
+    settingsSeenSeqKey(characterId),
     ...EDITABLE_COLLECTIONS.map((collection) => tombstoneKey(collection, characterId)),
   ]);
   await clearPullCursors(characterId);
