@@ -45,6 +45,7 @@ import type { OwnerRateEntry } from '@/engine/corpTaxBook/ownerRate';
 import type { StoredRefineryLabel, StoredRefineryStructure } from '@/engine/corpTaxBook/refinery';
 import type { ObservedRow } from '@/engine/corpTaxBook/types';
 import { getSyncFirestore } from '@/sync/firebaseApp';
+import { bookVersionsOf, cachedPart } from './bookCache';
 import { callRouted } from '@/sync/routedCallable';
 import { ensureSignedIn } from '@/sync/syncAuth';
 
@@ -200,8 +201,10 @@ export async function readBookSummary(
 ): Promise<BookSummary | null> {
   await ensureSignedIn(characterId);
   const snap = await getDoc(doc(getSyncFirestore(), 'corps', String(corporationId)));
-  if (!snap.exists()) return null;
-  const d = snap.data();
+  return snap.exists() ? summaryFrom(snap.data()) : null;
+}
+
+function summaryFrom(d: Record<string, unknown>): BookSummary {
   return {
     active: d.active === true,
     startDate: String(d.startDate ?? ''),
@@ -224,35 +227,62 @@ export async function readDeclinedAutoGroup(
   return new Set(Array.isArray(ids) ? (ids as number[]) : []);
 }
 
+/**
+ * Opens a book for reading: its settings document (always read: it carries
+ * the version marker), and readers for its parts that reuse this tab's copy
+ * while the part's stamp is unchanged (bookCache.ts, issue #5047).
+ */
+async function openBook(characterId: number, corporationId: number) {
+  await ensureSignedIn(characterId);
+  const db = getSyncFirestore();
+  const snap = await getDoc(doc(db, 'corps', String(corporationId)));
+  if (!snap.exists()) return null;
+  const data = snap.data();
+  const versions = bookVersionsOf(data);
+  const key = `${characterId}:${corporationId}`;
+  const part = <T>(collectionName: string, read: () => Promise<T>) =>
+    cachedPart(key, collectionName, versions, read);
+  const read = async <T>(name: string): Promise<T[]> =>
+    (await getDocs(collection(db, 'corps', String(corporationId), name))).docs.map(
+      (d) => d.data() as T
+    );
+  const list = <T>(name: string): Promise<T[]> => part(name, () => read<T>(name));
+  // Read fresh every time, never from the copy: it is officer-only, so the
+  // rules still decide each read even when every other part comes from cache.
+  const paidStatementIds = async () =>
+    new Set(
+      ((await getDoc(doc(db, 'corps', String(corporationId), 'meta', 'paid'))).data()?.ids as
+        string[] | undefined) ?? []
+    );
+  return { data, part, read, list, paidStatementIds };
+}
+
 /** The book's settings and the collections the sync needs. Officer-only: verify first. */
 export async function readBookState(
   characterId: number,
   corporationId: number
 ): Promise<BookState | null> {
-  const book = await readBookSummary(characterId, corporationId);
+  const book = await openBook(characterId, corporationId);
   if (!book) return null;
-  const root = (name: string) =>
-    collection(getSyncFirestore(), 'corps', String(corporationId), name);
-  const list = async <T>(name: string): Promise<T[]> =>
-    (await getDocs(root(name))).docs.map((d) => d.data() as T);
-  const [miners, statements, payments, dismissals, extractions, paid, writeOffs] =
+  const { list } = book;
+  const [miners, statements, payments, dismissals, extractions, paidStatementIds, writeOffs] =
     await Promise.all([
       list<Miner>('miners'),
       list<Statement>('statements'),
       list<SettlePayment>('payments'),
       list<Dismissal>('dismissals'),
       list<SyncExtraction>('extractions'),
-      getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'paid')),
+      book.paidStatementIds(),
       list<RecordedWriteOff>('writeOffs'),
     ]);
   return {
-    book,
+    book: summaryFrom(book.data),
     miners,
     statements,
     payments,
     dismissals,
     extractions,
-    paidStatementIds: new Set((paid.data()?.ids as string[] | undefined) ?? []),
+    paidStatementIds,
     writeOffs,
   };
 }
@@ -425,25 +455,24 @@ export async function readBookData(
   characterId: number,
   corporationId: number
 ): Promise<BookData | null> {
-  const settings = await readBookSettings(characterId, corporationId);
-  if (!settings) return null;
-  const root = (name: string) =>
-    collection(getSyncFirestore(), 'corps', String(corporationId), name);
-  const list = async <T>(name: string): Promise<T[]> =>
-    (await getDocs(root(name))).docs.map((d) => d.data() as T);
+  const book = await openBook(characterId, corporationId);
+  if (!book) return null;
+  const settings = settingsFrom(book.data);
+  const { list, part, read } = book;
+  const meta = (id: string) =>
+    getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', id));
   const [
     miners,
     statements,
     payments,
     dismissals,
     extractions,
-    paid,
+    paidStatementIds,
     observed,
     declarations,
     adjustments,
-    answers,
-    scheduled,
-    feeders,
+    [answers, scheduled],
+    feederRows,
     writeOffs,
   ] = await Promise.all([
     list<Miner>('miners'),
@@ -451,25 +480,28 @@ export async function readBookData(
     list<SettlePayment>('payments'),
     list<Dismissal>('dismissals'),
     list<SyncExtraction>('extractions'),
-    getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'paid')),
+    book.paidStatementIds(),
     list<ObservedRow>('observed'),
     list<BookDeclaration>('declarations'),
     list<Adjustment>('adjustments'),
-    getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'groupingAnswers')),
-    getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'scheduledSync')),
-    list<FeederDoc>('feeders'),
-    list<RecordedWriteOff>('writeOffs'),
-  ]);
-  const feederRows = await Promise.all(
-    feeders.map(async (f) =>
-      bookFeederFrom(
-        f,
-        (await getDocs(feederPayouts(corporationId, f.corporationId))).docs.map(
-          (d) => ({ ...d.data(), id: d.id }) as FeederPayoutRow
+    part('meta', async () =>
+      (await Promise.all([meta('groupingAnswers'), meta('scheduledSync')])).map((d) => d.data())
+    ),
+    // One stamp covers a feeder's record and its payouts: both live under `feeders`.
+    part('feeders', async () =>
+      Promise.all(
+        (await read<FeederDoc>('feeders')).map(async (f) =>
+          bookFeederFrom(
+            f,
+            (await getDocs(feederPayouts(corporationId, f.corporationId))).docs.map(
+              (d) => ({ ...d.data(), id: d.id }) as FeederPayoutRow
+            )
+          )
         )
       )
-    )
-  );
+    ),
+    list<RecordedWriteOff>('writeOffs'),
+  ]);
   return {
     settings,
     state: {
@@ -479,15 +511,15 @@ export async function readBookData(
       payments,
       dismissals,
       extractions,
-      paidStatementIds: new Set((paid.data()?.ids as string[] | undefined) ?? []),
+      paidStatementIds,
       writeOffs,
     },
     observed,
     declarations,
     adjustments,
     feeders: feederRows,
-    groupingAnswers: groupingAnswersFrom(answers.data()),
-    scheduledSync: scheduledSyncFrom(scheduled.data()),
+    groupingAnswers: groupingAnswersFrom(answers),
+    scheduledSync: scheduledSyncFrom(scheduled),
   };
 }
 
