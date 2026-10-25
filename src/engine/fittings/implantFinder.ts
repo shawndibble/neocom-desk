@@ -267,7 +267,8 @@ function longestWeaponReach(stats: FittingStats): number {
   let reach = 0;
   for (const weapon of stats.applied.weapons) {
     if (weapon.kind === 'turret') reach = Math.max(reach, weapon.optimal + weapon.falloff);
-    else if (weapon.kind === 'missile') reach = Math.max(reach, weapon.range);
+    else if (weapon.kind === 'missile' || weapon.kind === 'area')
+      reach = Math.max(reach, weapon.range);
   }
   return reach;
 }

@@ -91,12 +91,12 @@ const m3sFormat = createNumberFormat({ maximumFractionDigits: 1 });
 const m3Format = createNumberFormat({ maximumFractionDigits: 0 });
 const twoDecimals = createNumberFormat({ maximumFractionDigits: 2 });
 
-/** The furthest a turret's optimal or a missile's range reaches, in km. */
+/** The furthest a turret's optimal, a missile's or area weapon's range reaches, in km. */
 const reachKm = (s: FittingStats) =>
   Math.max(
     0,
     ...s.applied.weapons.map((w) =>
-      w.kind === 'turret' ? w.optimal : w.kind === 'missile' ? w.range : 0
+      w.kind === 'turret' ? w.optimal : w.kind === 'missile' || w.kind === 'area' ? w.range : 0
     )
   ) / 1000;
 
