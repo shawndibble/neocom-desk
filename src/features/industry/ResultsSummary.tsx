@@ -8,6 +8,7 @@ import type { BuildResult, IndustryActivity } from '@/engine/industry/types';
 import type { MaterialVolumeTotals } from '@/engine/industry/materialVolume';
 import type { LiquidationBasis, OwnedStockSale } from '@/engine/industry/ownedStockSale';
 import type { ProfitBasis } from '@/engine/industry/profitBasis';
+import type { ProductSellNow } from '@/engine/industry/productSellNow';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
 import { formatDuration } from '@/lib/duration';
@@ -108,6 +109,12 @@ interface ResultsSummaryProps {
   profitBasis: ProfitBasis | null;
   /** Profit on `profitBasis` — the ledger's bottom line, the hero's big number. */
   profit: number | null;
+  /**
+   * The product sold into the hub's buy orders instead, on the same basis as
+   * `profit` (issue #5007). `null` when the hub has no buy order for it;
+   * absent when there is no product sale to quote.
+   */
+  sellNow?: ProductSellNow | null;
   /** Grand total m3 across the materials table, for hauling-trip planning (issue #874). */
   totalVolume: MaterialVolumeTotals;
   /** The plan's trade hub, where the product is priced at its lowest sell. */
@@ -152,6 +159,7 @@ export function ResultsSummary({
   onSaleBasisChange,
   profitBasis,
   profit,
+  sellNow,
   totalVolume,
   hubName,
   planSeconds,
@@ -343,6 +351,24 @@ export function ResultsSummary({
             emphasized
             tone={profit >= 0 ? 'positive' : 'negative'}
             className="relative -mt-px border-t border-line-bright"
+          />
+        )}
+        {/* The second sale basis, under the headline it is read against: the
+            headline stays on the listed sell order (scope decision for #5007). */}
+        {profit !== null && sellNow !== undefined && (
+          <CostRow
+            label={t('industry.ledger.profitIfSoldNow')}
+            tooltip={t('industry.ledger.profitIfSoldNowHint')}
+            value={
+              sellNow === null ? (
+                <span className="font-normal text-text-dim">
+                  {t('industry.ledger.noBuyOrders', { hub: hubName })}
+                </span>
+              ) : (
+                formatIsk(sellNow.profit)
+              )
+            }
+            tone={sellNow === null ? undefined : sellNow.profit >= 0 ? 'positive' : 'negative'}
           />
         )}
       </div>

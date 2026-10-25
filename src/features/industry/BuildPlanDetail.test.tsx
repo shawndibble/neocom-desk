@@ -1467,6 +1467,40 @@ describe('BuildPlanDetail with an unreachable price source (offline)', () => {
   });
 });
 
+describe('BuildPlanDetail profit if sold now (issue #5007)', () => {
+  it('quotes the product into buy orders under Profit, and explains it in the breakdown', async () => {
+    const user = userEvent.setup();
+    loadMarketSnapshot.mockResolvedValue({
+      hubPrices: { 34: 5, 587: 100_000 },
+      hubBuyPrices: { 34: 4, 587: 90_000 },
+      adjustedPrices: { 34: 4.5 },
+      systemCostIndex: 0.05,
+    });
+    render(<Harness />);
+    await user.click(await screen.findByRole('button', { name: 'Show details' }));
+
+    expect(await screen.findByText('Profit if sold now')).toBeInTheDocument();
+    await user.click(screen.getAllByRole('button', { name: 'Calculations?' })[0]!);
+    expect(
+      await screen.findByText('Priced at the highest buy order; a large quantity may fill lower.')
+    ).toBeInTheDocument();
+  });
+
+  it('says the hub has no buy orders when there are none for the product', async () => {
+    const user = userEvent.setup();
+    loadMarketSnapshot.mockResolvedValue({
+      hubPrices: { 34: 5, 587: 100_000 },
+      hubBuyPrices: { 34: 4 },
+      adjustedPrices: { 34: 4.5 },
+      systemCostIndex: 0.05,
+    });
+    render(<Harness />);
+    await user.click(await screen.findByRole('button', { name: 'Show details' }));
+
+    expect(await screen.findByText('No buy orders at Jita')).toBeInTheDocument();
+  });
+});
+
 describe('BuildPlanDetail material price basis', () => {
   /** Tritanium at 5 sell / 4 buy, so the two bases are told apart by the price cell. */
   function pricedSnapshot() {

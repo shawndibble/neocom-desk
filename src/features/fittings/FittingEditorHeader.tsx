@@ -94,7 +94,6 @@ export function FittingEditorHeader({
         }}
         save={
           <FittingSaveButton
-            compact={compact}
             onSave={() => void workspace.save()}
             canSave={workspace.canSave}
             saveBlockedReason={

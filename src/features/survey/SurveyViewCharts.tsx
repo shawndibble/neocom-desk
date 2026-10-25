@@ -26,7 +26,12 @@ import {
 import { ChartTooltipShell } from '@/components/ui/ChartTooltipShell';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { formatEveClock } from '@/engine/survey/chatMessage';
-import { depletionSeries, iskSeries, type SurveySeriesRow } from '@/engine/survey/chartViews';
+import {
+  depletionSeries,
+  iskSeries,
+  paceByOreSeries,
+  type SurveySeriesRow,
+} from '@/engine/survey/chartViews';
 import type { SurveySummary } from '@/engine/survey/series';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { FULL_HEIGHT, MARGIN, makeScanDot, timeAxis, yAxis } from './surveyChartParts';
@@ -324,5 +329,89 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
         />
       }
     />
+  );
+}
+
+/**
+ * The pace panel's "By ore" view: the stepped bars of m³/s per scan interval,
+ * each stacked by ore in the legend's colours, the first (most valuable) ore at the bottom, so a slice's height is
+ * that ore's rate and the stack is the total pace. A surface-coloured 2px line on
+ * each slice's top edge leaves the gap between slices. The caller wraps it in its
+ * figure and table; only the plot is here.
+ */
+export function PaceByOreChart({ summary }: { summary: SurveySummary }) {
+  const { t } = useTranslation();
+  const { rows, activeOres, toneIndex } = useMemo(() => paceByOreSeries(summary), [summary]);
+  const { xAxis } = timeAxis(summary);
+
+  function Tip({ active, payload }: TooltipContentProps) {
+    const row = payload?.[0]?.payload as SurveySeriesRow | undefined;
+    if (!active || !row) return null;
+    const slices = activeOres
+      .map((ore) => ({ ore, rate: row[ore] ?? 0 }))
+      .filter((s) => s.rate > 0)
+      .sort((a, b) => b.rate - a.rate);
+    if (row.from === undefined || row.to === undefined) return null;
+    return (
+      <ChartTooltipShell>
+        <div className="min-w-48 space-y-1 text-xs">
+          <div className="font-semibold text-text">
+            {t('survey.paceRange', {
+              from: formatEveClock(row.from),
+              to: formatEveClock(row.to),
+            })}
+          </div>
+          <div className="flex justify-between gap-4 text-text">
+            <span>{t('survey.chartTotal')}</span>
+            <span>{t('survey.paceUnit', { rate: formatCount(row.total ?? 0) })}</span>
+          </div>
+          <div className="space-y-0.5 border-t border-line pt-1">
+            {slices.map(({ ore, rate }) => (
+              <div key={ore} className="flex items-center gap-2">
+                <Swatch tone={oreTone(toneIndex[ore])} />
+                <span className="min-w-0 flex-1 truncate">{ore}</span>
+                <span className="text-text">
+                  {t('survey.paceUnit', { rate: formatCount(rate) })}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </ChartTooltipShell>
+    );
+  }
+
+  return (
+    <ResponsiveContainer>
+      <ComposedChart key={activeOres.join('|')} data={rows} margin={{ ...MARGIN, top: 20 }}>
+        <CartesianGrid stroke="var(--color-line)" vertical={false} />
+        {xAxis(false)}
+        {yAxis({
+          label: {
+            value: t('survey.chartRateAxis'),
+            position: 'insideTopLeft',
+            offset: 8,
+            fill: 'var(--color-text-dim)',
+            fontSize: '0.625rem',
+          },
+        })}
+        {/* Unlike the volume and ISK charts, the first (most valuable) ore is the BOTTOM slice: it is mined first, so it anchors the baseline. */}
+        {activeOres.map((ore) => (
+          <Area
+            key={ore}
+            type="stepAfter"
+            dataKey={ore}
+            name={ore}
+            stackId="pace"
+            stroke="var(--color-panel)"
+            strokeWidth={2}
+            fill={oreTone(toneIndex[ore])}
+            fillOpacity={1}
+            isAnimationActive={false}
+          />
+        ))}
+        <Tooltip content={Tip} isAnimationActive={false} />
+      </ComposedChart>
+    </ResponsiveContainer>
   );
 }
