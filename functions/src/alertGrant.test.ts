@@ -34,6 +34,7 @@ function makeDeps(over: Partial<AlertGrantDeps> = {}) {
   const deps: AlertGrantDeps = {
     store: {
       get: async (id) => docs.get(id) ?? null,
+      getMany: async (ids) => new Map(ids.map((id) => [id, docs.get(id) ?? null])),
       set: async (id, doc) => void docs.set(id, doc),
       delete: async (id) => void docs.delete(id),
     },

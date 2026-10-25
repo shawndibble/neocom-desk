@@ -148,6 +148,15 @@ export function firestoreAlertGrantStore(db: Firestore): AlertGrantStore {
       const snap = await ref(characterId).get();
       return snap.exists ? (snap.data() as AlertGrantDoc) : null;
     },
+    async getMany(characterIds) {
+      const found = new Map<number, AlertGrantDoc | null>();
+      if (characterIds.length === 0) return found;
+      const snaps = await db.getAll(...characterIds.map(ref));
+      snaps.forEach((snap, i) => {
+        found.set(characterIds[i], snap.exists ? (snap.data() as AlertGrantDoc) : null);
+      });
+      return found;
+    },
     async set(characterId, doc) {
       await ref(characterId).set(doc);
     },

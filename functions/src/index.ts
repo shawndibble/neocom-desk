@@ -337,19 +337,18 @@ alertsAction('registerDevice', async (request) => {
   // so the client can offer a toggle for them. Only `seenTypes` is read out.
   const { store } = alertGrantDeps();
   const seenTypes: Record<string, string[]> = {};
-  await Promise.all(
-    registration.characterIds.map(async (characterId) => {
-      try {
-        seenTypes[String(characterId)] = (await store.get(characterId))?.seenTypes ?? [];
-      } catch (err) {
-        // The registration already landed; a failed read only delays new toggles.
-        logError('Device registration: seenTypes read failed', {
-          characterId,
-          error: String(err),
-        });
-      }
-    })
-  );
+  try {
+    const grants = await store.getMany(registration.characterIds);
+    for (const characterId of registration.characterIds) {
+      seenTypes[String(characterId)] = grants.get(characterId)?.seenTypes ?? [];
+    }
+  } catch (err) {
+    // The registration already landed; a failed read only delays new toggles.
+    logError('Device registration: seenTypes read failed', {
+      characterIds: registration.characterIds,
+      error: String(err),
+    });
+  }
 
   return { deviceId: input.deviceId, registered: registration.characterIds, rejected, seenTypes };
 });
