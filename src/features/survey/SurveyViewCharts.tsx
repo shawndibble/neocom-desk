@@ -52,7 +52,7 @@ function useScannedBy(summary: SurveySummary) {
     });
 }
 
-function Swatch({ tone }: { tone: string }) {
+export function Swatch({ tone }: { tone: string }) {
   return (
     <span aria-hidden="true" className="size-2 shrink-0 rounded-xs" style={{ background: tone }} />
   );
