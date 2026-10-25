@@ -11,9 +11,12 @@ import {
   SERVER_INPUTS_FIELD,
   readQuietHours,
 } from './projectionStore.js';
-
-/** Firestore's cap on `array-contains-any` values. */
-const ARRAY_CONTAINS_ANY_MAX = 30;
+import {
+  createRegistrationReader,
+  registeredAtMs,
+  type RegistrationReader,
+} from './registrationReader.js';
+import type { RunStats } from './runStats.js';
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -54,47 +57,50 @@ function nearbyJumpsOf(raw: unknown): NearbyDevice['nearbyJumpsByCharacter'] {
 }
 
 /** Firestore side of the nearby phase (issue #5122): see `NearbyStore`. */
-export function firestoreNearbyStore(db: Firestore): NearbyStore {
+export function firestoreNearbyStore(
+  db: Firestore,
+  options: {
+    /** Shared with the grant poller so a registration is read once per run (issue #5144). */
+    registrations?: RegistrationReader;
+    stats?: RunStats;
+  } = {}
+): NearbyStore {
   const registrations = db.collection(DEVICE_REGISTRATIONS_COLLECTION);
+  const { stats } = options;
+  const reader = options.registrations ?? createRegistrationReader(db, stats);
   return {
     async devicesFor(characterIds) {
-      const devices = new Map<string, NearbyDevice>();
-      for (let i = 0; i < characterIds.length; i += ARRAY_CONTAINS_ANY_MAX) {
-        const snap = await registrations
-          .where(
-            'characterIds',
-            'array-contains-any',
-            characterIds.slice(i, i + ARRAY_CONTAINS_ANY_MAX)
-          )
-          .get();
-        for (const doc of snap.docs) {
-          const data = doc.data();
-          if (typeof data.fcmToken !== 'string' || devices.has(doc.id)) continue;
-          devices.set(doc.id, {
-            deviceId: doc.id,
-            fcmToken: data.fcmToken,
-            characterIds: Array.isArray(data.characterIds)
-              ? data.characterIds.filter((id): id is number => typeof id === 'number')
-              : [],
-            serverEventsByCharacter: asRecord(
-              data[SERVER_EVENTS_FIELD]
-            ) as NearbyDevice['serverEventsByCharacter'],
-            nearbyJumpsByCharacter: nearbyJumpsOf(data[SERVER_INPUTS_FIELD]),
-            routeRules: data.routeRules as NearbyRouteRules | undefined,
-            quietHours: readQuietHours(data.quietHours),
-            state: readNearbyState(data.nearbyState),
-          });
-        }
+      const devices: NearbyDevice[] = [];
+      for (const { id, data } of await reader.holding(characterIds)) {
+        if (typeof data.fcmToken !== 'string') continue;
+        devices.push({
+          deviceId: id,
+          fcmToken: data.fcmToken,
+          characterIds: Array.isArray(data.characterIds)
+            ? data.characterIds.filter((c): c is number => typeof c === 'number')
+            : [],
+          serverEventsByCharacter: asRecord(
+            data[SERVER_EVENTS_FIELD]
+          ) as NearbyDevice['serverEventsByCharacter'],
+          nearbyJumpsByCharacter: nearbyJumpsOf(data[SERVER_INPUTS_FIELD]),
+          routeRules: data.routeRules as NearbyRouteRules | undefined,
+          quietHours: readQuietHours(data.quietHours),
+          updatedAtMs: registeredAtMs(data),
+          state: readNearbyState(data.nearbyState),
+        });
       }
-      return [...devices.values()];
+      return devices;
     },
     async writeState(deviceId, state) {
       // `update`, not `set`: a registration deleted meanwhile (a dead token) must
       // stay deleted, so this throws instead of recreating a doc with no token.
       await registrations.doc(deviceId).update({ nearbyState: state });
+      stats?.add('firestoreWrites');
     },
     async deleteDevice(deviceId) {
       await registrations.doc(deviceId).delete();
+      stats?.add('firestoreWrites');
+      reader.forget(deviceId);
     },
   };
 }

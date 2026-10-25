@@ -239,4 +239,12 @@ describe('runNearbyPhase', () => {
     expect(s.deps.fetchRaidableSkyhooks).not.toHaveBeenCalled();
     expect(s.store.writeState).not.toHaveBeenCalled();
   });
+
+  it('leaves a dormant registration alone (issue #5144)', async () => {
+    const s = setup({ devices: [{ ...device(), updatedAtMs: NOW - 120 * 24 * 3_600_000 }] });
+    const result = await run(s);
+    expect(result.pushesSent).toBe(0);
+    expect(s.deps.fetchIncursions).not.toHaveBeenCalled();
+    expect(s.store.writeState).not.toHaveBeenCalled();
+  });
 });

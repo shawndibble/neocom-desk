@@ -27,7 +27,16 @@ import {
   type StoredNearby,
 } from './nearbyAlerts.js';
 import { buildNearbyPush } from './nearbyPush.js';
+import { deviceCadence } from './pollerEfficiency.js';
 import { suppressPush, type QuietHours } from './quietHours.js';
+
+/**
+ * The origin handed to a Character whose location the run did not read because
+ * no list has an entry (issue #5144). With nothing listed the origin is never
+ * consulted: the Character still goes through the phase so its devices' stored
+ * state is brought up to date (an ended Incursion forgotten), as before.
+ */
+export const NO_ORIGIN_SYSTEM = 0;
 
 /** A registered device as the nearby phase reads it (`deviceRegistrations/{deviceId}`). */
 export interface NearbyDevice {
@@ -40,6 +49,8 @@ export interface NearbyDevice {
   nearbyJumpsByCharacter: Record<string, Partial<Record<NearbyEventId, number>>>;
   routeRules?: NearbyRouteRules;
   quietHours?: QuietHours;
+  /** When the registration was last written; a dormant one (pollerEfficiency.ts) is not processed. */
+  updatedAtMs?: number | null;
   /** What the last run stored for this device (`nearbyState` on the registration doc). */
   state: NearbyDeviceState;
 }
@@ -110,6 +121,7 @@ export async function runNearbyPhase(args: {
   if (locations.size === 0) return result;
 
   const devices = (await deps.store.devicesFor([...locations.keys()]))
+    .filter((device) => deviceCadence(device.updatedAtMs, nowMs) !== 'dormant')
     .map((device) => ({ device, characters: wantedCharacters(device, locations) }))
     .filter(({ characters }) => characters.length > 0);
   if (devices.length === 0) return result;

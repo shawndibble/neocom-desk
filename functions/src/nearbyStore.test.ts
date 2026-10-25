@@ -35,6 +35,7 @@ describe('firestoreNearbyStore', () => {
         serverInputsByCharacter: { '1': { incursionNearbyJumps: 5, shipLostMinimumIsk: 0 } },
         routeRules: { preference: 'shortest', securityPenalty: 50, avoid: [] },
         nearbyState: { characters: { '1': {} }, pushed: { k: 9, junk: 'x' } },
+        updatedAt: { toMillis: () => 1234 },
       },
       // No token: skipped.
       broken: { characterIds: [1] },
@@ -51,6 +52,7 @@ describe('firestoreNearbyStore', () => {
         nearbyJumpsByCharacter: { '1': { incursionNearby: 5 } },
         routeRules: { preference: 'shortest', securityPenalty: 50, avoid: [] },
         quietHours: undefined,
+        updatedAtMs: 1234,
         state: { characters: { '1': {} }, pushed: { k: 9 } },
       },
     ]);

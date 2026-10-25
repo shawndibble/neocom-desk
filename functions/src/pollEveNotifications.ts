@@ -12,6 +12,9 @@ import {
   type AlertGrantDoc,
 } from './alertGrant.js';
 import { shouldDeleteDeviceToken } from './dispatchProjections.js';
+import { NO_ORIGIN_SYSTEM } from './pollNearby.js';
+import { liveDevices, planGrant, wakeCutoffMs, type GrantPlan } from './pollerEfficiency.js';
+import { ALERTS_POLL_STATS_KEYS, createRunStats, type RunStats } from './runStats.js';
 import type { LocationResult } from './esiNearby.js';
 import type { MailHeadersResult } from './esiMail.js';
 import type { NotificationsResult } from './esiNotifications.js';
@@ -32,6 +35,14 @@ export interface PollDevice {
   serverEvents?: string[];
   /** Quiet time (issue #4566): no pushes inside the window. */
   quietHours?: QuietHours;
+  /** When the registration doc was last written (the open app re-registers hourly); absent on old docs. */
+  updatedAtMs?: number | null;
+}
+
+/** An active grant as the listing read it, so planning needs no second read. */
+export interface ListedGrant {
+  characterId: number;
+  grant: AlertGrantDoc;
 }
 
 export type RefreshOutcome =
@@ -40,8 +51,8 @@ export type RefreshOutcome =
   | { kind: 'skip' };
 
 export interface PollerStore {
-  /** Characters whose grant is `active`. */
-  listActive(): Promise<number[]>;
+  /** Every `active` grant (the listing already reads each in full). */
+  listActive(): Promise<ListedGrant[]>;
   /**
    * Refresh the Character's token at SSO and write the rotated one back
    * transactionally. `grant.encryptedRefreshToken` is the stored blob after
@@ -54,7 +65,24 @@ export interface PollerStore {
   patch(
     characterId: number,
     guard: string,
-    state: { highWaterId: number | null; etag: string | null; seenTypes: string[] }
+    state: {
+      highWaterId: number | null;
+      etag: string | null;
+      seenTypes: string[];
+      /** Written as `false` by the first read after the grant was marked idle. */
+      notificationsIdle?: false;
+    }
+  ): Promise<void>;
+  /**
+   * Nobody live wants this any more (issue #5144): mark the notifications idle so
+   * the next read resumes instead of replaying, and/or forget the mail mark
+   * (guarded like `patch`). Both are the "enabling never replays" half of
+   * skipping the reads.
+   */
+  markIdle(
+    characterId: number,
+    guard: string,
+    what: { notifications: boolean; clearMail: boolean }
   ): Promise<void>;
   markRevoked(characterId: number, guard: string): Promise<void>;
   /** Store the grant's scopes without the location one, after ESI refused it (guarded like `patch`). */
@@ -67,7 +95,8 @@ export interface PollerStore {
   ): Promise<void>;
   /** Store the grant's scopes without the mail one, after ESI refused it, and forget its mail state (guarded like `patch`). */
   dropMailScope(characterId: number, guard: string, scopes: string[]): Promise<void>;
-  devicesFor(characterId: number): Promise<PollDevice[]>;
+  /** Registered devices by Character, one read for the whole run. */
+  devicesForMany(characterIds: number[]): Promise<Map<number, PollDevice[]>>;
   deleteDevice(deviceId: string): Promise<void>;
 }
 
@@ -84,6 +113,8 @@ export interface PollDeps {
   concurrency?: number;
   /** Clock, injectable for tests. */
   now?: () => number;
+  /** The run's counters (issue #5144); the store and ESI wrappers share it. Absent: counted privately. */
+  stats?: RunStats;
   /**
    * New-mail alerts (issue #5143, ADR 0029). For a grant that carries the mail
    * scope and a device that wants `newMail`, the same refreshed token reads the
@@ -104,6 +135,12 @@ export interface PollDeps {
    */
   nearby?: {
     fetchLocation: (characterId: number, accessToken: string) => Promise<LocationResult>;
+    /**
+     * Whether any list a wanting device reads has an entry this run (issue
+     * #5144). False (every wanted list read, all empty): no Character's
+     * location is read. The lists are read once per run and shared with `runPhase`.
+     */
+    hasCandidates?: (wanted: { incursions: boolean; skyhooks: boolean }) => Promise<boolean>;
     runPhase: (locations: ReadonlyMap<number, number>) => Promise<NearbyPhaseResult>;
   };
 }
@@ -120,7 +157,29 @@ export interface PollSummary {
   budgetStopped: boolean;
 }
 
+interface RunContext {
+  deps: PollDeps;
+  summary: PollSummary;
+  stats: RunStats;
+  locations: Map<number, number>;
+  nowMs: number;
+  /** Read at most once, by the first grant that wants a location. */
+  candidates?: Promise<boolean>;
+  wantedLists: { incursions: boolean; skyhooks: boolean };
+}
+
+/** One grant with the devices holding its Character and what the run will do with it. */
+interface PlannedGrant {
+  characterId: number;
+  grant: AlertGrantDoc;
+  devices: PollDevice[];
+  plan: GrantPlan;
+}
+
 export async function pollEveNotifications(deps: PollDeps): Promise<PollSummary> {
+  const clock = deps.now ?? Date.now;
+  const startedAt = clock();
+  const stats = deps.stats ?? createRunStats(ALERTS_POLL_STATS_KEYS);
   const summary: PollSummary = {
     polled: 0,
     notModified: 0,
@@ -132,20 +191,57 @@ export async function pollEveNotifications(deps: PollDeps): Promise<PollSummary>
   };
   const locations = new Map<number, number>();
 
-  const queue = await deps.store.listActive();
-  const worker = async (): Promise<void> => {
-    for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
-      // Skip, never retry: the error budget is shared by every user of the client id.
-      if (summary.budgetStopped) {
-        summary.skipped++;
-        continue;
+  const listed = await deps.store.listActive();
+  stats.set('grantsListed', listed.length);
+  const devicesByCharacter =
+    listed.length > 0
+      ? await deps.store.devicesForMany(listed.map((l) => l.characterId))
+      : new Map<number, PollDevice[]>();
+  const wantedLists = { incursions: false, skyhooks: false };
+  const seenDevices = new Set<string>();
+  const queue: PlannedGrant[] = [];
+  for (const { characterId, grant } of listed) {
+    const devices = devicesByCharacter.get(characterId) ?? [];
+    for (const d of devices) seenDevices.add(d.deviceId);
+    const plan = planGrant(grant, devices, startedAt);
+    if (plan.action === 'backoff') {
+      stats.add('grantsSkippedDeviceBackoff');
+      continue;
+    }
+    queue.push({ characterId, grant, devices, plan });
+    if (plan.action === 'poll' && plan.call.nearby) {
+      // Every live device counts, asleep or not: the origin handed to a Character
+      // whose location is skipped must only stand where no list it reads has an entry.
+      for (const d of liveDevices(devices, startedAt)) {
+        if (d.serverEvents?.includes('incursionNearby')) wantedLists.incursions = true;
+        if (d.serverEvents?.includes('skyhookRaidableNearby')) wantedLists.skyhooks = true;
       }
+    }
+  }
+  stats.set('devicesRead', seenDevices.size);
+  const ctx: RunContext = { deps, summary, stats, locations, nowMs: startedAt, wantedLists };
+
+  const worker = async (): Promise<void> => {
+    for (let item = queue.shift(); item !== undefined; item = queue.shift()) {
       try {
-        await pollOne(deps, summary, locations, id);
+        if (item.plan.action === 'idle') {
+          // No refresh and no ESI call: only the once-off write that makes waking safe.
+          stats.add('grantsSkippedIdle');
+          await markIdle(ctx, item);
+          continue;
+        }
+        // Skip, never retry: the error budget is shared by every user of the client id.
+        if (summary.budgetStopped) {
+          summary.skipped++;
+          stats.add('grantsSkippedBudget');
+          continue;
+        }
+        await pollOne(ctx, item);
       } catch (err) {
         summary.skipped++;
+        stats.add('grantsSkippedError');
         deps.log('Alerts poll failed for a Character', {
-          characterId: id,
+          characterId: item.characterId,
           error: err instanceof Error ? err.name : 'unknown',
         });
       }
@@ -166,17 +262,30 @@ export async function pollEveNotifications(deps: PollDeps): Promise<PollSummary>
       });
     }
   }
+  stats.set('durationMs', clock() - startedAt);
   return summary;
 }
 
-async function pollOne(
-  deps: PollDeps,
-  summary: PollSummary,
-  locations: Map<number, number>,
-  characterId: number
-): Promise<void> {
-  const { store } = deps;
+/** An idle grant's state: notifications marked idle, the mail mark forgotten. One write, once. */
+async function markIdle(ctx: RunContext, item: PlannedGrant): Promise<void> {
+  const { grant, characterId } = item;
+  const notifications = item.plan.idle.notifications && grant.notificationsIdle !== true;
+  const clearMail =
+    item.plan.idle.mail && (grant.mailHighWaterId != null || grant.mailEtag != null);
+  if (!notifications && !clearMail) return;
+  await ctx.deps.store.markIdle(characterId, grant.encryptedRefreshToken, {
+    notifications,
+    clearMail,
+  });
+  ctx.stats.add('idleStateWrites');
+}
 
+async function pollOne(ctx: RunContext, item: PlannedGrant): Promise<void> {
+  const { deps, summary, stats, locations } = ctx;
+  const { store } = deps;
+  const { characterId, plan } = item;
+
+  stats.add('grantsRefreshed');
   const refreshed = await store.refresh(characterId);
   if (refreshed.kind === 'revoked') {
     summary.revoked++;
@@ -185,6 +294,7 @@ async function pollOne(
   }
   if (refreshed.kind === 'skip') {
     summary.skipped++;
+    stats.add('grantsSkippedRefresh');
     return;
   }
   const { accessToken, grant } = refreshed;
@@ -192,24 +302,39 @@ async function pollOne(
   // A 420/429 may have landed while this worker was refreshing: don't add to it.
   if (summary.budgetStopped) {
     summary.skipped++;
+    stats.add('grantsSkippedBudget');
     return;
   }
-  // The Character's devices, read at most once however many of the reads below want them.
-  let devicesRead: Promise<PollDevice[]> | undefined;
-  const devices = () => (devicesRead ??= store.devicesFor(characterId));
-  const grantAlive = await pollNotifications(
-    deps,
-    summary,
-    characterId,
-    accessToken,
-    grant,
-    devices
-  );
-  if (!grantAlive) return;
-  await pollMailSafely(deps, summary, characterId, accessToken, grant, devices);
-  if (!deps.nearby || !grantCoversNearby(grant) || summary.budgetStopped) return;
+  // Every device that is not dormant takes the pushes of what this run reads,
+  // asleep or not: the back-off decides whether to poll, not who is told.
+  const devices = liveDevices(item.devices, ctx.nowMs);
+  if (plan.call.notifications) {
+    const grantAlive = await pollNotifications(ctx, characterId, accessToken, grant, devices);
+    if (!grantAlive) return;
+  } else if (plan.idle.notifications && grant.notificationsIdle !== true) {
+    await markIdle(ctx, { ...item, grant });
+  }
+  await pollMailSafely(ctx, characterId, accessToken, grant, devices, plan);
+  if (!plan.call.nearby || !deps.nearby || !grantCoversNearby(grant) || summary.budgetStopped) {
+    return;
+  }
 
-  const location = await deps.nearby.fetchLocation(characterId, accessToken);
+  const { nearby } = deps;
+  if (nearby.hasCandidates) {
+    ctx.candidates ??= nearby.hasCandidates(ctx.wantedLists);
+    if (!(await ctx.candidates)) {
+      // Nothing is listed anywhere, so where the Character is cannot matter: it
+      // still goes through the phase (with no origin) so its devices' state is
+      // brought up to date, but no token spends a call on it.
+      locations.set(characterId, NO_ORIGIN_SYSTEM);
+      stats.add('locationReadsSkippedNoCandidates');
+      return;
+    }
+    if (summary.budgetStopped) return;
+  }
+
+  stats.add('esiLocationCalls');
+  const location = await nearby.fetchLocation(characterId, accessToken);
   switch (location.kind) {
     case 'ok':
       locations.set(characterId, location.solarSystemId);
@@ -239,16 +364,34 @@ async function pollOne(
 
 /** The grant's notifications; false when the grant turned out dead or the run must stop. */
 async function pollNotifications(
-  deps: PollDeps,
-  summary: PollSummary,
+  ctx: RunContext,
   characterId: number,
   accessToken: string,
   grant: AlertGrantDoc,
-  readDevices: () => Promise<PollDevice[]>
+  devices: PollDevice[]
 ): Promise<boolean> {
+  const { deps, summary, stats } = ctx;
   const { store } = deps;
   const guard = grant.encryptedRefreshToken;
-  const result = await deps.fetchNotifications(characterId, accessToken, grant.etag);
+  // A grant marked idle resumes here (issue #5144): its mark is stale, so the
+  // feed is read afresh (no ETag) and nothing older than the earliest wanting
+  // registration is pushed, exactly as enabling alerts never replays history.
+  const waking = grant.notificationsIdle === true;
+  const enabledAt = waking
+    ? Math.max(
+        grant.enabledAt,
+        wakeCutoffMs(
+          devices.filter((d) => d.eveTypes.length > 0),
+          ctx.nowMs
+        )
+      )
+    : grant.enabledAt;
+  stats.add('esiNotificationsCalls');
+  const result = await deps.fetchNotifications(
+    characterId,
+    accessToken,
+    waking ? null : grant.etag
+  );
   switch (result.kind) {
     case 'not-modified':
       summary.notModified++;
@@ -262,10 +405,12 @@ async function pollNotifications(
     case 'backoff':
       summary.budgetStopped = true;
       summary.skipped++;
+      stats.add('grantsSkippedBudget');
       deps.log('ESI error budget hit; stopping this run', { retryAfterMs: result.retryAfterMs });
       return false;
     case 'error':
       summary.skipped++;
+      stats.add('grantsSkippedError');
       deps.log('ESI notifications call failed', { characterId, status: result.status });
       return true;
     case 'ok':
@@ -275,11 +420,10 @@ async function pollNotifications(
   summary.polled++;
   if (result.budgetLow) summary.budgetStopped = true;
 
-  const devices = await readDevices();
   const selection = selectPushable({
     notifications: result.notifications,
     highWaterId: grant.highWaterId,
-    enabledAt: grant.enabledAt,
+    enabledAt,
     seenTypes: grant.seenTypes,
     devices,
   });
@@ -323,23 +467,24 @@ async function pollNotifications(
     highWaterId: selection.highWaterId,
     etag: result.etag,
     seenTypes: selection.seenTypes,
+    ...(waking ? { notificationsIdle: false as const } : {}),
   });
   return true;
 }
 
 /** One Character's mail must never cost it its nearby read, or the run its other Characters. */
 async function pollMailSafely(
-  deps: PollDeps,
-  summary: PollSummary,
+  ctx: RunContext,
   characterId: number,
   accessToken: string,
   grant: AlertGrantDoc,
-  readDevices: () => Promise<PollDevice[]>
+  devices: PollDevice[],
+  plan: GrantPlan
 ): Promise<void> {
   try {
-    await pollMail(deps, summary, characterId, accessToken, grant, readDevices);
+    await pollMail(ctx, characterId, accessToken, grant, devices, plan);
   } catch (err) {
-    deps.log('Mail alerts failed for a Character', {
+    ctx.deps.log('Mail alerts failed for a Character', {
       characterId,
       error: err instanceof Error ? err.name : 'unknown',
     });
@@ -353,18 +498,22 @@ async function pollMailSafely(
  * the Character itself is new. Only ids are kept — never a sender or a subject.
  */
 async function pollMail(
-  deps: PollDeps,
-  summary: PollSummary,
+  ctx: RunContext,
   characterId: number,
   accessToken: string,
   grant: AlertGrantDoc,
-  readDevices: () => Promise<PollDevice[]>
+  devices: PollDevice[],
+  plan: GrantPlan
 ): Promise<void> {
+  const { deps, summary, stats } = ctx;
   if (!deps.mail || !grantCoversMail(grant) || summary.budgetStopped) return;
   const { store } = deps;
   const guard = grant.encryptedRefreshToken;
-  const wanting = (await readDevices()).filter((d) => d.serverEvents?.includes('newMail'));
+  const wanting = devices.filter((d) => d.serverEvents?.includes('newMail'));
 
+  // Only devices whose turn it is make the read; one asleep is still pushed to
+  // when another's read finds mail, and keeps the mark while it waits.
+  if (wanting.length > 0 && !plan.call.mail) return;
   if (wanting.length === 0) {
     // Nobody wants it: read nothing, and forget the mark, so turning it on again
     // seeds afresh instead of announcing everything that arrived meanwhile.
@@ -374,11 +523,13 @@ async function pollMail(
         mailEtag: null,
         mailPushed: [],
       });
+      stats.add('idleStateWrites');
     }
     return;
   }
 
   const seeded = grant.mailHighWaterId != null;
+  stats.add('esiMailCalls');
   const result = await deps.mail.fetchHeaders(
     characterId,
     accessToken,
