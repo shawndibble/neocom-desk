@@ -1299,6 +1299,14 @@
         "coreFuel": "Core fuel {{before}} → {{after}} per activation"
       }
     },
+    "statChange": {
+      "better": "better",
+      "worse": "worse",
+      "spoken": "{{before}} to {{after}}",
+      "capacitor": "Capacitor {{value}}",
+      "stable": "stable at {{pct}}%",
+      "depletes": "depletes in {{time}}"
+    },
     "makeItFit": {
       "fix": {
         "cpu": "Fix CPU",

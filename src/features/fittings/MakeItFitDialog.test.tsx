@@ -203,10 +203,10 @@ describe('MakeItFitDialog', () => {
     renderDialog([option(0, 1000, [ehpDown, emResist, thermalResist])]);
     expect(screen.getByText('EHP -293, resists lower')).toBeTruthy();
     // The per-resist numbers are one click away, not gone.
-    expect(screen.queryByText('Shield EM resist -8%')).toBeNull();
+    expect(screen.queryByText('Shield EM resist 50 to 42%, worse')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'All changes' }));
-    expect(screen.getByText('Shield EM resist -8%')).toBeTruthy();
-    expect(screen.getByText('Shield thermal resist -6%')).toBeTruthy();
+    expect(screen.getByText('Shield EM resist 50 to 42%, worse')).toBeTruthy();
+    expect(screen.getByText('Shield thermal resist 40 to 34%, worse')).toBeTruthy();
   });
 
   it('says "no price" once for the list, not on every row', () => {

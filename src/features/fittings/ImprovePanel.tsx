@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  StatChange,
 } from '@/components/ui';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
 import { TANK_GOALS } from '@/engine/fittings/improveGroups';
@@ -61,7 +62,6 @@ import { summariseSelection } from '@/engine/fittings/improveSelection';
 import { diffFittingStats } from '@/engine/fittings/variationDelta';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { changeLabel } from './fittingVariationsCsv';
 import { MakeItFitSection } from './MakeItFitSection';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { ImproveSearch } from './useImprove';
@@ -204,15 +204,18 @@ export function ImprovePanel({
         })
       : moveLabel(option.candidate);
 
-  function changeLine(option: ImproveOption | RejectedOption, own: FittingStats): string {
+  function changeLine(option: ImproveOption | RejectedOption, own: FittingStats): ReactNode {
     // What the swap does first; the CPU, powergrid and calibration it takes after.
     const changes = [...diffFittingStats(own, option.after).changes].sort(
       (a, b) => Number(isResource(a.key)) - Number(isResource(b.key))
     );
-    const shown = changes.slice(0, CHANGES_SHOWN).map((change) => changeLabel(change, t));
+    const shown: ReactNode[] = changes
+      .slice(0, CHANGES_SHOWN)
+      .map((change) => <StatChange key={change.key} change={change} />);
     const rest = changes.length - shown.length;
     if (rest > 0) shown.push(t('fittings.makeItFit.otherStats', { count: rest }));
-    return shown.length > 0 ? shown.join(', ') : t('fittings.variations.noChanges');
+    if (shown.length === 0) return t('fittings.variations.noChanges');
+    return shown.flatMap((node, i) => (i === 0 ? [node] : [', ', node]));
   }
 
   function isk(option: ImproveOption) {
