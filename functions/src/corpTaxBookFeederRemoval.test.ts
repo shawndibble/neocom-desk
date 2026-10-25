@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { CorpSyncDeps } from './corpSyncGrant.js';
 import {
+  finalizeDueRemovals,
   parseRemovalCall,
   parseRemovalLinkCall,
   parseRemovalNoticeCall,
@@ -53,5 +55,68 @@ describe('payee input', () => {
       parseSetFeederPayeeInput({ ...base, payee: { kind: 'character', id: 0 } })
     ).toThrow();
     expect(() => parseSetFeederPayeeInput(base)).toThrow();
+  });
+});
+
+// Nothing here is due (no effectiveAt), so these pin only how the hourly run finds candidates.
+describe('finalizeDueRemovals reads', () => {
+  const pending = { status: 'pending-removal', removal: { startedAt: 1 } };
+  function fakeDeps(opts: { missingIndex?: boolean; failRead?: string } = {}) {
+    const reads: string[] = [];
+    const log = vi.fn();
+    const doc = (path: string, data: unknown) => ({
+      id: path.split('/').at(-1)!,
+      ref: { path, parent: { parent: { id: path.split('/')[1] } } },
+      data: () => data,
+      get: (f: string) => (data as Record<string, unknown>)[f],
+    });
+    const db = {
+      collectionGroup: () => ({
+        where: () => ({
+          get: async () => {
+            if (opts.missingIndex) throw Object.assign(new Error('needs index'), { code: 9 });
+            reads.push('group');
+            return { docs: [doc('corps/1/feeders/2', pending), doc('other/1/feeders/3', pending)] };
+          },
+        }),
+      }),
+      collection: (name: string) => ({
+        get: async () => {
+          reads.push(name);
+          return {
+            docs: [
+              doc(`${name}/2`, { collectorCorporationId: 1 }),
+              doc(`${name}/4`, { collectorCorporationId: 1 }),
+            ],
+          };
+        },
+        doc: (c: string) => ({
+          collection: (sub: string) => ({
+            doc: (f: string) => ({
+              get: async () => {
+                const path = `${name}/${c}/${sub}/${f}`;
+                reads.push(path);
+                if (path === opts.failRead) throw new Error('unavailable');
+                return { data: () => pending };
+              },
+            }),
+          }),
+        }),
+      }),
+    };
+    return { deps: { db, log, now: () => 10 } as unknown as CorpSyncDeps, reads, log };
+  }
+
+  it('is one collection-group query, ignoring a same-named collection outside corps', async () => {
+    const f = fakeDeps();
+    expect(await finalizeDueRemovals(f.deps)).toEqual({ ended: 0 });
+    expect(f.reads).toEqual(['group']);
+  });
+
+  it('falls back to the pointer scan until the index is deployed; one bad read skips only itself', async () => {
+    const f = fakeDeps({ missingIndex: true, failRead: 'corps/1/feeders/2' });
+    expect(await finalizeDueRemovals(f.deps, 'pointers')).toEqual({ ended: 0 });
+    expect(f.reads).toEqual(['pointers', 'corps/1/feeders/2', 'corps/1/feeders/4']);
+    expect(f.log).toHaveBeenCalledTimes(2); // the fallback notice and the failed read
   });
 });

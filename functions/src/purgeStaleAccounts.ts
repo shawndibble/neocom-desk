@@ -42,6 +42,18 @@ export function staleAccountCutoff(nowMs: number): number {
   return nowMs - ACCOUNT_INACTIVITY_MS;
 }
 
+/**
+ * The UTC weekday the purge reads every `characters/{uid}` doc to seed the
+ * ones with no heartbeat (Sunday). Every other day it only queries
+ * `lastSyncedAt < cutoff`, which a doc missing the field never matches: seeding
+ * a week late only starts its 90-day window a week late.
+ */
+export const FULL_SCAN_UTC_DAY = 0;
+
+export function isFullScanDay(nowMs: number): boolean {
+  return new Date(nowMs).getUTCDay() === FULL_SCAN_UTC_DAY;
+}
+
 /** Strictly more than 90 days since the last sync. */
 export function isAccountStale(lastSyncedMs: number, nowMs: number): boolean {
   return lastSyncedMs < staleAccountCutoff(nowMs);

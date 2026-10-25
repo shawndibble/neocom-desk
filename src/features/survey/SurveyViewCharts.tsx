@@ -29,7 +29,7 @@ import { formatEveClock } from '@/engine/survey/chatMessage';
 import {
   depletionSeries,
   iskSeries,
-  paceByOreSeries,
+  type PaceByOreSeries,
   type SurveySeriesRow,
 } from '@/engine/survey/chartViews';
 import type { SurveySummary } from '@/engine/survey/series';
@@ -339,9 +339,15 @@ export function IskChart({ summary }: { summary: SurveySummary }) {
  * each slice's top edge leaves the gap between slices. The caller wraps it in its
  * figure and table; only the plot is here.
  */
-export function PaceByOreChart({ summary }: { summary: SurveySummary }) {
+export function PaceByOreChart({
+  summary,
+  pace,
+}: {
+  summary: SurveySummary;
+  pace: PaceByOreSeries;
+}) {
   const { t } = useTranslation();
-  const { rows, activeOres, toneIndex } = useMemo(() => paceByOreSeries(summary), [summary]);
+  const { rows, activeOres, toneIndex } = pace;
   const { xAxis } = timeAxis(summary);
 
   function Tip({ active, payload }: TooltipContentProps) {

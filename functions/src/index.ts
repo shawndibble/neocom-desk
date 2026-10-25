@@ -42,7 +42,11 @@ import { firestoreAlertGrantStore, firestorePollerStore } from './alertGrantStor
 import { fetchNotifications as fetchEsiNotifications } from './esiNotifications.js';
 import { pollEveNotifications as pollEveNotificationsRun } from './pollEveNotifications.js';
 import { buildDeviceRegistration, parseRegisterDeviceInput } from './registerDevice.js';
-import { dispatchDueProjections, writeDeviceRegistration } from './projectionStore.js';
+import {
+  dispatchDueProjections,
+  purgeFiredProjections,
+  writeDeviceRegistration,
+} from './projectionStore.js';
 import {
   parseBookCall,
   parseClaimPaymentInput,
@@ -1101,6 +1105,11 @@ export const corpTaxBookCall = onCall<unknown>(
  *   their Shares. Bounded to 500 deletes a run.
  * - sweepSrpClaims (ADR 0026): deletes Paid and Rejected SRP Claims a year after
  *   they close, with their SRP log entries. Bounded to 500 deletes a run.
+ * - purgeFiredProjections: deletes Scheduled Push rows fired more than 30 days ago (was every
+ *   `dispatchProjections` tick, an empty billed query 96 times a day).
+ * The three sweeps and the stale-account purge read with one query each (collection-group for
+ * the sweeps, indexes in firestore.indexes.json, deployed by hand) and fall back to the old
+ * per-parent scan until those indexes exist (indexedSweep.ts).
  */
 export const dailyHousekeeping = onSchedule(
   { schedule: 'every 24 hours', secrets: [ALERTS_TOKEN_KEY], timeoutSeconds: 540 },
@@ -1108,6 +1117,17 @@ export const dailyHousekeeping = onSchedule(
     runDailyHousekeeping(
       [
         { name: 'purgeNotificationFeed', run: runPurgeNotificationFeed },
+        {
+          name: 'purgeFiredProjections',
+          run: async () => {
+            const { deleted, truncated } = await purgeFiredProjections(firestore(), Date.now());
+            if (truncated) {
+              logWarn('Fired projection purge: pass limit reached, backlog continues next run', {
+                deleted,
+              });
+            }
+          },
+        },
         {
           name: 'purgeStaleAccounts',
           run: () => runPurgeStaleAccounts({ alertGrantDeps, corpSyncDeps }),

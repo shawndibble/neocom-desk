@@ -211,24 +211,17 @@ describe('declared collections vs the hand-written Firestore config', () => {
     expect([...ruledSubcollections].sort()).toEqual([...REMOTE_COLLECTION_NAMES].sort());
   });
 
-  // Editable collections and the feed are read incrementally
-  // (`ownerHash == h AND updatedAt > cursor`), which needs this composite.
-  // Synced settings are deliberately read unwindowed and need none.
-  it.each(REMOTE_COLLECTIONS.filter((c) => c.kind !== 'settings').map((c) => c.remoteName))(
-    'has the incremental-pull composite index on %s',
-    (name) => {
-      expect(indexes).toContainEqual({
-        collectionGroup: name,
-        queryScope: 'COLLECTION',
-        fields: [
-          { fieldPath: 'ownerHash', order: 'ASCENDING' },
-          { fieldPath: 'updatedAt', order: 'ASCENDING' },
-        ],
-      });
-    }
-  );
-
-  it('has no composite index on synced settings', () => {
-    expect(indexes.filter((i) => i.collectionGroup === SYNCED_SETTINGS.remoteName)).toEqual([]);
+  // Every remote collection is read incrementally
+  // (`ownerHash == h AND updatedAt > cursor`), which needs this composite —
+  // synced settings too, since issue #5045.
+  it.each(REMOTE_COLLECTION_NAMES)('has the incremental-pull composite index on %s', (name) => {
+    expect(indexes).toContainEqual({
+      collectionGroup: name,
+      queryScope: 'COLLECTION',
+      fields: [
+        { fieldPath: 'ownerHash', order: 'ASCENDING' },
+        { fieldPath: 'updatedAt', order: 'ASCENDING' },
+      ],
+    });
   });
 });
