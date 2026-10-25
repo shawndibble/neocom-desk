@@ -9,33 +9,21 @@ import {
   Button,
   Checkbox,
   DataTable,
+  EditableValue,
   IskAmount,
   MenuItem,
   MenuSeparator,
   TextInput,
   type DataTableColumn,
 } from '@/components/ui';
-import {
-  focusRingClassName,
-  interactiveClassName,
-  touchCheckboxLabelClassName,
-} from '@/components/ui/controlStyles';
-import * as Icon from '@/components/ui/icons';
+import { touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import type { StockRow } from '@/engine/stockTargets/stockRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { useItemActions } from '@/features/market/itemActions';
-import { cx } from '@/lib/cx';
 import { useFocusAfterCommit } from '@/lib/useFocusAfterCommit';
 import { useRowSelection } from '@/lib/useRowSelection';
 import { StockFillBar, StockStatusPill } from './StockStatus';
 import { formatNumber } from '@/lib/numberLocale';
-
-/** Editable-in-place value (§6c): faint pencil at rest, field box on hover/focus; 44px tap area via ::after. */
-const editableValueClassName = cx(
-  'relative inline-flex items-center gap-1 rounded-xs border border-transparent px-1 tabular-nums hover:border-line-bright hover:bg-panel-2 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[""]',
-  interactiveClassName,
-  focusRingClassName
-);
 
 function TargetCell({
   row,
@@ -51,6 +39,8 @@ function TargetCell({
   const buttonRef = useRef<HTMLButtonElement>(null);
   // Set once the field has closed, so the blur its own unmount fires cannot save an escaped value.
   const closed = useRef(false);
+  // Set when a typed digit opened the field: that digit stays, never selected for replacing.
+  const seeded = useRef(false);
   const focusAfterCommit = useFocusAfterCommit();
   function close() {
     closed.current = true;
@@ -71,14 +61,19 @@ function TargetCell({
     return (
       <TextInput
         size="sm"
-        type="number"
-        min={1}
+        // Text with a numeric keypad, not type="number": a seeded digit needs
+        // the caret after it, and a number field can't place its caret.
+        inputMode="numeric"
         autoFocus
         aria-label={t('stockTargets.table.targetFor', { name })}
         className="w-24 text-right"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        onFocus={(e) => e.currentTarget.select()}
+        onFocus={(e) => {
+          const field = e.currentTarget;
+          if (seeded.current) field.setSelectionRange(field.value.length, field.value.length);
+          else field.select();
+        }}
         onClick={(e) => e.stopPropagation()}
         onBlur={() => {
           // Blur that is not the field's own close saves, as leaving any edit field does.
@@ -101,21 +96,20 @@ function TargetCell({
     );
   }
   return (
-    <button
+    <EditableValue
       ref={buttonRef}
-      type="button"
       data-stock-target-edit={row.typeId}
-      className={editableValueClassName}
-      onClick={(e) => {
-        e.stopPropagation();
+      label={t('stockTargets.table.editTargetFor', { name })}
+      onEdit={(seed) => {
         closed.current = false;
-        setDraft(String(row.target));
+        // A target is a whole number: only a digit seeds the field.
+        const digit = seed !== undefined && /^\d$/.test(seed);
+        seeded.current = digit;
+        setDraft(digit ? seed : String(row.target));
       }}
     >
-      <span className="sr-only">{t('stockTargets.table.editTargetFor', { name })}, </span>
       {formatNumber(row.target)}
-      <Icon.Rename size={Icon.ICON_SIZE.sm} aria-hidden="true" className="text-text-dim" />
-    </button>
+    </EditableValue>
   );
 }
 

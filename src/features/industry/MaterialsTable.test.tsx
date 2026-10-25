@@ -131,16 +131,22 @@ function row(name: string): HTMLElement {
 function openField(name: string): HTMLElement {
   const open = screen.queryByRole('textbox', { name });
   if (open) return open;
-  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${escaped}:`) }));
+  fireEvent.click(valueButton(name));
   return screen.getByRole('textbox', { name });
 }
 const ownedInput = (material: string) => openField(`Have: ${material}`);
-/** The value shown at rest, before it is clicked into a field. */
-const valueButton = (name: string) =>
-  screen.getByRole('button', {
-    name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`),
-  });
+/**
+ * The value shown at rest, before it is clicked into a field, found by its
+ * field's name: the value names the action ("Edit Have for Tritanium") where
+ * the field names what it holds ("Have: Tritanium").
+ */
+function valueButton(field: string): HTMLElement {
+  const action = field
+    .replace(/^Have: /, 'Edit Have for ')
+    .replace(/^Price for /, 'Edit price for ');
+  const escaped = action.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return screen.getByRole('button', { name: new RegExp(`^${escaped},`) });
+}
 const priceInput = (material: string) => openField(`Price for ${material}`);
 const revertButton = (material: string) =>
   screen.getByRole('button', { name: `Reset ${material} to the market price` });
@@ -520,7 +526,7 @@ describe('MaterialsTable on a phone', () => {
     render(<Harness initial={{ 34: { ownedQuantity: 0 } }} />);
 
     const row = screen.getByText('Tritanium').closest('li')!;
-    const have = within(row).getByRole('button', { name: /^Have: Tritanium/ });
+    const have = within(row).getByRole('button', { name: /^Edit Have for Tritanium,/ });
     expect(have).toHaveClass('text-text-dim');
     expect(have).not.toHaveClass('text-text-faint');
   });
@@ -535,7 +541,7 @@ describe('MaterialsTable on a phone', () => {
     expect(row).toHaveTextContent('Need 1,000');
     // Have is a number with a faint pencil, not a field stretched across its column.
     expect(within(row).queryByRole('textbox', { name: 'Have: Tritanium' })).toBeNull();
-    const have = within(row).getByRole('button', { name: /^Have: Tritanium/ });
+    const have = within(row).getByRole('button', { name: /^Edit Have for Tritanium,/ });
     expect(have).toHaveTextContent('400');
     expect(have).toHaveClass('text-accent');
     expect(have.querySelector('svg')).not.toBeNull();
@@ -545,7 +551,7 @@ describe('MaterialsTable on a phone', () => {
     const field = within(row).getByRole('textbox', { name: 'Have: Tritanium' });
     expect(field).toHaveFocus();
     fireEvent.blur(field);
-    expect(within(row).getByRole('button', { name: /^Have: Tritanium/ })).toBeTruthy();
+    expect(within(row).getByRole('button', { name: /^Edit Have for Tritanium,/ })).toBeTruthy();
   });
 
   it('says nothing to buy on a fully owned card — no Buy 0, no price', () => {
@@ -553,7 +559,7 @@ describe('MaterialsTable on a phone', () => {
     expandHave();
     const row = screen.getByText('Tritanium').closest('li')!;
     expect(row).not.toHaveTextContent('Buy');
-    expect(within(row).queryByRole('button', { name: /^Price for Tritanium/ })).toBeNull();
+    expect(within(row).queryByRole('button', { name: /^Edit price for Tritanium,/ })).toBeNull();
   });
 
   it('keeps the section headings and their subtotals', () => {
@@ -574,8 +580,8 @@ describe('MaterialsTable on a phone', () => {
 
     const row = screen.getByText('Tritanium').closest('li')!;
     const offer = within(row).getByRole('button', { name: /^Use assets/ });
-    const price = within(row).getByRole('button', { name: /^Price for Tritanium/ });
-    const have = within(row).getByRole('button', { name: /^Have: Tritanium/ });
+    const price = within(row).getByRole('button', { name: /^Edit price for Tritanium,/ });
+    const have = within(row).getByRole('button', { name: /^Edit Have for Tritanium,/ });
     // The price sits with what to buy; the offer on the card's last line, under Need · Have.
     const buyLine = price.closest('li > div')!;
     expect(buyLine).toHaveTextContent('Buy');

@@ -1481,8 +1481,8 @@ describe('BuildPlanDetail material price basis', () => {
   const basisSelect = () => screen.getByRole('combobox', { name: 'Material prices' });
   // The price is edited in place, so at rest it is the value's text.
   const tritaniumPrice = () => ({
-    value: (screen.getByRole('button', { name: /^Price for Tritanium:/ }).textContent ?? '')
-      .replace('Price for Tritanium:', '')
+    value: (screen.getByRole('button', { name: /^Edit price for Tritanium,/ }).textContent ?? '')
+      .replace('Edit price for Tritanium,', '')
       .trim(),
   });
 
@@ -1811,7 +1811,7 @@ describe('BuildPlanDetail Break Even button', () => {
     render(<Harness plan={{ runs: 10 }} />);
     await openSetup(user);
 
-    await screen.findByRole('button', { name: /^Price for Tritanium:/ });
+    await screen.findByRole('button', { name: /^Edit price for Tritanium,/ });
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Break Even' })).not.toBeInTheDocument()
     );

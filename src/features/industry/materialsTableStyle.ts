@@ -29,18 +29,6 @@ export const ERRAND_LABEL_KEY: Record<MaterialErrand, string> = {
   have: 'industry.errands.have',
 };
 
-/**
- * Editable-in-place value (§6c): faint pencil at rest, field box on hover/focus.
- * The 44px touch tier is the button's own height below `md` (§3), never an
- * overhanging `::after`, which reached into the row's next target.
- */
-export const editableValueClassName = cx(
-  'inline-flex min-h-11 items-center gap-1 rounded-xs border border-transparent px-1 hover:border-line-bright hover:bg-panel-2 md:min-h-0',
-  interactiveClassName,
-  focusRingClassName
-);
-export const editPencilClassName = 'text-text-faint';
-
 type LinkTone = 'accent' | 'build' | 'blueprint' | 'quiet';
 
 /**

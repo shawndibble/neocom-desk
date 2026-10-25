@@ -1,11 +1,6 @@
 import { eyebrowClassName } from '@/components/ui/eyebrowClassName';
 import { usePricesUnavailableLabel } from '@/features/market/usePricesUnavailableLabel';
-import {
-  fieldBaseClassName,
-  fieldSizeClassName,
-  tappableRowClassName,
-  touchCheckboxLabelClassName,
-} from '@/components/ui/controlStyles';
+import { tappableRowClassName, touchCheckboxLabelClassName } from '@/components/ui/controlStyles';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +9,6 @@ import {
   CollapsiblePanel,
   DataAgeBadge,
   EmptyState,
-  FilterChip,
   IconButton,
   InfoTooltip,
   Panel,
@@ -44,11 +38,7 @@ import {
   type BuildStrategy,
 } from '@/engine/industry/autoMakeOrBuy';
 import { craftScope } from '@/engine/industry/craftScope';
-import {
-  ownedStockSale,
-  sellableMaterials,
-  type LiquidationBasis,
-} from '@/engine/industry/ownedStockSale';
+import { planOwnedStockSale, type LiquidationBasis } from '@/engine/industry/ownedStockSale';
 import { profitOnBasis, type ProfitBasis } from '@/engine/industry/profitBasis';
 import { securityBand } from '@/engine/securityStatus';
 import type { FacilityKind, MaterialPriceBasis, RigKind } from '@/engine/industry/types';
@@ -99,7 +89,7 @@ import { formatDuration } from '@/lib/duration';
 import { useTableExport } from '@/components/ui/useTableExport';
 import { TableActionsMenu } from '@/components/ui/TableExport';
 import { writeToClipboard } from '@/lib/clipboard';
-import { parseOrKeep, parseTaxPct } from './planInputParsers';
+import { parseTaxPct } from './planInputParsers';
 import { buildItemMenuProps } from './buildItemMenuProps';
 import { MaterialsTable, type MaterialsTableHandle } from './MaterialsTable';
 import { SourcingInput } from './SourcingInput';
@@ -127,12 +117,12 @@ import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import type { CorpOwnedStockState } from './corpOwnedStock';
 import { pricingSourcesForHub, type BuildPlanPricingInputs } from './buildPlanPricingInputs';
 import { blueprintTypeIdsIn, useBlueprintPurchaseOffers } from './blueprintPurchaseOffers';
-import { OwnedStockScopeControl } from './OwnedStockScopeControl';
+import { PlanOwnedStockControl } from './PlanOwnedStockControl';
+import { PlanRunsControl } from './PlanRunsControl';
 import { BuildPlanAutoBuildControl } from './BuildPlanAutoBuildControl';
 import { ResultsSummary } from './ResultsSummary';
 import { useCheaperNearbySystems } from './useCheaperNearbySystems';
 import { formatCostIndex } from './format';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/Popover';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import { BpcCoverageWarning, PlanVerdictHero } from './PlanVerdictHero';
 import { PlanSetupFacts } from './PlanSetupFacts';
@@ -399,11 +389,6 @@ export function BuildPlanDetail({
   const [strategyUndo, setStrategyUndo] = useState<{
     previous: number[];
     built: number;
-  } | null>(null);
-  // The plan and profit a failed search ran against: the note is stale once either moves.
-  const [noBreakEvenAt, setNoBreakEvenAt] = useState<{
-    plan: BuildPlanRecord;
-    profit: number | null;
   } | null>(null);
   const isDesktop = useIsDesktop();
   const [costsOpen, setCostsOpen] = useState<boolean | null>(null);
@@ -738,22 +723,25 @@ export function BuildPlanDetail({
    * profit is net of what the owned stock that many runs would use could fetch,
    * since a bigger job eats more of it.
    */
-  const applyBreakEvenRuns = () => {
+  const findBreakEvenRuns = () => {
     const runs = breakEvenRuns((trial) => {
       const trialResult = resolveAt({ ...plan, runs: trial }).result;
       if (!trialResult || trialResult.profit === null) return null;
       if (heroBasis !== 'sellValue' || !snapshot) return trialResult.profit;
-      const sale = ownedStockSale(
-        sellableMaterials(trialResult.materials),
-        saleBasis === 'instant' ? snapshot.hubBuyPrices : snapshot.hubPrices,
+      const sale = planOwnedStockSale(
+        trialResult.materials,
+        snapshot,
         saleBasis,
         modifiers.skills,
         standing
       );
+      // The hero's own rule: an owned type with no price leaves no sell value
+      // to charge, and a trial's run count can reach stock this one didn't.
+      if (sale.unpriced.length > 0) return trialResult.profit;
       return trialResult.profit - sale.net;
     }, plan.runs);
-    setNoBreakEvenAt(runs === null ? { plan, profit: heroFigures?.profit ?? null } : null);
     if (runs !== null) update({ runs });
+    return runs;
   };
 
   /**
@@ -765,16 +753,15 @@ export function BuildPlanDetail({
    */
   const ownedSale = useMemo(() => {
     if (!result || !snapshot) return null;
-    const materials = sellableMaterials(result.materials);
     return {
-      instant: ownedStockSale(
-        materials,
-        snapshot.hubBuyPrices,
+      instant: planOwnedStockSale(
+        result.materials,
+        snapshot,
         'instant',
         modifiers.skills,
         standing
       ),
-      order: ownedStockSale(materials, snapshot.hubPrices, 'order', modifiers.skills, standing),
+      order: planOwnedStockSale(result.materials, snapshot, 'order', modifiers.skills, standing),
     };
   }, [result, snapshot, modifiers, standing]);
 
@@ -1218,46 +1205,18 @@ export function BuildPlanDetail({
     </>
   );
 
-  const ownedLabelId = `${plan.id}-owned-label`;
-  const ownedValueId = `${plan.id}-owned-value`;
-  const ownedScopeLabel =
-    plan.ownedStockScope?.mode === 'selected'
-      ? t('industry.ownedStockScopeSelected')
-      : t('industry.ownedStockScopeEverywhere');
-
   const runsControl = (
-    <span className="flex flex-wrap items-center gap-2 text-sm text-text-dim">
-      <SourcingInput
-        value={plan.runs}
-        label={t('industry.runs')}
-        inputMode="numeric"
-        widthClassName="w-16"
-        // Blank/garbage reverts to the last committed value rather than
-        // snapping to the minimum — clearing the box to retype "10" as
-        // "100" must not overwrite it with 1 mid-edit.
-        parse={(raw) => parseOrKeep(plan.runs, raw, (n) => Math.max(1, Math.round(n)))}
-        onCommit={(runs) => update({ runs })}
-      />
-      <span aria-hidden="true">{t('industry.hero.runsUnit', { count: plan.runs })}</span>
-      {/* The plan's time, priced or not: it is a fact of the recipe, so it
-          stays when prices are unreachable and the ledger is an empty state. */}
-      {result && (
-        <>
-          <span aria-hidden="true">·</span>
-          <span className="tabular-nums">{formatDuration(planSeconds ?? result.seconds)}</span>
-        </>
-      )}
-      {pricesReady && heroFigures?.profit != null && heroFigures.profit < 0 && (
-        <Button size="sm" onClick={applyBreakEvenRuns}>
-          {t('industry.breakEvenRuns')}
-        </Button>
-      )}
-      {noBreakEvenAt?.plan === plan && noBreakEvenAt.profit === (heroFigures?.profit ?? null) && (
-        <span role="status" className="text-xs">
-          {t('industry.breakEvenRunsNone')}
-        </span>
-      )}
-    </span>
+    <PlanRunsControl
+      runs={plan.runs}
+      onRunsChange={(runs) => update({ runs })}
+      seconds={result ? (planSeconds ?? result.seconds) : null}
+      profit={heroFigures?.profit ?? null}
+      findBreakEven={
+        pricesReady && heroFigures?.profit != null && heroFigures.profit < 0
+          ? findBreakEvenRuns
+          : null
+      }
+    />
   );
 
   return (
@@ -1850,70 +1809,17 @@ export function BuildPlanDetail({
                     disabled={!makeOrBuyContext}
                     onApply={applyAutoBuild}
                   />
-                  <div className="flex items-center gap-2 text-xs">
-                    <span id={ownedLabelId} className="whitespace-nowrap">
-                      {t('industry.ownedControl.label')}
-                    </span>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        {/* §6c: a trigger that opens a popover is field chrome with a trailing caret. */}
-                        <button
-                          type="button"
-                          aria-labelledby={`${ownedLabelId} ${ownedValueId}`}
-                          className={cx(
-                            fieldBaseClassName,
-                            fieldSizeClassName.sm,
-                            'inline-flex items-center gap-2'
-                          )}
-                        >
-                          <span id={ownedValueId}>
-                            {plan.includeCorpAssets
-                              ? t('industry.ownedControl.withCorp', { scope: ownedScopeLabel })
-                              : ownedScopeLabel}
-                          </span>
-                          <Icon.Expanded size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        align="start"
-                        aria-label={t('industry.ownedControl.label')}
-                        className="w-80 space-y-3 p-3"
-                      >
-                        <OwnedStockScopeControl
-                          scope={plan.ownedStockScope}
-                          detectedStock={detectedStock}
-                          detection={detection}
-                          onChange={(ownedStockScope) => update({ ownedStockScope })}
-                        />
-                        <div className="space-y-1">
-                          <FilterChip
-                            label={t('industry.includeCorpAssets')}
-                            selected={plan.includeCorpAssets ?? false}
-                            disabled={!corpOwnedStock.available}
-                            onToggle={() =>
-                              update({ includeCorpAssets: !(plan.includeCorpAssets ?? false) })
-                            }
-                          />
-                          <p className="text-xs text-text-dim">
-                            {corpOwnedStock.available
-                              ? t('industry.includeCorpAssetsTooltip')
-                              : t('industry.includeCorpAssetsUnavailable')}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2 border-t border-line pt-3 text-xs">
-                          <span className="flex-1 text-text-dim">
-                            {t('industry.ownedControl.fill')}
-                          </span>
-                          <Button size="sm" onClick={() => materialsTable.current?.fillAll()}>
-                            {t('industry.useAllOwned')}
-                          </Button>
-                          <Button size="sm" onClick={() => materialsTable.current?.clearAll()}>
-                            {t('industry.useNoneOwned')}
-                          </Button>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                  <PlanOwnedStockControl
+                    scope={plan.ownedStockScope}
+                    includeCorpAssets={plan.includeCorpAssets ?? false}
+                    corpAvailable={corpOwnedStock.available}
+                    detectedStock={detectedStock}
+                    detection={detection}
+                    onScopeChange={(ownedStockScope) => update({ ownedStockScope })}
+                    onIncludeCorpAssetsChange={(include) => update({ includeCorpAssets: include })}
+                    onFillAll={() => materialsTable.current?.fillAll()}
+                    onClearAll={() => materialsTable.current?.clearAll()}
+                  />
                 </div>
                 <GroupOwnedDiffersHint
                   difference={
