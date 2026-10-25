@@ -16,6 +16,12 @@ describe('blockedByRefs', () => {
     expect(blockedByRefs(body)).toEqual([5025, 5176]);
   });
 
+  it('reads a list item wrapped onto an indented continuation line', () => {
+    expect(blockedByRefs('## Blocked by\n- #1 and, once that lands,\n  #2\n\nParent: #9')).toEqual([
+      1, 2,
+    ]);
+  });
+
   it('reads an inline section with no list', () => {
     expect(blockedByRefs('## Blocked by\n\n#12 and #13\n\nLater note about #99')).toEqual([12, 13]);
   });

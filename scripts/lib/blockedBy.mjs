@@ -12,8 +12,15 @@ export function blockedByRefs(body) {
   if (!m) return [];
   const section = m[1].trim();
   if (!section || /^none\b/i.test(section)) return [];
-  const lines = section.split('\n');
-  const items = lines.filter((line) => LIST_ITEM.test(line));
+  // A list item, and any indented line straight after one (an item wrapped onto
+  // a continuation line), are blockers; a blank or unindented line ends the item.
+  const items = [];
+  let inItem = false;
+  for (const line of section.split('\n')) {
+    if (LIST_ITEM.test(line)) inItem = true;
+    else if (!/^\s+\S/.test(line)) inItem = false;
+    if (inItem) items.push(line);
+  }
   const source = items.length > 0 ? items.join('\n') : section.split(/\n\s*\n/)[0];
   return [...source.matchAll(/#(\d+)/g)].map((mm) => Number(mm[1]));
 }

@@ -94,12 +94,7 @@ if (!acquireLock()) {
   process.exit(0);
 }
 
-/**
- * Pick (and, unless a dry run, claim) under the lock. Returns the result to
- * print; it never exits the process itself, so the lock is always released
- * below. An exit from inside the `try` skipped the `finally` and left the
- * lock for the next run to wait out as stale (~90 s).
- */
+/** Pick (and, unless a dry run, claim) under the lock. Never exits the process: the caller releases the lock. */
 function selectUnderLock() {
   const currentUser = ghJson(['api', 'user']).login;
   const issues = ghJson([
