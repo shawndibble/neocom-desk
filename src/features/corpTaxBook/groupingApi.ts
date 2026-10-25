@@ -20,14 +20,18 @@ export interface PendingGrouping {
   mainCharacterId: number;
 }
 
-const call = <In, Out>(name: CallableAction, data: In): Promise<Out> =>
-  callRouted<In, Out>(name, data);
+const call = <In, Out>(
+  characterId: number | undefined,
+  name: CallableAction,
+  data: In
+): Promise<Out> => callRouted<In, Out>(name, data, characterId);
 
 /** The groupings waiting for `characterId`, read as that Character. */
 export function listPendingGroupings(characterId: number): Promise<PendingGrouping[]> {
   return underFirebaseSession(async () => {
     await ensureSignedIn(characterId);
     return call<Record<string, never>, PendingGrouping[]>(
+      characterId,
       'listPendingCorpTaxBookGroupingsCallable',
       {}
     );
@@ -43,6 +47,7 @@ export function answerGrouping(
   return underFirebaseSession(async () => {
     await ensureSignedIn(characterId);
     await call(
+      characterId,
       answer === 'confirm'
         ? 'confirmCorpTaxBookGroupingCallable'
         : 'declineCorpTaxBookGroupingCallable',
@@ -70,6 +75,7 @@ export async function confirmPendingInCorporation(
 /** The Miner's verify link declines a pending character. It can never confirm one. */
 export function declineByVerifyLink(token: string, characterId: number): Promise<void> {
   return call<{ token: string; characterId: number }, unknown>(
+    undefined, // a guest's token is the credential: no session
     'declineCorpTaxBookGroupingByTokenCallable',
     { token, characterId }
   ).then(() => undefined);

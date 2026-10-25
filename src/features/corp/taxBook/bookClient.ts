@@ -105,7 +105,7 @@ export async function call<In, Out>(
   data: In
 ): Promise<Out> {
   await ensureSignedIn(characterId);
-  const result = await callRouted<In, Out>(name, data);
+  const result = await callRouted<In, Out>(name, data, characterId);
   return result;
 }
 
@@ -120,7 +120,7 @@ export async function readFeederRemovalState(
 ): Promise<RemovalNoticeRecord | undefined> {
   await ensureSignedIn(characterId);
   const ref = doc(
-    getSyncFirestore(),
+    getSyncFirestore(characterId),
     'corps',
     String(corporationId),
     'feeders',
@@ -200,7 +200,7 @@ export async function readBookSummary(
   corporationId: number
 ): Promise<BookSummary | null> {
   await ensureSignedIn(characterId);
-  const snap = await getDoc(doc(getSyncFirestore(), 'corps', String(corporationId)));
+  const snap = await getDoc(doc(getSyncFirestore(characterId), 'corps', String(corporationId)));
   return snap.exists() ? summaryFrom(snap.data()) : null;
 }
 
@@ -221,7 +221,7 @@ export async function readDeclinedAutoGroup(
 ): Promise<Set<number>> {
   await ensureSignedIn(characterId);
   const snap = await getDoc(
-    doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', 'declinedAutoGroup')
+    doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'meta', 'declinedAutoGroup')
   );
   const ids = snap.data()?.ids;
   return new Set(Array.isArray(ids) ? (ids as number[]) : []);
@@ -234,7 +234,7 @@ export async function readDeclinedAutoGroup(
  */
 async function openBook(characterId: number, corporationId: number) {
   await ensureSignedIn(characterId);
-  const db = getSyncFirestore();
+  const db = getSyncFirestore(characterId);
   const snap = await getDoc(doc(db, 'corps', String(corporationId)));
   if (!snap.exists()) return null;
   const data = snap.data();
@@ -318,7 +318,7 @@ export async function readBookSettings(
   corporationId: number
 ): Promise<BookSettings | null> {
   await ensureSignedIn(characterId);
-  const snap = await getDoc(doc(getSyncFirestore(), 'corps', String(corporationId)));
+  const snap = await getDoc(doc(getSyncFirestore(characterId), 'corps', String(corporationId)));
   return snap.exists() ? settingsFrom(snap.data()) : null;
 }
 
@@ -452,8 +452,15 @@ export interface BookData {
   scheduledSync?: ScheduledSyncStatus | null;
 }
 
-const feederPayouts = (book: number, feeder: number) =>
-  collection(getSyncFirestore(), 'corps', String(book), 'feeders', String(feeder), 'payouts');
+const feederPayouts = (characterId: number, book: number, feeder: number) =>
+  collection(
+    getSyncFirestore(characterId),
+    'corps',
+    String(book),
+    'feeders',
+    String(feeder),
+    'payouts'
+  );
 
 export async function readBookData(
   characterId: number,
@@ -464,7 +471,7 @@ export async function readBookData(
   const settings = settingsFrom(book.data);
   const { list, part, read } = book;
   const meta = (id: string) =>
-    getDoc(doc(getSyncFirestore(), 'corps', String(corporationId), 'meta', id));
+    getDoc(doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'meta', id));
   const [
     miners,
     statements,
@@ -502,7 +509,7 @@ export async function readBookData(
           (await read<FeederDoc>('feeders')).map(async (f) =>
             bookFeederFrom(
               f,
-              (await getDocs(feederPayouts(corporationId, f.corporationId))).docs.map(
+              (await getDocs(feederPayouts(characterId, corporationId, f.corporationId))).docs.map(
                 (d) => ({ ...d.data(), id: d.id }) as FeederPayoutRow
               )
             )
@@ -557,7 +564,7 @@ export interface Rebill {
 export async function readRebills(characterId: number, corporationId: number): Promise<Rebill[]> {
   await ensureSignedIn(characterId);
   const snap = await getDocs(
-    collection(getSyncFirestore(), 'corps', String(corporationId), 'rebills')
+    collection(getSyncFirestore(characterId), 'corps', String(corporationId), 'rebills')
   );
   return snap.docs.map((d) => ({ ...(d.data() as Omit<Rebill, 'id'>), id: d.id }));
 }
@@ -580,7 +587,7 @@ export async function readAudit(
   count: number | null = 100
 ): Promise<AuditEntry[]> {
   await ensureSignedIn(characterId);
-  const log = collection(getSyncFirestore(), 'corps', String(corporationId), 'audit');
+  const log = collection(getSyncFirestore(characterId), 'corps', String(corporationId), 'audit');
   const snap = await getDocs(
     count === null
       ? query(log, orderBy('at', 'desc'))
@@ -634,7 +641,7 @@ export async function readVerifyTokens(
   statementIds: readonly string[]
 ): Promise<Map<string, string>> {
   await ensureSignedIn(characterId);
-  const db = getSyncFirestore();
+  const db = getSyncFirestore(characterId);
   const tokens = new Map<string, string>();
   await Promise.all(
     statementIds.map(async (id) => {

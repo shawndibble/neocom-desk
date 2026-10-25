@@ -407,7 +407,7 @@ async function readBilledBy(characterId: number): Promise<number[] | null> {
   try {
     return await underFirebaseSession(async () => {
       const uid = await ensureSignedIn(characterId);
-      const snap = await getDoc(doc(getSyncFirestore(), 'corpTaxBookBilledBy', uid));
+      const snap = await getDoc(doc(getSyncFirestore(characterId), 'corpTaxBookBilledBy', uid));
       return readBilledByPointer(snap.data());
     });
   } catch {
@@ -466,7 +466,7 @@ async function readOneBook(
   characterIds: readonly number[],
   billedHere: (characterId: number) => 'billed' | 'not-billed' | 'unknown'
 ): Promise<LoadedCorpBook | null> {
-  const fs = getSyncFirestore();
+  const fs = getSyncFirestore(characterIds[0]);
   const root = `corps/${corporationId}`;
   await ensureSignedIn(characterIds[0]);
   const bookDoc = (await getDoc(doc(fs, 'corps', String(corporationId)))).data();
@@ -486,6 +486,7 @@ async function readOneBook(
   let feeders: MemberFeederCoverage[] | null = null;
   for (const characterId of characterIds) {
     const uid = await ensureSignedIn(characterId);
+    const memberFs = getSyncFirestore(characterId);
     // Its own key: a member's copy holds only its own lines, never an officer's whole book.
     const key = `member:${characterId}:${corporationId}`;
     const part = (name: string, field: 'uid' | 'uids'): Promise<Docs> =>
@@ -493,7 +494,7 @@ async function readOneBook(
         docsOf(
           await getDocs(
             query(
-              collection(fs, root, name),
+              collection(memberFs, root, name),
               field === 'uid' ? where('uid', '==', uid) : where('uids', 'array-contains', uid)
             )
           )
@@ -501,7 +502,8 @@ async function readOneBook(
       );
     // Readable by a Character the book bills; any one of them will do. Cached only
     // while this load's pointer names the book; with no pointer read, live as before.
-    const readCoverage = async () => docsOf(await getDocs(collection(fs, root, 'feederCoverage')));
+    const readCoverage = async () =>
+      docsOf(await getDocs(collection(memberFs, root, 'feederCoverage')));
     const billing = feeders === null ? billedHere(characterId) : 'not-billed';
     const coverageRead: Promise<Docs | null> =
       billing === 'billed'
@@ -590,7 +592,8 @@ export async function claimCorpTaxBookPayment(
     await ensureSignedIn(characterId);
     return callRouted<{ corporationId: number; paymentId: string }, { minerId: string }>(
       'claimCorpTaxBookPaymentCallable',
-      { corporationId, paymentId }
+      { corporationId, paymentId },
+      characterId
     );
   });
 }
@@ -631,7 +634,8 @@ export async function teachRefinerySystems(
           await ensureSignedIn(characterId);
           await callRouted<{ corporationId: number; systems: Record<string, number> }, unknown>(
             'learnCorpTaxBookRefinerySystemsCallable',
-            { corporationId: book.corporationId, systems: Object.fromEntries(fresh) }
+            { corporationId: book.corporationId, systems: Object.fromEntries(fresh) },
+            characterId
           );
         });
       } catch {

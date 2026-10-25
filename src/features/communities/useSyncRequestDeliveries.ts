@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { isSyncConfigured } from '@/app/syncStatus';
-import { pledgeWritesInFlight } from './pledgeWrites';
+import { joinTabElection } from '@/lib/tabLeader';
 
 /** First run waits out boot and the shared-library publish. */
 export const DELIVERY_BOOT_DELAY_MS = 45 * 1000;
@@ -26,7 +26,9 @@ export function useSyncRequestDeliveries(
   useEffect(() => {
     if (!characterIds?.length || !isSyncConfigured()) return;
     let cancelled = false;
+    const seat = joinTabElection('sweep', () => {});
     const sweep = async () => {
+      if (document.visibilityState !== 'visible' || !seat.isLeader()) return;
       const { hasDeliveryScope, syncRequestDeliveries } = await import('./requestDelivery');
       const { listCommunityIds } = await import('./communityStore');
       const ordered = [...characterIds].sort(
@@ -35,11 +37,6 @@ export function useSyncRequestDeliveries(
       for (const id of ordered) {
         if (cancelled) return;
         if (!(await hasDeliveryScope(id))) continue;
-        // Signing in as another Character swaps the Firebase session: not under a Pledge write.
-        if (id !== activeCharacterId && pledgeWritesInFlight() > 0) {
-          console.warn('Request delivery sweep skipped a Character while a Pledge was being saved');
-          continue;
-        }
         try {
           for (const communityId of await listCommunityIds(id)) {
             if (cancelled) return;
@@ -57,6 +54,7 @@ export function useSyncRequestDeliveries(
     const timer = setInterval(run, DELIVERY_INTERVAL_MS);
     return () => {
       cancelled = true;
+      seat.leave();
       clearTimeout(boot);
       clearInterval(timer);
     };

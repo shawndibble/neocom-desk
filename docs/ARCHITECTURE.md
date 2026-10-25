@@ -359,8 +359,8 @@ the current EVE access token, uid `char:{characterId}`, claim `ownerHash`) →
 per collection: fetch remote docs filtered `where(ownerHash==current)` →
 `merge.mergeRecords`/`merge.mergeSettings` (last-write-wins by `updatedAt`;
 remote tombstones kept 30 days, local settings tombstones until the key is
-rewritten) → push/pull/delete accordingly. Syncs are globally serialized (one Firebase
-session, swapped on character switch) and coalesced per character. If a
+rewritten) → push/pull/delete accordingly. Syncs are globally serialized and coalesced per character; each
+character signs in on its own persisted Firebase session (`sync/syncAuth.ts`). If a
 character's `ownerHash` changed since the last sync (sold/transferred), local
 plans for it are wiped first (`handleOwnerHashChange`).
 

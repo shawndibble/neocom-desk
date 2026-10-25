@@ -35,7 +35,11 @@ describe('SurveyOwnerChange', () => {
     // The dialog's submit button follows the footer's trigger of the same name.
     fireEvent.click(screen.getAllByRole('button', { name: 'Change owner' }).at(-1)!);
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
-    expect(setSurveyOwner).toHaveBeenCalledWith({ id: 'abc123', owner: 'New Pilot' });
+    expect(setSurveyOwner).toHaveBeenCalledWith({
+      id: 'abc123',
+      owner: 'New Pilot',
+      characterId: 7,
+    });
   });
 
   it('renders its character search as a searchbox, like every other search-then-pick dialog', () => {

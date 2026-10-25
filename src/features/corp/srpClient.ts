@@ -30,7 +30,7 @@ export async function readSrpSettings(
   if (stand) return stand.readSettings();
   await ensureSignedIn(characterId);
   const snap = await getDoc(
-    doc(getSyncFirestore(), 'corps', String(corporationId), 'srp', 'settings')
+    doc(getSyncFirestore(characterId), 'corps', String(corporationId), 'srp', 'settings')
   );
   return snap.exists() ? (snap.data() as SrpSettings) : null;
 }

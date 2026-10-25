@@ -59,7 +59,9 @@ export async function loadFleetPayouts(
   if (override?.loadFleetPayouts) return readAll(override.loadFleetPayouts(communityId));
   const snap = await underFirebaseSession(async () => {
     await ensureSignedIn(characterId);
-    return getDocs(collection(getSyncFirestore(), 'communities', communityId, 'fleetPayouts'));
+    return getDocs(
+      collection(getSyncFirestore(characterId), 'communities', communityId, 'fleetPayouts')
+    );
   });
   return readAll(
     snap.docs
@@ -79,7 +81,14 @@ export async function loadFleetShares(
   const snap = await underFirebaseSession(async () => {
     await ensureSignedIn(characterId);
     return getDocs(
-      collection(getSyncFirestore(), 'communities', communityId, 'fleetPayouts', payoutId, 'shares')
+      collection(
+        getSyncFirestore(characterId),
+        'communities',
+        communityId,
+        'fleetPayouts',
+        payoutId,
+        'shares'
+      )
     );
   });
   return snap.docs
@@ -107,7 +116,7 @@ export async function loadMyFleetShare(
     return getDocs(
       query(
         collection(
-          getSyncFirestore(),
+          getSyncFirestore(characterId),
           'communities',
           communityId,
           'fleetPayouts',

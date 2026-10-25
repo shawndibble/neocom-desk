@@ -30,8 +30,8 @@ import type {
 import { invalidateSrpOfficer } from './srpClient';
 import { call } from './taxBook/bookClient';
 
-const corpDoc = (corporationId: number, name: string) =>
-  collection(getSyncFirestore(), 'corps', String(corporationId), name);
+const corpDoc = (characterId: number, corporationId: number, name: string) =>
+  collection(getSyncFirestore(characterId), 'corps', String(corporationId), name);
 
 const isOpen = (c: SrpClaim) => c.state === 'pending' || c.state === 'approved';
 
@@ -44,7 +44,10 @@ export async function readSrpClaims(
   if (stand) return stand.claims().filter(isOpen);
   await ensureSignedIn(characterId);
   const snap = await getDocs(
-    query(corpDoc(corporationId, 'srpClaims'), where('state', 'in', ['pending', 'approved']))
+    query(
+      corpDoc(characterId, corporationId, 'srpClaims'),
+      where('state', 'in', ['pending', 'approved'])
+    )
   );
   return snap.docs.map((d) => d.data() as SrpClaim);
 }
@@ -68,7 +71,11 @@ export async function readSrpHistory(
   }
   await ensureSignedIn(characterId);
   const snap = await getDocs(
-    query(corpDoc(corporationId, 'srpClaims'), orderBy('closedAt', 'desc'), limitTo(count))
+    query(
+      corpDoc(characterId, corporationId, 'srpClaims'),
+      orderBy('closedAt', 'desc'),
+      limitTo(count)
+    )
   );
   return snap.docs.map((d) => d.data() as SrpClaim);
 }
@@ -82,7 +89,7 @@ export async function readSrpActivity(
   const stand = srpOfficerBackendOverride();
   if (stand) return stand.activity();
   await ensureSignedIn(characterId);
-  const log = corpDoc(corporationId, 'srpAudit');
+  const log = corpDoc(characterId, corporationId, 'srpAudit');
   const snap = await getDocs(
     count === null
       ? query(log, orderBy('at', 'desc'))
@@ -99,7 +106,7 @@ export async function readAllSrpClaims(
   const stand = srpOfficerBackendOverride();
   if (stand) return stand.claims();
   await ensureSignedIn(characterId);
-  const snap = await getDocs(corpDoc(corporationId, 'srpClaims'));
+  const snap = await getDocs(corpDoc(characterId, corporationId, 'srpClaims'));
   return snap.docs.map((d) => d.data() as SrpClaim);
 }
 
@@ -113,7 +120,10 @@ export async function readSrpClaimAudit(
   if (stand) return stand.claimAudit(killmailId);
   await ensureSignedIn(characterId);
   const snap = await getDocs(
-    query(corpDoc(corporationId, 'srpAudit'), where('detail.killmailId', '==', killmailId))
+    query(
+      corpDoc(characterId, corporationId, 'srpAudit'),
+      where('detail.killmailId', '==', killmailId)
+    )
   );
   return snap.docs
     .map((d) => ({ id: d.id, ...(d.data() as Omit<SrpAuditEntry, 'id'>) }))

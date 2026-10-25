@@ -7,8 +7,7 @@
  * Cost is kept off everyone who never runs a Community. A Character is only
  * read once the Communities page has seen it administer one (`rememberCommunityAdmin`),
  * and only while the Firebase session is already its own: the poll never mints
- * a token or swaps the session, which the sync sweep and the Communities page
- * are relying on. A Character it cannot read right now returns null, so the
+ * a token. A Character it cannot read right now returns null, so the
  * poll skips rather than writing a baseline that would make the next good poll
  * look like a burst of arrivals.
  *
@@ -125,7 +124,7 @@ export async function loadCommunityAlertEntries(
     import('./requestStore'),
   ]);
   const myUid = uidForCharacter(characterId);
-  if (getSyncAuth().currentUser?.uid !== myUid) return null;
+  if (getSyncAuth(characterId).currentUser?.uid !== myUid) return null;
   return store.withMyCommunities(characterId, async (mine) => {
     if (admin) await rememberCommunityAdmin(characterId, mine);
     const entries: CommunityAlertEntry[] = [];

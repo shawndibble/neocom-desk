@@ -71,7 +71,7 @@ async function readList(characterId: number): Promise<void> {
       import('@/sync/syncAuth'),
     ]);
     await ensureAnySession(characterId);
-    const snapshot = await getDoc(doc(getSyncFirestore(), COLLECTION, DOC_ID));
+    const snapshot = await getDoc(doc(getSyncFirestore(characterId), COLLECTION, DOC_ID));
     lastRead = { at: Date.now(), data: snapshot.data() };
   } catch {
     // Offline or signed out: keep whatever was last read; it still ages out.

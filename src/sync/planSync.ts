@@ -8,9 +8,8 @@
 // Merge policy is pure and lives in merge.ts: last-write-wins per record id,
 // tombstones for deletes kept 30 days.
 //
-// Syncs are serialized GLOBALLY, not just per character: the Firebase session is
-// a single slot swapped by ensureSignedIn, so two concurrent syncs would race
-// the auth state mid-flight. Status is tracked per character so a later
+// Syncs are serialized GLOBALLY, not just per character: one pass at a time
+// keeps the read load and the sweep ordering simple. Status is tracked per character so a later
 // character's success cannot mask an earlier one's failure. Within one
 // character's sync the collections pull concurrently (syncCharacter). Queued
 // syncs start foreground-first (SyncPriority), so an edit never waits behind a
@@ -456,7 +455,7 @@ async function syncCharacter(characterId: number, requested: SyncScope): Promise
   const scope: SyncScope = (await handleOwnerHashChange(character)) ? 'all' : requested;
 
   const uid = await ensureSignedIn(characterId);
-  const firestore = getSyncFirestore();
+  const firestore = getSyncFirestore(characterId);
   const ownerHash = character.ownerHash;
   const now = Date.now();
   const ctx: SyncContext = { firestore, uid, ownerHash, characterId, now };

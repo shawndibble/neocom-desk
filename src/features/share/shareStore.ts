@@ -15,13 +15,40 @@
  * (`firestore.indexes.json`), which can lag a day — so the read checks expiry
  * itself as well.
  */
-import { doc, getDoc, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore/lite';
+import {
+  connectFirestoreEmulator,
+  doc,
+  type Firestore,
+  getDoc,
+  getFirestore,
+  serverTimestamp,
+  setDoc,
+  Timestamp,
+} from 'firebase/firestore/lite';
 import { db } from '@/db';
 import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { isOfflineFailure } from '@/esi/client';
 import { generateShareId, isShareId } from '@/engine/share/shareId';
-import { getSyncFirestore } from '@/sync/firebaseApp';
+import { getFirebaseApp, getSyncFirestore } from '@/sync/firebaseApp';
+import { emulatorsOn } from '@/sync/firebaseCore';
 import { ensureAnySession } from '@/sync/syncAuth';
+
+let anonymousEmulatorConnected = false;
+
+/**
+ * The Firestore for a read or write the rules allow without sign-in (a share
+ * `get`, a survey scan): the Character's session when one is given, else the
+ * default app, which holds no session (issue #5074).
+ */
+export function shareFirestore(characterId?: number): Firestore {
+  if (characterId !== undefined) return getSyncFirestore(characterId);
+  const firestore = getFirestore(getFirebaseApp());
+  if (emulatorsOn() && !anonymousEmulatorConnected) {
+    anonymousEmulatorConnected = true;
+    connectFirestoreEmulator(firestore, '127.0.0.1', 8080);
+  }
+  return firestore;
+}
 
 export const SHARES_COLLECTION = 'shares';
 export const SHARE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -65,7 +92,7 @@ export async function saveShare(input: {
 }): Promise<number> {
   await ensureAnySession(input.characterId);
   const expiresAt = Date.now() + SHARE_TTL_MS;
-  await setDoc(doc(getSyncFirestore(), SHARES_COLLECTION, input.id), {
+  await setDoc(doc(getSyncFirestore(input.characterId), SHARES_COLLECTION, input.id), {
     type: input.type,
     payload: input.payload,
     createdAt: serverTimestamp(),
@@ -190,7 +217,7 @@ export async function loadShare(id: string): Promise<LoadShareResult> {
   if (!isShareId(id)) return { ok: false, reason: 'not-found' };
   let snapshot;
   try {
-    snapshot = await getDoc(doc(getSyncFirestore(), SHARES_COLLECTION, id));
+    snapshot = await getDoc(doc(shareFirestore(), SHARES_COLLECTION, id));
   } catch (error) {
     // The rules refuse an expired doc, and refuse a missing one too (their
     // expiry check has no `resource` to read) — both are "this link is gone".

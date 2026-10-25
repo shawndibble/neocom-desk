@@ -212,11 +212,12 @@ export async function dismissFeederHistory(
 
 /** Reads the view under the viewer's access record. `null` when the server has not built it. */
 export async function readFeederView(
+  characterId: number,
   collectorCorporationId: number,
   feederCorporationId: number
 ): Promise<FeederView | null> {
   const base = [
-    getSyncFirestore(),
+    getSyncFirestore(characterId),
     'corps',
     String(collectorCorporationId),
     'feederViews',
@@ -244,6 +245,6 @@ export async function loadFeederView(
   const access = await getFeederViewAccess(characterId, corporationId, collectorCorporationId);
   return {
     access,
-    view: await readFeederView(access.collectorCorporationId, corporationId),
+    view: await readFeederView(characterId, access.collectorCorporationId, corporationId),
   };
 }

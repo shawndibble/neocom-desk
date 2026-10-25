@@ -68,7 +68,7 @@ export function SurveyOwnerChange({
     setBusy(true);
     setFailed(false);
     try {
-      await setSurveyOwner({ id: surveyId, owner: chosen.name });
+      await setSurveyOwner({ id: surveyId, owner: chosen.name, characterId });
       close();
       onChanged();
     } catch {

@@ -55,9 +55,11 @@ vi.mock('firebase/firestore/lite', () => ({
   Timestamp: FakeTimestamp,
 }));
 vi.mock('@/sync/firebaseApp', () => ({ getSyncFirestore: () => ({}) }));
+vi.mock('@/sync/syncAuth', () => ({ ensureAnySession: vi.fn(async () => 'char:1') }));
 vi.mock('@/features/share/shareStore', () => ({
   loadShare,
   saveShare,
+  shareFirestore: () => ({}),
   shareUrl: (id: string) => `https://neocomdesk.test/s/${id}`,
 }));
 
@@ -245,7 +247,13 @@ describe('loadSurvey', () => {
 
 describe('moon tax', () => {
   it('stores each change as a new doc on the survey, expiring with it', async () => {
-    await setSurveyTax({ id: 'abc123XYZ', expiresAt: EXPIRES, name: 'Moon Corp', pct: 8 });
+    await setSurveyTax({
+      id: 'abc123XYZ',
+      expiresAt: EXPIRES,
+      name: 'Moon Corp',
+      pct: 8,
+      characterId: 1,
+    });
     expect(addDoc).toHaveBeenCalledWith(
       { path: 'shares/abc123XYZ/surveyTax' },
       {
@@ -292,6 +300,7 @@ describe('location and notes', () => {
       expiresAt: EXPIRES,
       location: { id: 60003760, name: 'Jita IV - Moon 4' },
       notes: 'Dock at the refinery.',
+      characterId: 1,
     });
     expect(addDoc).toHaveBeenCalledWith(
       { path: 'shares/abc123XYZ/surveyInfo' },
@@ -311,6 +320,7 @@ describe('location and notes', () => {
       expiresAt: EXPIRES,
       location: { id: null, name: 'Moro - This is not a moodrill' },
       notes: '',
+      characterId: 1,
     });
     expect(addDoc).toHaveBeenCalledWith(
       { path: 'shares/abc123XYZ/surveyInfo' },
@@ -323,7 +333,13 @@ describe('location and notes', () => {
   });
 
   it('leaves out what is empty, so clearing a field stores its absence', async () => {
-    await setSurveyInfo({ id: 'abc123XYZ', expiresAt: EXPIRES, location: null, notes: '  ' });
+    await setSurveyInfo({
+      id: 'abc123XYZ',
+      expiresAt: EXPIRES,
+      location: null,
+      notes: '  ',
+      characterId: 1,
+    });
     expect(addDoc).toHaveBeenCalledWith(
       { path: 'shares/abc123XYZ/surveyInfo' },
       { createdAt: 'SERVER_TIME', expiresAt: FakeTimestamp.fromMillis(EXPIRES) }
@@ -336,6 +352,7 @@ describe('location and notes', () => {
       expiresAt: EXPIRES,
       location: { id: 30000142, name: 'x'.repeat(MAX_LOCATION_NAME + 20) },
       notes: 'n'.repeat(MAX_SURVEY_NOTES + 20),
+      characterId: 1,
     });
     const data = addDoc.mock.calls[0][1] as { locationName: string; notes: string };
     expect(data.locationName).toHaveLength(MAX_LOCATION_NAME);
@@ -404,6 +421,7 @@ describe('ignored scans', () => {
       expiresAt: EXPIRES,
       scanId: 'scan1',
       ignored: true,
+      characterId: 1,
     });
     expect(addDoc).toHaveBeenCalledWith(
       { path: 'shares/abc123XYZ/surveyIgnores' },
@@ -538,7 +556,7 @@ describe('finishing a survey', () => {
 describe('setSurveyOwner', () => {
   it('updates only the survey share payload owner', async () => {
     updateDoc.mockResolvedValue(undefined);
-    await setSurveyOwner({ id: 'abc123XYZ', owner: '  New Pilot ' });
+    await setSurveyOwner({ id: 'abc123XYZ', owner: '  New Pilot ', characterId: 1 });
     expect(updateDoc).toHaveBeenCalledWith(
       { path: 'shares/abc123XYZ' },
       { 'payload.owner': 'New Pilot' }
@@ -546,7 +564,9 @@ describe('setSurveyOwner', () => {
   });
 
   it('refuses an empty name', async () => {
-    await expect(setSurveyOwner({ id: 'abc123XYZ', owner: '  ' })).rejects.toThrow();
+    await expect(
+      setSurveyOwner({ id: 'abc123XYZ', owner: '  ', characterId: 1 })
+    ).rejects.toThrow();
     expect(updateDoc).not.toHaveBeenCalled();
   });
 });
@@ -664,16 +684,24 @@ describe('polling a survey', () => {
     vi.setSystemTime(NOW + SURVEY_DETAILS_TTL_MS - 1);
     expect(await loadSurvey('abc123XYZ')).toMatchObject({ tax: null });
     vi.setSystemTime(NOW + SURVEY_DETAILS_TTL_MS);
-    expect(await loadSurvey('abc123XYZ')).toMatchObject({ tax: { name: 'Moon Corp', pct: 8 } });
+    expect(await loadSurvey('abc123XYZ')).toMatchObject({
+      tax: { name: 'Moon Corp', pct: 8 },
+    });
     expect(loadShare).toHaveBeenCalledTimes(2);
   });
 
   it('re-reads the details on the next load after this app changes them', async () => {
     serve({});
     await loadSurvey('abc123XYZ');
-    await setSurveyTax({ id: 'abc123XYZ', expiresAt: LIVE, name: 'Moon Corp', pct: 8 });
+    await setSurveyTax({
+      id: 'abc123XYZ',
+      expiresAt: LIVE,
+      name: 'Moon Corp',
+      pct: 8,
+      characterId: 1,
+    });
     await loadSurvey('abc123XYZ');
-    await setSurveyOwner({ id: 'abc123XYZ', owner: 'Bob' });
+    await setSurveyOwner({ id: 'abc123XYZ', owner: 'Bob', characterId: 1 });
     await loadSurvey('abc123XYZ');
     expect(loadShare).toHaveBeenCalledTimes(3);
   });
@@ -685,7 +713,13 @@ describe('polling a survey', () => {
     let answer!: (v: unknown) => void;
     loadShare.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
     const stale = loadSurvey('abc123XYZ');
-    await setSurveyTax({ id: 'abc123XYZ', expiresAt: LIVE, name: 'Moon Corp', pct: 8 });
+    await setSurveyTax({
+      id: 'abc123XYZ',
+      expiresAt: LIVE,
+      name: 'Moon Corp',
+      pct: 8,
+      characterId: 1,
+    });
     answer({ ok: true, share: { type: 'survey', payload: { v: 1 }, expiresAt: LIVE } });
     await stale;
     loadShare.mockClear();

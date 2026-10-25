@@ -9,7 +9,7 @@
  * alerts poll does it (`communityAlertEntries.ts`): a Character is only read
  * once the Communities page has listed a Community for it
  * (`rememberCommunityWatch`), and only while the Firebase session is already
- * its own: the poll never mints a token or swaps the session. A Community's
+ * its own: the poll never mints a token. A Community's
  * first read sets its baseline to now, so Requests that were already on the
  * board are not announced as new.
  */
@@ -115,7 +115,7 @@ export async function refreshRequestBadge(characterId: number, now = Date.now())
     import('./requestStore'),
   ]);
   const myUid = uidForCharacter(characterId);
-  if (getSyncAuth().currentUser?.uid !== myUid) return;
+  if (getSyncAuth(characterId).currentUser?.uid !== myUid) return;
   const started = generation;
   const next = await store.withMyCommunities(
     characterId,

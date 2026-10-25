@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   hasScope: vi.fn(),
   sync: vi.fn(),
   listIds: vi.fn(),
-  inFlight: vi.fn(),
+  leader: true,
 }));
 vi.mock('@/app/syncStatus', () => ({ isSyncConfigured: () => true }));
 vi.mock('./requestDelivery', () => ({
@@ -13,7 +13,9 @@ vi.mock('./requestDelivery', () => ({
   syncRequestDeliveries: mocks.sync,
 }));
 vi.mock('./communityStore', () => ({ listCommunityIds: mocks.listIds }));
-vi.mock('./pledgeWrites', () => ({ pledgeWritesInFlight: mocks.inFlight }));
+vi.mock('@/lib/tabLeader', () => ({
+  joinTabElection: () => ({ isLeader: () => mocks.leader, leave: () => undefined }),
+}));
 
 import { DELIVERY_BOOT_DELAY_MS, useSyncRequestDeliveries } from './useSyncRequestDeliveries';
 
@@ -24,7 +26,7 @@ beforeEach(() => {
   mocks.hasScope.mockResolvedValue(true);
   mocks.listIds.mockResolvedValue(['c1']);
   mocks.sync.mockResolvedValue({ status: 'ok', updated: 0, flags: new Map() });
-  mocks.inFlight.mockReturnValue(0);
+  mocks.leader = true;
 });
 afterEach(() => vi.useRealTimers());
 
@@ -58,11 +60,18 @@ describe('useSyncRequestDeliveries', () => {
     expect(mocks.sync).not.toHaveBeenCalled();
   });
 
-  it('leaves the other Characters for the next run while a Pledge is being saved', async () => {
-    mocks.inFlight.mockReturnValue(1);
+  it('does not sweep in a tab that is not the leader', async () => {
+    mocks.leader = false;
     renderHook(() => useSyncRequestDeliveries([1, 2], 1));
     await bootSweep();
-    // The active Character's session is the one in use: it is safe, the other would swap it.
-    expect(mocks.sync.mock.calls.map((c) => c[0])).toEqual([1]);
+    expect(mocks.sync).not.toHaveBeenCalled();
+  });
+
+  it('does not sweep in a hidden tab', async () => {
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    renderHook(() => useSyncRequestDeliveries([1, 2], 1));
+    await bootSweep();
+    visibility.mockRestore();
+    expect(mocks.sync).not.toHaveBeenCalled();
   });
 });

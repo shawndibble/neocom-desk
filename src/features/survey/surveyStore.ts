@@ -35,9 +35,10 @@ import {
 import { generateShareId } from '@/engine/share/shareId';
 import { parseSurveyScan } from '@/engine/survey/parseScan';
 import type { SurveyRock, SurveyScan } from '@/engine/survey/series';
-import { loadShare, saveShare, shareUrl } from '@/features/share/shareStore';
+import { loadShare, saveShare, shareFirestore, shareUrl } from '@/features/share/shareStore';
 import { isMissingIndex } from '@/sync/missingIndex';
 import { getSyncFirestore } from '@/sync/firebaseApp';
+import { ensureAnySession } from '@/sync/syncAuth';
 import { MAX_SCAN_TEXT, rejectScanText, ScanRejected } from './scanResult';
 
 export { MAX_SCAN_TEXT };
@@ -96,16 +97,21 @@ export async function addSurveyScan(input: {
   expiresAt: number;
   /** The submitting Character's name, or none for an anonymous visitor. */
   by?: string | null;
+  /** Writes under this Character's session; omitted for an anonymous visitor (the rules allow it). */
+  characterId?: number;
 }): Promise<void> {
   const rejected = rejectScanText(input.text);
   if (rejected !== null) throw new ScanRejected(rejected);
   const by = input.by?.trim().slice(0, MAX_SCAN_BY) ?? '';
-  await addDoc(collection(getSyncFirestore(), 'shares', input.id, SURVEY_SCANS_COLLECTION), {
-    text: input.text,
-    ...(by === '' ? {} : { by }),
-    createdAt: serverTimestamp(),
-    expiresAt: Timestamp.fromMillis(input.expiresAt),
-  });
+  await addDoc(
+    collection(shareFirestore(input.characterId), 'shares', input.id, SURVEY_SCANS_COLLECTION),
+    {
+      text: input.text,
+      ...(by === '' ? {} : { by }),
+      createdAt: serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(input.expiresAt),
+    }
+  );
 }
 
 /**
@@ -120,15 +126,20 @@ export async function finishSurvey(input: {
   expiresAt: number;
   /** The Character name of whoever marked it, or none for an anonymous visitor. */
   by?: string | null;
+  /** Writes under this Character's session; omitted for an anonymous visitor (the rules allow it). */
+  characterId?: number;
 }): Promise<void> {
   const by = input.by?.trim().slice(0, MAX_SCAN_BY) ?? '';
-  await addDoc(collection(getSyncFirestore(), 'shares', input.id, SURVEY_SCANS_COLLECTION), {
-    text: '',
-    cleared: true,
-    ...(by === '' ? {} : { by }),
-    createdAt: serverTimestamp(),
-    expiresAt: Timestamp.fromMillis(input.expiresAt),
-  });
+  await addDoc(
+    collection(shareFirestore(input.characterId), 'shares', input.id, SURVEY_SCANS_COLLECTION),
+    {
+      text: '',
+      cleared: true,
+      ...(by === '' ? {} : { by }),
+      createdAt: serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(input.expiresAt),
+    }
+  );
 }
 
 export async function setSurveyTax(input: {
@@ -136,13 +147,19 @@ export async function setSurveyTax(input: {
   expiresAt: number;
   name: string;
   pct: number;
+  /** The signed-in Character writing it. */
+  characterId: number;
 }): Promise<void> {
-  await addDoc(collection(getSyncFirestore(), 'shares', input.id, SURVEY_TAX_COLLECTION), {
-    name: input.name.slice(0, MAX_TAX_NAME),
-    pct: input.pct,
-    createdAt: serverTimestamp(),
-    expiresAt: Timestamp.fromMillis(input.expiresAt),
-  });
+  await ensureAnySession(input.characterId);
+  await addDoc(
+    collection(getSyncFirestore(input.characterId), 'shares', input.id, SURVEY_TAX_COLLECTION),
+    {
+      name: input.name.slice(0, MAX_TAX_NAME),
+      pct: input.pct,
+      createdAt: serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(input.expiresAt),
+    }
+  );
   markDetailsDue(input.id);
 }
 
@@ -152,19 +169,25 @@ export async function setSurveyInfo(input: {
   expiresAt: number;
   location: { id: number | null; name: string } | null;
   notes: string;
+  /** The signed-in Character writing it. */
+  characterId: number;
 }): Promise<void> {
   const notes = input.notes.trim().slice(0, MAX_SURVEY_NOTES);
-  await addDoc(collection(getSyncFirestore(), 'shares', input.id, SURVEY_INFO_COLLECTION), {
-    ...(input.location === null
-      ? {}
-      : {
-          ...(input.location.id === null ? {} : { locationId: input.location.id }),
-          locationName: input.location.name.slice(0, MAX_LOCATION_NAME),
-        }),
-    ...(notes === '' ? {} : { notes }),
-    createdAt: serverTimestamp(),
-    expiresAt: Timestamp.fromMillis(input.expiresAt),
-  });
+  await ensureAnySession(input.characterId);
+  await addDoc(
+    collection(getSyncFirestore(input.characterId), 'shares', input.id, SURVEY_INFO_COLLECTION),
+    {
+      ...(input.location === null
+        ? {}
+        : {
+            ...(input.location.id === null ? {} : { locationId: input.location.id }),
+            locationName: input.location.name.slice(0, MAX_LOCATION_NAME),
+          }),
+      ...(notes === '' ? {} : { notes }),
+      createdAt: serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(input.expiresAt),
+    }
+  );
   markDetailsDue(input.id);
 }
 
@@ -173,10 +196,18 @@ export async function setSurveyInfo(input: {
  * (`payload.owner` alone). The rules can't tell who the current owner is, so
  * the app only offers this to them.
  */
-export async function setSurveyOwner(input: { id: string; owner: string }): Promise<void> {
+export async function setSurveyOwner(input: {
+  id: string;
+  owner: string;
+  /** The signed-in Character handing it over. */
+  characterId: number;
+}): Promise<void> {
   const owner = input.owner.trim().slice(0, MAX_SCAN_BY);
   if (owner === '') throw new Error('A survey needs an owner name.');
-  await updateDoc(doc(getSyncFirestore(), 'shares', input.id), { 'payload.owner': owner });
+  await ensureAnySession(input.characterId);
+  await updateDoc(doc(getSyncFirestore(input.characterId), 'shares', input.id), {
+    'payload.owner': owner,
+  });
   markDetailsDue(input.id);
 }
 
@@ -190,13 +221,19 @@ export async function setSurveyScanIgnored(input: {
   expiresAt: number;
   scanId: string;
   ignored: boolean;
+  /** The signed-in Character setting it aside. */
+  characterId: number;
 }): Promise<void> {
-  await addDoc(collection(getSyncFirestore(), 'shares', input.id, SURVEY_IGNORES_COLLECTION), {
-    scanId: input.scanId,
-    ignored: input.ignored,
-    createdAt: serverTimestamp(),
-    expiresAt: Timestamp.fromMillis(input.expiresAt),
-  });
+  await ensureAnySession(input.characterId);
+  await addDoc(
+    collection(getSyncFirestore(input.characterId), 'shares', input.id, SURVEY_IGNORES_COLLECTION),
+    {
+      scanId: input.scanId,
+      ignored: input.ignored,
+      createdAt: serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(input.expiresAt),
+    }
+  );
 }
 
 export type LoadSurveyResult =
@@ -269,7 +306,7 @@ function markDetailsDue(id: string): void {
 }
 
 function subcollection(id: string, name: string) {
-  return collection(getSyncFirestore(), 'shares', id, name);
+  return collection(shareFirestore(), 'shares', id, name);
 }
 
 /** Runs the indexed query, or the full read when the index isn't there. */
