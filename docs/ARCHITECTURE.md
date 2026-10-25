@@ -34,7 +34,7 @@ no app server. Two kinds of data:
   (`features/fittings/workbenchFits.ts`). Only the sync's checkpoint
   (`workbenchFitsSync`, admin-only) stays in Firestore.
 
-- A daily job (`syncMarketOpenPrices`) folds EVE Ref's last market-order
+- A daily GitHub Actions job (`.github/workflows/public-data-market-open-prices.yml`, `functions/src/publicDataMarketOpenPrices.ts`) folds EVE Ref's last market-order
   snapshot of the previous UTC day into the R2 object `open-prices/<typeId>.json`:
   per type, every Trade Hub _station_'s highest buy and lowest sell for the day
   (`{ typeId, dates, stations: { <stationId>: { buy, sell } } }`), up
@@ -43,7 +43,7 @@ no app server. Two kinds of data:
   same objects, one per type it prices (`features/market/hubSnapshot.ts`); they
   replaced the retired `captureMiningPriceSnapshot` job, its Firestore
   `marketHistory` and the `mining-prices/` month objects.
-  The deployment now has ten scheduled functions, i.e. ten Cloud Scheduler jobs.
+  Its last-run record (the shrink guard) is the R2 object `open-prices-state/last-run.json`, not Firestore.
 
 Auth is browser-only OAuth2 PKCE against `login.eveonline.com`; refresh
 tokens never leave the device. Market prices come from Fuzzwork aggregates,

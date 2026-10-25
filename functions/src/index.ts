@@ -25,7 +25,7 @@ import { R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, r2ConfigOrThrow } from './r2Pub
 import { openPricesR2Key } from './r2DailySnapshots.js';
 import { createR2Get } from './r2Publisher.js';
 import { runSyncActiveWars } from './activeWarsJob.js';
-import { runSyncLawlessSystems, runSyncMarketOpenPrices } from './marketHistoryJob.js';
+import { runSyncLawlessSystems } from './marketHistoryJob.js';
 import { runSyncPublicContractOffers, runSyncWorkbenchFits } from './snapshotJobs.js';
 import { verifyEveAccessToken, verifyOptionsFromEnv, uidForCharacter } from './verifyEveToken.js';
 import {
@@ -1329,63 +1329,6 @@ export const syncWorkbenchFits = onSchedule(
     secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
   },
   runSyncWorkbenchFits
-);
-
-/**
- * syncMarketOpenPrices: the price-history chart's Buy and Sell lines (decision
- * 20261018-121126). Once a day, shortly after the previous UTC day's last
- * EVE Ref market-order snapshot (23:45) is published, folds that snapshot into
- * the highest buy and lowest sell per hub *station* and type (only orders
- * placed at the station; decision 20261019-004148 moved it from region-wide) and
- * merges the day into R2's `open-prices/<typeId>.json`, every hub station in
- * one object (~20,000 objects; layout decision 20261018-164126, storage
- * decision 20261018-201511-moving-the-daily-snapshots-to-r2). The region-wide
- * fold still runs in the same pass, but only for the plausibility guards; it is
- * no longer stored. Only the small meta doc stays in Firestore, for the shrink
- * guard. The mining pages price from these same objects (decision
- * 20261019-091155, which retired the separate `mining-prices/` month objects).
- *
- * Idempotent (re-running a day replaces its entry). The day's 23:45 snapshot is
- * normally listed by ~23:50, but a run that finds only an earlier one (EVE Ref
- * lagging) or none must not store a price that is not the day's last, so it
- * throws and Cloud Scheduler retries it (`retryCount`, 15 then 30 minutes
- * apart); an earlier snapshot is accepted once the next day is listed, since
- * then the 23:45 slot was skipped for good (`findFinalSnapshot`). A stream that
- * errors or ends truncated also throws and retries. A tracked region
- * implausibly thin, or one under half its size on the previous published day,
- * publishes nothing, the same stance as the LP store job (`publicDataLpStore.ts`): retrying the same
- * file would not change it, that day simply has no point, and the backfill
- * script can fill it later. 1GiB because the decompress-and-fold peaked at ~300MB RSS
- * in a local measurement and the contracts job has OOM'd before; 540s because
- * the same measurement took ~45s to download and fold, leaving room for the
- * ~20,000 read-merge-write round trips of ~37 KB objects (32 at a time). Folding
- * every type per station (#4279) adds one map lookup per row and holds ~5 x 15k
- * station/type pairs, the size of the region fold; it writes no more objects
- * than the region fold did (a type priced only away from the hub stations gets
- * no new day), so the same 540s holds. A
- * type that fails to read or write throws the run, so it is retried whole; the
- * merge is idempotent.
- *
- * Another Cloud Scheduler job past the free three; with `captureMiningPriceSnapshot`
- * folded in here the deployment has ten scheduled functions.
- */
-export const syncMarketOpenPrices = onSchedule(
-  // A cron, unlike the other jobs' 'every N' strings, runs in the scheduler's
-  // default zone; pinning Etc/UTC keeps it right after the 23:45 UTC snapshot.
-  {
-    schedule: '45 0 * * *',
-    timeZone: 'Etc/UTC',
-    memory: '1GiB',
-    timeoutSeconds: 540,
-    // A thrown run (the final snapshot not listed yet, a broken download) is
-    // retried at ~01:00, ~01:30 and ~02:00 UTC; `previousUtcDate` still names
-    // the same day on every retry.
-    retryCount: 3,
-    minBackoffSeconds: 900,
-    maxBackoffSeconds: 1800,
-    secrets: [R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY],
-  },
-  runSyncMarketOpenPrices
 );
 
 // mutamarketEstimate (mutamarket.ts). Session required: an import publishes
