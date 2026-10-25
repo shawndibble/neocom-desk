@@ -233,6 +233,42 @@ describe('fittingToDogmaFit', () => {
     });
   });
 
+  it('puts each implant and booster in its own EVE slot, not its place in the list', () => {
+    // A clone with only a slot-10 implant: list position would call it slot 1, and the
+    // engine reports "in a slot it can't use".
+    const slotOf = (typeId: number) =>
+      typeId === 22535
+        ? { kind: 'implant' as const, slot: 10 }
+        : typeId === 30006
+          ? { kind: 'booster' as const, slot: 3 }
+          : undefined;
+    const dogmaFit = fittingToDogmaFit(
+      fitting(),
+      { skillLevels: new Map(), implantTypeIds: [22535, 19540], boosterTypeIds: [30006] },
+      undefined,
+      null,
+      slotOf
+    );
+
+    expect(dogmaFit.items).toContainEqual({
+      type_id: 22535,
+      slot: { type: 'implant', index: 10 },
+      state: 'online',
+    });
+    // One the lookup does not know keeps its place in the list.
+    expect(dogmaFit.items).toContainEqual({
+      type_id: 19540,
+      slot: { type: 'implant', index: 2 },
+      state: 'online',
+    });
+    expect(dogmaFit.items).toContainEqual({
+      type_id: 30006,
+      slot: { type: 'booster', index: 3 },
+      state: 'online',
+      booster_side_effects: [],
+    });
+  });
+
   it("maps the pilot's boosters into booster slots, numbered from 1, with side effects off", () => {
     const dogmaFit = fittingToDogmaFit(fitting(), {
       skillLevels: new Map(),

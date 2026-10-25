@@ -10,14 +10,12 @@ import { idSetKey } from '@/lib/idSetKey';
 import { useEffect, useMemo, useState } from 'react';
 import {
   IMPLANT_GOALS,
-  boosterEntriesFromMarket,
   cheapestFixes,
   goalById,
   goalGain,
   groupImplantFamilies,
   headroom,
   headroomGain,
-  implantEntriesFromMarket,
   keepMoreHeadroom,
   placeAllInSet,
   placeInSet,
@@ -38,7 +36,7 @@ import type {
   PilotProfile,
 } from '@/engine/fittings/types';
 import { getTradeHub, DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
-import { loadMarketGroups, loadMarketTypes } from '@/sde/loadMarketSde';
+import { loadImplantMarketEntries } from './implantSlotLookup';
 import { useDamageProfiles } from './damageProfiles';
 import { loadImplantPurchase, type ImplantPurchase } from './implantPurchase';
 import { useStatsConditions } from './statsConditions';
@@ -64,20 +62,10 @@ let catalogPromise: Promise<ImplantCatalog> | null = null;
 /** Every implant and booster family, once per session. */
 export function loadImplantCatalog(): Promise<ImplantCatalog> {
   if (!catalogPromise) {
-    const pending = Promise.all([loadMarketTypes(), loadMarketGroups()]).then(([types, groups]) => {
-      const implants = implantEntriesFromMarket(types, groups);
-      const boosters = boosterEntriesFromMarket(types, groups);
-      const slots = new Map(
-        [...implants, ...boosters].map((e) => [
-          e.typeId,
-          { kind: e.kind ?? ('implant' as const), slot: e.slot },
-        ])
-      );
-      return {
-        families: [...groupImplantFamilies(implants), ...groupImplantFamilies(boosters)],
-        slotOf: (id: number) => slots.get(id),
-      };
-    });
+    const pending = loadImplantMarketEntries().then(({ implants, boosters, slotOf }) => ({
+      families: [...groupImplantFamilies(implants), ...groupImplantFamilies(boosters)],
+      slotOf,
+    }));
     catalogPromise = pending;
     pending.catch(() => {
       if (catalogPromise === pending) catalogPromise = null;

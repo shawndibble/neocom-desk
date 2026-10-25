@@ -3,6 +3,7 @@ import { sideEffectsSwitchedOn } from './boosterSideEffects';
 import { fighterTubes } from './inventoryFlags';
 import { defaultTacticalMode, tacticalModesFor } from './tacticalModes';
 import { normaliseMutation, type MutaplasmidLookup } from './mutaplasmids';
+import type { SlotOf } from './implantFinder';
 import type { DamageProfile, Fitting, FittingModule, ItemMutation, PilotProfile } from './types';
 
 /** EVE numbers implant/booster slots starting at 1, not 0 (dogma-engine's own `Slot` doc). */
@@ -64,16 +65,26 @@ function launchFighters(fitting: Fitting): FitItem[] {
   });
 }
 
-/** An implant or booster, numbered from `SLOT_INDEX_START` — same shape either way, just the slot type and (for a booster) side effects. */
+/**
+ * An implant or booster in its own EVE slot, as `slotOf` knows it; the engine
+ * checks the number against the item's slot, so a lone slot-10 implant given
+ * its list position (1) reads as "in a slot it can't use". One `slotOf` does
+ * not know keeps its list position, numbered from `SLOT_INDEX_START`.
+ */
 function slottedItem(
   typeId: number,
   index: number,
   slotType: 'implant' | 'booster',
+  slotOf: SlotOf | null,
   extra?: Pick<FitItem, 'booster_side_effects'>
 ): FitItem {
+  const known = slotOf?.(typeId);
   return {
     type_id: typeId,
-    slot: { type: slotType, index: index + SLOT_INDEX_START },
+    slot: {
+      type: slotType,
+      index: known?.kind === slotType ? known.slot : index + SLOT_INDEX_START,
+    },
     state: 'online',
     ...extra,
   };
@@ -91,13 +102,14 @@ function slottedItem(
  * the engine rejects an explicit `environment: undefined` (live run,
  * 2026-09-24).
  *
- * `mutaplasmids`: see `toEngineMutation`.
+ * `mutaplasmids`: see `toEngineMutation`. `slotOf`: see `slottedItem`.
  */
 export function fittingToDogmaFit(
   fitting: Fitting,
   profile: PilotProfile,
   damageProfile?: DamageProfile,
-  mutaplasmids: MutaplasmidLookup | null = null
+  mutaplasmids: MutaplasmidLookup | null = null,
+  slotOf: SlotOf | null = null
 ): Fit {
   const items: FitItem[] = [
     ...fitting.modules.map((module) => moduleToFitItem(module, mutaplasmids)),
@@ -118,12 +130,12 @@ export function fittingToDogmaFit(
       quantity: item.quantity,
       state: 'offline',
     })),
-    ...profile.implantTypeIds.map((typeId, index) => slottedItem(typeId, index, 'implant')),
+    ...profile.implantTypeIds.map((typeId, index) => slottedItem(typeId, index, 'implant', slotOf)),
     // Only the side effects the pilot switched on, and only each booster's
     // own; an empty array is the engine's own "none"
     // (`FitItem.booster_side_effects`'s doc).
     ...profile.boosterTypeIds.map((typeId, index) =>
-      slottedItem(typeId, index, 'booster', {
+      slottedItem(typeId, index, 'booster', slotOf, {
         booster_side_effects: sideEffectsSwitchedOn(typeId, profile.boosterSideEffects),
       })
     ),

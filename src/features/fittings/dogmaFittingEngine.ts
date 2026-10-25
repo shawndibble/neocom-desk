@@ -22,6 +22,8 @@ import { racksWithSlots } from '@/engine/fittings/hullFitKey';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import type { MutaplasmidLookup } from '@/engine/fittings/mutaplasmids';
 import { loadMutaplasmidLookup } from '@/features/abyssal/mutaplasmidData';
+import type { SlotOf } from '@/engine/fittings/implantFinder';
+import { loadImplantMarketEntries } from './implantSlotLookup';
 import {
   extractCapacitorBudget,
   extractCapBoosterFigures,
@@ -74,9 +76,11 @@ export { warmDogmaEngineAssets, type DogmaAssetProgress };
 let enginePromise: Promise<DogmaEngine> | null = null;
 /** Loaded with the engine, for `fittingToDogmaFit`'s mutation check; null when the data wouldn't load. */
 let readyMutaplasmids: MutaplasmidLookup | null = null;
+/** Loaded with the engine: each implant's own slot, for `fittingToDogmaFit`; null when it wouldn't load. */
+let readySlotOf: SlotOf | null = null;
 
 function toDogmaFit(fitting: Fitting, profile: PilotProfile, damageProfile?: DamageProfile) {
-  return fittingToDogmaFit(fitting, profile, damageProfile, readyMutaplasmids);
+  return fittingToDogmaFit(fitting, profile, damageProfile, readyMutaplasmids, readySlotOf);
 }
 
 /** Set once `loadDogmaEngine` has resolved; the only way to the synchronous fit checks. */
@@ -133,7 +137,7 @@ export function loadDogmaEngine(
         for (const listener of [...progressListeners]) listener(lastProgress);
       };
 
-      const [wasmBytes, sdeBytes, mutaplasmids] = await Promise.all([
+      const [wasmBytes, sdeBytes, mutaplasmids, slotOf] = await Promise.all([
         fetchWithProgress(WASM_URL, (loaded, total) => {
           wasmLoaded = loaded;
           wasmTotal = total;
@@ -145,11 +149,15 @@ export function loadDogmaEngine(
           report();
         }),
         loadMutaplasmidLookup().catch(() => null),
+        loadImplantMarketEntries()
+          .then((entries) => entries.slotOf)
+          .catch(() => null),
       ]);
 
       await wasmInit({ module_or_path: wasmBytes });
       load_sde(new Uint8Array(sdeBytes));
       readyMutaplasmids = mutaplasmids;
+      readySlotOf = slotOf;
       readyEngine = dogmaEngine;
       progressListeners.clear();
       setDogmaEngineStatus('ready');
