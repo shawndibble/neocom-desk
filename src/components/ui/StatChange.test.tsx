@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import '@/i18n';
-import { StatChange } from './StatChange';
+import { StatChange, StatChangeList } from './StatChange';
 
 describe('StatChange', () => {
   it('tints the after value success when a higher-is-better stat rises', () => {
@@ -40,5 +40,26 @@ describe('StatChange', () => {
 
     expect(container.querySelector('[data-verdict]')).toHaveClass('text-danger');
     expect(container).toHaveTextContent('Capacitor stable at 60% → depletes in');
+  });
+});
+
+describe('StatChangeList', () => {
+  it('puts each change on its own row: the stat in one column, before → after and unit in the next', () => {
+    render(
+      <StatChangeList
+        changes={[
+          { key: 'maxVelocity', before: 2894, after: 2928 },
+          { key: 'cpuUsed', before: 177, after: 186 },
+        ]}
+      />
+    );
+    const rows = screen.getAllByRole('listitem');
+    expect(rows).toHaveLength(2);
+    const [name, value] = Array.from(rows[0]!.children).filter((c) => !c.matches('.sr-only'));
+    expect(name).toHaveTextContent(/^Max velocity$/);
+    expect(value).toHaveTextContent('2,894 → 2,928 m/s');
+    // Every row but the last ends in a pause, so a neutral one does not run into the next.
+    expect(screen.getByText('Max velocity 2,894 to 2,928 m/s, better;')).toBeInTheDocument();
+    expect(screen.getByText('CPU used 177 to 186 tf, worse')).toBeInTheDocument();
   });
 });

@@ -18,6 +18,8 @@ interface FittingEditorLayoutProps {
   onViewChange: (view: FittingView) => void;
   editor: ReactNode;
   statsSections: ReactNode;
+  /** Improve holds the left column on a narrower desktop: one column, the stats above the editor (`leftColumn`). */
+  statsFirst?: boolean;
 }
 
 /**
@@ -36,6 +38,7 @@ export function FittingEditorLayout({
   onViewChange,
   editor,
   statsSections,
+  statsFirst = false,
 }: FittingEditorLayoutProps) {
   const { t } = useTranslation();
   // Below desktop the Ring, the List and the stats are one set of tabs.
@@ -75,7 +78,7 @@ export function FittingEditorLayout({
             </TabPanel>
           </div>
         ) : (
-          <div className={editorGridClass(addMode, view, addOpen)}>
+          <div className={editorGridClass(addMode, view, addOpen || statsFirst)}>
             {addMode === 'docked' && (
               <Panel
                 title={addTitle}
@@ -88,7 +91,7 @@ export function FittingEditorLayout({
             <div
               data-testid="fitting-editor-column"
               {...{ [RING_ROOM_ATTR]: '' }}
-              className={editorColumnClass(view, addMode, addOpen)}
+              className={`${editorColumnClass(view, addMode, addOpen || statsFirst)}${statsFirst ? ' order-last' : ''}`}
             >
               <Tabs
                 tabsId={viewTabsId}

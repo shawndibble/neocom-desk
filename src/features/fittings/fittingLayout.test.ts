@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addModeFor, editorColumnClass, editorGridClass } from './fittingLayout';
+import { addModeFor, editorColumnClass, editorGridClass, leftColumn } from './fittingLayout';
 
 describe('addModeFor', () => {
   it('docks on three columns, slides out on desktop, sheets below', () => {
@@ -35,5 +35,60 @@ describe('editorColumnClass', () => {
   it('does not stick the list or an open slide-out', () => {
     expect(editorColumnClass('list', 'docked', false)).not.toContain('sticky');
     expect(editorColumnClass('ring', 'slideOut', true)).not.toContain('sticky');
+  });
+});
+
+describe('leftColumn', () => {
+  const base = { statsFirst: false };
+  it('leaves the page alone with nothing open', () => {
+    expect(leftColumn('docked', false, false)).toEqual({
+      ...base,
+      addMode: 'docked',
+      addOpen: false,
+      pushed: false,
+    });
+  });
+
+  it('pushes the page aside for the Add slide-out', () => {
+    expect(leftColumn('slideOut', true, false)).toEqual({
+      ...base,
+      addMode: 'slideOut',
+      addOpen: true,
+      pushed: true,
+    });
+  });
+
+  it('gives Improve the docked browser column: the browser steps aside, the page makes room', () => {
+    expect(leftColumn('docked', false, true)).toEqual({
+      ...base,
+      addMode: 'slideOut',
+      addOpen: false,
+      pushed: true,
+    });
+  });
+
+  it('on a narrower desktop, Improve pushes the page and puts the stats above the editor', () => {
+    // 26rem gone leaves no room for both side by side; the stats are what Improve changes.
+    expect(leftColumn('slideOut', true, true)).toEqual({
+      addMode: 'slideOut',
+      addOpen: false,
+      pushed: true,
+      statsFirst: true,
+    });
+  });
+
+  it('never pushes below desktop, where the stats are a tab of their own', () => {
+    expect(leftColumn('sheet', true, true)).toEqual({
+      ...base,
+      addMode: 'sheet',
+      addOpen: true,
+      pushed: false,
+    });
+    expect(leftColumn('sheet', true, false)).toEqual({
+      ...base,
+      addMode: 'sheet',
+      addOpen: true,
+      pushed: false,
+    });
   });
 });

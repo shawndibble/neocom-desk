@@ -259,7 +259,7 @@ describe('ImprovePanel', () => {
     const [lead, detail] = row.querySelectorAll('span.block.text-xs');
     expect(lead).toHaveTextContent('Applied DPS');
     expect(lead).not.toHaveTextContent('Sustained DPS');
-    expect(detail).toHaveTextContent('Sustained DPS 90.7 → 128');
+    expect(detail).toHaveTextContent(/Sustained DPS\s*90.7 → 128/);
   });
 
   it("never shows the same stat in a row's lead line and its detail line", () => {

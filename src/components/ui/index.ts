@@ -140,5 +140,5 @@ export { SearchInput } from './SearchInput';
 export type { ControlSize } from './controlStyles';
 export { IskAmount } from './IskAmount';
 export { IskDelta } from './IskDelta';
-export { StatChange } from './StatChange';
+export { StatChange, StatChangeList } from './StatChange';
 export { IskFigureGroup } from './IskFigureGroup';

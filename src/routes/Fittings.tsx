@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
@@ -53,7 +53,7 @@ import { FittingModuleDialog } from '@/features/fittings/FittingModuleDialog';
 import { FittingStatsColumn } from '@/features/fittings/FittingStatsColumn';
 import { RuleBreakFlags } from '@/features/fittings/ruleBreakFlags';
 import { useFittingRuleBreaks } from '@/features/fittings/useFittingRuleBreaks';
-import { THREE_COLUMN_QUERY, addModeFor } from '@/features/fittings/fittingLayout';
+import { THREE_COLUMN_QUERY, addModeFor, leftColumn } from '@/features/fittings/fittingLayout';
 import { useFittingPasteLoad } from '@/features/fittings/useFittingPasteLoad';
 import { useSavedFittingRecord } from '@/features/fittings/useSavedFittingRecord';
 import { tacticalModeKind } from '@/engine/fittings/tacticalModes';
@@ -418,6 +418,17 @@ function FittingsPage() {
     moduleResults,
     openMakeItFit: makeItFit.open,
   });
+  // Improve and the Add browser share the left of the page: the last one opened wins.
+  const { docked: improveDocked, close: closeImprove } = improve;
+  const opened = useRef({ add: addOpen, improve: improveDocked });
+  useEffect(() => {
+    const was = opened.current;
+    opened.current = { add: addOpen, improve: improveDocked };
+    if (addOpen && improveDocked) {
+      if (!was.add) closeImprove();
+      else if (!was.improve) setAddOpen(false);
+    }
+  }, [addOpen, improveDocked, closeImprove]);
   const itemActionsWithImprove = useMemo(
     () => (itemActions === null ? null : { ...itemActions, openImprove: improve.open }),
     [itemActions, improve.open]
@@ -514,7 +525,13 @@ function FittingsPage() {
   // and whether this is a saved Fitting.
   const hullName = typeName(fitting.shipTypeId);
   // The open slide-out takes 26rem off the page, too little for the one-row header.
-  const headerCompact = addMode === 'sheet' || (addMode === 'slideOut' && addOpen);
+  const {
+    addMode: layoutAddMode,
+    addOpen: layoutAddOpen,
+    pushed,
+    statsFirst,
+  } = leftColumn(addMode, addOpen, improve.docked);
+  const headerCompact = addMode === 'sheet' || pushed;
   const subtitle = [
     hullName !== fitting.name ? hullName : null,
     workspace.savedId !== null ? t('fittings.header.savedInMyFittings') : null,
@@ -531,9 +548,8 @@ function FittingsPage() {
         <RuleBreakFlags.Provider value={ruleBreaks.flagged}>
           {/* Capped and centred, so a wide screen gets even gutters rather than an empty Ring
         panel (scope decision `20261016-171349`). */}
-          <div
-            className={`mx-auto max-w-[120rem] space-y-3 ${addOpen && addMode === 'slideOut' ? 'pl-[26rem]' : ''}`}
-          >
+          {/* Pushed: from the panel's edge, not centred, so a wide screen leaves no gap beside it. */}
+          <div className={`max-w-[120rem] space-y-3 ${pushed ? 'pl-[26rem]' : 'mx-auto'}`}>
             <FittingEditorHeader
               workspace={workspace}
               fitting={fitting}
@@ -566,8 +582,8 @@ function FittingsPage() {
             </p>
 
             <FittingEditorLayout
-              addMode={addMode}
-              addOpen={addOpen}
+              addMode={layoutAddMode}
+              addOpen={layoutAddOpen}
               addTitle={addTitle}
               addPanel={addPanel}
               onCloseAdd={closeAdd}
@@ -576,6 +592,7 @@ function FittingsPage() {
               onViewChange={(next) => void setView(next)}
               editor={editor}
               statsSections={statsSections}
+              statsFirst={statsFirst}
             />
             {makeItFit.dialog}
             {improve.drawer}

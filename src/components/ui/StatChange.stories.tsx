@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { StatChange } from './StatChange';
+import { StatChange, StatChangeList } from './StatChange';
 
 /**
  * One fit stat changing, `before → after`: the arrow and the after value are
@@ -32,4 +32,20 @@ export const Neutral: Story = { args: { change: { key: 'cpuTotal', before: 100, 
 /** @summary Capacitor going from stable to unstable: worse. */
 export const CapacitorStableToUnstable: Story = {
   args: { change: { key: 'capacitor', before: 60, after: -90 } },
+};
+
+/** @summary Several changes as a list: the stat in one column, before → after and unit in the next (Improve's rows). */
+export const List: Story = {
+  render: () => (
+    <div className="w-72 text-xs">
+      <StatChangeList
+        changes={[
+          { key: 'capacitor', before: -30, after: -36 },
+          { key: 'maxVelocity', before: 2894, after: 2928 },
+          { key: 'capacitorCapacity', before: 430, after: 484 },
+          { key: 'powergridUsed', before: 28, after: 30 },
+        ]}
+      />
+    </div>
+  ),
 };

@@ -7,6 +7,7 @@
  * are applied together as one unsaved edit.
  */
 import { Fragment, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import {
@@ -25,6 +26,7 @@ import {
   Spinner,
   Caret,
   StatChange,
+  StatChangeList,
   TypeIcon,
 } from '@/components/ui';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
@@ -106,6 +108,8 @@ const reachKm = (s: FittingStats) =>
 interface Lead {
   node: ReactNode;
   keys: string[];
+  /** When the figure is a plain stat change, so a row of several lines them up as a list. */
+  change?: { key: StatChangeKey; before: number; after: number };
 }
 
 /** How many figures Best overall's lead line shows: the two that moved the score most. */
@@ -181,6 +185,8 @@ interface Props {
    * pointer or keyboard focus, would change; null when nothing is previewed.
    */
   onPreview?: (delta: FittingStatsDelta | null) => void;
+  /** The drawer's footer, where the selection and Apply bar goes; absent: it sticks to the list's bottom. */
+  footerTarget?: HTMLElement | null;
 }
 
 /** The guardrail a rejected swap broke; a budget or cap says by how much. */
@@ -228,6 +234,7 @@ export function ImprovePanel({
   fitting,
   target,
   onPreview,
+  footerTarget,
 }: Props) {
   const { t } = useTranslation();
   const moreId = useId();
@@ -304,42 +311,44 @@ export function ImprovePanel({
     const changes = diffFittingStats(own, option.after)
       .changes.filter((change) => !omit.includes(change.key))
       .sort((a, b) => Number(isResource(a.key)) - Number(isResource(b.key)));
-    const shown: ReactNode[] = changes
-      .slice(0, all ? undefined : CHANGES_SHOWN)
-      .map((change) => <StatChange key={change.key} change={change} />);
+    if (changes.length === 0) return t('fittings.variations.noChanges');
+    // One stat per row, so a long list reads down instead of running on as a sentence.
+    const shown = changes.slice(0, all ? undefined : CHANGES_SHOWN);
     const rest = changes.length - shown.length;
-    if (rest > 0) {
-      const label = t('fittings.makeItFit.otherStats', { count: rest });
-      shown.push(
-        onOpen ? (
-          <button key="rest" type="button" className={textActionClassName()} onClick={onOpen}>
-            {label}
-          </button>
-        ) : (
-          label
-        )
-      );
-    }
-    if (shown.length === 0) return t('fittings.variations.noChanges');
-    return shown.flatMap((node, i) => (i === 0 ? [node] : [', ', node]));
+    const label = rest > 0 ? t('fittings.makeItFit.otherStats', { count: rest }) : null;
+    return (
+      <>
+        <StatChangeList changes={shown} />
+        {label !== null &&
+          (onOpen ? (
+            <button type="button" className={textActionClassName()} onClick={onOpen}>
+              {label}
+            </button>
+          ) : (
+            <span className="block">{label}</span>
+          ))}
+      </>
+    );
   }
 
-  /** Each stat the swap makes worse, with its before → after, so the loss has a size. */
+  /** Each stat the swap makes worse, with its before → after, so the loss has a size: one per row. */
   function lostLine(option: ImproveOption): ReactNode {
-    return option.lost.flatMap(({ kind, change }, i): ReactNode[] => {
-      const node =
-        kind === 'stat' ? (
-          <StatChange key={change.key} change={change} />
-        ) : (
-          <span key={change.key}>
-            {t(`fittings.whatToTrain.role.${change.key}`, {
-              before: change.before,
-              after: change.after,
-            })}
-          </span>
-        );
-      return i === 0 ? [node] : [', ', node];
-    });
+    const stats = option.lost.flatMap((lost) => (lost.kind === 'stat' ? [lost.change] : []));
+    return (
+      <>
+        {stats.length > 0 && <StatChangeList changes={stats} />}
+        {option.lost.map((lost) =>
+          lost.kind === 'stat' ? null : (
+            <span key={lost.change.key} className="block">
+              {t(`fittings.whatToTrain.role.${lost.change.key}`, {
+                before: lost.change.before,
+                after: lost.change.after,
+              })}
+            </span>
+          )
+        )}
+      </>
+    );
   }
 
   function isk(option: ImproveOption) {
@@ -448,6 +457,7 @@ export function ImprovePanel({
     const stat = (key: StatChangeKey, before: number, after: number): Lead => ({
       node: <StatChange key={key} change={{ key, before, after }} />,
       keys: [key],
+      change: { key, before, after },
     });
     const text = (key: string, line: string | null): Lead | null =>
       line === null ? null : { node: <span key={key}>{line}</span>, keys: [] };
@@ -533,7 +543,22 @@ export function ImprovePanel({
         return leads.length === 0
           ? null
           : {
-              node: leads.flatMap((lead, i) => (i === 0 ? [lead.node] : [', ', lead.node])),
+              // A line each, like the change rows below them: the plain stat
+              // changes as one list, any worded figure on its own line after.
+              node: (
+                <>
+                  <StatChangeList
+                    changes={leads.flatMap((lead) => (lead.change ? [lead.change] : []))}
+                  />
+                  {leads
+                    .filter((lead) => !lead.change)
+                    .map((lead) => (
+                      <span key={lead.keys.join() || String(lead.node)} className="block">
+                        {lead.node}
+                      </span>
+                    ))}
+                </>
+              ),
               keys: leads.flatMap((lead) => lead.keys),
             };
       }
@@ -633,7 +658,8 @@ export function ImprovePanel({
             </span>
             {option.lost.length > 0 && (
               <span className="text-warning block text-xs">
-                {t('fittings.improve.givesUp')} {lostLine(option)}
+                <span className="block">{t('fittings.improve.givesUp')}</span>
+                {lostLine(option)}
               </span>
             )}
             <span className="block text-xs">{isk(option)}</span>
@@ -1270,7 +1296,7 @@ export function ImprovePanel({
                 {rows(state.result.tradeOffs, state.before, 'to')}
               </MakeItFitSection>
             )}
-            <div className="bg-panel border-line sticky bottom-0 space-y-2 border-t pt-2">
+            <ImproveFooter target={footerTarget}>
               {chosen.length > 0 && checkable && (
                 <div className="space-y-1 text-sm" data-testid="improve-selection">
                   {summary ? (
@@ -1300,7 +1326,8 @@ export function ImprovePanel({
                         )}
                         {summary.unpriced > 0 &&
                           ` + ${t('fittings.improve.selection.unpriced', { count: summary.unpriced })}`}
-                        {' · '}
+                      </p>
+                      <p>
                         {t('fittings.improve.selection.dps', {
                           before: m3sFormat(summary.dps.before),
                           after: m3sFormat(summary.dps.after),
@@ -1356,9 +1383,23 @@ export function ImprovePanel({
                     : t('fittings.improve.applyCount', { count: chosen.length })}
                 </Button>
               </div>
-            </div>
+            </ImproveFooter>
           </div>
         ))}
     </div>
+  );
+}
+
+/**
+ * The selection and Apply bar. In the drawer it goes to the container's own
+ * footer (`target`), below the scrolling list, so no row ever scrolls under it;
+ * on its own (tests, a page with no footer) it sticks to the bottom of the list.
+ */
+function ImproveFooter({ target, children }: { target?: HTMLElement | null; children: ReactNode }) {
+  const bar = <div className="space-y-2">{children}</div>;
+  return target ? (
+    createPortal(bar, target)
+  ) : (
+    <div className="bg-panel border-line sticky bottom-0 border-t pt-2">{bar}</div>
   );
 }
