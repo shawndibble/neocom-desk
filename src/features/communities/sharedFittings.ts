@@ -42,7 +42,7 @@ import { communityBackendOverride } from './backendOverride';
 import {
   loadCommunityMembers,
   loadMyCommunities,
-  loadMyCommunitiesCached,
+  withMyCommunities,
   type CommunitySummary,
 } from './communityStore';
 
@@ -156,14 +156,15 @@ export async function loadSharedFittings(characterId: number): Promise<{
   fittings: SharedFitting[];
   sharerNames: Map<string, string>;
 }> {
-  const communities = await loadMyCommunitiesCached(characterId);
-  const [perCommunity, perMembers] = await Promise.all([
-    Promise.all(communities.map((community) => loadCommunityFittings(characterId, community.id))),
-    Promise.all(communities.map((community) => loadCommunityMembers(characterId, community.id))),
-  ]);
-  const sharerNames = new Map<string, string>();
-  for (const member of perMembers.flat()) sharerNames.set(member.uid, member.characterName);
-  return { communities, fittings: perCommunity.flat(), sharerNames };
+  return withMyCommunities(characterId, async (communities) => {
+    const [perCommunity, perMembers] = await Promise.all([
+      Promise.all(communities.map((community) => loadCommunityFittings(characterId, community.id))),
+      Promise.all(communities.map((community) => loadCommunityMembers(characterId, community.id))),
+    ]);
+    const sharerNames = new Map<string, string>();
+    for (const member of perMembers.flat()) sharerNames.set(member.uid, member.characterName);
+    return { communities, fittings: perCommunity.flat(), sharerNames };
+  });
 }
 
 /** The Communities this Character is in, and which of them already hold this one Fitting. */
@@ -171,19 +172,20 @@ export async function loadShareStatus(
   characterId: number,
   key: SharedFittingKey
 ): Promise<{ communities: CommunitySummary[]; sharedIn: Set<string> }> {
-  const communities = await loadMyCommunitiesCached(characterId);
   const docId = sharedFittingId(uidForCharacter(characterId), key);
   await ensureSignedIn(characterId);
   const db = getSyncFirestore();
-  const held = await Promise.all(
-    communities.map(async (community) =>
-      (await getDoc(doc(fittingsOf(db, community.id), docId))).exists() ? community.id : null
-    )
-  );
-  return {
-    communities,
-    sharedIn: new Set(held.filter((id): id is string => id !== null)),
-  };
+  return withMyCommunities(characterId, async (communities) => {
+    const held = await Promise.all(
+      communities.map(async (community) =>
+        (await getDoc(doc(fittingsOf(db, community.id), docId))).exists() ? community.id : null
+      )
+    );
+    return {
+      communities,
+      sharedIn: new Set(held.filter((id): id is string => id !== null)),
+    };
+  });
 }
 
 /** What toggling a Fitting in a Community did, for the notice it leaves. */

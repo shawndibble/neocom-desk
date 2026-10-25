@@ -5,7 +5,14 @@ import '@/i18n';
 import { db } from '@/db';
 
 vi.mock('@/sync/firebaseApp', () => ({ getSyncAuth: () => ({ currentUser: { uid: 'char:1' } }) }));
-const store = vi.hoisted(() => ({ loadMyCommunitiesCached: vi.fn() }));
+const store = vi.hoisted(() => {
+  const loadMyCommunitiesCached = vi.fn();
+  return {
+    loadMyCommunitiesCached,
+    withMyCommunities: async (id: number, read: (list: unknown) => Promise<unknown>) =>
+      read(await loadMyCommunitiesCached(id)),
+  };
+});
 vi.mock('@/features/communities/communityStore', () => store);
 const requests = vi.hoisted(() => ({ loadRequestsSince: vi.fn() }));
 vi.mock('@/features/communities/requestStore', () => requests);

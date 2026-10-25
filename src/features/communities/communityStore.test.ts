@@ -22,6 +22,7 @@ import {
   joinCommunity,
   loadMyCommunities,
   loadMyCommunitiesCached,
+  withMyCommunities,
 } from './communityStore';
 
 const NOW = 1_000_000;
@@ -93,6 +94,39 @@ describe('loadMyCommunitiesCached', () => {
     await loadMyCommunitiesCached(1, NOW);
     await callCommunity(1, 'editCommunityRequestCallable', {});
     await loadMyCommunitiesCached(1, NOW);
+    expect(reads()).toBe(2);
+  });
+});
+
+describe('withMyCommunities', () => {
+  it('reruns over a fresh list when a Community refuses this Member (left or removed elsewhere)', async () => {
+    await loadMyCommunitiesCached(1, NOW);
+    fs.getDocs.mockResolvedValue({ docs: [] }); // removed from c1 on another device
+    const seen: string[][] = [];
+    const result = await withMyCommunities(
+      1,
+      async (list) => {
+        seen.push(list.map((c) => c.id));
+        if (list.some((c) => c.id === 'c1')) {
+          throw Object.assign(new Error('Missing or insufficient permissions.'), {
+            code: 'permission-denied',
+          });
+        }
+        return 'ok';
+      },
+      NOW
+    );
+    expect(result).toBe('ok');
+    expect(seen).toEqual([['c1'], []]);
+    // The fresh list is what the cache holds now.
+    expect(await loadMyCommunitiesCached(1, NOW)).toEqual([]);
+  });
+
+  it('passes any other failure through without rereading', async () => {
+    await loadMyCommunitiesCached(1, NOW);
+    await expect(
+      withMyCommunities(1, async () => Promise.reject(new Error('offline')), NOW)
+    ).rejects.toThrow('offline');
     expect(reads()).toBe(2);
   });
 });

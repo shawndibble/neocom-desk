@@ -11,7 +11,8 @@ const store = vi.hoisted(() => ({
 }));
 
 vi.mock('./communityStore', () => ({
-  loadMyCommunitiesCached: store.loadMyCommunitiesCached,
+  withMyCommunities: async (id: number, read: (list: unknown) => Promise<unknown>) =>
+    read(await store.loadMyCommunitiesCached(id)),
   loadCommunityMembers: store.loadCommunityMembers,
 }));
 vi.mock('./sharedPlans', () => ({ loadCommunityPlans: store.loadCommunityPlans }));

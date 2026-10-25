@@ -125,6 +125,27 @@ export async function loadMyCommunitiesCached(
   return value;
 }
 
+/**
+ * Runs `read` over the cached list. A Community this Character was removed from, or that was
+ * deleted, elsewhere (no call on this device dropped the cache) refuses its Member reads: then
+ * the cache is dropped and `read` runs once more over a fresh list, so one gone Community never
+ * fails the whole read for the rest of the TTL.
+ */
+export async function withMyCommunities<T>(
+  characterId: number,
+  read: (communities: CommunitySummary[]) => Promise<T>,
+  now = Date.now()
+): Promise<T> {
+  const cached = await loadMyCommunitiesCached(characterId, now);
+  try {
+    return await read(cached);
+  } catch (err) {
+    if ((err as { code?: string } | null)?.code !== 'permission-denied') throw err;
+    invalidateMyCommunities(characterId);
+    return read(await loadMyCommunities(characterId));
+  }
+}
+
 /** The Character's Communities, read now (and remembered for `loadMyCommunitiesCached`). */
 export async function loadMyCommunities(characterId: number): Promise<CommunitySummary[]> {
   const override = communityBackendOverride();

@@ -17,12 +17,17 @@ vi.mock('@/sync/firebaseApp', () => ({
   getSyncAuth: () => ({ currentUser: session.uid ? { uid: session.uid } : null }),
 }));
 vi.mock('./requestStore', () => ({ loadMyRequests: vi.fn(), loadCommunityPledges: vi.fn() }));
-vi.mock('./communityStore', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./communityStore')>()),
-  loadMyCommunitiesCached: vi.fn(),
-  loadJoinRequests: vi.fn(),
-  loadCommunityMembers: vi.fn(),
-}));
+vi.mock('./communityStore', async (importOriginal) => {
+  const loadMyCommunitiesCached = vi.fn();
+  return {
+    ...(await importOriginal<typeof import('./communityStore')>()),
+    loadMyCommunitiesCached,
+    withMyCommunities: async (id: number, read: (list: unknown) => Promise<unknown>) =>
+      read(await loadMyCommunitiesCached(id)),
+    loadJoinRequests: vi.fn(),
+    loadCommunityMembers: vi.fn(),
+  };
+});
 
 const CHARACTER = 90000001;
 const community = (over: Partial<CommunitySummary> = {}): CommunitySummary => ({

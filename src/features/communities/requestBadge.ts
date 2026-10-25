@@ -117,23 +117,30 @@ export async function refreshRequestBadge(characterId: number, now = Date.now())
   const myUid = uidForCharacter(characterId);
   if (getSyncAuth().currentUser?.uid !== myUid) return;
   const started = generation;
-  const next = new Map<string, number>();
-  for (const community of await store.loadMyCommunitiesCached(characterId, now)) {
-    if (viewed.has(community.id)) {
-      // Being looked at: Requests that arrive now are seen, not new.
-      await db.settings.put({ key: seenKey(characterId, community.id), value: now });
-      continue;
-    }
-    const seen = (await db.settings.get(seenKey(characterId, community.id)))?.value;
-    if (typeof seen !== 'number') {
-      await db.settings.put({ key: seenKey(characterId, community.id), value: now });
-      continue;
-    }
-    // Only what was posted since: an idle tick is one read per Community, not its whole board.
-    const posted = await requests.loadRequestsSince(characterId, community.id, seen);
-    const fresh = countNewRequests(posted, myUid, seen, now);
-    if (fresh > 0) next.set(community.id, fresh);
-  }
+  const next = await store.withMyCommunities(
+    characterId,
+    async (communities) => {
+      const counted = new Map<string, number>();
+      for (const community of communities) {
+        if (viewed.has(community.id)) {
+          // Being looked at: Requests that arrive now are seen, not new.
+          await db.settings.put({ key: seenKey(characterId, community.id), value: now });
+          continue;
+        }
+        const seen = (await db.settings.get(seenKey(characterId, community.id)))?.value;
+        if (typeof seen !== 'number') {
+          await db.settings.put({ key: seenKey(characterId, community.id), value: now });
+          continue;
+        }
+        // Only what was posted since: an idle tick is one read per Community, not its whole board.
+        const posted = await requests.loadRequestsSince(characterId, community.id, seen);
+        const fresh = countNewRequests(posted, myUid, seen, now);
+        if (fresh > 0) counted.set(community.id, fresh);
+      }
+      return counted;
+    },
+    now
+  );
   // The Character changed while this read was in flight: its count is not the new one's.
   if (started !== generation) return;
   // A tab opened during the read marked its Community seen: that count is not new either.
