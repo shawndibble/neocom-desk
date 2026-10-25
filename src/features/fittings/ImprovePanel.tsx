@@ -935,15 +935,15 @@ export function ImprovePanel({
       <div>
         <button
           type="button"
-          className={textActionClassName('w-full justify-between gap-2')}
+          className={textActionClassName('flex-wrap gap-x-1 text-left')}
           aria-expanded={settingsOpen}
           aria-controls={settingsId}
           onClick={() => setSettingsOpen((open) => !open)}
         >
           <span>{t('fittings.improve.settingsLabel')}</span>
-          <span className="text-text-dim flex items-center gap-1 normal-case tracking-normal">
+          <Caret expanded={settingsOpen} />
+          <span className="text-text-dim basis-full text-xs normal-case tracking-normal">
             {settingsSummary}
-            <Caret expanded={settingsOpen} />
           </span>
         </button>
         <Collapse open={settingsOpen} id={settingsId} className="pt-2">
