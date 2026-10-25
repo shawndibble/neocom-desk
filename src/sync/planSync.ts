@@ -547,6 +547,11 @@ async function syncCharacter(
       scope === 'all' ? tasks : tasks.filter((task) => scope.has(task.name)),
       COLLECTION_PULL_CONCURRENCY
     );
+  } catch (error) {
+    // Any failure, narrowed or not, can leave a local edit unpushed: the next
+    // background pass must read for real rather than trust an unchanged marker.
+    await clearSeenSyncMarker(characterId);
+    throw error;
   } finally {
     // What did land still has to reach the other devices, failure or not.
     if (pushed) bumped = await bumpMarkerQuietly(firestore, uid, characterId);

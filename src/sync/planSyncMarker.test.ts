@@ -4,7 +4,7 @@
 // what they would read is theirs to test; here only whether they ran.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
-import { syncEditableCollection, type SyncContext } from './collectionSync';
+import { syncEditableCollection } from './collectionSync';
 import { syncFeed } from './feedSync';
 import { syncSettings } from './settingsSync';
 import { getSyncStatus, haltSync, resetSyncHalt, scheduleSync, triggerSync } from './planSync';
@@ -53,6 +53,12 @@ function collectionPasses(): number {
   );
 }
 
+function resetPassCounts(): void {
+  vi.mocked(syncEditableCollection).mockClear();
+  vi.mocked(syncFeed).mockClear();
+  vi.mocked(syncSettings).mockClear();
+}
+
 /** One background sweep pass, awaited to the end. */
 async function backgroundPass(): Promise<void> {
   const reads = vi.mocked(readRemoteMarker).mock.calls.length;
@@ -86,9 +92,7 @@ describe('idle background pass', () => {
     await triggerSync(1);
     expect(collectionPasses()).toBe(COLLECTION_PASSES);
     vi.mocked(readRemoteMarker).mockClear();
-    vi.mocked(syncEditableCollection).mockClear();
-    vi.mocked(syncFeed).mockClear();
-    vi.mocked(syncSettings).mockClear();
+    resetPassCounts();
 
     await backgroundPass();
 
@@ -106,18 +110,14 @@ describe('idle background pass', () => {
 
   it('runs the full incremental pass when another device bumped the marker', async () => {
     await triggerSync(1);
-    vi.mocked(syncEditableCollection).mockClear();
-    vi.mocked(syncFeed).mockClear();
-    vi.mocked(syncSettings).mockClear();
+    resetPassCounts();
     remote.version = (remote.version ?? 0) + 1;
 
     await backgroundPass();
 
     expect(collectionPasses()).toBe(COLLECTION_PASSES);
     // ...and the next idle one is cheap again.
-    vi.mocked(syncEditableCollection).mockClear();
-    vi.mocked(syncFeed).mockClear();
-    vi.mocked(syncSettings).mockClear();
+    resetPassCounts();
     await backgroundPass();
     expect(collectionPasses()).toBe(0);
   });
@@ -130,9 +130,7 @@ describe('idle background pass', () => {
   it('runs the safety reconcile once the interval has passed, marker unchanged', async () => {
     const clock = vi.spyOn(Date, 'now').mockReturnValue(1_800_000_000_000);
     await triggerSync(1);
-    vi.mocked(syncEditableCollection).mockClear();
-    vi.mocked(syncFeed).mockClear();
-    vi.mocked(syncSettings).mockClear();
+    resetPassCounts();
 
     clock.mockReturnValue(1_800_000_000_000 + SAFETY_RECONCILE_INTERVAL_MS - 1);
     await backgroundPass();
@@ -162,10 +160,27 @@ describe('idle background pass', () => {
   });
 });
 
+describe('a failed narrowed pass', () => {
+  it('voids the idle skip, so the unpushed edit is retried by the next sweep', async () => {
+    await triggerSync(1);
+    vi.mocked(syncEditableCollection).mockRejectedValueOnce(new Error('quota'));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    scheduleSync(1, { collections: ['plans'], debounceMs: 0 });
+    await vi.advanceTimersByTimeAsync(0);
+    vi.useRealTimers();
+    await vi.waitFor(() => expect(getSyncStatus(1).state).toBe('error'));
+    expect(await readSeenSyncMarker(1)).toBeUndefined();
+    resetPassCounts();
+
+    await backgroundPass();
+
+    expect(collectionPasses()).toBe(COLLECTION_PASSES);
+  });
+});
+
 describe('bumping the marker', () => {
-  function pushOnce(ctxs: SyncContext[]) {
+  function pushOnce() {
     vi.mocked(syncEditableCollection).mockImplementationOnce(async (_spec, ctx) => {
-      ctxs.push(ctx);
       ctx.onPush?.();
     });
   }
@@ -179,8 +194,8 @@ describe('bumping the marker', () => {
   it('bumps once per pass that pushed, after the pass, not once per collection', async () => {
     await triggerSync(1);
     vi.mocked(bumpRemoteMarker).mockClear();
-    pushOnce([]);
-    pushOnce([]);
+    pushOnce();
+    pushOnce();
 
     await triggerSync(1);
 
@@ -191,7 +206,7 @@ describe('bumping the marker', () => {
   it('bumps after a narrowed pass that pushed, so another device pulls it', async () => {
     await triggerSync(1);
     vi.mocked(bumpRemoteMarker).mockClear();
-    pushOnce([]);
+    pushOnce();
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     scheduleSync(1, { collections: ['plans'], debounceMs: 0 });
     await vi.advanceTimersByTimeAsync(0);
@@ -203,22 +218,21 @@ describe('bumping the marker', () => {
 
   it('lets this device skip the pass its own push earns only after one more full read', async () => {
     await triggerSync(1);
-    pushOnce([]);
+    pushOnce();
     await triggerSync(1);
-    vi.mocked(syncEditableCollection).mockClear();
-    vi.mocked(syncFeed).mockClear();
-    vi.mocked(syncSettings).mockClear();
+    resetPassCounts();
 
     await backgroundPass(); // marker moved by our own push: one full read
     expect(collectionPasses()).toBe(COLLECTION_PASSES);
+    resetPassCounts();
     await backgroundPass(); // now it is idle
-    expect(collectionPasses()).toBe(COLLECTION_PASSES);
+    expect(collectionPasses()).toBe(0);
   });
 
   it('bumps even when the pass failed after pushing', async () => {
     await triggerSync(1);
     vi.mocked(bumpRemoteMarker).mockClear();
-    pushOnce([]);
+    pushOnce();
     vi.mocked(syncFeed).mockRejectedValueOnce(new Error('offline'));
 
     await triggerSync(1).catch(() => {});
