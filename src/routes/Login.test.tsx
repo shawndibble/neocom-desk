@@ -39,8 +39,6 @@ const READ_ONLY_PHRASES: Record<string, string> = {
   'esi-industry.read_character_jobs.v1': 'industry jobs',
   'esi-industry.read_character_mining.v1': 'mining ledger',
   'esi-planets.manage_planets.v1': 'planetary colonies',
-  'esi-structures.read_character.v1': 'Mercenary Dens',
-  'esi-activities.read_character.v1': 'Mercenary Dens',
   'esi-characters.read_contacts.v1': 'contacts',
   'esi-characters.read_loyalty.v1': 'loyalty points',
   'esi-characters.read_standings.v1': 'standings',
@@ -366,7 +364,7 @@ describe('Login', () => {
     renderLogin();
     await user.click(await screen.findByRole('button', { name: /industry & planets/i }));
     expect(screen.getByText('Your mining ledger.')).toBeInTheDocument();
-    expect(screen.getByText('Your planetary colonies and Mercenary Dens.')).toBeInTheDocument();
+    expect(screen.getByText('Your planetary colonies.')).toBeInTheDocument();
   });
 
   it('keeps the planetary-scope note, the separate-grants note and the revoke link', async () => {
