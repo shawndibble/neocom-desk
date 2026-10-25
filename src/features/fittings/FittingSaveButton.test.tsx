@@ -103,11 +103,11 @@ describe('FittingSaveButton', () => {
   });
 
   describe('naming where it saves', () => {
-    it('reads "Save to My Fittings" and lists every destination in the caret', async () => {
+    it('reads "Save", names My Fittings, and lists every destination in the caret', async () => {
       const user = userEvent.setup();
       setup(true);
       expect(screen.getByRole('button', { name: 'Save to My Fittings' })).toHaveTextContent(
-        'Save to My Fittings'
+        /^Save$/
       );
       await user.click(screen.getByRole('button', { name: 'More save options' }));
       expect(await screen.findByRole('menuitem', { name: /^Save to My Fittings/ })).toBeTruthy();
@@ -116,11 +116,10 @@ describe('FittingSaveButton', () => {
       expect(screen.queryByRole('menuitem', { name: /Save as new/ })).toBeNull();
     });
 
-    it('keeps the short label on the phone, with the destination in its name and tooltip', async () => {
+    it('names the destination in its accessible name and tooltip', async () => {
       const user = userEvent.setup();
       render(
         <FittingSaveButton
-          compact
           onSave={vi.fn()}
           canSave
           updating={false}
