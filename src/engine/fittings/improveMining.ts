@@ -5,6 +5,9 @@
  * too, so every row's m³/s is the same ore's. Pure.
  */
 import { parseCrystal } from './crystalChoice';
+import type { ChargeLoadStep } from './improveCharges';
+import type { ModuleAt } from './fittingEdit';
+import { isFiring } from './stats';
 import type { Fitting } from './types';
 
 /** "A2" for a Type A II crystal; null for a charge that is not a mining crystal. */
@@ -54,4 +57,55 @@ export async function bestCrystalKey(
     if (best === null || perSecond > best.perSecond) best = { key, perSecond };
   }
   return best?.key ?? null;
+}
+
+/** "Type B II" for the key "B2". */
+export function crystalLabel(key: string): string {
+  return `Type ${key[0]} ${key[1] === '2' ? 'II' : 'I'}`;
+}
+
+/**
+ * Active miners that take a crystal of the picked ore but hold none of it
+ * (empty, or another ore's), and the loads that fix them with `crystalFor`'s
+ * crystal. Null when there are none.
+ */
+export function unloadedMiners(
+  fitting: Fitting,
+  crystalsOf: (moduleTypeId: number) => readonly number[],
+  crystalFor: (moduleTypeId: number) => number | null
+): { count: number; steps: ChargeLoadStep[] } | null {
+  const byCrystal = new Map<number, ModuleAt[]>();
+  let count = 0;
+  for (const module of fitting.modules) {
+    if (!isFiring(module.state)) continue;
+    const takes = crystalsOf(module.typeId);
+    if (
+      takes.length === 0 ||
+      (module.chargeTypeId !== undefined && takes.includes(module.chargeTypeId))
+    )
+      continue;
+    const crystal = crystalFor(module.typeId);
+    if (crystal === null) continue;
+    count++;
+    const at = byCrystal.get(crystal) ?? [];
+    at.push({ slot: module.slot, slotIndex: module.slotIndex });
+    byCrystal.set(crystal, at);
+  }
+  if (count === 0) return null;
+  return {
+    count,
+    steps: [...byCrystal].map(([chargeTypeId, at]) => ({ chargeTypeId, fromCargo: false, at })),
+  };
+}
+
+/**
+ * Whether a miner in the calculation does not hold the plan's crystal, so it
+ * would mine another ore's m³/s. A miner the plan gives no crystal (it takes
+ * none) holds none: its charge is `undefined`, the plan's answer `null`.
+ */
+export function minerWithoutCrystal(
+  rows: readonly { typeId: number; isDrone: boolean; chargeTypeId?: number }[],
+  crystalFor: (moduleTypeId: number) => number | null
+): boolean {
+  return rows.some((row) => !row.isDrone && (row.chargeTypeId ?? null) !== crystalFor(row.typeId));
 }

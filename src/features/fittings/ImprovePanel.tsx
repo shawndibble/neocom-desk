@@ -57,6 +57,7 @@ import {
   type RejectedOption,
 } from '@/engine/fittings/improve';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
+import { crystalLabel } from '@/engine/fittings/improveMining';
 import type { Resource } from '@/engine/fittings/makeItFit';
 import { formatIskCompact } from '@/lib/isk';
 import { createNumberFormat } from '@/lib/numberLocale';
@@ -162,6 +163,8 @@ interface Props {
   onFixFirst: (resource: Resource) => void;
   /** Weapons holding no charge, which damage goals can't score; null or absent: none. */
   unloaded?: UnloadedWeapons | null;
+  /** Loads Mine more's best crystal into the miners that hold none of the ore's; absent when it cannot. */
+  onLoadBestCrystal?: () => void;
   /** Loads the best charge into each empty weapon group; absent when none can be loaded. */
   onLoadBestCharge?: () => void;
   /** Train and Implants, which cost the fit nothing and sit above the swaps; none for an over-budget fit. */
@@ -216,6 +219,7 @@ export function ImprovePanel({
   settings,
   onFixFirst,
   unloaded,
+  onLoadBestCrystal,
   onLoadBestCharge,
   freeSections,
   fitting,
@@ -351,10 +355,7 @@ export function ImprovePanel({
 
   /** Mine more: the ore the row is scored with, and the m³/s it gives. */
   function oreLine(option: ImproveOption | RejectedOption, own: FittingStats) {
-    const family = settings.oreFamily;
     return t('fittings.improve.oreLine', {
-      ores: (CRYSTAL_FAMILY_ORES[family] ?? []).join(', '),
-      family,
       before: m3sFormat(own.mining.perSecond),
       after: m3sFormat(option.after.mining.perSecond),
     });
@@ -686,7 +687,13 @@ export function ImprovePanel({
     );
   }
 
-  const bestFound = state.status === 'done' ? bestFoundLine(state.result, state.before) : null;
+  // Mine more's rows compare on the best crystals; "Now" is the fit as it is.
+  const bestFound =
+    state.status === 'done' ? bestFoundLine(state.result, state.fitAsIs ?? state.before) : null;
+  const crystalBasis = state.status === 'done' ? state.crystals : undefined;
+  const unloadedCrystals = crystalBasis?.unloaded ?? null;
+  const unloadedNow = state.status === 'done' ? (state.fitAsIs?.mining.perSecond ?? 0) : 0;
+  const unloadedBest = state.status === 'done' ? state.before.mining.perSecond : 0;
   const chosen = useMemo(() => [...ticked.values()], [ticked]);
 
   // The rows were each scored alone: one recalculation of the ticked set checks them together.
@@ -1053,6 +1060,25 @@ export function ImprovePanel({
         </div>
       )}
 
+      {unloadedCrystals && (
+        <div className="space-y-2">
+          <p role="status" className="text-warning text-sm">
+            {t('fittings.improve.unloadedCrystals', {
+              count: unloadedCrystals.count,
+              family: settings.oreFamily,
+              now: m3sFormat(unloadedNow),
+              crystal: crystalLabel(crystalBasis!.bestKey),
+              best: m3sFormat(unloadedBest),
+            })}
+          </p>
+          {onLoadBestCrystal && (
+            <Button size="sm" onClick={onLoadBestCrystal}>
+              {t('fittings.improve.loadBestCrystal')}
+            </Button>
+          )}
+        </div>
+      )}
+
       {state.status === 'searching' && (
         <div className="space-y-2">
           <p className="text-text-dim flex items-center gap-2 text-sm">
@@ -1175,6 +1201,14 @@ export function ImprovePanel({
               <p className="text-sm" data-testid="improve-best-found">
                 <span className="text-text-dim">{t('fittings.improve.bestFound')} </span>
                 <span className="font-medium">{bestFound}</span>
+                {crystalBasis && (
+                  <span className="text-text-dim">
+                    {' '}
+                    {t('fittings.improve.bestCrystals', {
+                      ores: (CRYSTAL_FAMILY_ORES[settings.oreFamily] ?? []).join(', '),
+                    })}
+                  </span>
+                )}
               </p>
             )}
             {state.result.stopped && (

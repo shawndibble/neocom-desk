@@ -1557,7 +1557,13 @@
         "fuelBay": "Fuel bay",
         "infrastructureHold": "Infrastructure hold"
       },
-      "oreLine": "Mines {{before}} → {{after}} m³/s of {{ores}} ({{family}} crystals)"
+      "oreLine": "Mines {{before}} → {{after}} m³/s",
+      "bestCrystals": "Rows use the best crystals for {{ores}}.",
+      "unloadedCrystals_one": "{{count}} miner has no crystal for {{family}} ore, so it mines {{now}} m³/s; with {{crystal}}, {{best}}.",
+      "unloadedCrystals_other": "{{count}} miners have no crystal for {{family}} ore, so they mine {{now}} m³/s; with {{crystal}}, {{best}}.",
+      "loadBestCrystal": "Load best crystal",
+      "crystalsLoaded_one": "Loaded crystals into {{count}} miner. Not saved yet.",
+      "crystalsLoaded_other": "Loaded crystals into {{count}} miners. Not saved yet."
     },
     "variations": {
       "title": "Variations",
