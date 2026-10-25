@@ -341,6 +341,80 @@ export async function loadCommunityPledges(
 }
 
 /**
+ * This Character's own Pledges in a Community, by Request id: the delivery sweep needs nothing
+ * else. One collection-group query on `communityId` and `ownerHash` (every Pledge carries both,
+ * the rules bind them), so it costs what the Character has pledged, not the whole Community.
+ * Until its composite index is deployed it reads every Pledge in the Community, as before.
+ */
+export async function loadMyPledges(
+  characterId: number,
+  communityId: string
+): Promise<Map<string, RequestPledge>> {
+  const uid = uidForCharacter(characterId);
+  const mineOf = (all: ReadonlyMap<string, readonly RequestPledge[]>) => {
+    const mine = new Map<string, RequestPledge>();
+    for (const [requestId, list] of all) {
+      const pledge = list.find((p) => p.uid === uid);
+      if (pledge) mine.set(requestId, pledge);
+    }
+    return mine;
+  };
+  const ownerHash = (await localDb.characters.get(characterId))?.ownerHash;
+  if (communityBackendOverride()?.loadAllPledges || !ownerHash) {
+    return mineOf(await loadCommunityPledges(characterId, communityId));
+  }
+  let snap;
+  try {
+    snap = await underFirebaseSession(async () => {
+      await ensureSignedIn(characterId);
+      return getDocs(
+        query(
+          collectionGroup(getSyncFirestore(), 'pledges'),
+          where('communityId', '==', communityId),
+          where('ownerHash', '==', ownerHash)
+        )
+      );
+    });
+  } catch (err) {
+    if (!isMissingIndex(err)) throw err;
+    return mineOf(await loadCommunityPledges(characterId, communityId));
+  }
+  const mine = new Map<string, RequestPledge>();
+  for (const entry of snap.docs) {
+    const requestId = entry.ref.parent.parent?.id;
+    // The document id is the Pledger: an owner hash alone never makes a Pledge this Character's.
+    if (!requestId || entry.id !== uid) continue;
+    const pledge = readPledge(entry.id, entry.data());
+    if (pledge) mine.set(requestId, pledge);
+  }
+  return mine;
+}
+
+/** Some Requests of a Community by id, one read each; one since removed is left out. */
+export async function loadRequestsById(
+  characterId: number,
+  communityId: string,
+  requestIds: readonly string[]
+): Promise<CommunityRequest[]> {
+  if (communityBackendOverride()?.loadItemRequests) {
+    const wanted = new Set(requestIds);
+    return (await loadRequests(characterId, communityId)).filter((r) => wanted.has(r.id));
+  }
+  const snaps = await underFirebaseSession(async () => {
+    await ensureSignedIn(characterId);
+    return Promise.all(
+      requestIds.map((id) =>
+        getDoc(doc(getSyncFirestore(), 'communities', communityId, 'itemRequests', id))
+      )
+    );
+  });
+  return snaps
+    .filter((snap) => snap.exists())
+    .map((snap) => readRequest(snap.id, snap.data()))
+    .filter((request): request is CommunityRequest => request !== null);
+}
+
+/**
  * Rewrites this Character's Pledge on one Request: inside a transaction, reads
  * the stored document (so a delivery marked from another device, or a typed
  * amount saved a moment ago, is kept; a concurrent write makes it retry on the
