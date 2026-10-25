@@ -19,6 +19,11 @@ export function availableChartViews(summary: SurveySummary): SurveyChartView[] {
 /** One chart row: a time, plus a value per series key. */
 export type SurveySeriesRow = { at: number } & Record<string, number | undefined>;
 
+/** Each ore's index in `summary.oreNames`, for its colour. */
+function oreToneIndex(summary: SurveySummary): Record<string, number> {
+  return Object.fromEntries(summary.oreNames.map((ore, i) => [ore, i]));
+}
+
 const clampPercent = (v: number): number => Math.min(100, Math.max(0, v));
 
 /**
@@ -61,10 +66,7 @@ export function iskSeries(summary: SurveySummary): IskSeries {
   const priced = new Set(summary.ores.filter((o) => o.unitPrice !== null).map((o) => o.ore));
   const pricedOres = summary.oreNames.filter((o) => priced.has(o));
   const unpricedOres = summary.oreNames.filter((o) => !priced.has(o));
-  const toneIndex: Record<string, number> = {};
-  summary.oreNames.forEach((ore, i) => {
-    toneIndex[ore] = i;
-  });
+  const toneIndex = oreToneIndex(summary);
 
   const rows: SurveySeriesRow[] = summary.points.map((p, i) => {
     const row: SurveySeriesRow = { at: p.at, total: 0 };
@@ -130,10 +132,7 @@ export interface PaceShareSeries {
  * those percents normalised to sum to 100.
  */
 export function paceShareSeries(summary: SurveySummary): PaceShareSeries {
-  const toneIndex: Record<string, number> = {};
-  summary.oreNames.forEach((ore, i) => {
-    toneIndex[ore] = i;
-  });
+  const toneIndex = oreToneIndex(summary);
   const startOf = new Map(summary.ores.map((o) => [o.ore, o.startVolume]));
   const active = new Set<string>();
 
@@ -203,10 +202,7 @@ export interface RateByOreSeries {
 
 /** The Ore left view's rate chart: each interval's m³/s, split by the ore mined in it. */
 export function rateByOreSeries(summary: SurveySummary): RateByOreSeries {
-  const toneIndex: Record<string, number> = {};
-  summary.oreNames.forEach((ore, i) => {
-    toneIndex[ore] = i;
-  });
+  const toneIndex = oreToneIndex(summary);
   const active = new Set<string>();
   const intervals: RateInterval[] = summary.intervals.map((i) => {
     const seconds = (i.to - i.from) / 1000;
