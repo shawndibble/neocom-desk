@@ -31,17 +31,25 @@ export function buildDispatchRequest(workflow, token) {
   };
 }
 
-// GitHub answers 204 No Content on success. Any other status throws, so the
-// Worker invocation shows as failed in the Cloudflare dashboard.
+// GitHub answers 204 No Content on success. Any failure throws after every
+// workflow was tried, so the invocation shows as failed in the Cloudflare
+// dashboard and one bad workflow doesn't skip the rest.
 export async function dispatchWorkflows(cron, token, fetchFn = fetch) {
   const workflows = workflowsForCron(cron);
   if (workflows.length === 0) throw new Error(`No workflows mapped to cron "${cron}"`);
-  if (!token) throw new Error('GITHUB_TOKEN secret is not set');
+  const trimmed = token?.trim();
+  if (!trimmed) throw new Error('GITHUB_TOKEN secret is not set');
   const failures = [];
   for (const workflow of workflows) {
-    const { url, init } = buildDispatchRequest(workflow, token);
-    const res = await fetchFn(url, init);
-    if (res.status !== 204) failures.push(`${workflow}: HTTP ${res.status} ${await res.text()}`);
+    try {
+      const { url, init } = buildDispatchRequest(workflow, trimmed);
+      const res = await fetchFn(url, init);
+      if (res.status !== 204) {
+        failures.push(`${workflow}: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
+      }
+    } catch (err) {
+      failures.push(`${workflow}: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
   if (failures.length > 0) throw new Error(`Dispatch failed: ${failures.join('; ')}`);
   return workflows;

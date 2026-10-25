@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  SCHEDULES,
   buildDispatchRequest,
   dispatchWorkflows,
   workflowsForCron,
@@ -47,9 +49,33 @@ describe('dispatchWorkflows', () => {
     await expect(dispatchWorkflows('1 1 * * *', 'tok', fetchFn)).rejects.toThrow(/No workflows/);
     expect(fetchFn).not.toHaveBeenCalled();
   });
+  it('reports a network error and still tries the remaining workflows', async () => {
+    const fetchFn = vi.fn(() => Promise.reject(new Error('boom')));
+    await expect(dispatchWorkflows('*/15 * * * *', 'tok', fetchFn)).rejects.toThrow(/boom/);
+  });
+  it('caps the echoed response body', async () => {
+    const fetchFn = vi.fn(() =>
+      Promise.resolve({ status: 500, text: () => Promise.resolve('x'.repeat(5000)) })
+    );
+    const err = await dispatchWorkflows('*/15 * * * *', 'tok', fetchFn).catch((e) => e);
+    expect(err.message.length).toBeLessThan(400);
+  });
   it('throws when the token is missing', async () => {
     const fetchFn = vi.fn(ok);
     await expect(dispatchWorkflows('*/15 * * * *', '', fetchFn)).rejects.toThrow(/GITHUB_TOKEN/);
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+});
+
+describe('wrangler.toml', () => {
+  it('lists exactly the crons SCHEDULES maps', () => {
+    const toml = readFileSync(
+      new URL('../../workers/public-data-dispatch/wrangler.toml', import.meta.url),
+      'utf8'
+    );
+    const crons = [...toml.match(/crons\s*=\s*\[(.*?)\]/s)[1].matchAll(/"([^"]+)"/g)].map(
+      (m) => m[1]
+    );
+    expect(crons.sort()).toEqual(Object.keys(SCHEDULES).sort());
   });
 });

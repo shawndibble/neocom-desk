@@ -5,7 +5,7 @@ against a 15 min target). This Worker has a Cloudflare Cron Trigger that calls
 `workflow_dispatch` on `public-data-lawless-systems.yml` every 15 min, which
 starts right away. The workflow's own `schedule:` stays as a fallback; its
 `concurrency` group (`cancel-in-progress: false`) keeps overlapping runs from
-colliding, and the job rewrites one R2 object, so last writer wins.
+colliding (one running and one pending run per group; extra pending runs are dropped), and the job rewrites one R2 object, so last writer wins.
 
 ## One-time setup (Shawn)
 
