@@ -344,7 +344,10 @@ alertsAction('registerDevice', async (request) => {
     }
   } catch (err) {
     // The registration already landed; a failed read only delays new toggles.
-    logError('Device registration: seenTypes read failed', { error: String(err) });
+    logError('Device registration: seenTypes read failed', {
+      characterIds: registration.characterIds,
+      error: String(err),
+    });
   }
 
   return { deviceId: input.deviceId, registered: registration.characterIds, rejected, seenTypes };
