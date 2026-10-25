@@ -347,6 +347,8 @@ export async function loadCorpBooks(
   };
   /** `${characterId}:${corporationId}` for each book whose pointer names the Character. */
   const billed = new Set<string>();
+  /** Characters whose pointer could not be read this load: their coverage is read live. */
+  const unknown = new Set<number>();
   for (const c of characters) {
     entry(c.corporationId).characterIds.add(c.characterId);
     entry(c.corporationId).members.add(c.characterId);
@@ -354,7 +356,9 @@ export async function loadCorpBooks(
       entry(corporationId).characterIds.add(c.characterId);
     }
     // The books that bill this Character, whatever corporation they are in (#4517).
-    for (const corporationId of await readBilledBy(c.characterId)) {
+    const pointer = await readBilledBy(c.characterId);
+    if (pointer === null) unknown.add(c.characterId);
+    for (const corporationId of pointer ?? []) {
       entry(corporationId).characterIds.add(c.characterId);
       entry(corporationId).members.add(c.characterId);
       billed.add(`${c.characterId}:${corporationId}`);
@@ -366,6 +370,10 @@ export async function loadCorpBooks(
       const book = await underFirebaseSession(() =>
         readOneBook(corporationId, [...characterIds], (characterId) =>
           billed.has(`${characterId}:${corporationId}`)
+            ? 'billed'
+            : unknown.has(characterId)
+              ? 'unknown'
+              : 'not-billed'
         )
       );
       if (!book) continue;
@@ -394,7 +402,8 @@ export function readBilledByPointer(d: Data | undefined): number[] {
     .filter((id) => Number.isInteger(id) && id > 0);
 }
 
-async function readBilledBy(characterId: number): Promise<number[]> {
+/** The pointer's books, or null when it could not be read (offline, signed out). */
+async function readBilledBy(characterId: number): Promise<number[] | null> {
   try {
     return await underFirebaseSession(async () => {
       const uid = await ensureSignedIn(characterId);
@@ -403,7 +412,7 @@ async function readBilledBy(characterId: number): Promise<number[]> {
     });
   } catch {
     // Offline or signed out: the current and remembered corporations still load.
-    return [];
+    return null;
   }
 }
 
@@ -448,13 +457,14 @@ const docsOf = (snap: QuerySnapshot): Docs => snap.docs.map((d) => ({ id: d.id, 
  * `isOwnLine`/`isOnOwnLine`), so access only changes with a write, which moves
  * the stamp. The one part gated on anything else, `feederCoverage`
  * (`isBilledHere`: the Character's `corpTaxBookBilledBy` pointer, outside the
- * book and so never stamped), is read only while that pointer — read fresh on
- * every load — still names the book.
+ * book and so never stamped), is served from the copy only while that pointer —
+ * read fresh on every load — still names the book; when the pointer could not
+ * be read it is read live, as before, and the rules decide.
  */
 async function readOneBook(
   corporationId: number,
   characterIds: readonly number[],
-  billedHere: (characterId: number) => boolean
+  billedHere: (characterId: number) => 'billed' | 'not-billed' | 'unknown'
 ): Promise<LoadedCorpBook | null> {
   const fs = getSyncFirestore();
   const root = `corps/${corporationId}`;
@@ -489,15 +499,16 @@ async function readOneBook(
           )
         )
       );
-    // Readable by a Character the book bills; any one of them will do.
+    // Readable by a Character the book bills; any one of them will do. Cached only
+    // while this load's pointer names the book; with no pointer read, live as before.
+    const readCoverage = async () => docsOf(await getDocs(collection(fs, root, 'feederCoverage')));
+    const billing = feeders === null ? billedHere(characterId) : 'not-billed';
     const coverageRead: Promise<Docs | null> =
-      feeders === null && billedHere(characterId)
-        ? orNone(
-            cachedPart(key, 'feederCoverage', versions, async () =>
-              docsOf(await getDocs(collection(fs, root, 'feederCoverage')))
-            )
-          )
-        : Promise.resolve(null);
+      billing === 'billed'
+        ? orNone(cachedPart(key, 'feederCoverage', versions, readCoverage))
+        : billing === 'unknown'
+          ? orNone(readCoverage())
+          : Promise.resolve(null);
     const [
       observedDocs,
       paymentDocs,

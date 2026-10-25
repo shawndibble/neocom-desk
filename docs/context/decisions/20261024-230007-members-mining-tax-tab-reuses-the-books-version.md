@@ -16,7 +16,8 @@ _Recorded 2026-10-24 · issue #5050._
   document outside the book (`isBilledHere`), which no stamp tracks. The
   pointer is written for every observed Character, own-corporation members
   included, so this is exactly the rule; a read the pointer does not allow
-  would be refused anyway.
+  would be refused anyway. When the pointer cannot be read (offline, signed
+  out), coverage is read live and uncached, as before.
 - **The pointer itself is not cached**: it lives outside `corps/{id}` and is
   the access gate above.
 - **No incremental `observed` pull**, for #5047's reason: edits rewrite past

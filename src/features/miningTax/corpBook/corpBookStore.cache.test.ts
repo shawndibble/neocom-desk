@@ -133,8 +133,30 @@ describe('loadCorpBooks over the version marker', () => {
 
     const [book] = await loadCorpBooks(me);
 
-    expect(store.reads).not.toContain(`${BOOK}/feederCoverage`);
     expect(book?.feeders).toBeUndefined();
+  });
+
+  it('reads feeder coverage live when the pointer could not be read', async () => {
+    await loadCorpBooks(me);
+    store.denied.add(POINTER);
+    store.reads.length = 0;
+
+    const [book] = await loadCorpBooks(me);
+
+    // As before this change: the rules decide, never the copy.
+    expect(store.reads).toContain(`${BOOK}/feederCoverage`);
+    expect(book?.feeders).toHaveLength(1);
+  });
+
+  it('does not keep a part whose read failed', async () => {
+    store.denied.add(`${BOOK}/adjustments`);
+    await loadCorpBooks(me);
+    store.denied.delete(`${BOOK}/adjustments`);
+    store.reads.length = 0;
+
+    await loadCorpBooks(me);
+
+    expect(store.reads).toEqual([POINTER, BOOK, `${BOOK}/adjustments`]);
   });
 
   it('reads every part on every load while the server has not stamped the book', async () => {
