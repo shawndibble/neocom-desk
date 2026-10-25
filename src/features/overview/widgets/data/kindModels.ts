@@ -30,7 +30,8 @@ import {
 } from './builderKit';
 import { marketTrend } from './marketTrendModel';
 import { omega } from './omegaModel';
-import { tradingProfit } from './tradingProfitModel';
+import { WALLET_TRADE_ENDPOINTS } from '../kinds';
+import { profit } from './profitModel';
 import { hbarsFromRows } from './chartBuilders';
 import { clonesTable, locationTable } from './characterTables';
 import {
@@ -911,5 +912,20 @@ export const KIND_DEFS: Readonly<Record<string, KindDef>> = {
   kills: { feeds: ['kills'], scope: 'account', build: kills },
   marketTrend: { feeds: ['marketTrend'], scope: 'character', build: marketTrend },
   omega: { feeds: ['omega'], scope: 'account', build: omega },
-  tradingProfit: { feeds: ['tradingProfit'], scope: 'account', build: tradingProfit },
+  // Its reads and scope follow the widget's Source (`profitModel.ts`).
+  profit: {
+    feeds: ['profit', 'tradingProfit'],
+    scope: 'character',
+    build: profit,
+    bySettings: ({ profitSource }) =>
+      profitSource === 'trading'
+        ? { feeds: ['tradingProfit'], scope: 'account', endpoints: WALLET_TRADE_ENDPOINTS }
+        : profitSource === 'both'
+          ? {
+              feeds: ['profit', 'tradingProfit'],
+              scope: 'character',
+              endpoints: WALLET_TRADE_ENDPOINTS,
+            }
+          : { feeds: ['profit'], scope: 'character', endpoints: [] },
+  },
 };

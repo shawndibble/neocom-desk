@@ -356,3 +356,5 @@ Reset and the Gallery all follow it. A saved layout keeps the view it stored
 | mail | Table | M | Number, Table |
 
 Coming-soon kinds open as a Number until they are built.
+
+`profit` has a Source setting (Builds / Trading / Both; a new one opens on Both). It took over the retired `tradingProfit` kind, whose saved widgets load as `profit` on Trading.

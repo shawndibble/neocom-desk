@@ -76,6 +76,12 @@ export function Lines({ model, height }: { model: LinesChartModel; height: numbe
           </svg>
         </ChartHover>
       )}
+      {drawn && (model.xStart || model.xEnd) && (
+        <div className="flex justify-between gap-2 text-[0.6875rem] text-text-dim tabular-nums">
+          <span>{model.xStart}</span>
+          <span>{model.xEnd}</span>
+        </div>
+      )}
       {(model.low !== undefined || model.high !== undefined) && (
         <div className="flex justify-between gap-2 text-[0.6875rem] text-text-dim tabular-nums">
           <span>{model.low}</span>

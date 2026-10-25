@@ -5,6 +5,8 @@
  */
 import { formatAge } from '@/lib/age';
 import type { WidgetStateInput } from '../state';
+import type { EsiEndpointId } from '@/esi/registry';
+import type { SettingsContext } from './viewSettings';
 import type {
   BuildContext,
   FeedId,
@@ -93,6 +95,14 @@ export type Builder = (feeds: Feeds, ctx: BuildContext) => KindView;
  */
 export type KindScope = 'character' | 'account';
 
+/** What one widget of a kind reads under its settings (`KindDef.bySettings`). */
+export interface SettingsReads {
+  feeds: readonly FeedId[];
+  scope: KindScope;
+  /** The endpoints its "needs permission" state asks for. */
+  endpoints: readonly EsiEndpointId[];
+}
+
 /**
  * One widget kind, declared once: the feeds it reads, whether it sums across
  * Characters, and the builder that turns the feeds into a view. Which per-widget
@@ -110,4 +120,11 @@ export interface KindDef {
   build: Builder;
   /** The real builder, behind `import()` to keep its copy off the startup graph; `ensureBuilders` loads it. */
   loadBuild?: () => Promise<Builder>;
+  /**
+   * For a kind whose reads follow a per-widget setting (Profit's Source): the
+   * feeds, scope and ESI endpoints under those settings. `feeds` above is then
+   * every feed it may read, `scope` what it is with no settings, and the
+   * catalogue's `endpoints` every endpoint it may need.
+   */
+  bySettings?: (settings: SettingsContext) => SettingsReads;
 }

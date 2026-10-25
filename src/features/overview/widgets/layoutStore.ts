@@ -16,7 +16,6 @@
  */
 import { createSyncedSetting } from '@/lib/useSyncedSetting';
 import { getKind } from './kinds';
-import { migrateRetiredKind } from './migrate';
 import {
   cleanTrendHubs,
   cleanTrendItems,
@@ -29,6 +28,7 @@ import {
   type Widget,
   type WidgetRange,
 } from './layout';
+import { migrateRetiredKind } from './migrate';
 import { SIZES } from './sizes';
 import { isRowsPerPage } from './tableSortPage';
 
@@ -71,6 +71,7 @@ function parseWidget(stored: unknown): Widget | null {
     delete out.raidsRadius;
   }
   if (!def.hasPlexPlan || !isPlexPlan(raw.plexPer30Days)) delete out.plexPer30Days;
+  if (!def.hasProfitSource) delete out.profitSource;
   const items = cleanTrendItems(raw.trendItems);
   if (!def.hasTrendSources || items.length === 0) delete out.trendItems;
   else out.trendItems = items;

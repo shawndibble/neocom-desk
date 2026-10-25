@@ -19,6 +19,7 @@ import {
   setCalendarEvents,
   setRaidsRadius,
   setRaidsWhere,
+  setProfitSource,
   setTrendHubs,
   setTrendItems,
   setPlexPer30Days,
@@ -298,6 +299,27 @@ describe('setRaidsWhere and setRaidsRadius', () => {
     expect(setRaidsRadius(l, 'a', 8)).toBe(l);
     expect(setRaidsRadius(l, 'a', 7)).toBe(l);
     expect(setRaidsRadius(l, 'b', 5)).toBe(l);
+  });
+});
+
+describe('setProfitSource', () => {
+  it('opens a new Profit widget on Both', () => {
+    expect(newWidget('profit', 'a')?.profitSource).toBe('both');
+    expect('profitSource' in newWidget('wallet', 'b')!).toBe(false);
+  });
+
+  it('stores every choice, Builds included, since absent already means Builds', () => {
+    const l = layoutOf(w('a', 'profit', { profitSource: 'both' }));
+    const builds = setProfitSource(l, 'a', 'builds');
+    expect(builds.widgets[0].profitSource).toBe('builds');
+    expect(setProfitSource(builds, 'a', 'trading').widgets[0].profitSource).toBe('trading');
+  });
+
+  it('changes nothing for the current choice, absent read as Builds, or another kind', () => {
+    const l = layoutOf(w('a', 'profit'), w('b', 'orders'));
+    expect(setProfitSource(l, 'a', 'builds')).toBe(l);
+    expect(setProfitSource(l, 'b', 'trading')).toBe(l);
+    expect(setProfitSource(l, 'a', 'everything' as never)).toBe(l);
   });
 });
 

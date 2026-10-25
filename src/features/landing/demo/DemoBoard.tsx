@@ -68,6 +68,7 @@ export default function DemoBoard() {
       setRaidsWhere: none,
       setRaidsRadius: none,
       setStructuresShow: none,
+      setProfitSource: none,
       setTrendItems: none,
       setTrendHubs: none,
       rename: none,

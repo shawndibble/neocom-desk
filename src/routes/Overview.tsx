@@ -198,10 +198,11 @@ export function Overview() {
   const onLayoutChange = useCallback((next: OverviewLayout) => void setLayout(next), [setLayout]);
 
   const widgets = layout?.widgets;
-  const kinds = useMemo(
-    () => (widgets ? distinctKinds(visibleWidgets(widgets, isPhone)) : []),
+  const shown = useMemo(
+    () => (widgets ? visibleWidgets(widgets, isPhone) : []),
     [widgets, isPhone]
   );
+  const kinds = useMemo(() => distinctKinds(shown), [shown]);
 
   if (!hydrated) {
     return (
@@ -243,7 +244,7 @@ export function Overview() {
   return (
     <OverviewRefreshProvider>
       <OverviewEditProvider layout={layout} onLayoutChange={onLayoutChange}>
-        <WidgetDataProvider kinds={kinds}>
+        <WidgetDataProvider kinds={kinds} widgets={shown}>
           <Board characterId={activeCharacterId} layout={layout} />
         </WidgetDataProvider>
       </OverviewEditProvider>

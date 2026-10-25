@@ -4421,7 +4421,11 @@
         "profit": {
           "summary": "Realized profit {{total}} from {{runs}} logged runs in the last {{range}} days. Per period, oldest first: {{buckets}}.",
           "noteDaily": "ISK profit per day; a loss hangs below the axis",
-          "noteWeekly": "ISK profit per week; a loss hangs below the axis"
+          "noteWeekly": "ISK profit per week; a loss hangs below the axis",
+          "summaryBoth": "Profit {{total}} in the last {{range}} days: builds {{builds}}, trading {{trading}}. Per period, oldest first: {{buckets}}.",
+          "noteBothDaily": "ISK profit per day from builds and from trading. Broker fees aren't taken off.",
+          "noteBothWeekly": "ISK profit per week from builds and from trading. Broker fees aren't taken off.",
+          "tipTotal": "Total"
         },
         "tradingProfit": {
           "summary": "Trading profit {{total}} from {{matched}} of {{count}} sales in the last {{range}} days.",
@@ -4844,26 +4848,32 @@
         }
       },
       "profit": {
-        "title": "Build profit",
-        "description": "What your builds earned",
+        "title": "Profit",
+        "description": "What your builds and your market trading earned",
         "empty": "No production has been logged yet.",
+        "emptyBoth": "No logged builds and no sales in this range.",
+        "tradingFailed": "Trading couldn't be read, so this is builds only.",
         "vsPrevious_one": "{{delta}} vs the previous day",
         "vsPrevious_other": "{{delta}} vs the previous {{count}} days",
+        "source": {
+          "builds": "Build",
+          "trading": "Trade"
+        },
         "col": {
           "product": "Product",
           "profit": "Profit",
           "built": "Built",
-          "perUnit": "Per unit"
-        }
-      },
-      "tradingProfit": {
-        "title": "Trading profit",
-        "description": "What your market sales made, against the buys behind them",
-        "empty": "No sales in your wallet history for this range.",
-        "col": {
-          "item": "Item",
-          "sales": "Sales",
-          "margin": "Margin"
+          "perUnit": "Per unit",
+          "name": "Product or item",
+          "source": "Source"
+        },
+        "trading": {
+          "empty": "No sales in your wallet history for this range.",
+          "col": {
+            "item": "Item",
+            "sales": "Sales",
+            "margin": "Margin"
+          }
         }
       },
       "miningYield": {
@@ -5814,9 +5824,6 @@
         "profit": {
           "note": "This month · +18%"
         },
-        "tradingProfit": {
-          "note": "41 of 45 sales matched"
-        },
         "miningYield": {
           "note": "Average over the range"
         },
@@ -5978,6 +5985,12 @@
       "structuresShowChoice": {
         "all": "All structures",
         "problems": "Problems only"
+      },
+      "profitSource": "Source",
+      "profitSourceChoice": {
+        "builds": "Builds",
+        "trading": "Trading",
+        "both": "Both"
       },
       "rename": "Rename",
       "renameTitle": "Rename {{title}}",

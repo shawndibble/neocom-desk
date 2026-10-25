@@ -105,7 +105,8 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
   }
   const feedIds = useMemo(() => {
     const ids = new Set<FeedId>();
-    for (const request of stable) for (const id of feedsOf(request.kind) ?? NO_FEEDS) ids.add(id);
+    for (const request of stable)
+      for (const id of feedsOf(request.kind, request) ?? NO_FEEDS) ids.add(id);
     return [...ids];
   }, [stable]);
   // Re-render only when a feed these kinds read changes, not on any feed's update.
@@ -125,7 +126,7 @@ export function useKindViews(requests: readonly ViewRequest[]): ReadonlyMap<stri
         cachedView(
           store,
           request,
-          feedsOf(request.kind) ?? NO_FEEDS,
+          feedsOf(request.kind, request) ?? NO_FEEDS,
           {
             t,
             now,
@@ -152,6 +153,7 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
     raidsWhere,
     raidsRadius,
     structuresShow,
+    profitSource,
     trendItems,
     trendHubs,
   } = settings;
@@ -165,6 +167,7 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
       raidsWhere,
       raidsRadius,
       structuresShow,
+      profitSource,
       trendItems,
       trendHubs,
     }),
@@ -177,6 +180,7 @@ export function useWidgetView(kind: string, scopeAll: boolean, settings: ViewSet
       raidsWhere,
       raidsRadius,
       structuresShow,
+      profitSource,
       trendItems,
       trendHubs,
     ]
