@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { EditableValue, TextInput } from '@/components/ui';
 import { formatPercent } from './formatPercent';
 
@@ -11,20 +12,21 @@ import { formatPercent } from './formatPercent';
  */
 export function InlinePercent({
   fraction,
-  label,
+  name,
   min,
   max,
   onCommit,
 }: {
   /** The value shown at rest, as a fraction. */
   fraction: number;
-  /** The action, for a screen reader: "Edit facility yield". */
-  label: string;
+  /** What the value is, already translated: "Facility yield". The field is named this; the value's button reads "Edit …". */
+  name: string;
   /** Percent bounds, inclusive. */
   min: number;
   max: number;
   onCommit: (fraction: number) => void;
 }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState<string | null>(null);
   const [refocus, setRefocus] = useState(false);
   // Set once Enter or Escape has settled the field, so the blur that follows does not save again.
@@ -51,7 +53,7 @@ export function InlinePercent({
         // the caret after it, and a number field can't place its caret.
         inputMode="decimal"
         autoFocus
-        aria-label={label}
+        aria-label={name}
         className="w-16 text-right"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -74,7 +76,7 @@ export function InlinePercent({
   }
   return (
     <EditableValue
-      label={label}
+      label={t('refining.editValue', { name })}
       focusOnMount={refocus}
       onFocused={() => setRefocus(false)}
       onEdit={(seed) => {

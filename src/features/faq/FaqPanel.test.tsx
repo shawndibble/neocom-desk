@@ -72,7 +72,7 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.miningTaxManualIgnoredTypeIds': /ore types you tagged/i,
   'sync.miningTaxCompressedOre': /compressed ore/i,
   'sync.oreRefiningStructureRate': /refining rate you type/i,
-  'sync.reprocessingTaxRate': /refining rate you type/i,
+  'sync.reprocessingTaxRate': /reprocessing tax/i,
   'sync.surveyHistory': /survey links you created or opened/i,
   'sync.surveyInfoTemplates': /info templates/i,
   'sync.stockLists': /markets you stock/i,

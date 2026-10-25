@@ -19,7 +19,7 @@ export function RefiningSetupChips() {
         value={
           <InlinePercent
             fraction={setup.stationRate}
-            label={t('market.appraisal.editRefineYield')}
+            name={t('market.appraisal.refineYield')}
             min={1}
             max={100}
             onCommit={(fraction) => void setYieldRate(fraction)}
@@ -32,7 +32,7 @@ export function RefiningSetupChips() {
         value={
           <InlinePercent
             fraction={setup.taxRate}
-            label={t('market.appraisal.editRefineTax')}
+            name={t('market.appraisal.refineTax')}
             min={0}
             max={100}
             onCommit={(fraction) => void setTaxRate(fraction)}

@@ -124,6 +124,26 @@ describe('useAppraisal', () => {
     });
   });
 
+  it('waits for the stored Refining Setup before pricing, so it is priced once', async () => {
+    const setup = { stationRate: 0.54, taxRate: 0.01 };
+    const { result, rerender } = renderHook(
+      ({ ready }) => useAppraisal(DEFAULT_TRADE_HUB, 90, 1, setup, ready),
+      { initialProps: { ready: false } }
+    );
+
+    act(() => result.current.setText('Veldspar 100'));
+    act(() => result.current.appraise());
+    await waitFor(() => expect(result.current.canAppraise).toBe(true));
+    expect(appraisePaste).not.toHaveBeenCalled();
+
+    rerender({ ready: true });
+    await waitFor(() => expect(appraisePaste).toHaveBeenCalledTimes(1));
+    expect(appraisePaste).toHaveBeenLastCalledWith('Veldspar 100', DEFAULT_TRADE_HUB, 90, 1, {
+      force: false,
+      refining: setup,
+    });
+  });
+
   it('re-prices when the hub changes', async () => {
     const amarr = getTradeHub('amarr')!;
     const { result, rerender } = renderHook(({ hub }) => useAppraisal(hub, 90, null), {

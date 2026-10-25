@@ -7,7 +7,7 @@ function setup(fraction = 0.5, min = 1, max = 100) {
   render(
     <InlinePercent
       fraction={fraction}
-      label="Edit facility yield"
+      name="Facility yield"
       min={min}
       max={max}
       onCommit={onCommit}
@@ -17,8 +17,8 @@ function setup(fraction = 0.5, min = 1, max = 100) {
 }
 
 function openField() {
-  fireEvent.click(screen.getByRole('button', { name: /Edit facility yield/ }));
-  return screen.getByRole('textbox', { name: 'Edit facility yield' });
+  fireEvent.click(screen.getByRole('button', { name: /Edit Facility yield/ }));
+  return screen.getByRole('textbox', { name: 'Facility yield' });
 }
 
 describe('InlinePercent', () => {
@@ -85,7 +85,7 @@ describe('InlinePercent', () => {
 
   it('opens with a typed digit', () => {
     setup();
-    fireEvent.keyDown(screen.getByRole('button', { name: /Edit facility yield/ }), { key: '5' });
+    fireEvent.keyDown(screen.getByRole('button', { name: /Edit Facility yield/ }), { key: '5' });
     expect(screen.getByRole('textbox')).toHaveValue('5');
   });
 });

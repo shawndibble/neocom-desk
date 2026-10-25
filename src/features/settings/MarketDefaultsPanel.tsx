@@ -73,7 +73,7 @@ export function MarketDefaultsPanel() {
           <Field label={t('settings.refiningYieldLabel')} note={t('settings.refiningYieldHint')}>
             <InlinePercent
               fraction={refining.setup.stationRate}
-              label={t('market.appraisal.editRefineYield')}
+              name={t('settings.refiningYieldLabel')}
               min={1}
               max={100}
               onCommit={(fraction) => void refining.setYieldRate(fraction)}
@@ -83,7 +83,7 @@ export function MarketDefaultsPanel() {
           <Field label={t('settings.refiningTaxLabel')} note={t('settings.refiningTaxHint')}>
             <InlinePercent
               fraction={refining.setup.taxRate}
-              label={t('market.appraisal.editRefineTax')}
+              name={t('settings.refiningTaxLabel')}
               min={0}
               max={100}
               onCommit={(fraction) => void refining.setTaxRate(fraction)}

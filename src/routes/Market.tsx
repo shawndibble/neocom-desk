@@ -533,8 +533,14 @@ export function Market() {
 
   // Held here rather than inside `AppraisalPanel` so a pasted list survives a
   // trip to the Browser tab, and so the header's refresh button can drive it.
-  const { setup: refiningSetup } = useRefiningSetup();
-  const appraisal = useAppraisal(effectiveHub, pricePercent, activeCharacterId, refiningSetup);
+  const { setup: refiningSetup, hydrated: refiningHydrated } = useRefiningSetup();
+  const appraisal = useAppraisal(
+    effectiveHub,
+    pricePercent,
+    activeCharacterId,
+    refiningSetup,
+    refiningHydrated
+  );
   // A Fitting's Export menu, or a page-level paste (`app/GlobalPasteRouter.tsx`),
   // lands here with a list to appraise. Keyed on the navigation itself so a
   // re-render never re-submits it.

@@ -12045,12 +12045,10 @@
       "assumesBaseStandingsHint": "The broker fee above is calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
       "refineTotal": "Refine",
       "refineTotalHelp": "What refining the list with the active Character's own reprocessing skills would fetch, sold into buy orders at this hub, less the reprocessing tax. The facility yield and tax beside it are yours to set.",
-      "refineYield": "Yield",
+      "refineYield": "Facility yield",
       "refineYieldHelp": "The facility's own yield before your skills and implants, which are applied on top. 50% at an NPC station. At a structure, hover an item in its Reprocessing window for the yield breakdown.",
-      "editRefineYield": "Edit facility yield",
-      "refineTax": "Tax",
-      "refineTaxHelp": "The facility's fee, taken from the refined value in ISK. An NPC station's depends on your standings: about 5% with none, falling to 0 near 6.7. A structure's is set by its owner; hover the reprocessing icon in the Structures browser.",
-      "editRefineTax": "Edit reprocessing tax",
+      "refineTax": "Reprocessing tax",
+      "refineTaxHelp": "The facility's fee, taken from the refined value in ISK. An NPC station's depends on your standings; a structure's is set by its owner. Check the structure in the Structures browser.",
       "refineImplantHint": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
       "refineAssumesNoImplantsHint": "Refine value is calculated without this character's fitted implants, so a refining implant isn't counted. Grant Character details for an accurate estimate.",
       "refineLeftoverHint_one": "{{count}} unit is too few for a full refine batch. It sells at the buy price for {{isk}} ISK. With it, refining beats the {{buyTotal}} ISK buy total.",
@@ -12855,6 +12853,9 @@
     "title": "{{page}} settings",
     "allSettings": "All settings"
   },
+  "refining": {
+    "editValue": "Edit {{name}}"
+  },
   "settings": {
     "title": "Settings",
     "tabs": {
@@ -13572,10 +13573,10 @@
     "bpcHideAuctionsHint": "Hides auction contracts when BPC Sourcing opens.",
     "bpcHideHint": "Hides PLEX contracts when BPC Sourcing opens. Toggle it in the filter bar per search.",
     "tradeHubHint": "Prices LP offers and item lookups; Hauling Opportunities starts here. Moon mining tax uses each payee’s own hub.",
-    "refiningYieldLabel": "Refining facility yield",
+    "refiningYieldLabel": "Facility yield",
     "refiningYieldHint": "Where you refine, before your skills and implants: 50% at an NPC station. At a structure, hover an item in its Reprocessing window for the yield breakdown.",
     "refiningTaxLabel": "Reprocessing tax",
-    "refiningTaxHint": "The facility's fee, taken from the refined value. An NPC station's depends on your standings; a structure's is set by its owner. Hover the reprocessing icon in the Structures browser.",
+    "refiningTaxHint": "The facility's fee, taken from the refined value. An NPC station's depends on your standings; a structure's is set by its owner. Check the structure in the Structures browser.",
     "assumedMeLabel": "Assumed ME for blueprints you don’t own",
     "assumedMeHint": "Quotes new plans and sub-builds at this ME. A blueprint you own uses its real ME.",
     "assumedTeLabel": "Assumed TE for blueprints you don’t own",
