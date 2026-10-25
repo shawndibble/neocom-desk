@@ -1,3 +1,4 @@
+import { liveQuery } from 'dexie';
 import { useEffect, useState } from 'react';
 import { loadRosterSnapshot, type RosterEntry } from '@/features/character/roster';
 import { rosterCoreMap, mergeRosterCore, type RosterCore } from '@/features/character/rosterView';
@@ -23,21 +24,17 @@ export function useRosterData(characters: readonly { characterId: number }[] | u
     setRosterCore((previous) => mergeRosterCore(previous, entry, now));
   }
 
+  // Live over the cache rows the snapshot reads, not read once: a sync still
+  // landing when the page opens (straight after a first login) would otherwise
+  // leave every row "Unknown" until something else changed the characters.
+  // `characters` is only the trigger: the snapshot reads them itself, and is empty with none.
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      if (!characters || characters.length === 0) {
-        if (!cancelled) setRosterCore(new Map());
-        return;
-      }
-      const now = Date.now();
-      const roster = await loadRosterSnapshot();
-      if (cancelled) return;
-      setRosterCore(rosterCoreMap(roster, now));
-    })();
-    return () => {
-      cancelled = true;
-    };
+    const subscription = liveQuery(() => loadRosterSnapshot()).subscribe({
+      next: (roster) => setRosterCore(rosterCoreMap(roster, Date.now())),
+      // Keeps the last snapshot shown, as the one-shot read did when it failed.
+      error: () => undefined,
+    });
+    return () => subscription.unsubscribe();
   }, [characters]);
 
   // Mirrors the cache-only effect above, cache-only by default: manufacturing

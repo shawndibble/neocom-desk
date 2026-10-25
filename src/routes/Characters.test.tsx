@@ -1339,6 +1339,7 @@ describe('Characters table view', () => {
         queue: queueAt(threeHoursAgo),
       },
     ];
+    let cached = stale;
     let finishRoster: () => void = () => {};
     const rosterGate = new Promise<void>((resolve) => {
       finishRoster = resolve;
@@ -1346,8 +1347,12 @@ describe('Characters table view', () => {
     const snapshotSpy = vi
       .spyOn(rosterModule, 'loadRosterSnapshot')
       .mockImplementation(async (opts) => {
-        if (!opts?.live) return stale;
-        opts.onEntry?.({ ...stale[0], queue: queueAt(new Date()) });
+        if (!opts?.live) return cached;
+        // A live load writes the cache as each character finishes, which the
+        // cache-only snapshot is live over.
+        const fresh = { ...stale[0], queue: queueAt(new Date()) };
+        cached = [fresh, stale[1]];
+        opts.onEntry?.(fresh);
         await rosterGate;
         return stale;
       });
