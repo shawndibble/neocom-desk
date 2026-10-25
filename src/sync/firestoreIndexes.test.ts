@@ -3,6 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { SHARES_COLLECTION } from '@/features/share/shareStore';
 import { REMOTE_COLLECTION_NAMES } from './syncedCollections';
 
+/** Collection-group single-field indexes the scheduled sweeps query (functions/, #5049). */
+const SWEEP_GROUP_FIELDS: [group: string, field: string][] = [
+  ['feeders', 'status'],
+  ['itemRequests', 'expiresAt'],
+  ['itemRequests', 'closedAt'],
+  ['fleetPayouts', 'expiresAt'],
+  ['srpClaims', 'closedAt'],
+];
+
 /**
  * Drift guard over `firestore.indexes.json` — **not** a proof that Firestore
  * honours the exemptions (issue #583's AC1). It cannot be: the Firestore
@@ -122,9 +131,30 @@ describe('firestore.indexes.json field overrides', () => {
       'pledges',
       // A guest's pending Miner groupings are found across books (#4210).
       'miners',
+      // Scheduled sweeps query across every parent instead of once per parent (#5049).
+      ...SWEEP_GROUP_FIELDS.map(([group]) => group),
     ]);
     expect(config.fieldOverrides.filter((o) => !groups.has(o.collectionGroup))).toEqual([]);
   });
+
+  it.each(SWEEP_GROUP_FIELDS)(
+    'indexes %s.%s at collection-group scope, keeping the default collection indexes',
+    (group, field) => {
+      // functions/src/indexedSweep.ts: the sweeps fall back to the per-parent scan
+      // until this is deployed, so a missing entry costs reads, not a failing job.
+      expect(overridesFor(group)).toContainEqual({
+        collectionGroup: group,
+        fieldPath: field,
+        ttl: false,
+        indexes: [
+          { order: 'ASCENDING', queryScope: 'COLLECTION' },
+          { order: 'DESCENDING', queryScope: 'COLLECTION' },
+          { arrayConfig: 'CONTAINS', queryScope: 'COLLECTION' },
+          { order: 'ASCENDING', queryScope: 'COLLECTION_GROUP' },
+        ],
+      });
+    }
+  );
 
   it('indexes pending Miner groupings by character at collection-group scope', () => {
     // `listPendingGroupings` runs `collectionGroup('miners').where('pendingConfirmation', 'array-contains', id)`.

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
 import {
   dispatchDueProjections,
+  purgeFiredProjections,
   projectionDocId,
   writeDeviceRegistration,
   type PushSender,
@@ -503,7 +504,7 @@ describe('dispatchDueProjections', () => {
   });
 });
 
-// The Firestore queries in `dispatchDueProjections` re-express `isDue` and
+// The Firestore queries in `dispatchDueProjections` and `purgeFiredProjections` re-express `isDue` and
 // `isPastRetention` as `where` filters (a query cannot call them), so these
 // pin each query's boundary to the function it mirrors.
 describe('dispatchDueProjections query boundaries', () => {
@@ -532,7 +533,7 @@ describe('dispatchDueProjections query boundaries', () => {
       expect(db.get('projections', id)).toMatchObject({ fired: true, firedAt: NOW });
 
       const later = NOW + FIRED_RETENTION_MS + d;
-      await dispatchDueProjections(asFirestore(db), new FakeMessaging(), later);
+      await purgeFiredProjections(asFirestore(db), later);
 
       expect(db.get('projections', id) === undefined).toBe(isPastRetention(NOW, later));
     }

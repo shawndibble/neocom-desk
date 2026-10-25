@@ -30,6 +30,13 @@ import { writeOpenPricesToR2 } from './r2DailySnapshots.js';
 // get the ESI User-Agent naming this app, never a personal contact.
 export const PUBLIC_HOST_USER_AGENT = ESI_USER_AGENT;
 
+/**
+ * `systemConditions/lawless` as this warm instance last read or wrote it. This
+ * job is its only writer, so after the first run an instance knows the doc
+ * without paying a read every 15 minutes; a cold start reads it once.
+ */
+let lawlessSeen: Record<string, unknown> | undefined;
+
 /** Body of syncLawlessSystems (see its doc in index.ts). */
 export async function runSyncLawlessSystems(): Promise<void> {
   const response = await fetch(INSURGENCY_URL, {
@@ -52,8 +59,15 @@ export async function runSyncLawlessSystems(): Promise<void> {
   const systemIds = parseLawlessSystemIds(body);
   const ref = firestore().collection(SYSTEM_CONDITIONS_COLLECTION).doc(LAWLESS_SYSTEMS_DOC);
   const now = Date.now();
-  const written = lawlessWriteNeeded((await ref.get()).data(), systemIds, now);
-  if (written) await ref.set({ systemIds, updatedAt: now });
+  const stored = lawlessSeen ?? (await ref.get()).data();
+  const written = lawlessWriteNeeded(stored, systemIds, now);
+  if (written) {
+    const next = { systemIds, updatedAt: now };
+    await ref.set(next);
+    lawlessSeen = next;
+  } else {
+    lawlessSeen = stored;
+  }
   logInfo('lawless systems sync', { count: systemIds.length, written });
 }
 

@@ -10,6 +10,8 @@ import { removePledge, removeRequest, sweepRequests } from './communityRequestsC
 import { deleteMemberShares, purgeCharacterCommunities } from './communitiesStore.js';
 
 type Doc = Record<string, unknown>;
+/** Path prefix the fake gives a collection-group query. */
+const GROUP = '**/';
 
 /**
  * An in-memory stand-in for the slice of Firestore these functions touch:
@@ -23,6 +25,8 @@ function fakeDb(initial: Record<string, Doc>) {
   const bulkDeletes: string[] = [];
   const failOn = new Set<string>();
   const hooks: { afterQuery?: () => void } = {};
+  // `missingIndex`: collection-group queries fail as they do before the index is deployed.
+  const stats = { queries: 0, listings: 0, missingIndex: false };
 
   // A snapshot is a copy: it outlives a later delete, as a Firestore one does.
   const snap = (path: string) => {
@@ -52,7 +56,10 @@ function fakeDb(initial: Record<string, Doc>) {
     const next = (step: (typeof steps)[number], by = order) => query(path, [...steps, step], by);
     return {
       doc: (id: string) => ref(`${path}/${id}`),
-      listDocuments: async () => directChildren(path).map((row) => ref(row.path)),
+      listDocuments: async () => {
+        stats.listings += 1;
+        return directChildren(path).map((row) => ref(row.path));
+      },
       where: (field: string, op: string, value: number | string) =>
         next((rows) =>
           rows.filter((row) => {
@@ -73,6 +80,10 @@ function fakeDb(initial: Record<string, Doc>) {
         ),
       limit: (n: number) => next((rows) => rows.slice(0, n)),
       get: async () => {
+        if (path.startsWith(GROUP) && stats.missingIndex) {
+          throw Object.assign(new Error('The query requires an index'), { code: 9 });
+        }
+        stats.queries += 1;
         let rows = directChildren(path);
         for (const step of steps) rows = step(rows);
         const found = {
@@ -86,12 +97,19 @@ function fakeDb(initial: Record<string, Doc>) {
     };
   }
   function directChildren(path: string) {
+    if (path.startsWith(GROUP)) {
+      const name = path.slice(GROUP.length);
+      return [...docs.entries()]
+        .filter(([p]) => p.split('/').at(-2) === name)
+        .map(([p, data]) => ({ path: p, data }));
+    }
     return [...docs.entries()]
       .filter(([p]) => p.startsWith(`${path}/`) && !p.slice(path.length + 1).includes('/'))
       .map(([p, data]) => ({ path: p, data }));
   }
   const db = {
     collection,
+    collectionGroup: (name: string) => collection(`${GROUP}${name}`),
     recursiveDelete: async (target: { path: string }) => {
       if (failOn.has(target.path)) throw new Error('boom');
       recursiveDeletes.push(target.path);
@@ -107,7 +125,7 @@ function fakeDb(initial: Record<string, Doc>) {
       close: async () => {},
     }),
   } as unknown as Firestore;
-  return { db, docs, recursiveDeletes, bulkDeletes, failOn, hooks };
+  return { db, docs, recursiveDeletes, bulkDeletes, failOn, hooks, stats };
 }
 
 const NOW = 5_000_000_000_000;
@@ -159,6 +177,33 @@ describe('sweepRequests', () => {
     });
     expect((await sweepRequests(f.db, NOW)).deleted).toBe(2);
     expect(await sweepRequests(f.db, NOW)).toEqual({ deleted: 0, failed: 0, truncated: false });
+  });
+
+  it('an idle run is one collection-group query per rule, with no per-Community reads', async () => {
+    const f = fakeDb({
+      [`${C}`]: {},
+      ['communities/c2']: {},
+      [`${C}/itemRequests/live`]: request(),
+    });
+    expect((await sweepRequests(f.db, NOW)).deleted).toBe(0);
+    expect(f.stats).toMatchObject({ queries: 2, listings: 0 });
+  });
+
+  it('falls back to the per-Community scan until the index is deployed', async () => {
+    const f = fakeDb({
+      [`${C}`]: {},
+      ['communities/c2']: {},
+      [`${C}/itemRequests/a`]: request({ expiresAt: 1 }),
+      [`communities/c2/itemRequests/b`]: request({ closed: true, closedAt: 1 }),
+    });
+    f.stats.missingIndex = true;
+    expect(await sweepRequests(f.db, NOW)).toEqual({ deleted: 2, failed: 0, truncated: false });
+  });
+
+  it('leaves a same-named collection outside Communities alone', async () => {
+    const f = fakeDb({ ['elsewhere/x/itemRequests/a']: request({ expiresAt: 1 }) });
+    expect((await sweepRequests(f.db, NOW)).deleted).toBe(0);
+    expect(f.docs.has('elsewhere/x/itemRequests/a')).toBe(true);
   });
 
   it('counts a Request once when both queries find it', async () => {

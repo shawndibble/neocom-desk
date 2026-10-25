@@ -217,7 +217,7 @@ export function readQuietHours(raw: unknown): QuietHours | undefined {
 }
 
 /**
- * Fire every due row, then purge fired rows past retention. Per row, in
+ * Fire every due row (`purgeFiredProjections` purges old ones). Per row, in
  * order: stale (>7 days past fireAt) → delete unsent; a device-scoped row
  * whose device has no registration → delete (orphan: its token was deleted
  * after FCM reported it dead — e.g. the device logged out, which deletes its
@@ -335,11 +335,18 @@ export async function dispatchDueProjections(
       }
     })
   );
+}
 
-  // Fired rows are kept as the backend's half of the Notification Feed, then
-  // purged like every other Feed row (round 20/45) — mirrors `isPastRetention`
-  // as a query filter, same reasoning as `isDue` above.
-  const purgeSnapshot = await projections
+/**
+ * Fired rows are kept as the backend's half of the Notification Feed, then
+ * purged like every other Feed row (round 20/45) — mirrors `isPastRetention`
+ * as a query filter, same reasoning as `isDue` in `dispatchDueProjections`.
+ * A task of `dailyHousekeeping`, not of every dispatch tick: the retention is
+ * 30 days, so a day's lag is nothing, and an empty query is still a billed read.
+ */
+export async function purgeFiredProjections(db: Firestore, now: number): Promise<void> {
+  const purgeSnapshot = await db
+    .collection(PROJECTIONS_COLLECTION)
     .where('fired', '==', true)
     .where('firedAt', '<', now - FIRED_RETENTION_MS)
     .get();
