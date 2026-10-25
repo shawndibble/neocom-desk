@@ -7,7 +7,7 @@ export interface OwnedHullCopy {
   characterId: number;
   characterName: string;
   locationId: number;
-  locationType: 'station' | 'other';
+  locationType: 'station' | 'structure';
 }
 
 /** Assembled copies of `hullTypeIds`; a ship in a container or in space has no place to name. */
@@ -25,7 +25,7 @@ export function ownedHullCopies(
         characterId,
         characterName: name,
         locationId: a.location_id,
-        locationType: a.location_type === 'station' ? 'station' : 'other',
+        locationType: a.location_type === 'station' ? 'station' : 'structure',
       });
     }
   }

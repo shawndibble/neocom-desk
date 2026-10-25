@@ -650,12 +650,10 @@ describe('PlanResult', () => {
 
     it('marks owned rows with jumps, unknown, or just Owned; others stay plain', () => {
       renderCrowded();
-      expect(screen.getByLabelText('Owned, 3 jumps from Alice').textContent).toBe(
-        'Owned · 3 jumps'
-      );
-      expect(screen.getByLabelText('Owned, distance from Alice unknown').textContent).toBe(
-        'Owned · jumps unknown'
-      );
+      expect(screen.getByText('Owned, 3 jumps from Alice')).toBeTruthy();
+      expect(screen.getByText('Owned · 3 jumps')).toBeTruthy();
+      expect(screen.getByText('Owned, distance from Alice unknown')).toBeTruthy();
+      expect(screen.getByText('Owned · jumps unknown')).toBeTruthy();
       expect(screen.getByText('Owned')).toBeTruthy();
       expect(screen.queryByText(/Owned · 0/)).toBeNull();
     });

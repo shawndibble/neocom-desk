@@ -134,64 +134,67 @@ async function load(characterIds: readonly number[]): Promise<Loaded> {
   return { sources, shipTypeIds, stacks, typeNames, unitM3, places, systems, hues, rigs, skipped };
 }
 
+/** Systems resolved for owned-hull places, per load, so a re-plan never repeats a failed structure lookup. */
+const hullPlaceSystems = new WeakMap<Loaded, Map<number, number | null>>();
+
 /**
  * Where the nearest owned copy of each hull sits, and its jumps from the
  * character it is nearest to: local graph, saved Jump Basis, no ESI route call.
  * Anything unreadable leaves a hull without a place or with an unknown count,
  * never a failed plan.
  */
+
 async function ownedHullPlaces(loaded: Loaded, hullTypeIds: ReadonlySet<number>) {
   const copies = ownedHullCopies(loaded.sources, hullTypeIds);
   if (copies.length === 0) return new Map<number, MoveHullOwnedAt>();
-  const systemOf = new Map(loaded.systems);
+  let resolved = hullPlaceSystems.get(loaded);
+  if (!resolved) hullPlaceSystems.set(loaded, (resolved = new Map()));
+  const systemOf = new Map([...loaded.systems, ...resolved]);
   await Promise.all(
     copies
       .filter((c) => !systemOf.has(c.locationId))
       .map(async (c) => {
-        systemOf.set(
-          c.locationId,
-          await resolvePlace(
-            {
-              locationId: c.locationId,
-              characterId: c.characterId,
-              kind: c.locationType === 'station' ? 'station' : 'structure',
-            },
-            undefined,
-            { name: false, settle: true }
-          )
-            .then((place) => place.systemId)
-            .catch(() => null)
-        );
+        const systemId = await resolvePlace(
+          { locationId: c.locationId, characterId: c.characterId, kind: c.locationType },
+          undefined,
+          { name: false, settle: true }
+        )
+          .then((place) => place.systemId)
+          .catch(() => null);
+        systemOf.set(c.locationId, systemId);
+        resolved.set(c.locationId, systemId);
       })
   );
   const distance = new Map<string, number | null>();
   try {
     const basis = await loadJumpBasis();
+    const owners = [...new Set(copies.map((c) => c.characterId))];
     const origins = new Map(
       await Promise.all(
-        loaded.sources.map(
-          async (s) =>
-            [s.characterId, await loadCurrentSystemId(s.characterId).catch(() => null)] as const
-        )
+        owners.map(async (id) => [id, await loadCurrentSystemId(id).catch(() => null)] as const)
       )
     );
+    const pairs = new Map<string, { origin: number; systemId: number }>();
+    for (const c of copies) {
+      const origin = origins.get(c.characterId) ?? null;
+      const systemId = systemOf.get(c.locationId);
+      if (origin !== null && systemId != null)
+        pairs.set(`${origin}:${systemId}`, { origin, systemId });
+    }
     await Promise.all(
-      copies.map(async (c) => {
-        const origin = origins.get(c.characterId) ?? null;
-        const systemId = systemOf.get(c.locationId);
-        if (origin === null || systemId == null) return;
+      [...pairs].map(async ([key, { origin, systemId }]) => {
         const result = await jumpsBetween(origin, systemId, basis);
-        distance.set(`${c.characterId}:${systemId}`, result.kind === 'known' ? result.jumps : null);
+        distance.set(key, result.kind === 'known' ? result.jumps : null);
       })
     );
+    return nearestOwnedHulls(copies, systemOf, (characterId, systemId) => {
+      const origin = origins.get(characterId) ?? null;
+      return origin === null ? null : (distance.get(`${origin}:${systemId}`) ?? null);
+    });
   } catch {
-    // Owned and placed, distance unknown.
+    // A distance failure must not fail the plan: hulls stay owned, count unknown.
+    return nearestOwnedHulls(copies, systemOf, () => null);
   }
-  return nearestOwnedHulls(
-    copies,
-    systemOf,
-    (characterId, systemId) => distance.get(`${characterId}:${systemId}`) ?? null
-  );
 }
 
 interface MovePlanTabProps {
