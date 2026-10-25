@@ -20,7 +20,7 @@ interface PageHeaderProps {
    * The page's one `CharacterFilterControl` (This character / All characters
    * / Corporation), rendered first in the right-hand cluster, before
    * `actions`. In this slot the control takes the header's touch tier
-   * (44px tall below `md`, 36px from `md` up; an avatar stack with no words)
+   * (36px tall below `md`, 36px from `md` up; an avatar stack with no words)
    * on its own, through
    * `PageHeaderClusterContext`, so it is always level with the `IconButton`s
    * beside it.
@@ -73,8 +73,8 @@ interface PageHeaderProps {
  * The badge belongs beside the title because it describes the whole view, and
  * one `<h1>` per route is what a screen reader's heading list is for.
  *
- * `min-h-11 md:min-h-9` reserves the touch-tier `IconButton`'s own height
- * (`size-11 md:size-9`) whether or not this route passes `actions` — a route
+ * `min-h-9` reserves the touch-tier `IconButton`'s own height
+ * (`size-9`) whether or not this route passes `actions` — a route
  * without any (just the `<h1>`) would otherwise render a shorter header than
  * one with icon actions, and everything below it (a `Tabs` sub-nav, most
  * visibly) would sit at a different height route to route, jumping as you
@@ -110,7 +110,7 @@ export function PageHeader({
   return (
     <header
       className={cx(
-        'flex min-h-11 flex-wrap gap-2 md:min-h-9',
+        'flex min-h-9 flex-wrap gap-2',
         // Below `md` the sub-nav still needs its own wrapped line; from `md` up
         // everything shares one row and must not wrap.
         singleLine && 'md:flex-nowrap',

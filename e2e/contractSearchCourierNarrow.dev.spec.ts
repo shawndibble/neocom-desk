@@ -54,7 +54,7 @@ const THE_FORGE = 10000002;
 const DOMAIN = 10000043;
 
 /** The touch tier `controlHeightClassName.md` sets aside for a phone thumb. */
-const TOUCH_TARGET_PX = 44;
+const TOUCH_TARGET_PX = 36;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

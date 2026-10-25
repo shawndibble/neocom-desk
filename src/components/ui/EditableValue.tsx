@@ -14,12 +14,12 @@ import { cx } from '@/lib/cx';
 const SEED_KEY = /^[0-9.,]$/;
 
 /**
- * Faint pencil at rest, field box on hover or focus. The 44px touch tier is
+ * Faint pencil at rest, field box on hover or focus. The 36px touch tier is
  * the button's own height below `md` (§3), never an overhanging `::after`,
  * which reached into a row's next target.
  */
 const editableValueClassName = cx(
-  'inline-flex min-h-11 items-center gap-1 rounded-xs border border-transparent px-1 tabular-nums hover:border-line-bright hover:bg-panel-2 md:min-h-0',
+  'inline-flex min-h-9 items-center gap-1 rounded-xs border border-transparent px-1 tabular-nums hover:border-line-bright hover:bg-panel-2 md:min-h-0',
   interactiveClassName,
   focusRingClassName
 );

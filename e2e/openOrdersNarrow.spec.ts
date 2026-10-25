@@ -1,6 +1,6 @@
 /**
  * Open Orders fix list at narrow widths: the Needs you / Watch / All segments
- * and the healthy fold's "Show" text action meet the 44px touch floor on a
+ * and the healthy fold's "Show" text action meet the 36px touch floor on a
  * phone, the page never scrolls sideways (390px, and 768px with every
  * optional column on — the table scrolls inside its own frame instead), and
  * the compact phone card opens its detail.
@@ -89,7 +89,7 @@ async function seedOpenOrders(page: Page): Promise<void> {
 const height = (locator: Locator) => locator.evaluate((el) => el.getBoundingClientRect().height);
 
 test.describe('Open Orders — fix list at narrow widths', () => {
-  test('the segments and the healthy fold meet the 44px floor at 390px, with no sideways scroll', async ({
+  test('the segments and the healthy fold meet the 36px floor at 390px, with no sideways scroll', async ({
     page,
   }) => {
     await seedOpenOrders(page);
@@ -101,11 +101,11 @@ test.describe('Open Orders — fix list at narrow widths', () => {
     await expect(needsYou).toHaveAttribute('aria-pressed', 'true');
     const show = page.getByRole('button', { name: 'Show', exact: true });
     await expect(show).toBeVisible();
-    // The joined segments are one 44px control; its border is the box's own.
+    // The joined segments are one 36px control; its border is the box's own.
     expect(await height(page.getByRole('group', { name: 'Which orders' }))).toBeGreaterThanOrEqual(
-      44
+      36
     );
-    expect(await height(show)).toBeGreaterThanOrEqual(44);
+    expect(await height(show)).toBeGreaterThanOrEqual(36);
     await expectNoPageOverflow(page);
   });
 
@@ -161,7 +161,7 @@ test.describe('Open Orders — compact phone list (#1429)', () => {
     await signInAndGoto(page);
   });
 
-  test('the expiring order renders as a 44px+ tap row that opens its detail modal', async ({
+  test('the expiring order renders as a 36px+ tap row that opens its detail modal', async ({
     page,
   }) => {
     await page.setViewportSize(PHONE);
@@ -170,7 +170,7 @@ test.describe('Open Orders — compact phone list (#1429)', () => {
     const row = page.getByRole('button', { name: /^Mexallon/ });
     await expect(row).toBeVisible();
     expect(await row.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(
-      44
+      36
     );
 
     await row.click();

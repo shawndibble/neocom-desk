@@ -157,7 +157,7 @@ export function CompareAttributesMatrix({
       }
     >
       <div className="sticky left-0 flex w-fit max-w-full flex-wrap items-center gap-x-3 gap-y-1">
-        <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
+        <label className="flex min-h-9 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
           <Checkbox
             checked={differencesOnly}
             disabled={rows.length < 2}
@@ -238,7 +238,7 @@ export function CompareAttributesMatrix({
                   type="button"
                   aria-expanded={!isCollapsed}
                   onClick={() => toggleCategory(group.category)}
-                  className={`flex min-h-11 items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text md:min-h-0 ${interactiveClassName} ${focusRingClassName}`}
+                  className={`flex min-h-9 items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase hover:text-text md:min-h-0 ${interactiveClassName} ${focusRingClassName}`}
                 >
                   <Caret expanded={!isCollapsed} />
                   {group.category}

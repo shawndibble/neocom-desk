@@ -16,7 +16,7 @@ export interface IconButtonClassNameOptions {
   tone?: IconButtonTone;
   /**
    * `md` (default) is the toolbar size; `sm` is for controls nested in a
-   * dense row. `row` is `sm` on a pointer and the 44px touch tier below
+   * dense row. `row` is `sm` on a pointer and the 36px touch tier below
    * `md` — a row's own ⋮ or inline action, the thumb's only way in.
    */
   size?: IconButtonSize;
@@ -37,7 +37,7 @@ export interface IconButtonClassNameOptions {
  * that navigates rather than acting, say — can match it exactly instead of
  * hand-copying the cascade. Mirrors `buttonClassName` for the same reason.
  *
- * The size classes are the 44px touch tier below `md` or on a coarse pointer
+ * The size classes are the 36px touch tier below `md` or on a coarse pointer
  * (`touch:`) and the standard 36px control above it (DESIGN.md §3): a pointer
  * never gets the phone-sized box and a thumb never gets the mouse-sized one.
  */
@@ -60,11 +60,11 @@ export function iconButtonClassName({
     withText
       ? size === 'sm' || size === 'row'
         ? 'size-9 md:size-auto md:h-7 md:gap-1.5 md:px-2 touch:h-9 touch:min-w-9'
-        : 'size-11 md:size-auto md:h-9 md:gap-1.5 md:px-2.5 touch:h-11 touch:min-w-11'
+        : 'size-9 md:size-auto md:h-9 md:gap-1.5 md:px-2.5 touch:h-9 touch:min-w-9'
       : size === 'md'
-        ? 'size-11 md:size-9 touch:size-11'
+        ? 'size-9'
         : size === 'row'
-          ? 'size-11 md:size-7 touch:size-11'
+          ? 'size-9 md:size-7 touch:size-9'
           : 'size-9 md:size-7 touch:size-9',
     // `border` alone here: each state below names its own border colour, so no
     // two border-colour utilities ever land on the element at once. Tailwind

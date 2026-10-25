@@ -49,7 +49,7 @@ export function ChannelCheckbox({
       className={
         caption === undefined
           ? touchCheckboxLabelClassName
-          : 'inline-flex cursor-pointer items-center justify-center gap-0.5 py-1 touch:min-h-11 touch:min-w-11'
+          : 'inline-flex cursor-pointer items-center justify-center gap-0.5 py-1 touch:min-h-9 touch:min-w-9'
       }
     >
       <Checkbox

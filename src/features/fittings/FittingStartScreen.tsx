@@ -364,7 +364,7 @@ export function FittingStartScreen({
                               open(row);
                             }}
                             className={cx(
-                              'group flex min-h-11 min-w-0 flex-1 items-center gap-2 px-3 text-left text-sm md:min-h-9',
+                              'group flex min-h-9 min-w-0 flex-1 items-center gap-2 px-3 text-left text-sm',
                               rowInteractiveClassName,
                               focusRingInsetClassName,
                               isSelected

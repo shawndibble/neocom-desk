@@ -94,7 +94,7 @@ function SavedComparisonRow({
           ref={(el) => registerLoad(comparison.id, el)}
           onClick={() => onLoad(comparison)}
           className={entityLinkClassName(
-            'flex min-h-11 flex-1 items-center truncate text-left md:min-h-0 touch:min-h-11'
+            'flex min-h-9 flex-1 items-center truncate text-left md:min-h-0 touch:min-h-9'
           )}
         >
           {comparison.name}

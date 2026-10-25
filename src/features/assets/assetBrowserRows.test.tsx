@@ -110,10 +110,10 @@ describe('ItemRow name', () => {
     }
   });
 
-  it('gives the name a 44px touch target, back to its pointer size at md+', () => {
+  it('gives the name a 36px touch target, back to its pointer size at md+', () => {
     renderItemRow({ typeId: 11 });
     expect(screen.getByRole('link', { name: 'Rifter Blueprint' })).toHaveClass(
-      'min-h-11',
+      'min-h-9',
       'md:min-h-7'
     );
   });

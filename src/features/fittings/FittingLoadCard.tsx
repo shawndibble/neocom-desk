@@ -227,9 +227,7 @@ export function FittingLoadCard({
                     {load.kind === 'fitting' ? (
                       <button
                         type="button"
-                        className={entityLinkClassName(
-                          'min-h-11 w-full truncate text-left text-sm'
-                        )}
+                        className={entityLinkClassName('min-h-9 w-full truncate text-left text-sm')}
                         aria-label={t('fittings.load.xml.open', { name })}
                         onClick={() => void onOpenLoaded(load)}
                       >

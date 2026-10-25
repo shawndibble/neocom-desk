@@ -165,7 +165,7 @@ export function activeJobColumns({
       header: '',
       align: 'right',
       // A text button, not the corner icon `cardActions` pins: closes the
-      // phone card's meta line at its right end, 44px tall.
+      // phone card's meta line at its right end, 36px tall.
       stackEdge: 'end',
       cellClassName: () => 'dt-action-row',
       render: (job) =>
@@ -258,7 +258,7 @@ export function historyColumns({
       header: '',
       align: 'right',
       // A text button, not the corner icon `cardActions` pins: its own
-      // full-width row on the phone card, 44px tall.
+      // full-width row on the phone card, 36px tall.
       cellClassName: () => 'dt-action-row',
       render: (job) => {
         if (!isLoggableHistoryJob(job)) return null;

@@ -197,7 +197,7 @@ test('a danger alert draws the banner and a red bell; Acknowledge clears both', 
   await expect(page.locator('main').getByRole('button', { name: /one is danger/ })).toHaveCount(0);
 });
 
-test('phone Customize is a reorder and remove list with 44px targets', async ({ page }) => {
+test('phone Customize is a reorder and remove list with 36px targets', async ({ page }) => {
   await page.setViewportSize(PHONE);
   await signInAndGoto(page, './overview', SCOPES, THREE);
   await expect(card(page, 'Training')).toBeVisible(FIRST_LOAD);
@@ -208,13 +208,13 @@ test('phone Customize is a reorder and remove list with 44px targets', async ({ 
   await expect(remove).toBeVisible();
   await expect
     .poll(async () => (await remove.boundingBox())?.height ?? 0)
-    .toBeGreaterThanOrEqual(44);
+    .toBeGreaterThanOrEqual(36);
   await expect
     .poll(
       async () =>
         (await page.getByRole('button', { name: 'Move Wallet up' }).boundingBox())?.height ?? 0
     )
-    .toBeGreaterThanOrEqual(44);
+    .toBeGreaterThanOrEqual(36);
 
   await remove.click();
   await page.getByRole('button', { name: 'Done' }).click();

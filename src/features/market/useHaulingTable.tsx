@@ -128,7 +128,7 @@ export function useHaulingTable({
       header: '',
       width: '7ch',
       stackEdge: 'start',
-      // The label is the 44px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
+      // The label is the 36px touch target on a coarse pointer; it grows the cell, never overlays a neighbour.
       render: (row) => (
         <label className={touchCheckboxLabelClassName}>
           <Checkbox

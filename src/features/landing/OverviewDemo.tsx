@@ -219,7 +219,7 @@ export function OverviewDemo() {
           </span>
         </div>
         <span
-          className={buttonClassName({ className: 'w-11 cursor-default px-0 md:w-auto md:px-4' })}
+          className={buttonClassName({ className: 'w-9 cursor-default px-0 md:w-auto md:px-4' })}
         >
           <EditBoard size={ICON_SIZE.md} aria-hidden="true" />
           <span className="sr-only md:not-sr-only">{t('overview.header.customize')}</span>

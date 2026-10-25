@@ -133,7 +133,7 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
                     <Link
                       to={tabPath(SETTINGS_TABS, id)}
                       className={cx(
-                        'group flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 px-3 py-2 text-sm',
+                        'group flex min-h-9 min-w-0 flex-1 items-center justify-between gap-3 px-3 py-2 text-sm',
                         rowInteractiveClassName,
                         focusRingInsetClassName
                       )}
@@ -198,7 +198,7 @@ export function SettingsBackLink() {
     <Link
       to={SETTINGS_TABS.base}
       className={cx(
-        'inline-flex min-h-11 items-center gap-1 rounded-xs px-2 text-xs text-text-dim hover:text-text active:text-text-dim md:hidden',
+        'inline-flex min-h-9 items-center gap-1 rounded-xs px-2 text-xs text-text-dim hover:text-text active:text-text-dim md:hidden',
         interactiveClassName,
         focusRingClassName
       )}

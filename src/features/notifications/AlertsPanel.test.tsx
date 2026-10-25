@@ -217,13 +217,13 @@ describe('AlertsPanel', () => {
     expect(screen.queryByText(/appear as a banner/)).toBeNull();
   });
 
-  it('as a sheet it leaves Close to the sheet and uses 44px buttons', async () => {
+  it('as a sheet it leaves Close to the sheet and uses 36px buttons', async () => {
     await db.notificationFeed.bulkPut([MAIL]);
     renderPanel('sheet');
 
     await screen.findByText('New mail');
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^View/ })).toHaveClass('h-11');
+    expect(screen.getByRole('button', { name: /^View/ })).toHaveClass('h-9');
   });
 
   describe('a group of several fires', () => {

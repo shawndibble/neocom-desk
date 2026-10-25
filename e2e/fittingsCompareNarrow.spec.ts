@@ -58,7 +58,7 @@ test.describe('Fitting Compare at 390px', () => {
     await expect(prev).toBeVisible(STATS_TIMEOUT);
     expect(await prev.isDisabled()).toBe(true);
     const nextBox = await next.boundingBox();
-    expect(nextBox!.height).toBeGreaterThanOrEqual(44);
+    expect(nextBox!.height).toBeGreaterThanOrEqual(36);
 
     await expect(page.getByText('Fit A')).toBeVisible(STATS_TIMEOUT);
     await expect(page.getByText('Fit C')).not.toBeVisible();

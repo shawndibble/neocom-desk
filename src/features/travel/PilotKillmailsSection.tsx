@@ -229,7 +229,7 @@ function KillmailRow({
         aria-controls={isOpen ? panelId : undefined}
         onClick={onToggle}
         className={cx(
-          'flex min-h-11 w-full flex-wrap items-center gap-x-3 gap-y-1 px-2.5 py-1.5 text-left text-sm md:min-h-0',
+          'flex min-h-9 w-full flex-wrap items-center gap-x-3 gap-y-1 px-2.5 py-1.5 text-left text-sm md:min-h-0',
           rowInteractiveClassName,
           focusRingInsetClassName
         )}

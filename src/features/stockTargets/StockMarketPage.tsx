@@ -288,7 +288,7 @@ export function StockMarketPage({
       {showBack && (
         <Link
           to={STOCK_PATH}
-          className="inline-flex items-center self-start text-xs text-accent hover:underline touch:min-h-11"
+          className="inline-flex items-center self-start text-xs text-accent hover:underline touch:min-h-9"
         >
           ‹ {t('stockTargets.markets.back')}
         </Link>

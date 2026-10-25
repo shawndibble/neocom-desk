@@ -79,7 +79,7 @@ export function Disclosure({
         <div
           onClick={onToggle}
           className={cx(
-            'flex min-h-11 w-full cursor-pointer items-center gap-1.5 px-2.5 py-1.5 md:min-h-0',
+            'flex min-h-9 w-full cursor-pointer items-center gap-1.5 px-2.5 py-1.5 md:min-h-0',
             rowInteractiveClassName
           )}
         >
@@ -112,7 +112,7 @@ export function Disclosure({
         aria-expanded={expanded}
         onClick={onToggle}
         className={cx(
-          'flex min-h-11 w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left md:min-h-0',
+          'flex min-h-9 w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left md:min-h-0',
           rowInteractiveClassName,
           focusRingInsetClassName
         )}

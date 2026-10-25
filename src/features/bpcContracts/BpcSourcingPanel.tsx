@@ -742,7 +742,7 @@ export function BpcSourcingPanel({
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => selectBlueprint(suggestion)}
                       className={cx(
-                        'flex min-h-11 w-full cursor-pointer items-center gap-3 border-b border-line px-3 py-1.5 text-left text-sm last:border-b-0 md:min-h-9',
+                        'flex min-h-9 w-full cursor-pointer items-center gap-3 border-b border-line px-3 py-1.5 text-left text-sm last:border-b-0',
                         suggestion === highlightedSuggestion
                           ? `bg-panel-2 ${activeOptionClassName}`
                           : 'hover:bg-panel-2'
@@ -954,7 +954,7 @@ export function BpcSourcingPanel({
                   // is gone. The cap above follows that same sort.
                   stackLayout="dense"
                   // Name, price and the More actions button centred on one
-                  // line, the button's 44px touch target no longer making that
+                  // line, the button's 36px touch target no longer making that
                   // line button-tall (Hauling's opt-in, `index.css`).
                   className="dt-dense-tight"
                   mobileSort

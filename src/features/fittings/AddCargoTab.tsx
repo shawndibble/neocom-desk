@@ -78,7 +78,7 @@ export function CargoTab({
                   disabled={!valid}
                   onClick={() => onAddCargo(entry.typeId, count)}
                   className={cx(
-                    'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9',
+                    'flex min-h-9 w-full items-center gap-2 px-2 text-left text-xs',
                     rowInteractiveClassName,
                     focusRingInsetClassName,
                     disabledClassName

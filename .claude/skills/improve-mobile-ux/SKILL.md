@@ -39,7 +39,7 @@ The app's mobile contract is **written down**, and a finding that cites it is
 worth ten that appeal to general mobile practice. Establish it before looking
 at anything:
 
-- `docs/DESIGN.md` §3 (touch tier), §4a (tables on a phone), §4b (filters on a
+- `docs/DESIGN.md` §3 (36px control scale, no 44px tier; bottom nav stays 44px), §4a (tables on a phone), §4b (filters on a
   phone), §7 (accessibility) — the rules themselves.
 - `src/components/ui/controlStyles.ts` — the one place the control scale lives.
 - `src/app/Layout.tsx` — the desktop rail, the `md:hidden` phone tab bar, and
@@ -245,7 +245,7 @@ Readable on its own — a human triaging a batch reads only this.
 **Category:** enhancement
 **Summary:** one line
 **Surface:** the route or panel, and the components involved — named, not pathed
-**Rule:** the DESIGN.md rule violated (§3 touch tier, §4a tables, §4b filters,
+**Rule:** the DESIGN.md rule violated (§3 control scale, §4a tables, §4b filters,
 §7 accessibility), or the readability problem when no rule covers it
 **Current behavior at 390px:** what a phone user sees and cannot do
 **Desired behavior at 390px:** what should happen, including the empty state and

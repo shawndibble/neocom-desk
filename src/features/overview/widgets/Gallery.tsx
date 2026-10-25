@@ -150,7 +150,7 @@ function GalleryItem({
       <Button
         variant={count > 0 ? 'ghost' : 'primary'}
         size={isPhone ? 'md' : 'sm'}
-        className={isPhone ? 'min-h-11 min-w-20' : undefined}
+        className={isPhone ? 'min-h-9 min-w-20' : undefined}
         aria-label={
           count > 0
             ? t('overview.gallery.addAnotherLabel', { title })
@@ -250,7 +250,7 @@ function PresetItem({
             <Button
               variant="primary"
               size={isPhone ? 'md' : 'sm'}
-              className={isPhone ? 'min-h-11 min-w-20' : undefined}
+              className={isPhone ? 'min-h-9 min-w-20' : undefined}
               aria-label={t('overview.gallery.addLabel', { title })}
               onClick={() => onAdd(preset, title)}
             >

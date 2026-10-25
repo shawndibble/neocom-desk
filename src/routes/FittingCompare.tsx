@@ -303,7 +303,7 @@ export function FittingCompare() {
   }));
 
   const differencesToggle = (
-    <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
+    <label className="flex min-h-9 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
       <Checkbox
         checked={showDifferencesOnly}
         disabled={count < 2}
@@ -353,7 +353,7 @@ export function FittingCompare() {
           {isPhone && count > 2 && (
             <div className="flex items-center justify-between">
               <Button
-                className="min-h-11 min-w-11"
+                className="min-h-9 min-w-9"
                 aria-disabled={pageWindow.start === 0 || undefined}
                 onClick={() => {
                   if (pageWindow.start > 0) setPage((p) => p - 1);
@@ -362,7 +362,7 @@ export function FittingCompare() {
                 {t('fittings.compare.pagePrev')}
               </Button>
               <Button
-                className="min-h-11 min-w-11"
+                className="min-h-9 min-w-9"
                 aria-disabled={pageWindow.end >= count || undefined}
                 onClick={() => {
                   if (pageWindow.end < count) setPage((p) => p + 1);

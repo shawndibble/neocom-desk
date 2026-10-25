@@ -80,9 +80,9 @@ export function OwedBalances({
       aria-label={t('miningTax.filterToPayee', { payee: balance.payee.name })}
       aria-pressed={isSoleFilter(balance.payee.id)}
       className={cx(
-        // -my-3 cancels min-h-11's height so the card doesn't grow: the 44px
+        // -my-2 cancels min-h-9's height so the card doesn't grow: the 36px
         // is invisible hit area on a phone (issue #1055); md: reverts both.
-        '-my-3 flex min-h-11 min-w-0 flex-1 items-center rounded-xs text-left text-base font-semibold hover:text-accent active:text-accent/75 aria-pressed:text-accent md:my-0 md:min-h-0',
+        '-my-2 flex min-h-9 min-w-0 flex-1 items-center rounded-xs text-left text-base font-semibold hover:text-accent active:text-accent/75 aria-pressed:text-accent md:my-0 md:min-h-0',
         interactiveClassName,
         focusRingClassName
       )}

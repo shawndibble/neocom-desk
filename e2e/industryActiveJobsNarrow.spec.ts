@@ -126,7 +126,7 @@ test.describe('Active Jobs phone card (#3684)', () => {
     );
   });
 
-  test('each job is a compact card with its countdown, bar and 44px Log production', async ({
+  test('each job is a compact card with its countdown, bar and 36px Log production', async ({
     page,
   }) => {
     await page.setViewportSize(PHONE);
@@ -157,7 +157,7 @@ test.describe('Active Jobs phone card (#3684)', () => {
 
     const log = doneRow.getByRole('button', { name: 'Log production…' });
     await expect(log).toBeVisible();
-    expect((await log.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    expect((await log.boundingBox())!.height).toBeGreaterThanOrEqual(36);
 
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth

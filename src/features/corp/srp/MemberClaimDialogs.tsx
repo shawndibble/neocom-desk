@@ -138,7 +138,7 @@ export function ClaimDetailDialog({
       title={hullName}
       footer={
         canRefile(claim) ? (
-          <Button variant="primary" className="min-h-11 w-full sm:w-auto" onClick={onRefile}>
+          <Button variant="primary" className="min-h-9 w-full sm:w-auto" onClick={onRefile}>
             {t('srpMember.claims.refile')}
           </Button>
         ) : undefined

@@ -468,7 +468,7 @@ export function MapBoard(props: MapBoardProps) {
                     <li
                       key={product.typeId}
                       aria-hidden="true"
-                      className="h-11 flex-none md:h-[2.125rem] touch:h-11"
+                      className="h-9 flex-none md:h-[2.125rem] touch:h-9"
                     />
                   );
                 }
@@ -521,7 +521,7 @@ export function MapBoard(props: MapBoardProps) {
                         onKeyDown={(e) => clickOnSpace(e) || move(key, e)}
                         onClick={onPlanLinkClick(() => props.onProduct(product.typeId))}
                         className={cx(
-                          'grid min-h-11 w-full md:min-h-[2.125rem] touch:min-h-11 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xs border py-0.5 pr-[0.3125rem] pl-[0.1875rem] text-left text-xs',
+                          'grid min-h-9 w-full md:min-h-[2.125rem] touch:min-h-9 grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-1.5 rounded-xs border py-0.5 pr-[0.3125rem] pl-[0.1875rem] text-left text-xs',
                           interactiveClassName,
                           focusRingClassName,
                           goal

@@ -142,7 +142,7 @@ test.describe('PI Colonies — Switch to an alt (issue #1770)', () => {
     );
   }
 
-  test('offers a 44px Switch action that stays on the page at 390px', async ({ page }) => {
+  test('offers a 36px Switch action that stays on the page at 390px', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await signInAndGoto(page, './planetary-industry/colonies');
     await seedNotLoadedAlt(page);
@@ -155,7 +155,7 @@ test.describe('PI Colonies — Switch to an alt (issue #1770)', () => {
     await page.getByRole('button', { name: /show \d+ alt/i }).click();
     const action = page.getByRole('button', { name: 'Switch to Alt Hauler' });
     await expect(action).toBeVisible();
-    expect((await action.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    expect((await action.boundingBox())!.height).toBeGreaterThanOrEqual(36);
     await expectNoPageOverflow(page);
 
     await action.click();

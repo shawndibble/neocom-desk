@@ -77,7 +77,7 @@ export function ColorDialog({ open, onClose, phone, canReset, current, onPick }:
               aria-pressed={current === color}
               onClick={() => pick(color)}
               style={{ backgroundColor: markupColorToCss(color) }}
-              className="flex size-11 items-center justify-center rounded-xs border border-white/30 text-black/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="flex size-9 items-center justify-center rounded-xs border border-white/30 text-black/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               {current === color && <Icon.Done />}
             </button>
@@ -154,7 +154,7 @@ export function SizeDialog({ open, onClose, phone, canReset, current, onPick }: 
                 onClose();
               }}
               className={cx(
-                'flex min-h-11 w-full items-center justify-between rounded-xs border px-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+                'flex min-h-9 w-full items-center justify-between rounded-xs border px-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
                 active === p.id ? 'border-accent bg-accent/10' : 'border-line hover:bg-panel-2',
                 'disabled:cursor-not-allowed disabled:opacity-40'
               )}

@@ -261,7 +261,7 @@ function ChargePickerPanel({
                   onClick={() => load(typeId)}
                   className={chargeRowClassName(
                     isLoaded,
-                    'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9'
+                    'flex min-h-9 w-full items-center gap-2 px-2 text-left text-xs'
                   )}
                 >
                   <TypeIcon typeId={typeId} size={32} width={20} height={20} />

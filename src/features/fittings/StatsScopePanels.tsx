@@ -33,7 +33,7 @@ export function StatsScopeTrigger({
       aria-haspopup="dialog"
       aria-expanded={open}
       onClick={onClick}
-      // The `sm` height on a pointer, the 44px touch tier on a phone or touch screen.
+      // The `sm` height on a pointer, the 36px touch tier on a phone or touch screen.
       className={cx('max-w-full min-w-0 gap-2', tappableRowClassName)}
     >
       <span className="shrink-0 text-text-dim">{label}</span>

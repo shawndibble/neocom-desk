@@ -60,15 +60,14 @@ describe('IconButton', () => {
   it('takes the touch tier on phones but stays row-sized from md up at size row', () => {
     render(<IconButton icon={glyph} label="More" size="row" />);
     const button = screen.getByRole('button');
-    expect(button).toHaveClass('size-11', 'md:size-7');
-    expect(button).not.toHaveClass('md:size-9');
+    expect(button).toHaveClass('size-9', 'md:size-7');
   });
 
   it('takes the touch-sized box on phones and the standard control size from md up', () => {
     render(<IconButton icon={glyph} label="Refresh" />);
     const button = screen.getByRole('button');
-    expect(button).toHaveClass('size-11');
-    expect(button).toHaveClass('md:size-9');
+    expect(button).toHaveClass('size-9');
+    expect(button).not.toHaveClass('md:size-9');
   });
 });
 
@@ -78,14 +77,14 @@ describe('IconButton visibleLabel', () => {
     const button = screen.getByRole('button', { name: 'Filters (2 active)' });
     const text = screen.getByText('Filters');
     expect(text).toHaveClass('hidden', 'md:inline');
-    expect(button).toHaveClass('size-11', 'md:size-auto', 'md:h-9');
+    expect(button).toHaveClass('size-9', 'md:size-auto', 'md:h-9');
     expect(button).not.toHaveClass('md:size-9');
   });
 
   it('stays a bare icon without it', () => {
     render(<IconButton icon="x" label="Go" />);
     expect(screen.getByRole('button')).toHaveTextContent('x');
-    expect(screen.getByRole('button')).toHaveClass('md:size-9');
+    expect(screen.getByRole('button')).toHaveClass('size-9');
   });
 });
 

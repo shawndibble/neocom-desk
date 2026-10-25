@@ -137,7 +137,7 @@ function CharacterGroupHeader({
 function SwitchToButton({ name, onSwitch }: { name: string; onSwitch: () => void }) {
   const { t } = useTranslation();
   return (
-    <Button size="sm" className="min-h-11 shrink-0 md:min-h-0" onClick={onSwitch}>
+    <Button size="sm" className="min-h-9 shrink-0 md:min-h-0" onClick={onSwitch}>
       {t('pi.altColonies.switchTo', { name })}
     </Button>
   );

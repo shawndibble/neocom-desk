@@ -64,7 +64,7 @@ export function CharacterSwitcher({
               <li
                 key={row.characterId}
                 className={cx(
-                  'relative flex min-h-11 items-center gap-2 px-3 py-2 md:min-h-9 touch:min-h-11',
+                  'relative flex min-h-9 items-center gap-2 px-3 py-2',
                   rowInteractiveClassName,
                   active && 'bg-panel-2'
                 )}

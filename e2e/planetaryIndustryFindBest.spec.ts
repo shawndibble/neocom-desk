@@ -2,7 +2,7 @@
  * PI Plan, "Find the best thing to build", at laptop and phone widths.
  *
  * Only a real layout engine can say whether the cards, the Show me how panel
- * and the All products grid stay inside a 390px page and keep their 44px
+ * and the All products grid stay inside a 390px page and keep their 36px
  * targets. With `PI_SHOTS=<dir>` set, each state is also screenshot there, for
  * a side-by-side with `docs/design/pi-tabs/ref/`.
  */
@@ -103,7 +103,7 @@ for (const [label, viewport] of [
       // boundingBox() doesn't wait and returns null for an element not yet rendered.
       await expect(how).toBeVisible();
       if (label === 'phone') {
-        expect((await how.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+        expect((await how.boundingBox())!.height).toBeGreaterThanOrEqual(36);
       }
       await how.click();
       const panel = page.locator('section[id^="find-how-"]');
@@ -117,12 +117,12 @@ for (const [label, viewport] of [
           const target = panel.getByRole(name === 'Close' ? 'button' : 'checkbox', { name });
           await expect(target).toBeVisible();
           const box = (await target.boundingBox())!;
-          // The checkbox's label row carries the 44px target, not the 16px box.
+          // The checkbox's label row carries the 36px target, not the 16px box.
           const height =
             name === 'Close'
               ? box.height
               : (await target.locator('xpath=..').boundingBox())!.height;
-          expect(height).toBeGreaterThanOrEqual(44);
+          expect(height).toBeGreaterThanOrEqual(36);
         }
       }
       await shot(page, `${label}-show-me-how`);

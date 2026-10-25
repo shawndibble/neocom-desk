@@ -356,7 +356,7 @@ function PilotSearch({
                   onList(pasted);
                 }}
                 onKeyDown={handleKeyDown}
-                className="block w-full"
+                className="block min-h-9 w-full py-1.5"
               />
               {listOpen && (
                 <ul

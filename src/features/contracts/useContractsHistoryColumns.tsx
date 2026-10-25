@@ -229,7 +229,7 @@ export function useContractsHistoryColumns({
               onClick={() => onOpen(contract)}
               className={entityLinkClassName(
                 cx(
-                  'flex min-h-11 w-full items-center text-left font-medium md:block md:min-h-0 md:w-auto',
+                  'flex min-h-9 w-full items-center text-left font-medium md:block md:min-h-0 md:w-auto',
                   contract.title && 'md:max-w-72 md:truncate'
                 )
               )}

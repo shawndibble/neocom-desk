@@ -415,7 +415,7 @@ export function ColonyExpanded({
           <Link
             to={planHref}
             className={entityLinkClassName(
-              'inline-flex min-h-11 items-center gap-1 font-semibold md:min-h-0'
+              'inline-flex min-h-9 items-center gap-1 font-semibold md:min-h-0'
             )}
           >
             {t('piColonies.expanded.planThis')}
@@ -430,7 +430,7 @@ export function ColonyExpanded({
         <Link
           to={piPlanetHref(planet.planet_id)}
           className={entityLinkClassName(
-            'inline-flex min-h-11 items-center gap-1 font-semibold md:min-h-0'
+            'inline-flex min-h-9 items-center gap-1 font-semibold md:min-h-0'
           )}
         >
           {t('piColonies.expanded.richness')}

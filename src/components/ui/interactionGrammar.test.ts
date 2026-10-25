@@ -108,7 +108,7 @@ const focusRecipes = recipesMatching(/focus-visible|focus:outline|focusRing/, [
   'focusRingClassName',
   'focusRingInsetClassName',
 ]);
-const touchRecipes = recipesMatching(/\b(min-h|size|h)-11\b/, [
+const touchRecipes = recipesMatching(/\b(min-h|size|h)-9\b/, [
   'touchCheckboxLabelClassName',
   'tappableRowClassName',
 ]);
@@ -219,13 +219,13 @@ describe('interaction grammar source guards (DESIGN.md §6c)', () => {
   });
 
   it('spells no touch-tier row height by hand (use tappableRowClassName)', () => {
-    // `min-h-11 md:min-h-7` is `tappableRowClassName` in controlStyles.ts.
+    // `min-h-9 md:min-h-7` is `tappableRowClassName` in controlStyles.ts.
     expect(
-      offendersOf((src) => /min-h-11[^'"`]*md:min-h-7|md:min-h-7[^'"`]*min-h-11/.test(src))
+      offendersOf((src) => /min-h-9[^'"`]*md:min-h-7|md:min-h-7[^'"`]*min-h-9/.test(src))
     ).toEqual([]);
   });
 
-  it('puts every <Checkbox> in a label with a 44px touch target', () => {
+  it('puts every <Checkbox> in a label with a 36px touch target', () => {
     // The 16px native box can't carry its own touch target, so the wrapping
     // <label> must compose `tappableRowClassName` (a row) or
     // `touchCheckboxLabelClassName` (a lone box), or pin its own touch height.

@@ -220,7 +220,7 @@ export function BookSideToggle({
             aria-pressed={pressed}
             onClick={() => onChange(segment.id)}
             className={cx(
-              'flex min-h-11 flex-1 flex-col items-start justify-center border border-b-2 px-3 py-1.5 text-left',
+              'flex min-h-9 flex-1 flex-col items-start justify-center border border-b-2 px-3 py-1.5 text-left',
               interactiveClassName,
               focusRingInsetClassName,
               toggleChipStateClassName(pressed),

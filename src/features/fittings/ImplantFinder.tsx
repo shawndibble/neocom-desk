@@ -166,7 +166,7 @@ export function ImplantFinder({
         onClick={() => setGoalId(g.id)}
         aria-current={goalId === g.id ? 'true' : undefined}
         className={cx(
-          'flex min-h-11 w-full items-center gap-2 border-l-2 px-2 text-left text-sm md:min-h-9',
+          'flex min-h-9 w-full items-center gap-2 border-l-2 px-2 text-left text-sm',
           rowInteractiveClassName,
           focusRingInsetClassName,
           goalId === g.id ? `${selectedRowClassName} text-accent` : 'border-l-transparent',

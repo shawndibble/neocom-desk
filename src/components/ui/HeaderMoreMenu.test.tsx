@@ -26,11 +26,7 @@ describe('HeaderMoreMenu', () => {
         <DropdownMenuItem>A</DropdownMenuItem>
       </HeaderMoreMenu>
     );
-    expect(screen.getByRole('button', { name: 'More actions' })).toHaveClass(
-      'size-11',
-      'md:size-9',
-      'touch:size-11'
-    );
+    expect(screen.getByRole('button', { name: 'More actions' })).toHaveClass('size-9');
   });
 
   it('renders nothing when every child is falsy, fragments included', () => {

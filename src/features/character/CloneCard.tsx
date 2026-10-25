@@ -13,8 +13,8 @@ import { MIN_JUMP_GAIN_SECONDS, type CloneRow } from '@/engine/clone/cloneVerdic
 import { useInPlaceEdit } from '@/lib/useInPlaceEdit';
 import type { AttributeName } from '@/engine/types';
 
-/** 44px tap box on a phone; stacked wrapped links must not overlap, so no negative margins here. */
-export const TOUCH_LINK = 'inline-flex min-h-11 items-center md:min-h-0';
+/** 36px tap box on a phone; stacked wrapped links must not overlap, so no negative margins here. */
+export const TOUCH_LINK = 'inline-flex min-h-9 items-center md:min-h-0';
 
 /** An implant name linking to Show Info, with its description in a hover/focus tooltip when it has one. */
 function ImplantLink({
@@ -222,8 +222,8 @@ export function CloneCard({
       {implantIds.length === 0 ? (
         <p className="text-text-dim">{t('clones.noImplants')}</p>
       ) : (
-        // One row per implant, divided: on a phone each row is a 44px tap target,
-        // and a wrapped run of 44px links read as gaps, not as a list.
+        // One row per implant, divided: on a phone each row is a 36px tap target,
+        // and a wrapped run of 36px links read as gaps, not as a list.
         <IskFigureGroup className="space-y-1.5">
           <ul className="divide-y divide-line border-y border-line">
             {bySlot(implantIds, implantDetails).map((id) => (

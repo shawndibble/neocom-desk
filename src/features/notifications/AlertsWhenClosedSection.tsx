@@ -202,7 +202,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
             aria-haspopup="dialog"
             aria-label={t('settings.notifications.alertsWhenClosed.manageFor')}
             onClick={() => setExpanded(true)}
-            className={cx(inlineLinkClassName, focusRingInsetClassName, 'touch:min-h-11')}
+            className={cx(inlineLinkClassName, focusRingInsetClassName, 'touch:min-h-9')}
           >
             {t('settings.notifications.alertsWhenClosed.manage')}
           </button>
@@ -213,7 +213,7 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
           aria-haspopup="dialog"
           onClick={() => setExpanded(true)}
           className={cx(
-            'flex min-h-11 w-full items-center gap-3 text-left text-xs',
+            'flex min-h-9 w-full items-center gap-3 text-left text-xs',
             interactiveClassName,
             focusRingInsetClassName
           )}

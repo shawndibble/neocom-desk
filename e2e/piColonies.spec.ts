@@ -3,7 +3,7 @@
  * do about it, and when to log in next.
  *
  * Playwright rather than jsdom for the layout claims (no sideways scroll at
- * 390px, 44px touch targets), which only a real layout engine can tell.
+ * 390px, 36px touch targets), which only a real layout engine can tell.
  * `PI_SHOTS=<dir>` also writes full-page screenshots there, for the side by
  * side with `docs/design/pi-tabs/ref/`.
  */
@@ -103,7 +103,7 @@ test.describe('PI Colonies, the daily check', () => {
     await shot(page, 'colonies-expanded-desk');
   });
 
-  test('lays out at 390px without a sideways scroll, with 44px controls', async ({ page }) => {
+  test('lays out at 390px without a sideways scroll, with 36px controls', async ({ page }) => {
     await page.setViewportSize(PHONE);
     await openColonies(page);
     await expectNoPageOverflow(page);
@@ -116,7 +116,7 @@ test.describe('PI Colonies, the daily check', () => {
     ]) {
       // boundingBox() doesn't wait: a control still rendering reads as null.
       await expect(control).toBeVisible();
-      expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(36);
     }
     await shot(page, 'colonies-phone');
     await row.getByRole('button', { name: /^Show details for / }).click();

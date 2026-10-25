@@ -68,6 +68,6 @@ describe('AlphaCloneChip', () => {
     expect(slot).toHaveAttribute('aria-hidden', 'true');
     expect(slot).not.toHaveAttribute('tabindex');
     expect(slot).toBeEmptyDOMElement();
-    expect(slot).toHaveClass('size-11', 'md:size-9');
+    expect(slot).toHaveClass('size-9');
   });
 });

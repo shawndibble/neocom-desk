@@ -196,7 +196,7 @@ function ItemRow({
           if (placeable && !blocked) onAdd(entry.typeId, rack);
         }}
         className={cx(
-          'flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs md:min-h-9',
+          'flex min-h-9 w-full items-center gap-2 px-2 text-left text-xs',
           rowInteractiveClassName,
           focusRingInsetClassName,
           disabledClassName
@@ -316,7 +316,7 @@ export function FittingAddPanel({
     hiddenByFilters > 0 ? (
       <button
         type="button"
-        className={`${inlineLinkClassName} min-h-11 text-left text-xs md:min-h-9`}
+        className={`${inlineLinkClassName} min-h-9 text-left text-xs`}
         onClick={() => {
           setFitFilters(relaxed);
           // This button goes away with the filters it lifts; focus follows to the search.
@@ -354,7 +354,7 @@ export function FittingAddPanel({
           aria-expanded={open}
           onClick={() => toggle(node.id)}
           className={cx(
-            'flex min-h-11 w-full items-center gap-2 px-1 text-left text-xs md:min-h-9',
+            'flex min-h-9 w-full items-center gap-2 px-1 text-left text-xs',
             rowInteractiveClassName,
             focusRingInsetClassName,
             depth === 0 && 'font-semibold'

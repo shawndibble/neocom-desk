@@ -18,7 +18,7 @@ export function StatsToolbar({ stats }: { stats: FittingStats }) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-1 text-xs">
       <label
-        className={`flex min-h-11 items-center gap-2 md:min-h-9 ${
+        className={`flex min-h-9 items-center gap-2 ${
           stats.allOverheated ? 'text-warning' : ''
         } ${canOverheat ? 'cursor-pointer' : 'text-text-dim'}`}
       >

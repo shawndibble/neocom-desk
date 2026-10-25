@@ -413,7 +413,7 @@ export function RequestPanel({
                 const name =
                   memberNames.get(pledge.uid) ?? t('communities.board.admin.unknownPledger');
                 return (
-                  <li key={pledge.uid} className="flex min-h-11 items-center gap-2 py-1.5 text-xs">
+                  <li key={pledge.uid} className="flex min-h-9 items-center gap-2 py-1.5 text-xs">
                     <span className="min-w-0 flex-1 truncate">{name}</span>
                     <span className="text-text-dim">
                       {pledge.quote

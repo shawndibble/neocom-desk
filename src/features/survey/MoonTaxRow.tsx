@@ -71,13 +71,10 @@ function ConnectedNote({
   return (
     <>
       <div className="flex items-center gap-x-3 sm:ml-auto">
-        <Link
-          to={MINING_TAX_HREF}
-          className={buttonClassName({ size: 'sm', className: 'touch:min-h-11' })}
-        >
+        <Link to={MINING_TAX_HREF} className={buttonClassName({ size: 'sm' })}>
           {t('survey.moonTax.openTax')}
         </Link>
-        <Button id={stopId} size="sm" variant="ghost" className="touch:min-h-11" onClick={onStop}>
+        <Button id={stopId} size="sm" variant="ghost" onClick={onStop}>
           {t('survey.moonTax.stop')}
         </Button>
       </div>
@@ -301,7 +298,7 @@ export function MoonTaxRow({
           <Button
             id={moon.manageId}
             size="sm"
-            className="touch:min-h-11 sm:ml-auto"
+            className="sm:ml-auto"
             disabled={!ready}
             loading={busy}
             onClick={() => void openTax()}
@@ -383,7 +380,7 @@ export function MoonTaxReadout({
             <Button
               id={moon.manageId}
               size="sm"
-              className="touch:min-h-11"
+
               // Stays focusable with its reason linked, rather than the native attribute (DESIGN §6c Disabled).
               aria-disabled={loggedOut || undefined}
               aria-describedby={loggedOut ? hintId : undefined}

@@ -119,7 +119,7 @@ export function CharacterBoardRow({
       <Link
         to={contractHref}
         className={cx(
-          'group flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left',
+          'group flex min-h-9 w-full items-start gap-2.5 px-3 py-2 text-left',
           rowInteractiveClassName,
           focusRingInsetClassName
         )}
@@ -140,7 +140,7 @@ export function CharacterBoardRow({
         type="button"
         onClick={() => onSelectSkyhook(Number(item.sourceId))}
         className={cx(
-          'flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left',
+          'flex min-h-9 w-full items-start gap-2.5 px-3 py-2 text-left',
           rowInteractiveClassName,
           focusRingInsetClassName
         )}
@@ -151,7 +151,7 @@ export function CharacterBoardRow({
   }
 
   if (!openable) {
-    return <div className="flex min-h-11 items-start gap-2.5 px-3 py-2">{body}</div>;
+    return <div className="flex min-h-9 items-start gap-2.5 px-3 py-2">{body}</div>;
   }
 
   return (
@@ -160,7 +160,7 @@ export function CharacterBoardRow({
         type="button"
         onClick={() => onSelectEvent(Number(item.sourceId))}
         className={cx(
-          'flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left',
+          'flex min-h-9 w-full items-start gap-2.5 px-3 py-2 text-left',
           rowInteractiveClassName,
           focusRingInsetClassName
         )}

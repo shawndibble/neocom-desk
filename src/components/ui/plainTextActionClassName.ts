@@ -10,8 +10,8 @@ import { disabledClassName, focusRingClassName, interactiveClassName } from './c
  * uppercase header action (`textActionClassName`).
  *
  * Like `textActionClassName`, a class helper so it lands on a `<button>` and a
- * router `Link` alike. It carries no `min-h-11`: it sits right under the login
- * image, and a 44px box would push it away from the button it belongs to.
+ * router `Link` alike. It carries no `min-h-9`: it sits right under the login
+ * image, and a 36px box would push it away from the button it belongs to.
  */
 export function plainTextActionClassName(extra = ''): string {
   return cx(

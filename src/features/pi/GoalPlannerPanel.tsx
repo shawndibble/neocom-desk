@@ -116,7 +116,7 @@ function GoalPlanner({
 }: GoalPlannerPanelProps) {
   const { t } = useTranslation();
   const mdUp = useMediaQuery(MD_UP);
-  // Phone-sized (44px) controls below `md`; the dense tier beside a pointer.
+  // Phone-sized (36px) controls below `md`; the dense tier beside a pointer.
   const size = mdUp ? 'sm' : 'md';
   // Folded on a phone, open beside a pointer, until the pilot says otherwise.
   // `#customs` lands on the customs rate fields: Colonies open, first rate focused.

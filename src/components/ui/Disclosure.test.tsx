@@ -67,7 +67,7 @@ describe('Disclosure', () => {
     );
 
     const button = screen.getByRole('button', { name: /job fee/i });
-    expect(button.className).toContain('min-h-11');
+    expect(button.className).toContain('min-h-9');
     expect(button.className).toContain('md:min-h-0');
   });
 

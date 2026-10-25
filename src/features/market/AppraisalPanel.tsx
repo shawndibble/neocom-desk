@@ -262,7 +262,7 @@ export function AppraisalPanel({
               focusListOnOpen.current = true;
               setEditingList(true);
             }}
-            className={`flex min-h-11 w-full items-center gap-1.5 px-3 py-1.5 text-left text-xs ${rowInteractiveClassName} ${focusRingInsetClassName}`}
+            className={`flex min-h-9 w-full items-center gap-1.5 px-3 py-1.5 text-left text-xs ${rowInteractiveClassName} ${focusRingInsetClassName}`}
           >
             <Caret expanded={false} />
             <span className="font-medium">

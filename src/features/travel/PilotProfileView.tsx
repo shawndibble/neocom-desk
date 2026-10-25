@@ -156,7 +156,7 @@ export default PilotProfileView;
 
 /**
  * The compact header: the portrait, then name and badge, corporation and alliance, and a facts line.
- * Its links stay text height on a phone: the header is three tight lines beside a portrait, and a 44px
+ * Its links stay text height on a phone: the header is three tight lines beside a portrait, and a 36px
  * box around each one pushed them apart more than it helped a thumb (see DESIGN.md "Touch tier").
  */
 function PilotIdentity({

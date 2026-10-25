@@ -197,7 +197,7 @@ export function AssetsList({
             t={t}
             locationId={station.locationId}
             preference={routeOverride}
-            linkClassName="inline-flex min-h-11 items-center"
+            linkClassName="inline-flex min-h-9 items-center"
           />
         ),
       });
@@ -245,7 +245,7 @@ export function AssetsList({
         <Panel padded={false} fill className="flex min-h-0 flex-1 flex-col">
           {/* --- level header: breadcrumb when drilled in, sort controls at the root --- */}
           {flatModeActive ? (
-            <div className="flex h-11 shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
+            <div className="flex h-9 shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3">
               <span className={eyebrowClassName}>
                 {t('assets.search.resultCount', { count: flatMatches.length })}
               </span>

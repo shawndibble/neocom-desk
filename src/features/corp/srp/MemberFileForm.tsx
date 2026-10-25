@@ -128,7 +128,7 @@ export function MemberFileForm({
           type="submit"
           variant="primary"
           disabled={busy || link.trim() === ''}
-          className={cx(fullWidth && 'min-h-11 w-full')}
+          className={cx(fullWidth && 'min-h-9 w-full')}
         >
           {busy ? t('srpMember.file.filing') : t('srpMember.file.submit')}
         </Button>
