@@ -191,6 +191,8 @@ describe('ImprovePanel', () => {
     expect(screen.getByText(/Max velocity 300 to 250 m\/s, worse/)).toBeInTheDocument();
     const apply = screen.getByRole('button', { name: 'Apply' });
     expect(apply).toBeDisabled();
+    // Opaque in the drawer's surface token, so rows scrolling under it don't show through.
+    expect(apply.closest('.sticky')).toHaveClass('bg-panel');
     const boxes = screen.getAllByRole('checkbox');
     await userEvent.click(boxes[0]);
     await userEvent.click(boxes[1]);
