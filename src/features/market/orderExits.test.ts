@@ -123,6 +123,21 @@ describe('orderExits', () => {
       });
     });
 
+    it("refines at the pilot's own facility yield and pays its tax", () => {
+      // 10 units -> 1,000 Tritanium at 100%; 60% yield = 600 at 2 ISK = 1,200, less 10% tax = 1,080
+      const exits = orderExits({
+        row: BASE_ROW,
+        reprocessing: {
+          entry: ENTRY,
+          modifiers: SKILLS,
+          materialPrices: { 34: 2 },
+          refining: { stationRate: 0.6, taxRate: 0.1 },
+        },
+      });
+      const refine = exits.find((e) => e.kind === 'reprocess');
+      expect(refine?.price).toBeCloseTo(108, 6);
+    });
+
     it('reports the stock that cannot make up a whole portion', () => {
       const exits = orderExits({
         row: { ...BASE_ROW, volumeRemain: 23 },

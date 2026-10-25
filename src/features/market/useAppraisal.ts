@@ -29,6 +29,7 @@ import {
   type HubComparisonRow,
 } from './appraisalData';
 import { addRecent, useRecentAppraisals } from './appraisalRecent';
+import { DEFAULT_REFINING_SETUP, type RefiningSetup } from '@/engine/industry/refiningSetup';
 
 export interface AppraisalController {
   /** What is in the box. */
@@ -59,8 +60,10 @@ export interface AppraisalController {
 export function useAppraisal(
   hub: TradeHub,
   pricePercent: number,
-  characterId: number | null
+  characterId: number | null,
+  refining: RefiningSetup = DEFAULT_REFINING_SETUP
 ): AppraisalController {
+  const { stationRate, taxRate } = refining;
   const [text, setText] = useState('');
   const [submitted, setSubmitted] = useState('');
   const [result, setResult] = useState<AppraisalOutcome | null>(null);
@@ -89,7 +92,10 @@ export function useAppraisal(
       setFailed(false);
       try {
         const [outcome, compareRows] = await Promise.all([
-          appraisePaste(submitted, hub, pricePercent, characterId, { force }),
+          appraisePaste(submitted, hub, pricePercent, characterId, {
+            force,
+            refining: { stationRate, taxRate },
+          }),
           compareHubs(submitted, pricePercent, { force }),
         ]);
         if (cancelled) return;
@@ -109,7 +115,7 @@ export function useAppraisal(
     return () => {
       cancelled = true;
     };
-  }, [submitted, hub, pricePercent, characterId, forceTick]);
+  }, [submitted, hub, pricePercent, characterId, forceTick, stationRate, taxRate]);
 
   const appraiseText = useCallback((next: string) => {
     setText(next);

@@ -45,6 +45,7 @@ import {
   type SidePrices,
 } from '@/engine/miningTax/priceBasis';
 import { eveToday } from '@/engine/miningTax/yieldRange';
+import type { RefiningSetup } from '@/engine/industry/refiningSetup';
 import { loadHubSnapshotRange } from '@/features/market/hubSnapshot';
 
 export interface TrackedCharacter {
@@ -176,7 +177,8 @@ async function fetchVolumesFromEsi(typeIds: number[]): Promise<Map<number, numbe
  */
 export async function loadMiningYieldSnapshot(
   showRefining = true,
-  compressed = true
+  compressed = true,
+  refining?: RefiningSetup
 ): Promise<MiningYieldSnapshot> {
   const yields = await loadAllCharacterYields();
 
@@ -332,7 +334,7 @@ export async function loadMiningYieldSnapshot(
           reprocessingByTypeId,
           modifiers,
           materialPrices,
-          { includeRefining }
+          { includeRefining, refining }
         ),
         materialUnitPrices: new Map(
           Object.entries(materialPrices).map(([typeId, price]) => [Number(typeId), price])

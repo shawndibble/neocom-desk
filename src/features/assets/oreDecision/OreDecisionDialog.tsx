@@ -24,8 +24,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  TextInput,
-  textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
 import { DataGate } from '@/components/DataGate';
@@ -49,12 +47,13 @@ import { SKILL_IDS } from '@/engine/industry/types';
 import {
   allocateOreToNeeds,
   planCoverage,
-  resolveRefiningRate,
   valueOreExits,
   type OreStack,
 } from '@/engine/industry/oreDecision';
 import type { ReprocessingMaterial } from '@/engine/industry/reprocessing';
-import { useOreRefiningStructureRate } from './refiningFacility';
+import { formatPercent } from '@/features/refining/formatPercent';
+import { RefiningSetupChips } from '@/features/refining/RefiningSetupChips';
+import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 
 const CARD = 'rounded-xs border bg-panel-2 p-2.5';
 const CARD_SUGGESTED = 'border-accent-dim';
@@ -145,15 +144,9 @@ export function OreDecisionDialog({
   const isPhone = useIsPhone();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hubId = useMarketHub((state) => state.value);
-  const structureRate = useOreRefiningStructureRate((state) => state.value);
-  const setStructureRate = useOreRefiningStructureRate((state) => state.setValue);
-  const [editingYield, setEditingYield] = useState(false);
+  const { setup: refiningSetup } = useRefiningSetup();
   const [data, setData] = useState<OreData | null>(null);
   const [planId, setPlanId] = useState<string | null>(null);
-
-  useEffect(() => {
-    void useOreRefiningStructureRate.getState().hydrate();
-  }, []);
 
   // What couldn't load, rather than a spinner for good: the reprocessing data
   // is a lazy download that can be missing offline; anything else is a plain failure.
@@ -231,10 +224,7 @@ export function OreDecisionDialog({
     pricingInputs: workspace.pricingInputs,
   });
 
-  const rate = resolveRefiningRate({
-    facility: structureRate > 0 ? 'structure' : 'npc',
-    typedRate: structureRate,
-  });
+  const rate = refiningSetup.stationRate;
   const efficiency =
     data?.recipe && data
       ? refiningEfficiency(data.modifiers, data.recipe.specialisationSkillId, rate)
@@ -260,9 +250,14 @@ export function OreDecisionDialog({
   const exits = useMemo(
     () =>
       stack && data
-        ? valueOreExits({ stack, mineralPrices: data.buyPrices, salesTaxPct: taxPct })
+        ? valueOreExits({
+            stack,
+            mineralPrices: data.buyPrices,
+            salesTaxPct: taxPct,
+            reprocessingTaxRate: refiningSetup.taxRate,
+          })
         : null,
-    [stack, data, taxPct]
+    [stack, data, taxPct, refiningSetup.taxRate]
   );
 
   /** Plans still buying a mineral this ore refines into, with that remaining need. */
@@ -369,10 +364,6 @@ export function OreDecisionDialog({
   const suggestedKey =
     best <= 0 ? null : useValue === best ? 'plan' : refine === best ? 'refine' : 'raw';
 
-  const facilityLabel =
-    structureRate > 0
-      ? t('assets.oreDecision.facilityStructure')
-      : t('assets.oreDecision.facilityNpc');
   const percentText = fixed1(efficiency * 100);
 
   return (
@@ -411,7 +402,7 @@ export function OreDecisionDialog({
                   suggested={suggestedKey === 'refine'}
                   hint={t('assets.oreDecision.refineHint', {
                     efficiency: percentText,
-                    facility: facilityLabel,
+                    tax: formatPercent(refiningSetup.taxRate, false),
                   })}
                 >
                   {refine > 0 ? <IskAmount value={refine} decimals={0} /> : '—'}
@@ -512,45 +503,14 @@ export function OreDecisionDialog({
                       tax: fixed2(taxPct),
                     })}
                   </p>
-                  <p className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span>
                       {t('assets.oreDecision.yieldAssumption', {
                         efficiency: percentText,
-                        facility: facilityLabel,
                       })}
                     </span>
-                    <button
-                      type="button"
-                      className={textActionClassName()}
-                      onClick={() => setEditingYield((v) => !v)}
-                      aria-expanded={editingYield}
-                    >
-                      {t('assets.oreDecision.editYield')}
-                    </button>
-                  </p>
-                  {editingYield && (
-                    <label className="flex flex-wrap items-center gap-2">
-                      <span>{t('assets.oreDecision.structureRateLabel')}</span>
-                      <TextInput
-                        size="sm"
-                        type="number"
-                        inputMode="decimal"
-                        min={0}
-                        max={100}
-                        step={0.1}
-                        className="w-24"
-                        defaultValue={structureRate > 0 ? (structureRate * 100).toFixed(1) : ''} // fixed format: type=number input needs '.'
-                        placeholder="50"
-                        onChange={(e) => {
-                          const pct = Number(e.target.value);
-                          void setStructureRate(
-                            Number.isFinite(pct) && pct > 0 && e.target.value !== '' ? pct / 100 : 0
-                          );
-                        }}
-                      />
-                      <span>{t('assets.oreDecision.structureRateHint')}</span>
-                    </label>
-                  )}
+                    <RefiningSetupChips />
+                  </div>
                   {!exits.pricedAll && (
                     <p className="text-warning">{t('assets.oreDecision.partialPricing')}</p>
                   )}

@@ -21,6 +21,8 @@ import {
   ITEM_FLAG_MULTIPLE_OPTIONS,
   useItemFlagMultiple,
 } from '@/features/contractSearch/contractFlagThreshold';
+import { InlinePercent } from '@/features/refining/InlinePercent';
+import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 import { LpValueField } from '@/features/settings/LpValueSettingsForm';
 import {
   ChipRow,
@@ -39,7 +41,8 @@ export function MarketDefaultsPanel() {
   const itemFlagMultiple = useItemFlagMultiple((state) => state.value);
   const setItemFlagMultiple = useItemFlagMultiple((state) => state.setValue);
   const itemFlagHydrated = useHydratedStore(useItemFlagMultiple);
-  const hydrated = hubHydrated && collateralHydrated && itemFlagHydrated;
+  const refining = useRefiningSetup();
+  const hydrated = hubHydrated && collateralHydrated && itemFlagHydrated && refining.hydrated;
 
   if (!hydrated) return <SettingsPanelLoading />;
 
@@ -65,6 +68,26 @@ export function MarketDefaultsPanel() {
                 ))}
               </SelectContent>
             </Select>
+          </Field>
+
+          <Field label={t('settings.refiningYieldLabel')} note={t('settings.refiningYieldHint')}>
+            <InlinePercent
+              fraction={refining.setup.stationRate}
+              label={t('market.appraisal.editRefineYield')}
+              min={1}
+              max={100}
+              onCommit={(fraction) => void refining.setYieldRate(fraction)}
+            />
+          </Field>
+
+          <Field label={t('settings.refiningTaxLabel')} note={t('settings.refiningTaxHint')}>
+            <InlinePercent
+              fraction={refining.setup.taxRate}
+              label={t('market.appraisal.editRefineTax')}
+              min={0}
+              max={100}
+              onCommit={(fraction) => void refining.setTaxRate(fraction)}
+            />
           </Field>
 
           <ChipRow

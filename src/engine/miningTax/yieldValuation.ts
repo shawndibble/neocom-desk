@@ -1,5 +1,10 @@
 import type { OreLine } from './types';
 import {
+  DEFAULT_REFINING_SETUP,
+  netOfReprocessingTax,
+  type RefiningSetup,
+} from '@/engine/industry/refiningSetup';
+import {
   reprocessingValue,
   reprocessingYield,
   type ReprocessingMaterial,
@@ -96,6 +101,8 @@ export interface ValueMiningYieldOptions {
    * does. Default true — every existing caller keeps today's behaviour.
    */
   includeRefining?: boolean;
+  /** The pilot's facility yield and tax; absent = an NPC station at 50%, no tax. */
+  refining?: RefiningSetup;
 }
 
 export function valueMiningYield(
@@ -104,12 +111,12 @@ export function valueMiningYield(
   reprocessingByTypeId: ReadonlyMap<number, YieldReprocessingEntry | undefined>,
   modifiers: CharacterModifiers,
   materialPrices: Readonly<Record<number, number>>,
-  { includeRefining = true }: ValueMiningYieldOptions = {}
+  { includeRefining = true, refining = DEFAULT_REFINING_SETUP }: ValueMiningYieldOptions = {}
 ): EntryValuation {
   // The baseline `refineBasisHint` states — general skills only, no
   // specialisation, since no single number can honestly speak for lines
   // resolved against different specialisation skills.
-  const efficiency = baselineRefiningEfficiency(modifiers);
+  const efficiency = baselineRefiningEfficiency(modifiers, refining.stationRate);
   let rawValue = 0;
   let refineValue = 0;
   let pricedAll = true;
@@ -127,7 +134,11 @@ export function valueMiningYield(
     let batches = 0;
     let unitsLeftOver = 0;
     if (reprocessing) {
-      const lineEfficiency = refiningEfficiency(modifiers, reprocessing.specialisationSkillId);
+      const lineEfficiency = refiningEfficiency(
+        modifiers,
+        reprocessing.specialisationSkillId,
+        refining.stationRate
+      );
       const yielded = reprocessingYield({
         portionSize: reprocessing.portionSize,
         materials: reprocessing.materials,
@@ -135,7 +146,7 @@ export function valueMiningYield(
         efficiency: lineEfficiency,
       });
       const value = reprocessingValue(yielded.outputs, materialPrices);
-      lineRefineValue = value.total;
+      lineRefineValue = netOfReprocessingTax(value.total, refining.taxRate);
       refineOutputs = yielded.outputs;
       batches = yielded.batches;
       unitsLeftOver = yielded.unitsLeftOver;

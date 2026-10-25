@@ -17,8 +17,6 @@ import {
   IskAmount,
   Modal,
   SegmentedControl,
-  TextInput,
-  textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
 import { DataGate } from '@/components/DataGate';
@@ -28,10 +26,11 @@ import type { TradeHub } from '@/market/hubs';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
-import { useOreRefiningStructureRate } from '@/features/assets/oreDecision/refiningFacility';
+import { reprocessingTaxOn } from '@/engine/industry/refiningSetup';
+import { RefiningSetupChips } from '@/features/refining/RefiningSetupChips';
+import { useRefiningSetup } from '@/features/refining/useRefiningSetup';
 import { NO_CHARACTER_MODIFIERS, refiningEfficiency } from '@/engine/industry/characterModifiers';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
-import { resolveRefiningRate } from '@/engine/industry/oreDecision';
 import {
   compareOreRoute,
   oreBuyListText,
@@ -81,9 +80,7 @@ export function BuyOreDialog({
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const structureRate = useOreRefiningStructureRate((state) => state.value);
-  const setStructureRate = useOreRefiningStructureRate((state) => state.setValue);
-  const [editingYield, setEditingYield] = useState(false);
+  const { setup: refiningSetup } = useRefiningSetup();
   const [ordering, setOrdering] = useState<OreOrdering>('cost');
   // Keyed on the inputs they were built for, so a changed hub or shortfall never
   // reads the previous load's prices while the new one is in flight.
@@ -94,10 +91,6 @@ export function BuyOreDialog({
   } | null>(null);
   const { copied, flash } = useCopyFeedback<'copied' | 'failed'>(2000);
   const { failed: loadFailed, attempt, fail, clear, retry } = useRetryableLoad();
-
-  useEffect(() => {
-    void useOreRefiningStructureRate.getState().hydrate();
-  }, []);
 
   const needsKey = JSON.stringify(Object.entries(needs).sort());
   const inputKey = `${hub.id}|${needsKey}`;
@@ -159,10 +152,7 @@ export function BuyOreDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, needsKey, hub, activeCharacterId, attempt, fail, clear]);
 
-  const rate = resolveRefiningRate({
-    facility: structureRate > 0 ? 'structure' : 'npc',
-    typedRate: structureRate,
-  });
+  const rate = refiningSetup.stationRate;
   const ores: BuyableOre[] = useMemo(
     () =>
       data
@@ -220,7 +210,14 @@ export function BuyOreDialog({
     },
     [depth]
   );
-  const oreCost = route ? route.purchases.reduce((s, p) => s + unitCost(p) * p.units, 0) : 0;
+  // The facility's fee on the minerals the route refines, paid on top of the ore itself.
+  const refiningFee =
+    route && data
+      ? reprocessingTaxOn(route.refined, data.mineralBuyPrices, refiningSetup.taxRate)
+      : 0;
+  const oreCost = route
+    ? route.purchases.reduce((s, p) => s + unitCost(p) * p.units, 0) + refiningFee
+    : 0;
   const comparison =
     route && data && walkSettled && mineralsTotal !== null
       ? compareOreRoute({
@@ -235,8 +232,6 @@ export function BuyOreDialog({
   const recommendOre = !!comparison?.recommendOre && !underfilled;
   const showRoute = !comparison || recommendOre;
   const name = (id: number) => data?.names.get(id) ?? `#${id}`;
-  const facilityLabel =
-    structureRate > 0 ? t('industry.buyOre.facilityStructure') : t('industry.buyOre.facilityNpc');
   const efficiencyPct = fixed1(rate * 100);
 
   const columns: DataTableColumn<OrePurchase>[] = [
@@ -387,44 +382,10 @@ export function BuyOreDialog({
               )}
               <div className="space-y-1.5 text-[0.6875rem] leading-relaxed text-text-dim">
                 <p>{t('industry.buyOre.pricingBasis', { hub: hub.name })}</p>
-                <p className="flex flex-wrap items-center gap-2">
-                  <span>
-                    {t('industry.buyOre.yieldAssumption', {
-                      rate: efficiencyPct,
-                      facility: facilityLabel,
-                    })}
-                  </span>
-                  <button
-                    type="button"
-                    className={textActionClassName()}
-                    onClick={() => setEditingYield((v) => !v)}
-                    aria-expanded={editingYield}
-                  >
-                    {t('industry.buyOre.editYield')}
-                  </button>
-                </p>
-                {editingYield && (
-                  <label className="flex flex-wrap items-center gap-2">
-                    <span>{t('industry.buyOre.structureRateLabel')}</span>
-                    <TextInput
-                      size="sm"
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      max={100}
-                      step={0.1}
-                      className="w-24"
-                      defaultValue={structureRate > 0 ? (structureRate * 100).toFixed(1) : ''} // fixed format: type=number input needs '.'
-                      placeholder="50"
-                      onChange={(e) => {
-                        const pct = Number(e.target.value);
-                        void setStructureRate(
-                          Number.isFinite(pct) && pct > 0 && e.target.value !== '' ? pct / 100 : 0
-                        );
-                      }}
-                    />
-                  </label>
-                )}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span>{t('industry.buyOre.yieldAssumption', { rate: efficiencyPct })}</span>
+                  <RefiningSetupChips />
+                </div>
                 <p>
                   {t(
                     ordering === 'cost'

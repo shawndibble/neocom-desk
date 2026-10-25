@@ -60,6 +60,11 @@ import {
   type ReprocessingMaterial,
 } from '@/engine/industry/reprocessing';
 import { refiningEfficiency, type CharacterModifiers } from '@/engine/industry/characterModifiers';
+import {
+  DEFAULT_REFINING_SETUP,
+  netOfReprocessingTax,
+  type RefiningSetup,
+} from '@/engine/industry/refiningSetup';
 import { brokerFee, brokerFeePct, salesTax, salesTaxPct } from '@/engine/industry/fees';
 import type { AppraisalLpOption } from '@/engine/market/lpAcquisition';
 import { undercutPrice } from '@/engine/market/priceTick';
@@ -506,11 +511,13 @@ export interface ComputeAppraisalRefineInput {
   modifiers: CharacterModifiers;
   /** materialTypeId -> ISK a unit at the appraisal's Trade Hub. */
   materialPrices: Readonly<Record<number, number>>;
+  /** The pilot's facility yield and tax; absent = an NPC station at 50%, no tax. */
+  refining?: RefiningSetup;
 }
 
 /**
  * The per-row refine comparison: the pasted quantity, refined with the
- * character's own skills at the assumed NPC-station rate, priced at the
+ * character's own skills at the pilot's Refining Setup, net of its tax, priced at the
  * appraisal's hub — deliberately not the station-priced comparison
  * `orderExits.ts` makes for one open order, since an Appraisal is quoted at a
  * Trade Hub rather than wherever the pasted stock happens to sit.
@@ -524,9 +531,14 @@ export function computeAppraisalRefine({
   reprocessing,
   modifiers,
   materialPrices,
+  refining = DEFAULT_REFINING_SETUP,
 }: ComputeAppraisalRefineInput): AppraisalRefine | undefined {
   if (!reprocessing) return undefined;
-  const efficiency = refiningEfficiency(modifiers, reprocessing.specialisationSkillId);
+  const efficiency = refiningEfficiency(
+    modifiers,
+    reprocessing.specialisationSkillId,
+    refining.stationRate
+  );
   const yielded = reprocessingYield({
     portionSize: reprocessing.portionSize,
     materials: reprocessing.materials,
@@ -535,7 +547,7 @@ export function computeAppraisalRefine({
   });
   const value = reprocessingValue(yielded.outputs, materialPrices);
   return {
-    valueAtFullPrice: value.total,
+    valueAtFullPrice: netOfReprocessingTax(value.total, refining.taxRate),
     pricedAll: value.pricedAll,
     unitsLeftOver: yielded.unitsLeftOver,
   };
