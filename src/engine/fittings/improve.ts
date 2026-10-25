@@ -35,9 +35,11 @@ import {
 import { commandGain, commandOf, hasCommand } from './improveCommand';
 import { hullRoleOf, roleUnlocks, type HullRef } from './improveRole';
 import { ewarOf, tackleOf } from './improveTackle';
-import { gainMetrics, type GainMetric } from './skillGains';
+import { changeVerdict } from './fittingStatFields';
+import { gainMetrics, roleChanges, type RoleChange } from './skillGains';
 import { fitsResourceBudget } from './skillGaps';
 import type { TargetProfile } from './targetProfile';
+import { diffFittingStats, type StatChange } from './variationDelta';
 import { alignTimeSeconds } from './stats';
 import type { Fitting, FittingModule, FittingSlotKind, FittingStats, HoldStats } from './types';
 
@@ -145,8 +147,47 @@ export interface ImproveOption {
   iskDelta: number | null;
   /** Refitting changes a rig: the old one is destroyed when removed. */
   destroysRigs: boolean;
-  /** The stats it worsens; empty is No downside. */
-  downsides: GainMetric[];
+  /** Every stat it makes worse, before and after, so "Gives up" names the size; empty is No downside. */
+  lost: LostStat[];
+}
+
+/** A stat a swap makes worse: a stats-panel change, or a weapon-reach and mining one. */
+export type LostStat = { kind: 'stat'; change: StatChange } | { kind: 'role'; change: RoleChange };
+
+/** A fit this full of CPU, powergrid or calibration has no room left, so using more is a cost. */
+const TIGHT_BUDGET = 0.9;
+
+const BUDGET_USED = {
+  cpuUsed: 'cpuTotal',
+  powergridUsed: 'powergridTotal',
+  calibrationUsed: 'calibrationTotal',
+} as const;
+
+/** Role stats a swap is told it gives up, whatever the goal. */
+const LOST_ROLE_KEYS: ReadonlySet<string> = new Set([
+  'optimal',
+  'falloff',
+  'tracking',
+  'miningYield',
+]);
+
+/**
+ * Every shown stat the swap makes worse. Fitting resources count only when the
+ * fit ends within `TIGHT_BUDGET` of its budget.
+ */
+export function lostStats(before: FittingStats, after: FittingStats): LostStat[] {
+  const shown = diffFittingStats(before, after).changes.filter((change) => {
+    if (changeVerdict(change) !== 'worse') return false;
+    const total = BUDGET_USED[change.key as keyof typeof BUDGET_USED];
+    return total === undefined || (after[total] > 0 && change.after > after[total] * TIGHT_BUDGET);
+  });
+  const roles = roleChanges(before, after).filter(
+    (change) => LOST_ROLE_KEYS.has(change.key) && changeVerdict(change) === 'worse'
+  );
+  return [
+    ...shown.map((change): LostStat => ({ kind: 'stat', change })),
+    ...roles.map((change): LostStat => ({ kind: 'role', change })),
+  ];
 }
 
 export interface RejectedOption extends ImproveOption {
@@ -174,20 +215,6 @@ const EXCLUDED_META_GROUPS: ReadonlySet<number> = new Set([5, 6]);
 
 /** A change smaller than this (a fraction) is rounding, not a gain or a loss. */
 const EPSILON = 1e-4;
-
-/** The stats a swap can give up, as What to train scores them. */
-const DOWNSIDE_METRICS: readonly GainMetric[] = [
-  'dps',
-  'ehp',
-  'activeTank',
-  'speed',
-  'align',
-  'capacitor',
-  'lockRange',
-  'optimal',
-  'falloff',
-  'tracking',
-];
 
 export type GoalAvailability =
   | { available: true }
@@ -644,6 +671,8 @@ export interface FindImprovementsParams {
 /** Adds that gained on the goal but did not fit the CPU or powergrid, tried with a downgrade. */
 const PAIR_SEEDS = 5;
 
+const isNoDownside = (option: ImproveOption) => option.lost.length === 0;
+
 /** Null when cancelled. */
 export async function findImprovements({
   fitting,
@@ -674,7 +703,6 @@ export async function findImprovements({
     const { isk: iskDelta, destroysRigs } = iskDeltaOf(candidate, priceOf, mode);
     const score = scoreOf(goal, before, after, iskDelta, target, hold);
     if (score === null || score <= (goal === 'cheaper' ? 0 : EPSILON)) return;
-    const metrics = gainMetrics(before, after);
     const option: ImproveOption = {
       candidate,
       fitting: swapped,
@@ -682,11 +710,7 @@ export async function findImprovements({
       score,
       iskDelta,
       destroysRigs,
-      downsides: [
-        ...DOWNSIDE_METRICS.filter((metric) => metrics[metric] < -EPSILON),
-        // A goal that does not score mining must still name a weaker miner.
-        ...(goal !== 'mining' && metrics.miningYield < -EPSILON ? (['miningYield'] as const) : []),
-      ],
+      lost: lostStats(before, after),
     };
     const overSpend =
       spendCap !== null &&
@@ -759,8 +783,8 @@ export async function findImprovements({
 
   const ranked = rankImproveOptions(kept);
   return {
-    noDownside: ranked.filter((option) => option.downsides.length === 0),
-    tradeOffs: ranked.filter((option) => option.downsides.length > 0),
+    noDownside: ranked.filter(isNoDownside),
+    tradeOffs: ranked.filter((option) => !isNoDownside(option)),
     rejected: [...rejected].sort((a, b) => b.score - a.score).slice(0, REJECTED_LIMIT),
     checked,
     stopped,
