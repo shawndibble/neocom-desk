@@ -816,7 +816,7 @@
       }
     },
     "header": {
-      "menu": "Fittings",
+      "menu": "Open",
       "rename": "Rename fitting",
       "newFromHull": "New from a hull…",
       "import": "Import…",
@@ -1073,7 +1073,6 @@
         "cpu": "CPU",
         "powergrid": "Powergrid",
         "calibration": "Calibration",
-        "sell": "Sell",
         "maxActiveDrones": "Max active drones",
         "droneControlRange": "Drone control range",
         "cargo": "Cargo hold",

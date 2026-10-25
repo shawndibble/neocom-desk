@@ -31,13 +31,11 @@ interface FittingSaveButtonProps {
   saveToEveBlockedReason?: string;
   /** The Permissions Save to EVE lacks: lists a "Grant missing Permissions" item under it. */
   saveToEveMissingGroups?: readonly ScopeGroup[];
-  /** The phone's header: the button keeps its short "Save" label, and its accessible name and tooltip say where it saves. */
-  compact?: boolean;
 }
 
 /**
  * Save as one split button (mockup A): the button saves to My Fittings — the
- * everyday save, named on the button — and its caret lists every destination,
+ * everyday save, named in its tooltip — and its caret lists every destination,
  * that one first, then Save to EVE, the rarer export that opens its own
  * dialog.
  */
@@ -51,7 +49,6 @@ export function FittingSaveButton({
   canSaveToEve,
   saveToEveBlockedReason,
   saveToEveMissingGroups = [],
-  compact = false,
 }: FittingSaveButtonProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -81,11 +78,7 @@ export function FittingSaveButton({
           onClick={onSave}
           className="rounded-r-none"
         >
-          {updating
-            ? t('fittings.myFittings.update')
-            : compact
-              ? t('fittings.myFittings.save')
-              : t('fittings.myFittings.saveDestination')}
+          {updating ? t('fittings.myFittings.update') : t('fittings.myFittings.save')}
         </Button>
       )}
       <DropdownMenu>

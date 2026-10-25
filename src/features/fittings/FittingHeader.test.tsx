@@ -78,9 +78,9 @@ describe('FittingHeader on desktop', () => {
     expect(await screen.findByText('Stats copied')).toBeTruthy();
   });
 
-  it('gives Fittings and Export the quiet look, leaving Save the one primary', () => {
+  it('gives Open and Export the quiet look, leaving Save the one primary', () => {
     renderHeader();
-    for (const name of ['Fittings', 'Export']) {
+    for (const name of ['Open', 'Export']) {
       expect(screen.getByRole('button', { name }).className).not.toMatch(/bg-accent\b/);
     }
   });
