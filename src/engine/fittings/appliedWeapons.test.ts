@@ -3,6 +3,7 @@ import {
   APPLIED_DPS_ATTRIBUTE as A,
   DEFAULT_DRONE_CONTROL_RANGE,
   extractAppliedDpsInputs,
+  weaponRange,
 } from './appliedWeapons';
 
 function attrs(entries: Record<number, number>) {
@@ -205,5 +206,53 @@ describe('extractAppliedDpsInputs fighters', () => {
       kind: 'fighter',
       damage: { em: 0, thermal: 0.75, kinetic: 0.25, explosive: 0 },
     });
+  });
+});
+
+describe('area weapons: smartbombs, Vorton projectors, breacher pods', () => {
+  const smartbomb = attrs({
+    [A.dps]: 40,
+    [A.smartbombRange]: 7500,
+    [A.emDamage]: 100,
+  });
+  const vorton = attrs({ [A.dps]: 152.5, [A.optimal]: 49500 });
+  const breacherLauncher = attrs({ [A.dps]: 250 });
+  const breacherPod = attrs({
+    [A.maxVelocity]: 2000,
+    [A.explosionDelay]: 5000,
+    [A.thermalDamage]: 30,
+  });
+
+  it('reads each as an area weapon with its reach, damage off the module or charge', () => {
+    const inputs = extractAppliedDpsInputs(
+      [high, high, high],
+      [
+        { attributes: smartbomb, state: 'active' },
+        { attributes: vorton, state: 'active' },
+        { attributes: breacherLauncher, state: 'active', charge: { attributes: breacherPod } },
+      ],
+      attrs({})
+    );
+    expect(inputs.weapons).toEqual([
+      {
+        kind: 'area',
+        dps: 40,
+        range: 7500,
+        damage: { em: 1, thermal: 0, kinetic: 0, explosive: 0 },
+      },
+      { kind: 'area', dps: 152.5, range: 49500 },
+      {
+        kind: 'area',
+        dps: 250,
+        range: 10000,
+        damage: { em: 0, thermal: 1, kinetic: 0, explosive: 0 },
+      },
+    ]);
+  });
+
+  it('gives a Vorton and a breacher charge a reach for the Charge Picker', () => {
+    expect(weaponRange(vorton)).toEqual({ optimal: 49500, falloff: 0 });
+    expect(weaponRange(breacherLauncher, breacherPod)).toEqual({ optimal: 10000, falloff: 0 });
+    expect(weaponRange(breacherLauncher)).toBeNull();
   });
 });

@@ -13,6 +13,10 @@
  * - Drones: nothing past drone control range; a mobile drone at least as
  *   fast as its target is assumed to keep up and always hit (Pyfa's "auto"
  *   mode), one slower than it — or a sentry — tracks like a turret on the ship.
+ * - Area weapons (smartbombs, Vorton projectors, breacher pods): full damage
+ *   inside their range, nothing past it. A smartbomb's blast and a Vorton's
+ *   chain lightning need no tracking; a breacher's damage-over-time needs only
+ *   to land.
  * - Fighters: at full, wherever the target is. A squadron flies to its
  *   target, so neither the shooter's range nor drone control range limits
  *   it, and no application model for its attack is verified against the
@@ -65,6 +69,12 @@ export type AppliedWeapon = DamageTyped &
         speed: number;
       } & TrackingWeapon)
     | {
+        kind: 'area';
+        dps: number;
+        /** Metres: a smartbomb's blast, a Vorton's optimal, a breacher's flight. */
+        range: number;
+      }
+    | {
         kind: 'fighter';
         /** A launched squadron's raw DPS: per fighter, times the fighters in it. */
         dps: number;
@@ -83,6 +93,11 @@ export interface AppliedDpsPoint {
   /** Metres for a range graph, m/s for a speed graph. */
   x: number;
   dps: number;
+}
+
+/** Pyfa's own threshold for a "mobile" drone: a sentry's speed reads ~0 (a Garde's 1.25e-5 m/s). */
+export function isMobileDrone(speed: number): boolean {
+  return speed > 1;
 }
 
 export function turretHitChance(
@@ -137,11 +152,12 @@ function weaponAppliedDps(
       return distance > weapon.range ? 0 : weapon.dps * missileApplication(weapon, target);
     case 'drone': {
       if (distance > droneControlRange) return 0;
-      // Pyfa's own threshold for "mobile": a sentry's speed reads 0.
-      const keepsUp = weapon.speed > 1 && weapon.speed >= target.velocity;
+      const keepsUp = isMobileDrone(weapon.speed) && weapon.speed >= target.velocity;
       const hitChance = keepsUp ? 1 : turretHitChance(weapon, target, distance);
       return weapon.dps * turretDamageMultiplier(hitChance);
     }
+    case 'area':
+      return distance > weapon.range ? 0 : weapon.dps;
     case 'fighter':
       return weapon.dps;
   }
@@ -210,6 +226,7 @@ function weaponReach(weapon: AppliedWeapon, droneControlRange: number): number {
     case 'turret':
       return weapon.optimal + 3 * weapon.falloff;
     case 'missile':
+    case 'area':
       return weapon.range;
     case 'drone':
       return droneControlRange;
