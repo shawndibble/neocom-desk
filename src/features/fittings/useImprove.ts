@@ -179,6 +179,8 @@ export type ImproveState =
       status: 'done';
       result: ImproveResult;
       before: FittingStats;
+      /** What the fit costs now at the hub, for the selection summary; null when not loaded. */
+      fitTotal: number | null;
       elapsedMs: number;
       /** A tank goal under Shield or Armor: both sides' results, to compare. */
       sides?: Record<'shield' | 'armor', ImproveResult>;
@@ -196,6 +198,8 @@ export interface ImproveSearch {
   showBestSoFar: () => void;
   /** Runs the search again after a Cancel. */
   restart: () => void;
+  /** One whole-fit recalculation under the search's own conditions, for the ticked set; null before a search has run. */
+  recalc: ((fitting: Fitting) => Promise<FittingStats>) | null;
 }
 
 /** The module pool the catalogue gives Rework and the fills: group, group members, market-listed, hull and skills. */
@@ -319,6 +323,7 @@ export function useImprove(
   const [attempt, setAttempt] = useState(0);
   const cancelRef = useRef<() => void>(() => {});
   const stopRef = useRef(false);
+  const [recalc, setRecalc] = useState<ImproveSearch['recalc']>(null);
   const { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
   const hullTypeId = variants?.fitting.shipTypeId;
   const hullGroupId =
@@ -345,6 +350,7 @@ export function useImprove(
     setState({ status: 'searching', checked: 0, total: 0, slow: false });
     // The last fit's baseline must not decide this fit's goal chips.
     setBefore(null);
+    setRecalc(null);
     const started = performance.now();
     const slowTimer = setTimeout(() => {
       if (!cancelled)
@@ -389,7 +395,7 @@ export function useImprove(
         const [priceMap, fitTotal] = await Promise.all([
           getHubPrices(hub, typeIds).catch(() => null),
           // The Price section's own total, for Planning's budget.
-          mode === 'buy' && spendCap !== null
+          mode === 'buy'
             ? loadFittingPrice(variants.fitting, hub)
                 .then((price) => price.totals.sell)
                 .catch(() => null)
@@ -413,6 +419,16 @@ export function useImprove(
               .after;
           }
         }
+        const stats = async (fitting: Fitting) => {
+          const { after } = await variants.compare(load(fitting), controller.signal);
+          // A miner with no crystal of the ore would mine another ore's m³/s: left out, not compared.
+          if (
+            plan &&
+            after.mining.rows.some((row) => !row.isDrone && row.chargeTypeId !== plan!(row.typeId))
+          )
+            throw new Error('A miner takes no crystal of this ore');
+          return after;
+        };
         const results: ImproveResult[] = [];
         let done = 0;
         for (const set of sets) {
@@ -422,18 +438,7 @@ export function useImprove(
             goal: searched,
             hold: effectiveHold(own.holds, hold),
             candidates: set.candidates,
-            stats: async (fitting) => {
-              const { after } = await variants.compare(load(fitting), controller.signal);
-              // A miner with no crystal of the ore would mine another ore's m³/s: left out, not compared.
-              if (
-                plan &&
-                after.mining.rows.some(
-                  (row) => !row.isDrone && row.chargeTypeId !== plan!(row.typeId)
-                )
-              )
-                throw new Error('A miner takes no crystal of this ore');
-              return after;
-            },
+            stats,
             priceOf: (typeId) => priceMap?.get(typeId)?.sellMin ?? null,
             ...(target ? { target } : {}),
             mode,
@@ -476,10 +481,12 @@ export function useImprove(
                 [sets[1].side]: sided[1],
               } as Record<DefenseSide, ImproveResult>)
             : undefined;
+        setRecalc(() => stats);
         setState({
           status: 'done',
           result: { ...listed, checked },
           before: scoredBefore,
+          fitTotal,
           elapsedMs: performance.now() - started,
           ...(sideResults ? { sides: sideResults } : {}),
         });
@@ -490,6 +497,8 @@ export function useImprove(
     return () => {
       cancelled = true;
       controller.abort();
+      // Its signal is aborted: a recalculation through it would fail.
+      setRecalc(null);
       clearTimeout(slowTimer);
     };
   }, [
@@ -525,5 +534,6 @@ export function useImprove(
     cancel,
     showBestSoFar,
     restart,
+    recalc: enabled ? recalc : null,
   };
 }

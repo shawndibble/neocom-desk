@@ -1461,6 +1461,24 @@
       "applied_one": "Applied {{count}} change. Not saved yet.",
       "applied_other": "Applied {{count}} changes. Not saved yet.",
       "undo": "Undo",
+      "replacesPick": "Replaces your pick: {{swap}}",
+      "selection": {
+        "changes_one": "{{count}} change",
+        "changes_other": "{{count}} changes",
+        "total": "fit costs",
+        "unpriced_one": "{{count}} unpriced",
+        "unpriced_other": "{{count}} unpriced",
+        "dps": "DPS {{before}} → {{after}}",
+        "ehp": "EHP {{before}} → {{after}}",
+        "checking": "Checking the ticked changes together…",
+        "failed": "Couldn't check the ticked changes together. They may not fit together.",
+        "resource": { "cpu": "CPU", "powergrid": "powergrid", "calibration": "calibration" },
+        "problem": {
+          "over": "Together these over-run the {{resource}}.",
+          "capStable": "Together these leave the capacitor unstable.",
+          "spend": "Together these pass your spend cap."
+        }
+      },
       "unloaded": {
         "launcher_one": "{{count}} launcher has no missiles loaded, so damage goals ignore it.",
         "launcher_other": "{{count}} launchers have no missiles loaded, so damage goals ignore them.",
