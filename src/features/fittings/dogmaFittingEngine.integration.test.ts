@@ -1771,3 +1771,38 @@ describe('hull fit pre-filter (real WASM + real pinned SDE)', () => {
     expect(counts.subsystem).toBeGreaterThan(0);
   });
 });
+
+describe('Tech 3 cruiser subsystems (real WASM + real pinned SDE)', () => {
+  // Looked up by exact name in `public/data/types.json`, 2026-10-25.
+  const TENGU = 29984;
+  const TENGU_SUBSYSTEMS = [45625, 45590, 45603, 45614];
+
+  it('gives a Tengu with all four subsystems its slots and hardpoints, with no slot rule broken', () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Tengu',
+      shipTypeId: TENGU,
+      modules: TENGU_SUBSYSTEMS.map((typeId, slotIndex) => ({
+        slot: 'subsystem' as const,
+        slotIndex,
+        typeId,
+        state: 'online' as const,
+      })),
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(ALL_TEST_SKILL_IDS));
+
+    const calculation = calculate(dogmaFit, { validate: true });
+    const stats = extractFittingStats(
+      dogmaFit.items,
+      calculation.ship.attributes,
+      calculation.items
+    );
+
+    expect(stats.slotCounts.high).toBeGreaterThan(0);
+    expect(stats.slotCounts.medium).toBeGreaterThan(0);
+    expect(stats.slotCounts.low).toBeGreaterThan(0);
+    const slotBreaks = (calculation.violations ?? []).filter((v) => v.rule.type === 'slots');
+    expect(slotBreaks).toEqual([]);
+  });
+});
