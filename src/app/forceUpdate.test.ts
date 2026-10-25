@@ -135,6 +135,19 @@ describe('forceUpdate', () => {
     expect(result.current).toBe(false);
   });
 
+  it('reports pending, not failed, when a slow install uses up the install wait', async () => {
+    vi.useFakeTimers();
+    fetchLatestRelease.mockResolvedValue('neocom-desk@0.1.0+newer');
+    stubServiceWorker({
+      update: vi.fn(() => new Promise<void>((r) => setTimeout(r, 12_000))),
+      installing: { state: 'installing', addEventListener: vi.fn() },
+      waiting: null,
+    });
+    const done = forceUpdate();
+    await vi.advanceTimersByTimeAsync(33_000);
+    await expect(done).resolves.toBe('pending');
+  });
+
   it('reloads when no new worker came and the published release is the running one', async () => {
     fetchLatestRelease.mockResolvedValue(__APP_RELEASE__);
     stubServiceWorker({
@@ -167,7 +180,7 @@ describe('forceUpdate', () => {
     const { result } = renderHook(() => useBootCover());
     stubServiceWorker({ update: vi.fn(() => new Promise<void>(() => {})), installing: null });
     const done = forceUpdate();
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(35_000);
     await expect(done).resolves.toBe('failed');
     expect(reload).not.toHaveBeenCalled();
     expect(result.current).toBe(false);

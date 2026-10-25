@@ -1,9 +1,11 @@
 import { showBootCover, hideBootCover } from './bootCover';
 import { compareRelease, fetchLatestRelease } from './latestRelease';
-import { activateWaitingWorker, timeout, waitForInstall } from './swUpdate';
+import { INSTALL_TIMEOUT_MS, activateWaitingWorker, timeout, waitForInstall } from './swUpdate';
 
 // A check that never settles must not leave the cover up with no way out.
-const FORCE_UPDATE_CHECK_CAP_MS = 30_000;
+// Above the install wait plus the release read (5 s), with room for the
+// `sw.js` fetch, so a slow precache ends as `pending`, not `failed`.
+const FORCE_UPDATE_CHECK_CAP_MS = INSTALL_TIMEOUT_MS + 15_000;
 
 /** `pending`: a newer release is published, but no worker for it has installed yet. */
 async function checkAndActivate(): Promise<'pending' | undefined> {
