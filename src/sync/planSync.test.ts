@@ -128,6 +128,14 @@ vi.mock('./firebaseApp', () => ({
   getSyncFirestore: () => ({}),
 }));
 
+// The change marker (issue #5073) has its own suite (planSyncMarker.test.ts);
+// here it reads as never-written so no pass here is ever skipped.
+vi.mock('./syncMarker', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./syncMarker')>()),
+  readRemoteMarker: vi.fn(async () => null),
+  bumpRemoteMarker: vi.fn(async () => {}),
+}));
+
 vi.mock('./syncAuth', () => ({
   ensureSignedIn: vi.fn(async (characterId: number) => `char:${characterId}`),
   uidForCharacter: (characterId: number) => `char:${characterId}`,

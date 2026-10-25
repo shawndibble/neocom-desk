@@ -302,3 +302,33 @@ describe('sync status', () => {
     expect(narrowed.lastFullSyncAt).toBe(clock - 1000);
   });
 });
+
+describe('pass priority', () => {
+  it('tells the pass whether it runs as a background or foreground sync', async () => {
+    const priorities: string[] = [];
+    const sched = createSyncScheduler(
+      async (_id, _scope, priority) => {
+        priorities.push(priority);
+      },
+      { now: () => clock }
+    );
+    sched.scheduleSync(1, { priority: 'background', debounceMs: 0 });
+    await vi.advanceTimersByTimeAsync(0);
+    await sched.triggerSync(2);
+    expect(priorities).toEqual(['background', 'foreground']);
+  });
+
+  it('runs a background request that an edit overtook as foreground', async () => {
+    const priorities: string[] = [];
+    const sched = createSyncScheduler(
+      async (_id, _scope, priority) => {
+        priorities.push(priority);
+      },
+      { now: () => clock }
+    );
+    sched.scheduleSync(1, { priority: 'background', debounceMs: 1000 });
+    sched.scheduleSync(1, { priority: 'foreground', debounceMs: 0 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(priorities).toEqual(['foreground']);
+  });
+});

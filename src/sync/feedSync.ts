@@ -158,6 +158,7 @@ export async function syncFeed(ctx: SyncContext): Promise<void> {
     return remoteRow === undefined ? row : toLocalFeedRecord(remoteRow, writeNow, row);
   });
   const pushed = [...plan.pushCreate, ...plan.pushDismiss, ...redated];
+  if (pushed.length > 0) ctx.onPush?.();
   await runBounded([
     ...pushed.map(
       (row) => () => setDoc(doc(col, row.id), toRemoteFeedDoc(row, ctx.ownerHash, writeNow))

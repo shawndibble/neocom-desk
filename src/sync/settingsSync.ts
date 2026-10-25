@@ -109,6 +109,7 @@ export async function syncSettings(ctx: SyncContext): Promise<void> {
   /** LWW stamps this pass wants to record, applied under the transaction below. */
   const stamps = new Map<string, number>();
 
+  if (settings.push.length > 0 || settings.pushTombstones.length > 0) ctx.onPush?.();
   await Promise.all([
     ...settings.push.map((s) => {
       // A key written outside setSyncedSetting has no timestamp yet: stamp now.

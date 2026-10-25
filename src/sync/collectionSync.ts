@@ -96,6 +96,8 @@ export interface SyncContext {
   ownerHash: string;
   characterId: number;
   now: number;
+  /** Called after a pass pushes at least one doc, so the driver bumps the change marker. */
+  onPush?: () => void;
 }
 
 /**
@@ -228,6 +230,7 @@ export async function syncEditableCollection(
     pull.since
   );
 
+  if (plan.pushUpserts.length > 0 || plan.pushTombstones.length > 0) ctx.onPush?.();
   await runBounded([
     ...plan.pushUpserts.map(
       (p) => () => setDoc(doc(col, p.id), spec.toRemoteDoc(p, ctx.ownerHash))
