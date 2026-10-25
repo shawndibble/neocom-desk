@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { Panel } from './Panel';
 import { Toast } from './Toast';
 
 const noop = () => {};
@@ -50,14 +51,14 @@ export const OverPanel: Story = {
   decorators: [
     (Story) => (
       <div className="bg-bg h-screen p-4">
-        <div className="bg-panel border-line text-text-dim h-full rounded-xs border p-4 text-sm">
+        <Panel title="Materials" className="text-text h-full overflow-hidden text-sm">
           {Array.from({ length: 24 }, (_, i) => (
-            <div key={i} className="border-line flex justify-between border-b py-2">
-              <span className="text-accent">Material {i + 1}</span>
+            <div key={i} className="border-line flex justify-between border-b px-3 py-2">
+              <span>Material {i + 1}</span>
               <span>1,738</span>
             </div>
           ))}
-        </div>
+        </Panel>
         <Story />
       </div>
     ),
