@@ -4,15 +4,18 @@ import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 
 /**
+ * Shorthand from 1M up (a blueprint's "1.5B", which otherwise grows the cell),
+ * cents below, where a material's 4,512.30 vs 4,498.10 is the difference.
+ */
+function depthIsk(value: number): string {
+  return Math.abs(value) >= 1_000_000 ? formatIskCompact(value) : formatIsk(value, 2);
+}
+
+/**
  * A walked material's Price-cell second line: the lowest sell
  * beside the average the row is costed at, or a warning when the hub lists
  * fewer units than the plan needs.
  */
-/** Shorthand from 1,000 up (a blueprint's "1.5B"), cents below where they are the difference. */
-function depthIsk(value: number): string {
-  return Math.abs(value) >= 1_000 ? formatIskCompact(value) : formatIsk(value, 2);
-}
-
 export function DepthPriceLine({ depth }: { depth: DepthPrice }) {
   const { t } = useTranslation();
   if (!depth.covered) {

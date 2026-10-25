@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
 
-/** Matches DESIGN.md §6 "States and motion": overlays take 200–250ms. */
+/** Long enough to read as a slide, short enough not to wait on (DESIGN.md §6c "Edit setup"). */
 export const COLLAPSE_MS = 220;
 
 type Phase = 'closed' | 'opening' | 'open' | 'closing';

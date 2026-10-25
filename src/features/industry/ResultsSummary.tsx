@@ -350,8 +350,9 @@ export function ResultsSummary({
       {/* Facts about the plan, not lines of the sum: a footer band flush to the
           panel's edges (the `-mx-3 -mb-3` undo the panel's `p-3`), styled like
           the verdict hero's setup strip, so Profit ends the ledger and this
-          reads as the card's foot. No caret indent — nothing here expands. */}
-      <dl className="-mx-3 -mb-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 rounded-b-xs border-t border-line bg-bg/40 px-3 py-3 text-xs">
+          reads as the card's foot. `mt-0!` sits it straight under Profit, so
+          one rule divides them, not a gap and a rule. No caret indent. */}
+      <dl className="-mx-3 mt-0! -mb-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1.5 rounded-b-xs border-t border-line bg-bg/40 px-3 py-3 text-xs">
         {revenue !== null && (
           <>
             <dt className="text-text-dim">

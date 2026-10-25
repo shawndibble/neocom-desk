@@ -20,8 +20,8 @@ describe('DepthPriceLine', () => {
     expect(screen.getByText('1.5B best · 1.5B avg for 1')).toBeInTheDocument();
   });
 
-  it('keeps cents on a cheap price, where they are the difference', () => {
-    render(<DepthPriceLine depth={depth(4.12, 4.31)} />);
-    expect(screen.getByText('4.12 best · 4.31 avg for 1')).toBeInTheDocument();
+  it('keeps cents below a million, where they are the difference', () => {
+    render(<DepthPriceLine depth={depth(4.12, 4_512.3)} />);
+    expect(screen.getByText('4.12 best · 4,512.30 avg for 1')).toBeInTheDocument();
   });
 });

@@ -9,7 +9,9 @@ import { useHydratedStore } from '@/lib/useHydratedStore';
  * The pilot's LP Value as one labelled field: the same store (`useLpValue`)
  * everywhere it is edited — Settings → Market, the LP Store's settings modal
  * and the Blueprint Acquisition modal — so the three can never disagree.
- * Blank or 0 means "use each store's market rate".
+ * Blank or 0 means "use each store's market rate", except for a blueprint,
+ * where it counts the LP as already earned (`blueprintLpRate`); the
+ * Blueprint Acquisition modal says so through `note`.
  */
 export function LpValueField({
   id,

@@ -1224,8 +1224,8 @@ export function BuildPlanDetail({
 
   // Slides open under the setup strip, attached to the card it edits, rather
   // than a second card that pushes the page down.
-  const setupForm = (
-    <Collapse open={setupOpen} id={setupFormId} className="border-t border-line p-4">
+  const renderSetupForm = (className: string) => (
+    <Collapse open={setupOpen} id={setupFormId} className={className}>
       <div className="space-y-4">
         {bpcCoverage && (
           <div>
@@ -1662,7 +1662,7 @@ export function BuildPlanDetail({
           onBasisChange={setProfitBasis}
           runsControl={runsControl}
           footer={setupStrip}
-          expansion={setupForm}
+          expansion={renderSetupForm('border-t border-line p-4')}
           pricesReady={pricesReady}
           pricesUnreachable={pricesUnreachable}
           pricesLoading={pricesLoading}
@@ -1697,7 +1697,8 @@ export function BuildPlanDetail({
             {runsControl}
             {setupStrip}
           </div>
-          {setupForm}
+          {/* Inside the panel's own padding: a rule and a gap, no second inset. */}
+          {renderSetupForm('mt-3 border-t border-line pt-3')}
         </Panel>
       )}
       {result && !error && result.revenue !== null && (

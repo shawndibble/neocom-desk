@@ -54,7 +54,7 @@ export function useLpBlueprintOffers({
             hub,
             matches.map((m) => m.offer)
           );
-          rows = lpOfferRows(matches, () => blueprintLpRate(lpValue), turnIns)
+          rows = lpOfferRows(matches, blueprintLpRate(lpValue), turnIns)
             .flatMap((row) => {
               const typeId = typeIdByOffer.get(`${row.corporationId}:${row.offerId}`);
               return row.pickable && typeId !== undefined ? [{ row, typeId }] : [];

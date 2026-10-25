@@ -431,7 +431,7 @@ export function PlanVerdictHero({
       </div>
 
       {footer && (
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-b-xs border-t border-line bg-bg/40 px-4 py-2 text-xs text-text-dim">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-b-xs border-t [&:has(+[data-state=open])]:rounded-b-none border-line bg-bg/40 px-4 py-2 text-xs text-text-dim">
           {footer}
         </div>
       )}

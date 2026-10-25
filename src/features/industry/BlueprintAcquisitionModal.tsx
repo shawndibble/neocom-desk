@@ -315,7 +315,7 @@ export function BlueprintAcquisitionModal({
       lp.status === 'ready'
         ? lpOfferRows(
             lp.data,
-            () => blueprintLpRate(lpValue),
+            blueprintLpRate(lpValue),
             turnIns.status === 'ready' ? turnIns.data : () => null
           )
         : [],
@@ -417,16 +417,9 @@ export function BlueprintAcquisitionModal({
         lp: formatIsk(row.lpCost),
       }),
       tier(row),
-      row.lpRateSource === 'free'
-        ? t('industry.bpAcqLpFree', { isk: formatIsk(row.price) })
-        : row.lpPriced && row.lpRate !== null
-          ? t(
-              row.lpRateSource === 'market'
-                ? 'industry.bpAcqLpPricedMarket'
-                : 'industry.bpAcqLpPriced',
-              { isk: formatIsk(row.price), rate: formatIsk(row.lpRate) }
-            )
-          : t('industry.bpAcqLpIskOnly'),
+      row.lpRateSource === 'yours' && row.lpRate !== null
+        ? t('industry.bpAcqLpPriced', { isk: formatIsk(row.price), rate: formatIsk(row.lpRate) })
+        : t('industry.bpAcqLpFree', { isk: formatIsk(row.price) }),
     ];
     if (row.quantity > 1)
       parts.push(t('industry.blueprintAcquisitionLpQuantity', { count: row.quantity }));
