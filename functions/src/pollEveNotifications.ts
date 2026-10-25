@@ -13,7 +13,13 @@ import {
 } from './alertGrant.js';
 import { shouldDeleteDeviceToken } from './dispatchProjections.js';
 import { NO_ORIGIN_SYSTEM } from './pollNearby.js';
-import { liveDevices, planGrant, wakeCutoffMs, type GrantPlan } from './pollerEfficiency.js';
+import {
+  deviceCadence,
+  liveDevices,
+  planGrant,
+  wakeCutoffMs,
+  type GrantPlan,
+} from './pollerEfficiency.js';
 import { ALERTS_POLL_STATS_KEYS, createRunStats, type RunStats } from './runStats.js';
 import type { LocationResult } from './esiNearby.js';
 import type { MailHeadersResult } from './esiMail.js';
@@ -199,10 +205,17 @@ export async function pollEveNotifications(deps: PollDeps): Promise<PollSummary>
       : new Map<number, PollDevice[]>();
   const wantedLists = { incursions: false, skyhooks: false };
   const seenDevices = new Set<string>();
+  const sleepingDevices = new Set<string>();
+  const dormantDevices = new Set<string>();
   const queue: PlannedGrant[] = [];
   for (const { characterId, grant } of listed) {
     const devices = devicesByCharacter.get(characterId) ?? [];
-    for (const d of devices) seenDevices.add(d.deviceId);
+    for (const d of devices) {
+      seenDevices.add(d.deviceId);
+      const cadence = deviceCadence(d.updatedAtMs, startedAt);
+      if (cadence === 'sleeping') sleepingDevices.add(d.deviceId);
+      if (cadence === 'dormant') dormantDevices.add(d.deviceId);
+    }
     const plan = planGrant(grant, devices, startedAt);
     if (plan.action === 'backoff') {
       stats.add('grantsSkippedDeviceBackoff');
@@ -219,6 +232,8 @@ export async function pollEveNotifications(deps: PollDeps): Promise<PollSummary>
     }
   }
   stats.set('devicesRead', seenDevices.size);
+  stats.set('devicesSleeping', sleepingDevices.size);
+  stats.set('devicesDormant', dormantDevices.size);
   const ctx: RunContext = { deps, summary, stats, locations, nowMs: startedAt, wantedLists };
 
   const worker = async (): Promise<void> => {
@@ -312,7 +327,12 @@ async function pollOne(ctx: RunContext, item: PlannedGrant): Promise<void> {
     const grantAlive = await pollNotifications(ctx, characterId, accessToken, grant, devices);
     if (!grantAlive) return;
   } else if (plan.idle.notifications && grant.notificationsIdle !== true) {
-    await markIdle(ctx, { ...item, grant });
+    // The mail mark is pollMail's to forget on this path; clearing it here too would write twice.
+    await store.markIdle(characterId, grant.encryptedRefreshToken, {
+      notifications: true,
+      clearMail: false,
+    });
+    stats.add('idleStateWrites');
   }
   await pollMailSafely(ctx, characterId, accessToken, grant, devices, plan);
   if (!plan.call.nearby || !deps.nearby || !grantCoversNearby(grant) || summary.budgetStopped) {

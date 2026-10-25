@@ -126,11 +126,12 @@ export async function listPolledDevices(db: Firestore, stats?: RunStats): Promis
     const baselines = record<ServerEventBaseline>(data[SERVER_BASELINES_FIELD]);
     const characterIds: unknown[] = Array.isArray(data.characterIds) ? data.characterIds : [];
     const quietHours = readQuietHours(data.quietHours);
+    const updatedAtMs = registeredAtMs(data);
     devices.push({
       deviceId: doc.id,
       fcmToken: data.fcmToken,
       ...(quietHours ? { quietHours } : {}),
-      ...(registeredAtMs(data) !== null ? { updatedAtMs: registeredAtMs(data) } : {}),
+      ...(updatedAtMs !== null ? { updatedAtMs } : {}),
       characters: characterIds
         .filter((id): id is number => typeof id === 'number')
         .map((characterId) => ({

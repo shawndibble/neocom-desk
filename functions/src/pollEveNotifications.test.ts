@@ -702,6 +702,8 @@ describe('pollEveNotifications: skipping idle grants and stale devices (issue #5
       grantsSkippedIdle: 1,
       grantsSkippedDeviceBackoff: 1,
       devicesRead: 1,
+      devicesSleeping: 1,
+      devicesDormant: 0,
       esiNotificationsCalls: 1,
       esiMailCalls: 0,
       idleStateWrites: 1,
