@@ -48,7 +48,9 @@ function setup(opts: {
 }) {
   const grants = opts.grants ?? { 1: grant() };
   const store = {
-    listActive: vi.fn(async () => Object.keys(grants).map(Number)),
+    listActive: vi.fn(async () =>
+      Object.keys(grants).map((id) => ({ characterId: Number(id), grant: grants[Number(id)]! }))
+    ),
     refresh: vi.fn(async (id: number): Promise<RefreshOutcome> => {
       const outcome = await opts.refresh?.(id);
       return outcome ?? { kind: 'ok', accessToken: `access-${id}`, grant: grants[id]! };
@@ -58,7 +60,10 @@ function setup(opts: {
     dropLocationScope: vi.fn(async () => {}),
     patchMail: vi.fn(async () => {}),
     dropMailScope: vi.fn(async () => {}),
-    devicesFor: vi.fn(async () => opts.devices ?? [phone]),
+    markIdle: vi.fn(async () => {}),
+    devicesForMany: vi.fn(
+      async (ids: number[]) => new Map(ids.map((id) => [id, opts.devices ?? [phone]]))
+    ),
     deleteDevice: vi.fn(async () => {}),
   } satisfies PollerStore;
   const sent: { token: string; m: PushMessage }[] = [];
@@ -320,6 +325,8 @@ describe('pollEveNotifications: nearby alerts (issue #5122)', () => {
     scopes: ['esi-characters.read_notifications.v1', 'esi-location.read_location.v1'],
   };
 
+  const wantsNearby: PollDevice = { ...phone, serverEvents: ['incursionNearby'] };
+
   function withNearby(
     s: ReturnType<typeof setup>,
     location: (id: number) => LocationResult = () => ({
@@ -340,7 +347,7 @@ describe('pollEveNotifications: nearby alerts (issue #5122)', () => {
   }
 
   it('reads the location only for a grant that carries the location scope', async () => {
-    const s = setup({ grants: { 1: grant(LOCATION_GRANT), 2: grant() } });
+    const s = setup({ grants: { 1: grant(LOCATION_GRANT), 2: grant() }, devices: [wantsNearby] });
     const { deps, fetchLocation, runPhase } = withNearby(s);
     const summary = await pollEveNotifications(deps);
     expect(fetchLocation).toHaveBeenCalledTimes(1);
@@ -352,6 +359,7 @@ describe('pollEveNotifications: nearby alerts (issue #5122)', () => {
   it('still reads the location when the notifications feed answered 304', async () => {
     const s = setup({
       grants: { 1: grant(LOCATION_GRANT) },
+      devices: [wantsNearby],
       esi: () => ({ kind: 'not-modified', budgetLow: false }),
     });
     const { deps, fetchLocation } = withNearby(s);
@@ -367,7 +375,7 @@ describe('pollEveNotifications: nearby alerts (issue #5122)', () => {
   });
 
   it('a refused location drops that scope from the grant but never revokes it', async () => {
-    const s = setup({ grants: { 1: grant(LOCATION_GRANT) } });
+    const s = setup({ grants: { 1: grant(LOCATION_GRANT) }, devices: [wantsNearby] });
     const { deps, runPhase } = withNearby(s, () => ({ kind: 'forbidden' }));
     await pollEveNotifications(deps);
     expect(runPhase).toHaveBeenCalledWith(new Map());
@@ -378,7 +386,7 @@ describe('pollEveNotifications: nearby alerts (issue #5122)', () => {
   });
 
   it('a failed location read just leaves the Character out', async () => {
-    const s = setup({ grants: { 1: grant(LOCATION_GRANT) } });
+    const s = setup({ grants: { 1: grant(LOCATION_GRANT) }, devices: [wantsNearby] });
     const { deps, runPhase } = withNearby(s, () => ({ kind: 'error', status: 502 }));
     await pollEveNotifications(deps);
     expect(runPhase).toHaveBeenCalledWith(new Map());
@@ -386,7 +394,7 @@ describe('pollEveNotifications: nearby alerts (issue #5122)', () => {
   });
 
   it('skips the nearby phase once the shared error budget is spent', async () => {
-    const s = setup({ grants: { 1: grant(LOCATION_GRANT) } });
+    const s = setup({ grants: { 1: grant(LOCATION_GRANT) }, devices: [wantsNearby] });
     const { deps, runPhase } = withNearby(s, () => ({ kind: 'backoff', retryAfterMs: null }));
     const summary = await pollEveNotifications(deps);
     expect(runPhase).not.toHaveBeenCalled();
@@ -607,9 +615,228 @@ describe('pollEveNotifications: new-mail alerts (issue #5143)', () => {
     );
   });
 
-  it('reads the devices once per Character however many reads want them', async () => {
+  it('reads the devices once per run however many Characters and reads want them', async () => {
     const s = setup({ grants: { 1: grant(MAIL_GRANT) }, devices: [wantsMail] });
     await pollEveNotifications(withMail(s, () => ok([header(101)])).deps);
-    expect(s.store.devicesFor).toHaveBeenCalledTimes(1);
+    expect(s.store.devicesForMany).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('pollEveNotifications: skipping idle grants and stale devices (issue #5144)', () => {
+  const DAY = 24 * 3_600_000;
+  // Lands on the hourly slot of the stale-device back-off (floor(now / 15 min) % 4 === 0).
+  const SLOT = 4_000 * 15 * 60_000;
+  const OFF_SLOT = SLOT + 15 * 60_000;
+  const now = () => OFF_SLOT;
+  const nothingOn: PollDevice = { ...phone, eveTypes: [] };
+  const MAIL_LOCATION = {
+    scopes: [
+      'esi-characters.read_notifications.v1',
+      'esi-location.read_location.v1',
+      'esi-mail.read_mail.v1',
+    ],
+  };
+
+  it('neither refreshes nor calls ESI for a grant no device wants anything from, and marks it idle once', async () => {
+    const s = setup({ grants: { 1: grant() }, devices: [nothingOn], now });
+    const summary = await pollEveNotifications(s.deps);
+    expect(s.store.refresh).not.toHaveBeenCalled();
+    expect(s.deps.fetchNotifications).not.toHaveBeenCalled();
+    expect(s.store.markIdle).toHaveBeenCalledWith(1, 'blob', {
+      notifications: true,
+      clearMail: false,
+    });
+    expect(summary.skipped).toBe(0);
+  });
+
+  it('writes nothing more for a grant already marked idle', async () => {
+    const s = setup({
+      grants: { 1: grant({ notificationsIdle: true }) },
+      devices: [nothingOn],
+      now,
+    });
+    await pollEveNotifications(s.deps);
+    expect(s.store.markIdle).not.toHaveBeenCalled();
+    expect(s.store.refresh).not.toHaveBeenCalled();
+  });
+
+  it('forgets the mail mark of an idle grant so turning mail on later seeds afresh', async () => {
+    const s = setup({
+      grants: {
+        1: grant({
+          ...MAIL_LOCATION,
+          notificationsIdle: true,
+          mailHighWaterId: 40,
+          mailEtag: '"m"',
+        }),
+      },
+      devices: [nothingOn],
+      now,
+    });
+    await pollEveNotifications(s.deps);
+    expect(s.store.markIdle).toHaveBeenCalledWith(1, 'blob', {
+      notifications: false,
+      clearMail: true,
+    });
+  });
+
+  it('counts the run: listed, skipped by reason, devices and duration', async () => {
+    const s = setup({
+      grants: { 1: grant(), 2: grant(), 3: grant() },
+      devices: [phone],
+      now,
+    });
+    s.store.devicesForMany.mockResolvedValueOnce(
+      new Map([
+        [1, [phone]],
+        [2, [nothingOn]],
+        [3, [{ ...phone, updatedAtMs: OFF_SLOT - 20 * DAY }]],
+      ])
+    );
+    const { createRunStats, ALERTS_POLL_STATS_KEYS } = await import('./runStats.js');
+    const stats = createRunStats(ALERTS_POLL_STATS_KEYS);
+    await pollEveNotifications({ ...s.deps, stats });
+    expect(stats.snapshot()).toMatchObject({
+      grantsListed: 3,
+      grantsRefreshed: 1,
+      grantsSkippedIdle: 1,
+      grantsSkippedDeviceBackoff: 1,
+      devicesRead: 1,
+      devicesSleeping: 1,
+      devicesDormant: 0,
+      esiNotificationsCalls: 1,
+      esiMailCalls: 0,
+      idleStateWrites: 1,
+    });
+    expect(Object.keys(stats.snapshot())).toEqual([...ALERTS_POLL_STATS_KEYS]);
+  });
+
+  it('polls a stale device on the hourly run only, but a sleeping one still gets pushes', async () => {
+    const stale: PollDevice = {
+      ...phone,
+      deviceId: 'old',
+      fcmToken: 'fcm-old',
+      updatedAtMs: OFF_SLOT - 20 * DAY,
+    };
+    const notes = () => ({
+      kind: 'ok' as const,
+      etag: '"n"',
+      budgetLow: false,
+      notifications: [note(11)],
+    });
+    const quiet = setup({ devices: [stale], esi: notes, now });
+    await pollEveNotifications(quiet.deps);
+    expect(quiet.store.refresh).not.toHaveBeenCalled();
+    expect(quiet.store.markIdle).not.toHaveBeenCalled();
+
+    const hourly = setup({ devices: [stale], esi: notes, now: () => SLOT });
+    await pollEveNotifications(hourly.deps);
+    expect(hourly.sent.map((x) => x.token)).toEqual(['fcm-old']);
+
+    const mixed = setup({ devices: [phone, stale], esi: notes, now });
+    await pollEveNotifications(mixed.deps);
+    expect(mixed.sent.map((x) => x.token).sort()).toEqual(['fcm-old', 'fcm-phone']);
+  });
+
+  it('does not poll for a dormant device, and marks the grant idle', async () => {
+    const dormant: PollDevice = { ...phone, updatedAtMs: OFF_SLOT - 120 * DAY };
+    const s = setup({ devices: [dormant], now });
+    await pollEveNotifications(s.deps);
+    expect(s.store.refresh).not.toHaveBeenCalled();
+    expect(s.store.markIdle).toHaveBeenCalledTimes(1);
+  });
+
+  it('resumes an idle grant without replaying what passed meanwhile', async () => {
+    const enabledAt = Date.parse('2026-10-01T00:00:00Z');
+    const registered = Date.parse('2026-10-14T12:30:00Z');
+    const s = setup({
+      grants: { 1: grant({ enabledAt, notificationsIdle: true, etag: '"stale"', highWaterId: 5 }) },
+      devices: [{ ...phone, updatedAtMs: registered }],
+      esi: () => ({
+        kind: 'ok',
+        etag: '"fresh"',
+        budgetLow: false,
+        notifications: [
+          { ...note(11), timestamp: '2026-10-14T12:00:00Z' }, // before it was wanted
+          { ...note(12), timestamp: '2026-10-14T13:00:00Z' }, // after
+        ],
+      }),
+      now: () => Date.parse('2026-10-14T13:15:00Z'),
+    });
+    await pollEveNotifications(s.deps);
+    expect(s.deps.fetchNotifications).toHaveBeenCalledWith(1, 'access-1', null);
+    expect(s.sent.map((x) => x.m.data.notificationId)).toEqual(['12']);
+    expect(s.store.patch).toHaveBeenCalledWith(1, 'blob', {
+      highWaterId: 12,
+      etag: '"fresh"',
+      seenTypes: ['StructureUnderAttack', 'WarDeclared'],
+      notificationsIdle: false,
+    });
+  });
+
+  it('refreshes for mail alone, skips the feed, and marks its notifications idle', async () => {
+    const wantsMail: PollDevice = { ...nothingOn, serverEvents: ['newMail'] };
+    const s = setup({ grants: { 1: grant(MAIL_LOCATION) }, devices: [wantsMail], now });
+    const fetchHeaders = vi.fn(async (): Promise<MailHeadersResult> => ({
+      kind: 'ok',
+      headers: [],
+      etag: null,
+      budgetLow: false,
+    }));
+    await pollEveNotifications({ ...s.deps, mail: { fetchHeaders } });
+    expect(s.store.refresh).toHaveBeenCalledTimes(1);
+    expect(s.deps.fetchNotifications).not.toHaveBeenCalled();
+    expect(fetchHeaders).toHaveBeenCalledTimes(1);
+    expect(s.store.markIdle).toHaveBeenCalledWith(1, 'blob', {
+      notifications: true,
+      clearMail: false,
+    });
+  });
+
+  describe('the location read', () => {
+    const wantsNearby: PollDevice = { ...phone, serverEvents: ['incursionNearby'] };
+    function nearbyDeps(s: ReturnType<typeof setup>, hasCandidates: () => Promise<boolean>) {
+      const fetchLocation = vi.fn(async (): Promise<LocationResult> => ({
+        kind: 'ok',
+        solarSystemId: 7,
+        budgetLow: false,
+      }));
+      const runPhase = vi.fn(async () => ({ pushesSent: 0, budgetStopped: false }));
+      const has = vi.fn(hasCandidates);
+      return {
+        deps: { ...s.deps, nearby: { fetchLocation, runPhase, hasCandidates: has } },
+        fetchLocation,
+        runPhase,
+        has,
+      };
+    }
+
+    it('is skipped for every Character when nothing is listed, yet the phase still sees them', async () => {
+      const s = setup({
+        grants: { 1: grant(MAIL_LOCATION), 2: grant(MAIL_LOCATION) },
+        devices: [wantsNearby],
+        now,
+      });
+      const { deps, fetchLocation, runPhase, has } = nearbyDeps(s, async () => false);
+      const summary = await pollEveNotifications(deps);
+      expect(has).toHaveBeenCalledTimes(1);
+      expect(has).toHaveBeenCalledWith({ incursions: true, skyhooks: false });
+      expect(fetchLocation).not.toHaveBeenCalled();
+      expect(runPhase).toHaveBeenCalledWith(
+        new Map([
+          [1, 0],
+          [2, 0],
+        ])
+      );
+      expect(summary.located).toBe(0);
+    });
+
+    it('is read as before when a list has an entry', async () => {
+      const s = setup({ grants: { 1: grant(MAIL_LOCATION) }, devices: [wantsNearby], now });
+      const { deps, fetchLocation, runPhase } = nearbyDeps(s, async () => true);
+      await pollEveNotifications(deps);
+      expect(fetchLocation).toHaveBeenCalledTimes(1);
+      expect(runPhase).toHaveBeenCalledWith(new Map([[1, 7]]));
+    });
   });
 });

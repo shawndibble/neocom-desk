@@ -71,6 +71,12 @@ export interface AlertGrantDoc {
   mailEtag?: string | null;
   /** `deviceId|Occurrence Key` of mails already pushed to a device while the mark could not advance (a partial send). */
   mailPushed?: string[];
+  /**
+   * Set by the poller (issue #5144) when no live device wanted any notification
+   * type and it stopped reading the feed: the next read resumes from the wanting
+   * device's registration instead of replaying what passed meanwhile.
+   */
+  notificationsIdle?: boolean;
 }
 
 export interface AlertGrantStore {
@@ -171,6 +177,8 @@ export async function saveAlertGrant(
     seenTypes: previousActive?.seenTypes ?? [],
     status: 'active',
     scopes,
+    // A re-grant keeps the idle mark with the stale high-water mark it guards.
+    ...(previousActive?.notificationsIdle ? { notificationsIdle: true } : {}),
     ...(withMail
       ? {
           mailHighWaterId: keptMail ? (previousActive.mailHighWaterId ?? null) : null,

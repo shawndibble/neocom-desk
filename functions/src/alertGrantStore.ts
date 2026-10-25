@@ -14,7 +14,13 @@ import {
   SERVER_EVENTS_FIELD,
   readQuietHours,
 } from './projectionStore.js';
-import type { PollDevice, PollerStore } from './pollEveNotifications.js';
+import type { ListedGrant, PollDevice, PollerStore } from './pollEveNotifications.js';
+import {
+  createRegistrationReader,
+  registeredAtMs,
+  type RegistrationReader,
+} from './registrationReader.js';
+import type { RunStats } from './runStats.js';
 
 export const ALERT_GRANTS_COLLECTION = 'alertGrants';
 
@@ -24,8 +30,14 @@ export function firestorePollerStore(
   deps: {
     key: () => Buffer;
     refresh: (clientId: string, refreshToken: string) => Promise<RefreshedTokens>;
+    /** Counters for this run's log line (issue #5144): in-memory, never written. */
+    stats?: RunStats;
+    /** Shared with the nearby phase so a registration is read once per run. */
+    registrations?: RegistrationReader;
   }
 ): PollerStore {
+  const stats = deps.stats;
+  const registrations = deps.registrations ?? createRegistrationReader(db, stats);
   const grants = db.collection(ALERT_GRANTS_COLLECTION);
   const ref = (characterId: number) => grants.doc(String(characterId));
   const guardedUpdate = (
@@ -35,8 +47,12 @@ export function firestorePollerStore(
   ): Promise<void> =>
     db.runTransaction(async (tx) => {
       const snap = await tx.get(ref(characterId));
+      stats?.add('firestoreReads');
       const data = snap.data() as AlertGrantDoc | undefined;
-      if (data?.encryptedRefreshToken === guardBlob) tx.update(ref(characterId), update);
+      if (data?.encryptedRefreshToken === guardBlob) {
+        tx.update(ref(characterId), update);
+        stats?.add('firestoreWrites');
+      }
     });
   // The store lives for one poll run. The listing already read every active
   // grant in full, so `refresh` starts from that copy instead of reading each
@@ -49,14 +65,16 @@ export function firestorePollerStore(
   return {
     async listActive() {
       const snap = await grants.where('status', '==', 'active').get();
-      const ids: number[] = [];
+      stats?.add('firestoreReads', Math.max(1, snap.docs.length));
+      const active: ListedGrant[] = [];
       for (const d of snap.docs) {
         const id = Number(d.id);
         if (!Number.isSafeInteger(id)) continue;
-        listed.set(id, d.data() as AlertGrantDoc);
-        ids.push(id);
+        const grant = d.data() as AlertGrantDoc;
+        listed.set(id, grant);
+        active.push({ characterId: id, grant });
       }
-      return ids;
+      return active;
     },
 
     // SSO rotates the token, so the SSO call must not run inside a retryable
@@ -69,6 +87,7 @@ export function firestorePollerStore(
       listed.delete(characterId);
       if (!grant) {
         const snap = await ref(characterId).get();
+        stats?.add('firestoreReads');
         if (!snap.exists) return { kind: 'skip' };
         grant = snap.data() as AlertGrantDoc;
       }
@@ -77,6 +96,7 @@ export function firestorePollerStore(
       const current = decryptRefreshToken(grant.encryptedRefreshToken, characterId, key);
       let tokens: RefreshedTokens;
       try {
+        stats?.add('ssoRefreshCalls');
         tokens = await deps.refresh(grant.clientId, current);
       } catch (err) {
         if (err instanceof SsoRefreshError && err.invalidGrant) {
@@ -94,9 +114,12 @@ export function firestorePollerStore(
       if (rotated === null) return { kind: 'ok', accessToken: tokens.accessToken, grant };
       const written = await db.runTransaction(async (tx) => {
         const latest = await tx.get(ref(characterId));
+        stats?.add('firestoreReads');
         const data = latest.data() as AlertGrantDoc | undefined;
         if (data?.encryptedRefreshToken !== grant.encryptedRefreshToken) return false;
         tx.update(ref(characterId), { encryptedRefreshToken: rotated });
+        stats?.add('firestoreWrites');
+        stats?.add('tokenRotationWrites');
         return true;
       });
       if (!written) return { kind: 'skip' };
@@ -125,6 +148,13 @@ export function firestorePollerStore(
       await guardedUpdate(characterId, guard, state);
     },
 
+    async markIdle(characterId, guard, what) {
+      await guardedUpdate(characterId, guard, {
+        ...(what.notifications ? { notificationsIdle: true } : {}),
+        ...(what.clearMail ? { mailHighWaterId: null, mailEtag: null, mailPushed: [] } : {}),
+      });
+    },
+
     async dropMailScope(characterId, guard, scopes) {
       // The mail state goes with the scope: asking for mail again starts unmarked.
       await guardedUpdate(characterId, guard, {
@@ -135,35 +165,39 @@ export function firestorePollerStore(
       });
     },
 
-    async devicesFor(characterId) {
-      const snap = await db
-        .collection(DEVICE_REGISTRATIONS_COLLECTION)
-        .where('characterIds', 'array-contains', characterId)
-        .get();
-      const devices: PollDevice[] = [];
-      for (const doc of snap.docs) {
-        const data = doc.data();
+    async devicesForMany(characterIds) {
+      const byCharacter = new Map<number, PollDevice[]>();
+      for (const { id, data } of await registrations.holding(characterIds)) {
         if (typeof data.fcmToken !== 'string') continue;
-        const byCharacter = data.eveTypesByCharacter as Record<string, unknown> | undefined;
-        const types = byCharacter?.[String(characterId)];
-        const serverEvents = (data[SERVER_EVENTS_FIELD] as Record<string, unknown> | undefined)?.[
-          String(characterId)
-        ];
-        devices.push({
-          deviceId: doc.id,
-          fcmToken: data.fcmToken,
-          eveTypes: Array.isArray(types) ? types.filter((t) => typeof t === 'string') : [],
-          serverEvents: Array.isArray(serverEvents)
-            ? serverEvents.filter((id) => typeof id === 'string')
-            : [],
-          quietHours: readQuietHours(data.quietHours),
-        });
+        const held = Array.isArray(data.characterIds) ? data.characterIds : [];
+        for (const characterId of characterIds) {
+          if (!held.includes(characterId)) continue;
+          const types = (data.eveTypesByCharacter as Record<string, unknown> | undefined)?.[
+            String(characterId)
+          ];
+          const serverEvents = (data[SERVER_EVENTS_FIELD] as Record<string, unknown> | undefined)?.[
+            String(characterId)
+          ];
+          const device: PollDevice = {
+            deviceId: id,
+            fcmToken: data.fcmToken,
+            eveTypes: Array.isArray(types) ? types.filter((t) => typeof t === 'string') : [],
+            serverEvents: Array.isArray(serverEvents)
+              ? serverEvents.filter((e) => typeof e === 'string')
+              : [],
+            quietHours: readQuietHours(data.quietHours),
+            updatedAtMs: registeredAtMs(data),
+          };
+          byCharacter.set(characterId, [...(byCharacter.get(characterId) ?? []), device]);
+        }
       }
-      return devices;
+      return byCharacter;
     },
 
     async deleteDevice(deviceId) {
       await db.collection(DEVICE_REGISTRATIONS_COLLECTION).doc(deviceId).delete();
+      stats?.add('firestoreWrites');
+      registrations.forget(deviceId);
     },
   };
 }

@@ -24,6 +24,8 @@ import {
   type ServerEventInputs,
 } from './serverEvents.js';
 import type { PolledDevice } from './serverEventPoll.js';
+import { registeredAtMs } from './registrationReader.js';
+import type { RunStats } from './runStats.js';
 import {
   joinRequestFire,
   memberJoinedFire,
@@ -94,21 +96,27 @@ export async function deliverServerEvent(
 export async function deleteDeviceIfToken(
   db: Firestore,
   deviceId: string,
-  fcmToken: string
+  fcmToken: string,
+  stats?: RunStats
 ): Promise<void> {
   const ref = db.collection(DEVICE_REGISTRATIONS_COLLECTION).doc(deviceId);
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    if (snap.exists && snap.get('fcmToken') === fcmToken) tx.delete(ref);
+    stats?.add('firestoreReads');
+    if (snap.exists && snap.get('fcmToken') === fcmToken) {
+      tx.delete(ref);
+      stats?.add('firestoreWrites');
+    }
   });
 }
 
 /** The polled tick's devices: those with a price alert or ship-lost event on for some Character. */
-export async function listPolledDevices(db: Firestore): Promise<PolledDevice[]> {
+export async function listPolledDevices(db: Firestore, stats?: RunStats): Promise<PolledDevice[]> {
   const snap = await db
     .collection(DEVICE_REGISTRATIONS_COLLECTION)
     .where(POLLED_EVENTS_FIELD, 'array-contains-any', [...POLLED_EVENT_IDS])
     .get();
+  stats?.add('firestoreReads', Math.max(1, snap.docs.length));
   const devices: PolledDevice[] = [];
   for (const doc of snap.docs) {
     const data = doc.data();
@@ -118,10 +126,12 @@ export async function listPolledDevices(db: Firestore): Promise<PolledDevice[]> 
     const baselines = record<ServerEventBaseline>(data[SERVER_BASELINES_FIELD]);
     const characterIds: unknown[] = Array.isArray(data.characterIds) ? data.characterIds : [];
     const quietHours = readQuietHours(data.quietHours);
+    const updatedAtMs = registeredAtMs(data);
     devices.push({
       deviceId: doc.id,
       fcmToken: data.fcmToken,
       ...(quietHours ? { quietHours } : {}),
+      ...(updatedAtMs !== null ? { updatedAtMs } : {}),
       characters: characterIds
         .filter((id): id is number => typeof id === 'number')
         .map((characterId) => ({
@@ -144,13 +154,15 @@ export async function listPolledDevices(db: Firestore): Promise<PolledDevice[]> 
 export async function saveServerBaselines(
   db: Firestore,
   deviceId: string,
-  baselines: Record<string, ServerEventBaseline>
+  baselines: Record<string, ServerEventBaseline>,
+  stats?: RunStats
 ): Promise<void> {
   try {
     await db
       .collection(DEVICE_REGISTRATIONS_COLLECTION)
       .doc(deviceId)
       .update(new FieldPath(SERVER_BASELINES_FIELD), baselines);
+    stats?.add('firestoreWrites');
   } catch (err) {
     const code = err instanceof Error && 'code' in err ? (err as { code: unknown }).code : null;
     // 5 = NOT_FOUND: the device is gone, nothing to keep a reading for.
