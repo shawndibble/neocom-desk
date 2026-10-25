@@ -19,6 +19,8 @@ import {
 } from '@/engine/fittings/improve';
 import type { FittingStats } from '@/engine/fittings/types';
 import { diffFittingStats } from '@/engine/fittings/variationDelta';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { changeLabel } from './fittingVariationsCsv';
 import { MakeItFitSection } from './MakeItFitSection';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
@@ -103,7 +105,10 @@ export function ImprovePanel({ goal, onGoalChange, search, catalogue, onApply }:
           const id = `improve-${optionKey(option)}`;
           return (
             <li key={optionKey(option)} className="border-line rounded-xs border p-2 text-sm">
-              <label htmlFor={id} className="flex cursor-pointer items-start gap-2">
+              <label
+                htmlFor={id}
+                className={cx('flex cursor-pointer items-start gap-2', tappableRowClassName)}
+              >
                 <Checkbox
                   id={id}
                   className="mt-0.5"
