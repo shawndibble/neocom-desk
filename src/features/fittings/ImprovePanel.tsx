@@ -30,6 +30,7 @@ import {
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
 import { TANK_GOALS } from '@/engine/fittings/improveGroups';
 import { commandOf } from '@/engine/fittings/improveCommand';
+import { hullRoleOf, roleUnlocks } from '@/engine/fittings/improveRole';
 import { ewarOf, tackleOf } from '@/engine/fittings/improveTackle';
 import { Collapse } from '@/components/ui/Collapse';
 import { textActionClassName } from '@/components/ui/textActionClassName';
@@ -41,6 +42,7 @@ import {
   goalAvailability,
   effectiveHold,
   remoteRepairOf,
+  COMBAT_GOALS,
   IMPROVE_GOALS,
   IMPROVE_HOLDS,
   IMPROVE_MODES,
@@ -172,6 +174,16 @@ function brokeText(
   });
 }
 
+/** Goals the fit itself decides: they only matter once it has the modules, whatever the hull. */
+const FIT_DERIVED_GOALS: readonly ImproveGoal[] = [
+  'mining',
+  'repair',
+  'transfer',
+  'tackle',
+  'ewar',
+  'command',
+];
+
 const NO_TICKS: ReadonlyMap<string, ImproveOption> = new Map();
 const NO_OPEN: ReadonlySet<string> = new Set();
 
@@ -193,6 +205,10 @@ export function ImprovePanel({
   const { t } = useTranslation();
   const moreId = useId();
   const [moreOpen, setMoreOpen] = useState(false);
+  const settingsId = useId();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const goalsId = useId();
+  const [goalsOpen, setGoalsOpen] = useState(false);
   const { sort, onSortChange: setSort } = settings;
   // Modules whose other options, and rows whose other stats, are showing; like ticks, they belong to one result.
   const [open, setOpen] = useState<{ result: ImproveResult | null; keys: ReadonlySet<string> }>({
@@ -670,6 +686,28 @@ export function ImprovePanel({
       </MakeItFitSection>
     );
 
+  const role = hullRoleOf(hull);
+  const availabilityOf = (id: ImproveGoal) =>
+    before ? goalAvailability(id, before, hull) : { available: true as const };
+  const unavailableReason = (id: ImproveGoal): string | undefined => {
+    const availability = availabilityOf(id);
+    return 'reason' in availability
+      ? t(`fittings.improve.unavailable.${availability.reason}`)
+      : undefined;
+  };
+  // Role-relevant goals lead as chips; the rest, and any the fit cannot score, sit under "More goals".
+  const roleGoals: readonly ImproveGoal[] = role === 'combat' ? COMBAT_GOALS : roleUnlocks(role);
+  const isRelevant = (id: ImproveGoal) =>
+    id === goal ||
+    (availabilityOf(id).available && (roleGoals.includes(id) || FIT_DERIVED_GOALS.includes(id)));
+  const relevantGoals = IMPROVE_GOALS.filter(isRelevant);
+  const otherGoals = IMPROVE_GOALS.filter((id) => !isRelevant(id));
+  const pickGoal = (id: ImproveGoal) => {
+    if (goal === id) return;
+    setTicked(new Map());
+    onGoalChange(id);
+  };
+
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -678,35 +716,52 @@ export function ImprovePanel({
           aria-label={t('fittings.improve.goalLabel')}
           className="flex flex-wrap gap-2"
         >
-          {IMPROVE_GOALS.map((id) => {
-            const availability = before ? goalAvailability(id, before, hull) : { available: true };
-            const reason =
-              'reason' in availability
-                ? t(`fittings.improve.unavailable.${availability.reason}`)
-                : undefined;
-            return (
-              <FilterChip
-                key={id}
-                label={t(`fittings.improve.goal.${id}`)}
-                selected={goal === id}
-                disabled={!availability.available}
-                {...(reason ? { tooltip: reason } : {})}
-                onToggle={() => {
-                  if (goal === id) return;
-                  setTicked(new Map());
-                  onGoalChange(id);
-                }}
-              />
-            );
-          })}
+          {relevantGoals.map((id) => (
+            <FilterChip
+              key={id}
+              label={t(`fittings.improve.goal.${id}`)}
+              selected={goal === id}
+              onToggle={() => pickGoal(id)}
+            />
+          ))}
         </div>
-        <p className="text-text-dim text-xs">
-          {t(
-            goal === 'cheaper'
-              ? 'fittings.improve.guardrail.cheaper'
-              : 'fittings.improve.guardrail.combat'
-          )}
-        </p>
+        {otherGoals.length > 0 && (
+          <div>
+            <button
+              type="button"
+              className={textActionClassName('gap-1')}
+              aria-expanded={goalsOpen}
+              aria-controls={goalsId}
+              onClick={() => setGoalsOpen((open) => !open)}
+            >
+              {t('fittings.improve.moreGoals', { count: otherGoals.length })}
+              <Caret expanded={goalsOpen} />
+            </button>
+            <Collapse open={goalsOpen} id={goalsId} className="pt-1">
+              <ul>
+                {otherGoals.map((id) => {
+                  const reason = unavailableReason(id);
+                  return (
+                    <li
+                      key={id}
+                      className="flex flex-col items-start gap-1 py-1 sm:flex-row sm:items-center sm:gap-3"
+                    >
+                      <span className="sm:w-52 sm:shrink-0">
+                        <FilterChip
+                          label={t(`fittings.improve.goal.${id}`)}
+                          selected={goal === id}
+                          disabled={reason !== undefined}
+                          onToggle={() => pickGoal(id)}
+                        />
+                      </span>
+                      {reason && <span className="text-warning text-xs">{reason}</span>}
+                    </li>
+                  );
+                })}
+              </ul>
+            </Collapse>
+          </div>
+        )}
         {goal === 'mining' && (
           <div className="space-y-1 text-sm">
             <span aria-hidden="true">{t('fittings.improve.oreLabel')}</span>
@@ -751,85 +806,109 @@ export function ImprovePanel({
         )}
       </div>
 
-      <div className="space-y-3">
-        <SegmentedControl
-          label={t('fittings.improve.reachLabel')}
-          options={IMPROVE_REACHES.map((value) => ({
-            value,
-            label: t(`fittings.improve.reach.${value}`),
-          }))}
-          value={settings.reach}
-          onChange={settings.onReachChange}
-          fill
-        />
-        <p className="text-text-dim text-xs">{t(`fittings.improve.reachHint.${settings.reach}`)}</p>
-        <SegmentedControl
-          label={t('fittings.improve.modeLabel')}
-          options={IMPROVE_MODES.map((value) => ({
-            value,
-            label: t(`fittings.improve.mode.${value}`),
-          }))}
-          value={settings.mode}
-          onChange={settings.onModeChange}
-          fill
-        />
-        <label className="block space-y-1 text-sm">
-          <span>{t(`fittings.improve.cap.${settings.mode}`)}</span>
-          <IskInput
-            value={settings.spendCap === null ? '' : String(settings.spendCap)}
-            onChange={(value) => settings.onSpendCapChange(value === '' ? null : Number(value))}
-          />
-        </label>
-        {TANK_GOALS.has(goal) && (
-          <>
+      <div>
+        <button
+          type="button"
+          className={textActionClassName('w-full justify-between gap-2')}
+          aria-expanded={settingsOpen}
+          aria-controls={settingsId}
+          onClick={() => setSettingsOpen((open) => !open)}
+        >
+          <span>{t('fittings.improve.settingsLabel')}</span>
+          <Caret expanded={settingsOpen} />
+        </button>
+        <Collapse open={settingsOpen} id={settingsId} className="pt-2">
+          <div className="space-y-3">
+            <p className="text-text-dim text-xs">
+              {t(
+                goal === 'cheaper'
+                  ? 'fittings.improve.guardrail.cheaper'
+                  : 'fittings.improve.guardrail.combat'
+              )}
+            </p>
             <SegmentedControl
-              label={t('fittings.improve.defenseLabel')}
-              options={DEFENSE_CHOICES.map((value) => ({
+              label={t('fittings.improve.reachLabel')}
+              options={IMPROVE_REACHES.map((value) => ({
                 value,
-                label: t(`fittings.improve.defense.${value}`),
-                // Upgrade swaps a module within its own type, so it can't change tank side.
-                ...(value !== 'keep' && settings.reach === 'upgrade'
-                  ? { disabled: true, disabledReason: t('fittings.improve.defenseUpgrade') }
-                  : {}),
+                label: t(`fittings.improve.reach.${value}`),
               }))}
-              value={settings.defense}
-              onChange={settings.onDefenseChange}
+              value={settings.reach}
+              onChange={settings.onReachChange}
               fill
             />
-            {settings.reach === 'upgrade' && (
-              <p className="text-text-dim text-xs">{t('fittings.improve.defenseUpgrade')}</p>
+            <p className="text-text-dim text-xs">
+              {t(`fittings.improve.reachHint.${settings.reach}`)}
+            </p>
+            <SegmentedControl
+              label={t('fittings.improve.modeLabel')}
+              options={IMPROVE_MODES.map((value) => ({
+                value,
+                label: t(`fittings.improve.mode.${value}`),
+              }))}
+              value={settings.mode}
+              onChange={settings.onModeChange}
+              fill
+            />
+            <label className="block space-y-1 text-sm">
+              <span>{t(`fittings.improve.cap.${settings.mode}`)}</span>
+              <IskInput
+                value={settings.spendCap === null ? '' : String(settings.spendCap)}
+                onChange={(value) => settings.onSpendCapChange(value === '' ? null : Number(value))}
+              />
+            </label>
+            {TANK_GOALS.has(goal) && (
+              <>
+                <SegmentedControl
+                  label={t('fittings.improve.defenseLabel')}
+                  options={DEFENSE_CHOICES.map((value) => ({
+                    value,
+                    label: t(`fittings.improve.defense.${value}`),
+                    // Upgrade swaps a module within its own type, so it can't change tank side.
+                    ...(value !== 'keep' && settings.reach === 'upgrade'
+                      ? { disabled: true, disabledReason: t('fittings.improve.defenseUpgrade') }
+                      : {}),
+                  }))}
+                  value={settings.defense}
+                  onChange={settings.onDefenseChange}
+                  fill
+                />
+                {settings.reach === 'upgrade' && (
+                  <p className="text-text-dim text-xs">{t('fittings.improve.defenseUpgrade')}</p>
+                )}
+              </>
             )}
-          </>
-        )}
-        <div>
-          <button
-            type="button"
-            className={textActionClassName()}
-            aria-expanded={moreOpen}
-            aria-controls={moreId}
-            onClick={() => setMoreOpen((open) => !open)}
-          >
-            {t('fittings.improve.moreLabel')}
-          </button>
-          <Collapse open={moreOpen} id={moreId} className="pt-2">
-            <div className="space-y-1">
-              <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
-                <Checkbox
-                  checked={settings.includeRigs}
-                  onChange={(event) => settings.onIncludeRigsChange(event.target.checked)}
-                />
-                {t('fittings.improve.includeRigs')}
-              </label>
-              <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
-                <Checkbox
-                  checked={settings.includeOfficer}
-                  onChange={(event) => settings.onIncludeOfficerChange(event.target.checked)}
-                />
-                {t('fittings.improve.includeOfficer')}
-              </label>
+            <div>
+              <button
+                type="button"
+                className={textActionClassName('gap-1')}
+                aria-expanded={moreOpen}
+                aria-controls={moreId}
+                onClick={() => setMoreOpen((open) => !open)}
+              >
+                {t('fittings.improve.moreLabel')}
+                <Caret expanded={moreOpen} />
+              </button>
+              <Collapse open={moreOpen} id={moreId} className="pt-2">
+                <div className="space-y-1">
+                  <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
+                    <Checkbox
+                      checked={settings.includeRigs}
+                      onChange={(event) => settings.onIncludeRigsChange(event.target.checked)}
+                    />
+                    {t('fittings.improve.includeRigs')}
+                  </label>
+                  <label className={cx('flex items-center gap-2 text-sm', tappableRowClassName)}>
+                    <Checkbox
+                      checked={settings.includeOfficer}
+                      onChange={(event) => settings.onIncludeOfficerChange(event.target.checked)}
+                    />
+                    {t('fittings.improve.includeOfficer')}
+                  </label>
+                </div>
+              </Collapse>
             </div>
-          </Collapse>
-        </div>
+          </div>
+        </Collapse>
       </div>
 
       {unloaded && (
