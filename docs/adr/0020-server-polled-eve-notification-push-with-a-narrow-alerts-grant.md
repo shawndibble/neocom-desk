@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted (2026-10-18)
+Accepted (2026-10-18). Amended by ADR 0027: the grant may also carry the
+location scope, for nearby alerts.
 
 ## Context
 

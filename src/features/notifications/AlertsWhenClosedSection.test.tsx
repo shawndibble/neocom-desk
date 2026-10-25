@@ -219,3 +219,39 @@ describe('Quiet time (issue #4566)', () => {
     await waitFor(() => expect(within(quiet).queryByLabelText('From')).not.toBeInTheDocument());
   });
 });
+
+describe('AlertsWhenClosedSection: nearby alerts (ADR 0027)', () => {
+  it('says nothing about nearby alerts until the server takes the location scope', async () => {
+    await turnOn(1);
+    await renderSection();
+    expect(await screen.findByTestId('alerts-state-1')).toHaveTextContent(/^On$/);
+    expect(screen.queryByRole('button', { name: /add nearby/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/notifications only; Turn off/)).toBeInTheDocument();
+  });
+
+  it('offers to re-authorize a grant from before nearby alerts, and says what it covers', async () => {
+    await turnOn(1);
+    await db.settings.put({ key: 'alertsNearby', value: { supported: true, characterIds: [] } });
+    await renderSection();
+    await waitFor(() =>
+      expect(screen.getByTestId('alerts-state-1')).toHaveTextContent('On, without nearby alerts')
+    );
+    expect(
+      screen.getByText(/nearby Incursions and raidable skyhooks, while the app is closed/)
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'Re-authorize Alpha to add nearby Incursions and raidable skyhooks',
+      })
+    );
+    expect(login.begin).toHaveBeenCalledWith(1);
+  });
+
+  it('shows a grant that already carries the location as plainly on', async () => {
+    await turnOn(1);
+    await db.settings.put({ key: 'alertsNearby', value: { supported: true, characterIds: [1] } });
+    await renderSection();
+    await waitFor(() => expect(screen.getByTestId('alerts-state-1')).toHaveTextContent(/^On$/));
+    expect(screen.queryByRole('button', { name: /add nearby/i })).not.toBeInTheDocument();
+  });
+});

@@ -26,6 +26,12 @@
  * arrives as one summary push (`summaryCount`) that writes no feed row; the
  * Foreground Poller files those when the app opens.
  *
+ * Server-pushed nearby alerts (ADR 0027, issue #5122) carry the fire's raw
+ * fields (`jumps`, the system, planet and window, or the constellation,
+ * staging system and state); the worker words them with the app's own copy
+ * (`pollDomains/copy/nearbyWording.ts`) and the names one public lookup
+ * resolves, keyed as the Foreground Poller keys them.
+ *
  * The fields sit under a top-level `data` key, not flat: FCM's Admin SDK only
  * ever sends webpush `data` payloads as a `{[key: string]: string}` map, and
  * `@firebase/messaging`'s own service-worker listener confirms what reaches
@@ -50,6 +56,13 @@ import { occurrenceKey } from '@/engine/occurrenceKey';
 import type { EveNotificationFire } from '@/engine/notificationDiffs';
 import { RESOLUTION_BUDGET_MS, withinBudget } from './eveNotificationNamePlan';
 import { renderEveNotification, type EveNotificationNames } from './eveNotificationRender';
+import type { IncursionNearbyFire } from '@/engine/incursions/incursionAlert';
+import type { SkyhookRaidableNearbyFire } from '@/engine/skyhooks/skyhookAlert';
+import { INCURSION_STATES } from '@/engine/incursions/incursionRows';
+import {
+  incursionNearbyWording,
+  skyhookRaidableNearbyWording,
+} from './pollDomains/copy/nearbyWording';
 
 /**
  * The service worker's own i18next instance, not `@/i18n`: that module loads
@@ -73,6 +86,8 @@ export interface PushEnv {
   characterName?: (characterId: number) => Promise<string | undefined>;
   /** Names for a raw EVE notification, already within the resolution budget; never rejects. */
   resolveNames?: (fire: EveNotificationFire) => Promise<EveNotificationNames>;
+  /** Public names for system, planet and constellation ids (a nearby push); never rejects. */
+  resolveIdNames?: (ids: readonly number[]) => Promise<ReadonlyMap<number, string>>;
   /** The Time format zone (`'UTC'` for EVE time) the body's times render in; absent means the host's own. Never rejects. */
   timeZone?: () => Promise<string | undefined>;
 }
@@ -109,6 +124,51 @@ export interface PushPayload {
   readonly rawNotification?: RawEveNotification;
   /** Present on a summary push: how many new EVE notifications the Character has. */
   readonly summaryCount?: number;
+  /** Present on a server-pushed nearby alert (ADR 0027): the fire the server diffed. */
+  readonly nearby?: NearbyFire;
+}
+
+type NearbyFire = IncursionNearbyFire | SkyhookRaidableNearbyFire;
+
+/** A wire string that is a safe integer, or null. */
+function wireInt(value: unknown): number | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  const n = Number(value);
+  return Number.isSafeInteger(n) ? n : null;
+}
+
+/** The nearby block of a server push, or null when any field is missing or malformed. */
+function parseNearby(
+  eventId: NotificationEventId,
+  characterId: number,
+  data: Record<string, unknown>
+): NearbyFire | null {
+  const jumps = wireInt(data.jumps);
+  if (jumps === null) return null;
+  if (eventId === 'skyhookRaidableNearby') {
+    const systemId = wireInt(data.systemId);
+    const planetId = wireInt(data.planetId);
+    const startMs = wireInt(data.windowStartMs);
+    const endMs = wireInt(data.windowEndMs);
+    if (systemId === null || planetId === null || startMs === null || endMs === null) return null;
+    return { eventId, characterId, systemId, planetId, startMs, endMs, jumps };
+  }
+  if (eventId === 'incursionNearby') {
+    const constellationId = wireInt(data.constellationId);
+    const stagingSystemId = wireInt(data.stagingSystemId);
+    const state = data.incursionState;
+    if (constellationId === null || stagingSystemId === null) return null;
+    if (!(INCURSION_STATES as readonly unknown[]).includes(state)) return null;
+    return {
+      eventId,
+      characterId,
+      constellationId,
+      stagingSystemId,
+      state: state as IncursionNearbyFire['state'],
+      jumps,
+    };
+  }
+  return null;
 }
 
 function isNotificationEventId(value: unknown): value is NotificationEventId {
@@ -174,6 +234,8 @@ export function parsePushPayload(rawText: string | null): PushPayload | null {
       : null;
   const summaryNum =
     typeof summaryCount === 'string' && summaryCount.length > 0 ? Number(summaryCount) : NaN;
+  // Lenient like the raw block: a malformed one only costs the rendered copy.
+  const nearby = parseNearby(eventId, characterIdNum, data as Record<string, unknown>);
 
   return {
     characterId: characterIdNum,
@@ -185,7 +247,36 @@ export function parsePushPayload(rawText: string | null): PushPayload | null {
     ...(Number.isFinite(fireAtNum) ? { fireAt: fireAtNum } : {}),
     ...(raw !== null ? { rawNotification: raw } : {}),
     ...(Number.isInteger(summaryNum) && summaryNum > 0 ? { summaryCount: summaryNum } : {}),
+    ...(nearby !== null ? { nearby } : {}),
   };
+}
+
+/** A nearby push in the app's own words, keyed as the Foreground Poller keys it. */
+async function presentNearby(env: PushEnv, fire: NearbyFire, now: number): Promise<Presented> {
+  const ids =
+    fire.eventId === 'incursionNearby'
+      ? [fire.constellationId, fire.stagingSystemId]
+      : [fire.systemId, fire.planetId];
+  const resolved =
+    (await withinBudget(
+      Promise.resolve(env.resolveIdNames?.(ids)),
+      undefined,
+      RESOLUTION_BUDGET_MS
+    )) ?? new Map<number, string>();
+  const t = (key: string, vars?: Record<string, unknown>) => i18n.t(key, vars);
+  const { title, body } =
+    fire.eventId === 'incursionNearby'
+      ? incursionNearbyWording(t, fire, {
+          constellation: resolved.get(fire.constellationId),
+          system: resolved.get(fire.stagingSystemId),
+        })
+      : skyhookRaidableNearbyWording(
+          t,
+          fire,
+          { system: resolved.get(fire.systemId), planet: resolved.get(fire.planetId) },
+          now
+        );
+  return { title, body, feedKey: occurrenceKey(fire, now) };
 }
 
 interface Presented {
@@ -232,6 +323,7 @@ async function present(env: PushEnv, payload: PushPayload, now: number): Promise
         feedKey: null,
       };
     }
+    if (payload.nearby !== undefined) return await presentNearby(env, payload.nearby, now);
     const raw = payload.rawNotification;
     if (raw === undefined || payload.eveType === undefined) return generic;
     const fire: EveNotificationFire = {

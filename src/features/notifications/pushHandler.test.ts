@@ -520,3 +520,111 @@ describe('server-polled EVE notifications (ADR 0020)', () => {
     }
   });
 });
+
+describe('server-pushed nearby alerts (ADR 0027)', () => {
+  const NOW = Date.parse('2026-10-25T12:00:00Z');
+  const HOUR = 3_600_000;
+
+  /** Exactly what `functions/src/nearbyPush.ts`'s `buildNearbyPush` sends. */
+  function serverSkyhook(overrides: Record<string, string> = {}): string {
+    return JSON.stringify({
+      data: {
+        characterId: '777',
+        eventId: 'skyhookRaidableNearby',
+        occurrenceKey: `skyhookRaidableNearby:30000142:40009077:${NOW + HOUR}`,
+        fireAt: String(NOW - 60_000),
+        jumps: '2',
+        title: 'Raidable skyhook 2 jumps away',
+        body: 'A skyhook 2 jumps from your current system can be raided.',
+        systemId: '30000142',
+        planetId: '40009077',
+        windowStartMs: String(NOW + HOUR),
+        windowEndMs: String(NOW + 2 * HOUR),
+        ...overrides,
+      },
+    });
+  }
+
+  function serverIncursion(): string {
+    return JSON.stringify({
+      data: {
+        characterId: '777',
+        eventId: 'incursionNearby',
+        occurrenceKey: 'incursionNearby:20000020:30000144',
+        fireAt: String(NOW),
+        jumps: '1',
+        title: 'Incursion 1 jump away',
+        body: 'An Incursion is staging 1 jump from your current system.',
+        constellationId: '20000020',
+        stagingSystemId: '30000144',
+        incursionState: 'established',
+      },
+    });
+  }
+
+  const names = new Map([
+    [30000142, 'Jita'],
+    [40009077, 'Jita IV'],
+    [20000020, 'Kimotoro'],
+    [30000144, 'Perimeter'],
+  ]);
+
+  it('renders a raid window with the app’s own wording and resolved names', async () => {
+    const e = env({ resolveIdNames: vi.fn(async () => names) });
+    await handlePush(e, serverSkyhook(), NOW);
+    expect(e.showNotification).toHaveBeenCalledWith(
+      'Raidable skyhook 2 jumps away',
+      expect.objectContaining({
+        body: 'Jita IV can be raided in 1h 0m, 2 jumps from your current system.',
+      })
+    );
+  });
+
+  it('renders an Incursion with its state', async () => {
+    const e = env({ resolveIdNames: vi.fn(async () => names) });
+    await handlePush(e, serverIncursion(), NOW);
+    expect(e.showNotification).toHaveBeenCalledWith(
+      'Incursion 1 jump away',
+      expect.objectContaining({
+        body: 'Kimotoro, staging in Perimeter: Established, 1 jump from your current system.',
+      })
+    );
+  });
+
+  it('writes the feed row under the key the Foreground Poller derives', async () => {
+    const e = env();
+    await handlePush(e, serverSkyhook({ occurrenceKey: 'something-else' }), NOW);
+    const fire = {
+      eventId: 'skyhookRaidableNearby' as const,
+      characterId: 777,
+      systemId: 30000142,
+      planetId: 40009077,
+      startMs: NOW + HOUR,
+      endMs: NOW + 2 * HOUR,
+      jumps: 2,
+    };
+    expect(e.recordFeedEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ id: occurrenceKey(fire, NOW), notifiedHereAt: NOW })
+    );
+  });
+
+  it('still words it, with ids, when no name resolves', async () => {
+    const e = env({ resolveIdNames: vi.fn(async () => new Map()) });
+    await handlePush(e, serverIncursion(), NOW);
+    expect(e.showNotification).toHaveBeenCalledWith(
+      'Incursion 1 jump away',
+      expect.objectContaining({
+        body: 'Constellation 20000020, staging in #30000144: Established, 1 jump from your current system.',
+      })
+    );
+  });
+
+  it('falls back to the sender’s generic copy when the nearby block is malformed', async () => {
+    const e = env();
+    await handlePush(e, serverSkyhook({ planetId: 'x' }), NOW);
+    expect(e.showNotification).toHaveBeenCalledWith(
+      'Raidable skyhook 2 jumps away',
+      expect.objectContaining({ body: 'A skyhook 2 jumps from your current system can be raided.' })
+    );
+  });
+});

@@ -50,3 +50,16 @@ export async function resolvePushNames(
     return {};
   }
 }
+
+/** Names for plain public ids (a nearby push's system, planet, constellation). Never rejects. */
+export async function resolveIdNames(
+  ids: readonly number[],
+  fetchImpl: typeof fetch = fetch
+): Promise<ReadonlyMap<number, string>> {
+  try {
+    if (ids.length === 0) return new Map();
+    return await withinBudget(postNames([...new Set(ids)], fetchImpl), new Map<number, string>());
+  } catch {
+    return new Map();
+  }
+}

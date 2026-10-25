@@ -9,6 +9,7 @@
  * "Needs re-authorizing" is therefore set by whatever learns the grant died
  * (`markAlertsNeedReauth`), and cleared by a fresh successful grant.
  */
+import { useLiveQuery } from 'dexie-react-hooks';
 import { completeAlertsLogin } from '@/auth/session';
 import { db } from '@/db';
 import { reportFailure } from '@/observability/reportFailure';
@@ -85,6 +86,13 @@ export async function readAlertsNearby(): Promise<AlertsNearby> {
       ? value.characterIds.filter((id): id is number => typeof id === 'number')
       : [],
   };
+}
+
+const NO_NEARBY: AlertsNearby = { supported: false, characterIds: [] };
+
+/** {@link readAlertsNearby}, live. Reads as unsupported until loaded. */
+export function useAlertsNearby(): AlertsNearby {
+  return useLiveQuery(readAlertsNearby, []) ?? NO_NEARBY;
 }
 
 async function writeNearby(change: (ids: Set<number>) => void, supported?: true): Promise<void> {

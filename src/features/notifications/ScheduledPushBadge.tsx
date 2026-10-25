@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
+import { useAlertsNearby } from './alertsGrant';
 
 /**
  * The "arrives with the app closed" mark on a Scheduled Push event's row.
@@ -11,9 +12,13 @@ import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
  * a tab stop on each would make the panel worse to keyboard through than the
  * badge is worth.
  */
-export function ScheduledPushBadge() {
+export function ScheduledPushBadge({
+  labelKey = 'settings.notifications.scheduledPushBadge',
+}: {
+  labelKey?: string;
+}) {
   const { t } = useTranslation();
-  const label = t('settings.notifications.scheduledPushBadge');
+  const label = t(labelKey);
   return (
     <Tooltip content={label} openOnTap>
       <span role="img" aria-label={label} className="shrink-0 text-accent">
@@ -21,4 +26,16 @@ export function ScheduledPushBadge() {
       </span>
     </Tooltip>
   );
+}
+
+/**
+ * The same mark on a nearby event's row (ADR 0027), shown once some Character
+ * on this device has an Alerts Grant that carries the location: only then can
+ * the server push it to a closed app.
+ */
+export function NearbyPushBadge() {
+  const { characterIds } = useAlertsNearby();
+  return characterIds.length > 0 ? (
+    <ScheduledPushBadge labelKey="settings.notifications.nearbyPushBadge" />
+  ) : null;
 }

@@ -1,0 +1,9 @@
+# Scope decisions — Nearby alerts ride the Alerts Grant and its 15-minute poll (issue #5122)
+
+_Recorded 2026-10-25 · issue #5122._
+
+- **Nearby alerts are part of Alerts when closed, not a second opt-in.** Turning the grant on (once the deployed server says it takes the location scope) asks EVE for notifications and location together; a grant from before stays notifications-only and keeps working, and its row offers "Add nearby" to re-authorize. One switch per Character is what the owner asked for; a separate toggle would be a third consent screen for one more scope.
+- **Same job, same token, no sibling schedule.** `pollEveNotifications` reads the location right after the notifications with the token it already refreshed. A sibling job would refresh the same rotating refresh token on its own clock and race the poller for it (ADR 0020's custody writes are guarded, but a lost race reads as `invalid_grant`), and it would cost a second Cloud Scheduler job.
+- **A 403 on the location does not revoke the grant.** The notifications half still works; the Character simply has no nearby alerts that run.
+- **Edges and keys are the Foreground Poller's.** The server diffs with mirrors of `diffIncursionNearby` / `diffSkyhookRaidableNearby` per device and Character (frame change re-baselines silently, first poll fires nothing), keeps one copy of a world-scoped occurrence per device (nearest Character, then lowest id, as `keepOneSharedFire` does), and keys pushes with the app's character-free Occurrence Keys. A device is not pushed the same occurrence again for 24 hours (the app's `TOAST_STALE_AFTER_MS`), so a second Character coming into range later does not push twice. Quiet Time skips a nearby push without queueing it, as it does every other server push.
+- **The per-device state lives on the device's registration doc** (`nearbyState`), so a dead token or a purge that deletes the registration deletes it too; `registerDevice` carries it across uploads.

@@ -5,12 +5,15 @@
  * mounted while that screen is closed: the EVE round trip hands its outcome
  * back here, and a "Turn on for all" walk carries on from here, so neither
  * may wait for someone to open the screen. Off by default. Turning one on
- * sends the user to EVE to authorize that Character for notifications only;
+ * sends the user to EVE to authorize that Character for notifications only,
+ * plus the location for nearby alerts once the server takes it (ADR 0027);
  * the token goes to our server and never to this device.
  *
- * Every state is a word, never a colour alone (§6c). The row has one action,
- * so there is no ⋮ menu. "Turn on for all" walks the Characters one at a time,
- * because EVE's own page picks the Character and each needs its own round trip.
+ * Every state is a word, never a colour alone (§6c). A row has one action, or
+ * two for a grant from before nearby alerts ("Add nearby" re-authorizes it
+ * with the location), so there is no ⋮ menu. "Turn on for all" walks the
+ * Characters one at a time, because EVE's own page picks the Character and
+ * each needs its own round trip.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -34,6 +37,7 @@ import {
   readAlertsGrants,
   takeNextQueuedAlerts,
   turnOffAlerts,
+  useAlertsNearby,
   type AlertsGrantRecord,
 } from './alertsGrant';
 import { QuietTimeRows } from './QuietTimeRows';
@@ -50,6 +54,10 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
   const location = useLocation();
   const navigate = useNavigate();
   const grants: Record<number, AlertsGrantRecord> = useLiveQuery(readAlertsGrants, []) ?? {};
+  const nearby = useAlertsNearby();
+  /** An on grant from before the server took the location scope: it can be re-authorized to add it. */
+  const lacksNearby = (characterId: number) =>
+    nearby.supported && !nearby.characterIds.includes(characterId);
   const nameOf = (characterId: number) =>
     characters.find((character) => character.characterId === characterId)?.name ??
     String(characterId);
@@ -202,7 +210,11 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
       >
         <div className="space-y-3">
           <p className="text-[0.6875rem] text-text-dim">
-            {t('settings.notifications.alertsWhenClosed.hint')}
+            {t(
+              nearby.supported
+                ? 'settings.notifications.alertsWhenClosed.hintNearby'
+                : 'settings.notifications.alertsWhenClosed.hint'
+            )}
           </p>
           <QuietTimeRows />
           {toAuthorize.length > 1 && (
@@ -236,15 +248,41 @@ export function AlertsWhenClosedSection({ characters }: { characters: readonly C
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-text">{character.name}</span>
                     <span className="block text-[0.6875rem] text-text-dim">
-                      {t('settings.notifications.alertsWhenClosed.stores')}
+                      {t(
+                        nearby.supported
+                          ? 'settings.notifications.alertsWhenClosed.storesNearby'
+                          : 'settings.notifications.alertsWhenClosed.stores'
+                      )}
                     </span>
                   </span>
                   <span
                     className={state === 'needs-reauth' ? 'text-warning' : 'text-text-dim'}
                     data-testid={`alerts-state-${character.characterId}`}
                   >
-                    {t(`settings.notifications.alertsWhenClosed.state.${state}`)}
+                    {t(
+                      `settings.notifications.alertsWhenClosed.state.${
+                        state === 'on' && lacksNearby(character.characterId)
+                          ? 'onWithoutNearby'
+                          : state
+                      }`
+                    )}
                   </span>
+                  {state === 'on' && lacksNearby(character.characterId) && (
+                    <NeedsConnection>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        loading={busy}
+                        disabled={busyId !== null}
+                        aria-label={t('settings.notifications.alertsWhenClosed.addNearbyFor', {
+                          name: character.name,
+                        })}
+                        onClick={() => turnOn(character.characterId)}
+                      >
+                        {t('settings.notifications.alertsWhenClosed.addNearby')}
+                      </Button>
+                    </NeedsConnection>
+                  )}
                   {state === 'on' ? (
                     <Button
                       size="sm"

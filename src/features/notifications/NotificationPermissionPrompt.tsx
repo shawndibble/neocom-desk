@@ -18,6 +18,7 @@ import { useHasLeftFirstScreen } from './firstScreen';
 import { useHydratedStore } from '@/lib/useHydratedStore';
 import { useStickyClearance } from '@/lib/useStickyClearance';
 import { beginAlertsLogin } from '@/app/loginFlow';
+import { useAlertsNearby } from './alertsGrant';
 
 /**
  * The one-time notification explainer (issue #171). Mounted in `Layout`, so it
@@ -52,6 +53,7 @@ export function NotificationPermissionPrompt() {
     [characters]
   );
   const { value: alertsOfferSeen, setValue: setAlertsOfferSeen } = useAlertsOfferSeen();
+  const nearbySupported = useAlertsNearby().supported;
   // True only after this banner's own Enable ended in a grant, so the offer
   // never reaches someone who saw the explainer on an earlier visit.
   const [grantedHere, setGrantedHere] = useState(false);
@@ -117,7 +119,15 @@ export function NotificationPermissionPrompt() {
   const copy = offering
     ? {
         title: t('notifications.alertsOffer.title'),
-        body: t('notifications.alertsOffer.body', { name: newestCharacter?.name }),
+        // What EVE will ask for: the location too once the server takes it (ADR 0027).
+        body: t(
+          nearbySupported
+            ? 'notifications.alertsOffer.bodyNearby'
+            : 'notifications.alertsOffer.body',
+          {
+            name: newestCharacter?.name,
+          }
+        ),
         dismiss: t('notifications.alertsOffer.dismiss'),
         enable: t('notifications.alertsOffer.enable'),
         onDismiss: declineAlerts,
