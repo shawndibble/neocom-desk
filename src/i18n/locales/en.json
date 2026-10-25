@@ -8039,6 +8039,9 @@
   },
   "mail": {
     "title": "Mail",
+    "sendGrantTitle": "Permission to send mail",
+    "sendGrantHint": "Grant it to send mail from this character.",
+    "sendGrantAction": "Grant send mail",
     "markup": {
       "openInEve": "Open this in EVE. Neocom Desk can't show it.",
       "realHost": "Opens {{host}}"
@@ -8226,6 +8229,9 @@
     "csvResponse": "Response",
     "downloadIcs": "Download .ics",
     "addToGoogleCalendar": "Add to Google Calendar",
+    "rsvpGrantTitle": "Permission to respond to events",
+    "rsvpGrantHint": "Grant it to RSVP from this character.",
+    "rsvpGrantAction": "Grant RSVP",
     "rsvpAccept": "Accept",
     "rsvpDecline": "Decline",
     "rsvpTentative": "Tentative",

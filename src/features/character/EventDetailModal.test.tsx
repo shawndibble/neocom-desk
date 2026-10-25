@@ -7,6 +7,8 @@ import '@/i18n';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { resetRevalidationState } from '@/esi/cache';
 import { db } from '@/db';
+import { requiredScopesForEndpoints } from '@/esi/registry';
+import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { EventDetailModal } from './EventDetailModal';
 import type { CalendarEventSummary } from '@/esi/endpoints';
@@ -39,6 +41,8 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
+  await db.tokens.clear();
+  await db.settings.clear();
   resetRevalidationState();
   vi.mocked(beginEveLogin).mockClear();
 });
@@ -212,6 +216,35 @@ describe('EventDetailModal', () => {
         )
       );
     }
+
+    async function seedGrant(scopes: readonly string[]) {
+      await db.tokens.put({
+        characterId: CHAR_ID,
+        accessToken: 'a',
+        refreshToken: 'r',
+        expiresAt: Date.now() + 3_600_000,
+        scopes: [...scopes],
+      });
+      await useActiveCharacter.getState().hydrate();
+    }
+
+    it('offers the grant note when the stored grant lacks the RSVP Permission', async () => {
+      serveDetail('not_responded');
+      await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
+      await seedGrant(['esi-calendar.read_calendar_events.v1']);
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+      expect(await screen.findByText('Permission to respond to events')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Grant RSVP' })).toBeInTheDocument();
+    });
+
+    it('shows no grant note when the RSVP Permission is held', async () => {
+      serveDetail('not_responded');
+      await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
+      await seedGrant(requiredScopesForEndpoints(['putCharacterCalendarResponse']));
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+      await screen.findByRole('button', { name: 'Accept' });
+      expect(screen.queryByText('Permission to respond to events')).not.toBeInTheDocument();
+    });
 
     it('PUTs the response and disables the buttons while saving', async () => {
       serveDetail('not_responded');

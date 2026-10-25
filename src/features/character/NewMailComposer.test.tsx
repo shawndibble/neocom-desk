@@ -102,6 +102,21 @@ describe('recipients', () => {
   });
 });
 
+describe('send-mail Permission', () => {
+  it('offers the grant note when the stored grant lacks it', async () => {
+    lacks.value = true;
+    setup();
+    expect(await screen.findByText('Permission to send mail')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant send mail' })).toBeInTheDocument();
+  });
+
+  it('shows no grant note when the Permission is held', async () => {
+    setup();
+    await screen.findByLabelText('Subject');
+    expect(screen.queryByText('Permission to send mail')).not.toBeInTheDocument();
+  });
+});
+
 describe('action layout', () => {
   it('puts Close in the header after the title, and Send and Discard in the footer', async () => {
     const { user } = setup();

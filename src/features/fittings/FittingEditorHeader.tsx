@@ -34,13 +34,13 @@ interface FittingEditorHeaderProps {
   onImprove: () => void;
 }
 
+/** The Permission Save to EVE needs, from the registry so a regrouping can't strand a hard-coded name. */
+const SAVE_TO_EVE_GROUPS = permissionsForEndpoints(['postCharacterFitting']);
+
 /**
  * The open Fitting's header with its Save menu, plus the dialogs that menu
  * opens (Save as new, Save to EVE) and the Compare jump.
  */
-/** The Permission Save to EVE needs, from the registry so a regrouping can't strand a hard-coded name. */
-const SAVE_TO_EVE_GROUPS = permissionsForEndpoints(['postCharacterFitting']);
-
 export function FittingEditorHeader({
   workspace,
   fitting,

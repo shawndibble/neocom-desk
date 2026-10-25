@@ -199,8 +199,8 @@ export function PermissionsPanel() {
   }
 
   // Two columns from `xl`: one full-width list put each status a screen away from its name.
-  // The Write to EVE rows sit under their own heading, below the reads.
-  function renderRows(list: ScopeGroup[]) {
+  // The Write to EVE rows sit under their own heading, below the reads; the folded list drops it so the heading shows once.
+  function renderRows(list: ScopeGroup[], headed = true) {
     const writes = list.filter((group) => WRITE_GROUPS.includes(group));
     const reads = list.filter((group) => !WRITE_GROUPS.includes(group));
     return (
@@ -208,13 +208,16 @@ export function PermissionsPanel() {
         {reads.length > 0 && (
           <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">{reads.map(renderRow)}</ul>
         )}
-        {writes.length > 0 && (
-          <section aria-label={t('permissions.writeSection')} className="space-y-1 pt-2">
-            <h3 className="text-xs font-semibold text-text">{t('permissions.writeSection')}</h3>
-            <p className="text-xs text-text-dim">{t('permissions.writeSectionHint')}</p>
+        {writes.length > 0 &&
+          (headed ? (
+            <section aria-label={t('permissions.writeSection')} className="space-y-1 pt-2">
+              <h3 className="text-xs font-semibold text-text">{t('permissions.writeSection')}</h3>
+              <p className="text-xs text-text-dim">{t('permissions.writeSectionHint')}</p>
+              <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">{writes.map(renderRow)}</ul>
+            </section>
+          ) : (
             <ul className="grid text-xs xl:grid-cols-2 xl:gap-x-8">{writes.map(renderRow)}</ul>
-          </section>
-        )}
+          ))}
       </>
     );
   }
@@ -262,7 +265,7 @@ export function PermissionsPanel() {
                 expanded={grantedFold.expanded}
                 onToggle={grantedFold.toggle}
               >
-                {renderRows(foldedRows)}
+                {renderRows(foldedRows, false)}
               </Disclosure>
             )}
           </>
