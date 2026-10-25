@@ -1,6 +1,6 @@
 /**
  * Reads the LP Store offers snapshot (issue #2873): every LP corporation's
- * offers and station systems, published daily by `syncLpStoreOffers` as one
+ * offers and station systems, published daily by the `public-data-lp-store` GitHub Actions job as one
  * object in Cloudflare R2 (docs/context/decisions/20261018-201511-moving-the-daily-snapshots-to-r2.md). Public and unauthenticated, so the page works with no
  * Firebase session.
  *

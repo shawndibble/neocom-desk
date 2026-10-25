@@ -3,8 +3,8 @@
  * (`scripts/public-data/lp-store.mjs`, `.github/workflows/public-data-lp-store.yml`).
  * It replaces the `syncLpStoreOffers` Cloud Function with the same R2 keys and shapes
  * (`lp-store-offers/snapshot.json`, `cost-indices/<systemId>.json`). The job keeps no
- * state, so nothing moves to a state object. Free of `firebase-*` imports: the runner
- * loads it from `functions/lib` without a Firebase app.
+ * state, so nothing moves to a state object. Touches no Firestore or Firebase app
+ * (only `firebase-functions/logger`, via `r2ConfigFromEnv`'s module).
  */
 import { setTimeout as sleep } from 'node:timers/promises';
 import { LP_CORP_STATION_SYSTEMS } from './data/lpCorpStationSystems.js';
@@ -57,7 +57,9 @@ export async function publishLpStoreOffers(deps: PublicLpStoreDeps): Promise<voi
   console.info('LP store offers', { corporations: rows.length, failed: failed.length });
   // The write replaces yesterday's snapshot wholesale, so a thin crawl leaves it standing.
   if (rows.length === 0 || failed.length > Math.max(1, rows.length * LP_STORE_MAX_FAILED_SHARE)) {
-    throw new Error(`LP store offers: ${failed.length} corporations failed; nothing published`);
+    throw new Error(
+      `LP store offers: ${failed.length} corporations failed (${failed.join(', ')}); nothing published`
+    );
   }
   await publishLpStoreOffersToR2(rows, (deps.now ?? Date.now)(), deps.put);
 }
