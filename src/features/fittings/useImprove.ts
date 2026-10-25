@@ -47,6 +47,7 @@ import type { Resource } from '@/engine/fittings/makeItFit';
 import type { TargetProfile } from '@/engine/fittings/targetProfile';
 import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/types';
 import { buildVariationIndex } from '@/engine/market/variations';
+import { db } from '@/db';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
@@ -144,12 +145,40 @@ export const useImproveHold = createLocalSetting<ImproveHold>({
       : DEFAULT_IMPROVE_HOLD,
 });
 
-/** The total budget (planning) or extra-spend cap (refitting) in ISK; null is no limit. */
-export const useImproveSpendCap = createLocalSetting<number | null>({
-  key: 'fittingsImproveSpendCap',
+const parseCap = (raw: unknown) =>
+  typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null;
+
+/** Planning's total budget in ISK; null is no limit. Its own setting: a refit cap is not a budget. */
+export const useImproveBudget = createLocalSetting<number | null>({
+  key: 'fittingsImproveBudget',
   defaultValue: null,
-  parse: (raw) => (typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null),
+  parse: parseCap,
 });
+
+/** Refitting's extra-spend cap in ISK; null is no limit. */
+export const useImproveRefitCap = createLocalSetting<number | null>({
+  key: 'fittingsImproveRefitCap',
+  defaultValue: null,
+  parse: parseCap,
+});
+
+const LEGACY_SPEND_CAP_KEY = 'fittingsImproveSpendCap';
+
+/**
+ * One shared cap used to serve both modes. Moves it to the mode that was active (Planning when none is stored: it is the default), once, then drops the old row.
+ */
+export async function migrateSpendCap(): Promise<void> {
+  const legacy = await db.settings.get(LEGACY_SPEND_CAP_KEY);
+  if (!legacy) return;
+  const cap = parseCap(legacy.value);
+  if (cap !== null) {
+    const stored = (await db.settings.get('fittingsImproveMode'))?.value;
+    const store = stored === undefined || stored === 'buy' ? useImproveBudget : useImproveRefitCap;
+    await store.getState().hydrate();
+    if (store.getState().value === null) await store.getState().setValue(cap);
+  }
+  await db.settings.delete(LEGACY_SPEND_CAP_KEY);
+}
 
 /** What the drawer asks of one search beyond the goal. */
 export interface ImproveConfig {
@@ -174,11 +203,15 @@ export type ImproveState =
   | { status: 'cancelled' }
   /** The fit is over a budget: Improve hands over to Make it fit and searches nothing. */
   | { status: 'overBudget'; resources: Resource[] }
+  /** Planning's budget is under the fit's own price: nothing is searched until it changes. */
+  | { status: 'belowPrice'; budget: number; fitTotal: number }
   | { status: 'failed' }
   | {
       status: 'done';
       result: ImproveResult;
       before: FittingStats;
+      /** What the fit costs now at the hub, for the selection summary; null when not loaded. */
+      fitTotal: number | null;
       elapsedMs: number;
       /** A tank goal under Shield or Armor: both sides' results, to compare. */
       sides?: Record<'shield' | 'armor', ImproveResult>;
@@ -196,6 +229,8 @@ export interface ImproveSearch {
   showBestSoFar: () => void;
   /** Runs the search again after a Cancel. */
   restart: () => void;
+  /** One whole-fit recalculation under the search's own conditions, for the ticked set; null before a search has run. */
+  recalc: ((fitting: Fitting) => Promise<FittingStats>) | null;
 }
 
 /** The module pool the catalogue gives Rework and the fills: group, group members, market-listed, hull and skills. */
@@ -319,6 +354,7 @@ export function useImprove(
   const [attempt, setAttempt] = useState(0);
   const cancelRef = useRef<() => void>(() => {});
   const stopRef = useRef(false);
+  const [recalc, setRecalc] = useState<ImproveSearch['recalc']>(null);
   const { reach, mode, spendCap, defense, includeRigs, includeOfficer, oreFamily, hold } = config;
   const hullTypeId = variants?.fitting.shipTypeId;
   const hullGroupId =
@@ -345,6 +381,7 @@ export function useImprove(
     setState({ status: 'searching', checked: 0, total: 0, slow: false });
     // The last fit's baseline must not decide this fit's goal chips.
     setBefore(null);
+    setRecalc(null);
     const started = performance.now();
     const slowTimer = setTimeout(() => {
       if (!cancelled)
@@ -389,7 +426,7 @@ export function useImprove(
         const [priceMap, fitTotal] = await Promise.all([
           getHubPrices(hub, typeIds).catch(() => null),
           // The Price section's own total, for Planning's budget.
-          mode === 'buy' && spendCap !== null
+          mode === 'buy'
             ? loadFittingPrice(variants.fitting, hub)
                 .then((price) => price.totals.sell)
                 .catch(() => null)
@@ -399,6 +436,10 @@ export function useImprove(
         // A cap that cannot be checked is not silently waived.
         if (spendCap !== null && (priceMap === null || (mode === 'buy' && fitTotal === null)))
           throw new Error('Prices unavailable for the spend cap');
+        if (mode === 'buy' && spendCap !== null && fitTotal !== null && spendCap < fitTotal) {
+          setState({ status: 'belowPrice', budget: spendCap, fitTotal });
+          return;
+        }
         // Mine more: every miner carries the picked ore's crystal, the baseline's too.
         let scoredBefore = own;
         let load = (fitting: Fitting) => fitting;
@@ -413,6 +454,16 @@ export function useImprove(
               .after;
           }
         }
+        const stats = async (fitting: Fitting) => {
+          const { after } = await variants.compare(load(fitting), controller.signal);
+          // A miner with no crystal of the ore would mine another ore's m³/s: left out, not compared.
+          if (
+            plan &&
+            after.mining.rows.some((row) => !row.isDrone && row.chargeTypeId !== plan!(row.typeId))
+          )
+            throw new Error('A miner takes no crystal of this ore');
+          return after;
+        };
         const results: ImproveResult[] = [];
         let done = 0;
         for (const set of sets) {
@@ -422,18 +473,7 @@ export function useImprove(
             goal: searched,
             hold: effectiveHold(own.holds, hold),
             candidates: set.candidates,
-            stats: async (fitting) => {
-              const { after } = await variants.compare(load(fitting), controller.signal);
-              // A miner with no crystal of the ore would mine another ore's m³/s: left out, not compared.
-              if (
-                plan &&
-                after.mining.rows.some(
-                  (row) => !row.isDrone && row.chargeTypeId !== plan!(row.typeId)
-                )
-              )
-                throw new Error('A miner takes no crystal of this ore');
-              return after;
-            },
+            stats,
             priceOf: (typeId) => priceMap?.get(typeId)?.sellMin ?? null,
             ...(target ? { target } : {}),
             mode,
@@ -476,10 +516,12 @@ export function useImprove(
                 [sets[1].side]: sided[1],
               } as Record<DefenseSide, ImproveResult>)
             : undefined;
+        setRecalc(() => stats);
         setState({
           status: 'done',
           result: { ...listed, checked },
           before: scoredBefore,
+          fitTotal,
           elapsedMs: performance.now() - started,
           ...(sideResults ? { sides: sideResults } : {}),
         });
@@ -490,6 +532,8 @@ export function useImprove(
     return () => {
       cancelled = true;
       controller.abort();
+      // Its signal is aborted: a recalculation through it would fail.
+      setRecalc(null);
       clearTimeout(slowTimer);
     };
   }, [
@@ -525,5 +569,6 @@ export function useImprove(
     cancel,
     showBestSoFar,
     restart,
+    recalc: enabled ? recalc : null,
   };
 }

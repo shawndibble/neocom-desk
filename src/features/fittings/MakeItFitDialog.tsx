@@ -9,9 +9,12 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Disclosure, IskAmount, Modal, Spinner } from '@/components/ui';
+import { Button, Disclosure, IskAmount, Modal, Spinner, StatChange } from '@/components/ui';
 import type { FitOption } from '@/engine/fittings/makeItFit';
-import { diffFittingStats, type StatChange } from '@/engine/fittings/variationDelta';
+import {
+  diffFittingStats,
+  type StatChange as StatChangeValue,
+} from '@/engine/fittings/variationDelta';
 import { changeLabel } from './fittingVariationsCsv';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import { catalogueTypeName } from './useFittingCatalogue';
@@ -36,7 +39,7 @@ const optionKey = (option: FitOption) =>
  * The trade-off in one line ("EHP -293, resists lower") with the other stats
  * counted; every number stays in the expander beneath it.
  */
-function tradeOffSummary(changes: StatChange[], t: Translate): string {
+function tradeOffSummary(changes: StatChangeValue[], t: Translate): string {
   if (changes.length === 0) return t('fittings.variations.noChanges');
   const ehp = changes.find((change) => change.key === 'ehp');
   const resists = changes.filter((change) => change.key.endsWith('Resonance'));
@@ -228,7 +231,7 @@ export function MakeItFitDialog({
                           >
                             <p className="text-text-dim flex flex-wrap gap-x-2 px-2 pb-2 text-xs">
                               {delta.changes.map((change) => (
-                                <span key={change.key}>{changeLabel(change, t)}</span>
+                                <StatChange key={change.key} change={change} />
                               ))}
                             </p>
                           </Disclosure>

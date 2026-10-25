@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect, vi } from 'vitest';
 import type { EveNotificationFire } from '@/engine/notificationDiffs';
-import { resolveIdNames, resolvePushNames } from './pushNames';
+import { resolvePushNames } from './pushNames';
 
 function fire(type: string, text: string): EveNotificationFire {
   return {
@@ -80,24 +80,5 @@ describe('service worker bundle weight', () => {
     expect(source).not.toMatch(/from 'react/);
     expect(source).not.toMatch(/import \w+ from '@\/i18n\/locales\/en\.json'/);
     expect(source).not.toMatch(/from '@\/features\/character\//);
-  });
-});
-
-describe('resolveIdNames (a nearby push, ADR 0027)', () => {
-  it('posts the ids and returns them keyed by id', async () => {
-    const fetchImpl = vi.fn(
-      async () => new Response(JSON.stringify([{ id: 30000142, name: 'Jita' }]))
-    );
-    const names = await resolveIdNames([30000142, 40009077], fetchImpl as typeof fetch);
-    expect(names.get(30000142)).toBe('Jita');
-    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
-    expect(JSON.parse(init.body as string)).toEqual([30000142, 40009077]);
-  });
-
-  it('never rejects: a failed lookup is no names', async () => {
-    const fetchImpl = vi.fn(async () => {
-      throw new Error('offline');
-    });
-    expect((await resolveIdNames([1], fetchImpl as typeof fetch)).size).toBe(0);
   });
 });

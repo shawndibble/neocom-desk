@@ -13,7 +13,8 @@
 import { verifyEveAccessToken, type VerifyOptions } from './verifyEveToken.js';
 import type { ProjectionRowInput } from './projectionRow.js';
 import { parseQuietHours, type QuietHours } from './quietHours.js';
-import { NEARBY_EVENT_IDS, type NearbyEventId, type NearbyRouteRules } from './nearbyAlerts.js';
+import { parseServerEvents, parseServerInputs, type ServerEventInputs } from './serverEvents.js';
+import type { NearbyRouteRules } from './nearbyAlerts.js';
 
 export type { ProjectionRowInput };
 
@@ -34,30 +35,19 @@ export interface DeviceCharacterInput {
    */
   eveTypes?: string[];
   /**
-   * The Notification Event ids this device enabled for the browser channel
-   * for this Character among the ones the server pushes itself (issues #5121,
-   * #5122), sorted and de-duplicated. Replaces this device's own previous
-   * list; absent (an older client) leaves it untouched.
+   * The server-pushed Notification Events (issue #5121) this device enabled
+   * for the browser channel for this Character: sorted, de-duplicated ids.
+   * Same per-device rule as `eveTypes`; absent (an older client) leaves the
+   * stored list untouched. Ids this server does not handle are stored anyway.
    */
   serverEvents?: string[];
-  /**
-   * This device's N for each nearby event for this Character (issue #5122):
-   * how many jumps from the Current System counts as nearby. Absent leaves
-   * the stored value untouched.
-   */
-  nearbyJumps?: Partial<Record<NearbyEventId, number>>;
+  /** What the server needs to evaluate them (price targets, the ship-lost minimum). Absent keeps the stored inputs. */
+  serverInputs?: ServerEventInputs;
 }
 
 /** Bounds a hostile or buggy client's `eveTypes` upload; the real list is a few dozen. */
 export const MAX_EVE_TYPES = 200;
 const MAX_EVE_TYPE_LENGTH = 100;
-const MAX_SERVER_EVENTS = 100;
-const MAX_EVENT_ID_LENGTH = 64;
-/** The app's options top out at 20; anything sane fits. */
-const MAX_NEARBY_JUMPS = 100;
-/** Avoided Systems, including pod-kill / EDENCOM / Triglavian ones; New Eden has ~8,500 gated systems. */
-export const MAX_AVOIDED_SYSTEMS = 10_000;
-const ROUTE_PREFERENCES = ['shortest', 'prefer-highsec', 'avoid-highsec'] as const;
 
 export interface RegisterDeviceInput {
   deviceId: string;
@@ -70,8 +60,8 @@ export interface RegisterDeviceInput {
   quietHours?: QuietHours | null;
   /**
    * This device's Travel Settings, as the nearby-alerts poller counts jumps
-   * under them (issue #5122). Absent (an older client) leaves the stored rules
-   * untouched.
+   * under them (issue #5122). Absent (an older client, or a value that does not
+   * parse) leaves the stored rules untouched.
    */
   routeRules?: NearbyRouteRules;
 }
@@ -102,8 +92,8 @@ export interface RegisterDeviceResult {
   eveTypesByCharacter: Record<number, string[]>;
   /** Each verified character's server-pushed event ids; absent when the client sent none. */
   serverEventsByCharacter: Record<number, string[]>;
-  /** Each verified character's nearby N per event; absent when the client sent none. */
-  nearbyJumpsByCharacter: Record<number, Partial<Record<NearbyEventId, number>>>;
+  /** Each verified character's server inputs; absent when the client sent none. */
+  serverInputsByCharacter: Record<number, ServerEventInputs>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -154,47 +144,27 @@ function parseEveTypes(raw: unknown, path: string): string[] | undefined {
   return [...new Set(raw as string[])].sort();
 }
 
-function parseServerEvents(raw: unknown, path: string): string[] | undefined {
-  if (raw === undefined) return undefined;
-  if (!Array.isArray(raw)) throw new Error(`${path}, if present, must be an array`);
-  if (raw.length > MAX_SERVER_EVENTS) {
-    throw new Error(`${path} has more than ${MAX_SERVER_EVENTS} entries`);
-  }
-  for (const id of raw) {
-    if (typeof id !== 'string' || id.length === 0 || id.length > MAX_EVENT_ID_LENGTH) {
-      throw new Error(`${path} must contain only non-empty strings`);
-    }
-  }
-  return [...new Set(raw as string[])].sort();
-}
-
-const isWholeIn = (value: unknown, max: number): value is number =>
-  typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= max;
+/** Avoided Systems, including pod-kill / EDENCOM / Triglavian ones; New Eden has ~8,500 gated systems. */
+export const MAX_AVOIDED_SYSTEMS = 10_000;
+const ROUTE_PREFERENCES = ['shortest', 'prefer-highsec', 'avoid-highsec'] as const;
 
 /**
- * Lenient, unlike the fields above: these only feed nearby alerts, so a value a
- * later or buggy client sends that does not parse is dropped (the stored one
- * stays) instead of refusing the whole upload with its Projection and types.
- * Only the nearby events' keys are kept; another key is ignored.
+ * Lenient, unlike most of the registration: the rules only feed nearby alerts,
+ * so a value that does not parse is dropped (the stored rules stay) instead of
+ * refusing the whole upload with its Projection and types.
  */
-function parseNearbyJumps(raw: unknown): Partial<Record<NearbyEventId, number>> | undefined {
-  if (!isRecord(raw) || Array.isArray(raw)) return undefined;
-  const jumps: Partial<Record<NearbyEventId, number>> = {};
-  for (const eventId of NEARBY_EVENT_IDS) {
-    const value = raw[eventId];
-    if (value === undefined) continue;
-    if (!isWholeIn(value, MAX_NEARBY_JUMPS)) return undefined;
-    jumps[eventId] = value;
-  }
-  return jumps;
-}
-
-/** Lenient for the same reason as `parseNearbyJumps`. */
 function parseRouteRules(raw: unknown): NearbyRouteRules | undefined {
   if (!isRecord(raw) || Array.isArray(raw)) return undefined;
   const { preference, securityPenalty, avoid } = raw;
   if (!(ROUTE_PREFERENCES as readonly unknown[]).includes(preference)) return undefined;
-  if (!isWholeIn(securityPenalty, 100)) return undefined;
+  if (
+    typeof securityPenalty !== 'number' ||
+    !Number.isInteger(securityPenalty) ||
+    securityPenalty < 0 ||
+    securityPenalty > 100
+  ) {
+    return undefined;
+  }
   if (!Array.isArray(avoid) || avoid.length > MAX_AVOIDED_SYSTEMS) return undefined;
   if (!avoid.every((id) => typeof id === 'number' && Number.isSafeInteger(id) && id > 0)) {
     return undefined;
@@ -234,7 +204,8 @@ export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
 
   const parsedCharacters = characters.map((entry, i) => {
     if (!isRecord(entry)) throw new Error(`characters[${i}] must be an object`);
-    const { characterId, accessToken, projectionRows, eveTypes, serverEvents, nearbyJumps } = entry;
+    const { characterId, accessToken, projectionRows, eveTypes, serverEvents, serverInputs } =
+      entry;
     if (typeof characterId !== 'number' || !Number.isFinite(characterId)) {
       throw new Error(`characters[${i}].characterId must be a number`);
     }
@@ -247,17 +218,19 @@ export function parseRegisterDeviceInput(data: unknown): RegisterDeviceInput {
     const rows = projectionRows.map((row, j) =>
       parseProjectionRow(row, `characters[${i}].projectionRows[${j}]`)
     );
+    const parsedServerEvents = parseServerEvents(serverEvents, `characters[${i}].serverEvents`);
+    const parsedServerInputs = parseServerInputs(serverInputs, `characters[${i}].serverInputs`);
     return {
       characterId,
       accessToken,
       projectionRows: rows,
       eveTypes: parseEveTypes(eveTypes, `characters[${i}].eveTypes`),
-      serverEvents: parseServerEvents(serverEvents, `characters[${i}].serverEvents`),
-      nearbyJumps: parseNearbyJumps(nearbyJumps),
+      ...(parsedServerEvents !== undefined ? { serverEvents: parsedServerEvents } : {}),
+      ...(parsedServerInputs !== undefined ? { serverInputs: parsedServerInputs } : {}),
     };
   });
-  const parsedRouteRules = parseRouteRules(routeRules);
 
+  const parsedRouteRules = parseRouteRules(routeRules);
   return {
     deviceId,
     fcmToken,
@@ -283,7 +256,7 @@ export async function buildDeviceRegistration(
   const projections: CharacterProjection[] = [];
   const eveTypesByCharacter: Record<number, string[]> = {};
   const serverEventsByCharacter: Record<number, string[]> = {};
-  const nearbyJumpsByCharacter: Record<number, Partial<Record<NearbyEventId, number>>> = {};
+  const serverInputsByCharacter: Record<number, ServerEventInputs> = {};
 
   for (const character of input.characters) {
     try {
@@ -299,8 +272,8 @@ export async function buildDeviceRegistration(
       if (character.serverEvents !== undefined) {
         serverEventsByCharacter[character.characterId] = character.serverEvents;
       }
-      if (character.nearbyJumps !== undefined) {
-        nearbyJumpsByCharacter[character.characterId] = character.nearbyJumps;
+      if (character.serverInputs !== undefined) {
+        serverInputsByCharacter[character.characterId] = character.serverInputs;
       }
     } catch (err) {
       logError('Device registration: character access token rejected', {
@@ -317,6 +290,6 @@ export async function buildDeviceRegistration(
     projections,
     eveTypesByCharacter,
     serverEventsByCharacter,
-    nearbyJumpsByCharacter,
+    serverInputsByCharacter,
   };
 }

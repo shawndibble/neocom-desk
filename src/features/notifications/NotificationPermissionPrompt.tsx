@@ -119,7 +119,7 @@ export function NotificationPermissionPrompt() {
   const copy = offering
     ? {
         title: t('notifications.alertsOffer.title'),
-        // What EVE will ask for: the location too once the server takes it (ADR 0027).
+        // What EVE will ask for: the location too once the server takes it (ADR 0028).
         body: t(
           nearbySupported
             ? 'notifications.alertsOffer.bodyNearby'

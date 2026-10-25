@@ -6,8 +6,9 @@
  * No downside and Trade-offs, never ranked against each other. Ticked rows
  * are applied together as one unsaved edit.
  */
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import {
   Button,
   Checkbox,
@@ -22,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  StatChange,
 } from '@/components/ui';
 import type { UnloadedWeapons } from '@/engine/fittings/improveCharges';
 import { TANK_GOALS } from '@/engine/fittings/improveGroups';
@@ -30,6 +32,7 @@ import { ewarOf, tackleOf } from '@/engine/fittings/improveTackle';
 import { Collapse } from '@/components/ui/Collapse';
 import { textActionClassName } from '@/components/ui/textActionClassName';
 import {
+  applyImproveCandidate,
   bestScore,
   DEFENSE_CHOICES,
   goalAvailability,
@@ -50,13 +53,15 @@ import {
 } from '@/engine/fittings/improve';
 import { CRYSTAL_FAMILY_ORES } from '@/engine/fittings/crystalChoice';
 import type { Resource } from '@/engine/fittings/makeItFit';
+import { formatIskCompact } from '@/lib/isk';
 import { createNumberFormat } from '@/lib/numberLocale';
 import { alignTimeSeconds } from '@/engine/fittings/stats';
-import type { FittingStats } from '@/engine/fittings/types';
+import type { TargetProfile } from '@/engine/fittings/targetProfile';
+import type { Fitting, FittingStats } from '@/engine/fittings/types';
+import { summariseSelection } from '@/engine/fittings/improveSelection';
 import { diffFittingStats } from '@/engine/fittings/variationDelta';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
-import { changeLabel } from './fittingVariationsCsv';
 import { MakeItFitSection } from './MakeItFitSection';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { ImproveSearch } from './useImprove';
@@ -122,7 +127,30 @@ interface Props {
   onLoadBestCharge?: () => void;
   /** Train and Implants, which cost the fit nothing and sit above the swaps; none for an over-budget fit. */
   freeSections?: ReactNode;
+  /** The open Fitting, to check the ticked rows together; absent: no combined check. */
+  fitting?: Fitting | null;
+  /** The page's Target Profile, for the summary's DPS. */
+  target?: TargetProfile;
 }
+
+/** The guardrail a rejected swap broke; a budget or cap says by how much. */
+function brokeText(
+  t: TFunction,
+  option: RejectedOption,
+  { mode, spendCap }: Pick<ImproveSettings, 'mode' | 'spendCap'>,
+  fitTotal: number | null
+): string {
+  if (option.guardrail !== 'spend' || spendCap === null || option.iskDelta === null)
+    return t(`fittings.improve.broke.${option.guardrail}`);
+  const planning = mode === 'buy';
+  const over = (planning ? (fitTotal ?? 0) + option.iskDelta : option.iskDelta) - spendCap;
+  return t(planning ? 'fittings.improve.broke.spendBudget' : 'fittings.improve.broke.spendCap', {
+    over: formatIskCompact(over),
+    cap: formatIskCompact(spendCap),
+  });
+}
+
+const NO_TICKS: ReadonlyMap<string, ImproveOption> = new Map();
 
 export function ImprovePanel({
   goal,
@@ -135,6 +163,8 @@ export function ImprovePanel({
   unloaded,
   onLoadBestCharge,
   freeSections,
+  fitting,
+  target,
 }: Props) {
   const { t } = useTranslation();
   const moreId = useId();
@@ -145,12 +175,17 @@ export function ImprovePanel({
   const [ticks, setTicks] = useState<{
     result: ImproveResult | null;
     byModule: ReadonlyMap<string, ImproveOption>;
-  }>({ result: null, byModule: new Map() });
+    /** For a ticked row, the label of the pick it displaced. */
+    replaced: ReadonlyMap<string, string>;
+  }>({ result: null, byModule: new Map(), replaced: new Map() });
   const { state, before, hull } = search;
   const result = state.status === 'done' ? state.result : null;
-  const ticked = ticks.result === result ? ticks.byModule : new Map<string, ImproveOption>();
-  const setTicked = (byModule: ReadonlyMap<string, ImproveOption>) =>
-    setTicks({ result, byModule });
+  const ticked = ticks.result === result ? ticks.byModule : NO_TICKS;
+  const replaced = ticks.result === result ? ticks.replaced : new Map<string, string>();
+  const setTicked = (
+    byModule: ReadonlyMap<string, ImproveOption>,
+    nextReplaced: ReadonlyMap<string, string> = new Map()
+  ) => setTicks({ result, byModule, replaced: nextReplaced });
   const name = (typeId: number) => catalogueTypeName(catalogue, typeId);
 
   const moveLabel = (candidate: ImproveOption['candidate']) =>
@@ -169,15 +204,18 @@ export function ImprovePanel({
         })
       : moveLabel(option.candidate);
 
-  function changeLine(option: ImproveOption | RejectedOption, own: FittingStats): string {
+  function changeLine(option: ImproveOption | RejectedOption, own: FittingStats): ReactNode {
     // What the swap does first; the CPU, powergrid and calibration it takes after.
     const changes = [...diffFittingStats(own, option.after).changes].sort(
       (a, b) => Number(isResource(a.key)) - Number(isResource(b.key))
     );
-    const shown = changes.slice(0, CHANGES_SHOWN).map((change) => changeLabel(change, t));
+    const shown: ReactNode[] = changes
+      .slice(0, CHANGES_SHOWN)
+      .map((change) => <StatChange key={change.key} change={change} />);
     const rest = changes.length - shown.length;
     if (rest > 0) shown.push(t('fittings.makeItFit.otherStats', { count: rest }));
-    return shown.length > 0 ? shown.join(', ') : t('fittings.variations.noChanges');
+    if (shown.length === 0) return t('fittings.variations.noChanges');
+    return shown.flatMap((node, i) => (i === 0 ? [node] : [', ', node]));
   }
 
   function isk(option: ImproveOption) {
@@ -275,15 +313,25 @@ export function ImprovePanel({
 
   function toggle(option: ImproveOption) {
     const next = new Map(ticked);
+    const nextReplaced = new Map(replaced);
     const key = optionKey(option);
-    if (next.has(key)) next.delete(key);
-    else {
+    if (next.has(key)) {
+      next.delete(key);
+      nextReplaced.delete(key);
+    } else {
       const taken = new Set(slotsOf(option.candidate));
-      for (const [other, ticked] of next)
-        if (slotsOf(ticked.candidate).some((slot) => taken.has(slot))) next.delete(other);
+      for (const [other, pick] of next)
+        if (slotsOf(pick.candidate).some((slot) => taken.has(slot))) {
+          next.delete(other);
+          nextReplaced.delete(other);
+          nextReplaced.set(
+            key,
+            [nextReplaced.get(key), swapLabel(pick)].filter(Boolean).join(', ')
+          );
+        }
       next.set(key, option);
     }
-    setTicked(next);
+    setTicked(next, nextReplaced);
   }
 
   function rows(options: ImproveOption[], own: FittingStats) {
@@ -321,6 +369,13 @@ export function ImprovePanel({
                     </span>
                   )}
                   <span className="block text-xs">{isk(option)}</span>
+                  {replaced.has(optionKey(option)) && ticked.has(optionKey(option)) && (
+                    <span className="text-text-dim block text-xs">
+                      {t('fittings.improve.replacesPick', {
+                        swap: replaced.get(optionKey(option)),
+                      })}
+                    </span>
+                  )}
                   {option.destroysRigs && (
                     <span className="text-warning block text-xs">
                       {t('fittings.improve.destroysRig')}
@@ -335,8 +390,52 @@ export function ImprovePanel({
     );
   }
 
-  const chosen = [...ticked.values()];
+  const chosen = useMemo(() => [...ticked.values()], [ticked]);
 
+  // The rows were each scored alone: one recalculation of the ticked set checks them together.
+  const chosenKey = chosen.map(optionKey).sort().join('|');
+  const recalc = search.recalc;
+  const [combined, setCombined] = useState<{
+    key: string;
+    fitting: Fitting;
+    after: FittingStats | null;
+  } | null>(null);
+  useEffect(() => {
+    if (!fitting || !recalc || chosen.length === 0) return;
+    let stale = false;
+    const folded = chosen.reduce(
+      (acc, pick) => applyImproveCandidate(acc, pick.candidate),
+      fitting
+    );
+    recalc(folded)
+      .then((after) => !stale && setCombined({ key: chosenKey, fitting, after }))
+      .catch(() => !stale && setCombined({ key: chosenKey, fitting, after: null }));
+    return () => {
+      stale = true;
+    };
+  }, [fitting, recalc, chosen, chosenKey]);
+  const checkable = Boolean(fitting && recalc && state.status === 'done');
+  const checked =
+    combined?.key === chosenKey && combined.fitting === fitting ? combined.after : undefined;
+  const summary =
+    checkable && checked && state.status === 'done'
+      ? summariseSelection({
+          options: chosen,
+          before: state.before,
+          after: checked,
+          mode: settings.mode,
+          spendCap: settings.spendCap,
+          fitTotal: state.fitTotal,
+          target,
+        })
+      : null;
+  // A pending check holds Apply back; a failed one (each row was valid alone) warns but does not block.
+  const canApply =
+    chosen.length > 0 &&
+    (!checkable || checked === null || (summary !== null && summary.problems.length === 0));
+
+  // A blank hull has no fitted module to vary: the empty state must not talk about one.
+  const noModules = fitting?.modules.length === 0;
   // A fit that doesn't fit has nothing to improve yet: hand over to Make it fit (`20261019-144736`).
   if (state.status === 'overBudget')
     return (
@@ -565,6 +664,15 @@ export function ImprovePanel({
         </div>
       )}
 
+      {state.status === 'belowPrice' && (
+        <p className="text-warning text-sm" data-testid="improve-below-price">
+          {t('fittings.improve.belowPrice', {
+            budget: formatIskCompact(state.budget),
+            price: formatIskCompact(state.fitTotal),
+          })}
+        </p>
+      )}
+
       {state.status === 'failed' && (
         <p className="text-danger text-sm">{t('fittings.improve.failed')}</p>
       )}
@@ -591,7 +699,13 @@ export function ImprovePanel({
       {state.status === 'done' &&
         (state.result.noDownside.length === 0 && state.result.tradeOffs.length === 0 ? (
           <div className="space-y-2">
-            <p className="text-sm">{t(`fittings.improve.nothing.${goal}`)}</p>
+            <p className="text-sm">
+              {t(
+                noModules
+                  ? 'fittings.improve.nothing.noModules'
+                  : `fittings.improve.nothing.${goal}`
+              )}
+            </p>
             {state.result.stopped && (
               <div className="space-y-2">
                 <p className="text-text-dim text-xs">
@@ -619,7 +733,7 @@ export function ImprovePanel({
                         {line && <p className="text-xs">{line}</p>}
                         <p className="text-text-dim text-xs">{changeLine(option, state.before)}</p>
                         <p className="text-warning text-xs">
-                          {t(`fittings.improve.broke.${option.guardrail}`)}
+                          {brokeText(t, option, settings, state.fitTotal)}
                         </p>
                       </li>
                     );
@@ -627,7 +741,11 @@ export function ImprovePanel({
                 </ul>
               </MakeItFitSection>
             )}
-            <p className="text-text-dim text-xs">{t(`fittings.improve.widen.${settings.reach}`)}</p>
+            {!noModules && (
+              <p className="text-text-dim text-xs">
+                {t(`fittings.improve.widen.${settings.reach}`)}
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -646,26 +764,85 @@ export function ImprovePanel({
                 {rows(state.result.tradeOffs, state.before)}
               </MakeItFitSection>
             )}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-text-dim text-xs" data-testid="improve-timing">
-                {t('fittings.improve.checked', {
-                  count: state.result.checked,
-                  seconds: (state.elapsedMs / 1000).toFixed(1),
-                })}
-              </p>
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={chosen.length === 0}
-                onClick={() => {
-                  onApply(chosen);
-                  setTicked(new Map());
-                }}
-              >
-                {chosen.length === 0
-                  ? t('fittings.improve.apply')
-                  : t('fittings.improve.applyCount', { count: chosen.length })}
-              </Button>
+            <div className="bg-surface border-line sticky bottom-0 space-y-2 border-t pt-2">
+              {chosen.length > 0 && checkable && (
+                <div className="space-y-1 text-sm" data-testid="improve-selection">
+                  {summary ? (
+                    <>
+                      <p>
+                        {t('fittings.improve.selection.changes', { count: summary.count })}
+                        {' · '}
+                        {settings.mode === 'buy' && summary.total !== null ? (
+                          <>
+                            {t('fittings.improve.selection.total')}{' '}
+                            <IskAmount value={summary.total} />
+                          </>
+                        ) : (
+                          <>
+                            {summary.isk < 0
+                              ? t('fittings.makeItFit.saves')
+                              : t('fittings.makeItFit.costs')}{' '}
+                            <IskAmount value={Math.abs(summary.isk)} />
+                          </>
+                        )}
+                        {summary.unpriced > 0 &&
+                          ` + ${t('fittings.improve.selection.unpriced', { count: summary.unpriced })}`}
+                        {' · '}
+                        {t('fittings.improve.selection.dps', {
+                          before: m3sFormat(summary.dps.before),
+                          after: m3sFormat(summary.dps.after),
+                        })}
+                        {' · '}
+                        {t('fittings.improve.selection.ehp', {
+                          before: m3Format(summary.ehp.before),
+                          after: m3Format(summary.ehp.after),
+                        })}
+                      </p>
+                      {summary.problems.map((problem) => (
+                        <p
+                          key={problem.kind === 'over' ? problem.resource : problem.kind}
+                          role="alert"
+                          className="text-danger text-xs"
+                        >
+                          {t(`fittings.improve.selection.problem.${problem.kind}`, {
+                            resource:
+                              problem.kind === 'over'
+                                ? t(`fittings.improve.selection.resource.${problem.resource}`)
+                                : undefined,
+                          })}
+                        </p>
+                      ))}
+                    </>
+                  ) : (
+                    <p className="text-text-dim text-xs" role="status">
+                      {checked === null
+                        ? t('fittings.improve.selection.failed')
+                        : t('fittings.improve.selection.checking')}
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-text-dim text-xs" data-testid="improve-timing">
+                  {t('fittings.improve.checked', {
+                    count: state.result.checked,
+                    seconds: (state.elapsedMs / 1000).toFixed(1),
+                  })}
+                </p>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={!canApply}
+                  onClick={() => {
+                    onApply(chosen);
+                    setTicked(new Map());
+                  }}
+                >
+                  {chosen.length === 0
+                    ? t('fittings.improve.apply')
+                    : t('fittings.improve.applyCount', { count: chosen.length })}
+                </Button>
+              </div>
             </div>
           </div>
         ))}

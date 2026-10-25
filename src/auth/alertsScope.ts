@@ -6,7 +6,7 @@
 export const ALERTS_SCOPE = 'esi-characters.read_notifications.v1';
 
 /**
- * The grant's one optional extra (ADR 0027): the Character's location, so the
+ * The grant's one optional extra (ADR 0028): the Character's location, so the
  * server can push nearby Incursions and raidable skyhooks to a closed app.
  * Asked for only once the deployed server says it takes it.
  */

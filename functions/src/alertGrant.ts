@@ -1,4 +1,4 @@
-// Alerts Grant custody (issue #3753, ADR 0020, ADR 0027): save/delete logic for
+// Alerts Grant custody (issue #3753, ADR 0020, ADR 0028): save/delete logic for
 // the one server-held EVE token — a refresh token scoped to notifications and,
 // when the user granted it for nearby alerts, the Character's location. Pure of
 // Firebase: the Firestore store, key, verifier and SSO revoke are injected, so
@@ -12,14 +12,14 @@ import type { EveTokenClaims } from './verifyEveToken.js';
 /** The scope every Alerts Grant carries. */
 export const ALERTS_SCOPE = 'esi-characters.read_notifications.v1';
 /**
- * The one optional extra (ADR 0027): the Character's location, so the poller
+ * The one optional extra (ADR 0028): the Character's location, so the poller
  * can push nearby Incursions and raidable skyhooks. A grant saved before it
  * existed holds the notifications scope alone and keeps working for that.
  */
 export const ALERTS_LOCATION_SCOPE = 'esi-location.read_location.v1';
 const ALLOWED_SCOPES: ReadonlySet<string> = new Set([ALERTS_SCOPE, ALERTS_LOCATION_SCOPE]);
 
-/** Whether a grant's token can read the Character's location (absent `scopes`: saved before ADR 0027). */
+/** Whether a grant's token can read the Character's location (absent `scopes`: saved before ADR 0028). */
 export function grantCoversNearby(grant: Pick<AlertGrantDoc, 'scopes'>): boolean {
   return grant.scopes?.includes(ALERTS_LOCATION_SCOPE) === true;
 }
@@ -43,7 +43,7 @@ export interface AlertGrantDoc {
   seenTypes: string[];
   status: 'active' | 'revoked';
   /**
-   * The scopes the stored token carries, sorted (ADR 0027). Absent on a grant
+   * The scopes the stored token carries, sorted (ADR 0028). Absent on a grant
    * saved before the location scope existed, which means notifications only.
    */
   scopes?: string[];
@@ -73,7 +73,7 @@ export interface AlertGrantDeps {
   now: () => number;
   /** Receives only messages and ids — never a token. */
   log: (message: string, data?: Record<string, unknown>) => void;
-  /** Drop the Character's nearby-alerts state from its devices (ADR 0027); best effort. */
+  /** Drop the Character's nearby-alerts state from its devices (ADR 0028); best effort. */
   forgetNearby?: (characterId: number) => Promise<void>;
 }
 

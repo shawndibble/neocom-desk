@@ -112,6 +112,46 @@ describe('parseRegisterDeviceInput', () => {
     ).toThrow(/eveTypes/);
   });
 
+  describe('server-pushed events (issue #5121)', () => {
+    const character = { characterId: 1, accessToken: 'a', projectionRows: [] };
+
+    it('parses serverEvents sorted and de-duplicated, and serverInputs', () => {
+      const input = parseRegisterDeviceInput({
+        deviceId: 'device-1',
+        fcmToken: 'fcm-token',
+        characters: [
+          {
+            ...character,
+            serverEvents: ['shipLost', 'priceAlertTriggered', 'shipLost'],
+            serverInputs: { shipLostMinimumIsk: 5 },
+          },
+        ],
+      });
+      expect(input.characters[0].serverEvents).toEqual(['priceAlertTriggered', 'shipLost']);
+      expect(input.characters[0].serverInputs).toEqual({ shipLostMinimumIsk: 5 });
+    });
+
+    it('leaves both absent for an older client', () => {
+      const input = parseRegisterDeviceInput({
+        deviceId: 'device-1',
+        fcmToken: 'fcm-token',
+        characters: [character],
+      });
+      expect(input.characters[0].serverEvents).toBeUndefined();
+      expect(input.characters[0].serverInputs).toBeUndefined();
+    });
+
+    it('rejects a malformed list', () => {
+      expect(() =>
+        parseRegisterDeviceInput({
+          deviceId: 'device-1',
+          fcmToken: 'fcm-token',
+          characters: [{ ...character, serverEvents: 'shipLost' }],
+        })
+      ).toThrow(/serverEvents/);
+    });
+  });
+
   it('accepts the client fallback deviceId shape (base36 time + random)', () => {
     expect(
       parseRegisterDeviceInput({
@@ -334,6 +374,38 @@ describe('buildDeviceRegistration', () => {
     expect(result.eveTypesByCharacter).toEqual({ 1: ['StructureDestroyed'] });
   });
 
+  it('keys each verified character’s server events and inputs, omitting rejected and absent ones', async () => {
+    verifyMock.mockImplementation(async (token) => {
+      if (token === 'token-2') throw new Error('expired');
+      return {
+        characterId: token === 'token-1' ? 1 : 3,
+        ownerHash: 'hash',
+        name: 'P',
+        scopes: [],
+        clientId: 'c',
+      };
+    });
+
+    const result = await buildDeviceRegistration(
+      {
+        ...input,
+        characters: [
+          {
+            ...input.characters[0],
+            serverEvents: ['shipLost'],
+            serverInputs: { shipLostMinimumIsk: 1 },
+          },
+          { ...input.characters[1], serverEvents: ['shipLost'] },
+          { characterId: 3, accessToken: 'token-3', projectionRows: [] },
+        ],
+      },
+      opts
+    );
+
+    expect(result.serverEventsByCharacter).toEqual({ 1: ['shipLost'] });
+    expect(result.serverInputsByCharacter).toEqual({ 1: { shipLostMinimumIsk: 1 } });
+  });
+
   it('drops a character whose access token fails verification, keeping the rest', async () => {
     verifyMock.mockImplementation(async (token) => {
       if (token === 'token-1') throw new Error('expired');
@@ -379,49 +451,28 @@ describe('buildDeviceRegistration', () => {
   });
 });
 
-describe('server-pushed events and nearby choices (issues #5121, #5122)', () => {
+describe('nearby alert inputs and Travel Settings (issue #5122)', () => {
   const base = {
     deviceId: 'device-1',
     fcmToken: 'fcm-token',
     characters: [{ characterId: 1, accessToken: 'a', projectionRows: [] }],
   };
-  const withCharacter = (extra: Record<string, unknown>) => ({
+  const withInputs = (serverInputs: Record<string, unknown>) => ({
     ...base,
-    characters: [{ ...base.characters[0], ...extra }],
+    characters: [{ ...base.characters[0], serverInputs }],
   });
 
-  it('leaves every new field absent for an older client', () => {
-    const input = parseRegisterDeviceInput(base);
-    expect(input.characters[0].serverEvents).toBeUndefined();
-    expect(input.characters[0].nearbyJumps).toBeUndefined();
-    expect('routeRules' in input).toBe(false);
+  it('leaves routeRules absent for an older client', () => {
+    expect('routeRules' in parseRegisterDeviceInput(base)).toBe(false);
   });
 
-  it('parses serverEvents sorted and de-duplicated', () => {
+  it('parses each nearby N from serverInputs', () => {
     const input = parseRegisterDeviceInput(
-      withCharacter({
-        serverEvents: ['skyhookRaidableNearby', 'incursionNearby', 'incursionNearby'],
-      })
+      withInputs({ incursionNearbyJumps: 10, skyhookRaidableNearbyJumps: 3 })
     );
-    expect(input.characters[0].serverEvents).toEqual(['incursionNearby', 'skyhookRaidableNearby']);
-  });
-
-  it.each([
-    ['not an array', 'x'],
-    ['a non-string', [1]],
-    ['an empty id', ['']],
-    ['too many', Array.from({ length: 101 }, (_, i) => `e${i}`)],
-  ])('rejects serverEvents that is %s', (_, serverEvents) => {
-    expect(() => parseRegisterDeviceInput(withCharacter({ serverEvents }))).toThrow(/serverEvents/);
-  });
-
-  it('parses nearbyJumps for the nearby events, ignoring other keys', () => {
-    const input = parseRegisterDeviceInput(
-      withCharacter({ nearbyJumps: { incursionNearby: 10, skyhookRaidableNearby: 3, other: 4 } })
-    );
-    expect(input.characters[0].nearbyJumps).toEqual({
-      incursionNearby: 10,
-      skyhookRaidableNearby: 3,
+    expect(input.characters[0].serverInputs).toEqual({
+      incursionNearbyJumps: 10,
+      skyhookRaidableNearbyJumps: 3,
     });
   });
 
@@ -430,11 +481,9 @@ describe('server-pushed events and nearby choices (issues #5121, #5122)', () => 
     ['a negative', -1],
     ['a huge value', 1000],
     ['a string', '5'],
-  ])('drops nearbyJumps with a value that is %s, keeping the upload', (_, value) => {
-    const input = parseRegisterDeviceInput(
-      withCharacter({ nearbyJumps: { incursionNearby: value } })
-    );
-    expect(input.characters[0].nearbyJumps).toBeUndefined();
+  ])('drops a nearby N that is %s, keeping the upload', (_, value) => {
+    const input = parseRegisterDeviceInput(withInputs({ incursionNearbyJumps: value }));
+    expect(input.characters[0].serverInputs).toEqual({});
   });
 
   it('parses routeRules, sorting and de-duplicating the Avoided Systems', () => {
@@ -458,42 +507,10 @@ describe('server-pushed events and nearby choices (issues #5121, #5122)', () => 
       {
         preference: 'shortest',
         securityPenalty: 50,
-        avoid: Array.from({ length: 10_001 }, (_, i) => i),
+        avoid: Array.from({ length: 10_001 }, (_, i) => i + 1),
       },
     ],
   ])('drops routeRules with %s, keeping the upload', (_, routeRules) => {
     expect(parseRegisterDeviceInput({ ...base, routeRules }).routeRules).toBeUndefined();
-  });
-
-  it('keys serverEvents and nearbyJumps by verified Character only', async () => {
-    verifyMock.mockReset();
-    verifyMock.mockImplementation(async (token) => {
-      if (token === 'b') throw new Error('expired');
-      return { characterId: 1, ownerHash: 'h', name: 'P', scopes: [], clientId: 'c' };
-    });
-    const result = await buildDeviceRegistration(
-      parseRegisterDeviceInput({
-        ...base,
-        characters: [
-          {
-            characterId: 1,
-            accessToken: 'a',
-            projectionRows: [],
-            serverEvents: ['incursionNearby'],
-            nearbyJumps: { incursionNearby: 5 },
-          },
-          {
-            characterId: 2,
-            accessToken: 'b',
-            projectionRows: [],
-            serverEvents: ['incursionNearby'],
-            nearbyJumps: { incursionNearby: 5 },
-          },
-        ],
-      }),
-      opts
-    );
-    expect(result.serverEventsByCharacter).toEqual({ 1: ['incursionNearby'] });
-    expect(result.nearbyJumpsByCharacter).toEqual({ 1: { incursionNearby: 5 } });
   });
 });

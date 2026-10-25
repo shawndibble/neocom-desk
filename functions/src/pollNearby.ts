@@ -1,4 +1,4 @@
-// The nearby-alerts phase of the Alerts poller (issue #5122, ADR 0027). After every
+// The nearby-alerts phase of the Alerts poller (issue #5122, ADR 0028). After every
 // grant's notifications have been read, the Characters whose grant can read the
 // location have a Current System; this phase reads the two public lists once, works out
 // per registered device which Incursions and raid windows came within its N jumps, and

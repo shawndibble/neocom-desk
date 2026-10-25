@@ -100,7 +100,7 @@ export async function beginEveLogin(options: EveLoginOptions = {}): Promise<void
 /**
  * Turn on Alerts when closed for one Character (ADR 0020): a separate SSO
  * round trip for the grant's narrow scopes, returning to the page it was
- * pressed on. The location scope for nearby alerts (ADR 0027) is asked for
+ * pressed on. The location scope for nearby alerts (ADR 0028) is asked for
  * only once the deployed server has said it takes it. The callback never
  * stores its token on this device; see `features/notifications/alertsGrant.ts`.
  */

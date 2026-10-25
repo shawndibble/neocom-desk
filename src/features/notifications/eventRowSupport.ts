@@ -6,19 +6,27 @@ import type { ScopeGroup } from '@/esi/registry';
 import { eventApplicability } from './eventApplicability';
 import { eventEntry } from './eventEntries';
 import type { NotificationEventId } from './events';
+import { isNearbyServerEvent, isServerPushedEvent } from './serverEvents';
 import type { NotificationPreferencesValue } from './preferences';
 import type { CharacterAvailability, CharacterRef } from './CharacterChipGrid';
 
 export const EMPTY_SCOPES: ReadonlySet<string> = new Set();
 
 /**
- * Events whose whole row is delivered by Scheduled Push, i.e. the ones that
- * carry the badge. Read from each Event Entry's `projection.everyOccurrence`,
- * not merely "projects at all": `eveNotification` projects one sub-case only,
- * and a badge there would claim the other types reach you with the app closed.
+ * Which "arrives with the app closed" badge an event's row carries, if any:
+ * `scheduled` for an event whose every occurrence is a Scheduled Push (read
+ * from the Event Entry's `projection.everyOccurrence`, not merely "projects at
+ * all": `eveNotification` projects one sub-case only, and a badge there would
+ * claim the other types reach you with the app closed); `server` for one the
+ * backend pushes on its own (issue #5121, `serverEvents.ts`).
  */
-export function isPushBadged(eventId: NotificationEventId): boolean {
-  return eventEntry(eventId).projection?.everyOccurrence === true;
+export function pushBadgeKind(
+  eventId: NotificationEventId
+): 'scheduled' | 'server' | 'nearby' | null {
+  if (eventEntry(eventId).projection?.everyOccurrence === true) return 'scheduled';
+  // A nearby alert reaches a closed app only under a location-capable Alerts Grant (ADR 0028).
+  if (isNearbyServerEvent(eventId)) return 'nearby';
+  return isServerPushedEvent(eventId) ? 'server' : null;
 }
 
 export interface EventRowContext {

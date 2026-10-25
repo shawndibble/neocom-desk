@@ -1,4 +1,4 @@
-// The ESI reads behind nearby alerts (issue #5122, ADR 0027): one Character's location
+// The ESI reads behind nearby alerts (issue #5122, ADR 0028): one Character's location
 // under its Alerts Grant, and the two public lists, read once per poll run. Same
 // etiquette as esiNotifications.ts: ESI's identification headers (no email address),
 // and a classified result so the poller never reads a status code — 403 is "this grant

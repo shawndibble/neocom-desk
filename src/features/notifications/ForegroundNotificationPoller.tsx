@@ -12,9 +12,11 @@ import { isOnline, onReconnect } from '@/stores/network';
 
 /**
  * Mounts the Foreground Poller (GLOSSARY.md round 20): renders nothing, just
- * runs a poll every `POLL_INTERVAL_MS` while the tab is visible *and* the Tab
- * Leader (`lib/tabLeader.ts` — one tab polls for all of them), paused while
- * hidden, with an immediate catch-up check on regaining visibility — and
+ * runs a poll every `POLL_INTERVAL_MS` while the tab is the Tab Leader
+ * (`lib/tabLeader.ts` — one tab polls for all of them). It keeps polling while
+ * hidden (issue #5120): a player who switches apps for a few minutes still gets
+ * device pop-ups, for as long as the browser lets a background page run. An
+ * immediate catch-up check runs on regaining visibility — and
  * shortly after mount (`FIRST_POLL_DELAY_MS`), since opening the app is itself
  * the strongest case of "becoming visible", just not one worth contending
  * with the first route's own reads for. Mounted once in `Layout`, beside `NotificationPermissionPrompt`;
@@ -44,7 +46,7 @@ export function ForegroundNotificationPoller() {
     function poll() {
       // Offline, every domain would just fail into its cached row: nothing new
       // can be found. The reconnect catch-up below makes up for the missed ticks.
-      if (cancelled || document.hidden || !isOnline() || !seat.isLeader()) return;
+      if (cancelled || !isOnline() || !seat.isLeader()) return;
       // A new leader's catch-up must not overlap the old leader's poll still
       // in flight: both would fire, and feed, the same occurrences. A poll cut
       // short by iOS aborting its IndexedDB transactions (the tab went to the

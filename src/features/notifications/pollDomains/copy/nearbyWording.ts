@@ -10,7 +10,9 @@ import type { SkyhookRaidableNearbyFire } from '@/engine/skyhooks/skyhookAlert';
 import type { NotificationCopy } from '@/engine/notificationWording';
 import { formatCountdown } from '@/lib/duration';
 
-export type Translate = (key: string, vars?: Record<string, unknown>) => string;
+import type { Translate } from '../../serverEventCopy';
+
+export type { Translate };
 
 export interface SkyhookNames {
   readonly planet?: string;

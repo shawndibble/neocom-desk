@@ -289,7 +289,7 @@ describe('grantCoversNearby', () => {
   });
 });
 
-describe('deleteAlertGrant: nearby state (ADR 0027)', () => {
+describe('deleteAlertGrant: nearby state (ADR 0028)', () => {
   it('drops the Character from its devices’ nearby state, and a failure there still deletes and revokes', async () => {
     const forgetNearby = vi.fn(async () => {
       throw new Error('offline');

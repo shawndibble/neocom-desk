@@ -24,7 +24,7 @@ import { callRouted } from './routedCallable';
 import { getDeviceId } from './deviceId';
 import { readLocal, removeLocal, writeLocal } from '@/lib/safeLocalStorage';
 import type { QuietHoursPayload } from '@/features/notifications/quietTime';
-import type { ServerPushChoices } from '@/features/notifications/serverPushChoices';
+import type { ServerEventRegistration } from '@/features/notifications/serverEvents';
 import type { RouteRules } from '@/features/route/routeRules';
 
 interface RegisterDeviceResponse {
@@ -34,9 +34,9 @@ interface RegisterDeviceResponse {
   /** Per Character (id as a string): the ESI types the server has seen. Absent from an older deployed function. */
   seenTypes?: Record<string, string[]>;
   /**
-   * The Characters whose Alerts Grant can read the location (ADR 0027).
-   * Absent from an older deployed function — which also means it would refuse
-   * a grant carrying the location scope.
+   * The Characters whose Alerts Grant can read the location (ADR 0028).
+   * Absent from an older deployed function, which would also refuse a grant
+   * carrying the location scope.
    */
   nearbyGrants?: number[];
 }
@@ -44,6 +44,7 @@ interface RegisterDeviceResponse {
 /** No Projection to upload for a Character this call doesn't mention. */
 const NO_PROJECTION_ROWS: readonly ProjectionRow[] = [];
 const NO_EVE_TYPES: readonly string[] = [];
+const NO_SERVER_EVENTS: ServerEventRegistration = { serverEvents: [], serverInputs: {} };
 
 /**
  * How long an unchanged registration is trusted before the poll re-sends it
@@ -119,8 +120,8 @@ function registrationFingerprint(
   characterIds: readonly number[],
   projectionsByCharacter: ReadonlyMap<number, readonly ProjectionRow[]>,
   eveTypesByCharacter: ReadonlyMap<number, readonly string[]>,
+  serverEventsByCharacter: ReadonlyMap<number, ServerEventRegistration>,
   quietHours: QuietHoursPayload | null,
-  serverChoicesByCharacter: ReadonlyMap<number, ServerPushChoices>,
   routeRules: RouteRules | null
 ): string {
   const characters = [...characterIds]
@@ -140,7 +141,7 @@ function registrationFingerprint(
           row.eveType ?? null,
         ]),
       [...(eveTypesByCharacter.get(characterId) ?? NO_EVE_TYPES)].sort(),
-      serverChoicesByCharacter.get(characterId) ?? null,
+      serverEventsByCharacter.get(characterId) ?? NO_SERVER_EVENTS,
     ]);
   return digest(JSON.stringify([getDeviceId(), fcmToken, characters, quietHours, routeRules]));
 }
@@ -176,14 +177,17 @@ export interface RegisterDeviceOptions {
    */
   quietHours?: QuietHoursPayload | null;
   /**
-   * Each Character's server-pushed event choices (issues #5121, #5122). A
-   * Character with no entry sends none, so the server keeps what it stored.
-   * Part of the fingerprint. An older deployed function ignores the fields.
+   * Each Character's server-pushed events and their inputs (issue #5121): sent
+   * as `serverEvents` / `serverInputs` beside `eveTypes`, replacing this
+   * device's previous ones. A Character with no entry uploads empty ones. Part
+   * of the fingerprint. A function deployed before #5121 ignores both fields
+   * (its parser reads only the keys it knows), so the upload is safe either way.
    */
-  serverChoicesByCharacter?: ReadonlyMap<number, ServerPushChoices>;
+  serverEventsByCharacter?: ReadonlyMap<number, ServerEventRegistration>;
   /**
    * This device's Travel Settings, which the server counts nearby jumps under
    * (issue #5122). `null` (the default) sends none, keeping the stored rules.
+   * Part of the fingerprint; an older deployed function ignores the field.
    */
   routeRules?: RouteRules | null;
 }
@@ -209,8 +213,8 @@ export async function registerDeviceForWebPush(
   {
     skipIfUnchanged = false,
     eveTypesByCharacter = new Map(),
+    serverEventsByCharacter = new Map(),
     quietHours = null,
-    serverChoicesByCharacter = new Map(),
     routeRules = null,
   }: RegisterDeviceOptions = {}
 ): Promise<RegisterDeviceResponse | null> {
@@ -235,8 +239,8 @@ export async function registerDeviceForWebPush(
     characters.map((character) => character.characterId),
     projectionsByCharacter,
     eveTypesByCharacter,
+    serverEventsByCharacter,
     quietHours,
-    serverChoicesByCharacter,
     routeRules
   );
   const now = Date.now();
@@ -271,8 +275,8 @@ export async function registerDeviceForWebPush(
       accessToken: string;
       projectionRows: readonly ProjectionRow[];
       eveTypes: readonly string[];
-      serverEvents?: readonly string[];
-      nearbyJumps?: ServerPushChoices['nearbyJumps'];
+      serverEvents: readonly string[];
+      serverInputs: ServerEventRegistration['serverInputs'];
     }[];
     quietHours: QuietHoursPayload | null;
     routeRules?: RouteRules;
@@ -298,7 +302,7 @@ export async function registerDeviceForWebPush(
           ...character,
           projectionRows: projectionsByCharacter.get(character.characterId) ?? NO_PROJECTION_ROWS,
           eveTypes: eveTypesByCharacter.get(character.characterId) ?? NO_EVE_TYPES,
-          ...serverChoicesByCharacter.get(character.characterId),
+          ...(serverEventsByCharacter.get(character.characterId) ?? NO_SERVER_EVENTS),
         })),
       },
       // Each Character is proven by its own access token in the payload: no session.

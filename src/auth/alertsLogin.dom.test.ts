@@ -64,7 +64,7 @@ describe('startAlertsLogin', () => {
     expect(new URL(url).searchParams.get('scope')).toBe(ALERTS_SCOPE);
   });
 
-  it('adds the location scope, and only that, when asked for nearby alerts (ADR 0027)', async () => {
+  it('adds the location scope, and only that, when asked for nearby alerts (ADR 0028)', async () => {
     const url = await startAlertsLogin(111, cfg, { nearby: true });
     expect(new URL(url).searchParams.get('scope')?.split(' ').sort()).toEqual(
       [ALERTS_LOCATION_SCOPE, ALERTS_SCOPE].sort()

@@ -220,7 +220,7 @@ describe('Quiet time (issue #4566)', () => {
   });
 });
 
-describe('AlertsWhenClosedSection: nearby alerts (ADR 0027)', () => {
+describe('AlertsWhenClosedSection: nearby alerts (ADR 0028)', () => {
   it('says nothing about nearby alerts until the server takes the location scope', async () => {
     await turnOn(1);
     await renderSection();

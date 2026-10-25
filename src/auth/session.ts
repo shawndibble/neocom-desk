@@ -149,7 +149,7 @@ export function startLogin(scopes: string[], config?: SsoConfig): Promise<string
 
 /**
  * An Alerts Grant round trip for one Character's Settings row: the
- * notifications scope, plus the location for nearby alerts (ADR 0027), marked
+ * notifications scope, plus the location for nearby alerts (ADR 0028), marked
  * so the callback never persists it as a login. Leaves `INTENT_KEY` alone — a failed callback must not restart this
  * as a plain login, which would store the narrow token as the device session.
  */

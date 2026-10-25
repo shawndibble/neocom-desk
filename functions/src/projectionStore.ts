@@ -28,7 +28,8 @@ import {
 } from './dispatchProjections.js';
 import type { CharacterProjection } from './registerDevice.js';
 import { suppressPush, type QuietHours } from './quietHours.js';
-import type { NearbyEventId, NearbyRouteRules } from './nearbyAlerts.js';
+import { polledEventsOf, trimBaseline, type ServerEventInputs } from './serverEvents.js';
+import type { NearbyRouteRules } from './nearbyAlerts.js';
 
 export const PROJECTIONS_COLLECTION = 'projections';
 export const DEVICE_REGISTRATIONS_COLLECTION = 'deviceRegistrations';
@@ -39,19 +40,6 @@ export const DEVICE_REGISTRATIONS_COLLECTION = 'deviceRegistrations';
  * legacy (deviceId-less) rows to sweep — see `writeDeviceRegistration`.
  */
 export const PER_DEVICE_MARKER = 'perDeviceProjections';
-
-/** Every field `writeDeviceRegistration` owns; anything else on the doc (the poller's `nearbyState`) is left alone. */
-const REGISTRATION_FIELDS = [
-  'fcmToken',
-  'characterIds',
-  'eveTypesByCharacter',
-  'serverEventsByCharacter',
-  'nearbyJumpsByCharacter',
-  'routeRules',
-  'quietHours',
-  'updatedAt',
-  PER_DEVICE_MARKER,
-];
 
 /** Firestore's cap on writes in one batch. */
 const MAX_BATCH_OPS = 500;
@@ -80,19 +68,52 @@ export interface DeviceRegistrationWrite {
    */
   eveTypesByCharacter: Record<number, string[]>;
   /**
-   * Verified Characters' server-pushed event ids and nearby N from this
-   * device (issues #5121, #5122). A Character with no entry keeps what this
-   * device stored before (an older client sends none).
-   */
-  serverEventsByCharacter?: Record<number, string[]>;
-  nearbyJumpsByCharacter?: Record<number, Partial<Record<NearbyEventId, number>>>;
-  /** This device's Travel Settings (issue #5122); `undefined` keeps the stored ones. */
-  routeRules?: NearbyRouteRules;
-  /**
    * This device's quiet time (issue #4566). `undefined` (an older client)
    * keeps what the registration already stores; `null` clears it.
    */
   quietHours?: QuietHours | null;
+  /**
+   * Verified Characters' server-pushed event ids and inputs from this device
+   * (issue #5121). A Character absent from either map (an older client) keeps
+   * what this device stored for it, the `eveTypesByCharacter` rule.
+   */
+  serverEventsByCharacter?: Record<number, string[]>;
+  serverInputsByCharacter?: Record<number, ServerEventInputs>;
+  /** This device's Travel Settings for nearby alerts (issue #5122); `undefined` keeps the stored ones. */
+  routeRules?: NearbyRouteRules;
+}
+
+/** The registration doc's map fields, keyed by characterId as a string. */
+export const SERVER_EVENTS_FIELD = 'serverEventsByCharacter';
+export const SERVER_INPUTS_FIELD = 'serverInputsByCharacter';
+/** The polled events' last readings per Character, written by the dispatch tick (`serverEventPoll.ts`). */
+export const SERVER_BASELINES_FIELD = 'serverEventBaselines';
+/** Which polled events any Character on the device enabled, for the tick's one query. */
+export const POLLED_EVENTS_FIELD = 'polledServerEvents';
+/** The device's Travel Settings the nearby-alerts poller counts jumps under (issue #5122). */
+export const ROUTE_RULES_FIELD = 'routeRules';
+
+/**
+ * Every field `writeDeviceRegistration` owns. Anything else on the doc — the
+ * nearby-alerts poller's `nearbyState` (pollNearby.ts) — is left alone, so a
+ * poll writing it between this upload's read and its write is not undone.
+ */
+const REGISTRATION_FIELDS = [
+  'fcmToken',
+  'characterIds',
+  'eveTypesByCharacter',
+  'quietHours',
+  SERVER_EVENTS_FIELD,
+  SERVER_INPUTS_FIELD,
+  SERVER_BASELINES_FIELD,
+  POLLED_EVENTS_FIELD,
+  ROUTE_RULES_FIELD,
+  'updatedAt',
+  PER_DEVICE_MARKER,
+];
+
+function mapField<T>(raw: unknown): Record<string, T> {
+  return typeof raw === 'object' && raw !== null ? (raw as Record<string, T>) : {};
 }
 
 type Doc = QueryDocumentSnapshot;
@@ -145,24 +166,28 @@ export async function writeDeviceRegistration(
     typeof previous?.eveTypesByCharacter === 'object' && previous.eveTypesByCharacter !== null
       ? (previous.eveTypesByCharacter as Record<string, string[]>)
       : {};
-  const previousMap = <T>(field: string): Record<string, T> =>
-    typeof previous?.[field] === 'object' && previous[field] !== null
-      ? (previous[field] as Record<string, T>)
-      : {};
-  const perCharacter = <T>(field: string, uploaded: Record<number, T> | undefined) => {
-    const stored = previousMap<T>(field);
-    return Object.fromEntries(
-      write.characterIds.flatMap((id) => {
-        const value = uploaded?.[id] ?? stored[String(id)];
-        return value === undefined ? [] : [[String(id), value]];
-      })
-    );
-  };
-  const routeRules = write.routeRules ?? (previous?.routeRules as NearbyRouteRules | undefined);
   // An upload without a window keeps the stored one; `null` drops it (`set`
   // below rebuilds the doc, so an omitted field is a deleted one).
   const quietHours =
     write.quietHours === undefined ? readQuietHours(previous?.quietHours) : write.quietHours;
+  const routeRules =
+    write.routeRules ?? (previous?.[ROUTE_RULES_FIELD] as NearbyRouteRules | undefined);
+  const previousServerEvents = mapField<string[]>(previous?.[SERVER_EVENTS_FIELD]);
+  const previousServerInputs = mapField<ServerEventInputs>(previous?.[SERVER_INPUTS_FIELD]);
+  const previousBaselines = mapField<unknown>(previous?.[SERVER_BASELINES_FIELD]);
+  const serverEventsByCharacter = Object.fromEntries(
+    write.characterIds.map((id) => [
+      String(id),
+      write.serverEventsByCharacter?.[id] ?? previousServerEvents[String(id)] ?? [],
+    ])
+  );
+  const keep = <T>(byId: Record<string, T>, fresh?: Record<number, T>): Record<string, T> =>
+    Object.fromEntries(
+      write.characterIds.flatMap((id) => {
+        const value = fresh?.[id] ?? byId[String(id)];
+        return value === undefined ? [] : [[String(id), value]];
+      })
+    );
   const droppedIds = previousIds.filter((id) => !write.characterIds.includes(id));
   // Once per Character per device: on the device's first per-device upload,
   // and again for any Character it adds later, which may still carry another
@@ -205,19 +230,24 @@ export async function writeDeviceRegistration(
           write.eveTypesByCharacter[id] ?? previousEveTypes[String(id)] ?? [],
         ])
       ),
-      serverEventsByCharacter: perCharacter(
-        'serverEventsByCharacter',
-        write.serverEventsByCharacter
-      ),
-      nearbyJumpsByCharacter: perCharacter('nearbyJumpsByCharacter', write.nearbyJumpsByCharacter),
-      ...(routeRules ? { routeRules } : {}),
       ...(quietHours ? { quietHours } : {}),
+      [SERVER_EVENTS_FIELD]: serverEventsByCharacter,
+      [SERVER_INPUTS_FIELD]: keep(previousServerInputs, write.serverInputsByCharacter),
+      // The tick's readings for Characters still held, for events still enabled: a
+      // re-registration must not reset them, or the next tick would seed silently
+      // and miss a crossing.
+      [SERVER_BASELINES_FIELD]: Object.fromEntries(
+        Object.entries(keep(previousBaselines)).map(([id, baseline]) => [
+          id,
+          trimBaseline(baseline, serverEventsByCharacter[id] ?? []),
+        ])
+      ),
+      [POLLED_EVENTS_FIELD]: polledEventsOf(serverEventsByCharacter),
+      ...(routeRules ? { [ROUTE_RULES_FIELD]: routeRules } : {}),
       updatedAt: FieldValue.serverTimestamp(),
     },
     {
-      // Every field this upload owns is rewritten (a listed field left out is
-      // deleted, as a plain `set` would); the poller's `nearbyState`
-      // (pollNearby.ts) is not listed, so a concurrent poll's write survives.
+      // A listed field left out is deleted, as a plain `set` would; an unlisted one is kept.
       mergeFields: REGISTRATION_FIELDS,
     }
   );

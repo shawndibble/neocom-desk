@@ -1,11 +1,16 @@
-// Firestore side of the nearby phase (issue #5122, ADR 0027): the registered
+// Firestore side of the nearby phase (issue #5122, ADR 0028): the registered
 // devices that want nearby alerts, read from `deviceRegistrations`, and the
 // poller's own `nearbyState` on each registration doc. Logic lives in pollNearby.ts.
 
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import type { NearbyRouteRules } from './nearbyAlerts.js';
 import type { NearbyDevice, NearbyDeviceState, NearbyStore } from './pollNearby.js';
-import { DEVICE_REGISTRATIONS_COLLECTION, readQuietHours } from './projectionStore.js';
+import {
+  DEVICE_REGISTRATIONS_COLLECTION,
+  SERVER_EVENTS_FIELD,
+  SERVER_INPUTS_FIELD,
+  readQuietHours,
+} from './projectionStore.js';
 
 /** Firestore's cap on `array-contains-any` values. */
 const ARRAY_CONTAINS_ANY_MAX = 30;
@@ -26,6 +31,26 @@ function readNearbyState(raw: unknown): NearbyDeviceState {
     characters: asRecord(state.characters) as NearbyDeviceState['characters'],
     pushed,
   };
+}
+
+/** Each Character's nearby N, from its `serverInputs` (issue #5121's per-Character inputs). */
+function nearbyJumpsOf(raw: unknown): NearbyDevice['nearbyJumpsByCharacter'] {
+  return Object.fromEntries(
+    Object.entries(asRecord(raw)).map(([id, inputs]) => {
+      const { incursionNearbyJumps, skyhookRaidableNearbyJumps } = asRecord(inputs);
+      return [
+        id,
+        {
+          ...(typeof incursionNearbyJumps === 'number'
+            ? { incursionNearby: incursionNearbyJumps }
+            : {}),
+          ...(typeof skyhookRaidableNearbyJumps === 'number'
+            ? { skyhookRaidableNearby: skyhookRaidableNearbyJumps }
+            : {}),
+        },
+      ];
+    })
+  );
 }
 
 /** Firestore side of the nearby phase (issue #5122): see `NearbyStore`. */
@@ -52,11 +77,9 @@ export function firestoreNearbyStore(db: Firestore): NearbyStore {
               ? data.characterIds.filter((id): id is number => typeof id === 'number')
               : [],
             serverEventsByCharacter: asRecord(
-              data.serverEventsByCharacter
+              data[SERVER_EVENTS_FIELD]
             ) as NearbyDevice['serverEventsByCharacter'],
-            nearbyJumpsByCharacter: asRecord(
-              data.nearbyJumpsByCharacter
-            ) as NearbyDevice['nearbyJumpsByCharacter'],
+            nearbyJumpsByCharacter: nearbyJumpsOf(data[SERVER_INPUTS_FIELD]),
             routeRules: data.routeRules as NearbyRouteRules | undefined,
             quietHours: readQuietHours(data.quietHours),
             state: readNearbyState(data.nearbyState),

@@ -67,7 +67,7 @@ async function writeGrants(
 }
 
 /**
- * Nearby alerts on the grant (ADR 0027), as the server last reported it:
+ * Nearby alerts on the grant (ADR 0028), as the server last reported it:
  * whether it takes the location scope at all, and which Characters' grants
  * carry it. `supported` stays false until a `registerDevice` answer says so,
  * so this device never asks EVE for a grant an older deployed function would

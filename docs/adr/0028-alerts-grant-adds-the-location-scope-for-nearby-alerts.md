@@ -1,4 +1,4 @@
-# 0027 — The Alerts Grant may also carry the location scope, so nearby alerts reach a closed app
+# 0028 — The Alerts Grant may also carry the location scope, so nearby alerts reach a closed app
 
 ## Status
 
@@ -42,16 +42,19 @@ raid windows.
   older function ignores them.
 - **Per-device choices.** Each `registerDevice` upload carries, per Character,
   the server-pushed event ids the device enabled for the browser channel
-  (`serverEvents`, shared with issue #5121) and its N per nearby event
-  (`nearbyJumps`), and, once, the device's Travel Settings (`routeRules`). The
-  registration doc stores them, as it stores `eveTypes`.
+  (`serverEvents`, ADR 0027's list; the two nearby ids join
+  `SERVER_PUSHED_EVENT_IDS`) and its N per nearby event (`incursionNearbyJumps`,
+  `skyhookRaidableNearbyJumps` in ADR 0027's `serverInputs`), and, once, the
+  device's Travel Settings (`routeRules`). The registration doc stores them, as
+  it stores `eveTypes`. A push carries the raw fire as JSON (`fire`), as ADR
+  0027's pushes do, and the worker renders it with the poller's copy.
 - **Same rules as the open app.** Entries are built, diffed, ranked and keyed as
   the Foreground Poller does (mirrors of the engine files, pinned by tests), over
   a bundled copy of the stargate graph; see decision
   `20261025-074204-server-counts-nearby-jumps-over-stargates-from-the` for what
   the server leaves out (holes, bridges, a hand-picked system) and decision
   `20261025-074204-nearby-alerts-ride-the-alerts-grant-and-its` for the poll.
-- **Payload.** Raw fields plus a generic English title and body. The service
+- **Payload.** The raw fire plus a generic English title and body. The service
   worker words it with the app's own copy and names from one public
   `/universe/names` call, and writes the feed row under the app's Occurrence Key.
 

@@ -146,7 +146,7 @@ describe('Turn on for all', () => {
   });
 });
 
-describe('nearby alerts on the grant (ADR 0027)', () => {
+describe('nearby alerts on the grant (ADR 0028)', () => {
   it('knows nothing until a registration says the server takes the location scope', async () => {
     expect(await readAlertsNearby()).toEqual({ supported: false, characterIds: [] });
     await recordAlertsNearby(undefined);

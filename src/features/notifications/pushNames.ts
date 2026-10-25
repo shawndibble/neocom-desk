@@ -51,14 +51,19 @@ export async function resolvePushNames(
   }
 }
 
-/** Names for plain public ids (a nearby push's system, planet, constellation). Never rejects. */
-export async function resolveIdNames(
+/**
+ * Public names for ids a server-pushed event names (issue #5121: a lost
+ * hull and its system), one `POST /universe/names`, within the budget. Never
+ * rejects; an id it could not name is simply absent.
+ */
+export async function resolvePublicNames(
   ids: readonly number[],
   fetchImpl: typeof fetch = fetch
-): Promise<ReadonlyMap<number, string>> {
+): Promise<Map<number, string>> {
   try {
-    if (ids.length === 0) return new Map();
-    return await withinBudget(postNames([...new Set(ids)], fetchImpl), new Map<number, string>());
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return new Map();
+    return await withinBudget(postNames(unique, fetchImpl), new Map<number, string>());
   } catch {
     return new Map();
   }

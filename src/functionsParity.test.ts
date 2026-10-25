@@ -41,6 +41,32 @@ import {
   RATE_BASES as FUNCTIONS_RATE_BASES,
   isValidRate as functionsIsValidRate,
 } from '../functions/src/buybackTerms';
+import {
+  COMMUNITY_EVENT_IDS,
+  POLLED_EVENT_IDS,
+  diffPriceAlerts,
+  diffShipLosses,
+  serverEventFiredAt,
+  serverEventOccurrenceKey,
+  type ServerEventFire as FunctionsServerEventFire,
+  type ServerEventInputs as FunctionsServerEventInputs,
+} from '../functions/src/serverEvents';
+import {
+  NEARBY_EVENT_IDS,
+  occurrenceKeyOf as nearbyOccurrenceKey,
+  type NearbyFire as FunctionsNearbyFire,
+} from '../functions/src/nearbyAlerts';
+import { occurrenceFiredAt, occurrenceKey } from '@/engine/occurrenceKey';
+import {
+  diffPriceAlertTriggered,
+  diffShipLost,
+  type PriceAlertEntrySnapshot,
+} from '@/engine/notificationDiffs';
+import {
+  SERVER_PUSHED_EVENT_IDS,
+  type ServerEventInputs as ClientServerEventInputs,
+} from '@/features/notifications/serverEvents';
+import type { ServerEventFire as ClientServerEventFire } from '@/features/notifications/serverEventPayload';
 
 describe('trade hubs', () => {
   it('SNAPSHOT_HUBS matches TRADE_HUBS ids, stations and regions, in order', () => {
@@ -125,4 +151,146 @@ describe('standing buyback Requests', () => {
       expect(functionsIsValidRate(rate)).toBe(isValidRate(rate));
     }
   });
+});
+
+describe('server-pushed events (issue #5121)', () => {
+  it('the server handles exactly the events the client registers for', () => {
+    expect([...COMMUNITY_EVENT_IDS, ...POLLED_EVENT_IDS, ...NEARBY_EVENT_IDS].sort()).toEqual(
+      [...SERVER_PUSHED_EVENT_IDS].sort()
+    );
+  });
+
+  it('the server builds the fires the service worker parses', () => {
+    expectTypeOf<
+      FunctionsServerEventFire | FunctionsNearbyFire
+    >().toEqualTypeOf<ClientServerEventFire>();
+    expectTypeOf<FunctionsServerEventInputs>().toEqualTypeOf<ClientServerEventInputs>();
+  });
+
+  const fires: FunctionsServerEventFire[] = [
+    {
+      eventId: 'communityJoinRequest',
+      characterId: 7,
+      communityId: 'c1',
+      communityName: 'Wing',
+      uid: 'char:9',
+      characterName: 'Nine',
+      at: 1000,
+    },
+    {
+      eventId: 'communityMemberJoined',
+      characterId: 7,
+      communityId: 'c1',
+      communityName: 'Wing',
+      uid: 'char:9',
+      characterName: 'Nine',
+      at: 2000,
+    },
+    {
+      eventId: 'communityRequestPledged',
+      characterId: 5,
+      communityId: 'c1',
+      communityName: 'Wing',
+      uid: 'char:9',
+      characterName: '',
+      requestId: 'r1',
+      requestLabel: 'Rifter',
+      count: 1,
+      at: 3000,
+    },
+    {
+      eventId: 'priceAlertTriggered',
+      characterId: 7,
+      typeId: 34,
+      name: 'Tritanium',
+      price: 4.5,
+      targetPrice: 5.25,
+      direction: 'below',
+    },
+    { eventId: 'shipLost', characterId: 7, killmailId: 55, timeMs: 9_000, value: 1.5e6 },
+    { eventId: 'shipLost', characterId: 7, killmailId: 56, timeMs: 99_000 },
+  ];
+
+  it.each(fires.map((fire) => [fire.eventId, fire] as const))(
+    '%s: the push is keyed and dated like the Foreground Poller’s row',
+    (_, fire) => {
+      const now = 50_000;
+      expect(serverEventOccurrenceKey(fire)).toBe(occurrenceKey(fire, now));
+      expect(serverEventFiredAt(fire, now)).toBe(occurrenceFiredAt(fire, now));
+    }
+  );
+
+  it('price alerts fire on the same crossings', () => {
+    const entry = (
+      price: number | null,
+      targetPrice = 10,
+      direction: 'above' | 'below' = 'above'
+    ): PriceAlertEntrySnapshot => ({ typeId: 34, name: 'T', targetPrice, direction, price });
+    const cases: [PriceAlertEntrySnapshot[] | undefined, PriceAlertEntrySnapshot[]][] = [
+      [undefined, [entry(11)]],
+      [[entry(9)], [entry(11)]],
+      [[entry(11)], [entry(12)]],
+      [[entry(11, 10)], [entry(11, 9)]],
+      [[entry(11)], [entry(11, 10, 'below')]],
+      [[entry(null)], [entry(10)]],
+      [[], [entry(10)]],
+      [[entry(9)], [entry(null)]],
+    ];
+    for (const [prev, next] of cases) {
+      expect(diffPriceAlerts(7, prev, next)).toEqual(
+        diffPriceAlertTriggered(7, prev && { entries: prev, nowMs: 0 }, { entries: next, nowMs: 0 })
+      );
+    }
+  });
+
+  it('ship losses fire for the same killmails, against the same minimum', () => {
+    const losses = [
+      { killmailId: 3, timeMs: 3, value: 50 },
+      { killmailId: 2, timeMs: 2 },
+      { killmailId: 1, timeMs: 1, value: 5, shipTypeId: 587, systemId: 30000142 },
+    ];
+    for (const minimum of [0, 10]) {
+      for (const seen of [undefined, [], [1], [1, 2, 3]]) {
+        const snapshot = (entries: typeof losses) => ({
+          entries: entries.map((entry) => ({ ...entry, thresholdIsk: minimum })),
+          nowMs: 0,
+        });
+        expect(diffShipLosses(7, seen, losses, minimum)).toEqual(
+          diffShipLost(
+            7,
+            seen && snapshot(losses.filter((l) => seen.includes(l.killmailId))),
+            snapshot(losses)
+          )
+        );
+      }
+    }
+  });
+});
+
+describe('server-pushed nearby alerts (issue #5122)', () => {
+  const fires: FunctionsNearbyFire[] = [
+    {
+      eventId: 'incursionNearby',
+      characterId: 7,
+      constellationId: 20000020,
+      stagingSystemId: 30000144,
+      state: 'established',
+      jumps: 1,
+    },
+    {
+      eventId: 'skyhookRaidableNearby',
+      characterId: 7,
+      systemId: 30000142,
+      planetId: 40009077,
+      startMs: 1_700_000_000_000,
+      endMs: 1_700_000_360_000,
+      jumps: 3,
+    },
+  ];
+  it.each(fires.map((fire) => [fire.eventId, fire] as const))(
+    '%s: the push is keyed like the Foreground Poller’s row',
+    (_, fire) => {
+      expect(nearbyOccurrenceKey(fire)).toBe(occurrenceKey(fire, 50_000));
+    }
+  );
 });

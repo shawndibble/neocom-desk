@@ -6,7 +6,7 @@
  * back here, and a "Turn on for all" walk carries on from here, so neither
  * may wait for someone to open the screen. Off by default. Turning one on
  * sends the user to EVE to authorize that Character for notifications only,
- * plus the location for nearby alerts once the server takes it (ADR 0027);
+ * plus the location for nearby alerts once the server takes it (ADR 0028);
  * the token goes to our server and never to this device.
  *
  * Every state is a word, never a colour alone (§6c). A row has one action, or

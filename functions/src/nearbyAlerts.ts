@@ -1,4 +1,4 @@
-// Nearby alerts for a closed app (issue #5122, ADR 0027): which Incursions and raidable
+// Nearby alerts for a closed app (issue #5122, ADR 0028): which Incursions and raidable
 // skyhook windows came within a device's N jumps of a Character's location since the
 // last poll. Pure: the poller (pollEveNotifications.ts) hands in the location, the two
 // public lists, the device's choices and the state it stored last time.

@@ -41,6 +41,7 @@ function search(state: ImproveState, own: FittingStats | null = before): Improve
     cancel: vi.fn(),
     showBestSoFar: vi.fn(),
     restart: vi.fn(),
+    recalc: null,
   };
 }
 
@@ -48,6 +49,7 @@ function done(result: Partial<ImproveResult>, own: FittingStats = before): Impro
   return {
     status: 'done',
     before: own,
+    fitTotal: null,
     elapsedMs: 1200,
     result: { noDownside: [], tradeOffs: [], rejected: [], checked: 3, stopped: false, ...result },
   };
@@ -84,6 +86,7 @@ const renderPanel = (
     goal?: ImproveGoal;
     unloaded?: UnloadedWeapons | null;
     onLoadBestCharge?: () => void;
+    fitting?: Fitting;
   } = {}
 ) =>
   render(
@@ -98,6 +101,7 @@ const renderPanel = (
       freeSections={extra.freeSections}
       unloaded={extra.unloaded}
       onLoadBestCharge={extra.onLoadBestCharge}
+      fitting={extra.fitting}
     />
   );
 
@@ -196,6 +200,40 @@ describe('ImprovePanel', () => {
     renderPanel(search(done({ rejected: [rejected] })));
     expect(screen.getByText('No variation of a fitted module adds damage.')).toBeInTheDocument();
     expect(screen.getByText('Goes over CPU, powergrid or calibration')).toBeInTheDocument();
+  });
+
+  it('names the overage on a swap over the budget or the cap', () => {
+    const rejected = {
+      ...option(11, { ehp: 1100 }, { iskDelta: 12_300_000 }),
+      guardrail: 'spend' as const,
+    };
+    const state = { ...done({ rejected: [rejected] }), fitTotal: 40_000_000 } as ImproveState;
+    const { unmount } = renderPanel(
+      search(state),
+      vi.fn(),
+      vi.fn(),
+      settings({ mode: 'buy', spendCap: 50_000_000 })
+    );
+    expect(screen.getByText('Over your 50M budget by 2.3M')).toBeInTheDocument();
+    unmount();
+    renderPanel(search(state), vi.fn(), vi.fn(), settings({ mode: 'refit', spendCap: 5_000_000 }));
+    expect(screen.getByText('7.3M over your 5M cap')).toBeInTheDocument();
+  });
+
+  it('shows a notice and no results when the budget is below the fit price', () => {
+    renderPanel(search({ status: 'belowPrice', budget: 5_000_000, fitTotal: 40_100_000 }));
+    expect(
+      screen.getByText(/Your budget \(5M\) is below this fit's price \(40\.1M\)/)
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing could be added on a fit with no modules', () => {
+    const blank = { name: 'Blank', shipTypeId: 1, modules: [], drones: [], cargo: [] };
+    renderPanel(search(done({})), vi.fn(), vi.fn(), settings(), { fitting: blank });
+    expect(
+      screen.getByText('Nothing could be added to this fit within the guardrails.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/No variation of a fitted/)).not.toBeInTheDocument();
   });
 
   it('disables a goal the fit cannot score', () => {
@@ -503,5 +541,56 @@ describe('ImprovePanel', () => {
         'Burst strength 10 → 12 · Burst reach 30 → 40 km · Core fuel 200 → 150 per cycle'
       )
     ).toBeInTheDocument();
+  });
+
+  describe('combined check', () => {
+    const fitting = {
+      modules: [
+        { slot: 'low', slotIndex: 0, typeId: 1 },
+        { slot: 'low', slotIndex: 1, typeId: 2 },
+      ],
+    } as unknown as Fitting;
+    const checked = (after: FittingStats, state: ImproveState) => ({
+      ...search(state),
+      recalc: vi.fn().mockResolvedValue(after),
+    });
+
+    it('shows the cost and combined stats, then applies', async () => {
+      const a = option(11, { ehp: 1100 });
+      const b = option(21, { ehp: 1200 });
+      const onApply = vi.fn();
+      const s = checked({ ...before, ehp: before.ehp + 700 }, done({ noDownside: [a, b] }));
+      renderPanel(s, onApply, vi.fn(), settings(), { fitting });
+      const boxes = screen.getAllByRole('checkbox');
+      await userEvent.click(boxes[0]);
+      await userEvent.click(boxes[1]);
+      const summary = await screen.findByTestId('improve-selection');
+      expect(summary).toHaveTextContent('2 changes');
+      expect(summary).toHaveTextContent('EHP 1,000 → 1,700');
+      expect(s.recalc).toHaveBeenLastCalledWith(expect.anything());
+      await userEvent.click(screen.getByRole('button', { name: 'Apply 2 changes' }));
+      expect(onApply).toHaveBeenCalledWith([a, b]);
+    });
+
+    it('blocks Apply and names the budget the set over-runs', async () => {
+      const a = option(11, { ehp: 1100 });
+      const onApply = vi.fn();
+      const s = checked({ ...before, cpuUsed: before.cpuTotal + 10 }, done({ noDownside: [a] }));
+      renderPanel(s, onApply, vi.fn(), settings(), { fitting });
+      await userEvent.click(screen.getByRole('checkbox'));
+      expect(await screen.findByRole('alert')).toHaveTextContent('over-run the CPU');
+      expect(screen.getByRole('button', { name: 'Apply 1 change' })).toBeDisabled();
+    });
+
+    it('says which pick a ticked row replaces', async () => {
+      const a = option(11, { ehp: 1100 });
+      const b = option(12, { ehp: 1050 });
+      const s = checked(before, done({ noDownside: [a, b] }));
+      renderPanel(s, vi.fn(), vi.fn(), settings(), { fitting });
+      const boxes = screen.getAllByRole('checkbox');
+      await userEvent.click(boxes[0]);
+      await userEvent.click(boxes[1]);
+      expect(screen.getByText(/Replaces your pick:/)).toBeInTheDocument();
+    });
   });
 });

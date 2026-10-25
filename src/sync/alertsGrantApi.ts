@@ -10,7 +10,7 @@
 import { callRouted } from './routedCallable';
 import { ensureSignedIn } from './syncAuth';
 
-/** `nearby` (ADR 0027): whether the saved grant carries the location scope; absent from an older deployed function. */
+/** `nearby` (ADR 0028): whether the saved grant carries the location scope; absent from an older deployed function. */
 export async function saveAlertGrantRemote(tokens: {
   accessToken: string;
   refreshToken: string;

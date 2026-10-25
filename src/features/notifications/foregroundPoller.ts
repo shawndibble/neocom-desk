@@ -34,8 +34,13 @@ import { settleFillTimes } from './fillTimeSettle';
 import type { EventEnabledMap, EveTypeEnabledMap } from './eventSelection';
 import { readNotificationPermission } from './permission';
 import { uploadProjectionRows } from './projectionUpload';
-import type { ServerPushChoices } from './serverPushChoices';
 import { rebuildProjection } from './projectionRebuild';
+import type {
+  ServerEventInputs,
+  ServerEventRegistration,
+  ServerPushedEventId,
+} from './serverEvents';
+import { readServerInputs } from './serverEventInputs';
 import {
   reviseContractFeedRow,
   sendBrowserNotification,
@@ -170,9 +175,17 @@ export interface PollDependencies {
   uploadProjection: (
     rowsByCharacter: ReadonlyMap<number, ProjectionRow[]>,
     eveTypesByCharacter: ReadonlyMap<number, readonly string[]>,
-    /** Each Character's server-pushed event choices (`serverPushChoices.ts`). */
-    serverChoicesByCharacter?: ReadonlyMap<number, ServerPushChoices>
+    serverEventsByCharacter: ReadonlyMap<number, ServerEventRegistration>
   ) => Promise<void>;
+  /**
+   * What the server needs to push this Character's enabled server events
+   * (issue #5121): the Quickbar's price targets and hub, the ship-lost minimum.
+   * Absent sends no inputs.
+   */
+  serverInputsFor?: (
+    characterId: number,
+    events: readonly ServerPushedEventId[]
+  ) => Promise<ServerEventInputs>;
 }
 
 /**
@@ -335,5 +348,6 @@ export function liveDependencies(): PollDependencies {
     retractFromFeed: dismissFeedKeysAndSync,
     settleFillTimes: (characterId, scopes) => settleFillTimes(characterId, scopes, Date.now()),
     uploadProjection: uploadProjectionRows,
+    serverInputsFor: readServerInputs,
   };
 }

@@ -24,8 +24,7 @@ import type { PollDependencies } from './foregroundPoller';
 import { POLL_DOMAINS, type PollDomain } from './pollDomains';
 import type { PollerState } from './pollerState';
 import { useSeenEveTypesStore } from './seenEveTypes';
-import { currentThresholds } from './pollDomains/shared';
-import { serverPushChoicesByCharacter } from './serverPushChoices';
+import { serverRegistrationsByCharacter } from './serverEvents';
 
 export type ProjectionRebuildDependencies = Pick<
   PollDependencies,
@@ -39,6 +38,7 @@ export type ProjectionRebuildDependencies = Pick<
   | 'eveTypePrefsFor'
   | 'permission'
   | 'uploadProjection'
+  | 'serverInputsFor'
 >;
 
 const PROJECTING_DOMAINS = POLL_DOMAINS.filter((domain) => domain.projection);
@@ -172,6 +172,6 @@ async function rebuildOnce(
   await deps.uploadProjection(
     rowsByCharacter,
     await enabledEveTypesByCharacter(deps),
-    await serverPushChoicesByCharacter({ ...deps, thresholdsFor: currentThresholds })
+    await serverRegistrationsByCharacter(deps)
   );
 }

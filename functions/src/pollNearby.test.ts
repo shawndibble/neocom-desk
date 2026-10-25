@@ -93,11 +93,15 @@ describe('runNearbyPhase', () => {
       characterId: '1',
       eventId: 'incursionNearby',
       occurrenceKey: `incursionNearby:20000020:${PERIMETER}`,
-      jumps: '1',
-      constellationId: '20000020',
-      stagingSystemId: String(PERIMETER),
-      incursionState: 'established',
       fireAt: String(NOW),
+    });
+    expect(JSON.parse(s.sent[0].m.data.fire)).toEqual({
+      eventId: 'incursionNearby',
+      characterId: 1,
+      constellationId: 20000020,
+      stagingSystemId: PERIMETER,
+      state: 'established',
+      jumps: 1,
     });
     expect(s.sent[0].m.data.title).toBeTruthy();
     expect(s.states.phone.pushed).toEqual({

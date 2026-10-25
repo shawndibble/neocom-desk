@@ -12,7 +12,7 @@ import type { AppliedWeapon } from './appliedDps';
 import { alignTimeSeconds } from './stats';
 import type { PlanEntry } from '../types';
 import type { FittingStats } from './types';
-import { round } from './fittingStatFields';
+import { round, statDirection } from './fittingStatFields';
 import { budgetOverages } from './skillGaps';
 import { diffFittingStats, type FittingStatsDelta } from './variationDelta';
 
@@ -166,8 +166,6 @@ interface RoleField {
   values: (s: FittingStats) => number[];
   /** Whether this fit's `before` has the role at all; absent: always. */
   applies?: (before: FittingStats) => boolean;
-  /** Less is better: a reload, a fuel bill. The gain is scored the other way up. */
-  lowerIsBetter?: boolean;
 }
 
 /**
@@ -233,7 +231,6 @@ const ROLE_FIELDS: readonly RoleField[] = [
     key: 'burstReload',
     digits: 1,
     values: (s) => s.fleetSupport.bursts.map((burst) => burst.reloadSeconds),
-    lowerIsBetter: true,
   },
   {
     key: 'compressionRange',
@@ -244,7 +241,6 @@ const ROLE_FIELDS: readonly RoleField[] = [
     key: 'coreFuel',
     digits: 0,
     values: (s) => [s.fleetSupport.core?.fuelPerCycle ?? 0],
-    lowerIsBetter: true,
   },
 ];
 
@@ -267,8 +263,9 @@ function roleResults(
     for (let i = 0; i < Math.max(was.length, now.length); i++) {
       const b = round(was[i] ?? 0, field.digits);
       const a = round(now[i] ?? 0, field.digits);
-      if (b === a || (field.lowerIsBetter && b === 0)) continue;
-      const gain = field.lowerIsBetter ? -relative(b, a) : relative(b, a);
+      const lowerIsBetter = statDirection(field.key) === 'lower';
+      if (b === a || (lowerIsBetter && b === 0)) continue;
+      const gain = lowerIsBetter ? -relative(b, a) : relative(b, a);
       if (best === null || gain > best.gain)
         best = { change: { key: field.key, before: b, after: a }, gain };
     }

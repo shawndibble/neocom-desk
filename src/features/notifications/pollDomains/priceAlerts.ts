@@ -22,9 +22,20 @@ const isPriceAlertEntrySnapshot = shapeGuard<PriceAlertEntrySnapshot>({
 });
 
 /** The Trade Hub Quickbar prices at, re-read every poll for the same reason as `currentThresholds` in `shared.ts`: AC4's "without a reload" needs the live value. */
-async function currentHub() {
+export async function currentHub() {
   await useMarketHub.getState().hydrate();
   return getTradeHub(useMarketHub.getState().value) ?? DEFAULT_TRADE_HUB;
+}
+
+type TargetedItem = QuickbarItem & { targetPrice: number; targetDirection: 'above' | 'below' };
+
+/** The Character's Quickbar items that carry a price target: the price alerts. */
+export async function targetedQuickbarItems(characterId: number): Promise<TargetedItem[]> {
+  const record = await db.quickbars.get(String(characterId));
+  return (record?.items ?? []).filter(
+    (item): item is TargetedItem =>
+      item.targetPrice !== undefined && item.targetDirection !== undefined
+  );
 }
 
 /**
@@ -44,11 +55,7 @@ export const priceAlertDomain = defineDomain<
   entriesKey: 'entries',
   isEntry: isPriceAlertEntrySnapshot,
   load: async (characterId) => {
-    const record = await db.quickbars.get(String(characterId));
-    const targeted = (record?.items ?? []).filter(
-      (item): item is QuickbarItem & { targetPrice: number; targetDirection: 'above' | 'below' } =>
-        item.targetPrice !== undefined && item.targetDirection !== undefined
-    );
+    const targeted = await targetedQuickbarItems(characterId);
     if (targeted.length === 0) return [];
     const hub = await currentHub();
     const prices = await getHubPrices(

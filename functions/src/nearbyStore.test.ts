@@ -32,7 +32,7 @@ describe('firestoreNearbyStore', () => {
         fcmToken: 'fcm',
         characterIds: [1, 2],
         serverEventsByCharacter: { '1': ['incursionNearby'] },
-        nearbyJumpsByCharacter: { '1': { incursionNearby: 5 } },
+        serverInputsByCharacter: { '1': { incursionNearbyJumps: 5, shipLostMinimumIsk: 0 } },
         routeRules: { preference: 'shortest', securityPenalty: 50, avoid: [] },
         nearbyState: { characters: { '1': {} }, pushed: { k: 9, junk: 'x' } },
       },

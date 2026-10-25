@@ -67,7 +67,7 @@ export interface PollDeps {
   /** Clock, injectable for tests. */
   now?: () => number;
   /**
-   * Nearby alerts (issue #5122, ADR 0027). For a grant that carries the
+   * Nearby alerts (issue #5122, ADR 0028). For a grant that carries the
    * location scope, the same refreshed token reads the Current System; once
    * every grant is done, `runPhase` (pollNearby.ts) pushes what came near.
    * Absent: notifications only.

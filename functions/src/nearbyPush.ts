@@ -1,8 +1,8 @@
-// The push payload for a nearby alert (issue #5122, ADR 0027). Pure. Like the EVE
-// notification push (eveNotificationPush.ts) it carries the raw facts and a generic
-// English title/body as the floor: this package has no SDE and no i18n catalog, so the
-// service worker (`pushHandler.ts`) renders the app's own wording with the names it
-// resolves, and falls back to this text when it cannot.
+// The push payload for a nearby alert (issue #5122, ADR 0028). Pure. Like every
+// server-pushed event (issue #5121, serverEventPoll.ts) it carries the raw fire as
+// JSON (`fire`) and a generic English title/body as the floor: this package has no
+// SDE and no i18n catalog, so the service worker (`pushHandler.ts`) renders the app's
+// own wording with the names it resolves, and falls back to this text when it cannot.
 
 import type { PushMessage } from './eveNotificationPush.js';
 import type { KeyedNearbyFire } from './nearbyAlerts.js';
@@ -13,34 +13,23 @@ export function buildNearbyPush(
   { fire, occurrenceKey }: KeyedNearbyFire,
   nowMs: number
 ): PushMessage {
-  const common = {
-    characterId: String(fire.characterId),
-    eventId: fire.eventId,
-    occurrenceKey,
-    fireAt: String(nowMs),
-    jumps: String(fire.jumps),
-  };
-  if (fire.eventId === 'incursionNearby') {
-    return {
-      data: {
-        ...common,
-        title: `Incursion ${jumpsPhrase(fire.jumps)} away`,
-        body: `An Incursion is staging ${jumpsPhrase(fire.jumps)} from your current system.`,
-        constellationId: String(fire.constellationId),
-        stagingSystemId: String(fire.stagingSystemId),
-        incursionState: fire.state,
-      },
-    };
-  }
+  const jumps = jumpsPhrase(fire.jumps);
+  const [title, body] =
+    fire.eventId === 'incursionNearby'
+      ? [`Incursion ${jumps} away`, `An Incursion is staging ${jumps} from your current system.`]
+      : [
+          `Raidable skyhook ${jumps} away`,
+          `A skyhook ${jumps} from your current system can be raided.`,
+        ];
   return {
     data: {
-      ...common,
-      title: `Raidable skyhook ${jumpsPhrase(fire.jumps)} away`,
-      body: `A skyhook ${jumpsPhrase(fire.jumps)} from your current system can be raided.`,
-      systemId: String(fire.systemId),
-      planetId: String(fire.planetId),
-      windowStartMs: String(fire.startMs),
-      windowEndMs: String(fire.endMs),
+      characterId: String(fire.characterId),
+      eventId: fire.eventId,
+      occurrenceKey,
+      fireAt: String(nowMs),
+      title,
+      body,
+      fire: JSON.stringify(fire),
     },
   };
 }

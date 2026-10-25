@@ -1,6 +1,6 @@
 // Writes functions/src/data/stargateGraph.ts from public/data/market (functions cannot
 // import public/): the stargate graph and each gated system's raw security, which is all
-// the nearby-alerts poller needs to count jumps the way the app does (ADR 0027). Run after
+// the nearby-alerts poller needs to count jumps the way the app does (ADR 0028). Run after
 // the SDE data changes; functions/src/stargateGraph.test.ts fails on drift.
 import { readFileSync, writeFileSync } from 'node:fs';
 

@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, SlideOver, Toast, useTimedToast } from '@/components/ui';
 import {
@@ -29,7 +29,9 @@ import {
   useImproveMode,
   useImproveOre,
   useImproveReach,
-  useImproveSpendCap,
+  useImproveBudget,
+  useImproveRefitCap,
+  migrateSpendCap,
 } from './useImprove';
 import type { FittingWorkspace } from './useFittingWorkspace';
 
@@ -91,8 +93,16 @@ export function useImproveDrawer({
   const setOreFamily = useImproveOre((state) => state.setValue);
   const hold = useImproveHold((state) => state.value);
   const setHold = useImproveHold((state) => state.setValue);
-  const spendCap = useImproveSpendCap((state) => state.value);
-  const setSpendCap = useImproveSpendCap((state) => state.setValue);
+  // Planning's budget and Refitting's cap are separate settings; the field shows the mode's own.
+  const budget = useImproveBudget((state) => state.value);
+  const setBudget = useImproveBudget((state) => state.setValue);
+  const refitCap = useImproveRefitCap((state) => state.value);
+  const setRefitCap = useImproveRefitCap((state) => state.setValue);
+  const spendCap = mode === 'buy' ? budget : refitCap;
+  const setSpendCap = mode === 'buy' ? setBudget : setRefitCap;
+  useEffect(() => {
+    void migrateSpendCap();
+  }, []);
   // Not remembered: a Defense Choice, and the Rigs and Officer ticks, are about this fit.
   const [defense, setDefense] = useState<DefenseChoice>('keep');
   const [includeRigs, setIncludeRigs] = useState(false);
@@ -165,6 +175,8 @@ export function useImproveDrawer({
       search={search}
       catalogue={catalogue}
       onApply={apply}
+      fitting={fitting}
+      target={targetProfiles.hydrated ? targetProfiles.selected : undefined}
       unloaded={unloaded}
       onLoadBestCharge={chargeSteps.length > 0 ? loadBestCharge : undefined}
       onFixFirst={(resource) => {
@@ -230,7 +242,14 @@ export function useImproveDrawer({
           {body}
         </Modal>
       ) : (
-        <SlideOver open={isOpen} onClose={close} title={t('fittings.improve.title')}>
+        <SlideOver
+          open={isOpen}
+          onClose={close}
+          side="left"
+          // Clears the app's 12rem nav, over the Add column, so the stats stay visible.
+          className="md:left-48"
+          title={t('fittings.improve.title')}
+        >
           {body}
         </SlideOver>
       )}
