@@ -1,6 +1,9 @@
 /**
- * Active character's current solar system, for jumps-away distances on the
- * Assets page (issue #87): fetched once per page load via ESI, never polled.
+ * Active character's current solar system, for jumps-away distances (first
+ * the Assets page, issue #87): fetched on each page load via ESI, never polled.
+ * Every page that measures from it (route, market, assets, PI...) asks on
+ * load, and the row is only fresh for a 5 s TTL (ESI's own cache), so opening a
+ * page minutes later reads where the pilot is now, not where they were.
  *
  * `esi-location.read_location.v1` was added to the registry alongside this
  * loader, so a character who logged in before it existed hasn't granted it
@@ -12,6 +15,9 @@
 import { getCharacterLocation } from '@/esi/endpoints';
 import { isCredentialFailure } from '@/esi/client';
 import { loadWithCache } from '@/esi/cache';
+
+/** A 5 s TTL matching ESI's cache on /location; `STALE_AFTER.default` would serve a stale system. */
+const LOCATION_FRESH_MS = 5_000;
 
 function cacheKey(): string {
   return 'characterLocation';
@@ -31,6 +37,7 @@ export async function loadCharacterSolarSystemRead(characterId: number): Promise
     async () => (await getCharacterLocation(characterId)).data?.solar_system_id ?? null,
     {
       detectAuthFailure: isCredentialFailure,
+      staleAfterMs: LOCATION_FRESH_MS,
     }
   );
   return { systemId: result?.data ?? null, fetchedAt: result?.fetchedAt ?? null };
